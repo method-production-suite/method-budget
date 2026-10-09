@@ -151,6 +151,12 @@ total to the cent exists in spirit (D4 property tests); keep it explicit (02).
 
 ---
 
+### Phase 1 addition (Sam, 2026-10-09)
+
+| # | Item | Source | Status | Size | Depends |
+|---|---|---|---|---|---|
+| 1.22 | **Tools panel rebuild**: two stacked tab panes (Apply and Tables merged; checkbox applies, double-click edits), Budget sub-tabs, drag tabs between panes, dock right (default) / bottom / pop-out window, remembered | Sam's mock review, decision 21 | [missing] | L | inline editing (in progress) |
+
 ## Phase 2: Parity and polish
 
 | # | Item | Notes | Status | Size | Depends |

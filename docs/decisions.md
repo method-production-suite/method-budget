@@ -259,3 +259,13 @@ bulk edits under ~100 ms. Measured with `examples/perf.rs` on `fwb_core::sample`
   Linux) wait in Rust until the page has asked about unsaved changes, then open. No
   single-instance plugin (it would add crates): a second launch on Windows or Linux is a
   second copy of the app.
+
+## 21. Tools panel layout (2026-10-09, Sam)
+
+The side panel becomes two stacked tab panes, compact like the reference product's: top
+pane Fringes, Groups, Globals, Units; bottom pane Sets, Locations, Currency, Notes, Budget
+(Budget holds sub-tabs: Charges, Credits, Info, Settings, Baseline). Apply and Tables merge:
+each list's checkbox applies the item to the selection and double-click edits it in place.
+Tabs can be dragged between panes. Three positions: docked right (default), docked at the
+bottom with the panes side by side, or popped out into its own window; the choice is
+remembered.
