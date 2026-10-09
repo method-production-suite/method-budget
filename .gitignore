@@ -1,0 +1,19 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+.mcp.json
+*.pem
+*.key
+id_rsa*
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Logs / scratch
+*.log
+
+# Rust
+/target/

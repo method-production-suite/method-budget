@@ -1,0 +1,11 @@
+# Least privilege by default. Pin third-party actions to SHAs (pinact run).
+name: ci
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4   # first-party; pin to SHA when convenient
+      - run: cargo test --workspace --locked
