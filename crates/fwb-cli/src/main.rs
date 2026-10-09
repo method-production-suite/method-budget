@@ -37,7 +37,7 @@ fn run(args: &[String]) -> Result<String, String> {
     match cmd.as_str() {
         "show" => {
             let mut opts = RecalcOptions::default();
-            let mut it = rest[1..].iter();
+            let mut it = rest.iter().skip(1);
             while let Some(flag) = it.next() {
                 match (flag.as_str(), it.next()) {
                     ("--exclude", Some(g)) => {
@@ -90,7 +90,7 @@ fn money(c: Cents) -> String {
     let digits = (a / 100).to_string();
     let mut grouped = String::new();
     for (i, ch) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i) % 3 == 0 {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
             grouped.push(',');
         }
         grouped.push(ch);
