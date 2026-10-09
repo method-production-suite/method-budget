@@ -11,7 +11,8 @@ use fwb_core::coding::AccountCoding;
 use fwb_core::{
     Account, Baseline, Budget, Category, Cents, Charge, ChargeKind, Credit, CreditCap, CreditRow,
     CreditSource, Currency, Dec, Detail, Formula, Fringe, FringeKind, FringePosting, Group,
-    InfoValue, Location, ProductionTotal, RowId, RowKind, SetDef, TopsheetRow, UnitDef, Version,
+    InfoValue, Location, NewLineDefaults, ProductionTotal, RowId, RowKind, SetDef, TopsheetRow,
+    UnitDef, Version,
 };
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -174,6 +175,8 @@ pub(crate) struct FileBudget {
     account_coding: Option<FileCoding>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     fringe_posting: Option<FilePosting>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    new_line_defaults: Option<FileNewLineDefaults>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     info: BTreeMap<String, FileInfo>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -215,6 +218,7 @@ impl From<&Budget> for FileBudget {
             fringes,
             fringe_posting,
             account_coding,
+            new_line_defaults,
             groups,
             sets,
             locations,
@@ -232,6 +236,8 @@ impl From<&Budget> for FileBudget {
                 .then(|| FileCoding::from(account_coding)),
             fringe_posting: (*fringe_posting != FringePosting::default())
                 .then(|| FilePosting::from(fringe_posting)),
+            new_line_defaults: (*new_line_defaults != NewLineDefaults::default())
+                .then(|| FileNewLineDefaults::from(new_line_defaults)),
             info: map(info, FileInfo::from),
             currencies: map(currencies, FileCurrency::from),
             units: map(units, FileUnit::from),
@@ -267,6 +273,10 @@ impl From<FileBudget> for Budget {
             account_coding: f
                 .account_coding
                 .map(AccountCoding::from)
+                .unwrap_or_default(),
+            new_line_defaults: f
+                .new_line_defaults
+                .map(NewLineDefaults::from)
                 .unwrap_or_default(),
             groups: unmap(f.groups, Group::from),
             sets: unmap(f.sets, SetDef::from),
@@ -392,6 +402,49 @@ impl From<FileCoding> for AccountCoding {
             sub_width: f.sub_width,
             set_width: f.set_width,
             separator: f.separator.0,
+        }
+    }
+}
+
+/// What an inserted line copies from its neighbor. Written only when it
+/// differs from the default; then every field is present.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileNewLineDefaults {
+    fringes: bool,
+    groups: bool,
+    set: bool,
+    location: bool,
+    currency: bool,
+}
+
+impl From<&NewLineDefaults> for FileNewLineDefaults {
+    fn from(d: &NewLineDefaults) -> FileNewLineDefaults {
+        let NewLineDefaults {
+            fringes,
+            groups,
+            set,
+            location,
+            currency,
+        } = *d;
+        FileNewLineDefaults {
+            fringes,
+            groups,
+            set,
+            location,
+            currency,
+        }
+    }
+}
+
+impl From<FileNewLineDefaults> for NewLineDefaults {
+    fn from(f: FileNewLineDefaults) -> NewLineDefaults {
+        NewLineDefaults {
+            fringes: f.fringes,
+            groups: f.groups,
+            set: f.set,
+            location: f.location,
+            currency: f.currency,
         }
     }
 }

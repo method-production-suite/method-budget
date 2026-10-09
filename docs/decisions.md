@@ -132,6 +132,15 @@ subtotal: the keys people switching from other budgeting tools already have in t
 Fill down moves to Shift+Cmd/Ctrl+D rather than the spreadsheet Cmd+D. Matching common
 shortcuts is about familiarity, not copying; labels and menus stay our own.
 
+Extended the same day (Sam): Cmd+minus inserts an adjustment (Option+Cmd+A still works),
+Cmd+R and Shift+Cmd+R make and remove a fringe range, Shift+Cmd+Space edits a line's note,
+Cmd+Left and Cmd+Right step accounts (Cmd+[ and Cmd+] stay as aliases), and the setup
+tabs take the setup keys switchers know: Cmd+G globals, Cmd+3 fringes, Cmd+4 groups,
+Cmd+5 locations, Cmd+6 currencies, Cmd+7 units, Cmd+8 sets, Cmd+9 settings, Cmd+\\
+credits, Cmd+/ charges. Our own Cmd+1 to Cmd+9 tab numbering collided, so it is gone, and
+the shortcut sheet moved from Cmd+/ to Shift+Cmd+/. File, clipboard, undo and select-all
+keys are never given up for this.
+
 ## 16. Row style, notes and separators are display data (2026-10-09)
 
 Groups get a `color`; detail rows get `bold`, `italic`, `indent` (0 to 4), `color` (wins
@@ -214,3 +223,39 @@ bulk edits under ~100 ms. Measured with `examples/perf.rs` on `fwb_core::sample`
 - **Several budgets open as tabs in one window**, each with its own undo; split view later.
 - **Compare shows both** each budget's difference from the base and optional
   Sum / Average / Variance columns in the reference's style.
+
+## 20. Autosave into the file, recovery copies, backups (2026-10-09, autosave default by Sam)
+
+- **Autosave is on by default and writes the budget file itself** (Sam's call), 3 seconds
+  after the last change, at most 30 seconds after the first unsaved one, and at once when
+  the window loses focus, on close or quit, and before another budget replaces it. It is
+  an app-wide setting (toolbar switch and File > Autosave), not stored in budgets: one
+  person's preference shouldn't travel with a file to a colleague. Undo history is per
+  session and survives autosaves.
+- **Recovery copies cover what autosave can't**: a budget with no file yet, Autosave off,
+  a failed write, and a recovered budget not yet saved into its original file. They live
+  in the app's local data folder, one per open document with its own key (not one per
+  path), so an old crash's copy and a fresh edit of the same file never overwrite each
+  other. A recovered budget asks before its first save replaces the original file.
+- **Running copies are told apart by a file lock** (std's `File::try_lock`, no crate):
+  each running app holds a lock on its own owner file, and only copies whose owner lock is
+  free are offered as recovered. No pid checks, no new dependencies.
+- **Backups go in the app's data folder, not beside the budget** (`film.fwb~` was the
+  alternative): nothing appears in shared project folders or sync services, there is
+  room for several versions, and File > Revert to Backup can list them. Because autosave
+  writes often, backups are spaced: always on an explicit Save, on the first write in a
+  session, then at most every 10 minutes; 10 kept per file. Restoring is an undoable edit,
+  never a file copy over the budget.
+- **Every write is atomic** (temporary file, fsync, rename, folder fsync on Unix); app
+  data is 0600/0700 on Unix; a budget keeps the permissions of the file it replaces.
+- **Never write over a version we haven't seen.** Each read or write of the budget file
+  records its size, time and an FNV-1a content hash; every autosave and Save into it
+  compares first (size and time unchanged means unchanged; otherwise the content
+  decides, so a sync service touching the file isn't a conflict). A change pauses
+  autosave for that budget and asks: keep mine, load theirs (both back up the other
+  version first, and refuse if they can't) or save mine as a copy. Loading theirs is an
+  undoable edit. A missing file isn't a conflict; saving recreates it.
+- **Files from the system** (macOS open events, a path on the command line on Windows and
+  Linux) wait in Rust until the page has asked about unsaved changes, then open. No
+  single-instance plugin (it would add crates): a second launch on Windows or Linux is a
+  second copy of the app.

@@ -67,7 +67,8 @@ To update, quit the app and replace it the same way. Your budgets are `.fwb` fil
 you saved them; installing or removing the app never touches them.
 
 The app registers the `.fwb` file type ("Film Wizard Budget"), so Finder shows `.fwb`
-files as belonging to it and offers it under Open With.
+files as belonging to it and offers it under Open With; double-clicking one opens it in the
+app (asking first if the open budget has unsaved changes).
 
 ### First launch: "unidentified developer"
 

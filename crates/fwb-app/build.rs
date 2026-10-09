@@ -68,6 +68,23 @@ const COMMANDS: &[&str] = &[
     "assign_to_rows",
     "make_fringe_range",
     "clear_fringe_range",
+    // Quick entry: add setup items from a cell, new-line defaults (src/quickadd.rs)
+    "set_cell_creating",
+    "set_new_line_defaults",
+    // Saving safety: autosave, recovery, backups, recent and system-opened
+    // files (src/safety_app.rs)
+    "autosave_setting",
+    "set_autosave",
+    "flush_autosave",
+    "open_pending",
+    "open_recent",
+    "recovery_list",
+    "open_recovered",
+    "discard_recovered",
+    "backup_list",
+    "restore_backup",
+    "reveal_backups",
+    "resolve_external_change",
 ];
 
 fn main() {

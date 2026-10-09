@@ -12,8 +12,8 @@ use fwb_core::expr::is_ident;
 use fwb_core::{
     recalc, Account, Baseline, Budget, Category, Charge, ChargeKind, Credit, CreditCap, CreditRow,
     CreditSource, Currency, Dec, Detail, Formula, Fringe, FringeKind, FringePosting, Group,
-    InfoValue, Location, ProductionTotal, RecalcOptions, RowId, RowKind, SetDef, TopsheetRow,
-    UnitDef,
+    InfoValue, Location, NewLineDefaults, ProductionTotal, RecalcOptions, RowId, RowKind, SetDef,
+    TopsheetRow, UnitDef,
 };
 use serde::Deserialize;
 
@@ -269,8 +269,12 @@ fn account_mut<'a>(b: &'a mut Budget, code: &str) -> EditResult<&'a mut Account>
         .ok_or_else(|| format!("account {code} no longer exists"))
 }
 
-/// Inserts a blank row of `kind` after row `after` (or at the end of the
-/// account when `after` is `None`). Returns the new row's id.
+/// Inserts a row of `kind` after row `after` (or at the end of the account
+/// when `after` is `None`). Returns the new row's id.
+///
+/// The row is blank, except that a new line copies the tags the budget's
+/// [`NewLineDefaults`] ask for (fringes, by default) from its neighbor: see
+/// [`copy_from_neighbor`].
 pub fn add_detail(
     b: &mut Budget,
     account: &str,
@@ -278,6 +282,7 @@ pub fn add_detail(
     kind: RowKind,
 ) -> EditResult<RowId> {
     let id = next_row_id(b);
+    let defaults = b.new_line_defaults;
     let acct = account_mut(b, account)?;
     let at = match after {
         None => acct.details.len(),
@@ -289,14 +294,49 @@ pub fn add_detail(
                 + 1
         }
     };
-    let row = match kind {
+    let mut row = match kind {
         RowKind::Line => Detail::line(id, "", "", "", ""),
         RowKind::Subtotal => Detail::subtotal(id, ""),
         RowKind::Adjustment => Detail::adjustment(id, "", ""),
         RowKind::Separator => Detail::separator(id),
     };
+    if kind == RowKind::Line {
+        copy_from_neighbor(&mut row, &acct.details, at, defaults);
+    }
     acct.details.insert(at, row);
     Ok(id)
+}
+
+/// Gives a line about to be inserted at index `at` of `rows` the tags
+/// `defaults` asks for, copied from the nearest line above that index, or
+/// below it when there is no line above (subtotals, adjustments and
+/// separators are passed over). With no line in the account, nothing changes.
+pub fn copy_from_neighbor(row: &mut Detail, rows: &[Detail], at: usize, defaults: NewLineDefaults) {
+    let at = at.min(rows.len());
+    let is_line = |d: &&Detail| d.kind == RowKind::Line;
+    let Some(from) = rows[..at]
+        .iter()
+        .rev()
+        .find(is_line)
+        .or_else(|| rows[at..].iter().find(is_line))
+    else {
+        return;
+    };
+    if defaults.fringes {
+        row.fringes = from.fringes.clone();
+    }
+    if defaults.groups {
+        row.groups = from.groups.clone();
+    }
+    if defaults.set {
+        row.set = from.set.clone();
+    }
+    if defaults.location {
+        row.location = from.location.clone();
+    }
+    if defaults.currency {
+        row.currency = from.currency.clone();
+    }
 }
 
 /// Deletes rows by id. Returns how many were removed.

@@ -1,0 +1,169 @@
+/* Quick entry (js/quickentry.js, js/autocomplete.js): the type-ahead list
+   under a cell, the small dialog next to a cell (notes, a new global's value)
+   and the formula bar above the grid. Uses the tokens in styles.css. */
+
+/* ------------------------------------------------------------------------ */
+/* Type-ahead list. Placed under (or over) the cell by a generated rule
+   (.ac-list.placed); without one it isn't shown. */
+
+.ac-list {
+  display: none;
+  position: fixed;
+  z-index: 46;
+  min-width: 200px;
+  max-width: min(420px, calc(100vw - 16px));
+  max-height: 280px;
+  overflow: auto;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.ac-list.placed {
+  display: block;
+}
+
+.ac-item {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ac-item:hover {
+  background: var(--row-hover);
+}
+
+.ac-item.active {
+  background: var(--selection);
+}
+
+.ac-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ac-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* "Add unit ..." and "Create global ...": an action, set apart from the names. */
+.ac-item.ac-add,
+.ac-item.ac-create {
+  color: var(--accent);
+}
+
+.ac-list .ac-item.ac-add:not(:first-child),
+.ac-list .ac-item.ac-create:not(:first-child) {
+  margin-top: 3px;
+  border-top: 1px solid var(--border-soft);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+/* ------------------------------------------------------------------------ */
+/* A small dialog next to a cell (modal.js anchoredDialog). The backdrop is
+   clear: it only catches a click outside. Placed by a generated rule. */
+
+.popover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+
+.popover-backdrop > .popover {
+  position: fixed;
+  top: 20vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 360px;
+  max-width: calc(100vw - 16px);
+  gap: 10px;
+  padding: 14px;
+}
+
+.popover-backdrop > .popover.placed {
+  transform: none;
+}
+
+.popover-title {
+  font-size: 14px;
+}
+
+.popover-text {
+  min-height: 96px;
+  resize: vertical;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.popover-hint {
+  margin: -4px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Formula bar: the selected cell as typed (a formula, not its result). */
+
+.formula-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  padding: 0 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+}
+
+.formula-label {
+  flex: none;
+  min-width: 64px;
+  padding-right: 8px;
+  border-right: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.formula-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.formula-text.formula {
+  color: var(--formula);
+}
+
+.formula-text.ro {
+  color: var(--text-muted);
+}
+
+@media print {
+  .formula-bar,
+  .ac-list,
+  .popover-backdrop {
+    display: none !important;
+  }
+}

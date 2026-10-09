@@ -36,6 +36,8 @@ import { isHelpOpen, toggleHelp, closeHelp } from './help.js';
 import { openMenu, updateMenu, closeMenu, isMenuOpen, setMenuAnchor } from './menu.js';
 import { readPref, writePref } from './prefs.js';
 import { setRules, dynamicStyles } from './sheet.js';
+import { initSafety } from './safety.js';
+import { initQuickEntry, editAssist, commitDetailCell, editNote, fringeRange, showFormula } from './quickentry.js';
 
 const state = {
   view: null,
@@ -69,8 +71,13 @@ const grid = new Grid($('grid-host'), {
     if (b) b.focus();
     return Boolean(b);
   },
+  // Type-ahead in setup-backed cells, and the formula bar (quickentry.js).
+  onEditStart: (editor) => editAssist(editor),
+  onCursor: (at) => showFormula(at),
   enterMovesDown: false,
 });
+
+initQuickEntry({ grid, view: () => state.view, level: () => state.level, act, call, toast });
 
 // ---------------------------------------------------------------------------
 // Talking to Rust
@@ -105,7 +112,7 @@ function apply(view, opts = {}) {
 }
 
 // Commands that return a view without changing the budget.
-const NOT_EDITS = new Set(['get_view', 'save_budget', 'focus_account']);
+const NOT_EDITS = new Set(['get_view', 'save_budget', 'focus_account', 'flush_autosave']);
 
 /**
  * Footer change counters. `opts.fresh` (a file opened or created) starts
@@ -514,7 +521,7 @@ function stepAccount(delta) {
 function commitCell(rowKey, colKey, value) {
   const ix = state.ix;
   if (state.level === 'details') {
-    act('set_detail_field', { rowId: Number(rowKey.slice(1)), field: colKey, value });
+    commitDetailCell(rowKey, colKey, value); // adds a new unit, set... with the edit
   } else if (state.level === 'topsheet') {
     const ti = Number(rowKey.slice(1));
     const row = ix.topsheet[ti];
@@ -854,6 +861,8 @@ async function deleteAccount() {
 // Files and history
 
 async function discardOk() {
+  // With Autosave on, unsaved changes go into the file first (src/safety_app.rs).
+  if (state.view && state.view.file.dirty) await act('flush_autosave');
   if (!state.view || !state.view.file.dirty) return true;
   return confirmDialog({
     title: 'Unsaved changes',
@@ -905,6 +914,41 @@ function doUndo() {
 function doRedo() {
   act('redo');
 }
+
+// Saving safety: Autosave, recovered budgets, backups, Open Recent and files
+// the system opens (safety.js, src/safety_app.rs).
+
+/** Opens the budget `cmd` returns (null: nothing), asking about unsaved changes first. */
+async function openBy(cmd, args = {}) {
+  await act('get_view'); // edits still on their way land first
+  if (!(await discardOk())) return grid.focus();
+  try {
+    const v = await invoke(cmd, args);
+    if (v) {
+      resetNav();
+      apply(v, { resetSelection: true, focusKey: 't0', fresh: true });
+    }
+  } catch (e) {
+    toast(e);
+  }
+  grid.focus();
+}
+
+const safety = initSafety({
+  grid,
+  toast,
+  call,
+  openBy,
+  saveAs: () => doSave(true),
+  view: () => state.view,
+  // Autosave saved into the file: only the file state changed.
+  fileState: (rev, file) => {
+    if (state.view && state.view.rev === rev) {
+      state.view.file = file;
+      renderTitle(state.view);
+    }
+  },
+});
 
 /**
  * File > Print: the printout needs every row, which views leave out, so this
@@ -1151,6 +1195,9 @@ const COMMANDS = {
   'edit.select_all': () => fieldEdit('selectAll') || selectAll(),
   'edit.fill_down': fillDown,
   'edit.delete_rows': deleteRows,
+  'edit.note': editNote,
+  'edit.make_range': () => fringeRange(true),
+  'edit.remove_range': () => fringeRange(false),
   'insert.line': () => insertRow('line'),
   'insert.subtotal': () => insertRow('subtotal'),
   'insert.adjustment': () => insertRow('adjustment'),
@@ -1173,6 +1220,8 @@ const COMMANDS = {
 for (const s of SHORTCUTS) {
   if (s.id.startsWith('view.tab.')) COMMANDS[s.id] = () => showTab(s.id.slice('view.tab.'.length));
 }
+// File > Open Recent and File > Revert to Backup (safety.js).
+Object.assign(COMMANDS, safety.commands);
 
 /** Commands that act on a focused text field (and so leave a cell edit open). */
 const FIELD_COMMANDS = new Set(SHORTCUTS.filter((s) => s.field).map((s) => s.id));
@@ -1336,6 +1385,7 @@ async function start() {
     toast(e);
   }
   grid.focus();
+  await safety.start(); // a file to open, budgets to recover
 }
 
 start();

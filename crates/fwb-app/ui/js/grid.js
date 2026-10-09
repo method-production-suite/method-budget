@@ -26,6 +26,13 @@
 //            onSelect(rowKeys)                      cursor or selection changed
 //            onTabOut(dir)                          Shift+Tab (dir -1) at the first cell;
 //                                                   true if it moved focus elsewhere
+//            onEditStart({ input, rowKey, colKey, typed, anchor, host })
+//                                                   a cell editor opened; may return a
+//                                                   helper { key(e), close(), place() }
+//                                                   that sees editor keys first
+//                                                   (autocomplete, quickentry.js)
+//            onCursor(at)                           the cursor cell or its content changed
+//                                                   (at: cursorCell(), or null)
 //            enterMovesDown                         true: Enter moves down (details)
 //
 // Selection: a set of rows (Shift+Up/Down, Shift-click, Cmd/Ctrl-click) and a
@@ -122,6 +129,7 @@ export class Grid {
     this.editor = null;
     this.rerendering = false;
     this.lastSelectSig = '';
+    this.lastCursorSig = null;
     gridCount += 1;
     this.uid = `grid-${gridCount}`;
     this.fitSig = null;
@@ -555,13 +563,16 @@ export class Grid {
         } catch {
           // Not all inputs support selection ranges.
         }
+        if (editing.assist) editing.assist.place();
       } else {
         this.editor = null;
+        if (editing.assist) editing.assist.close();
       }
       this.rerendering = false;
     }
     this.scrollToCursor();
     this.notifySelect();
+    this.notifyCursor();
   }
 
   /**
@@ -781,6 +792,18 @@ export class Grid {
     this.paintMarks();
     this.scrollToCursor();
     this.notifySelect();
+    this.notifyCursor();
+  }
+
+  /** Tells onCursor when the cursor cell, or what it holds, changed. */
+  notifyCursor() {
+    if (!this.h.onCursor) return;
+    const at = this.cursorCell();
+    const cell = at ? at.cell : null;
+    const sig = at ? [at.row.key, at.col.key, cell.edit, cell.text].join('\u0001') : '';
+    if (sig === this.lastCursorSig) return;
+    this.lastCursorSig = sig;
+    this.h.onCursor(at);
   }
 
   notifySelect() {
@@ -943,7 +966,43 @@ export class Grid {
     input.focus();
     if (text === null) input.select();
     else input.setSelectionRange(input.value.length, input.value.length);
+    if (this.h.onEditStart) {
+      const ed = this.editor;
+      ed.assist =
+        this.h.onEditStart({
+          input,
+          rowKey: ed.rowKey,
+          colKey: ed.colKey,
+          typed: ed.typed,
+          anchor: () => (this.editor === ed ? ed.td : null),
+          host: this.host,
+        }) || null;
+    }
     return true;
+  }
+
+  /**
+   * Ends the edit without sending anything and returns what was typed:
+   * { rowKey, colKey, value, original }, or null with no edit open. The
+   * caller sends the value its own way (adding a setup item with it, say).
+   */
+  takeEdit() {
+    const ed = this.editor;
+    if (!ed) return null;
+    this.editor = null;
+    if (ed.assist) ed.assist.close();
+    const value = ed.input.value;
+    ed.input.remove();
+    if (ed.td) ed.td.classList.remove('editing');
+    this.host.focus({ preventScroll: true });
+    return { rowKey: ed.rowKey, colKey: ed.colKey, value, original: ed.original };
+  }
+
+  /** Opens the editor on a cell again with `text` in it (after takeEdit()). */
+  resumeEdit(rowKey, colKey, text) {
+    this.goTo(rowKey, colKey);
+    if (this.cursorKey() !== rowKey || this.cursorColKey() !== colKey) return false;
+    return this.startEdit(text);
   }
 
   /** Ends the edit, sending the value if it changed, then moves the cursor. */
@@ -951,6 +1010,7 @@ export class Grid {
     const ed = this.editor;
     if (!ed) return;
     this.editor = null;
+    if (ed.assist) ed.assist.close();
     const value = ed.input.value;
     ed.input.remove();
     if (ed.td) ed.td.classList.remove('editing');
@@ -967,6 +1027,7 @@ export class Grid {
     const ed = this.editor;
     if (!ed) return;
     this.editor = null;
+    if (ed.assist) ed.assist.close();
     ed.input.remove();
     if (ed.td) ed.td.classList.remove('editing');
     this.host.focus({ preventScroll: true });
@@ -1077,6 +1138,9 @@ export class Grid {
   handleEditorKey(e) {
     const ed = this.editor;
     const mod = hasMod(e);
+    // An autocomplete list sees the keys first (Up, Down, Enter, Tab, Escape).
+    if (ed.assist && ed.assist.key(e)) return true;
+    if (this.editor !== ed) return true; // the helper ended the edit
     switch (e.key) {
       case 'Enter':
         if (mod) this.commitEdit(null, { many: true });
@@ -1096,13 +1160,17 @@ export class Grid {
         if (mod) return false;
         this.commitEdit('down');
         return true;
+      // Cmd/Ctrl+Left and Right move the caret in the editor (they step
+      // accounts only when no cell is being edited).
       case 'ArrowLeft':
+        if (mod) return false;
         if (ed.typed && ed.input.selectionStart === 0 && ed.input.selectionEnd === 0) {
           this.commitEdit('left');
           return true;
         }
         return false;
       case 'ArrowRight':
+        if (mod) return false;
         if (ed.typed && ed.input.selectionStart === ed.input.value.length) {
           this.commitEdit('right');
           return true;

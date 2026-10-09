@@ -1099,3 +1099,74 @@ body.panel-resizing {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ------------------------------------------------------------------------ */
+/* Saving safety: the Autosave switch, recovered budgets, backups (js/safety.js) */
+
+.autosave-switch {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.autosave-switch input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.modal.modal-wide {
+  width: 540px;
+}
+
+.safety-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 50vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.safety-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+}
+
+.safety-item + .safety-item {
+  border-top: 1px solid var(--border);
+}
+
+.safety-item-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.safety-item-main,
+.safety-item-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.safety-item-main {
+  font-weight: 600;
+}
+
+.safety-item-sub {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.safety-item-actions {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}

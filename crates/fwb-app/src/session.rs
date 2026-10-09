@@ -6,6 +6,7 @@
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Instant;
 
 use fwb_core::calc::cache::RecalcCache;
 use fwb_core::{
@@ -16,6 +17,7 @@ use fwb_core::{
 use crate::diagnose::{lenient_recalc_with, Outcome};
 use crate::edit::{self, EditResult};
 use crate::report_dto::SelectionDto;
+use crate::safety::{self, Access};
 use crate::view::{Focus, FullView, View, ViewState};
 
 /// Undo steps kept. Each step keeps only what its edit changed (see [`Patch`]).
@@ -221,6 +223,45 @@ pub struct Session {
     /// Each account's evaluated rows, so a recalc after an edit evaluates
     /// only the accounts that changed.
     cache: RecalcCache,
+    /// Autosave and recovery bookkeeping (src/safety.rs).
+    safety: SafetyState,
+}
+
+/// What autosave needs to know about one open budget.
+#[derive(Debug)]
+struct SafetyState {
+    /// Names this document's recovery copy (unique per open document).
+    recovery_key: String,
+    /// The latest change (edit, undo or redo).
+    last_change: Option<Instant>,
+    /// The first change not yet in the file or a recovery copy.
+    pending_since: Option<Instant>,
+    /// The rev in the recovery copy, if one was written and not removed.
+    recovery_rev: Option<u64>,
+    /// Recovered from a crash: the first save into the original file asks.
+    confirm_overwrite: bool,
+    /// The file whose previous version this session has backed up.
+    backed_up: Option<PathBuf>,
+    /// The file as we last read or wrote it, to notice changes made outside.
+    disk: Option<safety::DiskStamp>,
+    /// The file changed outside the app: autosave into it is paused until
+    /// the user chooses whose version to keep.
+    conflict: bool,
+}
+
+impl SafetyState {
+    fn new(path: Option<&Path>, recovery_key: Option<String>) -> SafetyState {
+        SafetyState {
+            recovery_key: recovery_key.unwrap_or_else(|| safety::new_recovery_key(path)),
+            last_change: None,
+            pending_since: None,
+            recovery_rev: None,
+            confirm_overwrite: false,
+            backed_up: None,
+            disk: None,
+            conflict: false,
+        }
+    }
 }
 
 impl Default for Session {
@@ -236,6 +277,7 @@ impl Session {
     }
 
     pub fn with_budget(budget: Budget, path: Option<PathBuf>) -> Session {
+        let safety = SafetyState::new(path.as_deref(), None);
         Session {
             budget,
             path,
@@ -248,7 +290,21 @@ impl Session {
             focus: None,
             view_rev: next_view_rev(),
             cache: RecalcCache::new(),
+            safety,
         }
+    }
+
+    /// A budget recovered from a crash: unsaved (dirty), pointing at the file
+    /// it came from (`None`: never saved), keeping the recovery copy it came
+    /// from under `recovery_key`. Saving into the original file asks first.
+    pub fn recovered(budget: Budget, path: Option<PathBuf>, recovery_key: String) -> Session {
+        let mut s = Session::with_budget(budget, path);
+        s.rev = 1;
+        s.next_rev = 2;
+        s.safety = SafetyState::new(None, Some(recovery_key));
+        s.safety.recovery_rev = Some(1);
+        s.safety.confirm_overwrite = s.path.is_some();
+        s
     }
 
     pub fn budget(&self) -> &Budget {
@@ -282,11 +338,10 @@ impl Session {
 
     /// Reads a budget file and starts a fresh session on it.
     pub fn open(path: &Path) -> Result<Session, String> {
-        let text = std::fs::read_to_string(path)
-            .map_err(|e| format!("Couldn't read {}: {e}", path.display()))?;
-        let budget = fwb_format::from_str(&text)
-            .map_err(|e| format!("{} isn't a readable budget: {e}", path.display()))?;
-        Ok(Session::with_budget(budget, Some(path.to_path_buf())))
+        let (budget, stamp) = read_budget(path)?;
+        let mut s = Session::with_budget(budget, Some(path.to_path_buf()));
+        s.safety.disk = Some(stamp);
+        Ok(s)
     }
 
     /// Writes the budget to `path` (through a temporary file in the same folder,
@@ -294,11 +349,153 @@ impl Session {
     /// marks the budget saved.
     pub fn save_to(&mut self, path: &Path) -> Result<(), String> {
         let text = fwb_format::to_string(&self.budget);
-        write_atomically(path, text.as_bytes())
+        safety::write_atomically(path, text.as_bytes(), Access::Document)
             .map_err(|e| format!("Couldn't save {}: {e}", path.display()))?;
         self.path = Some(path.to_path_buf());
         self.saved_rev = self.rev;
+        self.safety.pending_since = None;
+        self.safety.confirm_overwrite = false;
+        self.safety.disk = Some(safety::DiskStamp::of(path, text.as_bytes()));
+        self.safety.conflict = false;
         Ok(())
+    }
+
+    // Changes made outside the app (a sync service, another computer).
+
+    /// Whether the budget's file changed on disk since the app last read or
+    /// wrote it. Missing (moved or deleted) is not a change: a save puts the
+    /// file back. Unknown (no file, or not read by this session) is not
+    /// either.
+    pub fn changed_on_disk(&mut self) -> bool {
+        let (Some(path), Some(stamp)) = (self.path.as_deref(), &self.safety.disk) else {
+            return false;
+        };
+        match stamp.check(path) {
+            safety::DiskCheck::Changed => true,
+            safety::DiskCheck::Same(fresh) => {
+                if let Some(fresh) = fresh {
+                    self.safety.disk = Some(fresh);
+                }
+                false
+            }
+            safety::DiskCheck::Missing => false,
+        }
+    }
+
+    /// The file changed outside the app and the user hasn't chosen yet:
+    /// autosave into it is paused.
+    pub fn in_conflict(&self) -> bool {
+        self.safety.conflict
+    }
+
+    pub fn set_conflict(&mut self, on: bool) {
+        self.safety.conflict = on;
+    }
+
+    /// Replaces the budget with the file's current content ("Load theirs"),
+    /// as one edit so Undo brings this version back. Afterwards the budget
+    /// matches the file: no unsaved changes, no conflict.
+    pub fn load_from_disk(&mut self) -> Result<(), String> {
+        let path = self.path.clone().ok_or("This budget has no file.")?;
+        let (theirs, stamp) = read_budget(&path)?;
+        self.edit(|b| {
+            *b = theirs;
+            Ok(())
+        })?;
+        self.saved_rev = self.rev;
+        self.safety.pending_since = None;
+        self.safety.confirm_overwrite = false;
+        self.safety.disk = Some(stamp);
+        self.safety.conflict = false;
+        Ok(())
+    }
+
+    // Autosave and recovery (src/safety.rs, src/safety_app.rs).
+
+    /// Names this document's recovery copy.
+    pub fn recovery_key(&self) -> &str {
+        &self.safety.recovery_key
+    }
+
+    /// Notes a change at `at` (every edit, undo and redo does, at now).
+    pub fn note_change(&mut self, at: Instant) {
+        self.safety.last_change = Some(at);
+        self.safety.pending_since.get_or_insert(at);
+    }
+
+    /// Whether autosave should run at `now`: there are unsaved changes not
+    /// yet in a recovery copy, and the budget has been quiet long enough (or
+    /// changing for too long).
+    pub fn autosave_due(&self, now: Instant) -> bool {
+        self.is_dirty()
+            && self.safety.recovery_rev != Some(self.rev)
+            && self
+                .safety
+                .last_change
+                .is_some_and(|t| safety::autosave_due(now, t, self.safety.pending_since))
+    }
+
+    /// Whether autosave may write into the budget's own file: it has one, and
+    /// it isn't a crash recovery still waiting for the user to save it there.
+    pub fn can_autosave_to_file(&self) -> bool {
+        self.path.is_some() && !self.safety.confirm_overwrite
+    }
+
+    /// A recovered budget whose first save into its original file should ask.
+    pub fn needs_overwrite_confirm(&self) -> bool {
+        self.path.is_some() && self.safety.confirm_overwrite
+    }
+
+    /// The budget as file text, for a recovery copy.
+    pub fn file_text(&self) -> String {
+        fwb_format::to_string(&self.budget)
+    }
+
+    /// The current state is now in the recovery copy.
+    pub fn recovery_written(&mut self) {
+        self.safety.recovery_rev = Some(self.rev);
+        self.safety.pending_since = None;
+    }
+
+    /// There is a recovery copy, but nothing unsaved any more (saved, or
+    /// undone back to the saved state): the copy should go.
+    pub fn recovery_stale(&self) -> bool {
+        self.safety.recovery_rev.is_some() && !self.is_dirty()
+    }
+
+    /// The recovery copy was deleted.
+    pub fn recovery_removed(&mut self) {
+        self.safety.recovery_rev = None;
+    }
+
+    /// Whether this session has backed up the previous version of `path`
+    /// (the first write into a file in a session always does).
+    pub fn has_backed_up(&self, path: &Path) -> bool {
+        self.safety.backed_up.as_deref() == Some(path)
+    }
+
+    /// The file at `path` has had its previous version backed up.
+    pub fn backed_up(&mut self, path: &Path) {
+        self.safety.backed_up = Some(path.to_path_buf());
+    }
+
+    /// Whether the recovery copy holds exactly the current state.
+    pub fn recovery_current(&self) -> bool {
+        self.safety.recovery_rev == Some(self.rev)
+    }
+
+    /// The current view revision (what the next view's `rev` will be).
+    pub fn view_rev(&self) -> u64 {
+        self.view_rev
+    }
+
+    /// The file part of a view: name, path, unsaved changes.
+    pub fn file_info(&self) -> crate::view::FileDto {
+        crate::view::FileDto {
+            path: self.path.as_deref().map(|p| p.display().to_string()),
+            name: self.display_name(),
+            dirty: self.is_dirty(),
+        }
     }
 
     /// Applies `f` to a copy of the budget. On success the copy becomes current
@@ -329,6 +526,7 @@ impl Session {
     fn changed(&mut self) {
         self.outcome = None;
         self.view_rev = next_view_rev();
+        self.note_change(Instant::now());
     }
 
     pub fn undo(&mut self) -> bool {
@@ -509,21 +707,19 @@ impl<'a> SelectionIndex<'a> {
     }
 }
 
-/// Writes `bytes` to a temporary sibling of `path`, then renames it over `path`.
-fn write_atomically(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let dir = match path.parent() {
-        Some(d) if !d.as_os_str().is_empty() => d.to_path_buf(),
-        _ => PathBuf::from("."),
-    };
-    let name = path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "budget".into());
-    let tmp = dir.join(format!(".{name}.{}.tmp", std::process::id()));
-    std::fs::write(&tmp, bytes)?;
-    std::fs::rename(&tmp, path).inspect_err(|_| {
-        let _ = std::fs::remove_file(&tmp);
-    })
+/// Reads and parses a budget file, with the stamp of what was read.
+fn read_budget(path: &Path) -> Result<(Budget, safety::DiskStamp), String> {
+    let bytes =
+        std::fs::read(path).map_err(|e| format!("Couldn't read {}: {e}", path.display()))?;
+    let text = std::str::from_utf8(&bytes).map_err(|_| {
+        format!(
+            "Couldn't read {}: stream did not contain valid UTF-8",
+            path.display()
+        )
+    })?;
+    let budget = fwb_format::from_str(text)
+        .map_err(|e| format!("{} isn't a readable budget: {e}", path.display()))?;
+    Ok((budget, safety::DiskStamp::of(path, &bytes)))
 }
 
 #[cfg(test)]
@@ -767,6 +963,77 @@ mod tests {
                 assert_eq!(index.totals(&unique), want, "{broken:?}");
             }
         }
+    }
+
+    /// Autosave runs only with unsaved changes, after a quiet spell (or a
+    /// long busy one), once per state.
+    #[test]
+    fn autosave_triggers_follow_changes() {
+        use std::time::Duration;
+        let secs = |n| Duration::from_secs(n);
+        let mut s = Session::with_budget(small_sample(6), None);
+        let t0 = Instant::now();
+        assert!(!s.autosave_due(t0 + secs(600)), "nothing unsaved");
+        let id = row_ids(s.budget())[0];
+        s.set_detail_field(id, "rate", "11").unwrap();
+        let changed = s.safety.last_change.unwrap();
+        assert!(!s.autosave_due(changed + secs(1)), "still typing");
+        assert!(s.autosave_due(changed + safety::AUTOSAVE_QUIET));
+
+        // Busy: a change every two seconds still autosaves after the cap.
+        let start = s.safety.pending_since.unwrap();
+        let mut t = start;
+        while t < start + safety::AUTOSAVE_MAX_WAIT {
+            t += secs(2);
+            s.note_change(t);
+            if t < start + safety::AUTOSAVE_MAX_WAIT {
+                assert!(!s.autosave_due(t + secs(1)));
+            }
+        }
+        assert!(s.autosave_due(t));
+
+        // Written to a recovery copy: not due again until the next change.
+        s.recovery_written();
+        assert!(s.recovery_current());
+        assert!(!s.autosave_due(t + secs(600)));
+        s.set_detail_field(id, "rate", "12").unwrap();
+        assert!(!s.recovery_current());
+        assert!(s.autosave_due(Instant::now() + secs(600)));
+
+        // Undo back to the saved state: nothing to autosave, and the copy
+        // is stale; once removed, nothing is left to do.
+        s.undo();
+        s.undo();
+        assert!(!s.is_dirty());
+        assert!(!s.autosave_due(Instant::now() + secs(600)));
+        assert!(s.recovery_stale());
+        s.recovery_removed();
+        assert!(!s.recovery_stale());
+
+        // Without a file, autosave can't write into one.
+        assert!(!s.can_autosave_to_file());
+        assert!(s.recovery_key().starts_with("untitled-"));
+    }
+
+    #[test]
+    fn a_recovered_budget_is_unsaved_and_asks_before_replacing_its_file() {
+        let dir = safety::tests::temp_dir("session-recovered");
+        let path = dir.join("film.fwb");
+        let mut s = Session::recovered(small_sample(7), Some(path.clone()), "abc-1".into());
+        assert!(s.is_dirty());
+        assert!(!s.can_undo());
+        assert_eq!(s.recovery_key(), "abc-1");
+        assert!(s.recovery_current(), "its copy already holds it");
+        assert!(!s.autosave_due(Instant::now() + std::time::Duration::from_secs(600)));
+        assert!(s.needs_overwrite_confirm() && !s.can_autosave_to_file());
+        assert!(!s.has_backed_up(&path));
+        s.save_to(&path).unwrap();
+        assert!(!s.is_dirty() && s.recovery_stale());
+        assert!(!s.needs_overwrite_confirm() && s.can_autosave_to_file());
+        // Never saved: nothing to confirm, still unsaved.
+        let u = Session::recovered(small_sample(7), None, "abc-2".into());
+        assert!(u.is_dirty() && !u.needs_overwrite_confirm());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

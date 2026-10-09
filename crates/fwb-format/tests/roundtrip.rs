@@ -201,6 +201,70 @@ fn row_style_separators_and_group_colors_round_trip() {
 }
 
 #[test]
+fn new_line_defaults_round_trip_and_are_left_out_at_default() {
+    let mut b = rich();
+    assert_eq!(b.new_line_defaults, NewLineDefaults::default());
+    let text = round_trip(&b);
+    assert!(!text.contains("new_line_defaults"), "default is left out");
+
+    b.new_line_defaults = NewLineDefaults {
+        fringes: false,
+        groups: true,
+        set: true,
+        location: false,
+        currency: true,
+    };
+    let text = round_trip(&b);
+    let v: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(
+        v["budget"]["new_line_defaults"],
+        serde_json::json!({
+            "fringes": false,
+            "groups": true,
+            "set": true,
+            "location": false,
+            "currency": true
+        })
+    );
+    let pos = |k: &str| text.find(&format!("\"{k}\":")).unwrap();
+    assert!(pos("fringe_posting") < pos("new_line_defaults"));
+    assert!(pos("new_line_defaults") < pos("info"));
+
+    // Versions keep their own copy of the setting.
+    b.versions.push(Version {
+        id: 1,
+        name: "v1".into(),
+        created: "2026-10-09T00:00:00Z".into(),
+        note: None,
+        budget: Box::new(b.snapshot()),
+    });
+    b.new_line_defaults = NewLineDefaults::default();
+    let text = round_trip(&b);
+    assert_eq!(
+        text.matches("\"new_line_defaults\"").count(),
+        1,
+        "only the version's"
+    );
+
+    // When present, every switch is required, and nothing else is allowed.
+    let file = |body: &str| {
+        format!(
+            "{{\"format\": \"film-wizard-budget\", \"version\": 1, \"budget\": \
+             {{\"title\": \"T\", \"base_currency\": \"USD\", \"new_line_defaults\": {body}}}}}"
+        )
+    };
+    let ok = file(
+        r#"{"fringes": true, "groups": true, "set": false, "location": false, "currency": false}"#,
+    );
+    assert!(fwb_format::from_str(&ok).unwrap().new_line_defaults.groups);
+    assert!(fwb_format::from_str(&file(r#"{"fringes": true}"#)).is_err());
+    let extra = file(
+        r#"{"fringes": true, "groups": true, "set": false, "location": false, "currency": false, "notes": true}"#,
+    );
+    assert!(fwb_format::from_str(&extra).is_err());
+}
+
+#[test]
 fn files_without_new_fields_read_with_defaults() {
     let golden = include_str!("golden/small.json");
     let b = fwb_format::from_str(golden).unwrap();
@@ -214,6 +278,7 @@ fn files_without_new_fields_read_with_defaults() {
         assert_eq!((&d.color, &d.note), (&None, &None));
         assert_ne!(d.kind, RowKind::Separator);
     }
+    assert_eq!(b.new_line_defaults, NewLineDefaults::default());
     assert_eq!(fwb_format::to_string(&b), golden, "golden is unchanged");
 }
 

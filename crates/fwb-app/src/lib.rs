@@ -11,8 +11,11 @@ pub mod batch;
 pub mod diagnose;
 pub mod edit;
 pub mod menu;
+pub mod quickadd;
 pub mod report_dto;
 pub mod rowstyle;
+pub mod safety;
+pub mod safety_app;
 pub mod session;
 pub mod view;
 

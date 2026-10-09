@@ -99,6 +99,7 @@ Fields in written order:
 | `totals_currency` | optional text | Currency the totals are shown in, when not the base currency. |
 | `account_coding`  | [account coding](#account-coding) | Left out when it is the default pattern. |
 | `fringe_posting`  | [fringe posting](#fringe-posting) | Left out when it is the default (by category, suffix `"99"`). |
+| `new_line_defaults` | [new-line defaults](#new-line-defaults) | Left out when it is the default (copy fringes only). |
 | `info`            | map of [info values](#info-value) | Budget information fields, keyed by label. |
 | `currencies`      | map of [currencies](#currency) | Foreign currencies, keyed by code. |
 | `units`           | map of [units](#unit) | Keyed by singular name. Omitted means **no units**. |
@@ -144,6 +145,21 @@ Where fringe totals appear. A tagged object:
 | `production_level` | none | One fringe row above each production total. |
 | `category`         | `suffix`: text, **required** | A fringe account at the end of each category, numbered from the category code and the suffix. |
 | `account`          | none | A fringe line at the end of each account. |
+
+### New-line defaults
+
+Which tags a line inserted in the application copies from the nearest line above it (or
+below it, when there is none above). An editing preference saved with the budget; it never
+changes any total by itself. Left out entirely when it equals the default: `fringes` on,
+every other switch off. When present, every field is required.
+
+| Field      | Type | Notes |
+|------------|------|-------|
+| `fringes`  | `true` or `false` | Copy the neighbor's fringes. |
+| `groups`   | `true` or `false` | Copy its groups. |
+| `set`      | `true` or `false` | Copy its set. |
+| `location` | `true` or `false` | Copy its location. |
+| `currency` | `true` or `false` | Copy its currency. |
 
 ### Info value
 
@@ -443,6 +459,9 @@ valid. Loading and saving it in Film Wizard Budgeting normalizes it.
   so files that don't use them are unchanged.
 - Version 1, additive (2026-10): budget `versions` (named full copies of the budget's
   content). Left out when there are none, so files without versions are unchanged.
+- Version 1, additive (2026-10): budget `new_line_defaults` (what an inserted line copies
+  from its neighbor). Left out at its default, so files that don't change it are
+  unchanged.
 
 ## Complete example
 

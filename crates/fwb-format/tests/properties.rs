@@ -262,6 +262,15 @@ fn gen_content(rng: &mut Rng) -> Budget {
             },
         };
     }
+    if rng.chance(50) {
+        b.new_line_defaults = NewLineDefaults {
+            fringes: rng.chance(50),
+            groups: rng.chance(50),
+            set: rng.chance(50),
+            location: rng.chance(50),
+            currency: rng.chance(50),
+        };
+    }
     b.groups = rng.map(|r| Group {
         description: r.text(),
         in_budget_total: r.chance(50),
@@ -403,6 +412,7 @@ fn generator_covers_every_variant_and_field() {
         "totals_currency",
         "account_coding",
         "fringe_posting",
+        "new_line_defaults",
         "info",
         "currencies",
         "units",

@@ -108,12 +108,16 @@ pub const EDIT: &[Entry] = &[
     SEP,
     item("edit.fill_down", "Fill Down", "mod+shift+d"),
     item("edit.delete_rows", "Delete Rows", "mod+d"),
+    SEP,
+    item("edit.note", "Note…", "mod+shift+space"),
+    item("edit.make_range", "Make Fringe Range", "mod+r"),
+    item("edit.remove_range", "Remove Fringe Range", "mod+shift+r"),
 ];
 
 pub const INSERT: &[Entry] = &[
     item("insert.line", "Line", "mod+i"),
     item("insert.subtotal", "Subtotal", "mod+="),
-    item("insert.adjustment", "Adjustment", "mod+alt+a"),
+    item("insert.adjustment", "Adjustment", "mod+-"),
     plain("insert.separator", "Separator"),
     SEP,
     plain("insert.account", "Account…"),
@@ -126,8 +130,8 @@ pub const GO: &[Entry] = &[
     item("go.up", "Up a Level", "mod+up"),
     item("go.down", "Down a Level", "mod+down"),
     SEP,
-    item("go.next_account", "Next Account", "mod+]"),
-    item("go.prev_account", "Previous Account", "mod+["),
+    item("go.next_account", "Next Account", "mod+right"),
+    item("go.prev_account", "Previous Account", "mod+left"),
 ];
 
 pub const VIEW: &[Entry] = &[
@@ -136,23 +140,24 @@ pub const VIEW: &[Entry] = &[
 ];
 
 /// The setup panel's tabs, in the panel's order (ui/js/setup.js and
-/// ui/js/topsheet-setup.js).
+/// ui/js/topsheet-setup.js). Their keys are the ones long-time users of
+/// other budgeting tools already know (decisions.md, entry 15).
 pub const SETUP_TABS: &[Entry] = &[
-    item("view.tab.globals", "Globals", "mod+1"),
-    item("view.tab.fringes", "Fringes", "mod+2"),
-    item("view.tab.groups", "Groups", "mod+3"),
-    item("view.tab.units", "Units", "mod+4"),
-    item("view.tab.currencies", "Currencies", "mod+5"),
-    item("view.tab.sets", "Sets", "mod+6"),
-    item("view.tab.locations", "Locations", "mod+7"),
-    item("view.tab.charges", "Charges", "mod+8"),
-    item("view.tab.credits", "Credits", "mod+9"),
+    item("view.tab.globals", "Globals", "mod+g"),
+    item("view.tab.fringes", "Fringes", "mod+3"),
+    item("view.tab.groups", "Groups", "mod+4"),
+    item("view.tab.units", "Units", "mod+7"),
+    item("view.tab.currencies", "Currencies", "mod+6"),
+    item("view.tab.sets", "Sets", "mod+8"),
+    item("view.tab.locations", "Locations", "mod+5"),
+    item("view.tab.charges", "Charges", "mod+/"),
+    item("view.tab.credits", "Credits", "mod+backslash"),
     plain("view.tab.info", "Info"),
-    plain("view.tab.settings", "Settings"),
+    item("view.tab.settings", "Settings", "mod+9"),
     plain("view.tab.baseline", "Baseline"),
 ];
 
-pub const HELP: &[Entry] = &[item("help.shortcuts", "Keyboard Shortcuts", "mod+/")];
+pub const HELP: &[Entry] = &[item("help.shortcuts", "Keyboard Shortcuts", "mod+shift+/")];
 
 /// A shortcut-list key spec as a Tauri accelerator: `mod+shift+s` is
 /// `CmdOrCtrl+Shift+S`.
@@ -166,7 +171,12 @@ pub fn accelerator(spec: &str) -> String {
             "backspace" => "Backspace".to_string(),
             "up" => "Up".to_string(),
             "down" => "Down".to_string(),
+            "left" => "Left".to_string(),
+            "right" => "Right".to_string(),
+            "space" => "Space".to_string(),
+            "backslash" => "Backslash".to_string(),
             "=" => "Equal".to_string(),
+            "-" => "Minus".to_string(),
             key => key.to_uppercase(),
         })
         .collect::<Vec<_>>()
@@ -258,6 +268,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     }
 
     let file = submenu(app, "&File", FILE)?;
+    // Open Recent, Autosave and Revert to Backup… (src/safety_app.rs).
+    crate::safety_app::extend_file_menu(app, &file)?;
     if !cfg!(target_os = "macos") {
         append(app, &file, FILE_QUIT)?;
     }
@@ -408,5 +420,11 @@ mod tests {
         assert_eq!(accelerator("mod+]"), "CmdOrCtrl+]");
         assert_eq!(accelerator("mod+/"), "CmdOrCtrl+/");
         assert_eq!(accelerator("mod+1"), "CmdOrCtrl+1");
+        assert_eq!(accelerator("mod+-"), "CmdOrCtrl+Minus");
+        assert_eq!(accelerator("mod+shift+space"), "CmdOrCtrl+Shift+Space");
+        assert_eq!(accelerator("mod+left"), "CmdOrCtrl+Left");
+        assert_eq!(accelerator("mod+backslash"), "CmdOrCtrl+Backslash");
+        assert_eq!(accelerator("mod+shift+/"), "CmdOrCtrl+Shift+/");
+        assert_eq!(accelerator("mod+g"), "CmdOrCtrl+G");
     }
 }

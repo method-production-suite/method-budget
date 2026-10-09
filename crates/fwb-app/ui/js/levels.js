@@ -349,6 +349,12 @@ export function fringeRangeMarks(details, rows) {
   return marks;
 }
 
+/** A line with nothing typed in it yet (a newly inserted one): no description and no numbers. */
+export function isFreshLine(d) {
+  const blank = (v) => v === undefined || v === null || String(v).trim() === '';
+  return blank(d.description) && blank(d.amount) && blank(d.x) && blank(d.rate) && blank(d.x4);
+}
+
 /** Deepest indent the grid draws (the app allows 0 to 4). */
 export const MAX_INDENT = 4;
 
@@ -441,7 +447,7 @@ export function detailRows(ix, entry, ai, full) {
 
     const description = {
       ...textCell(d.description, issues.description),
-      placeholder: sub ? 'Subtotal' : kind === 'adjustment' ? 'Adjustment' : '',
+      placeholder: sub ? 'Subtotal' : kind === 'adjustment' ? 'Adjustment' : line && isFreshLine(d) ? 'Type a description' : '',
     };
     if (note) {
       description.cls = 'has-note';

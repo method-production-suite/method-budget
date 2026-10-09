@@ -1,10 +1,10 @@
-// The keyboard shortcut sheet (Help > Keyboard Shortcuts, or mod+/). Built
+// The keyboard shortcut sheet (Help > Keyboard Shortcuts, or mod+shift+/). Built
 // from the shortcut list, so it always shows what the app really does, with
 // this platform's keys. A modal dialog: the rest of the window is inert while
 // it's open, Tab stays inside it, and Escape closes it.
 
 import { el, isMac } from './dom.js';
-import { SHORTCUTS, GROUPS, keysFor, keyText, matches, menuRunsAppKeys } from './shortcuts.js';
+import { SHORTCUTS, GROUPS, keysFor, keyText, matches, menuRunsAppKeys, shortcutById } from './shortcuts.js';
 
 let open = null; // { root, previous }
 
@@ -82,7 +82,7 @@ export function openHelp() {
       return;
     }
     // The same key closes it again. On macOS the menu item does that.
-    if (!menuRunsAppKeys && matches(e, 'mod+/')) {
+    if (!menuRunsAppKeys && keysFor(shortcutById('help.shortcuts')).some((k) => matches(e, k))) {
       e.preventDefault();
       closeHelp();
     }

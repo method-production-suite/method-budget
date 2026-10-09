@@ -52,11 +52,50 @@ breadcrumb segment below the budget has a small button (▾) listing its sibling
 jump straight to another category or another account in the category; Down arrow on the
 button opens the list, then arrows, a typed number or name, Enter, and Escape. On the
 detail level, the ‹ › buttons beside the account step to the previous or next account,
-across categories (Cmd+[ and Cmd+]). On the detail grid, typing in a cell starts editing
-it, Enter and Tab commit and move on, Escape cancels. Formulas can use globals
-(`SHOOT_DAYS / 5`). A cell that can't be calculated is kept as typed, outlined in red with
-the reason on hover, and the banner says what is wrong; the rest of the budget still
-totals, counting that cell as blank.
+across categories (Cmd+Right and Cmd+Left, or Cmd+] and Cmd+[). On the detail grid,
+typing in a cell starts editing it, Enter and Tab commit and move on, Escape cancels.
+Formulas can use globals (`SHOOT_DAYS / 5`). A cell that can't be calculated is kept as
+typed, outlined in red with the reason on hover, and the banner says what is wrong; the
+rest of the budget still totals, counting that cell as blank.
+
+**Quick entry.** Typing in a unit, currency, set or location cell opens a short list of
+matching names under the cell (names that start with what you typed first, then names
+that contain it; capitals don't matter), with "Add unit ..." (or set, location, currency)
+at the end when no name matches exactly. In amount, X, rate and 4X cells the list offers
+the globals whose names start with the name at the caret, anywhere in the formula, and
+"Create global ..." when no global has that name. Fringe and group cells complete the
+item at the caret in their comma list, leaving out names already in it. Up and Down move
+the highlight; Enter or Tab puts the highlighted name in and then finishes the edit as
+usual (Tab moves right); Escape closes the list, and a second Escape cancels the edit; a
+click puts the name in and keeps editing. Committing a unit, set, location or currency the
+budget doesn't have adds it to setup with the edit, as one undo step (a new currency
+starts at an exchange rate of 1, and a message says to set its rate); a name typed in
+other capitals is written the way setup spells it. "Create global" asks for the global's
+value in a small box next to the cell, then adds the global and sets the cell as one undo
+step; Cancel goes back to the cell with the formula as typed. A formula that names an
+unknown global without creating it is kept and flagged, as before.
+
+**New lines.** An inserted line starts with an empty description (the cell shows a hint)
+and copies tags from the nearest line above it, or below it when there is none above.
+Which tags is a budget setting saved in the file (Budget > Settings > New lines): fringes
+by default, and optionally groups, set, location and currency. Subtotals, adjustments and
+separators copy nothing.
+
+**Notes and the formula bar.** Edit > Note (Shift+Cmd+Space) opens a small editor for the
+line's note next to its description: Save (or Cmd+Enter) keeps it, an empty note removes
+it, Escape cancels. The bar above the grid shows the selected cell as typed: a formula
+with its global names, a number unformatted, or a read-only cell's value.
+
+The commands live in `src/quickadd.rs` (notes use `set_row_note` in `src/rowstyle.rs`):
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `set_cell_creating` | `rowId`, `field`, `value`, `create` (`{kind, name, value}`: kind `unit`, `set`, `location`, `currency` or `global`; `value` is a global's formula or a currency's rate, 1 when left out) | View |
+| `set_new_line_defaults` | `defaults` (`{fringes, groups, set, location, currency}`, each true or false) | View |
+
+`set_cell_creating` is refused, with nothing changed, when the item already exists, the
+column doesn't hold that kind of item (units go in the unit columns, globals in amount, X,
+rate and 4X), the name or value isn't valid, or the row can't take the value.
 
 **Detail grid columns.** The button in the grid's top-left corner (Shift+Tab from the
 first cell reaches it) opens the column menu: X, the three unit columns, currency, 4X,
@@ -143,7 +182,7 @@ fresh summary on that event and on every new view.
 ### Keyboard and menus
 
 Everything has a key, and the menu bar (File, Edit, Insert, Go, View, Help) lists the same
-commands with the same keys. Help > Keyboard Shortcuts (Cmd+/ or Ctrl+/) shows the full
+commands with the same keys. Help > Keyboard Shortcuts (Shift+Cmd+/ or Ctrl+Shift+/) shows the full
 list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the menu bar
 (`src/menu.rs`) uses the same ids and keys, and a Rust test fails if they drift apart.
 
@@ -167,20 +206,27 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 | Same value into every selected row | Cmd+Enter while editing | Ctrl+Enter while editing |
 | Cancel an edit, clear the selection, or go up a level | Escape | Escape |
 | Insert a line below | Cmd+I | Ctrl+I |
-| Insert a subtotal, an adjustment | Cmd+=, Option+Cmd+A | Ctrl+=, Ctrl+Alt+A |
+| Insert a subtotal, an adjustment | Cmd+=, Cmd+minus (or Option+Cmd+A) | Ctrl+=, Ctrl+minus (or Ctrl+Alt+A) |
+| Add or edit the line's note | Shift+Cmd+Space | Ctrl+Shift+Space |
+| Make the selected lines one fringe range; take them out of their range | Cmd+R; Shift+Cmd+R | Ctrl+R; Ctrl+Shift+R |
 | Up a level; down a level (also Enter) | Cmd+Up; Cmd+Down | Ctrl+Up; Ctrl+Down |
 | Go to the topsheet | Shift+Cmd+Up | Ctrl+Shift+Up |
-| Next, previous account (across categories, wrapping; also the ‹ › buttons) | Cmd+], Cmd+[ | Ctrl+], Ctrl+[ |
+| Next, previous account (across categories, wrapping; also the ‹ › buttons; not while editing a cell, where they move the caret) | Cmd+Right, Cmd+Left (or Cmd+], Cmd+[) | Ctrl+Right, Ctrl+Left (or Ctrl+], Ctrl+[) |
+| In a type-ahead list: move, take the name, close it | Up, Down; Enter or Tab; Escape | Up, Down; Enter or Tab; Escape |
 | Open a breadcrumb jump list or the column menu (on its button) | Down or Enter | Down or Enter |
 | The column menu button | Shift+Tab from the first cell | Shift+Tab from the first cell |
 | Show or hide the setup panel | Option+Cmd+S | Ctrl+Alt+S |
 | Widen or narrow the setup panel (on its edge; Shift for bigger steps) | Left, Right | Left, Right |
-| Setup tab 1 to 9 (Globals ... Credits; Escape returns to the grid) | Cmd+1 ... Cmd+9 | Ctrl+1 ... Ctrl+9 |
-| Keyboard shortcuts | Cmd+/ | Ctrl+/ |
+| Setup: Globals, Fringes, Groups, Locations (Escape returns to the grid) | Cmd+G, Cmd+3, Cmd+4, Cmd+5 | Ctrl+G, Ctrl+3, Ctrl+4, Ctrl+5 |
+| Setup: Currencies, Units, Sets, Settings | Cmd+6, Cmd+7, Cmd+8, Cmd+9 | Ctrl+6, Ctrl+7, Ctrl+8, Ctrl+9 |
+| Setup: Credits, Charges | Cmd+\\, Cmd+/ | Ctrl+\\, Ctrl+/ |
+| Keyboard shortcuts | Shift+Cmd+/ | Ctrl+Shift+/ |
 
-The row keys (Cmd+I insert, Cmd+D delete, Cmd+= subtotal) follow the habits of people
-coming from other budgeting tools; fill down is on Shift+Cmd+D instead of the spreadsheet
-Cmd+D. Insert > Account, Category and Production Total have no key; they go to the level they
+The row keys (Cmd+I insert, Cmd+D delete, Cmd+= subtotal, Cmd+minus adjustment, Cmd+R
+fringe range, Shift+Cmd+Space note) and the setup keys (Cmd+G globals, Cmd+3 to Cmd+9,
+Cmd+\\ credits, Cmd+/ charges) follow the habits of people coming from other budgeting
+tools, so the shortcut sheet moved to Shift+Cmd+/ and Cmd+1 and Cmd+2 have no setup tab;
+fill down is on Shift+Cmd+D instead of the spreadsheet Cmd+D. Insert > Account, Category and Production Total have no key; they go to the level they
 belong to first and open the same dialog as the buttons. Insert > Separator has no key
 either; it adds a separator row below the cursor on the detail grid. Info, Settings and
 Baseline tabs are in View > Setup Tab.
@@ -203,8 +249,8 @@ from firing too. On Windows and Linux `main.js` handles every key and ignores a 
 that repeats a key it handled in the last 400 ms. Cut, Copy and Paste are the stock menu
 items everywhere: text fields edit natively, and the grid answers the browser's `copy`,
 `cut` and `paste` events, so no clipboard permission or plugin is involved. In a text field,
-Undo, Redo and Select All act on the field; grid keys that move the caret (Cmd+Up) or
-delete (Cmd+Backspace) stay with the field, and other grid keys are ignored there. Grid
+Undo, Redo and Select All act on the field; grid keys that move the caret (Cmd+Up,
+Cmd+Left, Cmd+Right) or delete (Cmd+Backspace) stay with the field, and other grid keys are ignored there. Grid
 commands that arrive from the menu while a text field has focus are ignored too, because
 where menus see keys before the page (GTK on Linux) the key was meant for the field.
 Close Window and Quit from the menu are answered in Rust (both ask about unsaved changes);
@@ -212,7 +258,117 @@ their keys on Windows and Linux close the window from the page, which asks the s
 Menu items are never disabled: Undo and Redo also serve text fields, and each command does
 nothing where it doesn't apply. While a dialog is open, the menu only reaches its fields.
 
-Closing the window or quitting with unsaved changes asks first.
+Closing the window or quitting with unsaved changes asks first (with Autosave on, they
+are saved into the file instead, below).
+
+## Saving and recovery
+
+**Autosave** is on unless you turn it off: the Autosave switch in the toolbar next to Save
+As, or File > Autosave (one setting for the app, kept in its data folder). With it on, a
+budget that has a file is saved into that file 3 seconds after you stop changing it (at
+most 30 seconds after the first unsaved change while you keep going), and right away when
+the window loses focus, when you close or quit, and before New, Open or Open Recent. The
+unsaved-changes mark clears after each autosave. Undo and Redo keep working across
+autosaves (an undo is a change like any other and is saved in turn). A budget never saved
+(Untitled) can't be saved into a file: it gets a recovery copy instead (below), and the
+first Save asks where, as before. If an autosave into the file fails (the folder is gone,
+the disk is full), the app says so once and keeps a recovery copy.
+
+**Changes made outside the app.** Because autosave writes the file often, the app never
+writes over a version it hasn't seen. When it opens or writes a budget file it notes the
+file's size, modification time and a hash of its content; before every autosave and every
+Save into that file, and whenever the window gets focus back, it compares. If another
+program changed the file meanwhile (a sync service such as Dropbox or iCloud, another
+computer, another app), nothing is written, autosave into that file pauses (a recovery copy
+keeps the unsaved work safe), and a dialog, "This budget was changed outside Film Wizard",
+offers:
+
+- **Keep mine**: the version on disk is copied to Backups, then this budget is saved over
+  it and autosave carries on.
+- **Load theirs**: this budget is copied to Backups, then the version on disk replaces it,
+  as one edit (Undo brings this one back, unsaved).
+- **Save mine as a copy…**: Save As; the file on disk is left as it is and the budget
+  continues in the new file.
+- **Decide later**: autosave stays paused; the question comes back with the next Save (or
+  a new change on disk).
+
+If the backup that comes first can't be made, nothing changes. A file that was only
+touched (same content, new time) is not a change, and neither is a file that was moved or
+deleted (the next save puts it back). Save As to another file never asks.
+
+**Autosave off** leaves the file alone until you save, and keeps a recovery copy of the
+unsaved changes on the same timing.
+
+**Recovery copies** are the safety net for a crash, a forced quit or a power cut. They live
+in the app's data folder (`Recovery/`, readable only by you: 0700 folder, 0600 files on
+macOS and Linux), one per open budget, each a `.fwb` with a small `.json` beside it (the
+original path, title and time). A copy is deleted when the budget is saved, when undo
+takes it back to the saved state, when you close or quit and choose not to save, and when
+another budget replaces it (New, Open) after you agreed to lose the changes. Quitting
+without the guard (logging out, the system quitting the app) keeps the changes: into the
+file with Autosave on, else into a recovery copy.
+
+On the next start, if copies were left behind, a **Recovered budgets** dialog lists each
+one (budget title, original file or "Untitled (never saved)", when it was autosaved) with
+**Open Recovered** and **Discard** (a second click confirms; discarding can't be undone).
+Later keeps them all for the next start. A recovered budget opens with unsaved changes,
+pointing at its original file; the first Save into that file asks before replacing it, and
+autosave won't write into it until then. Each running copy of the app holds a lock on a
+small file in `Recovery/`, so a second copy of the app never offers the first one's live
+copies as recovered.
+
+**Backups.** Before a save replaces a budget file, the version on disk is copied to the
+app's data folder: `Backups/<hash of the file's path>/<name> <date time> UTC.fwb`, with a
+`source.json` naming the file. An explicit Save always makes one (unless the file is
+unchanged since the last backup); autosaves make one on the first write in a session and
+then at most every 10 minutes, so the backups span real time rather than the last few
+seconds of typing. The last 10 per file are kept. **File > Revert to Backup…** lists the
+open budget's backups, newest first; **Restore** puts that version in place of the budget
+as one edit (Undo brings the current one back; autosave or Save then writes it), and
+**Show Backups Folder** opens the folder in Finder, Explorer or the file manager. We chose
+the data folder over a `film.fwb~` file beside the budget: nothing appears in shared
+project folders, there is room for more than one version, and the dialog finds them.
+
+**Saves are atomic.** Every write (a save, an autosave, a recovery copy, a backup, the
+settings and recent lists) goes to a temporary file in the same folder, is flushed to disk,
+then renamed over the target (and the folder flushed, on macOS and Linux). A budget file
+keeps the permissions of the file it replaces. A failed write leaves the old file whole.
+
+**File > Open Recent** lists the last 10 budgets opened or saved (newest first, each once;
+two files with one name show their folder), kept in the data folder's `recent.json`. Files
+that no longer exist drop off when the menu is refreshed (every open and save). Clear Menu
+empties it. macOS's own system-wide recent documents list is not updated.
+
+**Opening from the system.** Double-clicking a `.fwb` file, Open With, or dropping one on
+the Dock icon opens it: on macOS the app receives an open event, on Windows and Linux the
+path arrives on the command line. If the app is running with unsaved changes, it asks
+first, as Open does. When several files arrive at once, the first one opens. On macOS a
+second double-click goes to the running app. On Windows and Linux there is no
+single-instance handling: a second launch with a path starts a second copy of the app with
+that file (each copy has its own recovery copies and doesn't offer the other's).
+
+The app's data folder is the platform's local app data folder for
+`io.github.ssandweiss.film-wizard-budgeting`: `~/Library/Application Support/...` on macOS,
+`%LOCALAPPDATA%\...` on Windows, `~/.local/share/...` on Linux.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `autosave_setting`, `set_autosave` | `on` (set) | the setting |
+| `flush_autosave` | none | View (autosaved now, if anything was unsaved) |
+| `open_pending` | none | View of a file the system asked to open, or `null` |
+| `open_recent` | `index` (its place in Open Recent) | View, or `null` |
+| `recovery_list` | none | `[{ key, path, name, title, saved_at_ms }]`, newest first |
+| `open_recovered`, `discard_recovered` | `key` | View; the remaining list |
+| `backup_list` | none | `[{ id, saved_at_ms, bytes }]` for the open budget's file |
+| `restore_backup` | `id` | View |
+| `reveal_backups` | none | nothing (opens the folder) |
+| `resolve_external_change` | `choice`: `keep` or `load` | View |
+
+Rust tells the page about autosave with events: `file-state` (`{ rev, file }` after an
+autosave into the file; the page updates the title if `rev` is still current),
+`autosave-changed`, `autosave-error`, `open-request` (a file from the system; the page
+asks about unsaved changes, then calls `open_pending`) and `external-change` (the file
+changed outside the app; the page shows the dialog above).
 
 ## Architecture
 
@@ -226,7 +382,13 @@ crates/fwb-app/
   src/view.rs        what the UI draws after each command (lean), and the full view for printing
   src/batch.rs       multi-cell edits (paste, fill down) applied as one undo step
   src/apply.rs       the apply panel: tag the selected rows, fringe ranges, selection summary
+  src/quickadd.rs    quick entry: add a unit, set, location, currency or global from a
+                     cell with the edit (one undo step); the new-line defaults setting
   src/menu.rs        native menu bar, built from the same table as ui/js/shortcuts.js
+  src/safety.rs      saving safety as plain files: atomic writes, recovery copies,
+                     backups, settings, the recent list (tested with temporary folders)
+  src/safety_app.rs  its Tauri side: autosave timer, recovery and backup commands, Open
+                     Recent and Autosave menu items, files opened by the system
   src/app.rs         Tauri glue: commands, file dialogs, close and quit guard, menu events
   examples/perf.rs   timings on a large sample budget (fwb_core::sample), and canned
                      replies for a UI harness (perf dump DIR)
@@ -307,6 +469,9 @@ shortcuts), `grid.js` (a generic keyboard grid used at all three levels), `level
 by a test), `help.js` (the shortcut sheet), `topsheet-setup.js` (charges, credits, sets,
 locations, info, settings and baseline tabs), `report.js` with `print.css` (printable
 reports), `menu.js` (the small popup menus: breadcrumb jump lists and the column menu),
+`autocomplete.js` (the type-ahead list on a cell editor, a listbox the editor drives with
+`aria-activedescendant`), `quickentry.js` (wires it to the grid, sends edits that add
+setup items, the note editor, the fringe range keys and the formula bar),
 `prefs.js` (per-user display choices in local storage: visible columns, panel width) and
 `sheet.js` (styles worked out at run time, below). The side panel opens on Apply (`apply.js`, the selected lines) and groups the
 setup tabs into Tables and Budget. Commands run one at a
@@ -346,8 +511,13 @@ untrusted (a budget file is data from anywhere).
   but it is never registered, so none of its commands exist.)
 - **Paths never come from the web view.** Open and Save show the native file dialog from
   Rust and read or write the chosen file there. JavaScript can ask to open or save, but it
-  can't name a path. Saves write a temporary file next to the target and rename it into
-  place, so a failed save never leaves half a file.
+  can't name a path. Saves write a temporary file next to the target, flush it and rename
+  it into place, so a failed save never leaves half a file. Other paths come from the
+  operating system (open events, the command line) or the app's own data folder (Open
+  Recent, recovery copies, backups); the web view names those only by their place in the
+  list, a recovery key or a backup's file name, each checked against what is there.
+  Show Backups Folder runs the system's `open`, `explorer` or `xdg-open` from Rust on a
+  folder Rust chose.
 - **Budget text is never markup.** The UI builds the page with DOM calls and puts every
   string from a budget in with `textContent` or input values, never `innerHTML`.
   `freezePrototype` is on.
@@ -367,5 +537,5 @@ least 14 days old when added (`python3 scripts/check-crate-ages.py --only-change
 Moving rows by drag, editing fringe ranges in the grid, original/variance columns in the
 grid (the data is in `view.variance`; reports already print it), renaming setup entries (add
 the new one, then delete the old), renumbering accounts when the coding pattern changes,
-import from other tools, find and replace, and opening a `.fwb` file by double-clicking it
-in the file manager. Printing and the Windows/Linux menu keys still need a live check.
+import from other tools, find and replace, single-instance handling on Windows and Linux,
+and the macOS system recent documents list. Printing and the Windows/Linux menu keys still need a live check.

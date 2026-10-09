@@ -38,13 +38,17 @@ impl AppState {
 
 type CmdResult<T = View> = Result<T, String>;
 
-fn window_title(s: &Session) -> String {
+pub(crate) fn window_title(s: &Session) -> String {
     let edited = if s.is_dirty() { " (edited)" } else { "" };
     format!("{}{edited} - {APP_NAME}", s.display_name())
 }
 
 /// The view after a command, with the native title kept in sync.
-fn finish<R: Runtime>(window: &WebviewWindow<R>, s: &mut Session, created: Option<RowId>) -> View {
+pub(crate) fn finish<R: Runtime>(
+    window: &WebviewWindow<R>,
+    s: &mut Session,
+    created: Option<RowId>,
+) -> View {
     let _ = window.set_title(&window_title(s));
     s.view_with(created)
 }
@@ -113,8 +117,9 @@ pub fn focus_account<R: Runtime>(
 /// are unsaved changes.
 #[tauri::command]
 pub fn new_budget<R: Runtime>(window: WebviewWindow<R>, state: State<'_, AppState>) -> View {
+    // The old budget's recovery copy goes with it (src/safety_app.rs).
+    crate::safety_app::replace_session(&state, &window.state(), Session::new());
     let mut s = state.lock();
-    *s = Session::new();
     finish(&window, &mut s, None)
 }
 
@@ -142,9 +147,10 @@ pub async fn open_budget<R: Runtime>(
         return Ok(None);
     };
     let path = picked.into_path().map_err(|e| e.to_string())?;
-    let opened = Session::open(&path)?;
+    // Opens it, drops the old budget's recovery copy, lists it in Open Recent.
+    crate::safety_app::open_path(&state, &window.state(), &path)?;
+    crate::safety_app::refresh_menu(window.app_handle());
     let mut s = state.lock();
-    *s = opened;
     Ok(Some(finish(&window, &mut s, None)))
 }
 
@@ -166,7 +172,13 @@ pub async fn save_budget<R: Runtime>(
         (s.path().map(PathBuf::from), suggested)
     };
     let path = match current {
-        Some(p) if !save_as => p,
+        Some(p) if !save_as => {
+            // A budget recovered after a crash asks before replacing its file.
+            if !crate::safety_app::confirm_overwrite(&window, &state) {
+                return Ok(None);
+            }
+            p
+        }
         _ => {
             let mut dialog = window
                 .dialog()
@@ -188,8 +200,13 @@ pub async fn save_budget<R: Runtime>(
             with_fwb_extension(picked.into_path().map_err(|e| e.to_string())?)
         }
     };
+    // Backs up the file's previous version, saves atomically, drops the
+    // recovery copy and lists the file in Open Recent (src/safety_app.rs).
+    // If the file changed outside the app, nothing is written and the page
+    // asks what to do instead.
+    crate::safety_app::save_from(&window, &state, &path)?;
+    crate::safety_app::refresh_menu(window.app_handle());
     let mut s = state.lock();
-    s.save_to(&path)?;
     Ok(Some(finish(&window, &mut s, None)))
 }
 
@@ -696,7 +713,9 @@ const DISCARD: &str = "Close without saving";
 /// Asks before throwing away unsaved changes; runs `then` if the user agrees
 /// (or there was nothing to lose). Never blocks the event loop.
 fn confirm_discard<R: Runtime>(app: &AppHandle<R>, then: impl FnOnce() + Send + 'static) {
-    let dirty = app.state::<AppState>().lock().is_dirty();
+    // With Autosave on, unsaved changes go into the file first (src/safety_app.rs).
+    let saved = crate::safety_app::save_before_leaving(app);
+    let dirty = !saved && app.state::<AppState>().lock().is_dirty();
     if !dirty {
         then();
         return;
@@ -716,8 +735,11 @@ fn confirm_discard<R: Runtime>(app: &AppHandle<R>, then: impl FnOnce() + Send + 
     if let Some(w) = app.get_webview_window("main") {
         dialog = dialog.parent(&w);
     }
+    let handle = app.clone();
     dialog.show_with_result(move |choice| {
         if choice == MessageDialogResult::Custom(DISCARD.into()) {
+            // Thrown away on purpose: no recovery copy of it either.
+            crate::safety_app::discarded(&handle);
             then();
         }
     });
@@ -752,13 +774,25 @@ pub fn run() {
             if id == crate::menu::QUIT {
                 let handle = app.clone();
                 confirm_discard(app, move || handle.exit(0));
-            } else {
+            } else if !crate::safety_app::handle_menu(app, id) {
+                // Open Recent's Clear Menu and the Autosave check are answered
+                // in src/safety_app.rs.
                 crate::menu::handle(app, id);
             }
         });
 
     builder
         .on_window_event(|window, event| {
+            // Leaving the window autosaves now rather than in a few seconds.
+            if let tauri::WindowEvent::Focused(false) = event {
+                let app = window.app_handle().clone();
+                std::thread::spawn(move || crate::safety_app::autosave_now(&app, true));
+            }
+            // Back in the window: ask now if the file changed outside meanwhile.
+            if let tauri::WindowEvent::Focused(true) = event {
+                let app = window.app_handle().clone();
+                std::thread::spawn(move || crate::safety_app::check_external(&app));
+            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.state::<AppState>().lock().is_dirty() {
                     api.prevent_close();
@@ -832,15 +866,45 @@ pub fn run() {
             crate::apply::assign_to_rows,
             crate::apply::make_fringe_range,
             crate::apply::clear_fringe_range,
+            // Quick entry: add setup items from a cell, new-line defaults (src/quickadd.rs)
+            crate::quickadd::set_cell_creating,
+            crate::quickadd::set_new_line_defaults,
+            // Saving safety: autosave, recovery, backups, recent and
+            // system-opened files, outside changes (src/safety_app.rs)
+            crate::safety_app::autosave_setting,
+            crate::safety_app::set_autosave,
+            crate::safety_app::flush_autosave,
+            crate::safety_app::open_pending,
+            crate::safety_app::open_recent,
+            crate::safety_app::recovery_list,
+            crate::safety_app::open_recovered,
+            crate::safety_app::discard_recovered,
+            crate::safety_app::backup_list,
+            crate::safety_app::restore_backup,
+            crate::safety_app::reveal_backups,
+            crate::safety_app::resolve_external_change,
         ])
         .setup(|app| {
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.set_title(&window_title(&app.state::<AppState>().lock()));
             }
+            // Autosave, recovery, backups, recent files (src/safety_app.rs).
+            crate::safety_app::init(app.handle());
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Film Wizard Budgeting");
+        .build(tauri::generate_context!())
+        .expect("error while running Film Wizard Budgeting")
+        .run(|app, event| match event {
+            // macOS hands over double-clicked and Open With files here
+            // (Windows and Linux pass them on the command line).
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Opened { urls } => crate::safety_app::on_opened(
+                app,
+                urls.iter().filter_map(|u| u.to_file_path().ok()).collect(),
+            ),
+            tauri::RunEvent::Exit => crate::safety_app::on_exit(app),
+            _ => {}
+        });
 }
 
 #[cfg(test)]

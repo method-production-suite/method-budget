@@ -45,6 +45,9 @@ export const SHORTCUTS = [
   { id: 'edit.fill_down', group: 'Edit', label: 'Fill down (top selected cell into the cells below)', keys: 'mod+shift+d', scope: 'grid' },
   { id: 'edit.delete_rows', group: 'Edit', label: 'Delete the selected rows (or the category or account)', keys: 'mod+d', scope: 'grid', text: true },
   { id: 'grid.clear', group: 'Edit', label: 'Clear the selected cells', keys: ['backspace', 'delete'], scope: 'builtin' },
+  { id: 'edit.note', group: 'Edit', label: 'Add or edit the note on the line', keys: 'mod+shift+space', scope: 'grid' },
+  { id: 'edit.make_range', group: 'Edit', label: 'Make the selected lines one fringe range', keys: 'mod+r', scope: 'grid' },
+  { id: 'edit.remove_range', group: 'Edit', label: 'Take the selected lines out of their fringe range', keys: 'mod+shift+r', scope: 'grid' },
 
   // Moving around and editing cells
   { id: 'grid.move', group: 'Cells', label: 'Move between cells', keys: ['up', 'down', 'left', 'right'], scope: 'builtin' },
@@ -60,7 +63,7 @@ export const SHORTCUTS = [
   // Insert
   { id: 'insert.line', group: 'Insert', label: 'Insert a line below', keys: 'mod+i', scope: 'grid' },
   { id: 'insert.subtotal', group: 'Insert', label: 'Insert a subtotal row', keys: 'mod+=', scope: 'grid' },
-  { id: 'insert.adjustment', group: 'Insert', label: 'Insert an adjustment row', keys: 'mod+alt+a', scope: 'grid' },
+  { id: 'insert.adjustment', group: 'Insert', label: 'Insert an adjustment row', keys: ['mod+-', 'mod+alt+a'], scope: 'grid' },
   { id: 'insert.separator', group: 'Insert', label: 'Insert a separator (a drawn rule line)', scope: 'menu' },
   { id: 'insert.account', group: 'Insert', label: 'Add an account', scope: 'menu' },
   { id: 'insert.category', group: 'Insert', label: 'Add a category', scope: 'menu' },
@@ -70,26 +73,28 @@ export const SHORTCUTS = [
   { id: 'go.topsheet', group: 'Go', label: 'Go to the topsheet', keys: 'mod+shift+up', scope: 'grid', text: true },
   { id: 'go.up', group: 'Go', label: 'Up a level', keys: 'mod+up', scope: 'grid', text: true },
   { id: 'go.down', group: 'Go', label: 'Open the category or account (also Enter)', keys: 'mod+down', scope: 'grid', text: true },
-  { id: 'go.next_account', group: 'Go', label: 'Next account', keys: 'mod+]', scope: 'grid' },
-  { id: 'go.prev_account', group: 'Go', label: 'Previous account', keys: 'mod+[', scope: 'grid' },
+  { id: 'go.next_account', group: 'Go', label: 'Next account', keys: ['mod+right', 'mod+]'], scope: 'grid', text: true },
+  { id: 'go.prev_account', group: 'Go', label: 'Previous account', keys: ['mod+left', 'mod+['], scope: 'grid', text: true },
 
   // View
   { id: 'view.toggle_panel', group: 'View', label: 'Show or hide the setup panel', keys: 'mod+alt+s', scope: 'app' },
-  { id: 'view.tab.globals', group: 'View', label: 'Setup: Globals', keys: 'mod+1', scope: 'app' },
-  { id: 'view.tab.fringes', group: 'View', label: 'Setup: Fringes', keys: 'mod+2', scope: 'app' },
-  { id: 'view.tab.groups', group: 'View', label: 'Setup: Groups', keys: 'mod+3', scope: 'app' },
-  { id: 'view.tab.units', group: 'View', label: 'Setup: Units', keys: 'mod+4', scope: 'app' },
-  { id: 'view.tab.currencies', group: 'View', label: 'Setup: Currencies', keys: 'mod+5', scope: 'app' },
-  { id: 'view.tab.sets', group: 'View', label: 'Setup: Sets', keys: 'mod+6', scope: 'app' },
-  { id: 'view.tab.locations', group: 'View', label: 'Setup: Locations', keys: 'mod+7', scope: 'app' },
-  { id: 'view.tab.charges', group: 'View', label: 'Setup: Charges', keys: 'mod+8', scope: 'app' },
-  { id: 'view.tab.credits', group: 'View', label: 'Setup: Credits', keys: 'mod+9', scope: 'app' },
+  // Setup tabs take the keys long-time users of other budgeting tools have in
+  // their hands (decisions.md, entry 15).
+  { id: 'view.tab.globals', group: 'View', label: 'Setup: Globals', keys: 'mod+g', scope: 'app' },
+  { id: 'view.tab.fringes', group: 'View', label: 'Setup: Fringes', keys: 'mod+3', scope: 'app' },
+  { id: 'view.tab.groups', group: 'View', label: 'Setup: Groups', keys: 'mod+4', scope: 'app' },
+  { id: 'view.tab.units', group: 'View', label: 'Setup: Units', keys: 'mod+7', scope: 'app' },
+  { id: 'view.tab.currencies', group: 'View', label: 'Setup: Currencies', keys: 'mod+6', scope: 'app' },
+  { id: 'view.tab.sets', group: 'View', label: 'Setup: Sets', keys: 'mod+8', scope: 'app' },
+  { id: 'view.tab.locations', group: 'View', label: 'Setup: Locations', keys: 'mod+5', scope: 'app' },
+  { id: 'view.tab.charges', group: 'View', label: 'Setup: Charges', keys: 'mod+/', scope: 'app' },
+  { id: 'view.tab.credits', group: 'View', label: 'Setup: Credits', keys: 'mod+backslash', scope: 'app' },
   { id: 'view.tab.info', group: 'View', label: 'Setup: Info', scope: 'menu' },
-  { id: 'view.tab.settings', group: 'View', label: 'Setup: Settings', scope: 'menu' },
+  { id: 'view.tab.settings', group: 'View', label: 'Setup: Settings (budget preferences)', keys: 'mod+9', scope: 'app' },
   { id: 'view.tab.baseline', group: 'View', label: 'Setup: Baseline', scope: 'menu' },
 
   // Help
-  { id: 'help.shortcuts', group: 'Help', label: 'Show this list of shortcuts', keys: 'mod+/', scope: 'app' },
+  { id: 'help.shortcuts', group: 'Help', label: 'Show this list of shortcuts', keys: 'mod+shift+/', scope: 'app' },
 ];
 
 /** Groups in the order the shortcut sheet shows them. */
@@ -128,6 +133,8 @@ const MAC_NAMES = {
   home: 'Home',
   end: 'End',
   f2: 'F2',
+  space: 'Space',
+  backslash: '\\',
 };
 
 const PC_NAMES = {
@@ -143,6 +150,8 @@ const PC_NAMES = {
   home: 'Home',
   end: 'End',
   f2: 'F2',
+  space: 'Space',
+  backslash: '\\',
 };
 
 function parse(spec) {
@@ -194,12 +203,23 @@ const NAMED = {
   home: 'Home',
   end: 'End',
   f2: 'F2',
+  space: ' ',
+  backslash: '\\',
 };
 
-const CODES = { '[': 'BracketLeft', ']': 'BracketRight', '/': 'Slash', '=': 'Equal' };
+// Physical keys, for when a modifier changes the character (Shift+/ types ?).
+const CODES = {
+  '[': 'BracketLeft',
+  ']': 'BracketRight',
+  '/': 'Slash',
+  '=': 'Equal',
+  '-': 'Minus',
+  space: 'Space',
+  backslash: 'Backslash',
+};
 
 function keyMatches(e, k) {
-  if (NAMED[k]) return e.key === NAMED[k];
+  if (NAMED[k]) return e.key === NAMED[k] || (CODES[k] !== undefined && e.code === CODES[k]);
   const key = typeof e.key === 'string' ? e.key : '';
   if (/^[a-z]$/.test(k)) {
     // Trust the layout's letter; Option on a Mac turns letters into symbols,

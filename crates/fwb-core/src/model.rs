@@ -69,6 +69,8 @@ pub struct Budget {
     pub fringe_posting: FringePosting,
     /// How account numbers are segmented and written.
     pub account_coding: AccountCoding,
+    /// What a line inserted in the editor copies from its neighbor.
+    pub new_line_defaults: NewLineDefaults,
     pub groups: BTreeMap<String, Group>,
     pub sets: BTreeMap<String, SetDef>,
     pub locations: BTreeMap<String, Location>,
@@ -98,6 +100,7 @@ impl Budget {
             fringes: BTreeMap::new(),
             fringe_posting: FringePosting::default(),
             account_coding: AccountCoding::default(),
+            new_line_defaults: NewLineDefaults::default(),
             groups: BTreeMap::new(),
             sets: BTreeMap::new(),
             locations: BTreeMap::new(),
@@ -195,6 +198,34 @@ impl Default for FringePosting {
     fn default() -> FringePosting {
         FringePosting::Category {
             suffix: "99".into(),
+        }
+    }
+}
+
+/// Which tags a new line copies from the nearest line above it (below it when
+/// there is none above) when it is inserted in the editor. A budget setting,
+/// saved with the file. Never affects totals by itself: it only decides what
+/// a fresh line starts with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NewLineDefaults {
+    pub fringes: bool,
+    pub groups: bool,
+    pub set: bool,
+    pub location: bool,
+    pub currency: bool,
+}
+
+impl Default for NewLineDefaults {
+    /// Fringes on, everything else off: a new line usually pays the same
+    /// people's fringes as its neighbors, but groups, sets, locations and
+    /// currencies are deliberate choices.
+    fn default() -> NewLineDefaults {
+        NewLineDefaults {
+            fringes: true,
+            groups: false,
+            set: false,
+            location: false,
+            currency: false,
         }
     }
 }
@@ -504,6 +535,7 @@ pub struct BudgetSnapshot {
     pub fringes: BTreeMap<String, Fringe>,
     pub fringe_posting: FringePosting,
     pub account_coding: AccountCoding,
+    pub new_line_defaults: NewLineDefaults,
     pub groups: BTreeMap<String, Group>,
     pub sets: BTreeMap<String, SetDef>,
     pub locations: BTreeMap<String, Location>,
@@ -528,6 +560,7 @@ impl Budget {
             fringes,
             fringe_posting,
             account_coding,
+            new_line_defaults,
             groups,
             sets,
             locations,
@@ -548,6 +581,7 @@ impl Budget {
             fringes: fringes.clone(),
             fringe_posting: fringe_posting.clone(),
             account_coding: *account_coding,
+            new_line_defaults: *new_line_defaults,
             groups: groups.clone(),
             sets: sets.clone(),
             locations: locations.clone(),
@@ -571,6 +605,7 @@ impl Budget {
             fringes,
             fringe_posting,
             account_coding,
+            new_line_defaults,
             groups,
             sets,
             locations,
@@ -591,6 +626,7 @@ impl Budget {
             fringes,
             fringe_posting,
             account_coding,
+            new_line_defaults,
             groups,
             sets,
             locations,
@@ -660,6 +696,7 @@ impl BudgetSnapshot {
             fringes,
             fringe_posting,
             account_coding,
+            new_line_defaults,
             groups,
             sets,
             locations,
@@ -679,6 +716,7 @@ impl BudgetSnapshot {
             fringes,
             fringe_posting,
             account_coding,
+            new_line_defaults,
             groups,
             sets,
             locations,

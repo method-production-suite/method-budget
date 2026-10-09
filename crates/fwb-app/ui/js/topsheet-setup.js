@@ -1192,7 +1192,47 @@ function renderSettings(panel) {
   if (k.state().errors.has(fk)) fr.append(k.errorLine(k.state().errors.get(fk)));
   panel.append(fr);
 
+  panel.append(newLinesGroup());
   panel.append(codingForm());
+}
+
+// What a line inserted in the grid copies from its neighbor (a budget setting).
+const NEW_LINE_FIELDS = [
+  ['fringes', 'Fringes'],
+  ['groups', 'Groups'],
+  ['set', 'Set'],
+  ['location', 'Location'],
+  ['currency', 'Currency'],
+];
+
+function newLineDefaults() {
+  const d = obj(k.budget().new_line_defaults);
+  // The file leaves the setting out at its default: fringes on, the rest off.
+  const has = Object.keys(d).length > 0;
+  const out = {};
+  for (const [f] of NEW_LINE_FIELDS) out[f] = has ? d[f] === true : f === 'fringes';
+  return out;
+}
+
+function newLinesGroup() {
+  const nk = k.key('settings', 'new_lines');
+  const group = k.el('div', 'tss-group');
+  group.dataset.item = nk;
+  const now = newLineDefaults();
+  group.append(
+    heading('New lines'),
+    k.el('p', 'setup-hint tss-note', 'A line you insert copies these from the line above it (or the line below, when there is none above).'),
+  );
+  for (const [f, label] of NEW_LINE_FIELDS) {
+    const fieldKey = k.key('settings', 'new_lines', f);
+    group.append(
+      checkbox(fieldKey, now[f], label, (on) =>
+        k.run(nk, () => ['set_new_line_defaults', { defaults: { ...newLineDefaults(), [f]: on } }], { restore: [fieldKey, !on] }),
+      ),
+    );
+  }
+  if (k.state().errors.has(nk)) group.append(k.errorLine(k.state().errors.get(nk)));
+  return group;
 }
 
 function codingForm() {
