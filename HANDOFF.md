@@ -53,9 +53,10 @@ manual. Sam's MMB screenshots live in `Screenshots/` and notes on them in
 plus Sam's real production budget figures). Never use those figures in tests.
 
 ## Next
-1. Still-v1 engine gaps: account coding rules (segment widths, separator), budget info
-   fields, display currency, original/variance baseline, delete-global-to-value.
-2. Native format: serde, TOML or JSON with stable ordering; document in `docs/FORMAT.md`.
+1. Done since: account coding, budget info, totals currency, baseline/variance,
+   delete-global-to-value, and the native `.fwb` JSON format (`crates/fwb-format`,
+   spec in `docs/FORMAT.md`).
+2. Sam has a test plan for exporting from MMB: `docs/research/export-test-plan.md`.
 3. Import from MMB exports (tab, XML, JSON, Excel). Column layouts aren't public: plan is
    to design a test budget, have Sam enter and export it from his licensed copy, and
    build against those files. Currency direction must be confirmed from them.

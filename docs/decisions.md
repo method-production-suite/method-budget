@@ -102,3 +102,14 @@ for comparison and import. Category fringe accounts are built through the patter
 - **Deleting a global** first freezes its current value into every formula that used it, so
   no total changes (property-tested).
 - **Budget info** fields (text, number, date) are plain data for now; they don't feed formulas.
+
+## 13. Native file format (2026-10-08)
+
+JSON, not TOML: budgets are deeply nested (topsheet > categories > accounts > rows), which
+TOML handles poorly. Pretty-printed with fixed key order so files diff cleanly in git. It
+lives in its own crate (`fwb-format`) with separate file-side types, so the engine stays
+dependency-free and the file layout can stay stable while the model evolves. Money is
+integer cents, decimals are strings, never JSON floats. Extension `.fwb`. Spec:
+`docs/FORMAT.md`. First dependencies: serde and serde_json, pinned to releases well past
+the 14-day cooldown (checked by publish date; zmij is dtolnay's float formatter, pulled in
+by serde_json).

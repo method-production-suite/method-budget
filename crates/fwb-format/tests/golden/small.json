@@ -1,0 +1,122 @@
+{
+  "format": "film-wizard-budget",
+  "version": 1,
+  "budget": {
+    "title": "Short Film",
+    "base_currency": "USD",
+    "info": {
+      "Shoot days": {
+        "kind": "number",
+        "value": "5"
+      }
+    },
+    "units": {
+      "Day": {
+        "plural": "Days",
+        "hours": "10"
+      },
+      "Flat": {
+        "plural": "Flat"
+      },
+      "Week": {
+        "plural": "Weeks",
+        "hours": "50"
+      }
+    },
+    "globals": {
+      "DAYS": "5"
+    },
+    "fringes": {
+      "Payroll": {
+        "kind": "percent",
+        "description": "Payroll taxes",
+        "rate": "18.5",
+        "cutoff": 15000000
+      }
+    },
+    "groups": {
+      "Alt": {
+        "in_budget_total": false
+      }
+    },
+    "topsheet": [
+      {
+        "kind": "category",
+        "code": "10",
+        "name": "Above-the-line",
+        "accounts": [
+          {
+            "code": "10-01",
+            "name": "Director",
+            "details": [
+              {
+                "id": 1,
+                "description": "Director",
+                "amount": "1",
+                "unit": "Flat",
+                "rate": "5000",
+                "fringes": [
+                  "Payroll"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Above-the-Line"
+      },
+      {
+        "kind": "category",
+        "code": "20",
+        "name": "Production",
+        "accounts": [
+          {
+            "code": "20-01",
+            "name": "Camera",
+            "details": [
+              {
+                "id": 2,
+                "description": "Director of photography",
+                "amount": "DAYS",
+                "unit": "Day",
+                "rate": "850.50",
+                "fringes": [
+                  "Payroll"
+                ]
+              },
+              {
+                "id": 3,
+                "kind": "adjustment",
+                "description": "Kit rental",
+                "amount": "0.1"
+              },
+              {
+                "id": 4,
+                "description": "Drone package",
+                "amount": "1",
+                "unit": "Week",
+                "rate": "1200",
+                "groups": [
+                  "Alt"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Below-the-Line"
+      }
+    ],
+    "charges": [
+      {
+        "kind": "percent",
+        "name": "Contingency",
+        "percent": "10"
+      }
+    ]
+  }
+}
