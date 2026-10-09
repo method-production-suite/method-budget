@@ -113,3 +113,19 @@ integer cents, decimals are strings, never JSON floats. Extension `.fwb`. Spec:
 `docs/FORMAT.md`. First dependencies: serde and serde_json, pinned to releases well past
 the 14-day cooldown (checked by publish date; zmij is dtolnay's float formatter, pulled in
 by serde_json).
+
+## 14. UI approach: PROPOSED, not decided (2026-10-08)
+
+Options:
+- **Web app on WASM** (engine compiled to WebAssembly, UI in TypeScript). Runs in any
+  browser with nothing to install, easy to demo and share, and the same build can later be
+  wrapped as a desktop app. Cost: a JS toolchain (npm deps, cooldown applies) and file access
+  through the browser's file APIs.
+- **Tauri desktop app** (Rust backend, web UI). Native file open/save, menus, offline by
+  default, small installers. Cost: platform builds and signing, and still a web UI inside.
+- **Native Rust GUI** (egui, iced, Slint). One language, but spreadsheet-grade grid editing
+  (the core of budgeting) is far less mature than on the web.
+
+Recommendation: **web UI over WASM first, wrapped in Tauri when we want a desktop app.**
+The grid is the product, and the web has the best grid tooling; WASM keeps the engine
+identical everywhere; Tauri reuses the same UI later. Needs Sam's sign-off before building.
