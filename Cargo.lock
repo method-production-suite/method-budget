@@ -3,6 +3,14 @@
 version = 4
 
 [[package]]
+name = "fwb-cli"
+version = "0.0.1"
+dependencies = [
+ "fwb-core",
+ "fwb-format",
+]
+
+[[package]]
 name = "fwb-core"
 version = "0.0.1"
 

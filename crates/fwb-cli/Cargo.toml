@@ -1,0 +1,15 @@
+[package]
+name = "fwb-cli"
+description = "Film Wizard Budgeting command line: check, show and tidy .fwb budgets"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "fwb"
+path = "src/main.rs"
+
+[dependencies]
+fwb-core = { path = "../fwb-core" }
+fwb-format = { path = "../fwb-format" }

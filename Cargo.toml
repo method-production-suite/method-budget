@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/fwb-core", "crates/fwb-format"]
+members = ["crates/fwb-core", "crates/fwb-format", "crates/fwb-cli"]
 
 [workspace.package]
 edition = "2021"
