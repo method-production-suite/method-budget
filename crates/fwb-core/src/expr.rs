@@ -127,10 +127,20 @@ fn lex(src: &str) -> Result<Vec<(usize, Tok)>, ParseError> {
     Ok(out)
 }
 
+/// Longest formula accepted, in bytes not counting spaces (so a formula's
+/// printed form, which adds spaces, is always accepted too). Bounds the tree's
+/// size and depth, so evaluating, printing or dropping it can't exhaust the
+/// stack, whatever a file contains.
+pub const MAX_FORMULA_LEN: usize = 4096;
+
+/// Deepest nesting of parentheses and unary signs accepted.
+pub const MAX_NESTING: usize = 64;
+
 struct Parser {
     toks: Vec<(usize, Tok)>,
     i: usize,
     end: usize,
+    depth: usize,
 }
 
 impl Parser {
@@ -168,6 +178,16 @@ impl Parser {
     }
 
     fn unary(&mut self) -> Result<Expr, ParseError> {
+        if self.depth >= MAX_NESTING {
+            return self.err("formula nested too deeply");
+        }
+        self.depth += 1;
+        let e = self.unary_inner();
+        self.depth -= 1;
+        e
+    }
+
+    fn unary_inner(&mut self) -> Result<Expr, ParseError> {
         match self.peek() {
             Some(Tok::Op(Op::Sub)) => {
                 self.i += 1;
@@ -207,10 +227,17 @@ impl Parser {
 
 impl Expr {
     pub fn parse(src: &str) -> Result<Expr, ParseError> {
+        if src.bytes().filter(|b| !matches!(b, b' ' | b'\t')).count() > MAX_FORMULA_LEN {
+            return Err(ParseError {
+                pos: MAX_FORMULA_LEN,
+                msg: format!("formula longer than {MAX_FORMULA_LEN} characters"),
+            });
+        }
         let mut p = Parser {
             toks: lex(src)?,
             i: 0,
             end: src.len(),
+            depth: 0,
         };
         let e = p.expr()?;
         if p.i != p.toks.len() {
@@ -392,6 +419,32 @@ mod tests {
         assert_eq!(Expr::parse("2 $ 3").unwrap_err().pos, 2);
         assert_eq!(Expr::parse("1 2").unwrap_err().pos, 2);
         assert_eq!(Expr::parse("1..2").unwrap_err().msg, "malformed number");
+    }
+
+    #[test]
+    fn hostile_input_is_rejected_not_a_crash() {
+        let deep = format!("{}1{}", "(".repeat(100_000), ")".repeat(100_000));
+        assert!(Expr::parse(&deep).unwrap_err().msg.contains("longer than"));
+        let nested = format!("{}1{}", "(".repeat(MAX_NESTING), ")".repeat(MAX_NESTING));
+        assert_eq!(
+            Expr::parse(&nested).unwrap_err().msg,
+            "formula nested too deeply"
+        );
+        let ok = format!(
+            "{}1{}",
+            "(".repeat(MAX_NESTING - 1),
+            ")".repeat(MAX_NESTING - 1)
+        );
+        assert_eq!(eval(&ok), Ok(d("1")));
+        assert!(Expr::parse(&"-".repeat(500)).is_err());
+        // The longest allowed chain still evaluates and prints fine.
+        let chain = vec!["1"; MAX_FORMULA_LEN / 2].join("+");
+        let e = Expr::parse(&chain).unwrap();
+        assert_eq!(
+            e.eval(&|_| None),
+            Ok(Dec::from_int((MAX_FORMULA_LEN / 2) as i64))
+        );
+        assert_eq!(Expr::parse(&e.to_string()).unwrap(), e);
     }
 
     #[test]

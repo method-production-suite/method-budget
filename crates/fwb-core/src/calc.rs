@@ -152,56 +152,63 @@ pub(crate) fn row_at(code: &str, idx: usize, d: &Detail, field: &str) -> String 
 }
 
 pub(crate) fn eval_globals(b: &Budget) -> Result<BTreeMap<String, Dec>, CalcError> {
-    let mut parsed = BTreeMap::new();
+    // Each global with the other globals it refers to (unknown names are left for
+    // eval to report, with the global as context).
+    let mut parsed: BTreeMap<&str, (Expr, Vec<&str>)> = BTreeMap::new();
     for (name, f) in &b.globals {
         let at = || format!("global {name}");
         if !is_ident(name) {
             return Err(err(at(), ErrorKind::BadGlobalName));
         }
         let e = Expr::parse(&f.0).map_err(|e| err(at(), ErrorKind::Parse(e)))?;
-        parsed.insert(name.as_str(), e);
+        let mut vars = BTreeSet::new();
+        e.vars(&mut vars);
+        let deps = vars
+            .iter()
+            .filter_map(|v| b.globals.get_key_value(v).map(|(k, _)| k.as_str()))
+            .collect();
+        parsed.insert(name.as_str(), (e, deps));
     }
-    let mut done = BTreeMap::new();
-    let mut stack = Vec::new();
-    for name in parsed.keys() {
-        visit_global(name, &parsed, &mut done, &mut stack)?;
-    }
-    Ok(done)
-}
 
-/// Evaluates `name` after everything it depends on, depth-first.
-fn visit_global<'a>(
-    name: &'a str,
-    parsed: &BTreeMap<&'a str, Expr>,
-    done: &mut BTreeMap<String, Dec>,
-    stack: &mut Vec<&'a str>,
-) -> Result<(), CalcError> {
-    if done.contains_key(name) {
-        return Ok(());
-    }
-    if let Some(i) = stack.iter().position(|s| *s == name) {
-        let mut cycle: Vec<String> = stack[i..].iter().map(|s| s.to_string()).collect();
-        cycle.push(name.to_string());
-        return Err(err(format!("global {name}"), ErrorKind::GlobalCycle(cycle)));
-    }
-    // Unknown names are reported by eval below, with this global as context.
-    let Some((&key, expr)) = parsed.get_key_value(name) else {
-        return Ok(());
-    };
-    let mut deps = BTreeSet::new();
-    expr.vars(&mut deps);
-    stack.push(key);
-    for dep in &deps {
-        if let Some((&dep, _)) = parsed.get_key_value(dep.as_str()) {
-            visit_global(dep, parsed, done, stack)?;
+    // Depth-first in name order, with an explicit stack so a long chain of
+    // globals can't overflow the call stack.
+    let mut done: BTreeMap<String, Dec> = BTreeMap::new();
+    for &root in parsed.keys() {
+        if done.contains_key(root) {
+            continue;
+        }
+        // (global, index of the next dependency to visit)
+        let mut stack: Vec<(&str, usize)> = vec![(root, 0)];
+        let mut on_stack: BTreeSet<&str> = BTreeSet::from([root]);
+        while let Some(&(name, next)) = stack.last() {
+            let (expr, deps) = &parsed[name];
+            if let Some(&dep) = deps.get(next) {
+                if let Some(top) = stack.last_mut() {
+                    top.1 += 1;
+                }
+                if done.contains_key(dep) {
+                    continue;
+                }
+                if on_stack.contains(dep) {
+                    let start = stack.iter().position(|(n, _)| *n == dep).unwrap_or(0);
+                    let mut cycle: Vec<String> =
+                        stack[start..].iter().map(|(n, _)| n.to_string()).collect();
+                    cycle.push(dep.to_string());
+                    return Err(err(format!("global {dep}"), ErrorKind::GlobalCycle(cycle)));
+                }
+                stack.push((dep, 0));
+                on_stack.insert(dep);
+                continue;
+            }
+            let v = expr
+                .eval(&|n| done.get(n).copied())
+                .map_err(|e| err(format!("global {name}"), ErrorKind::Eval(e)))?;
+            done.insert(name.to_string(), v);
+            stack.pop();
+            on_stack.remove(name);
         }
     }
-    stack.pop();
-    let v = expr
-        .eval(&|n| done.get(n).copied())
-        .map_err(|e| err(format!("global {name}"), ErrorKind::Eval(e)))?;
-    done.insert(name.to_string(), v);
-    Ok(())
+    Ok(done)
 }
 
 fn check_row_ids(b: &Budget) -> Result<(), CalcError> {

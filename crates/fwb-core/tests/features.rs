@@ -108,3 +108,32 @@ fn budget_info_is_plain_data() {
         .insert("Start".into(), InfoValue::Date("2027-03-01".into()));
     assert_eq!(run(&b).net_total, run(&sample()).net_total);
 }
+
+#[test]
+fn a_long_chain_of_globals_is_fine() {
+    let mut b = sample();
+    let n = 100_000;
+    for i in 0..n {
+        b.globals
+            .insert(format!("G{i}"), format!("G{} + 1", i + 1).into());
+    }
+    b.globals.insert(format!("G{n}"), "0".into());
+    let r = run(&b);
+    assert_eq!(r.globals["G0"], Dec::from_int(n));
+}
+
+#[test]
+fn a_long_cycle_of_globals_is_reported() {
+    let mut b = sample();
+    let n = 50_000;
+    for i in 0..n {
+        b.globals
+            .insert(format!("G{i}"), format!("G{}", (i + 1) % n).into());
+    }
+    let e = recalc(&b, &RecalcOptions::default()).unwrap_err();
+    let ErrorKind::GlobalCycle(c) = e.kind else {
+        panic!("{e}")
+    };
+    assert_eq!(c.len(), n as usize + 1);
+    assert_eq!(c.first(), c.last());
+}
