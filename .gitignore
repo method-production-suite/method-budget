@@ -17,3 +17,6 @@ id_rsa*
 
 # Rust
 /target/
+
+# Reference screenshots of other tools (clean-room: never commit)
+/Screenshots/
