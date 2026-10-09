@@ -20,3 +20,4 @@ id_rsa*
 
 # Reference screenshots of other tools (clean-room: never commit)
 /Screenshots/
+/docs/research/mmb-screens.md
