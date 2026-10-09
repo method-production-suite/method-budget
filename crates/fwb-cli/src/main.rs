@@ -13,6 +13,7 @@ Usage:
   fwb check <file.fwb>                       Read and recalculate; report problems
   fwb fmt <file.fwb>                         Rewrite in canonical form
   fwb new <file.fwb>                         Write a starter budget
+  fwb sample <file.fwb>                      Write a large invented test budget (5,000 rows)
 ";
 
 fn main() -> ExitCode {
@@ -66,6 +67,17 @@ fn run(args: &[String]) -> Result<String, String> {
                 return Err(format!("{p} already exists"));
             }
             save(p, &starter::budget())?;
+            Ok(format!("wrote {p}\n"))
+        }
+        "sample" => {
+            let p = path?;
+            if std::path::Path::new(p).exists() {
+                return Err(format!("{p} already exists"));
+            }
+            save(
+                p,
+                &fwb_core::sample::budget(&fwb_core::sample::SampleSpec::default()),
+            )?;
             Ok(format!("wrote {p}\n"))
         }
         "help" | "--help" | "-h" => Ok(USAGE.to_string()),
