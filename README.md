@@ -2,7 +2,9 @@
 
 An open-source, clean-room film and TV budgeting app, written in Rust. A Darkwell project.
 
-**Status:** scaffold. Nothing usable yet.
+**Status:** engine in progress (`crates/fwb-core`): budget model, formulas and globals,
+fringes with cutoffs and ranges, groups, currencies, charges, credits and topsheet totals.
+No file format or UI yet. Design choices live in [docs/decisions.md](docs/decisions.md).
 
 ## Scope (v1)
 1. **Budgeting engine** (`crates/fwb-core`): topsheet, account and detail levels, fringes,

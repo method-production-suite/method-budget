@@ -1,16 +1,28 @@
 //! The budget document: what a user edits and what the native format will store.
 //!
-//! Hierarchy: [`Budget`] > [`Category`] (topsheet line) > [`Account`] > [`Detail`].
-//! Maps are `BTreeMap`/`BTreeSet` so iteration order, and therefore output, is stable.
+//! Hierarchy: [`Budget`] > topsheet ([`TopsheetRow`]: categories and production
+//! totals) > [`Account`] > [`Detail`] rows. Maps are `BTreeMap`/`BTreeSet` so
+//! iteration order, and therefore output, is stable.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::decimal::Dec;
 use crate::Cents;
 
+/// Stable identity of a detail row. Survives reordering and edits, so versions,
+/// comparisons and imports can match rows. Unique within a budget.
+pub type RowId = u64;
+
 /// An expression source string such as `"30"`, `"SHOOT_DAYS"` or `"WEEKS * 5"`.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// Blank means "not filled in"; see [`Detail`] for what blank counts as.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Formula(pub String);
+
+impl Formula {
+    pub fn is_blank(&self) -> bool {
+        self.0.trim().is_empty()
+    }
+}
 
 impl From<&str> for Formula {
     fn from(s: &str) -> Formula {
@@ -39,18 +51,26 @@ impl From<Dec> for Formula {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Budget {
     pub title: String,
-    /// ISO-style code totals are reported in, e.g. `"USD"`.
+    /// Currency code totals are reported in, and that blank-currency lines use.
     pub base_currency: String,
-    /// Base-currency units per one unit of each foreign currency.
-    pub exchange_rates: BTreeMap<String, Dec>,
+    /// Foreign currencies, keyed by code.
+    pub currencies: BTreeMap<String, Currency>,
     /// Named values usable in any formula. May refer to each other, not cyclically.
     pub globals: BTreeMap<String, Formula>,
+    /// Units, keyed by singular name. Lines refer to them by name.
+    pub units: BTreeMap<String, UnitDef>,
     /// Fringe definitions, keyed by the name details use to apply them.
     pub fringes: BTreeMap<String, Fringe>,
-    /// Topsheet lines, in display order.
-    pub categories: Vec<Category>,
-    /// Applied below the line, in order, to the budget subtotal.
-    pub contractual_charges: Vec<ContractualCharge>,
+    pub fringe_posting: FringePosting,
+    pub groups: BTreeMap<String, Group>,
+    pub sets: BTreeMap<String, SetDef>,
+    pub locations: BTreeMap<String, Location>,
+    /// Categories and production-total rows, in display order.
+    pub topsheet: Vec<TopsheetRow>,
+    /// Contractual charges, in application order.
+    pub charges: Vec<Charge>,
+    /// Applied credits (incentives), in application order.
+    pub credits: Vec<Credit>,
 }
 
 impl Budget {
@@ -58,18 +78,146 @@ impl Budget {
         Budget {
             title: title.into(),
             base_currency: base_currency.into(),
-            exchange_rates: BTreeMap::new(),
+            currencies: BTreeMap::new(),
             globals: BTreeMap::new(),
+            units: default_units(),
             fringes: BTreeMap::new(),
-            categories: Vec::new(),
-            contractual_charges: Vec::new(),
+            fringe_posting: FringePosting::default(),
+            groups: BTreeMap::new(),
+            sets: BTreeMap::new(),
+            locations: BTreeMap::new(),
+            topsheet: Vec::new(),
+            charges: Vec::new(),
+            credits: Vec::new(),
+        }
+    }
+
+    pub fn categories(&self) -> impl Iterator<Item = &Category> {
+        self.topsheet.iter().filter_map(|r| match r {
+            TopsheetRow::Category(c) => Some(c),
+            TopsheetRow::ProductionTotal(_) => None,
+        })
+    }
+
+    pub fn categories_mut(&mut self) -> impl Iterator<Item = &mut Category> {
+        self.topsheet.iter_mut().filter_map(|r| match r {
+            TopsheetRow::Category(c) => Some(c),
+            TopsheetRow::ProductionTotal(_) => None,
+        })
+    }
+}
+
+/// Our starter units. Hours equivalences are editable per budget (decisions.md).
+pub fn default_units() -> BTreeMap<String, UnitDef> {
+    let u = |plural: &str, hours: Option<i64>| UnitDef {
+        plural: plural.into(),
+        description: String::new(),
+        hours: hours.map(Dec::from_int),
+    };
+    BTreeMap::from([
+        ("Allow".into(), u("Allow", None)),
+        ("Day".into(), u("Days", Some(10))),
+        ("Flat".into(), u("Flat", None)),
+        ("Hour".into(), u("Hours", Some(1))),
+        ("Month".into(), u("Months", Some(200))),
+        ("Week".into(), u("Weeks", Some(50))),
+    ])
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Currency {
+    pub description: String,
+    pub symbol: String,
+    /// Base-currency units per one unit of this currency.
+    pub rate: Dec,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UnitDef {
+    pub plural: String,
+    pub description: String,
+    /// How many hours one of this unit is. `None` for non-time units.
+    pub hours: Option<Dec>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Fringe {
+    pub description: String,
+    /// For `Percent`, the percentage (`"7.65"` is 7.65%). For `Flat`, the amount
+    /// in base-currency units. May use globals.
+    pub rate: Formula,
+    pub kind: FringeKind,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FringeKind {
+    /// `rate`% of the earner's subtotal, capped at `cutoff` when set. The earner
+    /// is a single line, or a whole fringe range (see [`Detail::fringe_range`]).
+    Percent { cutoff: Option<Cents> },
+    /// `rate` once per line. When `unit` and the line's primary unit both have
+    /// hours, it's charged per unit instead, scaled by the hours ratio and
+    /// multiplied by the line's quantity (amount x X x 4X).
+    Flat { unit: Option<String> },
+}
+
+/// Where fringe dollars show up. They never show on the line itself.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FringePosting {
+    /// One Total Fringes row for the budget, outside ATL and BTL.
+    Budget,
+    /// One fringe row above each production total, inside that level.
+    ProductionLevel,
+    /// A fringe account at the end of each category, numbered category code + suffix.
+    Category { suffix: String },
+    /// A fringe line at the end of each account.
+    Account,
+}
+
+impl Default for FringePosting {
+    fn default() -> FringePosting {
+        FringePosting::Category {
+            suffix: "99".into(),
         }
     }
 }
 
-/// A topsheet line such as "Above-the-line" or "Post".
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Group {
+    pub description: String,
+    /// "In budget total". When false, every line tagged with this group is
+    /// suppressed: shown, but counted as 0 everywhere.
+    pub in_budget_total: bool,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SetDef {
+    pub description: String,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Location {
+    pub description: String,
+    pub city: String,
+    pub region: String,
+    pub country: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TopsheetRow {
+    Category(Category),
+    /// Subtotals every category since the previous production total. The first
+    /// one marks the end of above-the-line.
+    ProductionTotal(ProductionTotal),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProductionTotal {
+    pub name: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Category {
+    pub code: String,
     pub name: String,
     pub accounts: Vec<Account>,
 }
@@ -82,83 +230,165 @@ pub struct Account {
     pub details: Vec<Detail>,
 }
 
-/// One line item. Total = amount x multiplier x rate, in `currency`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RowKind {
+    /// A costed line: amount x X x rate x 4X. With everything blank it's a title line.
+    Line,
+    /// Shows the running total of rows since the previous subtotal row. Adds nothing.
+    Subtotal,
+    /// A real cost whose rate is locked to the sum of the lines above it, back to
+    /// the previous adjustment row. Amount and multipliers set the percentage.
+    Adjustment,
+}
+
+/// One row in an account.
+///
+/// Blank formulas: `amount` and `rate` count as 0, `x` and `x4` as 1.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Detail {
+    pub id: RowId,
+    pub kind: RowKind,
     pub description: String,
     pub amount: Formula,
-    pub units: Unit,
-    /// The "X" column: people, episodes, and so on.
-    pub multiplier: Formula,
+    /// Primary unit name. The only unit used for flat-fringe hour conversion.
+    pub unit: String,
+    pub x: Formula,
+    pub unit2: String,
     pub rate: Formula,
-    /// `None` means the budget's base currency.
+    pub unit3: String,
+    pub x4: Formula,
+    pub unit4: String,
+    /// `None` means the base currency. Ignored on adjustment rows.
     pub currency: Option<String>,
     /// Names of fringes from [`Budget::fringes`] applied to this line.
     pub fringes: BTreeSet<String>,
     pub groups: BTreeSet<String>,
     pub location: Option<String>,
     pub set: Option<String>,
+    /// Consecutive lines with the same `Some(n)` form one fringe range: percent
+    /// fringe cutoffs apply to their combined subtotal, as one earner.
+    pub fringe_range: Option<u32>,
 }
 
 impl Detail {
-    /// A line with multiplier 1, base currency and no fringes, groups or tags.
-    pub fn new(
-        description: impl Into<String>,
-        amount: impl Into<Formula>,
-        units: Unit,
-        rate: impl Into<Formula>,
-    ) -> Detail {
+    fn blank(id: RowId, kind: RowKind, description: String) -> Detail {
         Detail {
-            description: description.into(),
-            amount: amount.into(),
-            units,
-            multiplier: Formula::from(1),
-            rate: rate.into(),
+            id,
+            kind,
+            description,
+            amount: Formula::default(),
+            unit: String::new(),
+            x: Formula::default(),
+            unit2: String::new(),
+            rate: Formula::default(),
+            unit3: String::new(),
+            x4: Formula::default(),
+            unit4: String::new(),
             currency: None,
             fringes: BTreeSet::new(),
             groups: BTreeSet::new(),
             location: None,
             set: None,
+            fringe_range: None,
+        }
+    }
+
+    /// A costed line: `amount` `unit` at `rate`, with blank X and 4X.
+    pub fn line(
+        id: RowId,
+        description: impl Into<String>,
+        amount: impl Into<Formula>,
+        unit: impl Into<String>,
+        rate: impl Into<Formula>,
+    ) -> Detail {
+        Detail {
+            amount: amount.into(),
+            unit: unit.into(),
+            rate: rate.into(),
+            ..Detail::blank(id, RowKind::Line, description.into())
+        }
+    }
+
+    pub fn subtotal(id: RowId, description: impl Into<String>) -> Detail {
+        Detail::blank(id, RowKind::Subtotal, description.into())
+    }
+
+    /// An adjustment row; `amount` is usually a fraction like `"0.1"` for 10%.
+    pub fn adjustment(
+        id: RowId,
+        description: impl Into<String>,
+        amount: impl Into<Formula>,
+    ) -> Detail {
+        Detail {
+            amount: amount.into(),
+            ..Detail::blank(id, RowKind::Adjustment, description.into())
         }
     }
 }
 
-/// Label for what `amount` counts. Informational; it does not change the math.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Unit {
-    Allow,
-    Flat,
-    Hours,
-    Days,
-    Weeks,
-    Months,
-    Each,
-    Other(String),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Fringe {
-    /// `percent` of the line's base-currency total (18.5 means 18.5%). With a
-    /// `wage_cap`, only the first `wage_cap` cents of each line are fringed.
-    Percent {
-        percent: Dec,
-        wage_cap: Option<Cents>,
-    },
-    /// `per_unit` cents for every unit on the line (amount x multiplier), with
-    /// units optionally capped at `unit_cap`.
-    FlatPerUnit {
-        per_unit: Cents,
-        unit_cap: Option<Dec>,
-    },
-}
-
-/// A percent-of-subtotal line such as contingency, insurance or a fee.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ContractualCharge {
+pub struct Charge {
     pub name: String,
-    pub percent: Dec,
-    /// Account codes left out of this charge's base.
+    pub account: Option<String>,
+    /// Only applied charges count. Unapplied ones are kept for reuse.
+    pub applied: bool,
+    pub kind: ChargeKind,
+    /// Manual exclusions: (description, amount).
+    pub excluded_amounts: Vec<(String, Cents)>,
+    pub excluded_groups: BTreeSet<String>,
+    pub excluded_categories: BTreeSet<String>,
     pub excluded_accounts: BTreeSet<String>,
-    /// Whether fringes count toward the base, not just line totals.
-    pub include_fringes: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ChargeKind {
+    /// Percent of ATL + BTL, less exclusions. `10` means 10%.
+    Percent(Dec),
+    /// A fixed fee, less excluded amounts and excluded group totals.
+    Flat {
+        amount: Cents,
+        currency: Option<String>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Credit {
+    pub name: String,
+    pub account: Option<String>,
+    pub applied: bool,
+    /// Ceiling on the sum of the row credits.
+    pub cap: Option<Cents>,
+    /// Taken off after the cap, e.g. a broker's fee for selling the credit. `5` = 5%.
+    pub discount_percent: Dec,
+    pub rows: Vec<CreditRow>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CreditRow {
+    pub description: String,
+    pub source: CreditSource,
+    /// `25` means 25% of the row's net spend.
+    pub percent: Dec,
+    pub cap: CreditCap,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CreditSource {
+    /// A gross amount typed in directly.
+    Flat(Cents),
+    /// The total of lines tagged with `group`, plus their fringes except
+    /// `excluded_fringes`.
+    Group {
+        group: String,
+        excluded_fringes: BTreeSet<String>,
+    },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CreditCap {
+    None,
+    /// Caps the spend the percent applies to.
+    QualifiedSpend(Cents),
+    /// Caps the resulting credit.
+    Credit(Cents),
 }

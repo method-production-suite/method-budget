@@ -3,14 +3,12 @@
 //! Uses a small seeded generator instead of a property-testing crate, so the
 //! engine stays dependency-free. Each failure prints its seed for replay.
 
-use std::collections::BTreeSet;
+mod common;
 
-use fwb_core::calc::Report;
-use fwb_core::{
-    recalc, Account, Budget, Category, ContractualCharge, Dec, Detail, Fringe, RecalcOptions, Unit,
-};
+use common::*;
+use fwb_core::*;
 
-const CASES: u64 = 500;
+const CASES: u64 = 400;
 
 /// xorshift64*: tiny, deterministic, good enough for test data.
 struct Rng(u64);
@@ -30,173 +28,265 @@ impl Rng {
     fn chance(&mut self, pct: u64) -> bool {
         self.below(100) < pct
     }
+
+    fn pick<'a>(&mut self, items: &[&'a str]) -> &'a str {
+        items[self.below(items.len() as u64) as usize]
+    }
 }
 
-fn d(s: &str) -> Dec {
-    s.parse().unwrap()
+fn gen_detail(rng: &mut Rng, id: RowId, range: Option<u32>) -> Detail {
+    let mut det = match rng.below(10) {
+        0 => return Detail::subtotal(id, "sub"),
+        1 => Detail::adjustment(id, "adj", format!("0.{}", rng.below(30)).as_str()),
+        _ => {
+            let amount = match rng.below(3) {
+                0 => "DAYS".to_string(),
+                1 => "WEEKS".to_string(),
+                _ => rng.below(50).to_string(),
+            };
+            let rate = format!("{}.{:02}", rng.below(5_000), rng.below(100));
+            let unit = rng.pick(&["Day", "Week", "Hour", "Flat", ""]);
+            let mut det = Detail::line(id, "line", amount.as_str(), unit, rate.as_str());
+            det.x = (rng.below(3) as i64 + 1).into();
+            if rng.chance(20) {
+                det.x4 = (rng.below(4) as i64 + 1).into();
+            }
+            det.currency = match rng.below(5) {
+                0 => Some("CAD".into()),
+                1 => Some("GBP".into()),
+                _ => None,
+            };
+            for f in ["PCT", "CAPPED", "FLAT", "DAILY"] {
+                if rng.chance(30) {
+                    det.fringes.insert(f.into());
+                }
+            }
+            det.fringe_range = range;
+            det
+        }
+    };
+    for g in ["A", "B", "OFF"] {
+        if rng.chance(20) {
+            det.groups.insert(g.into());
+        }
+    }
+    if rng.chance(30) {
+        det.set = Some(rng.pick(&["S1", "S2"]).into());
+    }
+    det
 }
 
 fn gen_budget(rng: &mut Rng) -> Budget {
     let mut b = Budget::new("random", "USD");
-    b.exchange_rates.insert("CAD".into(), d("0.73"));
-    b.exchange_rates.insert("GBP".into(), d("1.27"));
+    for (code, rate) in [("CAD", "0.73"), ("GBP", "1.27")] {
+        b.currencies.insert(
+            code.into(),
+            Currency {
+                description: String::new(),
+                symbol: String::new(),
+                rate: d(rate),
+            },
+        );
+    }
     b.globals
         .insert("DAYS".into(), (rng.below(60) as i64 + 1).into());
     b.globals.insert("WEEKS".into(), "DAYS / 5".into());
+    let fringe = |rate: &str, kind| Fringe {
+        description: String::new(),
+        rate: rate.into(),
+        kind,
+    };
     b.fringes.insert(
         "PCT".into(),
-        Fringe::Percent {
-            percent: d("18.5"),
-            wage_cap: Some(rng.below(5_000_000) as i64),
-        },
+        fringe("18.5", FringeKind::Percent { cutoff: None }),
     );
     b.fringes.insert(
-        "FLAT".into(),
-        Fringe::FlatPerUnit {
-            per_unit: 2_500,
-            unit_cap: None,
-        },
+        "CAPPED".into(),
+        fringe(
+            "7.65",
+            FringeKind::Percent {
+                cutoff: Some(rng.below(3_000_000) as i64),
+            },
+        ),
     );
+    b.fringes
+        .insert("FLAT".into(), fringe("25", FringeKind::Flat { unit: None }));
+    b.fringes.insert(
+        "DAILY".into(),
+        fringe(
+            "12.5",
+            FringeKind::Flat {
+                unit: Some("Day".into()),
+            },
+        ),
+    );
+    b.fringe_posting = match rng.below(4) {
+        0 => FringePosting::Budget,
+        1 => FringePosting::ProductionLevel,
+        2 => FringePosting::Account,
+        _ => FringePosting::Category {
+            suffix: "99".into(),
+        },
+    };
+    b.groups.insert("A".into(), group(true));
+    b.groups.insert("B".into(), group(true));
+    b.groups.insert("OFF".into(), group(false));
 
-    let mut code = 1000;
-    for c in 0..=rng.below(4) {
+    let (mut id, mut code, mut range) = (0, 1000, 0);
+    for c in 0..=rng.below(5) {
         let mut accounts = Vec::new();
-        for _ in 0..=rng.below(5) {
+        for _ in 0..=rng.below(4) {
             code += 10;
             let mut details = Vec::new();
-            for i in 0..rng.below(7) {
-                let amount = match rng.below(3) {
-                    0 => "DAYS".to_string(),
-                    1 => "WEEKS".to_string(),
-                    _ => rng.below(50).to_string(),
-                };
-                let rate = format!("{}.{:02}", rng.below(5_000), rng.below(100));
-                let mut det = Detail::new(
-                    format!("line {i}"),
-                    amount.as_str(),
-                    Unit::Days,
-                    rate.as_str(),
-                );
-                det.multiplier = (rng.below(3) as i64 + 1).into();
-                det.currency = match rng.below(4) {
-                    0 => Some("CAD".into()),
-                    1 => Some("GBP".into()),
-                    _ => None,
-                };
-                for f in ["PCT", "FLAT"] {
-                    if rng.chance(40) {
-                        det.fringes.insert(f.into());
-                    }
+            let mut current = None;
+            for _ in 0..rng.below(8) {
+                // Ranges are contiguous blocks, each with its own number.
+                if rng.chance(25) {
+                    range += 1;
+                    current = if rng.chance(50) { Some(range) } else { None };
                 }
-                for g in ["A", "B"] {
-                    if rng.chance(25) {
-                        det.groups.insert(g.into());
-                    }
-                }
-                details.push(det);
+                id += 1;
+                details.push(gen_detail(rng, id, current));
             }
-            accounts.push(Account {
-                code: code.to_string(),
-                name: format!("acct {code}"),
-                details,
-            });
+            accounts.push(account(&code.to_string(), "acct", details));
         }
-        b.categories.push(Category {
-            name: format!("cat {c}"),
-            accounts,
-        });
+        b.topsheet
+            .push(category(&format!("{c}000"), "cat", accounts));
+        if rng.chance(50) {
+            b.topsheet.push(level("level"));
+        }
     }
-    b.contractual_charges.push(ContractualCharge {
-        name: "Contingency".into(),
-        percent: d("10"),
-        excluded_accounts: BTreeSet::from(["1010".to_string()]),
-        include_fringes: rng.chance(50),
+
+    let mut charge = percent_charge("Contingency", "10");
+    charge.excluded_groups = set(&["B"]);
+    charge.excluded_accounts = set(&["1010"]);
+    b.charges.push(charge);
+    b.charges.push(Charge {
+        kind: ChargeKind::Flat {
+            amount: 250_000,
+            currency: Some("GBP".into()),
+        },
+        ..percent_charge("Fee", "0")
+    });
+    b.credits.push(Credit {
+        name: "Credit".into(),
+        account: None,
+        applied: true,
+        cap: Some(rng.below(2_000_000) as i64),
+        discount_percent: d("5"),
+        rows: vec![CreditRow {
+            description: String::new(),
+            source: CreditSource::Group {
+                group: "A".into(),
+                excluded_fringes: set(&["FLAT"]),
+            },
+            percent: d("25"),
+            cap: CreditCap::QualifiedSpend(rng.below(5_000_000) as i64),
+        }],
     });
     b
 }
 
-fn check_rollups(r: &Report, seed: u64) {
+fn check_rollups(b: &Budget, r: &Report, seed: u64) {
+    let msg = format!("seed {seed}");
+    let posting = &b.fringe_posting;
     let mut all_fringes = 0;
+    let mut posted = r.budget_fringes;
     for cat in &r.categories {
         for acct in &cat.accounts {
-            for det in &acct.details {
-                assert_eq!(
-                    det.fringe_total,
-                    det.fringes.values().sum::<i64>(),
-                    "seed {seed}"
-                );
-                if !det.included {
-                    assert_eq!((det.total, det.fringe_total), (0, 0), "seed {seed}");
+            for row in &acct.rows {
+                assert_eq!(row.fringe_total, row.fringes.values().sum::<i64>(), "{msg}");
+                if !row.included || row.kind != RowKind::Line {
+                    assert_eq!(row.fringe_total, 0, "{msg}");
                 }
-                all_fringes += det.fringe_total;
+                if !row.included {
+                    assert_eq!(row.total, 0, "{msg}");
+                }
+                all_fringes += row.fringe_total;
             }
             assert_eq!(
                 acct.details_total,
-                acct.details.iter().map(|d| d.total).sum::<i64>(),
-                "seed {seed}"
+                acct.rows.iter().map(|r| r.total).sum::<i64>(),
+                "{msg}"
             );
             assert_eq!(
                 acct.fringe_total,
-                acct.details.iter().map(|d| d.fringe_total).sum::<i64>(),
-                "seed {seed}"
+                acct.rows.iter().map(|r| r.fringe_total).sum::<i64>(),
+                "{msg}"
             );
-            assert_eq!(
-                acct.total,
-                acct.details_total + acct.fringe_total,
-                "seed {seed}"
-            );
+            let expect = match posting {
+                FringePosting::Account => acct.details_total + acct.fringe_total,
+                _ => acct.details_total,
+            };
+            assert_eq!(acct.total, expect, "{msg}");
+            if *posting == FringePosting::Account {
+                posted += acct.fringe_total;
+            }
         }
+        let fa = cat.fringe_account.as_ref().map_or(0, |f| f.1);
+        posted += fa;
         assert_eq!(
-            cat.details_total,
-            cat.accounts.iter().map(|a| a.details_total).sum::<i64>(),
-            "seed {seed}"
+            cat.total,
+            cat.accounts.iter().map(|a| a.total).sum::<i64>() + fa,
+            "{msg}"
         );
         assert_eq!(
             cat.fringe_total,
             cat.accounts.iter().map(|a| a.fringe_total).sum::<i64>(),
-            "seed {seed}"
-        );
-        assert_eq!(
-            cat.total,
-            cat.accounts.iter().map(|a| a.total).sum::<i64>(),
-            "seed {seed}"
+            "{msg}"
         );
     }
+    for l in &r.levels {
+        posted += l.posted_fringes;
+        let cats: i64 = r.categories[l.start..l.end].iter().map(|c| c.total).sum();
+        assert_eq!(l.total, cats + l.posted_fringes, "{msg}");
+    }
     assert_eq!(
-        r.fringe_totals.values().sum::<i64>(),
+        posted, all_fringes,
+        "every fringe dollar posts exactly once, {msg}"
+    );
+    assert_eq!(
+        r.fringes.values().map(|f| f.total).sum::<i64>(),
         all_fringes,
-        "seed {seed}"
+        "{msg}"
     );
     assert_eq!(
-        r.subtotal,
-        r.categories.iter().map(|c| c.total).sum::<i64>(),
-        "seed {seed}"
+        r.total_atl + r.total_btl,
+        r.levels.iter().map(|l| l.total).sum::<i64>(),
+        "{msg}"
     );
+    assert_eq!(r.atl_btl, r.total_atl + r.total_btl, "{msg}");
+    let charges: i64 = r.charges.iter().map(|c| c.amount).sum();
     assert_eq!(
         r.grand_total,
-        r.subtotal + r.contractual.iter().map(|c| c.amount).sum::<i64>(),
-        "seed {seed}"
+        r.atl_btl + r.budget_fringes + charges,
+        "{msg}"
     );
+    assert_eq!(
+        r.credits_total,
+        r.credits.iter().map(|c| c.amount).sum::<i64>(),
+        "{msg}"
+    );
+    assert_eq!(r.net_total, r.grand_total - r.credits_total, "{msg}");
 }
 
 #[test]
 fn rollups_always_agree() {
     for seed in 1..=CASES {
-        let mut rng = Rng(seed);
-        let b = gen_budget(&mut rng);
+        let b = gen_budget(&mut Rng(seed));
         for opts in [
             RecalcOptions::default(),
             RecalcOptions {
-                exclude_groups: BTreeSet::from(["A".to_string()]),
+                exclude_groups: set(&["A"]),
                 ..Default::default()
             },
             RecalcOptions {
-                only_groups: Some(BTreeSet::from(["B".to_string()])),
+                only_groups: Some(set(&["B"])),
                 ..Default::default()
             },
         ] {
-            let r = recalc(&b, &opts).unwrap();
-            check_rollups(&r, seed);
+            let r = recalc(&b, &opts).unwrap_or_else(|e| panic!("seed {seed}: {e}"));
+            check_rollups(&b, &r, seed);
         }
     }
 }
@@ -204,23 +294,77 @@ fn rollups_always_agree() {
 #[test]
 fn excluding_a_group_equals_deleting_its_lines() {
     for seed in 1..=CASES {
-        let mut rng = Rng(seed);
-        let b = gen_budget(&mut rng);
+        let b = gen_budget(&mut Rng(seed));
         let opts = RecalcOptions {
-            exclude_groups: BTreeSet::from(["A".to_string()]),
+            exclude_groups: set(&["A"]),
             ..Default::default()
         };
         let filtered = recalc(&b, &opts).unwrap();
 
         let mut pruned = b.clone();
-        for acct in pruned.categories.iter_mut().flat_map(|c| &mut c.accounts) {
-            acct.details.retain(|d| !d.groups.contains("A"));
+        for acct in pruned.categories_mut().flat_map(|c| &mut c.accounts) {
+            acct.details
+                .retain(|d| d.kind == RowKind::Subtotal || !d.groups.contains("A"));
         }
         let direct = recalc(&pruned, &RecalcOptions::default()).unwrap();
 
-        assert_eq!(filtered.subtotal, direct.subtotal, "seed {seed}");
+        assert_eq!(filtered.atl_btl, direct.atl_btl, "seed {seed}");
         assert_eq!(filtered.grand_total, direct.grand_total, "seed {seed}");
-        assert_eq!(filtered.contractual, direct.contractual, "seed {seed}");
+        assert_eq!(filtered.charges, direct.charges, "seed {seed}");
+        assert_eq!(
+            filtered.fringes,
+            direct
+                .fringes
+                .iter()
+                .map(|(k, v)| {
+                    // Uses count every tagged line, filtered or not.
+                    (
+                        k.clone(),
+                        FringeSummary {
+                            uses: filtered.fringes[k].uses,
+                            total: v.total,
+                        },
+                    )
+                })
+                .collect(),
+            "seed {seed}"
+        );
+    }
+}
+
+#[test]
+fn suppressed_group_equals_excluding_it() {
+    for seed in 1..=CASES {
+        let mut b = gen_budget(&mut Rng(seed));
+        b.groups.insert("OFF".into(), group(true));
+        let opts = RecalcOptions {
+            exclude_groups: set(&["OFF"]),
+            ..Default::default()
+        };
+        let excluded = recalc(&b, &opts).unwrap();
+        b.groups.insert("OFF".into(), group(false));
+        let suppressed = recalc(&b, &RecalcOptions::default()).unwrap();
+        assert_eq!(excluded.categories, suppressed.categories, "seed {seed}");
+        assert_eq!(excluded.net_total, suppressed.net_total, "seed {seed}");
+    }
+}
+
+#[test]
+fn full_group_totals_ignore_filters() {
+    for seed in 1..=CASES {
+        let b = gen_budget(&mut Rng(seed));
+        let plain = recalc(&b, &RecalcOptions::default()).unwrap();
+        let filtered = recalc(
+            &b,
+            &RecalcOptions {
+                exclude_groups: set(&["A", "B"]),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        for g in ["A", "B", "OFF"] {
+            assert_eq!(plain.groups[g].full, filtered.groups[g].full, "seed {seed}");
+        }
     }
 }
 

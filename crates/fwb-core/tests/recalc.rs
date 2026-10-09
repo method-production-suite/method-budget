@@ -1,135 +1,151 @@
 //! End-to-end recalc scenarios with hand-checked numbers.
 
+mod common;
+
 use std::collections::BTreeSet;
 
-use fwb_core::{
-    recalc, Account, Budget, Category, ContractualCharge, Dec, Detail, ErrorKind, Fringe,
-    RecalcOptions, Unit,
-};
+use common::*;
+use fwb_core::*;
 
-fn d(s: &str) -> Dec {
-    s.parse().unwrap()
-}
-
-fn set(items: &[&str]) -> BTreeSet<String> {
-    items.iter().map(|s| s.to_string()).collect()
-}
-
-fn account(code: &str, name: &str, details: Vec<Detail>) -> Account {
-    Account {
-        code: code.into(),
-        name: name.into(),
-        details,
-    }
-}
-
-fn sample() -> Budget {
-    let mut b = Budget::new("Sample Feature", "USD");
-    b.exchange_rates.insert("CAD".into(), d("0.73"));
-    b.globals.insert("SHOOT_DAYS".into(), "30".into());
-    b.globals
-        .insert("PREP_DAYS".into(), "SHOOT_DAYS / 3".into());
-    b.fringes.insert(
-        "FICA".into(),
-        Fringe::Percent {
-            percent: d("7.65"),
-            wage_cap: Some(1_000_000),
-        },
-    );
-    b.fringes.insert(
-        "PH".into(),
-        Fringe::FlatPerUnit {
-            per_unit: 5_000,
-            unit_cap: None,
-        },
-    );
-
-    let mut writer = Detail::new("Writer", 1, Unit::Flat, 150_000);
-    writer.fringes = set(&["FICA"]);
-
-    let mut grip = Detail::new("Key grip", "SHOOT_DAYS + PREP_DAYS", Unit::Days, 450);
-    grip.multiplier = 3.into();
-    grip.fringes = set(&["FICA", "PH"]);
-
-    let mut camera = Detail::new("Camera package", 6, Unit::Weeks, "1200.50");
-    camera.currency = Some("CAD".into());
-    camera.groups = set(&["OptionA"]);
-
-    b.categories = vec![
-        Category {
-            name: "Above-the-line".into(),
-            accounts: vec![account("1100", "Writing", vec![writer])],
-        },
-        Category {
-            name: "Production".into(),
-            accounts: vec![account("2000", "Crew and equipment", vec![grip, camera])],
-        },
-        Category {
-            name: "Post".into(),
-            accounts: vec![account(
-                "5000",
-                "Editorial",
-                vec![Detail::new("Editor", 10, Unit::Weeks, 3_000)],
-            )],
-        },
-    ];
-    b.contractual_charges = vec![
-        ContractualCharge {
-            name: "Contingency".into(),
-            percent: d("10"),
-            excluded_accounts: BTreeSet::new(),
-            include_fringes: true,
-        },
-        ContractualCharge {
-            name: "Insurance".into(),
-            percent: d("2.5"),
-            excluded_accounts: set(&["1100"]),
-            include_fringes: false,
-        },
-    ];
-    b
+fn run(b: &Budget) -> Report {
+    recalc(b, &RecalcOptions::default()).unwrap()
 }
 
 #[test]
-fn sample_budget_totals() {
-    let r = recalc(&sample(), &RecalcOptions::default()).unwrap();
-
+fn sample_lines_and_rows() {
+    let r = run(&sample());
     assert_eq!(r.globals["PREP_DAYS"], d("10"));
 
-    let atl = &r.categories[0];
-    assert_eq!(atl.details_total, 15_000_000);
-    assert_eq!(
-        atl.fringe_total, 76_500,
-        "FICA stops at the $10,000 wage cap"
-    );
-
     let crew = &r.categories[1].accounts[0];
-    let grip = &crew.details[0];
+    let [grip, ot, sub, camera, adj, supp] = &crew.rows[..] else {
+        panic!("6 rows")
+    };
+
     assert_eq!(grip.quantity, d("120"));
     assert_eq!(grip.total, 5_400_000);
-    assert_eq!(grip.fringes["FICA"], 76_500);
-    assert_eq!(grip.fringes["PH"], 600_000, "$50 x 120 person-days");
+    assert_eq!(ot.total, 200_000);
+    assert_eq!(sub.subtotal, Some(5_600_000));
+    assert_eq!(sub.total, 0, "subtotal rows add nothing");
 
-    let camera = &crew.details[1];
     assert_eq!(camera.currency, "CAD");
     assert_eq!(camera.local_total, 720_300);
     assert_eq!(camera.total, 525_819, "720,300 CAD cents x 0.73");
 
-    assert_eq!(r.categories[1].total, 6_602_319);
-    assert_eq!(r.categories[2].total, 3_000_000);
-    assert_eq!(r.subtotal, 24_678_819);
+    // 10% of everything above it: 5,400,000 + 200,000 + 525,819 = 6,125,819.
+    assert_eq!(adj.total, 612_582);
 
-    assert_eq!(r.fringe_totals["FICA"], 153_000);
-    assert_eq!(r.fringe_totals["PH"], 600_000);
+    assert!(!supp.included, "Suppress group has in-budget-total off");
+    assert_eq!(supp.total, 0);
 
-    assert_eq!(r.contractual[0].base, 24_678_819);
+    assert_eq!(crew.details_total, 6_738_401);
+}
+
+#[test]
+fn sample_fringes() {
+    let r = run(&sample());
+    let atl = &r.categories[0];
+    assert_eq!(atl.fringe_total, 76_500, "FICA stops at the $10,000 cutoff");
+
+    let rows = &r.categories[1].accounts[0].rows;
+    // Grip and overtime are one earner: 5,600,000 caps to 1,000,000, so one
+    // 76,500 FICA split 54:2 between them.
+    assert_eq!(rows[0].fringes["FICA"], 73_768);
+    assert_eq!(rows[1].fringes["FICA"], 2_732);
+    // $50 per day x 120 person-days.
+    assert_eq!(rows[0].fringes["PH"], 600_000);
+    assert_eq!(r.categories[1].fringe_total, 676_500);
+
     assert_eq!(
-        r.contractual[0].amount, 2_467_882,
-        "10% of 24,678,819 rounds up"
+        r.fringes["FICA"],
+        FringeSummary {
+            uses: 3,
+            total: 153_000
+        }
     );
-    assert_eq!(r.contractual[1].base, 8_925_819, "no 1100, no fringes");
-    assert_eq!(r.contractual[1].amount, 223_145);
-    assert_eq!(r.grand_total, 27_369_846);
+    assert_eq!(
+        r.fringes["PH"],
+        FringeSummary {
+            uses: 1,
+            total: 600_000
+        }
+    );
+}
+
+#[test]
+fn sample_topsheet() {
+    let r = run(&sample());
+
+    // Fringes post to a fringe account in each category.
+    assert_eq!(
+        r.categories[0].fringe_account,
+        Some(("100099".into(), 76_500))
+    );
+    assert_eq!(r.categories[0].total, 15_076_500);
+    assert_eq!(r.categories[1].total, 7_414_901);
+    assert_eq!(r.categories[2].total, 3_000_000);
+
+    assert_eq!(r.levels.len(), 3);
+    assert_eq!(r.total_atl, 15_076_500);
+    assert_eq!(r.total_btl, 10_414_901);
+    assert_eq!(r.atl_btl, 25_491_401);
+
+    let c: Vec<_> = r
+        .charges
+        .iter()
+        .map(|c| (c.name.as_str(), c.amount))
+        .collect();
+    assert_eq!(
+        c,
+        [
+            ("Contingency", 2_549_140),
+            // (25,491,401 - 15,076,500 writer and fringes - 100,000 deposit) x 2.5%
+            ("Insurance", 257_873),
+            // 500,000 CAD cents x 0.73
+            ("Bond fee", 365_000),
+        ]
+    );
+    assert_eq!(r.grand_total, 28_663_414);
+
+    // (3,000,000 x 30% + min(250,000, 200,000)) less 10% discount.
+    assert_eq!(r.credits[0].amount, 990_000);
+    assert_eq!(r.credits_total, 990_000);
+    assert_eq!(r.net_total, 27_673_414);
+}
+
+#[test]
+fn sample_breakdowns() {
+    let b = sample();
+    let r = run(&b);
+    let g = |name: &str| &r.groups[name];
+    assert_eq!(g("OptionA").active.details_total, 525_819);
+    assert_eq!(g("Suppress").full.details_total, 100_000);
+    assert_eq!(g("Suppress").active.details_total, 0);
+    assert_eq!(g("Incentive").active.details_total, 3_000_000);
+    assert_eq!(r.sets["Cutting room"].details_total, 3_000_000);
+    assert_eq!(r.locations["LA"].details_total, 3_000_000);
+
+    let sel = selection_totals(&b, &r, &BTreeSet::from([2, 3])).unwrap();
+    assert_eq!(
+        sel.lines,
+        Breakdown {
+            details_total: 5_600_000,
+            fringe_total: 676_500
+        }
+    );
+    assert_eq!(sel.fringes["FICA"], 76_500);
+}
+
+#[test]
+fn budget_posting_keeps_fringes_out_of_levels() {
+    let mut b = sample();
+    b.fringe_posting = FringePosting::Budget;
+    let r = run(&b);
+    assert_eq!(r.categories[0].fringe_account, None);
+    assert_eq!(r.total_atl, 15_000_000);
+    assert_eq!(r.total_btl, 9_738_401);
+    assert_eq!(r.budget_fringes, 753_000);
+    let charges: i64 = r.charges.iter().map(|c| c.amount).sum();
+    assert_eq!(r.grand_total, r.atl_btl + r.budget_fringes + charges);
 }
 
 #[test]
@@ -139,28 +155,20 @@ fn excluding_a_group_drops_its_lines() {
         ..Default::default()
     };
     let r = recalc(&sample(), &opts).unwrap();
-    let camera = &r.categories[1].accounts[0].details[1];
-    assert!(!camera.included);
-    assert_eq!(camera.total, 0);
-    assert_eq!(r.subtotal, 24_153_000);
-}
-
-#[test]
-fn only_groups_keeps_tagged_lines() {
-    let opts = RecalcOptions {
-        only_groups: Some(set(&["OptionA"])),
-        ..Default::default()
-    };
-    let r = recalc(&sample(), &opts).unwrap();
-    assert_eq!(r.subtotal, 525_819);
+    let rows = &r.categories[1].accounts[0].rows;
+    assert!(!rows[3].included);
+    // The adjustment now only sees grip and overtime.
+    assert_eq!(rows[4].total, 560_000);
+    assert_eq!(r.groups["OptionA"].active.details_total, 0);
+    assert_eq!(r.groups["OptionA"].full.details_total, 525_819);
 }
 
 #[test]
 fn changing_a_global_recalculates_dependents() {
     let mut b = sample();
     b.globals.insert("SHOOT_DAYS".into(), "35".into());
-    let r = recalc(&b, &RecalcOptions::default()).unwrap();
-    let grip = &r.categories[1].accounts[0].details[0];
+    let r = run(&b);
+    let grip = &r.categories[1].accounts[0].rows[0];
     // 35 / 3 rounds to 11.666666667 at 9 places, so 3 x 46.666666667 = 140.000000001.
     assert_eq!(grip.quantity, d("140.000000001"));
     assert_eq!(grip.total, 6_300_000);
@@ -170,9 +178,7 @@ fn changing_a_global_recalculates_dependents() {
 #[test]
 fn recalc_is_deterministic() {
     let b = sample();
-    let a = recalc(&b, &RecalcOptions::default()).unwrap();
-    let c = recalc(&b, &RecalcOptions::default()).unwrap();
-    assert_eq!(format!("{a:?}"), format!("{c:?}"));
+    assert_eq!(format!("{:?}", run(&b)), format!("{:?}", run(&b.clone())));
 }
 
 #[test]
@@ -191,42 +197,59 @@ fn global_cycles_are_reported() {
     );
 }
 
-#[test]
-fn errors_name_the_line_and_field() {
-    let mut b = sample();
-    b.categories[2].accounts[0].details[0].rate = "WEEKLY_RATE".into();
-    let e = recalc(&b, &RecalcOptions::default()).unwrap_err();
-    assert_eq!(
-        e.to_string(),
-        "account 5000 line 1 (Editor): rate: unknown global `WEEKLY_RATE`"
-    );
-
-    let mut b = sample();
-    b.categories[2].accounts[0].details[0].currency = Some("EUR".into());
-    let e = recalc(&b, &RecalcOptions::default()).unwrap_err();
-    assert_eq!(e.kind, ErrorKind::UnknownCurrency("EUR".into()));
-
-    let mut b = sample();
-    b.categories[2].accounts[0].details[0].fringes = set(&["PENSION"]);
-    let e = recalc(&b, &RecalcOptions::default()).unwrap_err();
-    assert_eq!(e.kind, ErrorKind::UnknownFringe("PENSION".into()));
-
-    let mut b = sample();
-    b.globals.insert("bad-name".into(), "1".into());
-    let e = recalc(&b, &RecalcOptions::default()).unwrap_err();
-    assert_eq!(e.kind, ErrorKind::BadGlobalName);
+fn editor(b: &mut Budget) -> &mut Detail {
+    b.categories_mut().nth(2).unwrap().accounts[0]
+        .details
+        .get_mut(0)
+        .unwrap()
 }
 
 #[test]
-fn flat_fringe_unit_cap() {
+fn errors_name_the_line_and_field() {
+    let check = |f: fn(&mut Budget), want: ErrorKind| {
+        let mut b = sample();
+        f(&mut b);
+        assert_eq!(
+            recalc(&b, &RecalcOptions::default()).unwrap_err().kind,
+            want
+        );
+    };
+
     let mut b = sample();
-    b.fringes.insert(
-        "PH".into(),
-        Fringe::FlatPerUnit {
-            per_unit: 5_000,
-            unit_cap: Some(d("100")),
-        },
+    editor(&mut b).rate = "WEEKLY_RATE".into();
+    let e = recalc(&b, &RecalcOptions::default()).unwrap_err();
+    assert_eq!(
+        e.to_string(),
+        "account 5100 line 1 (Editor): rate: unknown global `WEEKLY_RATE`"
     );
-    let r = recalc(&b, &RecalcOptions::default()).unwrap();
-    assert_eq!(r.fringe_totals["PH"], 500_000);
+
+    check(
+        |b| editor(b).currency = Some("EUR".into()),
+        ErrorKind::UnknownCurrency("EUR".into()),
+    );
+    check(
+        |b| editor(b).fringes = set(&["PENSION"]),
+        ErrorKind::UnknownFringe("PENSION".into()),
+    );
+    check(
+        |b| editor(b).groups = set(&["Nope"]),
+        ErrorKind::UnknownGroup("Nope".into()),
+    );
+    check(|b| editor(b).id = 1, ErrorKind::DuplicateRowId(1));
+    check(
+        |b| drop(b.globals.insert("bad-name".into(), "1".into())),
+        ErrorKind::BadGlobalName,
+    );
+}
+
+#[test]
+fn blank_fields_make_title_lines() {
+    let mut b = sample();
+    let title = Detail::line(99, "CAST TRAVEL", "", "", "");
+    b.categories_mut().nth(2).unwrap().accounts[0]
+        .details
+        .insert(0, title);
+    let r = run(&b);
+    assert_eq!(r.categories[2].accounts[0].rows[0].total, 0);
+    assert_eq!(r.categories[2].total, 3_000_000);
 }

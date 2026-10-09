@@ -1,36 +1,37 @@
 //! Recalculation: a pure function from [`Budget`] to [`Report`].
 //!
-//! Same budget and options in, identical report out. Every money value is
-//! rounded to cents exactly once, at the detail line (see docs/decisions.md);
-//! everything above a line is plain integer addition, so rollups always agree.
+//! Same budget and options in, identical report out. Money is rounded to cents
+//! at the line (and once per fringe, charge and credit; see docs/decisions.md).
+//! Everything above that is integer addition, so rollups always agree.
+//!
+//! Stages, each in its own module:
+//! 1. [`lines`]: evaluate every row of every account (formulas, currency,
+//!    suppression, subtotal and adjustment rows).
+//! 2. [`fringes`]: fringe dollars per row (cutoffs, ranges, unit conversion).
+//! 3. [`topsheet`]: fringe posting, production levels, ATL/BTL, charges, credits.
+//! 4. [`breakdown`]: per-fringe, group, set and location totals.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use crate::decimal::{mul_cents, percent_of, Dec};
+use crate::decimal::Dec;
 use crate::expr::{is_ident, EvalError, Expr, ParseError};
-use crate::model::{Budget, Detail, Formula, Fringe};
+use crate::model::{Budget, Detail, Formula, RowId};
+use crate::report::{AccountTotals, CategoryTotals, Report};
 use crate::Cents;
 
-/// Which details count toward totals.
+pub mod breakdown;
+pub(crate) mod fringes;
+pub(crate) mod lines;
+pub(crate) mod topsheet;
+
+/// Which details count toward totals, on top of group suppression.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct RecalcOptions {
     /// Lines tagged with any of these groups are left out.
     pub exclude_groups: BTreeSet<String>,
     /// When set, only lines tagged with at least one of these groups count.
     pub only_groups: Option<BTreeSet<String>>,
-}
-
-impl RecalcOptions {
-    fn includes(&self, d: &Detail) -> bool {
-        if d.groups.iter().any(|g| self.exclude_groups.contains(g)) {
-            return false;
-        }
-        match &self.only_groups {
-            Some(only) => d.groups.iter().any(|g| only.contains(g)),
-            None => true,
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -49,6 +50,8 @@ pub enum ErrorKind {
     GlobalCycle(Vec<String>),
     UnknownCurrency(String),
     UnknownFringe(String),
+    UnknownGroup(String),
+    DuplicateRowId(RowId),
     Overflow,
 }
 
@@ -64,6 +67,8 @@ impl fmt::Display for CalcError {
             }
             ErrorKind::UnknownCurrency(c) => write!(f, "no exchange rate for `{c}`"),
             ErrorKind::UnknownFringe(n) => write!(f, "unknown fringe `{n}`"),
+            ErrorKind::UnknownGroup(n) => write!(f, "unknown group `{n}`"),
+            ErrorKind::DuplicateRowId(id) => write!(f, "row id {id} is used twice"),
             ErrorKind::Overflow => f.write_str("number too large"),
         }
     }
@@ -71,71 +76,79 @@ impl fmt::Display for CalcError {
 
 impl std::error::Error for CalcError {}
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Report {
-    pub base_currency: String,
-    pub globals: BTreeMap<String, Dec>,
-    pub categories: Vec<CategoryTotals>,
-    /// Budget-wide total per fringe name.
-    pub fringe_totals: BTreeMap<String, Cents>,
-    /// All categories: lines plus fringes.
-    pub subtotal: Cents,
-    pub contractual: Vec<ChargeTotal>,
-    pub grand_total: Cents,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CategoryTotals {
-    pub name: String,
-    pub accounts: Vec<AccountTotals>,
-    pub details_total: Cents,
-    pub fringe_total: Cents,
-    pub total: Cents,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AccountTotals {
-    pub code: String,
-    pub name: String,
-    pub details: Vec<DetailTotals>,
-    pub details_total: Cents,
-    pub fringe_total: Cents,
-    pub total: Cents,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DetailTotals {
-    pub description: String,
-    /// False when group filtering left this line out; its money fields are then 0.
-    pub included: bool,
-    /// amount x multiplier.
-    pub quantity: Dec,
-    pub currency: String,
-    /// In `currency`.
-    pub local_total: Cents,
-    /// In the base currency.
-    pub total: Cents,
-    pub fringes: BTreeMap<String, Cents>,
-    pub fringe_total: Cents,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ChargeTotal {
-    pub name: String,
-    /// What the percentage was applied to.
-    pub base: Cents,
-    pub amount: Cents,
-}
-
-fn err(at: impl Into<String>, kind: ErrorKind) -> CalcError {
+pub(crate) fn err(at: impl Into<String>, kind: ErrorKind) -> CalcError {
     CalcError {
         at: at.into(),
         kind,
     }
 }
 
-fn sum(it: impl IntoIterator<Item = Cents>) -> Option<Cents> {
+pub(crate) fn overflow(at: impl Into<String>) -> CalcError {
+    err(at, ErrorKind::Overflow)
+}
+
+/// Checked sum of cents.
+pub(crate) fn sum(it: impl IntoIterator<Item = Cents>) -> Option<Cents> {
     it.into_iter().try_fold(0, Cents::checked_add)
+}
+
+/// Shared, read-only state for one recalc.
+pub(crate) struct Ctx<'a> {
+    pub b: &'a Budget,
+    pub globals: BTreeMap<String, Dec>,
+    pub opts: &'a RecalcOptions,
+    /// When true, ignore group suppression and options: used for "full" group totals.
+    pub unfiltered: bool,
+}
+
+impl Ctx<'_> {
+    /// Evaluates a formula; a blank one is `blank`.
+    pub fn eval(&self, f: &Formula, blank: Dec, at: &dyn Fn() -> String) -> Result<Dec, CalcError> {
+        if f.is_blank() {
+            return Ok(blank);
+        }
+        Expr::parse(&f.0)
+            .map_err(|e| err(at(), ErrorKind::Parse(e)))?
+            .eval(&|n| self.globals.get(n).copied())
+            .map_err(|e| err(at(), ErrorKind::Eval(e)))
+    }
+
+    /// Whether a line counts toward totals: not suppressed by a group with
+    /// "in budget total" off, and allowed by the options.
+    pub fn includes(&self, d: &Detail, at: &dyn Fn() -> String) -> Result<bool, CalcError> {
+        let mut suppressed = false;
+        for g in &d.groups {
+            let group = self
+                .b
+                .groups
+                .get(g)
+                .ok_or_else(|| err(at(), ErrorKind::UnknownGroup(g.clone())))?;
+            suppressed |= !group.in_budget_total;
+        }
+        if self.unfiltered {
+            return Ok(true);
+        }
+        if suppressed
+            || d.groups
+                .iter()
+                .any(|g| self.opts.exclude_groups.contains(g))
+        {
+            return Ok(false);
+        }
+        Ok(match &self.opts.only_groups {
+            Some(only) => d.groups.iter().any(|g| only.contains(g)),
+            None => true,
+        })
+    }
+}
+
+/// Where a row lives, for error messages.
+pub(crate) fn row_at(code: &str, idx: usize, d: &Detail, field: &str) -> String {
+    format!(
+        "account {code} line {} ({}): {field}",
+        idx + 1,
+        d.description
+    )
 }
 
 fn eval_globals(b: &Budget) -> Result<BTreeMap<String, Dec>, CalcError> {
@@ -191,179 +204,93 @@ fn visit_global<'a>(
     Ok(())
 }
 
-fn calc_detail(
-    b: &Budget,
-    globals: &BTreeMap<String, Dec>,
-    opts: &RecalcOptions,
-    code: &str,
-    idx: usize,
-    d: &Detail,
-) -> Result<DetailTotals, CalcError> {
-    let at = |field: &str| {
-        format!(
-            "account {code} line {} ({}): {field}",
-            idx + 1,
-            d.description
-        )
-    };
-    let ev = |f: &Formula, field: &str| -> Result<Dec, CalcError> {
-        Expr::parse(&f.0)
-            .map_err(|e| err(at(field), ErrorKind::Parse(e)))?
-            .eval(&|n| globals.get(n).copied())
-            .map_err(|e| err(at(field), ErrorKind::Eval(e)))
-    };
-    let overflow = || err(at("total"), ErrorKind::Overflow);
-
-    let amount = ev(&d.amount, "amount")?;
-    let multiplier = ev(&d.multiplier, "multiplier")?;
-    let rate = ev(&d.rate, "rate")?;
-    let quantity = amount.checked_mul(multiplier).ok_or_else(overflow)?;
-    let local_total = quantity
-        .checked_mul(rate)
-        .and_then(Dec::to_cents)
-        .ok_or_else(overflow)?;
-
-    let currency = d
-        .currency
-        .clone()
-        .unwrap_or_else(|| b.base_currency.clone());
-    let total = if currency == b.base_currency {
-        local_total
-    } else {
-        let fx = b
-            .exchange_rates
-            .get(&currency)
-            .ok_or_else(|| err(at("currency"), ErrorKind::UnknownCurrency(currency.clone())))?;
-        mul_cents(local_total, *fx).ok_or_else(overflow)?
-    };
-
-    let mut fringes = BTreeMap::new();
-    for name in &d.fringes {
-        let f = b
-            .fringes
-            .get(name)
-            .ok_or_else(|| err(at("fringes"), ErrorKind::UnknownFringe(name.clone())))?;
-        let amt = match *f {
-            Fringe::Percent { percent, wage_cap } => {
-                percent_of(wage_cap.map_or(total, |cap| total.min(cap)), percent)
+fn check_row_ids(b: &Budget) -> Result<(), CalcError> {
+    let mut seen = BTreeSet::new();
+    for acct in b.categories().flat_map(|c| &c.accounts) {
+        for (i, d) in acct.details.iter().enumerate() {
+            if !seen.insert(d.id) {
+                return Err(err(
+                    row_at(&acct.code, i, d, "id"),
+                    ErrorKind::DuplicateRowId(d.id),
+                ));
             }
-            Fringe::FlatPerUnit { per_unit, unit_cap } => {
-                mul_cents(per_unit, unit_cap.map_or(quantity, |cap| quantity.min(cap)))
-            }
-        };
-        fringes.insert(name.clone(), amt.ok_or_else(overflow)?);
+        }
     }
-
-    if !opts.includes(d) {
-        return Ok(DetailTotals {
-            description: d.description.clone(),
-            included: false,
-            quantity,
-            currency,
-            local_total: 0,
-            total: 0,
-            fringes: BTreeMap::new(),
-            fringe_total: 0,
-        });
-    }
-    Ok(DetailTotals {
-        description: d.description.clone(),
-        included: true,
-        quantity,
-        currency,
-        local_total,
-        total,
-        fringe_total: sum(fringes.values().copied()).ok_or_else(overflow)?,
-        fringes,
-    })
+    Ok(())
 }
 
-/// Recalculates every total in `b`.
-pub fn recalc(b: &Budget, opts: &RecalcOptions) -> Result<Report, CalcError> {
-    let globals = eval_globals(b)?;
-    let overflow = || err("budget totals", ErrorKind::Overflow);
-
-    let mut categories = Vec::with_capacity(b.categories.len());
-    for cat in &b.categories {
+/// Stages 1 and 2 for every account, with category and account sums filled in.
+/// `total` fields are left equal to `details_total`; posting adjusts them.
+pub(crate) fn eval_categories(ctx: &Ctx) -> Result<Vec<CategoryTotals>, CalcError> {
+    let ovf = || overflow("budget totals");
+    let mut categories = Vec::new();
+    for cat in ctx.b.categories() {
         let mut accounts = Vec::with_capacity(cat.accounts.len());
         for acct in &cat.accounts {
-            let details = acct
-                .details
-                .iter()
-                .enumerate()
-                .map(|(i, d)| calc_detail(b, &globals, opts, &acct.code, i, d))
-                .collect::<Result<Vec<_>, _>>()?;
-            let details_total = sum(details.iter().map(|d| d.total)).ok_or_else(overflow)?;
-            let fringe_total = sum(details.iter().map(|d| d.fringe_total)).ok_or_else(overflow)?;
+            let mut rows = lines::eval_rows(ctx, acct)?;
+            fringes::apply_fringes(ctx, acct, &mut rows)?;
+            let details_total = sum(rows.iter().map(|r| r.total)).ok_or_else(ovf)?;
+            let fringe_total = sum(rows.iter().map(|r| r.fringe_total)).ok_or_else(ovf)?;
             accounts.push(AccountTotals {
                 code: acct.code.clone(),
                 name: acct.name.clone(),
-                details,
+                rows,
                 details_total,
                 fringe_total,
-                total: details_total
-                    .checked_add(fringe_total)
-                    .ok_or_else(overflow)?,
+                total: details_total,
             });
         }
-        let details_total = sum(accounts.iter().map(|a| a.details_total)).ok_or_else(overflow)?;
-        let fringe_total = sum(accounts.iter().map(|a| a.fringe_total)).ok_or_else(overflow)?;
+        let details_total = sum(accounts.iter().map(|a| a.details_total)).ok_or_else(ovf)?;
+        let fringe_total = sum(accounts.iter().map(|a| a.fringe_total)).ok_or_else(ovf)?;
         categories.push(CategoryTotals {
+            code: cat.code.clone(),
             name: cat.name.clone(),
             accounts,
             details_total,
             fringe_total,
-            total: details_total
-                .checked_add(fringe_total)
-                .ok_or_else(overflow)?,
+            fringe_account: None,
+            total: details_total,
         });
     }
+    Ok(categories)
+}
 
-    let all_accounts = || categories.iter().flat_map(|c| &c.accounts);
+/// Recalculates every total in `b`.
+pub fn recalc(b: &Budget, opts: &RecalcOptions) -> Result<Report, CalcError> {
+    check_row_ids(b)?;
+    let ctx = Ctx {
+        b,
+        globals: eval_globals(b)?,
+        opts,
+        unfiltered: false,
+    };
+    let categories = eval_categories(&ctx)?;
+    let ts = topsheet::finish(&ctx, categories)?;
 
-    let mut fringe_totals: BTreeMap<String, Cents> = BTreeMap::new();
-    for d in all_accounts().flat_map(|a| &a.details) {
-        for (name, amt) in &d.fringes {
-            let slot = fringe_totals.entry(name.clone()).or_insert(0);
-            *slot = slot.checked_add(*amt).ok_or_else(overflow)?;
-        }
-    }
+    let full_ctx = Ctx {
+        unfiltered: true,
+        ..ctx
+    };
+    let full = eval_categories(&full_ctx)?;
+    let bd = breakdown::breakdowns(&full_ctx, &ts.categories, &full)?;
 
-    let subtotal = sum(categories.iter().map(|c| c.total)).ok_or_else(overflow)?;
-
-    let mut contractual = Vec::with_capacity(b.contractual_charges.len());
-    for c in &b.contractual_charges {
-        let base = sum(all_accounts()
-            .filter(|a| !c.excluded_accounts.contains(&a.code))
-            .map(|a| {
-                if c.include_fringes {
-                    a.total
-                } else {
-                    a.details_total
-                }
-            }))
-        .ok_or_else(overflow)?;
-        let amount = percent_of(base, c.percent).ok_or_else(|| {
-            err(
-                format!("contractual charge {}", c.name),
-                ErrorKind::Overflow,
-            )
-        })?;
-        contractual.push(ChargeTotal {
-            name: c.name.clone(),
-            base,
-            amount,
-        });
-    }
-
-    let charges = sum(contractual.iter().map(|c| c.amount)).ok_or_else(overflow)?;
     Ok(Report {
         base_currency: b.base_currency.clone(),
-        globals,
-        categories,
-        fringe_totals,
-        subtotal,
-        contractual,
-        grand_total: subtotal.checked_add(charges).ok_or_else(overflow)?,
+        globals: full_ctx.globals,
+        categories: ts.categories,
+        levels: ts.levels,
+        budget_fringes: ts.budget_fringes,
+        total_atl: ts.total_atl,
+        total_btl: ts.total_btl,
+        atl_btl: ts.atl_btl,
+        charges: ts.charges,
+        grand_total: ts.grand_total,
+        credits: ts.credits,
+        credits_total: ts.credits_total,
+        net_total: ts.net_total,
+        fringes: bd.fringes,
+        groups: bd.groups,
+        sets: bd.sets,
+        locations: bd.locations,
     })
 }

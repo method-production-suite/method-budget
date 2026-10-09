@@ -9,9 +9,10 @@ Budgeting (Entertainment Partners). A Darkwell project owned by Sam Sandweiss. T
 (github.com/storytold), who ship clean-room Rust rewrites of Photoshop, Premiere, etc.
 
 - Local: `~/Documents/CODING_PROJECTS/Projects/02_Darkwell/film-wizard-budgeting`
-- Repo: https://github.com/cwpsandywhois/film-wizard-budgeting (**private** until Sam says go public)
-- GitHub: this Mac has several `gh` accounts. Pushes need `cwpsandywhois` active
-  (`gh auth switch --user cwpsandywhois`). A push that 404s means the wrong account is active.
+- Repo: https://github.com/ssandweiss/film-wizard-budgeting (**private** until Sam says go public).
+  The older cwpsandywhois/film-wizard-budgeting copy is retired.
+- GitHub: this Mac has several `gh` accounts. Pushes need `ssandweiss` active
+  (`gh auth switch --user ssandweiss`). A push that 404s means the wrong account is active.
 - License: **MIT OR Apache-2.0** (same terms as ArtCraft). Decided, don't revisit.
 
 ## Decided scope (v1)
@@ -32,31 +33,33 @@ Budgeting (Entertainment Partners). A Darkwell project owned by Sam Sandweiss. T
   SHA-pin any third-party Action. Machine-wide dependency cooldowns exist; don't bypass them.
 - Stage explicit paths, never `git add -A` blindly.
 
-## Current state
-Scaffold only: Cargo workspace, `fwb-core` stub (just `Cents` + an empty test), README,
-CLEAN-ROOM.md, licenses, CI (`cargo test --workspace --locked`). Zero dependencies.
-CI is green as of 2026-10-08 (`gh run list` to recheck).
+## Current state (2026-10-08)
+The engine (`crates/fwb-core`, zero dependencies) covers the v1 calc model:
+- Budget > topsheet (categories + production totals) > accounts > detail rows (line,
+  subtotal, adjustment), with stable `RowId`s.
+- Formulas with globals (own parser, cycle detection), 4-factor lines, per-line currency.
+- Fringes: percent with cutoffs per earner (line or fringe range, split back by largest
+  remainder), flat with unit-hours conversion, four posting modes.
+- Groups with in-budget-total suppression, full/active totals; sets, locations,
+  selection totals.
+- ATL/BTL levels, contractual charges (percent and flat, exclusions), credits (three cap
+  types, overall cap, discount, unrounded row sums), grand and net totals.
+- Tests: unit tests per stage, hand-checked scenarios (`tests/recalc.rs`), seeded property
+  tests (`tests/properties.rs`). Design choices: `docs/decisions.md`.
 
-## Next: the engine data model
-Build in `fwb-core`, test-first, no UI yet:
-- **Hierarchy**: Budget > Topsheet categories (Above-the-line, Production, Post, Other) >
-  Accounts (e.g. 1100 Writing) > Details (line items).
-- **Detail line**: description, amount, units (Days/Weeks/Flat/Allow/etc.), multiplier ("X"),
-  rate, currency, fringes applied, groups, location/set tags. Total = amount x X x rate.
-- **Fringes**: percentage or flat-per-unit, with optional cutoffs (cap a fringe at a wage
-  ceiling). Applied per detail, rolled up separately so the topsheet shows fringe totals.
-- **Globals**: named variables (e.g. `SHOOT_DAYS = 30`) usable in amount/rate fields; changing
-  one recalculates everything. Needs a tiny expression evaluator with no `eval`.
-- **Contractual charges**: percent-of-subtotal lines (contingency, insurance, fee), with
-  per-account exclusions.
-- **Groups**: tag details to include/exclude in a recalculated total (e.g. "Option A").
-- **Currencies**: per-detail currency with a budget-level rate table; totals in base currency.
-- **Recalc**: deterministic, pure. Same input gives byte-identical output. Property-test the
-  rollups (sum of details == account total == topsheet line).
+Research (clean-room, own words): `docs/research/mmb-feature-inventory.md` from EP's public
+manual. Sam's MMB screenshots live in `Screenshots/` and notes on them in
+`docs/research/mmb-screens.md`; **both are gitignored and must stay that way** (vendor UI
+plus Sam's real production budget figures). Never use those figures in tests.
 
-Then: the native format (serde, probably TOML or JSON with stable ordering; pick one and
-document it in `docs/FORMAT.md`), then Excel/CSV import, then a UI (Tauri or web/WASM; decide
-when you get there and write the reasoning in `docs/decisions.md`).
+## Next
+1. Still-v1 engine gaps: account coding rules (segment widths, separator), budget info
+   fields, display currency, original/variance baseline, delete-global-to-value.
+2. Native format: serde, TOML or JSON with stable ordering; document in `docs/FORMAT.md`.
+3. Import from MMB exports (tab, XML, JSON, Excel). Column layouts aren't public: plan is
+   to design a test budget, have Sam enter and export it from his licensed copy, and
+   build against those files. Currency direction must be confirmed from them.
+4. UI (Tauri or web/WASM; decide then and record in `docs/decisions.md`).
 
 ## Working style for Sam
 - Casual and short. **No em dashes** in anything you write for him.
