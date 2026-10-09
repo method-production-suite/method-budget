@@ -203,3 +203,14 @@ bulk edits under ~100 ms. Measured with `examples/perf.rs` on `fwb_core::sample`
   19.0 ms before, 9.8 ms after; drawing the reply after a one-cell edit in a UI harness
   (Chromium, fake bridge with the canned replies) 227 ms before, 13 ms after; opening the
   big account 192 ms before, 24 ms after.
+
+## 19. Four product calls from the roadmap (2026-10-09, Sam)
+
+- **Autosave writes the file itself**, on by default with a visible toggle. Untitled budgets
+  get a recovery copy until first saved, and every document keeps rolling backups so an
+  autosaved mistake can be walked back.
+- **Setup shortcuts match the reference product** (e.g. Cmd+G globals, Cmd+/ charges); our
+  shortcut sheet moves to Shift+Cmd+/.
+- **Several budgets open as tabs in one window**, each with its own undo; split view later.
+- **Compare shows both** each budget's difference from the base and optional
+  Sum / Average / Variance columns in the reference's style.

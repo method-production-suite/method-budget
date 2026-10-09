@@ -40,6 +40,13 @@ signed installers, and import from the reference product (waiting on the export 
 
 ## Decisions needed from Sam
 
+**Decided 2026-10-09 (Sam):** 1 compare math: **both** (each budget vs base, plus optional
+Sum/Average/Variance columns); 2 setup keys: **adopt the reference's**, shortcut sheet moves to
+Shift+Cmd+/; 8 more than one budget: **tabs in one window** (with split view later), not one
+window per budget; 9 autosave: **always save into the file** (on by default, with a toggle),
+recovery copies for untitled budgets and rolling backups. The rest below are still open; the
+recommendation stands as the default until Sam says otherwise.
+
 1. **Compare math.** The reference shows each linked budget, their sum and average, then
    "variance" = sum of the others minus this budget and "%" = variance over the average (21).
    Ours shows each budget's own difference from the base and percent of the base (D17).
@@ -113,7 +120,7 @@ What Sam needs to do real work every day. Ordered by priority.
 
 | # | Item | Notes | Status | Size | Depends |
 |---|---|---|---|---|---|
-| 1.1 | **Never lose work**: recovery copy and optional autosave, restore after a crash, recent files list, open a `.fwb` by double-clicking it (file type is registered; the app ignores the open event) | 07, inv 15, APP | [partial] | M | decision 9 |
+| 1.1 | **Never lose work**: autosave into the file (default on, toggle), recovery copy for untitled budgets, rolling backups, restore after a crash, recent files list, open a `.fwb` by double-clicking it (file type is registered; the app ignores the open event) | 07, inv 15, APP | [partial] | M | decision 9 |
 | 1.2 | **Type-ahead in cells**: units, currencies, sets, locations by prefix; global names in Amt, X, Rate, 4X; Enter or Tab accepts | 02, 07, 09, inv 3, 5 | [missing] | M | none |
 | 1.3 | **Add on the fly**: typing an unknown unit, currency, set, location or global offers "add it", then applies the edit, one undo step (today an unknown currency is refused) | 02, 07, inv 3, 7 | [missing] | S | 1.2 |
 | 1.4 | **New-line defaults**: copy fringes (and optionally groups, set, location, currency) from the line above, Amt 1, empty account shows one ready line; per-budget switches in the file | 02, 03, 17, inv 2 | [missing] | S | decision 10 |
@@ -121,7 +128,7 @@ What Sam needs to do real work every day. Ordered by priority.
 | 1.6 | **Style and note editing in the app**: bold, italic, indent, line color, group color, and a notes editor (side panel, Shift+Cmd+Space, click the note mark) for lines; engine and commands already exist | 01, 19, D16 | [partial] | M | 1.5, decision 11 |
 | 1.7 | **Shortcut parity pass**: setup keys, Cmd+Left/Right sibling steps on the account list too (stepping categories), range, adjustment, note and bold keys, visible prev/next buttons on the deepest crumb | 01, 02, 03, 09, 14, 17, 19, 20 | [partial] | S | decision 2 |
 | 1.8 | **Copy and paste rows with their tags**: our own clipboard payload (plus TSV for spreadsheets) carrying fringes, groups, set, location, currency, notes, style and ranges; "paste as new rows" above the cursor; accounts and categories with their lines | 20, inv 18 | [missing] | L | 1.9 for cross-budget |
-| 1.9 | **One window per budget**, so copying between budgets is normal clipboard work; each window its own undo; paste conflict review | 04, 20, inv 16 | [missing] | M | decisions 8, 12 |
+| 1.9 | **Budget tabs in one window** (Sam's call), each tab its own undo; copying between tabs is normal clipboard work; paste conflict review; split view later | 04, 20, inv 16 | [missing] | M | decisions 8, 12 |
 | 1.10 | **Move rows**: move up or down by key, cut and paste rows as rows, keep fringe ranges whole | APP, inv 18 | [missing] | S | 1.8 |
 | 1.11 | **Find and replace**: typed search (go to account number, description, fringe, global, group, set, location, unit, currency, notes), results by account with the matching column, jump to each, replace or remove in checked results only, token-exact for globals, one undo step | 18, inv 5, 17 | [missing] | L | none |
 | 1.12 | **Versions screen**: save a version, list, rename, add a note, restore (reversible), delete | 01, D17, inv 14 | [partial] | M | none |
