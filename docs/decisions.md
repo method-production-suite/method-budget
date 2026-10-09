@@ -269,3 +269,66 @@ each list's checkbox applies the item to the selection and double-click edits it
 Tabs can be dragged between panes. Three positions: docked right (default), docked at the
 bottom with the panes side by side, or popped out into its own window; the choice is
 remembered.
+
+## 22. Right-click menus, text style keys, editing setup items where they are listed (2026-10-09)
+
+- **Keys.** Bold is Cmd+B. Cmd+I inserts a line (decision 15), so italic is Shift+Cmd+I;
+  Cmd+[ and Cmd+] step accounts, so Indent More and Less are Option+Cmd+Right and Left.
+  Text Color and Clear Formatting are menu only (Format menu and the right-click menu).
+  The right-click menu also opens with Shift+F10 or the keyboard's menu key, at the cursor
+  cell. Windows note: some older Intel graphics drivers take Ctrl+Alt+arrows for screen
+  rotation; the menu items always work.
+- **One undo step each.** `set_row_style` takes `indentBy` (each row moves and stays within
+  0 to 4), so indenting a selection at mixed depths is one step. A new `update_group`
+  sets a group's description, "counts in total" and color together, for the same reason;
+  `set_group_color` stays for callers that only change the color.
+- **Palette.** Eight colors, each with a light and a dark value, both at 4.5:1 or better
+  on every grid background including selected rows. The file keeps one `#hex` (the light
+  value); a dark window shows the dark one through static CSS keyed on the row's color
+  class. Colors that came in some other way show as stored, and the group editor keeps
+  them unless another is picked.
+- **Double-click in the apply panel.** A click ticks or unticks an item at once, as before,
+  and a double-click edits the item. The first click of a double-click has already
+  toggled it, so the double-click undoes that one step (only when it is still the latest
+  change) before opening the editor, and the footer's Last change is put back. Delaying
+  every click until a double-click can be ruled out would slow the panel's main action;
+  decision 21's merged layout (the check box applies, double-click edits) removes the
+  overlap when it lands.
+- **Topsheet and account list.** A double-click on a number or a description edits it in
+  place; a double-click elsewhere on the row, or Enter, still opens it.
+- **Cut, Copy and Paste from the right-click menu** fire the same clipboard events as the
+  keys (`document.execCommand`), so they reach the grid's own handlers with no clipboard
+  plugin or new crate. A web view may ask before pasting text another app copied (macOS
+  shows a small Paste button) or refuse; then a message points at Cmd+V.
+
+## 23. Copying rows with everything on them; the paste review (2026-10-09)
+
+- **Whole rows copy as rows.** With the selection across every column (Select All, or
+  Shift+arrows end to end), Copy and Cut take the rows: lines, accounts on the account
+  list, categories on the topsheet, each with everything in it. Any narrower selection is
+  a cell copy, as before. Edit > Copy Rows, Cut Rows and Paste Rows do it whatever the
+  columns, for the menu bar and the right-click menu.
+- **The rows live in Rust, keyed by the clipboard text.** One clipboard for the app, not
+  per budget, so budgets opening as tabs (decision 19) share it. The page puts the rows'
+  tab-separated cells on the system clipboard, exactly as a cell copy would; Rust keeps the
+  rows and the setup they use, and that text is the key: a paste of any other text is a
+  cell paste and forgets the rows. Not a custom clipboard type (WebKit doesn't keep those
+  reliably across apps), not HTML (WebKit may rewrite it on paste), and not a marker in the
+  text (it would land in spreadsheet cells). The one gap: identical text copied elsewhere
+  would paste the rows, which is harmless.
+- **A copy carries its setup**, transitively: fringes (and their flat units and the globals
+  in their rates), groups, units, sets, locations, currencies and every global a formula
+  names, however deep. Items the source doesn't define are left as names.
+- **Paste adds what is missing and keeps the target's version of what differs** (Sam's
+  decision 12), after a review that shows both definitions; per item the user can instead
+  replace the target's version, or add the copied one under a new name (`Name (2)`, globals
+  `NAME_2`), which the pasted rows and the copied items that refer to it then use (formulas
+  rewritten token by token). Currencies are codes, so they can't be renamed. Same-name,
+  same-definition items need nothing; a paste with nothing to review goes straight in.
+  Everything a paste does is one undo step; a cut is copy plus a delete step.
+- **Pasted content gets fresh identity**: row ids past every id the budget has used
+  (versions and the baseline included), fringe ranges renumbered new in the target
+  account, accounts and categories their own number when free, else the next free one in
+  the same segment, wrapping round; a pasted category's accounts move under its number.
+  Lines in the source's base currency count in the target's base currency (the review
+  says so when the two differ).

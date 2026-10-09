@@ -13,6 +13,13 @@
 // returns the row ids, which the edit commands then take, so a click acts on
 // exactly the rows the panel shows.
 //
+// Double-clicking an item (or Enter or F2 on it) opens a small editor for the
+// item itself, next to it: a fringe's kind, rate, cutoff or unit and
+// description; a group's description, color and "counts in the total"; a
+// set's, location's or currency's details. Saving is one command, so one undo
+// step. A double-click's first click has already toggled the item, so the
+// double-click undoes that toggle first (only if nothing else changed since).
+//
 // setup.js mounts the panel with renderApply(host, view, ctx); main.js fires
 // a "fwb:selection" event on the document when the grid selection changes.
 // Budget text only reaches the page through textContent (dom.js el()), and
@@ -21,6 +28,8 @@
 import { invoke } from './api.js';
 import { el } from './dom.js';
 import { money } from './format.js';
+import { anchoredForm } from './modal.js';
+import { PALETTE, paletteColor } from './rowformat.js';
 
 const LISTS = [
   {
@@ -94,6 +103,7 @@ const st = {
   filters: {},
   onlyApplied: {},
   closed: new Set(),
+  lastToggle: null, // { key, at, done }: the latest click's toggle, for a double-click to undo
 };
 
 /** Draws the panel into `host` and asks Rust for fresh numbers. */
@@ -259,27 +269,33 @@ async function freshSummary() {
 // ---------------------------------------------------------------------------
 // Edits
 
-/** Runs one edit: `plan(summary)` returns [command, args, patched summary] or null. */
+/**
+ * Runs one edit: `plan(summary)` returns [command, args, patched summary] or
+ * null. Resolves with the new view's rev when a command ran and succeeded,
+ * else null.
+ */
 async function act(plan) {
-  if (st.busy) return;
+  if (st.busy) return null;
   st.busy = true;
   st.error = '';
   draw();
   try {
     const s = await freshSummary();
     const step = s && s.rows.length ? plan(s) : null;
-    if (!step) return;
+    if (!step) return null;
     const [cmd, args, patched] = step;
     if (patched) {
       st.summary = patched;
       draw();
     }
     if (typeof st.ctx.call !== 'function') throw new Error('Not connected');
-    await st.ctx.call(cmd, args);
+    const v = await st.ctx.call(cmd, args);
+    return v && v.rev !== undefined ? v.rev : null;
   } catch (e) {
     st.error = errText(e);
     st.summaryGen = -1; // the patch may be wrong now; fetch the truth
     schedule(0);
+    return null;
   } finally {
     st.busy = false;
     draw();
@@ -297,7 +313,7 @@ function patch(s, list, name, eligible, on, single) {
 }
 
 function toggle(list, name) {
-  act((s) => {
+  return act((s) => {
     const eligible = list.eligible(s);
     if (!eligible) return null;
     const on = stateOf(tally(s, list.id, name).count, eligible) !== 'all';
@@ -594,11 +610,22 @@ function item(list, s, name, def, eligible) {
     el('span', { class: 'setup-sr', text: [info.join('; '), amount].filter(Boolean).join('. '), attrs: { id: infoId } }),
   );
   if (!eligible || st.busy) b.setAttribute('aria-disabled', 'true');
-  b.addEventListener('click', () => {
-    if (b.getAttribute('aria-disabled') === 'true') return;
-    toggle(list, name);
+  const key = b.dataset.key;
+  b.addEventListener('click', (e) => {
+    // The second click of a double-click opens the editor (below), no toggle.
+    if (e.detail > 1 || b.getAttribute('aria-disabled') === 'true') return;
+    st.lastToggle = { key, at: performance.now(), done: toggle(list, name) };
+  });
+  b.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    undoToggle(key).then(() => editItem(list, name));
   });
   b.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === 'F2') && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+      e.preventDefault();
+      editItem(list, name);
+      return;
+    }
     const step = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
     if (!step) return;
     const items = [...b.closest('.apply-items').querySelectorAll('.apply-check')];
@@ -637,4 +664,171 @@ function fringeFoot(s) {
   if (ranged) range.append(el('span', { class: 'apply-hint', text: `${plural(ranged, 'row', 'rows')} in a range` }));
   foot.append(range);
   return foot;
+}
+
+// ---------------------------------------------------------------------------
+// Editing an item in place: double-click, or Enter or F2 on it
+
+/**
+ * The first click of a double-click toggled the item. Undoes that toggle, but
+ * only when it was this item's, it went through, and nothing else has changed
+ * the budget since (the view's rev is still the one the toggle produced).
+ */
+async function undoToggle(key) {
+  const t = st.lastToggle;
+  st.lastToggle = null;
+  if (!t || t.key !== key || performance.now() - t.at > 2000) return;
+  const rev = await t.done;
+  if (rev === null || rev === undefined || !st.view || st.view.rev !== rev) return;
+  try {
+    await st.ctx.call('undo', {}, { revert: true });
+  } catch (e) {
+    st.error = errText(e);
+    draw();
+  }
+}
+
+function itemButton(key) {
+  if (!st.host) return null;
+  return [...st.host.querySelectorAll('.apply-check')].find((b) => b.dataset.key === key) || null;
+}
+
+/** Money typed as "176,000.00" or "(12.50)" as plain text for a command; null when blank. */
+function moneyText(s) {
+  let t = str(s).replace(/[,\s]/g, '');
+  if (t === '') return null;
+  const m = /^\((.*)\)$/.exec(t);
+  if (m) t = `-${m[1]}`;
+  return t;
+}
+
+/** Units with hours (what a flat fringe can be charged per), plus `current`. */
+function timeUnits(current) {
+  const units = obj(budget().units);
+  const out = Object.keys(units)
+    .sort(byteOrder)
+    .filter((n) => {
+      const u = obj(units[n]);
+      return u.hours !== undefined && u.hours !== null && u.hours !== '';
+    });
+  if (current && !out.includes(current)) out.push(current);
+  return out;
+}
+
+// Per list: the editor's fields for item `name` (its definition `def`), and
+// build(values) -> [command, args]. One command each, so one undo step.
+const EDITORS = {
+  fringes: (name, def) => {
+    const base = str(budget().base_currency);
+    const unit = def.unit === undefined || def.unit === null ? '' : String(def.unit);
+    return {
+      what: 'Fringe',
+      fields: [
+        { key: 'kind', label: 'Kind', type: 'select', options: [['percent', 'Percent of pay'], ['flat', 'Flat amount']], value: def.kind === 'flat' ? 'flat' : 'percent' },
+        { key: 'rate', label: 'Rate', value: str(def.rate), suffix: (v) => (v.kind === 'flat' ? base : '%') },
+        {
+          key: 'cutoff',
+          label: 'Cutoff (pay per earner)',
+          value: def.cutoff === undefined || def.cutoff === null ? '' : money(def.cutoff),
+          placeholder: 'None',
+          showIf: (v) => v.kind !== 'flat',
+        },
+        {
+          key: 'unit',
+          label: 'Charged per',
+          type: 'select',
+          options: [['', 'Line'], ...timeUnits(unit).map((u) => [u, u])],
+          value: unit,
+          showIf: (v) => v.kind === 'flat',
+        },
+        { key: 'description', label: 'Description', value: str(def.description) },
+      ],
+      build: (v) => [
+        'set_fringe',
+        {
+          name,
+          fringe: {
+            kind: v.kind === 'flat' ? 'flat' : 'percent',
+            description: v.description,
+            rate: v.rate.trim(),
+            cutoff: v.kind === 'flat' ? null : moneyText(v.cutoff),
+            unit: v.kind === 'flat' && v.unit ? v.unit : null,
+          },
+        },
+      ],
+    };
+  },
+  groups: (name, def) => {
+    const current = typeof def.color === 'string' ? def.color.toLowerCase() : '';
+    const ours = paletteColor(current);
+    const options = [{ id: '', label: 'No color', cls: 'sw-none' }, ...PALETTE.map((c) => ({ id: c.id, label: c.label, cls: `sw-${c.id}` }))];
+    if (current && !ours) options.push({ id: 'keep', label: `Keep its color (${current})`, cls: 'sw-keep' });
+    return {
+      what: 'Group',
+      fields: [
+        { key: 'description', label: 'Description', value: str(def.description) },
+        { key: 'counted', label: 'Counts in total', type: 'check', value: def.in_budget_total !== false },
+        { key: 'color', label: 'Line color', type: 'swatches', options, value: ours ? ours.id : current ? 'keep' : '' },
+      ],
+      build: (v) => {
+        const picked = PALETTE.find((c) => c.id === v.color);
+        return [
+          'update_group',
+          {
+            name,
+            group: { description: v.description, in_budget_total: Boolean(v.counted) },
+            color: v.color === 'keep' ? current : picked ? picked.light : null,
+          },
+        ];
+      },
+    };
+  },
+  sets: (name, def) => ({
+    what: 'Set',
+    fields: [{ key: 'description', label: 'Description', value: str(def.description) }],
+    build: (v) => ['set_set', { name, set: { description: v.description } }],
+  }),
+  locations: (name, def) => ({
+    what: 'Location',
+    fields: ['description', 'city', 'region', 'country'].map((k) => ({ key: k, label: k[0].toUpperCase() + k.slice(1), value: str(def[k]) })),
+    build: (v) => ['set_location', { name, location: { description: v.description, city: v.city, region: v.region, country: v.country } }],
+  }),
+  currencies: (name, def) => {
+    const base = str(budget().base_currency);
+    return {
+      what: 'Currency',
+      fields: [
+        { key: 'rate', label: `Rate (${base || 'base'} per 1 ${name})`, value: str(def.rate) },
+        { key: 'symbol', label: 'Symbol', value: str(def.symbol) },
+        { key: 'description', label: 'Description', value: str(def.description) },
+      ],
+      build: (v) => ['set_currency', { code: name, currency: { description: v.description, symbol: v.symbol, rate: v.rate.trim() } }],
+    };
+  },
+};
+
+/** Opens the editor for item `name` of `list` next to it. */
+function editItem(list, name) {
+  const defs = obj(list.defs(budget()));
+  const spec = EDITORS[list.id];
+  if (!spec || !Object.prototype.hasOwnProperty.call(defs, name)) return;
+  const { what, fields, build } = spec(name, obj(defs[name]));
+  const key = `apply:item:${list.id}:${name}`;
+  const start = Object.fromEntries(fields.map((f) => [f.key, f.type === 'check' ? Boolean(f.value) : str(f.value)]));
+  const unchanged = JSON.stringify(build(start));
+  anchoredForm({
+    anchor: itemButton(key),
+    title: `${what} ${name}`,
+    fields,
+    onSubmit: (v) => {
+      const step = build(v);
+      // Nothing changed: no command, no undo step.
+      if (JSON.stringify(step) === unchanged) return Promise.resolve();
+      if (typeof st.ctx.call !== 'function') return Promise.reject('Not connected');
+      return st.ctx.call(step[0], step[1]);
+    },
+  }).then(() => {
+    const again = itemButton(key);
+    if (again) again.focus({ preventScroll: true });
+  });
 }

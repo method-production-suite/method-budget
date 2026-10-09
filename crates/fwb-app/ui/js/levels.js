@@ -91,9 +91,11 @@ const PROBLEM = 'Some cells inside have problems; totals count them as blank.';
 // ---------------------------------------------------------------------------
 // Topsheet
 
+// Double-clicking a code or name edits it in place; elsewhere on a category's
+// row, double-click opens the category (grid.js editOnDoubleClick).
 export const TOPSHEET_COLUMNS = [
-  { key: 'code', label: 'Acct #' },
-  { key: 'name', label: 'Description' },
+  { key: 'code', label: 'Acct #', editOnDoubleClick: true },
+  { key: 'name', label: 'Description', editOnDoubleClick: true },
   { key: 'total', label: 'Total', cls: 'num' },
 ];
 
@@ -159,8 +161,8 @@ export function topsheetRows(ix) {
 // Accounts in one category
 
 export const ACCOUNT_COLUMNS = [
-  { key: 'code', label: 'Acct #' },
-  { key: 'name', label: 'Description' },
+  { key: 'code', label: 'Acct #', editOnDoubleClick: true },
+  { key: 'name', label: 'Description', editOnDoubleClick: true },
   { key: 'fringe_total', label: 'Fringes', cls: 'num' },
   { key: 'total', label: 'Total', cls: 'num' },
 ];

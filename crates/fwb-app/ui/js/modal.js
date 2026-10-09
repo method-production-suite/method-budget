@@ -1,6 +1,7 @@
-// In-app dialogs: a small form (add a category, rename...), a confirm, and a
+// In-app dialogs: a small form (add a category, rename...), a confirm, a
 // small one-field dialog anchored to a grid cell (a line's note, a new
-// global's value). One at a time. Escape cancels, Enter submits.
+// global's value), and a small form anchored to a side panel item (a setup
+// item's editor, apply.js). One at a time. Escape cancels, Enter submits.
 
 import { el, $, isMac } from './dom.js';
 import { setRules } from './sheet.js';
@@ -159,6 +160,189 @@ export function anchoredDialog({ anchor, title, message = '', label, value = '',
     input.focus();
     if (input.select) input.select();
   });
+}
+
+/**
+ * A small form next to `anchor` (an item in the side panel) with several
+ * fields: the editor for one setup item (apply.js). Each field is
+ *   { key, label, type, value, options, suffix, placeholder, showIf }
+ * where type is 'text' (the default), 'select' (options: [[value, label]]),
+ * 'check' (value true or false) or 'swatches' (options: [{ id, label, cls }],
+ * value an id: a row of color chips, one picked). `suffix` is text after a
+ * text box, or a function of the current values; `showIf(values)` hides the
+ * field while it returns false. Enter saves from any field, Escape cancels.
+ * `onSubmit(values)` returns a promise; if it rejects, the message shows and
+ * the form stays open. Resolves true when saved, false when cancelled.
+ */
+export function anchoredForm({ anchor, title, message = '', fields = [], submitText = 'Save', onSubmit }) {
+  return new Promise((resolve) => {
+    const root = $('modal-root');
+    const previous = document.activeElement;
+    const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
+    error.hidden = true;
+    const form = el('form', { class: 'modal popover popover-form', attrs: { role: 'dialog', 'aria-labelledby': 'popover-title', novalidate: true } });
+    form.append(el('h2', { class: 'modal-title popover-title', text: title, attrs: { id: 'popover-title' } }));
+    if (message) form.append(el('p', { class: 'modal-message', text: message }));
+    const box = el('div', { class: 'popover-fields' });
+    const parts = fields.map((f, i) => formField(f, `popover-f${i}`));
+    box.append(...parts.map((p) => p.wrap));
+    form.append(box, error);
+    const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
+    const ok = el('button', { class: 'btn btn-primary', text: submitText, attrs: { type: 'submit' } });
+    form.append(el('div', { class: 'modal-actions' }, cancel, ok));
+    const backdrop = el('div', { class: 'popover-backdrop' }, form);
+
+    const values = () => Object.fromEntries(parts.map((p) => [p.key, p.get()]));
+    const refresh = () => {
+      const v = values();
+      for (const p of parts) p.refresh(v);
+    };
+    form.addEventListener('input', refresh);
+    form.addEventListener('change', refresh);
+    form.addEventListener('fwb:pick', refresh);
+
+    const close = (result) => {
+      open = null;
+      backdrop.remove();
+      setRules('popover', '');
+      if (previous && previous.isConnected && previous.focus) previous.focus({ preventScroll: true });
+      resolve(result);
+    };
+    cancel.addEventListener('click', () => close(false));
+    backdrop.addEventListener('mousedown', (e) => {
+      if (e.target === backdrop) close(false);
+    });
+    form.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        close(false);
+      } else if (e.key === 'Enter' && !e.isComposing && e.target !== cancel && e.target !== ok) {
+        // Enter saves from any field, a pop-up list or a color chip included.
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      ok.disabled = true;
+      try {
+        if (onSubmit) await onSubmit(values());
+        close(true);
+      } catch (err) {
+        error.textContent = String(err);
+        error.hidden = false;
+        ok.disabled = false;
+      }
+    });
+
+    open = backdrop;
+    root.replaceChildren(backdrop);
+    refresh();
+    placePopover(form, anchor);
+    const first = parts.find((p) => !p.wrap.hidden);
+    if (first) first.focus();
+    else ok.focus();
+  });
+}
+
+/** One field of anchoredForm: { key, wrap, get(), refresh(values), focus() }. */
+function formField(f, id) {
+  const type = f.type || 'text';
+  let control;
+  let get;
+  let wrap;
+  let adorn = null;
+  if (type === 'check') {
+    control = el('input', { attrs: { id, type: 'checkbox' } });
+    control.checked = Boolean(f.value);
+    get = () => control.checked;
+    wrap = el('label', { class: 'popover-check', attrs: { for: id } }, control, el('span', { text: f.label }));
+  } else if (type === 'swatches') {
+    let picked = f.value === undefined || f.value === null ? '' : String(f.value);
+    const chips = (f.options || []).map((o) =>
+      el('button', {
+        class: `swatch ${o.cls || ''}`,
+        title: o.label,
+        attrs: { type: 'button', role: 'radio', 'aria-label': o.label },
+        data: { id: o.id },
+      }),
+    );
+    const row = el('div', { class: 'swatch-row', attrs: { role: 'radiogroup', 'aria-labelledby': `${id}-l` } }, ...chips);
+    const paint = () => {
+      for (const c of chips) {
+        const on = c.dataset.id === picked;
+        c.setAttribute('aria-checked', String(on));
+        c.tabIndex = on || (!chips.some((x) => x.dataset.id === picked) && c === chips[0]) ? 0 : -1;
+      }
+    };
+    const pick = (c) => {
+      picked = c.dataset.id;
+      paint();
+      c.focus();
+      row.dispatchEvent(new CustomEvent('fwb:pick', { bubbles: true }));
+    };
+    for (const c of chips) {
+      c.addEventListener('click', () => pick(c));
+      c.addEventListener('keydown', (e) => {
+        const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+        if (!step) return;
+        e.preventDefault();
+        const i = chips.indexOf(c);
+        pick(chips[(i + step + chips.length) % chips.length]);
+      });
+    }
+    paint();
+    control = row;
+    get = () => picked;
+    wrap = el('div', { class: 'modal-field', attrs: { role: 'group' } }, el('span', { text: f.label, attrs: { id: `${id}-l` } }), row);
+    return {
+      key: f.key,
+      wrap,
+      get,
+      refresh: (v) => {
+        wrap.hidden = typeof f.showIf === 'function' && !f.showIf(v);
+      },
+      focus: () => (chips.find((c) => c.tabIndex === 0) || chips[0] || row).focus(),
+    };
+  } else if (type === 'select') {
+    control = el('select', { class: 'modal-input', attrs: { id } });
+    for (const [v, label] of f.options || []) {
+      const o = el('option', { text: label });
+      o.value = v;
+      control.append(o);
+    }
+    control.value = f.value === undefined || f.value === null ? '' : String(f.value);
+    get = () => control.value;
+    wrap = el('label', { class: 'modal-field', attrs: { for: id } }, el('span', { text: f.label }), control);
+  } else {
+    control = el('input', {
+      class: 'modal-input',
+      attrs: { id, type: 'text', autocomplete: 'off', spellcheck: 'false', autocapitalize: 'off', placeholder: f.placeholder || '' },
+    });
+    control.value = f.value === undefined || f.value === null ? '' : String(f.value);
+    get = () => control.value;
+    const label = el('span', { text: f.label });
+    if (f.suffix) {
+      adorn = el('span', { class: 'popover-adorn', attrs: { 'aria-hidden': 'true' } });
+      wrap = el('label', { class: 'modal-field', attrs: { for: id } }, label, el('div', { class: 'popover-adorned' }, control, adorn));
+    } else {
+      wrap = el('label', { class: 'modal-field', attrs: { for: id } }, label, control);
+    }
+  }
+  return {
+    key: f.key,
+    wrap,
+    get,
+    refresh: (v) => {
+      wrap.hidden = typeof f.showIf === 'function' && !f.showIf(v);
+      if (adorn) adorn.textContent = typeof f.suffix === 'function' ? f.suffix(v) : String(f.suffix);
+    },
+    focus: () => {
+      control.focus();
+      if (type === 'text' && control.select) control.select();
+    },
+  };
 }
 
 /** Puts the dialog under the cell, or above it when there isn't room below. */

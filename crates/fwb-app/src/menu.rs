@@ -45,6 +45,8 @@ pub enum Entry {
     Paste,
     /// The setup panel's tabs, as a submenu.
     SetupTabs,
+    /// Format > Text Color, as a submenu.
+    TextColors,
 }
 
 use Entry::Separator as SEP;
@@ -104,6 +106,10 @@ pub const EDIT: &[Entry] = &[
     Entry::Cut,
     Entry::Copy,
     Entry::Paste,
+    // Whole rows with everything on them (ui/js/clipboard.js).
+    plain("edit.cut_rows", "Cut Rows"),
+    plain("edit.copy_rows", "Copy Rows"),
+    plain("edit.paste_rows", "Paste Rows"),
     item("edit.select_all", "Select All", "mod+a"),
     SEP,
     item("edit.fill_down", "Fill Down", "mod+shift+d"),
@@ -123,6 +129,33 @@ pub const INSERT: &[Entry] = &[
     plain("insert.account", "Account…"),
     plain("insert.category", "Category…"),
     plain("insert.production_total", "Production Total…"),
+];
+
+/// Text style for the selected detail lines (ui/js/rowformat.js). Italic is
+/// not on Cmd+I, which inserts a line.
+pub const FORMAT: &[Entry] = &[
+    item("format.bold", "Bold", "mod+b"),
+    item("format.italic", "Italic", "mod+shift+i"),
+    SEP,
+    item("format.indent_more", "Indent More", "mod+alt+right"),
+    item("format.indent_less", "Indent Less", "mod+alt+left"),
+    SEP,
+    Entry::TextColors,
+    plain("format.clear", "Clear Formatting"),
+];
+
+/// The text colors, in the order of the palette in ui/js/rowformat.js.
+pub const TEXT_COLORS: &[Entry] = &[
+    plain("format.color.none", "No Color"),
+    SEP,
+    plain("format.color.red", "Red"),
+    plain("format.color.orange", "Orange"),
+    plain("format.color.gold", "Gold"),
+    plain("format.color.green", "Green"),
+    plain("format.color.teal", "Teal"),
+    plain("format.color.blue", "Blue"),
+    plain("format.color.purple", "Purple"),
+    plain("format.color.pink", "Pink"),
 ];
 
 pub const GO: &[Entry] = &[
@@ -213,6 +246,11 @@ fn append<R: Runtime>(
                 append(app, &tabs, SETUP_TABS)?;
                 menu.append(&tabs)?;
             }
+            Entry::TextColors => {
+                let colors = Submenu::new(app, "Text Color", true)?;
+                append(app, &colors, TEXT_COLORS)?;
+                menu.append(&colors)?;
+            }
         }
     }
     Ok(())
@@ -276,6 +314,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     menu.append(&file)?;
     menu.append(&submenu(app, "&Edit", EDIT)?)?;
     menu.append(&submenu(app, "&Insert", INSERT)?)?;
+    menu.append(&submenu(app, "F&ormat", FORMAT)?)?;
     menu.append(&submenu(app, "&Go", GO)?)?;
     menu.append(&submenu(app, "&View", VIEW)?)?;
 
@@ -319,11 +358,22 @@ mod tests {
 
     /// Every command item in the menus, with its keys.
     fn items() -> Vec<Entry> {
-        [FILE, FILE_QUIT, EDIT, INSERT, GO, VIEW, SETUP_TABS, HELP]
-            .iter()
-            .flat_map(|m| m.iter().copied())
-            .filter(|e| matches!(e, Entry::Item { .. }))
-            .collect()
+        [
+            FILE,
+            FILE_QUIT,
+            EDIT,
+            INSERT,
+            FORMAT,
+            TEXT_COLORS,
+            GO,
+            VIEW,
+            SETUP_TABS,
+            HELP,
+        ]
+        .iter()
+        .flat_map(|m| m.iter().copied())
+        .filter(|e| matches!(e, Entry::Item { .. }))
+        .collect()
     }
 
     /// The text after `key: '` (or `key: ['`) up to the next quote.
@@ -426,5 +476,26 @@ mod tests {
         assert_eq!(accelerator("mod+backslash"), "CmdOrCtrl+Backslash");
         assert_eq!(accelerator("mod+shift+/"), "CmdOrCtrl+Shift+/");
         assert_eq!(accelerator("mod+g"), "CmdOrCtrl+G");
+        assert_eq!(accelerator("mod+alt+right"), "CmdOrCtrl+Alt+Right");
+        assert_eq!(accelerator("mod+shift+i"), "CmdOrCtrl+Shift+I");
+    }
+
+    #[test]
+    fn text_colors_match_the_palette() {
+        // Each Format > Text Color item names a color rowformat.js knows.
+        const ROWFORMAT_JS: &str = include_str!("../ui/js/rowformat.js");
+        let mut n = 0;
+        for e in TEXT_COLORS {
+            let Entry::Item { id, .. } = e else { continue };
+            let color = id.strip_prefix("format.color.").unwrap();
+            if color != "none" {
+                assert!(
+                    ROWFORMAT_JS.contains(&format!("{{ id: '{color}',")),
+                    "{color} is missing from rowformat.js"
+                );
+                n += 1;
+            }
+        }
+        assert_eq!(n, 8);
     }
 }

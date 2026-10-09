@@ -62,6 +62,7 @@ const COMMANDS: &[&str] = &[
     "set_row_style",
     "set_row_note",
     "set_group_color",
+    "update_group",
     // Apply panel: tag the selected rows, fringe ranges (src/apply.rs)
     "apply_summary",
     "apply_to_rows",
@@ -71,6 +72,13 @@ const COMMANDS: &[&str] = &[
     // Quick entry: add setup items from a cell, new-line defaults (src/quickadd.rs)
     "set_cell_creating",
     "set_new_line_defaults",
+    // Copy and paste whole rows, accounts and categories with their setup
+    // (src/clipboard.rs)
+    "clip_copy",
+    "clip_cut",
+    "clip_preview",
+    "clip_paste",
+    "clip_forget",
     // Saving safety: autosave, recovery, backups, recent and system-opened
     // files (src/safety_app.rs)
     "autosave_setting",

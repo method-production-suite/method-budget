@@ -38,6 +38,9 @@ import { readPref, writePref } from './prefs.js';
 import { setRules, dynamicStyles } from './sheet.js';
 import { initSafety } from './safety.js';
 import { initQuickEntry, editAssist, commitDetailCell, editNote, fringeRange, showFormula } from './quickentry.js';
+import { initRowFormat, toggleStyle, indent, setColor, clearFormatting, PALETTE } from './rowformat.js';
+import { initContextMenu } from './context.js';
+import { initClipboard, copyEvent, cellsCopied, pasteEvent, copyRows, pasteRows } from './clipboard.js';
 
 const state = {
   view: null,
@@ -78,6 +81,13 @@ const grid = new Grid($('grid-host'), {
 });
 
 initQuickEntry({ grid, view: () => state.view, level: () => state.level, act, call, toast });
+// Format menu and keys (rowformat.js); the grid's right-click menu (context.js).
+initRowFormat({ grid, view: () => state.view, level: () => state.level, act });
+// Its items call the commands directly: not through run(), whose guard against
+// a key and its menu item both arriving would drop a key pressed right after.
+initContextMenu({ grid, host: $('grid-host'), view: () => state.view, level: () => state.level, run: (id) => COMMANDS[id] && COMMANDS[id](), act, toast });
+// Copy and paste whole rows with everything on them (clipboard.js).
+initClipboard({ grid, level: () => state.level, ix: () => state.ix, cat: () => state.cat, acct: () => state.acct, act, render, toast });
 
 // ---------------------------------------------------------------------------
 // Talking to Rust
@@ -132,7 +142,17 @@ function trackChanges(view, opts) {
     c.prev = net;
     return;
   }
-  if (!NOT_EDITS.has(opts.cmd)) c.last = net - c.prev;
+  if (!NOT_EDITS.has(opts.cmd)) {
+    // `revert` (an undo that takes back a toggle the user didn't mean: the
+    // first click of a double-click in the apply panel) puts back the last
+    // change from before that toggle.
+    if (opts.revert && c.before !== undefined) {
+      c.last = c.before;
+    } else {
+      c.before = c.last;
+      c.last = net - c.prev;
+    }
+  }
   c.prev = net;
 }
 
@@ -387,7 +407,7 @@ function renderPanel() {
   $('btn-panel').setAttribute('aria-pressed', String(state.panelOpen));
   if (!state.panelOpen || !state.view) return;
   renderSetup(panel, state.view, {
-    call: (cmd, args) => call(cmd, args),
+    call: (cmd, args, opts) => call(cmd, args, opts),
     tab: state.tab,
     // Apply panel: the grid's selected row keys at the current level.
     selection: () => ({ level: state.level, keys: grid.selectedKeys(), cat: state.cat }),
@@ -625,20 +645,27 @@ function wireClipboard() {
       if (gridHasClipboard()) e.preventDefault();
     });
   }
-  const copy = (e) => {
+  // True when cells were copied (a cut then clears them). Whole rows are
+  // copied, or cut, with everything on them instead (clipboard.js).
+  const copy = (e, cut = false) => {
     if (!gridHasClipboard() || !e.clipboardData) return false;
     e.preventDefault();
+    if (copyEvent(e.clipboardData, { cut })) return false;
     e.clipboardData.setData('text/plain', grid.copyText());
+    cellsCopied();
     return true;
   };
-  document.addEventListener('copy', copy);
+  document.addEventListener('copy', (e) => copy(e));
   document.addEventListener('cut', (e) => {
-    if (copy(e)) clearCells(grid.editableCells());
+    if (copy(e, true)) clearCells(grid.editableCells());
   });
   document.addEventListener('paste', (e) => {
     if (!gridHasClipboard() || !e.clipboardData) return;
     e.preventDefault();
-    pasteText(e.clipboardData.getData('text/plain'));
+    // Copied rows go in as rows above the selection (clipboard.js); any
+    // other text is pasted into cells.
+    const text = e.clipboardData.getData('text/plain');
+    pasteEvent(text, () => pasteText(text));
   });
 }
 
@@ -1222,6 +1249,23 @@ for (const s of SHORTCUTS) {
 }
 // File > Open Recent and File > Revert to Backup (safety.js).
 Object.assign(COMMANDS, safety.commands);
+// Format: text style of the selected detail lines (rowformat.js).
+Object.assign(COMMANDS, {
+  'format.bold': () => toggleStyle('bold'),
+  'format.italic': () => toggleStyle('italic'),
+  'format.indent_more': () => indent(1),
+  'format.indent_less': () => indent(-1),
+  'format.clear': () => clearFormatting(),
+  'format.color.none': () => setColor(null),
+});
+for (const c of PALETTE) COMMANDS[`format.color.${c.id}`] = () => setColor(c.id);
+// Edit > Cut Rows, Copy Rows, Paste Rows: whole rows with everything on
+// them, whatever columns are selected (clipboard.js).
+Object.assign(COMMANDS, {
+  'edit.cut_rows': () => copyRows(true),
+  'edit.copy_rows': () => copyRows(false),
+  'edit.paste_rows': () => pasteRows(),
+});
 
 /** Commands that act on a focused text field (and so leave a cell edit open). */
 const FIELD_COMMANDS = new Set(SHORTCUTS.filter((s) => s.field).map((s) => s.id));

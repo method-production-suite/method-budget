@@ -38,9 +38,14 @@ export const SHORTCUTS = [
   // Edit
   { id: 'edit.undo', group: 'Edit', label: 'Undo', keys: 'mod+z', scope: 'app', field: true },
   { id: 'edit.redo', group: 'Edit', label: 'Redo', mac: 'mod+shift+z', other: ['mod+y', 'mod+shift+z'], scope: 'app', field: true },
-  { id: 'edit.cut', group: 'Edit', label: 'Cut the selected cells', keys: 'mod+x', scope: 'native' },
-  { id: 'edit.copy', group: 'Edit', label: 'Copy the selected cells (tab-separated, for spreadsheets)', keys: 'mod+c', scope: 'native' },
-  { id: 'edit.paste', group: 'Edit', label: 'Paste cells, starting at the selection', keys: 'mod+v', scope: 'native' },
+  { id: 'edit.cut', group: 'Edit', label: 'Cut the selected cells (whole rows: the rows, with everything on them)', keys: 'mod+x', scope: 'native' },
+  { id: 'edit.copy', group: 'Edit', label: 'Copy the selected cells (tab-separated, for spreadsheets; whole rows also with everything on them)', keys: 'mod+c', scope: 'native' },
+  { id: 'edit.paste', group: 'Edit', label: 'Paste cells, starting at the selection (copied rows: above it)', keys: 'mod+v', scope: 'native' },
+  // Whole rows whatever columns are selected (clipboard.js): lines, accounts
+  // on the account list, categories on the topsheet.
+  { id: 'edit.cut_rows', group: 'Edit', label: 'Cut the selected rows, with everything on them', scope: 'menu' },
+  { id: 'edit.copy_rows', group: 'Edit', label: 'Copy the selected rows, with their fringes, groups and other setup', scope: 'menu' },
+  { id: 'edit.paste_rows', group: 'Edit', label: 'Paste copied rows above the selected row', scope: 'menu' },
   { id: 'edit.select_all', group: 'Edit', label: 'Select every row', keys: 'mod+a', scope: 'app', field: true },
   { id: 'edit.fill_down', group: 'Edit', label: 'Fill down (top selected cell into the cells below)', keys: 'mod+shift+d', scope: 'grid' },
   { id: 'edit.delete_rows', group: 'Edit', label: 'Delete the selected rows (or the category or account)', keys: 'mod+d', scope: 'grid', text: true },
@@ -59,6 +64,7 @@ export const SHORTCUTS = [
   { id: 'grid.commit', group: 'Cells', label: 'Finish editing and move down or up (detail lines)', keys: ['enter', 'shift+enter'], scope: 'builtin' },
   { id: 'grid.commit_all', group: 'Cells', label: 'While editing: same value into every selected row', keys: 'mod+enter', scope: 'builtin' },
   { id: 'grid.cancel', group: 'Cells', label: 'Cancel the edit, clear the selection, or go up a level', keys: 'escape', scope: 'builtin' },
+  { id: 'grid.context_menu', group: 'Cells', label: 'Open the menu for the cursor cell (also the menu key, or a right-click)', keys: 'shift+f10', scope: 'builtin' },
 
   // Insert
   { id: 'insert.line', group: 'Insert', label: 'Insert a line below', keys: 'mod+i', scope: 'grid' },
@@ -68,6 +74,24 @@ export const SHORTCUTS = [
   { id: 'insert.account', group: 'Insert', label: 'Add an account', scope: 'menu' },
   { id: 'insert.category', group: 'Insert', label: 'Add a category', scope: 'menu' },
   { id: 'insert.production_total', group: 'Insert', label: 'Add a production total', scope: 'menu' },
+
+  // Format: text style of the selected detail lines (rowformat.js). Cmd+I
+  // inserts a line, so italic is Shift+Cmd+I; Cmd+[ and Cmd+] step accounts,
+  // so indenting is Option+Cmd+Right and Left.
+  { id: 'format.bold', group: 'Format', label: 'Bold on or off for the selected lines', keys: 'mod+b', scope: 'grid' },
+  { id: 'format.italic', group: 'Format', label: 'Italic on or off for the selected lines', keys: 'mod+shift+i', scope: 'grid' },
+  { id: 'format.indent_more', group: 'Format', label: 'Indent the selected lines one step more', keys: 'mod+alt+right', scope: 'grid' },
+  { id: 'format.indent_less', group: 'Format', label: 'Indent the selected lines one step less', keys: 'mod+alt+left', scope: 'grid' },
+  { id: 'format.color.none', group: 'Format', label: 'Text color: none (the group color, if any)', scope: 'menu' },
+  { id: 'format.color.red', group: 'Format', label: 'Text color: red', scope: 'menu' },
+  { id: 'format.color.orange', group: 'Format', label: 'Text color: orange', scope: 'menu' },
+  { id: 'format.color.gold', group: 'Format', label: 'Text color: gold', scope: 'menu' },
+  { id: 'format.color.green', group: 'Format', label: 'Text color: green', scope: 'menu' },
+  { id: 'format.color.teal', group: 'Format', label: 'Text color: teal', scope: 'menu' },
+  { id: 'format.color.blue', group: 'Format', label: 'Text color: blue', scope: 'menu' },
+  { id: 'format.color.purple', group: 'Format', label: 'Text color: purple', scope: 'menu' },
+  { id: 'format.color.pink', group: 'Format', label: 'Text color: pink', scope: 'menu' },
+  { id: 'format.clear', group: 'Format', label: 'Clear formatting (bold, italic, indent and color)', scope: 'menu' },
 
   // Go
   { id: 'go.topsheet', group: 'Go', label: 'Go to the topsheet', keys: 'mod+shift+up', scope: 'grid', text: true },
@@ -98,7 +122,7 @@ export const SHORTCUTS = [
 ];
 
 /** Groups in the order the shortcut sheet shows them. */
-export const GROUPS = ['File', 'Edit', 'Cells', 'Insert', 'Go', 'View', 'Help'];
+export const GROUPS = ['File', 'Edit', 'Cells', 'Insert', 'Format', 'Go', 'View', 'Help'];
 
 /** On macOS the native menu answers `app` keys; elsewhere main.js does. */
 export const menuRunsAppKeys = isMac;
@@ -133,6 +157,7 @@ const MAC_NAMES = {
   home: 'Home',
   end: 'End',
   f2: 'F2',
+  f10: 'F10',
   space: 'Space',
   backslash: '\\',
 };
@@ -150,6 +175,7 @@ const PC_NAMES = {
   home: 'Home',
   end: 'End',
   f2: 'F2',
+  f10: 'F10',
   space: 'Space',
   backslash: '\\',
 };
@@ -203,6 +229,7 @@ const NAMED = {
   home: 'Home',
   end: 'End',
   f2: 'F2',
+  f10: 'F10',
   space: ' ',
   backslash: '\\',
 };

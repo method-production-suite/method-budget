@@ -763,7 +763,9 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(nav_guard)
-        .manage(AppState::default());
+        .manage(AppState::default())
+        // The row clipboard: one for the app, shared by every budget (src/clipboard.rs).
+        .manage(crate::clipboard::ClipboardState::default());
 
     // The menu bar (src/menu.rs). Quit asks about unsaved changes first, like
     // closing the window; every other item goes to menu::handle.
@@ -860,6 +862,7 @@ pub fn run() {
             crate::rowstyle::set_row_style,
             crate::rowstyle::set_row_note,
             crate::rowstyle::set_group_color,
+            crate::rowstyle::update_group,
             // Apply panel (src/apply.rs)
             crate::apply::apply_summary,
             crate::apply::apply_to_rows,
@@ -869,6 +872,13 @@ pub fn run() {
             // Quick entry: add setup items from a cell, new-line defaults (src/quickadd.rs)
             crate::quickadd::set_cell_creating,
             crate::quickadd::set_new_line_defaults,
+            // Copy and paste whole rows, accounts and categories with their
+            // setup (src/clipboard.rs)
+            crate::clipboard::clip_copy,
+            crate::clipboard::clip_cut,
+            crate::clipboard::clip_preview,
+            crate::clipboard::clip_paste,
+            crate::clipboard::clip_forget,
             // Saving safety: autosave, recovery, backups, recent and
             // system-opened files, outside changes (src/safety_app.rs)
             crate::safety_app::autosave_setting,

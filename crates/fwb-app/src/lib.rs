@@ -8,6 +8,7 @@
 pub mod app;
 pub mod apply;
 pub mod batch;
+pub mod clipboard;
 pub mod diagnose;
 pub mod edit;
 pub mod menu;

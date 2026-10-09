@@ -16,6 +16,8 @@
 //   pin: 'left' or 'right' keeps the column in view while scrolling sideways.
 //   grow: true takes spare room first (up to twice its width).
 //   head: a function returning a node to show in the header instead of label.
+//   editOnDoubleClick: true edits the cell on a double-click even on an
+//   activatable row (where double-click otherwise calls onActivate).
 //
 // Handlers:  onCommit(rowKey, colKey, value)        one cell edited
 //            onCommitMany(rowKeys, colKey, value)   same value into many rows
@@ -44,7 +46,7 @@
 // ones, with spacer rows standing in for the rest; everything else (cursor,
 // selection, copy and paste) works on the row specs, so it covers every row.
 
-import { el, hasMod } from './dom.js';
+import { el, hasMod, isMac } from './dom.js';
 import { setRules, dynamicStyles } from './sheet.js';
 
 const SAFE_KEY = /^[a-z0-9_]+$/i;
@@ -378,6 +380,24 @@ export class Grid {
   copyText() {
     const { rows, cols } = this.cellRange();
     return toTSV(rows.map((r) => cols.map((c) => Grid.cellValue(r, c))));
+  }
+
+  /**
+   * True when the selection is whole rows: Select All, or a selection across
+   * every column. Copy, Cut and Paste then work on rows (clipboard.js).
+   */
+  wholeRows() {
+    if (!this.nav.length || !this.columns.length) return false;
+    if (this.allCols) return true;
+    const [a, b] = this.colRange();
+    return this.columns.length > 1 && a === 0 && b === this.columns.length - 1;
+  }
+
+  /** Rows (keys, taken in display order) as tab-separated text, every column. */
+  rowsText(keys) {
+    const want = new Set(keys);
+    const rows = this.nav.map((i) => this.rows[i]).filter((r) => want.has(r.key));
+    return toTSV(rows.map((r) => this.columns.map((c) => Grid.cellValue(r, c))));
   }
 
   /** The selected cells that can be edited: [{ rowKey, colKey }]. */
@@ -1192,7 +1212,9 @@ export class Grid {
   }
 
   onMouseDown(e) {
-    if (e.button !== 0) return;
+    // Control-click on a Mac is a right-click: the context menu (context.js)
+    // moves the cursor itself, and keeps a selection it falls inside.
+    if (e.button !== 0 || (isMac && e.ctrlKey)) return;
     if (this.editor && e.target === this.editor.input) return;
     const h = this.hit(e);
     if (!h) return;
@@ -1205,7 +1227,12 @@ export class Grid {
   onDoubleClick(e) {
     const h = this.hit(e);
     if (!h || this.editor) return;
-    if (h.row.activatable && this.h.onActivate) {
+    // A column marked editOnDoubleClick edits its cell in place even on a row
+    // that double-click otherwise opens (the code and name on the topsheet
+    // and account list).
+    const col = this.columns[h.col];
+    const editsHere = Boolean(col && col.editOnDoubleClick && Grid.editable(h.row, col));
+    if (h.row.activatable && this.h.onActivate && !editsHere) {
       this.h.onActivate(h.row.key);
       return;
     }

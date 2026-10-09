@@ -47,7 +47,10 @@ The window has three levels, with a breadcrumb above the grid:
    fringes, fringe percent, fringe dollars, groups and the line total. More columns (the
    units next to X, rate and 4X, 4X itself, set and location) are in the column menu.
 
-Enter or a double-click goes down a level; Escape or the breadcrumb goes back up. Each
+Enter or a double-click goes down a level; Escape or the breadcrumb goes back up. On the
+topsheet and the account list, a double-click on the number or the description edits it in
+place instead (Enter keeps it, Escape cancels, one undo step), so double-click the total, or
+press Enter, to open the row. Each
 breadcrumb segment below the budget has a small button (▾) listing its siblings, so you can
 jump straight to another category or another account in the category; Down arrow on the
 button opens the list, then arrows, a typed number or name, Enter, and Escape. On the
@@ -108,7 +111,13 @@ cut with an ellipsis, in full on hover) before the grid scrolls sideways, and wh
 scrolls, # and Description stay at the left and Total at the right. At 1280 pixels wide
 with the side panel open, the default columns fit without scrolling.
 
-**Row styles.** Bold, italic and indented lines (up to 4 levels) show as such. A line's text
+**Row styles.** The Format menu (and the grid's right-click menu) styles the selected
+lines: Bold (Cmd+B) and Italic (Shift+Cmd+I) go on, or off when every selected line has
+them already; Indent More and Indent Less (Option+Cmd+Right and Left) move each line one
+step, keeping lines at different depths apart; Text Color picks one of eight colors or No
+Color; Clear Formatting takes all of it off. Each is one undo step. The eight colors read
+at 4.5:1 or better on the grid in a light or a dark window: the file stores the light
+value, and a dark window shows a lighter one. Bold, italic and indented lines (up to 4 levels) show as such. A line's text
 takes its own color, else the color of its first group (by name) that has one; lines a
 group keeps out of the total are greyed and struck through. A separator row is drawn as a
 rule: it can be selected and deleted, has nothing to edit, and Enter after an edit moves
@@ -116,6 +125,35 @@ past it (Insert > Separator, or the Insert separator button). A row with a note 
 small mark in the corner of its description; the note is its tooltip. Lines that share a
 fringe range have a bracket in the # column. The printed report shows bold, italic, indent
 and separators too.
+
+**Right-click menus.** A right-click on a cell (Control-click on a Mac) moves the cursor
+there, keeping a selection of several rows it falls inside, and opens a menu of what can be
+done to it; Shift+F10 or the keyboard's menu key opens the same menu at the cursor cell.
+Up and Down move (passing over rules and dimmed items), Right or Enter opens a submenu, Left
+or Escape closes one, Enter or Space chooses, a letter jumps to the next item starting with
+it, Escape or Tab closes the menu, and a key with Command or Ctrl closes it and does what
+it does anywhere. Each item shows its key. On detail lines: Cut, Copy, Paste; Insert line,
+subtotal, adjustment, separator; Delete rows; Format (bold, italic, indent more and less,
+text color, clear formatting, with check marks for what the selection has); Add or Edit
+note; Make and Remove fringe range (dimmed when the selection can't); Apply group and Apply
+fringe (every group or fringe, checked when every selected line has it, a dash when some
+do; choosing one puts it on them all, or takes it off, as the apply panel does). On the
+account list: Cut, Copy, Paste; Open account; Insert, Rename (edits the name in place) and
+Delete account. On the topsheet: Cut, Copy, Paste; Open category; Insert category,
+Insert production total, Rename, Delete; and Add or apply a charge, Add or apply a credit
+(the Charges and Credits tabs). A right-click on a total row offers only the inserts, and
+one inside the cell editor gets the system's own text menu. Paste from the menu goes
+through the web view's paste command; where the web view asks first, or refuses, the key
+(Cmd+V) always works.
+
+Styles, notes and group colors are these commands, in `src/rowstyle.rs`:
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `set_row_style` | `rowIds`, and any of `bold`, `italic`, `indent` (0 to 4), `indentBy` (-4 to 4: each row moves that many steps, kept within 0 to 4; not with `indent`) and `color` (`#rrggbb`, or `null` to clear); fields left out are left alone | View |
+| `set_row_note` | `rowId`, `note` (`null` or blank removes it) | View |
+| `set_group_color` | `name`, `color` (`#rrggbb` or `null`) | View |
+| `update_group` | `name` (an existing group), `group` (`{ description, in_budget_total }`), `color` (`#rrggbb` or `null`): all three as one undo step | View |
 
 The side panel edits the budget's setup tables: globals (with their current values),
 fringes, groups (with the "in budget total" switch), units and currencies. Drag its left
@@ -155,6 +193,20 @@ are fine, since they never break a range). **Remove range** takes the selected l
 their ranges. Each list has a filter box, an "Applied only" switch and an Edit link to its
 setup tab. Every click is one undo step.
 
+**Editing an item where it is listed.** Double-click an item, or press Enter or F2 on it
+(Space still ticks it), to edit the item itself in a small box next to it: a fringe's kind,
+rate, cutoff (percent) or what it is charged per (flat) and description; a group's
+description, "counts in total" switch and line color (No color or one of the eight
+colors; a color set some other way is kept unless another is picked); a set's description;
+a location's description, city, region and country; a currency's rate, symbol and
+description. Enter saves, Escape or Cancel closes it, a refused value keeps it open with the
+message, and saving with nothing changed does nothing. Each save is one command, so one
+undo step (a group's three fields go together through `update_group`). The first click of
+a double-click has already ticked or unticked the item, so the double-click takes that
+back first (an undo of that one step, only when nothing else changed since), leaving the
+lines as they were and the footer's Last change as it was. Units and globals aren't in the
+apply panel; their setup tabs edit them in place.
+
 The commands live in `src/apply.rs`:
 
 | Command | Arguments | Returns |
@@ -181,7 +233,7 @@ fresh summary on that event and on every new view.
 
 ### Keyboard and menus
 
-Everything has a key, and the menu bar (File, Edit, Insert, Go, View, Help) lists the same
+Everything has a key, and the menu bar (File, Edit, Insert, Format, Go, View, Help) lists the same
 commands with the same keys. Help > Keyboard Shortcuts (Shift+Cmd+/ or Ctrl+Shift+/) shows the full
 list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the menu bar
 (`src/menu.rs`) uses the same ids and keys, and a Rust test fails if they drift apart.
@@ -193,7 +245,7 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 | Print the budget (topsheet and detail), the topsheet | Cmd+P, Shift+Cmd+P | Ctrl+P, Ctrl+Shift+P |
 | Close the window, Quit | Cmd+W, Cmd+Q | Ctrl+W, Ctrl+Q |
 | Undo, Redo (in a text field: its typing) | Cmd+Z, Shift+Cmd+Z | Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z |
-| Cut, Copy, Paste cells (tab-separated, like a spreadsheet) | Cmd+X, Cmd+C, Cmd+V | Ctrl+X, Ctrl+C, Ctrl+V |
+| Cut, Copy, Paste cells (tab-separated, like a spreadsheet; with whole rows selected, the rows with everything on them, below) | Cmd+X, Cmd+C, Cmd+V | Ctrl+X, Ctrl+C, Ctrl+V |
 | Select every row | Cmd+A | Ctrl+A |
 | Fill down | Shift+Cmd+D | Ctrl+Shift+D |
 | Delete the selected rows (or the category or account; Cmd+Z brings them back) | Cmd+D | Ctrl+D |
@@ -208,6 +260,9 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 | Insert a line below | Cmd+I | Ctrl+I |
 | Insert a subtotal, an adjustment | Cmd+=, Cmd+minus (or Option+Cmd+A) | Ctrl+=, Ctrl+minus (or Ctrl+Alt+A) |
 | Add or edit the line's note | Shift+Cmd+Space | Ctrl+Shift+Space |
+| Bold, italic on or off for the selected lines | Cmd+B, Shift+Cmd+I | Ctrl+B, Ctrl+Shift+I |
+| Indent the selected lines more, less | Option+Cmd+Right, Option+Cmd+Left | Ctrl+Alt+Right, Ctrl+Alt+Left |
+| Open the right-click menu at the cursor cell | Shift+F10 (or Control-click, or the menu key) | Shift+F10 (or the menu key) |
 | Make the selected lines one fringe range; take them out of their range | Cmd+R; Shift+Cmd+R | Ctrl+R; Ctrl+Shift+R |
 | Up a level; down a level (also Enter) | Cmd+Up; Cmd+Down | Ctrl+Up; Ctrl+Down |
 | Go to the topsheet | Shift+Cmd+Up | Ctrl+Shift+Up |
@@ -229,7 +284,9 @@ tools, so the shortcut sheet moved to Shift+Cmd+/ and Cmd+1 and Cmd+2 have no se
 fill down is on Shift+Cmd+D instead of the spreadsheet Cmd+D. Insert > Account, Category and Production Total have no key; they go to the level they
 belong to first and open the same dialog as the buttons. Insert > Separator has no key
 either; it adds a separator row below the cursor on the detail grid. Info, Settings and
-Baseline tabs are in View > Setup Tab.
+Baseline tabs are in View > Setup Tab. Cmd+I inserts a line, so italic is Shift+Cmd+I;
+Cmd+[ and Cmd+] step accounts, so indenting is Option+Cmd+Right and Left. Format > Text
+Color and Clear Formatting have no key.
 
 **Cells.** The selection is a set of rows (Shift+Up/Down, Shift-click, Cmd/Ctrl-click) across
 a run of columns (Shift+Left/Right). Copy gives tab-separated text, raw formulas for
@@ -260,6 +317,74 @@ nothing where it doesn't apply. While a dialog is open, the menu only reaches it
 
 Closing the window or quitting with unsaved changes asks first (with Autosave on, they
 are saved into the file instead, below).
+
+### Copy and paste rows
+
+**Whole rows.** When the selection is whole rows (Select All, or Shift+arrows across every
+column), Copy and Cut work on rows instead of cells: on the detail grid the lines, on the
+account list the accounts with all their lines, on the topsheet the categories with all
+their accounts and lines (production totals are left out, and a cut leaves them). The
+clipboard still gets the rows' cells as tab-separated text for spreadsheets, and the app
+keeps the rows themselves: every field (formulas as typed, units, X, rate, currency, 4X,
+fringes, groups, set, location, fringe range, bold, italic, indent, color, note, row kind)
+and the definition of every setup item they use: fringes, groups, units, sets, locations,
+currencies, and the globals their formulas name, with what those use in turn (a fringe's
+flat unit and the globals in its rate, the globals in a global's formula, however deep).
+Edit > Copy Rows, Cut Rows and Paste Rows (also on the right-click menu) do the same
+whatever columns are selected; with a single cell selected, Copy Rows copies its row.
+
+**Paste** with copied rows on the clipboard puts them in as new rows: lines above the
+selected line (at the end of an empty account), accounts above the selected account in the
+category on screen, categories above the selected topsheet row. Pasted lines get new ids;
+pasted fringe ranges get numbers new in the account, so they never join a range already
+there; pasted accounts and categories keep their numbers when free, else count on (an
+account copied as `11-05` goes into category 20 as `20-05`, or `20-06` when that is taken,
+wrapping round to `20-01`); a pasted category's accounts move under its new number. A line
+in the base currency of the budget it came from counts in this budget's base currency. The
+paste, with any setup it adds or changes, is one undo step; a cut deletes as one step and
+its paste is another. Anything else on the clipboard (cells copied since, here or in another
+app) pastes as cells, as before. Lines go only into an account, accounts only into a
+category's account list and categories only onto the topsheet; elsewhere a message says
+where to go.
+
+**The review.** Before rows land, each setup item they use is checked against this
+budget: missing here (it will be added), the same here (nothing to do), or set up
+differently under the same name. With nothing missing or different (a paste within one
+budget, usually) the rows go straight in. Otherwise a dialog lists each difference with
+both definitions in words, and what will be added. For each difference the choice is
+**Keep this budget's version** (the default, decision 12 in ROADMAP.md: the pasted lines
+then follow this budget's rate or cutoff, so they may total differently), **Use the copied
+version everywhere here** (it replaces this budget's, for every line that uses it), or
+**Add the copied one as** a new name (`FICA (2)`; globals `DAYS_2`, so formulas can still
+use them), which the pasted lines, and any copied fringe or global that names it, then use.
+A currency can't take a new name. Paste applies everything as one undo step; Cancel,
+Escape or a click outside changes nothing. Items that only a kept item would have needed
+(say a unit used by a copied fringe whose own version is kept here) are still added.
+
+**One clipboard for the app.** The copied rows live in Rust (`src/clipboard.rs`), not in
+the page, so a paste reaches any budget open in the app (budgets opening as tabs will
+share it). The clipboard text is the key: a paste whose text isn't the rows' text (any copy
+since, here or elsewhere, replaced it) is a paste of cells, and the copied rows are
+forgotten; copying cells forgets them too. No custom clipboard formats are used (WebKit
+doesn't keep them reliably), and nothing extra goes into the text, so spreadsheets get
+exactly the cells. If the page can't put the text on the system clipboard (Copy Rows from
+the menu bar in a web view that refuses), the rows are still kept and Paste Rows pastes
+them; Cmd+V then pastes whatever the clipboard holds.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `clip_copy` | `pick` (`{what: "rows", rowIds}`, `{what: "accounts", accounts}` or `{what: "categories", categories}`, topsheet positions), `text` (what went on the clipboard), `onClipboard` | `{token, what, count, lines}` |
+| `clip_cut` | the same | View (the copy, then the delete as one undo step) |
+| `clip_preview` | `text` (what Cmd+V found; `null` for Paste Rows) | the review, or `null` when that text isn't the copied rows' |
+| `clip_paste` | `token` (from the review), `target` (`{account, beforeRow}`, `{category, beforeAccount}` or `{at}`), `resolutions` (`[{kind, name, choice}]`, choice `keep`, `copied` or `rename`) | View (`created_row`: the first pasted line) |
+| `clip_forget` | none | nothing |
+
+The review has `what`, `count`, `lines`, `source` (the title of the budget the rows came
+from), `items` (`[{kind, name, status, copied, here, rename_to}]`: status `add` or
+`differs`, definitions in words), `same` (items that match), `notes` (sentences, such as a
+different base currency) and `review` (whether to show it). `clip_paste` is refused, with
+nothing changed, when another copy replaced the reviewed one, the target is gone, or a
+choice is unknown.
 
 ## Saving and recovery
 
@@ -384,6 +509,8 @@ crates/fwb-app/
   src/apply.rs       the apply panel: tag the selected rows, fringe ranges, selection summary
   src/quickadd.rs    quick entry: add a unit, set, location, currency or global from a
                      cell with the edit (one undo step); the new-line defaults setting
+  src/clipboard.rs   copy and paste whole rows, accounts and categories with the setup
+                     they use: the app's one row clipboard, the paste review, the paste
   src/menu.rs        native menu bar, built from the same table as ui/js/shortcuts.js
   src/safety.rs      saving safety as plain files: atomic writes, recovery copies,
                      backups, settings, the recent list (tested with temporary folders)
@@ -468,10 +595,15 @@ shortcuts), `grid.js` (a generic keyboard grid used at all three levels), `level
 `dom.js`, `shortcuts.js` (the one list of shortcuts, shared with the Rust menu and checked
 by a test), `help.js` (the shortcut sheet), `topsheet-setup.js` (charges, credits, sets,
 locations, info, settings and baseline tabs), `report.js` with `print.css` (printable
-reports), `menu.js` (the small popup menus: breadcrumb jump lists and the column menu),
+reports), `menu.js` (the small popup menus: breadcrumb jump lists and the column menu, and
+the right-click menu with its submenus), `context.js` (what the right-click menu offers at
+each level, opened by the mouse, Shift+F10 or the menu key), `rowformat.js` (bold, italic,
+indent, text color and the color palette; `context.css` draws the menu, the palette and
+the apply panel's small editors),
 `autocomplete.js` (the type-ahead list on a cell editor, a listbox the editor drives with
 `aria-activedescendant`), `quickentry.js` (wires it to the grid, sends edits that add
 setup items, the note editor, the fringe range keys and the formula bar),
+`clipboard.js` (copy, cut and paste of whole rows, and the paste review),
 `prefs.js` (per-user display choices in local storage: visible columns, panel width) and
 `sheet.js` (styles worked out at run time, below). The side panel opens on Apply (`apply.js`, the selected lines) and groups the
 setup tabs into Tables and Budget. Commands run one at a
@@ -538,4 +670,6 @@ Moving rows by drag, editing fringe ranges in the grid, original/variance column
 grid (the data is in `view.variance`; reports already print it), renaming setup entries (add
 the new one, then delete the old), renumbering accounts when the coding pattern changes,
 import from other tools, find and replace, single-instance handling on Windows and Linux,
-and the macOS system recent documents list. Printing and the Windows/Linux menu keys still need a live check.
+the macOS system recent documents list, a mark on copied rows, and the total change a
+paste will cause in its review. Printing, the Windows/Linux menu keys, and Copy Rows from
+the menu bar reaching the system clipboard still need a live check.

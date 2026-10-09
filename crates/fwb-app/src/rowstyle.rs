@@ -14,7 +14,7 @@ use tauri::ipc::{InvokeBody, Request};
 use tauri::{Runtime, State, WebviewWindow};
 
 use crate::app::{edit_budget, AppState};
-use crate::edit::EditResult;
+use crate::edit::{EditResult, GroupInput};
 use crate::view::View;
 
 /// A color typed by the user: `#` and exactly 6 hex digits. Stored lowercase,
@@ -52,6 +52,11 @@ pub struct RowStyleInput {
     /// readable message instead of a parse error.
     #[serde(default)]
     pub indent: Option<i64>,
+    /// Moves every row's indent by this many levels (Format > Indent More is
+    /// 1, Indent Less -1), each kept within 0 to [`MAX_INDENT`], so rows at
+    /// different depths keep their shape. Not together with `indent`.
+    #[serde(default)]
+    pub indent_by: Option<i64>,
     /// `Some(Some(c))` sets, `Some(None)` (JSON `null`) clears, `None` (absent)
     /// leaves each row's color alone.
     #[serde(default, deserialize_with = "present")]
@@ -97,6 +102,13 @@ pub fn apply_row_style(b: &mut Budget, s: &RowStyleInput) -> EditResult {
                 .ok_or_else(|| format!("indent must be 0 to {MAX_INDENT}, not {n}"))?,
         ),
     };
+    let max = i64::from(MAX_INDENT);
+    let indent_by = match s.indent_by {
+        None => None,
+        Some(_) if indent.is_some() => return Err("give indent or indentBy, not both".into()),
+        Some(n) if (-max..=max).contains(&n) => Some(n),
+        Some(n) => return Err(format!("indentBy must be -{max} to {max}, not {n}")),
+    };
     let color = match &s.color {
         None => None,
         Some(None) => Some(None),
@@ -111,6 +123,10 @@ pub fn apply_row_style(b: &mut Budget, s: &RowStyleInput) -> EditResult {
         }
         if let Some(indent) = indent {
             d.indent = indent;
+        }
+        if let Some(by) = indent_by {
+            let moved = (i64::from(d.indent) + by).clamp(0, max);
+            d.indent = u8::try_from(moved).unwrap_or(0);
         }
         if let Some(color) = &color {
             d.color.clone_from(color);
@@ -147,6 +163,23 @@ pub fn apply_group_color(b: &mut Budget, name: &str, color: Option<&str>) -> Edi
         .ok_or_else(|| format!("group {name} no longer exists"))?;
     g.color = color;
     Ok(())
+}
+
+/// Edits an existing group's description, "counts in total" switch and color
+/// together, so the group editor in the apply panel is one undo step. Refused
+/// when the group is gone, so a stale editor never brings it back.
+pub fn apply_group_update(
+    b: &mut Budget,
+    name: &str,
+    g: &GroupInput,
+    color: Option<&str>,
+) -> EditResult {
+    if !b.groups.contains_key(name) {
+        return Err(format!("group {name} no longer exists"));
+    }
+    let color = color.map(check_color).transpose()?;
+    crate::edit::set_group(b, name, g)?;
+    apply_group_color(b, name, color.as_deref())
 }
 
 // ---------------------------------------------------------------------------
@@ -189,6 +222,21 @@ pub fn set_group_color<R: Runtime>(
 ) -> Result<View, String> {
     edit_budget(&window, &state, |b| {
         apply_group_color(b, &name, color.as_deref())
+    })
+}
+
+/// `{name, group: {description, in_budget_total}, color: string | null}`:
+/// everything about an existing group in one undo step.
+#[tauri::command]
+pub fn update_group<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    name: String,
+    group: GroupInput,
+    color: Option<String>,
+) -> Result<View, String> {
+    edit_budget(&window, &state, |b| {
+        apply_group_update(b, &name, &group, color.as_deref())
     })
 }
 
@@ -317,6 +365,134 @@ mod tests {
         let ok = style(json!({"rowIds": [a], "indent": 4}));
         s.edit(|bud| apply_row_style(bud, &ok)).unwrap();
         assert_eq!(row(&s, a).indent, 4);
+    }
+
+    #[test]
+    fn indent_by_moves_each_row_and_stays_in_range() {
+        let mut s = Session::new();
+        let (_, a, b) = two_rows(&s);
+        let set = style(json!({"rowIds": [a], "indent": 3}));
+        s.edit(|bud| apply_row_style(bud, &set)).unwrap();
+
+        // Mixed depths keep their shape; the deepest stops at the limit.
+        let more = style(json!({"rowIds": [a, b], "indentBy": 1}));
+        s.edit(|bud| apply_row_style(bud, &more)).unwrap();
+        assert_eq!((row(&s, a).indent, row(&s, b).indent), (4, 1));
+        s.edit(|bud| apply_row_style(bud, &more)).unwrap();
+        assert_eq!((row(&s, a).indent, row(&s, b).indent), (4, 2));
+
+        let less = style(json!({"rowIds": [a, b], "indentBy": -3}));
+        s.edit(|bud| apply_row_style(bud, &less)).unwrap();
+        assert_eq!((row(&s, a).indent, row(&s, b).indent), (1, 0));
+
+        // One undo step per command.
+        assert!(s.undo());
+        assert_eq!((row(&s, a).indent, row(&s, b).indent), (4, 2));
+
+        // Nothing left to move: no change, no undo step.
+        let at_zero = style(json!({"rowIds": [b], "indent": 0}));
+        s.edit(|bud| apply_row_style(bud, &at_zero)).unwrap();
+        let (unchanged, rev) = (s.budget().clone(), s.view_rev());
+        let out = style(json!({"rowIds": [b], "indentBy": -1}));
+        s.edit(|bud| apply_row_style(bud, &out)).unwrap();
+        assert_eq!(s.budget(), &unchanged);
+        assert_eq!(s.view_rev(), rev, "no change, no new revision");
+
+        let before = s.budget().clone();
+        for bad in [
+            json!({"rowIds": [a], "indentBy": 5}),
+            json!({"rowIds": [a], "indentBy": -5}),
+            json!({"rowIds": [a], "indent": 1, "indentBy": 1}),
+            json!({"rowIds": [a], "indentBy": 0.5}),
+        ] {
+            let input = RowStyleInput::from_json(&bad);
+            let refused = match input {
+                Err(_) => true,
+                Ok(i) => s.edit(|bud| apply_row_style(bud, &i)).is_err(),
+            };
+            assert!(refused, "{bad}");
+        }
+        assert_eq!(s.budget(), &before);
+    }
+
+    #[test]
+    fn group_update_is_one_step_and_needs_the_group() {
+        let mut s = Session::new();
+        let g = GroupInput {
+            description: "Option A".into(),
+            in_budget_total: true,
+        };
+        s.edit(|b| edit::set_group(b, "Alt", &g)).unwrap();
+        s.edit(|b| apply_group_color(b, "Alt", Some("#123456")))
+            .unwrap();
+
+        let next = GroupInput {
+            description: "  Option B ".into(),
+            in_budget_total: false,
+        };
+        s.edit(|b| apply_group_update(b, "Alt", &next, Some("#ABCDEF")))
+            .unwrap();
+        let got = &s.budget().groups["Alt"];
+        assert_eq!(got.description, "Option B");
+        assert!(!got.in_budget_total);
+        assert_eq!(got.color.as_deref(), Some("#abcdef"));
+
+        // Clearing the color keeps the rest.
+        s.edit(|b| apply_group_update(b, "Alt", &next, None))
+            .unwrap();
+        assert_eq!(s.budget().groups["Alt"].color, None);
+        assert_eq!(s.budget().groups["Alt"].description, "Option B");
+
+        let before = s.budget().clone();
+        assert!(s
+            .edit(|b| apply_group_update(b, "Gone", &next, None))
+            .is_err());
+        assert!(!s.budget().groups.contains_key("Gone"));
+        assert!(s
+            .edit(|b| apply_group_update(b, "Alt", &g, Some("red")))
+            .is_err());
+        assert_eq!(s.budget(), &before);
+
+        // Each update undoes as one step.
+        assert!(s.undo());
+        assert_eq!(s.budget().groups["Alt"].color.as_deref(), Some("#abcdef"));
+        assert!(s.undo());
+        let back = &s.budget().groups["Alt"];
+        assert_eq!(
+            (
+                back.description.as_str(),
+                back.in_budget_total,
+                back.color.as_deref()
+            ),
+            ("Option A", true, Some("#123456"))
+        );
+    }
+
+    /// Every command here is registered, listed for access control and
+    /// allowed for the window (a command missing from any of the three
+    /// can't be called).
+    #[test]
+    fn row_style_commands_are_wired() {
+        const APP_RS: &str = include_str!("app.rs");
+        const BUILD_RS: &str = include_str!("../build.rs");
+        const CAPS: &str = include_str!("../capabilities/main.json");
+        for c in [
+            "set_row_style",
+            "set_row_note",
+            "set_group_color",
+            "update_group",
+        ] {
+            assert!(
+                APP_RS.contains(&format!("crate::rowstyle::{c},")),
+                "{c} not in generate_handler!"
+            );
+            assert!(
+                BUILD_RS.contains(&format!("\"{c}\",")),
+                "{c} not in build.rs"
+            );
+            let allow = format!("\"allow-{}\"", c.replace('_', "-"));
+            assert!(CAPS.contains(&allow), "{c} not allowed in capabilities");
+        }
     }
 
     #[test]
