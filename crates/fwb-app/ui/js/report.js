@@ -352,6 +352,16 @@ function sumRow(cls, label, cents, note) {
   return tr;
 }
 
+/** Text style classes for a detail row (bold, italic, indent 1 to 4), each with a leading space. */
+function rowStyle(d) {
+  let cls = '';
+  if (d.bold === true) cls += ' row-bold';
+  if (d.italic === true) cls += ' row-italic';
+  const indent = Number.isInteger(d.indent) ? Math.min(Math.max(d.indent, 0), 4) : 0;
+  if (indent) cls += ` indent-${indent}`;
+  return cls;
+}
+
 function accountBlock(ctx, acct, ar, catRep) {
   const b = ctx.b;
   const baseCur = b.base_currency || (ctx.r && ctx.r.base_currency) || '';
@@ -387,9 +397,14 @@ function accountBlock(ctx, acct, ar, catRep) {
   details.forEach((d, i) => {
     const kind = d.kind || 'line';
     const rr = rows[i] || null;
+    // A separator prints as a rule across the row, nothing else.
+    if (kind === 'separator') {
+      trs.push(el('tr', { class: 'rpt-row separator' }, td(String(i + 1), 'num no'), td('', 'rule', NCOLS - 1)));
+      return;
+    }
     const out = rr && !rr.included && kind !== 'subtotal';
     if (out) suppressed += 1;
-    const tr = el('tr', { class: `rpt-row ${kind}${out ? ' excluded' : ''}` });
+    const tr = el('tr', { class: `rpt-row ${kind}${out ? ' excluded' : ''}${rowStyle(d)}` });
     tr.append(td(String(i + 1), 'num no'));
     const desc = el('td', { class: 'desc' });
     const text = d.description || (kind === 'subtotal' ? 'Subtotal' : kind === 'adjustment' ? 'Adjustment' : '');

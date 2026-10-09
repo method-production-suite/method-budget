@@ -35,9 +35,23 @@ impl Rng {
 }
 
 fn gen_detail(rng: &mut Rng, id: RowId, range: Option<u32>) -> Detail {
-    let mut det = match rng.below(10) {
+    let mut det = match rng.below(11) {
         0 => return Detail::subtotal(id, "sub"),
         1 => Detail::adjustment(id, "adj", format!("0.{}", rng.below(30)).as_str()),
+        // Separators sometimes sit inside a fringe range, sometimes carry a
+        // different range or stray tags: none of it may matter.
+        2 => {
+            let mut sep = Detail::separator(id);
+            sep.fringe_range = match rng.below(3) {
+                0 => range,
+                1 => Some(u32::MAX),
+                _ => None,
+            };
+            if rng.chance(30) {
+                sep.fringes.insert("PCT".into());
+            }
+            sep
+        }
         _ => {
             let amount = match rng.below(3) {
                 0 => "DAYS".to_string(),
@@ -72,6 +86,16 @@ fn gen_detail(rng: &mut Rng, id: RowId, range: Option<u32>) -> Detail {
     }
     if rng.chance(30) {
         det.set = Some(rng.pick(&["S1", "S2"]).into());
+    }
+    // Display-only styling, on any kind of row.
+    det.bold = rng.chance(20);
+    det.italic = rng.chance(20);
+    det.indent = rng.below(5) as u8;
+    if rng.chance(20) {
+        det.color = Some("#c04000".into());
+    }
+    if rng.chance(10) {
+        det.note = Some("check with UPM".into());
     }
     det
 }
@@ -131,6 +155,9 @@ fn gen_budget(rng: &mut Rng) -> Budget {
     b.groups.insert("A".into(), group(true));
     b.groups.insert("B".into(), group(true));
     b.groups.insert("OFF".into(), group(false));
+    if rng.chance(50) {
+        b.groups.get_mut("A").unwrap().color = Some("#2060a0".into());
+    }
 
     let (mut id, mut code, mut range) = (0, 1000, 0);
     for c in 0..=rng.below(5) {
@@ -198,6 +225,10 @@ fn check_rollups(b: &Budget, r: &Report, seed: u64) {
                 assert_eq!(row.fringe_total, row.fringes.values().sum::<i64>(), "{msg}");
                 if !row.included || row.kind != RowKind::Line {
                     assert_eq!(row.fringe_total, 0, "{msg}");
+                }
+                if row.kind == RowKind::Separator {
+                    assert!(row.included, "{msg}");
+                    assert_eq!((row.total, row.subtotal), (0, None), "{msg}");
                 }
                 if !row.included {
                     assert_eq!(row.total, 0, "{msg}");
@@ -392,4 +423,50 @@ fn deleting_any_global_keeps_every_total() {
             assert_eq!(after.net_total, before.net_total, "seed {seed} {name}");
         }
     }
+}
+
+/// A copy of `r` with separator rows dropped from every account.
+fn without_separator_rows(mut r: Report) -> Report {
+    for cat in &mut r.categories {
+        for acct in &mut cat.accounts {
+            acct.rows.retain(|row| row.kind != RowKind::Separator);
+        }
+    }
+    r
+}
+
+#[test]
+fn separators_and_styling_change_nothing() {
+    let mut separators = 0;
+    for seed in 1..=CASES {
+        let b = gen_budget(&mut Rng(seed));
+        let mut plain = b.clone();
+        for g in plain.groups.values_mut() {
+            g.color = None;
+        }
+        for acct in plain.categories_mut().flat_map(|c| &mut c.accounts) {
+            separators += acct.details.len();
+            acct.details.retain(|d| d.kind != RowKind::Separator);
+            separators -= acct.details.len();
+            for d in &mut acct.details {
+                d.bold = false;
+                d.italic = false;
+                d.indent = 0;
+                d.color = None;
+                d.note = None;
+            }
+        }
+        for opts in [
+            RecalcOptions::default(),
+            RecalcOptions {
+                exclude_groups: set(&["A"]),
+                ..Default::default()
+            },
+        ] {
+            let with = recalc(&b, &opts).unwrap_or_else(|e| panic!("seed {seed}: {e}"));
+            let without = recalc(&plain, &opts).unwrap();
+            assert_eq!(without_separator_rows(with), without, "seed {seed}");
+        }
+    }
+    assert!(separators > 100, "the generator makes separators");
 }

@@ -24,6 +24,7 @@ pub fn kind_name(k: RowKind) -> &'static str {
         RowKind::Line => "line",
         RowKind::Subtotal => "subtotal",
         RowKind::Adjustment => "adjustment",
+        RowKind::Separator => "separator",
     }
 }
 

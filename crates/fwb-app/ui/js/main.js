@@ -17,8 +17,10 @@ import {
   findCategory,
   accountList,
   TOPSHEET_COLUMNS,
-  ACCOUNT_COLUMNS,
-  DETAIL_COLUMNS,
+  accountColumns,
+  detailColumns,
+  columnShown,
+  OPTIONAL_DETAIL_COLUMNS,
   topsheetRows,
   accountRows,
   detailRows,
@@ -29,6 +31,9 @@ import { renderSetup } from './setup.js';
 import { printReport } from './report.js';
 import { SHORTCUTS, matchShortcut, menuRunsAppKeys, shortcutById, withShortcut } from './shortcuts.js';
 import { isHelpOpen, toggleHelp, closeHelp } from './help.js';
+import { openMenu, updateMenu, closeMenu, isMenuOpen, setMenuAnchor } from './menu.js';
+import { readPref, writePref } from './prefs.js';
+import { setRules, dynamicStyles } from './sheet.js';
 
 const state = {
   view: null,
@@ -36,10 +41,14 @@ const state = {
   level: 'topsheet', // 'topsheet' | 'accounts' | 'details'
   cat: null, // { code, ti }
   acct: null, // { code, ai }
-  tab: 'globals',
+  tab: 'apply', // side panel tab; 'apply' is the apply panel (apply.js)
   panelOpen: true,
   selection: null, // { count, totals } on the detail grid
   memory: {}, // level -> row key to return to
+  columns: readColumnChoices(), // optional detail column -> shown (saved per user)
+  // Net totals for the footer's change counters: when the file was opened or
+  // created (start), after the latest command (prev), and the latest edit's effect.
+  changes: null, // { start, prev, last }
 };
 
 const grid = new Grid($('grid-host'), {
@@ -52,6 +61,12 @@ const grid = new Grid($('grid-host'), {
   onPastEnd: () => {
     if (state.level === 'details') insertRow('line');
   },
+  // Shift+Tab from the first cell reaches the column menu button.
+  onTabOut: () => {
+    const b = $('grid-host').querySelector('.col-chooser');
+    if (b) b.focus();
+    return Boolean(b);
+  },
   enterMovesDown: false,
 });
 
@@ -61,7 +76,7 @@ const grid = new Grid($('grid-host'), {
 /** Runs a command and redraws from the view it returns. Rejects with a message. */
 async function call(cmd, args = {}, opts = {}) {
   const v = await invoke(cmd, args);
-  if (v && typeof v === 'object' && 'budget' in v) apply(v, opts);
+  if (v && typeof v === 'object' && 'budget' in v) apply(v, { ...opts, cmd });
   return v;
 }
 
@@ -78,7 +93,35 @@ async function act(cmd, args = {}, opts = {}) {
 function apply(view, opts = {}) {
   state.view = view;
   state.ix = indexView(view);
+  trackChanges(view, opts);
   render(opts);
+  // The selected rows' totals may have changed even if the selection didn't.
+  if (state.level === 'details') requestSelectionTotals(grid.selectedKeys());
+}
+
+// Commands that return a view without changing the budget.
+const NOT_EDITS = new Set(['get_view', 'save_budget']);
+
+/**
+ * Footer change counters. `opts.fresh` (a file opened or created) starts
+ * over; every other command that returns a view is an edit, and its effect on
+ * the net total becomes the last change (0 for an edit that moves no money).
+ */
+function trackChanges(view, opts) {
+  const net = view.report ? view.report.net_total : null;
+  if (opts.fresh || !state.changes) {
+    state.changes = { start: net, prev: net, last: 0 };
+    return;
+  }
+  const c = state.changes;
+  if (net === null) return; // no totals right now; compare with the last ones known
+  if (c.start === null) {
+    c.start = net; // the first totals since the file was opened
+    c.prev = net;
+    return;
+  }
+  if (!NOT_EDITS.has(opts.cmd)) c.last = net - c.prev;
+  c.prev = net;
 }
 
 let toastTimer = null;
@@ -131,17 +174,17 @@ function render(opts = {}) {
   renderActions();
 
   const ix = state.ix;
+  $('grid-host').dataset.level = state.level;
   if (state.level === 'topsheet') {
     grid.h.enterMovesDown = false;
     grid.setData(TOPSHEET_COLUMNS, topsheetRows(ix), opts);
   } else if (state.level === 'accounts') {
     grid.h.enterMovesDown = false;
-    grid.setData(ACCOUNT_COLUMNS, accountRows(ix, entry), opts);
+    grid.setData(accountColumns(ix), accountRows(ix, entry), opts);
   } else {
     grid.h.enterMovesDown = true;
-    grid.setData(DETAIL_COLUMNS, detailRows(ix, entry, ai), opts);
+    grid.setData(gridDetailColumns(), detailRows(ix, entry, ai), opts);
   }
-  $('grid-host').dataset.level = state.level;
   renderPanel();
   renderFooterNow();
 }
@@ -155,22 +198,97 @@ function renderTitle(v) {
 }
 
 function crumb(label, onClick, current) {
-  if (current) return el('span', { class: 'crumb current', text: label, attrs: { 'aria-current': 'page' } });
-  return el('button', { class: 'crumb', text: label, attrs: { type: 'button' }, on: { click: onClick } });
+  if (current) return el('span', { class: 'crumb current', text: label, title: label, attrs: { 'aria-current': 'page' } });
+  return el('button', { class: 'crumb', text: label, title: label, attrs: { type: 'button' }, on: { click: onClick } });
+}
+
+/** A breadcrumb segment's jump list: a small button that opens a menu of its siblings. */
+function crumbPicker(id, label, items, onPick) {
+  return el('button', {
+    class: 'crumb-pick',
+    title: label,
+    attrs: { type: 'button', 'aria-label': label, 'aria-haspopup': 'menu', 'aria-expanded': 'false' },
+    data: { crumb: id },
+    on: {
+      click: (e) => openMenu(e.currentTarget, { owner: 'crumbs', label, items, onPick }),
+      keydown: (e) => {
+        // Down or Up opens the list too, as on a native pop-up button.
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        e.preventDefault();
+        e.stopPropagation();
+        openMenu(e.currentTarget, { owner: 'crumbs', label, items, onPick });
+      },
+    },
+  });
+}
+
+/** Previous or next account (the same as Cmd+[ and Cmd+]). Keeps focus when used from the keyboard. */
+function crumbStep(id, label, delta, cmd) {
+  return el('button', {
+    class: 'crumb-step',
+    text: delta < 0 ? '‹' : '›',
+    title: withShortcut(label, cmd),
+    attrs: { type: 'button', 'aria-label': label },
+    data: { crumb: id },
+    on: {
+      click: (e) => {
+        const fromKeyboard = e.detail === 0;
+        stepAccount(delta);
+        if (fromKeyboard) {
+          const again = $('crumbs').querySelector(`[data-crumb="${id}"]`);
+          if (again) again.focus();
+        }
+      },
+    },
+  });
 }
 
 function renderCrumbs(entry, ai) {
+  closeMenu('crumbs');
+  const ix = state.ix;
   const b = state.view.budget;
   const parts = [crumb(b.title || 'Untitled budget', () => goTo('topsheet'), state.level === 'topsheet')];
   if (entry) {
     const c = entry.cat;
+    const cats = ix.cats.map((x) => ({
+      id: x.ti,
+      label: `${x.cat.code} ${x.cat.name}`.trim(),
+      checked: x.ti === entry.ti,
+    }));
     parts.push(el('span', { class: 'crumb-sep', text: '/' }));
-    parts.push(crumb(`${c.code} ${c.name}`.trim(), () => goTo('accounts'), state.level === 'accounts'));
+    parts.push(
+      el(
+        'span',
+        { class: 'crumb-seg' },
+        crumb(`${c.code} ${c.name}`.trim(), () => goTo('accounts'), state.level === 'accounts'),
+        crumbPicker('cat', 'Go to another category', cats, (it) => openCategory(it.id)),
+      ),
+    );
   }
   if (state.level === 'details' && entry) {
     const a = entry.cat.accounts[ai];
+    const accts = (entry.cat.accounts || []).map((x, i) => ({
+      id: i,
+      label: `${x.code} ${x.name}`.trim(),
+      checked: i === ai,
+    }));
     parts.push(el('span', { class: 'crumb-sep', text: '/' }));
-    parts.push(crumb(`${a.code} ${a.name}`.trim(), null, true));
+    parts.push(
+      el(
+        'span',
+        { class: 'crumb-seg' },
+        crumb(`${a.code} ${a.name}`.trim(), null, true),
+        crumbPicker('acct', `Go to another account in ${entry.cat.code}`.trim(), accts, (it) => openAccount(entry.ti, it.id)),
+      ),
+    );
+    parts.push(
+      el(
+        'span',
+        { class: 'crumb-steps', attrs: { role: 'group', 'aria-label': 'Step through accounts' } },
+        crumbStep('prev', 'Previous account', -1, 'go.prev_account'),
+        crumbStep('next', 'Next account', 1, 'go.next_account'),
+      ),
+    );
   }
   $('crumbs').replaceChildren(...parts);
 }
@@ -233,6 +351,10 @@ function renderActions() {
         cmd: 'insert.adjustment',
         title: 'Insert an adjustment: a percentage of the lines above it (Amount 0.1 is 10%)',
       }),
+      button('Insert separator', () => insertRow('separator'), {
+        cmd: 'insert.separator',
+        title: 'Insert a separator: a drawn rule line with no cost',
+      }),
       el('span', { class: 'spacer' }),
       button('Delete rows', deleteRows, { cmd: 'edit.delete_rows', danger: true }),
     );
@@ -242,11 +364,14 @@ function renderActions() {
 function renderPanel() {
   const panel = $('panel');
   panel.hidden = !state.panelOpen;
+  if (resizer) resizer.hidden = !state.panelOpen || !dynamicStyles;
   $('btn-panel').setAttribute('aria-pressed', String(state.panelOpen));
   if (!state.panelOpen || !state.view) return;
   renderSetup(panel, state.view, {
     call: (cmd, args) => call(cmd, args),
     tab: state.tab,
+    // Apply panel: the grid's selected row keys at the current level.
+    selection: () => ({ level: state.level, keys: grid.selectedKeys(), cat: state.cat }),
     setTab: (tab) => {
       state.tab = tab;
       renderPanel();
@@ -255,7 +380,28 @@ function renderPanel() {
 }
 
 function renderFooterNow() {
-  renderFooter($('footer'), state.view, state.level === 'details' ? state.selection : null);
+  const c = state.changes;
+  const changes = c && c.start !== null && c.prev !== null ? { session: c.prev - c.start, last: c.last } : null;
+  renderFooter($('footer'), state.view, state.level === 'details' ? state.selection : null, {
+    context: footerContext(),
+    changes,
+  });
+}
+
+/** When drilled down: the current account's and its category's totals, labeled with code and name. */
+function footerContext() {
+  if (state.level === 'topsheet' || !state.ix || !state.cat) return [];
+  const entry = findCategory(state.ix, state.cat.code, state.cat.ti);
+  if (!entry) return [];
+  const out = [];
+  if (state.level === 'details' && state.acct) {
+    const a = (entry.cat.accounts || [])[state.acct.ai];
+    const ar = entry.rep ? entry.rep.accounts[state.acct.ai] : null;
+    if (a) out.push({ label: `${a.code} ${a.name}`.trim(), cents: ar ? ar.total : null, title: 'Total of the account you are in' });
+  }
+  const c = entry.cat;
+  out.push({ label: `${c.code} ${c.name}`.trim(), cents: entry.rep ? entry.rep.total : null, title: 'Total of the category you are in' });
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -276,27 +422,35 @@ function goUp() {
 }
 
 function drillDown(rowKey) {
-  const ix = state.ix;
-  if (state.level === 'topsheet') {
-    const ti = Number(rowKey.slice(1));
-    const c = ix.cats.find((x) => x.ti === ti);
-    if (!c) return;
-    state.memory.topsheet = rowKey;
-    state.cat = { code: c.cat.code, ti };
-    state.level = 'accounts';
-    render({ focusKey: 'a0', resetSelection: true });
-  } else if (state.level === 'accounts') {
-    const ai = Number(rowKey.slice(1));
-    const entry = findCategory(ix, state.cat.code, state.cat.ti);
-    const a = entry && entry.cat.accounts[ai];
-    if (!a) return;
-    state.memory.accounts = rowKey;
-    state.acct = { code: a.code, ai };
-    state.level = 'details';
-    state.selection = null;
-    const first = (a.details || [])[0];
-    render({ focusKey: first ? `r${first.id}` : null, focusCol: 'description', resetSelection: true });
-  }
+  if (state.level === 'topsheet') openCategory(Number(rowKey.slice(1)));
+  else if (state.level === 'accounts') openAccount(state.cat.ti, Number(rowKey.slice(1)));
+}
+
+/** Shows the accounts of the category at topsheet index `ti` (from anywhere). */
+function openCategory(ti) {
+  const c = state.ix.cats.find((x) => x.ti === ti);
+  if (!c) return;
+  state.memory.topsheet = `t${ti}`;
+  state.cat = { code: c.cat.code, ti };
+  state.level = 'accounts';
+  state.selection = null;
+  render({ focusKey: 'a0', resetSelection: true });
+  grid.focus();
+}
+
+/** Shows the lines of account `ai` in the category at topsheet index `ti` (from anywhere). */
+function openAccount(ti, ai) {
+  const c = state.ix.cats.find((x) => x.ti === ti);
+  const a = c && (c.cat.accounts || [])[ai];
+  if (!a) return;
+  state.memory.topsheet = `t${ti}`;
+  state.memory.accounts = `a${ai}`;
+  state.cat = { code: c.cat.code, ti };
+  state.acct = { code: a.code, ai };
+  state.level = 'details';
+  state.selection = null;
+  const first = (a.details || [])[0];
+  render({ focusKey: first ? `r${first.id}` : null, focusCol: 'description', resetSelection: true });
   grid.focus();
 }
 
@@ -314,16 +468,7 @@ function stepAccount(delta) {
   const i = list.findIndex((x) => x.ti === state.cat.ti && x.ai === state.acct.ai);
   if (i < 0 || list.length < 2) return;
   const next = list[(i + delta + list.length) % list.length];
-  state.cat = { code: next.catCode, ti: next.ti };
-  state.acct = { code: next.code, ai: next.ai };
-  state.memory.topsheet = `t${next.ti}`;
-  state.memory.accounts = `a${next.ai}`;
-  state.selection = null;
-  const entry = findCategory(state.ix, next.catCode, next.ti);
-  const a = entry && entry.cat.accounts[next.ai];
-  const first = a && (a.details || [])[0];
-  render({ focusKey: first ? `r${first.id}` : null, focusCol: 'description', resetSelection: true });
-  grid.focus();
+  openAccount(next.ti, next.ai);
 }
 
 // ---------------------------------------------------------------------------
@@ -459,7 +604,18 @@ function wireClipboard() {
 let selTimer = null;
 let selSeq = 0;
 function selectionChanged(keys) {
+  document.dispatchEvent(new CustomEvent('fwb:selection')); // apply panel (apply.js)
   if (state.level !== 'details') return;
+  requestSelectionTotals(keys);
+}
+
+/**
+ * Asks for the selected detail rows' totals (debounced; the newest request
+ * wins). The footer shows the row count at once and the totals when they come.
+ * Called when the selection changes and after every edit, which can change
+ * the totals of rows that stay selected.
+ */
+function requestSelectionTotals(keys) {
   const ids = keys.filter((k) => k.startsWith('r')).map((k) => Number(k.slice(1)));
   state.selection = { count: ids.length, totals: state.selection ? state.selection.totals : null };
   renderFooterNow();
@@ -681,7 +837,7 @@ function resetNav() {
 async function doNew() {
   if (!(await discardOk())) return grid.focus();
   resetNav();
-  await act('new_budget', {}, { resetSelection: true, focusKey: 't0' });
+  await act('new_budget', {}, { resetSelection: true, focusKey: 't0', fresh: true });
   grid.focus();
 }
 
@@ -692,7 +848,7 @@ async function doOpen() {
     const v = await invoke('open_budget');
     if (v) {
       resetNav();
-      apply(v, { resetSelection: true, focusKey: 't0' });
+      apply(v, { resetSelection: true, focusKey: 't0', fresh: true });
     }
   } catch (e) {
     toast(e);
@@ -728,7 +884,8 @@ async function doPrint(kind) {
 // View: setup panel
 
 function togglePanel() {
-  const hadFocus = $('panel').contains(document.activeElement);
+  const a = document.activeElement;
+  const hadFocus = $('panel').contains(a) || a === resizer;
   state.panelOpen = !state.panelOpen;
   renderPanel();
   if (!state.panelOpen && hadFocus) grid.focus();
@@ -741,6 +898,179 @@ function showTab(tab) {
   renderPanel();
   const button = document.getElementById(`setup-tab-${tab}`);
   if (button) button.focus();
+}
+
+// ---------------------------------------------------------------------------
+// View: the setup panel's width (drag its edge; saved per user)
+
+const PANEL_DEFAULT = 380; // styles.css .panel
+const PANEL_MIN = 260;
+let resizer = null;
+let panelWidth = null; // null: the default width
+
+function panelMax() {
+  return Math.max(PANEL_MIN, Math.min(760, window.innerWidth - 480));
+}
+
+/** Sets the panel's width (null: back to the default). Saves it when `save`. */
+function setPanelWidth(w, { save = false } = {}) {
+  panelWidth = w === null ? null : Math.round(Math.max(PANEL_MIN, Math.min(w, panelMax())));
+  setRules('panel-width', panelWidth === null ? '' : `.workspace > .panel { width: ${panelWidth}px; }`);
+  if (resizer) {
+    resizer.setAttribute('aria-valuenow', String(panelWidth === null ? PANEL_DEFAULT : panelWidth));
+    resizer.setAttribute('aria-valuemax', String(panelMax()));
+  }
+  if (save) writePref('panelWidth', panelWidth);
+}
+
+function currentPanelWidth() {
+  return panelWidth === null ? $('panel').getBoundingClientRect().width || PANEL_DEFAULT : panelWidth;
+}
+
+function wirePanelResizer() {
+  resizer = el('div', {
+    class: 'panel-resizer',
+    title: 'Drag to resize the setup panel; double-click for the standard width',
+    attrs: {
+      role: 'separator',
+      tabindex: '0',
+      'aria-orientation': 'vertical',
+      'aria-controls': 'panel',
+      'aria-label': 'Setup panel width',
+      'aria-valuemin': String(PANEL_MIN),
+      'aria-valuemax': String(panelMax()),
+      'aria-valuenow': String(PANEL_DEFAULT),
+    },
+  });
+  $('panel').before(resizer);
+  const saved = readPref('panelWidth', null);
+  if (typeof saved === 'number' && Number.isFinite(saved)) setPanelWidth(saved);
+
+  resizer.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = currentPanelWidth();
+    resizer.setPointerCapture(e.pointerId);
+    document.body.classList.add('panel-resizing');
+    const move = (ev) => setPanelWidth(startW + (startX - ev.clientX));
+    const end = () => {
+      resizer.removeEventListener('pointermove', move);
+      resizer.removeEventListener('pointerup', end);
+      resizer.removeEventListener('pointercancel', end);
+      document.body.classList.remove('panel-resizing');
+      if (panelWidth !== null) writePref('panelWidth', panelWidth);
+    };
+    resizer.addEventListener('pointermove', move);
+    resizer.addEventListener('pointerup', end);
+    resizer.addEventListener('pointercancel', end);
+  });
+  resizer.addEventListener('dblclick', () => setPanelWidth(null, { save: true }));
+  // Left makes the panel wider (the edge moves left), Right narrower; Shift for
+  // bigger steps; Home and End for the narrowest and widest; Escape to the grid.
+  resizer.addEventListener('keydown', (e) => {
+    const step = e.shiftKey ? 80 : 20;
+    const w = currentPanelWidth();
+    let next = null;
+    if (e.key === 'ArrowLeft') next = w + step;
+    else if (e.key === 'ArrowRight') next = w - step;
+    else if (e.key === 'Home') next = PANEL_MIN;
+    else if (e.key === 'End') next = panelMax();
+    else if (e.key === 'Escape') {
+      e.preventDefault();
+      grid.focus();
+      return;
+    } else return;
+    e.preventDefault();
+    e.stopPropagation();
+    setPanelWidth(next, { save: true });
+  });
+  window.addEventListener('resize', () => {
+    if (panelWidth !== null) setPanelWidth(panelWidth);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// View: optional detail columns (the menu in the grid's top-left corner; saved per user)
+
+function readColumnChoices() {
+  const saved = readPref('detailColumns', null);
+  const out = {};
+  if (saved && typeof saved === 'object') {
+    for (const c of OPTIONAL_DETAIL_COLUMNS) if (typeof saved[c.key] === 'boolean') out[c.key] = saved[c.key];
+  }
+  return out;
+}
+
+function gridDetailColumns() {
+  return detailColumns(state.columns).map((c) => (c.key === 'num' ? { ...c, head: columnMenuButton } : c));
+}
+
+function columnMenuItems() {
+  return OPTIONAL_DETAIL_COLUMNS.map((c) => ({
+    id: c.key,
+    label: c.name || c.label,
+    title: c.title,
+    checked: columnShown(c, state.columns),
+  }));
+}
+
+function columnsIcon() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  for (const [k, v] of Object.entries({ viewBox: '0 0 16 16', width: '14', height: '14', 'aria-hidden': 'true', focusable: 'false' })) {
+    svg.setAttribute(k, v);
+  }
+  for (const x of [1.5, 6.5, 11.5]) {
+    const r = document.createElementNS(NS, 'rect');
+    for (const [k, v] of Object.entries({ x: String(x), y: '2', width: '3', height: '12', rx: '0.8' })) r.setAttribute(k, v);
+    svg.append(r);
+  }
+  return svg;
+}
+
+function openColumnMenu(anchor) {
+  openMenu(anchor, {
+    owner: 'columns',
+    label: 'Columns',
+    checkable: true,
+    items: columnMenuItems(),
+    returnFocus: () => $('grid-host').querySelector('.col-chooser'),
+    onPick: (item) => {
+      const col = OPTIONAL_DETAIL_COLUMNS.find((c) => c.key === item.id);
+      if (!col) return;
+      state.columns = { ...state.columns, [col.key]: !columnShown(col, state.columns) };
+      writePref('detailColumns', state.columns);
+      if (state.level === 'details') render();
+      updateMenu(columnMenuItems());
+    },
+  });
+}
+
+/** The header button for the column menu (the grid draws it in the # column's header). */
+function columnMenuButton() {
+  const b = el(
+    'button',
+    {
+      class: 'col-chooser',
+      title: 'Show or hide columns',
+      attrs: { type: 'button', 'aria-label': 'Choose columns', 'aria-haspopup': 'menu', 'aria-expanded': 'false' },
+      data: { focusId: 'col-chooser' },
+      on: {
+        click: (e) => openColumnMenu(e.currentTarget),
+        keydown: (e) => {
+          if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+          e.preventDefault();
+          e.stopPropagation();
+          openColumnMenu(e.currentTarget);
+        },
+      },
+    },
+    columnsIcon(),
+  );
+  // The grid redraws while the menu is open (a column was toggled): follow it.
+  if (isMenuOpen('columns')) setMenuAnchor('columns', b);
+  return b;
 }
 
 /** In a text field, Undo, Redo and Select All act on the field. */
@@ -778,6 +1108,7 @@ const COMMANDS = {
   'insert.line': () => insertRow('line'),
   'insert.subtotal': () => insertRow('subtotal'),
   'insert.adjustment': () => insertRow('adjustment'),
+  'insert.separator': () => insertRow('separator'),
   'insert.account': insertAccount,
   'insert.category': () => insertOnTopsheet(addCategory),
   'insert.production_total': () => insertOnTopsheet(addProductionTotal),
@@ -886,7 +1217,8 @@ function onKeyDown(e) {
   const active = document.activeElement;
   const editing = Boolean(grid.editor);
   const inField = isTextField(active);
-  const inGrid = $('grid-host').contains(active);
+  // A button in the grid's header row (the column menu) is not the grid.
+  const inGrid = $('grid-host').contains(active) && !(active.closest && active.closest('thead'));
   const bodyFocused = !active || active === document.body;
 
   // The cell editor answers its own keys first: Enter, Tab, Escape, arrows,
@@ -902,8 +1234,10 @@ function onKeyDown(e) {
     return;
   }
 
-  // Escape on a setup panel tab or button goes back to the grid.
-  if (e.key === 'Escape' && !inField && $('panel').contains(active)) {
+  // Escape on a setup panel tab or button, a breadcrumb button or the column
+  // menu button goes back to the grid.
+  const chrome = $('panel').contains(active) || $('crumbs').contains(active) || (active && active.closest && active.closest('#grid-host thead'));
+  if (e.key === 'Escape' && !inField && chrome) {
     e.preventDefault();
     grid.focus();
     return;
@@ -920,6 +1254,7 @@ function onKeyDown(e) {
 // Start
 
 function wire() {
+  wirePanelResizer();
   $('btn-new').addEventListener('click', doNew);
   $('btn-open').addEventListener('click', doOpen);
   $('btn-save').addEventListener('click', () => doSave(false));
@@ -950,7 +1285,7 @@ async function start() {
     return;
   }
   try {
-    apply(await invoke('get_view'), { focusKey: 't0' });
+    apply(await invoke('get_view'), { focusKey: 't0', fresh: true });
   } catch (e) {
     toast(e);
   }

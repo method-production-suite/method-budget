@@ -29,7 +29,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    fn lock(&self) -> MutexGuard<'_, Session> {
+    pub(crate) fn lock(&self) -> MutexGuard<'_, Session> {
         // A panic mid-command can't leave the budget half-edited (edits apply
         // to a copy), so a poisoned lock is still safe to use.
         self.session.lock().unwrap_or_else(|e| e.into_inner())
@@ -60,7 +60,7 @@ fn apply<R: Runtime, T>(
 }
 
 /// Runs a pure budget edit as one undo step.
-fn edit_budget<R: Runtime, T>(
+pub(crate) fn edit_budget<R: Runtime, T>(
     window: &WebviewWindow<R>,
     state: &AppState,
     f: impl FnOnce(&mut fwb_core::Budget) -> edit::EditResult<T>,
@@ -787,6 +787,16 @@ pub fn run() {
             clear_baseline,
             // Several cells at once
             set_cells,
+            // Row style, notes, group colors
+            crate::rowstyle::set_row_style,
+            crate::rowstyle::set_row_note,
+            crate::rowstyle::set_group_color,
+            // Apply panel (src/apply.rs)
+            crate::apply::apply_summary,
+            crate::apply::apply_to_rows,
+            crate::apply::assign_to_rows,
+            crate::apply::make_fringe_range,
+            crate::apply::clear_fringe_range,
         ])
         .setup(|app| {
             if let Some(w) = app.get_webview_window("main") {

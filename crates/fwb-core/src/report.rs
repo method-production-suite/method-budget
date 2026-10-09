@@ -95,14 +95,14 @@ pub struct RowTotals {
     pub id: RowId,
     pub kind: RowKind,
     /// False when the row is suppressed by a group or filtered out by options.
-    /// Its money fields are then 0. Subtotal rows are always included.
+    /// Its money fields are then 0. Subtotal and separator rows are always included.
     pub included: bool,
     /// amount x X x 4X.
     pub quantity: Dec,
     pub currency: String,
     /// In `currency`.
     pub local_total: Cents,
-    /// In the base currency. Always 0 for subtotal rows.
+    /// In the base currency. Always 0 for subtotal and separator rows.
     pub total: Cents,
     /// Subtotal rows only: the running total they display.
     pub subtotal: Option<Cents>,

@@ -533,3 +533,28 @@
 .fwb-report .rpt-title-block {
   break-inside: avoid;
 }
+
+/* Row styles and separators (js/report.js rowStyle). */
+
+.fwb-report .rpt-row.row-bold td {
+  font-weight: 700;
+}
+
+.fwb-report .rpt-row.row-italic td {
+  font-style: italic;
+}
+
+.fwb-report .rpt-row.indent-1 td.desc { padding-left: 14pt; }
+.fwb-report .rpt-row.indent-2 td.desc { padding-left: 24pt; }
+.fwb-report .rpt-row.indent-3 td.desc { padding-left: 34pt; }
+.fwb-report .rpt-row.indent-4 td.desc { padding-left: 44pt; }
+
+.fwb-report .rpt-row.separator td.rule {
+  padding-top: 0;
+  padding-bottom: 0;
+  height: 7pt;
+  background-image: linear-gradient(#000, #000);
+  background-size: 100% 0.5pt;
+  background-position: center;
+  background-repeat: no-repeat;
+}

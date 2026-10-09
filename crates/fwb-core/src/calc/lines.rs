@@ -37,6 +37,22 @@ pub(crate) fn eval_rows(ctx: &Ctx, acct: &Account) -> Result<Vec<RowTotals>, Cal
             since_subtotal = 0;
             continue;
         }
+        if d.kind == RowKind::Separator {
+            // A drawn rule: no cost, and it resets neither window.
+            out.push(RowTotals {
+                id: d.id,
+                kind: d.kind,
+                included: true,
+                quantity: Dec::ZERO,
+                currency: base.clone(),
+                local_total: 0,
+                total: 0,
+                subtotal: None,
+                fringes: BTreeMap::new(),
+                fringe_total: 0,
+            });
+            continue;
+        }
 
         let amount = ctx.eval(&d.amount, Dec::ZERO, &at("amount"))?;
         let x = ctx.eval(&d.x, Dec::ONE, &at("X"))?;

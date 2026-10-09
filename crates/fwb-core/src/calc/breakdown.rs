@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::calc::{overflow, CalcError, Ctx};
-use crate::model::{Budget, Detail, RowId, RowKind};
+use crate::model::{Budget, Detail, RowId};
 use crate::report::{Breakdown, CategoryTotals, FringeSummary, GroupTotals, Report, RowTotals};
 
 pub(crate) struct Breakdowns {
@@ -62,7 +62,7 @@ pub(crate) fn breakdowns(
     let mut locations: BTreeMap<String, Breakdown> = BTreeMap::new();
 
     for (d, a, f) in rows(ctx.b, active, full) {
-        if d.kind == RowKind::Subtotal {
+        if !d.kind.is_costed() {
             continue;
         }
         for name in &d.fringes {

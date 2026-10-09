@@ -4,11 +4,18 @@
 // keeps a cursor cell and a row selection, and edits cells in place. Changes go
 // out through handlers; the new data comes back through setData().
 //
-// Row spec:  { key, cls, selectable = true, activatable = false,
-//              cells: { [colKey]: { text, edit, cls, title, error, placeholder } } }
+// Row spec:  { key, cls, selectable = true, activatable = false, editSkip = false,
+//              color, cells: { [colKey]: { text, edit, cls, title, error, placeholder } } }
 //   `edit` is the raw value to edit (a string); leave it undefined for
-//   read-only cells.
-// Column:    { key, label, cls, title }
+//   read-only cells. `editSkip` rows (separators) can be selected, but moving
+//   on after an edit passes over them. `color` is a `#hex` text color.
+// Column:    { key, label, cls, title, width, min, pin, head }
+//   width/min: preferred and narrowest width in px. When every column has a
+//   width, the grid sizes them itself: preferred widths when they fit, else
+//   squeezed toward min before the grid scrolls sideways.
+//   pin: 'left' or 'right' keeps the column in view while scrolling sideways.
+//   grow: true takes spare room first (up to twice its width).
+//   head: a function returning a node to show in the header instead of label.
 //
 // Handlers:  onCommit(rowKey, colKey, value)        one cell edited
 //            onCommitMany(rowKeys, colKey, value)   same value into many rows
@@ -17,6 +24,8 @@
 //            onActivate(rowKey)                     Enter / double-click on an activatable row
 //            onEscape()                             Escape with nothing to cancel
 //            onSelect(rowKeys)                      cursor or selection changed
+//            onTabOut(dir)                          Shift+Tab (dir -1) at the first cell;
+//                                                   true if it moved focus elsewhere
 //            enterMovesDown                         true: Enter moves down (details)
 //
 // Selection: a set of rows (Shift+Up/Down, Shift-click, Cmd/Ctrl-click) and a
@@ -24,6 +33,11 @@
 // those columns; copy, paste, fill down and clearing work on them.
 
 import { el, hasMod } from './dom.js';
+import { setRules } from './sheet.js';
+
+const SAFE_KEY = /^[a-z0-9_]+$/i;
+const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+let gridCount = 0;
 
 // ---------------------------------------------------------------------------
 // Tab-separated text, the way spreadsheets put cells on the clipboard
@@ -97,13 +111,112 @@ export class Grid {
     this.editor = null;
     this.rerendering = false;
     this.lastSelectSig = '';
+    gridCount += 1;
+    this.uid = `grid-${gridCount}`;
+    this.fitSig = null;
+    this.colorSig = '';
 
-    this.table = el('table', { class: 'grid', attrs: { role: 'grid' } });
+    this.table = el('table', { class: `grid ${this.uid}`, attrs: { role: 'grid' } });
     host.replaceChildren(this.table);
     host.tabIndex = 0;
+    host.classList.add(`${this.uid}-host`);
 
     this.table.addEventListener('mousedown', (e) => this.onMouseDown(e));
     this.table.addEventListener('dblclick', (e) => this.onDoubleClick(e));
+    if (typeof ResizeObserver === 'function') {
+      let queued = false;
+      new ResizeObserver(() => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => {
+          queued = false;
+          this.fit();
+        });
+      }).observe(host);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Column sizes, pinned columns and row colors (constructed stylesheets; see sheet.js)
+
+  /**
+   * Sizes the columns to the space there is: preferred widths when they fit,
+   * otherwise every column squeezed the same fraction of the way to its
+   * minimum, and only then a sideways scroll (with pinned columns in view).
+   */
+  fit() {
+    const cols = this.columns;
+    const sized = cols.length > 0 && cols.every((c) => c.width > 0 && SAFE_KEY.test(c.key));
+    if (!sized) {
+      if (this.fitSig !== '') setRules(this.uid, '');
+      this.fitSig = '';
+      return;
+    }
+    const avail = this.host.clientWidth;
+    if (!avail) return; // hidden; fits again when shown
+    const want = cols.reduce((n, c) => n + c.width, 0);
+    const room = cols.reduce((n, c) => n + (c.width - Math.min(c.min || c.width, c.width)), 0);
+    const f = want > avail && room > 0 ? Math.min(1, (want - avail) / room) : 0;
+    const widths = cols.map((c) => Math.floor(c.width - (c.width - Math.min(c.min || c.width, c.width)) * f));
+    // Room to spare goes to `grow` columns first (up to twice their width);
+    // the table's min-width spreads any rest over every column.
+    let spare = avail - want;
+    cols.forEach((c, i) => {
+      if (!c.grow || spare <= 0) return;
+      const add = Math.min(spare, c.width);
+      widths[i] += add;
+      spare -= add;
+    });
+    const sig = `${cols.map((c) => c.key).join(',')}:${widths.join(',')}`;
+    if (sig === this.fitSig) return;
+    this.fitSig = sig;
+    // A fixed table width makes the browser keep these widths (an auto-width
+    // table grows columns to fit their text); min-width: 100% in styles.css
+    // still stretches it to fill a wider window.
+    const sum = widths.reduce((n, w) => n + w, 0);
+    const rules = [`table.${this.uid} { width: ${sum}px; }`];
+    cols.forEach((c, i) => rules.push(`.${this.uid} col.c-${c.key} { width: ${widths[i]}px; }`));
+    // Offsets for pinned columns: the widths of the pinned columns outside them.
+    let left = 0;
+    cols.forEach((c, i) => {
+      if (c.pin !== 'left') return;
+      rules.push(`.${this.uid} .pin-l.c-${c.key} { left: ${left}px; }`);
+      left += widths[i];
+    });
+    let right = 0;
+    for (let i = cols.length - 1; i >= 0; i--) {
+      if (cols[i].pin !== 'right') continue;
+      rules.push(`.${this.uid} .pin-r.c-${cols[i].key} { right: ${right}px; }`);
+      right += widths[i];
+    }
+    // Keyboard moves scroll a cell clear of the pinned columns, not under them.
+    rules.push(`.${this.uid}-host { scroll-padding-left: ${left}px; scroll-padding-right: ${right}px; }`);
+    setRules(this.uid, rules.join('\n'));
+  }
+
+  /** One rule per text color in use: `tr.tc-2a6fdb` takes #2a6fdb. */
+  paintColors() {
+    const colors = new Set();
+    for (const r of this.rows) if (r.color && HEX_COLOR.test(r.color)) colors.add(r.color.toLowerCase());
+    const sig = [...colors].sort().join(',');
+    if (sig === this.colorSig) return;
+    this.colorSig = sig;
+    const rules = [...colors].map((c) => `.${this.uid} tr.tc-${c.slice(1)} { color: ${c}; }`);
+    setRules(`${this.uid}-colors`, rules.join('\n'));
+  }
+
+  /** Class names that pin a column, with an edge line on the side facing the scrolling columns. */
+  pinClass(ci) {
+    const c = this.columns[ci];
+    if (c.pin === 'left') {
+      const next = this.columns[ci + 1];
+      return next && next.pin === 'left' ? 'pin pin-l' : 'pin pin-l pin-edge-l';
+    }
+    if (c.pin === 'right') {
+      const prev = this.columns[ci - 1];
+      return prev && prev.pin === 'right' ? 'pin pin-r' : 'pin pin-r pin-edge-r';
+    }
+    return '';
   }
 
   // -------------------------------------------------------------------------
@@ -286,13 +399,25 @@ export class Grid {
     const editing = this.editor;
     if (editing) this.rerendering = true;
 
+    // A header control (the column menu button) keeps focus across redraws.
+    const a = document.activeElement;
+    const headFocus = a && a.closest && this.table.contains(a) && a.closest('thead') ? a.dataset.focusId || null : null;
+
+    this.fit();
+    this.paintColors();
+    const pins = this.columns.map((c, ci) => this.pinClass(ci));
+
     const colgroup = el('colgroup');
     for (const c of this.columns) colgroup.append(el('col', { class: `c-${c.key}` }));
 
     const head = el('tr');
-    for (const c of this.columns) {
-      head.append(el('th', { class: `c-${c.key} ${c.cls || ''}`, text: c.label, title: c.title, attrs: { scope: 'col' } }));
-    }
+    this.columns.forEach((c, ci) => {
+      const th = el('th', { class: `c-${c.key} ${c.cls || ''} ${pins[ci]}`, title: c.title, attrs: { scope: 'col' } });
+      const node = typeof c.head === 'function' ? c.head() : null;
+      if (node) th.append(node);
+      else th.textContent = c.label;
+      head.append(th);
+    });
     const thead = el('thead', {}, head);
 
     const tbody = el('tbody');
@@ -302,14 +427,15 @@ export class Grid {
     const [ca, cb] = this.colRange();
     this.rows.forEach((r, ri) => {
       const tr = el('tr', { class: r.cls || '', data: { row: ri } });
+      if (r.color && HEX_COLOR.test(r.color)) tr.classList.add(`tc-${r.color.toLowerCase().slice(1)}`);
       if (r.selectable === false) tr.classList.add('static');
       if (r.selectable !== false && selKeys.has(r.key)) tr.classList.add('sel');
       if (r.activatable) tr.classList.add('drill');
       this.columns.forEach((c, ci) => {
         const cell = r.cells[c.key] || {};
         const td = el('td', {
-          class: `c-${c.key} ${c.cls || ''} ${cell.cls || ''}`,
-          title: cell.error || cell.title,
+          class: `c-${c.key} ${c.cls || ''} ${cell.cls || ''} ${pins[ci]}`,
+          title: cell.error && cell.title ? `${cell.error}\n\n${cell.title}` : cell.error || cell.title,
           data: { col: ci },
         });
         if (cell.edit !== undefined) td.classList.add('editable');
@@ -329,6 +455,10 @@ export class Grid {
     });
 
     this.table.replaceChildren(colgroup, thead, tbody);
+    if (headFocus) {
+      const again = thead.querySelector(`[data-focus-id="${headFocus.replace(/[^a-z0-9_-]/gi, '')}"]`);
+      if (again) again.focus();
+    }
 
     if (editing) {
       const td = this.cellFor(editing.rowKey, editing.colKey);
@@ -579,14 +709,30 @@ export class Grid {
     this.host.focus({ preventScroll: true });
   }
 
+  /** The next row from `from` in direction `d` that editing can land on, or null. */
+  nextEditRow(from, d) {
+    for (let i = from + d; i >= 0 && i < this.nav.length; i += d) {
+      if (!this.rowAt(i).editSkip) return i;
+    }
+    return null;
+  }
+
   afterEdit(dir) {
     this.host.focus({ preventScroll: true });
-    if (dir === 'down') {
-      if (this.cur.row + 1 >= this.nav.length && this.h.onPastEnd) this.h.onPastEnd();
-      else this.move(1, 0);
-    } else if (dir === 'up') this.move(-1, 0);
-    else if (dir === 'right') this.move(0, 1, { wrap: true });
-    else if (dir === 'left') this.move(0, -1, { wrap: true });
+    if (dir === 'down' || dir === 'up') {
+      const next = this.nextEditRow(this.cur.row, dir === 'down' ? 1 : -1);
+      if (next !== null) this.setCursor(next, this.cur.col);
+      else if (dir === 'down' && this.h.onPastEnd) this.h.onPastEnd();
+    } else if (dir === 'right' || dir === 'left') {
+      const d = dir === 'right' ? 1 : -1;
+      const before = this.cur.row;
+      this.move(0, d, { wrap: true });
+      const r = this.cursorRow();
+      if (this.cur.row !== before && r && r.editSkip) {
+        const next = this.nextEditRow(this.cur.row, d);
+        if (next !== null) this.setCursor(next, this.cur.col);
+      }
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -623,6 +769,7 @@ export class Grid {
         else this.setCursor(this.cur.row, this.columns.length - 1, { extend: e.shiftKey });
         return true;
       case 'Tab':
+        if (e.shiftKey && this.cur.row === 0 && this.cur.col === 0 && this.h.onTabOut && this.h.onTabOut(-1)) return true;
         this.move(0, e.shiftKey ? -1 : 1, { wrap: true });
         return true;
       case 'Enter': {

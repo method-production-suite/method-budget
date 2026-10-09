@@ -112,9 +112,10 @@ impl Rng {
 fn gen_detail(rng: &mut Rng, id: RowId) -> Detail {
     Detail {
         id,
-        kind: match rng.below(3) {
+        kind: match rng.below(4) {
             0 => RowKind::Line,
             1 => RowKind::Subtotal,
+            2 => RowKind::Separator,
             _ => RowKind::Adjustment,
         },
         description: rng.text(),
@@ -136,6 +137,17 @@ fn gen_detail(rng: &mut Rng, id: RowId) -> Detail {
             1 => Some(u32::MAX),
             _ => None,
         },
+        bold: rng.chance(30),
+        italic: rng.chance(30),
+        indent: match rng.below(4) {
+            0 => u8::MAX,
+            1 => rng.below(5) as u8,
+            _ => 0,
+        },
+        color: rng
+            .chance(30)
+            .then(|| rng.pick(&["#a0b1c2", "", "red"]).into()),
+        note: rng.opt_text(),
     }
 }
 
@@ -252,6 +264,7 @@ fn gen_budget(rng: &mut Rng) -> Budget {
     b.groups = rng.map(|r| Group {
         description: r.text(),
         in_budget_total: r.chance(50),
+        color: r.chance(40).then(|| r.pick(&["#00ff7f", ""]).into()),
     });
     b.sets = rng.map(|r| SetDef {
         description: r.text(),
@@ -327,9 +340,20 @@ fn output_is_deterministic() {
 #[test]
 fn generator_covers_every_variant_and_field() {
     let mut all = String::new();
+    let (mut group_colors, mut row_colors) = (0, 0);
     for seed in 1..=CASES {
-        all.push_str(&fwb_format::to_string(&gen_budget(&mut Rng(seed))));
+        let b = gen_budget(&mut Rng(seed));
+        group_colors += b.groups.values().filter(|g| g.color.is_some()).count();
+        row_colors += b
+            .categories()
+            .flat_map(|c| &c.accounts)
+            .flat_map(|a| &a.details)
+            .filter(|d| d.color.is_some())
+            .count();
+        all.push_str(&fwb_format::to_string(&b));
     }
+    // `color` is a field of both groups and detail rows: check each.
+    assert!(group_colors > 0 && row_colors > 0);
     let kinds = [
         "text",
         "number",
@@ -343,6 +367,7 @@ fn generator_covers_every_variant_and_field() {
         "production_total",
         "subtotal",
         "adjustment",
+        "separator",
         "group",
         "qualified_spend",
         "credit",
@@ -392,6 +417,11 @@ fn generator_covers_every_variant_and_field() {
         "fringe_range",
         "set",
         "location",
+        "bold",
+        "italic",
+        "indent",
+        "color",
+        "note",
         "applied",
         "excluded_amounts",
         "excluded_groups",

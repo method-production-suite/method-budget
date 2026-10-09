@@ -77,6 +77,8 @@ default:
 | map (object of named entries) | empty |
 | list or name set | empty |
 | `applied`, `in_budget_total` | `true` |
+| `bold`, `italic` | `false` |
+| `indent` | `0` |
 | `kind` of a detail row | `"line"` |
 
 Writers always leave out fields that equal their default. For the fields marked optional
@@ -183,6 +185,7 @@ A tagged object:
 |-------------------|------|-------|
 | `description`     | text | |
 | `in_budget_total` | boolean, default `true` | When `false`, every line tagged with the group is shown but counts as zero. |
+| `color`           | optional text | Display color for the text of tagged lines, written `"#rrggbb"`. A line's own `color` wins. Never affects totals. |
 
 ### Set
 
@@ -225,7 +228,7 @@ Fields in written order:
 | Field          | Type | Notes |
 |----------------|------|-------|
 | `id`           | row id, **required** | Stable identity. Unique within a budget. |
-| `kind`         | `"line"`, `"subtotal"` or `"adjustment"` | Default `"line"`. |
+| `kind`         | `"line"`, `"subtotal"`, `"adjustment"` or `"separator"` | Default `"line"`. |
 | `description`  | text, **required** | Always written, even when empty. |
 | `amount`       | formula | Blank counts as 0. On an adjustment row, the percentage as a fraction (`"0.1"` is 10%). |
 | `unit`         | text | Primary unit name. |
@@ -241,10 +244,23 @@ Fields in written order:
 | `groups`       | name set | Groups this line belongs to. |
 | `set`          | optional text | Set name. |
 | `location`     | optional text | Location name. |
+| `bold`         | boolean, default `false` | Display style. |
+| `italic`       | boolean, default `false` | Display style. |
+| `indent`       | integer 0 to 255, default `0` | Indent level. The application uses 0 to 4. |
+| `color`        | optional text | Text color, written `"#rrggbb"`. Overrides the color of the row's groups. |
+| `note`         | optional text | A plain-text note on the row. The application allows up to 10,000 characters. |
 
 A line costs `amount x X x rate x 4X`. A subtotal row shows a running total and adds
 nothing. An adjustment row's rate is the sum of the lines above it (back to the previous
-adjustment row).
+adjustment row). A separator row is a drawn rule line: it has no cost and is ignored by
+all math. It is never counted or fringed, it doesn't break a fringe range, and it doesn't
+reset a subtotal or adjustment window. Other fields on a separator row are kept but have
+no effect.
+
+`bold`, `italic`, `indent`, `color` and `note` are display only and never affect totals.
+They apply to every kind of row. The file stores them as given: the application's own
+rules (colors are `#` plus 6 hex digits, indent 0 to 4, notes up to 10,000 characters)
+are checked by the application, not by the file reader.
 
 ### Charge
 
@@ -358,6 +374,9 @@ valid. Loading and saving it in Film Wizard Budgeting normalizes it.
 ### Changelog
 
 - **Version 1** (2026-10): first release.
+- Version 1, additive (2026-10): group `color`; detail row `bold`, `italic`, `indent`,
+  `color` and `note`; detail row kind `"separator"`. All are left out at their default,
+  so files that don't use them are unchanged.
 
 ## Complete example
 

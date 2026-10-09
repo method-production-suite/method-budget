@@ -1,0 +1,345 @@
+/* Apply panel (ui/js/apply.js): what the selected lines carry.
+   Uses only the app's :root tokens and the setup panel's controls; every
+   class of its own is prefixed with apply-. */
+
+.apply {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.apply p {
+  margin: 0;
+}
+
+.apply-num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* What is selected, and its totals */
+
+.apply-head {
+  display: grid;
+  gap: 3px;
+}
+
+.apply-scope {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apply-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  font-size: 12px;
+}
+
+.apply-stat {
+  display: inline-flex;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.apply-stat-label,
+.apply-hint {
+  color: var(--text-muted);
+}
+
+.apply-hint {
+  font-size: 12px;
+}
+
+.apply-error {
+  margin: 0;
+}
+
+/* One list: fringes, groups, set, location or currency */
+
+.apply-list {
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+}
+
+.apply-list-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.apply-fold {
+  appearance: none;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 3px 2px;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.apply-fold-mark::before {
+  content: "";
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--text-muted);
+  vertical-align: middle;
+}
+
+.apply-fold[aria-expanded="false"] .apply-fold-mark::before {
+  transform: rotate(-90deg);
+}
+
+.apply-title {
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+.apply-badge {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--selection);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.apply-link,
+.apply-pill {
+  appearance: none;
+  flex: 0 0 auto;
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.apply-link:hover,
+.apply-pill:hover:not([aria-disabled="true"]) {
+  background: var(--row-hover);
+}
+
+.apply-pill {
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+.apply-pill[aria-pressed="true"] {
+  color: var(--text);
+  background: var(--selection);
+  border-color: var(--accent);
+}
+
+.apply-pill[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.apply-fold:focus-visible,
+.apply-link:focus-visible,
+.apply-pill:focus-visible,
+.apply-check:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.apply-body {
+  display: grid;
+  gap: 4px;
+  padding: 2px 0 6px;
+}
+
+.apply-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.apply-tools .apply-filter {
+  flex: 1 1 auto;
+  height: 22px;
+  font-size: 12px;
+}
+
+.apply-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* One item: a three-state checkbox (a round one for one-per-line lists) */
+
+.apply-check {
+  appearance: none;
+  position: relative;
+  display: grid;
+  grid-template-columns: 14px minmax(0, auto) minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: 6px;
+  width: 100%;
+  min-height: 24px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.apply-check:hover:not([aria-disabled="true"]) {
+  background: var(--row-hover);
+}
+
+.apply-check[aria-disabled="true"] {
+  cursor: default;
+}
+
+.apply-check[aria-disabled="true"] .apply-box,
+.apply-check[aria-disabled="true"] .apply-name {
+  opacity: 0.55;
+}
+
+.apply-box {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--text-muted);
+  border-radius: 3px;
+  background: var(--surface);
+}
+
+.apply-radio .apply-box {
+  border-radius: 50%;
+}
+
+.apply-check[aria-checked="true"] .apply-box {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.apply-check[aria-checked="true"] .apply-box::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--accent-text);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.apply-radio[aria-checked="true"] .apply-box::after {
+  left: 3px;
+  top: 3px;
+  width: 6px;
+  height: 6px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent-text);
+  transform: none;
+}
+
+.apply-check[aria-checked="mixed"] .apply-box {
+  border-color: var(--accent);
+}
+
+.apply-check[aria-checked="mixed"] .apply-box::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 5px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+.apply-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apply-desc {
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apply-count {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.apply-amt {
+  min-width: 64px;
+  text-align: right;
+  font-size: 12px;
+}
+
+.apply-off {
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-style: italic;
+}
+
+/* Fringe footer: totals and the range buttons */
+
+.apply-foot {
+  display: grid;
+  gap: 6px;
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+
+.apply-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.setup-btn.apply-btn {
+  height: 22px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.setup-btn.apply-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.apply[aria-busy="true"] .apply-check {
+  cursor: progress;
+}

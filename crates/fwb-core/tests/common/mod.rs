@@ -38,6 +38,7 @@ pub fn group(in_budget_total: bool) -> Group {
     Group {
         description: String::new(),
         in_budget_total,
+        color: None,
     }
 }
 

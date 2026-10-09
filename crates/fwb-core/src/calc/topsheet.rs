@@ -4,8 +4,7 @@ use crate::calc::{err, overflow, sum, CalcError, Ctx, ErrorKind};
 use crate::coding::AccountCoding;
 use crate::decimal::{mul_cents, percent_of, Dec};
 use crate::model::{
-    Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource, Detail, FringePosting, RowKind,
-    TopsheetRow,
+    Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource, Detail, FringePosting, TopsheetRow,
 };
 use crate::report::{
     CategoryTotals, ChargeTotals, CreditRowTotals, CreditTotals, LevelTotals, RowTotals,
@@ -164,7 +163,7 @@ fn levels(
     Some((out, closed))
 }
 
-/// A costed row with where it lives. Subtotal rows are skipped.
+/// A costed row with where it lives. Subtotal and separator rows are skipped.
 struct Line<'a> {
     category: &'a str,
     account: &'a str,
@@ -172,7 +171,7 @@ struct Line<'a> {
     row: &'a RowTotals,
 }
 
-/// Every non-subtotal detail of `b` with its evaluated row.
+/// Every costed detail (line or adjustment) of `b` with its evaluated row.
 fn lines<'a>(b: &'a Budget, cats: &'a [CategoryTotals]) -> impl Iterator<Item = Line<'a>> {
     b.categories().zip(cats).flat_map(|(cat, ct)| {
         cat.accounts
@@ -182,7 +181,7 @@ fn lines<'a>(b: &'a Budget, cats: &'a [CategoryTotals]) -> impl Iterator<Item = 
                 acct.details
                     .iter()
                     .zip(&at.rows)
-                    .filter(|(d, _)| d.kind != RowKind::Subtotal)
+                    .filter(|(d, _)| d.kind.is_costed())
                     .map(move |(detail, row)| Line {
                         category: &cat.code,
                         account: &acct.code,
@@ -382,6 +381,7 @@ mod tests {
         Group {
             description: String::new(),
             in_budget_total,
+            color: None,
         }
     }
 

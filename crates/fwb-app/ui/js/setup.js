@@ -9,8 +9,11 @@
 // it runs, so two quick edits to the same item never undo each other.
 
 import { EXTRA_TABS, renderExtraTab } from './topsheet-setup.js';
+import { renderApply } from './apply.js';
 
 const TABS = [
+  // The apply panel (apply.js): what the selected lines carry. No tab strip.
+  { id: 'apply', label: 'Apply' },
   { id: 'globals', label: 'Globals' },
   { id: 'fringes', label: 'Fringes' },
   { id: 'groups', label: 'Groups' },
@@ -20,9 +23,11 @@ const TABS = [
   ...EXTRA_TABS,
 ];
 
-// Tabs are split into two sections so the strip fits one row: reusable
+// Tabs are split into sections so the strip fits one row: the apply panel
+// (first, and the default: it's what is used while editing lines), reusable
 // tables lines refer to, and settings for the budget as a whole.
 const SECTIONS = [
+  { id: 'apply', label: 'Apply', tabs: ['apply'] },
   { id: 'tables', label: 'Tables', tabs: ['globals', 'fringes', 'groups', 'units', 'currencies', 'sets', 'locations'] },
   { id: 'budget', label: 'Budget', tabs: ['charges', 'credits', 'info', 'settings', 'baseline'] },
 ];
@@ -63,11 +68,17 @@ export function renderSetup(container, view, ctx) {
   state.ctx = ctx;
   uid = 0;
 
-  const tab = TABS.some((t) => t.id === (ctx && ctx.tab)) ? ctx.tab : 'globals';
+  const tab = TABS.some((t) => t.id === (ctx && ctx.tab)) ? ctx.tab : 'apply';
   if (tab !== state.tab) state.errors.clear();
   state.tab = tab;
   const root = el('div', 'setup');
-  root.append(renderSections(tab), renderTabs(tab), renderPanel(tab));
+  if (tab === 'apply') {
+    const host = el('div', 'setup-panel apply-host');
+    renderApply(host, state.view, ctx);
+    root.append(renderSections(tab), host);
+  } else {
+    root.append(renderSections(tab), renderTabs(tab), renderPanel(tab));
+  }
   // One swap, so a scrolled parent keeps its position.
   state.swapping = true;
   try {

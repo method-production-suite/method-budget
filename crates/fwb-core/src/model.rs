@@ -201,6 +201,9 @@ pub struct Group {
     /// "In budget total". When false, every line tagged with this group is
     /// suppressed: shown, but counted as 0 everywhere.
     pub in_budget_total: bool,
+    /// Display color for tagged lines' text, as `#rrggbb`. A line's own
+    /// [`Detail::color`] wins. Display only: never affects totals.
+    pub color: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -253,7 +256,25 @@ pub enum RowKind {
     /// A real cost whose rate is locked to the sum of the lines above it, back to
     /// the previous adjustment row. Amount and multipliers set the percentage.
     Adjustment,
+    /// A drawn rule line between rows. No cost, ignored by all math: never
+    /// counted or fringed, and it doesn't break fringe ranges or reset subtotal
+    /// and adjustment windows.
+    Separator,
 }
+
+impl RowKind {
+    /// Whether rows of this kind carry a cost of their own (lines and
+    /// adjustments). Subtotal and separator rows add nothing.
+    pub fn is_costed(self) -> bool {
+        matches!(self, RowKind::Line | RowKind::Adjustment)
+    }
+}
+
+/// Deepest [`Detail::indent`] level.
+pub const MAX_INDENT: u8 = 4;
+
+/// Longest [`Detail::note`], in characters.
+pub const MAX_NOTE_CHARS: usize = 10_000;
 
 /// One row in an account.
 ///
@@ -282,6 +303,15 @@ pub struct Detail {
     /// Consecutive lines with the same `Some(n)` form one fringe range: percent
     /// fringe cutoffs apply to their combined subtotal, as one earner.
     pub fringe_range: Option<u32>,
+    /// Text style. Display only: never affects totals.
+    pub bold: bool,
+    pub italic: bool,
+    /// Indent level, 0 to [`MAX_INDENT`].
+    pub indent: u8,
+    /// Text color as `#rrggbb`; overrides the color of the line's groups.
+    pub color: Option<String>,
+    /// A plain-text note on the row, up to [`MAX_NOTE_CHARS`] characters.
+    pub note: Option<String>,
 }
 
 impl Detail {
@@ -304,6 +334,11 @@ impl Detail {
             location: None,
             set: None,
             fringe_range: None,
+            bold: false,
+            italic: false,
+            indent: 0,
+            color: None,
+            note: None,
         }
     }
 
@@ -325,6 +360,11 @@ impl Detail {
 
     pub fn subtotal(id: RowId, description: impl Into<String>) -> Detail {
         Detail::blank(id, RowKind::Subtotal, description.into())
+    }
+
+    /// A separator: a drawn rule line with no cost.
+    pub fn separator(id: RowId) -> Detail {
+        Detail::blank(id, RowKind::Separator, String::new())
     }
 
     /// An adjustment row; `amount` is usually a fraction like `"0.1"` for 10%.

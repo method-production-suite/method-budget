@@ -19,6 +19,7 @@
   --row-hover: #f2f5f7;
   --level-bg: #f3f5f8;
   --subtotal-bg: #f6f8f4;
+  --note: #d29a12;
   --shadow: 0 12px 40px rgba(16, 24, 32, 0.22);
   --backdrop: rgba(16, 22, 28, 0.36);
   --radius: 6px;
@@ -46,6 +47,7 @@
     --row-hover: #20262d;
     --level-bg: #20252b;
     --subtotal-bg: #1f2622;
+    --note: #e3b341;
     --shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
     --backdrop: rgba(0, 0, 0, 0.5);
     color-scheme: dark;
@@ -259,6 +261,76 @@ button {
   color: var(--text-muted);
 }
 
+/* A segment with its jump list, and the previous/next account buttons. */
+.crumb-seg {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+}
+
+.crumb-seg .crumb {
+  margin-right: 0;
+}
+
+.crumb-pick {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  appearance: none;
+  width: 20px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+/* A small chevron pointing down. */
+.crumb-pick::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin-top: -4px;
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.crumb-pick:hover,
+.crumb-pick[aria-expanded="true"] {
+  background: var(--row-hover);
+  color: var(--text);
+}
+
+.crumb-steps {
+  flex: none;
+  display: flex;
+  gap: 3px;
+  margin-left: 4px;
+}
+
+.crumb-step {
+  appearance: none;
+  width: 24px;
+  height: 22px;
+  padding: 0 0 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.crumb-step:hover {
+  background: var(--row-hover);
+}
+
 .banner {
   display: flex;
   flex-wrap: wrap;
@@ -279,9 +351,14 @@ button {
 
 .actions {
   display: flex;
+  flex-wrap: wrap; /* a narrow window wraps the buttons rather than cutting them off */
   align-items: center;
-  gap: 4px;
+  gap: 2px 4px;
   margin: 0 -6px;
+}
+
+.actions .btn-danger-text {
+  margin-left: auto;
 }
 
 .spacer {
@@ -338,6 +415,7 @@ table.grid {
   position: relative;
   height: 28px;
   padding: 0 8px;
+  background: var(--surface); /* opaque, so pinned cells cover what scrolls under them */
   border-bottom: 1px solid var(--border-soft);
   white-space: nowrap;
   overflow: hidden;
@@ -454,6 +532,68 @@ table.grid {
   text-decoration: line-through;
 }
 
+/* A separator row is a drawn rule across the description. */
+.grid tr.separator td.c-description::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 50%;
+  border-top: 1px solid var(--text-muted);
+}
+
+/* Row styles (levels.js rowClasses): bold, italic, indent. The text color comes
+   from generated rules (grid.js, tr.tc-rrggbb). */
+.grid tr.row-bold td {
+  font-weight: 700;
+}
+
+.grid tr.row-italic td {
+  font-style: italic;
+}
+
+.grid tr.indent-1 td.c-description { padding-left: 24px; }
+.grid tr.indent-2 td.c-description { padding-left: 40px; }
+.grid tr.indent-3 td.c-description { padding-left: 56px; }
+.grid tr.indent-4 td.c-description { padding-left: 72px; }
+
+/* A note on a row: a corner mark on the description; the note is its tooltip. */
+.grid td.has-note::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-style: solid;
+  border-width: 7px 7px 0 0;
+  border-color: var(--note) transparent transparent transparent;
+}
+
+/* A fringe range: a bracket in the # column spanning its lines. */
+.grid tr.fr td.c-num::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 0;
+  bottom: -1px;
+  width: 5px;
+  border-left: 2px solid var(--accent);
+  pointer-events: none;
+}
+
+.grid tr.fr-start td.c-num::before,
+.grid tr.fr-single td.c-num::before {
+  top: 7px;
+  border-top: 2px solid var(--accent);
+  border-top-left-radius: 3px;
+}
+
+.grid tr.fr-end td.c-num::before,
+.grid tr.fr-single td.c-num::before {
+  bottom: 7px;
+  border-bottom: 2px solid var(--accent);
+  border-bottom-left-radius: 3px;
+}
+
 /* Topsheet and account rows */
 
 .grid tr.level td {
@@ -465,6 +605,11 @@ table.grid {
 .grid tr.posted td {
   color: var(--text-muted);
   font-style: italic;
+}
+
+/* The category's fringe account in its account list (fringes posted by category). */
+.grid tr.fringe-account td {
+  font-weight: 700;
 }
 
 .grid tr.static td {
@@ -487,25 +632,81 @@ table.grid {
   color: var(--text-muted);
 }
 
-/* Column widths. Detail columns are sized so Total stays in view next to the
-   side panel on a typical laptop screen. */
+/* Column widths. The detail grid's preferred widths live in levels.js
+   (DETAIL_COLUMNS), and grid.js squeezes them when the window is short of room;
+   these are the same widths, used where it can't. */
 
 .grid col.c-code { width: 110px; }
 .grid col.c-name { width: 360px; }
 .grid col.c-total { width: 140px; }
+:where(.grid-host[data-level="details"]) .grid col.c-total { width: 130px; }
 .grid col.c-num { width: 44px; }
-.grid col.c-description { width: 220px; }
+.grid col.c-description { width: 240px; }
 .grid col.c-amount { width: 110px; }
 .grid col.c-unit { width: 72px; }
 .grid col.c-x { width: 52px; }
+.grid col.c-unit2 { width: 72px; }
 .grid col.c-rate { width: 100px; }
+.grid col.c-unit3 { width: 76px; }
 .grid col.c-currency { width: 52px; }
 .grid col.c-x4 { width: 52px; }
+.grid col.c-unit4 { width: 72px; }
 .grid col.c-fringes { width: 140px; }
-.grid col.c-fringe_total { width: 110px; }
+.grid col.c-fringe_pct { width: 76px; }
+.grid col.c-fringe_total { width: 104px; }
 .grid col.c-groups { width: 130px; }
 .grid col.c-set { width: 90px; }
 .grid col.c-location { width: 110px; }
+
+/* Pinned columns: # and Description stay at the left and Total at the right
+   while the detail grid scrolls sideways. grid.js sets the offsets to match
+   squeezed widths; these match the preferred ones. */
+.grid td.pin {
+  position: sticky;
+  z-index: 1;
+}
+
+.grid th.pin {
+  z-index: 3;
+}
+
+.grid .pin-l.c-num { left: 0; }
+.grid .pin-l.c-description { left: 44px; }
+.grid .pin-r.c-total { right: 0; }
+
+.grid .pin-edge-l {
+  border-right: 1px solid var(--border);
+}
+
+.grid .pin-edge-r {
+  border-left: 1px solid var(--border);
+}
+
+/* The column menu button in the grid's top-left corner. */
+.grid th .col-chooser {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.grid th .col-chooser:hover,
+.grid th .col-chooser[aria-expanded="true"] {
+  background: var(--row-hover);
+  color: var(--text);
+}
+
+.col-chooser svg {
+  fill: currentColor;
+}
 
 /* Selection wins over row-kind shading; a flagged cell stays flagged. */
 .grid tbody tr.sel td {
@@ -521,9 +722,9 @@ table.grid {
 
 .footer {
   display: flex;
+  flex-wrap: wrap; /* a narrow window puts the right-hand group on a second line */
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 6px 22px;
   min-height: 46px;
   padding: 6px 14px;
   background: var(--surface);
@@ -531,11 +732,42 @@ table.grid {
 }
 
 .footer-totals,
-.footer-selection {
+.footer-context,
+.footer-right,
+.footer-selection,
+.footer-changes {
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 18px;
   min-width: 0;
+}
+
+.footer-context:empty {
+  display: none;
+}
+
+.footer-context {
+  padding-left: 18px;
+  border-left: 1px solid var(--border-soft);
+}
+
+.footer-right {
+  margin-left: auto;
+  gap: 22px;
+}
+
+.stat.context {
+  max-width: 210px;
+}
+
+.stat.context .stat-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stat.change .stat-value {
+  text-align: right;
 }
 
 .stat {
@@ -773,4 +1005,97 @@ table.grid {
   border-top: 1px solid var(--border-soft);
   color: var(--text-muted);
   font-size: 12px;
+}
+
+/* ------------------------------------------------------------------------ */
+/* The setup panel's draggable edge (main.js) and popup menus (js/menu.js).  */
+
+.panel-resizer {
+  flex: none;
+  position: relative;
+  z-index: 4;
+  width: 7px;
+  margin: 0 -4px 0 -3px;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.panel-resizer:hover::after,
+.panel-resizer:focus-visible::after,
+body.panel-resizing .panel-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 3px;
+  background: var(--accent);
+}
+
+body.panel-resizing {
+  cursor: col-resize;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Placed under its button by a generated rule (.popup-menu.placed); without
+   one it sits near the top, centered. */
+.popup-menu {
+  position: fixed;
+  z-index: 45;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 200px;
+  max-width: min(440px, calc(100vw - 16px));
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.popup-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 12px 5px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.popup-item:hover {
+  background: var(--row-hover);
+}
+
+.popup-item:focus {
+  outline: none;
+  background: var(--selection);
+}
+
+.popup-item[role="menuitemradio"].checked {
+  font-weight: 600;
+}
+
+.popup-check {
+  flex: none;
+  width: 14px;
+  color: var(--accent);
+  font-weight: 700;
+  text-align: center;
+}
+
+.popup-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

@@ -266,3 +266,34 @@ fn trailing_content_is_rejected() {
     let text = format!("{SMALL}{{}}");
     assert!(matches!(from_str(&text), Err(FormatError::Invalid { .. })));
 }
+
+#[test]
+fn row_style_fields_are_checked() {
+    let at = "\"description\": \"Kit rental\",";
+    let with = |extra: &str| edit(at, &format!("{at}\n                \"{extra},"));
+
+    for bad in [
+        "indent\": 256",
+        "indent\": -1",
+        "indent\": 1.0",
+        "indent\": \"2\"",
+        "bold\": \"yes\"",
+        "italic\": 1",
+        "color\": 7",
+        "note\": [\"a\"]",
+    ] {
+        let (_, path, _) = invalid(&with(bad));
+        let field = bad.split('"').next().unwrap();
+        assert_eq!(
+            path,
+            format!("budget.topsheet[2].accounts[0].details[1].{field}"),
+            "{bad}"
+        );
+    }
+    // The file stores what it is given: range and color rules are the app's.
+    for ok in ["indent\": 255", "color\": \"not a color\"", "note\": null"] {
+        assert!(from_str(&with(ok)).is_ok(), "{ok}");
+    }
+    let text = edit("\"kind\": \"adjustment\"", "\"kind\": \"separator\"");
+    assert!(from_str(&text).is_ok());
+}

@@ -6,11 +6,13 @@
 //! The UI itself is static HTML/CSS/JS in `ui/`; see docs/APP.md.
 
 pub mod app;
+pub mod apply;
 pub mod batch;
 pub mod diagnose;
 pub mod edit;
 pub mod menu;
 pub mod report_dto;
+pub mod rowstyle;
 pub mod session;
 pub mod view;
 

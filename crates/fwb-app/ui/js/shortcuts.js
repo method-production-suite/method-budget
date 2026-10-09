@@ -61,6 +61,7 @@ export const SHORTCUTS = [
   { id: 'insert.line', group: 'Insert', label: 'Insert a line below', keys: 'mod+i', scope: 'grid' },
   { id: 'insert.subtotal', group: 'Insert', label: 'Insert a subtotal row', keys: 'mod+=', scope: 'grid' },
   { id: 'insert.adjustment', group: 'Insert', label: 'Insert an adjustment row', keys: 'mod+alt+a', scope: 'grid' },
+  { id: 'insert.separator', group: 'Insert', label: 'Insert a separator (a drawn rule line)', scope: 'menu' },
   { id: 'insert.account', group: 'Insert', label: 'Add an account', scope: 'menu' },
   { id: 'insert.category', group: 'Insert', label: 'Add a category', scope: 'menu' },
   { id: 'insert.production_total', group: 'Insert', label: 'Add a production total', scope: 'menu' },

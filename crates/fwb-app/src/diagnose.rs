@@ -207,7 +207,8 @@ pub fn sanitize(b: &Budget) -> (Budget, Vec<Issue>) {
     let base = clean.base_currency.clone();
     for acct in clean.categories_mut().flat_map(|c| &mut c.accounts) {
         for d in &mut acct.details {
-            if d.kind == RowKind::Subtotal {
+            // Subtotal and separator rows have nothing to evaluate.
+            if !d.kind.is_costed() {
                 continue;
             }
             let id = d.id;

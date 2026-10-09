@@ -68,6 +68,8 @@ impl Field {
                 self,
                 Field::Rate | Field::Unit3 | Field::Currency | Field::Fringes
             ),
+            // A drawn rule line shows nothing (style and notes have their own commands).
+            RowKind::Separator => false,
         }
     }
 }
@@ -77,6 +79,7 @@ pub fn parse_kind(s: &str) -> EditResult<RowKind> {
         "line" => Ok(RowKind::Line),
         "subtotal" => Ok(RowKind::Subtotal),
         "adjustment" => Ok(RowKind::Adjustment),
+        "separator" => Ok(RowKind::Separator),
         other => Err(format!("unknown row kind `{other}`")),
     }
 }
@@ -86,6 +89,7 @@ fn kind_label(k: RowKind) -> &'static str {
         RowKind::Line => "lines",
         RowKind::Subtotal => "subtotal rows",
         RowKind::Adjustment => "adjustment rows",
+        RowKind::Separator => "separator rows",
     }
 }
 
@@ -263,6 +267,7 @@ pub fn add_detail(
         RowKind::Line => Detail::line(id, "", "", "", ""),
         RowKind::Subtotal => Detail::subtotal(id, ""),
         RowKind::Adjustment => Detail::adjustment(id, "", ""),
+        RowKind::Separator => Detail::separator(id),
     };
     acct.details.insert(at, row);
     Ok(id)
@@ -575,11 +580,14 @@ pub struct GroupInput {
 
 pub fn set_group(b: &mut Budget, name: &str, g: &GroupInput) -> EditResult {
     let name = check_name(name, "group")?;
+    // Color has its own command (rowstyle::set_group_color); keep it here.
+    let color = b.groups.get(&name).and_then(|old| old.color.clone());
     b.groups.insert(
         name,
         Group {
             description: g.description.trim().to_string(),
             in_budget_total: g.in_budget_total,
+            color,
         },
     );
     Ok(())

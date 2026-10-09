@@ -38,22 +38,105 @@ The window has three levels, with a breadcrumb above the grid:
 1. **Topsheet**: categories with their totals, production totals (the first one ends
    above-the-line), then the summary rows: above and below-the-line totals, charges, the
    grand total, credits and the net total.
-2. **Accounts** in one category, with the category's fringe account when fringes post by
-   category.
-3. **Detail lines** in one account: description, amount, unit, X, rate, currency, 4X, the
-   line total, fringes, fringe dollars, groups, set and location.
+2. **Accounts** in one category with each account's fringes and total. When fringes post
+   by category, the category's fringe account is a bold row before the category total;
+   when they post by account, the Fringes column is part of each account's total.
+3. **Detail lines** in one account: #, description, amount, unit, X, rate, currency,
+   fringes, fringe percent, fringe dollars, groups and the line total. More columns (the
+   units next to X, rate and 4X, 4X itself, set and location) are in the column menu.
 
-Enter or a double-click goes down a level; Escape or the breadcrumb goes back up. On the
-detail grid, typing in a cell starts editing it, Enter and Tab commit and move on, Escape
-cancels. Formulas can use globals (`SHOOT_DAYS / 5`). A cell that can't be calculated is
-kept as typed, outlined in red with the reason on hover, and the banner says what is wrong;
-the rest of the budget still totals, counting that cell as blank.
+Enter or a double-click goes down a level; Escape or the breadcrumb goes back up. Each
+breadcrumb segment below the budget has a small button (▾) listing its siblings, so you can
+jump straight to another category or another account in the category; Down arrow on the
+button opens the list, then arrows, a typed number or name, Enter, and Escape. On the
+detail level, the ‹ › buttons beside the account step to the previous or next account,
+across categories (Cmd+[ and Cmd+]). On the detail grid, typing in a cell starts editing
+it, Enter and Tab commit and move on, Escape cancels. Formulas can use globals
+(`SHOOT_DAYS / 5`). A cell that can't be calculated is kept as typed, outlined in red with
+the reason on hover, and the banner says what is wrong; the rest of the budget still
+totals, counting that cell as blank.
+
+**Detail grid columns.** The button in the grid's top-left corner (Shift+Tab from the
+first cell reaches it) opens the column menu: X, the three unit columns, currency, 4X,
+fringes, fringe percent, fringe dollars, groups, set and location can each be shown or
+hidden, and the choice is remembered for you (in the web view's local storage, not in the
+budget). Fringe % is the line's fringe dollars over its total, blank when the total is 0.
+Columns are sized to the window: when there isn't room for every column at its usual
+width, they all narrow toward a minimum (numbers keep room for their digits; long text is
+cut with an ellipsis, in full on hover) before the grid scrolls sideways, and while it
+scrolls, # and Description stay at the left and Total at the right. At 1280 pixels wide
+with the side panel open, the default columns fit without scrolling.
+
+**Row styles.** Bold, italic and indented lines (up to 4 levels) show as such. A line's text
+takes its own color, else the color of its first group (by name) that has one; lines a
+group keeps out of the total are greyed and struck through. A separator row is drawn as a
+rule: it can be selected and deleted, has nothing to edit, and Enter after an edit moves
+past it (Insert > Separator, or the Insert separator button). A row with a note has a
+small mark in the corner of its description; the note is its tooltip. Lines that share a
+fringe range have a bracket in the # column. The printed report shows bold, italic, indent
+and separators too.
 
 The side panel edits the budget's setup tables: globals (with their current values),
-fringes, groups (with the "in budget total" switch), units and currencies. The footer
-shows the above-the-line, below-the-line, grand and net totals, and the totals of the
-selected detail rows (Shift+arrows or Shift+click to select a range, Cmd/Ctrl+click to add
-rows).
+fringes, groups (with the "in budget total" switch), units and currencies. Drag its left
+edge to make it wider or narrower (or focus the edge and use the arrow keys; double-click
+for the standard width); the width is remembered. Option+Cmd+S hides and shows it.
+
+The footer shows the above-the-line, below-the-line, grand and net totals. Drilled down,
+it adds the current account's total and its category's total, each labeled with code and
+name. It shows the totals of the selected detail rows (Shift+arrows or Shift+click to
+select a range, Cmd/Ctrl+click to add rows), and at the right two change counters: **This
+session** is the net total now less the net total when the budget was opened or created,
+and **Last change** is how much the most recent edit moved the net total (0 for an edit
+that moves no money; an undo shows the reverse). Both start at 0 when a budget is opened
+or created.
+
+### Apply panel
+
+The side panel opens on **Apply**: the half of setup that works on the selected lines
+rather than on the tables. It lists every fringe, group, set, location and currency with a
+checkbox that reflects the grid's selection: checked when every selected line has it, a
+dash when some do (with how many), empty when none do. On the topsheet and the account
+list, the selection is every line under the selected categories or accounts. Next to each
+item are its dollars within the selection: a fringe's own dollars, and for groups, sets,
+locations and currencies the selected lines' totals (a group that is out of the budget
+total says so instead). The top of the panel and the foot of the fringe list show the
+selection's line total, fringe total and effective fringe percent (fringe dollars over
+line totals).
+
+Clicking an item puts it on every selected line that can take it, or takes it off them all
+when every one already has it. Sets, locations and currencies are one per line (round
+checkboxes): picking one replaces each line's old value, and Clear takes it off (for a
+currency: back to the base currency). Fringes and currencies go on lines; groups, sets and
+locations on lines and adjustments; other rows are skipped. **Make range** turns the
+selected lines into one fringe range with a number new in that account; they must be next
+to each other in one account, with at least two lines (unselected subtotal rows in between
+are fine, since they never break a range). **Remove range** takes the selected lines out of
+their ranges. Each list has a filter box, an "Applied only" switch and an Edit link to its
+setup tab. Every click is one undo step.
+
+The commands live in `src/apply.rs`:
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `apply_summary` | `rowIds`, `accounts` (account numbers), `categories` (topsheet positions) | the summary below |
+| `apply_to_rows` | `rowIds`, `field` (`fringes` or `groups`), `name`, `on` | View |
+| `assign_to_rows` | `rowIds`, `field` (`set`, `location` or `currency`), `value` (`null` clears) | View |
+| `make_fringe_range` | `rowIds` | View |
+| `clear_fringe_range` | `rowIds` | View |
+
+The summary has `rows` (every selected row id, in budget order; the edit commands take
+these), `lines` and `costed` (how many are lines, and lines or adjustments), `totals` (the
+`selection_totals` result), `fringe_percent` (`"18.25"`, or `null` when the lines total 0),
+`fringes`, `groups`, `sets`, `locations` and `currencies` (`{ name: { count, total } }` for
+every defined item; currencies include the base currency), `in_range` (selected rows in a
+fringe range) and `range_blocked` (why Make range can't run, or `null`). Edits check
+everything before changing anything: an unknown name, a row that no longer exists, or a
+selection with no row that takes the field is refused and nothing changes.
+
+`setup.js` mounts `apply.js` as the panel's first section. `main.js` gives it the grid's
+selection (`selection()` in the panel context: level, row keys, current category) and fires
+a `fwb:selection` event on the document when the selection changes; the panel asks for a
+fresh summary on that event and on every new view.
 
 ### Keyboard and menus
 
@@ -85,16 +168,20 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 | Insert a subtotal, an adjustment | Cmd+=, Option+Cmd+A | Ctrl+=, Ctrl+Alt+A |
 | Up a level; down a level (also Enter) | Cmd+Up; Cmd+Down | Ctrl+Up; Ctrl+Down |
 | Go to the topsheet | Shift+Cmd+Up | Ctrl+Shift+Up |
-| Next, previous account (across categories, wrapping) | Cmd+], Cmd+[ | Ctrl+], Ctrl+[ |
+| Next, previous account (across categories, wrapping; also the ‹ › buttons) | Cmd+], Cmd+[ | Ctrl+], Ctrl+[ |
+| Open a breadcrumb jump list or the column menu (on its button) | Down or Enter | Down or Enter |
+| The column menu button | Shift+Tab from the first cell | Shift+Tab from the first cell |
 | Show or hide the setup panel | Option+Cmd+S | Ctrl+Alt+S |
+| Widen or narrow the setup panel (on its edge; Shift for bigger steps) | Left, Right | Left, Right |
 | Setup tab 1 to 9 (Globals ... Credits; Escape returns to the grid) | Cmd+1 ... Cmd+9 | Ctrl+1 ... Ctrl+9 |
 | Keyboard shortcuts | Cmd+/ | Ctrl+/ |
 
 The row keys (Cmd+I insert, Cmd+D delete, Cmd+= subtotal) follow the habits of people
 coming from other budgeting tools; fill down is on Shift+Cmd+D instead of the spreadsheet
 Cmd+D. Insert > Account, Category and Production Total have no key; they go to the level they
-belong to first and open the same dialog as the buttons. Info, Settings and Baseline tabs
-are in View > Setup Tab.
+belong to first and open the same dialog as the buttons. Insert > Separator has no key
+either; it adds a separator row below the cursor on the detail grid. Info, Settings and
+Baseline tabs are in View > Setup Tab.
 
 **Cells.** The selection is a set of rows (Shift+Up/Down, Shift-click, Cmd/Ctrl-click) across
 a run of columns (Shift+Left/Right). Copy gives tab-separated text, raw formulas for
@@ -135,6 +222,7 @@ crates/fwb-app/
   src/report_dto.rs  serde shapes for fwb_core::Report (the engine stays serde-free)
   src/view.rs        what the UI draws after each command
   src/batch.rs       multi-cell edits (paste, fill down) applied as one undo step
+  src/apply.rs       the apply panel: tag the selected rows, fringe ranges, selection summary
   src/menu.rs        native menu bar, built from the same table as ui/js/shortcuts.js
   src/app.rs         Tauri glue: commands, file dialogs, close and quit guard, menu events
   ui/                index.html, styles.css, setup.css, js/*.js (ES modules, no build step)
@@ -174,8 +262,11 @@ shortcuts), `grid.js` (a generic keyboard grid used at all three levels), `level
 `modal.js`, `format.js` (money and decimal display), `api.js` (the command queue),
 `dom.js`, `shortcuts.js` (the one list of shortcuts, shared with the Rust menu and checked
 by a test), `help.js` (the shortcut sheet), `topsheet-setup.js` (charges, credits, sets,
-locations, info, settings and baseline tabs) and `report.js` with `print.css` (printable
-reports). The setup panel groups its tabs into Tables and Budget. Commands run one at a
+locations, info, settings and baseline tabs), `report.js` with `print.css` (printable
+reports), `menu.js` (the small popup menus: breadcrumb jump lists and the column menu),
+`prefs.js` (per-user display choices in local storage: visible columns, panel width) and
+`sheet.js` (styles worked out at run time, below). The side panel opens on Apply (`apply.js`, the selected lines) and groups the
+setup tabs into Tables and Budget. Commands run one at a
 time, in order.
 
 ## Security model
@@ -186,7 +277,13 @@ untrusted (a budget file is data from anywhere).
 - **No network.** No updater, no telemetry, no remote content. The CSP limits every
   resource to the app's own bundled files and Tauri's IPC:
   `default-src 'self'; script-src 'self'; style-src 'self'; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`.
-  No inline scripts or styles, no CDN.
+  No inline scripts or styles, no CDN. Styles that depend on the window or the budget
+  (squeezed column widths, the panel's width, line and group colors) go into constructed
+  stylesheets (`CSSStyleSheet` and `document.adoptedStyleSheets`, in `ui/js/sheet.js`),
+  never style attributes or `element.style`. Every value in those rules is a number or a
+  checked `#hex` color, and a color reaches a row as a generated class (`tr.tc-2a6fdb`).
+  Where constructed stylesheets aren't supported the fixed widths in `styles.css` apply,
+  the panel keeps its standard width and lines show without color.
 - **Navigation is locked** to the bundled UI (`tauri://localhost`, or `http://tauri.localhost`
   on Windows) by a small navigation guard, so a link or dropped URL can't load another page.
 - **Least privilege for the web view.** `capabilities/main.json` grants the main window

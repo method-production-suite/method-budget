@@ -2,7 +2,8 @@
 //!
 //! Only included `Line` rows earn fringes. A percent fringe is charged per
 //! earner: a single line, or a fringe range (consecutive rows sharing
-//! `fringe_range: Some(n)`; subtotal and uncounted rows don't break a run).
+//! `fringe_range: Some(n)`; subtotal, separator and uncounted rows don't
+//! break a run).
 //! The earner's amount is rounded once, then split back over its lines so the
 //! shares sum exactly. A flat fringe is charged per line, converted by unit
 //! hours when both units have them.
@@ -116,15 +117,15 @@ pub(crate) fn apply_fringes(
 
 /// Percent-fringe earners as lists of `Line` row indexes, in row order. Lines
 /// outside a range are their own earner. A range is a maximal run of rows with
-/// the same `fringe_range: Some(n)`. Subtotal rows and rows that don't count
-/// (suppressed or filtered out) are skipped, so they never break a run; any
-/// other row with a different value does. Skipping uncounted rows keeps
+/// the same `fringe_range: Some(n)`. Subtotal and separator rows, and rows
+/// that don't count (suppressed or filtered out), are skipped, so they never
+/// break a run; any other row with a different value does. Skipping uncounted rows keeps
 /// "excluding a group equals deleting its lines" true (decisions.md 4).
 fn earners(details: &[Detail], rows: &[RowTotals]) -> Vec<Vec<usize>> {
     let mut out = Vec::new();
     let mut run: Option<(u32, Vec<usize>)> = None;
     for (i, d) in details.iter().enumerate() {
-        if d.kind == RowKind::Subtotal || !rows[i].included {
+        if !d.kind.is_costed() || !rows[i].included {
             continue;
         }
         let is_line = d.kind == RowKind::Line;
@@ -260,6 +261,7 @@ mod tests {
         let g = Group {
             description: String::new(),
             in_budget_total: false,
+            color: None,
         };
         (BTreeSet::from(["Hold".to_string()]), g)
     }
@@ -437,6 +439,7 @@ mod tests {
             Group {
                 description: String::new(),
                 in_budget_total: false,
+                color: None,
             },
         );
         b.fringes.insert("PEN".into(), pct("10", Some(150_000)));
@@ -577,6 +580,7 @@ mod tests {
             Group {
                 description: String::new(),
                 in_budget_total: false,
+                color: None,
             },
         );
         let e = run(&b).unwrap_err();

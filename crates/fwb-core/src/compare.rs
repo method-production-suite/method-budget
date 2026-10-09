@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::model::{Baseline, RowId, RowKind};
+use crate::model::{Baseline, RowId};
 use crate::report::Report;
 use crate::Cents;
 
@@ -51,7 +51,7 @@ impl Baseline {
             add(&mut b.categories, cat.code.clone(), cat.total)?;
             for acct in &cat.accounts {
                 add(&mut b.accounts, acct.code.clone(), acct.total)?;
-                for row in acct.rows.iter().filter(|r| r.kind != RowKind::Subtotal) {
+                for row in acct.rows.iter().filter(|r| r.kind.is_costed()) {
                     b.rows.insert(row.id, row.total);
                 }
             }

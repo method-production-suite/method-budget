@@ -56,6 +56,16 @@ const COMMANDS: &[&str] = &[
     "clear_baseline",
     // Several cells at once (paste, fill down, cut)
     "set_cells",
+    // Row style, notes, group colors (src/rowstyle.rs)
+    "set_row_style",
+    "set_row_note",
+    "set_group_color",
+    // Apply panel: tag the selected rows, fringe ranges (src/apply.rs)
+    "apply_summary",
+    "apply_to_rows",
+    "assign_to_rows",
+    "make_fringe_range",
+    "clear_fringe_range",
 ];
 
 fn main() {

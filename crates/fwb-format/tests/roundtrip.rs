@@ -137,3 +137,82 @@ fn key_order_is_fixed() {
     }
     assert!(text.starts_with("{\n  \"format\": \"film-wizard-budget\",\n  \"version\": 1,\n"));
 }
+
+#[test]
+fn row_style_separators_and_group_colors_round_trip() {
+    let mut b = Budget::new("T", "USD");
+    b.units.clear();
+    b.groups.insert(
+        "Alt".into(),
+        Group {
+            description: String::new(),
+            in_budget_total: false,
+            color: Some("#336699".into()),
+        },
+    );
+    let mut styled = Detail::line(1, "Grip", "", "", "");
+    styled.location = Some("LA".into());
+    styled.bold = true;
+    styled.italic = true;
+    styled.indent = 2;
+    styled.color = Some("#aa0000".into());
+    styled.note = Some("Rate per UPM\nconfirm".into());
+    let mut italic_only = Detail::line(3, "", "", "", "");
+    italic_only.italic = true;
+    b.topsheet.push(category(
+        "1",
+        "C",
+        vec![account(
+            "11",
+            "A",
+            vec![styled, Detail::separator(2), italic_only],
+        )],
+    ));
+    let text = round_trip(&b);
+    let v: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(
+        v["budget"]["groups"]["Alt"],
+        serde_json::json!({"in_budget_total": false, "color": "#336699"})
+    );
+    let details = &v["budget"]["topsheet"][0]["accounts"][0]["details"];
+    assert_eq!(
+        details[1],
+        serde_json::json!({"id": 2, "kind": "separator", "description": ""})
+    );
+    assert_eq!(
+        details[2],
+        serde_json::json!({"id": 3, "description": "", "italic": true}),
+        "style fields at their default are left out"
+    );
+    // Style fields come last, in documented order.
+    let keys: Vec<&str> = details[0]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    let row = &text[text.find("\"id\": 1,").unwrap()..];
+    let at = |k: &str| row.find(&format!("\"{k}\":")).unwrap();
+    for w in ["location", "bold", "italic", "indent", "color", "note"].windows(2) {
+        assert!(at(w[0]) < at(w[1]), "{} before {}", w[0], w[1]);
+    }
+    assert_eq!(keys.len(), 8);
+    assert!(text.contains("\"indent\": 2"), "indent is a JSON integer");
+}
+
+#[test]
+fn files_without_new_fields_read_with_defaults() {
+    let golden = include_str!("golden/small.json");
+    let b = fwb_format::from_str(golden).unwrap();
+    assert!(b.groups.values().all(|g| g.color.is_none()));
+    for d in b
+        .categories()
+        .flat_map(|c| &c.accounts)
+        .flat_map(|a| &a.details)
+    {
+        assert!(!d.bold && !d.italic && d.indent == 0);
+        assert_eq!((&d.color, &d.note), (&None, &None));
+        assert_ne!(d.kind, RowKind::Separator);
+    }
+    assert_eq!(fwb_format::to_string(&b), golden, "golden is unchanged");
+}

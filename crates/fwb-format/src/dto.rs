@@ -99,6 +99,14 @@ fn yes() -> bool {
     true
 }
 
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
+fn is_zero_u8(n: &u8) -> bool {
+    *n == 0
+}
+
 fn map<'a, K: Clone + Ord, A, B>(m: &'a BTreeMap<K, A>, f: impl Fn(&'a A) -> B) -> BTreeMap<K, B> {
     m.iter().map(|(k, v)| (k.clone(), f(v))).collect()
 }
@@ -518,6 +526,8 @@ struct FileGroup {
     description: String,
     #[serde(default = "yes", skip_serializing_if = "is_true")]
     in_budget_total: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    color: Option<String>,
 }
 
 impl From<&Group> for FileGroup {
@@ -525,10 +535,12 @@ impl From<&Group> for FileGroup {
         let Group {
             description,
             in_budget_total,
+            color,
         } = g;
         FileGroup {
             description: description.clone(),
             in_budget_total: *in_budget_total,
+            color: color.clone(),
         }
     }
 }
@@ -538,6 +550,7 @@ impl From<FileGroup> for Group {
         Group {
             description: f.description,
             in_budget_total: f.in_budget_total,
+            color: f.color,
         }
     }
 }
@@ -752,6 +765,7 @@ enum FileRowKind {
     Line,
     Subtotal,
     Adjustment,
+    Separator,
 }
 
 impl FileRowKind {
@@ -795,6 +809,16 @@ struct FileDetail {
     set: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     location: Option<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    bold: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    italic: bool,
+    #[serde(default, skip_serializing_if = "is_zero_u8")]
+    indent: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    color: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    note: Option<String>,
 }
 
 impl From<&Detail> for FileDetail {
@@ -817,6 +841,11 @@ impl From<&Detail> for FileDetail {
             location,
             set,
             fringe_range,
+            bold,
+            italic,
+            indent,
+            color,
+            note,
         } = d;
         FileDetail {
             id: *id,
@@ -824,6 +853,7 @@ impl From<&Detail> for FileDetail {
                 RowKind::Line => FileRowKind::Line,
                 RowKind::Subtotal => FileRowKind::Subtotal,
                 RowKind::Adjustment => FileRowKind::Adjustment,
+                RowKind::Separator => FileRowKind::Separator,
             },
             description: description.clone(),
             amount: amount.0.clone(),
@@ -840,6 +870,11 @@ impl From<&Detail> for FileDetail {
             groups: groups.clone(),
             set: set.clone(),
             location: location.clone(),
+            bold: *bold,
+            italic: *italic,
+            indent: *indent,
+            color: color.clone(),
+            note: note.clone(),
         }
     }
 }
@@ -852,6 +887,7 @@ impl From<FileDetail> for Detail {
                 FileRowKind::Line => RowKind::Line,
                 FileRowKind::Subtotal => RowKind::Subtotal,
                 FileRowKind::Adjustment => RowKind::Adjustment,
+                FileRowKind::Separator => RowKind::Separator,
             },
             description: f.description,
             amount: Formula(f.amount),
@@ -868,6 +904,11 @@ impl From<FileDetail> for Detail {
             location: f.location,
             set: f.set,
             fringe_range: f.fringe_range,
+            bold: f.bold,
+            italic: f.italic,
+            indent: f.indent,
+            color: f.color,
+            note: f.note,
         }
     }
 }

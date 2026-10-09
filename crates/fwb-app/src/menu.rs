@@ -114,6 +114,7 @@ pub const INSERT: &[Entry] = &[
     item("insert.line", "Line", "mod+i"),
     item("insert.subtotal", "Subtotal", "mod+="),
     item("insert.adjustment", "Adjustment", "mod+alt+a"),
+    plain("insert.separator", "Separator"),
     SEP,
     plain("insert.account", "Account…"),
     plain("insert.category", "Category…"),

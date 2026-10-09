@@ -131,3 +131,14 @@ Cmd/Ctrl+I inserts a line, Cmd/Ctrl+D deletes rows (undoable), Cmd/Ctrl+= insert
 subtotal: the keys people switching from other budgeting tools already have in their hands.
 Fill down moves to Shift+Cmd/Ctrl+D rather than the spreadsheet Cmd+D. Matching common
 shortcuts is about familiarity, not copying; labels and menus stay our own.
+
+## 16. Row style, notes and separators are display data (2026-10-09)
+
+Groups get a `color`; detail rows get `bold`, `italic`, `indent` (0 to 4), `color` (wins
+over the group's) and a plain-text `note` (up to 10,000 characters). A new row kind,
+`separator`, is a drawn rule line. None of it touches the math: separators are never
+counted or fringed, don't break fringe ranges and don't reset subtotal or adjustment
+windows, so removing every separator and all styling gives an identical report
+(property-tested). All of it is additive in format version 1 and left out at its default,
+so existing files and the golden file are unchanged. Colors are checked (`#` plus 6 hex
+digits, stored lowercase) and limits enforced by the app's commands, not the file reader.
