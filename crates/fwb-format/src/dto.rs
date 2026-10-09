@@ -11,7 +11,7 @@ use fwb_core::coding::AccountCoding;
 use fwb_core::{
     Account, Baseline, Budget, Category, Cents, Charge, ChargeKind, Credit, CreditCap, CreditRow,
     CreditSource, Currency, Dec, Detail, Formula, Fringe, FringeKind, FringePosting, Group,
-    InfoValue, Location, ProductionTotal, RowId, RowKind, SetDef, TopsheetRow, UnitDef,
+    InfoValue, Location, ProductionTotal, RowId, RowKind, SetDef, TopsheetRow, UnitDef, Version,
 };
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -198,6 +198,8 @@ pub(crate) struct FileBudget {
     credits: Vec<FileCredit>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     baseline: Option<FileBaseline>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    versions: Vec<FileVersion>,
 }
 
 impl From<&Budget> for FileBudget {
@@ -220,6 +222,7 @@ impl From<&Budget> for FileBudget {
             charges,
             credits,
             baseline,
+            versions,
         } = b;
         FileBudget {
             title: title.clone(),
@@ -241,6 +244,7 @@ impl From<&Budget> for FileBudget {
             charges: charges.iter().map(FileCharge::from).collect(),
             credits: credits.iter().map(FileCredit::from).collect(),
             baseline: baseline.as_ref().map(FileBaseline::from),
+            versions: versions.iter().map(FileVersion::from).collect(),
         }
     }
 }
@@ -271,6 +275,78 @@ impl From<FileBudget> for Budget {
             charges: f.charges.into_iter().map(Charge::from).collect(),
             credits: f.credits.into_iter().map(Credit::from).collect(),
             baseline: f.baseline.map(Baseline::from),
+            versions: f.versions.into_iter().map(Version::from).collect(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Versions
+
+/// A named copy of the budget's content.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileVersion {
+    id: u64,
+    name: String,
+    created: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    note: Option<String>,
+    budget: FileSnapshot,
+}
+
+/// A version's budget: the same object as the top-level budget, except that
+/// it may not have `versions` of its own.
+struct FileSnapshot(FileBudget);
+
+impl Serialize for FileSnapshot {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        self.0.serialize(s)
+    }
+}
+
+impl<'de> Deserialize<'de> for FileSnapshot {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<FileSnapshot, D::Error> {
+        let b = FileBudget::deserialize(d)?;
+        if !b.versions.is_empty() {
+            return Err(de::Error::custom(
+                "a version's budget cannot have versions of its own",
+            ));
+        }
+        Ok(FileSnapshot(b))
+    }
+}
+
+impl From<&Version> for FileVersion {
+    fn from(v: &Version) -> FileVersion {
+        let Version {
+            id,
+            name,
+            created,
+            note,
+            budget,
+        } = v;
+        FileVersion {
+            id: *id,
+            name: name.clone(),
+            created: created.clone(),
+            note: note.clone(),
+            // A snapshot has no versions, so this never writes nested ones.
+            budget: FileSnapshot(FileBudget::from(&budget.to_budget())),
+        }
+    }
+}
+
+impl From<FileVersion> for Version {
+    fn from(f: FileVersion) -> Version {
+        // Nested versions were rejected while reading, so none are dropped here.
+        let (content, _) = Budget::from(f.budget.0).into_parts();
+        Version {
+            id: f.id,
+            name: f.name,
+            created: f.created,
+            note: f.note,
+            budget: Box::new(content),
         }
     }
 }

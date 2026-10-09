@@ -4,7 +4,9 @@ This is the open, documented file format Film Wizard Budgeting uses to save budg
 plain JSON, designed to be read and written by other tools and to diff cleanly in version
 control. The reference implementation is `crates/fwb-format` (`to_string` and `from_str`).
 
-File extension: `.fwb`. Encoding: UTF-8. MIME type for tools that need one: `application/json`.
+File extension: `.fwb`. Encoding: UTF-8. The registered MIME type is
+`application/vnd.film-wizard-budget+json`; since the content is plain JSON, tools may also
+treat it as `application/json`.
 
 ## At a glance
 
@@ -109,6 +111,7 @@ Fields in written order:
 | `charges`         | list of [charges](#charge) | Contractual charges, in application order. |
 | `credits`         | list of [credits](#credit) | Applied credits (incentives), in application order. |
 | `baseline`        | [baseline](#baseline) | Frozen totals for comparison. Left out when there is none. |
+| `versions`        | list of [versions](#version) | Named copies of the budget, oldest first. Left out when there are none. |
 
 A new budget in Film Wizard Budgeting starts with a set of editable starter units (Allow,
 Day, Flat, Hour, Month, Week). They are ordinary data and are written out like any other
@@ -330,6 +333,67 @@ budget can show what changed. Rows are matched by id, accounts and categories by
 | `grand_total` | cents, **required** | |
 | `net_total`   | cents, **required** | |
 
+### Version
+
+A named, full copy of the budget's content, saved inside the budget so it can be restored
+or compared later. Fields in written order:
+
+| Field     | Type | Notes |
+|-----------|------|-------|
+| `id`      | integer, **required** | Unsigned 64-bit integer. The application keeps ids unique within the budget's `versions`; the reader does not check. |
+| `name`    | text, **required** | |
+| `created` | text, **required** | When the version was saved, as an ISO 8601 date-time such as `"2026-10-09T14:30:00Z"`. Stored as given; the reader does not check it. |
+| `note`    | optional text | |
+| `budget`  | object, **required** | A [budget](#budget) object with every field except `versions`: a version cannot contain versions, and a reader rejects one that does. |
+
+Restoring a version in the application first saves the current content as another version
+(named `Before restoring "<name>"`), so a restore can be undone.
+
+**File size.** Each version is a complete copy of the budget's content (every category,
+account and row), so a file with N versions is roughly N + 1 times the size of the budget
+alone. That is deliberate for version 1: versions are simple, self-contained and survive
+any later edit. Row ids inside a version are the ids the rows had when it was saved, which
+is what lets the application match rows between a version and the current budget.
+
+Example (inside `budget`, after `baseline`):
+
+```json
+"versions": [
+  {
+    "id": 1,
+    "name": "Studio draft",
+    "created": "2026-10-09T14:30:00Z",
+    "note": "Sent to the studio",
+    "budget": {
+      "title": "Short Film",
+      "base_currency": "USD",
+      "topsheet": [
+        {
+          "kind": "category",
+          "code": "10",
+          "name": "Above-the-line",
+          "accounts": [
+            {
+              "code": "10-01",
+              "name": "Director",
+              "details": [
+                {
+                  "id": 1,
+                  "description": "Director",
+                  "amount": "1",
+                  "unit": "Flat",
+                  "rate": "4500"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+]
+```
+
 ## Reading rules
 
 A reader that follows this document should:
@@ -377,6 +441,8 @@ valid. Loading and saving it in Film Wizard Budgeting normalizes it.
 - Version 1, additive (2026-10): group `color`; detail row `bold`, `italic`, `indent`,
   `color` and `note`; detail row kind `"separator"`. All are left out at their default,
   so files that don't use them are unchanged.
+- Version 1, additive (2026-10): budget `versions` (named full copies of the budget's
+  content). Left out when there are none, so files without versions are unchanged.
 
 ## Complete example
 

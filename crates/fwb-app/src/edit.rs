@@ -5,7 +5,7 @@
 //! exists). Formulas are stored as typed: a formula that doesn't evaluate is
 //! kept and flagged by recalc (see `diagnose`), never rejected.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 use fwb_core::coding::AccountCoding;
 use fwb_core::expr::is_ident;
@@ -176,25 +176,50 @@ fn detail_mut(b: &mut Budget, id: RowId) -> EditResult<&mut Detail> {
         .flat_map(|c| &mut c.accounts)
         .flat_map(|a| &mut a.details)
         .find(|d| d.id == id)
-        .ok_or_else(|| format!("row {id} no longer exists"))
+        .ok_or_else(|| row_gone(id))
 }
 
-/// The next unused row id: past every row and every baseline row, so a new
-/// row is never mistaken for an old one when comparing.
+/// The next unused row id: past every row, the baseline's rows and every
+/// saved version's rows, so a new row is never mistaken for an old one when
+/// comparing.
 pub fn next_row_id(b: &Budget) -> RowId {
-    let rows = details(b).map(|d| d.id).max().unwrap_or(0);
-    let base = b
-        .baseline
-        .as_ref()
-        .and_then(|bl| bl.rows.keys().next_back().copied())
-        .unwrap_or(0);
-    rows.max(base).saturating_add(1)
+    b.highest_row_id().unwrap_or(0).saturating_add(1)
 }
 
-fn apply_field(d: &mut Detail, field: Field, value: &str) -> EditResult {
-    if !field.applies_to(d.kind) {
-        return Err(format!("{} don't use this column", kind_label(d.kind)));
+/// Rows by id, mutably, found in one pass over the budget (not one search per
+/// row). Only ids in `want`; when an id repeats in the budget, the first row
+/// wins, as with a search.
+pub fn rows_by_id<'a>(b: &'a mut Budget, want: &BTreeSet<RowId>) -> HashMap<RowId, &'a mut Detail> {
+    let mut out = HashMap::with_capacity(want.len());
+    for d in b
+        .categories_mut()
+        .flat_map(|c| &mut c.accounts)
+        .flat_map(|a| &mut a.details)
+    {
+        if want.contains(&d.id) {
+            out.entry(d.id).or_insert(d);
+        }
     }
+    out
+}
+
+/// The error for a row that is gone.
+pub fn row_gone(id: RowId) -> String {
+    format!("row {id} no longer exists")
+}
+
+/// Refuses a field the row's kind doesn't use (a subtotal's rate, say).
+pub fn check_field(d: &Detail, field: Field) -> EditResult {
+    if field.applies_to(d.kind) {
+        Ok(())
+    } else {
+        Err(format!("{} don't use this column", kind_label(d.kind)))
+    }
+}
+
+/// Sets one field of one row, as typed.
+pub fn apply_field(d: &mut Detail, field: Field, value: &str) -> EditResult {
+    check_field(d, field)?;
     let formula = || Formula(value.trim().to_string());
     match field {
         Field::Description => d.description = value.to_string(),
@@ -222,9 +247,10 @@ pub fn set_detail_field(b: &mut Budget, id: RowId, field: Field, value: &str) ->
 /// Sets one field on several rows. Rows that don't use the field are skipped;
 /// it's an error only if none do.
 pub fn set_rows_field(b: &mut Budget, ids: &[RowId], field: Field, value: &str) -> EditResult {
+    let mut rows = rows_by_id(b, &ids.iter().copied().collect());
     let mut applied = 0;
     for &id in ids {
-        let d = detail_mut(b, id)?;
+        let d = rows.get_mut(&id).ok_or_else(|| row_gone(id))?;
         if field.applies_to(d.kind) {
             apply_field(d, field, value)?;
             applied += 1;

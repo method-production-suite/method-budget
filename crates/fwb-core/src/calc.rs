@@ -17,12 +17,15 @@ use std::fmt;
 use crate::decimal::Dec;
 use crate::expr::{is_ident, EvalError, Expr, ParseError};
 use crate::model::{Budget, Detail, Formula, RowId};
-use crate::report::{AccountTotals, CategoryTotals, Report};
+use crate::report::{AccountTotals, CategoryTotals, Report, RowTotals};
 use crate::Cents;
 
 pub mod breakdown;
+pub mod cache;
 pub(crate) mod fringes;
 pub(crate) mod lines;
+#[cfg(test)]
+mod reference;
 pub(crate) mod topsheet;
 
 /// Which details count toward totals, on top of group suppression.
@@ -53,6 +56,8 @@ pub enum ErrorKind {
     UnknownGroup(String),
     DuplicateRowId(RowId),
     Overflow,
+    /// A comparison was asked for with this many budgets; it takes 2 to 16.
+    CompareCount(usize),
 }
 
 impl fmt::Display for CalcError {
@@ -70,6 +75,12 @@ impl fmt::Display for CalcError {
             ErrorKind::UnknownGroup(n) => write!(f, "unknown group `{n}`"),
             ErrorKind::DuplicateRowId(id) => write!(f, "row id {id} is used twice"),
             ErrorKind::Overflow => f.write_str("number too large"),
+            ErrorKind::CompareCount(n) => write!(
+                f,
+                "a comparison takes {} to {} budgets, not {n}",
+                crate::comparison::MIN_COMPARED,
+                crate::comparison::MAX_COMPARED
+            ),
         }
     }
 }
@@ -107,10 +118,19 @@ impl Ctx<'_> {
         if f.is_blank() {
             return Ok(blank);
         }
+        if let Some(v) = self.eval_simple(&f.0) {
+            return Ok(v);
+        }
         Expr::parse(&f.0)
             .map_err(|e| err(at(), ErrorKind::Parse(e)))?
             .eval(&|n| self.globals.get(n).copied())
             .map_err(|e| err(at(), ErrorKind::Eval(e)))
+    }
+
+    /// Plain numbers and bare globals without a parse tree (see
+    /// [`crate::expr::quick_value`]).
+    fn eval_simple(&self, src: &str) -> Option<Dec> {
+        crate::expr::quick_value(src, &|n| self.globals.get(n).copied())
     }
 
     /// Whether a line counts toward totals: not suppressed by a group with
@@ -228,16 +248,38 @@ fn check_row_ids(b: &Budget) -> Result<(), CalcError> {
 
 /// Stages 1 and 2 for every account, with category and account sums filled in.
 /// `total` fields are left equal to `details_total`; posting adjusts them.
+#[cfg(test)]
 pub(crate) fn eval_categories(ctx: &Ctx) -> Result<Vec<CategoryTotals>, CalcError> {
+    eval_categories_with(ctx, None)
+}
+
+/// [`eval_categories`], taking each unchanged account's rows from `cache`
+/// (and keeping the ones evaluated there).
+fn eval_categories_with(
+    ctx: &Ctx,
+    mut cache: Option<&mut cache::Accounts>,
+) -> Result<Vec<CategoryTotals>, CalcError> {
     let ovf = || overflow("budget totals");
     let mut categories = Vec::new();
+    let mut k = 0;
     for cat in ctx.b.categories() {
         let mut accounts = Vec::with_capacity(cat.accounts.len());
         for acct in &cat.accounts {
-            let mut rows = lines::eval_rows(ctx, acct)?;
-            fringes::apply_fringes(ctx, acct, &mut rows)?;
-            let details_total = sum(rows.iter().map(|r| r.total)).ok_or_else(ovf)?;
-            let fringe_total = sum(rows.iter().map(|r| r.fringe_total)).ok_or_else(ovf)?;
+            let reused = cache.as_deref().and_then(|c| c.counted(k, acct));
+            let (rows, details_total, fringe_total) = match reused {
+                Some(hit) => hit,
+                None => {
+                    let mut rows = lines::eval_rows(ctx, acct)?;
+                    fringes::apply_fringes(ctx, acct, &mut rows)?;
+                    let details_total = sum(rows.iter().map(|r| r.total)).ok_or_else(ovf)?;
+                    let fringe_total = sum(rows.iter().map(|r| r.fringe_total)).ok_or_else(ovf)?;
+                    if let Some(c) = cache.as_deref_mut() {
+                        c.keep(k, acct, &rows, details_total, fringe_total);
+                    }
+                    (rows, details_total, fringe_total)
+                }
+            };
+            k += 1;
             accounts.push(AccountTotals {
                 code: acct.code.clone(),
                 name: acct.name.clone(),
@@ -262,8 +304,74 @@ pub(crate) fn eval_categories(ctx: &Ctx) -> Result<Vec<CategoryTotals>, CalcErro
     Ok(categories)
 }
 
+/// Per category, per account: the account's unfiltered rows, or `None` when
+/// they are the same as its counted rows.
+pub(crate) type FullRows = Vec<Vec<Option<Vec<RowTotals>>>>;
+
+/// Unfiltered rows for each account (as `ctx.unfiltered` evaluates them),
+/// for the "full" group totals. `None` for an account whose rows all count:
+/// evaluating it again unfiltered would give exactly the same rows, so the
+/// counted ones stand in. Only accounts with a row left out are evaluated
+/// again. Errors are the ones a full unfiltered pass would raise, in the
+/// same order (accounts that are skipped can't raise any).
+fn eval_full(
+    ctx: &Ctx,
+    active: &[CategoryTotals],
+    mut cache: Option<&mut cache::Accounts>,
+) -> Result<FullRows, CalcError> {
+    let ovf = || overflow("budget totals");
+    let mut out = Vec::with_capacity(active.len());
+    let mut k = 0;
+    for (cat, ac) in ctx.b.categories().zip(active) {
+        let mut accounts = Vec::with_capacity(cat.accounts.len());
+        let mut details_totals = Vec::with_capacity(cat.accounts.len());
+        let mut fringe_totals = Vec::with_capacity(cat.accounts.len());
+        for (acct, aa) in cat.accounts.iter().zip(&ac.accounts) {
+            let at = k;
+            k += 1;
+            if aa.rows.iter().all(|r| r.included) {
+                details_totals.push(aa.details_total);
+                fringe_totals.push(aa.fringe_total);
+                accounts.push(None);
+                continue;
+            }
+            if let Some(hit) = cache.as_deref().and_then(|c| c.full(at)) {
+                details_totals.push(hit.1);
+                fringe_totals.push(hit.2);
+                accounts.push(Some(hit.0));
+                continue;
+            }
+            let mut rows = lines::eval_rows(ctx, acct)?;
+            fringes::apply_fringes(ctx, acct, &mut rows)?;
+            let dt = sum(rows.iter().map(|r| r.total)).ok_or_else(ovf)?;
+            let ft = sum(rows.iter().map(|r| r.fringe_total)).ok_or_else(ovf)?;
+            if let Some(c) = cache.as_deref_mut() {
+                c.keep_full(at, &rows, dt, ft);
+            }
+            details_totals.push(dt);
+            fringe_totals.push(ft);
+            accounts.push(Some(rows));
+        }
+        // The category sums a full pass adds up, for the same overflow errors.
+        sum(details_totals).ok_or_else(ovf)?;
+        sum(fringe_totals).ok_or_else(ovf)?;
+        out.push(accounts);
+    }
+    Ok(out)
+}
+
 /// Recalculates every total in `b`.
 pub fn recalc(b: &Budget, opts: &RecalcOptions) -> Result<Report, CalcError> {
+    recalc_with(b, opts, None)
+}
+
+/// [`recalc`], reusing account rows from `cache` when given (see
+/// [`cache::RecalcCache`]).
+fn recalc_with(
+    b: &Budget,
+    opts: &RecalcOptions,
+    mut cache: Option<&mut cache::Accounts>,
+) -> Result<Report, CalcError> {
     check_row_ids(b)?;
     let totals_rate = match &b.totals_currency {
         Some(c) if *c != b.base_currency => {
@@ -280,14 +388,14 @@ pub fn recalc(b: &Budget, opts: &RecalcOptions) -> Result<Report, CalcError> {
         opts,
         unfiltered: false,
     };
-    let categories = eval_categories(&ctx)?;
+    let categories = eval_categories_with(&ctx, cache.as_deref_mut())?;
     let ts = topsheet::finish(&ctx, categories)?;
 
     let full_ctx = Ctx {
         unfiltered: true,
         ..ctx
     };
-    let full = eval_categories(&full_ctx)?;
+    let full = eval_full(&full_ctx, &ts.categories, cache)?;
     let bd = breakdown::breakdowns(&full_ctx, &ts.categories, &full)?;
 
     Ok(Report {

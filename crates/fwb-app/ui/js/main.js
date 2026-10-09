@@ -4,6 +4,8 @@
 //
 // Rust owns the budget. Every change is a command that returns a fresh view;
 // this file only decides what to ask for and redraws from what comes back.
+// The view is lean: the budget's outline and totals, plus the rows of the one
+// account on screen (focus_account picks it). Printing asks for everything.
 //
 // Every keyboard shortcut and menu item runs a command from COMMANDS by id
 // (ids and keys: shortcuts.js). A key press and a menu click reach the same
@@ -91,16 +93,19 @@ async function act(cmd, args = {}, opts = {}) {
 }
 
 function apply(view, opts = {}) {
+  const same = state.view && state.view.rev === view.rev;
   state.view = view;
   state.ix = indexView(view);
   trackChanges(view, opts);
+  // Leaving an account (focus_account with none) changes nothing on screen.
+  if (opts.quiet && same) return;
   render(opts);
   // The selected rows' totals may have changed even if the selection didn't.
   if (state.level === 'details') requestSelectionTotals(grid.selectedKeys());
 }
 
 // Commands that return a view without changing the budget.
-const NOT_EDITS = new Set(['get_view', 'save_budget']);
+const NOT_EDITS = new Set(['get_view', 'save_budget', 'focus_account']);
 
 /**
  * Footer change counters. `opts.fresh` (a file opened or created) starts
@@ -152,13 +157,15 @@ function resolveNav() {
     }
   }
   if (state.level === 'details') {
+    // The view carries the account on screen; Rust finds it the same way
+    // (codes first), so its place is the one to show.
+    const acct = state.view.account;
     const accts = entry.cat.accounts || [];
-    ai = accts.findIndex((a, i) => a.code === state.acct.code && i === state.acct.ai);
-    if (ai < 0) ai = accts.findIndex((a) => a.code === state.acct.code);
-    if (ai < 0) {
+    if (!acct || acct.ti !== entry.ti || !accts[acct.ai] || accts[acct.ai].code !== acct.code) {
       state.level = 'accounts';
     } else {
-      state.acct = { code: accts[ai].code, ai };
+      ai = acct.ai;
+      state.acct = { code: acct.code, ai };
     }
   }
   return { entry, ai };
@@ -183,7 +190,12 @@ function render(opts = {}) {
     grid.setData(accountColumns(ix), accountRows(ix, entry), opts);
   } else {
     grid.h.enterMovesDown = true;
-    grid.setData(gridDetailColumns(), detailRows(ix, entry, ai), opts);
+    const rows = detailRows(ix, entry, ai, v.account);
+    if (opts.focusFirst) {
+      const first = rows.find((r) => r.selectable !== false);
+      opts = { ...opts, focusKey: first ? first.key : null };
+    }
+    grid.setData(gridDetailColumns(), rows, opts);
   }
   renderPanel();
   renderFooterNow();
@@ -300,7 +312,7 @@ function renderBanner(v) {
     banner.replaceChildren();
     return;
   }
-  const count = (v.issues || []).length;
+  const count = typeof v.issue_count === 'number' ? v.issue_count : (v.issues || []).length;
   const head = v.report
     ? count > 1
       ? `${count} problems need fixing. Until then, totals count the flagged cells as blank.`
@@ -410,10 +422,13 @@ function footerContext() {
 function goTo(level, opts = {}) {
   const order = ['topsheet', 'accounts', 'details'];
   if (order.indexOf(level) >= order.indexOf(state.level)) return;
+  const leaving = state.level === 'details';
   state.level = level;
   state.selection = null;
   render({ focusKey: state.memory[level] || null, ...opts });
   grid.focus();
+  // No account on screen: later views leave its rows out.
+  if (leaving) act('focus_account', {}, { quiet: true });
 }
 
 function goUp() {
@@ -430,27 +445,48 @@ function drillDown(rowKey) {
 function openCategory(ti) {
   const c = state.ix.cats.find((x) => x.ti === ti);
   if (!c) return;
+  const leaving = state.level === 'details';
   state.memory.topsheet = `t${ti}`;
   state.cat = { code: c.cat.code, ti };
   state.level = 'accounts';
   state.selection = null;
   render({ focusKey: 'a0', resetSelection: true });
   grid.focus();
+  if (leaving) act('focus_account', {}, { quiet: true });
 }
 
-/** Shows the lines of account `ai` in the category at topsheet index `ti` (from anywhere). */
-function openAccount(ti, ai) {
+// The account being opened, while Rust fetches its rows (so Cmd+] pressed
+// again before they arrive steps on from there).
+let opening = null;
+
+/**
+ * Shows the lines of account `ai` in the category at topsheet index `ti`
+ * (from anywhere). The view carries only the account on screen, so this asks
+ * Rust for it first and draws when it arrives.
+ */
+async function openAccount(ti, ai) {
   const c = state.ix.cats.find((x) => x.ti === ti);
   const a = c && (c.cat.accounts || [])[ai];
   if (!a) return;
-  state.memory.topsheet = `t${ti}`;
-  state.memory.accounts = `a${ai}`;
-  state.cat = { code: c.cat.code, ti };
-  state.acct = { code: a.code, ai };
+  const target = { ti, ai };
+  opening = target;
+  let v;
+  try {
+    v = await invoke('focus_account', { category: c.cat.code, ti, account: a.code, ai });
+  } catch (e) {
+    toast(e);
+    return;
+  } finally {
+    if (opening === target) opening = null;
+  }
+  if (!v || !v.account) return;
+  state.memory.topsheet = `t${v.account.ti}`;
+  state.memory.accounts = `a${v.account.ai}`;
+  state.cat = { code: c.cat.code, ti: v.account.ti };
+  state.acct = { code: v.account.code, ai: v.account.ai };
   state.level = 'details';
   state.selection = null;
-  const first = (a.details || [])[0];
-  render({ focusKey: first ? `r${first.id}` : null, focusCol: 'description', resetSelection: true });
+  apply(v, { cmd: 'focus_account', focusFirst: true, focusCol: 'description', resetSelection: true });
   grid.focus();
 }
 
@@ -465,7 +501,8 @@ function goDown() {
 function stepAccount(delta) {
   if (state.level !== 'details' || !state.acct) return;
   const list = accountList(state.ix);
-  const i = list.findIndex((x) => x.ti === state.cat.ti && x.ai === state.acct.ai);
+  const from = opening || { ti: state.cat.ti, ai: state.acct.ai };
+  const i = list.findIndex((x) => x.ti === from.ti && x.ai === from.ai);
   if (i < 0 || list.length < 2) return;
   const next = list[(i + delta + list.length) % list.length];
   openAccount(next.ti, next.ai);
@@ -802,7 +839,7 @@ async function deleteAccount() {
   const entry = findCategory(state.ix, state.cat.code, state.cat.ti);
   const a = entry && entry.cat.accounts[Number(key.slice(1))];
   if (!a) return;
-  const n = (a.details || []).length;
+  const n = typeof a.lines === 'number' ? a.lines : (a.details || []).length;
   const ok = n === 0 || (await confirmDialog({
     title: 'Delete account',
     message: `Delete ${a.code} ${a.name} and its ${n === 1 ? '1 line' : `${n} lines`}? You can undo this.`,
@@ -869,11 +906,20 @@ function doRedo() {
   act('redo');
 }
 
-/** File > Print: waits for queued edits so the printout has them. */
+/**
+ * File > Print: the printout needs every row, which views leave out, so this
+ * asks for everything (after any queued edits, so the printout has them).
+ */
 async function doPrint(kind) {
-  if (!(await act('get_view'))) return;
+  let full;
   try {
-    await printReport(state.view, kind);
+    full = await invoke('get_full_view');
+  } catch (e) {
+    toast(e);
+    return;
+  }
+  try {
+    await printReport(full, kind);
   } catch (e) {
     toast(e);
   }

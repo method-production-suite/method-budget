@@ -1,23 +1,203 @@
 //! One open budget: the authoritative [`Budget`], where it lives on disk, whether
-//! it has unsaved changes, and undo/redo history. No Tauri types here, so the
-//! whole edit -> recalc -> view path is testable without a window.
+//! it has unsaved changes, undo/redo history, and which account the UI shows.
+//! No Tauri types here, so the whole edit -> recalc -> view path is testable
+//! without a window.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
-use fwb_core::{selection_totals, starter, Budget, RowId};
+use fwb_core::calc::cache::RecalcCache;
+use fwb_core::{
+    selection_totals, starter, Breakdown, Budget, Detail, RowId, RowTotals, SelectionTotals,
+    TopsheetRow, Version,
+};
 
-use crate::diagnose::{lenient_recalc, Outcome};
+use crate::diagnose::{lenient_recalc_with, Outcome};
 use crate::edit::{self, EditResult};
 use crate::report_dto::SelectionDto;
-use crate::view::View;
+use crate::view::{Focus, FullView, View, ViewState};
 
-/// Undo steps kept. Snapshots are whole budgets, which are small.
+/// Undo steps kept. Each step keeps only what its edit changed (see [`Patch`]).
 pub const UNDO_LIMIT: usize = 200;
 
-#[derive(Clone, Debug)]
+/// View revisions, unique across sessions in this process, so a new or
+/// opened budget never reuses an old number.
+static NEXT_VIEW_REV: AtomicU64 = AtomicU64::new(1);
+
+fn next_view_rev() -> u64 {
+    NEXT_VIEW_REV.fetch_add(1, Ordering::Relaxed)
+}
+
+/// An account's rows as they were before an edit.
+#[derive(Debug)]
+enum Rows {
+    /// Every row (rows were added, removed or moved).
+    All(Vec<Detail>),
+    /// The same rows in the same order: just the ones that changed, by index.
+    Some(Vec<(usize, Detail)>),
+}
+
+/// What one undo or redo step puts back: only what the edit changed.
+///
+/// Budgets run to thousands of lines and an edit usually touches one cell,
+/// so keeping a whole budget per step would cost hundreds of megabytes over
+/// a long session. Applying a patch gives back the patch that reverses it.
+#[derive(Debug)]
+struct Patch {
+    /// The version list, when the edit changed it.
+    versions: Option<Vec<Version>>,
+    body: Body,
+}
+
+#[derive(Debug)]
+enum Body {
+    /// The edit changed nothing outside the version list.
+    None,
+    /// The whole budget (without its versions): categories or accounts were
+    /// added, removed or moved.
+    Whole(Box<Budget>),
+    /// Every category and account kept its place.
+    Parts {
+        /// Everything except detail rows and versions, when that changed
+        /// (a budget whose accounts have no rows).
+        shell: Option<Box<Budget>>,
+        /// Rows of the accounts that changed, by account position in budget
+        /// order.
+        rows: Vec<(usize, Rows)>,
+    },
+}
+
+/// Same categories and accounts in the same places (contents aside).
+fn same_shape(a: &Budget, b: &Budget) -> bool {
+    a.topsheet.len() == b.topsheet.len()
+        && a.topsheet
+            .iter()
+            .zip(&b.topsheet)
+            .all(|(x, y)| match (x, y) {
+                (TopsheetRow::Category(x), TopsheetRow::Category(y)) => {
+                    x.accounts.len() == y.accounts.len()
+                }
+                (TopsheetRow::ProductionTotal(_), TopsheetRow::ProductionTotal(_)) => true,
+                _ => false,
+            })
+}
+
+fn accounts_mut(b: &mut Budget) -> impl Iterator<Item = &mut Vec<Detail>> {
+    b.categories_mut()
+        .flat_map(|c| &mut c.accounts)
+        .map(|a| &mut a.details)
+}
+
+/// Takes every account's rows out of `b`, in order.
+fn take_rows(b: &mut Budget) -> Vec<Vec<Detail>> {
+    accounts_mut(b).map(std::mem::take).collect()
+}
+
+/// Puts rows taken by [`take_rows`] back.
+fn put_rows(b: &mut Budget, rows: Vec<Vec<Detail>>) {
+    for (slot, r) in accounts_mut(b).zip(rows) {
+        *slot = r;
+    }
+}
+
+impl Patch {
+    /// What turns `new` back into `old`, or `None` when they are the same.
+    /// `old` is used up: its parts move into the patch, nothing is copied.
+    fn between(mut old: Budget, new: &mut Budget) -> Option<Patch> {
+        let versions = (old.versions != new.versions).then(|| std::mem::take(&mut old.versions));
+        old.versions = Vec::new();
+        let new_versions = std::mem::take(&mut new.versions);
+
+        let body = if !same_shape(&old, new) {
+            Body::Whole(Box::new(old))
+        } else {
+            let mut rows = Vec::new();
+            let mut old_rows = take_rows(&mut old);
+            for (k, (o, n)) in old_rows.iter_mut().zip(accounts_mut(new)).enumerate() {
+                if o == n {
+                    continue;
+                }
+                let same_ids =
+                    o.len() == n.len() && o.iter().zip(n.iter()).all(|(a, b)| a.id == b.id);
+                let changed = if same_ids {
+                    Rows::Some(
+                        o.iter_mut()
+                            .zip(n.iter())
+                            .enumerate()
+                            .filter(|(_, (a, b))| a != b)
+                            .map(|(i, (a, _))| (i, std::mem::replace(a, Detail::separator(0))))
+                            .collect(),
+                    )
+                } else {
+                    Rows::All(std::mem::take(o))
+                };
+                rows.push((k, changed));
+            }
+            // Compare everything else with the rows set aside.
+            let new_rows = take_rows(new);
+            let shell = (old != *new).then(|| Box::new(old));
+            put_rows(new, new_rows);
+            if shell.is_none() && rows.is_empty() {
+                Body::None
+            } else {
+                Body::Parts { shell, rows }
+            }
+        };
+        new.versions = new_versions;
+        if versions.is_none() && matches!(body, Body::None) {
+            return None;
+        }
+        Some(Patch { versions, body })
+    }
+
+    /// Applies the patch to `cur` and returns the patch that undoes it.
+    fn apply(self, cur: &mut Budget) -> Patch {
+        let versions = self
+            .versions
+            .map(|v| std::mem::replace(&mut cur.versions, v));
+        let body = match self.body {
+            Body::None => Body::None,
+            Body::Whole(mut b) => {
+                b.versions = std::mem::take(&mut cur.versions);
+                let mut old = std::mem::replace(cur, *b);
+                old.versions = Vec::new();
+                Body::Whole(Box::new(old))
+            }
+            Body::Parts { shell, rows } => {
+                let mut slots: Vec<&mut Vec<Detail>> = accounts_mut(cur).collect();
+                let mut back = Vec::with_capacity(rows.len());
+                for (k, r) in rows {
+                    let slot = &mut *slots[k];
+                    back.push((
+                        k,
+                        match r {
+                            Rows::All(all) => Rows::All(std::mem::replace(slot, all)),
+                            Rows::Some(some) => Rows::Some(
+                                some.into_iter()
+                                    .map(|(i, d)| (i, std::mem::replace(&mut slot[i], d)))
+                                    .collect(),
+                            ),
+                        },
+                    ));
+                }
+                let shell = shell.map(|mut s| {
+                    put_rows(&mut s, take_rows(cur));
+                    s.versions = std::mem::take(&mut cur.versions);
+                    let mut old = std::mem::replace(cur, *s);
+                    old.versions = Vec::new();
+                    Box::new(old)
+                });
+                Body::Parts { shell, rows: back }
+            }
+        };
+        Patch { versions, body }
+    }
+}
+
+#[derive(Debug)]
 struct Snapshot {
-    budget: Budget,
+    patch: Patch,
     rev: u64,
 }
 
@@ -34,6 +214,13 @@ pub struct Session {
     undo: Vec<Snapshot>,
     redo: Vec<Snapshot>,
     outcome: Option<Outcome>,
+    /// The account the UI shows; its rows go out with every view.
+    focus: Option<Focus>,
+    /// Changes with every change to the budget, undo and redo included.
+    view_rev: u64,
+    /// Each account's evaluated rows, so a recalc after an edit evaluates
+    /// only the accounts that changed.
+    cache: RecalcCache,
 }
 
 impl Default for Session {
@@ -58,6 +245,9 @@ impl Session {
             undo: Vec::new(),
             redo: Vec::new(),
             outcome: None,
+            focus: None,
+            view_rev: next_view_rev(),
+            cache: RecalcCache::new(),
         }
     }
 
@@ -112,15 +302,15 @@ impl Session {
     }
 
     /// Applies `f` to a copy of the budget. On success the copy becomes current
-    /// and the old budget goes on the undo stack; on error nothing changes. An
+    /// and what changed goes on the undo stack; on error nothing changes. An
     /// edit that changes nothing leaves history and the dirty flag alone.
     pub fn edit<T>(&mut self, f: impl FnOnce(&mut Budget) -> EditResult<T>) -> EditResult<T> {
         let mut next = self.budget.clone();
         let out = f(&mut next)?;
-        if next != self.budget {
-            let old = std::mem::replace(&mut self.budget, next);
+        let old = std::mem::replace(&mut self.budget, next);
+        if let Some(patch) = Patch::between(old, &mut self.budget) {
             self.undo.push(Snapshot {
-                budget: old,
+                patch,
                 rev: self.rev,
             });
             if self.undo.len() > UNDO_LIMIT {
@@ -129,22 +319,29 @@ impl Session {
             self.redo.clear();
             self.rev = self.next_rev;
             self.next_rev += 1;
-            self.outcome = None;
+            self.changed();
         }
         Ok(out)
+    }
+
+    /// The budget changed: totals must be worked out again, and views get a
+    /// new revision.
+    fn changed(&mut self) {
+        self.outcome = None;
+        self.view_rev = next_view_rev();
     }
 
     pub fn undo(&mut self) -> bool {
         let Some(s) = self.undo.pop() else {
             return false;
         };
-        let cur = Snapshot {
-            budget: std::mem::replace(&mut self.budget, s.budget),
+        let back = s.patch.apply(&mut self.budget);
+        self.redo.push(Snapshot {
+            patch: back,
             rev: self.rev,
-        };
-        self.redo.push(cur);
+        });
         self.rev = s.rev;
-        self.outcome = None;
+        self.changed();
         true
     }
 
@@ -152,23 +349,34 @@ impl Session {
         let Some(s) = self.redo.pop() else {
             return false;
         };
-        let cur = Snapshot {
-            budget: std::mem::replace(&mut self.budget, s.budget),
+        let back = s.patch.apply(&mut self.budget);
+        self.undo.push(Snapshot {
+            patch: back,
             rev: self.rev,
-        };
-        self.undo.push(cur);
+        });
         self.rev = s.rev;
-        self.outcome = None;
+        self.changed();
         true
     }
 
     /// The (cached) lenient recalc of the current budget.
     pub fn outcome(&mut self) -> &Outcome {
         self.outcome
-            .get_or_insert_with(|| lenient_recalc(&self.budget))
+            .get_or_insert_with(|| lenient_recalc_with(&self.budget, &mut self.cache))
     }
 
-    /// Everything the UI shows.
+    /// Sets the account the UI shows (`None`: none, on the topsheet and the
+    /// account list). Its rows go out with every view from now on.
+    pub fn set_focus(&mut self, focus: Option<Focus>) {
+        self.focus = focus;
+    }
+
+    /// The account on screen, if it still exists: (topsheet index, account index).
+    pub fn focused(&self) -> Option<(usize, usize)> {
+        self.focus.as_ref().and_then(|f| f.resolve(&self.budget))
+    }
+
+    /// What the UI draws after a command.
     pub fn view(&mut self) -> View {
         self.view_with(None)
     }
@@ -176,17 +384,38 @@ impl Session {
     /// The view, noting a row an edit just created so the UI can select it.
     pub fn view_with(&mut self, created_row: Option<RowId>) -> View {
         self.outcome();
-        let outcome = self.outcome.as_ref().expect("just computed");
-        View::build(
-            &self.budget,
-            outcome,
-            self.path.as_deref(),
-            self.display_name(),
-            self.is_dirty(),
-            self.can_undo(),
-            self.can_redo(),
-            created_row,
-        )
+        let focus = self.focused();
+        let st = ViewState {
+            rev: self.view_rev,
+            outcome: self.outcome.as_ref().expect("just computed"),
+            path: self.path.as_deref(),
+            name: self.display_name(),
+            dirty: self.is_dirty(),
+            can_undo: self.can_undo(),
+            can_redo: self.can_redo(),
+        };
+        View::build(&mut self.budget, &st, focus, created_row)
+    }
+
+    /// Everything, every row (for printing).
+    pub fn full_view(&mut self) -> FullView {
+        self.outcome();
+        let st = ViewState {
+            rev: self.view_rev,
+            outcome: self.outcome.as_ref().expect("just computed"),
+            path: self.path.as_deref(),
+            name: self.display_name(),
+            dirty: self.is_dirty(),
+            can_undo: self.can_undo(),
+            can_redo: self.can_redo(),
+        };
+        FullView::build(&mut self.budget, &st)
+    }
+
+    /// The budget with its (cached) lenient recalc, borrowed together.
+    pub fn totals(&mut self) -> (&Budget, &Outcome) {
+        self.outcome();
+        (&self.budget, self.outcome.as_ref().expect("just computed"))
     }
 
     /// Totals for the selected rows, or zeros when totals can't be computed.
@@ -221,6 +450,65 @@ impl Session {
     }
 }
 
+/// Selection totals for many selections of one budget: the rows are looked
+/// up once, so each selection costs only its own rows (the apply panel asks
+/// for one per set, location and currency in use).
+pub struct SelectionIndex<'a> {
+    rows: Option<HashMap<RowId, (&'a Detail, &'a RowTotals)>>,
+}
+
+impl<'a> SelectionIndex<'a> {
+    /// `budget` and its recalc, as [`Session::totals`] gives them.
+    pub fn new(budget: &'a Budget, outcome: &'a Outcome) -> SelectionIndex<'a> {
+        let rows = outcome.report.as_ref().map(|report| {
+            // The report's rows line up with the budget it was computed from.
+            let b = outcome.sanitized.as_ref().unwrap_or(budget);
+            b.categories()
+                .zip(&report.categories)
+                .flat_map(|(cat, ct)| {
+                    cat.accounts
+                        .iter()
+                        .zip(&ct.accounts)
+                        .flat_map(|(acct, at)| acct.details.iter().zip(&at.rows))
+                })
+                .map(|(d, r)| (d.id, (d, r)))
+                .collect()
+        });
+        SelectionIndex { rows }
+    }
+
+    /// What [`Session::selection`] gives for `ids` (rows in budget order,
+    /// each once), without a pass over the whole budget.
+    pub fn totals(&self, ids: &[RowId]) -> SelectionDto {
+        fn add(b: &mut Breakdown, r: &RowTotals) -> Option<()> {
+            b.details_total = b.details_total.checked_add(r.total)?;
+            b.fringe_total = b.fringe_total.checked_add(r.fringe_total)?;
+            Some(())
+        }
+        let Some(rows) = &self.rows else {
+            return SelectionDto::default();
+        };
+        let mut out = SelectionTotals::default();
+        let mut sum = || -> Option<()> {
+            for (d, r) in ids.iter().filter_map(|id| rows.get(id)) {
+                add(&mut out.lines, r)?;
+                for (name, amt) in &r.fringes {
+                    let slot = out.fringes.entry(name.clone()).or_insert(0);
+                    *slot = slot.checked_add(*amt)?;
+                }
+                for g in &d.groups {
+                    add(out.groups.entry(g.clone()).or_default(), r)?;
+                }
+            }
+            Some(())
+        };
+        match sum() {
+            Some(()) => SelectionDto::from(&out),
+            None => SelectionDto::default(),
+        }
+    }
+}
+
 /// Writes `bytes` to a temporary sibling of `path`, then renames it over `path`.
 fn write_atomically(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let dir = match path.parent() {
@@ -236,4 +524,262 @@ fn write_atomically(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     std::fs::rename(&tmp, path).inspect_err(|_| {
         let _ = std::fs::remove_file(&tmp);
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fwb_core::sample::{self, SampleSpec};
+    use fwb_core::{Formula, Group, RowKind};
+
+    /// xorshift64*, for random edit sequences.
+    struct Rng(u64);
+
+    impl Rng {
+        fn below(&mut self, n: u64) -> u64 {
+            self.0 ^= self.0 >> 12;
+            self.0 ^= self.0 << 25;
+            self.0 ^= self.0 >> 27;
+            self.0.wrapping_mul(0x2545_F491_4F6C_DD1D) % n.max(1)
+        }
+    }
+
+    fn small_sample(seed: u64) -> Budget {
+        sample::budget(&SampleSpec {
+            seed,
+            rows: 120,
+            accounts: 9,
+            categories: 3,
+            fringes: 6,
+            groups: 4,
+            baseline: true,
+        })
+    }
+
+    fn row_ids(b: &Budget) -> Vec<RowId> {
+        edit::details(b).map(|d| d.id).collect()
+    }
+
+    fn version(id: u64, b: &Budget) -> Version {
+        Version {
+            id,
+            name: format!("v{id}"),
+            created: "2026-10-09T00:00:00Z".into(),
+            note: None,
+            budget: Box::new(b.snapshot()),
+        }
+    }
+
+    /// One random edit of every kind the app makes: cells, inserts and
+    /// deletes, setup tables, structure, versions.
+    fn random_edit(rng: &mut Rng, b: &mut Budget) {
+        let ids = row_ids(b);
+        let id = ids[rng.below(ids.len() as u64) as usize];
+        match rng.below(10) {
+            0..=2 => {
+                let _ = edit::set_detail_field(
+                    b,
+                    id,
+                    edit::Field::Rate,
+                    &format!("{}", rng.below(5000)),
+                );
+            }
+            3 => {
+                let _ = edit::set_detail_field(b, id, edit::Field::Description, "Changed");
+                let other = ids[rng.below(ids.len() as u64) as usize];
+                let _ = edit::set_detail_field(b, other, edit::Field::Amount, "SHOOT_DAYS");
+            }
+            4 => {
+                let acct = b
+                    .categories()
+                    .flat_map(|c| &c.accounts)
+                    .nth(rng.below(9) as usize)
+                    .map(|a| a.code.clone())
+                    .unwrap();
+                let _ = edit::add_detail(b, &acct, Some(id), RowKind::Line);
+            }
+            5 => {
+                let _ = edit::delete_details(b, &[id]);
+            }
+            6 => {
+                b.globals.insert(
+                    "SHOOT_DAYS".into(),
+                    Formula::from(format!("{}", rng.below(60) + 1)),
+                );
+            }
+            7 => {
+                b.groups.insert(
+                    format!("NEW{}", rng.below(5)),
+                    Group {
+                        description: String::new(),
+                        in_budget_total: rng.below(2) == 0,
+                        color: None,
+                    },
+                );
+                let _ = edit::set_detail_field(b, id, edit::Field::Rate, "77");
+            }
+            8 => {
+                // Structure: move the last category to the front.
+                if let Some(last) = b.topsheet.pop() {
+                    b.topsheet.insert(0, last);
+                }
+            }
+            _ => {
+                let next = b.versions.len() as u64 + 1;
+                let v = version(next, b);
+                b.versions.push(v);
+            }
+        }
+    }
+
+    /// Patch-based undo and redo bring back exactly the budgets a full copy
+    /// per step would, over long random edit sequences.
+    #[test]
+    fn undo_and_redo_restore_every_state() {
+        for seed in 1..=6 {
+            let mut rng = Rng(seed * 7_919 + 1);
+            let mut s = Session::with_budget(small_sample(seed), None);
+            let mut states = vec![s.budget().clone()];
+            for _ in 0..60 {
+                let before = s.budget().clone();
+                s.edit(|b| {
+                    random_edit(&mut rng, b);
+                    Ok(())
+                })
+                .unwrap();
+                if *s.budget() != before {
+                    states.push(s.budget().clone());
+                }
+                if rng.below(3) == 0 {
+                    // Sometimes break a cell, so partial totals are cached too.
+                    let before = s.budget().clone();
+                    let id = row_ids(s.budget())[0];
+                    let bad = if rng.below(2) == 0 { "NOPE" } else { "7" };
+                    s.set_detail_field(id, "amount", bad).unwrap();
+                    if *s.budget() != before {
+                        states.push(s.budget().clone());
+                    }
+                }
+                s.outcome();
+            }
+            assert_eq!(s.undo.len(), states.len() - 1);
+            // All the way back, then all the way forward; the cached totals
+            // are always what a fresh recalc gives.
+            let fresh = |s: &mut Session| {
+                let want = crate::diagnose::lenient_recalc(s.budget());
+                let got = s.outcome();
+                assert_eq!(got.report, want.report, "seed {seed}: report");
+                assert_eq!(got.error, want.error, "seed {seed}: error");
+                assert_eq!(got.issues, want.issues, "seed {seed}: issues");
+                assert_eq!(got.sanitized, want.sanitized, "seed {seed}: sanitized");
+            };
+            fresh(&mut s);
+            for want in states.iter().rev().skip(1) {
+                assert!(s.undo());
+                assert_eq!(s.budget(), want, "seed {seed}: undo");
+                fresh(&mut s);
+            }
+            assert!(!s.undo());
+            for want in states.iter().skip(1) {
+                assert!(s.redo());
+                assert_eq!(s.budget(), want, "seed {seed}: redo");
+            }
+            assert!(!s.redo());
+            // Halfway back, then a new edit drops the redo steps.
+            for _ in 0..states.len() / 2 {
+                s.undo();
+            }
+            let at = states.len() - 1 - states.len() / 2;
+            assert_eq!(s.budget(), &states[at]);
+            s.set_detail_field(row_ids(s.budget())[0], "rate", "12345")
+                .unwrap();
+            assert!(!s.can_redo());
+            assert!(s.undo());
+            assert_eq!(s.budget(), &states[at]);
+        }
+    }
+
+    /// A one-cell edit keeps one row, not a budget.
+    #[test]
+    fn a_cell_edit_keeps_only_that_row() {
+        let mut s = Session::with_budget(small_sample(3), None);
+        let id = row_ids(s.budget())[5];
+        s.set_detail_field(id, "rate", "999").unwrap();
+        match &s.undo[0].patch {
+            Patch {
+                versions: None,
+                body: Body::Parts { shell: None, rows },
+            } => {
+                assert_eq!(rows.len(), 1);
+                assert!(matches!(&rows[0].1, Rows::Some(r) if r.len() == 1));
+            }
+            other => panic!("unexpected patch {other:?}"),
+        }
+        // A setup edit keeps the shell, not the rows.
+        s.edit(|b| {
+            b.globals.insert("X".into(), "1".into());
+            Ok(())
+        })
+        .unwrap();
+        assert!(matches!(
+            &s.undo[1].patch.body,
+            Body::Parts { shell: Some(_), rows } if rows.is_empty()
+        ));
+        // An edit that changes nothing adds no step.
+        s.edit(|_| Ok(())).unwrap();
+        assert_eq!(s.undo.len(), 2);
+    }
+
+    /// The index gives what a pass over the budget gives, for any selection,
+    /// with totals partial or missing too.
+    #[test]
+    fn selection_index_matches_selection_totals() {
+        let mut rng = Rng(99);
+        for broken in [None, Some("NOPE"), Some("dup")] {
+            let mut b = small_sample(5);
+            let ids = row_ids(&b);
+            match broken {
+                Some("NOPE") => {
+                    edit::set_detail_field(&mut b, ids[3], edit::Field::Rate, "NOPE").unwrap();
+                    edit::set_detail_field(&mut b, ids[9], edit::Field::Groups, "GHOST").unwrap();
+                }
+                Some(_) => {
+                    // Duplicate ids: no totals at all.
+                    let first = ids[0];
+                    b.categories_mut()
+                        .flat_map(|c| &mut c.accounts)
+                        .flat_map(|a| &mut a.details)
+                        .nth(1)
+                        .unwrap()
+                        .id = first;
+                }
+                None => {}
+            }
+            let mut s = Session::with_budget(b, None);
+            let ids = row_ids(s.budget());
+            for _ in 0..40 {
+                let pick: Vec<RowId> = ids.iter().copied().filter(|_| rng.below(4) == 0).collect();
+                let want = s.selection(&pick);
+                let (b, o) = s.totals();
+                let index = SelectionIndex::new(b, o);
+                let mut unique = pick.clone();
+                unique.dedup();
+                assert_eq!(index.totals(&unique), want, "{broken:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn view_revisions_follow_changes() {
+        let mut s = Session::with_budget(small_sample(4), None);
+        let r0 = s.view().rev;
+        assert_eq!(s.view().rev, r0, "nothing changed");
+        s.set_detail_field(row_ids(s.budget())[0], "rate", "5")
+            .unwrap();
+        let r1 = s.view().rev;
+        assert_ne!(r1, r0);
+        s.undo();
+        let r2 = s.view().rev;
+        assert!(r2 != r0 && r2 != r1, "undo is a change too");
+    }
 }

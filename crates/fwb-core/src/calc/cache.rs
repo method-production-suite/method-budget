@@ -1,0 +1,345 @@
+//! Recalculation that reuses what an edit didn't touch.
+//!
+//! Stages 1 and 2 (evaluating rows and their fringes) are most of a recalc,
+//! and they work account by account: an account's rows depend only on the
+//! account itself and on the budget's globals, fringes, currencies, units and
+//! groups (and the recalc options). An edit usually changes one account, so
+//! [`RecalcCache`] keeps every account's evaluated rows, and the next recalc
+//! evaluates again only the accounts whose rows changed (all of them when one
+//! of those tables changed). Stages 3 and 4 run in full every time. The
+//! result is exactly [`recalc`](super::recalc)'s.
+
+use std::collections::BTreeMap;
+
+use crate::calc::{recalc_with, CalcError, RecalcOptions};
+use crate::model::{Account, Budget, Currency, Formula, Fringe, Group, UnitDef};
+use crate::report::{Report, RowTotals};
+use crate::Cents;
+
+/// Keeps each account's evaluated rows between recalcs. Use one per budget
+/// being edited; it compares contents, so it is never stale, only slower
+/// when it has to start over.
+#[derive(Clone, Debug, Default)]
+pub struct RecalcCache {
+    key: Option<Key>,
+    accounts: Accounts,
+}
+
+/// Everything besides an account that its rows depend on.
+#[derive(Clone, Debug)]
+struct Key {
+    base_currency: String,
+    currencies: BTreeMap<String, Currency>,
+    globals: BTreeMap<String, Formula>,
+    units: BTreeMap<String, UnitDef>,
+    fringes: BTreeMap<String, Fringe>,
+    groups: BTreeMap<String, Group>,
+    opts: RecalcOptions,
+}
+
+impl Key {
+    fn of(b: &Budget, opts: &RecalcOptions) -> Key {
+        Key {
+            base_currency: b.base_currency.clone(),
+            currencies: b.currencies.clone(),
+            globals: b.globals.clone(),
+            units: b.units.clone(),
+            fringes: b.fringes.clone(),
+            groups: b.groups.clone(),
+            opts: opts.clone(),
+        }
+    }
+
+    fn matches(&self, b: &Budget, opts: &RecalcOptions) -> bool {
+        self.base_currency == b.base_currency
+            && self.currencies == b.currencies
+            && self.globals == b.globals
+            && self.units == b.units
+            && self.fringes == b.fringes
+            && self.groups == b.groups
+            && self.opts == *opts
+    }
+}
+
+impl RecalcCache {
+    pub fn new() -> RecalcCache {
+        RecalcCache::default()
+    }
+
+    /// Recalculates `b` as [`recalc`](super::recalc) does, evaluating only the
+    /// accounts that changed since the last call.
+    pub fn recalc(&mut self, b: &Budget, opts: &RecalcOptions) -> Result<Report, CalcError> {
+        if !self.key.as_ref().is_some_and(|k| k.matches(b, opts)) {
+            self.accounts = Accounts::default();
+            self.key = Some(Key::of(b, opts));
+        }
+        let out = recalc_with(b, opts, Some(&mut self.accounts));
+        let count = b.categories().map(|c| c.accounts.len()).sum();
+        self.accounts.entries.truncate(count);
+        out
+    }
+
+    /// Forgets everything (the next recalc evaluates every account).
+    pub fn clear(&mut self) {
+        *self = RecalcCache::default();
+    }
+}
+
+/// One account as last evaluated.
+#[derive(Clone, Debug)]
+struct Entry {
+    account: Account,
+    rows: Vec<RowTotals>,
+    details_total: Cents,
+    fringe_total: Cents,
+    /// Its unfiltered rows and their sums, once worked out.
+    full: Option<(Vec<RowTotals>, Cents, Cents)>,
+}
+
+/// Evaluated accounts by position in budget order.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Accounts {
+    entries: Vec<Option<Entry>>,
+}
+
+impl Accounts {
+    /// The counted rows and sums of `acct`, at position `k`, if it is the
+    /// account evaluated there last time.
+    pub(crate) fn counted(
+        &self,
+        k: usize,
+        acct: &Account,
+    ) -> Option<(Vec<RowTotals>, Cents, Cents)> {
+        match self.entries.get(k) {
+            Some(Some(e)) if e.account == *acct => {
+                Some((e.rows.clone(), e.details_total, e.fringe_total))
+            }
+            _ => None,
+        }
+    }
+
+    /// Keeps a freshly evaluated account.
+    pub(crate) fn keep(
+        &mut self,
+        k: usize,
+        acct: &Account,
+        rows: &[RowTotals],
+        details_total: Cents,
+        fringe_total: Cents,
+    ) {
+        if self.entries.len() <= k {
+            self.entries.resize_with(k + 1, || None);
+        }
+        self.entries[k] = Some(Entry {
+            account: acct.clone(),
+            rows: rows.to_vec(),
+            details_total,
+            fringe_total,
+            full: None,
+        });
+    }
+
+    /// The unfiltered rows at position `k`, if worked out before. Only asked
+    /// after [`Accounts::counted`] or [`Accounts::keep`] settled that position
+    /// in the same recalc, so the entry is the current account's.
+    pub(crate) fn full(&self, k: usize) -> Option<(Vec<RowTotals>, Cents, Cents)> {
+        match self.entries.get(k) {
+            Some(Some(Entry {
+                full: Some((rows, d, f)),
+                ..
+            })) => Some((rows.clone(), *d, *f)),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn keep_full(
+        &mut self,
+        k: usize,
+        rows: &[RowTotals],
+        details_total: Cents,
+        fringe_total: Cents,
+    ) {
+        if let Some(Some(e)) = self.entries.get_mut(k) {
+            e.full = Some((rows.to_vec(), details_total, fringe_total));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use super::*;
+    use crate::calc::recalc;
+    use crate::model::{Detail, FringePosting, RowKind, TopsheetRow};
+    use crate::sample::{self, SampleSpec};
+
+    struct Rng(u64);
+
+    impl Rng {
+        fn below(&mut self, n: u64) -> u64 {
+            self.0 ^= self.0 >> 12;
+            self.0 ^= self.0 << 25;
+            self.0 ^= self.0 >> 27;
+            self.0.wrapping_mul(0x2545_F491_4F6C_DD1D) % n.max(1)
+        }
+    }
+
+    fn details_mut(b: &mut Budget) -> Vec<&mut Detail> {
+        b.categories_mut()
+            .flat_map(|c| &mut c.accounts)
+            .flat_map(|a| &mut a.details)
+            .collect()
+    }
+
+    /// One random edit: cells (some that break the budget), rows added and
+    /// removed, globals, fringes, groups, structure.
+    fn edit(rng: &mut Rng, b: &mut Budget) {
+        let n = details_mut(b).len() as u64;
+        let k = rng.below(n) as usize;
+        let fringes: Vec<String> = b.fringes.keys().cloned().collect();
+        let groups: Vec<String> = b.groups.keys().cloned().collect();
+        match rng.below(14) {
+            0..=3 => details_mut(b)[k].rate = format!("{}", rng.below(9_000)).into(),
+            4 => details_mut(b)[k].amount = "SHOOT_DAYS / 2".into(),
+            5 => details_mut(b)[k].amount = "NOPE".into(),
+            6 => {
+                let f = fringes[rng.below(fringes.len() as u64) as usize].clone();
+                details_mut(b)[k].fringes.insert(f);
+            }
+            7 => {
+                let g = groups[rng.below(groups.len() as u64) as usize].clone();
+                details_mut(b)[k].groups.insert(g);
+            }
+            8 => {
+                let id = 1_000_000 + rng.below(1_000_000);
+                let acct = b
+                    .categories_mut()
+                    .flat_map(|c| &mut c.accounts)
+                    .next()
+                    .unwrap();
+                acct.details
+                    .insert(0, Detail::line(id, "new", "2", "Day", "300"));
+            }
+            9 => {
+                let id = details_mut(b)[k].id;
+                for a in b.categories_mut().flat_map(|c| &mut c.accounts) {
+                    a.details.retain(|d| d.id != id);
+                }
+            }
+            10 => {
+                b.globals
+                    .insert("SHOOT_DAYS".into(), format!("{}", rng.below(80) + 1).into());
+            }
+            11 => {
+                if let Some(f) = b.fringes.values_mut().next() {
+                    f.rate = format!("{}.5", rng.below(20)).into();
+                }
+            }
+            12 => {
+                let g = groups[rng.below(groups.len() as u64) as usize].clone();
+                if let Some(g) = b.groups.get_mut(&g) {
+                    g.in_budget_total = !g.in_budget_total;
+                }
+            }
+            _ => {
+                // Move a category: every position after it changes.
+                if let Some(TopsheetRow::Category(_)) = b.topsheet.first() {
+                    let first = b.topsheet.remove(0);
+                    b.topsheet.push(first);
+                }
+            }
+        }
+    }
+
+    /// Over long random edit sequences (and undos, which are just edits back
+    /// to an earlier budget), the cache gives exactly what a full recalc
+    /// gives: the same reports and the same errors.
+    #[test]
+    fn cached_recalc_equals_recalc() {
+        for seed in 1..=6u64 {
+            let mut b = sample::budget(&SampleSpec {
+                seed,
+                rows: 400,
+                accounts: 14,
+                categories: 4,
+                fringes: 12,
+                groups: 5,
+                baseline: false,
+            });
+            if seed % 2 == 0 {
+                b.fringe_posting = FringePosting::Account;
+            }
+            let mut cache = RecalcCache::new();
+            let mut rng = Rng(seed * 104_729 + 7);
+            let mut history = vec![b.clone()];
+            let opts_list = [
+                RecalcOptions::default(),
+                RecalcOptions {
+                    exclude_groups: b.groups.keys().take(1).cloned().collect(),
+                    only_groups: None,
+                },
+                RecalcOptions {
+                    exclude_groups: BTreeSet::new(),
+                    only_groups: Some(b.groups.keys().skip(1).take(2).cloned().collect()),
+                },
+            ];
+            for step in 0..80 {
+                if step % 9 == 8 && history.len() > 2 {
+                    // Back to an earlier state, as undo does.
+                    b = history[history.len() - 3].clone();
+                } else {
+                    edit(&mut rng, &mut b);
+                }
+                history.push(b.clone());
+                let opts = &opts_list[(step / 20) % opts_list.len()];
+                assert_eq!(
+                    cache.recalc(&b, opts),
+                    recalc(&b, opts),
+                    "seed {seed} step {step}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn unchanged_accounts_are_not_evaluated_again() {
+        let mut b = sample::budget(&SampleSpec {
+            rows: 200,
+            accounts: 8,
+            categories: 2,
+            ..SampleSpec::default()
+        });
+        let opts = RecalcOptions::default();
+        let mut cache = RecalcCache::new();
+        cache.recalc(&b, &opts).unwrap();
+        // Poison account 3's cached rows: a reused account shows the poison.
+        if let Some(Some(e)) = cache.accounts.entries.get_mut(3) {
+            if let Some(r) = e.rows.iter_mut().find(|r| r.kind == RowKind::Line) {
+                r.quantity = crate::decimal::Dec::from_int(-7);
+            }
+        }
+        // Edit another account: account 3 comes from the cache.
+        let first = b
+            .categories_mut()
+            .flat_map(|c| &mut c.accounts)
+            .next()
+            .unwrap();
+        first.details[0].rate = "1".into();
+        let r = cache.recalc(&b, &opts).unwrap();
+        let acct3 = r
+            .categories
+            .iter()
+            .flat_map(|c| &c.accounts)
+            .nth(3)
+            .unwrap();
+        assert!(acct3
+            .rows
+            .iter()
+            .any(|r| r.quantity == crate::decimal::Dec::from_int(-7)));
+        // A global change starts over.
+        b.globals.insert("SHOOT_DAYS".into(), "43".into());
+        let r = cache.recalc(&b, &opts).unwrap();
+        assert_eq!(r, recalc(&b, &opts).unwrap());
+    }
+}

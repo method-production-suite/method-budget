@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::calc::{overflow, CalcError, Ctx};
+use crate::calc::{overflow, CalcError, Ctx, FullRows};
 use crate::model::{Budget, Detail, RowId};
 use crate::report::{Breakdown, CategoryTotals, FringeSummary, GroupTotals, Report, RowTotals};
 
@@ -19,22 +19,24 @@ fn add(b: &mut Breakdown, r: &RowTotals) -> Option<()> {
     Some(())
 }
 
-/// Every detail with its row in `active` and in `full` (same budget, unfiltered).
+/// Every detail with its row in `active` and unfiltered (`full`, where an
+/// account's rows differ; see `calc::eval_full`).
 fn rows<'a>(
     b: &'a Budget,
     active: &'a [CategoryTotals],
-    full: &'a [CategoryTotals],
+    full: &'a FullRows,
 ) -> impl Iterator<Item = (&'a Detail, &'a RowTotals, &'a RowTotals)> {
     b.categories()
         .zip(active.iter().zip(full))
         .flat_map(|(cat, (ac, fc))| {
             cat.accounts
                 .iter()
-                .zip(ac.accounts.iter().zip(&fc.accounts))
+                .zip(ac.accounts.iter().zip(fc))
                 .flat_map(|(acct, (aa, fa))| {
+                    let fa = fa.as_deref().unwrap_or(&aa.rows);
                     acct.details
                         .iter()
-                        .zip(aa.rows.iter().zip(&fa.rows))
+                        .zip(aa.rows.iter().zip(fa))
                         .map(|(d, (a, f))| (d, a, f))
                 })
         })
@@ -43,7 +45,7 @@ fn rows<'a>(
 pub(crate) fn breakdowns(
     ctx: &Ctx,
     active: &[CategoryTotals],
-    full: &[CategoryTotals],
+    full: &FullRows,
 ) -> Result<Breakdowns, CalcError> {
     let ovf = || overflow("breakdown totals");
     let mut fringes: BTreeMap<String, FringeSummary> = ctx

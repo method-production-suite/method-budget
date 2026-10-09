@@ -16,6 +16,8 @@ cargo run -p fwb-app                        # run a debug build
 cargo tauri build --debug --no-bundle       # debug binary in target/debug/fwb-app
 cargo tauri build                           # release installers (.app/.dmg, .msi, .deb/.AppImage)
 cargo test -p fwb-app                       # command-layer tests, no window needed
+cargo build --release -p fwb-app --example perf && target/release/examples/perf
+                                            # timings on a 5,000-row sample budget (no window)
 ```
 
 Run the `cargo tauri` commands from `crates/fwb-app` (or pass `--config crates/fwb-app/tauri.conf.json`).
@@ -216,35 +218,76 @@ Closing the window or quitting with unsaved changes asks first.
 
 ```
 crates/fwb-app/
-  src/session.rs     one open budget: Budget, file path, dirty flag, undo/redo snapshots
+  src/session.rs     one open budget: Budget, file path, dirty flag, undo/redo patches,
+                     the account on screen, the recalc cache
   src/edit.rs        every edit as a function on &mut Budget (validates, then applies)
   src/diagnose.rs    lenient recalc: flags every bad cell instead of stopping at the first
   src/report_dto.rs  serde shapes for fwb_core::Report (the engine stays serde-free)
-  src/view.rs        what the UI draws after each command
+  src/view.rs        what the UI draws after each command (lean), and the full view for printing
   src/batch.rs       multi-cell edits (paste, fill down) applied as one undo step
   src/apply.rs       the apply panel: tag the selected rows, fringe ranges, selection summary
   src/menu.rs        native menu bar, built from the same table as ui/js/shortcuts.js
   src/app.rs         Tauri glue: commands, file dialogs, close and quit guard, menu events
+  examples/perf.rs   timings on a large sample budget (fwb_core::sample), and canned
+                     replies for a UI harness (perf dump DIR)
   ui/                index.html, styles.css, setup.css, js/*.js (ES modules, no build step)
   capabilities/      what the web view may call
 ```
 
 **Rust owns the budget.** The app state is one `Session` behind a mutex. The web view never
 holds the real budget; it sends a command (`set_detail_field`, `add_detail`, `set_global`,
-`undo`, ...) and gets back a complete `View`:
+`undo`, ...) and gets back a `View`.
 
-- `budget`: the budget as file-format JSON (the same text a `.fwb` file holds, via
-  `fwb_format`), so the UI reads exactly the documented format.
-- `report`: every total from `fwb_core::recalc`, with money as integer cents and decimals
-  as strings, never floats.
-- `error`, `issues`, `partial`: calculation problems (see below).
+**What crosses the bridge.** Budgets run to thousands of lines, so a view carries what the
+screen needs, not the whole budget (decisions.md, entry 18). Its size depends on the
+account on screen, not on the budget: about 35 KB plus half a kilobyte per row of that
+account.
+
+- `rev`: changes whenever the budget does (edit, undo, redo, a new or opened budget).
+- `budget`: the budget's outline as file-format JSON (via `fwb_format`, so the UI reads the
+  documented format): setup tables, categories and accounts, charges, credits, info. Each
+  account has `lines` (its row count) instead of `details`; the baseline has no `rows`;
+  `versions` lists each version's `id`, `name`, `created` and `note`, not its content.
+- `report`: every total down to the account from `fwb_core::recalc`, with money as integer
+  cents and decimals as strings, never floats. Accounts have no `rows` here.
+- `account`: the account on screen in full, or `null`: `ti` and `ai` (its topsheet index and
+  index in its category), `code`, `details` (its rows, file-format JSON) and `rows` (their
+  totals, as the report's rows would be, or `null` without totals).
+- `error`, `partial`, `issues` (problems with globals, fringes, charges and the like, plus
+  the cells of `account`), `issue_count` (all problems) and `issue_accounts`
+  (`[ti, ai]` of every account with a problem cell, for the red outlines up the levels).
+- `variance`: original vs current totals when there is a baseline: `accounts`,
+  `categories`, `grand_total`, `net_total`, `rows` for `account`'s rows only, and
+  `rows_changed` (rows that moved, anywhere).
 - `file` (`name`, `path`, `dirty`), `can_undo`, `can_redo`, and `created_row` after an insert.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `focus_account` | `category`, `ti`, `account`, `ai` (all `null`: no account) | View with that account |
+| `get_full_view` | none | everything: the whole budget, every row's totals, every problem |
+
+`focus_account` sets the account whose rows every later view carries; the UI calls it when
+it opens an account (and with nothing when it leaves one). Rust finds the account by code
+first, as the UI does, so an edit that moves it doesn't lose it. Printing calls
+`get_full_view`, the view as it was before (`budget` in full, `report` with `rows`, all
+`issues`, `variance` with every row).
 
 Every edit runs on a copy of the budget; if it is rejected (an unknown row, a duplicate
 account number, a bad global name) nothing changes and the message comes back as the
-command's error. An accepted edit pushes the old budget onto the undo stack (200 steps).
-The dirty flag compares a revision number with the one last saved, so undoing back to the
-saved state clears it.
+command's error. An accepted edit puts what it changed on the undo stack (200 steps): the
+old rows of the accounts it touched (just the changed rows when none were added or
+removed), the rest of the budget only when that changed, the whole budget only when
+categories or accounts were added, removed or moved. The dirty flag compares a revision
+number with the one last saved, so undoing back to the saved state clears it.
+
+**Recalculation at scale.** Totals are worked out once per change and cached. The session
+keeps a `fwb_core::calc::cache::RecalcCache`: an account's rows depend only on the account
+and on the globals, fringes, currencies, units and groups, so after an edit only the
+accounts whose rows changed are evaluated again (every account when one of those tables
+changed); topsheet, charges, credits and breakdowns are always worked out in full. The
+result is exactly `recalc`'s (tested over random edit sequences, and against the engine as
+it was before these optimizations). On this Mac, a one-cell edit in a 5,000-row budget
+costs about 5 ms in Rust from command to JSON.
 
 **Calculation errors never lose an edit.** The engine stops at the first problem, which is
 right for `fwb check` but not for an editor. `diagnose::lenient_recalc` runs the engine;
@@ -268,6 +311,15 @@ reports), `menu.js` (the small popup menus: breadcrumb jump lists and the column
 `sheet.js` (styles worked out at run time, below). The side panel opens on Apply (`apply.js`, the selected lines) and groups the
 setup tabs into Tables and Budget. Commands run one at a
 time, in order.
+
+The grid redraws by patching: a row whose content is unchanged keeps its element, so an
+edit touches the rows it changed, and scroll position, focus and an open cell editor stay
+put. Only a change of columns (another level, a column shown or hidden) builds the table
+afresh. A grid of more than 150 rows (a big account) draws only the rows near the visible
+ones, 40 beyond each edge, with spacer rows (sized by a generated rule) standing in for the
+rest, so a redraw lays out about a hundred rows however long the account is; scrolling,
+the keyboard and the cell editor bring rows in as needed. Scrolling the cursor into view
+waits for the next frame, so one layout serves a whole redraw.
 
 ## Security model
 

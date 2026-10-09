@@ -202,7 +202,8 @@ fn gen_credit(rng: &mut Rng) -> Credit {
     }
 }
 
-fn gen_budget(rng: &mut Rng) -> Budget {
+/// A budget with no versions.
+fn gen_content(rng: &mut Rng) -> Budget {
     let mut b = Budget::new(rng.text(), rng.text());
     b.totals_currency = rng.opt_text();
     b.info = rng.map(|r| match r.below(3) {
@@ -313,6 +314,26 @@ fn gen_budget(rng: &mut Rng) -> Budget {
     b
 }
 
+/// A budget whose versions hold other random content.
+fn gen_budget(rng: &mut Rng) -> Budget {
+    let mut b = gen_content(rng);
+    for _ in 0..rng.below(3) {
+        let (content, _) = gen_content(rng).into_parts();
+        b.versions.push(Version {
+            id: if rng.chance(5) {
+                u64::MAX
+            } else {
+                rng.below(100)
+            },
+            name: rng.text(),
+            created: rng.pick(&["2026-10-09T14:30:00Z", "", "not a time"]).into(),
+            note: rng.opt_text(),
+            budget: Box::new(content),
+        });
+    }
+    b
+}
+
 #[test]
 fn random_budgets_round_trip_exactly() {
     for seed in 1..=CASES {
@@ -394,6 +415,8 @@ fn generator_covers_every_variant_and_field() {
         "charges",
         "credits",
         "baseline",
+        "versions",
+        "created",
         "plural",
         "hours",
         "symbol",

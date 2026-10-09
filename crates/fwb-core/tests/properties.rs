@@ -470,3 +470,189 @@ fn separators_and_styling_change_nothing() {
     }
     assert!(separators > 100, "the generator makes separators");
 }
+
+/// Every line of a comparison, with where it is.
+fn compare_lines(c: &Comparison) -> Vec<(String, &CompareLine)> {
+    let mut out = Vec::new();
+    for cat in &c.categories {
+        out.push((format!("category {}", cat.code), &cat.line));
+        for a in &cat.accounts {
+            out.push((format!("account {}", a.code), &a.line));
+        }
+    }
+    let t = &c.totals;
+    for (name, line) in [
+        ("atl", &t.total_atl),
+        ("btl", &t.total_btl),
+        ("fringes", &t.fringes),
+        ("charges", &t.charges),
+        ("grand", &t.grand_total),
+        ("credits", &t.credits),
+        ("net", &t.net_total),
+    ] {
+        out.push((name.to_string(), line));
+    }
+    out
+}
+
+#[test]
+fn comparing_a_budget_with_itself_shows_no_differences() {
+    for seed in 1..=CASES {
+        let b = gen_budget(&mut Rng(seed));
+        // The second copy spells every code in its normalized form, which
+        // must not matter.
+        let mut spelled = b.clone();
+        let coding = spelled.account_coding;
+        for cat in spelled.categories_mut() {
+            cat.code = coding.normalize(&cat.code).unwrap();
+            for a in &mut cat.accounts {
+                a.code = coding.normalize(&a.code).unwrap();
+            }
+        }
+        // Charge exclusions name codes by their exact text, so they follow.
+        for ch in &mut spelled.charges {
+            for codes in [&mut ch.excluded_accounts, &mut ch.excluded_categories] {
+                *codes = codes.iter().map(|c| coding.normalize(c).unwrap()).collect();
+            }
+        }
+        let c = compare(&[("a".to_string(), &b), ("b".to_string(), &spelled)])
+            .unwrap_or_else(|e| panic!("seed {seed}: {e}"));
+        let r = recalc(&b, &RecalcOptions::default()).unwrap();
+        assert_eq!(c.categories.len(), r.categories.len(), "seed {seed}");
+        for (at, line) in compare_lines(&c) {
+            assert_eq!(line.values[0], line.values[1], "seed {seed} {at}");
+            assert!(line.values[0].is_some(), "seed {seed} {at}");
+            for d in &line.diffs {
+                assert_eq!(d.amount, 0, "seed {seed} {at}");
+                let zero_base = line.values[0] == Some(0);
+                assert_eq!(
+                    d.percent,
+                    (!zero_base).then_some(Dec::ZERO),
+                    "seed {seed} {at}"
+                );
+            }
+        }
+    }
+}
+
+/// Random edits: change rates, delete rows, add rows and accounts, drop an account.
+fn edit_randomly(b: &mut Budget, rng: &mut Rng) {
+    let mut next_id = b.highest_row_id().unwrap_or(0) + 1;
+    for acct in b.categories_mut().flat_map(|c| &mut c.accounts) {
+        for det in &mut acct.details {
+            if det.kind == RowKind::Line && rng.chance(30) {
+                det.rate = format!("{}", rng.below(3_000)).into();
+            }
+        }
+        acct.details.retain(|_| !rng.chance(10));
+        if rng.chance(20) {
+            acct.details
+                .push(Detail::line(next_id, "new", 2, "Day", "125.50"));
+            next_id += 1;
+        }
+    }
+    let n = b.categories().count() as u64;
+    if rng.chance(30) {
+        let cat = b.categories_mut().nth(rng.below(n) as usize).unwrap();
+        if !cat.accounts.is_empty() {
+            cat.accounts.remove(0);
+        }
+    }
+    if rng.chance(30) {
+        let cat = b.categories_mut().nth(rng.below(n) as usize).unwrap();
+        cat.accounts.push(account(
+            "9990",
+            "added",
+            vec![Detail::line(next_id, "added", 1, "Flat", 777)],
+        ));
+    }
+}
+
+#[test]
+fn version_vs_current_equals_variance() {
+    let (mut changed, mut missing) = (0, 0);
+    for seed in 1..=CASES {
+        let mut rng = Rng(seed);
+        let mut b = gen_budget(&mut rng);
+        let v = save_version(&mut b, "before", "2026-10-09T10:00:00Z", None);
+        edit_randomly(&mut b, &mut rng);
+        let old = b.version(v).unwrap().budget.to_budget();
+        let opts = RecalcOptions::default();
+        let (r_old, r_now) = (recalc(&old, &opts).unwrap(), recalc(&b, &opts).unwrap());
+        let var = variance(&Baseline::capture(&r_old).unwrap(), &r_now).unwrap();
+
+        let c = compare(&[("old".to_string(), &old), ("now".to_string(), &b)]).unwrap();
+        let mut seen = 0;
+        for cat in &c.categories {
+            let ch = var.categories[&cat.code];
+            assert_eq!(
+                cat.line.values,
+                vec![ch.original, ch.current],
+                "seed {seed}"
+            );
+            assert_eq!(Some(cat.line.diffs[1].amount), ch.variance(), "seed {seed}");
+            for a in cat.accounts.iter().filter(|a| !a.fringe_account) {
+                let ch = var.accounts[&a.code];
+                assert_eq!(a.line.values, vec![ch.original, ch.current], "seed {seed}");
+                assert_eq!(Some(a.line.diffs[1].amount), ch.variance(), "seed {seed}");
+                seen += 1;
+                changed += usize::from(a.line.diffs[1].amount != 0);
+                missing += a.line.values.iter().filter(|v| v.is_none()).count();
+
+                // Rows of a version match the current rows by id.
+                let rows = compare_account(
+                    &[("old".to_string(), &old), ("now".to_string(), &b)],
+                    &a.code,
+                    RowMatch::Id,
+                )
+                .unwrap();
+                for row in &rows.rows {
+                    let ch = var.rows[&row.id];
+                    assert_eq!(
+                        row.line.values,
+                        vec![ch.original, ch.current],
+                        "seed {seed}"
+                    );
+                }
+            }
+        }
+        // Accounts with the generator's unique codes, plus "9990" which may
+        // be added to one category only: every variance account is listed.
+        assert_eq!(seen, var.accounts.len(), "seed {seed}");
+        assert_eq!(
+            Some(c.totals.grand_total.diffs[1].amount),
+            var.grand_total.variance(),
+            "seed {seed}"
+        );
+        assert_eq!(
+            Some(c.totals.net_total.diffs[1].amount),
+            var.net_total.variance(),
+            "seed {seed}"
+        );
+    }
+    assert!(
+        changed > 200 && missing > 50,
+        "edits change totals and accounts"
+    );
+}
+
+#[test]
+fn restoring_a_version_brings_back_its_totals() {
+    for seed in 1..=CASES / 4 {
+        let mut rng = Rng(seed);
+        let mut b = gen_budget(&mut rng);
+        let original = recalc(&b, &RecalcOptions::default()).unwrap();
+        let v = save_version(&mut b, "v", "t", None);
+        edit_randomly(&mut b, &mut rng);
+        let edited = b.snapshot();
+        let auto = restore_version(&mut b, v, "t2").unwrap();
+        assert_eq!(
+            recalc(&b, &RecalcOptions::default()).unwrap(),
+            original,
+            "seed {seed}"
+        );
+        restore_version(&mut b, auto, "t3").unwrap();
+        assert_eq!(b.snapshot(), edited, "seed {seed}");
+        assert_eq!(b.versions.len(), 3, "seed {seed}");
+    }
+}

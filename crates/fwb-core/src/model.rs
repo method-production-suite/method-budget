@@ -80,6 +80,9 @@ pub struct Budget {
     pub credits: Vec<Credit>,
     /// Frozen totals to compare against ("original" vs current).
     pub baseline: Option<Baseline>,
+    /// Named full copies of the budget's content, oldest first. See
+    /// [`crate::versions`] for saving and restoring them.
+    pub versions: Vec<Version>,
 }
 
 impl Budget {
@@ -102,6 +105,7 @@ impl Budget {
             charges: Vec::new(),
             credits: Vec::new(),
             baseline: None,
+            versions: Vec::new(),
         }
     }
 
@@ -464,4 +468,232 @@ pub struct Baseline {
     pub categories: BTreeMap<String, Cents>,
     pub grand_total: Cents,
     pub net_total: Cents,
+}
+
+/// Identity of a [`Version`]. Unique within a budget's version list.
+pub type VersionId = u64;
+
+/// A named copy of a budget's content, saved inside the budget.
+///
+/// A version is a full copy (every category, account and row), so each one
+/// adds about as much to the file as the budget itself. That is fine for v1;
+/// see docs/decisions.md.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Version {
+    pub id: VersionId,
+    pub name: String,
+    /// When it was saved, as an ISO 8601 date-time provided by the caller
+    /// (for example `2026-10-09T14:30:00Z`). The engine never reads the clock
+    /// and stores this text as given.
+    pub created: String,
+    pub note: Option<String>,
+    pub budget: Box<BudgetSnapshot>,
+}
+
+/// Everything in a [`Budget`] except its versions: what a [`Version`] stores.
+/// Leaving the version list out means versions never nest.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BudgetSnapshot {
+    pub title: String,
+    pub base_currency: String,
+    pub totals_currency: Option<String>,
+    pub info: BTreeMap<String, InfoValue>,
+    pub currencies: BTreeMap<String, Currency>,
+    pub globals: BTreeMap<String, Formula>,
+    pub units: BTreeMap<String, UnitDef>,
+    pub fringes: BTreeMap<String, Fringe>,
+    pub fringe_posting: FringePosting,
+    pub account_coding: AccountCoding,
+    pub groups: BTreeMap<String, Group>,
+    pub sets: BTreeMap<String, SetDef>,
+    pub locations: BTreeMap<String, Location>,
+    pub topsheet: Vec<TopsheetRow>,
+    pub charges: Vec<Charge>,
+    pub credits: Vec<Credit>,
+    pub baseline: Option<Baseline>,
+}
+
+impl Budget {
+    /// A copy of this budget's content, without its versions.
+    pub fn snapshot(&self) -> BudgetSnapshot {
+        // Destructured completely, so a new Budget field is a compile error here.
+        let Budget {
+            title,
+            base_currency,
+            totals_currency,
+            info,
+            currencies,
+            globals,
+            units,
+            fringes,
+            fringe_posting,
+            account_coding,
+            groups,
+            sets,
+            locations,
+            topsheet,
+            charges,
+            credits,
+            baseline,
+            versions: _,
+        } = self;
+        BudgetSnapshot {
+            title: title.clone(),
+            base_currency: base_currency.clone(),
+            totals_currency: totals_currency.clone(),
+            info: info.clone(),
+            currencies: currencies.clone(),
+            globals: globals.clone(),
+            units: units.clone(),
+            fringes: fringes.clone(),
+            fringe_posting: fringe_posting.clone(),
+            account_coding: *account_coding,
+            groups: groups.clone(),
+            sets: sets.clone(),
+            locations: locations.clone(),
+            topsheet: topsheet.clone(),
+            charges: charges.clone(),
+            credits: credits.clone(),
+            baseline: baseline.clone(),
+        }
+    }
+
+    /// Splits off the content, leaving the version list behind.
+    pub fn into_parts(self) -> (BudgetSnapshot, Vec<Version>) {
+        let Budget {
+            title,
+            base_currency,
+            totals_currency,
+            info,
+            currencies,
+            globals,
+            units,
+            fringes,
+            fringe_posting,
+            account_coding,
+            groups,
+            sets,
+            locations,
+            topsheet,
+            charges,
+            credits,
+            baseline,
+            versions,
+        } = self;
+        let content = BudgetSnapshot {
+            title,
+            base_currency,
+            totals_currency,
+            info,
+            currencies,
+            globals,
+            units,
+            fringes,
+            fringe_posting,
+            account_coding,
+            groups,
+            sets,
+            locations,
+            topsheet,
+            charges,
+            credits,
+            baseline,
+        };
+        (content, versions)
+    }
+
+    /// The version with this id.
+    pub fn version(&self, id: VersionId) -> Option<&Version> {
+        self.versions.iter().find(|v| v.id == id)
+    }
+
+    /// The highest row id anywhere in the budget: current rows, the baseline,
+    /// and every version's rows and baseline. A new row id above this can never
+    /// be mistaken for an older row when comparing against a version.
+    pub fn highest_row_id(&self) -> Option<RowId> {
+        fn content_max(s: &BudgetSnapshot) -> Option<RowId> {
+            let rows = s
+                .categories()
+                .flat_map(|c| &c.accounts)
+                .flat_map(|a| &a.details)
+                .map(|d| d.id)
+                .max();
+            let base = s
+                .baseline
+                .as_ref()
+                .and_then(|b| b.rows.keys().next_back().copied());
+            rows.max(base)
+        }
+        let rows = self
+            .categories()
+            .flat_map(|c| &c.accounts)
+            .flat_map(|a| &a.details)
+            .map(|d| d.id)
+            .max();
+        let base = self
+            .baseline
+            .as_ref()
+            .and_then(|b| b.rows.keys().next_back().copied());
+        self.versions
+            .iter()
+            .map(|v| content_max(&v.budget))
+            .fold(rows.max(base), Option::max)
+    }
+}
+
+impl BudgetSnapshot {
+    /// This content as a budget with no versions (for recalc or comparison).
+    pub fn to_budget(&self) -> Budget {
+        self.clone().into_budget(Vec::new())
+    }
+
+    /// This content as a budget carrying `versions`.
+    pub fn into_budget(self, versions: Vec<Version>) -> Budget {
+        let BudgetSnapshot {
+            title,
+            base_currency,
+            totals_currency,
+            info,
+            currencies,
+            globals,
+            units,
+            fringes,
+            fringe_posting,
+            account_coding,
+            groups,
+            sets,
+            locations,
+            topsheet,
+            charges,
+            credits,
+            baseline,
+        } = self;
+        Budget {
+            title,
+            base_currency,
+            totals_currency,
+            info,
+            currencies,
+            globals,
+            units,
+            fringes,
+            fringe_posting,
+            account_coding,
+            groups,
+            sets,
+            locations,
+            topsheet,
+            charges,
+            credits,
+            baseline,
+            versions,
+        }
+    }
+
+    pub fn categories(&self) -> impl Iterator<Item = &Category> {
+        self.topsheet.iter().filter_map(|r| match r {
+            TopsheetRow::Category(c) => Some(c),
+            TopsheetRow::ProductionTotal(_) => None,
+        })
+    }
 }

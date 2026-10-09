@@ -1,5 +1,6 @@
-// Printable budget reports: a topsheet and a full detail listing, built from a
-// View (budget JSON + report). Our own layout. Everything from the budget goes
+// Printable budget reports: a topsheet and a full detail listing, built from
+// the full view (get_full_view: the whole budget JSON and every row's totals).
+// Our own layout. Everything from the budget goes
 // in through textContent; no inline styles, so it works under the app's CSP.
 //
 //   renderReport(container, view, kind)  builds the report into `container`

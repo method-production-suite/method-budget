@@ -18,7 +18,7 @@ use crate::edit::{self, CurrencyInput, FringeInput, GroupInput, UnitInput};
 use crate::edit::{ChargeInput, CreditInput, InfoInput, LocationInput, SetInput};
 use crate::report_dto::SelectionDto;
 use crate::session::Session;
-use crate::view::View;
+use crate::view::{Focus, FullView, View};
 
 const APP_NAME: &str = "Film Wizard Budgeting";
 const FILTER_NAME: &str = "Film Wizard budget";
@@ -69,12 +69,45 @@ pub(crate) fn edit_budget<R: Runtime, T>(
 }
 
 // ---------------------------------------------------------------------------
-// Files
+// Views
 
 #[tauri::command]
 pub fn get_view<R: Runtime>(window: WebviewWindow<R>, state: State<'_, AppState>) -> View {
     finish(&window, &mut state.lock(), None)
 }
+
+/// Everything, every row: for printing. Other commands return the lean view.
+#[tauri::command]
+pub fn get_full_view(state: State<'_, AppState>) -> FullView {
+    state.lock().full_view()
+}
+
+/// Shows an account: its rows go out with this and every later view, until
+/// another account (or `null`, for none) is shown. The account is named as
+/// the UI knows it: category code and topsheet index, account code and index
+/// in the category (codes win when they disagree).
+#[tauri::command]
+pub fn focus_account<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    category: Option<String>,
+    ti: Option<usize>,
+    account: Option<String>,
+    ai: Option<usize>,
+) -> View {
+    let mut s = state.lock();
+    let focus = category.zip(account).map(|(category, account)| Focus {
+        category,
+        ti: ti.unwrap_or(usize::MAX),
+        account,
+        ai: ai.unwrap_or(usize::MAX),
+    });
+    s.set_focus(focus);
+    finish(&window, &mut s, None)
+}
+
+// ---------------------------------------------------------------------------
+// Files
 
 /// Replaces the budget with a fresh starter. The UI confirms first when there
 /// are unsaved changes.
@@ -738,6 +771,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_view,
+            get_full_view,
+            focus_account,
             new_budget,
             open_budget,
             save_budget,

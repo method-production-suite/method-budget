@@ -7,6 +7,8 @@
 
 const COMMANDS: &[&str] = &[
     "get_view",
+    "get_full_view",
+    "focus_account",
     "new_budget",
     "open_budget",
     "save_budget",

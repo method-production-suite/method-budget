@@ -31,11 +31,22 @@
 // Selection: a set of rows (Shift+Up/Down, Shift-click, Cmd/Ctrl-click) and a
 // run of columns (Shift+Left/Right). The selected cells are those rows across
 // those columns; copy, paste, fill down and clearing work on them.
+//
+// Drawing: setData() patches the table (unchanged rows keep their elements).
+// A grid longer than WINDOW_MIN_ROWS draws only the rows near the visible
+// ones, with spacer rows standing in for the rest; everything else (cursor,
+// selection, copy and paste) works on the row specs, so it covers every row.
 
 import { el, hasMod } from './dom.js';
-import { setRules } from './sheet.js';
+import { setRules, dynamicStyles } from './sheet.js';
 
 const SAFE_KEY = /^[a-z0-9_]+$/i;
+// Grids longer than this draw only the rows near the visible ones (an
+// account can have hundreds of lines; drawing them all makes every redraw
+// lay out every row). Shorter grids draw every row.
+const WINDOW_MIN_ROWS = 150;
+// Rows drawn beyond the visible ones, above and below.
+const OVERSCAN = 40;
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 let gridCount = 0;
 
@@ -115,6 +126,10 @@ export class Grid {
     this.uid = `grid-${gridCount}`;
     this.fitSig = null;
     this.colorSig = '';
+    this.colSig = null; // columnSig() of the header drawn
+    this.tbody = null;
+    this.rowEls = new Map(); // row key -> { tr, sig }
+    this.marked = new Set(); // rows with cursor or selection marks
 
     this.table = el('table', { class: `grid ${this.uid}`, attrs: { role: 'grid' } });
     host.replaceChildren(this.table);
@@ -123,17 +138,44 @@ export class Grid {
 
     this.table.addEventListener('mousedown', (e) => this.onMouseDown(e));
     this.table.addEventListener('dblclick', (e) => this.onDoubleClick(e));
+    this.hostWidth = null; // the host's size, kept by the observer below
+    this.hostHeight = null;
+    this.scrollQueued = false;
+    // Drawing only some rows (long grids): the range drawn, the scroll
+    // position, and row and header heights (measured once drawn).
+    this.windowed = false;
+    this.win = { start: 0, end: 0 };
+    this.scrollY = 0;
+    this.rowH = 29;
+    this.headH = 31;
+    this.spaceSig = '';
+    this.windowQueued = false;
     if (typeof ResizeObserver === 'function') {
       let queued = false;
-      new ResizeObserver(() => {
+      new ResizeObserver((entries) => {
+        const box = entries[entries.length - 1];
+        if (box && box.contentRect) {
+          this.hostWidth = box.contentRect.width;
+          this.hostHeight = box.contentRect.height;
+        }
         if (queued) return;
         queued = true;
         requestAnimationFrame(() => {
           queued = false;
           this.fit();
+          this.followScroll();
         });
       }).observe(host);
     }
+    host.addEventListener('scroll', () => {
+      this.scrollY = host.scrollTop;
+      if (!this.windowed || this.windowQueued) return;
+      this.windowQueued = true;
+      requestAnimationFrame(() => {
+        this.windowQueued = false;
+        this.followScroll();
+      });
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -152,7 +194,8 @@ export class Grid {
       this.fitSig = '';
       return;
     }
-    const avail = this.host.clientWidth;
+    // The observer's width, so a redraw doesn't force a layout to measure it.
+    const avail = this.hostWidth !== null ? this.hostWidth : this.host.clientWidth;
     if (!avail) return; // hidden; fits again when shown
     const want = cols.reduce((n, c) => n + c.width, 0);
     const room = cols.reduce((n, c) => n + (c.width - Math.min(c.min || c.width, c.width)), 0);
@@ -394,6 +437,82 @@ export class Grid {
 
   // -------------------------------------------------------------------------
   // Drawing
+  //
+  // Redraws are patches: a row whose spec is unchanged keeps its element, so
+  // an edit that changes a few cells touches a few rows, and scroll position,
+  // focus and an open cell editor are left alone. Only a change of columns
+  // (another level, a column shown or hidden) builds the table afresh.
+
+  /** What the header depends on; a change rebuilds the table. */
+  columnSig() {
+    return this.columns
+      .map((c) => [c.key, c.label, c.cls, c.title, c.pin, typeof c.head === 'function' ? 1 : 0].join('\u0001'))
+      .join('\u0002');
+  }
+
+  /** Everything a row's element shows; the same text means the same element. */
+  rowSig(r) {
+    const parts = [r.cls || '', r.color || '', r.selectable === false ? 0 : 1, r.activatable ? 1 : 0];
+    for (const c of this.columns) {
+      const cell = r.cells[c.key];
+      if (!cell) {
+        parts.push('\u0003');
+        continue;
+      }
+      parts.push(cell.text, cell.edit === undefined ? 'r' : 'e', cell.cls, cell.title, cell.error, cell.placeholder);
+    }
+    return parts.join('\u0001');
+  }
+
+  /** A fresh element for row `r` (its cursor and selection marks come later). */
+  buildRow(r, pins) {
+    const tr = el('tr', { class: r.cls || '' });
+    if (r.color && HEX_COLOR.test(r.color)) tr.classList.add(`tc-${r.color.toLowerCase().slice(1)}`);
+    if (r.selectable === false) tr.classList.add('static');
+    if (r.activatable) tr.classList.add('drill');
+    this.columns.forEach((c, ci) => {
+      const cell = r.cells[c.key] || {};
+      const td = el('td', {
+        class: `c-${c.key} ${c.cls || ''} ${cell.cls || ''} ${pins[ci]}`,
+        title: cell.error && cell.title ? `${cell.error}\n\n${cell.title}` : cell.error || cell.title,
+        data: { col: ci },
+      });
+      if (cell.edit !== undefined) td.classList.add('editable');
+      else td.classList.add('ro');
+      if (cell.error) td.classList.add('has-error');
+      const text = cell.text === undefined || cell.text === null ? '' : String(cell.text);
+      if (text === '' && cell.placeholder) {
+        td.append(el('span', { class: 'ph', text: cell.placeholder }));
+      } else {
+        td.textContent = text;
+      }
+      tr.append(td);
+    });
+    return tr;
+  }
+
+  /** Builds the column widths and header row, with an empty body. */
+  buildFrame(pins) {
+    const colgroup = el('colgroup');
+    for (const c of this.columns) colgroup.append(el('col', { class: `c-${c.key}` }));
+    const head = el('tr');
+    this.columns.forEach((c, ci) => {
+      const th = el('th', { class: `c-${c.key} ${c.cls || ''} ${pins[ci]}`, title: c.title, attrs: { scope: 'col' } });
+      const node = typeof c.head === 'function' ? c.head() : null;
+      if (node) th.append(node);
+      else th.textContent = c.label;
+      head.append(th);
+    });
+    this.tbody = el('tbody');
+    this.table.replaceChildren(colgroup, el('thead', {}, head), this.tbody);
+    this.rowEls = new Map();
+    this.marked = new Set();
+    // Stand-ins for the rows above and below the drawn ones (long grids).
+    const spacer = (cls) => el('tr', { class: `vspace ${cls} static`, attrs: { 'aria-hidden': 'true' } }, el('td', { attrs: { colspan: String(this.columns.length || 1) } }));
+    this.spaceTop = spacer('vspace-top');
+    this.spaceBottom = spacer('vspace-bottom');
+    this.spaceSig = '';
+  }
 
   render() {
     const editing = this.editor;
@@ -406,68 +525,31 @@ export class Grid {
     this.fit();
     this.paintColors();
     const pins = this.columns.map((c, ci) => this.pinClass(ci));
-
-    const colgroup = el('colgroup');
-    for (const c of this.columns) colgroup.append(el('col', { class: `c-${c.key}` }));
-
-    const head = el('tr');
-    this.columns.forEach((c, ci) => {
-      const th = el('th', { class: `c-${c.key} ${c.cls || ''} ${pins[ci]}`, title: c.title, attrs: { scope: 'col' } });
-      const node = typeof c.head === 'function' ? c.head() : null;
-      if (node) th.append(node);
-      else th.textContent = c.label;
-      head.append(th);
-    });
-    const thead = el('thead', {}, head);
-
-    const tbody = el('tbody');
-    const curKey = this.cursorKey();
-    const selKeys = new Set(this.selectedKeys());
-    const ranged = this.hasRange();
-    const [ca, cb] = this.colRange();
-    this.rows.forEach((r, ri) => {
-      const tr = el('tr', { class: r.cls || '', data: { row: ri } });
-      if (r.color && HEX_COLOR.test(r.color)) tr.classList.add(`tc-${r.color.toLowerCase().slice(1)}`);
-      if (r.selectable === false) tr.classList.add('static');
-      if (r.selectable !== false && selKeys.has(r.key)) tr.classList.add('sel');
-      if (r.activatable) tr.classList.add('drill');
-      this.columns.forEach((c, ci) => {
-        const cell = r.cells[c.key] || {};
-        const td = el('td', {
-          class: `c-${c.key} ${c.cls || ''} ${cell.cls || ''} ${pins[ci]}`,
-          title: cell.error && cell.title ? `${cell.error}\n\n${cell.title}` : cell.error || cell.title,
-          data: { col: ci },
-        });
-        if (cell.edit !== undefined) td.classList.add('editable');
-        else td.classList.add('ro');
-        if (cell.error) td.classList.add('has-error');
-        const text = cell.text === undefined || cell.text === null ? '' : String(cell.text);
-        if (text === '' && cell.placeholder) {
-          td.append(el('span', { class: 'ph', text: cell.placeholder }));
-        } else {
-          td.textContent = text;
-        }
-        if (r.key === curKey && ci === this.cur.col && r.selectable !== false) td.classList.add('cursor');
-        if (ranged && r.selectable !== false && selKeys.has(r.key) && ci >= ca && ci <= cb) td.classList.add('in-range');
-        tr.append(td);
-      });
-      tbody.append(tr);
-    });
-
-    this.table.replaceChildren(colgroup, thead, tbody);
-    if (headFocus) {
-      const again = thead.querySelector(`[data-focus-id="${headFocus.replace(/[^a-z0-9_-]/gi, '')}"]`);
-      if (again) again.focus();
+    const colSig = this.columnSig();
+    const fresh = colSig !== this.colSig || !this.tbody;
+    if (fresh) {
+      this.colSig = colSig;
+      this.buildFrame(pins);
+      if (headFocus) {
+        const again = this.table.tHead.querySelector(`[data-focus-id="${headFocus.replace(/[^a-z0-9_-]/gi, '')}"]`);
+        if (again) again.focus();
+      }
     }
+
+    this.pins = pins;
+    this.windowed = dynamicStyles && this.rows.length > WINDOW_MIN_ROWS;
+    this.win = this.windowed ? this.wantedWindow(true) : { start: 0, end: this.rows.length };
+    this.patchRows();
+    this.paintMarks();
 
     if (editing) {
       const td = this.cellFor(editing.rowKey, editing.colKey);
       if (td) {
         td.classList.add('editing');
-        td.append(editing.input);
+        if (editing.input.parentNode !== td) td.append(editing.input);
         editing.td = td;
         const { selectionStart, selectionEnd } = editing;
-        editing.input.focus();
+        if (document.activeElement !== editing.input) editing.input.focus();
         try {
           editing.input.setSelectionRange(selectionStart, selectionEnd);
         } catch {
@@ -482,41 +564,221 @@ export class Grid {
     this.notifySelect();
   }
 
-  cellFor(rowKey, colKey) {
-    const ri = this.rows.findIndex((r) => r.key === rowKey);
-    const ci = this.columns.findIndex((c) => c.key === colKey);
-    if (ri < 0 || ci < 0) return null;
-    const tr = this.table.tBodies[0] && this.table.tBodies[0].rows[ri];
-    return tr ? tr.cells[ci] : null;
+  /**
+   * Draws the rows in `this.win` (every row unless the grid is long): reuses
+   * each unchanged row's element, builds the rest, and keeps stand-ins for
+   * the rows above and below so the scroll height stays right.
+   */
+  patchRows() {
+    const pins = this.pins || this.columns.map((c, ci) => this.pinClass(ci));
+    const old = this.rowEls;
+    const next = new Map();
+    const trs = [];
+    const { start, end } = this.win;
+    if (this.windowed) trs.push(this.spaceTop);
+    for (let ri = start; ri < end; ri++) {
+      const r = this.rows[ri];
+      const sig = this.rowSig(r);
+      let ent = old.get(r.key);
+      if (!ent || ent.sig !== sig || next.has(r.key)) ent = { tr: this.buildRow(r, pins), sig };
+      ent.tr.dataset.row = String(ri);
+      if (!next.has(r.key)) next.set(r.key, ent);
+      trs.push(ent.tr);
+    }
+    if (this.windowed) {
+      trs.push(this.spaceBottom);
+      this.sizeSpacers();
+    }
+    // Drop the rows that went or changed, then put the rest in order. Rows
+    // that kept their place aren't touched: moving a row re-styles it.
+    const body = this.tbody;
+    if (!this.windowed) {
+      for (const sp of [this.spaceTop, this.spaceBottom]) if (sp && sp.parentNode === body) body.removeChild(sp);
+    }
+    const keep = new Set(trs);
+    for (const { tr } of old.values()) {
+      if (!keep.has(tr) && tr.parentNode === body) {
+        body.removeChild(tr);
+        this.marked.delete(tr);
+      }
+    }
+    let at = body.firstChild;
+    for (const tr of trs) {
+      if (at === tr) at = at.nextSibling;
+      else body.insertBefore(tr, at);
+    }
+    while (at) {
+      const gone = at;
+      at = at.nextSibling;
+      body.removeChild(gone);
+      this.marked.delete(gone);
+    }
+    this.rowEls = next;
   }
 
+  /** Heights of the stand-ins for the rows not drawn (a generated rule). */
+  sizeSpacers() {
+    const top = Math.round(this.win.start * this.rowH);
+    const bottom = Math.round((this.rows.length - this.win.end) * this.rowH);
+    const sig = `${top}:${bottom}`;
+    if (sig === this.spaceSig) return;
+    this.spaceSig = sig;
+    const base = `padding: 0; border: 0; background: transparent;`;
+    setRules(
+      `${this.uid}-space`,
+      `.${this.uid} tr.vspace-top > td { ${base} height: ${top}px; }\n` +
+        `.${this.uid} tr.vspace-bottom > td { ${base} height: ${bottom}px; }`,
+    );
+  }
+
+  /** Index into rows of the cursor row, or -1. */
+  cursorIndex() {
+    const i = this.nav[this.cur.row];
+    return i === undefined ? -1 : i;
+  }
+
+  /**
+   * The rows to draw for the scroll position: the visible ones and OVERSCAN
+   * more each way, widened to keep an open cell editor's row. With `cursor`,
+   * centred on the cursor row instead when it is out of that range (it is
+   * about to be scrolled into view).
+   */
+  wantedWindow(cursor = false) {
+    const n = this.rows.length;
+    const view = this.hostHeight || this.host.clientHeight || 600;
+    const visible = Math.ceil(view / this.rowH) + 1;
+    const first = Math.max(0, Math.floor((this.scrollY - this.headH) / this.rowH));
+    let start = Math.max(0, first - OVERSCAN);
+    let end = Math.min(n, first + visible + OVERSCAN);
+    const ci = this.cursorIndex();
+    if (cursor && ci >= 0 && (ci < start + 1 || ci >= end - 1)) {
+      start = Math.max(0, ci - OVERSCAN - visible);
+      end = Math.min(n, ci + OVERSCAN + visible);
+    }
+    if (this.editor) {
+      const ei = this.rows.findIndex((r) => r.key === this.editor.rowKey);
+      if (ei >= 0) {
+        start = Math.min(start, ei);
+        end = Math.max(end, ei + 1);
+      }
+    }
+    return { start, end };
+  }
+
+  /** After a scroll: draws the rows now in view, if they aren't drawn yet. */
+  followScroll() {
+    if (!this.windowed || !this.tbody) return;
+    this.measure();
+    const w = this.wantedWindow(false);
+    const visibleFirst = Math.max(0, Math.floor((this.scrollY - this.headH) / this.rowH));
+    const view = this.hostHeight || this.host.clientHeight || 600;
+    const visibleLast = Math.min(this.rows.length, visibleFirst + Math.ceil(view / this.rowH) + 1);
+    const covered = visibleFirst >= this.win.start && visibleLast <= this.win.end;
+    if (covered && w.start >= this.win.start - OVERSCAN && w.end <= this.win.end + OVERSCAN) return;
+    this.win = w;
+    this.patchRows();
+    this.paintMarks();
+  }
+
+  /** Row and header heights from the drawn rows (their layout is due anyway). */
+  measure() {
+    const tr = this.tbody && this.rowEl(this.rows[this.win.start] && this.rows[this.win.start].key);
+    if (!tr) return;
+    const h = tr.getBoundingClientRect().height;
+    if (h > 4 && Math.abs(h - this.rowH) > 0.01) {
+      this.rowH = h;
+      this.sizeSpacers();
+    }
+    const head = this.table.tHead;
+    if (head) this.headH = head.getBoundingClientRect().height || this.headH;
+  }
+
+  /** Makes sure the row at index `ri` is drawn (long grids draw a range). */
+  ensureDrawn(ri) {
+    if (!this.windowed || ri < 0 || (ri >= this.win.start && ri < this.win.end)) return;
+    const view = this.hostHeight || this.host.clientHeight || 600;
+    const visible = Math.ceil(view / this.rowH) + 1;
+    this.win = {
+      start: Math.max(0, ri - OVERSCAN - visible),
+      end: Math.min(this.rows.length, ri + OVERSCAN + visible),
+    };
+    this.patchRows();
+    this.paintMarks();
+  }
+
+  /** The element of row `rowKey`, or null. */
+  rowEl(rowKey) {
+    const ent = this.rowEls && this.rowEls.get(rowKey);
+    return ent ? ent.tr : null;
+  }
+
+  cellFor(rowKey, colKey) {
+    const tr = this.rowEl(rowKey);
+    const ci = this.columns.findIndex((c) => c.key === colKey);
+    if (!tr || ci < 0) return null;
+    return tr.cells[ci] || null;
+  }
+
+  /**
+   * Scrolls the cursor cell into view, just before the next frame: scrolling
+   * needs a layout, and doing it then lets one layout serve a whole redraw
+   * (and several quick moves) instead of forcing one each time.
+   */
   scrollToCursor() {
+    if (this.scrollQueued) return;
+    this.scrollQueued = true;
+    requestAnimationFrame(() => {
+      this.scrollQueued = false;
+      const k = this.cursorKey();
+      const c = this.cursorColKey();
+      if (k === null || c === null) return;
+      this.ensureDrawn(this.cursorIndex());
+      const td = this.cellFor(k, c);
+      if (td) td.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      if (this.windowed) {
+        this.scrollY = this.host.scrollTop;
+        this.followScroll();
+      }
+    });
+  }
+
+  /**
+   * Draws the cursor and selection marks: clears the rows marked last time
+   * and marks the selected rows and the cursor cell, so moving the cursor
+   * touches a few rows however long the grid is.
+   */
+  paintMarks() {
+    if (!this.marked) return;
+    for (const tr of this.marked) {
+      tr.classList.remove('sel');
+      for (const td of tr.cells) td.classList.remove('cursor', 'in-range');
+    }
+    this.marked.clear();
+    const ranged = this.hasRange();
+    const [ca, cb] = this.colRange();
+    const markable = (key) => {
+      const tr = this.rowEl(key);
+      if (!tr) return null;
+      const r = this.rows[Number(tr.dataset.row)];
+      if (!r || r.selectable === false) return null;
+      this.marked.add(tr);
+      return tr;
+    };
+    for (const k of this.selectedKeys()) {
+      const tr = markable(k);
+      if (!tr) continue;
+      tr.classList.add('sel');
+      if (ranged) for (let ci = ca; ci <= cb; ci++) if (tr.cells[ci]) tr.cells[ci].classList.add('in-range');
+    }
     const k = this.cursorKey();
-    const c = this.cursorColKey();
-    if (k === null || c === null) return;
-    const td = this.cellFor(k, c);
-    if (td) td.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const tr = k === null ? null : markable(k);
+    if (tr && tr.cells[this.cur.col]) tr.cells[this.cur.col].classList.add('cursor');
   }
 
   /** Redraws just the cursor and selection marks (cheap; used while moving). */
   paintCursor() {
-    const body = this.table.tBodies[0];
-    if (!body) return;
-    const curKey = this.cursorKey();
-    const selKeys = new Set(this.selectedKeys());
-    const ranged = this.hasRange();
-    const [ca, cb] = this.colRange();
-    for (const tr of body.rows) {
-      const r = this.rows[Number(tr.dataset.row)];
-      if (!r || r.selectable === false) continue;
-      const sel = selKeys.has(r.key);
-      tr.classList.toggle('sel', sel);
-      for (const td of tr.cells) {
-        const ci = Number(td.dataset.col);
-        td.classList.toggle('cursor', r.key === curKey && ci === this.cur.col);
-        td.classList.toggle('in-range', ranged && sel && ci >= ca && ci <= cb);
-      }
-    }
+    if (!this.tbody) return;
+    this.paintMarks();
     this.scrollToCursor();
     this.notifySelect();
   }
@@ -641,6 +903,7 @@ export class Grid {
   startEdit(text = null) {
     const at = this.cursorCell();
     if (!at || at.cell.edit === undefined) return false;
+    this.ensureDrawn(this.cursorIndex());
     const td = this.cellFor(at.row.key, at.col.key);
     if (!td) return false;
     const original = String(at.cell.edit);

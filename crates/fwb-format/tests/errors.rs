@@ -297,3 +297,58 @@ fn row_style_fields_are_checked() {
     let text = edit("\"kind\": \"adjustment\"", "\"kind\": \"separator\"");
     assert!(from_str(&text).is_ok());
 }
+
+/// The golden file with one version (a copy of its own budget) appended.
+fn with_version(version_fields: &str, inner_extra: &str) -> String {
+    let budget_start = SMALL.find("\"budget\": {").unwrap() + "\"budget\": ".len();
+    let budget = &SMALL[budget_start..SMALL.rfind('}').unwrap()].trim_end();
+    let inner = format!("{}{inner_extra}}}", &budget[..budget.len() - 1].trim_end());
+    let version = format!("{{{version_fields}\"budget\": {inner}}}");
+    format!(
+        "{}, \"versions\": [{version}]}}}}\n",
+        &budget[..budget.len() - 1].trim_end()
+    )
+    .replacen("{", &format!("{}{{", &SMALL[..budget_start]), 1)
+}
+
+#[test]
+fn versions_read_and_are_checked() {
+    let good = with_version(
+        "\"id\": 1, \"name\": \"v\", \"created\": \"2026-10-09\", ",
+        "",
+    );
+    let b = from_str(&good).unwrap_or_else(|e| panic!("{e}\n{good}"));
+    assert_eq!(b.versions.len(), 1);
+    assert_eq!(b.versions[0].budget.to_budget().versions, vec![]);
+    assert_eq!(
+        b.versions[0].budget.title, b.title,
+        "the version holds the budget's content"
+    );
+
+    // A version's budget may not have versions of its own.
+    let nested = with_version(
+        "\"id\": 1, \"name\": \"v\", \"created\": \"t\", ",
+        ", \"versions\": [{\"id\": 2, \"name\": \"w\", \"created\": \"t\", \
+         \"budget\": {\"title\": \"x\", \"base_currency\": \"USD\"}}]",
+    );
+    let (_, path, message) = invalid(&nested);
+    assert!(
+        message.contains("a version's budget cannot have versions of its own"),
+        "{message}"
+    );
+    assert!(path.starts_with("budget.versions[0]"), "{path}");
+
+    // Unknown fields and missing required fields are errors.
+    let unknown = with_version(
+        "\"id\": 1, \"name\": \"v\", \"created\": \"t\", \"author\": \"me\", ",
+        "",
+    );
+    let (_, path, message) = invalid(&unknown);
+    assert_eq!(path, "budget.versions[0].author");
+    assert!(message.contains("unknown field `author`"), "{message}");
+    let missing = with_version("\"id\": 1, \"name\": \"v\", ", "");
+    let (_, _, message) = invalid(&missing);
+    assert!(message.contains("missing field `created`"), "{message}");
+    let bad_id = with_version("\"id\": -1, \"name\": \"v\", \"created\": \"t\", ", "");
+    invalid(&bad_id);
+}

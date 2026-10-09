@@ -216,3 +216,58 @@ fn files_without_new_fields_read_with_defaults() {
     }
     assert_eq!(fwb_format::to_string(&b), golden, "golden is unchanged");
 }
+
+#[test]
+fn versions_round_trip_after_the_baseline() {
+    let mut b = rich();
+    assert!(b.baseline.is_some());
+    let first = save_version(&mut b, "Studio draft", "2026-10-09T14:30:00Z", None);
+    b.title = "Renamed".into();
+    save_version(
+        &mut b,
+        "Line \"two\"\n",
+        "2026-10-10T09:00:00-07:00",
+        Some("after notes".into()),
+    );
+    let auto = restore_version(&mut b, first, "2026-10-11T08:00:00Z").unwrap();
+    assert_eq!(b.versions.len(), 3);
+    let text = round_trip(&b);
+    assert_no_floats(&serde_json::from_str(&text).unwrap());
+
+    // `versions` is the budget's last field, after `baseline`, and each
+    // version's fields come in documented order.
+    let v: Value = serde_json::from_str(&text).unwrap();
+    let keys: Vec<&String> = v["budget"].as_object().unwrap().keys().collect();
+    assert_eq!(keys.last().unwrap().as_str(), "versions");
+    let pos = |k: &str| text.find(k).unwrap_or_else(|| panic!("{k} missing"));
+    assert!(pos("\n    \"baseline\":") < pos("\n    \"versions\":"));
+    let version = &v["budget"]["versions"][2];
+    assert_eq!(
+        version.as_object().unwrap().keys().collect::<Vec<_>>(),
+        vec!["budget", "created", "id", "name"],
+        "note left out when not set"
+    );
+    let second = &text[pos("\"name\": \"Line")..];
+    let at = |k: &str| second.find(&format!("\"{k}\":")).unwrap();
+    assert!(at("created") < at("note") && at("note") < at("budget"));
+    let first = &text[pos("\n    \"versions\":")..];
+    let at = |k: &str| first.find(&format!("\"{k}\":")).unwrap();
+    assert!(at("id") < at("name") && at("name") < at("created") && at("created") < at("budget"));
+    assert_eq!(version["id"], auto);
+    assert!(version["budget"].get("versions").is_none());
+    assert_eq!(v["budget"]["versions"][1]["note"], "after notes");
+    // A version's budget is written exactly like a top-level budget.
+    let alone = fwb_format::to_string(&b.versions[1].budget.to_budget());
+    let alone: Value = serde_json::from_str(&alone).unwrap();
+    assert_eq!(v["budget"]["versions"][1]["budget"], alone["budget"]);
+}
+
+#[test]
+fn no_versions_writes_no_versions_field() {
+    let text = round_trip(&sample());
+    assert!(!text.contains("\"versions\""));
+    let mut b = sample();
+    let id = save_version(&mut b, "v", "t", None);
+    delete_version(&mut b, id).unwrap();
+    assert_eq!(fwb_format::to_string(&b), text);
+}

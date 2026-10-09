@@ -90,7 +90,10 @@ pub struct CategoryDto {
 pub struct AccountDto {
     pub code: String,
     pub name: String,
-    pub rows: Vec<RowDto>,
+    /// Per-row figures. Left out of the lean view (`View`), which carries
+    /// the rows of the account on screen only (`View::account`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rows: Option<Vec<RowDto>>,
     pub details_total: Cents,
     pub fringe_total: Cents,
     pub total: Cents,
@@ -209,6 +212,13 @@ impl From<&RowTotals> for RowDto {
 
 impl From<&CategoryTotals> for CategoryDto {
     fn from(c: &CategoryTotals) -> CategoryDto {
+        CategoryDto::with_rows(c, true)
+    }
+}
+
+impl CategoryDto {
+    /// The category's totals, with each account's per-row figures when `rows`.
+    pub fn with_rows(c: &CategoryTotals, rows: bool) -> CategoryDto {
         CategoryDto {
             code: c.code.clone(),
             name: c.name.clone(),
@@ -218,7 +228,7 @@ impl From<&CategoryTotals> for CategoryDto {
                 .map(|a| AccountDto {
                     code: a.code.clone(),
                     name: a.name.clone(),
-                    rows: a.rows.iter().map(RowDto::from).collect(),
+                    rows: rows.then(|| a.rows.iter().map(RowDto::from).collect()),
                     details_total: a.details_total,
                     fringe_total: a.fringe_total,
                     total: a.total,
@@ -285,12 +295,24 @@ impl From<&CreditTotals> for CreditDto {
 
 impl From<&Report> for ReportDto {
     fn from(r: &Report) -> ReportDto {
+        ReportDto::with_rows(r, true)
+    }
+}
+
+impl ReportDto {
+    /// Every total, with per-row figures when `rows` (the printed report and
+    /// the full view need them; the lean view does not).
+    pub fn with_rows(r: &Report, rows: bool) -> ReportDto {
         ReportDto {
             base_currency: r.base_currency.clone(),
             totals_currency: r.totals_currency.clone(),
             totals_rate: dec(r.totals_rate),
             globals: map(&r.globals, |d| dec(*d)),
-            categories: r.categories.iter().map(CategoryDto::from).collect(),
+            categories: r
+                .categories
+                .iter()
+                .map(|c| CategoryDto::with_rows(c, rows))
+                .collect(),
             levels: r.levels.iter().map(LevelDto::from).collect(),
             budget_fringes: r.budget_fringes,
             total_atl: r.total_atl,
@@ -341,11 +363,36 @@ pub struct ChangeDto {
 /// decimal strings (JSON object keys); accounts and categories are by code.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct VarianceDto {
+    /// Every row in the full view; in the lean view only the rows of the
+    /// account on screen.
     pub rows: BTreeMap<RowId, ChangeDto>,
+    /// Rows (in the whole budget) whose total moved, or that were added or
+    /// deleted, since the baseline was locked.
+    pub rows_changed: usize,
     pub accounts: BTreeMap<String, ChangeDto>,
     pub categories: BTreeMap<String, ChangeDto>,
     pub grand_total: ChangeDto,
     pub net_total: ChangeDto,
+}
+
+impl VarianceDto {
+    /// The comparison with only the rows `keep` accepts listed (all of them
+    /// still count in `rows_changed`).
+    pub fn with_rows(v: &Variance, keep: impl Fn(RowId) -> bool) -> VarianceDto {
+        VarianceDto {
+            rows: v
+                .rows
+                .iter()
+                .filter(|(id, _)| keep(**id))
+                .map(|(id, c)| (*id, c.into()))
+                .collect(),
+            rows_changed: v.rows.values().filter(|c| c.variance() != Some(0)).count(),
+            accounts: map(&v.accounts, |c| c.into()),
+            categories: map(&v.categories, |c| c.into()),
+            grand_total: (&v.grand_total).into(),
+            net_total: (&v.net_total).into(),
+        }
+    }
 }
 
 impl From<&Change> for ChangeDto {
@@ -360,13 +407,7 @@ impl From<&Change> for ChangeDto {
 
 impl From<&Variance> for VarianceDto {
     fn from(v: &Variance) -> VarianceDto {
-        VarianceDto {
-            rows: map(&v.rows, |c| c.into()),
-            accounts: map(&v.accounts, |c| c.into()),
-            categories: map(&v.categories, |c| c.into()),
-            grand_total: (&v.grand_total).into(),
-            net_total: (&v.net_total).into(),
-        }
+        VarianceDto::with_rows(v, |_| true)
     }
 }
 

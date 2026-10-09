@@ -8,6 +8,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use fwb_core::calc::cache::RecalcCache;
 use fwb_core::expr::Expr;
 use fwb_core::{
     recalc, Budget, CalcError, ChargeKind, CreditSource, Dec, Formula, RecalcOptions, Report,
@@ -74,8 +75,14 @@ pub fn error_message(e: &CalcError) -> String {
 }
 
 pub fn lenient_recalc(b: &Budget) -> Outcome {
+    lenient_recalc_with(b, &mut RecalcCache::new())
+}
+
+/// [`lenient_recalc`], evaluating only the accounts that changed since the
+/// last call with the same `cache` (the results are the same).
+pub fn lenient_recalc_with(b: &Budget, cache: &mut RecalcCache) -> Outcome {
     let opts = RecalcOptions::default();
-    let error = match recalc(b, &opts) {
+    let error = match cache.recalc(b, &opts) {
         Ok(report) => {
             return Outcome {
                 report: Some(report),
@@ -87,7 +94,7 @@ pub fn lenient_recalc(b: &Budget) -> Outcome {
         Err(e) => e,
     };
     let (clean, issues) = sanitize(b);
-    match recalc(&clean, &opts) {
+    match cache.recalc(&clean, &opts) {
         Ok(report) => Outcome {
             report: Some(report),
             sanitized: Some(clean),
@@ -159,12 +166,13 @@ fn check(f: &Formula, globals: &BTreeMap<String, Dec>) -> Option<String> {
     if f.is_blank() {
         return None;
     }
+    let lookup = |n: &str| globals.get(n).copied();
+    if fwb_core::expr::quick_value(&f.0, &lookup).is_some() {
+        return None;
+    }
     match Expr::parse(&f.0) {
         Err(e) => Some(e.to_string()),
-        Ok(e) => e
-            .eval(&|n| globals.get(n).copied())
-            .err()
-            .map(|e| e.to_string()),
+        Ok(e) => e.eval(&lookup).err().map(|e| e.to_string()),
     }
 }
 

@@ -225,6 +225,32 @@ impl Parser {
     }
 }
 
+/// The value of a formula that is just a number (`1250.50`) or just a
+/// global `lookup` knows (`SHOOT_DAYS`), the most common cells, without
+/// building a parse tree. `None` for anything else, and for anything the
+/// parser would reject or report, so errors always come from
+/// [`Expr::parse`] and [`Expr::eval`] with their usual messages. When it
+/// gives a value, it is exactly what parsing and evaluating would give.
+pub fn quick_value(src: &str, lookup: &dyn Fn(&str) -> Option<Dec>) -> Option<Dec> {
+    // The lexer skips only spaces and tabs.
+    let t = src.trim_matches([' ', '\t']);
+    // Short enough that the length limit can't apply.
+    if t.is_empty() || t.len() > 64 {
+        return None;
+    }
+    let first = t.as_bytes()[0];
+    if t.bytes().all(|c| c.is_ascii_digit() || c == b'.') {
+        // One number token, parsed the way the lexer parses it.
+        return t.parse::<Dec>().ok();
+    }
+    if (first.is_ascii_alphabetic() || first == b'_')
+        && t.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_')
+    {
+        return lookup(t);
+    }
+    None
+}
+
 impl Expr {
     pub fn parse(src: &str) -> Result<Expr, ParseError> {
         if src.bytes().filter(|b| !matches!(b, b' ' | b'\t')).count() > MAX_FORMULA_LEN {

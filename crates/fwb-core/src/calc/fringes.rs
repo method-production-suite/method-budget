@@ -8,7 +8,7 @@
 //! shares sum exactly. A flat fringe is charged per line, converted by unit
 //! hours when both units have them.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::calc::{err, overflow, row_at, sum, CalcError, Ctx, ErrorKind};
 use crate::decimal::{percent_of, Dec};
@@ -36,16 +36,17 @@ pub(crate) fn apply_fringes(
             continue;
         }
         for name in &d.fringes {
+            if rates.contains_key(name.as_str()) {
+                continue;
+            }
             let (key, f) = ctx.b.fringes.get_key_value(name).ok_or_else(|| {
                 err(
                     row_at(&acct.code, i, d, "fringes"),
                     ErrorKind::UnknownFringe(name.clone()),
                 )
             })?;
-            if !rates.contains_key(key.as_str()) {
-                let rate = ctx.eval(&f.rate, Dec::ZERO, &|| format!("fringe {key}: rate"))?;
-                rates.insert(key, (f, rate));
-            }
+            let rate = ctx.eval(&f.rate, Dec::ZERO, &|| format!("fringe {key}: rate"))?;
+            rates.insert(key, (f, rate));
         }
     }
     let earns: Vec<bool> = details
@@ -54,17 +55,49 @@ pub(crate) fn apply_fringes(
         .map(|(d, r)| d.kind == RowKind::Line && r.included)
         .collect();
 
-    // Percent fringes, per earner.
+    // Percent fringes, per earner. Only the fringes the earner's lines carry
+    // can give it anything, so those are the ones visited, in name order (the
+    // same order, and so the same first error, as visiting every fringe).
+    let mut carried: BTreeSet<&str> = BTreeSet::new();
+    let mut names: Vec<&str> = Vec::new();
+    let mut lines: Vec<usize> = Vec::new();
+    let mut weights: Vec<Cents> = Vec::new();
     for earner in earners(details, rows) {
-        for (&name, &(f, rate)) in &rates {
+        // A lone line (the usual earner) carries its own, already sorted, set.
+        let single = match earner[..] {
+            [i] if earns[i] => Some(i),
+            _ => None,
+        };
+        names.clear();
+        match single {
+            Some(i) => names.extend(details[i].fringes.iter().map(String::as_str)),
+            None => {
+                carried.clear();
+                for &i in &earner {
+                    if earns[i] {
+                        carried.extend(details[i].fringes.iter().map(String::as_str));
+                    }
+                }
+                names.extend(carried.iter().copied());
+            }
+        }
+        for &name in &names {
+            let Some(&(f, rate)) = rates.get(name) else {
+                continue;
+            };
             let FringeKind::Percent { cutoff } = f.kind else {
                 continue;
             };
-            let lines: Vec<usize> = earner
-                .iter()
-                .copied()
-                .filter(|&i| earns[i] && details[i].fringes.contains(name))
-                .collect();
+            lines.clear();
+            match single {
+                Some(i) => lines.push(i),
+                None => lines.extend(
+                    earner
+                        .iter()
+                        .copied()
+                        .filter(|&i| earns[i] && details[i].fringes.contains(name)),
+                ),
+            }
             let Some(&first) = lines.first() else {
                 continue;
             };
@@ -76,7 +109,8 @@ pub(crate) fn apply_fringes(
                     &format!("fringe {name}"),
                 ))
             };
-            let weights: Vec<Cents> = lines.iter().map(|&i| rows[i].total).collect();
+            weights.clear();
+            weights.extend(lines.iter().map(|&i| rows[i].total));
             let mut base = sum(weights.iter().copied()).ok_or_else(ovf)?;
             if let Some(c) = cutoff {
                 base = base.min(c);
@@ -121,7 +155,7 @@ pub(crate) fn apply_fringes(
 /// that don't count (suppressed or filtered out), are skipped, so they never
 /// break a run; any other row with a different value does. Skipping uncounted rows keeps
 /// "excluding a group equals deleting its lines" true (decisions.md 4).
-fn earners(details: &[Detail], rows: &[RowTotals]) -> Vec<Vec<usize>> {
+pub(super) fn earners(details: &[Detail], rows: &[RowTotals]) -> Vec<Vec<usize>> {
     let mut out = Vec::new();
     let mut run: Option<(u32, Vec<usize>)> = None;
     for (i, d) in details.iter().enumerate() {
@@ -153,7 +187,7 @@ fn earners(details: &[Detail], rows: &[RowTotals]) -> Vec<Vec<usize>> {
 /// sum to exactly `amount`. Ties go to the earlier weight. The magnitude is
 /// split and the sign restored, so a credit mirrors the matching debit. When
 /// the weights sum to 0 the first one takes everything. `None` on overflow.
-fn allocate(amount: Cents, weights: &[Cents]) -> Option<Vec<Cents>> {
+pub(super) fn allocate(amount: Cents, weights: &[Cents]) -> Option<Vec<Cents>> {
     let mut out = vec![0; weights.len()];
     let Some(first) = out.first_mut() else {
         return Some(out);
@@ -196,7 +230,7 @@ fn allocate(amount: Cents, weights: &[Cents]) -> Option<Vec<Cents>> {
 /// A flat fringe on one line. Per unit, scaled by the hours ratio, when the
 /// fringe's unit and the line's primary unit both have hours (and the
 /// fringe's are not zero); otherwise `rate` once. Rounded to cents once.
-fn flat_amount(
+pub(super) fn flat_amount(
     ctx: &Ctx,
     fringe_unit: Option<&str>,
     line_unit: &str,

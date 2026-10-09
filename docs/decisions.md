@@ -142,3 +142,64 @@ windows, so removing every separator and all styling gives an identical report
 (property-tested). All of it is additive in format version 1 and left out at its default,
 so existing files and the golden file are unchanged. Colors are checked (`#` plus 6 hex
 digits, stored lowercase) and limits enforced by the app's commands, not the file reader.
+
+## 17. Versions and multi-budget compare (2026-10-09)
+
+- **Versions live inside the budget.** `Budget::versions` holds named full copies of the
+  content (`BudgetSnapshot`: everything but the version list, so versions never nest), with
+  an id, a name, a caller-supplied ISO 8601 `created` time (the engine never reads the
+  clock) and an optional note. A version is a whole copy, so N versions make the file
+  roughly N + 1 times as big. Simple and robust for v1; deltas can come later if files
+  get large. The baseline (decision 12) is unchanged and is part of each version's content.
+- **Restore is reversible**: the content being replaced is saved first as an automatic
+  version (`Before restoring "<name>"`), then the version's content replaces the current
+  one. The version list is kept. Ids are one past the highest in use. Names and notes
+  are stored as given; any limits are the app's commands' job, like other display data.
+- **Row ids stay meaningful across versions.** `Budget::highest_row_id` covers current
+  rows, the baseline and every version, so new rows never reuse an id a version still has.
+- **Compare matches by account code** through each budget's own coding: codes are parsed
+  into segments and compared segment by segment, so `1100`, `11-00` and `11.00` (under a
+  `.` pattern) all match. A code that doesn't fit falls back to its trimmed text. Accounts
+  match within their category; category fringe accounts are listed and matched only with
+  each other. 2 to 16 budgets (a base and up to 15 others). Order is the first budget's,
+  then anything new in the order later budgets show it. Differences are against the first
+  budget, a missing value counting as 0; the percent is against the base's size (sign
+  follows the amount) and is `None` when the base is 0 or missing.
+- **Detail compare** is per account: rows match by id (versions of one budget) or by
+  trimmed, case-insensitive description with the n-th duplicate matching the n-th. Only
+  costed rows. Property-tested: comparing a version with the current budget gives exactly
+  the baseline variance for every category, account and row.
+
+## 18. Edits stay instant on big budgets (2026-10-09)
+
+Real budgets have thousands of lines (2,000+ across ~60 accounts is common). Every command
+used to send the whole budget and every row's totals (2 MB at 5,000 rows) and the UI redrew
+everything. Target: a one-cell edit in a 5,000-row budget under ~30 ms from key to screen,
+bulk edits under ~100 ms. Measured with `examples/perf.rs` on `fwb_core::sample` budgets.
+
+- **A lean view, not a diff.** Every command returns the budget's outline (no detail rows),
+  totals down to the account, and the one account on screen in full; `focus_account`
+  says which, `get_full_view` gives everything for printing. Each reply stands alone, so
+  there is no client copy to keep in sync and nothing to go stale after an undo or an
+  error. Size follows the account on screen (about 35 KB plus 0.5 KB a row), not the
+  budget. Problems elsewhere come as a count and a list of accounts; variance rows only
+  for the account on screen, with a count of changed rows. Versions are listed, not sent.
+- **Same numbers, less work.** Percent fringes visit only the fringes an earner's lines
+  carry (it visited every fringe in the account for every earner); the unfiltered pass
+  for "full" group totals skips accounts where every row counts (it re-ran every
+  account); plain numbers and bare globals skip the parser. A per-account recalc cache
+  (`RecalcCache`) re-evaluates only accounts whose rows changed, keyed by the tables rows
+  depend on. Results are bit-identical: the old engine is kept as a test reference and
+  compared on generated budgets with random edits, filters and every posting mode.
+- **Undo keeps what changed**, not whole budgets: the changed rows (or an account's rows
+  when rows were added or removed), the rest only when it changed, the version list only
+  when it changed, the whole budget only for structural edits. 200 steps of one-cell edits
+  now hold 200 rows, not 200 budgets.
+- **The grid patches and windows.** Unchanged rows keep their elements; grids over 150
+  rows draw only the rows near the viewport. Cursor scrolling waits for the next frame so
+  a redraw costs one layout.
+- **Numbers** (release build, this Mac, 5,000 rows, a 416-line account on screen): one-cell
+  edit in Rust 17.9 ms and 2,000 KB of JSON before, 5.0 ms and 205 KB after; 500-cell paste
+  19.0 ms before, 9.8 ms after; drawing the reply after a one-cell edit in a UI harness
+  (Chromium, fake bridge with the canned replies) 227 ms before, 13 ms after; opening the
+  big account 192 ms before, 24 ms after.

@@ -1345,7 +1345,8 @@ function renderBaseline(panel) {
     table.append(thead, tbody);
     box.append(table);
     if (variance) {
-      const lines = changedCount(variance.rows);
+      // Views list only the rows on screen; the count covers every row.
+      const lines = typeof variance.rows_changed === 'number' ? variance.rows_changed : changedCount(variance.rows);
       const accounts = changedCount(variance.accounts);
       box.append(
         k.el(

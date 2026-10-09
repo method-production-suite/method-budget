@@ -81,3 +81,23 @@ fn format_doc_example_matches_golden_file() {
         "docs/FORMAT.md's complete example must match tests/golden/small.json"
     );
 }
+
+#[test]
+fn format_doc_versions_example_reads() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let doc = std::fs::read_to_string(root.join("../../docs/FORMAT.md")).unwrap();
+    let start = doc
+        .find("```json\n\"versions\": [")
+        .expect("FORMAT.md has a versions example")
+        + "```json\n".len();
+    let example = &doc[start..start + doc[start..].find("```").unwrap()];
+    let text = format!(
+        "{{\"format\": \"film-wizard-budget\", \"version\": 1, \"budget\": \
+         {{\"title\": \"Short Film\", \"base_currency\": \"USD\", {example}}}}}"
+    );
+    let b = fwb_format::from_str(&text).unwrap_or_else(|e| panic!("{e}\n{text}"));
+    let v = &b.versions[0];
+    assert_eq!((v.id, v.name.as_str()), (1, "Studio draft"));
+    assert_eq!(v.note.as_deref(), Some("Sent to the studio"));
+    assert_eq!(v.budget.categories().count(), 1);
+}

@@ -1,5 +1,6 @@
-// Turns a View (budget JSON + report) into grid columns and rows for each of
-// the three levels. Pure functions: no DOM, no commands.
+// Turns a View (the budget's outline and totals, plus the account on screen in
+// full) into grid columns and rows for each of the three levels. Pure
+// functions: no DOM, no commands.
 
 import { money, decimal, names } from './format.js';
 
@@ -24,7 +25,8 @@ export function indexView(view) {
     }
   });
 
-  // Problems on detail cells: row id -> { field: message }.
+  // Problems on detail cells (the view lists the ones in the account on
+  // screen): row id -> { field: message }.
   const cellIssues = new Map();
   for (const issue of view.issues || []) {
     const t = issue.target || {};
@@ -33,8 +35,16 @@ export function indexView(view) {
     m[t.field] = m[t.field] ? `${m[t.field]}; ${issue.message}` : issue.message;
     cellIssues.set(t.row_id, m);
   }
-  const accountHasIssue = (acct) => (acct.details || []).some((d) => cellIssues.has(d.id));
-  const categoryHasIssue = (cat) => (cat.accounts || []).some(accountHasIssue);
+  // Accounts with a problem cell anywhere, by topsheet and account index.
+  const badAccounts = new Set();
+  const badCategories = new Set();
+  for (const at of Array.isArray(view.issue_accounts) ? view.issue_accounts : []) {
+    if (!Array.isArray(at) || at.length !== 2) continue;
+    badAccounts.add(`${at[0]}:${at[1]}`);
+    badCategories.add(at[0]);
+  }
+  const accountHasIssue = (ti, ai) => badAccounts.has(`${ti}:${ai}`);
+  const categoryHasIssue = (ti) => badCategories.has(ti);
 
   return { b, r, topsheet, cats, levels, cellIssues, accountHasIssue, categoryHasIssue };
 }
@@ -110,7 +120,7 @@ export function topsheetRows(ix) {
       continue;
     }
     const c = ix.cats.find((x) => x.ti === ti);
-    const bad = ix.categoryHasIssue(row);
+    const bad = ix.categoryHasIssue(ti);
     rows.push({
       key: `t${ti}`,
       cls: 'category',
@@ -181,7 +191,7 @@ export function accountRows(ix, entry) {
   const frCls = postingKind(ix) === 'account' ? '' : 'muted';
   const rows = accounts.map((a, ai) => {
     const ar = rep ? rep.accounts[ai] : null;
-    const bad = ix.accountHasIssue(a);
+    const bad = ix.accountHasIssue(entry.ti, ai);
     return {
       key: `a${ai}`,
       code: a.code,
@@ -369,11 +379,18 @@ export function fringePercent(fringeCents, totalCents) {
   return `${decimal((hundredths / 100).toFixed(2))}%`;
 }
 
-export function detailRows(ix, entry, ai) {
+/**
+ * The rows of account `ai` in category `entry`. `full` is the view's account
+ * on screen ({ details, rows }): the account's rows in file-format JSON and
+ * their totals (rows is null without totals).
+ */
+export function detailRows(ix, entry, ai, full) {
   const acct = (entry.cat.accounts || [])[ai];
   if (!acct) return [];
-  const ar = entry.rep ? entry.rep.accounts[ai] : null;
-  const details = acct.details || [];
+  const rep = entry.rep ? entry.rep.accounts[ai] : null;
+  const details = full && Array.isArray(full.details) ? full.details : acct.details || [];
+  const rowTotals = full ? full.rows : rep && rep.rows;
+  const ar = rep && Array.isArray(rowTotals) ? { ...rep, rows: rowTotals } : null;
   const base = ix.b.base_currency;
   const groups = ix.b.groups || {};
 

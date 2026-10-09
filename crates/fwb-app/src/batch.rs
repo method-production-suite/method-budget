@@ -37,13 +37,22 @@ pub fn set_cells(b: &mut Budget, edits: &[CellEdit]) -> EditResult<usize> {
         .iter()
         .map(|e| Field::parse(&e.field))
         .collect::<EditResult<Vec<Field>>>()?;
-    // Work on a copy so a bad cell late in the batch leaves no partial change,
-    // even outside a Session.
-    let mut next = b.clone();
-    for (e, field) in edits.iter().zip(fields) {
-        edit::set_detail_field(&mut next, e.row_id, field, &e.value)?;
+    // Find every row in one pass, and check every cell before changing any,
+    // so a bad cell late in the batch leaves no partial change, even outside
+    // a Session. (Setting a field can only fail on these checks.)
+    let mut rows = edit::rows_by_id(b, &edits.iter().map(|e| e.row_id).collect());
+    for (e, &field) in edits.iter().zip(&fields) {
+        let d = rows
+            .get(&e.row_id)
+            .ok_or_else(|| edit::row_gone(e.row_id))?;
+        edit::check_field(d, field)?;
     }
-    *b = next;
+    for (e, field) in edits.iter().zip(fields) {
+        let d = rows
+            .get_mut(&e.row_id)
+            .ok_or_else(|| edit::row_gone(e.row_id))?;
+        edit::apply_field(d, field, &e.value)?;
+    }
     Ok(edits.len())
 }
 

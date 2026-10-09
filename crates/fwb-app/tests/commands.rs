@@ -5,12 +5,14 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use fwb_app::edit::{self, CurrencyInput, FringeInput, GroupInput, UnitInput};
+use fwb_app::view::Focus;
 use fwb_app::Session;
 use fwb_core::{Budget, RowId};
 use serde_json::Value;
 
+/// Everything, every row (the full view the printed report uses).
 fn view(s: &mut Session) -> Value {
-    serde_json::to_value(s.view()).unwrap()
+    serde_json::to_value(s.full_view()).unwrap()
 }
 
 fn ids_in(s: &Session, account: &str) -> Vec<RowId> {
@@ -185,9 +187,17 @@ fn adding_and_deleting_rows() {
         "ids continue after the starter's 13"
     );
 
+    // The lean view carries the account on screen in full.
+    s.set_focus(Some(Focus {
+        category: "20".into(),
+        ti: 5,
+        account: "20-01".into(),
+        ai: 0,
+    }));
     let v = serde_json::to_value(s.view_with(Some(adj))).unwrap();
     assert_eq!(v["created_row"], adj);
-    let details = &v["budget"]["topsheet"][5]["accounts"][0]["details"];
+    assert_eq!(v["account"]["code"], "20-01");
+    let details = &v["account"]["details"];
     assert_eq!(details[1]["description"], "");
     assert!(
         details[1].get("kind").is_none(),
@@ -1100,4 +1110,174 @@ fn baseline_is_refused_while_the_budget_has_errors() {
             .unwrap()
             < 0
     );
+}
+
+/// The lean view every command returns is the full view cut down: the
+/// budget without rows (with each account's row count), totals without
+/// per-row figures, and the account on screen in full.
+#[test]
+fn lean_view_is_the_full_view_cut_down() {
+    let mut b = fwb_core::sample::budget(&fwb_core::sample::SampleSpec {
+        rows: 600,
+        accounts: 14,
+        categories: 4,
+        ..Default::default()
+    });
+    // Two problem cells in different accounts, and a version saved.
+    let snapshot = b.snapshot();
+    b.versions.push(fwb_core::Version {
+        id: 1,
+        name: "First pass".into(),
+        created: "2026-10-09T10:00:00Z".into(),
+        note: Some("before notes".into()),
+        budget: Box::new(snapshot),
+    });
+    let mut s = Session::with_budget(b, None);
+    let places: Vec<(usize, usize, String, String)> = s
+        .budget()
+        .topsheet
+        .iter()
+        .enumerate()
+        .filter_map(|(ti, r)| match r {
+            fwb_core::TopsheetRow::Category(c) => Some((ti, c)),
+            _ => None,
+        })
+        .flat_map(|(ti, c)| {
+            c.accounts
+                .iter()
+                .enumerate()
+                .map(move |(ai, a)| (ti, ai, c.code.clone(), a.code.clone()))
+        })
+        .collect();
+    let first = ids_in(&s, &places[0].3)[0];
+    let last = *ids_in(&s, &places[places.len() - 1].3).last().unwrap();
+    s.set_detail_field(first, "rate", "NOPE").unwrap();
+    s.set_detail_field(last, "amount", "1 +").unwrap();
+
+    let full = view(&mut s);
+    for (ti, ai, cat, code) in places.iter().cloned() {
+        s.set_focus(Some(Focus {
+            category: cat,
+            ti,
+            account: code.clone(),
+            ai,
+        }));
+        let lean = serde_json::to_value(s.view()).unwrap();
+        assert_eq!(lean["rev"], full["rev"]);
+
+        // Budget: the full one with rows swapped for counts.
+        let mut want = full["budget"].clone();
+        for r in want["topsheet"].as_array_mut().unwrap() {
+            let accounts = r.get_mut("accounts").and_then(Value::as_array_mut);
+            for a in accounts.into_iter().flatten() {
+                let n = a
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("details")
+                    .map_or(0, |d| d.as_array().unwrap().len());
+                a["lines"] = n.into();
+            }
+        }
+        want["baseline"].as_object_mut().unwrap().remove("rows");
+        assert_eq!(lean["budget"], want);
+        assert_eq!(lean["budget"]["versions"][0]["name"], "First pass");
+        assert!(lean["budget"]["versions"][0].get("budget").is_none());
+
+        // Report: the full one without rows; the account's rows separately.
+        let mut want = full["report"].clone();
+        let mut rows = Value::Null;
+        let ci = places
+            .iter()
+            .map(|p| p.0)
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .position(|t| t == ti)
+            .unwrap();
+        for (i, c) in want["categories"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .enumerate()
+        {
+            for (j, a) in c["accounts"].as_array_mut().unwrap().iter_mut().enumerate() {
+                let r = a.as_object_mut().unwrap().remove("rows").unwrap();
+                if i == ci && j == ai {
+                    rows = r;
+                }
+            }
+        }
+        assert_eq!(lean["report"], want);
+        let acct = &lean["account"];
+        assert_eq!(
+            (acct["ti"].as_u64(), acct["ai"].as_u64()),
+            (Some(ti as u64), Some(ai as u64))
+        );
+        assert_eq!(acct["code"], code.as_str());
+        assert_eq!(acct["rows"], rows);
+        assert_eq!(
+            acct["details"],
+            full["budget"]["topsheet"][ti]["accounts"][ai]["details"]
+        );
+
+        // Problems: all counted, the ones in this account listed.
+        assert_eq!(lean["issue_count"], 2);
+        assert_eq!(lean["issue_accounts"].as_array().unwrap().len(), 2);
+        let ids: Vec<RowId> = ids_in(&s, &code);
+        let listed = lean["issues"].as_array().unwrap();
+        let want: Vec<&Value> = full["issues"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|i| ids.contains(&i["target"]["row_id"].as_u64().unwrap()))
+            .collect();
+        assert_eq!(listed.iter().collect::<Vec<_>>(), want);
+        for k in ["error", "partial", "file", "can_undo", "can_redo"] {
+            assert_eq!(lean[k], full[k], "{k}");
+        }
+
+        // Variance: the account's rows; the same totals and count.
+        let lv = &lean["variance"];
+        for k in [
+            "accounts",
+            "categories",
+            "grand_total",
+            "net_total",
+            "rows_changed",
+        ] {
+            assert_eq!(lv[k], full["variance"][k], "{k}");
+        }
+        let lrows = lv["rows"].as_object().unwrap();
+        assert!(lrows.keys().all(|k| ids.contains(&k.parse().unwrap())));
+        assert!(full["variance"]["rows_changed"].as_u64().unwrap() >= 2);
+    }
+    // No account on screen: no rows at all.
+    s.set_focus(None);
+    let lean = serde_json::to_value(s.view()).unwrap();
+    assert!(lean["account"].is_null());
+    assert!(lean["issues"].as_array().unwrap().is_empty());
+    assert!(lean["variance"]["rows"].as_object().unwrap().is_empty());
+}
+
+/// A focused account is found by code first, as the UI finds its place.
+#[test]
+fn focus_follows_the_account_code() {
+    let mut s = Session::new();
+    // 21-01 is the only account in category 21, at topsheet index 6.
+    s.set_focus(Some(Focus {
+        category: "21".into(),
+        ti: 99,
+        account: "21-01".into(),
+        ai: 7,
+    }));
+    assert_eq!(s.focused(), Some((6, 0)));
+    let v = serde_json::to_value(s.view()).unwrap();
+    assert_eq!(v["account"]["code"], "21-01");
+    s.set_focus(Some(Focus {
+        category: "21".into(),
+        ti: 6,
+        account: "99-99".into(),
+        ai: 0,
+    }));
+    assert_eq!(s.focused(), None);
+    assert!(serde_json::to_value(s.view()).unwrap()["account"].is_null());
 }

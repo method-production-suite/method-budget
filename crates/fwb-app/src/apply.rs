@@ -22,6 +22,7 @@ use tauri::{Runtime, State, WebviewWindow};
 use crate::app::{edit_budget, AppState};
 use crate::edit::{details, EditResult};
 use crate::report_dto::SelectionDto;
+use crate::session::SelectionIndex;
 use crate::view::View;
 
 type Cents = i64;
@@ -593,14 +594,16 @@ pub fn apply_summary(
     categories: Option<Vec<usize>>,
 ) -> ApplySummary {
     let mut s = state.lock();
-    let budget = s.budget().clone();
+    let (budget, outcome) = s.totals();
     let rows = rows_under(
-        &budget,
+        budget,
         row_ids.as_deref().unwrap_or_default(),
         accounts.as_deref().unwrap_or_default(),
         categories.as_deref().unwrap_or_default(),
     );
-    summary(&budget, rows, |ids| s.selection(ids))
+    // Rows are looked up once for every total the panel shows.
+    let index = SelectionIndex::new(budget, outcome);
+    summary(budget, rows, |ids| index.totals(ids))
 }
 
 /// Puts a fringe or group on the rows (`on`), or takes it off.

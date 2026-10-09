@@ -6,6 +6,8 @@
   ],
   "permissions": [
     "allow-get-view",
+    "allow-get-full-view",
+    "allow-focus-account",
     "allow-new-budget",
     "allow-open-budget",
     "allow-save-budget",

@@ -1,0 +1,116 @@
+//! Named versions saved inside a budget: save, restore, rename and delete.
+//!
+//! A [`Version`] is a full copy of the budget's content (a [`BudgetSnapshot`]:
+//! everything except the version list, so versions never nest). Versions are
+//! kept oldest first. Ids are unique within the list: a new version gets one
+//! more than the highest id in use.
+//!
+//! Restoring is reversible: the content being replaced is first saved as an
+//! automatic version, so restoring that one puts everything back.
+//!
+//! The engine never reads the clock. Callers pass `created` (an ISO 8601
+//! date-time) and it is stored as given. Names and notes are stored as given
+//! too; length or blank-name rules belong to the application's commands, like
+//! other display data.
+
+use std::collections::BTreeSet;
+use std::fmt;
+
+use crate::model::{Budget, Version, VersionId};
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum VersionError {
+    /// No version has this id.
+    NotFound(VersionId),
+}
+
+impl fmt::Display for VersionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VersionError::NotFound(id) => write!(f, "there is no version {id}"),
+        }
+    }
+}
+
+impl std::error::Error for VersionError {}
+
+/// One more than the highest id in use, or (only if that would overflow) the
+/// smallest unused id from 1.
+fn next_id(b: &Budget) -> VersionId {
+    let max = b.versions.iter().map(|v| v.id).max().unwrap_or(0);
+    max.checked_add(1).unwrap_or_else(|| {
+        let used: BTreeSet<VersionId> = b.versions.iter().map(|v| v.id).collect();
+        (1..=VersionId::MAX)
+            .find(|i| !used.contains(i))
+            .unwrap_or(VersionId::MAX)
+    })
+}
+
+/// Saves the current content as a new version at the end of the list and
+/// returns its id.
+pub fn save_version(
+    b: &mut Budget,
+    name: impl Into<String>,
+    created: impl Into<String>,
+    note: Option<String>,
+) -> VersionId {
+    let id = next_id(b);
+    let snapshot = b.snapshot();
+    b.versions.push(Version {
+        id,
+        name: name.into(),
+        created: created.into(),
+        note,
+        budget: Box::new(snapshot),
+    });
+    id
+}
+
+/// The name given to the automatic version saved before a restore.
+pub fn before_restore_name(restored: &str) -> String {
+    format!("Before restoring \"{restored}\"")
+}
+
+/// Replaces the current content with version `id`'s content. The version list
+/// is kept, and the content being replaced is first saved as a new version
+/// (named by [`before_restore_name`], with `created` as its time), so the
+/// restore can be undone by restoring that version. Returns the automatic
+/// version's id. Nothing changes if `id` does not exist.
+pub fn restore_version(
+    b: &mut Budget,
+    id: VersionId,
+    created: impl Into<String>,
+) -> Result<VersionId, VersionError> {
+    let target = b.version(id).ok_or(VersionError::NotFound(id))?;
+    let name = before_restore_name(&target.name);
+    let content = (*target.budget).clone();
+    let auto = save_version(b, name, created, None);
+    let versions = std::mem::take(&mut b.versions);
+    *b = content.into_budget(versions);
+    Ok(auto)
+}
+
+/// Removes version `id` and returns it.
+pub fn delete_version(b: &mut Budget, id: VersionId) -> Result<Version, VersionError> {
+    let i = b
+        .versions
+        .iter()
+        .position(|v| v.id == id)
+        .ok_or(VersionError::NotFound(id))?;
+    Ok(b.versions.remove(i))
+}
+
+/// Renames version `id`.
+pub fn rename_version(
+    b: &mut Budget,
+    id: VersionId,
+    name: impl Into<String>,
+) -> Result<(), VersionError> {
+    let v = b
+        .versions
+        .iter_mut()
+        .find(|v| v.id == id)
+        .ok_or(VersionError::NotFound(id))?;
+    v.name = name.into();
+    Ok(())
+}

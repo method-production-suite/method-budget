@@ -283,7 +283,7 @@ mod tests {
         assert_eq!(row(&s, b).color.as_deref(), Some("#abcdef"));
 
         // The view carries the new fields in file-format JSON.
-        let v = serde_json::to_value(s.view()).unwrap();
+        let v = serde_json::to_value(s.full_view()).unwrap();
         let text = v["budget"].to_string();
         assert!(text.contains("\"italic\":true") && text.contains("\"indent\":2"));
 
@@ -399,7 +399,7 @@ mod tests {
         assert_eq!(r0.grand_total, r1.grand_total);
         assert_eq!(r0.net_total, r1.net_total);
         assert!(after.issues.is_empty());
-        let v = serde_json::to_value(s.view()).unwrap();
+        let v = serde_json::to_value(s.full_view()).unwrap();
         assert!(v["budget"].to_string().contains("\"kind\":\"separator\""));
 
         // Separators use no columns, but take style and notes.
