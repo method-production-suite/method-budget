@@ -114,18 +114,13 @@ integer cents, decimals are strings, never JSON floats. Extension `.fwb`. Spec:
 the 14-day cooldown (checked by publish date; zmij is dtolnay's float formatter, pulled in
 by serde_json).
 
-## 14. UI approach: PROPOSED, not decided (2026-10-08)
+## 14. UI approach: Tauri desktop app (2026-10-08, decided by Sam)
 
-Options:
-- **Web app on WASM** (engine compiled to WebAssembly, UI in TypeScript). Runs in any
-  browser with nothing to install, easy to demo and share, and the same build can later be
-  wrapped as a desktop app. Cost: a JS toolchain (npm deps, cooldown applies) and file access
-  through the browser's file APIs.
-- **Tauri desktop app** (Rust backend, web UI). Native file open/save, menus, offline by
-  default, small installers. Cost: platform builds and signing, and still a web UI inside.
-- **Native Rust GUI** (egui, iced, Slint). One language, but spreadsheet-grade grid editing
-  (the core of budgeting) is far less mature than on the web.
+Film Wizard Budgeting is a **local, open-source desktop app**, not a web app. Budgets live as
+`.fwb` files on the user's disk; no server, no account, works offline.
 
-Recommendation: **web UI over WASM first, wrapped in Tauri when we want a desktop app.**
-The grid is the product, and the web has the best grid tooling; WASM keeps the engine
-identical everywhere; Tauri reuses the same UI later. Needs Sam's sign-off before building.
+Built with **Tauri**: the Rust engine runs natively in the app process, and the UI is drawn
+with web tech inside a native window (no browser, nothing hosted). Chosen over a pure-Rust
+GUI (Slint, iced, egui) because spreadsheet-grade grid editing is the heart of budgeting and
+the web stack's grid tooling is far more mature. Small installers for macOS, Windows and
+Linux. The JS toolchain this adds is held to the same dependency cooldown and lockfile rules.
