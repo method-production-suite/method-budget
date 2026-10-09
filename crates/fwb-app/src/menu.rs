@@ -106,13 +106,13 @@ pub const EDIT: &[Entry] = &[
     Entry::Paste,
     item("edit.select_all", "Select All", "mod+a"),
     SEP,
-    item("edit.fill_down", "Fill Down", "mod+d"),
-    item("edit.delete_rows", "Delete Rows", "mod+backspace"),
+    item("edit.fill_down", "Fill Down", "mod+shift+d"),
+    item("edit.delete_rows", "Delete Rows", "mod+d"),
 ];
 
 pub const INSERT: &[Entry] = &[
-    item("insert.line", "Line", "mod+enter"),
-    item("insert.subtotal", "Subtotal", "mod+alt+t"),
+    item("insert.line", "Line", "mod+i"),
+    item("insert.subtotal", "Subtotal", "mod+="),
     item("insert.adjustment", "Adjustment", "mod+alt+a"),
     SEP,
     plain("insert.account", "Account…"),
@@ -165,6 +165,7 @@ pub fn accelerator(spec: &str) -> String {
             "backspace" => "Backspace".to_string(),
             "up" => "Up".to_string(),
             "down" => "Down".to_string(),
+            "=" => "Equal".to_string(),
             key => key.to_uppercase(),
         })
         .collect::<Vec<_>>()
@@ -401,6 +402,7 @@ mod tests {
         assert_eq!(accelerator("mod+alt+t"), "CmdOrCtrl+Alt+T");
         assert_eq!(accelerator("mod+enter"), "CmdOrCtrl+Enter");
         assert_eq!(accelerator("mod+backspace"), "CmdOrCtrl+Backspace");
+        assert_eq!(accelerator("mod+="), "CmdOrCtrl+Equal");
         assert_eq!(accelerator("mod+shift+up"), "CmdOrCtrl+Shift+Up");
         assert_eq!(accelerator("mod+]"), "CmdOrCtrl+]");
         assert_eq!(accelerator("mod+/"), "CmdOrCtrl+/");

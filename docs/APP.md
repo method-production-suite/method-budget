@@ -71,8 +71,8 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 | Undo, Redo (in a text field: its typing) | Cmd+Z, Shift+Cmd+Z | Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z |
 | Cut, Copy, Paste cells (tab-separated, like a spreadsheet) | Cmd+X, Cmd+C, Cmd+V | Ctrl+X, Ctrl+C, Ctrl+V |
 | Select every row | Cmd+A | Ctrl+A |
-| Fill down | Cmd+D | Ctrl+D |
-| Delete the selected rows (or the category or account) | Cmd+Backspace | Ctrl+Backspace |
+| Fill down | Shift+Cmd+D | Ctrl+Shift+D |
+| Delete the selected rows (or the category or account; Cmd+Z brings them back) | Cmd+D | Ctrl+D |
 | Clear the selected cells | Backspace or Delete | Backspace or Delete |
 | Move; extend the selection | Arrows; Shift+arrows | Arrows; Shift+arrows |
 | Next or previous cell | Tab, Shift+Tab | Tab, Shift+Tab |
@@ -81,8 +81,8 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 | Finish editing and move down or up (detail lines) | Enter, Shift+Enter | Enter, Shift+Enter |
 | Same value into every selected row | Cmd+Enter while editing | Ctrl+Enter while editing |
 | Cancel an edit, clear the selection, or go up a level | Escape | Escape |
-| Insert a line below | Cmd+Enter | Ctrl+Enter |
-| Insert a subtotal, an adjustment | Option+Cmd+T, Option+Cmd+A | Ctrl+Alt+T, Ctrl+Alt+A |
+| Insert a line below | Cmd+I | Ctrl+I |
+| Insert a subtotal, an adjustment | Cmd+=, Option+Cmd+A | Ctrl+=, Ctrl+Alt+A |
 | Up a level; down a level (also Enter) | Cmd+Up; Cmd+Down | Ctrl+Up; Ctrl+Down |
 | Go to the topsheet | Shift+Cmd+Up | Ctrl+Shift+Up |
 | Next, previous account (across categories, wrapping) | Cmd+], Cmd+[ | Ctrl+], Ctrl+[ |
@@ -90,7 +90,9 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 | Setup tab 1 to 9 (Globals ... Credits; Escape returns to the grid) | Cmd+1 ... Cmd+9 | Ctrl+1 ... Ctrl+9 |
 | Keyboard shortcuts | Cmd+/ | Ctrl+/ |
 
-Insert > Account, Category and Production Total have no key; they go to the level they
+The row keys (Cmd+I insert, Cmd+D delete, Cmd+= subtotal) follow the habits of people
+coming from other budgeting tools; fill down is on Shift+Cmd+D instead of the spreadsheet
+Cmd+D. Insert > Account, Category and Production Total have no key; they go to the level they
 belong to first and open the same dialog as the buttons. Info, Settings and Baseline tabs
 are in View > Setup Tab.
 

@@ -124,3 +124,10 @@ with web tech inside a native window (no browser, nothing hosted). Chosen over a
 GUI (Slint, iced, egui) because spreadsheet-grade grid editing is the heart of budgeting and
 the web stack's grid tooling is far more mature. Small installers for macOS, Windows and
 Linux. The JS toolchain this adds is held to the same dependency cooldown and lockfile rules.
+
+## 15. Row shortcuts follow budgeting habits (2026-10-09, Sam)
+
+Cmd/Ctrl+I inserts a line, Cmd/Ctrl+D deletes rows (undoable), Cmd/Ctrl+= inserts a
+subtotal: the keys people switching from other budgeting tools already have in their hands.
+Fill down moves to Shift+Cmd/Ctrl+D rather than the spreadsheet Cmd+D. Matching common
+shortcuts is about familiarity, not copying; labels and menus stay our own.

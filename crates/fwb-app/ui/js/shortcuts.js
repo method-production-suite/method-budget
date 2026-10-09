@@ -42,8 +42,8 @@ export const SHORTCUTS = [
   { id: 'edit.copy', group: 'Edit', label: 'Copy the selected cells (tab-separated, for spreadsheets)', keys: 'mod+c', scope: 'native' },
   { id: 'edit.paste', group: 'Edit', label: 'Paste cells, starting at the selection', keys: 'mod+v', scope: 'native' },
   { id: 'edit.select_all', group: 'Edit', label: 'Select every row', keys: 'mod+a', scope: 'app', field: true },
-  { id: 'edit.fill_down', group: 'Edit', label: 'Fill down (top selected cell into the cells below)', keys: 'mod+d', scope: 'grid' },
-  { id: 'edit.delete_rows', group: 'Edit', label: 'Delete the selected rows (or the category or account)', keys: 'mod+backspace', scope: 'grid', text: true },
+  { id: 'edit.fill_down', group: 'Edit', label: 'Fill down (top selected cell into the cells below)', keys: 'mod+shift+d', scope: 'grid' },
+  { id: 'edit.delete_rows', group: 'Edit', label: 'Delete the selected rows (or the category or account)', keys: 'mod+d', scope: 'grid', text: true },
   { id: 'grid.clear', group: 'Edit', label: 'Clear the selected cells', keys: ['backspace', 'delete'], scope: 'builtin' },
 
   // Moving around and editing cells
@@ -58,8 +58,8 @@ export const SHORTCUTS = [
   { id: 'grid.cancel', group: 'Cells', label: 'Cancel the edit, clear the selection, or go up a level', keys: 'escape', scope: 'builtin' },
 
   // Insert
-  { id: 'insert.line', group: 'Insert', label: 'Insert a line below', keys: 'mod+enter', scope: 'grid' },
-  { id: 'insert.subtotal', group: 'Insert', label: 'Insert a subtotal row', keys: 'mod+alt+t', scope: 'grid' },
+  { id: 'insert.line', group: 'Insert', label: 'Insert a line below', keys: 'mod+i', scope: 'grid' },
+  { id: 'insert.subtotal', group: 'Insert', label: 'Insert a subtotal row', keys: 'mod+=', scope: 'grid' },
   { id: 'insert.adjustment', group: 'Insert', label: 'Insert an adjustment row', keys: 'mod+alt+a', scope: 'grid' },
   { id: 'insert.account', group: 'Insert', label: 'Add an account', scope: 'menu' },
   { id: 'insert.category', group: 'Insert', label: 'Add a category', scope: 'menu' },
@@ -195,7 +195,7 @@ const NAMED = {
   f2: 'F2',
 };
 
-const CODES = { '[': 'BracketLeft', ']': 'BracketRight', '/': 'Slash' };
+const CODES = { '[': 'BracketLeft', ']': 'BracketRight', '/': 'Slash', '=': 'Equal' };
 
 function keyMatches(e, k) {
   if (NAMED[k]) return e.key === NAMED[k];
