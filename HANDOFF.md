@@ -35,7 +35,7 @@ Budgeting (Entertainment Partners). A Darkwell project owned by Sam Sandweiss. T
 ## Current state
 Scaffold only: Cargo workspace, `fwb-core` stub (just `Cents` + an empty test), README,
 CLEAN-ROOM.md, licenses, CI (`cargo test --workspace --locked`). Zero dependencies.
-First CI run not yet checked: check it (`gh run list`) and fix if red.
+CI is green as of 2026-10-08 (`gh run list` to recheck).
 
 ## Next: the engine data model
 Build in `fwb-core`, test-first, no UI yet:
