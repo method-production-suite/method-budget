@@ -1,0 +1,133 @@
+# Builds installable bundles when a version tag (v*) is pushed, and drafts a GitHub
+# Release with them. Bundles are unsigned (macOS: ad-hoc signed), so no secrets are
+# needed. Signing and notarization: docs/INSTALL.md.
+# Only first-party actions, pinned to full commit SHAs. No caches (release builds start clean).
+name: release
+on:
+  push:
+    tags:
+      - "v*"
+permissions:
+  contents: read # checkout only
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    name: build (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-universal
+            os: macos-latest
+            rust_targets: aarch64-apple-darwin x86_64-apple-darwin
+            target: universal-apple-darwin
+            bundles: app,dmg
+          - name: windows-x64
+            os: windows-latest
+            rust_targets: ""
+            target: ""
+            bundles: msi,nsis
+          - name: linux-x64
+            # The oldest supported Ubuntu keeps the AppImage's glibc requirement low.
+            os: ubuntu-22.04
+            rust_targets: ""
+            target: ""
+            bundles: deb,appimage
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Install Tauri system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev build-essential pkg-config libgtk-3-dev file
+
+      - name: Add Rust targets
+        if: matrix.rust_targets != ''
+        shell: bash
+        env:
+          RUST_TARGETS: ${{ matrix.rust_targets }}
+        run: |
+          # shellcheck disable=SC2086 # word splitting is intended
+          rustup target add $RUST_TARGETS
+
+      - name: Install Tauri CLI (pinned)
+        run: cargo install tauri-cli --version 2.11.4 --locked
+
+      - name: Build bundles
+        shell: bash
+        working-directory: crates/fwb-app
+        env:
+          BUNDLES: ${{ matrix.bundles }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          args=(build --bundles "$BUNDLES")
+          if [ -n "$TARGET" ]; then args+=(--target "$TARGET"); fi
+          cargo tauri "${args[@]}" -- --locked
+
+      - name: Collect bundles
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          if [ -n "$TARGET" ]; then root="target/$TARGET/release/bundle"; else root="target/release/bundle"; fi
+          mkdir -p dist
+          case "$RUNNER_OS" in
+            macOS)
+              # A .app is a folder: zip it with ditto so permissions and the signature survive.
+              for app in "$root"/macos/*.app; do
+                ditto -c -k --keepParent "$app" "dist/$(basename "$app" .app)_${GITHUB_REF_NAME}_universal.app.zip"
+              done
+              cp "$root"/dmg/*.dmg dist/
+              ;;
+            Windows)
+              cp "$root"/msi/*.msi "$root"/nsis/*.exe dist/
+              ;;
+            Linux)
+              cp "$root"/deb/*.deb "$root"/appimage/*.AppImage dist/
+              ;;
+          esac
+          ls -l dist
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bundles-${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: draft release
+    # The only job with write access: it drafts a GitHub Release for the tag and attaches
+    # the bundles. Publishing the draft is left to a person.
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # create the draft release and upload its assets
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: bundles-*
+          path: dist
+          merge-multiple: true
+
+      - name: Draft the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ls -l dist
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --verify-tag \
+            --title "Film Wizard Budgeting $GITHUB_REF_NAME" \
+            --notes "Unsigned builds. macOS: see docs/INSTALL.md for the one-time Open Anyway step."
