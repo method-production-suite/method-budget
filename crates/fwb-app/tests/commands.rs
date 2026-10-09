@@ -562,3 +562,542 @@ fn undo_history_is_capped() {
     // and it isn't the saved state either.
     assert!(s.is_dirty());
 }
+
+// ---------------------------------------------------------------------------
+// Topsheet setup: charges, credits, sets, locations, budget info, settings and
+// the baseline. Inputs are built from the JSON the UI sends.
+
+fn input<T: serde::de::DeserializeOwned>(v: Value) -> T {
+    serde_json::from_value(v).unwrap()
+}
+
+/// Asserts an edit is refused and changes nothing: same budget, same history,
+/// same dirty flag.
+fn refused<T: std::fmt::Debug>(
+    s: &mut Session,
+    f: impl FnOnce(&mut Budget) -> edit::EditResult<T>,
+) -> String {
+    let before = s.budget().clone();
+    let (undo, dirty) = (s.can_undo(), s.is_dirty());
+    let e = s.edit(f).unwrap_err();
+    assert_eq!(
+        s.budget(),
+        &before,
+        "a refused edit changed the budget: {e}"
+    );
+    assert_eq!((s.can_undo(), s.is_dirty()), (undo, dirty), "{e}");
+    e
+}
+
+/// Applies an edit and checks it is exactly one undo step.
+fn one_step<T: std::fmt::Debug>(
+    s: &mut Session,
+    f: impl FnOnce(&mut Budget) -> edit::EditResult<T>,
+) -> T {
+    let before = s.budget().clone();
+    let out = s.edit(f).unwrap();
+    assert_ne!(s.budget(), &before, "the edit changed nothing");
+    let after = s.budget().clone();
+    assert!(s.undo());
+    assert_eq!(s.budget(), &before, "one undo goes back to before the edit");
+    assert!(s.redo());
+    assert_eq!(s.budget(), &after);
+    out
+}
+
+fn grand(v: &Value) -> i64 {
+    v["report"]["grand_total"].as_i64().unwrap()
+}
+
+fn net(v: &Value) -> i64 {
+    v["report"]["net_total"].as_i64().unwrap()
+}
+
+#[test]
+fn charges_are_added_edited_moved_and_deleted() {
+    let mut s = Session::new();
+    let v0 = view(&mut s);
+    let insurance: edit::ChargeInput = input(serde_json::json!({
+        "name": "Insurance", "kind": "flat", "amount": "$1,000.00",
+        "applied": true, "excluded_amounts": [], "excluded_groups": [],
+        "excluded_categories": [], "excluded_accounts": []
+    }));
+    let at = one_step(&mut s, |b| edit::set_charge(b, None, &insurance));
+    assert_eq!(at, 1);
+    let v = view(&mut s);
+    assert_eq!(grand(&v) - grand(&v0), 100_000);
+    assert_eq!(v["budget"]["charges"][1]["kind"], "flat");
+    assert_eq!(v["budget"]["charges"][1]["amount"], 100_000);
+    assert_eq!(v["report"]["charges"][1]["amount"], 100_000);
+
+    // Edit in place: a percent with a manual exclusion and a category left out.
+    let fee: edit::ChargeInput = input(serde_json::json!({
+        "name": "Completion bond", "account": "5002", "applied": true,
+        "kind": "percent", "percent": "2",
+        "excluded_amounts": [{"description": "Bond deposit", "amount": "(1,000)"}],
+        "excluded_groups": [], "excluded_categories": ["50"], "excluded_accounts": []
+    }));
+    one_step(&mut s, |b| edit::set_charge(b, Some(1), &fee));
+    let c = &s.budget().charges[1];
+    assert_eq!(c.name, "Completion bond");
+    assert_eq!(
+        c.account.as_deref(),
+        Some("50-02"),
+        "normalized by the coding"
+    );
+    assert_eq!(c.excluded_amounts, vec![("Bond deposit".into(), -100_000)]);
+    let v = view(&mut s);
+    assert_eq!(v["budget"]["charges"][1]["excluded_categories"][0], "50");
+    assert!(v["report"]["charges"][1]["excluded"].as_i64().unwrap() > 0);
+
+    // Unapplied charges stay but don't count.
+    let mut off = fee.clone();
+    off.applied = false;
+    one_step(&mut s, |b| edit::set_charge(b, Some(1), &off));
+    let v = view(&mut s);
+    assert_eq!(v["budget"]["charges"][1]["applied"], false);
+    assert_eq!(grand(&v), grand(&v0));
+
+    // Order matters and moves are one step each.
+    one_step(&mut s, |b| edit::move_charge(b, 1, 0));
+    let names: Vec<_> = s.budget().charges.iter().map(|c| c.name.clone()).collect();
+    assert_eq!(names, ["Completion bond", "Contingency"]);
+    one_step(&mut s, |b| edit::delete_charge(b, 0));
+    assert_eq!(s.budget().charges.len(), 1);
+    assert_eq!(grand(&view(&mut s)), grand(&v0));
+}
+
+#[test]
+fn bad_charges_are_refused_and_change_nothing() {
+    let mut s = Session::new();
+    let charge = |v: Value| -> edit::ChargeInput { input(v) };
+    let ok = serde_json::json!({"name": "Fee", "kind": "percent", "percent": "5"});
+    let with = |k: &str, val: Value| {
+        let mut c = ok.clone();
+        c[k] = val;
+        charge(c)
+    };
+    let cases = [
+        with("name", "  ".into()),
+        with("name", "Contingency".into()),
+        with("kind", "sometimes".into()),
+        with("percent", "-1".into()),
+        with("percent", "ten".into()),
+        with("percent", Value::Null),
+        with("excluded_groups", serde_json::json!(["Nope"])),
+        with("excluded_categories", serde_json::json!(["99"])),
+        with("excluded_accounts", serde_json::json!(["99-99"])),
+        with(
+            "excluded_amounts",
+            serde_json::json!([{"description": "x", "amount": "12a"}]),
+        ),
+        with("account", "11_01".into()),
+        charge(serde_json::json!({"name": "Fee", "kind": "flat"})),
+        charge(serde_json::json!({"name": "Fee", "kind": "flat", "amount": "abc"})),
+        charge(serde_json::json!({"name": "Fee", "kind": "flat", "amount": "-5"})),
+        charge(
+            serde_json::json!({"name": "Fee", "kind": "flat", "amount": "5", "currency": "EUR"}),
+        ),
+    ];
+    for c in &cases {
+        refused(&mut s, |b| edit::set_charge(b, None, c));
+    }
+    let good = charge(ok);
+    refused(&mut s, |b| edit::set_charge(b, Some(5), &good));
+    refused(&mut s, |b| edit::delete_charge(b, 1));
+    refused(&mut s, |b| edit::move_charge(b, 0, 1));
+    refused(&mut s, |b| edit::move_charge(b, 3, 0));
+    // Renaming a charge to its own name is fine.
+    let same =
+        charge(serde_json::json!({"name": "Contingency", "kind": "percent", "percent": "12"}));
+    one_step(&mut s, |b| edit::set_charge(b, Some(0), &same));
+}
+
+#[test]
+fn a_charge_keeps_an_exclusion_whose_group_is_gone() {
+    let mut s = Session::new();
+    // A file can name a group the budget no longer has; editing the charge's
+    // other fields must still work.
+    s.edit(|b| {
+        b.charges[0].excluded_groups.insert("Old".into());
+        Ok(())
+    })
+    .unwrap();
+    let c: edit::ChargeInput = input(serde_json::json!({
+        "name": "Contingency", "kind": "percent", "percent": "8", "excluded_groups": ["Old"]
+    }));
+    one_step(&mut s, |b| edit::set_charge(b, Some(0), &c));
+    // But a new charge can't pick it.
+    refused(&mut s, |b| {
+        edit::set_charge(
+            b,
+            None,
+            &edit::ChargeInput {
+                name: "New".into(),
+                ..c.clone()
+            },
+        )
+    });
+}
+
+#[test]
+fn credits_reduce_the_net_total() {
+    let mut s = Session::new();
+    s.edit(|b| {
+        edit::set_group(
+            b,
+            "Local",
+            &GroupInput {
+                description: String::new(),
+                in_budget_total: true,
+            },
+        )
+    })
+    .unwrap();
+    let v0 = view(&mut s);
+    let credit: edit::CreditInput = input(serde_json::json!({
+        "name": "State incentive", "applied": true, "cap": null, "discount_percent": "0",
+        "rows": [
+            {"description": "Typed spend", "source": {"kind": "flat", "amount": "100,000"},
+             "percent": "25", "cap": {"kind": "none"}},
+            {"description": "Local crew", "source": {"kind": "group", "group": "Local", "excluded_fringes": ["PAYROLL"]},
+             "percent": "30", "cap": {"kind": "credit", "amount": "5,000"}}
+        ]
+    }));
+    let at = one_step(&mut s, |b| edit::set_credit(b, None, &credit));
+    assert_eq!(at, 0);
+    let v = view(&mut s);
+    assert_eq!(grand(&v), grand(&v0));
+    assert_eq!(v["report"]["credits"][0]["amount"], 2_500_000);
+    assert_eq!(net(&v), grand(&v) - 2_500_000);
+    let rows = &v["budget"]["credits"][0]["rows"];
+    assert_eq!(rows[0]["source"]["amount"], 10_000_000);
+    assert_eq!(rows[1]["source"]["group"], "Local");
+    assert_eq!(rows[1]["source"]["excluded_fringes"][0], "PAYROLL");
+    assert_eq!(rows[1]["cap"]["kind"], "credit");
+    assert_eq!(rows[1]["cap"]["amount"], 500_000);
+
+    // Cap and discount: 25,000 capped at 20,000, less 10%.
+    let mut capped = credit.clone();
+    capped.cap = Some("$20,000".into());
+    capped.discount_percent = Some("10".into());
+    one_step(&mut s, |b| edit::set_credit(b, Some(0), &capped));
+    assert_eq!(view(&mut s)["report"]["credits"][0]["amount"], 1_800_000);
+
+    // A group a credit uses can't be deleted (existing rule), so the credit
+    // goes first.
+    refused(&mut s, |b| edit::delete_group(b, "Local"));
+    let second: edit::CreditInput = input(serde_json::json!({"name": "Rebate"}));
+    one_step(&mut s, |b| edit::set_credit(b, None, &second));
+    one_step(&mut s, |b| edit::move_credit(b, 1, 0));
+    assert_eq!(s.budget().credits[0].name, "Rebate");
+    assert!(s.budget().credits[0].applied, "applied defaults to true");
+    one_step(&mut s, |b| edit::delete_credit(b, 1));
+    one_step(&mut s, |b| edit::delete_group(b, "Local"));
+    assert_eq!(net(&view(&mut s)), grand(&v0));
+}
+
+#[test]
+fn bad_credits_are_refused_and_change_nothing() {
+    let mut s = Session::new();
+    let row = |src: Value, pct: &str, cap: Value| serde_json::json!({"description": "r", "source": src, "percent": pct, "cap": cap});
+    let flat = serde_json::json!({"kind": "flat", "amount": "10"});
+    let none = serde_json::json!({"kind": "none"});
+    let credit = |extra: Value| -> edit::CreditInput {
+        let mut c = serde_json::json!({"name": "C"});
+        for (k, v) in extra.as_object().unwrap() {
+            c[k] = v.clone();
+        }
+        input(c)
+    };
+    let cases = [
+        credit(serde_json::json!({"name": ""})),
+        credit(serde_json::json!({"cap": "-1"})),
+        credit(serde_json::json!({"cap": "lots"})),
+        credit(serde_json::json!({"discount_percent": "101"})),
+        credit(serde_json::json!({"discount_percent": "-1"})),
+        credit(serde_json::json!({"account": "#1"})),
+        credit(serde_json::json!({"rows": [row(flat.clone(), "x", none.clone())]})),
+        credit(serde_json::json!({"rows": [row(flat.clone(), "-5", none.clone())]})),
+        credit(
+            serde_json::json!({"rows": [row(serde_json::json!({"kind": "flat", "amount": "-10"}), "5", none.clone())]}),
+        ),
+        credit(
+            serde_json::json!({"rows": [row(serde_json::json!({"kind": "group", "group": "Nope"}), "5", none.clone())]}),
+        ),
+        credit(
+            serde_json::json!({"rows": [row(serde_json::json!({"kind": "group", "group": ""}), "5", none.clone())]}),
+        ),
+        credit(
+            serde_json::json!({"rows": [row(flat.clone(), "5", serde_json::json!({"kind": "qualified_spend", "amount": "-1"}))]}),
+        ),
+    ];
+    for c in &cases {
+        refused(&mut s, |b| edit::set_credit(b, None, c));
+    }
+    one_step(&mut s, |b| {
+        edit::set_credit(b, None, &credit(serde_json::json!({})))
+    });
+    refused(&mut s, |b| {
+        edit::set_credit(b, None, &credit(serde_json::json!({})))
+    });
+    refused(&mut s, |b| {
+        edit::set_credit(b, Some(1), &credit(serde_json::json!({"name": "D"})))
+    });
+    refused(&mut s, |b| edit::delete_credit(b, 1));
+    refused(&mut s, |b| edit::move_credit(b, 0, 1));
+    // Unknown JSON shapes don't even reach the edit.
+    assert!(serde_json::from_value::<edit::CreditRowInput>(row(
+        serde_json::json!({"kind": "teleport"}),
+        "5",
+        none
+    ))
+    .is_err());
+}
+
+#[test]
+fn sets_and_locations_tag_rows_and_deleting_untags_them() {
+    let mut s = Session::new();
+    let id = ids_in(&s, "21-01")[0];
+    let set: edit::SetInput = input(serde_json::json!({"description": "Diner interior"}));
+    one_step(&mut s, |b| edit::set_set(b, "Diner", &set));
+    let loc: edit::LocationInput = input(serde_json::json!({
+        "description": "Stage 4", "city": "Burbank", "region": "CA", "country": "US"
+    }));
+    one_step(&mut s, |b| edit::set_location(b, "Stage", &loc));
+    s.set_detail_field(id, "set", "Diner").unwrap();
+    s.set_detail_field(id, "location", "Stage").unwrap();
+    let v = view(&mut s);
+    assert_eq!(
+        v["budget"]["sets"]["Diner"]["description"],
+        "Diner interior"
+    );
+    assert_eq!(v["budget"]["locations"]["Stage"]["city"], "Burbank");
+    assert!(
+        v["report"]["sets"]["Diner"]["details_total"]
+            .as_i64()
+            .unwrap()
+            > 0
+    );
+
+    for bad in ["", "  ", "A,B"] {
+        refused(&mut s, |b| edit::set_set(b, bad, &set));
+        refused(&mut s, |b| edit::set_location(b, bad, &loc));
+    }
+    refused(&mut s, |b| edit::delete_set(b, "Nope"));
+    refused(&mut s, |b| edit::delete_location(b, "Nope"));
+
+    one_step(&mut s, |b| edit::delete_set(b, "Diner"));
+    one_step(&mut s, |b| edit::delete_location(b, "Stage"));
+    let d = edit::details(s.budget()).find(|d| d.id == id).unwrap();
+    assert_eq!((d.set.clone(), d.location.clone()), (None, None));
+    assert!(s.budget().sets.is_empty() && s.budget().locations.is_empty());
+}
+
+#[test]
+fn budget_info_fields_are_typed() {
+    let mut s = Session::new();
+    let info = |kind: &str, value: &str| -> edit::InfoInput {
+        input(serde_json::json!({"kind": kind, "value": value}))
+    };
+    one_step(&mut s, |b| {
+        edit::set_info(b, "Director", &info("text", " J. Director "))
+    });
+    one_step(&mut s, |b| {
+        edit::set_info(b, "Shoot days", &info("number", "30"))
+    });
+    one_step(&mut s, |b| {
+        edit::set_info(b, "Start", &info("date", "2027-03-01"))
+    });
+    let v = view(&mut s);
+    assert_eq!(v["budget"]["info"]["Director"]["value"], "J. Director");
+    assert_eq!(v["budget"]["info"]["Shoot days"]["kind"], "number");
+    assert_eq!(v["budget"]["info"]["Shoot days"]["value"], "30");
+    assert_eq!(v["budget"]["info"]["Start"]["kind"], "date");
+
+    refused(&mut s, |b| {
+        edit::set_info(b, "Shoot days", &info("number", "thirty"))
+    });
+    refused(&mut s, |b| {
+        edit::set_info(b, "Start", &info("date", "2027-02-30"))
+    });
+    refused(&mut s, |b| {
+        edit::set_info(b, "Start", &info("date", "March 1"))
+    });
+    refused(&mut s, |b| edit::set_info(b, " ", &info("text", "x")));
+    refused(&mut s, |b| edit::set_info(b, "X", &info("colour", "x")));
+    refused(&mut s, |b| edit::delete_info(b, "Nope"));
+    // Changing the kind of an existing field replaces it.
+    one_step(&mut s, |b| {
+        edit::set_info(b, "Shoot days", &info("text", "about 30"))
+    });
+    one_step(&mut s, |b| edit::delete_info(b, "Director"));
+    assert_eq!(s.budget().info.len(), 2);
+}
+
+#[test]
+fn fringe_posting_coding_and_currencies() {
+    let mut s = Session::new();
+    // Default is by category with suffix 99, so the fringe account is 11-99.
+    let v = view(&mut s);
+    assert_eq!(
+        v["report"]["categories"][1]["fringe_account"]["code"],
+        "11-99"
+    );
+    let g = grand(&v);
+
+    for mode in ["budget", "production_level", "account"] {
+        one_step(&mut s, |b| edit::set_fringe_posting(b, mode, None));
+        let v = view(&mut s);
+        assert_eq!(v["budget"]["fringe_posting"]["kind"], mode);
+        if mode == "budget" {
+            // Budget-level fringes sit outside ATL and BTL, so charges skip them.
+            assert!(v["report"]["budget_fringes"].as_i64().unwrap() > 0);
+        } else {
+            assert_eq!(grand(&v), g, "{mode} posting doesn't change the total");
+        }
+    }
+    // Back to category: a missing suffix means the default.
+    one_step(&mut s, |b| edit::set_fringe_posting(b, "category", None));
+    assert!(
+        view(&mut s)["budget"].get("fringe_posting").is_none(),
+        "default is left out"
+    );
+    one_step(&mut s, |b| {
+        edit::set_fringe_posting(b, "category", Some("FR"))
+    });
+    assert_eq!(
+        view(&mut s)["report"]["categories"][1]["fringe_account"]["code"],
+        "11-FR"
+    );
+    refused(&mut s, |b| {
+        edit::set_fringe_posting(b, "category", Some(""))
+    });
+    refused(&mut s, |b| {
+        edit::set_fringe_posting(b, "category", Some("9-9"))
+    });
+    refused(&mut s, |b| edit::set_fringe_posting(b, "weekly", None));
+
+    // Account coding: validated, written to the file, used for new numbers.
+    one_step(&mut s, |b| {
+        edit::set_account_coding(b, [2, 4, 0, 0], Some("."))
+    });
+    let v = view(&mut s);
+    assert_eq!(v["budget"]["account_coding"]["account_width"], 4);
+    assert_eq!(v["budget"]["account_coding"]["separator"], ".");
+    let code = s
+        .edit(|b| edit::add_account(b, "21", "21-7", "Grip", None))
+        .unwrap();
+    assert_eq!(code, "21.0007");
+    refused(&mut s, |b| edit::set_account_coding(b, [2, 0, 2, 0], None));
+    refused(&mut s, |b| {
+        edit::set_account_coding(b, [2, 2, 0, 0], Some("_"))
+    });
+
+    // Currencies.
+    s.edit(|b| {
+        edit::set_currency(
+            b,
+            "EUR",
+            &CurrencyInput {
+                description: String::new(),
+                symbol: String::new(),
+                rate: "2".into(),
+            },
+        )
+    })
+    .unwrap();
+    one_step(&mut s, |b| edit::set_totals_currency(b, Some("EUR")));
+    let v = view(&mut s);
+    assert_eq!(v["budget"]["totals_currency"], "EUR");
+    assert_eq!(v["report"]["display"]["grand_total"], grand(&v) / 2);
+    refused(&mut s, |b| edit::set_totals_currency(b, Some("GBP")));
+    refused(&mut s, |b| edit::set_base_currency(b, "EUR"));
+    refused(&mut s, |b| edit::set_base_currency(b, " "));
+    one_step(&mut s, |b| edit::set_base_currency(b, "CAD"));
+    assert_eq!(view(&mut s)["budget"]["base_currency"], "CAD");
+    one_step(&mut s, |b| edit::set_totals_currency(b, None));
+    assert!(view(&mut s)["budget"]["totals_currency"].is_null());
+    // The base currency as the totals currency means "none".
+    s.edit(|b| edit::set_totals_currency(b, Some("EUR")))
+        .unwrap();
+    one_step(&mut s, |b| edit::set_totals_currency(b, Some("CAD")));
+    assert_eq!(s.budget().totals_currency, None);
+}
+
+#[test]
+fn baseline_lock_shows_variance_and_clear_removes_it() {
+    let mut s = Session::new();
+    assert!(view(&mut s)["variance"].is_null());
+    refused(&mut s, edit::clear_baseline);
+
+    one_step(&mut s, edit::lock_baseline);
+    let v = view(&mut s);
+    let var = &v["variance"];
+    assert_eq!(var["grand_total"]["original"], grand(&v));
+    assert_eq!(var["grand_total"]["variance"], 0);
+    assert_eq!(var["net_total"]["variance"], 0);
+    assert_eq!(v["budget"]["baseline"]["grand_total"], grand(&v));
+
+    // Edit a row, add one, delete one.
+    let ids = ids_in(&s, "50-01");
+    s.set_detail_field(ids[0], "rate", "20000").unwrap();
+    let added = s.add_detail("50-01", None, "line").unwrap();
+    s.set_detail_field(added, "amount", "1").unwrap();
+    s.set_detail_field(added, "rate", "100").unwrap();
+    let gone = ids_in(&s, "21-01")[0];
+    s.edit(|b| edit::delete_details(b, &[gone])).unwrap();
+
+    let v = view(&mut s);
+    let var = &v["variance"];
+    let row = &var["rows"][ids[0].to_string()];
+    assert_eq!(row["original"], 1_500_000);
+    assert_eq!(row["current"], 2_000_000);
+    assert_eq!(row["variance"], 500_000);
+    let new = &var["rows"][added.to_string()];
+    assert!(new["original"].is_null());
+    assert_eq!(new["variance"], 10_000);
+    let old = &var["rows"][gone.to_string()];
+    assert!(old["current"].is_null());
+    assert!(old["variance"].as_i64().unwrap() < 0);
+    assert_eq!(var["accounts"]["50-01"]["variance"], 510_000);
+    assert_eq!(var["categories"]["50"]["variance"], 510_000);
+    let g = &var["grand_total"];
+    assert_eq!(
+        g["variance"].as_i64().unwrap(),
+        g["current"].as_i64().unwrap() - g["original"].as_i64().unwrap()
+    );
+    assert_eq!(g["current"], grand(&v));
+    // A new row never reuses a baseline row's id.
+    let next = s.add_detail("21-01", None, "line").unwrap();
+    assert!(next > gone);
+
+    // Locking again takes the new totals; clearing removes the variance.
+    one_step(&mut s, edit::lock_baseline);
+    assert_eq!(view(&mut s)["variance"]["grand_total"]["variance"], 0);
+    one_step(&mut s, edit::clear_baseline);
+    let v = view(&mut s);
+    assert!(v["variance"].is_null());
+    assert!(v["budget"].get("baseline").is_none());
+}
+
+#[test]
+fn baseline_is_refused_while_the_budget_has_errors() {
+    let mut s = Session::new();
+    let id = ids_in(&s, "21-01")[0];
+    s.set_detail_field(id, "amount", "NOPE * 2").unwrap();
+    let e = refused(&mut s, edit::lock_baseline);
+    assert!(e.contains("NOPE"), "{e}");
+    // With a baseline locked earlier, partial totals still give a variance.
+    s.set_detail_field(id, "amount", "1").unwrap();
+    s.edit(edit::lock_baseline).unwrap();
+    s.set_detail_field(id, "amount", "NOPE * 2").unwrap();
+    let v = view(&mut s);
+    assert_eq!(v["partial"], true);
+    assert!(
+        v["variance"]["rows"][id.to_string()]["variance"]
+            .as_i64()
+            .unwrap()
+            < 0
+    );
+}

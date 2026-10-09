@@ -35,6 +35,27 @@ const COMMANDS: &[&str] = &[
     "delete_unit",
     "set_currency",
     "delete_currency",
+    // Topsheet setup tabs
+    "set_charge",
+    "delete_charge",
+    "move_charge",
+    "set_credit",
+    "delete_credit",
+    "move_credit",
+    "set_set",
+    "delete_set",
+    "set_location",
+    "delete_location",
+    "set_info",
+    "delete_info",
+    "set_fringe_posting",
+    "set_account_coding",
+    "set_base_currency",
+    "set_totals_currency",
+    "lock_baseline",
+    "clear_baseline",
+    // Several cells at once (paste, fill down, cut)
+    "set_cells",
 ];
 
 fn main() {

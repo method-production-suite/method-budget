@@ -55,18 +55,71 @@ shows the above-the-line, below-the-line, grand and net totals, and the totals o
 selected detail rows (Shift+arrows or Shift+click to select a range, Cmd/Ctrl+click to add
 rows).
 
+### Keyboard and menus
+
+Everything has a key, and the menu bar (File, Edit, Insert, Go, View, Help) lists the same
+commands with the same keys. Help > Keyboard Shortcuts (Cmd+/ or Ctrl+/) shows the full
+list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the menu bar
+(`src/menu.rs`) uses the same ids and keys, and a Rust test fails if they drift apart.
+
 | Action | macOS | Windows and Linux |
 |---|---|---|
 | New, Open | Cmd+N, Cmd+O | Ctrl+N, Ctrl+O |
 | Save, Save As | Cmd+S, Shift+Cmd+S | Ctrl+S, Ctrl+Shift+S |
-| Undo, Redo | Cmd+Z, Shift+Cmd+Z | Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y |
-| Edit cell (keep text) | F2 or double-click | F2 or double-click |
+| Print the budget (topsheet and detail), the topsheet | Cmd+P, Shift+Cmd+P | Ctrl+P, Ctrl+Shift+P |
+| Close the window, Quit | Cmd+W, Cmd+Q | Ctrl+W, Ctrl+Q |
+| Undo, Redo (in a text field: its typing) | Cmd+Z, Shift+Cmd+Z | Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z |
+| Cut, Copy, Paste cells (tab-separated, like a spreadsheet) | Cmd+X, Cmd+C, Cmd+V | Ctrl+X, Ctrl+C, Ctrl+V |
+| Select every row | Cmd+A | Ctrl+A |
+| Fill down | Cmd+D | Ctrl+D |
+| Delete the selected rows (or the category or account) | Cmd+Backspace | Ctrl+Backspace |
+| Clear the selected cells | Backspace or Delete | Backspace or Delete |
+| Move; extend the selection | Arrows; Shift+arrows | Arrows; Shift+arrows |
+| Next or previous cell | Tab, Shift+Tab | Tab, Shift+Tab |
+| First or last column; first or last row | Home, End; Cmd+Home, Cmd+End | Home, End; Ctrl+Home, Ctrl+End |
+| Edit a cell keeping its text (or just type to replace it) | F2 or double-click | F2 or double-click |
+| Finish editing and move down or up (detail lines) | Enter, Shift+Enter | Enter, Shift+Enter |
 | Same value into every selected row | Cmd+Enter while editing | Ctrl+Enter while editing |
-| Insert line below | Cmd+Enter | Ctrl+Enter |
-| Insert subtotal / adjustment | Option+Cmd+T / Option+Cmd+A | Ctrl+Alt+T / Ctrl+Alt+A |
-| Delete selected rows (or the category or account) | Cmd+Backspace | Ctrl+Backspace |
-| Clear a cell | Backspace or Delete | Backspace or Delete |
-| Select all rows | Cmd+A | Ctrl+A |
+| Cancel an edit, clear the selection, or go up a level | Escape | Escape |
+| Insert a line below | Cmd+Enter | Ctrl+Enter |
+| Insert a subtotal, an adjustment | Option+Cmd+T, Option+Cmd+A | Ctrl+Alt+T, Ctrl+Alt+A |
+| Up a level; down a level (also Enter) | Cmd+Up; Cmd+Down | Ctrl+Up; Ctrl+Down |
+| Go to the topsheet | Shift+Cmd+Up | Ctrl+Shift+Up |
+| Next, previous account (across categories, wrapping) | Cmd+], Cmd+[ | Ctrl+], Ctrl+[ |
+| Show or hide the setup panel | Option+Cmd+S | Ctrl+Alt+S |
+| Setup tab 1 to 9 (Globals ... Credits; Escape returns to the grid) | Cmd+1 ... Cmd+9 | Ctrl+1 ... Ctrl+9 |
+| Keyboard shortcuts | Cmd+/ | Ctrl+/ |
+
+Insert > Account, Category and Production Total have no key; they go to the level they
+belong to first and open the same dialog as the buttons. Info, Settings and Baseline tabs
+are in View > Setup Tab.
+
+**Cells.** The selection is a set of rows (Shift+Up/Down, Shift-click, Cmd/Ctrl-click) across
+a run of columns (Shift+Left/Right). Copy gives tab-separated text, raw formulas for
+editable cells and the shown value for totals. Paste starts at the top-left selected cell
+and goes down and right, skipping cells that can't be edited; one copied cell fills every
+selected cell; numbers like `1,250.50` or `(300)` are cleaned up in number columns. Fill
+down copies the top selected cell of each column into the selected cells below it (with one
+row selected, the cell above). Paste, fill down, cut and clearing a range on the detail
+grid are one command, `set_cells`, so each is one undo step and one recalculation. The
+topsheet and account lists take one pasted cell at a time.
+
+**Who answers a key.** A menu item and its key run the same function in `main.js`, by id.
+On macOS the web page sees a key first and the menu's key equivalent fires only if the page
+didn't handle it, so `main.js` leaves app-level keys (file commands, undo and redo, select
+all, the setup panel, help) to the menu and handles grid keys itself, which stops the menu
+from firing too. On Windows and Linux `main.js` handles every key and ignores a menu event
+that repeats a key it handled in the last 400 ms. Cut, Copy and Paste are the stock menu
+items everywhere: text fields edit natively, and the grid answers the browser's `copy`,
+`cut` and `paste` events, so no clipboard permission or plugin is involved. In a text field,
+Undo, Redo and Select All act on the field; grid keys that move the caret (Cmd+Up) or
+delete (Cmd+Backspace) stay with the field, and other grid keys are ignored there. Grid
+commands that arrive from the menu while a text field has focus are ignored too, because
+where menus see keys before the page (GTK on Linux) the key was meant for the field.
+Close Window and Quit from the menu are answered in Rust (both ask about unsaved changes);
+their keys on Windows and Linux close the window from the page, which asks the same way.
+Menu items are never disabled: Undo and Redo also serve text fields, and each command does
+nothing where it doesn't apply. While a dialog is open, the menu only reaches its fields.
 
 Closing the window or quitting with unsaved changes asks first.
 
@@ -79,7 +132,9 @@ crates/fwb-app/
   src/diagnose.rs    lenient recalc: flags every bad cell instead of stopping at the first
   src/report_dto.rs  serde shapes for fwb_core::Report (the engine stays serde-free)
   src/view.rs        what the UI draws after each command
-  src/app.rs         Tauri glue: commands, file dialogs, close and quit guard, menu
+  src/batch.rs       multi-cell edits (paste, fill down) applied as one undo step
+  src/menu.rs        native menu bar, built from the same table as ui/js/shortcuts.js
+  src/app.rs         Tauri glue: commands, file dialogs, close and quit guard, menu events
   ui/                index.html, styles.css, setup.css, js/*.js (ES modules, no build step)
   capabilities/      what the web view may call
 ```
@@ -114,8 +169,12 @@ and shows totals marked as partial. The budget keeps what the user typed.
 **The UI** is a handful of ES modules with no dependencies: `main.js` (state, navigation,
 shortcuts), `grid.js` (a generic keyboard grid used at all three levels), `levels.js`
 (turns a View into rows and columns), `setup.js` (the side panel), `footer.js`,
-`modal.js`, `format.js` (money and decimal display), `api.js` (the command queue) and
-`dom.js`. Commands run one at a time, in order.
+`modal.js`, `format.js` (money and decimal display), `api.js` (the command queue),
+`dom.js`, `shortcuts.js` (the one list of shortcuts, shared with the Rust menu and checked
+by a test), `help.js` (the shortcut sheet), `topsheet-setup.js` (charges, credits, sets,
+locations, info, settings and baseline tabs) and `report.js` with `print.css` (printable
+reports). The setup panel groups its tabs into Tables and Budget. Commands run one at a
+time, in order.
 
 ## Security model
 
@@ -154,7 +213,8 @@ least 14 days old when added (`python3 scripts/check-crate-ages.py --only-change
 
 ## Not yet
 
-Copy and paste of rows and cells, moving rows, fringe ranges, sets and locations tables,
-charges and credits editors, renaming setup entries (add the new one, then delete the old),
-budget preferences (account coding, fringe posting), import from other tools, reports and
-printing, and opening a `.fwb` file by double-clicking it in the file manager.
+Moving rows by drag, editing fringe ranges in the grid, original/variance columns in the
+grid (the data is in `view.variance`; reports already print it), renaming setup entries (add
+the new one, then delete the old), renumbering accounts when the coding pattern changes,
+import from other tools, find and replace, and opening a `.fwb` file by double-clicking it
+in the file manager. Printing and the Windows/Linux menu keys still need a live check.

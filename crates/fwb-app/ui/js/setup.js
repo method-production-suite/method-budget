@@ -8,13 +8,28 @@
 // one at a time through a queue, and each one is built from the newest view when
 // it runs, so two quick edits to the same item never undo each other.
 
+import { EXTRA_TABS, renderExtraTab } from './topsheet-setup.js';
+
 const TABS = [
   { id: 'globals', label: 'Globals' },
   { id: 'fringes', label: 'Fringes' },
   { id: 'groups', label: 'Groups' },
   { id: 'units', label: 'Units' },
   { id: 'currencies', label: 'Currencies' },
+  // Sets, locations, charges, credits, info, settings, baseline.
+  ...EXTRA_TABS,
 ];
+
+// Tabs are split into two sections so the strip fits one row: reusable
+// tables lines refer to, and settings for the budget as a whole.
+const SECTIONS = [
+  { id: 'tables', label: 'Tables', tabs: ['globals', 'fringes', 'groups', 'units', 'currencies', 'sets', 'locations'] },
+  { id: 'budget', label: 'Budget', tabs: ['charges', 'credits', 'info', 'settings', 'baseline'] },
+];
+
+function sectionOf(tab) {
+  return SECTIONS.find((s) => s.tabs.includes(tab)) || SECTIONS[0];
+}
 
 const GLOBAL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)$/;
@@ -52,7 +67,7 @@ export function renderSetup(container, view, ctx) {
   if (tab !== state.tab) state.errors.clear();
   state.tab = tab;
   const root = el('div', 'setup');
-  root.append(renderTabs(tab), renderPanel(tab));
+  root.append(renderSections(tab), renderTabs(tab), renderPanel(tab));
   // One swap, so a scrolled parent keeps its position.
   state.swapping = true;
   try {
@@ -498,7 +513,35 @@ function neighbor(tab, names, i, addKey) {
 // ---------------------------------------------------------------------------
 // Tabs and panel
 
+// Remembers the last tab used in each section, so switching back returns there.
+const lastTab = {};
+
+function renderSections(active) {
+  const current = sectionOf(active);
+  lastTab[current.id] = active;
+  const bar = el('div', 'setup-sections');
+  bar.setAttribute('role', 'group');
+  bar.setAttribute('aria-label', 'Setup section');
+  for (const s of SECTIONS) {
+    const b = el('button', 'setup-section', s.label);
+    b.type = 'button';
+    b.dataset.key = key('section', s.id);
+    b.dataset.nobusy = '1';
+    b.setAttribute('aria-pressed', s.id === current.id ? 'true' : 'false');
+    b.addEventListener('click', () => {
+      if (s.id === current.id) return;
+      const tab = lastTab[s.id] || s.tabs[0];
+      state.focusKey = key('section', s.id);
+      if (state.ctx && typeof state.ctx.setTab === 'function') state.ctx.setTab(tab);
+    });
+    bar.append(b);
+  }
+  return bar;
+}
+
 function renderTabs(active) {
+  const ids = sectionOf(active).tabs;
+  const tabs = TABS.filter((t) => ids.includes(t.id));
   const bar = el('div', 'setup-tabs');
   bar.setAttribute('role', 'tablist');
   bar.setAttribute('aria-label', 'Budget setup');
@@ -507,7 +550,7 @@ function renderTabs(active) {
     state.focusKey = key('tab', id);
     if (state.ctx && typeof state.ctx.setTab === 'function') state.ctx.setTab(id);
   };
-  TABS.forEach((t, i) => {
+  tabs.forEach((t, i) => {
     const b = el('button', 'setup-tab', t.label);
     b.type = 'button';
     b.id = `setup-tab-${t.id}`;
@@ -520,13 +563,13 @@ function renderTabs(active) {
     b.addEventListener('click', () => go(t.id));
     b.addEventListener('keydown', (e) => {
       let j = null;
-      if (e.key === 'ArrowRight') j = (i + 1) % TABS.length;
-      else if (e.key === 'ArrowLeft') j = (i - 1 + TABS.length) % TABS.length;
+      if (e.key === 'ArrowRight') j = (i + 1) % tabs.length;
+      else if (e.key === 'ArrowLeft') j = (i - 1 + tabs.length) % tabs.length;
       else if (e.key === 'Home') j = 0;
-      else if (e.key === 'End') j = TABS.length - 1;
+      else if (e.key === 'End') j = tabs.length - 1;
       if (j === null) return;
       e.preventDefault();
-      go(TABS[j].id);
+      go(tabs[j].id);
     });
     bar.append(b);
   });
@@ -545,7 +588,8 @@ function renderPanel(tab) {
     units: renderUnits,
     currencies: renderCurrencies,
   }[tab];
-  render(panel);
+  if (render) render(panel);
+  else renderExtraTab(tab, panel, kit());
   return panel;
 }
 
@@ -1297,4 +1341,48 @@ function renderCurrencies(panel) {
       ],
     }),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers shared with the tabs in topsheet-setup.js, so they use the same
+// queue, focus handling, error display and controls as the tabs above.
+
+function kit() {
+  return {
+    el,
+    key,
+    nextId,
+    own,
+    str,
+    entries,
+    budget,
+    report,
+    baseCode,
+    formatCents,
+    centsToText,
+    formatDecimal,
+    plural,
+    findByData,
+    isBusy,
+    run,
+    errorLine,
+    textInput,
+    selectInput,
+    field,
+    itemShell,
+    finishItem,
+    deleteButton,
+    neighbor,
+    list,
+    emptyNote,
+    addInput,
+    addSelect,
+    addForm,
+    checkName,
+    view: () => state.view,
+    state: () => state,
+    setFocusKey: (k) => {
+      state.focusKey = k;
+    },
+  };
 }

@@ -12,12 +12,75 @@
 //
 // Handlers:  onCommit(rowKey, colKey, value)        one cell edited
 //            onCommitMany(rowKeys, colKey, value)   same value into many rows
+//            onClearCells(cells)                    Backspace/Delete on a range of
+//                                                   editable cells [{ rowKey, colKey }]
 //            onActivate(rowKey)                     Enter / double-click on an activatable row
 //            onEscape()                             Escape with nothing to cancel
 //            onSelect(rowKeys)                      cursor or selection changed
 //            enterMovesDown                         true: Enter moves down (details)
+//
+// Selection: a set of rows (Shift+Up/Down, Shift-click, Cmd/Ctrl-click) and a
+// run of columns (Shift+Left/Right). The selected cells are those rows across
+// those columns; copy, paste, fill down and clearing work on them.
 
 import { el, hasMod } from './dom.js';
+
+// ---------------------------------------------------------------------------
+// Tab-separated text, the way spreadsheets put cells on the clipboard
+
+/** Cells (an array of rows of strings) as TSV. Cells holding a tab, newline or quote are quoted. */
+export function toTSV(matrix) {
+  const cell = (v) => {
+    const s = v === null || v === undefined ? '' : String(v);
+    return /[\t\n\r"]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return matrix.map((row) => row.map(cell).join('\t')).join('\n');
+}
+
+/** TSV text as rows of cells. Understands spreadsheet quoting and a trailing newline. */
+export function parseTSV(text) {
+  let s = String(text).replace(/\r\n?/g, '\n');
+  if (s.endsWith('\n')) s = s.slice(0, -1);
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let quoted = false;
+  let fresh = true; // at the start of a cell
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (quoted) {
+      if (ch === '"' && s[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else if (ch === '"') {
+        quoted = false;
+      } else {
+        cell += ch;
+      }
+      continue;
+    }
+    if (ch === '"' && fresh) {
+      quoted = true;
+      fresh = false;
+    } else if (ch === '\t') {
+      row.push(cell);
+      cell = '';
+      fresh = true;
+    } else if (ch === '\n') {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = '';
+      fresh = true;
+    } else {
+      cell += ch;
+      fresh = false;
+    }
+  }
+  row.push(cell);
+  rows.push(row);
+  return rows;
+}
 
 export class Grid {
   constructor(host, handlers) {
@@ -29,6 +92,8 @@ export class Grid {
     this.cur = { row: 0, col: 0 }; // index into nav, index into columns
     this.selected = new Set(); // explicit multi-row selection (row keys)
     this.anchor = null; // nav index where a shift-selection started
+    this.anchorCol = null; // column where a shift-selection started
+    this.allCols = false; // select-all covers every column
     this.editor = null;
     this.rerendering = false;
     this.lastSelectSig = '';
@@ -69,9 +134,14 @@ export class Grid {
     this.cur.col = Math.max(0, Math.min(col, columns.length - 1));
 
     const keys = new Set(this.nav.map((i) => this.rows[i].key));
-    if (resetSelection || focusKey !== null) this.selected.clear();
+    if (resetSelection || focusKey !== null) {
+      this.selected.clear();
+      this.anchorCol = null;
+      this.allCols = false;
+    }
     for (const k of [...this.selected]) if (!keys.has(k)) this.selected.delete(k);
     if (this.anchor !== null && this.anchor >= this.nav.length) this.anchor = null;
+    if (this.anchorCol !== null && this.anchorCol >= columns.length) this.anchorCol = null;
 
     this.render();
   }
@@ -107,6 +177,108 @@ export class Grid {
     return this.nav.map((i) => this.rows[i].key).filter((k) => this.selected.has(k));
   }
 
+  /** The selected columns as [first, last] indexes. */
+  colRange() {
+    if (this.allCols) return [0, this.columns.length - 1];
+    if (this.anchorCol === null) return [this.cur.col, this.cur.col];
+    return [Math.min(this.anchorCol, this.cur.col), Math.max(this.anchorCol, this.cur.col)];
+  }
+
+  /** True when more than the cursor cell is selected. */
+  hasRange() {
+    const [a, b] = this.colRange();
+    return this.selected.size > 1 || a !== b;
+  }
+
+  /** The selected cells: rows (display order) and columns (left to right). */
+  cellRange() {
+    const keys = new Set(this.selectedKeys());
+    const rows = this.nav.map((i) => this.rows[i]).filter((r) => keys.has(r.key));
+    const [a, b] = this.colRange();
+    return { rows, cols: this.columns.slice(a, b + 1) };
+  }
+
+  /** What a cell copies as: its raw value when editable, else what it shows. */
+  static cellValue(row, col) {
+    const cell = row.cells[col.key] || {};
+    if (cell.edit !== undefined) return String(cell.edit);
+    return cell.text === undefined || cell.text === null ? '' : String(cell.text);
+  }
+
+  static editable(row, col) {
+    const cell = row.cells[col.key];
+    return Boolean(cell) && cell.edit !== undefined;
+  }
+
+  /** The selected cells as tab-separated text. */
+  copyText() {
+    const { rows, cols } = this.cellRange();
+    return toTSV(rows.map((r) => cols.map((c) => Grid.cellValue(r, c))));
+  }
+
+  /** The selected cells that can be edited: [{ rowKey, colKey }]. */
+  editableCells() {
+    const { rows, cols } = this.cellRange();
+    const out = [];
+    for (const r of rows) for (const c of cols) if (Grid.editable(r, c)) out.push({ rowKey: r.key, colKey: c.key });
+    return out;
+  }
+
+  /**
+   * Where pasted cells go: from the top-left selected cell, down and right. A
+   * single copied cell fills every selected cell. Read-only cells are skipped.
+   * Returns { cells: [{ rowKey, colKey, value }], rowsShort } where rowsShort
+   * counts pasted rows that ran past the last row.
+   */
+  pasteTargets(matrix) {
+    const { rows, cols } = this.cellRange();
+    const cells = [];
+    if (!rows.length || !cols.length || !matrix.length) return { cells, rowsShort: 0 };
+    if (matrix.length === 1 && matrix[0].length === 1) {
+      for (const r of rows) for (const c of cols) if (Grid.editable(r, c)) cells.push({ rowKey: r.key, colKey: c.key, value: matrix[0][0] });
+      return { cells, rowsShort: 0 };
+    }
+    const top = this.nav.findIndex((i) => this.rows[i].key === rows[0].key);
+    const left = this.columns.indexOf(cols[0]);
+    let rowsShort = 0;
+    matrix.forEach((values, dr) => {
+      const r = this.rowAt(top + dr);
+      if (!r) {
+        rowsShort += 1;
+        return;
+      }
+      values.forEach((value, dc) => {
+        const c = this.columns[left + dc];
+        if (c && Grid.editable(r, c)) cells.push({ rowKey: r.key, colKey: c.key, value });
+      });
+    });
+    return { cells, rowsShort };
+  }
+
+  /**
+   * Fill down: in each selected column, the top selected row's value goes into
+   * the selected rows below it. With one row selected, the row above is copied
+   * into it. Returns [{ rowKey, colKey, value }] for editable cells that change.
+   */
+  fillDownTargets() {
+    let { rows, cols } = this.cellRange();
+    if (rows.length === 1) {
+      const above = this.rowAt(this.nav.findIndex((i) => this.rows[i].key === rows[0].key) - 1);
+      if (!above) return [];
+      rows = [above, rows[0]];
+    }
+    const out = [];
+    for (const c of cols) {
+      const src = rows[0];
+      if (!Grid.editable(src, c)) continue;
+      const value = Grid.cellValue(src, c);
+      for (const r of rows.slice(1)) {
+        if (Grid.editable(r, c) && Grid.cellValue(r, c) !== value) out.push({ rowKey: r.key, colKey: c.key, value });
+      }
+    }
+    return out;
+  }
+
   // -------------------------------------------------------------------------
   // Drawing
 
@@ -126,6 +298,8 @@ export class Grid {
     const tbody = el('tbody');
     const curKey = this.cursorKey();
     const selKeys = new Set(this.selectedKeys());
+    const ranged = this.hasRange();
+    const [ca, cb] = this.colRange();
     this.rows.forEach((r, ri) => {
       const tr = el('tr', { class: r.cls || '', data: { row: ri } });
       if (r.selectable === false) tr.classList.add('static');
@@ -148,6 +322,7 @@ export class Grid {
           td.textContent = text;
         }
         if (r.key === curKey && ci === this.cur.col && r.selectable !== false) td.classList.add('cursor');
+        if (ranged && r.selectable !== false && selKeys.has(r.key) && ci >= ca && ci <= cb) td.classList.add('in-range');
         tr.append(td);
       });
       tbody.append(tr);
@@ -199,12 +374,17 @@ export class Grid {
     if (!body) return;
     const curKey = this.cursorKey();
     const selKeys = new Set(this.selectedKeys());
+    const ranged = this.hasRange();
+    const [ca, cb] = this.colRange();
     for (const tr of body.rows) {
       const r = this.rows[Number(tr.dataset.row)];
       if (!r || r.selectable === false) continue;
-      tr.classList.toggle('sel', selKeys.has(r.key));
+      const sel = selKeys.has(r.key);
+      tr.classList.toggle('sel', sel);
       for (const td of tr.cells) {
-        td.classList.toggle('cursor', r.key === curKey && Number(td.dataset.col) === this.cur.col);
+        const ci = Number(td.dataset.col);
+        td.classList.toggle('cursor', r.key === curKey && ci === this.cur.col);
+        td.classList.toggle('in-range', ranged && sel && ci >= ca && ci <= cb);
       }
     }
     this.scrollToCursor();
@@ -252,6 +432,8 @@ export class Grid {
   setCursor(row, col, { extend = false, toggle = false } = {}) {
     if (extend) {
       if (this.anchor === null) this.anchor = this.cur.row;
+      if (this.anchorCol === null) this.anchorCol = this.allCols ? 0 : this.cur.col;
+      this.allCols = false;
       this.cur = { row, col };
       const [a, b] = [Math.min(this.anchor, row), Math.max(this.anchor, row)];
       this.selected = new Set(this.nav.slice(a, b + 1).map((i) => this.rows[i].key));
@@ -265,10 +447,14 @@ export class Grid {
       if (this.selected.has(k)) this.selected.delete(k);
       else this.selected.add(k);
       this.anchor = row;
+      this.anchorCol = null;
+      this.allCols = false;
     } else {
       this.cur = { row, col };
       this.selected.clear();
       this.anchor = null;
+      this.anchorCol = null;
+      this.allCols = false;
     }
     this.paintCursor();
   }
@@ -285,10 +471,30 @@ export class Grid {
     this.setCursor(idx, col);
   }
 
+  /** Selects every row, across every column. */
   selectAll() {
     this.selected = new Set(this.nav.map((i) => this.rows[i].key));
     this.anchor = 0;
+    this.anchorCol = null;
+    this.allCols = true;
     this.paintCursor();
+  }
+
+  /** Clears a multi-cell selection, keeping the cursor. False if there was none. */
+  clearRange() {
+    if (!this.hasRange() && this.selected.size === 0) return false;
+    const had = this.hasRange();
+    this.selected.clear();
+    this.anchor = null;
+    this.anchorCol = null;
+    this.allCols = false;
+    this.paintCursor();
+    return had;
+  }
+
+  /** The cursor row's spec, or null. */
+  cursorRow() {
+    return this.rowAt(this.cur.row);
   }
 
   // -------------------------------------------------------------------------
@@ -391,25 +597,30 @@ export class Grid {
     if (this.editor) return this.handleEditorKey(e);
     const mod = hasMod(e);
     switch (e.key) {
+      // Cmd/Ctrl+Up and Down change level (main.js), so they aren't ours.
       case 'ArrowUp':
-        if (mod) this.setCursor(0, this.cur.col, { extend: e.shiftKey });
-        else this.move(-1, 0, { extend: e.shiftKey });
+        if (mod) return false;
+        this.move(-1, 0, { extend: e.shiftKey });
         return true;
       case 'ArrowDown':
-        if (mod) this.setCursor(this.nav.length - 1, this.cur.col, { extend: e.shiftKey });
-        else this.move(1, 0, { extend: e.shiftKey });
+        if (mod) return false;
+        this.move(1, 0, { extend: e.shiftKey });
         return true;
       case 'ArrowLeft':
-        this.move(0, -1);
+        if (mod) return false;
+        this.move(0, -1, { extend: e.shiftKey });
         return true;
       case 'ArrowRight':
-        this.move(0, 1);
+        if (mod) return false;
+        this.move(0, 1, { extend: e.shiftKey });
         return true;
       case 'Home':
-        this.setCursor(this.cur.row, 0);
+        if (mod) this.setCursor(0, this.cur.col, { extend: e.shiftKey });
+        else this.setCursor(this.cur.row, 0, { extend: e.shiftKey });
         return true;
       case 'End':
-        this.setCursor(this.cur.row, this.columns.length - 1);
+        if (mod) this.setCursor(this.nav.length - 1, this.cur.col, { extend: e.shiftKey });
+        else this.setCursor(this.cur.row, this.columns.length - 1, { extend: e.shiftKey });
         return true;
       case 'Tab':
         this.move(0, e.shiftKey ? -1 : 1, { wrap: true });
@@ -428,15 +639,16 @@ export class Grid {
         this.startEdit(null);
         return true;
       case 'Escape':
-        if (this.selected.size > 1) {
-          this.selected.clear();
-          this.anchor = null;
-          this.paintCursor();
-        } else if (this.h.onEscape) this.h.onEscape();
+        if (!this.clearRange() && this.h.onEscape) this.h.onEscape();
         return true;
       case 'Delete':
       case 'Backspace': {
-        if (mod) return false;
+        if (mod || e.altKey) return false;
+        if (this.hasRange() && this.h.onClearCells) {
+          const cells = this.editableCells();
+          if (cells.length) this.h.onClearCells(cells);
+          return true;
+        }
         const at = this.cursorCell();
         if (at && at.cell.edit !== undefined && at.cell.edit !== '' && this.h.onCommit) {
           this.h.onCommit(at.row.key, at.col.key, '');
@@ -445,10 +657,6 @@ export class Grid {
       }
       default:
         break;
-    }
-    if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'a') {
-      this.selectAll();
-      return true;
     }
     if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
       return this.startEdit(e.key);
@@ -471,9 +679,11 @@ export class Grid {
         this.cancelEdit();
         return true;
       case 'ArrowUp':
+        if (mod) return false;
         this.commitEdit('up');
         return true;
       case 'ArrowDown':
+        if (mod) return false;
         this.commitEdit('down');
         return true;
       case 'ArrowLeft':

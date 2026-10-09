@@ -1,0 +1,235 @@
+// Every keyboard shortcut in the app, in one list. The native menu bar
+// (src/menu.rs) uses the same ids and keys; a Rust test reads this file and
+// fails if the two drift apart, so keep one entry per line.
+//
+// Keys are written once for both platforms: `mod` is Command on macOS and Ctrl
+// on Windows and Linux; `alt` is Option on macOS. An entry with `mac` and
+// `other` instead of `keys` differs by platform; a list gives alternatives
+// (the first is the one menus show).
+//
+// scope says who answers the key:
+//   app      The menu item's key equivalent on macOS (main.js leaves the key
+//            alone there); main.js on Windows and Linux. Works anywhere.
+//   grid     main.js, whenever focus isn't in a text field outside the grid.
+//            The menu item runs the same command when clicked.
+//   native   The stock Cut, Copy and Paste: text fields edit natively, and the
+//            grid answers the browser's copy, cut and paste events.
+//   builtin  The grid itself (grid.js). Listed on the shortcut sheet only.
+//   menu     A menu command with no shortcut.
+//
+// field: true   In a text field the command acts on the field (undo typing,
+//               select its text) instead of the budget.
+// text: true    The keys also mean something in a text field (move the caret,
+//               delete a word), so a text field keeps them.
+
+import { isMac } from './dom.js';
+
+export const SHORTCUTS = [
+  // File
+  { id: 'file.new', group: 'File', label: 'New budget', keys: 'mod+n', scope: 'app' },
+  { id: 'file.open', group: 'File', label: 'Open a budget', keys: 'mod+o', scope: 'app' },
+  { id: 'file.save', group: 'File', label: 'Save', keys: 'mod+s', scope: 'app' },
+  { id: 'file.save_as', group: 'File', label: 'Save as a new file', keys: 'mod+shift+s', scope: 'app' },
+  { id: 'file.print_budget', group: 'File', label: 'Print the budget (topsheet and detail)', keys: 'mod+p', scope: 'app' },
+  { id: 'file.print_topsheet', group: 'File', label: 'Print the topsheet', keys: 'mod+shift+p', scope: 'app' },
+  { id: 'file.close', group: 'File', label: 'Close the window', keys: 'mod+w', scope: 'app' },
+  { id: 'app.quit', group: 'File', label: 'Quit', keys: 'mod+q', scope: 'app' },
+
+  // Edit
+  { id: 'edit.undo', group: 'Edit', label: 'Undo', keys: 'mod+z', scope: 'app', field: true },
+  { id: 'edit.redo', group: 'Edit', label: 'Redo', mac: 'mod+shift+z', other: ['mod+y', 'mod+shift+z'], scope: 'app', field: true },
+  { id: 'edit.cut', group: 'Edit', label: 'Cut the selected cells', keys: 'mod+x', scope: 'native' },
+  { id: 'edit.copy', group: 'Edit', label: 'Copy the selected cells (tab-separated, for spreadsheets)', keys: 'mod+c', scope: 'native' },
+  { id: 'edit.paste', group: 'Edit', label: 'Paste cells, starting at the selection', keys: 'mod+v', scope: 'native' },
+  { id: 'edit.select_all', group: 'Edit', label: 'Select every row', keys: 'mod+a', scope: 'app', field: true },
+  { id: 'edit.fill_down', group: 'Edit', label: 'Fill down (top selected cell into the cells below)', keys: 'mod+d', scope: 'grid' },
+  { id: 'edit.delete_rows', group: 'Edit', label: 'Delete the selected rows (or the category or account)', keys: 'mod+backspace', scope: 'grid', text: true },
+  { id: 'grid.clear', group: 'Edit', label: 'Clear the selected cells', keys: ['backspace', 'delete'], scope: 'builtin' },
+
+  // Moving around and editing cells
+  { id: 'grid.move', group: 'Cells', label: 'Move between cells', keys: ['up', 'down', 'left', 'right'], scope: 'builtin' },
+  { id: 'grid.extend', group: 'Cells', label: 'Extend the selection', keys: ['shift+up', 'shift+down', 'shift+left', 'shift+right'], scope: 'builtin' },
+  { id: 'grid.tab', group: 'Cells', label: 'Next or previous cell', keys: ['tab', 'shift+tab'], scope: 'builtin' },
+  { id: 'grid.row_ends', group: 'Cells', label: 'First or last column', keys: ['home', 'end'], scope: 'builtin' },
+  { id: 'grid.grid_ends', group: 'Cells', label: 'First or last row', keys: ['mod+home', 'mod+end'], scope: 'builtin' },
+  { id: 'grid.edit', group: 'Cells', label: 'Edit a cell, keeping its text (or just start typing to replace it)', keys: 'f2', scope: 'builtin' },
+  { id: 'grid.commit', group: 'Cells', label: 'Finish editing and move down or up (detail lines)', keys: ['enter', 'shift+enter'], scope: 'builtin' },
+  { id: 'grid.commit_all', group: 'Cells', label: 'While editing: same value into every selected row', keys: 'mod+enter', scope: 'builtin' },
+  { id: 'grid.cancel', group: 'Cells', label: 'Cancel the edit, clear the selection, or go up a level', keys: 'escape', scope: 'builtin' },
+
+  // Insert
+  { id: 'insert.line', group: 'Insert', label: 'Insert a line below', keys: 'mod+enter', scope: 'grid' },
+  { id: 'insert.subtotal', group: 'Insert', label: 'Insert a subtotal row', keys: 'mod+alt+t', scope: 'grid' },
+  { id: 'insert.adjustment', group: 'Insert', label: 'Insert an adjustment row', keys: 'mod+alt+a', scope: 'grid' },
+  { id: 'insert.account', group: 'Insert', label: 'Add an account', scope: 'menu' },
+  { id: 'insert.category', group: 'Insert', label: 'Add a category', scope: 'menu' },
+  { id: 'insert.production_total', group: 'Insert', label: 'Add a production total', scope: 'menu' },
+
+  // Go
+  { id: 'go.topsheet', group: 'Go', label: 'Go to the topsheet', keys: 'mod+shift+up', scope: 'grid', text: true },
+  { id: 'go.up', group: 'Go', label: 'Up a level', keys: 'mod+up', scope: 'grid', text: true },
+  { id: 'go.down', group: 'Go', label: 'Open the category or account (also Enter)', keys: 'mod+down', scope: 'grid', text: true },
+  { id: 'go.next_account', group: 'Go', label: 'Next account', keys: 'mod+]', scope: 'grid' },
+  { id: 'go.prev_account', group: 'Go', label: 'Previous account', keys: 'mod+[', scope: 'grid' },
+
+  // View
+  { id: 'view.toggle_panel', group: 'View', label: 'Show or hide the setup panel', keys: 'mod+alt+s', scope: 'app' },
+  { id: 'view.tab.globals', group: 'View', label: 'Setup: Globals', keys: 'mod+1', scope: 'app' },
+  { id: 'view.tab.fringes', group: 'View', label: 'Setup: Fringes', keys: 'mod+2', scope: 'app' },
+  { id: 'view.tab.groups', group: 'View', label: 'Setup: Groups', keys: 'mod+3', scope: 'app' },
+  { id: 'view.tab.units', group: 'View', label: 'Setup: Units', keys: 'mod+4', scope: 'app' },
+  { id: 'view.tab.currencies', group: 'View', label: 'Setup: Currencies', keys: 'mod+5', scope: 'app' },
+  { id: 'view.tab.sets', group: 'View', label: 'Setup: Sets', keys: 'mod+6', scope: 'app' },
+  { id: 'view.tab.locations', group: 'View', label: 'Setup: Locations', keys: 'mod+7', scope: 'app' },
+  { id: 'view.tab.charges', group: 'View', label: 'Setup: Charges', keys: 'mod+8', scope: 'app' },
+  { id: 'view.tab.credits', group: 'View', label: 'Setup: Credits', keys: 'mod+9', scope: 'app' },
+  { id: 'view.tab.info', group: 'View', label: 'Setup: Info', scope: 'menu' },
+  { id: 'view.tab.settings', group: 'View', label: 'Setup: Settings', scope: 'menu' },
+  { id: 'view.tab.baseline', group: 'View', label: 'Setup: Baseline', scope: 'menu' },
+
+  // Help
+  { id: 'help.shortcuts', group: 'Help', label: 'Show this list of shortcuts', keys: 'mod+/', scope: 'app' },
+];
+
+/** Groups in the order the shortcut sheet shows them. */
+export const GROUPS = ['File', 'Edit', 'Cells', 'Insert', 'Go', 'View', 'Help'];
+
+/** On macOS the native menu answers `app` keys; elsewhere main.js does. */
+export const menuRunsAppKeys = isMac;
+
+const byId = new Map(SHORTCUTS.map((s) => [s.id, s]));
+
+export function shortcutById(id) {
+  return byId.get(id) || null;
+}
+
+/** The key specs for this platform, first one first. */
+export function keysFor(entry) {
+  if (!entry) return [];
+  const k = entry.keys !== undefined ? entry.keys : isMac ? entry.mac : entry.other;
+  if (k === undefined || k === null) return [];
+  return Array.isArray(k) ? k : [k];
+}
+
+// ---------------------------------------------------------------------------
+// Showing keys
+
+const MAC_NAMES = {
+  enter: '↩',
+  backspace: '⌫',
+  delete: '⌦',
+  escape: 'Esc',
+  tab: '⇥',
+  up: '↑',
+  down: '↓',
+  left: '←',
+  right: '→',
+  home: 'Home',
+  end: 'End',
+  f2: 'F2',
+};
+
+const PC_NAMES = {
+  enter: 'Enter',
+  backspace: 'Backspace',
+  delete: 'Delete',
+  escape: 'Esc',
+  tab: 'Tab',
+  up: 'Up',
+  down: 'Down',
+  left: 'Left',
+  right: 'Right',
+  home: 'Home',
+  end: 'End',
+  f2: 'F2',
+};
+
+function parse(spec) {
+  const parts = spec.toLowerCase().split('+');
+  const key = parts.pop();
+  return { key, mod: parts.includes('mod'), shift: parts.includes('shift'), alt: parts.includes('alt') };
+}
+
+/** One key spec for display: "⇧⌘S" on a Mac, "Ctrl+Shift+S" elsewhere. */
+export function keyText(spec) {
+  const p = parse(spec);
+  if (isMac) {
+    const k = MAC_NAMES[p.key] || p.key.toUpperCase();
+    return (p.alt ? '⌥' : '') + (p.shift ? '⇧' : '') + (p.mod ? '⌘' : '') + k;
+  }
+  const k = PC_NAMES[p.key] || p.key.toUpperCase();
+  const mods = [];
+  if (p.mod) mods.push('Ctrl');
+  if (p.alt) mods.push('Alt');
+  if (p.shift) mods.push('Shift');
+  return [...mods, k].join('+');
+}
+
+/** The first shortcut for a command, for tooltips; '' when it has none. */
+export function shortcutText(id) {
+  const k = keysFor(byId.get(id));
+  return k.length ? keyText(k[0]) : '';
+}
+
+/** "Save (⌘S)", or just the label when there's no shortcut. */
+export function withShortcut(label, id) {
+  const k = shortcutText(id);
+  return k ? `${label} (${k})` : label;
+}
+
+// ---------------------------------------------------------------------------
+// Matching key presses
+
+const NAMED = {
+  enter: 'Enter',
+  backspace: 'Backspace',
+  delete: 'Delete',
+  escape: 'Escape',
+  tab: 'Tab',
+  up: 'ArrowUp',
+  down: 'ArrowDown',
+  left: 'ArrowLeft',
+  right: 'ArrowRight',
+  home: 'Home',
+  end: 'End',
+  f2: 'F2',
+};
+
+const CODES = { '[': 'BracketLeft', ']': 'BracketRight', '/': 'Slash' };
+
+function keyMatches(e, k) {
+  if (NAMED[k]) return e.key === NAMED[k];
+  const key = typeof e.key === 'string' ? e.key : '';
+  if (/^[a-z]$/.test(k)) {
+    // Trust the layout's letter; Option on a Mac turns letters into symbols,
+    // so fall back to the physical key then.
+    if (/^[a-z]$/i.test(key)) return key.toLowerCase() === k;
+    return e.code === `Key${k.toUpperCase()}`;
+  }
+  if (/^[0-9]$/.test(k)) {
+    if (/^[0-9]$/.test(key)) return key === k;
+    return e.code === `Digit${k}`;
+  }
+  return key === k || (CODES[k] !== undefined && e.code === CODES[k]);
+}
+
+/** True when a key event is exactly this spec (no extra modifiers). */
+export function matches(e, spec) {
+  const p = parse(spec);
+  const mod = isMac ? e.metaKey : e.ctrlKey;
+  const stray = isMac ? e.ctrlKey : e.metaKey;
+  if (stray || mod !== p.mod || e.shiftKey !== p.shift || e.altKey !== p.alt) return false;
+  // AltGr (Ctrl+Alt on Windows) types characters on many layouts; never a shortcut.
+  if (typeof e.getModifierState === 'function' && e.getModifierState('AltGraph')) return false;
+  return keyMatches(e, p.key);
+}
+
+/** The `app` or `grid` command a key event triggers, or null. */
+export function matchShortcut(e) {
+  if (e.isComposing) return null;
+  for (const s of SHORTCUTS) {
+    if (s.scope !== 'app' && s.scope !== 'grid') continue;
+    if (keysFor(s).some((k) => matches(e, k))) return s;
+  }
+  return null;
+}

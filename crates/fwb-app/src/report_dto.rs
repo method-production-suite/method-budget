@@ -7,8 +7,9 @@
 use std::collections::BTreeMap;
 
 use fwb_core::{
-    Breakdown, CategoryTotals, ChargeTotals, CreditRowTotals, CreditTotals, Dec, FringeSummary,
-    GroupTotals, LevelTotals, Report, RowId, RowKind, RowTotals, SelectionTotals,
+    Breakdown, CategoryTotals, Change, ChargeTotals, CreditRowTotals, CreditTotals, Dec,
+    FringeSummary, GroupTotals, LevelTotals, Report, RowId, RowKind, RowTotals, SelectionTotals,
+    Variance,
 };
 use serde::Serialize;
 
@@ -321,6 +322,49 @@ impl From<&SelectionTotals> for SelectionDto {
             lines: (&s.lines).into(),
             fringes: s.fringes.clone(),
             groups: map(&s.groups, |b| b.into()),
+        }
+    }
+}
+
+/// One compared figure against the baseline. `None` means it didn't exist on
+/// that side (a row added or deleted since the baseline was locked).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct ChangeDto {
+    pub original: Option<Cents>,
+    pub current: Option<Cents>,
+    /// Current minus original, a missing side counting as 0.
+    pub variance: Option<Cents>,
+}
+
+/// Original (baseline) vs current totals. Row keys are row ids written as
+/// decimal strings (JSON object keys); accounts and categories are by code.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct VarianceDto {
+    pub rows: BTreeMap<RowId, ChangeDto>,
+    pub accounts: BTreeMap<String, ChangeDto>,
+    pub categories: BTreeMap<String, ChangeDto>,
+    pub grand_total: ChangeDto,
+    pub net_total: ChangeDto,
+}
+
+impl From<&Change> for ChangeDto {
+    fn from(c: &Change) -> ChangeDto {
+        ChangeDto {
+            original: c.original,
+            current: c.current,
+            variance: c.variance(),
+        }
+    }
+}
+
+impl From<&Variance> for VarianceDto {
+    fn from(v: &Variance) -> VarianceDto {
+        VarianceDto {
+            rows: map(&v.rows, |c| c.into()),
+            accounts: map(&v.accounts, |c| c.into()),
+            categories: map(&v.categories, |c| c.into()),
+            grand_total: (&v.grand_total).into(),
+            net_total: (&v.net_total).into(),
         }
     }
 }

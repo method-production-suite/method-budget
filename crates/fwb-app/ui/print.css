@@ -1,0 +1,535 @@
+/* Film Wizard Budgeting: printable reports (js/report.js).
+   Loaded for all media. Every report rule is scoped to .fwb-report, so nothing
+   here touches the app. On screen, #print-root is always hidden; in print, when
+   <html> has the "printing" class, only #print-root is shown. */
+
+#print-root {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 12mm 11mm 14mm;
+
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font: 7.5pt -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+      color: #555;
+    }
+  }
+
+  html.printing,
+  html.printing body {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #000 !important;
+    color-scheme: light;
+  }
+
+  html.printing body > *:not(#print-root) {
+    display: none !important;
+  }
+
+  html.printing #print-root {
+    display: block !important;
+  }
+}
+
+/* ------------------------------------------------------------------------- */
+/* The report itself: black on white, system font, tabular figures.          */
+
+.fwb-report {
+  color-scheme: light;
+  background: #fff;
+  color: #000;
+  font: 8.5pt/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  text-align: left;
+}
+
+@media screen {
+  .fwb-report {
+    max-width: 8.5in;
+    margin: 0 auto;
+    padding: 0.5in;
+  }
+}
+
+.fwb-report *,
+.fwb-report *::before,
+.fwb-report *::after {
+  box-sizing: border-box;
+}
+
+/* Title block */
+
+.fwb-report .rpt-title-block {
+  margin: 0 0 16pt;
+}
+
+.fwb-report .rpt-kicker {
+  font-size: 8pt;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #444;
+}
+
+.fwb-report .rpt-title {
+  margin: 2pt 0 8pt;
+  font-size: 20pt;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.fwb-report .rpt-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4pt 18pt;
+  margin: 0;
+}
+
+.fwb-report .rpt-fact {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fwb-report .rpt-fact dt {
+  font-size: 7pt;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #555;
+}
+
+.fwb-report .rpt-fact dd {
+  margin: 0;
+  font-size: 9pt;
+  overflow-wrap: anywhere;
+}
+
+.fwb-report .rpt-warning {
+  margin-top: 10pt;
+  padding: 6pt 8pt;
+  border: 1.5pt solid #000;
+  background: #eee;
+  font-size: 8.5pt;
+  overflow-wrap: anywhere;
+}
+
+.fwb-report .rpt-empty {
+  margin: 12pt 0;
+  color: #555;
+  font-style: italic;
+}
+
+/* Tables */
+
+.fwb-report .rpt-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.fwb-report .rpt-table th,
+.fwb-report .rpt-table td {
+  padding: 1.6pt 4pt;
+  vertical-align: baseline;
+  overflow-wrap: anywhere;
+}
+
+.fwb-report .rpt-table .num {
+  text-align: right;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+/* Running header: repeats at the top of every printed page. */
+
+.fwb-report .rpt-run {
+  padding: 0 0 5pt !important;
+  font-weight: 400;
+  text-align: left;
+}
+
+.fwb-report .rpt-run-inner {
+  display: flex;
+  align-items: baseline;
+  gap: 12pt;
+  padding-bottom: 3pt;
+  border-bottom: 0.75pt solid #000;
+  font-size: 7.5pt;
+  color: #333;
+}
+
+.fwb-report .rpt-run-title {
+  font-weight: 700;
+  color: #000;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fwb-report .rpt-run-section {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fwb-report .rpt-run-date {
+  white-space: nowrap;
+}
+
+.fwb-report .rpt-cols th {
+  padding-top: 0;
+  padding-bottom: 3pt;
+  border-bottom: 0.75pt solid #000;
+  font-size: 7pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #333;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.fwb-report .rpt-cols th.num {
+  text-align: right;
+}
+
+/* On screen the running header only needs to show once. */
+@media screen {
+  .fwb-report .rpt-run-row {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------------- */
+/* Topsheet                                                                  */
+
+.fwb-report .rpt-ts .c-code { width: 12%; }
+.fwb-report .rpt-ts .c-name { width: auto; }
+.fwb-report .rpt-ts .c-money { width: 19%; }
+.fwb-report .rpt-ts.has-baseline .c-money { width: 15%; }
+.fwb-report .rpt-ts.has-baseline .c-code { width: 9%; }
+
+.fwb-report .rpt-ts td {
+  padding-top: 2.4pt;
+  padding-bottom: 2.4pt;
+  font-size: 9pt;
+}
+
+.fwb-report .rpt-ts tr.cat td {
+  border-bottom: 0.5pt solid #d6d6d6;
+}
+
+.fwb-report .rpt-ts td.code {
+  color: #333;
+}
+
+.fwb-report .rpt-ts tr.posted td {
+  font-style: italic;
+  color: #333;
+}
+
+.fwb-report .rpt-ts tr.level td {
+  padding-top: 3.5pt;
+  padding-bottom: 6pt;
+  border-top: 0.75pt solid #000;
+  font-weight: 700;
+}
+
+.fwb-report .rpt-ts td.base,
+.fwb-report .rpt-ts td.var {
+  color: #333;
+}
+
+.fwb-report .rpt-ts-summary tr.first td {
+  padding-top: 10pt;
+  border-top: 1.5pt solid #000;
+}
+
+.fwb-report .rpt-ts-summary tr.strong td {
+  font-weight: 600;
+}
+
+.fwb-report .rpt-ts-summary tr.charge td.name,
+.fwb-report .rpt-ts-summary tr.credit td.name {
+  padding-left: 12pt;
+}
+
+.fwb-report .rpt-ts-summary tr.grand td {
+  padding-top: 4pt;
+  padding-bottom: 4pt;
+  border-top: 0.75pt solid #000;
+  border-bottom: 2.25pt double #000;
+  font-size: 10pt;
+  font-weight: 700;
+}
+
+.fwb-report .rpt-ts-summary tr.grand + tr.credit td {
+  padding-top: 6pt;
+}
+
+.fwb-report .rpt-ts-summary tr.display td {
+  color: #333;
+  font-size: 8.5pt;
+}
+
+.fwb-report .rpt-ts-summary tr.display.first td {
+  padding-top: 8pt;
+  border-top: 0;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Detail                                                                    */
+
+.fwb-report .rpt-detail {
+  break-before: page;
+}
+
+.fwb-report .rpt-detail.first {
+  break-before: auto;
+}
+
+.fwb-report.kind-detail .rpt-detail-intro + .rpt-detail {
+  break-before: auto;
+}
+
+@media screen {
+  .fwb-report .rpt-detail {
+    margin-top: 28pt;
+  }
+}
+
+.fwb-report .rpt-dt .c-no { width: 4%; }
+.fwb-report .rpt-dt .c-desc { width: auto; }
+.fwb-report .rpt-dt .c-amt { width: 13%; }
+.fwb-report .rpt-dt .c-unit { width: 6%; }
+.fwb-report .rpt-dt .c-x { width: 6.5%; }
+.fwb-report .rpt-dt .c-rate { width: 9.5%; }
+.fwb-report .rpt-dt .c-cur { width: 5%; }
+.fwb-report .rpt-dt .c-x4 { width: 5.5%; }
+.fwb-report .rpt-dt .c-total { width: 12%; }
+.fwb-report .rpt-dt .c-fr { width: 10%; }
+
+.fwb-report .rpt-cat-head td.cat {
+  padding: 2pt 4pt 6pt;
+  font-size: 12pt;
+  font-weight: 700;
+}
+
+.fwb-report .cat-code,
+.fwb-report .acct-code {
+  display: inline-block;
+  margin-right: 8pt;
+  font-variant-numeric: tabular-nums;
+}
+
+.fwb-report .rpt-acct-head td.acct {
+  padding-top: 7pt;
+  padding-bottom: 2.5pt;
+  border-bottom: 0.5pt solid #000;
+  font-size: 9pt;
+  font-weight: 700;
+}
+
+.fwb-report .rpt-row td {
+  border-bottom: 0.5pt solid #e2e2e2;
+}
+
+.fwb-report .rpt-row td.no {
+  color: #777;
+  font-size: 7.5pt;
+}
+
+.fwb-report .rpt-row td.formula {
+  font-size: 7.5pt;
+  font-style: italic;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.fwb-report .rpt-row .unit,
+.fwb-report .rpt-row td.unit-col,
+.fwb-report .rpt-row td.cur {
+  color: #444;
+}
+
+.fwb-report .rpt-row td.fr {
+  font-size: 7pt;
+  color: #444;
+}
+
+.fwb-report .rpt-row td.total {
+  font-weight: 500;
+}
+
+.fwb-report .rpt-row .local {
+  display: block;
+  font-size: 6.5pt;
+  font-weight: 400;
+  color: #555;
+}
+
+/* Subtotal and adjustment rows */
+
+.fwb-report .rpt-row.subtotal td {
+  font-style: italic;
+  font-weight: 600;
+  border-top: 0.5pt solid #000;
+  border-bottom: 0.5pt solid #bbb;
+}
+
+.fwb-report .rpt-row.subtotal td.no {
+  font-weight: 400;
+}
+
+.fwb-report .rpt-row.adjustment td {
+  font-style: italic;
+  background: #f2f2f2;
+}
+
+.fwb-report .rpt-row.adjustment td.no {
+  font-style: normal;
+}
+
+/* Lines not counted in the total */
+
+.fwb-report .rpt-row.excluded td {
+  color: #8a8a8a;
+}
+
+.fwb-report .rpt-row.excluded .desc-text {
+  text-decoration: line-through;
+  text-decoration-thickness: 0.5pt;
+}
+
+.fwb-report .rpt-row .flag {
+  display: inline-block;
+  margin-left: 6pt;
+  padding: 0 3pt;
+  border: 0.5pt solid #8a8a8a;
+  border-radius: 2pt;
+  font-size: 6.5pt;
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.fwb-report .rpt-row .flag.issue {
+  border-color: #000;
+  color: #000;
+  font-weight: 600;
+}
+
+.fwb-report .rpt-row td.issue {
+  outline: 1pt dashed #000;
+  outline-offset: -1.5pt;
+}
+
+.fwb-report .rpt-row td.cur {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.fwb-report .rpt-row.empty td {
+  color: #777;
+  font-style: italic;
+}
+
+/* Account and category totals */
+
+.fwb-report .rpt-sum td {
+  padding-top: 1.6pt;
+  padding-bottom: 1.6pt;
+}
+
+.fwb-report .rpt-sum td.label {
+  text-align: right;
+  padding-right: 8pt;
+}
+
+.fwb-report .rpt-sum .note {
+  font-size: 7pt;
+  color: #555;
+}
+
+.fwb-report .rpt-sum.sub td {
+  color: #222;
+}
+
+.fwb-report .rpt-sum.first td.total,
+.fwb-report .rpt-sum.first td.label {
+  padding-top: 3pt;
+}
+
+.fwb-report .rpt-sum.acct-total td.label,
+.fwb-report .rpt-sum.acct-total td.total {
+  font-weight: 700;
+}
+
+.fwb-report .rpt-sum.acct-total td.total {
+  border-top: 0.75pt solid #000;
+}
+
+.fwb-report .rpt-note-row td.note {
+  padding-top: 1pt;
+  font-size: 7pt;
+  font-style: italic;
+  color: #555;
+}
+
+.fwb-report .rpt-cat-foot tr.first td {
+  padding-top: 10pt;
+}
+
+.fwb-report .rpt-sum.fringe-acct td.label {
+  font-weight: 600;
+}
+
+.fwb-report .rpt-sum.cat-total td {
+  font-size: 10pt;
+  font-weight: 700;
+}
+
+.fwb-report .rpt-sum.cat-total td.total {
+  border-top: 0.75pt solid #000;
+  border-bottom: 2.25pt double #000;
+}
+
+/* Page breaks: keep headings with what follows. */
+
+.fwb-report thead {
+  display: table-header-group;
+}
+
+.fwb-report tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.fwb-report .rpt-keep {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.fwb-report .rpt-cat-head,
+.fwb-report .rpt-acct-head {
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+.fwb-report .rpt-title-block {
+  break-inside: avoid;
+}

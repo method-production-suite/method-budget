@@ -15,6 +15,7 @@ use tauri_plugin_dialog::{
 };
 
 use crate::edit::{self, CurrencyInput, FringeInput, GroupInput, UnitInput};
+use crate::edit::{ChargeInput, CreditInput, InfoInput, LocationInput, SetInput};
 use crate::report_dto::SelectionDto;
 use crate::session::Session;
 use crate::view::View;
@@ -454,6 +455,206 @@ pub fn delete_currency<R: Runtime>(
 }
 
 // ---------------------------------------------------------------------------
+// Charges, credits, sets, locations, budget info, settings and the baseline
+// (the topsheet setup tabs in ui/js/topsheet-setup.js)
+
+#[tauri::command]
+pub fn set_charge<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    index: Option<usize>,
+    charge: ChargeInput,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| edit::set_charge(b, index, &charge))
+}
+
+#[tauri::command]
+pub fn delete_charge<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    index: usize,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| edit::delete_charge(b, index))
+}
+
+#[tauri::command]
+pub fn move_charge<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    index: usize,
+    to: usize,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| edit::move_charge(b, index, to))
+}
+
+#[tauri::command]
+pub fn set_credit<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    index: Option<usize>,
+    credit: CreditInput,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| edit::set_credit(b, index, &credit))
+}
+
+#[tauri::command]
+pub fn delete_credit<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    index: usize,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| edit::delete_credit(b, index))
+}
+
+#[tauri::command]
+pub fn move_credit<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    index: usize,
+    to: usize,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| edit::move_credit(b, index, to))
+}
+
+#[tauri::command]
+pub fn set_set<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    name: String,
+    set: SetInput,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| edit::set_set(b, &name, &set))
+}
+
+#[tauri::command]
+pub fn delete_set<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    name: String,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| edit::delete_set(b, &name))
+}
+
+#[tauri::command]
+pub fn set_location<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    name: String,
+    location: LocationInput,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| edit::set_location(b, &name, &location))
+}
+
+#[tauri::command]
+pub fn delete_location<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    name: String,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| edit::delete_location(b, &name))
+}
+
+#[tauri::command]
+pub fn set_info<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    name: String,
+    value: InfoInput,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| edit::set_info(b, &name, &value))
+}
+
+#[tauri::command]
+pub fn delete_info<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    name: String,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| edit::delete_info(b, &name))
+}
+
+#[tauri::command]
+pub fn set_fringe_posting<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    mode: String,
+    suffix: Option<String>,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| {
+        edit::set_fringe_posting(b, &mode, suffix.as_deref())
+    })
+}
+
+/// Arguments are snake_case here (`category_width`...), matching the file format.
+#[tauri::command(rename_all = "snake_case")]
+pub fn set_account_coding<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    category_width: u8,
+    account_width: u8,
+    sub_width: u8,
+    set_width: u8,
+    separator: Option<String>,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| {
+        edit::set_account_coding(
+            b,
+            [category_width, account_width, sub_width, set_width],
+            separator.as_deref(),
+        )
+    })
+}
+
+#[tauri::command]
+pub fn set_base_currency<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    code: String,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| edit::set_base_currency(b, &code))
+}
+
+#[tauri::command]
+pub fn set_totals_currency<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    code: Option<String>,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| {
+        edit::set_totals_currency(b, code.as_deref())
+    })
+}
+
+#[tauri::command]
+pub fn lock_baseline<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+) -> CmdResult {
+    edit_budget(&window, &state, edit::lock_baseline)
+}
+
+#[tauri::command]
+pub fn clear_baseline<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+) -> CmdResult {
+    edit_budget(&window, &state, edit::clear_baseline)
+}
+
+// ---------------------------------------------------------------------------
+// Several cells at once: paste, fill down, cut and clear (src/batch.rs)
+
+/// Sets many detail cells as one undo step, recalculating once.
+#[tauri::command]
+pub fn set_cells<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    edits: Vec<crate::batch::CellEdit>,
+) -> CmdResult {
+    edit_budget(&window, &state, |b| crate::batch::set_cells(b, &edits))
+}
+
+// ---------------------------------------------------------------------------
 // Unsaved-changes guard
 
 const KEEP_EDITING: &str = "Keep editing";
@@ -499,74 +700,6 @@ fn is_app_url(url: &tauri::Url) -> bool {
     }
 }
 
-#[cfg(target_os = "macos")]
-fn mac_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<tauri::menu::Menu<R>> {
-    use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
-    let about = AboutMetadata {
-        name: Some(APP_NAME.into()),
-        version: Some(app.package_info().version.to_string()),
-        ..Default::default()
-    };
-    // The stock Quit item would end the app without asking about unsaved
-    // changes, so ours goes through the same guard as closing the window.
-    let quit = MenuItem::with_id(
-        app,
-        "quit",
-        format!("Quit {APP_NAME}"),
-        true,
-        Some("CmdOrCtrl+Q"),
-    )?;
-    Menu::with_items(
-        app,
-        &[
-            &Submenu::with_items(
-                app,
-                APP_NAME,
-                true,
-                &[
-                    &PredefinedMenuItem::about(app, None, Some(about))?,
-                    &PredefinedMenuItem::separator(app)?,
-                    &PredefinedMenuItem::hide(app, None)?,
-                    &PredefinedMenuItem::hide_others(app, None)?,
-                    &PredefinedMenuItem::separator(app)?,
-                    &quit,
-                ],
-            )?,
-            &Submenu::with_items(
-                app,
-                "File",
-                true,
-                &[&PredefinedMenuItem::close_window(app, None)?],
-            )?,
-            // Text editing shortcuts (copy, paste...) in inputs need these.
-            &Submenu::with_items(
-                app,
-                "Edit",
-                true,
-                &[
-                    &PredefinedMenuItem::undo(app, None)?,
-                    &PredefinedMenuItem::redo(app, None)?,
-                    &PredefinedMenuItem::separator(app)?,
-                    &PredefinedMenuItem::cut(app, None)?,
-                    &PredefinedMenuItem::copy(app, None)?,
-                    &PredefinedMenuItem::paste(app, None)?,
-                    &PredefinedMenuItem::select_all(app, None)?,
-                ],
-            )?,
-            &Submenu::with_items(
-                app,
-                "Window",
-                true,
-                &[
-                    &PredefinedMenuItem::minimize(app, None)?,
-                    &PredefinedMenuItem::maximize(app, None)?,
-                    &PredefinedMenuItem::fullscreen(app, None)?,
-                ],
-            )?,
-        ],
-    )
-}
-
 pub fn run() {
     let nav_guard = tauri::plugin::Builder::<tauri::Wry>::new("nav-guard")
         .on_navigation(|_, url| is_app_url(url))
@@ -577,13 +710,19 @@ pub fn run() {
         .plugin(nav_guard)
         .manage(AppState::default());
 
-    #[cfg(target_os = "macos")]
-    let builder = builder.menu(mac_menu).on_menu_event(|app, event| {
-        if event.id() == "quit" {
-            let handle = app.clone();
-            confirm_discard(app, move || handle.exit(0));
-        }
-    });
+    // The menu bar (src/menu.rs). Quit asks about unsaved changes first, like
+    // closing the window; every other item goes to menu::handle.
+    let builder = builder
+        .menu(crate::menu::build)
+        .on_menu_event(|app, event| {
+            let id = event.id().as_ref();
+            if id == crate::menu::QUIT {
+                let handle = app.clone();
+                confirm_discard(app, move || handle.exit(0));
+            } else {
+                crate::menu::handle(app, id);
+            }
+        });
 
     builder
         .on_window_event(|window, event| {
@@ -627,6 +766,27 @@ pub fn run() {
             delete_unit,
             set_currency,
             delete_currency,
+            // Topsheet setup tabs
+            set_charge,
+            delete_charge,
+            move_charge,
+            set_credit,
+            delete_credit,
+            move_credit,
+            set_set,
+            delete_set,
+            set_location,
+            delete_location,
+            set_info,
+            delete_info,
+            set_fringe_posting,
+            set_account_coding,
+            set_base_currency,
+            set_totals_currency,
+            lock_baseline,
+            clear_baseline,
+            // Several cells at once
+            set_cells,
         ])
         .setup(|app| {
             if let Some(w) = app.get_webview_window("main") {

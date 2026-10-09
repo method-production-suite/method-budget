@@ -1,0 +1,342 @@
+/* Topsheet setup tabs (sets, locations, charges, credits, info, settings,
+   baseline). Builds on setup.css; uses only the app's :root tokens. Every
+   class here is prefixed with tss-. */
+
+/* Twelve tabs don't fit on one line in the panel: let them wrap instead of
+   scrolling out of sight. */
+/* Section switch above the tab strip (Tables / Budget). */
+.setup-sections {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  margin-bottom: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.setup-section {
+  flex: 1;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.setup-section[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.setup-section:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.tss-heading {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tss-group {
+  padding: 8px 0 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tss-group:first-child {
+  padding-top: 0;
+}
+
+.tss-note {
+  margin-top: 6px !important;
+}
+
+.tss-fields-3 {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr);
+  margin-top: 0;
+}
+
+.tss-info {
+  grid-template-columns: 96px minmax(0, 1fr);
+}
+
+/* Up / down buttons */
+
+.tss-move {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 1px;
+}
+
+.tss-move-btn {
+  appearance: none;
+  width: 20px;
+  height: 22px;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.tss-move-btn:hover:not(:disabled):not([aria-disabled="true"]) {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.tss-move-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.tss-move-btn:focus-visible,
+.tss-chip-x:focus-visible,
+.tss-more-title:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.setup-btn.tss-small {
+  height: 22px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+/* Collapsible "left out" section */
+
+.tss-more {
+  margin-top: 6px;
+}
+
+.tss-more-title {
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius);
+  padding: 1px 0;
+}
+
+.tss-more-title:hover {
+  color: var(--text);
+}
+
+.tss-more[open] > .tss-more-title {
+  color: var(--text);
+}
+
+.tss-more-body {
+  margin-top: 4px;
+  padding-left: 8px;
+  border-left: 2px solid var(--border);
+}
+
+/* Chips */
+
+.tss-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+}
+
+.tss-chips-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.tss-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  height: 22px;
+  padding: 0 2px 0 8px;
+  font-size: 12px;
+  border-radius: 11px;
+  background: var(--selection);
+  color: var(--text);
+}
+
+.tss-chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tss-chip-x {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.tss-chip-x:hover:not([aria-disabled="true"]) {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.setup-input.tss-chip-add {
+  width: auto;
+  max-width: 140px;
+  height: 22px;
+  font-size: 12px;
+}
+
+/* Typed-in amounts left out of a charge */
+
+.tss-amounts {
+  display: grid;
+  gap: 4px;
+}
+
+.tss-amount {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 22px;
+  gap: 4px;
+  align-items: center;
+}
+
+.tss-amounts > .setup-btn {
+  justify-self: start;
+}
+
+/* Credit rows */
+
+.tss-rows-wrap {
+  margin-top: 8px;
+  display: grid;
+  gap: 4px;
+}
+
+.tss-rows-wrap > .setup-btn {
+  justify-self: start;
+}
+
+.tss-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.tss-row {
+  padding: 4px 4px 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.tss-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+}
+
+.tss-row-num {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Settings */
+
+.tss-widths {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.tss-coding-actions {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tss-example {
+  font-size: 12.5px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tss-example strong {
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.tss-example-inline {
+  align-self: end;
+  padding-bottom: 5px;
+}
+
+.tss-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* Baseline summary */
+
+.tss-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.tss-table th,
+.tss-table td {
+  padding: 3px 4px;
+  border-bottom: 1px solid var(--border-soft);
+  white-space: nowrap;
+}
+
+.tss-table thead th {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.tss-table tbody th {
+  text-align: left;
+  font-weight: 600;
+}
+
+.tss-up {
+  color: var(--danger);
+}
+
+.tss-down {
+  color: var(--accent);
+}
+
+/* Tabs share the row evenly and wrap to a second row in a narrow panel,
+   so no tab is ever hidden off the edge. */
+.setup-tabs {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+
+.setup-tabs .setup-tab {
+  flex: 1 1 auto;
+  padding: 7px 4px 6px;
+  font-size: 12px;
+}

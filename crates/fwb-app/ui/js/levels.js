@@ -50,6 +50,18 @@ export function findCategory(ix, code, ti) {
   return same.find((c) => c.ti === ti) || same[0] || null;
 }
 
+/**
+ * Every account in topsheet order, across categories:
+ * [{ catCode, ti, code, ai }] (ai is the account's index in its category).
+ */
+export function accountList(ix) {
+  const out = [];
+  for (const c of ix.cats) {
+    (c.cat.accounts || []).forEach((a, ai) => out.push({ catCode: c.cat.code, ti: c.ti, code: a.code, ai }));
+  }
+  return out;
+}
+
 function moneyCell(cents, extra = {}) {
   if (cents === null || cents === undefined) return { ...NA, ...extra };
   return { text: money(cents), ...extra };

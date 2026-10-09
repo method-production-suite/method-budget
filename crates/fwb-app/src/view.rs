@@ -7,7 +7,7 @@ use fwb_core::{Budget, RowId};
 use serde::Serialize;
 
 use crate::diagnose::{error_message, Issue, Outcome};
-use crate::report_dto::ReportDto;
+use crate::report_dto::{ReportDto, VarianceDto};
 
 #[derive(Clone, Debug, Serialize)]
 pub struct View {
@@ -27,6 +27,9 @@ pub struct View {
     pub can_redo: bool,
     /// A row the last command created, for the UI to select.
     pub created_row: Option<RowId>,
+    /// Original (baseline) vs current totals, when the budget has a baseline
+    /// and totals could be computed (partial totals when `partial` is true).
+    pub variance: Option<VarianceDto>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -82,6 +85,13 @@ impl View {
             can_undo,
             can_redo,
             created_row,
+            variance: budget
+                .baseline
+                .as_ref()
+                .zip(outcome.report.as_ref())
+                .and_then(|(base, report)| fwb_core::variance(base, report))
+                .as_ref()
+                .map(VarianceDto::from),
         }
     }
 }

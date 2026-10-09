@@ -1,6 +1,6 @@
 {
   "identifier": "main",
-  "description": "The main window may call the app's own budget commands and nothing else: no file system, shell, network or dialog access from the web view (dialogs are opened by Rust).",
+  "description": "The main window may call the app's own budget commands, listen for the native menu's events, open the print sheet and close itself (which asks about unsaved changes), and nothing else: no file system, shell, network or dialog access from the web view (dialogs are opened by Rust).",
   "windows": [
     "main"
   ],
@@ -33,6 +33,28 @@
     "allow-set-unit",
     "allow-delete-unit",
     "allow-set-currency",
-    "allow-delete-currency"
+    "allow-delete-currency",
+    "allow-set-charge",
+    "allow-delete-charge",
+    "allow-move-charge",
+    "allow-set-credit",
+    "allow-delete-credit",
+    "allow-move-credit",
+    "allow-set-set",
+    "allow-delete-set",
+    "allow-set-location",
+    "allow-delete-location",
+    "allow-set-info",
+    "allow-delete-info",
+    "allow-set-fringe-posting",
+    "allow-set-account-coding",
+    "allow-set-base-currency",
+    "allow-set-totals-currency",
+    "allow-lock-baseline",
+    "allow-clear-baseline",
+    "allow-set-cells",
+    "core:event:allow-listen",
+    "core:webview:allow-print",
+    "core:window:allow-close"
   ]
 }

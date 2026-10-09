@@ -1,15 +1,21 @@
 // App shell: holds the current view, which level is showing, the toolbar,
-// breadcrumb, keyboard shortcuts, and wires the grid, side panel and footer.
+// breadcrumb, keyboard shortcuts and menu commands, and wires the grid, side
+// panel and footer.
 //
 // Rust owns the budget. Every change is a command that returns a fresh view;
 // this file only decides what to ask for and redraws from what comes back.
+//
+// Every keyboard shortcut and menu item runs a command from COMMANDS by id
+// (ids and keys: shortcuts.js). A key press and a menu click reach the same
+// function, so they always do the same thing.
 
 import { invoke, connected } from './api.js';
-import { el, $, hasMod, isTextField, shortcut } from './dom.js';
-import { Grid } from './grid.js';
+import { el, $, isTextField } from './dom.js';
+import { Grid, parseTSV } from './grid.js';
 import {
   indexView,
   findCategory,
+  accountList,
   TOPSHEET_COLUMNS,
   ACCOUNT_COLUMNS,
   DETAIL_COLUMNS,
@@ -20,6 +26,9 @@ import {
 import { renderFooter } from './footer.js';
 import { formDialog, confirmDialog, isModalOpen } from './modal.js';
 import { renderSetup } from './setup.js';
+import { printReport } from './report.js';
+import { SHORTCUTS, matchShortcut, menuRunsAppKeys, shortcutById, withShortcut } from './shortcuts.js';
+import { isHelpOpen, toggleHelp, closeHelp } from './help.js';
 
 const state = {
   view: null,
@@ -39,6 +48,7 @@ const grid = new Grid($('grid-host'), {
   onActivate: (rowKey) => drillDown(rowKey),
   onEscape: () => goUp(),
   onSelect: (keys) => selectionChanged(keys),
+  onClearCells: (cells) => clearCells(cells),
   onPastEnd: () => {
     if (state.level === 'details') insertRow('line');
   },
@@ -185,12 +195,11 @@ function renderBanner(v) {
   banner.hidden = false;
 }
 
-function button(label, onClick, { title = '', keys = '', danger = false } = {}) {
-  const hint = keys ? ` (${shortcut(keys)})` : '';
+function button(label, onClick, { title = '', cmd = '', danger = false } = {}) {
   return el('button', {
     class: danger ? 'btn btn-quiet btn-danger-text' : 'btn btn-quiet',
     text: label,
-    title: (title || label) + hint,
+    title: withShortcut(title || label, cmd),
     attrs: { type: 'button' },
     on: {
       click: () => {
@@ -208,24 +217,24 @@ function renderActions() {
       button('Add production total', addProductionTotal, { title: 'Add a production total (a subtotal of the categories above it)' }),
       button('Rename budget', renameBudget),
       el('span', { class: 'spacer' }),
-      button('Delete', deleteTopsheetRow, { keys: 'mod+backspace', danger: true }),
+      button('Delete', deleteTopsheetRow, { cmd: 'edit.delete_rows', danger: true }),
     );
   } else if (state.level === 'accounts') {
     bar.replaceChildren(
       button('Add account', addAccount),
       el('span', { class: 'spacer' }),
-      button('Delete account', deleteAccount, { keys: 'mod+backspace', danger: true }),
+      button('Delete account', deleteAccount, { cmd: 'edit.delete_rows', danger: true }),
     );
   } else {
     bar.replaceChildren(
-      button('Insert line', () => insertRow('line'), { keys: 'mod+enter' }),
-      button('Insert subtotal', () => insertRow('subtotal'), { keys: 'mod+alt+t' }),
+      button('Insert line', () => insertRow('line'), { cmd: 'insert.line' }),
+      button('Insert subtotal', () => insertRow('subtotal'), { cmd: 'insert.subtotal' }),
       button('Insert adjustment', () => insertRow('adjustment'), {
-        keys: 'mod+alt+a',
+        cmd: 'insert.adjustment',
         title: 'Insert an adjustment: a percentage of the lines above it (Amount 0.1 is 10%)',
       }),
       el('span', { class: 'spacer' }),
-      button('Delete rows', deleteRows, { keys: 'mod+backspace', danger: true }),
+      button('Delete rows', deleteRows, { cmd: 'edit.delete_rows', danger: true }),
     );
   }
 }
@@ -291,6 +300,32 @@ function drillDown(rowKey) {
   grid.focus();
 }
 
+/** Opens the category or account under the cursor (Cmd/Ctrl+Down). */
+function goDown() {
+  if (state.level === 'details') return;
+  const r = grid.cursorRow();
+  if (r && r.activatable) drillDown(r.key);
+}
+
+/** Next (1) or previous (-1) account's lines, across categories, wrapping around. */
+function stepAccount(delta) {
+  if (state.level !== 'details' || !state.acct) return;
+  const list = accountList(state.ix);
+  const i = list.findIndex((x) => x.ti === state.cat.ti && x.ai === state.acct.ai);
+  if (i < 0 || list.length < 2) return;
+  const next = list[(i + delta + list.length) % list.length];
+  state.cat = { code: next.catCode, ti: next.ti };
+  state.acct = { code: next.code, ai: next.ai };
+  state.memory.topsheet = `t${next.ti}`;
+  state.memory.accounts = `a${next.ai}`;
+  state.selection = null;
+  const entry = findCategory(state.ix, next.catCode, next.ti);
+  const a = entry && entry.cat.accounts[next.ai];
+  const first = a && (a.details || [])[0];
+  render({ focusKey: first ? `r${first.id}` : null, focusCol: 'description', resetSelection: true });
+  grid.focus();
+}
+
 // ---------------------------------------------------------------------------
 // Editing cells
 
@@ -326,6 +361,96 @@ function commitMany(rowKeys, colKey, value) {
     return;
   }
   act('set_rows_field', { rowIds: rowKeys.map((k) => Number(k.slice(1))), field: colKey, value });
+}
+
+// ---------------------------------------------------------------------------
+// Several cells at once: clear, paste, cut, fill down (detail grid)
+
+/** Sets detail cells as one undo step. cells: [{ rowKey, colKey, value }]. */
+function setCells(cells) {
+  const edits = cells.map((c) => ({ rowId: Number(c.rowKey.slice(1)), field: c.colKey, value: c.value }));
+  return act('set_cells', { edits });
+}
+
+function clearCells(cells) {
+  if (state.level === 'details') {
+    setCells(cells.map((c) => ({ ...c, value: '' })));
+    return;
+  }
+  // Category and account lists: one cell at a time, the cursor's.
+  const at = grid.cursorCell();
+  if (at && at.cell.edit !== undefined && at.cell.edit !== '') commitCell(at.row.key, at.col.key, '');
+}
+
+function fillDown() {
+  if (state.level !== 'details') return;
+  const cells = grid.fillDownTargets();
+  if (cells.length) setCells(cells);
+  grid.focus();
+}
+
+const NUMBER_FIELDS = new Set(['amount', 'x', 'rate', 'x4']);
+const PASTED_NUMBER = /^(\()?(-)?(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d*\.?\d+)(\))?$/;
+
+/** Spreadsheet number text ("1,500.00", "(250)") as a plain number for formula cells. */
+function pasteValue(colKey, value) {
+  if (!NUMBER_FIELDS.has(colKey)) return value;
+  const m = PASTED_NUMBER.exec(value.trim());
+  if (!m || Boolean(m[1]) !== Boolean(m[4])) return value;
+  const n = m[3].replace(/,/g, '');
+  return m[1] || m[2] ? `-${n}` : n;
+}
+
+function pasteText(text) {
+  if (!text) return;
+  const matrix = parseTSV(text);
+  if (state.level !== 'details') {
+    // Category and account lists take one cell at a time.
+    const at = grid.cursorCell();
+    if (!at || at.cell.edit === undefined) return;
+    if (matrix.length > 1 || matrix[0].length > 1) toast('Only one cell can be pasted here; pasted the first one.');
+    const value = matrix[0][0];
+    if (value !== String(at.cell.edit)) commitCell(at.row.key, at.col.key, value);
+    return;
+  }
+  const { cells, rowsShort } = grid.pasteTargets(matrix);
+  if (cells.length) setCells(cells.map((c) => ({ ...c, value: pasteValue(c.colKey, c.value) })));
+  if (rowsShort) {
+    const rows = rowsShort === 1 ? '1 pasted row' : `${rowsShort} pasted rows`;
+    toast(`${rows} didn't fit below the last line. Insert lines, then paste again.`);
+  }
+}
+
+/** True when the grid (not a text field or dialog) gets copy, cut and paste. */
+function gridHasClipboard() {
+  if (isHelpOpen() || isModalOpen() || grid.editor) return false;
+  const a = document.activeElement;
+  return !a || a === document.body || a === $('grid-host');
+}
+
+function wireClipboard() {
+  // WebKit enables Copy, Cut and Paste with nothing selected only when these
+  // "before" events are cancelled.
+  for (const type of ['beforecopy', 'beforecut', 'beforepaste']) {
+    document.addEventListener(type, (e) => {
+      if (gridHasClipboard()) e.preventDefault();
+    });
+  }
+  const copy = (e) => {
+    if (!gridHasClipboard() || !e.clipboardData) return false;
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', grid.copyText());
+    return true;
+  };
+  document.addEventListener('copy', copy);
+  document.addEventListener('cut', (e) => {
+    if (copy(e)) clearCells(grid.editableCells());
+  });
+  document.addEventListener('paste', (e) => {
+    if (!gridHasClipboard() || !e.clipboardData) return;
+    e.preventDefault();
+    pasteText(e.clipboardData.getData('text/plain'));
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -437,6 +562,27 @@ async function renameBudget() {
     onSubmit: (f) => call('set_title', { title: f.title }),
   });
   if (ok) grid.focus();
+}
+
+/** Insert > Category / Production Total: these live on the topsheet, so go there first. */
+async function insertOnTopsheet(add) {
+  if (state.level !== 'topsheet') goTo('topsheet');
+  await add();
+}
+
+/** Insert > Account: in the current category, after the current account. */
+async function insertAccount() {
+  if (state.level === 'details') {
+    goTo('accounts');
+  } else if (state.level === 'topsheet') {
+    const r = grid.cursorRow();
+    if (!r || !r.activatable) return;
+    drillDown(r.key);
+    const entry = findCategory(state.ix, state.cat.code, state.cat.ti);
+    const n = entry ? (entry.cat.accounts || []).length : 0;
+    if (n) grid.goTo(`a${n - 1}`);
+  }
+  await addAccount();
 }
 
 async function deleteTopsheetRow() {
@@ -567,66 +713,203 @@ function doRedo() {
   act('redo');
 }
 
+/** File > Print: waits for queued edits so the printout has them. */
+async function doPrint(kind) {
+  if (!(await act('get_view'))) return;
+  try {
+    await printReport(state.view, kind);
+  } catch (e) {
+    toast(e);
+  }
+  grid.focus();
+}
+
+// ---------------------------------------------------------------------------
+// View: setup panel
+
+function togglePanel() {
+  const hadFocus = $('panel').contains(document.activeElement);
+  state.panelOpen = !state.panelOpen;
+  renderPanel();
+  if (!state.panelOpen && hadFocus) grid.focus();
+}
+
+/** Opens the setup panel on a tab and puts focus on the tab. */
+function showTab(tab) {
+  state.tab = tab;
+  state.panelOpen = true;
+  renderPanel();
+  const button = document.getElementById(`setup-tab-${tab}`);
+  if (button) button.focus();
+}
+
+/** In a text field, Undo, Redo and Select All act on the field. */
+function fieldEdit(kind) {
+  const a = document.activeElement;
+  if (!isTextField(a)) return false;
+  if (kind === 'selectAll') {
+    if (typeof a.select === 'function') a.select();
+  } else {
+    document.execCommand(kind); // the field's own typing history
+  }
+  return true;
+}
+
+function selectAll() {
+  grid.selectAll();
+  grid.focus();
+}
+
+// ---------------------------------------------------------------------------
+// Commands: one per shortcut-list id, run from keys and the menu bar alike
+
+const COMMANDS = {
+  'file.new': () => doNew(),
+  'file.open': () => doOpen(),
+  'file.save': () => doSave(false),
+  'file.save_as': () => doSave(true),
+  'file.print_topsheet': () => doPrint('topsheet'),
+  'file.print_budget': () => doPrint('both'),
+  'edit.undo': () => fieldEdit('undo') || doUndo(),
+  'edit.redo': () => fieldEdit('redo') || doRedo(),
+  'edit.select_all': () => fieldEdit('selectAll') || selectAll(),
+  'edit.fill_down': fillDown,
+  'edit.delete_rows': deleteRows,
+  'insert.line': () => insertRow('line'),
+  'insert.subtotal': () => insertRow('subtotal'),
+  'insert.adjustment': () => insertRow('adjustment'),
+  'insert.account': insertAccount,
+  'insert.category': () => insertOnTopsheet(addCategory),
+  'insert.production_total': () => insertOnTopsheet(addProductionTotal),
+  'go.topsheet': () => goTo('topsheet'),
+  'go.up': goUp,
+  'go.down': goDown,
+  'go.next_account': () => stepAccount(1),
+  'go.prev_account': () => stepAccount(-1),
+  'view.toggle_panel': togglePanel,
+  'help.shortcuts': toggleHelp,
+  // The menu items are answered in Rust; these run only for the keys on
+  // Windows and Linux, where the page sees them first.
+  'file.close': closeWindow,
+  'app.quit': closeWindow,
+};
+for (const s of SHORTCUTS) {
+  if (s.id.startsWith('view.tab.')) COMMANDS[s.id] = () => showTab(s.id.slice('view.tab.'.length));
+}
+
+/** Commands that act on a focused text field (and so leave a cell edit open). */
+const FIELD_COMMANDS = new Set(SHORTCUTS.filter((s) => s.field).map((s) => s.id));
+
+// A key and its menu item can both arrive for one press (a native menu key
+// that also reaches the page). The second one within this window is dropped.
+const REPEAT_MS = 400;
+let lastRun = { id: '', via: '', at: 0 };
+
+function run(id, via) {
+  const fn = COMMANDS[id];
+  if (!fn) return;
+  const now = performance.now();
+  if (lastRun.id === id && lastRun.via !== via && now - lastRun.at < REPEAT_MS) {
+    lastRun = { id: '', via: '', at: 0 };
+    return;
+  }
+  lastRun = { id, via, at: now };
+  if (grid.editor && !FIELD_COMMANDS.has(id)) {
+    grid.commitEdit(null);
+    // Fill down would read the cell before the edit lands; just finish the edit.
+    if (id === 'edit.fill_down') return;
+  }
+  fn();
+}
+
+/** A key left to the browser (undo in a text field): a repeat from the menu is dropped. */
+function leftToBrowser(id) {
+  lastRun = { id, via: 'key', at: performance.now() };
+}
+
+function onMenu(id) {
+  if (typeof id !== 'string' || !COMMANDS[id]) return;
+  if (isHelpOpen() && id !== 'help.shortcuts') closeHelp();
+  // A dialog is open: only field commands (undo typing in it) make sense.
+  if (isModalOpen() && !FIELD_COMMANDS.has(id)) return;
+  // A grid command while a text field has focus: where menus see keys before
+  // the page (Linux), the key was meant for the field (Ctrl+Backspace deletes a
+  // word, not rows). The cell editor still takes the ones without a text meaning.
+  const sc = shortcutById(id);
+  if (sc && sc.scope === 'grid' && isTextField(document.activeElement) && (sc.text || !grid.editor)) return;
+  run(id, 'menu');
+}
+
+/**
+ * Close Window and Quit from the keyboard on Windows and Linux: closing the
+ * (only) window goes through the same unsaved-changes question in Rust.
+ */
+function closeWindow() {
+  const w = window.__TAURI__ && window.__TAURI__.window;
+  if (w && typeof w.getCurrentWindow === 'function') {
+    w.getCurrentWindow()
+      .close()
+      .catch((e) => toast(e));
+  }
+}
+
+function listenToMenu() {
+  const events = window.__TAURI__ && window.__TAURI__.event;
+  if (!events || typeof events.listen !== 'function') return;
+  events.listen('menu', (e) => onMenu(e.payload)).catch((err) => toast(err));
+}
+
 // ---------------------------------------------------------------------------
 // Keyboard
 
-function onKeyDown(e) {
-  if (isModalOpen()) return;
-  const mod = hasMod(e);
-  const key = e.key.toLowerCase();
-  const inGrid = $('grid-host').contains(document.activeElement);
-  const gridEditing = Boolean(grid.editor);
-  const inField = isTextField(document.activeElement);
-
-  if (mod && !e.altKey) {
-    const fileCmd = { n: doNew, o: doOpen };
-    if (!e.shiftKey && fileCmd[key]) {
-      e.preventDefault();
-      if (gridEditing) grid.commitEdit(null);
-      fileCmd[key]();
+function onShortcutKey(e, sc, { editing, inField }) {
+  if (sc.scope === 'app') {
+    if (menuRunsAppKeys) return; // macOS: the menu item's key equivalent runs it
+    if (inField && sc.field) {
+      leftToBrowser(sc.id); // the field's own undo, redo or select all
       return;
     }
-    if (key === 's') {
-      e.preventDefault();
-      if (gridEditing) grid.commitEdit(null);
-      doSave(e.shiftKey);
-      return;
-    }
-    // In a text field, undo and redo belong to the field.
-    if ((key === 'z' || key === 'y') && !inField) {
-      e.preventDefault();
-      if (key === 'y' || e.shiftKey) doRedo();
-      else doUndo();
-      return;
-    }
-  }
-
-  if (inField && !gridEditing) return; // the side panel's inputs handle their own keys
-
-  if (state.level === 'details' && mod && !gridEditing) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      insertRow('line');
-      return;
-    }
-    if (e.altKey && e.code === 'KeyT') {
-      e.preventDefault();
-      insertRow('subtotal');
-      return;
-    }
-    if (e.altKey && e.code === 'KeyA') {
-      e.preventDefault();
-      insertRow('adjustment');
-      return;
-    }
-  }
-  if (mod && !gridEditing && (e.key === 'Backspace' || e.key === 'Delete') && (inGrid || document.activeElement === document.body)) {
     e.preventDefault();
-    deleteRows();
+    run(sc.id, 'key');
+    return;
+  }
+  // Grid commands. Keys that move the caret or delete in a text field stay there.
+  if (inField && sc.text) return;
+  // Cancelling also keeps the key from reaching the menu bar a second time.
+  e.preventDefault();
+  if (inField && !editing) return; // a setup or dialog field: not meant for the grid
+  run(sc.id, 'key');
+}
+
+function onKeyDown(e) {
+  if (isHelpOpen() || isModalOpen()) return; // they handle their own keys
+  const active = document.activeElement;
+  const editing = Boolean(grid.editor);
+  const inField = isTextField(active);
+  const inGrid = $('grid-host').contains(active);
+  const bodyFocused = !active || active === document.body;
+
+  // The cell editor answers its own keys first: Enter, Tab, Escape, arrows,
+  // and Cmd/Ctrl+Enter (same value into every selected row).
+  if (editing && inGrid && grid.handleKey(e)) {
+    e.preventDefault();
     return;
   }
 
-  const bodyFocused = document.activeElement === document.body || document.activeElement === null;
+  const sc = matchShortcut(e);
+  if (sc) {
+    onShortcutKey(e, sc, { editing, inField });
+    return;
+  }
+
+  // Escape on a setup panel tab or button goes back to the grid.
+  if (e.key === 'Escape' && !inField && $('panel').contains(active)) {
+    e.preventDefault();
+    grid.focus();
+    return;
+  }
+
+  if (inField) return; // text fields handle their own keys
   if (inGrid || bodyFocused) {
     if (bodyFocused) grid.focus();
     if (grid.handleKey(e)) e.preventDefault();
@@ -643,20 +926,20 @@ function wire() {
   $('btn-saveas').addEventListener('click', () => doSave(true));
   $('btn-undo').addEventListener('click', doUndo);
   $('btn-redo').addEventListener('click', doRedo);
-  $('btn-panel').addEventListener('click', () => {
-    state.panelOpen = !state.panelOpen;
-    renderPanel();
-  });
+  $('btn-panel').addEventListener('click', togglePanel);
   const tips = {
-    'btn-new': ['New budget', 'mod+n'],
-    'btn-open': ['Open a budget', 'mod+o'],
-    'btn-save': ['Save', 'mod+s'],
-    'btn-saveas': ['Save as a new file', 'mod+shift+s'],
-    'btn-undo': ['Undo', 'mod+z'],
-    'btn-redo': ['Redo', 'mod+shift+z'],
+    'btn-new': ['New budget', 'file.new'],
+    'btn-open': ['Open a budget', 'file.open'],
+    'btn-save': ['Save', 'file.save'],
+    'btn-saveas': ['Save as a new file', 'file.save_as'],
+    'btn-undo': ['Undo', 'edit.undo'],
+    'btn-redo': ['Redo', 'edit.redo'],
+    'btn-panel': ['Show or hide the setup panel', 'view.toggle_panel'],
   };
-  for (const [id, [label, keys]] of Object.entries(tips)) $(id).title = `${label} (${shortcut(keys)})`;
+  for (const [id, [label, cmd]] of Object.entries(tips)) $(id).title = withShortcut(label, cmd);
   window.addEventListener('keydown', onKeyDown);
+  wireClipboard();
+  listenToMenu();
 }
 
 async function start() {
