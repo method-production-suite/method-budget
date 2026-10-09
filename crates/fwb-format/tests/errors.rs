@@ -302,11 +302,11 @@ fn row_style_fields_are_checked() {
 fn with_version(version_fields: &str, inner_extra: &str) -> String {
     let budget_start = SMALL.find("\"budget\": {").unwrap() + "\"budget\": ".len();
     let budget = &SMALL[budget_start..SMALL.rfind('}').unwrap()].trim_end();
-    let inner = format!("{}{inner_extra}}}", &budget[..budget.len() - 1].trim_end());
+    let inner = format!("{}{inner_extra}}}", budget[..budget.len() - 1].trim_end());
     let version = format!("{{{version_fields}\"budget\": {inner}}}");
     format!(
         "{}, \"versions\": [{version}]}}}}\n",
-        &budget[..budget.len() - 1].trim_end()
+        budget[..budget.len() - 1].trim_end()
     )
     .replacen("{", &format!("{}{{", &SMALL[..budget_start]), 1)
 }
