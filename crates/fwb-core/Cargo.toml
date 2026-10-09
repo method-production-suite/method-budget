@@ -3,6 +3,7 @@ name = "fwb-core"
 description = "Film Wizard Budgeting engine: accounts, fringes, globals, topsheet"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 publish = false
 
 [dependencies]

@@ -17,3 +17,7 @@ See [CLEAN-ROOM.md](CLEAN-ROOM.md) for the rules every contribution follows.
 ```bash
 cargo test
 ```
+
+## License
+Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
+Contributions are accepted under the same terms.
