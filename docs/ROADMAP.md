@@ -209,6 +209,12 @@ rates (no network), vendor template or rate data, native `.mbd`/`.mmbx` files.
 
 ---
 
+## Optional, outside this repo: native file converter
+
+| Item | Notes |
+|---|---|
+| **`.mmbx` / `.mbd` <-> `.fwb` converter, as a separate tool** | Sam's idea (2026-10-09). Lives in its own repository, never in this one. It converts between the reference product's native files and our documented `.fwb` format (docs/FORMAT.md), so Film Wizard itself never contains, links or reads any native-format code and stays clean-room. Built only by people or sessions that never work on Film Wizard's code. Gate: a short consult with an IP lawyer on the interoperability exceptions (US DMCA 1201(f), EU Software Directive art. 6) before anything is published. Film Wizard's own path in stays the clean one: import from the reference's open XML/JSON/Excel exports (Phase 1). |
+
 ## Engine checks to run
 
 Semantic questions only Sam's licensed copy can settle. Most are covered by the export test

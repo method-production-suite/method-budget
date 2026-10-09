@@ -16,3 +16,8 @@ with Entertainment Partners or Movie Magic Budgeting.
   lawyer's sign-off first and is out of scope for now.
 
 Our own native format is open and documented in this repo.
+
+**Native file conversion** lives outside this repository, as an optional separate tool that
+converts to and from our documented `.fwb` format. Its code, notes and guides must never be
+read by anyone working on Film Wizard's code, and must never be copied, linked or vendored
+here.
