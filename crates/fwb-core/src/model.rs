@@ -6,6 +6,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::coding::AccountCoding;
 use crate::decimal::Dec;
 use crate::Cents;
 
@@ -51,8 +52,12 @@ impl From<Dec> for Formula {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Budget {
     pub title: String,
-    /// Currency code totals are reported in, and that blank-currency lines use.
+    /// Currency code that blank-currency lines use and totals are computed in.
     pub base_currency: String,
+    /// Currency totals are shown in, when not the base currency.
+    pub totals_currency: Option<String>,
+    /// Typed metadata (shoot days, director, start date...), user-extensible.
+    pub info: BTreeMap<String, InfoValue>,
     /// Foreign currencies, keyed by code.
     pub currencies: BTreeMap<String, Currency>,
     /// Named values usable in any formula. May refer to each other, not cyclically.
@@ -62,6 +67,8 @@ pub struct Budget {
     /// Fringe definitions, keyed by the name details use to apply them.
     pub fringes: BTreeMap<String, Fringe>,
     pub fringe_posting: FringePosting,
+    /// How account numbers are segmented and written.
+    pub account_coding: AccountCoding,
     pub groups: BTreeMap<String, Group>,
     pub sets: BTreeMap<String, SetDef>,
     pub locations: BTreeMap<String, Location>,
@@ -71,6 +78,8 @@ pub struct Budget {
     pub charges: Vec<Charge>,
     /// Applied credits (incentives), in application order.
     pub credits: Vec<Credit>,
+    /// Frozen totals to compare against ("original" vs current).
+    pub baseline: Option<Baseline>,
 }
 
 impl Budget {
@@ -78,17 +87,21 @@ impl Budget {
         Budget {
             title: title.into(),
             base_currency: base_currency.into(),
+            totals_currency: None,
+            info: BTreeMap::new(),
             currencies: BTreeMap::new(),
             globals: BTreeMap::new(),
             units: default_units(),
             fringes: BTreeMap::new(),
             fringe_posting: FringePosting::default(),
+            account_coding: AccountCoding::default(),
             groups: BTreeMap::new(),
             sets: BTreeMap::new(),
             locations: BTreeMap::new(),
             topsheet: Vec::new(),
             charges: Vec::new(),
             credits: Vec::new(),
+            baseline: None,
         }
     }
 
@@ -167,7 +180,8 @@ pub enum FringePosting {
     Budget,
     /// One fringe row above each production total, inside that level.
     ProductionLevel,
-    /// A fringe account at the end of each category, numbered category code + suffix.
+    /// A fringe account at the end of each category, numbered from the category's
+    /// code and `suffix` by the budget's account coding (e.g. `11` + `99` = `11-99`).
     Category { suffix: String },
     /// A fringe line at the end of each account.
     Account,
@@ -391,4 +405,23 @@ pub enum CreditCap {
     QualifiedSpend(Cents),
     /// Caps the resulting credit.
     Credit(Cents),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum InfoValue {
+    Text(String),
+    Number(Dec),
+    /// ISO 8601 date, `YYYY-MM-DD`.
+    Date(String),
+}
+
+/// Totals frozen at some point, so the current budget can show what changed.
+/// Rows are matched by id, accounts and categories by code.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Baseline {
+    pub rows: BTreeMap<RowId, Cents>,
+    pub accounts: BTreeMap<String, Cents>,
+    pub categories: BTreeMap<String, Cents>,
+    pub grand_total: Cents,
+    pub net_total: Cents,
 }

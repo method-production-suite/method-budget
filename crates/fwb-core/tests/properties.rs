@@ -377,3 +377,19 @@ fn recalc_is_byte_identical() {
         assert_eq!(a, c, "seed {seed}");
     }
 }
+
+#[test]
+fn deleting_any_global_keeps_every_total() {
+    for seed in 1..=CASES {
+        let b = gen_budget(&mut Rng(seed));
+        let before = recalc(&b, &RecalcOptions::default()).unwrap();
+        for name in ["DAYS", "WEEKS"] {
+            let mut edited = b.clone();
+            delete_global(&mut edited, name).unwrap();
+            let after = recalc(&edited, &RecalcOptions::default())
+                .unwrap_or_else(|e| panic!("seed {seed} {name}: {e}"));
+            assert_eq!(after.categories, before.categories, "seed {seed} {name}");
+            assert_eq!(after.net_total, before.net_total, "seed {seed} {name}");
+        }
+    }
+}

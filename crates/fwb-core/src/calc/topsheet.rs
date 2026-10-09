@@ -1,6 +1,7 @@
 //! Stage 3: fringe posting, production levels, ATL/BTL, charges and credits.
 
 use crate::calc::{err, overflow, sum, CalcError, Ctx, ErrorKind};
+use crate::coding::AccountCoding;
 use crate::decimal::{mul_cents, percent_of, Dec};
 use crate::model::{
     Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource, Detail, FringePosting, RowKind,
@@ -36,7 +37,8 @@ pub(crate) fn finish(
 ) -> Result<Topsheet, CalcError> {
     let ovf = || overflow("topsheet totals");
     let posting = &ctx.b.fringe_posting;
-    let budget_fringes = post_fringes(posting, &mut categories).ok_or_else(ovf)?;
+    let budget_fringes =
+        post_fringes(posting, &ctx.b.account_coding, &mut categories).ok_or_else(ovf)?;
 
     let (levels, closed) = levels(ctx.b, posting, &categories).ok_or_else(ovf)?;
     // The first level is above-the-line only when a real production total ends it.
@@ -85,7 +87,11 @@ pub(crate) fn finish(
 
 /// Sets account and category totals for the posting mode. Returns the
 /// budget-wide fringe row (`FringePosting::Budget`), else 0. `None` on overflow.
-fn post_fringes(posting: &FringePosting, cats: &mut [CategoryTotals]) -> Option<Cents> {
+fn post_fringes(
+    posting: &FringePosting,
+    coding: &AccountCoding,
+    cats: &mut [CategoryTotals],
+) -> Option<Cents> {
     let mut budget_fringes: Cents = 0;
     for cat in cats.iter_mut() {
         match posting {
@@ -96,7 +102,11 @@ fn post_fringes(posting: &FringePosting, cats: &mut [CategoryTotals]) -> Option<
                 cat.total = sum(cat.accounts.iter().map(|a| a.total))?;
             }
             FringePosting::Category { suffix } => {
-                cat.fringe_account = Some((format!("{}{suffix}", cat.code), cat.fringe_total));
+                // Codes that don't fit the coding pattern fall back to plain concatenation.
+                let number = coding
+                    .fringe_account(&cat.code, suffix)
+                    .unwrap_or_else(|_| format!("{}{suffix}", cat.code));
+                cat.fringe_account = Some((number, cat.fringe_total));
                 cat.total = cat.details_total.checked_add(cat.fringe_total)?;
             }
             FringePosting::ProductionLevel => {}
@@ -571,9 +581,9 @@ mod tests {
         assert_eq!(
             cats,
             vec![
-                (1_600_000, Some(("100099".to_string(), 100_000))),
-                (660_600, Some(("200099".to_string(), 60_600))),
-                (55_000, Some(("500099".to_string(), 5_000))),
+                (1_600_000, Some(("10-99".to_string(), 100_000))),
+                (660_600, Some(("20-99".to_string(), 60_600))),
+                (55_000, Some(("50-99".to_string(), 5_000))),
             ]
         );
         assert_eq!(
@@ -592,7 +602,7 @@ mod tests {
         let ts = run(&b);
         assert_eq!(
             ts.categories[3].fringe_account,
-            Some(("600099".to_string(), 0))
+            Some(("60-99".to_string(), 0))
         );
         assert_eq!(ts.categories[3].total, 0);
     }

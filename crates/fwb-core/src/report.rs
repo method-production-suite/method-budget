@@ -9,6 +9,10 @@ use crate::Cents;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Report {
     pub base_currency: String,
+    /// Currency for displaying totals; the base currency unless set.
+    pub totals_currency: String,
+    /// Base-currency units per one unit of `totals_currency`.
+    pub totals_rate: Dec,
     pub globals: BTreeMap<String, Dec>,
     /// Categories in topsheet order (production-total rows are in `levels`).
     pub categories: Vec<CategoryTotals>,
@@ -34,6 +38,14 @@ pub struct Report {
     pub groups: BTreeMap<String, GroupTotals>,
     pub sets: BTreeMap<String, Breakdown>,
     pub locations: BTreeMap<String, Breakdown>,
+}
+
+impl Report {
+    /// Converts a base-currency amount for display in `totals_currency`,
+    /// rounded once. `None` on overflow or a zero rate.
+    pub fn in_totals_currency(&self, c: Cents) -> Option<Cents> {
+        Dec::from_cents(c).checked_div(self.totals_rate)?.to_cents()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

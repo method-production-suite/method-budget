@@ -78,7 +78,7 @@ fn sample_topsheet() {
     // Fringes post to a fringe account in each category.
     assert_eq!(
         r.categories[0].fringe_account,
-        Some(("100099".into(), 76_500))
+        Some(("10-99".into(), 76_500))
     );
     assert_eq!(r.categories[0].total, 15_076_500);
     assert_eq!(r.categories[1].total, 7_414_901);

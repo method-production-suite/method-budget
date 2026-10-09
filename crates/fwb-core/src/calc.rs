@@ -151,7 +151,7 @@ pub(crate) fn row_at(code: &str, idx: usize, d: &Detail, field: &str) -> String 
     )
 }
 
-fn eval_globals(b: &Budget) -> Result<BTreeMap<String, Dec>, CalcError> {
+pub(crate) fn eval_globals(b: &Budget) -> Result<BTreeMap<String, Dec>, CalcError> {
     let mut parsed = BTreeMap::new();
     for (name, f) in &b.globals {
         let at = || format!("global {name}");
@@ -258,6 +258,15 @@ pub(crate) fn eval_categories(ctx: &Ctx) -> Result<Vec<CategoryTotals>, CalcErro
 /// Recalculates every total in `b`.
 pub fn recalc(b: &Budget, opts: &RecalcOptions) -> Result<Report, CalcError> {
     check_row_ids(b)?;
+    let totals_rate = match &b.totals_currency {
+        Some(c) if *c != b.base_currency => {
+            b.currencies
+                .get(c)
+                .ok_or_else(|| err("totals currency", ErrorKind::UnknownCurrency(c.clone())))?
+                .rate
+        }
+        _ => Dec::ONE,
+    };
     let ctx = Ctx {
         b,
         globals: eval_globals(b)?,
@@ -276,6 +285,11 @@ pub fn recalc(b: &Budget, opts: &RecalcOptions) -> Result<Report, CalcError> {
 
     Ok(Report {
         base_currency: b.base_currency.clone(),
+        totals_currency: b
+            .totals_currency
+            .clone()
+            .unwrap_or_else(|| b.base_currency.clone()),
+        totals_rate,
         globals: full_ctx.globals,
         categories: ts.categories,
         levels: ts.levels,

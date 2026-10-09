@@ -234,6 +234,63 @@ impl Expr {
         }
     }
 
+    /// This expression with every reference to `name` replaced by `value`.
+    pub fn substitute(&self, name: &str, value: Dec) -> Expr {
+        match self {
+            // Negative as Neg(Num) so the printed text parses back to the same tree.
+            Expr::Var(n) if n == name => match value.checked_neg() {
+                Some(pos) if value < Dec::ZERO => Expr::Neg(Box::new(Expr::Num(pos))),
+                _ => Expr::Num(value),
+            },
+            Expr::Num(_) | Expr::Var(_) => self.clone(),
+            Expr::Neg(e) => Expr::Neg(Box::new(e.substitute(name, value))),
+            Expr::Bin(op, a, b) => Expr::Bin(
+                *op,
+                Box::new(a.substitute(name, value)),
+                Box::new(b.substitute(name, value)),
+            ),
+        }
+    }
+
+    fn prec(&self) -> u8 {
+        match self {
+            Expr::Bin(Op::Add | Op::Sub, ..) => 1,
+            Expr::Bin(Op::Mul | Op::Div, ..) => 2,
+            Expr::Neg(_) => 3,
+            Expr::Num(n) if *n < Dec::ZERO => 3,
+            Expr::Num(_) | Expr::Var(_) => 4,
+        }
+    }
+
+    fn fmt_prec(&self, f: &mut fmt::Formatter<'_>, min: u8) -> fmt::Result {
+        if self.prec() < min {
+            f.write_str("(")?;
+            self.fmt_prec(f, 0)?;
+            return f.write_str(")");
+        }
+        match self {
+            Expr::Num(n) => write!(f, "{n}"),
+            Expr::Var(v) => f.write_str(v),
+            Expr::Neg(e) => {
+                f.write_str("-")?;
+                e.fmt_prec(f, 3)
+            }
+            Expr::Bin(op, a, b) => {
+                let p = self.prec();
+                a.fmt_prec(f, p)?;
+                let sym = match op {
+                    Op::Add => " + ",
+                    Op::Sub => " - ",
+                    Op::Mul => " * ",
+                    Op::Div => " / ",
+                };
+                f.write_str(sym)?;
+                // Left-associative: a right operand of equal precedence needs parens.
+                b.fmt_prec(f, p + 1)
+            }
+        }
+    }
+
     pub fn eval(&self, lookup: &dyn Fn(&str) -> Option<Dec>) -> Result<Dec, EvalError> {
         match self {
             Expr::Num(n) => Ok(*n),
@@ -254,12 +311,46 @@ impl Expr {
     }
 }
 
+/// Prints with the fewest parentheses that parse back to the same tree.
+impl fmt::Display for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.fmt_prec(f, 0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn d(s: &str) -> Dec {
         s.parse().unwrap()
+    }
+
+    #[test]
+    fn display_round_trips() {
+        for src in [
+            "1 + 2 * 3",
+            "(1 + 2) * 3",
+            "10 - (4 - 3)",
+            "10 - 4 - 3",
+            "12 / (4 / 3)",
+            "-(A + B)",
+            "--4",
+            "A * -2",
+            "2.5 * (SHOOT_DAYS + PREP) / 5",
+        ] {
+            let e = Expr::parse(src).unwrap();
+            assert_eq!(e.to_string(), src);
+            assert_eq!(Expr::parse(&e.to_string()).unwrap(), e);
+        }
+        assert_eq!(Expr::parse("((1))+(2*3)").unwrap().to_string(), "1 + 2 * 3");
+    }
+
+    #[test]
+    fn substitute_replaces_only_that_name() {
+        let e = Expr::parse("A * (B - A)").unwrap().substitute("A", d("-3"));
+        assert_eq!(e.to_string(), "-3 * (B - -3)");
+        assert_eq!(Expr::parse(&e.to_string()).unwrap(), e);
     }
 
     fn eval(src: &str) -> Result<Dec, EvalError> {

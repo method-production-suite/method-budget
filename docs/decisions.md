@@ -81,3 +81,24 @@ convert between time units through hours, using the line's primary unit only.
 
 A currency's `rate` is base-currency units per one unit of that currency. The reference
 manual is inconsistent here, so importers must confirm direction against exported totals.
+
+## 11. Account coding (2026-10-08)
+
+Each budget has a coding pattern: widths for category, account, sub-account and set
+segments (0 to 6, used segments contiguous) and one separator. Default is `11-01` style
+(2 + 2, hyphen). Typed numbers are parsed by whichever separator was typed, or by widths
+when none was; short segments are zero-padded (`11-5` becomes `11-05`) so the same account
+always normalizes to the same text, which matters because account numbers are the join key
+for comparison and import. Category fringe accounts are built through the pattern
+(category `11` + suffix `99` = `11-99`).
+
+## 12. Baseline, display currency, global deletion (2026-10-08)
+
+- **Baseline** ("original" vs current) is a frozen copy of row, account, category, grand and
+  net totals stored in the budget. Variance is computed on demand; rows match by id, so
+  edited, deleted and added lines all show up correctly.
+- **Totals currency** is display only: the report carries the rate and converts on request,
+  rounding once. The math always runs in the base currency.
+- **Deleting a global** first freezes its current value into every formula that used it, so
+  no total changes (property-tested).
+- **Budget info** fields (text, number, date) are plain data for now; they don't feed formulas.
