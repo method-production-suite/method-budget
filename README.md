@@ -4,7 +4,8 @@ An open-source, clean-room film and TV budgeting app, written in Rust. A Darkwel
 
 **Status:** engine in progress (`crates/fwb-core`): budget model, formulas and globals,
 fringes with cutoffs and ranges, groups, currencies, charges, credits and topsheet totals.
-Native `.fwb` file format and a small `fwb` command line; no UI yet. Design choices live in [docs/decisions.md](docs/decisions.md).
+Native `.fwb` file format, a small `fwb` command line, and a first desktop app
+(`crates/fwb-app`, Tauri). Design choices live in [docs/decisions.md](docs/decisions.md).
 
 ## Scope (v1)
 1. **Budgeting engine** (`crates/fwb-core`): topsheet, account and detail levels, fringes,
@@ -21,6 +22,13 @@ cargo test
 ```
 
 ## Try it
+The desktop app (local files only, works offline; see [docs/APP.md](docs/APP.md)):
+```bash
+cargo run -p fwb-app
+```
+On Linux, install the WebKitGTK build packages first (listed in docs/APP.md).
+
+The command line:
 ```bash
 cargo run -p fwb-cli -- new my-film.fwb
 cargo run -p fwb-cli -- show my-film.fwb

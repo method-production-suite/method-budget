@@ -1,9 +1,10 @@
-//! The starter budget `fwb new` writes: our own small chart of accounts with
-//! placeholder rates to replace. Not derived from any vendor template.
+//! The starter budget for new files (`fwb new` and the app's New): our own small
+//! chart of accounts with placeholder rates to replace. Not derived from any
+//! vendor template.
 
 use std::collections::BTreeSet;
 
-use fwb_core::{
+use crate::model::{
     Account, Budget, Category, Charge, ChargeKind, Detail, Fringe, FringeKind, ProductionTotal,
     TopsheetRow,
 };
@@ -28,6 +29,7 @@ fn account(code: &str, name: &str, details: Vec<Detail>) -> Account {
     }
 }
 
+/// A fresh starter budget. Row ids start at 1 and are unique.
 pub fn budget() -> Budget {
     let mut b = Budget::new("Untitled feature", "USD");
     for (name, value) in [
@@ -163,4 +165,26 @@ pub fn budget() -> Budget {
         excluded_accounts: BTreeSet::new(),
     });
     b
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use crate::{recalc, RecalcOptions};
+
+    #[test]
+    fn recalcs_with_unique_ids() {
+        let b = super::budget();
+        let r = recalc(&b, &RecalcOptions::default()).unwrap();
+        assert!(r.total_atl > 0 && r.total_btl > 0);
+        assert!(r.grand_total > r.atl_btl);
+        let ids: Vec<_> = b
+            .categories()
+            .flat_map(|c| &c.accounts)
+            .flat_map(|a| &a.details)
+            .map(|d| d.id)
+            .collect();
+        assert_eq!(ids.len(), ids.iter().collect::<BTreeSet<_>>().len());
+    }
 }

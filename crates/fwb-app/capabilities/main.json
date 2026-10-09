@@ -1,0 +1,38 @@
+{
+  "identifier": "main",
+  "description": "The main window may call the app's own budget commands and nothing else: no file system, shell, network or dialog access from the web view (dialogs are opened by Rust).",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "allow-get-view",
+    "allow-new-budget",
+    "allow-open-budget",
+    "allow-save-budget",
+    "allow-undo",
+    "allow-redo",
+    "allow-set-title",
+    "allow-add-category",
+    "allow-add-production-total",
+    "allow-update-topsheet-row",
+    "allow-delete-topsheet-row",
+    "allow-add-account",
+    "allow-update-account",
+    "allow-delete-account",
+    "allow-set-detail-field",
+    "allow-set-rows-field",
+    "allow-add-detail",
+    "allow-delete-details",
+    "allow-selection-totals",
+    "allow-set-global",
+    "allow-delete-global",
+    "allow-set-fringe",
+    "allow-delete-fringe",
+    "allow-set-group",
+    "allow-delete-group",
+    "allow-set-unit",
+    "allow-delete-unit",
+    "allow-set-currency",
+    "allow-delete-currency"
+  ]
+}

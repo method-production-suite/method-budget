@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Film Wizard Budgeting</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="setup.css">
+    <script type="module" src="js/main.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="toolbar">
+        <div class="toolbar-group" role="group" aria-label="File">
+          <button type="button" class="btn" id="btn-new">New</button>
+          <button type="button" class="btn" id="btn-open">Open</button>
+          <button type="button" class="btn" id="btn-save">Save</button>
+          <button type="button" class="btn" id="btn-saveas">Save As</button>
+        </div>
+        <div class="toolbar-group" role="group" aria-label="History">
+          <button type="button" class="btn" id="btn-undo" disabled>Undo</button>
+          <button type="button" class="btn" id="btn-redo" disabled>Redo</button>
+        </div>
+        <div class="doc">
+          <span class="doc-name" id="doc-name"></span>
+          <span class="doc-dirty" id="doc-dirty" title="Unsaved changes" hidden></span>
+        </div>
+        <button type="button" class="btn" id="btn-panel" aria-pressed="true" aria-controls="panel">Setup</button>
+      </header>
+
+      <div class="workspace">
+        <main class="main">
+          <nav class="crumbs" id="crumbs" aria-label="Budget level"></nav>
+          <div class="banner" id="banner" role="status" hidden></div>
+          <div class="actions" id="actions"></div>
+          <div class="grid-host" id="grid-host" aria-label="Budget grid"></div>
+        </main>
+        <aside class="panel" id="panel" aria-label="Budget setup"></aside>
+      </div>
+
+      <footer class="footer" id="footer"></footer>
+    </div>
+    <div id="modal-root"></div>
+    <div class="toast" id="toast" role="alert" hidden></div>
+  </body>
+</html>

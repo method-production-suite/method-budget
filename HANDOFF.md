@@ -60,7 +60,13 @@ plus Sam's real production budget figures). Never use those figures in tests.
 3. Import from MMB exports (tab, XML, JSON, Excel). Column layouts aren't public: plan is
    to design a test budget, have Sam enter and export it from his licensed copy, and
    build against those files. Currency direction must be confirmed from them.
-4. UI (Tauri or web/WASM; decide then and record in `docs/decisions.md`).
+4. Desktop app (Tauri, decided: local app, not web; decisions.md 14) is built in
+   `crates/fwb-app` with a zero-npm UI. See `docs/APP.md`. Next for the app: more
+   editors (charges, credits, sets/locations, account coding, budget info), print/PDF
+   reports, compare view for the baseline, and installers (signing/notarizing).
+5. Supply chain: every locked crate must be at least 14 days old
+   (`scripts/check-crate-ages.py`; CI checks it on PRs). Tauri is pinned below its newest
+   release for that reason; don't `cargo update` blindly.
 
 ## Working style for Sam
 - Casual and short. **No em dashes** in anything you write for him.

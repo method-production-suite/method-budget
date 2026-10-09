@@ -11,6 +11,7 @@ pub mod edit;
 pub mod expr;
 pub mod model;
 pub mod report;
+pub mod starter;
 
 pub use calc::breakdown::{selection_totals, SelectionTotals};
 pub use calc::{recalc, CalcError, ErrorKind, RecalcOptions};

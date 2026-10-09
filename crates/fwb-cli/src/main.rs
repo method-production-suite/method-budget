@@ -3,9 +3,7 @@
 use std::fmt::Write as _;
 use std::process::ExitCode;
 
-use fwb_core::{recalc, Budget, Cents, RecalcOptions, Report};
-
-mod starter;
+use fwb_core::{recalc, starter, Budget, Cents, RecalcOptions, Report};
 
 const USAGE: &str = "\
 fwb: Film Wizard Budgeting command line
