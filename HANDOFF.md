@@ -33,40 +33,44 @@ Budgeting (Entertainment Partners). A Darkwell project owned by Sam Sandweiss. T
   SHA-pin any third-party Action. Machine-wide dependency cooldowns exist; don't bypass them.
 - Stage explicit paths, never `git add -A` blindly.
 
-## Current state (2026-10-08)
-The engine (`crates/fwb-core`, zero dependencies) covers the v1 calc model:
-- Budget > topsheet (categories + production totals) > accounts > detail rows (line,
-  subtotal, adjustment), with stable `RowId`s.
-- Formulas with globals (own parser, cycle detection), 4-factor lines, per-line currency.
-- Fringes: percent with cutoffs per earner (line or fringe range, split back by largest
-  remainder), flat with unit-hours conversion, four posting modes.
-- Groups with in-budget-total suppression, full/active totals; sets, locations,
-  selection totals.
-- ATL/BTL levels, contractual charges (percent and flat, exclusions), credits (three cap
-  types, overall cap, discount, unrounded row sums), grand and net totals.
-- Tests: unit tests per stage, hand-checked scenarios (`tests/recalc.rs`), seeded property
-  tests (`tests/properties.rs`). Design choices: `docs/decisions.md`.
+## Current state (2026-10-09)
+A working local desktop app (Tauri v2, `crates/fwb-app`, zero-npm UI) on a tested engine.
+Read docs/ROADMAP.md first (phases, decisions, engine checks), then docs/APP.md (how the app
+is built: lean views, multi-document tabs, security model, saving and recovery, printing),
+docs/decisions.md (every product and design call, numbered), docs/FORMAT.md (`.fwb` spec).
 
-Research (clean-room, own words): `docs/research/mmb-feature-inventory.md` from EP's public
-manual. Sam's MMB screenshots live in `Screenshots/` and notes on them in
-`docs/research/mmb-screens.md`; **both are gitignored and must stay that way** (vendor UI
-plus Sam's real production budget figures). Never use those figures in tests.
+- **Engine** (`fwb-core`, zero deps): topsheet levels, fringes (cutoffs per earner, ranges,
+  unit-hour flats, four posting modes), groups, charges, credits, currencies, globals,
+  account coding, baseline/variance, versions, multi-budget compare, report presets,
+  incremental recalc. Checked against vendor tutorial figures to the cent.
+- **Format** (`fwb-format`): `.fwb` JSON, documented, version 1, additive changes only.
+- **CLI** (`fwb-cli`): show, check, fmt, new, sample (5,000-line test budget).
+- **App**: tabs, grid with keyboard flow, autocomplete and add-on-the-fly, right-click menus,
+  formatting, notes, tools panel (two tab panes, dock right/bottom/pop-out window), apply to
+  selection, row copy/paste with tags across budgets, find and replace, versions and compare,
+  print setup with presets and PDF, autosave into the file with recovery and backups,
+  outside-change guard, Movie Magic-style shortcuts. ~5 ms per edit at 5,000 lines.
+- **Research**: docs/research/behaviors/01-24 (Sam's recordings 01-02 outrank the 2020/2021
+  vendor tutorials 03-24), feature inventory, export test plan.
 
 ## Next
-1. Done since: account coding, budget info, totals currency, baseline/variance,
-   delete-global-to-value, and the native `.fwb` JSON format (`crates/fwb-format`,
-   spec in `docs/FORMAT.md`).
-2. Sam has a test plan for exporting from MMB: `docs/research/export-test-plan.md`.
-3. Import from MMB exports (tab, XML, JSON, Excel). Column layouts aren't public: plan is
-   to design a test budget, have Sam enter and export it from his licensed copy, and
-   build against those files. Currency direction must be confirmed from them.
-4. Desktop app (Tauri, decided: local app, not web; decisions.md 14) is built in
-   `crates/fwb-app` with a zero-npm UI. See `docs/APP.md`. Next for the app: more
-   editors (charges, credits, sets/locations, account coding, budget info), print/PDF
-   reports, compare view for the baseline, and installers (signing/notarizing).
-5. Supply chain: every locked crate must be at least 14 days old
-   (`scripts/check-crate-ages.py`; CI checks it on PRs). Tauri is pinned below its newest
-   release for that reason; don't `cargo update` blindly.
+Phase 1 remaining (ROADMAP): import from MMB exports (1.16, blocked until Sam runs
+docs/research/export-test-plan.md; he tabled it for now), engine fixes from that test
+(1.17), signed Mac build (1.21, needs Sam's call on the signing team). Then Phase 2.
+
+## How to work here
+- Never launch the app or drive the GUI while Sam is at the computer unless he says so;
+  verify with tests, `node --check` and a browser-pane harness with a fake `__TAURI__`.
+  Launching only to take a window screenshot (no keystrokes) has been OK with Sam.
+- Parallel agents: each owns new files; shared files get small separated edits after a
+  re-read. Report progress to the savvy-flow panel (`mcp__savvy-progress__*`).
+- Every locked crate must be at least 14 days old (`scripts/check-crate-ages.py`); Rust is
+  pinned to 1.96.1 (`rust-toolchain.toml`) so CI and local agree.
+- GitHub: push as `ssandweiss` (repo-local credential helper is set; don't flip the global
+  gh account). Use `GH_TOKEN=$(gh auth token --user ssandweiss) gh ... -R
+  ssandweiss/film-wizard-budgeting` for gh commands.
+- Clean room: never open Sam's `mmb-decomp` project from a Film Wizard session (see
+  CLEAN-ROOM.md and ROADMAP "Optional, outside this repo").
 
 ## Working style for Sam
 - Casual and short. **No em dashes** in anything you write for him.
