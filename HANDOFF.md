@@ -1,4 +1,4 @@
-# Handoff: Film Wizard Budgeting
+# Handoff: Method Budget
 
 Read this whole file first, then `README.md` and `CLEAN-ROOM.md`. Everything you need is here;
 don't wait on follow-up questions for anything this file already answers.
@@ -9,8 +9,8 @@ Budgeting (Entertainment Partners). A Darkwell project owned by Sam Sandweiss. T
 (github.com/storytold), who ship clean-room Rust rewrites of Photoshop, Premiere, etc.
 
 - Local: `~/Documents/CODING_PROJECTS/Projects/02_Darkwell/film-wizard-budgeting`
-- Repo: https://github.com/ssandweiss/film-wizard-budgeting (**private** until Sam says go public).
-  The older cwpsandywhois/film-wizard-budgeting copy is retired.
+- Repo: https://github.com/ssandweiss/method-budget (**private** until Sam says go public).
+  The local folder keeps its old name for now. The older cwpsandywhois copy is retired.
 - GitHub: this Mac has several `gh` accounts. Pushes need `ssandweiss` active
   (`gh auth switch --user ssandweiss`). A push that 404s means the wrong account is active.
 - License: **MIT OR Apache-2.0** (same terms as ArtCraft). Decided, don't revisit.
@@ -35,16 +35,21 @@ Budgeting (Entertainment Partners). A Darkwell project owned by Sam Sandweiss. T
 
 ## Current state (2026-10-09)
 A working local desktop app (Tauri v2, `crates/fwb-app`, zero-npm UI) on a tested engine.
+The product is **Method Budget** (methodbudget.com; decisions.md, entry 46). Crate and
+module names (`fwb-core` and so on) are internal and unchanged for now. Never shorten the
+name to "MB" (that is how people shorten Movie Magic Budgeting).
 Read docs/ROADMAP.md first (phases, decisions, engine checks), then docs/APP.md (how the app
 is built: lean views, multi-document tabs, security model, saving and recovery, printing),
-docs/decisions.md (every product and design call, numbered), docs/FORMAT.md (`.fwb` spec).
+docs/decisions.md (every product and design call, numbered), docs/FORMAT.md (`.mthd` spec).
 
 - **Engine** (`fwb-core`, zero deps): topsheet levels, fringes (cutoffs per earner, ranges,
   unit-hour flats, four posting modes), groups, charges, credits, currencies, globals,
   account coding, baseline/variance, versions, multi-budget compare, report presets,
   incremental recalc. Checked against vendor tutorial figures to the cent.
-- **Format** (`fwb-format`): `.fwb` JSON, documented, version 1, additive changes only.
-- **CLI** (`fwb-cli`): show, check, fmt, new, sample (5,000-line test budget).
+- **Format** (`fwb-format`): `.mthd` JSON (older `.fwb` files still open), documented,
+  version 1, additive changes only.
+- **CLI** (`fwb-cli`, binary `method`; `fwb` is a deprecated alias): show, check, fmt, new,
+  sample (5,000-line test budget), and more (docs/CLI.md).
 - **App**: tabs, grid with keyboard flow, autocomplete and add-on-the-fly, right-click menus,
   formatting, notes, tools panel (two tab panes, dock right/bottom/pop-out window), apply to
   selection, row copy/paste with tags across budgets, find and replace, versions and compare,
@@ -68,8 +73,8 @@ docs/research/export-test-plan.md; he tabled it for now), engine fixes from that
   pinned to 1.96.1 (`rust-toolchain.toml`) so CI and local agree.
 - GitHub: push as `ssandweiss` (repo-local credential helper is set; don't flip the global
   gh account). Use `GH_TOKEN=$(gh auth token --user ssandweiss) gh ... -R
-  ssandweiss/film-wizard-budgeting` for gh commands.
-- Clean room: never open Sam's `mmb-decomp` project from a Film Wizard session (see
+  ssandweiss/method-budget` for gh commands.
+- Clean room: never open Sam's `mmb-decomp` project from a Method Budget session (see
   CLEAN-ROOM.md and ROADMAP "Optional, outside this repo").
 
 ## Working style for Sam

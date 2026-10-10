@@ -22,8 +22,11 @@ use crate::report_dto::SelectionDto;
 use crate::session::Session;
 use crate::view::{Focus, FullView, View};
 
-const APP_NAME: &str = "Film Wizard Budgeting";
-const FILTER_NAME: &str = "Film Wizard budget";
+pub(crate) const APP_NAME: &str = "Method Budget";
+/// The product's website (the About box links it).
+pub(crate) const WEBSITE: &str = "https://methodbudget.com";
+/// The file type's name in Open and Save dialogs (with [`fwb_format::EXTENSIONS`]).
+pub(crate) const FILTER_NAME: &str = "Method Budget file";
 
 type CmdResult<T = View> = Result<T, String>;
 
@@ -159,7 +162,7 @@ pub async fn open_budget<R: Runtime>(
         .dialog()
         .file()
         .set_title("Open budget")
-        .add_filter(FILTER_NAME, &["fwb"])
+        .add_filter(FILTER_NAME, fwb_format::EXTENSIONS)
         .set_parent(&window);
     if let Some(dir) = start {
         dialog = dialog.set_directory(dir);
@@ -232,8 +235,12 @@ fn save_doc<R: Runtime>(
                 .dialog()
                 .file()
                 .set_title(title)
-                .add_filter(FILTER_NAME, &["fwb"])
-                .set_file_name(format!("{}.fwb", safe_file_stem(&suggested)))
+                .add_filter(FILTER_NAME, &[fwb_format::EXTENSION])
+                .set_file_name(format!(
+                    "{}.{}",
+                    safe_file_stem(&suggested),
+                    fwb_format::EXTENSION
+                ))
                 .set_parent(window);
             if let Some(dir) = current.as_deref().and_then(|p| p.parent()) {
                 dialog = dialog.set_directory(dir);
@@ -241,7 +248,7 @@ fn save_doc<R: Runtime>(
             let Some(picked) = dialog.blocking_save_file() else {
                 return Ok(None);
             };
-            with_fwb_extension(picked.into_path().map_err(|e| e.to_string())?)
+            with_budget_extension(picked.into_path().map_err(|e| e.to_string())?)
         }
     };
     // Backs up the file's previous version, saves atomically, drops the
@@ -270,11 +277,13 @@ pub(crate) fn safe_file_stem(title: &str) -> String {
     }
 }
 
-pub(crate) fn with_fwb_extension(mut p: PathBuf) -> PathBuf {
-    let has = p.extension().is_some_and(|e| e.eq_ignore_ascii_case("fwb"));
-    if !has {
+/// `p` as picked in a Save dialog, with `.mthd` added unless it already has
+/// a budget extension (`.mthd`, or the legacy `.fwb` typed on purpose).
+pub(crate) fn with_budget_extension(mut p: PathBuf) -> PathBuf {
+    if !fwb_format::has_budget_extension(&p) {
         let mut name = p.file_name().unwrap_or_default().to_os_string();
-        name.push(".fwb");
+        name.push(".");
+        name.push(fwb_format::EXTENSION);
         p.set_file_name(name);
     }
     p
@@ -1097,7 +1106,8 @@ pub(crate) fn close_question(names: &[String]) -> (String, [&'static str; 3]) {
 /// budget that has them: Save All, Discard All or Cancel. Runs `then` once
 /// nothing unsaved is left (saved, thrown away on purpose, or nothing to
 /// lose). Never blocks the event loop.
-fn confirm_close<R: Runtime>(app: &AppHandle<R>, then: impl FnOnce() + Send + 'static) {
+/// (Also Restart to update: src/updater.rs.)
+pub(crate) fn confirm_close<R: Runtime>(app: &AppHandle<R>, then: impl FnOnce() + Send + 'static) {
     // With Autosave on, unsaved changes go into their files first
     // (src/safety_app.rs); what is left is untitled or can't be autosaved.
     let dirty = crate::safety_app::save_before_leaving(app);
@@ -1193,12 +1203,21 @@ fn is_app_url(url: &tauri::Url) -> bool {
 }
 
 pub fn run() {
+    let context = tauri::generate_context!();
+    // Settings, recent files, tabs, the library, recovery copies, backups and
+    // the web view's storage from before the rename (src/migrate.rs), copied
+    // before the window opens.
+    crate::migrate::before_start(&context.config().identifier);
+
     let nav_guard = tauri::plugin::Builder::<tauri::Wry>::new("nav-guard")
         .on_navigation(|_, url| is_app_url(url))
         .build();
 
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        // In-app updates, driven from Rust only (src/updater.rs): no window
+        // is granted the plugin's own commands.
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(nav_guard)
         .manage(AppState::default())
         // The Window menu's list of budgets (src/tabs.rs).
@@ -1225,9 +1244,12 @@ pub fn run() {
             if id == crate::menu::QUIT {
                 let handle = app.clone();
                 confirm_close(app, move || handle.exit(0));
-            } else if !crate::safety_app::handle_menu(app, id) {
+            } else if !crate::safety_app::handle_menu(app, id)
+                && !crate::updater::handle_menu(app, id)
+            {
                 // Open Recent's Clear Menu and the Autosave check are answered
-                // in src/safety_app.rs.
+                // in src/safety_app.rs, Check for Updates and its automatic
+                // switch in src/updater.rs.
                 crate::menu::handle(app, id);
             }
         });
@@ -1483,21 +1505,34 @@ pub fn run() {
             crate::overtime::ot_apply,
             crate::overtime::ot_save_pattern,
             crate::overtime::ot_delete_pattern,
+            // Updates, release notes and What's New (src/updater.rs)
+            crate::updater::update_status,
+            crate::updater::update_restart,
+            crate::updater::whats_new,
+            crate::updater::release_notes,
         ])
         .setup(|app| {
+            // The same copy, checked again with the data folder Tauri
+            // reports, before anything reads it (src/migrate.rs).
+            if let Ok(dir) = app.path().app_local_data_dir() {
+                crate::migrate::at_setup(&dir);
+            }
             // Autosave, recovery, backups, recent files, and the budgets that
             // were open as tabs last time (src/safety_app.rs).
             crate::safety_app::init(app.handle());
             // Which file is the personal setup library (src/library.rs).
             crate::library::init(app.handle());
+            // Update checks, What's New and the Help menu's switch
+            // (src/updater.rs).
+            crate::updater::init(app.handle());
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.set_title(&window_title(&app.state::<AppState>().lock()));
             }
             crate::tabs::after_command(app.handle(), &app.state::<AppState>().docs());
             Ok(())
         })
-        .build(tauri::generate_context!())
-        .expect("error while running Film Wizard Budgeting")
+        .build(context)
+        .expect("error while running Method Budget")
         .run(|app, event| match event {
             // macOS hands over double-clicked and Open With files here
             // (Windows and Linux pass them on the command line).
@@ -1531,16 +1566,21 @@ mod tests {
         assert_eq!(safe_file_stem("My Film: Part 2/3"), "My Film  Part 2 3");
         assert_eq!(safe_file_stem(" .. "), "Untitled");
         assert_eq!(
-            with_fwb_extension(PathBuf::from("/x/budget")),
-            PathBuf::from("/x/budget.fwb")
+            with_budget_extension(PathBuf::from("/x/budget")),
+            PathBuf::from("/x/budget.mthd")
         );
         assert_eq!(
-            with_fwb_extension(PathBuf::from("/x/budget.FWB")),
-            PathBuf::from("/x/budget.FWB")
+            with_budget_extension(PathBuf::from("/x/budget.MTHD")),
+            PathBuf::from("/x/budget.MTHD")
         );
         assert_eq!(
-            with_fwb_extension(PathBuf::from("/x/v1.2")),
-            PathBuf::from("/x/v1.2.fwb")
+            with_budget_extension(PathBuf::from("/x/budget.FWB")),
+            PathBuf::from("/x/budget.FWB"),
+            "a legacy name typed on purpose stays"
+        );
+        assert_eq!(
+            with_budget_extension(PathBuf::from("/x/v1.2")),
+            PathBuf::from("/x/v1.2.mthd")
         );
     }
 
@@ -1562,12 +1602,9 @@ mod tests {
     #[test]
     fn title_marks_unsaved_changes() {
         let mut s = Session::new();
-        assert_eq!(window_title(&s), "Untitled.fwb - Film Wizard Budgeting");
+        assert_eq!(window_title(&s), "Untitled.mthd - Method Budget");
         s.edit("Test edit", |b| edit::set_title(b, "Changed"))
             .unwrap();
-        assert_eq!(
-            window_title(&s),
-            "Untitled.fwb (edited) - Film Wizard Budgeting"
-        );
+        assert_eq!(window_title(&s), "Untitled.mthd (edited) - Method Budget");
     }
 }

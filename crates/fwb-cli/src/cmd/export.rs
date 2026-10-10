@@ -1,4 +1,4 @@
-//! `fwb export`: the evaluated budget as an Excel workbook, CSV files or
+//! `method export`: the evaluated budget as an Excel workbook, CSV files or
 //! tab-delimited text (decision 30).
 
 use std::fmt::Write as _;
@@ -8,8 +8,8 @@ use fwb_format::export::{self, Format, Options};
 
 use crate::cli::{load, not_the_input, write_atomic, CliError, Flags, Outcome};
 
-pub const USAGE: &str = "  fwb export <file.fwb> --xlsx|--csv|--tsv <path> [--bom]
-  fwb export <file.fwb> --format xlsx|csv|tsv --out <path> [--bom]
+pub const USAGE: &str = "  method export <file.mthd> --xlsx|--csv|--tsv <path> [--bom]
+  method export <file.mthd> --format xlsx|csv|tsv --out <path> [--bom]
       Export the evaluated budget: xlsx is one workbook (Topsheet, Accounts,
       Detail and the setup tables); csv is one file per table, named
       `<stem> - <Table>.csv` from the path (a folder: the budget's file name);

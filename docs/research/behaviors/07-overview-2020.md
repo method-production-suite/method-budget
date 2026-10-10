@@ -45,7 +45,7 @@ Era caution: launch-era (March 2020) tour on Windows. Cloud library, sharing, ac
 sign-in and the start screen are online features; they matter for parity of feel but are
 outside our local, no-network design (decision 14).
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. **Live recalculation on any setup change** [have]. Every command returns a fully
    recalculated view.

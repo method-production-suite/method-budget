@@ -49,7 +49,7 @@ Sam's 2026 notes 01 and 02 show the same select-then-tick workflow, range button
 selection dollars, plus the "copy fringes from the line above" preference on insert.
 This 2021 video agrees with them.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. [have] P1 **Apply panel**: tick a fringe to put it on every selected line, dollars per
    fringe within the selection, effective fringe percent, Make range and Remove range.

@@ -54,10 +54,10 @@ None.
 
 ## Era caution
 
-2020/2021 build, cloud storage tied to the vendor account. Film Wizard is local-only
+2020/2021 build, cloud storage tied to the vendor account. Method Budget is local-only
 (decision 14). Sam's 2026 recordings win any conflict.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 Local-first equivalent: a **personal library file** (our own open format, e.g. a `.fwblib`
 JSON next to the user's app data, or any folder the user picks, which they can put in a synced

@@ -1,12 +1,21 @@
-# Film Wizard Budgeting native file format
+# Method Budget native file format
 
-This is the open, documented file format Film Wizard Budgeting uses to save budgets. It is
+This is the open, documented file format Method Budget uses to save budgets. It is
 plain JSON, designed to be read and written by other tools and to diff cleanly in version
 control. The reference implementation is `crates/fwb-format` (`to_string` and `from_str`).
 
-File extension: `.fwb`. Encoding: UTF-8. The registered MIME type is
-`application/vnd.film-wizard-budget+json`; since the content is plain JSON, tools may also
+File extension: `.mthd`. Encoding: UTF-8. The registered MIME type is
+`application/vnd.method-budget+json`; since the content is plain JSON, tools may also
 treat it as `application/json`.
+
+## Identity
+
+- **Extension.** New files are `.mthd`. Files from before the product was renamed (to
+  Method Budget, decisions.md entry 46) end in `.fwb`; the content is the same format, and
+  readers should accept both. The app opens either, and a budget opened from a `.fwb`
+  keeps saving to that same file until it is saved under a new name.
+- **The `format` field.** Writers write `"method-budget"`. Readers also accept the legacy
+  value `"film-wizard-budget"`, which files written before the rename carry.
 
 ## At a glance
 
@@ -23,13 +32,13 @@ treat it as `application/json`.
   silently ignored.
 - Detail rows keep their `id` through every edit and move, and accounts and setup items
   keep their numbers and names, so two budgets can be compared and merged by identity
-  rather than by position (`fwb diff`, `fwb merge` and a git merge driver: docs/MERGE.md).
+  rather than by position (`method diff`, `method merge` and a git merge driver: docs/MERGE.md).
 
 ## Top level
 
 ```json
 {
-  "format": "film-wizard-budget",
+  "format": "method-budget",
   "version": 1,
   "budget": { ... }
 }
@@ -37,7 +46,7 @@ treat it as `application/json`.
 
 | Field     | Type    | Notes |
 |-----------|---------|-------|
-| `format`  | string  | Always `"film-wizard-budget"`. Anything else is rejected as "not a budget file". |
+| `format`  | string  | Written as `"method-budget"`; the legacy `"film-wizard-budget"` is read too (see [Identity](#identity)). Anything else is rejected as "not a budget file". |
 | `version` | integer | Format version, currently `1`. See [Versioning](#versioning). |
 | `budget`  | object  | The [budget](#budget). |
 
@@ -128,7 +137,7 @@ Fields in written order:
 | `compact_versions` | `true` or `false` | Write `versions` as changes instead of full copies ([version deltas](#version-deltas)). A file setting, not content. Default `false`, left out then. |
 | `versions`        | list of [versions](#version) | Named copies of the budget, oldest first. Left out when there are none. |
 
-A new budget in Film Wizard Budgeting starts with a set of editable starter units (Allow,
+A new budget in Method Budget starts with a set of editable starter units (Allow,
 Day, Flat, Hour, Month, Week). They are ordinary data and are written out like any other
 units, so a file with no `units` field really has no units.
 
@@ -514,15 +523,15 @@ in written order:
 
 | Field            | Type | Notes |
 |------------------|------|-------|
-| `kind`           | text, **required** | `"shared_copy"` (saved for sharing; Film Wizard Budgeting opens it read-only), `"editable_copy"` (an editable copy made from a shared copy), or `"sub_budget"` (a filtered copy of another budget). |
+| `kind`           | text, **required** | `"shared_copy"` (saved for sharing; Method Budget opens it read-only), `"editable_copy"` (an editable copy made from a shared copy), or `"sub_budget"` (a filtered copy of another budget). |
 | `source_title`   | text, **required** | The title of the budget it was made from. |
 | `source_version` | optional text | The name of the saved version it was made from, when it wasn't the budget as it stood. |
 | `saved`          | text, **required** | When it was made, as an ISO 8601 date-time such as `"2026-10-09T14:30:00-07:00"`. Stored as given; the reader does not check it. |
 | `app_version`    | text, **required** | The version of the program that made it. |
 | `note`           | optional text | A note from whoever made it; for a sub-budget, what it keeps (`"Categories 10, 20; groups Night; without fringes"`). |
 
-Read-only is a request, not a lock: any program may edit the file, and Film Wizard
-Budgeting offers an editable copy instead.
+Read-only is a request, not a lock: any program may edit the file, and Method Budget
+offers an editable copy instead.
 
 ```json
 "provenance": {
@@ -887,9 +896,9 @@ That is "8 hours straight time, then 1.5x after 8, 2x after 12; sixth day 1.5x".
 A reader that follows this document should:
 
 1. Parse the JSON. Reject trailing content after the top-level object.
-2. Check `format` is `"film-wizard-budget"`, then check `version`: reject a missing or
-   non-integer version, and reject a version newer than the reader supports, with a
-   message saying the file needs a newer program. Do this before checking other fields,
+2. Check `format` is `"method-budget"` (or the legacy `"film-wizard-budget"`), then check `version`:
+   reject a missing or non-integer version, and reject a version newer than the reader
+   supports, with a message saying the file needs a newer program. Do this before checking other fields,
    so a newer file gets the version message.
 3. Reject unknown fields anywhere, and fields that do not belong to the given `kind`.
 4. Reject JSON numbers where a decimal string is expected, and floats where cents or
@@ -909,7 +918,7 @@ after keys, and end the file with one newline. Strings use standard JSON escapin
 non-ASCII characters are written as UTF-8, not escaped.
 
 Other tools do not have to match byte for byte: any file that follows the reading rules is
-valid. Loading and saving it in Film Wizard Budgeting normalizes it.
+valid. Loading and saving it in Method Budget normalizes it.
 
 ## Versioning
 
@@ -982,7 +991,7 @@ checked by the test suite (`crates/fwb-format/tests/golden/small.json`).
 
 ```json
 {
-  "format": "film-wizard-budget",
+  "format": "method-budget",
   "version": 1,
   "budget": {
     "title": "Short Film",

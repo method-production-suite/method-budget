@@ -1,7 +1,7 @@
 //! Templates (roadmap 1.20; decisions.md, entry 29): File > New From
 //! Template… and File > Save as Template….
 //!
-//! A template is an ordinary `.fwb` budget, no new format. What makes a
+//! A template is an ordinary budget file, no new format. What makes a
 //! budget a good start for another is its chart (categories, accounts and
 //! production totals), its setup (globals, fringes, groups, units, sets,
 //! locations, currencies, charges, credits, presets) and its settings
@@ -10,7 +10,7 @@
 //! keeps them), the budget info, the baseline, the saved versions and every
 //! line note. [`strip`] does that, and both commands use it:
 //!
-//! - **New From Template** reads a picked `.fwb` (from its tab when it is
+//! - **New From Template** reads a picked budget file (from its tab when it is
 //!   open), strips it and opens it in a new tab with no file, titled
 //!   "Untitled", so the first Save asks where.
 //! - **Save as Template** writes the budget in front, stripped, to a new
@@ -24,7 +24,7 @@ use serde::Serialize;
 use tauri::{Runtime, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
-use crate::app::{finish, safe_file_stem, with_fwb_extension, AppState, DocId};
+use crate::app::{finish, safe_file_stem, with_budget_extension, AppState, DocId};
 use crate::safety::{self, Access};
 use crate::session::Session;
 use crate::view::View;
@@ -85,7 +85,7 @@ pub fn open_new(state: &AppState, template: &Budget, keep_lines: bool) -> DocId 
 // Commands (registered in app.rs, build.rs and capabilities/main.json; the
 // tools window may call none of them)
 
-/// Shows an Open dialog for a template (any `.fwb`) and opens a new budget
+/// Shows an Open dialog for a template (any budget file) and opens a new budget
 /// from it in a new tab, in front: its chart, setup and settings, no lines
 /// unless `keep_lines`. `None` when cancelled.
 #[tauri::command]
@@ -103,7 +103,7 @@ pub async fn template_new<R: Runtime>(
         .dialog()
         .file()
         .set_title("New budget from template")
-        .add_filter("Film Wizard budget", &["fwb"])
+        .add_filter(crate::app::FILTER_NAME, fwb_format::EXTENSIONS)
         .set_parent(&window);
     if let Some(dir) = start {
         dialog = dialog.set_directory(dir);
@@ -152,8 +152,8 @@ pub async fn template_save<R: Runtime>(
         .dialog()
         .file()
         .set_title("Save as template")
-        .add_filter("Film Wizard budget", &["fwb"])
-        .set_file_name(format!("{suggested}.fwb"))
+        .add_filter(crate::app::FILTER_NAME, &[fwb_format::EXTENSION])
+        .set_file_name(format!("{suggested}.{}", fwb_format::EXTENSION))
         .set_parent(&window);
     if let Some(dir) = dir {
         dialog = dialog.set_directory(dir);
@@ -161,7 +161,7 @@ pub async fn template_save<R: Runtime>(
     let Some(picked) = dialog.blocking_save_file() else {
         return Ok(None);
     };
-    let path = with_fwb_extension(picked.into_path().map_err(|e| e.to_string())?);
+    let path = with_budget_extension(picked.into_path().map_err(|e| e.to_string())?);
     let text = {
         let docs = state.docs();
         if docs.find_file(&path).is_some() {

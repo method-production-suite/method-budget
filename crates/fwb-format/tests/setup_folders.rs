@@ -3,7 +3,7 @@
 use fwb_core::{folders, Budget, Fringe, FringeKind, SetDef};
 
 fn library() -> Budget {
-    let mut b = Budget::new("My Film Wizard Library", "USD");
+    let mut b = Budget::new("My Method Budget Library", "USD");
     b.units.clear();
     b.fringes.insert(
         "FICA".into(),

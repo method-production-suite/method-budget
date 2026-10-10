@@ -1,8 +1,10 @@
 //! The personal setup library (roadmap 2.15; decisions.md, entries 15, 29
 //! and 37).
 //!
-//! - **A library is a budget file.** `My Film Wizard Library.fwb` (or any
-//!   `.fwb` the user picks): our ordinary format with setup and no lines, plus
+//! - **A library is a budget file.** `My Method Budget Library.mthd` (or any
+//!   budget file the user picks, `.fwb` ones included; a folder that already
+//!   has a library under its pre-rename name keeps using it): our
+//!   ordinary format with setup and no lines, plus
 //!   folders per kind (`setup_folders`, fwb_core::folders). It starts empty:
 //!   no units, fringes or anything else; we ship no library data. It opens
 //!   in the app like any other budget.
@@ -42,9 +44,12 @@ use crate::safety::{self, Access};
 use crate::view::View;
 
 /// The file a new library gets, in the folder the user picks.
-pub const LIBRARY_FILE_NAME: &str = "My Film Wizard Library.fwb";
+pub const LIBRARY_FILE_NAME: &str = "My Method Budget Library.mthd";
+/// What a new library was called before the rename to Method Budget: a
+/// folder that has one (and no new one) keeps using it.
+pub const LEGACY_LIBRARY_FILE_NAME: &str = "My Film Wizard Library.fwb";
 /// A new library's title.
-pub const LIBRARY_TITLE: &str = "My Film Wizard Library";
+pub const LIBRARY_TITLE: &str = "My Method Budget Library";
 
 const NO_LIBRARY: &str = "No library yet. Create one or choose a library file first.";
 
@@ -116,9 +121,12 @@ pub fn change<T>(
 /// the library already there. Returns its path and whether it was there.
 pub fn create_in(dir: &Path, base_currency: &str) -> Result<(PathBuf, bool), String> {
     let path = dir.join(LIBRARY_FILE_NAME);
-    if path.exists() {
-        crate::session::read_budget(&path)?;
-        return Ok((path, true));
+    let legacy = dir.join(LEGACY_LIBRARY_FILE_NAME);
+    for existing in [&path, &legacy] {
+        if existing.exists() {
+            crate::session::read_budget(existing)?;
+            return Ok((existing.clone(), true));
+        }
     }
     write(&path, &new_library(base_currency))?;
     Ok((path, false))
@@ -155,7 +163,7 @@ pub struct LibraryKind {
 pub struct LibraryView {
     /// A library file has been picked.
     pub configured: bool,
-    /// Its file name without `.fwb`.
+    /// Its file name without its extension.
     pub name: String,
     /// The folder it is in.
     pub location: String,
@@ -593,8 +601,8 @@ pub fn library_view(state: State<'_, AppState>, library: State<'_, Library>) -> 
     library_view_at(&state.docs(), path.as_deref())
 }
 
-/// Asks for a folder (Rust's dialog) and makes `My Film Wizard Library.fwb`
-/// in it, or uses the one already there; it becomes the library. `None`
+/// Asks for a folder (Rust's dialog) and makes `My Method Budget Library.mthd`
+/// in it, or uses the one already there (or the pre-rename one); it becomes the library. `None`
 /// when cancelled.
 #[tauri::command]
 pub async fn library_create<R: Runtime>(
@@ -639,7 +647,7 @@ pub async fn library_choose<R: Runtime>(
         .dialog()
         .file()
         .set_title("Choose your library")
-        .add_filter("Film Wizard budget", &["fwb"])
+        .add_filter(crate::app::FILTER_NAME, fwb_format::EXTENSIONS)
         .set_parent(&window);
     if let Some(dir) = library.path().as_deref().and_then(Path::parent) {
         dialog = dialog.set_directory(dir);
@@ -844,6 +852,18 @@ mod tests {
     }
 
     #[test]
+    fn a_folder_with_a_pre_rename_library_keeps_using_it() {
+        let dir = temp_dir("library-legacy");
+        let legacy = dir.join(LEGACY_LIBRARY_FILE_NAME);
+        write(&legacy, &new_library("USD")).unwrap();
+        let (path, existed) = create_in(&dir, "EUR").unwrap();
+        assert!(existed);
+        assert_eq!(path, legacy);
+        assert!(!dir.join(LIBRARY_FILE_NAME).exists(), "no second library");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
     fn a_new_library_is_empty_and_remembered() {
         let (dir, lib, state) = setup();
         let path = lib.path().unwrap();
@@ -865,7 +885,7 @@ mod tests {
         assert_eq!(on_disk(&lib).base_currency, "USD", "left as it was");
         let v = library_view_at(&state.docs(), Some(&path));
         assert!(v.configured && !v.in_tab && v.problem.is_none());
-        assert_eq!(v.name, "My Film Wizard Library");
+        assert_eq!(v.name, "My Method Budget Library");
         assert!(v.kinds.iter().all(|k| k.items.is_empty()));
         assert!(!v.kinds.iter().any(|k| k.kind == "account_coding"));
         // A library that isn't there says so.

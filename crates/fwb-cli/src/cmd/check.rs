@@ -1,10 +1,10 @@
-//! `fwb check`: read and recalculate a budget, reporting problems.
+//! `method check`: read and recalculate a budget, reporting problems.
 
 use fwb_core::{recalc, RecalcOptions};
 
 use crate::cli::{load, money, CliError, Flags, Outcome};
 
-pub const USAGE: &str = "  fwb check <file.fwb>
+pub const USAGE: &str = "  method check <file.mthd>
       Read and recalculate; report problems.
 ";
 

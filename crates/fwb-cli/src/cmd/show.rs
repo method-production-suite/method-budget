@@ -1,4 +1,4 @@
-//! `fwb show`: print the topsheet.
+//! `method show`: print the topsheet.
 
 use std::fmt::Write as _;
 
@@ -6,7 +6,7 @@ use fwb_core::{recalc, Budget, Cents, RecalcOptions, Report};
 
 use crate::cli::{load, money, CliError, Flags, Outcome};
 
-pub const USAGE: &str = "  fwb show <file.fwb> [--exclude GROUP]...
+pub const USAGE: &str = "  method show <file.mthd> [--exclude GROUP]...
       Print the topsheet. --exclude leaves a group's lines out (repeatable).
 ";
 

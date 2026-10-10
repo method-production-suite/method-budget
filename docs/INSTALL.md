@@ -1,6 +1,6 @@
-# Installing Film Wizard Budgeting
+# Installing Method Budget
 
-Film Wizard Budgeting is a local desktop app ([APP.md](APP.md)). This page covers building
+Method Budget is a local desktop app ([APP.md](APP.md)). This page covers building
 it from source, installing it on a Mac, the one-time Gatekeeper step for builds that are
 not notarized, and what a signed, notarized release needs.
 
@@ -11,12 +11,13 @@ builds every platform and drafts a GitHub Release with the files attached:
 
 | Platform | Files | Status |
 |---|---|---|
-| macOS 11 or later (Apple silicon and Intel) | `.dmg`, and the `.app` as a `.zip` | ad-hoc signed, not notarized |
+| macOS 11 or later (Apple silicon and Intel) | `.dmg`, and the `.app` as a `.zip` | signed and notarized once the release secrets are set (until then ad-hoc signed) |
 | Windows 10/11 (x64) | `.msi` and the NSIS `-setup.exe` | unsigned, untested |
 | Linux (x64) | `.deb` and `.AppImage` | untested |
 
-The draft is published by hand once it has been checked. Until the macOS build is signed
-with a Developer ID and notarized, the first launch needs the Gatekeeper step below.
+The draft is published by hand once it has been checked ([RELEASING.md](RELEASING.md)).
+Until the macOS build is signed with a Developer ID and notarized, the first launch needs
+the Gatekeeper step below; the release's description says when that applies.
 
 ## Build from source (macOS)
 
@@ -34,7 +35,7 @@ cargo tauri build --bundles app          # just the .app (quickest)
 cargo tauri build --bundles app,dmg      # the .app and a .dmg installer
 ```
 
-The app lands in `target/release/bundle/macos/Film Wizard Budgeting.app` (at the repository
+The app lands in `target/release/bundle/macos/Method Budget.app` (at the repository
 root, not inside `crates/fwb-app`), and the disk image in `target/release/bundle/dmg/`.
 Making the `.dmg` briefly opens and arranges a Finder window; that is normal.
 
@@ -47,8 +48,8 @@ cargo tauri build --bundles app --target universal-apple-darwin
 # lands in target/universal-apple-darwin/release/bundle/macos/
 ```
 
-To check a built bundle without opening it (architecture, minimum macOS, the `.fwb`
-document type and the signature):
+To check a built bundle without opening it (architecture, minimum macOS, the `.mthd` and
+`.fwb` document types and the signature):
 
 ```bash
 scripts/check-macos-bundle.sh
@@ -56,18 +57,27 @@ scripts/check-macos-bundle.sh
 
 ### Install to /Applications
 
-Drag `Film Wizard Budgeting.app` into Applications in Finder (from the `.dmg` window, or
+Drag `Method Budget.app` into Applications in Finder (from the `.dmg` window, or
 from `target/release/bundle/macos/`), or in Terminal:
 
 ```bash
-ditto "target/release/bundle/macos/Film Wizard Budgeting.app" "/Applications/Film Wizard Budgeting.app"
+ditto "target/release/bundle/macos/Method Budget.app" "/Applications/Method Budget.app"
 ```
 
-To update, quit the app and replace it the same way. Your budgets are `.fwb` files wherever
-you saved them; installing or removing the app never touches them.
+A released copy updates itself (once releases carry the updater key: [RELEASING.md](RELEASING.md)):
+when a new version is ready the toolbar says "Update ready: Restart to update", and restarting saves your budgets first and reopens your tabs
+(Help > Check for Updates Automatically turns the checks off; [APP.md](APP.md), "Updates").
+A copy built from source doesn't check; to update it, quit the app and replace it the same
+way. Your budgets are `.mthd` files wherever you saved them; installing, updating or
+removing the app never touches them.
 
-The app registers the `.fwb` file type ("Film Wizard Budget"), so Finder shows `.fwb`
-files as belonging to it and offers it under Open With; double-clicking one opens it in the
+A copy installed before the product was renamed has a different name and identifier, so it
+installs next to the new one rather than being replaced. On its first start the new app
+copies the old one's settings, recent files, open tabs, library choice, recovery copies and
+backups (decisions.md, entry 46); once it has, delete the old app.
+
+The app registers the `.mthd` file type ("Method Budget"), and the older `.fwb` one, so
+Finder shows those files as belonging to it and offers it under Open With; double-clicking one opens it in the
 app (asking first if the open budget has unsaved changes).
 
 ### First launch: "unidentified developer"
@@ -80,7 +90,7 @@ once per installed copy:
 1. Double-click the app. macOS says it can't verify the developer; click **Done** (or
    **Cancel**), not Move to Trash.
 2. Open **System Settings > Privacy & Security**, scroll to **Security**, and click
-   **Open Anyway** next to the message about Film Wizard Budgeting. Confirm with your
+   **Open Anyway** next to the message about Method Budget. Confirm with your
    password or Touch ID, then click **Open**.
 
 On macOS 14 and earlier, right-clicking (or Control-clicking) the app in Finder and choosing
@@ -109,7 +119,7 @@ show a SmartScreen warning: click **More info**, then **Run anyway**.
 Signing with a Developer ID and notarizing removes the Gatekeeper step. It needs an Apple
 Developer Program membership. Nothing below is stored in this repository: every secret
 lives in 1Password, in the **Darkwell** vault, per [BORN-SECURE.md](../BORN-SECURE.md)
-(titled `Thing - What - Where`, tagged `app/film-wizard-budgeting`), and is read at build
+(titled `Thing - What - Where`, tagged `app/method-budget`), and is read at build
 time with `op read` or `op run` and `op://` references.
 
 What is needed:
@@ -143,5 +153,6 @@ rm -f "$TMPDIR/AuthKey.p8"
 Afterwards `scripts/check-macos-bundle.sh` should show a `TeamIdentifier` and Gatekeeper
 `accepted` (source: Notarized Developer ID).
 
-Signing in CI is not set up. It would mean adding the values above as secrets of a protected
-GitHub environment, used only by the macOS job of `release.yml`; that is a separate change.
+The release workflow signs, notarizes, staples and verifies the Mac build itself once its
+secrets are set (an App Store Connect API key for notarizing, the certificate as a `.p12`);
+the secrets, the commands that set them and the updater key: [RELEASING.md](RELEASING.md).

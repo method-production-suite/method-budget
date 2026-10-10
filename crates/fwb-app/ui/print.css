@@ -1,4 +1,4 @@
-/* Film Wizard Budgeting: printable reports (js/report.js).
+/* Method Budget: printable reports (js/report.js).
    Loaded for all media. Every report rule is scoped to .fwb-report, so nothing
    here touches the app. A report is a column of Letter-sized page boxes
    (.rpt-page), each exactly one sheet of paper with its own header and

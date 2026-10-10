@@ -1,25 +1,25 @@
-//! The `fwb` binary end to end: every subcommand run as a script would run
+//! The `method` binary end to end: every subcommand run as a script would run
 //! it, checking output, files and exit codes (docs/CLI.md).
 
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 
-fn fwb(args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_fwb"))
+fn method(args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_method"))
         .args(args)
         .output()
-        .expect("fwb runs")
+        .expect("method runs")
 }
 
-fn fwb_stdin(args: &[&str], input: &str) -> Output {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_fwb"))
+fn method_stdin(args: &[&str], input: &str) -> Output {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_method"))
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("fwb runs");
+        .expect("method runs");
     child
         .stdin
         .take()
@@ -59,7 +59,7 @@ impl Dir {
     /// A starter budget at `name`.
     fn starter(&self, name: &str) -> String {
         let p = self.path(name);
-        let o = fwb(&["new", &p]);
+        let o = method(&["new", &p]);
         assert_eq!(code(&o), 0, "{}", err(&o));
         p
     }
@@ -75,9 +75,9 @@ fn read(p: &str) -> String {
     std::fs::read_to_string(p).unwrap()
 }
 
-/// `name<TAB>amount` from `fwb totals`.
+/// `name<TAB>amount` from `method totals`.
 fn total(p: &str, name: &str) -> String {
-    let o = fwb(&["totals", p]);
+    let o = method(&["totals", p]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     out(&o)
         .lines()
@@ -87,50 +87,82 @@ fn total(p: &str, name: &str) -> String {
 
 #[test]
 fn help_and_usage_errors() {
-    let o = fwb(&["help"]);
+    let o = method(&["help"]);
     assert_eq!(code(&o), 0);
     for c in [
         "show", "check", "export", "report", "totals", "set", "apply", "import",
     ] {
-        assert!(out(&o).contains(&format!("  fwb {c} ")), "{c}");
+        assert!(out(&o).contains(&format!("  method {c} ")), "{c}");
     }
-    assert_eq!(code(&fwb(&[])), 2);
-    let o = fwb(&["frobnicate"]);
+    assert_eq!(code(&method(&[])), 2);
+    let o = method(&["frobnicate"]);
     assert_eq!(code(&o), 2);
     assert!(err(&o).contains("unknown command"));
-    assert_eq!(code(&fwb(&["totals"])), 2);
-    assert_eq!(code(&fwb(&["totals", "a.fwb", "--nope"])), 2);
-    let o = fwb(&["totals", "/no/such/file.fwb"]);
+    assert_eq!(code(&method(&["totals"])), 2);
+    assert_eq!(code(&method(&["totals", "a.mthd", "--nope"])), 2);
+    let o = method(&["totals", "/no/such/file.mthd"]);
     assert_eq!(code(&o), 1);
+}
+
+#[test]
+fn version_flag() {
+    // The workspace version, the same one the app's About box shows.
+    let o = method(&["--version"]);
+    assert_eq!(code(&o), 0);
+    assert_eq!(
+        out(&o),
+        format!("method {} (Method Budget)\n", env!("CARGO_PKG_VERSION"))
+    );
+    assert_eq!(out(&method(&["-V"])), out(&o));
+}
+
+#[test]
+fn deprecated_fwb_alias_and_legacy_files() {
+    // `fwb` (the name from before the rename) runs the same command line,
+    // and `.fwb` files read and write like `.mthd` ones.
+    let d = Dir::new("alias");
+    let legacy = d.path("old.fwb");
+    let o = Command::new(env!("CARGO_BIN_EXE_fwb"))
+        .args(["new", &legacy])
+        .output()
+        .expect("fwb runs");
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let o = Command::new(env!("CARGO_BIN_EXE_fwb"))
+        .arg("help")
+        .output()
+        .expect("fwb runs");
+    assert!(out(&o).contains("  method show "));
+    assert!(out(&method(&["check", &legacy])).contains("ok, net total"));
+    assert_eq!(code(&method(&["fmt", &legacy])), 0);
 }
 
 #[test]
 fn basics_new_check_fmt_show_sample() {
     let d = Dir::new("basics");
-    let p = d.starter("a.fwb");
-    assert_eq!(code(&fwb(&["new", &p])), 1, "never over a file");
-    let o = fwb(&["check", &p]);
+    let p = d.starter("a.mthd");
+    assert_eq!(code(&method(&["new", &p])), 1, "never over a file");
+    let o = method(&["check", &p]);
     assert!(out(&o).contains("ok, net total"));
     let before = read(&p);
-    assert_eq!(code(&fwb(&["fmt", &p])), 0);
+    assert_eq!(code(&method(&["fmt", &p])), 0);
     assert_eq!(read(&p), before);
-    assert!(out(&fwb(&["show", &p])).contains("Grand total"));
-    let s = d.path("big.fwb");
-    assert_eq!(code(&fwb(&["sample", &s])), 0);
-    assert_eq!(code(&fwb(&["check", &s])), 0);
+    assert!(out(&method(&["show", &p])).contains("Grand total"));
+    let s = d.path("big.mthd");
+    assert_eq!(code(&method(&["sample", &s])), 0);
+    assert_eq!(code(&method(&["check", &s])), 0);
 }
 
 #[test]
 fn totals_text_and_json() {
     let d = Dir::new("totals");
-    let p = d.starter("a.fwb");
-    let o = fwb(&["totals", &p]);
+    let p = d.starter("a.mthd");
+    let o = method(&["totals", &p]);
     let text = out(&o);
     assert!(text.starts_with("category\t10\t"), "{text}");
     let net = total(&p, "net_total");
     let grand = total(&p, "grand_total");
     assert_eq!(net, grand);
-    let j = out(&fwb(&["totals", &p, "--json"]));
+    let j = out(&method(&["totals", &p, "--json"]));
     // The JSON's net total in cents is the text's in decimals.
     let cents = net.replace('.', "").trim_start_matches('0').to_string();
     assert!(j.contains(&format!("\"net_total\": {cents},")), "{j}");
@@ -141,34 +173,34 @@ fn totals_text_and_json() {
 #[test]
 fn export_shorthand_flags() {
     let d = Dir::new("export");
-    let p = d.starter("Film.fwb");
+    let p = d.starter("Film.mthd");
     let x = d.path("Film.xlsx");
-    let o = fwb(&["export", &p, "--xlsx", &x]);
+    let o = method(&["export", &p, "--xlsx", &x]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     assert!(std::fs::read(&x).unwrap().starts_with(b"PK"));
     let c = d.path("Film.csv");
-    assert_eq!(code(&fwb(&["export", &p, "--csv", &c])), 0);
+    assert_eq!(code(&method(&["export", &p, "--csv", &c])), 0);
     assert!(Path::new(&d.path("Film - Detail.csv")).exists());
-    assert_eq!(code(&fwb(&["export", &p])), 2);
+    assert_eq!(code(&method(&["export", &p])), 2);
 }
 
 #[test]
 fn reports_in_every_format() {
     let d = Dir::new("report");
-    let p = d.starter("a.fwb");
+    let p = d.starter("a.mthd");
     let date = "2026-10-09 12:00 UTC";
-    let o = fwb(&["report", &p, "--date", date]);
+    let o = method(&["report", &p, "--date", date]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     let txt = out(&o);
     assert!(txt.contains("Topsheet\n========"), "{txt}");
     assert!(txt.contains("Detail\n======"));
     assert!(txt.contains("2026-10-09 12:00 UTC"));
     // The same run gives the same text.
-    assert_eq!(out(&fwb(&["report", &p, "--date", date])), txt);
+    assert_eq!(out(&method(&["report", &p, "--date", date])), txt);
 
     let all = "topsheet,accounts,detail,fringes,globals,groups,notes,info,chart,units,sets,locations,currencies";
     let h = d.path("r.html");
-    let o = fwb(&["report", &p, "--sections", all, "-o", &h, "--date", date]);
+    let o = method(&["report", &p, "--sections", all, "-o", &h, "--date", date]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     let html = read(&h);
     assert!(html.starts_with("<!DOCTYPE html>"));
@@ -177,7 +209,7 @@ fn reports_in_every_format() {
     assert!(!html.contains("<script"));
 
     let c = d.path("r.csv");
-    assert_eq!(code(&fwb(&["report", &p, "-o", &c, "--date", date])), 0);
+    assert_eq!(code(&method(&["report", &p, "-o", &c, "--date", date])), 0);
     let csv = read(&c);
     assert!(
         csv.starts_with("Topsheet\r\nCode,Description,Total\r\n"),
@@ -185,7 +217,7 @@ fn reports_in_every_format() {
     );
 
     let pdf_path = d.path("r.pdf");
-    let o = fwb(&[
+    let o = method(&[
         "report",
         &p,
         "--sections",
@@ -198,15 +230,18 @@ fn reports_in_every_format() {
     assert_eq!(code(&o), 0, "{}", err(&o));
     check_pdf(&std::fs::read(&pdf_path).unwrap());
 
-    assert_eq!(code(&fwb(&["report", &p, "--format", "pdf"])), 2);
-    assert_eq!(code(&fwb(&["report", &p, "--sections", "nope"])), 2);
-    assert_eq!(code(&fwb(&["report", &p, "--format", "doc"])), 2);
-    let o = fwb(&["report", &p, "--preset", "Missing"]);
+    assert_eq!(code(&method(&["report", &p, "--format", "pdf"])), 2);
+    assert_eq!(code(&method(&["report", &p, "--sections", "nope"])), 2);
+    assert_eq!(code(&method(&["report", &p, "--format", "doc"])), 2);
+    let o = method(&["report", &p, "--preset", "Missing"]);
     assert_eq!(code(&o), 1);
     assert!(err(&o).contains("no report presets"));
-    assert_eq!(out(&fwb(&["report", &p, "--list-presets"])), "");
+    assert_eq!(out(&method(&["report", &p, "--list-presets"])), "");
     // Never over the budget itself.
-    assert_eq!(code(&fwb(&["report", &p, "-o", &p, "--format", "txt"])), 1);
+    assert_eq!(
+        code(&method(&["report", &p, "-o", &p, "--format", "txt"])),
+        1
+    );
 }
 
 /// A PDF whose cross-reference table points at every object.
@@ -256,7 +291,7 @@ fn check_pdf(bytes: &[u8]) {
 #[test]
 fn report_presets_from_the_budget() {
     let d = Dir::new("presets");
-    let p = d.starter("a.fwb");
+    let p = d.starter("a.mthd");
     // Add a preset by editing the file: the format is open.
     let text = read(&p);
     let preset = r#"    "report_presets": [
@@ -273,30 +308,30 @@ fn report_presets_from_the_budget() {
     let cut = text.rfind("\n  }\n}").unwrap();
     std::fs::write(&p, format!("{},\n{preset}", &text[..cut])).unwrap();
     assert_eq!(
-        code(&fwb(&["check", &p])),
+        code(&method(&["check", &p])),
         0,
         "{}",
-        err(&fwb(&["check", &p]))
+        err(&method(&["check", &p]))
     );
-    assert_eq!(out(&fwb(&["report", &p, "--list-presets"])), "* Short\n");
-    let txt = out(&fwb(&["report", &p, "--date", "x"]));
+    assert_eq!(out(&method(&["report", &p, "--list-presets"])), "* Short\n");
+    let txt = out(&method(&["report", &p, "--date", "x"]));
     assert!(
         txt.contains("Topsheet") && !txt.contains("Detail\n"),
         "{txt}"
     );
-    let txt = out(&fwb(&["report", &p, "--preset", "short", "--date", "x"]));
+    let txt = out(&method(&["report", &p, "--preset", "short", "--date", "x"]));
     assert!(!txt.contains("Detail\n"));
     let h = d.path("r.html");
-    fwb(&["report", &p, "-o", &h]);
+    method(&["report", &p, "-o", &h]);
     assert!(read(&h).contains("size: letter landscape"));
 }
 
 #[test]
 fn set_changes_one_value() {
     let d = Dir::new("set");
-    let p = d.starter("a.fwb");
+    let p = d.starter("a.mthd");
     let before = read(&p);
-    let o = fwb(&["set", &p, "line.10-01:1.rate", "60000", "--dry-run"]);
+    let o = method(&["set", &p, "line.10-01:1.rate", "60000", "--dry-run"]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     assert!(
         out(&o).contains("rate \"50000\" -> \"60000\""),
@@ -307,39 +342,39 @@ fn set_changes_one_value() {
     assert_eq!(read(&p), before);
 
     let grand = total(&p, "grand_total");
-    let o = fwb(&["set", &p, "line.10-01:1.rate", "60000"]);
+    let o = method(&["set", &p, "line.10-01:1.rate", "60000"]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     assert!(out(&o).contains("Grand total"));
     assert_ne!(total(&p, "grand_total"), grand);
     assert!(read(&p).contains("\"rate\": \"60000\""));
 
-    assert_eq!(code(&fwb(&["set", &p, "global.SHOOT_DAYS", "30"])), 0);
+    assert_eq!(code(&method(&["set", &p, "global.SHOOT_DAYS", "30"])), 0);
     assert!(read(&p).contains("\"SHOOT_DAYS\": \"30\""));
     assert_eq!(
-        code(&fwb(&["set", &p, "charge.Contingency.applied", "false"])),
+        code(&method(&["set", &p, "charge.Contingency.applied", "false"])),
         0
     );
     assert_eq!(total(&p, "charges_total"), "0.00");
-    assert_eq!(code(&fwb(&["set", &p, "title", "New title"])), 0);
+    assert_eq!(code(&method(&["set", &p, "title", "New title"])), 0);
     assert!(read(&p).contains("\"title\": \"New title\""));
 
     // Refused edits change nothing.
     let now = read(&p);
-    let o = fwb(&["set", &p, "fringe.NOPE.rate", "5"]);
+    let o = method(&["set", &p, "fringe.NOPE.rate", "5"]);
     assert_eq!(code(&o), 3);
     assert!(err(&o).contains("there is no fringe NOPE"), "{}", err(&o));
-    let o = fwb(&["set", &p, "line.10-01:1.rate", "NO_SUCH_GLOBAL * 2"]);
+    let o = method(&["set", &p, "line.10-01:1.rate", "NO_SUCH_GLOBAL * 2"]);
     assert_eq!(code(&o), 3, "{}", err(&o));
     assert!(err(&o).contains("nothing was written"));
-    assert_eq!(code(&fwb(&["set", &p, "nonsense", "1"])), 2);
-    assert_eq!(code(&fwb(&["set", &p, "line.10-01:1"])), 2);
+    assert_eq!(code(&method(&["set", &p, "nonsense", "1"])), 2);
+    assert_eq!(code(&method(&["set", &p, "line.10-01:1"])), 2);
     assert_eq!(read(&p), now);
 }
 
 #[test]
 fn apply_runs_a_script_all_or_nothing() {
     let d = Dir::new("apply");
-    let p = d.starter("a.fwb");
+    let p = d.starter("a.mthd");
     let script = d.path("edit.txt");
     std::fs::write(
         &script,
@@ -357,10 +392,10 @@ fn apply_runs_a_script_all_or_nothing() {
          \n",
     )
     .unwrap();
-    let o = fwb(&["apply", &p, &script, "--dry-run"]);
+    let o = method(&["apply", &p, &script, "--dry-run"]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     assert!(out(&o).contains("dry run"));
-    let o = fwb(&["apply", &p, &script]);
+    let o = method(&["apply", &p, &script]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     let text = read(&p);
     assert!(text.contains("\"title\": \"Feature, draft 3\""));
@@ -375,7 +410,7 @@ fn apply_runs_a_script_all_or_nothing() {
     // One bad line: nothing written, the line named, exit 3.
     let before = read(&p);
     std::fs::write(&script, "set global DAYS 31\nadd tag #1 group Nobody\n").unwrap();
-    let o = fwb(&["apply", &p, &script]);
+    let o = method(&["apply", &p, &script]);
     assert_eq!(code(&o), 3);
     assert!(
         err(&o).contains("edit.txt line 2: there is no group Nobody"),
@@ -384,36 +419,36 @@ fn apply_runs_a_script_all_or_nothing() {
     );
     assert_eq!(read(&p), before);
     std::fs::write(&script, "set global DAYS\n").unwrap();
-    let o = fwb(&["apply", &p, &script]);
+    let o = method(&["apply", &p, &script]);
     assert_eq!(code(&o), 3);
     assert!(err(&o).contains("line 1: missing a value"));
     assert_eq!(read(&p), before);
 
     // From stdin.
-    let o = fwb_stdin(&["apply", &p, "-"], "set global DAYS 32\n");
+    let o = method_stdin(&["apply", &p, "-"], "set global DAYS 32\n");
     assert_eq!(code(&o), 0, "{}", err(&o));
     assert!(read(&p).contains("\"DAYS\": \"32\""));
-    let o = fwb_stdin(&["apply", &p, "-"], "# nothing\n");
+    let o = method_stdin(&["apply", &p, "-"], "# nothing\n");
     assert!(out(&o).contains("no changes"));
 }
 
 #[test]
 fn compact_versions_through_the_cli() {
     let d = Dir::new("compact");
-    let p = d.starter("a.fwb");
-    assert_eq!(code(&fwb(&["set", &p, "compact_versions", "true"])), 0);
+    let p = d.starter("a.mthd");
+    assert_eq!(code(&method(&["set", &p, "compact_versions", "true"])), 0);
     assert!(read(&p).contains("\"compact_versions\": true"));
-    assert_eq!(code(&fwb(&["check", &p])), 0);
-    assert_eq!(code(&fwb(&["set", &p, "compact_versions", "false"])), 0);
+    assert_eq!(code(&method(&["check", &p])), 0);
+    assert_eq!(code(&method(&["set", &p, "compact_versions", "false"])), 0);
     assert!(!read(&p).contains("compact_versions"));
 }
 
 #[test]
 fn import_with_and_without_a_mapping() {
     let d = Dir::new("import");
-    let p = d.starter("a.fwb");
+    let p = d.starter("a.mthd");
     let x = d.path("a.xlsx");
-    assert_eq!(code(&fwb(&["export", &p, "--xlsx", &x])), 0);
+    assert_eq!(code(&method(&["export", &p, "--xlsx", &x])), 0);
 
     // Into a new budget, accounts created from the sheet.
     let m = d.path("m.json");
@@ -422,17 +457,17 @@ fn import_with_and_without_a_mapping() {
         r#"{"sheet": "Detail", "create_accounts": true, "create_setup": true}"#,
     )
     .unwrap();
-    let out_path = d.path("new.fwb");
-    let o = fwb(&["import", &x, "--mapping", &m, "-o", &out_path]);
+    let out_path = d.path("new.mthd");
+    let o = method(&["import", &x, "--mapping", &m, "-o", &out_path]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     assert!(out(&o).contains("different: 0"), "{}", out(&o));
-    assert_eq!(code(&fwb(&["check", &out_path])), 0);
+    assert_eq!(code(&method(&["check", &out_path])), 0);
     // Lines only: the same detail total as the budget's lines.
-    let o = fwb(&["import", &x, "--mapping", &m, "-o", &out_path]);
+    let o = method(&["import", &x, "--mapping", &m, "-o", &out_path]);
     assert_eq!(code(&o), 1, "an existing file is refused");
     assert!(err(&o).contains("--force"));
     assert_eq!(
-        code(&fwb(&[
+        code(&method(&[
             "import",
             &x,
             "--mapping",
@@ -445,8 +480,8 @@ fn import_with_and_without_a_mapping() {
     );
 
     // Into a copy of a budget, columns guessed: the lines double up.
-    let into = d.path("into.fwb");
-    let o = fwb(&["import", &x, "--into", &p, "-o", &into]);
+    let into = d.path("into.mthd");
+    let o = method(&["import", &x, "--into", &p, "-o", &into]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     let grand_before = total(&p, "atl_btl");
     let grand_after = total(&into, "atl_btl");
@@ -461,7 +496,7 @@ fn import_with_and_without_a_mapping() {
         r#"{"header_row": 1, "columns": {"account_code": "A", "description": 2, "amount": "C", "rate": "D"}}"#,
     )
     .unwrap();
-    let o = fwb(&[
+    let o = method(&[
         "import",
         &csv,
         "--mapping",
@@ -477,12 +512,12 @@ fn import_with_and_without_a_mapping() {
 
     // Problems are failures that write nothing.
     std::fs::write(&m, r#"{"columns": {"bogus": 1}}"#).unwrap();
-    let o = fwb(&["import", &csv, "--mapping", &m, "-o", &d.path("x.fwb")]);
+    let o = method(&["import", &csv, "--mapping", &m, "-o", &d.path("x.mthd")]);
     assert_eq!(code(&o), 1);
     assert!(err(&o).contains("unknown field `bogus`"));
-    assert!(!Path::new(&d.path("x.fwb")).exists());
-    let o = fwb(&["import", &csv, "-o", &d.path("x.fwb")]);
+    assert!(!Path::new(&d.path("x.mthd")).exists());
+    let o = method(&["import", &csv, "-o", &d.path("x.mthd")]);
     assert_eq!(code(&o), 1);
     assert!(err(&o).contains("create_accounts"), "{}", err(&o));
-    assert_eq!(code(&fwb(&["import", &csv])), 2);
+    assert_eq!(code(&method(&["import", &csv])), 2);
 }

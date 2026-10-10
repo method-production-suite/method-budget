@@ -1,4 +1,4 @@
-# Secrets — never commit
+# Secrets: never commit
 .env
 .env.*
 !.env.example
@@ -24,4 +24,13 @@ id_rsa*
 
 # Scratch budgets at the repo root (test files, personal budgets)
 /*.fwb
+/*.mthd
 /Test Library/
+
+# Claude Code: only the project's skills and shared settings are versioned. Everything
+# else under .claude/ stays local, above all .claude/worktrees/ (complete checkouts that
+# must never be staged) and settings.local.json. The trailing /* (not .claude/ itself)
+# is what lets the two ! lines re-include. docs/WEBSITE.md has the reasoning.
+/.claude/*
+!/.claude/skills/
+!/.claude/settings.json

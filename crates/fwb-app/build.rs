@@ -217,9 +217,32 @@ const COMMANDS: &[&str] = &[
     "ot_apply",
     "ot_save_pattern",
     "ot_delete_pattern",
+    // Updates, release notes and What's New (src/updater.rs)
+    "update_status",
+    "update_restart",
+    "whats_new",
+    "release_notes",
 ];
 
+/// Copies this version's release notes, `docs/releases/<version>.md`, where
+/// src/updater.rs embeds them (What's New, Help > Release Notes). A version
+/// without notes embeds nothing; `cargo xtask check-version` (CI) makes sure
+/// every version has them.
+fn embed_release_notes() {
+    let dir =
+        std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
+    let version = std::env::var("CARGO_PKG_VERSION").expect("CARGO_PKG_VERSION");
+    let notes = dir
+        .join("../../docs/releases")
+        .join(format!("{version}.md"));
+    println!("cargo:rerun-if-changed={}", notes.display());
+    let text = std::fs::read_to_string(&notes).unwrap_or_default();
+    let out = std::path::PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
+    std::fs::write(out.join("release-notes.md"), text).expect("failed to write the release notes");
+}
+
 fn main() {
+    embed_release_notes();
     tauri_build::try_build(
         tauri_build::Attributes::new()
             .app_manifest(tauri_build::AppManifest::new().commands(COMMANDS)),

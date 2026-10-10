@@ -76,7 +76,7 @@ export function showRecoveryDialog(entries, { open, discard }) {
       el('h2', { class: 'modal-title', text: 'Recovered budgets', attrs: { id: 'safety-title' } }),
       el('p', {
         class: 'modal-message',
-        text: 'Film Wizard Budgeting closed before these changes were saved. Open one to keep working on it, or discard it. Later keeps them for next time.',
+        text: 'Method Budget closed before these changes were saved. Open one to keep working on it, or discard it. Later keeps them for next time.',
       }),
       list,
       el('div', { class: 'modal-actions' }, later),
@@ -143,7 +143,7 @@ export function showConflictDialog(name, { keep, load, copy }) {
     return el(
       'div',
       { class: 'modal modal-wide', attrs: { role: 'dialog', 'aria-labelledby': 'safety-title' } },
-      el('h2', { class: 'modal-title', text: 'This budget was changed outside Film Wizard', attrs: { id: 'safety-title' } }),
+      el('h2', { class: 'modal-title', text: 'This budget was changed outside Method Budget', attrs: { id: 'safety-title' } }),
       el('p', {
         class: 'modal-message',
         text: `${name} was changed on disk by something else (a sync service, another computer or another app) since you opened or last saved it. Autosave is paused for this budget until you choose.`,

@@ -43,7 +43,7 @@ words; no copied text or images. The video stays outside the repo.
   system; our app has no accounts, so "author" would come from a local name setting or be
   left out. Note 01 confirms add-note and the Notes tab still exist in 2026.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. [partial] P1 **Note entry**: we store one plain-text note per detail row and show a
    corner mark with the note as a tooltip. Add a visible editor (side panel or popover)

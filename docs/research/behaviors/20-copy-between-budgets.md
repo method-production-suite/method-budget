@@ -56,7 +56,7 @@ vendor data.
 tabs layout and the marquee overlay may have changed; the target-wins conflict rule is the
 part most likely still current.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. [missing] P1: **Copy rows between budgets with their tools.** Our copy is tab-separated
    cell text (APP.md), which loses fringes, groups, set, location, currency, notes, styles

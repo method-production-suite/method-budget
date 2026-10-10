@@ -8,7 +8,7 @@
 //!
 //! - **Save a Copy for Sharing** writes a snapshot of the budget in front (or
 //!   of one of its versions) to a new file picked in Rust's Save dialog,
-//!   suggested as `<title> - <version> - <date>.fwb`, optionally without
+//!   suggested as `<title> - <version> - <date>.mthd`, optionally without
 //!   notes, budget info, versions, baseline or unused setup items, stamped
 //!   with a `provenance` (source title, version, when, app version, a note).
 //!   The budget and its own file don't change; a file open in a tab is
@@ -38,7 +38,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{Runtime, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
-use crate::app::{edit_budget, finish, safe_file_stem, with_fwb_extension, AppState, DocId};
+use crate::app::{edit_budget, finish, safe_file_stem, with_budget_extension, AppState, DocId};
 use crate::docs::Docs;
 use crate::edit::EditResult;
 use crate::safety::{self, Access};
@@ -79,7 +79,7 @@ impl From<ShareInput> for ShareOptions {
     }
 }
 
-/// The file name a shared copy is suggested under, without `.fwb`:
+/// The file name a shared copy is suggested under, without its extension:
 /// `<title> - <version> - <date>` (no version part when the budget is shared
 /// as it stands), safe for any file system.
 pub fn suggested_stem(title: &str, version: Option<&str>, saved: &str) -> String {
@@ -290,8 +290,8 @@ pub async fn share_copy_save<R: Runtime>(
         .dialog()
         .file()
         .set_title("Save a copy for sharing")
-        .add_filter("Film Wizard budget", &["fwb"])
-        .set_file_name(format!("{stem}.fwb"))
+        .add_filter(crate::app::FILTER_NAME, &[fwb_format::EXTENSION])
+        .set_file_name(format!("{stem}.{}", fwb_format::EXTENSION))
         .set_parent(&window);
     if let Some(dir) = dir {
         dialog = dialog.set_directory(dir);
@@ -299,7 +299,7 @@ pub async fn share_copy_save<R: Runtime>(
     let Some(picked) = dialog.blocking_save_file() else {
         return Ok(None);
     };
-    let path = with_fwb_extension(picked.into_path().map_err(|e| e.to_string())?);
+    let path = with_budget_extension(picked.into_path().map_err(|e| e.to_string())?);
     if state.docs().find_file(&path).is_some() {
         return Err("That file is open in a tab. Save the copy under another name.".into());
     }

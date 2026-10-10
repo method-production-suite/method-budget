@@ -1,6 +1,6 @@
 # Diff and merge
 
-Film Wizard budgets are text files with stable identities inside (docs/FORMAT.md): every
+Method Budget files are text files with stable identities inside (docs/FORMAT.md): every
 detail row has a row id that survives edits and moves, accounts and categories have
 numbers, and setup items have names. That makes two things possible that a budgeting tool
 usually can't do: say exactly **what changed** between two budgets, and **merge** two
@@ -130,42 +130,47 @@ tools are the copy's, as a copy carries the original's tools from when it was sa
 ## Command line
 
 ```
-fwb diff <old.fwb> <new.fwb> [--json] [--exit-code]
-fwb merge <base.fwb> <ours.fwb> <theirs.fwb> -o <out.fwb> [--ours|--theirs]
-fwb merge-driver <base> <ours> <theirs> [<path>] [--theirs]
+method diff <old.mthd> <new.mthd> [--json] [--exit-code]
+method merge <base.mthd> <ours.mthd> <theirs.mthd> -o <out.mthd> [--ours|--theirs]
+method merge-driver <base> <ours> <theirs> [<path>] [--theirs]
 ```
 
-- `fwb diff` prints the changes grouped under their headings, then the topsheet,
+- `method diff` prints the changes grouped under their headings, then the topsheet,
   category and account money. `--json` prints one object: `changes` (each with `kind`,
   `group`, `place`, `subject`, `text`, `money` in cents and `fields` with `before` and
   `after`), `accounts`, `categories` and `totals` (each `label`, `before`, `after`,
   `delta` in cents) and `money_known`. Exit 0; with `--exit-code`, 1 when anything changed.
-- `fwb merge` writes the merged budget to `-o` (atomically) and prints what it did and
+- `method merge` writes the merged budget to `-o` (atomically) and prints what it did and
   every conflict with the side it took. Exit 0 with no conflicts; **exit 1 when conflicts
   were settled** by the default side (the merged file is written either way, so it can be
   opened and checked); 2 for a usage error.
-- `fwb merge-driver` is the same merge for git: it writes the result over `<ours>`.
+- `method merge-driver` is the same merge for git: it writes the result over `<ours>`.
 
 ### With git
 
 Tell git which files use the driver, in the repository's `.gitattributes`:
 
 ```
-*.fwb merge=fwb
+*.mthd merge=method-budget
+*.fwb merge=method-budget
 ```
 
 and what the driver is, once per repository (or with `--global`):
 
 ```
-git config merge.fwb.name "Film Wizard budget merge"
-git config merge.fwb.driver "fwb merge-driver %O %A %B %P"
+git config merge.method-budget.name "Method Budget merge"
+git config merge.method-budget.driver "method merge-driver %O %A %B %P"
 ```
+
+Repositories set up before the rename (`*.fwb merge=fwb` and a driver line running
+`fwb merge-driver`) keep working: `fwb` is a deprecated alias of `method` (docs/CLI.md).
+Switch the driver line to `method` when convenient.
 
 `%O` is the common base, `%A` ours (which the result replaces), `%B` theirs and `%P` the
 file's path, for messages. A clean merge is committed as usual. When conflicts remain the
 driver still writes a valid budget, every conflict settled for ours, lists them and exits
 1, so git marks the file conflicted (`UU`) without writing conflict markers into it: open
-it in the app (or run `fwb merge ... --theirs`) to settle them, then `git add` it. When
+it in the app (or run `method merge ... --theirs`) to settle them, then `git add` it. When
 both branches added the same file there is no base (git passes an empty one); the driver
 says so and leaves ours. Use `--theirs` in the driver line to settle conflicts for theirs
 instead.

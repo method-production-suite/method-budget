@@ -290,7 +290,7 @@ async function start() {
   build();
   window.addEventListener('keydown', onKeyDown);
   if (!connected) {
-    toast('Open this page in the Film Wizard Budgeting app.');
+    toast('Open this page in the Method Budget app.');
     return;
   }
   await listen();

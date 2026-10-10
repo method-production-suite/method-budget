@@ -84,7 +84,7 @@ The video stays outside the repo.
   what it holds now is unknown. Sam's 2026 notes have not covered reports yet; check the
   current product before matching any specific option.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. [partial] P1 **Report templates saved in the budget**: we print topsheet, detail or
    both with a fixed layout. Add named templates (columns, options, sections, header and

@@ -790,7 +790,7 @@ pub async fn merge_pick_file<R: Runtime>(
         .dialog()
         .file()
         .set_title(title)
-        .add_filter("Film Wizard budget", &["fwb"])
+        .add_filter(crate::app::FILTER_NAME, fwb_format::EXTENSIONS)
         .set_parent(&window);
     if let Some(dir) = start {
         dialog = dialog.set_directory(dir);

@@ -52,7 +52,7 @@ words; no copied text or images. The video stays outside the repo.
   shows a "sort by applied" checkbox instead of a filter, so the control has changed over
   time. Folder organization of setup tables may be tied to the vendor's cloud library.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. [missing] P2 **Custom order for setup tables** (fringes, groups, globals, units, sets,
    locations, currencies): drag to reorder, stored in the budget file so reports and the

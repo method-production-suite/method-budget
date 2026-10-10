@@ -119,7 +119,7 @@ pub fn to_html(doc: &Doc) -> String {
     let _ = write!(
         out,
         "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
-         <meta name=\"generator\" content=\"Film Wizard Budgeting\">\n\
+         <meta name=\"generator\" content=\"Method Budget\">\n\
          <title>{}</title>\n<style>\n\
          @page {{ size: letter {orientation}; margin: 0.5in; }}\n\
          body {{ font-family: -apple-system, \"Helvetica Neue\", Helvetica, Arial, sans-serif; \

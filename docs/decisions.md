@@ -109,15 +109,15 @@ JSON, not TOML: budgets are deeply nested (topsheet > categories > accounts > ro
 TOML handles poorly. Pretty-printed with fixed key order so files diff cleanly in git. It
 lives in its own crate (`fwb-format`) with separate file-side types, so the engine stays
 dependency-free and the file layout can stay stable while the model evolves. Money is
-integer cents, decimals are strings, never JSON floats. Extension `.fwb`. Spec:
+integer cents, decimals are strings, never JSON floats. Extension `.mthd`. Spec:
 `docs/FORMAT.md`. First dependencies: serde and serde_json, pinned to releases well past
 the 14-day cooldown (checked by publish date; zmij is dtolnay's float formatter, pulled in
 by serde_json).
 
 ## 14. UI approach: Tauri desktop app (2026-10-08, decided by Sam)
 
-Film Wizard Budgeting is a **local, open-source desktop app**, not a web app. Budgets live as
-`.fwb` files on the user's disk; no server, no account, works offline.
+Method Budget is a **local, open-source desktop app**, not a web app. Budgets live as
+`.mthd` files on the user's disk; no server, no account, works offline.
 
 Built with **Tauri**: the Rust engine runs natively in the app process, and the UI is drawn
 with web tech inside a native window (no browser, nothing hosted). Chosen over a pure-Rust
@@ -240,7 +240,7 @@ bulk edits under ~100 ms. Measured with `examples/perf.rs` on `fwb_core::sample`
 - **Running copies are told apart by a file lock** (std's `File::try_lock`, no crate):
   each running app holds a lock on its own owner file, and only copies whose owner lock is
   free are offered as recovered. No pid checks, no new dependencies.
-- **Backups go in the app's data folder, not beside the budget** (`film.fwb~` was the
+- **Backups go in the app's data folder, not beside the budget** (`film.mthd~` was the
   alternative): nothing appears in shared project folders or sync services, there is
   room for several versions, and File > Revert to Backup can list them. Because autosave
   writes often, backups are spaced: always on an explicit Save, on the first write in a
@@ -406,7 +406,7 @@ Decision 19's "several budgets open as tabs in one window", with the calls it ne
   stay the tools tabs. The shortcut list gained a `ctrl` key (Control on a Mac too) and an
   `anywhere` flag for grid commands that also work from a text field, since these keys mean
   nothing there.
-- **What a tab shows.** The file's name without `.fwb`, or the budget's title before it has
+- **What a tab shows.** The file's name without `.mthd`, or the budget's title before it has
   a file; a dot for unsaved changes; the close button on the tab in front and the one under
   the pointer; the title and path in its tooltip. The Window menu lists every budget, the
   one in front ticked. The window title is the budget in front.
@@ -536,7 +536,7 @@ Roadmap 1.15 and 2.3 to 2.6 (behavior notes 15 and 19), as built:
 Roadmap 1.20 (behavior notes 07 and 24, decision 15), as built:
 
 - **Import from a budget file, no library format yet.** File > Import Setup From… picks any
-  `.fwb` in Rust's Open dialog (a file open in a tab is read from the tab, unsaved changes
+  `.mthd` in Rust's Open dialog (a file open in a tab is read from the tab, unsaved changes
   and all; a budget can't import from itself) and reviews every item in it. The personal
   library (2.15) can later be a budget file used this way.
 - **What can come over**: globals, fringes, groups, units, sets, locations, currencies,
@@ -564,7 +564,7 @@ Roadmap 1.20 (behavior notes 07 and 24, decision 15), as built:
 - **One undo step**, worked out completely before anything changes, so a refusal (an item
   gone, an unknown choice, more presets than a budget keeps) changes nothing. The page names
   the source by a token, never a path; only the last file picked is kept.
-- **A template is just a budget.** New From Template… opens any `.fwb` in a new tab with its
+- **A template is just a budget.** New From Template… opens any `.mthd` in a new tab with its
   chart (categories, accounts, production totals), setup, presets and settings, and without
   its detail lines, budget info, baseline, versions and line notes; "keep the detail lines"
   keeps the lines without their notes. It is titled Untitled and has no file, so the first
@@ -596,7 +596,7 @@ Roadmap 2.1 (inventory section 21: what accounting and payroll tools take in):
   written as the engine holds them. Text is always a shared string, never a formula.
 - **The export is the budget's real figures.** Unfiltered (every group as the budget sets
   it), and refused while any cell has a problem, because the grid then counts those cells
-  as blank. The app takes the tables from its cached recalc; `fwb export` recalculates.
+  as blank. The app takes the tables from its cached recalc; `method export` recalculates.
 - **Detail is every row**, subtotals, adjustments and separators included (with their
   kind), so its row count is the budget's. Totals stay summable: a subtotal row's running
   total is in its own Subtotal column, not Total, and a category fringe account's amount is
@@ -608,11 +608,11 @@ Roadmap 2.1 (inventory section 21: what accounting and payroll tools take in):
   leading `=`, `+`, `-`, `@`, tab or CR gets a `'`, plain numbers like `-5` excepted),
   because a budget file can come from anyone. The app's CSV files start with a byte order
   mark (Excel needs it for accented letters); its tab-delimited file doesn't (importers
-  may not expect one); `fwb export --bom` adds it on request.
+  may not expect one); `method export --bom` adds it on request.
 - **Files.** CSV is one file per table, `<name> - <Table>.csv` beside the name chosen in
   the Save dialog (one dialog, predictable names), instead of a folder picker. The path
   always comes from the Save dialog, the format's extension is forced, each file is written
-  atomically, and an export never replaces a budget open in a tab; `fwb export` refuses to
+  atomically, and an export never replaces a budget open in a tab; `method export` refuses to
   write over the budget it reads.
 - **Not yet**: deflate compression, a choice of filters (groups) for the export, Original
   and Variance columns, budget info and charges/credits as their own sheets.
@@ -942,8 +942,8 @@ export test).
 
 Roadmap 2.15 (behavior notes 09, 11 and 24; decision 15), as built:
 
-- **A library is a budget file**, not a new file type: `My Film Wizard Library.fwb` made in
-  a folder the user picks in Rust's folder dialog, or any `.fwb` picked in the Open dialog.
+- **A library is a budget file**, not a new file type: `My Method Budget Library.mthd` made in
+  a folder the user picks in Rust's folder dialog, or any `.mthd` picked in the Open dialog.
   It has setup and no lines, starts empty (no starter units either: we ship no library
   data, CLEAN-ROOM.md) and opens in the app like any budget. One additive field,
   `setup_folders` (kind to folder to item names), holds its folders; any budget may carry
@@ -1062,7 +1062,7 @@ Roadmap 2.20, 2.21 and 2.22, with the calls they needed:
   account on screen was renumbered.
 - **A shared copy is a stamped snapshot.** File > Save a Copy for Sharing… writes the
   budget, or one saved version of it (with the current presets and display settings),
-  to a new file suggested as `<title> - <version> - <date>.fwb`, optionally without
+  to a new file suggested as `<title> - <version> - <date>.mthd`, optionally without
   notes (lines, accounts, categories, line blocks), budget info, versions, baseline, or
   setup items nothing uses (pruned until none is left, keeping what tag and report
   presets name, so totals never move). The copy gets an additive `provenance` (kind,
@@ -1160,7 +1160,7 @@ Roadmap 2.26 (behavior note 04) and 2.23, with the calls they needed:
 
 Roadmap 3.12 and 3.4 (decision 17 left deltas for later):
 
-- **One module per subcommand.** `fwb` is a tiny dispatcher (`src/main.rs`, a table of
+- **One module per subcommand.** `method` is a tiny dispatcher (`src/main.rs`, a table of
   name, usage and function) over `src/cmd/<name>.rs`, with shared flag parsing, exit
   codes and atomic writes in `src/cli.rs`, so new commands (diff, merge, explain,
   actuals) are one file and one table entry each. It depends on `fwb-core` and
@@ -1168,7 +1168,7 @@ Roadmap 3.12 and 3.4 (decision 17 left deltas for later):
 - **Exit codes are a contract** (docs/CLI.md): 0 ok, 1 failed, 2 usage, 3 edit refused
   with nothing written. Every file a command writes goes through a temporary file and a
   rename.
-- **Headless reports reuse the export's figures.** `fwb report` builds sections from a
+- **Headless reports reuse the export's figures.** `method report` builds sections from a
   saved preset with the same tables the spreadsheet export makes (decision 30), so a
   report and an export never disagree, and filters never change totals (decision 28).
   HTML is one self-contained print-ready page; text is fixed-width; CSV is the sections
@@ -1180,15 +1180,15 @@ Roadmap 3.12 and 3.4 (decision 17 left deltas for later):
   advance keeps figures aligned) on Letter pages with the preset's header, footer and
   "Page X of Y": about 250 lines of std, PDF 1.4, WinAnsi text. Shading and colors stay
   with the HTML and the app.
-- **Edits are a line-oriented script, not a query language.** `fwb apply` runs commands
+- **Edits are a line-oriented script, not a query language.** `method apply` runs commands
   (`set global`, `set fringe ... rate|cutoff`, `set line ROW FIELD VALUE`, `add`/`remove
   tag`, `rename`, `apply`/`remove charge`, `set title`, `set compact_versions`) against a
   copy; every line must succeed and the result must recalculate, or nothing is written.
   Rows are named by id (`#17`, stable) or by account and position (`21-01:3`, as the grid
-  numbers them; `21-01:*` for every line). `fwb set` is one such command from a path
+  numbers them; `21-01:*` for every line). `method set` is one such command from a path
   (`line.21-01:3.rate`). Renames call the engine's own rename (decision 32). `remove
   charge` stops a charge counting rather than deleting it, so it can be applied again.
-  `--dry-run` prints `fwb diff`'s summary of what would change.
+  `--dry-run` prints `method diff`'s summary of what would change.
 - **Import reuses the app's importer** (decision 36) with a small JSON mapping file
   (sheet, header row, field-to-column by letter or number, the two cautious switches);
   without one, the header is found and columns guessed as the dialog does.
@@ -1209,7 +1209,7 @@ Roadmap 3.12 and 3.4 (decision 17 left deltas for later):
   the rest of the program never sees a delta; a patch that doesn't fit is an error naming
   the version. Ten versions of the 5,000-row sample: 26 MB in full, 2.0 MB as deltas
   (the budget alone is 2.0 MB).
-- **Not yet**: a switch for `compact_versions` in the app (the CLI's `fwb set ...
+- **Not yet**: a switch for `compact_versions` in the app (the CLI's `method set ...
   compact_versions true` turns it on; the app keeps it once set); the PDF's proportional
   fonts, shading and the topsheet page column; scripted adding and deleting of rows and
   accounts; a per-command JSON output for `set` and `apply`.
@@ -1280,7 +1280,7 @@ small and quick for applying (behavior notes 07, 09, 12, 23, 24, and the 2026 no
 Roadmap 3.5 and 3.10.
 
 - **Explain this number** (`fwb_core::explain`, src/explain.rs, ui/js/explain.js,
-  `fwb explain`). Any total (a line, a subtotal row, a line's fringes or one fringe on it,
+  `method explain`). Any total (a line, a subtotal row, a line's fringes or one fringe on it,
   an account's total, lines or fringes, a category and its fringes, a production level and
   its posted fringes, ATL, BTL, both, total fringes, each charge, the grand total, each
   credit, all credits, the net total, one fringe across the budget) gives a tree of steps.
@@ -1321,7 +1321,7 @@ Roadmap 3.5 and 3.10.
   added), a collapsible tree with plain-words lines and amounts; a click goes to the
   step's line, account or category (the notes and find jump); keys as a tree. The tree is
   asked for again when the budget changes, keeping what was open. With the panel popped
-  out the target goes with the panel's state. `fwb explain file.fwb <total>` names totals
+  out the target goes with the panel's state. `method explain file.mthd <total>` names totals
   as `21-01`, `21-01/lines`, `21-01/fringes`, `21`, `21/fringes`, `21-01:3`, `#ID`,
   `level:`, `charge:`, `credit:`, `fringe:`, `atl`, `btl`, `atl+btl`, `fringes`, `credits`,
   `grand` (or `topsheet`), `net`; `--depth N` cuts the printout.
@@ -1371,7 +1371,7 @@ Roadmap 3.1 and 3.2 (docs/MERGE.md), with the calls they needed:
 - **Words come from the engine.** Each change carries its fields before and after and a
   sentence in the grid's terms (`21-01 line 3: rate 1,200.00 -> 1,350.00 (+1,500.00 to
   21-01)`, line numbers as the `#` column counts); rates read as money, formulas as
-  typed, tags as `+FICA -WGA`, notes as counts. The CLI, `fwb apply --dry-run` and the app
+  typed, tags as `+FICA -WGA`, notes as counts. The CLI, `method apply --dry-run` and the app
   print the same sentences.
 - **Money comes from totals, not from the changes.** Both budgets are totalled and every
   account, category fringe account, category and topsheet line that moved is listed. The
@@ -1419,10 +1419,10 @@ Roadmap 3.1 and 3.2 (docs/MERGE.md), with the calls they needed:
   deleted version can come back; a reviewer's never goes), and its tools are the copy's.
   A copy saved from the budget as it stood has no version to go back to: the user picks
   the file that was sent (or a version, or an open budget).
-- **git**: `fwb merge-driver %O %A %B %P` writes a valid budget over ours even with
+- **git**: `method merge-driver %O %A %B %P` writes a valid budget over ours even with
   conflicts (settled for ours, listed on stderr) and exits 1, so git marks the file
   conflicted without conflict markers that would make it unreadable; it is opened in the
-  app and settled there. An empty base (added on both branches) is refused. `fwb merge`
+  app and settled there. An empty base (added on both branches) is refused. `method merge`
   exits 1 when conflicts were settled (its own code under decision 41's contract), and
   writes the file either way.
 - **In the app**: File > What Changed… (against the saved file, a version, an open budget
@@ -1509,9 +1509,113 @@ reference), with the calls it needed:
   grid's cursor account.
 - **Printed and exported.** A Cost report section in the report setup (accounts left out of
   a report leave the listing, never the totals, decision 28) and, for a budget with actuals,
-  Cost Report and Actuals sheets in File > Export and `fwb export` (both after the ten
+  Cost Report and Actuals sheets in File > Export and `method export` (both after the ten
   standard sheets, so positional readers keep theirs).
 - **Not yet**: entering a transaction by hand, ETC overrides on charges, purchase orders and
   commitments, actuals by period (a cost report as of a date), matching a re-import whose
   unmatched numbers were mapped differently the first time (the duplicate key compares the
   account the transaction ended up in).
+
+## 46. The product is Method Budget (2026-10-09, Sam)
+
+Formerly Film Wizard Budgeting. Sam renamed it; methodbudget.com is the site, and the repo is
+https://github.com/ssandweiss/method-budget. Never shorten the name to "MB" (that is how
+people shorten Movie Magic Budgeting), and no file extension of ours resembles `.mbd` or
+`.mmbx`. What changed and what didn't:
+
+- **User-visible name everywhere**: window title, macOS app menu (About and Quit Method
+  Budget), the About box (links methodbudget.com), dialogs, toasts, report and PDF metadata,
+  workbook metadata, CLI help. Crate and Rust module names (`fwb-core`, `fwb_app` and so
+  on), the UI's internal event names and its localStorage key prefix stay as they are for
+  now (internal; a later pass).
+- **Files are `.mthd`**, media type `application/vnd.method-budget+json`. New files, Save
+  As, shared copies, templates and sub-budgets suggest `.mthd`. Open (and every dialog that
+  picks a budget) accepts `.mthd` and `.fwb`. A budget opened from a `.fwb` keeps saving and
+  autosaving to that same file; only Save As (or Save a Copy) moves it to a new name, and a
+  `.fwb` name typed on purpose in a Save dialog is kept. Both extensions are registered,
+  `.mthd` first. Backups are written as `.mthd`; older `.fwb` backups are listed with them.
+  Recovery copies are internal and keep their old extension.
+- **The `"format"` field still says `"film-wizard-budget"`.** Builds from before the rename
+  refuse any other value, so writing a new one would lock them out of every file saved from
+  now on. This build also reads `"method-budget"`, reserved so a later build can switch to
+  writing it (one constant, `fwb_format::FORMAT_NAME`) once that no longer matters.
+- **The library**: a new one is `My Method Budget Library.mthd`; a folder that already has
+  the pre-rename library keeps using it.
+- **The command line is `method`.** `fwb` remains as a deprecated alias that runs the same
+  code (same output and exit codes), so scripts and git merge driver settings keep working.
+- **App identity**: product name Method Budget, bundle identifier `com.methodbudget.desktop`
+  (not `.app`: Tauri warns against identifiers ending in `.app` on macOS, where it is the
+  bundle extension). The local data folder follows the identifier, so on the first start
+  the old folder (`io.github.ssandweiss.film-wizard-budgeting`) is copied, never moved, to
+  the new one when the new one has no settings yet: settings, recent files, tabs, the
+  library choice, recovery copies and backups, and the web view's storage (display choices,
+  saved spreadsheet mappings). See src/migrate.rs and docs/APP.md ("Saving and recovery").
+- **Look unchanged**: same teal palette and icon artwork.
+
+## 47. One feature file for the README and the website; versioned skills (2026-10-09)
+
+- **Single source.** The public feature list lives in `docs/features.toml` (TOML, read
+  with Python's standard `tomllib`; no new tooling). `scripts/site.py` writes it into
+  README.md and site/index.html between marker comments, writes the site's "What's new"
+  from the newest `docs/releases/<version>.md`, and points the site's GitHub links and the
+  README's clone command at `[project] repo`, so a repository move is one line.
+  `--check` runs in CI (`site` job) and before every Pages deploy.
+- **The list can't overclaim.** A feature marked `have` must name roadmap items that are
+  `[have]` in docs/ROADMAP.md, or the script refuses; decision references must exist.
+- **The site** is one static page: inline CSS and SVG, system fonts, no JavaScript, no
+  third-party requests (enforced by a Content-Security-Policy), light and dark tokens,
+  AA contrast. Deployed by `.github/workflows/pages.yml`, which stays off until the
+  repository is public and the variable `PAGES_ENABLED` is `true` (Pages on a private
+  repository needs a paid plan). Turning it on and the DNS: docs/WEBSITE.md.
+- **Skills are versioned.** `.gitignore` ignores `/.claude/*` except `skills/` and
+  `settings.json`, so `/release` and `/features` travel with the repository into every
+  worktree, while `.claude/worktrees/` and `settings.local.json` stay out.
+- **Hooks are shipped, not switched on.** `scripts/hooks/require-release-notes.sh`
+  and `require-site-regen.sh` are tested in CI; wiring them into
+  Claude Code settings is left to the maintainer (`scripts/hooks/claude-settings.example.json`).
+
+## 48. Updates inside the app, one version, release notes, signed Mac releases (2026-10-10)
+
+- **The app updates itself.** `tauri-plugin-updater` (2.12.0, rustls only), driven from Rust
+  (src/updater.rs): a check two minutes after start and every six hours, a background
+  download whose signature is checked against the public key built into the app, a quiet
+  "Update ready: Restart to update" in the toolbar, and Restart to update saving every
+  budget (Autosave's rules, so the outside-change guard holds; Save All, Discard All or
+  Cancel for what can't be autosaved) and reopening the tabs and split view. Never a dialog
+  while working. Help > Check for Updates checks at once and is the only thing that says
+  anything about a failed check; Help > Check for Updates Automatically turns the timed
+  checks off. No window is granted the plugin's commands; the page has four narrow
+  commands of ours.
+- **This is the app's first network access**, and its only one. Decision 14's "works
+  offline" still holds: nothing needs the network, and the web view still has none (its CSP
+  is unchanged). The updater's client is https-only and stays on the endpoint's host (plus
+  GitHub's download hosts). Documented in SECURITY.md and docs/APP.md.
+- **Hosting is GitHub Releases**, the endpoint written once
+  (`plugins.updater.endpoints` in `tauri.conf.json`). While the repository is private every
+  check fails quietly; updates start once it is public. The manifest (`latest.json`) is
+  built by `cargo xtask update-manifest`, which refuses malformed signatures, a key the app
+  doesn't trust and unknown platforms. Updater archives are made for macOS only for now
+  (Windows and Linux builds are untested).
+- **Method Budget has its own updater key**, generated with `cargo tauri signer generate`,
+  kept in the team 1Password vault and the repository's Actions secrets, shared with no
+  other app (whoever holds it can ship code to every installed copy). Until it exists the
+  app carries a placeholder and never checks. `requireSignedVersion` stays off because the
+  pinned Tauri CLI (2.11.4) doesn't record the version in its signatures yet.
+- **One version.** `[workspace.package] version` in the root Cargo.toml; every crate
+  inherits it, `tauri.conf.json` and Cargo.lock copy it, `method --version` and the About
+  box show it. `cargo xtask check-version` (CI) fails on any drift or on a version without
+  notes; `cargo xtask bump` changes every place at once or none, and refuses on a dirty tree.
+  The release tooling is Rust with tests (`crates/xtask`, `crates/method-release`), not
+  workflow script.
+- **Release notes** are `docs/releases/<version>.md` in the shape of
+  docs/release-notes-template.md, written for people who budget films. The app embeds its
+  own version's notes at build time and shows them once after an update (What's New) and
+  from Help > Release Notes, as plain text. A tag whose notes aren't ready builds nothing.
+  `cargo xtask notes-facts` lists the commits since the last tag for drafting, treating
+  their subjects as untrusted data.
+- **Mac releases are signed as Clockwork Post Production, LLC** with its existing
+  Developer ID Application certificate, notarized with an App Store Connect API key,
+  stapled, and checked with `codesign` and `spctl` in the release workflow. Each step skips
+  cleanly when its secrets are absent (the build is then ad-hoc signed, as before).
+  Roadmap 1.21 is built as a pipeline; the first signed release needs the secrets
+  (docs/RELEASING.md).

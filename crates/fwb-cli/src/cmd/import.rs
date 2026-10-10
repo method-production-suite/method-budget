@@ -1,4 +1,4 @@
-//! `fwb import`: spreadsheet rows into a budget with a column mapping
+//! `method import`: spreadsheet rows into a budget with a column mapping
 //! (decision 36), without the app.
 
 use std::fmt::Write as _;
@@ -10,8 +10,8 @@ use fwb_format::import::{mapping_file, merge, read_file};
 use crate::cli::{load, money, write_atomic, CliError, Flags, Outcome};
 
 pub const USAGE: &str =
-    "  fwb import <sheet.xlsx|.csv|.txt> -o <out.fwb> [--mapping <mapping.json>]
-             [--into <budget.fwb>] [--title TEXT] [--currency CODE] [--force] [--dry-run]
+    "  method import <sheet.xlsx|.csv|.txt> -o <out.mthd> [--mapping <mapping.json>]
+                [--into <budget.mthd>] [--title TEXT] [--currency CODE] [--force] [--dry-run]
       Add a sheet's rows to a budget as detail lines. --mapping names the
       sheet, header row and columns (docs/CLI.md); without it the header row is
       found and every column guessed from its title. --into imports into a
@@ -34,7 +34,7 @@ pub fn run(args: &[String]) -> Outcome {
     let sheet_path = &f.exactly(1, "the spreadsheet file", USAGE)?[0];
     let out = f
         .value("--out")
-        .ok_or_else(|| CliError::usage("import needs -o <out.fwb>", USAGE))?;
+        .ok_or_else(|| CliError::usage("import needs -o <out.mthd>", USAGE))?;
     let dry_run = f.has("--dry-run");
 
     let mapping = match f.value("--mapping") {
@@ -90,7 +90,7 @@ pub fn run(args: &[String]) -> Outcome {
         }
         if f.value("--into").is_none() && !mapping.options.create_accounts {
             msg.push_str(
-                "\n(a new budget has no accounts: pass --into <budget.fwb>, or set \
+                "\n(a new budget has no accounts: pass --into <budget.mthd>, or set \
                  \"create_accounts\": true in the mapping)",
             );
         }

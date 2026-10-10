@@ -1,16 +1,19 @@
-//! `fwb`: check, show, tidy, export and script Film Wizard Budgeting files from
-//! a terminal. Every subcommand is documented in docs/CLI.md.
+//! `method`: check, show, tidy, export and script Method Budget files from
+//! a terminal. Every subcommand is documented in docs/CLI.md. `fwb`, the
+//! name from before the rename, is a deprecated alias (src/bin/fwb.rs).
 //!
 //! Adding a subcommand: write `src/cmd/<name>.rs` with `pub const USAGE` and
 //! `pub fn run(args: &[String]) -> Outcome` (see `src/cli.rs`), add one
 //! `pub mod` line to `cmd` below and one entry to `COMMANDS`. Keep each
 //! command's entry on its own lines so parallel edits don't collide.
 
-mod cli;
-mod render;
-mod script;
+// `pub(crate)` so the deprecated `fwb` alias (src/bin/fwb.rs), which holds
+// this file as a module, can name them from its crate root.
+pub(crate) mod cli;
+pub(crate) mod render;
+pub(crate) mod script;
 
-mod cmd {
+pub(crate) mod cmd {
     pub mod apply;
     pub mod check;
     pub mod diff;
@@ -39,7 +42,7 @@ struct Command {
     run: fn(&[String]) -> Outcome,
 }
 
-/// Every subcommand, in the order `fwb help` lists them.
+/// Every subcommand, in the order `method help` lists them.
 const COMMANDS: &[Command] = &[
     Command {
         name: "show",
@@ -119,7 +122,7 @@ const COMMANDS: &[Command] = &[
 ];
 
 const HEADER: &str = "\
-fwb: Film Wizard Budgeting command line
+method: Method Budget command line
 
 Usage:
 ";
@@ -135,12 +138,22 @@ fn usage() -> String {
     for c in COMMANDS {
         s.push_str(c.usage);
     }
-    s.push_str("  fwb help\n      Print this help.\n");
+    s.push_str("  method help\n      Print this help.\n");
+    s.push_str(
+        "  method --version\n      Print the version (the app's Help > About shows the same).\n",
+    );
     s.push_str(FOOTER);
     s
 }
 
-fn main() -> ExitCode {
+/// `method --version`: the workspace version, the one the app and its
+/// releases carry (docs/RELEASING.md).
+fn version() -> String {
+    format!("method {} (Method Budget)\n", env!("CARGO_PKG_VERSION"))
+}
+
+/// `pub(crate)` so the deprecated `fwb` alias (src/bin/fwb.rs) can run it.
+pub(crate) fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match run(&args) {
         Ok(out) => {
@@ -149,7 +162,7 @@ fn main() -> ExitCode {
         }
         Err(e) => {
             if !e.message.is_empty() {
-                eprintln!("fwb: {}", e.message);
+                eprintln!("method: {}", e.message);
             }
             ExitCode::from(e.code)
         }
@@ -162,6 +175,7 @@ fn run(args: &[String]) -> Outcome {
     };
     match name.as_str() {
         "help" | "--help" | "-h" => return Ok(usage()),
+        "--version" | "-V" | "version" => return Ok(version()),
         _ => {}
     }
     match COMMANDS.iter().find(|c| c.name == name) {
@@ -184,7 +198,16 @@ mod tests {
         assert!(e.message.contains("unknown command"));
         assert_eq!(e.code, exit::USAGE);
         assert_eq!(run(&["show".into()]).unwrap_err().code, exit::USAGE);
-        assert!(run(&["help".into()]).unwrap().contains("fwb export"));
+        assert!(run(&["help".into()]).unwrap().contains("method export"));
+    }
+
+    #[test]
+    fn version() {
+        let want = format!("method {} (Method Budget)\n", env!("CARGO_PKG_VERSION"));
+        for flag in ["--version", "-V", "version"] {
+            assert_eq!(run(&[flag.into()]).unwrap(), want);
+        }
+        assert!(usage().contains("method --version"));
     }
 
     #[test]
@@ -195,7 +218,7 @@ mod tests {
         assert_eq!(names.len(), COMMANDS.len());
         let help = usage();
         for c in COMMANDS {
-            assert!(help.contains(&format!("fwb {}", c.name)), "{}", c.name);
+            assert!(help.contains(&format!("method {}", c.name)), "{}", c.name);
         }
     }
 }

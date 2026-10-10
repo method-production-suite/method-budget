@@ -1,4 +1,4 @@
-//! File > Import Setup From…: setup items picked from another `.fwb` file
+//! File > Import Setup From…: setup items picked from another budget file
 //! (roadmap 1.20; decisions.md, entries 15, 23 and 29).
 //!
 //! - **The source.** Rust shows the Open dialog and reads the file (a file
@@ -684,7 +684,7 @@ pub struct ImportItem {
 pub struct ImportPreview {
     /// Names the source; the import names it.
     pub token: u64,
-    /// The source's file name without `.fwb`, or its tab's name.
+    /// The source's file name without its extension, or its tab's name.
     pub source: String,
     pub path: String,
     pub items: Vec<ImportItem>,
@@ -1196,7 +1196,7 @@ pub async fn import_setup_pick<R: Runtime>(
         .dialog()
         .file()
         .set_title("Import setup from")
-        .add_filter("Film Wizard budget", &["fwb"])
+        .add_filter(crate::app::FILTER_NAME, fwb_format::EXTENSIONS)
         .set_parent(&window);
     if let Some(dir) = start {
         dialog = dialog.set_directory(dir);

@@ -1,4 +1,4 @@
-//! Film Wizard Budgeting desktop app.
+//! Method Budget desktop app.
 //!
 //! Everything except [`app`] (and the other Tauri glue: [`tabs`],
 //! [`safety_app`], [`tools`], [`menu`]) is plain Rust with no window:
@@ -25,6 +25,7 @@ pub mod history;
 pub mod import_setup;
 pub mod library;
 pub mod menu;
+pub mod migrate;
 pub mod moverows;
 pub mod notes;
 pub mod overtime;
@@ -47,6 +48,7 @@ pub mod sheet_import;
 pub mod tabs;
 pub mod templates;
 pub mod tools;
+pub mod updater;
 pub mod versions;
 pub mod view;
 

@@ -325,10 +325,10 @@ function noLibrary(parts) {
       { class: 'library-actions' },
       button('Create Library…', 'library:create', () => pickFile('library_create'), {
         primary: true,
-        title: `Choose a folder: the library is made there as “My Film Wizard Library.fwb”`,
+        title: `Choose a folder: the library is made there as “My Method Budget Library.mthd”`,
       }),
       button('Use Existing Library…', 'library:choose', () => pickFile('library_choose'), {
-        title: 'Choose a library (any Film Wizard budget file)',
+        title: 'Choose a library (any Method Budget file)',
       }),
     ),
   );

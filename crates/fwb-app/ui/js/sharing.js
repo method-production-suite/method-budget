@@ -3,7 +3,7 @@
 //
 // - File > Save a Copy for Sharing…: a short dialog (what to share: the
 //   budget as it is or one of its versions; what to leave out; a note), then
-//   Rust's Save dialog, suggesting "<title> - <version> - <date>.fwb".
+//   Rust's Save dialog, suggesting "<title> - <version> - <date>.mthd".
 // - A copy saved for sharing opens read-only. Its banner says where it came
 //   from and offers Make Editable Copy, and, when the budget it came from is
 //   open in another tab, Compare With Original and Store as a Version of the

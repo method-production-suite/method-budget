@@ -1,6 +1,6 @@
 [package]
 name = "fwb-core"
-description = "Film Wizard Budgeting engine: accounts, fringes, globals, topsheet"
+description = "Method Budget engine: accounts, fringes, globals, topsheet"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

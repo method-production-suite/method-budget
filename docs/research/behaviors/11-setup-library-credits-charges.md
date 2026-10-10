@@ -46,7 +46,7 @@ the repo.
 The "applied in budget" versus library split and account-based storage are 2020/2021
 cloud-era features. Sam's 2026 notes have not covered the credits or charges screens yet.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. [have] P1 **Percent charge with manual and group exclusions**: matches on screen.
 2. [partial] P2 **Charge display options**: show the percent and/or the excluded amount

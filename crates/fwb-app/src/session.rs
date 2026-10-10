@@ -403,11 +403,11 @@ impl Session {
             .as_deref()
             .and_then(Path::file_name)
             .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "Untitled.fwb".to_string())
+            .unwrap_or_else(|| format!("Untitled.{}", fwb_format::EXTENSION))
     }
 
     /// What the budget's tab (and the Window menu) calls it: the file's
-    /// name without `.fwb`, or the budget's title while it has no file.
+    /// name without its extension, or the budget's title while it has no file.
     pub fn tab_label(&self) -> String {
         if let Some(stem) = self.path.as_deref().and_then(Path::file_stem) {
             return stem.to_string_lossy().into_owned();

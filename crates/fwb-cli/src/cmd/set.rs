@@ -1,9 +1,9 @@
-//! `fwb set`: change one value in a budget from the command line.
+//! `method set`: change one value in a budget from the command line.
 
 use crate::cli::{CliError, Flags, Outcome};
 use crate::script::{self, Op, RowRef, Word, LINE_FIELDS};
 
-pub const USAGE: &str = "  fwb set <file.fwb> <path> <value> [--dry-run]
+pub const USAGE: &str = "  method set <file.mthd> <path> <value> [--dry-run]
       Change one value and save atomically. Paths: title, compact_versions,
       global.NAME, fringe.NAME.rate, fringe.NAME.cutoff, line.ROW.FIELD (ROW is
       #ID, ACCOUNT:N or ACCOUNT:*; FIELD as in `set line`), charge.NAME.applied.
@@ -74,7 +74,7 @@ pub fn op_for(path: &str, value: &str) -> Result<Op, CliError> {
             }
             (_, other) => return Err(bad(format!("a charge has no field `{other}`"))),
         },
-        _ => return Err(bad(format!("`{path}` is not a path fwb set knows"))),
+        _ => return Err(bad(format!("`{path}` is not a path `method set` knows"))),
     })
 }
 

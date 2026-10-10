@@ -27,7 +27,7 @@ export function invoke(cmd, args = {}) {
   const extra = defaults ? defaults() : null;
   const all = extra ? { ...extra, ...args } : args;
   const run = async () => {
-    if (!connected) throw 'This window is not connected to Film Wizard Budgeting.';
+    if (!connected) throw 'This window is not connected to Method Budget.';
     try {
       return await tauri.core.invoke(cmd, all);
     } catch (e) {

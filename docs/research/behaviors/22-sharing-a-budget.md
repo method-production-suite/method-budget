@@ -31,10 +31,10 @@ None.
 
 ## Era caution
 
-2020/2021 build. The share service depends on the vendor's accounts and cloud. Film Wizard
+2020/2021 build. The share service depends on the vendor's accounts and cloud. Method Budget
 is local-only by Sam's decision (decision 14): no accounts, no server.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 Local-first equivalent: the `.fwb` file IS the shareable copy. People send it by email, chat
 or a shared drive they already use. What we can add is making that hand-off clean and making

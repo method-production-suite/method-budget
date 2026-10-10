@@ -1,8 +1,8 @@
-//! `fwb sample`: write a large invented test budget.
+//! `method sample`: write a large invented test budget.
 
 use crate::cli::{save, CliError, Flags, Outcome};
 
-pub const USAGE: &str = "  fwb sample <file.fwb>
+pub const USAGE: &str = "  method sample <file.mthd>
       Write a large invented test budget (5,000 rows).
 ";
 

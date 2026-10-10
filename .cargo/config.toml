@@ -1,0 +1,4 @@
+# `cargo xtask <command>` runs the release tooling in crates/xtask
+# (docs/RELEASING.md). Nothing else is configured here.
+[alias]
+xtask = "run --quiet --locked --package xtask --"

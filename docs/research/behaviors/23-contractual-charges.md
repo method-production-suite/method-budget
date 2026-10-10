@@ -71,7 +71,7 @@ None.
 2020/2021 build. The library lists (studio and vendor default charges) are vendor content and
 cloud features of that era. Sam's 2026 recordings win any conflict.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. [have] Percent and flat charges, manual excluded amounts, excluded groups, categories and
    accounts, applied switch, account number, ordering (`set_charge`, `move_charge`, decision

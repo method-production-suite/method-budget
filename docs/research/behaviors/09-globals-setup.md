@@ -64,7 +64,7 @@ a tools pane with the same tables, but the setup window's current layout, the "D
 "Dec" columns, and the library workflow were not checked in 2026. Treat column details as
 indicative.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. [partial] P2 **Global description and in-use count**: show where a global is used
    (lines and other globals) and allow a description. We show name, formula, value only.

@@ -588,7 +588,9 @@ pub fn autosave_one<R: Runtime>(app: &AppHandle<R>, id: DocId) {
     tell_autosaved(app, id, done);
 }
 
-fn tell_autosaved<R: Runtime>(app: &AppHandle<R>, id: DocId, done: Autosaved) {
+/// Tells the page what an autosave of budget `id` did (also before Restart
+/// to update, src/updater.rs).
+pub(crate) fn tell_autosaved<R: Runtime>(app: &AppHandle<R>, id: DocId, done: Autosaved) {
     let safety = app.state::<Safety>();
     match done {
         Autosaved::File => {
@@ -781,7 +783,9 @@ struct ExternalChange {
 // ---------------------------------------------------------------------------
 // Menu
 
-fn find<R: Runtime>(items: Vec<MenuItemKind<R>>, id: &str) -> Option<MenuItemKind<R>> {
+/// The menu item `id` among `items` and their submenus (also the Help
+/// menu's update switch, src/updater.rs).
+pub(crate) fn find<R: Runtime>(items: Vec<MenuItemKind<R>>, id: &str) -> Option<MenuItemKind<R>> {
     for item in items {
         if item.id() == id {
             return Some(item);

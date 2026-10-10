@@ -62,7 +62,7 @@ beside the current segment, which matches; whether stepping sideways still stops
 of a category or wraps across categories was not shown in either video. The 2021 video was
 recorded on macOS, the 2020 one on Windows; keys matched apart from Cmd versus Ctrl.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. **Cmd/Ctrl+Down and Cmd/Ctrl+Up to drill and climb** [have]. Ours already do this.
 2. **Cmd/Ctrl+Left and Cmd/Ctrl+Right as sibling steps** [partial] P1. We step accounts with

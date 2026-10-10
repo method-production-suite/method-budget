@@ -1,5 +1,5 @@
 // File > Compare Budgets…: the budget in front (the base) side by side with 1
-// to 15 others: open budgets (tabs), versions saved in this budget, and .fwb
+// to 15 others: open budgets (tabs), versions saved in this budget, and budget
 // files picked in the Open dialog (src/compare.rs; decisions.md, entries 17,
 // 19 and 27).
 //

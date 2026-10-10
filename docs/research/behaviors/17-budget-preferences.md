@@ -55,7 +55,7 @@ not demonstrated.
   The rest of the dialog may have grown or moved; confirm before matching labels or
   defaults.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. [missing] P1 **Copy from the line above on insert**: per-budget switches for fringes,
    groups, location, set and currency; fringes on by default. Our insert makes an empty

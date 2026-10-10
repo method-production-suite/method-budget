@@ -1,15 +1,21 @@
-# The `fwb` command line
+# The `method` command line
 
-`fwb` reads and writes Film Wizard Budgeting files (`.fwb`, docs/FORMAT.md) without the
-app: check a budget, print its totals, draw a report, export a spreadsheet, import one,
+`method` reads and writes Method Budget files (`.mthd`, and older `.fwb` ones:
+docs/FORMAT.md, "Identity") without the app: check a budget, print its totals, draw a report, export a spreadsheet, import one,
 and make scripted edits. It is plain Rust with no network and no GUI, so it runs the same
 on a laptop, a server or in CI. Build it with `cargo build --release -p fwb-cli`; the
-binary is `target/release/fwb`.
+binary is `target/release/method`.
+
+`fwb`, the command's name before the product was renamed, is still built
+(`target/release/fwb`) as a **deprecated alias**: it runs exactly the same code, with the
+same output, messages and exit codes, so existing scripts and git merge driver settings
+keep working. Switch to `method`; the alias will be removed in a later release.
 
 Every command takes the budget file first, then flags. Flags take their value as the next
 word or after `=` (`--out=x.pdf`); `-o` is short for `--out`; `--` ends the flags. A word
-that looks like a negative number (`-5`) is a value, not a flag. `fwb help` lists every
-command.
+that looks like a negative number (`-5`) is a value, not a flag. `method help` lists every
+command. `method --version` (or `-V`) prints the version, the same one the app's About box
+shows (docs/RELEASING.md).
 
 Commands that write a file write it **atomically**: to a temporary file in the same
 folder, then renamed over the target, so a reader never sees half a file and a failed
@@ -26,32 +32,32 @@ from unless that is its job (`fmt`, `set`, `apply`).
 | 3 | An edit was refused (`set`, `apply`): a bad script line, a name that doesn't exist, or a result that doesn't recalculate. **Nothing was written.** |
 
 Commands added later may define further codes in their own sections. Errors go to
-stderr as `fwb: <message>`; results go to stdout.
+stderr as `method: <message>`; results go to stdout.
 
 ## Commands
 
-### `fwb show <file.fwb> [--exclude GROUP]...`
+### `method show <file.mthd> [--exclude GROUP]...`
 
 Prints the topsheet for a person to read. `--exclude` leaves a group's lines out
 (repeatable).
 
-### `fwb check <file.fwb>`
+### `method check <file.mthd>`
 
 Reads and recalculates the budget. Prints `<file>: ok, net total 1,234.56`, or fails
 (exit 1) with the reader's or the engine's message, such as
 `line 40, column 21 (budget.topsheet[2].accounts[0].details[3].rate): ...`.
 
-### `fwb fmt <file.fwb>`
+### `method fmt <file.mthd>`
 
 Rewrites the file in canonical form (key order, decimals, indentation), the bytes the
 app would save.
 
-### `fwb new <file.fwb>` and `fwb sample <file.fwb>`
+### `method new <file.mthd>` and `method sample <file.mthd>`
 
 Write a starter budget, or a large invented test budget (5,000 rows). Both refuse to
 replace an existing file.
 
-### `fwb totals <file.fwb> [--json] [--exclude GROUP]...`
+### `method totals <file.mthd> [--json] [--exclude GROUP]...`
 
 The totals, for pipelines. Plain output is one tab-separated line per total, exact
 decimals with no thousands separators:
@@ -76,10 +82,10 @@ with `code`, `name`, `total`, `fringe_total` and its `accounts`' `code`, `name` 
 and `net_total_in_totals_currency` (`null` if it can't be converted).
 
 ```sh
-fwb totals film.fwb | awk -F'\t' '$1 == "net_total" { print $2 }'
+method totals film.mthd | awk -F'\t' '$1 == "net_total" { print $2 }'
 ```
 
-### `fwb export <file.fwb> --xlsx|--csv|--tsv <path> [--bom]`
+### `method export <file.mthd> --xlsx|--csv|--tsv <path> [--bom]`
 
 Also `--format xlsx|csv|tsv --out <path>`. The evaluated budget as an Excel workbook
 (Topsheet, Accounts, Detail and the setup tables), as one CSV file per table (named
@@ -88,7 +94,7 @@ accounting tools (decision 30). A folder as the path names the file after the bu
 `--bom` starts CSV and TSV with a UTF-8 byte order mark, which Excel needs for accented
 letters.
 
-### `fwb report <file.fwb> [--preset NAME] [--sections LIST] [--format F] [-o PATH] [--date TEXT] [--bom]`
+### `method report <file.mthd> [--preset NAME] [--sections LIST] [--format F] [-o PATH] [--date TEXT] [--bom]`
 
 Draws a report from one of the budget's saved report presets (docs/FORMAT.md, "Report
 preset"): its sections in order, category and account exclusions, skipped accounts and
@@ -106,7 +112,7 @@ vertical rules, collapsed detail, the topsheet fringes column, header and footer
 - `--date "2026-10-09 14:30"` sets the printed date and time (the header's standard
   right slot); without it the clock is read, in UTC. Use it when the output must be the
   same on every run.
-- `fwb report <file.fwb> --list-presets` lists the presets, the default marked `*`.
+- `method report <file.mthd> --list-presets` lists the presets, the default marked `*`.
 
 Like the app's reports, a filter never changes a total: leaving accounts or lines out
 prints the budget's own totals with a note, and the topsheet always lists every
@@ -132,7 +138,7 @@ The formats:
   pipelines, not the app's typeset PDF (decision 28), which needs the Mac app's web view.
   Shading, colors and the topsheet page column are on-screen and app-PDF features only.
 
-### `fwb set <file.fwb> <path> <value> [--dry-run]`
+### `method set <file.mthd> <path> <value> [--dry-run]`
 
 Changes one value and saves. Paths:
 
@@ -148,15 +154,15 @@ Changes one value and saves. Paths:
 
 A name or account code may contain dots: the path splits at its first and last dots.
 `none` (or an empty `""`) clears an optional value. The command prints each change and
-the totals that moved; `--dry-run` prints the changes and a full `fwb diff`-style
+the totals that moved; `--dry-run` prints the changes and a full `method diff`-style
 summary and writes nothing. A refused edit exits 3 and writes nothing.
 
 ```sh
-fwb set film.fwb line.21-01:2.rate 900
-fwb set film.fwb fringe.FICA.cutoff 168,600.00 --dry-run
+method set film.mthd line.21-01:2.rate 900
+method set film.mthd fringe.FICA.cutoff 168,600.00 --dry-run
 ```
 
-### `fwb apply <file.fwb> <script.txt> [--dry-run]`
+### `method apply <file.mthd> <script.txt> [--dry-run]`
 
 Runs an edit script (below) and saves. `-` reads the script from stdin. Every line must
 succeed and the result must recalculate, or nothing is written and the command exits 3
@@ -164,13 +170,13 @@ naming the line (`edit.txt line 4: there is no fringe FICA`). The output lists e
 change, then the totals before and after; `--dry-run` shows the changes and a full
 diff summary and writes nothing.
 
-### `fwb import <sheet> -o <out.fwb> [--mapping M.json] [--into B.fwb] [--title T] [--currency C] [--force] [--dry-run]`
+### `method import <sheet> -o <out.mthd> [--mapping M.json] [--into B.mthd] [--title T] [--currency C] [--force] [--dry-run]`
 
 Adds a sheet's rows to a budget as detail lines, with the app's own importer (decision
 36): `.xlsx` workbooks, CSV and tab-delimited text, with the same limits, account
 matching, reconciliation and cautious defaults.
 
-- `--into B.fwb` imports into a copy of that budget, whose chart and setup give the lines
+- `--into B.mthd` imports into a copy of that budget, whose chart and setup give the lines
   their meaning (fringes, globals, currencies). Without it the lines go into a new empty
   budget titled after the sheet's file (`--title` and `--currency`, default USD, change
   that); give the mapping `"create_accounts": true` then.
@@ -202,7 +208,7 @@ The **mapping file** is JSON; every field may be left out:
 
 Our own Excel export imports back with no mapping at all.
 
-### `fwb explain <file.fwb> <total> [--depth N] [--exclude GROUP]...`
+### `method explain <file.mthd> <total> [--depth N] [--exclude GROUP]...`
 
 Prints how one total is worked out, as an indented tree whose leaves add up to it exactly
 (roadmap 3.5, decision 43; the app's Explain tab shows the same steps). Each step is
@@ -222,7 +228,7 @@ what is left out). `<total>` is one of:
 
 A total that isn't in the budget is a usage error (exit 2).
 
-### `fwb diff <old.fwb> <new.fwb> [--json] [--exit-code]`
+### `method diff <old.mthd> <new.mthd> [--json] [--exit-code]`
 
 What changed from the first budget to the second (roadmap 3.1; docs/MERGE.md): every
 change in plain words (`21-01 line 3: rate 1,200.00 -> 1,350.00 (+1,500.00 to 21-01)`),
@@ -232,7 +238,7 @@ change). Rows match by id, accounts and categories by number (a renumbered one i
 what it holds). `--json` prints one object, money in integer cents. Exit 0; with
 `--exit-code`, 1 when anything changed.
 
-### `fwb merge <base.fwb> <ours.fwb> <theirs.fwb> -o <out.fwb> [--ours|--theirs]`
+### `method merge <base.mthd> <ours.mthd> <theirs.mthd> -o <out.mthd> [--ours|--theirs]`
 
 Three-way merge (roadmap 3.2; docs/MERGE.md): both budgets' changes since their common
 base. Different rows, fields and setup items merge on their own; the same field changed
@@ -241,16 +247,17 @@ settled for ours (or `--theirs`) and listed with the base, ours and theirs value
 merged budget is written either way. **Exit 1 when conflicts were settled** that way,
 0 when there were none.
 
-### `fwb merge-driver <base> <ours> <theirs> [<path>] [--theirs]`
+### `method merge-driver <base> <ours> <theirs> [<path>] [--theirs]`
 
-`fwb merge` for git, writing the result over `<ours>`; exit 1 when conflicts remain, so
+`method merge` for git, writing the result over `<ours>`; exit 1 when conflicts remain, so
 git marks the file conflicted (it stays a valid budget, conflicts settled for ours). Set
-up with `*.fwb merge=fwb` in `.gitattributes` and `git config merge.fwb.driver "fwb
-merge-driver %O %A %B %P"` (docs/MERGE.md, "With git").
+up with `*.mthd merge=method-budget` (and `*.fwb merge=method-budget`) in `.gitattributes`
+and `git config merge.method-budget.driver "method merge-driver %O %A %B %P"` (docs/MERGE.md,
+"With git").
 
 ## Edit scripts
 
-`fwb apply` reads one command per line. Blank lines and lines starting with `#` are
+`method apply` reads one command per line. Blank lines and lines starting with `#` are
 skipped. Words are separated by spaces; put a value with spaces in double quotes, with
 `\"` for a quote and `\\` for a backslash. A command with too many words is refused
 rather than guessed at.
@@ -306,16 +313,16 @@ that doesn't work) refuses the script.
 
 ```sh
 # Nightly: check every budget in a folder and keep a PDF and a workbook of each.
-for f in budgets/*.fwb; do
-  fwb check "$f" || exit 1
-  fwb report "$f" --preset "Studio pack" -o "out/$(basename "$f" .fwb).pdf"
-  fwb export "$f" --xlsx "out/$(basename "$f" .fwb).xlsx"
+for f in budgets/*.mthd; do
+  method check "$f" || exit 1
+  method report "$f" --preset "Studio pack" -o "out/$(basename "$f" .mthd).pdf"
+  method export "$f" --xlsx "out/$(basename "$f" .mthd).xlsx"
 done
 
 # Try a rate change, then make it.
-fwb set film.fwb line.21-01:2.rate 950 --dry-run
-fwb set film.fwb line.21-01:2.rate 950
+method set film.mthd line.21-01:2.rate 950 --dry-run
+method set film.mthd line.21-01:2.rate 950
 
 # A department's sheet into a copy of the budget.
-fwb import camera.xlsx --mapping camera.json --into film.fwb -o film-with-camera.fwb
+method import camera.xlsx --mapping camera.json --into film.mthd -o film-with-camera.mthd
 ```

@@ -45,7 +45,7 @@ Sam's 2026 note 01 lists a longer column menu (aggregate sum, unit2, unit3, unit
 location, set, 4X) and a pinnable subtotal column, so the current product has more toggles
 than this 2021 build. Note 01 wins.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. [have] P1 **Column menu**: our corner menu toggles X, unit columns, currency, 4X,
    fringes, fringe percent, fringe dollars, groups, set and location, remembered per user.

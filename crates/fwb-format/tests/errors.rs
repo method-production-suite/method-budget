@@ -82,7 +82,7 @@ fn bad_versions_are_rejected() {
 
 #[test]
 fn wrong_or_missing_format_is_rejected() {
-    let text = edit("\"film-wizard-budget\"", "\"some-other-app\"");
+    let text = edit("\"method-budget\"", "\"some-other-app\"");
     let err = from_str(&text).unwrap_err();
     assert_eq!(
         err,
@@ -90,11 +90,26 @@ fn wrong_or_missing_format_is_rejected() {
             found: Some("\"some-other-app\"".into())
         }
     );
-    assert!(err.to_string().contains("not a Film Wizard budget file"));
+    assert!(err.to_string().contains("not a Method Budget file"));
 
     assert_eq!(
         from_str("{\"title\": \"x\"}"),
         Err(FormatError::NotABudget { found: None })
+    );
+}
+
+#[test]
+fn both_format_identifiers_are_read_and_the_new_one_is_written() {
+    // Files from before the rename carry the legacy identifier; they still
+    // read, and saving writes the new one.
+    let original = edit("\"method-budget\"", "\"method-budget\"");
+    let legacy = edit("\"method-budget\"", "\"film-wizard-budget\"");
+    let b = from_str(&legacy).expect("the legacy identifier reads");
+    assert_eq!(b, from_str(&original).unwrap());
+    assert!(fwb_format::to_string(&b).contains("\"format\": \"method-budget\""));
+    assert_eq!(
+        fwb_format::FORMAT_NAMES,
+        ["method-budget", "film-wizard-budget"]
     );
 }
 

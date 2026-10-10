@@ -1,6 +1,7 @@
 {
-  "productName": "Film Wizard Budgeting",
-  "identifier": "io.github.ssandweiss.film-wizard-budgeting",
+  "productName": "Method Budget",
+  "identifier": "com.methodbudget.desktop",
+  "version": "0.1.0",
   "build": {
     "frontendDist": "ui"
   },
@@ -9,7 +10,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Film Wizard Budgeting",
+        "title": "Method Budget",
         "width": 1280,
         "height": 820,
         "minWidth": 880,
@@ -33,9 +34,9 @@
     "copyright": "Copyright (c) 2026 Sam Sandweiss and contributors",
     "category": "Productivity",
     "shortDescription": "Film and TV budgeting",
-    "longDescription": "An open-source, clean-room film and TV budgeting app. Budgets are plain .fwb files on your disk.",
+    "longDescription": "An open-source, clean-room film and TV budgeting app. Budgets are plain .mthd files on your disk.",
     "license": "MIT OR Apache-2.0",
-    "homepage": "https://github.com/ssandweiss/film-wizard-budgeting",
+    "homepage": "https://methodbudget.com",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -46,15 +47,32 @@
     "fileAssociations": [
       {
         "ext": [
-          "fwb"
+          "mthd"
         ],
-        "name": "Film Wizard Budget",
-        "description": "Film Wizard Budget",
+        "name": "Method Budget",
+        "description": "Method Budget",
         "role": "Editor",
         "rank": "Owner",
-        "mimeType": "application/vnd.film-wizard-budget+json",
+        "mimeType": "application/vnd.method-budget+json",
         "exportedType": {
-          "identifier": "io.github.ssandweiss.film-wizard-budgeting.fwb",
+          "identifier": "com.methodbudget.mthd",
+          "conformsTo": [
+            "public.json",
+            "public.data"
+          ]
+        }
+      },
+      {
+        "ext": [
+          "fwb"
+        ],
+        "name": "Method Budget (older .fwb)",
+        "description": "Method Budget (older .fwb)",
+        "role": "Editor",
+        "rank": "Owner",
+        "mimeType": "application/vnd.method-budget+json",
+        "exportedType": {
+          "identifier": "com.methodbudget.fwb",
           "conformsTo": [
             "public.json",
             "public.data"
@@ -65,6 +83,14 @@
     "macOS": {
       "minimumSystemVersion": "11.0",
       "signingIdentity": "-"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "REPLACE-WITH-THE-RELEASE-PUBLIC-KEY",
+      "endpoints": [
+        "https://github.com/ssandweiss/method-budget/releases/latest/download/latest.json"
+      ]
     }
   }
 }

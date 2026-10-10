@@ -1,0 +1,11 @@
+[package]
+name = "method-release"
+description = "Method Budget release plumbing shared by the app and xtask: versions, release notes, minisign containers"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+# No dependencies, on purpose: the app links this, and so does the release
+# tooling (crates/xtask), and neither should pull anything in for it.
+[dependencies]

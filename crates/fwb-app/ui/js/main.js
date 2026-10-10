@@ -56,6 +56,7 @@ import { openMenu, updateMenu, closeMenu, isMenuOpen, setMenuAnchor, openContext
 import { readPref, writePref } from './prefs.js';
 import { setRules, dynamicStyles } from './sheet.js';
 import { initSafety } from './safety.js';
+import { initUpdates } from './updates.js';
 import { initQuickEntry, editAssist, commitDetailCell, editNote, fringeRange, showFormula } from './quickentry.js';
 import { initRowFormat, toggleStyle, indent, setColor, clearFormatting, PALETTE } from './rowformat.js';
 import { initContextMenu, initContextMenuPresets, watchContextMenu } from './context.js';
@@ -2067,6 +2068,10 @@ COMMANDS['budget.create_charge'] = () => openSetup('charges', null, JSON.stringi
 COMMANDS['budget.create_credit'] = () => openSetup('credits', null, JSON.stringify(['add', 'credits', 'name']));
 // File > Open Recent and File > Revert to Backup (safety.js).
 Object.assign(COMMANDS, safety.commands);
+// Updates: the toolbar's quiet indicator, What's New once after an update,
+// and Help > Release Notes (updates.js, src/updater.rs).
+const updates = initUpdates({ grid, toast });
+Object.assign(COMMANDS, updates.commands);
 // View: formulas in a selection, zero accounts, totals' cents, grid zoom
 // (display.js; per-user choices).
 Object.assign(COMMANDS, displayCommands({ grid, render: () => renderAll(), toast }));
@@ -3016,7 +3021,7 @@ async function start() {
   wire();
   if (!connected) {
     $('banner').hidden = false;
-    $('banner').replaceChildren(el('strong', { text: 'Open this page in the Film Wizard Budgeting app.' }));
+    $('banner').replaceChildren(el('strong', { text: 'Open this page in the Method Budget app.' }));
     return;
   }
   try {
@@ -3028,6 +3033,7 @@ async function start() {
   // Popped out last time: the tools window opens where it was.
   if (state.position === 'window' && state.panelOpen) openToolsWindow(true).then(sendToolsState);
   await safety.start(); // a file to open, budgets to recover
+  await updates.start(); // where an update is; What's New, once after one
 }
 
 start();

@@ -1,8 +1,8 @@
-//! `fwb fmt`: rewrite a budget in canonical form.
+//! `method fmt`: rewrite a budget in canonical form.
 
 use crate::cli::{load, save, Flags, Outcome};
 
-pub const USAGE: &str = "  fwb fmt <file.fwb>
+pub const USAGE: &str = "  method fmt <file.mthd>
       Rewrite in canonical form (atomically).
 ";
 

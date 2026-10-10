@@ -59,7 +59,7 @@ fn starter_view_has_budget_json_and_totals() {
     assert_eq!(v["partial"], false);
     assert!(v["error"].is_null());
     assert_eq!(v["issues"].as_array().unwrap().len(), 0);
-    assert_eq!(v["file"]["name"], "Untitled.fwb");
+    assert_eq!(v["file"]["name"], "Untitled.mthd");
     assert_eq!(v["file"]["dirty"], false);
     assert_eq!(v["can_undo"], false);
 }
@@ -571,7 +571,7 @@ fn save_open_round_trip_and_dirty_flag() {
 
     std::fs::write(dir.join("bad.fwb"), "{ \"format\": \"something-else\" }").unwrap();
     let err = Session::open(&dir.join("bad.fwb")).unwrap_err();
-    assert!(err.contains("not a Film Wizard budget file"), "{err}");
+    assert!(err.contains("not a Method Budget file"), "{err}");
     assert!(Session::open(&dir.join("missing.fwb")).is_err());
     std::fs::remove_dir_all(&dir).unwrap();
 }

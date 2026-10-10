@@ -321,7 +321,12 @@ pub const WINDOW: &[Entry] = &[
     SEP,
 ];
 
-pub const HELP: &[Entry] = &[item("help.shortcuts", "Keyboard Shortcuts", "mod+shift+/")];
+pub const HELP: &[Entry] = &[
+    item("help.shortcuts", "Keyboard Shortcuts", "mod+shift+/"),
+    // This version's notes, in the page (ui/js/updates.js). Check for
+    // Updates and its automatic switch follow (src/updater.rs).
+    plain("help.release_notes", "Release Notes"),
+];
 
 /// A shortcut-list key spec as a Tauri accelerator: `mod+shift+s` is
 /// `CmdOrCtrl+Shift+S`.
@@ -420,6 +425,10 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         Some(AboutMetadata {
             name: Some(name.clone()),
             version: Some(app.package_info().version.to_string()),
+            // A link on Windows and Linux; macOS shows the credits line.
+            website: Some(crate::app::WEBSITE.into()),
+            website_label: Some("methodbudget.com".into()),
+            credits: Some("methodbudget.com".into()),
             ..Default::default()
         }),
     )?;
@@ -474,6 +483,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 
     let help = Submenu::with_id(app, HELP_SUBMENU_ID, "&Help", true)?;
     append(app, &help, HELP)?;
+    crate::updater::extend_help_menu(app, &help)?;
     if !cfg!(target_os = "macos") {
         help.append(&PredefinedMenuItem::separator(app)?)?;
         help.append(&about)?;

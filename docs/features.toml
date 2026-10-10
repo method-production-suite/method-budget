@@ -1,0 +1,451 @@
+# Method Budget's feature list: the single source for the feature section of README.md
+# and the feature list on the website (site/index.html).
+#
+# After editing, regenerate both:
+#
+#     python3 scripts/site.py
+#
+# CI runs `python3 scripts/site.py --check`, which fails when README.md or the site no
+# longer match this file. How it all fits together: docs/WEBSITE.md.
+#
+# Fields
+#   [[group]]    id, title. Groups appear in the order written here.
+#   [[feature]]  group    the id of a group above
+#                title    a few words, no trailing period
+#                text     one sentence, user-facing, ends with a period
+#                status   "have" (built) or "soon" (planned)
+#                ref      optional: roadmap items ("1.12") and decisions ("D44"), as a
+#                         string or a list. A "have" feature whose roadmap item is not
+#                         [have] in docs/ROADMAP.md is an error: the list never claims
+#                         something that isn't built.
+#
+# [project] repo is the source repository's URL. It is written into the site's links
+# (every <a href=... data-repo="path">) and the README's clone command, so moving the
+# repository is a one-line edit here plus a regenerate.
+#
+# Write for someone who budgets films, not for someone who reads the code. No em dashes,
+# no vendor names (the clean-room statement and the FAQ are the only places those go).
+# Inline `code` is allowed; nothing else is markup.
+
+[project]
+repo = "https://github.com/ssandweiss/method-budget"
+
+[[group]]
+id = "engine"
+title = "Budgeting engine"
+
+[[group]]
+id = "fringes"
+title = "Fringes, globals, charges and credits"
+
+[[group]]
+id = "editor"
+title = "Editing, split view and history"
+
+[[group]]
+id = "versions"
+title = "Versions, compare, diff and merge"
+
+[[group]]
+id = "actuals"
+title = "Actuals and cost reports"
+
+[[group]]
+id = "reports"
+title = "Reports, PDF and spreadsheets"
+
+[[group]]
+id = "setup"
+title = "Setup library and templates"
+
+[[group]]
+id = "cli"
+title = "Command line and git"
+
+# ---------------------------------------------------------------- engine
+
+[[feature]]
+group = "engine"
+title = "Topsheet, accounts and detail lines"
+text = "The familiar three levels, with every total rolling up live as you type."
+status = "have"
+
+[[feature]]
+group = "engine"
+title = "Money exact to the cent"
+text = "Every amount is kept in whole cents, never floating point, with one documented rounding rule, so the topsheet always adds up."
+status = "have"
+ref = ["D1", "D2"]
+
+[[feature]]
+group = "engine"
+title = "Formulas and globals"
+text = "Amount, quantity and rate cells take formulas and named globals; change a global and every line that uses it follows."
+status = "have"
+ref = ["D5", "2.10"]
+
+[[feature]]
+group = "engine"
+title = "Currencies"
+text = "Any line can be in its own currency, converted to the budget's base currency at rates you set."
+status = "have"
+ref = "D10"
+
+[[feature]]
+group = "engine"
+title = "Groups and what-ifs"
+text = "Tag lines into groups, leave a group out of the total to see a what-if, and get back to the exact cent when you put it back."
+status = "have"
+ref = "D4"
+
+[[feature]]
+group = "engine"
+title = "Explain this number"
+text = "Trace any total down to the lines, fringes, cutoffs, ranges and rounding steps that make it up."
+status = "have"
+ref = ["3.5", "D43"]
+
+[[feature]]
+group = "engine"
+title = "Overtime helper"
+text = "Work out a day or a week of straight time, overtime bands and sixth and seventh days, then write the pay into the line."
+status = "have"
+ref = ["3.10", "D43"]
+
+[[feature]]
+group = "engine"
+title = "Fast on big budgets"
+text = "An edit recalculates in about 5 ms on a 5,000-line budget."
+status = "have"
+ref = "D18"
+
+# ---------------------------------------------------------------- fringes
+
+[[feature]]
+group = "fringes"
+title = "Fringes with cutoffs and ranges"
+text = "Percent and flat fringes, cutoffs per earner, fringe ranges across several lines, unit-hour flats and four ways to post them."
+status = "have"
+ref = "D3"
+
+[[feature]]
+group = "fringes"
+title = "Globals with details"
+text = "Give a global a description, a unit and decimals, show it by name in cells, and see the formulas behind a selection."
+status = "have"
+ref = ["2.10", "D34"]
+
+[[feature]]
+group = "fringes"
+title = "Contractual charges"
+text = "Percent and flat charges with exclusions, a live preview while you type, and the percent shown on the topsheet if you want it."
+status = "have"
+ref = ["2.16", "D38"]
+
+[[feature]]
+group = "fringes"
+title = "Credits"
+text = "Credit rows show gross, excluded fringes, net and how far you are from a cap."
+status = "have"
+ref = ["2.16", "D38"]
+
+[[feature]]
+group = "fringes"
+title = "Apply panel"
+text = "Select lines, then tick fringes, groups, sets and locations on or off, with live totals for the selection."
+status = "have"
+ref = ["2.13", "D38"]
+
+[[feature]]
+group = "fringes"
+title = "In-use counts"
+text = "Every setup list shows how many lines use each item and what they cost, warns before you delete one in use, and finds them in a click."
+status = "have"
+ref = ["2.9", "D35"]
+
+# ---------------------------------------------------------------- editor
+
+[[feature]]
+group = "editor"
+title = "Keyboard-first grid"
+text = "Drill in, climb out, step between accounts, fill down and move rows without touching the mouse; a shortcut sheet lists every key."
+status = "have"
+ref = ["1.7", "1.10", "D15"]
+
+[[feature]]
+group = "editor"
+title = "Type-ahead and add on the fly"
+text = "Units, currencies, sets, locations and globals complete as you type, and a new one can be added right from the cell."
+status = "have"
+ref = ["1.2", "1.3"]
+
+[[feature]]
+group = "editor"
+title = "Never lose work"
+text = "Autosave into the file, recovery copies for untitled budgets, rolling backups and a restore after a crash."
+status = "have"
+ref = ["1.1", "D20"]
+
+[[feature]]
+group = "editor"
+title = "Budget tabs and split view"
+text = "Open several budgets as tabs, each with its own undo, and put two side by side in one window."
+status = "have"
+ref = ["1.9", "2.26", "D25", "D40"]
+
+[[feature]]
+group = "editor"
+title = "History list"
+text = "Every undo step is listed by name and time; click one to go back to it, or save it as a version."
+status = "have"
+ref = ["2.23", "D40"]
+
+[[feature]]
+group = "editor"
+title = "Find and replace"
+text = "Search descriptions, account numbers, fringes, globals, groups, notes and formulas, then replace only in the results you tick, as one undo step."
+status = "have"
+ref = ["1.11", "D26"]
+
+[[feature]]
+group = "editor"
+title = "Copy rows with everything on them"
+text = "Rows keep their fringes, groups, notes, style and ranges when copied, even between budgets, with a review of what the paste will change."
+status = "have"
+ref = ["1.8", "D23"]
+
+[[feature]]
+group = "editor"
+title = "Notes"
+text = "Dated notes on lines, accounts and categories, and a notes list that works as a review checklist."
+status = "have"
+ref = ["2.8", "D35"]
+
+# ---------------------------------------------------------------- versions
+
+[[feature]]
+group = "versions"
+title = "Named versions"
+text = "Save, rename, annotate and restore versions, all kept inside the budget file."
+status = "have"
+ref = ["1.12", "D27"]
+
+[[feature]]
+group = "versions"
+title = "Compare up to 16 budgets"
+text = "Versions or other files side by side at topsheet and account level, with sum, average and variance columns, down to detail lines."
+status = "have"
+ref = ["1.14", "2.7", "D27"]
+
+[[feature]]
+group = "versions"
+title = "Original and variance columns"
+text = "Keep a locked baseline and see each account's change from it right in the grid."
+status = "have"
+ref = "1.13"
+
+[[feature]]
+group = "versions"
+title = "What changed"
+text = "A plain-words diff of two budgets or versions: every changed line, field and setup item, with the money it moved."
+status = "have"
+ref = ["3.1", "D44"]
+
+[[feature]]
+group = "versions"
+title = "Three-way merge"
+text = "Two copies that changed apart merge on their own where they touched different things; real clashes are listed for you to pick."
+status = "have"
+ref = ["3.2", "D44"]
+
+[[feature]]
+group = "versions"
+title = "Share-ready copies"
+text = "Save a dated snapshot, optionally without notes or private info, that opens read-only and compares back against the original."
+status = "have"
+ref = ["2.21", "D39"]
+
+[[feature]]
+group = "versions"
+title = "Small version history"
+text = "Versions can be stored as compact patches, so ten versions of a large budget take about the space of one."
+status = "have"
+ref = ["3.4", "D41"]
+
+# ---------------------------------------------------------------- actuals
+
+[[feature]]
+group = "actuals"
+title = "Import actuals"
+text = "Bring in transactions from CSV, tab-delimited or Excel accounting exports with a column mapping, duplicate checks and a review of unknown accounts."
+status = "have"
+ref = ["3.7", "D45"]
+
+[[feature]]
+group = "actuals"
+title = "Cost report"
+text = "Budget, actual to date, estimate to complete and variance by account, with each account's estimate method your choice."
+status = "have"
+ref = ["3.7", "D45"]
+
+# ---------------------------------------------------------------- reports
+
+[[feature]]
+group = "reports"
+title = "Reports saved in the budget"
+text = "Pick sections, accounts and layout, save them as named presets with header and footer fields, and print straight to PDF."
+status = "have"
+ref = ["1.15", "2.4", "D28"]
+
+[[feature]]
+group = "reports"
+title = "Live preview"
+text = "The setup dialog shows the printed pages as you change them, with page navigation and a jump list of sections."
+status = "have"
+ref = ["2.6", "D33"]
+
+[[feature]]
+group = "reports"
+title = "More than the topsheet"
+text = "Category summaries, account detail, setup tables, chart of accounts, group totals, budget information and a notes list."
+status = "have"
+ref = ["2.5", "D33"]
+
+[[feature]]
+group = "reports"
+title = "Spreadsheet export"
+text = "One Excel workbook with topsheet, accounts, detail and setup tables, plus CSV and tab-delimited files for accounting."
+status = "have"
+ref = ["2.1", "D30"]
+
+[[feature]]
+group = "reports"
+title = "Spreadsheet import"
+text = "Turn any department's Excel, CSV or tab-delimited sheet into budget lines with a column mapping and a line-by-line check of the totals."
+status = "have"
+ref = ["2.2", "D36"]
+
+# ---------------------------------------------------------------- setup
+
+[[feature]]
+group = "setup"
+title = "Start from another budget"
+text = "Import setup items from any budget, with what they depend on, or start a new budget from a template."
+status = "have"
+ref = ["1.20", "D29"]
+
+[[feature]]
+group = "setup"
+title = "Personal setup library"
+text = "Keep your fringes, globals, groups and the rest in a library file of your own and copy them in and out with a conflict review."
+status = "have"
+ref = ["2.15", "D37"]
+
+[[feature]]
+group = "setup"
+title = "Tag presets and line blocks"
+text = "Save a set of tags or a block of lines once and apply or insert them anywhere."
+status = "have"
+ref = ["1.19", "2.14", "D31"]
+
+[[feature]]
+group = "setup"
+title = "Rename everywhere"
+text = "Rename a fringe, global, group or unit and every reference follows, formulas included, as one undo step."
+status = "have"
+ref = ["1.18", "D32"]
+
+[[feature]]
+group = "setup"
+title = "Renumber accounts"
+text = "Change the account numbering pattern and preview every old and new number before it applies."
+status = "have"
+ref = ["2.20", "D39"]
+
+[[feature]]
+group = "setup"
+title = "Sub-budgets"
+text = "Make a filtered copy by categories, accounts, groups, sets or locations, for a department or a unit."
+status = "have"
+ref = ["2.22", "D39"]
+
+# ---------------------------------------------------------------- cli
+
+[[feature]]
+group = "cli"
+title = "Open file format"
+text = "Budgets are `.mthd` files: plain, documented JSON that diffs cleanly and that any tool can read."
+status = "have"
+ref = "D13"
+
+[[feature]]
+group = "cli"
+title = "Scriptable command line"
+text = "`method` checks budgets, prints totals, draws reports as PDF, HTML or CSV, and exports and imports spreadsheets, with no window and no network."
+status = "have"
+ref = ["3.12", "D41"]
+
+[[feature]]
+group = "cli"
+title = "Batch edits"
+text = "`method set` and `method apply` run edit scripts all or nothing, with a dry run that shows what would change."
+status = "have"
+ref = ["3.12", "D41"]
+
+[[feature]]
+group = "cli"
+title = "Git merge driver"
+text = "Keep budgets in git and let `method merge-driver` merge edits to different lines, flagging only real conflicts."
+status = "have"
+ref = ["3.2", "D44"]
+
+# ---------------------------------------------------------------- soon
+
+[[feature]]
+group = "reports"
+title = "Import from other budgeting apps"
+text = "Readers for the open exports (XML, JSON, Excel) other budgeting apps write, checked line by line against their own totals."
+status = "soon"
+ref = "1.16"
+
+[[feature]]
+group = "editor"
+title = "Signed and notarized Mac app"
+text = "Install on a Mac without the one-time security step."
+status = "soon"
+ref = "1.21"
+
+[[feature]]
+group = "editor"
+title = "Windows and Linux, tested"
+text = "Installers for both are built today; printing, keys and file types still need a hands-on check."
+status = "soon"
+ref = "2.25"
+
+[[feature]]
+group = "versions"
+title = "Review files"
+text = "A reviewer marks up a read-only copy, and their comments come back in a small file you merge."
+status = "soon"
+ref = "3.3"
+
+[[feature]]
+group = "engine"
+title = "Incentive modeling"
+text = "Qualified spend by location, several programs side by side, caps and what-ifs, from rules you enter yourself."
+status = "soon"
+ref = "3.6"
+
+[[feature]]
+group = "engine"
+title = "Schedule-linked quantities"
+text = "Read day counts from a schedule's export and let them drive your globals."
+status = "soon"
+ref = "3.8"
+
+[[feature]]
+group = "engine"
+title = "Accessibility and translations"
+text = "A full accessibility pass and the app in more languages."
+status = "soon"
+ref = "3.14"

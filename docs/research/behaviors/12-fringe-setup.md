@@ -44,7 +44,7 @@ video, no copied help text, no images. The video stays outside the repo.
 Sam's 2026 note 01 shows the fringe list in the tools pane with checkboxes, dollars and
 range buttons; the setup screen's columns were not re-checked in 2026.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. [have] P1 **Percent and flat fringes with optional cutoff, uses and total.**
 2. [missing] P2 **Fringe short code (ID)**: an optional code shown in the grid's fringes

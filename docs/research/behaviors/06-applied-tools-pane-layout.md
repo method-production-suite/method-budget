@@ -42,7 +42,7 @@ on the right with a quick filter, setup and clear links, and an applied-only fil
 than a sort. Dock-to-bottom was not exercised in the 2026 recordings; assume it still
 exists but verify.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. **Selection-driven apply panel** [have]. Our Apply panel reflects the selection with
    tri-state boxes and dollars, including topsheet and account-list selections.

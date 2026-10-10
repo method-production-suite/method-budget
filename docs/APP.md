@@ -1,10 +1,11 @@
 # The desktop app (`crates/fwb-app`)
 
-Film Wizard Budgeting's editor is a local desktop app built with [Tauri 2](https://tauri.app):
+Method Budget's editor is a local desktop app built with [Tauri 2](https://tauri.app):
 the Rust engine runs natively inside the app, and the interface is plain HTML, CSS and
-JavaScript drawn in the operating system's own web view. Budgets are `.fwb` files on your
-disk ([FORMAT.md](FORMAT.md)). There is no server, no account, and the app never connects
-to the network. Why Tauri: [decisions.md](decisions.md), entry 14.
+JavaScript drawn in the operating system's own web view. Budgets are `.mthd` files on your
+disk ([FORMAT.md](FORMAT.md); older `.fwb` files open and save the same way). There is no server and no account, and the app
+goes online only to check for updates of itself, which can be turned off ("Updates" below).
+Why Tauri: [decisions.md](decisions.md), entry 14.
 
 ## Run and build
 
@@ -36,7 +37,7 @@ macOS and Windows use the system web view (WebKit and WebView2) and need nothing
 ## Using it
 
 **Budget tabs.** Several budgets can be open at once, one per tab in the strip under the
-toolbar (decisions.md, entries 19 and 25). A tab shows the file's name without `.fwb`, or
+toolbar (decisions.md, entries 19 and 25). A tab shows the file's name without its extension, or
 the budget's title before it has a file; a dot means unsaved changes; the tab in front,
 and the one under the pointer, show a close button (×). Its tooltip has the title, the
 full path and whether the file changed outside the app. Click a tab to bring it to the
@@ -45,7 +46,7 @@ all switch to that budget, and each tab comes back where it was left (level, cat
 account, cursor, scroll, and the footer's This session and Last change). Each budget has
 its own undo, autosave, recovery copy and backups; the row clipboard is shared. New
 (Cmd+N) and New Tab (Cmd+T) open a starter budget in a new tab, and so does the **+**
-button at the end of the strip. Open, Open Recent, a recovered budget and a `.fwb`
+button at the end of the strip. Open, Open Recent, a recovered budget and a `.mthd`
 double-clicked in the Finder open in a new tab; a file that is open already just has its
 tab brought forward, and an untouched Untitled budget alone in the window gives its tab up
 to the file. Close Tab (Cmd+W), the × or a middle-click closes a tab: with Autosave on its
@@ -717,7 +718,7 @@ charge's base) are fetched when opened, so a grand total of thousands of lines s
 dozen steps. The explanation is worked out on demand only (never on an edit), from the
 budget the totals on screen came from, and asked for again when the budget changes,
 keeping what was open. With cells that have problems it says the totals, and it, count
-them as blank. From a terminal, `fwb explain file.fwb <total>` prints the same tree (see
+them as blank. From a terminal, `method explain file.mthd <total>` prints the same tree (see
 docs/CLI.md).
 
 ### Overtime helper
@@ -1024,7 +1025,7 @@ called Untitled and has no file, so the first Save asks where; the budget it cam
 not touched (an open one is read from its tab). **Save as Template…** writes the budget in
 front to a new file, stripped the same way and titled after the file, without changing the
 budget or its own file; it won't write over a file open in a tab. A template is an
-ordinary `.fwb`: there is no template format and no template folder.
+ordinary `.mthd`: there is no template format and no template folder.
 
 | Command | Arguments | Returns |
 |---|---|---|
@@ -1050,7 +1051,7 @@ current presets and display settings). Tick what to leave out: notes (on lines, 
 categories and in line blocks), budget info fields, saved versions, the original totals,
 and setup items nothing uses (removed until none is left; what tag and report presets
 name stays, so no total moves). An optional note goes with it. Rust's Save dialog
-suggests `<title> - <version> - <date>.fwb` in the budget's folder; a file open in a tab is
+suggests `<title> - <version> - <date>.mthd` in the budget's folder; a file open in a tab is
 refused. The copy carries a `provenance` (docs/FORMAT.md): shared copy, the source title,
 the version's name, when it was saved, the app version and the note. The budget and its
 own file don't change.
@@ -1090,15 +1091,16 @@ are worked out normally: there is no fringe lock yet.
 
 Your own library of setup items to reuse across budgets (roadmap 2.15, decisions.md entries
 15 and 37): the local-first equivalent of a cloud setup library. **The library is a budget
-file**: our ordinary `.fwb` format with setup and no lines, plus folders per kind
+file**: our ordinary `.mthd` format with setup and no lines, plus folders per kind
 (`setup_folders`, FORMAT.md). It starts empty (no units, fringes or anything else: we ship
 no library data) and opens in the app like any other budget, so it can live in a synced
 folder or a git repository of your choosing.
 
 **The Library tab** (in the tools panel's second pane by default; draggable like any tab;
 View > Tools Panel > Library). With no library yet it explains itself and offers **Create
-Library…** (Rust asks for a folder and makes `My Film Wizard Library.fwb` there, or uses
-the one already there) and **Use Existing Library…** (any `.fwb`, in Rust's Open dialog).
+Library…** (Rust asks for a folder and makes `My Method Budget Library.mthd` there, or uses
+the one already there, under its current or its pre-rename name) and **Use Existing
+Library…** (any budget file, in Rust's Open dialog).
 The choice is remembered for you in `library.json` in the app's data folder; **Change…**
 and **New…** switch libraries at any time. Then the tab shows the library's name, a kind
 picker (globals, fringes, groups, units, sets, locations, currencies, charges, credits, tag
@@ -1390,7 +1392,7 @@ A budget with a cell the engine can't evaluate is not exported (the message name
 first problem): the grid counts such cells as blank, and an export must carry the real
 figures. Each file is written atomically, and an export never replaces a budget that is
 open in a tab. The same tables come from the command line:
-`fwb export <file.fwb> --format xlsx|csv|tsv --out <path> [--bom]`.
+`method export <file.mthd> --format xlsx|csv|tsv --out <path> [--bom]`.
 
 | Command | Arguments | Returns |
 |---|---|---|
@@ -1591,6 +1593,12 @@ autosaves (an undo is a change like any other and is saved in turn). A budget ne
 first Save asks where, as before. If an autosave into the file fails (the folder is gone,
 the disk is full), the app says so once and keeps a recovery copy.
 
+**File names.** New budgets, Save As, shared copies, templates and sub-budgets suggest
+`.mthd`, and a name typed without an extension gets `.mthd`. A budget opened from an older
+`.fwb` file keeps saving and autosaving to that same file; only Save As (or a copy) gives it
+a new name, and a `.fwb` name typed on purpose is kept. Every dialog that opens a budget
+accepts both.
+
 **Changes made outside the app.** Because autosave writes the file often, the app never
 writes over a version it hasn't seen. When it opens or writes a budget file it notes the
 file's size, modification time and a hash of its content; before every autosave and every
@@ -1599,7 +1607,7 @@ budget. A budget in a tab that isn't in front has its tab brought forward before
 question, one budget at a time. If another
 program changed the file meanwhile (a sync service such as Dropbox or iCloud, another
 computer, another app), nothing is written, autosave into that file pauses (a recovery copy
-keeps the unsaved work safe), and a dialog, "This budget was changed outside Film Wizard",
+keeps the unsaved work safe), and a dialog, "This budget was changed outside Method Budget",
 offers:
 
 - **Keep mine**: the version on disk is copied to Backups, then this budget is saved over
@@ -1620,7 +1628,8 @@ unsaved changes on the same timing.
 
 **Recovery copies** are the safety net for a crash, a forced quit or a power cut. They live
 in the app's data folder (`Recovery/`, readable only by you: 0700 folder, 0600 files on
-macOS and Linux), one per open budget, each a `.fwb` with a small `.json` beside it (the
+macOS and Linux), one per open budget, each a budget file (named `.fwb`, an internal detail) with a small
+`.json` beside it (the
 original path, title and time). A copy is deleted when the budget is saved, when undo
 takes it back to the saved state, when you close its tab or the window (or quit) and choose
 not to save, and when an untouched Untitled budget gives its tab up to a file. Quitting
@@ -1637,7 +1646,8 @@ small file in `Recovery/`, so a second copy of the app never offers the first on
 copies as recovered.
 
 **Backups.** Before a save replaces a budget file, the version on disk is copied to the
-app's data folder: `Backups/<hash of the file's path>/<name> <date time> UTC.fwb`, with a
+app's data folder: `Backups/<hash of the file's path>/<name> <date time> UTC.mthd` (backups
+taken before the rename end in `.fwb` and are listed too), with a
 `source.json` naming the file. An explicit Save always makes one (unless the file is
 unchanged since the last backup); autosaves make one on the first write in a session and
 then at most every 10 minutes, so the backups span real time rather than the last few
@@ -1645,7 +1655,7 @@ seconds of typing. The last 10 per file are kept. **File > Revert to Backup…**
 open budget's backups, newest first; **Restore** puts that version in place of the budget
 as one edit (Undo brings the current one back; autosave or Save then writes it), and
 **Show Backups Folder** opens the folder in Finder, Explorer or the file manager. We chose
-the data folder over a `film.fwb~` file beside the budget: nothing appears in shared
+the data folder over a `film.mthd~` file beside the budget: nothing appears in shared
 project folders, there is room for more than one version, and the dialog finds them.
 
 **Saves are atomic.** Every write (a save, an autosave, a recovery copy, a backup, the
@@ -1668,7 +1678,7 @@ two files with one name show their folder), kept in the data folder's `recent.js
 that no longer exist drop off when the menu is refreshed (every open and save). Clear Menu
 empties it. macOS's own system-wide recent documents list is not updated.
 
-**Opening from the system.** Double-clicking a `.fwb` file, Open With, or dropping one on
+**Opening from the system.** Double-clicking a `.mthd` (or older `.fwb`) file, Open With, or dropping one on
 the Dock icon opens it in a tab (its own tab, when it is open already): on macOS the app
 receives an open event, on Windows and Linux the path arrives on the command line. Nothing
 is asked: no budget is replaced. When several files arrive at once, the first one opens. On macOS a
@@ -1677,8 +1687,24 @@ single-instance handling: a second launch with a path starts a second copy of th
 that file (each copy has its own recovery copies and doesn't offer the other's).
 
 The app's data folder is the platform's local app data folder for
-`io.github.ssandweiss.film-wizard-budgeting`: `~/Library/Application Support/...` on macOS,
+`com.methodbudget.desktop`: `~/Library/Application Support/...` on macOS,
 `%LOCALAPPDATA%\...` on Windows, `~/.local/share/...` on Linux.
+
+**Moving over from the old identifier** (src/migrate.rs; decisions.md, entry 46). The data
+folder is named after the app's identifier, which changed with the rename from
+`io.github.ssandweiss.film-wizard-budgeting`. On every start, before the window opens,
+the app checks: when the new folder has none of its state (`settings.json`,
+`recent.json`, `tabs.json`, `library.json`, `Recovery/`, `Backups/` or the
+`migrated-from.json` marker) and the old folder exists, the old folder is **copied** (never
+moved, so an old copy of the app still works) into a temporary folder beside the new one,
+which is then renamed into place, so an interrupted copy leaves nothing half done. Lock
+files and web view caches stay behind; a file that can't be read is skipped and named on
+stderr. If the web view made the new folder first (Windows and Linux keep its storage
+there), the copied entries move in one by one, never over anything already there. On
+macOS the web view's storage (display choices and saved spreadsheet mappings) lives in
+`~/Library/WebKit/<identifier>` instead and is copied the same way when the new one doesn't
+exist yet. `migrated-from.json` records where the copy came from and when; the check runs
+again from Tauri's setup with the folder Tauri reports, which does nothing once copied.
 
 | Command | Arguments | Returns |
 |---|---|---|
@@ -1700,6 +1726,47 @@ the title if `doc` is in front and `rev` is still current), `autosave-changed`,
 `autosave-error`, `open-request` (a file from the system; the page finishes any cell edit,
 then calls `open_pending`) and `external-change` (`{ doc, name }`: that budget's file
 changed outside the app; the page brings its tab forward and shows the dialog above).
+
+## Updates
+
+The app keeps itself up to date (decisions.md, entry 48; how releases are made:
+[RELEASING.md](RELEASING.md)).
+
+- **Checking.** About two minutes after the app starts, then every six hours, it asks the
+  update endpoint (`plugins.updater.endpoints` in `tauri.conf.json`, the one place the
+  address is written) whether a newer version exists. Help > Check for Updates Automatically
+  (a check item, on unless turned off, kept in `updates.json` in the app's data folder)
+  stops the timed checks; Help > Check for Updates… checks at once.
+- **Quietly.** A newer version downloads in the background. The updater plugin checks the
+  download's signature against the public key the app was built with
+  (`plugins.updater.pubkey`) before it is kept; anything else is thrown away. Then the
+  toolbar shows **Update ready: Restart to update**. An automatic check that finds nothing
+  or can't reach the endpoint says nothing at all; only Help > Check for Updates answers, in
+  the same place for a few seconds ("Method Budget is up to date." or "Couldn't check for
+  updates"). Nothing appears as a dialog while you work.
+- **Restart to update** saves first: every open budget's unsaved changes go into its file
+  by Autosave's own rules (so a file changed outside the app is never written over: that
+  budget's question comes up instead), the open tabs and split view are remembered, and any
+  budget that still can't be saved (untitled, Autosave off, a file changed outside the app)
+  gets the same Save All, Discard All or Cancel question as quitting. Cancel leaves the
+  update ready. Then the update is installed and the app starts again with its tabs, split
+  view and tools panel as they were (the files reopen as at any start: src/tabs.rs).
+- **What's New** for the new version opens once after an update, after any start-up
+  question (recovered budgets, a file to open). Help > Release Notes shows this version's
+  notes at any time. The notes are `docs/releases/<version>.md`, copied into the app when it
+  is built (build.rs), read by `method_release::notes` into plain text pieces, and drawn with
+  DOM calls and `textContent` (ui/js/updates.js), never as markup.
+- **No key, no checks.** Until the release key exists, `tauri.conf.json` has a placeholder
+  public key; a build with it never checks (no timer, no network), and Help > Check for
+  Updates says "Couldn't check for updates". While the repository is private the endpoint
+  answers "not found", which is a failed check like any other.
+
+The page's side (main window only): `update_status` (the indicator's state:
+`{ phase, version, manual, said, automatic }`, `phase` being idle, checking, downloading,
+ready or installing; `manual` when the user asked; `said` a one-time answer: `current`,
+`failed` or `install-failed`), `update_restart`, `whats_new` (the notes once after an
+update, else null) and `release_notes`. Rust sends `update-status` events with the same
+shape. Check for Updates and the automatic switch are answered in Rust (src/updater.rs).
 
 ## Architecture
 
@@ -1770,6 +1837,9 @@ crates/fwb-app/
   src/safety_app.rs  its Tauri side: autosave timer, recovery and backup commands, Open
                      Recent and Autosave menu items, files opened by the system, opening
                      budgets in tabs and closing them, reopening the tabs at the start
+  src/updater.rs     in-app updates (the plugin driven from Rust: timed and asked-for
+                     checks, background download, Restart to update after saving every
+                     budget), What's New once after an update, Help > Release Notes
   src/app.rs         Tauri glue: commands, file dialogs, the close and quit guard (one
                      question about every unsaved tab), menu events
   examples/perf.rs   timings on a large sample budget (fwb_core::sample), and canned
@@ -1877,7 +1947,7 @@ it was before these optimizations). On this Mac, a one-cell edit in a 5,000-row 
 costs about 5 ms in Rust from command to JSON.
 
 **Calculation errors never lose an edit.** The engine stops at the first problem, which is
-right for `fwb check` but not for an editor. `diagnose::lenient_recalc` runs the engine;
+right for `method check` but not for an editor. `diagnose::lenient_recalc` runs the engine;
 if it fails, it checks every global, fringe rate and detail cell with the engine's own
 rules, flags each bad one (`issues`, by row id and field), and recalculates a copy with
 those cells blank. The UI shows the engine's message in a banner, outlines the bad cells,
@@ -1989,7 +2059,17 @@ waits for the next frame, so one layout serves a whole redraw.
 The app opens files the user picks and nothing else, and the web view is treated as
 untrusted (a budget file is data from anywhere).
 
-- **No network.** No updater, no telemetry, no remote content. The CSP limits every
+- **No network unless checking for updates.** No telemetry, no remote content, no
+  accounts. The only network access is the updater, in Rust (src/updater.rs): an HTTPS
+  request for the update manifest at the endpoint in `tauri.conf.json` and, when there is a
+  newer version, its archive. The updater's HTTP client is https-only and follows redirects
+  only to the endpoint's host (plus GitHub's two download hosts, `objects.githubusercontent.com`
+  and `release-assets.githubusercontent.com`, when the endpoint is on github.com); a
+  manifest pointing anywhere else is refused before downloading. An archive is installed
+  only if its minisign signature verifies against the public key built into the app; the
+  plugin's insecure-transport, invalid-certificate and downgrade options stay off (a test
+  checks), and a build with the placeholder key never checks at all. Automatic checks can be
+  turned off. The web view itself still has no network: the CSP limits every
   resource to the app's own bundled files and Tauri's IPC:
   `default-src 'self'; script-src 'self'; style-src 'self'; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`.
   No inline scripts or styles, no CDN. Styles that depend on the window or the budget
@@ -2006,7 +2086,10 @@ untrusted (a budget file is data from anywhere).
   `index.html?panel=setup`), never a URL from the page.
 - **Least privilege for the web view.** `capabilities/main.json` grants the main window
   only the app's own budget commands, the tab commands among them (and sending events to the
-  tools and Budget Setup windows).
+  tools and Budget Setup windows), and four update commands of ours (`update_status`,
+  `update_restart`, `whats_new`, `release_notes`). No window is granted the updater
+  plugin's own commands (`updater:*`): the plugin is driven from Rust only, and a test
+  checks that no capability names it.
   `capabilities/tools.json` grants the tools window, by its label, only what the panel
   calls: `get_view`, the selection summary and the apply edits, the setup tables as its
   compact tabs edit them, notes and the notes list, the setup lists' counts, order and short codes,
@@ -2102,7 +2185,13 @@ untrusted (a budget file is data from anywhere).
 Tauri crates are pinned to exact versions and, like every crate in `Cargo.lock`, must be at
 least 14 days old when added (`python3 scripts/check-crate-ages.py --only-changed HEAD`).
 `tauri` uses `default-features = false` with only `wry`, `common-controls-v6`, `x11` and
-`dbus` (no asset compression, no runtime ACL changes).
+`dbus` (no asset compression, no runtime ACL changes). `tauri-plugin-updater` uses
+`default-features = false` with only `rustls-tls`: no native TLS, no system proxy lookup,
+and no readers for the older archive formats (the Windows zip and the Linux tar; macOS
+always reads its `.app.tar.gz`). `reqwest` is named
+directly only for the updater's redirect policy; it was already in the build through the
+plugin, at the same version. `method-release` (the workspace's own release plumbing:
+versions, release notes, the updater key's shape) has no dependencies.
 
 ## Not yet
 

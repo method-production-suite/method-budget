@@ -1,0 +1,44 @@
+/* The toolbar's update indicator and the release notes dialog (js/updates.js). */
+
+.update-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.update-restart {
+  font-size: 12px;
+}
+
+.notes-dialog {
+  width: 560px;
+  max-height: calc(100vh - 64px);
+}
+
+.notes-body {
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+.notes-headline {
+  margin: 0 0 8px;
+}
+
+.notes-section {
+  margin: 14px 0 6px;
+  font-size: 13px;
+}
+
+.notes-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.notes-list li {
+  margin: 0 0 6px;
+  line-height: 1.45;
+}

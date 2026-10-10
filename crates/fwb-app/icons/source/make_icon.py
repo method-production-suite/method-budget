@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the Film Wizard Budgeting app icon (1024x1024 RGBA PNG), stdlib only.
+"""Generate the Method Budget app icon (1024x1024 RGBA PNG), stdlib only.
 
 Design: deep-indigo rounded-square tile; white film frame with sprocket holes
 on both side rails; three ascending white bars (a budget chart) inside.

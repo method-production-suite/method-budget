@@ -71,7 +71,7 @@ Sam's 2026 note 02 covers applying and removing the suppression group from the t
 with immediate recalculation, greyed lines, and a small rounding drift on toggling. The
 policy dropdowns and the "total" versus "active total" columns were not re-checked in 2026.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. [have] P1 **In-budget-total switch, greyed lines, full and counted totals, conflict =
    exclude.**

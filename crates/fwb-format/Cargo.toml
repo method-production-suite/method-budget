@@ -1,6 +1,6 @@
 [package]
 name = "fwb-format"
-description = "Film Wizard Budgeting native file format: versioned, diff-friendly JSON"
+description = "Method Budget native file format: versioned, diff-friendly JSON"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

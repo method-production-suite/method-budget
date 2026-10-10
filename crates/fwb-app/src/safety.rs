@@ -10,6 +10,8 @@
 //!
 //! ```text
 //! Recovery/<key>.fwb          the budget as it was at the last autosave
+//!                             (internal, never shown: keeps its pre-rename
+//!                             extension so migrated copies read the same way)
 //! Recovery/<key>.json         what it is: original path, title, time, owner
 //! Recovery/owner-<id>.lock    held (locked) by each running copy of the app
 //! Backups/<path hash>/        the last few versions of one document, as
@@ -526,8 +528,9 @@ pub struct BackupEntry {
 }
 
 /// The last [`BACKUPS_KEPT`] versions of each document, as they were on disk
-/// before a save replaced them: `Backups/<path hash>/<name> <time> UTC.fwb`,
-/// with a `source.json` naming the document.
+/// before a save replaced them: `Backups/<path hash>/<name> <time> UTC.mthd`,
+/// with a `source.json` naming the document. Backups taken before the rename
+/// to Method Budget end in `.fwb` and are listed alongside.
 #[derive(Debug)]
 pub struct Backups {
     dir: PathBuf,
@@ -558,7 +561,7 @@ impl Backups {
         let mut v: Vec<PathBuf> = entries
             .flatten()
             .map(|e| e.path())
-            .filter(|p| p.extension().is_some_and(|e| e == "fwb"))
+            .filter(|p| fwb_format::has_budget_extension(p))
             .collect();
         // Names end in a fixed-width UTC time, after the same document name.
         v.sort();
@@ -648,10 +651,11 @@ impl Backups {
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| "budget".into());
         let mut ms = now_ms();
-        let mut target = folder.join(format!("{stem} {} UTC.fwb", utc_stamp(ms)));
+        let name = |ms| format!("{stem} {} UTC.{}", utc_stamp(ms), fwb_format::EXTENSION);
+        let mut target = folder.join(name(ms));
         while target.exists() {
             ms += 1;
-            target = folder.join(format!("{stem} {} UTC.fwb", utc_stamp(ms)));
+            target = folder.join(name(ms));
         }
         write_atomically(&target, bytes, Access::Private)?;
         let all = self.list(document);
@@ -1131,6 +1135,26 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn backups_from_before_the_rename_are_listed_with_new_ones() {
+        let dir = temp_dir("backups-legacy");
+        let doc = dir.join("film.fwb");
+        let backups = Backups::new(&dir.join("Backups"));
+        let folder = backups.folder(&doc);
+        fs::create_dir_all(&folder).unwrap();
+        let old = "film 2026-01-01 00.00.00.000 UTC.fwb";
+        fs::write(folder.join(old), "version 1").unwrap();
+        fs::write(folder.join("notes.txt"), "not a backup").unwrap();
+        fs::write(&doc, "version 2").unwrap();
+        let new = backups.back_up(&doc, None).unwrap().unwrap();
+        assert!(new.to_string_lossy().ends_with(" UTC.mthd"), "{new:?}");
+        let entries = backups.entries(&doc);
+        assert_eq!(entries.len(), 2);
+        assert_eq!(backups.read(&doc, old).unwrap(), "version 1");
+        assert_eq!(backups.read(&doc, &entries[0].id).unwrap(), "version 2");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
     fn backups_keep_the_last_ten_distinct_versions() {
         let dir = temp_dir("backups");
         let doc = dir.join("work").join("film.fwb");
@@ -1157,7 +1181,7 @@ pub(crate) mod tests {
             .to_string_lossy()
             .into_owned();
         assert!(
-            first.starts_with("film ") && first.ends_with(" UTC.fwb"),
+            first.starts_with("film ") && first.ends_with(" UTC.mthd"),
             "{first}"
         );
         let source = fs::read_to_string(backups.folder(&doc).join("source.json")).unwrap();

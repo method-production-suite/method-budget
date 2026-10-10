@@ -80,7 +80,7 @@ stays outside the repo.
   and undo / redo. Top navigation: home, reports, setup, compare, find, an autosave toggle
   and a tools-pane toggle.
 
-## What this means for Film Wizard (backlog candidates)
+## What this means for Method Budget (backlog candidates)
 
 1. **Apply-to-selection panel**: tri-state checkboxes for fringes, groups, sets, locations
    and currency that reflect and edit the selected lines, with per-item selection totals.

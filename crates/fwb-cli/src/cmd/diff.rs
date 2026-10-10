@@ -1,4 +1,4 @@
-//! `fwb diff`: what changed from one budget to another, in plain words
+//! `method diff`: what changed from one budget to another, in plain words
 //! (`fwb_core::diff`; docs/MERGE.md).
 
 use std::fmt::Write as _;
@@ -7,7 +7,7 @@ use fwb_core::diff::{diff, BudgetDiff, MoneyLine, Place};
 
 use crate::cli::{exit, json_string, load, CliError, Flags, Outcome};
 
-pub const USAGE: &str = "  fwb diff <old.fwb> <new.fwb> [--json] [--exit-code]
+pub const USAGE: &str = "  method diff <old.mthd> <new.mthd> [--json] [--exit-code]
       What changed from the first budget to the second, in plain words
       (rows by id, accounts by number), with the money that moved per
       account, category and topsheet line. --json prints one JSON object

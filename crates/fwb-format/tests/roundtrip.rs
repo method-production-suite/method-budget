@@ -135,7 +135,7 @@ fn key_order_is_fixed() {
     for w in order.windows(2) {
         assert!(pos(w[0]) < pos(w[1]), "{} before {}", w[0], w[1]);
     }
-    assert!(text.starts_with("{\n  \"format\": \"film-wizard-budget\",\n  \"version\": 1,\n"));
+    assert!(text.starts_with("{\n  \"format\": \"method-budget\",\n  \"version\": 1,\n"));
 }
 
 #[test]

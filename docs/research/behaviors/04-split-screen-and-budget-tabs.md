@@ -38,7 +38,7 @@ None new. The tab menu has an entry for the keyboard shortcut sheet.
 Era caution: the 2021 build only. Not seen in Sam's 2026 recordings, so the split layout,
 the tab menu items and the sub-budget and share-version entries may have changed.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. **More than one budget open at once** [missing] P2. We are one budget per window and
    have no second window. The simplest local-desktop answer is multiple windows (one

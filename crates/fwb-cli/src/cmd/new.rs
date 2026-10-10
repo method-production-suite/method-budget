@@ -1,10 +1,10 @@
-//! `fwb new`: write a starter budget.
+//! `method new`: write a starter budget.
 
 use fwb_core::starter;
 
 use crate::cli::{save, CliError, Flags, Outcome};
 
-pub const USAGE: &str = "  fwb new <file.fwb>
+pub const USAGE: &str = "  method new <file.mthd>
       Write a starter budget.
 ";
 

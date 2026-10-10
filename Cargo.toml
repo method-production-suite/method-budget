@@ -1,8 +1,18 @@
 [workspace]
 resolver = "2"
-members = ["crates/fwb-core", "crates/fwb-format", "crates/fwb-cli", "crates/fwb-app"]
+members = [
+    "crates/fwb-core",
+    "crates/fwb-format",
+    "crates/fwb-cli",
+    "crates/fwb-app",
+    "crates/method-release",
+    "crates/xtask",
+]
 
 [workspace.package]
 edition = "2021"
-version = "0.0.1"
+# The one place the version lives: every crate inherits it, the app and
+# `method --version` report it, and `cargo xtask check-version` fails CI if
+# anything disagrees. Change it with `cargo xtask bump` (docs/RELEASING.md).
+version = "0.1.0"
 license = "MIT OR Apache-2.0"

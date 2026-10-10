@@ -1,4 +1,4 @@
-//! Film Wizard Budgeting native file format.
+//! Method Budget native file format.
 //!
 //! A budget is stored as pretty-printed JSON (2-space indent, trailing newline)
 //! with a fixed key order, so files diff cleanly and the same budget always
@@ -26,8 +26,38 @@ use fwb_core::Budget;
 
 use dto::{FileBudget, FileDoc, Header};
 
-/// The value of the top-level `"format"` field.
-pub const FORMAT_NAME: &str = "film-wizard-budget";
+/// The value of the top-level `"format"` field this build writes. See
+/// [`FORMAT_NAMES`] for what is read, and docs/FORMAT.md ("Identity").
+pub const FORMAT_NAME: &str = "method-budget";
+
+/// Every `"format"` value this build reads: [`FORMAT_NAME`], and the legacy
+/// identifier files were written with before the rename.
+pub const FORMAT_NAMES: &[&str] = &[FORMAT_NAME, LEGACY_FORMAT_NAME];
+
+/// The identifier written before the rename; still read, never written.
+pub const LEGACY_FORMAT_NAME: &str = "film-wizard-budget";
+
+/// The native file extension, without the dot. New files are saved as `.mthd`.
+pub const EXTENSION: &str = "mthd";
+
+/// The extension budgets had before the rename (`.fwb`). Still opened, and a
+/// budget opened from a `.fwb` keeps saving to that same file.
+pub const LEGACY_EXTENSION: &str = "fwb";
+
+/// Every extension a budget file may have, the native one first (for open
+/// dialogs and file associations).
+pub const EXTENSIONS: &[&str] = &[EXTENSION, LEGACY_EXTENSION];
+
+/// The media type of a budget file.
+pub const MIME_TYPE: &str = "application/vnd.method-budget+json";
+
+/// Whether `path` has one of the budget extensions ([`EXTENSIONS`]), in any
+/// letter case.
+pub fn has_budget_extension(path: &std::path::Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| EXTENSIONS.iter().any(|x| e.eq_ignore_ascii_case(x)))
+}
 
 /// The newest format version this build writes and reads.
 pub const FORMAT_VERSION: u64 = 1;
@@ -59,7 +89,7 @@ pub fn to_string(b: &Budget) -> String {
 pub fn from_str(s: &str) -> Result<Budget, FormatError> {
     let header: Header = serde_json::from_str(s).map_err(|e| FormatError::from_json(s, &e))?;
     match header.format {
-        Some(serde_json::Value::String(f)) if f == FORMAT_NAME => {}
+        Some(serde_json::Value::String(f)) if FORMAT_NAMES.contains(&f.as_str()) => {}
         other => {
             return Err(FormatError::NotABudget {
                 found: other.map(|v| v.to_string()),
@@ -106,7 +136,7 @@ pub enum FormatError {
         path: String,
         message: String,
     },
-    /// The top-level `"format"` field is missing or is not `"film-wizard-budget"`.
+    /// The top-level `"format"` field is missing or is none of [`FORMAT_NAMES`].
     /// `found` is the JSON text of the value found, if any.
     NotABudget { found: Option<String> },
     /// The `"version"` field is missing, or not a whole number of at least 1.
@@ -155,11 +185,11 @@ impl fmt::Display for FormatError {
             }
             FormatError::NotABudget { found: None } => write!(
                 f,
-                "not a Film Wizard budget file: no \"format\" field (expected \"{FORMAT_NAME}\")"
+                "not a Method Budget file: no \"format\" field (expected \"{FORMAT_NAME}\")"
             ),
             FormatError::NotABudget { found: Some(v) } => write!(
                 f,
-                "not a Film Wizard budget file: format is {v}, expected \"{FORMAT_NAME}\""
+                "not a Method Budget file: format is {v}, expected \"{FORMAT_NAME}\""
             ),
             FormatError::BadVersion { found: None } => {
                 f.write_str("missing \"version\" field: expected a whole number such as 1")
@@ -180,7 +210,7 @@ impl fmt::Display for FormatError {
             FormatError::NewerVersion { found, supported } => write!(
                 f,
                 "this file uses format version {found}, but this build reads versions up \
-                 to {supported}; open it with a newer Film Wizard Budgeting"
+                 to {supported}; open it with a newer Method Budget"
             ),
         }
     }
@@ -376,5 +406,17 @@ mod tests {
             path_at("{\"m\": {\"k\": {}}", 1, 15, "missing field `x`"),
             "m"
         );
+    }
+
+    #[test]
+    fn budget_extensions() {
+        use std::path::Path;
+        for ok in ["a.mthd", "a.MTHD", "a.fwb", "/x/v1.2.Fwb"] {
+            assert!(has_budget_extension(Path::new(ok)), "{ok}");
+        }
+        for no in ["a", "a.json", "a.mthd.xlsx", "mthd", "a.fwb-tmp"] {
+            assert!(!has_budget_extension(Path::new(no)), "{no}");
+        }
+        assert_eq!(EXTENSIONS, ["mthd", "fwb"]);
     }
 }

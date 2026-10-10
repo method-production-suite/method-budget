@@ -1,6 +1,6 @@
 //! The compare screen's commands (decisions.md, entries 17, 19 and 27): the
 //! budget in front (the base) against 1 to 15 others, each one an open tab,
-//! a saved version of the base, or a `.fwb` file picked in a native dialog.
+//! a saved version of the base, or a budget file picked in a native dialog.
 //!
 //! - Paths never come from the page. `compare_pick_files` shows the Open
 //!   dialog here, reads the chosen files and keeps them in [`CompareFiles`];
@@ -76,7 +76,7 @@ pub struct Picked {
     pub path: String,
 }
 
-/// The file's name without `.fwb`.
+/// The file's name without its extension.
 fn file_label(path: &Path) -> String {
     path.file_stem()
         .map(|s| s.to_string_lossy().into_owned())
@@ -637,7 +637,7 @@ pub async fn compare_pick_files<R: Runtime>(
         .dialog()
         .file()
         .set_title("Compare with budgets")
-        .add_filter("Film Wizard budget", &["fwb"])
+        .add_filter(crate::app::FILTER_NAME, fwb_format::EXTENSIONS)
         .set_parent(&window);
     if let Some(dir) = start {
         dialog = dialog.set_directory(dir);

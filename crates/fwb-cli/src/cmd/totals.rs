@@ -1,4 +1,4 @@
-//! `fwb totals`: the budget's totals for scripts and pipelines.
+//! `method totals`: the budget's totals for scripts and pipelines.
 
 use std::fmt::Write as _;
 
@@ -7,7 +7,7 @@ use fwb_format::export::money_text;
 
 use crate::cli::{json_string, load, CliError, Flags, Outcome};
 
-pub const USAGE: &str = "  fwb totals <file.fwb> [--json] [--exclude GROUP]...
+pub const USAGE: &str = "  method totals <file.mthd> [--json] [--exclude GROUP]...
       Print the totals, one `name<TAB>amount` line each (exact decimals), with
       the categories as `category<TAB>code<TAB>amount`. --json prints one JSON
       object with every amount in integer cents and the accounts too.

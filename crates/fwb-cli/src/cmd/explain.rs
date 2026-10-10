@@ -1,4 +1,4 @@
-//! `fwb explain`: how any total of a budget is worked out, step by step
+//! `method explain`: how any total of a budget is worked out, step by step
 //! (roadmap 3.5; the engine's `fwb_core::explain`).
 
 use fwb_core::explain::{Explainer, Target};
@@ -6,7 +6,7 @@ use fwb_core::RecalcOptions;
 
 use crate::cli::{load, CliError, Flags, Outcome};
 
-pub const USAGE: &str = "  fwb explain <file.fwb> <total> [--depth N] [--exclude GROUP]...
+pub const USAGE: &str = "  method explain <file.mthd> <total> [--depth N] [--exclude GROUP]...
       Explain how a total is worked out, as an indented tree whose leaves add
       up to it: lines (amount x X x 4X x rate, globals, currency, rounding),
       fringes (cutoffs, ranges, shares), posting, left-out lines, charges and

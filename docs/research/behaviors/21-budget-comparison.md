@@ -64,7 +64,7 @@ None.
 cloud). Sam's 2026 recordings win any conflict. Column names and the % definition could have
 changed; re-verify the percent rule against a current export before copying the semantics.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 Local-first: "link a budget" becomes "add a `.fwb` file (or a saved version) to the
 comparison"; recent files and versions inside the open budget are the picker's list.

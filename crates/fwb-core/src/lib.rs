@@ -1,4 +1,4 @@
-//! Film Wizard Budgeting engine.
+//! Method Budget engine.
 //!
 //! Clean-room: written from how film budgets work and from observed behaviour of
 //! budgeting tools, never from proprietary code or binaries. See CLEAN-ROOM.md.

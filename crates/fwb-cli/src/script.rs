@@ -1,4 +1,4 @@
-//! The edit language behind `fwb set` and `fwb apply` (docs/CLI.md, "Edit
+//! The edit language behind `method set` and `method apply` (docs/CLI.md, "Edit
 //! scripts"): one command per line, applied in order to a copy of the
 //! budget. Every command must succeed and the result must recalculate, or
 //! nothing is written.
@@ -673,7 +673,7 @@ pub fn run(path: &str, ops: &[(String, Op)], dry_run: bool) -> Outcome {
     if !changed {
         out.push_str("no changes\n");
     } else if dry_run {
-        // What would change, in the same words `fwb diff` uses.
+        // What would change, in the same words `method diff` uses.
         let d = fwb_core::diff::diff_with(&before, Some(&r_before), &after, Some(&r_after));
         out.push('\n');
         out.push_str(&d.to_text());

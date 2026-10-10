@@ -1,5 +1,5 @@
-//! `fwb merge`: three-way merge of budgets (`fwb_core::merge`;
-//! docs/MERGE.md). `fwb merge-driver` (src/cmd/merge_driver.rs) is the same
+//! `method merge`: three-way merge of budgets (`fwb_core::merge`;
+//! docs/MERGE.md). `method merge-driver` (src/cmd/merge_driver.rs) is the same
 //! merge for git.
 
 use std::fmt::Write as _;
@@ -11,7 +11,7 @@ use fwb_core::Budget;
 use crate::cli::{exit, load, write_atomic, CliError, Flags, Outcome};
 
 pub const USAGE: &str =
-    "  fwb merge <base.fwb> <ours.fwb> <theirs.fwb> -o <out.fwb> [--ours|--theirs]
+    "  method merge <base.mthd> <ours.mthd> <theirs.mthd> -o <out.mthd> [--ours|--theirs]
       Three-way merge: both budgets' changes since their common base.
       Changes to different rows, fields and setup items merge on their own;
       the same field changed both ways, or something deleted on one side and
@@ -25,7 +25,7 @@ pub fn run(args: &[String]) -> Outcome {
     let files = f.exactly(3, "the base, ours and theirs files", USAGE)?;
     let out = f
         .value("--out")
-        .ok_or_else(|| CliError::usage("merge needs -o <out.fwb>", USAGE))?;
+        .ok_or_else(|| CliError::usage("merge needs -o <out.mthd>", USAGE))?;
     let side = default_side(&f, USAGE)?;
     let (base, ours, theirs) = (load(&files[0])?, load(&files[1])?, load(&files[2])?);
     let m = merge_with(&base, &ours, &theirs, side, &Default::default());

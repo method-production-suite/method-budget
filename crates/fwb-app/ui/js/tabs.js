@@ -35,14 +35,14 @@ const strips = [];
 function ariaLabel(t) {
   const parts = [t.label];
   if (t.dirty) parts.push('unsaved changes');
-  if (t.conflict) parts.push('changed outside Film Wizard');
+  if (t.conflict) parts.push('changed outside Method Budget');
   return parts.join(', ');
 }
 
 function tooltip(t) {
   const lines = [t.title && t.title !== t.label ? `${t.label}: ${t.title}` : t.label, t.path || 'Not saved yet'];
   if (t.dirty) lines.push('Unsaved changes');
-  if (t.conflict) lines.push('Changed outside Film Wizard: autosave is paused until you choose which version to keep');
+  if (t.conflict) lines.push('Changed outside Method Budget: autosave is paused until you choose which version to keep');
   return lines.join('\n');
 }
 

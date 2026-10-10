@@ -47,7 +47,7 @@ Era caution: late-2020 build. The tab still exists in 2026 (note 01), but the di
 steps, the include list and the add versus replace buttons may have changed. Whether a
 "create new lines" shortcut keeps fringe ranges, notes or row formatting was not shown.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. **Tag presets: save a line's tags and stamp them onto a selection** [missing] P1. Our
    Apply panel tags a selection one item at a time. A saved bundle (for example "union crew

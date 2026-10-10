@@ -18,7 +18,7 @@ import time
 import tomllib
 import urllib.request
 
-UA = "film-wizard-budgeting cooldown check (https://github.com/ssandweiss/film-wizard-budgeting)"
+UA = "method-budget cooldown check (https://github.com/ssandweiss/method-budget)"
 
 
 def registry_packages(lock_text):

@@ -91,12 +91,12 @@ const NOT_SPLIT: &str = "The window isn't split.";
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct TabInfo {
     pub id: DocId,
-    /// What the tab shows: the file's name without `.fwb`, or the budget's
+    /// What the tab shows: the file's name without its extension, or the budget's
     /// title while it has no file ([`Session::tab_label`]).
     pub label: String,
     /// The budget's title.
     pub title: String,
-    /// The file's name as the title bar shows it (`Untitled.fwb` without one).
+    /// The file's name as the title bar shows it (`Untitled.mthd` without one).
     pub name: String,
     pub path: Option<String>,
     /// Unsaved changes.

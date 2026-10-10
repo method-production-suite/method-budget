@@ -323,7 +323,7 @@ fn app_props() -> String {
         "{XML_HEAD}<Properties \
          xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\" \
          xmlns:vt=\"http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes\">\
-         <Application>Film Wizard Budgeting</Application></Properties>"
+         <Application>Method Budget</Application></Properties>"
     )
 }
 

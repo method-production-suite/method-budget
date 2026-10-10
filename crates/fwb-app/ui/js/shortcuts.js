@@ -195,6 +195,7 @@ export const SHORTCUTS = [
 
   // Help
   { id: 'help.shortcuts', group: 'Help', label: 'Show this list of shortcuts', keys: 'mod+shift+/', scope: 'app' },
+  { id: 'help.release_notes', group: 'Help', label: 'Release notes: what is new in this version', scope: 'menu' },
 ];
 
 /** Groups in the order the shortcut sheet shows them. */

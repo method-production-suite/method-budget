@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Film Wizard Budgeting</title>
+    <title>Method Budget</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="setup.css">
     <link rel="stylesheet" href="print.css">
@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="sharing.css">
     <link rel="stylesheet" href="explain.css">
     <link rel="stylesheet" href="setupwin.css">
+    <link rel="stylesheet" href="updates.css">
     <script type="module" src="js/boot.js"></script>
   </head>
   <body>
@@ -50,6 +51,10 @@
         <div class="doc">
           <span class="doc-name" id="doc-name"></span>
           <span class="doc-dirty" id="doc-dirty" title="Unsaved changes" hidden></span>
+        </div>
+        <div class="update-status" id="update-status" role="status" aria-live="polite" hidden>
+          <span class="update-text" id="update-text" hidden></span>
+          <button type="button" class="btn update-restart" id="btn-update" hidden></button>
         </div>
         <button type="button" class="btn" id="btn-panel" aria-pressed="true" aria-controls="panel">Tools</button>
       </header>

@@ -219,7 +219,7 @@ pub fn to_pdf(doc: &Doc) -> Vec<u8> {
     }
     let mut info = b"<< /Title ".to_vec();
     info.extend(literal(&doc.title));
-    info.extend(b" /Producer (Film Wizard Budgeting) >>");
+    info.extend(b" /Producer (Method Budget) >>");
     objects.push(info);
     for (i, stream) in streams.into_iter().enumerate() {
         objects.push(

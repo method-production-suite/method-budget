@@ -51,7 +51,7 @@ text beyond a few-word term. The recording stays outside the repo.
   (Cmd+Shift+Space), make a fringe range (Cmd+R), remove a fringe range (Cmd+Shift+R). Range
   items are disabled unless the selection allows them.
 
-## What this means for Film Wizard (backlog candidates)
+## What this means for Method Budget (backlog candidates)
 
 1. **Autocomplete in unit and rate/amount cells**: prefix-matched dropdown of units (with
    "add new unit") and of global names in any formula cell; Enter/Tab accepts.

@@ -28,6 +28,10 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Test
         run: cargo test --workspace --locked
+      - name: Version agrees everywhere and has release notes
+        # docs/RELEASING.md: the workspace version, Cargo.lock, tauri.conf.json and
+        # docs/releases/<version>.md must agree on every push.
+        run: cargo xtask check-version
   cooldown:
     # Fails PRs that add crates published less than 14 days ago.
     if: github.event_name == 'pull_request'
@@ -40,3 +44,16 @@ jobs:
           persist-credentials: false
       - name: Check crate ages
         run: python3 scripts/check-crate-ages.py --only-changed origin/main
+  site:
+    # README.md and site/index.html must match docs/features.toml and the newest release
+    # notes (docs/WEBSITE.md); the Claude Code hooks behind that rule must still work.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Feature list and site are up to date
+        run: python3 scripts/site.py --check
+      - name: Hook scripts
+        run: bash scripts/hooks/test-hooks.sh

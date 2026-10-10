@@ -46,7 +46,7 @@ words; no copied text or images. The video stays outside the repo.
   pane and a Find item in the top navigation, so the feature lives on; the list of search
   types and the result layout may have changed.
 
-## What this means for Film Wizard
+## What this means for Method Budget
 
 1. [missing] P1 **Find panel**: pick a field or tag type (description, fringe, global,
    group, location, set, unit, currency, any formula text), type with suggestions, see
