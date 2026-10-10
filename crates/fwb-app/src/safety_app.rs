@@ -161,7 +161,8 @@ impl Safety {
     /// next start. Best effort.
     pub fn remember_tabs(&self, docs: &Docs) {
         let (files, active) = docs.files();
-        let _ = lock(&self.open_tabs).remember(&files, active);
+        let split = docs.saved_split();
+        let _ = lock(&self.open_tabs).remember_layout(&files, active, split);
     }
 }
 
@@ -461,6 +462,7 @@ pub fn close_doc(
 /// place of the starting Untitled budget; with nothing to reopen, that stays.
 pub fn restore_tabs(state: &AppState, safety: &Safety) -> usize {
     let (files, active) = lock(&safety.open_tabs).files();
+    let split = lock(&safety.open_tabs).split();
     let mut opened: Vec<(usize, Session)> = Vec::new();
     for (i, p) in files.iter().enumerate() {
         if let Ok(s) = Session::open(p) {
@@ -473,7 +475,9 @@ pub fn restore_tabs(state: &AppState, safety: &Safety) -> usize {
     let mut docs = state.docs();
     let mut instead = docs.lone_untouched();
     let mut ids = Vec::with_capacity(n);
-    for (_, s) in opened {
+    // The document each saved file opened as, by its place in the list.
+    let mut by_place: Vec<Option<DocId>> = vec![None; files.len()];
+    for (i, s) in opened {
         let id = match instead.take() {
             Some(old) => match docs.replace(old, s) {
                 Ok((id, gone)) => {
@@ -485,9 +489,16 @@ pub fn restore_tabs(state: &AppState, safety: &Safety) -> usize {
             None => docs.add(s),
         };
         ids.push(id);
+        if let Some(slot) = by_place.get_mut(i) {
+            *slot = Some(id);
+        }
     }
     if let Some(&id) = ids.get(front.unwrap_or(0)) {
         let _ = docs.switch(id);
+    }
+    // Split view as it was left (the target pane's budget in front).
+    if let Some(sp) = &split {
+        docs.restore_split(sp, &by_place);
     }
     ids.len()
 }
@@ -513,7 +524,7 @@ pub fn restore(
     let text = backups.read(&path, id).map_err(|e| e.to_string())?;
     let budget =
         fwb_format::from_str(&text).map_err(|e| format!("That backup can't be read: {e}"))?;
-    s.edit(|b| {
+    s.edit("Revert to a backup", |b| {
         *b = budget;
         Ok(())
     })
@@ -1094,7 +1105,10 @@ mod tests {
     }
 
     fn retitle(state: &AppState, t: &str) {
-        state.lock().edit(|b| edit::set_title(b, t)).unwrap();
+        state
+            .lock()
+            .edit("Test edit", |b| edit::set_title(b, t))
+            .unwrap();
     }
 
     fn files(dir: &Path, ext: &str) -> usize {
@@ -1364,7 +1378,7 @@ mod tests {
         state
             .lock_doc(Some(opened))
             .unwrap()
-            .edit(|b| edit::set_title(b, "Edited here"))
+            .edit("Test edit", |b| edit::set_title(b, "Edited here"))
             .unwrap();
         state.docs().switch(untitled).unwrap();
         let again = open_path(&state, &safety, &dir.join(".").join("other.fwb")).unwrap();
@@ -1400,7 +1414,7 @@ mod tests {
         state
             .lock_doc(Some(saved))
             .unwrap()
-            .edit(|b| edit::set_title(b, "Film, edited"))
+            .edit("Test edit", |b| edit::set_title(b, "Film, edited"))
             .unwrap();
         assert_eq!(state.docs().dirty(), [untitled, saved]);
 
@@ -1489,7 +1503,7 @@ mod tests {
         state
             .lock_doc(Some(o))
             .unwrap()
-            .edit(|b| edit::set_title(b, "Other, edited"))
+            .edit("Test edit", |b| edit::set_title(b, "Other, edited"))
             .unwrap();
         assert_eq!(
             autosave_doc(&state, &safety, Some(o), Instant::now(), true),
@@ -1519,7 +1533,7 @@ mod tests {
             state
                 .lock_doc(Some(f))
                 .unwrap()
-                .edit(|b| edit::set_title(b, "Film, unsaved"))
+                .edit("Test edit", |b| edit::set_title(b, "Film, unsaved"))
                 .unwrap();
             let done = autosave_pass(&state, &safety, later(5), false);
             assert!(
@@ -1624,7 +1638,7 @@ mod tests {
             state
                 .lock_doc(Some(id))
                 .unwrap()
-                .edit(|bud| edit::set_title(bud, t))
+                .edit("Test edit", |bud| edit::set_title(bud, t))
                 .unwrap();
         }
         write_theirs(&one, "One, theirs");
@@ -1641,7 +1655,7 @@ mod tests {
         state
             .lock_doc(Some(a))
             .unwrap()
-            .edit(|bud| edit::set_title(bud, "One, again"))
+            .edit("Test edit", |bud| edit::set_title(bud, "One, again"))
             .unwrap();
         assert!(save(&state, &safety, Some(a), &one).unwrap());
         assert_eq!(title_on_disk(&one), "One, again");

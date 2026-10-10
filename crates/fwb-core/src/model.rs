@@ -103,6 +103,13 @@ pub struct Budget {
     /// Hand-made display order of the setup tables (see [`crate::order`]).
     /// Layout, not content: versions don't carry it.
     pub setup_order: crate::order::SetupOrder,
+    /// Folders of setup items per kind (the personal library's folders, see
+    /// [`crate::folders`]). Layout, not content: versions don't carry them.
+    pub setup_folders: crate::folders::SetupFolders,
+    /// Where this budget came from, when it is a copy made for sharing or a
+    /// sub-budget (see [`Provenance`]). About the file, not content:
+    /// versions don't carry it.
+    pub provenance: Option<Provenance>,
 }
 
 impl Budget {
@@ -133,6 +140,8 @@ impl Budget {
             tag_presets: Vec::new(),
             line_presets: Vec::new(),
             setup_order: crate::order::SetupOrder::default(),
+            setup_folders: crate::folders::SetupFolders::default(),
+            provenance: None,
         }
     }
 
@@ -583,6 +592,12 @@ pub struct Charge {
     pub excluded_groups: BTreeSet<String>,
     pub excluded_categories: BTreeSet<String>,
     pub excluded_accounts: BTreeSet<String>,
+    /// Show the percent after the name in the topsheet label (percent
+    /// charges only). Display only: never changes a total.
+    pub label_percent: bool,
+    /// Show the excluded total after the name in the topsheet label.
+    /// Display only.
+    pub label_excluded: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -655,6 +670,45 @@ pub struct Baseline {
     pub categories: BTreeMap<String, Cents>,
     pub grand_total: Cents,
     pub net_total: Cents,
+}
+
+/// What kind of copy a budget with a [`Provenance`] is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProvenanceKind {
+    /// Saved for sharing (File > Save a Copy for Sharing). The application
+    /// opens it read-only.
+    SharedCopy,
+    /// An editable copy made from a shared copy; it keeps the shared copy's
+    /// source, so it can still be compared with or stored in the original.
+    EditableCopy,
+    /// A filtered copy of a parent budget (File > New Sub-Budget).
+    SubBudget,
+}
+
+/// Where a budget came from: stamped on copies made for sharing and on
+/// sub-budgets. Display data: never affects totals.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Provenance {
+    pub kind: ProvenanceKind,
+    /// The title of the budget it was made from.
+    pub source_title: String,
+    /// The version it was made from (its name), if it was a saved version
+    /// rather than the budget as it stood.
+    pub source_version: Option<String>,
+    /// When it was made, as an ISO 8601 date-time provided by the caller
+    /// (the engine never reads the clock).
+    pub saved: String,
+    /// The application version that made it (`"0.0.1"`).
+    pub app_version: String,
+    /// A note from whoever made it, or (for a sub-budget) what it keeps.
+    pub note: Option<String>,
+}
+
+impl Provenance {
+    /// Whether the application should open this budget read-only.
+    pub fn is_shared_copy(&self) -> bool {
+        self.kind == ProvenanceKind::SharedCopy
+    }
 }
 
 /// Identity of a [`Version`]. Unique within a budget's version list.
@@ -737,6 +791,8 @@ impl Budget {
             tag_presets: _,
             line_presets: _,
             setup_order: _,
+            setup_folders: _,
+            provenance: _,
         } = self;
         BudgetSnapshot {
             title: title.clone(),
@@ -790,6 +846,8 @@ impl Budget {
             tag_presets: _,
             line_presets: _,
             setup_order: _,
+            setup_folders: _,
+            provenance: _,
         } = self;
         let content = BudgetSnapshot {
             title,
@@ -909,6 +967,8 @@ impl BudgetSnapshot {
             tag_presets: Vec::new(),
             line_presets: Vec::new(),
             setup_order: crate::order::SetupOrder::default(),
+            setup_folders: crate::folders::SetupFolders::default(),
+            provenance: None,
         }
     }
 

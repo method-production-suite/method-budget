@@ -387,6 +387,24 @@ pub fn put_tag_preset(
     ids: &[RowId],
 ) -> EditResult<usize> {
     check_index(b, Which::Tags, index)?;
+    let p = b.tag_presets[index].clone();
+    put_tags(b, &p, mode, ids)
+}
+
+/// Makes the tags of rows `ids` exactly `tags` (its name is not used), as a
+/// tag preset's replace does: the apply panel's "Replace tags". Names are
+/// tidied as a saved preset's are, and each must be defined.
+pub fn replace_tags(b: &mut Budget, tags: TagPreset, ids: &[RowId]) -> EditResult<usize> {
+    let p = tidy_tags(b, tags);
+    let missing = missing_items(b, &p);
+    if !missing.is_empty() {
+        return Err(format!("This budget has no {}.", missing.join(", ")));
+    }
+    put_tags(b, &p, Mode::Replace, ids)
+}
+
+/// Puts the tags `p` carries on rows `ids` (see the module notes).
+fn put_tags(b: &mut Budget, p: &TagPreset, mode: Mode, ids: &[RowId]) -> EditResult<usize> {
     if ids.is_empty() {
         return Err("Select one or more lines first.".into());
     }
@@ -401,8 +419,7 @@ pub fn put_tag_preset(
     if !details(b).any(|d| want.contains(&d.id) && is_costed(d)) {
         return Err("None of the selected rows can take tags.".into());
     }
-    let p = b.tag_presets[index].clone();
-    refuse_missing(b, &p)?;
+    refuse_missing(b, p)?;
     let base = b.base_currency.clone();
     let currency = p.currency.clone().filter(|c| *c != base);
     let mut changed = 0;
@@ -681,7 +698,17 @@ pub fn save_tag_preset<R: Runtime>(
 ) -> Result<View, String> {
     let preset = fwb_format::tag_preset_from_value(preset)
         .map_err(|e| format!("That tag preset can't be saved: {e}"))?;
-    edit_budget(&window, &state, doc, |b| store_tag_preset(b, index, preset))
+    edit_budget(
+        &window,
+        &state,
+        doc,
+        if index.is_some() {
+            "Update a tag preset"
+        } else {
+            "Save a tag preset"
+        },
+        |b| store_tag_preset(b, index, preset),
+    )
 }
 
 /// `{rowId, name, parts}`: a new tag preset from a line's tags.
@@ -694,9 +721,13 @@ pub fn tag_preset_from_line<R: Runtime>(
     name: String,
     parts: Option<TagParts>,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| {
-        tag_preset_from_row(b, row_id, &name, parts.unwrap_or_default())
-    })
+    edit_budget(
+        &window,
+        &state,
+        doc,
+        format!("Save tag preset {}", name.trim()),
+        |b| tag_preset_from_row(b, row_id, &name, parts.unwrap_or_default()),
+    )
 }
 
 /// `{index, mode, rowIds, accounts, categories}`: puts tag preset `index` on
@@ -715,7 +746,7 @@ pub fn apply_tag_preset<R: Runtime>(
     categories: Option<Vec<usize>>,
 ) -> Result<View, String> {
     let mode = Mode::parse(&mode)?;
-    edit_budget(&window, &state, doc, |b| {
+    edit_budget(&window, &state, doc, "Apply a tag preset", |b| {
         let rows = selection_rows(
             b,
             row_ids.as_deref().unwrap_or_default(),
@@ -736,9 +767,13 @@ pub fn save_line_preset<R: Runtime>(
     row_ids: Vec<RowId>,
     keep: Option<BlockFields>,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| {
-        store_line_block(b, &name, &row_ids, keep.unwrap_or_default())
-    })
+    edit_budget(
+        &window,
+        &state,
+        doc,
+        format!("Save line block {}", name.trim()),
+        |b| store_line_block(b, &name, &row_ids, keep.unwrap_or_default()),
+    )
 }
 
 /// `{index}`: what inserting the block would add back, before inserting it.
@@ -765,7 +800,8 @@ pub fn insert_line_preset<R: Runtime>(
     before_row: Option<RowId>,
 ) -> Result<View, String> {
     let mut s = state.lock_doc(doc)?;
-    let pasted = s.edit(|b| insert_block(b, index, &account, before_row))?;
+    let label = format!("Insert a line block in {}", account.trim());
+    let pasted = s.edit(label, |b| insert_block(b, index, &account, before_row))?;
     Ok(finish(&window, &mut s, pasted.rows.first().copied()))
 }
 
@@ -780,9 +816,13 @@ pub fn rename_tool_preset<R: Runtime>(
     name: String,
 ) -> Result<View, String> {
     let which = Which::parse(&which)?;
-    edit_budget(&window, &state, doc, |b| {
-        rename_preset(b, which, index, &name)
-    })
+    edit_budget(
+        &window,
+        &state,
+        doc,
+        format!("Rename a preset to {}", name.trim()),
+        |b| rename_preset(b, which, index, &name),
+    )
 }
 
 /// `{which, index}`.
@@ -795,7 +835,9 @@ pub fn delete_tool_preset<R: Runtime>(
     index: usize,
 ) -> Result<View, String> {
     let which = Which::parse(&which)?;
-    edit_budget(&window, &state, doc, |b| delete_preset(b, which, index))
+    edit_budget(&window, &state, doc, "Delete a preset", |b| {
+        delete_preset(b, which, index)
+    })
 }
 
 /// `{which, index, to}`.
@@ -809,7 +851,9 @@ pub fn move_tool_preset<R: Runtime>(
     to: usize,
 ) -> Result<View, String> {
     let which = Which::parse(&which)?;
-    edit_budget(&window, &state, doc, |b| move_preset(b, which, index, to))
+    edit_budget(&window, &state, doc, "Move a preset", |b| {
+        move_preset(b, which, index, to)
+    })
 }
 
 #[cfg(test)]
@@ -892,12 +936,16 @@ mod tests {
     /// already tagged (group Crew, set Stage B, currency CAD).
     fn mixed(s: &mut Session) -> Vec<RowId> {
         let first = ids(s.budget(), "20-01")[0];
-        s.edit(|b| edit::add_detail(b, "20-01", Some(first), RowKind::Subtotal))
-            .unwrap();
-        s.edit(|b| edit::add_detail(b, "20-01", None, RowKind::Adjustment))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            edit::add_detail(b, "20-01", Some(first), RowKind::Subtotal)
+        })
+        .unwrap();
+        s.edit("Test edit", |b| {
+            edit::add_detail(b, "20-01", None, RowKind::Adjustment)
+        })
+        .unwrap();
         let rows = ids(s.budget(), "20-01");
-        s.edit(|b| {
+        s.edit("Test edit", |b| {
             let d = b
                 .categories_mut()
                 .flat_map(|c| &mut c.accounts)
@@ -967,8 +1015,10 @@ mod tests {
     fn a_preset_comes_from_a_lines_tags() {
         let mut s = Session::with_budget(budget(), None);
         let rows = mixed(&mut s);
-        s.edit(|b| tag_preset_from_row(b, rows[2], "From line", TagParts::default()))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            tag_preset_from_row(b, rows[2], "From line", TagParts::default())
+        })
+        .unwrap();
         let p = s.budget().tag_presets[0].clone();
         assert_eq!(p.fringes, names(&["PAYROLL"]));
         assert_eq!(p.groups, names(&["Crew"]));
@@ -981,8 +1031,10 @@ mod tests {
             currency: false,
             ..TagParts::default()
         };
-        s.edit(|b| tag_preset_from_row(b, rows[2], "Some", parts))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            tag_preset_from_row(b, rows[2], "Some", parts)
+        })
+        .unwrap();
         let p = &s.budget().tag_presets[1];
         assert!(p.fringes.is_empty() && p.currency.is_none());
         assert_eq!(p.groups, names(&["Crew"]));
@@ -990,10 +1042,20 @@ mod tests {
         // A subtotal has no tags; a gone row is refused.
         let before = s.budget().clone();
         assert!(s
-            .edit(|b| tag_preset_from_row(b, rows[1], "Sub", TagParts::default()))
+            .edit("Test edit", |b| tag_preset_from_row(
+                b,
+                rows[1],
+                "Sub",
+                TagParts::default()
+            ))
             .is_err());
         assert!(s
-            .edit(|b| tag_preset_from_row(b, 999_999, "Gone", TagParts::default()))
+            .edit("Test edit", |b| tag_preset_from_row(
+                b,
+                999_999,
+                "Gone",
+                TagParts::default()
+            ))
             .unwrap_err()
             .contains("999999"));
         assert_eq!(s.budget(), &before);
@@ -1003,10 +1065,13 @@ mod tests {
     fn add_joins_and_fills_only_empty_tags_in_one_undo_step() {
         let mut s = Session::with_budget(budget(), None);
         let rows = mixed(&mut s); // [line, subtotal, tagged line, adjustment]
-        s.edit(|b| store_tag_preset(b, None, crew())).unwrap();
+        s.edit("Test edit", |b| store_tag_preset(b, None, crew()))
+            .unwrap();
         let before = s.budget().clone();
 
-        let n = s.edit(|b| put_tag_preset(b, 0, Mode::Add, &rows)).unwrap();
+        let n = s
+            .edit("Test edit", |b| put_tag_preset(b, 0, Mode::Add, &rows))
+            .unwrap();
         assert_eq!(n, 3, "two lines and the adjustment");
         let b = s.budget().clone();
         let first = row(&b, rows[0]);
@@ -1038,7 +1103,10 @@ mod tests {
         assert!(s.redo());
         // Again: nothing changes, and there is no new undo step.
         let at = s.budget().clone();
-        assert_eq!(s.edit(|b| put_tag_preset(b, 0, Mode::Add, &rows)), Ok(0));
+        assert_eq!(
+            s.edit("Test edit", |b| put_tag_preset(b, 0, Mode::Add, &rows)),
+            Ok(0)
+        );
         assert_eq!(s.budget(), &at);
         assert!(s.undo());
         assert_eq!(s.budget(), &before);
@@ -1051,8 +1119,9 @@ mod tests {
         let mut p = crew();
         p.location = None; // an empty part clears the tag
         p.currency = None; // the base currency
-        s.edit(|b| store_tag_preset(b, None, p)).unwrap();
-        s.edit(|b| {
+        s.edit("Test edit", |b| store_tag_preset(b, None, p))
+            .unwrap();
+        s.edit("Test edit", |b| {
             let d = b
                 .categories_mut()
                 .flat_map(|c| &mut c.accounts)
@@ -1065,7 +1134,7 @@ mod tests {
         .unwrap();
         let before = s.budget().clone();
         let n = s
-            .edit(|b| put_tag_preset(b, 0, Mode::Replace, &rows))
+            .edit("Test edit", |b| put_tag_preset(b, 0, Mode::Replace, &rows))
             .unwrap();
         assert_eq!(n, 3);
         let b = s.budget().clone();
@@ -1086,20 +1155,22 @@ mod tests {
     fn a_refused_apply_changes_nothing() {
         let mut s = Session::with_budget(budget(), None);
         let rows = mixed(&mut s);
-        s.edit(|b| store_tag_preset(b, None, crew())).unwrap();
+        s.edit("Test edit", |b| store_tag_preset(b, None, crew()))
+            .unwrap();
         // The preset's fringe is deleted afterwards (it comes off the lines,
         // not off the preset).
-        s.edit(|b| edit::delete_fringe(b, "PENSION")).unwrap();
+        s.edit("Test edit", |b| edit::delete_fringe(b, "PENSION"))
+            .unwrap();
         let before = s.budget().clone();
         let refused = |s: &mut Session, index: usize, ids: &[RowId], want: &str| {
             let err = s
-                .edit(|b| put_tag_preset(b, index, Mode::Add, ids))
+                .edit("Test edit", |b| put_tag_preset(b, index, Mode::Add, ids))
                 .unwrap_err();
             assert!(err.contains(want), "{err}");
             assert_eq!(s.budget(), &before);
         };
         refused(&mut s, 0, &rows, "fringe PENSION");
-        s.edit(|b| {
+        s.edit("Test edit", |b| {
             b.tag_presets[0].fringes.clear();
             Ok(())
         })
@@ -1107,7 +1178,9 @@ mod tests {
         let before = s.budget().clone();
         let refused = |s: &mut Session, index: usize, ids: &[RowId], want: &str| {
             let err = s
-                .edit(|b| put_tag_preset(b, index, Mode::Replace, ids))
+                .edit("Test edit", |b| {
+                    put_tag_preset(b, index, Mode::Replace, ids)
+                })
                 .unwrap_err();
             assert!(err.contains(want), "{err}");
             assert_eq!(s.budget(), &before);
@@ -1172,14 +1245,17 @@ mod tests {
     fn a_block_keeps_the_checked_fields_and_the_setup_it_uses() {
         let mut s = Session::with_budget(budget(), None);
         let rows = ids(s.budget(), "20-01");
-        s.edit(|b| crate::apply::make_range(b, &rows)).unwrap();
-        s.edit(|b| {
+        s.edit("Test edit", |b| crate::apply::make_range(b, &rows))
+            .unwrap();
+        s.edit("Test edit", |b| {
             let on = crate::notes::NoteOwner::Row(rows[0]);
             crate::notes::add(b, &on, "Prep and shoot", "", None).map(|_| ())
         })
         .unwrap();
-        s.edit(|b| store_line_block(b, "Staff", &rows, BlockFields::default()))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            store_line_block(b, "Staff", &rows, BlockFields::default())
+        })
+        .unwrap();
         let p = s.budget().line_presets[0].clone();
         assert_eq!(p.rows.len(), 2);
         assert!(p.rows.iter().all(|d| d.id == 0));
@@ -1202,7 +1278,7 @@ mod tests {
             tags: false,
             notes: false,
         };
-        s.edit(|b| store_line_block(b, "Bare", &rows, bare))
+        s.edit("Test edit", |b| store_line_block(b, "Bare", &rows, bare))
             .unwrap();
         let p = &s.budget().line_presets[1];
         for d in &p.rows {
@@ -1220,7 +1296,9 @@ mod tests {
             ("", rows.clone(), "name"),
         ] {
             let err = s
-                .edit(|b| store_line_block(b, name, &ids, BlockFields::default()))
+                .edit("Test edit", |b| {
+                    store_line_block(b, name, &ids, BlockFields::default())
+                })
                 .unwrap_err();
             assert!(err.contains(want), "{err}");
             assert_eq!(s.budget(), &before);
@@ -1231,12 +1309,16 @@ mod tests {
     fn a_block_goes_in_above_the_cursor_with_new_ids_as_one_step() {
         let mut s = Session::with_budget(budget(), None);
         let staff = ids(s.budget(), "20-01");
-        s.edit(|b| crate::apply::make_range(b, &staff)).unwrap();
-        s.edit(|b| store_line_block(b, "Staff", &staff, BlockFields::default()))
+        s.edit("Test edit", |b| crate::apply::make_range(b, &staff))
             .unwrap();
+        s.edit("Test edit", |b| {
+            store_line_block(b, "Staff", &staff, BlockFields::default())
+        })
+        .unwrap();
         let camera = ids(s.budget(), "21-01");
         // Camera already has a range numbered 1.
-        s.edit(|b| crate::apply::make_range(b, &camera)).unwrap();
+        s.edit("Test edit", |b| crate::apply::make_range(b, &camera))
+            .unwrap();
         let total_before = s.selection(&camera).lines.details_total;
         let before = s.budget().clone();
 
@@ -1246,7 +1328,9 @@ mod tests {
         assert_eq!((p.what, p.count, p.source.as_str()), ("rows", 2, "Staff"));
 
         let pasted = s
-            .edit(|b| insert_block(b, 0, "21-01", Some(camera[1])))
+            .edit("Test edit", |b| {
+                insert_block(b, 0, "21-01", Some(camera[1]))
+            })
             .unwrap();
         let now = ids(s.budget(), "21-01");
         assert_eq!(now.len(), 4);
@@ -1271,7 +1355,9 @@ mod tests {
         assert_eq!(s.budget(), &before);
 
         // At the end of an account, and refusals that change nothing.
-        let pasted = s.edit(|b| insert_block(b, 0, "50-01", None)).unwrap();
+        let pasted = s
+            .edit("Test edit", |b| insert_block(b, 0, "50-01", None))
+            .unwrap();
         assert_eq!(ids(s.budget(), "50-01")[1..], pasted.rows[..]);
         s.undo();
         for (index, account, at, want) in [
@@ -1279,7 +1365,9 @@ mod tests {
             (0, "99-99", None, "99-99"),
             (0, "21-01", Some(staff[0]), "not in account"),
         ] {
-            let err = s.edit(|b| insert_block(b, index, account, at)).unwrap_err();
+            let err = s
+                .edit("Test edit", |b| insert_block(b, index, account, at))
+                .unwrap_err();
             assert!(err.contains(want), "{err}");
             assert_eq!(s.budget(), &before);
         }
@@ -1289,9 +1377,12 @@ mod tests {
     fn views_list_blocks_without_their_rows() {
         let mut s = Session::with_budget(budget(), None);
         let staff = ids(s.budget(), "20-01");
-        s.edit(|b| store_tag_preset(b, None, crew())).unwrap();
-        s.edit(|b| store_line_block(b, "Staff", &staff, BlockFields::default()))
+        s.edit("Test edit", |b| store_tag_preset(b, None, crew()))
             .unwrap();
+        s.edit("Test edit", |b| {
+            store_line_block(b, "Staff", &staff, BlockFields::default())
+        })
+        .unwrap();
         for v in [
             serde_json::to_value(s.view_with(None)).unwrap(),
             serde_json::to_value(s.full_view()).unwrap(),
@@ -1314,12 +1405,15 @@ mod tests {
     fn missing_setup_is_listed_and_added_back_while_the_budgets_own_wins() {
         let mut s = Session::with_budget(budget(), None);
         let staff = ids(s.budget(), "20-01");
-        s.edit(|b| store_line_block(b, "Staff", &staff, BlockFields::default()))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            store_line_block(b, "Staff", &staff, BlockFields::default())
+        })
+        .unwrap();
         // Since then: PAYROLL deleted (it comes off the lines), the Week unit
         // deleted, and a global changed.
-        s.edit(|b| edit::delete_fringe(b, "PAYROLL")).unwrap();
-        s.edit(|b| {
+        s.edit("Test edit", |b| edit::delete_fringe(b, "PAYROLL"))
+            .unwrap();
+        s.edit("Test edit", |b| {
             b.units.remove("Week");
             b.globals.insert("PREP_WEEKS".into(), "6".into());
             Ok(())
@@ -1339,7 +1433,9 @@ mod tests {
         );
 
         let before = s.budget().clone();
-        let pasted = s.edit(|b| insert_block(b, 0, "21-01", None)).unwrap();
+        let pasted = s
+            .edit("Test edit", |b| insert_block(b, 0, "21-01", None))
+            .unwrap();
         let b = s.budget().clone();
         assert!(b.fringes.contains_key("PAYROLL"));
         assert!(b.units.contains_key("Week"));

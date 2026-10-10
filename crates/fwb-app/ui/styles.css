@@ -361,6 +361,88 @@ body.tabs-dragging .doc-tab-btn {
 }
 
 /* ------------------------------------------------------------------------ */
+/* Split view (js/pane.js): two panes side by side, each with its own tab
+   strip, breadcrumb, grid and footer. The target pane (the one the toolbar,
+   menus and tools act on) has an accent along its strip and its tab in front
+   in bold; the other pane's tab in front is in plain weight. */
+
+.app.is-split {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.panes {
+  flex: 1 1 0;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pane {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pane > .main {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.pane.is-target > .tabbar {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.pane:not(.is-target) .doc-tab.is-active .doc-tab-btn {
+  font-weight: 400;
+}
+
+/* A tab dragged from the other pane, over an empty end of this strip. */
+.tabbar.is-drop-target .tabbar-tabs {
+  box-shadow: inset -2px 0 0 var(--accent);
+}
+
+.pane-divider {
+  flex: none;
+  position: relative;
+  z-index: 3;
+  width: 7px;
+  margin: 0 -3px;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.pane-divider::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: var(--border);
+}
+
+.pane-divider:hover::after,
+.pane-divider:focus-visible::after,
+body.panes-resizing .pane-divider::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 3px;
+  background: var(--accent);
+}
+
+body.panes-resizing {
+  cursor: col-resize;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ------------------------------------------------------------------------ */
 /* Buttons */
 
 .btn {

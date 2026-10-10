@@ -303,6 +303,7 @@ fn run<R: Runtime, K: Copy>(
     doc: Option<DocId>,
     key: String,
     what: &'static str,
+    label: String,
     f: impl FnOnce(&mut Budget) -> EditResult<Moved<K>>,
 ) -> Result<MovedView, String>
 where
@@ -310,7 +311,7 @@ where
 {
     let wide = |k: K| u64::try_from(k).unwrap_or(u64::MAX);
     let mut s = state.lock_doc(doc)?;
-    let moved = s.edit_merging(&key, |b| {
+    let moved = s.edit_merging(&key, label, |b| {
         let m = f(b)?;
         let next = key_of(what, m.items.iter().map(|&k| wide(k)));
         Ok((m, next))
@@ -333,7 +334,8 @@ pub fn move_rows<R: Runtime>(
     by: i32,
 ) -> Result<MovedView, String> {
     let key = key_of("rows", row_ids.iter().copied());
-    run(&window, &state, doc, key, "rows", |b| {
+    let label = move_label(row_ids.len(), "line", "lines", by);
+    run(&window, &state, doc, key, "rows", label, |b| {
         shift_rows(b, &row_ids, by)
     })
 }
@@ -367,7 +369,8 @@ pub fn move_accounts<R: Runtime>(
             .unwrap_or_default();
         key_of("accounts", places)
     };
-    run(&window, &state, doc, key, "accounts", |b| {
+    let label = move_label(codes.len(), "account", "accounts", by);
+    run(&window, &state, doc, key, "accounts", label, |b| {
         shift_accounts(b, &codes, by)
     })
 }
@@ -383,9 +386,16 @@ pub fn move_topsheet_rows<R: Runtime>(
     by: i32,
 ) -> Result<MovedView, String> {
     let key = key_of("topsheet", indexes.iter().map(|&i| i as u64));
-    run(&window, &state, doc, key, "topsheet", |b| {
+    let label = move_label(indexes.len(), "topsheet row", "topsheet rows", by);
+    run(&window, &state, doc, key, "topsheet", label, |b| {
         shift_topsheet_rows(b, &indexes, by)
     })
+}
+
+/// "Move 3 lines down".
+fn move_label(n: usize, one: &str, many: &str, by: i32) -> String {
+    let way = if by < 0 { "up" } else { "down" };
+    format!("Move {} {way}", crate::history::count(n, one, many))
 }
 
 #[cfg(test)]
@@ -673,7 +683,7 @@ mod tests {
         let start = s.budget().clone();
         let press = |s: &mut Session, sel: &[RowId], by| {
             let key = key_of("rows", sel.iter().copied());
-            s.edit_merging(&key, |b| {
+            s.edit_merging(&key, "Test edit", |b| {
                 let m = shift_rows(b, sel, by)?;
                 let next = key_of("rows", m.items.iter().copied());
                 Ok((m, next))

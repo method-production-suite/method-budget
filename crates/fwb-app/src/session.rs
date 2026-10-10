@@ -205,6 +205,60 @@ impl Patch {
 struct Snapshot {
     patch: Patch,
     rev: u64,
+    /// What the step did, as the History list shows it ("Edit rate on 21-01
+    /// line 3"), named by the command that made it.
+    label: String,
+    /// When the step was made: milliseconds since the Unix epoch (wall clock;
+    /// the History list shows it as a time of day).
+    at: u64,
+}
+
+/// Now, in milliseconds since the Unix epoch (0 if the clock is before it).
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
+}
+
+/// Longest step label kept, in characters (labels name rows and setup
+/// items, which can be long).
+pub const LABEL_MAX_CHARS: usize = 120;
+
+/// A step label: one line, at most [`LABEL_MAX_CHARS`] characters.
+fn tidy_label(label: String) -> String {
+    let one_line: String = label
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
+    let t = one_line.trim();
+    let t = if t.is_empty() { "Change" } else { t };
+    if t.chars().count() <= LABEL_MAX_CHARS {
+        return t.to_string();
+    }
+    let cut: String = t.chars().take(LABEL_MAX_CHARS - 1).collect();
+    format!("{}\u{2026}", cut.trim_end())
+}
+
+/// One undo step as the History list shows it.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct HistoryStep {
+    pub label: String,
+    /// Milliseconds since the Unix epoch.
+    pub at: u64,
+    /// Applied (an undo step), or undone (a redo step, after the current
+    /// position).
+    pub done: bool,
+}
+
+/// Every undo and redo step of a budget, oldest first. `current` is how
+/// many of them are applied: position 0 is the state before the first one
+/// listed (when the budget was opened or created, or the oldest state still
+/// kept once more than [`UNDO_LIMIT`] steps were made: `trimmed`).
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct History {
+    pub steps: Vec<HistoryStep>,
+    pub current: usize,
+    pub trimmed: bool,
 }
 
 #[derive(Debug)]
@@ -232,6 +286,8 @@ pub struct Session {
     /// The last [`Session::edit_merging`] step: the key the next one must
     /// bring to join it, when it was made, and the rev it left.
     merge: Option<(String, Instant, u64)>,
+    /// Older undo steps were dropped (more than [`UNDO_LIMIT`]).
+    trimmed: bool,
 }
 
 /// What autosave needs to know about one open budget.
@@ -299,6 +355,7 @@ impl Session {
             cache: RecalcCache::new(),
             safety,
             merge: None,
+            trimmed: false,
         }
     }
 
@@ -426,7 +483,7 @@ impl Session {
     pub fn load_from_disk(&mut self) -> Result<(), String> {
         let path = self.path.clone().ok_or("This budget has no file.")?;
         let (theirs, stamp) = read_budget(&path)?;
-        self.edit(|b| {
+        self.edit("Load the file's version", |b| {
             *b = theirs;
             Ok(())
         })?;
@@ -535,26 +592,58 @@ impl Session {
     }
 
     /// Applies `f` to a copy of the budget. On success the copy becomes current
-    /// and what changed goes on the undo stack; on error nothing changes. An
-    /// edit that changes nothing leaves history and the dirty flag alone.
-    pub fn edit<T>(&mut self, f: impl FnOnce(&mut Budget) -> EditResult<T>) -> EditResult<T> {
+    /// and what changed goes on the undo stack, named `label` in the History
+    /// list ("Edit rate on 21-01 line 3": what the command did); on error
+    /// nothing changes. An edit that changes nothing leaves history and the
+    /// dirty flag alone.
+    pub fn edit<T>(
+        &mut self,
+        label: impl Into<String>,
+        f: impl FnOnce(&mut Budget) -> EditResult<T>,
+    ) -> EditResult<T> {
+        self.check_writable()?;
         let mut next = self.budget.clone();
         let out = f(&mut next)?;
         let old = std::mem::replace(&mut self.budget, next);
         if let Some(patch) = Patch::between(old, &mut self.budget) {
-            self.undo.push(Snapshot {
-                patch,
-                rev: self.rev,
-            });
-            if self.undo.len() > UNDO_LIMIT {
-                self.undo.remove(0);
-            }
+            self.push_step(patch, self.rev, label.into());
             self.redo.clear();
             self.rev = self.next_rev;
             self.next_rev += 1;
             self.changed();
         }
         Ok(out)
+    }
+
+    /// A copy saved for sharing opens read-only (src/sharing.rs): its
+    /// provenance asks for it. Every edit goes through [`Session::edit`],
+    /// which refuses while this is true.
+    pub fn is_read_only(&self) -> bool {
+        self.budget
+            .provenance
+            .as_ref()
+            .is_some_and(fwb_core::Provenance::is_shared_copy)
+    }
+
+    fn check_writable(&self) -> EditResult {
+        if self.is_read_only() {
+            return Err(crate::sharing::READ_ONLY.into());
+        }
+        Ok(())
+    }
+
+    /// Puts a step on the undo stack (dropping the oldest past the limit).
+    fn push_step(&mut self, patch: Patch, rev: u64, label: String) {
+        self.undo.push(Snapshot {
+            patch,
+            rev,
+            label: tidy_label(label),
+            at: now_ms(),
+        });
+        if self.undo.len() > UNDO_LIMIT {
+            self.undo.remove(0);
+            self.trimmed = true;
+        }
     }
 
     /// Like [`Session::edit`], but quick repeats join one undo step: when the
@@ -564,18 +653,23 @@ impl Session {
     /// key the next edit must bring to join this one. Moving rows uses it, so
     /// holding Option+Down is one undo step, not one per row passed. A run
     /// that ends where it started leaves no step at all.
+    ///
+    /// `label` names the step in the History list; a joined step takes the
+    /// label of the latest edit that joined it.
     pub fn edit_merging<T>(
         &mut self,
         key: &str,
+        label: impl Into<String>,
         f: impl FnOnce(&mut Budget) -> EditResult<(T, String)>,
     ) -> EditResult<T> {
+        self.check_writable()?;
         let now = Instant::now();
         let joins = matches!(&self.merge, Some((k, at, rev))
             if k == key && *rev == self.rev && now.duration_since(*at) < MERGE_WINDOW)
             && !self.undo.is_empty();
         if !joins {
             let before = self.rev;
-            let (out, next_key) = self.edit(f)?;
+            let (out, next_key) = self.edit(label, f)?;
             // Only a step this made can be joined: one that changed nothing
             // left someone else's step on top.
             self.merge = (self.rev != before).then_some((next_key, now, self.rev));
@@ -595,10 +689,7 @@ impl Session {
         let start = std::mem::replace(&mut self.budget, next);
         match Patch::between(start, &mut self.budget) {
             Some(patch) => {
-                self.undo.push(Snapshot {
-                    patch,
-                    rev: top.rev,
-                });
+                self.push_step(patch, top.rev, label.into());
                 self.redo.clear();
                 self.rev = self.next_rev;
                 self.next_rev += 1;
@@ -620,6 +711,23 @@ impl Session {
     }
 
     pub fn undo(&mut self) -> bool {
+        if !self.step_back() {
+            return false;
+        }
+        self.changed();
+        true
+    }
+
+    pub fn redo(&mut self) -> bool {
+        if !self.step_forward() {
+            return false;
+        }
+        self.changed();
+        true
+    }
+
+    /// Undoes one step without telling anyone (undo, and the History jumps).
+    fn step_back(&mut self) -> bool {
         let Some(s) = self.undo.pop() else {
             return false;
         };
@@ -627,13 +735,15 @@ impl Session {
         self.redo.push(Snapshot {
             patch: back,
             rev: self.rev,
+            label: s.label,
+            at: s.at,
         });
         self.rev = s.rev;
-        self.changed();
         true
     }
 
-    pub fn redo(&mut self) -> bool {
+    /// Redoes one step without telling anyone.
+    fn step_forward(&mut self) -> bool {
         let Some(s) = self.redo.pop() else {
             return false;
         };
@@ -641,10 +751,98 @@ impl Session {
         self.undo.push(Snapshot {
             patch: back,
             rev: self.rev,
+            label: s.label,
+            at: s.at,
         });
         self.rev = s.rev;
-        self.changed();
         true
+    }
+
+    // The History list (src/history.rs): every step, a jump to any of them,
+    // and the budget as it was at any of them.
+
+    /// Every undo and redo step, oldest first, and how many are applied.
+    pub fn history(&self) -> History {
+        let steps = self
+            .undo
+            .iter()
+            .map(|s| (s, true))
+            .chain(self.redo.iter().rev().map(|s| (s, false)))
+            .map(|(s, done)| HistoryStep {
+                label: s.label.clone(),
+                at: s.at,
+                done,
+            })
+            .collect();
+        History {
+            steps,
+            current: self.undo.len(),
+            trimmed: self.trimmed,
+        }
+    }
+
+    /// How many history positions there are past the start (every undo and
+    /// redo step).
+    fn history_len(&self) -> usize {
+        self.undo.len() + self.redo.len()
+    }
+
+    /// Undoes or redoes steps until `pos` of them are applied (0: the start
+    /// of the list). One change, however many steps it passes. Refused
+    /// when there is no such position.
+    pub fn jump_to(&mut self, pos: usize) -> Result<(), String> {
+        if pos > self.history_len() {
+            return Err("That step is no longer in the history.".into());
+        }
+        if pos == self.undo.len() {
+            return Ok(());
+        }
+        while self.undo.len() > pos && self.step_back() {}
+        while self.undo.len() < pos && self.step_forward() {}
+        self.changed();
+        Ok(())
+    }
+
+    /// The budget as it was with `pos` steps applied, leaving the current
+    /// one, its history and its totals exactly as they are: the steps are
+    /// walked on the budget itself and walked back (a patch applied twice
+    /// gives what it started from), so nothing but the copy is made.
+    pub fn budget_at(&mut self, pos: usize) -> Result<Budget, String> {
+        let n = self.history_len();
+        if pos > n {
+            return Err("That step is no longer in the history.".into());
+        }
+        let here = self.undo.len();
+        if pos == here {
+            return Ok(self.budget.clone());
+        }
+        // (patch that walks back to here, rev, label, time), in walk order.
+        let mut walked: Vec<Snapshot> = Vec::new();
+        if pos < here {
+            for _ in pos..here {
+                let s = self.undo.pop().expect("counted above");
+                let back = s.patch.apply(&mut self.budget);
+                walked.push(Snapshot { patch: back, ..s });
+            }
+        } else {
+            for _ in here..pos {
+                let s = self.redo.pop().expect("counted above");
+                let back = s.patch.apply(&mut self.budget);
+                walked.push(Snapshot { patch: back, ..s });
+            }
+        }
+        let copy = self.budget.clone();
+        let forward = pos < here;
+        while let Some(s) = walked.pop() {
+            let again = s.patch.apply(&mut self.budget);
+            let restored = Snapshot { patch: again, ..s };
+            if forward {
+                self.undo.push(restored);
+            } else {
+                self.redo.push(restored);
+            }
+        }
+        Ok(copy)
     }
 
     /// The (cached) lenient recalc of the current budget.
@@ -667,6 +865,24 @@ impl Session {
     /// What the UI draws after a command.
     pub fn view(&mut self) -> View {
         self.view_with(None)
+    }
+
+    /// The view with `focus` on screen instead of the session's own account,
+    /// changing nothing: split view's other pane showing this budget at
+    /// another account (src/tabs.rs, `pane_view`).
+    pub fn view_at(&mut self, focus: Option<&Focus>) -> View {
+        self.outcome();
+        let focus = focus.and_then(|f| f.resolve(&self.budget));
+        let st = ViewState {
+            rev: self.view_rev,
+            outcome: self.outcome.as_ref().expect("just computed"),
+            path: self.path.as_deref(),
+            name: self.display_name(),
+            dirty: self.is_dirty(),
+            can_undo: self.can_undo(),
+            can_redo: self.can_redo(),
+        };
+        View::build(&mut self.budget, &st, focus, None)
     }
 
     /// The view, noting a row an edit just created so the UI can select it.
@@ -723,8 +939,9 @@ impl Session {
     // Convenience wrappers used by the commands and tests.
 
     pub fn set_detail_field(&mut self, id: RowId, field: &str, value: &str) -> EditResult {
+        let label = crate::history::cell_label(&self.budget, id, field);
         let field = edit::Field::parse(field)?;
-        self.edit(|b| edit::set_detail_field(b, id, field, value))
+        self.edit(label, |b| edit::set_detail_field(b, id, field, value))
     }
 
     pub fn add_detail(
@@ -734,7 +951,8 @@ impl Session {
         kind: &str,
     ) -> EditResult<RowId> {
         let kind = edit::parse_kind(kind)?;
-        self.edit(|b| edit::add_detail(b, account, after, kind))
+        let label = crate::history::insert_label(kind, account);
+        self.edit(label, |b| edit::add_detail(b, account, after, kind))
     }
 }
 
@@ -929,7 +1147,7 @@ mod tests {
             let mut states = vec![s.budget().clone()];
             for _ in 0..60 {
                 let before = s.budget().clone();
-                s.edit(|b| {
+                s.edit("Test edit", |b| {
                     random_edit(&mut rng, b);
                     Ok(())
                 })
@@ -986,6 +1204,53 @@ mod tests {
         }
     }
 
+    /// Split view's other pane gets its own account in its view without
+    /// moving the budget's own account on screen or changing anything.
+    #[test]
+    fn a_view_at_another_account_changes_nothing() {
+        let mut s = Session::with_budget(small_sample(5), None);
+        let accts: Vec<(usize, String, usize, String)> = s
+            .budget()
+            .topsheet
+            .iter()
+            .enumerate()
+            .filter_map(|(ti, r)| match r {
+                TopsheetRow::Category(c) => Some((ti, c)),
+                _ => None,
+            })
+            .flat_map(|(ti, c)| {
+                c.accounts
+                    .iter()
+                    .enumerate()
+                    .map(move |(ai, a)| (ti, c.code.clone(), ai, a.code.clone()))
+            })
+            .collect();
+        let focus = |i: usize| {
+            let (ti, cat, ai, acct) = accts[i].clone();
+            Focus {
+                category: cat,
+                ti,
+                account: acct,
+                ai,
+            }
+        };
+        s.set_focus(Some(focus(0)));
+        let rev = s.view_rev();
+        let mine = s.view();
+        let other = s.view_at(Some(&focus(1)));
+        assert_eq!(mine.account.as_ref().unwrap().code, accts[0].3);
+        assert_eq!(other.account.as_ref().unwrap().code, accts[1].3);
+        assert_eq!(other.rev, mine.rev, "the same budget, as it is");
+        assert_eq!(
+            s.focused(),
+            Some((accts[0].0, accts[0].2)),
+            "its own account stays"
+        );
+        assert_eq!(s.view_rev(), rev);
+        assert!(s.view_at(None).account.is_none());
+        assert_eq!(s.view().account.unwrap().code, accts[0].3);
+    }
+
     /// A one-cell edit keeps one row, not a budget.
     #[test]
     fn a_cell_edit_keeps_only_that_row() {
@@ -1003,7 +1268,7 @@ mod tests {
             other => panic!("unexpected patch {other:?}"),
         }
         // A setup edit keeps the shell, not the rows.
-        s.edit(|b| {
+        s.edit("Test edit", |b| {
             b.globals.insert("X".into(), "1".into());
             Ok(())
         })
@@ -1013,7 +1278,7 @@ mod tests {
             Body::Parts { shell: Some(_), rows } if rows.is_empty()
         ));
         // An edit that changes nothing adds no step.
-        s.edit(|_| Ok(())).unwrap();
+        s.edit("Test edit", |_| Ok(())).unwrap();
         assert_eq!(s.undo.len(), 2);
     }
 

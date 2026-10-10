@@ -452,3 +452,28 @@ fn a_setup_order_in_byte_order_or_naming_nothing_is_left_out() {
     }}"#;
     assert!(fwb_format::from_str(doc).is_err());
 }
+
+#[test]
+fn charge_label_switches_round_trip_and_are_left_out_when_off() {
+    let mut b = sample();
+    let text = fwb_format::to_string(&b);
+    assert!(!text.contains("label_percent") && !text.contains("label_excluded"));
+
+    b.charges[0].label_percent = true;
+    b.charges[2].label_excluded = true; // a flat charge
+    let text = round_trip(&b);
+    let v: Value = serde_json::from_str(&text).unwrap();
+    let charges = &v["budget"]["charges"];
+    assert_eq!(charges[0]["label_percent"], true);
+    assert!(charges[0].get("label_excluded").is_none());
+    assert_eq!(charges[2]["label_excluded"], true);
+    assert!(charges[2].get("label_percent").is_none());
+    // Written last in its charge, after the percent.
+    let at = |key: &str| text.find(key).unwrap();
+    let label = at("\"label_percent\"");
+    assert!(at("\"percent\": \"10\"") < label && label < at("\"Insurance\""));
+
+    // A switch that isn't a boolean is refused.
+    let bad = text.replacen("\"label_percent\": true", "\"label_percent\": \"yes\"", 1);
+    assert!(fwb_format::from_str(&bad).is_err());
+}

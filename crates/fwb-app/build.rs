@@ -39,6 +39,7 @@ const COMMANDS: &[&str] = &[
     "delete_currency",
     // Topsheet setup tabs
     "set_charge",
+    "preview_charge",
     "delete_charge",
     "move_charge",
     "set_credit",
@@ -76,6 +77,8 @@ const COMMANDS: &[&str] = &[
     "apply_summary",
     "apply_to_rows",
     "assign_to_rows",
+    "clear_from_rows",
+    "replace_tags_on_rows",
     "make_fringe_range",
     "clear_fringe_range",
     // Quick entry: add setup items from a cell, new-line defaults (src/quickadd.rs)
@@ -115,6 +118,10 @@ const COMMANDS: &[&str] = &[
     "restore_version",
     "rename_version",
     "delete_version",
+    // The History list (src/history.rs)
+    "history_list",
+    "history_jump",
+    "history_save_version",
     "compare_budgets",
     "compare_detail",
     "compare_pick_files",
@@ -124,6 +131,13 @@ const COMMANDS: &[&str] = &[
     "move_tab",
     "close_tab",
     "list_tabs",
+    // Split view (src/tabs.rs)
+    "split_view",
+    "close_split",
+    "set_target_pane",
+    "move_tab_in_pane",
+    "move_to_pane",
+    "pane_view",
     // Reports: saved report presets, printing and PDF (src/reports.rs)
     "save_report_preset",
     "delete_report_preset",
@@ -159,6 +173,25 @@ const COMMANDS: &[&str] = &[
     "sheet_import_pick",
     "sheet_import_preview",
     "sheet_import",
+    // Renumbering accounts to a new pattern (src/renumber.rs)
+    "renumber_preview",
+    "renumber_accounts",
+    // Copies for sharing and sub-budgets (src/sharing.rs)
+    "share_copy_save",
+    "share_copy_editable",
+    "share_copy_original",
+    "share_copy_store",
+    "sub_budget_new",
+    // The personal setup library (src/library.rs)
+    "library_view",
+    "library_create",
+    "library_choose",
+    "library_add_preview",
+    "library_add",
+    "library_save_preview",
+    "library_save",
+    "library_folder",
+    "library_move",
 ];
 
 fn main() {

@@ -7,7 +7,7 @@ use crate::model::{
     Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource, Detail, FringePosting, TopsheetRow,
 };
 use crate::report::{
-    CategoryTotals, ChargeTotals, CreditRowTotals, CreditTotals, LevelTotals, RowTotals,
+    CategoryTotals, ChargeTotals, CreditRowTotals, CreditTotals, LevelTotals, Report, RowTotals,
 };
 use crate::Cents;
 
@@ -52,7 +52,7 @@ pub(crate) fn finish(
         .charges
         .iter()
         .filter(|c| c.applied)
-        .map(|c| charge(ctx, &categories, atl_btl, c))
+        .map(|c| charge(ctx.b, &categories, atl_btl, c))
         .collect::<Result<Vec<_>, _>>()?;
     let grand_total = sum(charges.iter().map(|c| c.amount))
         .and_then(|c| c.checked_add(atl_btl))
@@ -201,8 +201,16 @@ fn counted(posting: &FringePosting, r: &RowTotals) -> Option<Cents> {
     }
 }
 
+/// What charge `c` comes to on the budget `report` was computed from, applied
+/// or not: the same figures a recalc would list for it, without
+/// recalculating anything else. For a live preview of a charge being edited.
+/// `report` must come from recalculating `b`.
+pub fn charge_preview(b: &Budget, report: &Report, c: &Charge) -> Result<ChargeTotals, CalcError> {
+    charge(b, &report.categories, report.atl_btl, c)
+}
+
 fn charge(
-    ctx: &Ctx,
+    b: &Budget,
     cats: &[CategoryTotals],
     atl_btl: Cents,
     c: &Charge,
@@ -213,7 +221,7 @@ fn charge(
     // Flat fees exclude only groups (and manual amounts), per the reference.
     let by_code = matches!(c.kind, ChargeKind::Percent(_));
     let mut excluded = sum(c.excluded_amounts.iter().map(|(_, a)| *a)).ok_or_else(ovf)?;
-    for l in lines(ctx.b, cats) {
+    for l in lines(b, cats) {
         let hit = l
             .detail
             .groups
@@ -223,7 +231,7 @@ fn charge(
                 && (c.excluded_accounts.contains(l.account)
                     || c.excluded_categories.contains(l.category)));
         if hit {
-            let v = counted(&ctx.b.fringe_posting, l.row).ok_or_else(ovf)?;
+            let v = counted(&b.fringe_posting, l.row).ok_or_else(ovf)?;
             excluded = excluded.checked_add(v).ok_or_else(ovf)?;
         }
     }
@@ -238,9 +246,8 @@ fn charge(
         }
         ChargeKind::Flat { amount, currency } => {
             let base = match currency {
-                Some(cur) if *cur != ctx.b.base_currency => {
-                    let rate = ctx
-                        .b
+                Some(cur) if *cur != b.base_currency => {
+                    let rate = b
                         .currencies
                         .get(cur)
                         .ok_or_else(|| err(at(), ErrorKind::UnknownCurrency(cur.clone())))?
@@ -302,18 +309,30 @@ fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals
         // Unrounded: rows are summed, capped and discounted before rounding.
         let pct = |v: Dec| v.checked_mul(cr.percent)?.checked_div(hundred);
         let net_dec = Dec::from_cents(net);
-        let credit = match cr.cap {
-            CreditCap::None => pct(net_dec),
-            CreditCap::QualifiedSpend(cap) => pct(net_dec.min(Dec::from_cents(cap))),
-            CreditCap::Credit(cap) => pct(net_dec).map(|v| v.min(Dec::from_cents(cap))),
-        }
-        .ok_or_else(row_ovf)?;
+        let (credit, cap_variance) = match cr.cap {
+            CreditCap::None => (pct(net_dec), None),
+            CreditCap::QualifiedSpend(cap) => {
+                let cap = Dec::from_cents(cap);
+                (pct(net_dec.min(cap)), Some(cap.checked_sub(net_dec)))
+            }
+            CreditCap::Credit(cap) => {
+                let cap = Dec::from_cents(cap);
+                let uncapped = pct(net_dec);
+                (
+                    uncapped.map(|v| v.min(cap)),
+                    Some(uncapped.and_then(|v| cap.checked_sub(v))),
+                )
+            }
+        };
+        let credit = credit.ok_or_else(row_ovf)?;
+        let cap_variance = cap_variance.map(|v| v.ok_or_else(row_ovf)).transpose()?;
         total = total.checked_add(credit).ok_or_else(ovf)?;
         rows.push(CreditRowTotals {
             gross,
             excluded_fringes,
             net,
             credit,
+            cap_variance,
         });
     }
 
@@ -511,6 +530,8 @@ mod tests {
             excluded_groups: BTreeSet::new(),
             excluded_categories: BTreeSet::new(),
             excluded_accounts: BTreeSet::new(),
+            label_percent: false,
+            label_excluded: false,
         }
     }
 
@@ -958,19 +979,24 @@ mod tests {
                     gross: 552_950,
                     excluded_fringes: 30_000,
                     net: 522_950,
-                    credit: d("1307.375")
+                    credit: d("1307.375"),
+                    cap_variance: None,
                 },
                 CreditRowTotals {
                     gross: 1_000_000,
                     excluded_fringes: 0,
                     net: 1_000_000,
-                    credit: d("800")
+                    credit: d("800"),
+                    // The cap is $4,000 of spend; $6,000 of it earns nothing.
+                    cap_variance: Some(d("-6000")),
                 },
                 CreditRowTotals {
                     gross: 1_000_000,
                     excluded_fringes: 0,
                     net: 1_000_000,
-                    credit: d("2500")
+                    credit: d("2500"),
+                    // 30% of $10,000 is $3,000, $500 over the $2,500 cap.
+                    cap_variance: Some(d("-500")),
                 },
             ]
         );
@@ -1027,6 +1053,29 @@ mod tests {
         );
         assert_eq!(ts.credits_total, 285_000 + 414_782);
         assert_eq!(ts.net_total, ts.grand_total - 285_000 - 414_782);
+    }
+
+    #[test]
+    fn cap_variance_is_room_left_under_the_cap() {
+        let mut b = fixture(FringePosting::Account);
+        b.credits = vec![credit(
+            "Tax",
+            vec![
+                // $1,000 of spend under a $1,500 spend cap: $500 of room.
+                credit_row(
+                    CreditSource::Flat(100_000),
+                    "25",
+                    CreditCap::QualifiedSpend(150_000),
+                ),
+                // 25% of $1,000 is $250, $50.01 under a $300.01 credit cap.
+                credit_row(CreditSource::Flat(100_000), "25", CreditCap::Credit(30_001)),
+                // Exactly at the cap.
+                credit_row(CreditSource::Flat(100_000), "25", CreditCap::Credit(25_000)),
+            ],
+        )];
+        let ts = run(&b);
+        let v: Vec<_> = ts.credits[0].rows.iter().map(|r| r.cap_variance).collect();
+        assert_eq!(v, vec![Some(d("500")), Some(d("50.01")), Some(d("0"))]);
     }
 
     #[test]

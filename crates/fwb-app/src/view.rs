@@ -63,6 +63,9 @@ pub struct View {
     pub doc: crate::docs::DocId,
     /// Every open budget's tab, in tab order.
     pub tabs: Vec<crate::docs::TabInfo>,
+    /// The window's panes: one, or two side by side (split view), each
+    /// pane's tabs and the one in front, and which pane is the target.
+    pub panes: Option<crate::docs::PanesInfo>,
 }
 
 /// One account in full: its rows in file-format JSON and their totals.
@@ -460,6 +463,7 @@ impl View {
             account,
             doc: 0,
             tabs: Vec::new(),
+            panes: None,
         }
     }
 }

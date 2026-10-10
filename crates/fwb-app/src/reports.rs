@@ -101,9 +101,17 @@ pub fn save_report_preset<R: Runtime>(
 ) -> Result<View, String> {
     let preset = fwb_format::report_preset_from_value(preset)
         .map_err(|e| format!("That report setup can't be saved: {e}"))?;
-    edit_budget(&window, &state, doc, |b| {
-        apply_save_preset(b, index, preset)
-    })
+    edit_budget(
+        &window,
+        &state,
+        doc,
+        if index.is_some() {
+            "Update a report preset"
+        } else {
+            "Save a report preset"
+        },
+        |b| apply_save_preset(b, index, preset),
+    )
 }
 
 /// `{index}`.
@@ -114,7 +122,9 @@ pub fn delete_report_preset<R: Runtime>(
     doc: Option<DocId>,
     index: usize,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| apply_delete_preset(b, index))
+    edit_budget(&window, &state, doc, "Delete a report preset", |b| {
+        apply_delete_preset(b, index)
+    })
 }
 
 /// How a print or PDF request ended.
@@ -290,19 +300,27 @@ mod tests {
     fn save_rename_default_delete() {
         let mut s = Session::new();
         assert_eq!(
-            s.edit(|b| apply_save_preset(b, None, preset("  Studio  ", true)))
-                .unwrap(),
+            s.edit("Test edit", |b| apply_save_preset(
+                b,
+                None,
+                preset("  Studio  ", true)
+            ))
+            .unwrap(),
             0
         );
-        s.edit(|b| apply_save_preset(b, None, preset("Crew", false)))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            apply_save_preset(b, None, preset("Crew", false))
+        })
+        .unwrap();
         assert_eq!(
             names(&s),
             vec![("Studio".into(), true), ("Crew".into(), false)]
         );
         // One default: making Crew the default clears Studio's flag.
-        s.edit(|b| apply_save_preset(b, Some(1), preset("Crew", true)))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            apply_save_preset(b, Some(1), preset("Crew", true))
+        })
+        .unwrap();
         assert_eq!(
             names(&s),
             vec![("Studio".into(), false), ("Crew".into(), true)]
@@ -310,14 +328,14 @@ mod tests {
         // Rename in place, and change the spec in the same step.
         let mut p = preset("Crew pack", true);
         p.spec.sections = vec![ReportSection::Notes];
-        s.edit(|b| apply_save_preset(b, Some(1), p.clone()))
+        s.edit("Test edit", |b| apply_save_preset(b, Some(1), p.clone()))
             .unwrap();
         assert_eq!(s.budget().report_presets[1], p);
         // Each change is one undo step.
         assert!(s.undo());
         assert_eq!(s.budget().report_presets[1].name, "Crew");
         assert!(s.redo());
-        s.edit(|b| apply_delete_preset(b, 0)).unwrap();
+        s.edit("Test edit", |b| apply_delete_preset(b, 0)).unwrap();
         assert_eq!(names(&s), vec![("Crew pack".into(), true)]);
         assert!(s.undo());
         assert_eq!(s.budget().report_presets.len(), 2);
@@ -326,39 +344,61 @@ mod tests {
     #[test]
     fn refused_changes_leave_the_budget_alone() {
         let mut s = Session::new();
-        s.edit(|b| apply_save_preset(b, None, preset("Studio", false)))
-            .unwrap();
-        s.edit(|b| apply_save_preset(b, None, preset("Crew", false)))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            apply_save_preset(b, None, preset("Studio", false))
+        })
+        .unwrap();
+        s.edit("Test edit", |b| {
+            apply_save_preset(b, None, preset("Crew", false))
+        })
+        .unwrap();
         let before = s.budget().clone();
-        let dup = s.edit(|b| apply_save_preset(b, None, preset(" studio ", false)));
+        let dup = s.edit("Test edit", |b| {
+            apply_save_preset(b, None, preset(" studio ", false))
+        });
         assert!(dup.unwrap_err().contains("already"));
         // Renaming onto another preset's name is refused too; keeping its
         // own name is fine.
         assert!(s
-            .edit(|b| apply_save_preset(b, Some(1), preset("STUDIO", false)))
+            .edit("Test edit", |b| apply_save_preset(
+                b,
+                Some(1),
+                preset("STUDIO", false)
+            ))
             .is_err());
         assert!(s
-            .edit(|b| apply_save_preset(b, None, preset("   ", false)))
+            .edit("Test edit", |b| apply_save_preset(
+                b,
+                None,
+                preset("   ", false)
+            ))
             .is_err());
         assert!(s
-            .edit(|b| apply_save_preset(b, Some(5), preset("X", false)))
+            .edit("Test edit", |b| apply_save_preset(
+                b,
+                Some(5),
+                preset("X", false)
+            ))
             .is_err());
-        assert!(s.edit(|b| apply_delete_preset(b, 2)).is_err());
+        assert!(s.edit("Test edit", |b| apply_delete_preset(b, 2)).is_err());
         let mut twice = preset("Twice", false);
         twice.spec.sections = vec![ReportSection::Topsheet, ReportSection::Topsheet];
-        let e = s.edit(|b| apply_save_preset(b, None, twice)).unwrap_err();
+        let e = s
+            .edit("Test edit", |b| apply_save_preset(b, None, twice))
+            .unwrap_err();
         assert!(e.starts_with("The section"), "{e}");
         assert_eq!(s.budget(), &before);
-        s.edit(|b| apply_save_preset(b, Some(1), preset("crew", false)))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            apply_save_preset(b, Some(1), preset("crew", false))
+        })
+        .unwrap();
         assert_eq!(s.budget().report_presets[1].name, "crew");
     }
 
     #[test]
     fn at_most_max_presets() {
         let mut s = Session::new();
-        s.edit(|b| {
+        s.edit("Test edit", |b| {
             for i in 0..MAX_PRESETS {
                 apply_save_preset(b, None, preset(&format!("P{i}"), false))?;
             }
@@ -366,11 +406,17 @@ mod tests {
         })
         .unwrap();
         assert!(s
-            .edit(|b| apply_save_preset(b, None, preset("One more", false)))
+            .edit("Test edit", |b| apply_save_preset(
+                b,
+                None,
+                preset("One more", false)
+            ))
             .is_err());
         // Replacing one is still fine at the limit.
-        s.edit(|b| apply_save_preset(b, Some(0), preset("First", false)))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            apply_save_preset(b, Some(0), preset("First", false))
+        })
+        .unwrap();
     }
 
     #[test]
@@ -383,7 +429,8 @@ mod tests {
         });
         let p = fwb_format::report_preset_from_value(v).unwrap();
         let mut s = Session::new();
-        s.edit(|b| apply_save_preset(b, None, p)).unwrap();
+        s.edit("Test edit", |b| apply_save_preset(b, None, p))
+            .unwrap();
         let view = serde_json::to_value(s.view()).unwrap();
         assert_eq!(
             view["budget"]["report_presets"],

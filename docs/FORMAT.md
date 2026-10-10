@@ -97,6 +97,7 @@ Fields in written order:
 | `title`           | text, **required** | Budget title. |
 | `base_currency`   | text, **required** | Currency code that totals are computed in and that lines without a currency use. |
 | `totals_currency` | optional text | Currency the totals are shown in, when not the base currency. |
+| `provenance`      | [provenance](#provenance) | Where this budget came from, when it is a copy saved for sharing or a sub-budget. Left out otherwise. |
 | `account_coding`  | [account coding](#account-coding) | Left out when it is the default pattern. |
 | `fringe_posting`  | [fringe posting](#fringe-posting) | Left out when it is the default (by category, suffix `"99"`). |
 | `new_line_defaults` | [new-line defaults](#new-line-defaults) | Left out when it is the default (copy fringes only). |
@@ -115,6 +116,7 @@ Fields in written order:
 | `baseline`        | [baseline](#baseline) | Frozen totals for comparison. Left out when there is none. |
 | `display`         | [display settings](#display-settings) | How numbers show on screen. Left out when every setting is the default. |
 | `setup_order`     | [setup order](#setup-order) | Hand-made display order of the setup tables. Left out when every table is in name order. |
+| `setup_folders`   | [setup folders](#setup-folders) | Folders of setup items per kind (the personal library's). Left out when no kind has a folder. |
 | `report_presets`  | list of [report presets](#report-preset) | Saved report setups, in the user's order. Left out when there are none. |
 | `tag_presets`     | list of [tag presets](#tag-preset) | Saved bundles of line tags, in the user's order. Left out when there are none. |
 | `line_presets`    | list of [line blocks](#line-block) | Saved blocks of rows to insert, in the user's order. Left out when there are none. |
@@ -357,6 +359,8 @@ A tagged object. Both kinds share these fields:
 | `excluded_groups`     | name set | |
 | `excluded_categories` | name set | Category codes. |
 | `excluded_accounts`   | name set | Account codes. |
+| `label_percent`       | boolean, default `false` | Show the percent after the name in the topsheet label (percent charges). Display only. Written last, left out when `false`. |
+| `label_excluded`      | boolean, default `false` | Show the excluded total after the name in the topsheet label. Display only. Written after `label_percent`, left out when `false`. |
 
 Kind-specific fields (written right after `applied`):
 
@@ -433,6 +437,36 @@ field is.
 "display": { "rate_cutoff": "10", "rate_decimals_below": 4, "rate_decimals_above": 2, "summary_rows": false }
 ```
 
+### Provenance
+
+Where a budget came from: stamped on a copy saved for sharing and on a sub-budget. It is
+about the file, not its content: a [version](#version) never has one, and restoring a
+version keeps the current one. It names its source by title only, never by path. Fields
+in written order:
+
+| Field            | Type | Notes |
+|------------------|------|-------|
+| `kind`           | text, **required** | `"shared_copy"` (saved for sharing; Film Wizard Budgeting opens it read-only), `"editable_copy"` (an editable copy made from a shared copy), or `"sub_budget"` (a filtered copy of another budget). |
+| `source_title`   | text, **required** | The title of the budget it was made from. |
+| `source_version` | optional text | The name of the saved version it was made from, when it wasn't the budget as it stood. |
+| `saved`          | text, **required** | When it was made, as an ISO 8601 date-time such as `"2026-10-09T14:30:00-07:00"`. Stored as given; the reader does not check it. |
+| `app_version`    | text, **required** | The version of the program that made it. |
+| `note`           | optional text | A note from whoever made it; for a sub-budget, what it keeps (`"Categories 10, 20; groups Night; without fringes"`). |
+
+Read-only is a request, not a lock: any program may edit the file, and Film Wizard
+Budgeting offers an editable copy instead.
+
+```json
+"provenance": {
+  "kind": "shared_copy",
+  "source_title": "Short Film",
+  "source_version": "Studio draft",
+  "saved": "2026-10-09T14:30:00-07:00",
+  "app_version": "0.0.1",
+  "note": "For the studio's review"
+}
+```
+
 ### Setup order
 
 The order the application shows each setup table in, first to last, when it isn't name
@@ -449,6 +483,27 @@ the type-ahead follow it; nothing else depends on it. Layout, not content: a
 "setup_order": { "fringes": ["PAYROLL", "PENSION", "MEALS"] }
 ```
 
+### Setup folders
+
+Named folders of setup items, one set of folders per kind: an object whose keys are kinds
+(`global`, `fringe`, `group`, `unit`, `set`, `location`, `currency`, `charge`, `credit`,
+`tag_preset`, `line_preset`, `report_preset`), each an object of folder names to lists of
+item names (exact names: a charge, credit or preset by its `name`). An item is in at most
+one folder of its kind; an item in none is unfiled. A folder may be empty. A folder name is
+1 to 60 characters with no control characters, unique within its kind ignoring case (the
+application's rule). A reader takes the object as is; a writer keeps only the known kinds,
+only names that exist (each in its first folder), keeps empty folders, leaves out a kind
+with no folders, and leaves `setup_folders` out when no kind has one. Display only: no
+amount or assignment depends on it. Layout, not content: a [version](#version) never has
+one, and saving or restoring a version keeps the current folders.
+
+The personal setup library (docs/APP.md, "Setup library") is an ordinary budget file with
+setup, no `topsheet`, and usually `setup_folders`; nothing else marks it as a library.
+
+```json
+"setup_folders": { "fringe": { "Payroll": ["FICA", "FUI"], "Union": [] } }
+```
+
 ### Version
 
 A named, full copy of the budget's content, saved inside the budget so it can be restored
@@ -460,7 +515,7 @@ or compared later. Fields in written order:
 | `name`    | text, **required** | |
 | `created` | text, **required** | When the version was saved, as an ISO 8601 date-time such as `"2026-10-09T14:30:00Z"`. Stored as given; the reader does not check it. |
 | `note`    | optional text | |
-| `budget`  | object, **required** | A [budget](#budget) object with every field except `versions`, `report_presets`, `tag_presets`, `line_presets`, `display` and `setup_order`: a version cannot contain versions, presets, display settings or a setup order, and a reader rejects one that does. |
+| `budget`  | object, **required** | A [budget](#budget) object with every field except `versions`, `report_presets`, `tag_presets`, `line_presets`, `display`, `setup_order`, `setup_folders` and `provenance`: a version cannot contain versions, presets, display settings, a setup order, setup folders or a provenance, and a reader rejects one that does. |
 
 Restoring a version in the application first saves the current content as another version
 (named `Before restoring "<name>"`), so a restore can be undone.
@@ -722,6 +777,14 @@ valid. Loading and saving it in Film Wizard Budgeting normalizes it.
   `short_code`; budget `setup_order`; report preset `skip_done_notes`. All are left out at
   their default, so files that don't use them are unchanged, and a file with an old
   `note` changes only when it is saved again.
+- Version 1, additive (2026-10): charge `label_percent` and `label_excluded` (what the
+  topsheet label shows besides the name). Display only and left out when `false`, so files
+  that don't use them are unchanged.
+- Version 1, additive (2026-10): budget `setup_folders` (folders of setup items per kind,
+  used by the personal setup library). Left out when no kind has a folder, so files that
+  don't use them are unchanged.
+- Version 1, additive (2026-10): budget [`provenance`](#provenance) (where a shared copy or
+  a sub-budget came from). Left out when there is none, so other files are unchanged.
 
 ## Complete example
 

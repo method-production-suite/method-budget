@@ -809,6 +809,9 @@ impl RecentFiles {
 struct TabsJson {
     files: Vec<String>,
     active: Option<usize>,
+    /// Split view: which of `files` are in which pane (src/docs.rs).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    split: Option<crate::docs::SavedSplit>,
 }
 
 /// The files open as tabs (in tab order) and which of them is in front, kept
@@ -846,15 +849,33 @@ impl OpenTabs {
         (files, active)
     }
 
+    /// Split view as it was kept, by place in [`OpenTabs::files`]'s list
+    /// (`None`: one pane). Places past the list are dropped when restored.
+    pub fn split(&self) -> Option<crate::docs::SavedSplit> {
+        self.saved.split.clone()
+    }
+
     /// Remembers `files` (tab order) with `active` in front; writes only
     /// when that differs from what is kept.
     pub fn remember(&mut self, files: &[PathBuf], active: Option<usize>) -> io::Result<()> {
+        self.remember_layout(files, active, None)
+    }
+
+    /// [`OpenTabs::remember`], with split view (which files are in which
+    /// pane) or `None` for one pane.
+    pub fn remember_layout(
+        &mut self,
+        files: &[PathBuf],
+        active: Option<usize>,
+        split: Option<crate::docs::SavedSplit>,
+    ) -> io::Result<()> {
         let next = TabsJson {
             files: files
                 .iter()
                 .filter_map(|p| p.to_str().map(str::to_string))
                 .collect(),
             active,
+            split,
         };
         if next == self.saved {
             return Ok(());
@@ -896,6 +917,33 @@ pub(crate) mod tests {
         assert_eq!(OpenTabs::load(Some(file.clone())).files().1, None);
         fs::write(&file, "not json").unwrap();
         assert_eq!(OpenTabs::load(Some(file)).files(), (Vec::new(), None));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn split_view_is_kept_with_the_open_tabs() {
+        let dir = temp_dir("tabs-split");
+        let file = dir.join("tabs.json");
+        let mut t = OpenTabs::load(Some(file.clone()));
+        let (a, b) = (dir.join("a.fwb"), dir.join("b.fwb"));
+        let split = crate::docs::SavedSplit {
+            panes: [vec![0], vec![1, 0]],
+            fronts: [0, 1],
+            target: 1,
+        };
+        t.remember_layout(&[a.clone(), b.clone()], Some(1), Some(split.clone()))
+            .unwrap();
+        let again = OpenTabs::load(Some(file.clone()));
+        assert_eq!(again.files(), (vec![a.clone(), b.clone()], Some(1)));
+        assert_eq!(again.split(), Some(split));
+        // One pane again: nothing about panes is written.
+        t.remember(&[a.clone(), b.clone()], Some(1)).unwrap();
+        let text = fs::read_to_string(&file).unwrap();
+        assert!(!text.contains("\"split\""), "{text}");
+        assert_eq!(OpenTabs::load(Some(file.clone())).split(), None);
+        // A file from before split view reads as one pane.
+        fs::write(&file, r#"{"files": ["x.fwb"], "active": 0}"#).unwrap();
+        assert_eq!(OpenTabs::load(Some(file)).split(), None);
         fs::remove_dir_all(&dir).unwrap();
     }
 

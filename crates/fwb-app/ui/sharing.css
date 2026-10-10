@@ -1,0 +1,148 @@
+/* Copies for sharing and sub-budgets (js/sharing.js), and the renumber
+   preview in the Settings tab (js/renumber.js). */
+
+/* The read-only shared copy's banner, under the breadcrumb. */
+.share-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--selection);
+}
+
+.share-banner strong {
+  color: var(--accent);
+}
+
+.share-banner-detail {
+  overflow-wrap: anywhere;
+}
+
+.share-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  margin-left: auto;
+}
+
+/* Dialogs */
+.share-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  padding: 6px 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.share-fieldset legend {
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.share-note {
+  resize: vertical;
+  min-height: 3em;
+}
+
+.sub-dialog {
+  max-height: 80vh;
+  overflow: auto;
+}
+
+.sub-list {
+  overflow: auto;
+}
+
+.sub-chart {
+  max-height: 30vh;
+}
+
+.sub-accounts {
+  padding-left: 22px;
+}
+
+.sub-tag-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sub-tags {
+  max-height: 16vh;
+}
+
+/* Renumber preview (Settings > Account numbers) */
+.rn-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.rn-table-host {
+  max-height: 40vh;
+  overflow: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.rn-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.rn-table th,
+.rn-table td {
+  padding: 2px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.rn-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-weight: normal;
+}
+
+.rn-table .rn-kind th {
+  padding-top: 6px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.rn-same td {
+  color: var(--text-muted);
+}
+
+.rn-bad td {
+  color: var(--danger);
+}
+
+.rn-box button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.rn-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.rn-conflicts {
+  color: var(--danger);
+}

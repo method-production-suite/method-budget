@@ -207,6 +207,8 @@ fn gen_charge(rng: &mut Rng) -> Charge {
         excluded_groups: rng.texts(),
         excluded_categories: rng.texts(),
         excluded_accounts: rng.texts(),
+        label_percent: rng.chance(50),
+        label_excluded: rng.chance(50),
     }
 }
 

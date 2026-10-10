@@ -108,17 +108,35 @@ export function importRequest(items, explicit, choices) {
   return { picks, resolutions };
 }
 
-function choiceSelect(it) {
+/** The review's words: Import Setup's, unless a caller (library.js) says otherwise. */
+const REVIEW_TEXT = {
+  title: (p) => `Import setup from ${p.source}`,
+  intro: "Tick what to bring into this budget. What an item needs comes with it. Where this budget has an item of the same name set up differently, it keeps its own version unless you choose otherwise.",
+  okText: 'Import',
+  keepText: "Keep this budget's version",
+  takeText: 'Use the imported version',
+  renameText: (to) => `Add the imported one as ${to}`,
+  choiceTitle: "The imported version replaces this budget's for everything here that uses it; a new name leaves this budget's as it is.",
+  hereLabel: 'Here',
+  otherLabel: 'Imported',
+  status: STATUS_TEXT,
+  emptyText: 'That budget has no setup items.',
+  doing: 'to import',
+  tickAll: (heading) => `Import every item in ${heading}`,
+  tickOne: (what) => `Import ${what}`,
+};
+
+function choiceSelect(it, text) {
   const label = `${KIND_LABELS[it.kind] || it.kind} ${it.name}`.trim();
   const select = el('select', { class: 'modal-input imp-choice', attrs: { 'aria-label': `What to do with ${label}` } });
   const options = [
-    ['keep', "Keep this budget's version"],
-    ['imported', 'Use the imported version'],
+    ['keep', text.keepText],
+    ['imported', text.takeText],
   ];
-  if (it.rename_to) options.push(['rename', `Add the imported one as ${it.rename_to}`]);
-  for (const [value, text] of options) select.append(el('option', { text, attrs: { value } }));
+  if (it.rename_to) options.push(['rename', text.renameText(it.rename_to)]);
+  for (const [value, label2] of options) select.append(el('option', { text: label2, attrs: { value } }));
   select.value = 'keep';
-  select.title = "The imported version replaces this budget's for everything here that uses it; a new name leaves this budget's as it is.";
+  select.title = text.choiceTitle;
   return select;
 }
 
@@ -143,9 +161,21 @@ export async function importSetup(ctx) {
   showReview(ctx, preview);
 }
 
-function showReview(ctx, p) {
+/**
+ * The review dialog: Import Setup's, or (library.js) a copy to or from the
+ * library. `opts`: words to use instead of REVIEW_TEXT's, `picked` (items to
+ * tick at the start) and `run(request)`, which does the copy and resolves
+ * with { view, message } (Import Setup's runs `import_setup`).
+ */
+export function showReview(ctx, p, opts = {}) {
+  const text = { ...REVIEW_TEXT, ...opts };
   const items = p.items || [];
   const explicit = new Set();
+  for (const it of opts.picked || []) {
+    const k = keyOf(it.kind, it.name);
+    if (items.some((x) => keyOf(x.kind, x.name) === k)) explicit.add(k);
+  }
+  const run = typeof opts.run === 'function' ? opts.run : (req) => ctx.invoke('import_setup', { token: p.token, picks: req.picks, resolutions: req.resolutions });
   const choices = new Map();
   const rows = new Map(); // key -> { it, box, select, sub }
   const groupBoxes = []; // [box, keys]
@@ -172,27 +202,22 @@ function showReview(ctx, p) {
     const picked = included.size;
     const along = picked - [...explicit].filter((k) => rows.has(k)).length;
     summary.textContent = picked
-      ? `${picked} ${picked === 1 ? 'item' : 'items'} to import${along > 0 ? `, ${along} of them needed by the others` : ''}.`
-      : 'Tick the items to import.';
+      ? `${picked} ${picked === 1 ? 'item' : 'items'} ${text.doing}${along > 0 ? `, ${along} of them needed by the others` : ''}.`
+      : `Tick the items ${text.doing}.`;
     ok.disabled = picked === 0;
   };
 
   customDialog((closeDialog) => {
     const parts = [];
-    parts.push(el('h2', { class: 'modal-title', text: `Import setup from ${p.source}`, attrs: { id: 'imp-title' } }));
-    parts.push(
-      el('p', {
-        class: 'modal-message',
-        text: "Tick what to bring into this budget. What an item needs comes with it. Where this budget has an item of the same name set up differently, it keeps its own version unless you choose otherwise.",
-      }),
-    );
+    parts.push(el('h2', { class: 'modal-title', text: text.title(p), attrs: { id: 'imp-title' } }));
+    parts.push(el('p', { class: 'modal-message', text: text.intro }));
     for (const note of p.notes || []) parts.push(el('p', { class: 'modal-message', text: note }));
     const scroll = el('div', { class: 'imp-scroll' });
     for (const [heading, kinds] of GROUPS) {
       const group = items.filter((it) => kinds.includes(it.kind));
       if (!group.length) continue;
       const keys = group.map((it) => keyOf(it.kind, it.name));
-      const all = el('input', { attrs: { type: 'checkbox', 'aria-label': `Import every item in ${heading}` } });
+      const all = el('input', { attrs: { type: 'checkbox', 'aria-label': text.tickAll(heading) } });
       all.addEventListener('change', () => {
         const { needed } = selectionState(items, explicit);
         const on = keys.every((k) => explicit.has(k) || needed.has(k));
@@ -207,36 +232,36 @@ function showReview(ctx, p) {
       const list = el('ul', { class: 'safety-list imp-list' });
       for (const it of group) {
         const k = keyOf(it.kind, it.name);
-        const box = el('input', { attrs: { type: 'checkbox', 'aria-label': `Import ${describeRef(it)}` } });
+        const box = el('input', { attrs: { type: 'checkbox', 'aria-label': text.tickOne(describeRef(it)) } });
         box.addEventListener('change', () => {
           if (box.checked) explicit.add(k);
           else explicit.delete(k);
           refresh();
         });
-        const text = el('div', { class: 'safety-item-text' });
-        const main = el('div', { class: 'safety-item-main' }, el('span', { text: itemLabel(it) }), el('span', { class: `imp-status imp-${it.status}`, text: STATUS_TEXT[it.status] || it.status }));
-        text.append(main);
+        const body = el('div', { class: 'safety-item-text' });
+        const main = el('div', { class: 'safety-item-main' }, el('span', { text: itemLabel(it) }), el('span', { class: `imp-status imp-${it.status}`, text: text.status[it.status] || it.status }));
+        body.append(main);
         if (it.status === 'differs') {
-          text.append(el('div', { class: 'safety-item-sub', text: `Here: ${it.here || ''}`, title: it.here || '' }));
-          text.append(el('div', { class: 'safety-item-sub', text: `Imported: ${it.imported}`, title: it.imported }));
+          body.append(el('div', { class: 'safety-item-sub', text: `${text.hereLabel}: ${it.here || ''}`, title: it.here || '' }));
+          body.append(el('div', { class: 'safety-item-sub', text: `${text.otherLabel}: ${it.imported}`, title: it.imported }));
         } else if (it.imported) {
-          text.append(el('div', { class: 'safety-item-sub', text: it.imported, title: it.imported }));
+          body.append(el('div', { class: 'safety-item-sub', text: it.imported, title: it.imported }));
         }
         const comes = el('div', { class: 'safety-item-sub imp-comes' });
         comes.hidden = true;
-        text.append(comes);
+        body.append(comes);
         let select = null;
         if (it.status === 'differs') {
-          select = choiceSelect(it);
+          select = choiceSelect(it, text);
           select.addEventListener('change', () => choices.set(k, select.value));
         }
-        const row = el('li', { class: 'safety-item imp-item' }, el('label', { class: 'imp-tick' }, box), text, select ? el('div', { class: 'safety-item-actions' }, select) : null);
+        const row = el('li', { class: 'safety-item imp-item' }, el('label', { class: 'imp-tick' }, box), body, select ? el('div', { class: 'safety-item-actions' }, select) : null);
         rows.set(k, { it, box, select, comes });
         list.append(row);
       }
       scroll.append(list);
     }
-    if (!items.length) scroll.append(el('p', { class: 'modal-message', text: 'That budget has no setup items.' }));
+    if (!items.length) scroll.append(el('p', { class: 'modal-message', text: text.emptyText }));
     parts.push(scroll);
     summary = el('p', { class: 'imp-summary', attrs: { 'aria-live': 'polite' } });
     parts.push(summary);
@@ -244,14 +269,14 @@ function showReview(ctx, p) {
     error.hidden = true;
     parts.push(error);
     const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button', 'data-autofocus': true } });
-    ok = el('button', { class: 'btn btn-primary', text: 'Import', attrs: { type: 'button' } });
+    ok = el('button', { class: 'btn btn-primary', text: text.okText, attrs: { type: 'button' } });
     cancel.addEventListener('click', () => closeDialog());
     ok.addEventListener('click', async () => {
       const req = importRequest(items, explicit, choices);
       if (!req.picks.length) return;
       ok.disabled = true;
       try {
-        const r = await ctx.invoke('import_setup', { token: p.token, picks: req.picks, resolutions: req.resolutions });
+        const r = await run(req);
         closeDialog();
         if (r && r.view) ctx.apply(r.view);
         if (r && r.message) ctx.toast(r.message);

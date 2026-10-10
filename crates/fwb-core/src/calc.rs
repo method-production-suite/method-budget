@@ -28,6 +28,8 @@ pub(crate) mod lines;
 mod reference;
 pub(crate) mod topsheet;
 
+pub use topsheet::charge_preview;
+
 /// Which details count toward totals, on top of group suppression.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct RecalcOptions {

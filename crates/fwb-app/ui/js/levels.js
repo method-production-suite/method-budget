@@ -103,6 +103,24 @@ function moneyCell(cents, extra = {}) {
   return { text: money(cents), ...extra };
 }
 
+/**
+ * Charge `i` of the report's charges as the topsheet names it: its name,
+ * then its percent and the amount left out of its base when the charge's
+ * switches say so (Budget > Charges; display only). `fmt` formats cents.
+ * Reports list only applied charges, in order, so the budget's applied
+ * charges line up with them.
+ */
+export function chargeLabel(b, entry, i, fmt) {
+  const name = (entry && entry.name) || 'Charge';
+  const applied = (Array.isArray(b && b.charges) ? b.charges : []).filter((c) => c && c.applied !== false);
+  const c = applied[i];
+  if (!c || c.name !== entry.name) return name;
+  let label = name;
+  if (c.label_percent === true && c.kind === 'percent' && c.percent !== undefined && c.percent !== null) label += ` ${c.percent}%`;
+  if (c.label_excluded === true) label += ` (excluding ${fmt(entry.excluded)})`;
+  return label;
+}
+
 function staticRow(key, cls, label, total, extra = {}) {
   return {
     key,
@@ -199,7 +217,7 @@ export function topsheetRows(ix) {
   }
   if (r.budget_fringes) rows.push(staticRow('s-fr', disp.summary_rows ? 'summary' : 'summary first', 'Total fringes', r.budget_fringes));
   r.charges.forEach((c, i) => {
-    rows.push(staticRow(`s-ch${i}`, 'summary charge', c.name, c.amount));
+    rows.push(staticRow(`s-ch${i}`, 'summary charge', chargeLabel(ix.b, c, i, money), c.amount));
   });
   rows.push(staticRow('s-grand', 'summary grand', 'Grand total', r.grand_total, ix.variance ? varianceCells(ix.variance.grand_total) : {}));
   r.credits.forEach((c, i) => {

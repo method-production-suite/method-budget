@@ -166,6 +166,8 @@ pub fn budget() -> Budget {
         excluded_groups: BTreeSet::new(),
         excluded_categories: BTreeSet::new(),
         excluded_accounts: BTreeSet::new(),
+        label_percent: false,
+        label_excluded: false,
     });
     b
 }

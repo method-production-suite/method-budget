@@ -559,6 +559,12 @@ mod tests {
             include_str!("../ui/js/presets.js"),
             include_str!("../ui/js/setuplist.js"),
             include_str!("../ui/js/display-settings.js"),
+            include_str!("../ui/js/history.js"),
+            // The Settings tab's renumber preview.
+            include_str!("../ui/js/renumber.js"),
+            // The Library tab (its reviews run its own commands, never
+            // importsetup.js's import_setup).
+            include_str!("../ui/js/library.js"),
         ];
         let mut named = std::collections::BTreeSet::new();
         for js in panel_js {

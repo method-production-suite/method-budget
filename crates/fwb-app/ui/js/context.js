@@ -18,14 +18,26 @@ import { PALETTE, paletteColor, selectedDetails, styleState } from './rowformat.
 import { presetMenu, blockMenu } from './presets.js';
 
 // { grid, host, view(), level(), run(id), act(cmd, args), toast(message) }
+// `host` is the grid's host element, or a function giving the one in use
+// (split view has a grid per pane; main.js points `grid` at the target's).
 let ctx = null;
 
 const SEP = { separator: true };
 
 export function initContextMenu(context) {
   ctx = context;
-  ctx.host.addEventListener('contextmenu', onContextMenu);
+  watchContextMenu(host());
   window.addEventListener('keydown', onKey);
+}
+
+/** Opens the menu on right-clicks in another grid host too (split view's second pane). */
+export function watchContextMenu(el) {
+  if (el) el.addEventListener('contextmenu', onContextMenu);
+}
+
+/** The grid host in use. */
+function host() {
+  return typeof ctx.host === 'function' ? ctx.host() : ctx.host;
 }
 
 // { selection(), call(cmd, args, opts) } for the preset submenus (main.js).
@@ -46,7 +58,7 @@ function presetItems(blocks) {
     sel: presets.selection(),
     call: presets.call,
     toast: ctx.toast,
-    anchor: () => ctx.grid.cellFor(ctx.grid.cursorKey(), ctx.grid.cursorColKey()) || ctx.host,
+    anchor: () => ctx.grid.cellFor(ctx.grid.cursorKey(), ctx.grid.cursorColKey()) || host(),
     openTab: () => ctx.run('view.tab.presets'),
   };
   const out = [SEP, { label: 'Apply preset', items: presetMenu(c) }];
@@ -82,7 +94,7 @@ function onKey(e) {
   if (!menuKey && !shiftF10) return;
   if (isModalOpen() || isHelpOpen() || isContextMenuOpen()) return;
   const a = document.activeElement;
-  const inGrid = a && ctx.host.contains(a) && !(a.closest && a.closest('thead'));
+  const inGrid = a && host().contains(a) && !(a.closest && a.closest('thead'));
   if (!inGrid && a && a !== document.body) return;
   e.preventDefault();
   openAtCursor();
@@ -94,7 +106,7 @@ export function openAtCursor() {
   const grid = ctx.grid;
   if (grid.editor) grid.commitEdit(null);
   grid.focus();
-  const box = ctx.host.getBoundingClientRect();
+  const box = host().getBoundingClientRect();
   const td = grid.cellFor(grid.cursorKey(), grid.cursorColKey());
   let x = box.left + 24;
   let y = box.top + 40;
@@ -304,6 +316,8 @@ function accountItems(onRow) {
 function topsheetItems(onRow) {
   const inserts = [cmd('insert.category', 'Insert category…'), cmd('insert.production_total', 'Insert production total…')];
   const setup = [
+    cmd('budget.create_charge', 'Create charge…', { title: 'Open the charges tab with a new charge ready to name' }),
+    cmd('budget.create_credit', 'Create credit…', { title: 'Open the credits tab with a new credit ready to name' }),
     cmd('view.tab.charges', 'Add or apply a charge…', { title: 'Open the charges tab: add a charge, or turn one on or off' }),
     cmd('view.tab.credits', 'Add or apply a credit…', { title: 'Open the credits tab: add a credit, or turn one on or off' }),
   ];

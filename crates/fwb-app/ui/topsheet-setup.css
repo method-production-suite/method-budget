@@ -186,6 +186,42 @@
   justify-self: start;
 }
 
+/* Groups left out of a charge, each with its amount in the base */
+
+.tss-excl {
+  display: grid;
+  gap: 2px;
+}
+
+.tss-excl-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  min-height: 22px;
+}
+
+.tss-excl-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tss-excl-total {
+  font-size: 12px;
+}
+
+.tss-excl-all {
+  margin: 0;
+}
+
+/* A live total that doesn't match what is typed yet */
+
+.tss-stale {
+  opacity: 0.5;
+}
+
 /* Credit rows */
 
 .tss-rows-wrap {
@@ -223,6 +259,19 @@
 .tss-row-num {
   font-size: 12px;
   font-weight: 600;
+}
+
+/* A credit row's figures: spend, fringes out, net, credit, cap */
+
+.tss-row-figs {
+  justify-content: flex-start;
+  margin: 0 0 4px;
+}
+
+.tss-fig {
+  display: inline-flex;
+  gap: 4px;
+  white-space: nowrap;
 }
 
 /* Settings */

@@ -164,9 +164,10 @@ pub fn set_cell_creating<R: Runtime>(
     value: String,
     create: CreateInput,
 ) -> Result<View, String> {
-    let field = Field::parse(&field)?;
-    edit_budget(&window, &state, doc, |b| {
-        create_and_set(b, row_id, field, &value, &create)
+    let parsed = Field::parse(&field)?;
+    let label = |b: &fwb_core::Budget| crate::history::cell_label(b, row_id, &field);
+    crate::app::edit_budget_as(&window, &state, doc, label, |b| {
+        create_and_set(b, row_id, parsed, &value, &create)
     })
 }
 
@@ -178,7 +179,7 @@ pub fn set_new_line_defaults<R: Runtime>(
     doc: Option<DocId>,
     defaults: NewLineDefaultsInput,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| {
+    edit_budget(&window, &state, doc, "Change new line defaults", |b| {
         apply_new_line_defaults(b, &defaults)
     })
 }
@@ -214,7 +215,7 @@ mod tests {
 
     fn quick(s: &mut Session, id: RowId, field: &str, value: &str, c: &CreateInput) -> EditResult {
         let field = Field::parse(field).unwrap();
-        s.edit(|b| create_and_set(b, id, field, value, c))
+        s.edit("Test edit", |b| create_and_set(b, id, field, value, c))
     }
 
     #[test]
@@ -412,7 +413,7 @@ mod tests {
         let (account, ids) = lines(&s);
         let first = ids[0];
         // Give the line above some tags of every kind.
-        s.edit(|b| {
+        s.edit("Test edit", |b| {
             b.groups.insert(
                 "Shoot".into(),
                 fwb_core::Group {
@@ -480,7 +481,8 @@ mod tests {
             location: true,
             currency: true,
         };
-        s.edit(|b| apply_new_line_defaults(b, &all)).unwrap();
+        s.edit("Test edit", |b| apply_new_line_defaults(b, &all))
+            .unwrap();
         let b2 = s.add_detail(&account, Some(first), "line").unwrap();
         let d = row(&s, b2);
         assert_eq!(
@@ -503,10 +505,12 @@ mod tests {
             location: false,
             currency: false,
         };
-        s.edit(|b| apply_new_line_defaults(b, &none)).unwrap();
+        s.edit("Test edit", |b| apply_new_line_defaults(b, &none))
+            .unwrap();
         let c = s.add_detail(&account, Some(first), "line").unwrap();
         assert!(row(&s, c).fringes.is_empty() && row(&s, c).groups.is_empty());
-        s.edit(|b| apply_new_line_defaults(b, &all)).unwrap();
+        s.edit("Test edit", |b| apply_new_line_defaults(b, &all))
+            .unwrap();
         let adj = s.add_detail(&account, Some(first), "adjustment").unwrap();
         assert!(row(&s, adj).groups.is_empty() && row(&s, adj).set.is_none());
 

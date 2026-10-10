@@ -26,7 +26,7 @@
 
 import { el } from './dom.js';
 import { money, decimal } from './format.js';
-import { rowColor, fringePercent } from './levels.js';
+import { rowColor, fringePercent, chargeLabel } from './levels.js';
 import { setRules } from './sheet.js';
 import { orderedNames } from './order.js';
 import { invoke, connected } from './api.js';
@@ -579,7 +579,7 @@ function topsheet(ctx) {
     sline('sum', 'Total below-the-line', r.total_btl, null);
     sline('sum strong', 'Total above and below-the-line', r.atl_btl, null);
     if (r.budget_fringes) sline('sum', 'Total fringes', r.budget_fringes, null);
-    for (const c of r.charges || []) sline('sum charge', c.name || 'Charge', c.amount, null);
+    (r.charges || []).forEach((c, i) => sline('sum charge', chargeLabel(ctx.b, c, i, money), c.amount, null));
     sline('sum grand', 'Grand total', r.grand_total, base ? base.grand_total : null);
     const credits = r.credits || [];
     for (const c of credits) sline('sum credit', `Less ${c.name || 'credit'}`, -c.amount, null);

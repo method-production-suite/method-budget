@@ -11,6 +11,7 @@
 
 import { anchoredForm } from './modal.js';
 import { openContextMenu } from './menu.js';
+import { saveItemToLibrary } from './library.js';
 
 const GLOBAL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -91,7 +92,8 @@ export function renameItem({ anchor, kind, name, ctx }) {
 
 /**
  * The right-click menu of an item in a tools panel list: Edit (when
- * `edit` is given), Rename and Delete (when `remove` is given). `at` is the
+ * `edit` is given), Rename, Save to Library and Delete (when `remove` is
+ * given). `at` is the
  * mouse event or a point.
  */
 export function itemMenu(at, { kind, name, anchor, ctx, edit = null, remove = null, onRenamed = null, extra = [] }) {
@@ -109,6 +111,12 @@ export function itemMenu(at, { kind, name, anchor, ctx, edit = null, remove = nu
   });
   // More of the item's own actions (a fringe's or group's short code).
   for (const x of extra) items.push(x);
+  // A copy into the personal setup library, with what it needs (library.js).
+  items.push({
+    label: 'Save to Library…',
+    title: 'Copy it, and what it needs, into your setup library',
+    run: () => saveItemToLibrary(ctx, kind, name),
+  });
   if (remove) items.push({ separator: true }, { label: 'Delete…', run: remove });
   const point = at && typeof at.clientX === 'number' ? { x: at.clientX, y: at.clientY } : at;
   openContextMenu(point, { label: `${info.what} ${name}`, items, returnFocus: () => anchor && anchor.focus && anchor.focus() });

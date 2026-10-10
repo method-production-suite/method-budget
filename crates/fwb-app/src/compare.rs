@@ -696,7 +696,8 @@ mod tests {
     /// Two open budgets: the base (1) and a copy with one rate changed.
     fn two_tabs() -> (Docs, DocId, DocId, String) {
         let mut base = Session::new();
-        base.edit(|b| crate::edit::set_title(b, "Feature")).unwrap();
+        base.edit("Test edit", |b| crate::edit::set_title(b, "Feature"))
+            .unwrap();
         let (row, code) = first_line(base.budget());
         let mut other = Session::with_budget(base.budget().clone(), None);
         other.set_detail_field(row, "rate", "99999").unwrap();
@@ -755,6 +756,8 @@ mod tests {
             excluded_groups: Default::default(),
             excluded_categories: Default::default(),
             excluded_accounts: Default::default(),
+            label_percent: false,
+            label_excluded: false,
         };
         let mut a = fwb_core::starter::budget();
         a.charges.clear();
@@ -781,7 +784,9 @@ mod tests {
         let mut s = Session::new();
         let (row, code) = first_line(s.budget());
         let v = s
-            .edit(|b| crate::versions::save(b, "Approved", Some("studio"), AT))
+            .edit("Test edit", |b| {
+                crate::versions::save(b, "Approved", Some("studio"), AT)
+            })
             .unwrap();
         s.set_detail_field(row, "rate", "1").unwrap();
         let mut docs = Docs::with(s);
@@ -888,8 +893,10 @@ mod tests {
         let mut s = Session::new();
         let ids: Vec<VersionId> = (0..=MAX_OTHERS)
             .map(|i| {
-                s.edit(|b| crate::versions::save(b, &format!("v{i}"), None, AT))
-                    .unwrap()
+                s.edit("Test edit", |b| {
+                    crate::versions::save(b, &format!("v{i}"), None, AT)
+                })
+                .unwrap()
             })
             .collect();
         let mut docs = Docs::with(s);

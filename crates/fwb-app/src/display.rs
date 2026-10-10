@@ -217,7 +217,13 @@ pub fn set_global_info<R: Runtime>(
     name: String,
     info: GlobalInfoInput,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| apply_global_info(b, &name, &info))
+    edit_budget(
+        &window,
+        &state,
+        doc,
+        format!("Edit the details of global {}", name.trim()),
+        |b| apply_global_info(b, &name, &info),
+    )
 }
 
 /// `{prefs: {rate_cutoff, rate_decimals_below, rate_decimals_above,
@@ -229,7 +235,9 @@ pub fn set_display_prefs<R: Runtime>(
     doc: Option<DocId>,
     prefs: DisplayPrefsInput,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| apply_display_prefs(b, &prefs))
+    edit_budget(&window, &state, doc, "Change numbers on screen", |b| {
+        apply_display_prefs(b, &prefs)
+    })
 }
 
 #[cfg(test)]
@@ -287,8 +295,10 @@ mod tests {
         let before = s.totals().1.report.clone();
         let name = s.budget().globals.keys().next().unwrap().clone();
         let unit = s.budget().units.keys().next().unwrap().clone();
-        s.edit(|b| apply_global_info(b, &name, &info(&unit, Some(3), true)))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            apply_global_info(b, &name, &info(&unit, Some(3), true))
+        })
+        .unwrap();
         assert_eq!(s.totals().1.report, before);
         assert!(s.can_undo());
     }
@@ -360,8 +370,10 @@ mod tests {
     fn display_prefs_never_change_a_total() {
         let mut s = Session::with_budget(fwb_core::sample::budget(&Default::default()), None);
         let before = s.totals().1.report.clone();
-        s.edit(|b| apply_display_prefs(b, &prefs(Some("100"), Some(4), Some(0))))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            apply_display_prefs(b, &prefs(Some("100"), Some(4), Some(0)))
+        })
+        .unwrap();
         assert_eq!(s.totals().1.report, before);
     }
 

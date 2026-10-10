@@ -1048,10 +1048,34 @@ pub struct ChargeInput {
     pub excluded_categories: Vec<String>,
     #[serde(default)]
     pub excluded_accounts: Vec<String>,
+    /// Show the percent in the topsheet label. Left out: keep the charge's
+    /// own setting (off for a new charge).
+    #[serde(default)]
+    pub label_percent: Option<bool>,
+    /// Show the excluded total in the topsheet label. Left out: keep it.
+    #[serde(default)]
+    pub label_excluded: Option<bool>,
 }
 
 /// Replaces charge `index`, or appends when `None`. Returns its index.
 pub fn set_charge(b: &mut Budget, index: Option<usize>, c: &ChargeInput) -> EditResult<usize> {
+    let charge = build_charge(b, index, c)?;
+    Ok(match index {
+        Some(i) => {
+            b.charges[i] = charge;
+            i
+        }
+        None => {
+            b.charges.push(charge);
+            b.charges.len() - 1
+        }
+    })
+}
+
+/// The charge `c` describes, checked as [`set_charge`] checks it, without
+/// changing the budget: as an edit of charge `index` (whose exclusions of
+/// items the budget no longer has may stay), or a new one when `None`.
+pub fn build_charge(b: &Budget, index: Option<usize>, c: &ChargeInput) -> EditResult<Charge> {
     let old = match index {
         Some(i) => {
             check_index(b.charges.len(), i, "charge")?;
@@ -1097,7 +1121,7 @@ pub fn set_charge(b: &mut Budget, index: Option<usize>, c: &ChargeInput) -> Edit
         .flat_map(|c| &c.accounts)
         .map(|a| a.code.clone())
         .collect();
-    let charge = Charge {
+    Ok(Charge {
         name: name.to_string(),
         account: optional_account(b, c.account.as_deref())?,
         applied: c.applied,
@@ -1121,16 +1145,12 @@ pub fn set_charge(b: &mut Budget, index: Option<usize>, c: &ChargeInput) -> Edit
             old.as_ref().map(|o| &o.excluded_accounts),
             "account",
         )?,
-    };
-    Ok(match index {
-        Some(i) => {
-            b.charges[i] = charge;
-            i
-        }
-        None => {
-            b.charges.push(charge);
-            b.charges.len() - 1
-        }
+        label_percent: c
+            .label_percent
+            .unwrap_or_else(|| old.as_ref().is_some_and(|o| o.label_percent)),
+        label_excluded: c
+            .label_excluded
+            .unwrap_or_else(|| old.as_ref().is_some_and(|o| o.label_excluded)),
     })
 }
 
@@ -1670,5 +1690,74 @@ mod tests {
         assert!(!Field::Amount.applies_to(RowKind::Subtotal));
         assert!(Field::Description.applies_to(RowKind::Subtotal));
         assert!(Field::parse("bogus").is_err());
+    }
+
+    #[test]
+    fn charge_label_switches_are_set_kept_and_cleared() {
+        let mut b = fwb_core::starter::budget();
+        let input = |v: serde_json::Value| -> ChargeInput { serde_json::from_value(v).unwrap() };
+        // A new charge is off unless asked.
+        let at = set_charge(
+            &mut b,
+            None,
+            &input(serde_json::json!({"name": "Bond", "kind": "percent", "percent": "2"})),
+        )
+        .unwrap();
+        assert!(!b.charges[at].label_percent && !b.charges[at].label_excluded);
+        set_charge(
+            &mut b,
+            Some(at),
+            &input(
+                serde_json::json!({"name": "Bond", "kind": "percent", "percent": "2",
+                "label_percent": true, "label_excluded": true}),
+            ),
+        )
+        .unwrap();
+        assert!(b.charges[at].label_percent && b.charges[at].label_excluded);
+        // Left out: each keeps the charge's own setting.
+        set_charge(
+            &mut b,
+            Some(at),
+            &input(serde_json::json!({"name": "Bond", "kind": "percent", "percent": "3"})),
+        )
+        .unwrap();
+        assert!(b.charges[at].label_percent && b.charges[at].label_excluded);
+        set_charge(
+            &mut b,
+            Some(at),
+            &input(
+                serde_json::json!({"name": "Bond", "kind": "percent", "percent": "3",
+                "label_excluded": false}),
+            ),
+        )
+        .unwrap();
+        assert!(b.charges[at].label_percent && !b.charges[at].label_excluded);
+    }
+
+    #[test]
+    fn build_charge_checks_without_changing_the_budget() {
+        let b = fwb_core::starter::budget();
+        let before = b.clone();
+        let c: ChargeInput = serde_json::from_value(serde_json::json!({
+            "name": "Contingency", "kind": "percent", "percent": "12.5",
+            "excluded_amounts": [{"description": "Typed", "amount": "1,000"}]
+        }))
+        .unwrap();
+        let charge = build_charge(&b, Some(0), &c).unwrap();
+        assert_eq!(charge.kind, ChargeKind::Percent("12.5".parse().unwrap()));
+        assert_eq!(charge.excluded_amounts, vec![("Typed".into(), 100_000)]);
+        assert_eq!(b, before);
+        let bad: ChargeInput = serde_json::from_value(
+            serde_json::json!({"name": "X", "kind": "percent", "percent": "1."}),
+        )
+        .unwrap();
+        // "1." is a number; a dangling sign is not.
+        assert!(build_charge(&b, None, &bad).is_ok());
+        let bad: ChargeInput = serde_json::from_value(
+            serde_json::json!({"name": "X", "kind": "percent", "percent": "-"}),
+        )
+        .unwrap();
+        assert!(build_charge(&b, None, &bad).is_err());
+        assert!(build_charge(&b, Some(9), &c).is_err());
     }
 }

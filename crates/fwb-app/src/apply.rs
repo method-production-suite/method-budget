@@ -15,11 +15,11 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use fwb_core::{Budget, Dec, Detail, RowId, RowKind, TopsheetRow};
-use serde::Serialize;
+use fwb_core::{Budget, Dec, Detail, FringeKind, RowId, RowKind, TagPreset, TopsheetRow};
+use serde::{Deserialize, Serialize};
 use tauri::{Runtime, State, WebviewWindow};
 
-use crate::app::{edit_budget, AppState, DocId};
+use crate::app::{edit_budget_as, AppState, DocId};
 use crate::edit::{details, EditResult};
 use crate::report_dto::SelectionDto;
 use crate::session::SelectionIndex;
@@ -243,6 +243,60 @@ pub fn apply_tag(
     Ok(changed)
 }
 
+/// Takes every fringe (`field` `fringes`) or group (`groups`) off the
+/// selected rows that can carry them, including names only left on the rows.
+/// Refused when none of the rows can. Returns how many rows changed.
+pub fn clear_tags(b: &mut Budget, ids: &[RowId], field: &str) -> EditResult<usize> {
+    let tag = Tag::parse(field)?;
+    let ids = selected(b, ids)?;
+    if !details(b).any(|d| ids.contains(&d.id) && tag.takes(d)) {
+        return Err(tag.none_take().into());
+    }
+    let mut changed = 0;
+    for d in selected_mut(b, &ids) {
+        if !tag.takes(d) {
+            continue;
+        }
+        let names = tag.names_mut(d);
+        changed += usize::from(!names.is_empty());
+        names.clear();
+    }
+    Ok(changed)
+}
+
+/// The tags "Replace tags" sets on the selected rows, exactly: every list
+/// empty and every value none takes them all off.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TagsInput {
+    #[serde(default)]
+    pub fringes: Vec<String>,
+    #[serde(default)]
+    pub groups: Vec<String>,
+    #[serde(default)]
+    pub set: Option<String>,
+    #[serde(default)]
+    pub location: Option<String>,
+    /// `None` or the base currency: the base currency.
+    #[serde(default)]
+    pub currency: Option<String>,
+}
+
+/// Makes the selected rows' tags exactly `tags` (fringes and the currency on
+/// lines; groups, a set and a location on lines and adjustments), as a tag
+/// preset's replace does. Every name must be defined. One undo step.
+pub fn replace_row_tags(b: &mut Budget, ids: &[RowId], tags: &TagsInput) -> EditResult<usize> {
+    let preset = TagPreset {
+        name: String::new(),
+        fringes: tags.fringes.iter().cloned().collect(),
+        groups: tags.groups.iter().cloned().collect(),
+        set: tags.set.clone(),
+        location: tags.location.clone(),
+        currency: tags.currency.clone(),
+    };
+    crate::presets::replace_tags(b, preset, ids)
+}
+
 /// Gives every selected row that can take it the set, location or currency
 /// `value` (`field` is `set`, `location` or `currency`); `None` or blank
 /// clears it, and the base currency counts as clearing the currency.
@@ -441,6 +495,11 @@ pub struct ApplySummary {
     /// Fringe dollars as a percentage of the line totals, rounded to two
     /// places (`"18.25"`). `None` when the line totals are 0.
     pub fringe_percent: Option<String>,
+    /// The selection's fringe dollars from percent fringes, and from flat
+    /// fringes (the fringe list's footer). Together they are the selection's
+    /// fringe total.
+    pub percent_fringes: Cents,
+    pub flat_fringes: Cents,
     /// Every defined fringe and group, by name.
     pub fringes: BTreeMap<String, Tally>,
     pub groups: BTreeMap<String, Tally>,
@@ -507,8 +566,14 @@ pub fn summary(
             }
         }
     }
+    let (mut percent_fringes, mut flat_fringes): (Cents, Cents) = (0, 0);
     for (name, t) in &mut fringes {
         t.total = totals.fringes.get(name).copied().unwrap_or(0);
+        let sum = match b.fringes.get(name).map(|f| &f.kind) {
+            Some(FringeKind::Flat { .. }) => &mut flat_fringes,
+            _ => &mut percent_fringes,
+        };
+        *sum = sum.saturating_add(t.total);
     }
     for (name, t) in &mut groups {
         t.total = totals.groups.get(name).map_or(0, |g| g.details_total);
@@ -568,6 +633,8 @@ pub fn summary(
         lines: chosen.iter().filter(|d| is_line(d)).count(),
         costed: chosen.iter().filter(|d| is_costed(d)).count(),
         fringe_percent: percent(totals.lines.fringe_total, totals.lines.details_total),
+        percent_fringes,
+        flat_fringes,
         in_range: chosen.iter().filter(|d| d.fringe_range.is_some()).count(),
         rows,
         totals,
@@ -618,9 +685,21 @@ pub fn apply_to_rows<R: Runtime>(
     name: String,
     on: bool,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| {
-        apply_tag(b, &row_ids, &field, &name, on)
-    })
+    edit_budget_as(
+        &window,
+        &state,
+        doc,
+        |b| {
+            let what = tag_noun(&field);
+            let rows = crate::history::rows_phrase(b, &row_ids);
+            if on {
+                format!("Add {what} {} to {rows}", name.trim())
+            } else {
+                format!("Remove {what} {} from {rows}", name.trim())
+            }
+        },
+        |b| apply_tag(b, &row_ids, &field, &name, on),
+    )
 }
 
 /// Gives the rows a set, location or currency; `null` clears it.
@@ -633,9 +712,67 @@ pub fn assign_to_rows<R: Runtime>(
     field: String,
     value: Option<String>,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| {
-        assign_value(b, &row_ids, &field, value.as_deref())
-    })
+    edit_budget_as(
+        &window,
+        &state,
+        doc,
+        |b| {
+            let rows = crate::history::rows_phrase(b, &row_ids);
+            match value.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+                Some(v) => format!("Set {} {v} on {rows}", tag_noun(&field)),
+                None => format!("Clear {} on {rows}", tag_noun(&field)),
+            }
+        },
+        |b| assign_value(b, &row_ids, &field, value.as_deref()),
+    )
+}
+
+/// Takes every fringe or group (`field`) off the rows.
+#[tauri::command]
+pub fn clear_from_rows<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    row_ids: Vec<RowId>,
+    field: String,
+) -> Result<View, String> {
+    edit_budget_as(
+        &window,
+        &state,
+        doc,
+        |b| {
+            format!(
+                "Clear {} on {}",
+                tag_noun(&field),
+                crate::history::rows_phrase(b, &row_ids)
+            )
+        },
+        |b| clear_tags(b, &row_ids, &field),
+    )
+}
+
+/// Sets exactly `tags` on the rows (fringes, groups, set, location,
+/// currency), as a tag preset's replace does.
+#[tauri::command]
+pub fn replace_tags_on_rows<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    row_ids: Vec<RowId>,
+    tags: TagsInput,
+) -> Result<View, String> {
+    edit_budget_as(
+        &window,
+        &state,
+        doc,
+        |b| {
+            format!(
+                "Set the tags on {}",
+                crate::history::rows_phrase(b, &row_ids)
+            )
+        },
+        |b| replace_row_tags(b, &row_ids, &tags),
+    )
 }
 
 #[tauri::command]
@@ -645,7 +782,18 @@ pub fn make_fringe_range<R: Runtime>(
     doc: Option<DocId>,
     row_ids: Vec<RowId>,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| make_range(b, &row_ids))
+    edit_budget_as(
+        &window,
+        &state,
+        doc,
+        |b| {
+            format!(
+                "Make a fringe range of {}",
+                crate::history::rows_phrase(b, &row_ids)
+            )
+        },
+        |b| make_range(b, &row_ids),
+    )
 }
 
 #[tauri::command]
@@ -655,7 +803,30 @@ pub fn clear_fringe_range<R: Runtime>(
     doc: Option<DocId>,
     row_ids: Vec<RowId>,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| clear_range(b, &row_ids))
+    edit_budget_as(
+        &window,
+        &state,
+        doc,
+        |b| {
+            format!(
+                "Remove the fringe range from {}",
+                crate::history::rows_phrase(b, &row_ids)
+            )
+        },
+        |b| clear_range(b, &row_ids),
+    )
+}
+
+/// A row tag field as a step label names it: "fringe", "group", "set".
+fn tag_noun(field: &str) -> &str {
+    match field {
+        "fringes" => "fringe",
+        "groups" => "group",
+        "set" => "set",
+        "location" => "location",
+        "currency" => "currency",
+        _ => "tag",
+    }
 }
 
 #[cfg(test)]
@@ -726,10 +897,14 @@ mod tests {
     /// at the end: [line, subtotal, line, adjustment].
     fn mixed(s: &mut Session) -> Vec<RowId> {
         let first = ids(s.budget(), "20-01")[0];
-        s.edit(|b| edit::add_detail(b, "20-01", Some(first), RowKind::Subtotal))
-            .unwrap();
-        s.edit(|b| edit::add_detail(b, "20-01", None, RowKind::Adjustment))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            edit::add_detail(b, "20-01", Some(first), RowKind::Subtotal)
+        })
+        .unwrap();
+        s.edit("Test edit", |b| {
+            edit::add_detail(b, "20-01", None, RowKind::Adjustment)
+        })
+        .unwrap();
         ids(s.budget(), "20-01")
     }
 
@@ -740,7 +915,9 @@ mod tests {
         let before = s.budget().clone();
 
         let n = s
-            .edit(|b| apply_tag(b, &rows, "fringes", "PENSION", true))
+            .edit("Test edit", |b| {
+                apply_tag(b, &rows, "fringes", "PENSION", true)
+            })
             .unwrap();
         assert_eq!(n, 2, "only the two lines take a fringe");
         assert!(row(s.budget(), rows[0]).fringes.contains("PENSION"));
@@ -752,7 +929,9 @@ mod tests {
 
         // Applying it again changes nothing and adds no undo step.
         assert_eq!(
-            s.edit(|b| apply_tag(b, &rows, "fringes", "PENSION", true)),
+            s.edit("Test edit", |b| apply_tag(
+                b, &rows, "fringes", "PENSION", true
+            )),
             Ok(0)
         );
         assert!(s.undo());
@@ -760,7 +939,9 @@ mod tests {
         assert!(s.redo());
 
         let off = s
-            .edit(|b| apply_tag(b, &rows[..1], "fringes", "PAYROLL", false))
+            .edit("Test edit", |b| {
+                apply_tag(b, &rows[..1], "fringes", "PAYROLL", false)
+            })
             .unwrap();
         assert_eq!(off, 1);
         assert!(!row(s.budget(), rows[0]).fringes.contains("PAYROLL"));
@@ -772,13 +953,15 @@ mod tests {
         let mut s = session();
         let rows = mixed(&mut s);
         let n = s
-            .edit(|b| apply_tag(b, &rows, "groups", "Crew", true))
+            .edit("Test edit", |b| apply_tag(b, &rows, "groups", "Crew", true))
             .unwrap();
         assert_eq!(n, 3, "two lines and the adjustment; not the subtotal");
         assert!(row(s.budget(), rows[3]).groups.contains("Crew"));
         assert!(row(s.budget(), rows[1]).groups.is_empty());
         let n = s
-            .edit(|b| apply_tag(b, &rows, "groups", "Crew", false))
+            .edit("Test edit", |b| {
+                apply_tag(b, &rows, "groups", "Crew", false)
+            })
             .unwrap();
         assert_eq!(n, 3);
         assert!(details(s.budget()).all(|d| d.groups.is_empty()));
@@ -790,7 +973,9 @@ mod tests {
         let rows = mixed(&mut s);
         let before = s.budget().clone();
         let refused = |s: &mut Session, ids: &[RowId], field: &str, name: &str, on: bool| {
-            let err = s.edit(|b| apply_tag(b, ids, field, name, on)).unwrap_err();
+            let err = s
+                .edit("Test edit", |b| apply_tag(b, ids, field, name, on))
+                .unwrap_err();
             assert_eq!(s.budget(), &before, "{err}");
             err
         };
@@ -825,21 +1010,27 @@ mod tests {
         let mut s = session();
         let rows = mixed(&mut s);
         let n = s
-            .edit(|b| assign_value(b, &rows, "set", Some("Stage A")))
+            .edit("Test edit", |b| {
+                assign_value(b, &rows, "set", Some("Stage A"))
+            })
             .unwrap();
         assert_eq!(n, 3, "lines and the adjustment");
         assert_eq!(row(s.budget(), rows[3]).set.as_deref(), Some("Stage A"));
         assert_eq!(row(s.budget(), rows[1]).set, None);
 
-        s.edit(|b| assign_value(b, &rows, "location", Some(" Toronto ")))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            assign_value(b, &rows, "location", Some(" Toronto "))
+        })
+        .unwrap();
         assert_eq!(
             row(s.budget(), rows[0]).location.as_deref(),
             Some("Toronto")
         );
 
         let n = s
-            .edit(|b| assign_value(b, &rows, "currency", Some("CAD")))
+            .edit("Test edit", |b| {
+                assign_value(b, &rows, "currency", Some("CAD"))
+            })
             .unwrap();
         assert_eq!(n, 2, "only lines have a currency");
         assert_eq!(row(s.budget(), rows[2]).currency.as_deref(), Some("CAD"));
@@ -848,24 +1039,43 @@ mod tests {
         // The base currency, blank and null all clear it.
         let before = s.budget().clone();
         assert_eq!(
-            s.edit(|b| assign_value(b, &rows, "currency", Some("USD"))),
+            s.edit("Test edit", |b| assign_value(
+                b,
+                &rows,
+                "currency",
+                Some("USD")
+            )),
             Ok(2)
         );
         assert!(details(s.budget()).all(|d| d.currency.is_none()));
         s.undo();
         assert_eq!(s.budget(), &before);
         assert_eq!(
-            s.edit(|b| assign_value(b, &rows, "currency", Some(""))),
+            s.edit("Test edit", |b| assign_value(
+                b,
+                &rows,
+                "currency",
+                Some("")
+            )),
             Ok(2)
         );
         s.undo();
-        assert_eq!(s.edit(|b| assign_value(b, &rows, "currency", None)), Ok(2));
+        assert_eq!(
+            s.edit("Test edit", |b| assign_value(b, &rows, "currency", None)),
+            Ok(2)
+        );
 
-        assert_eq!(s.edit(|b| assign_value(b, &rows, "set", None)), Ok(3));
+        assert_eq!(
+            s.edit("Test edit", |b| assign_value(b, &rows, "set", None)),
+            Ok(3)
+        );
         assert!(details(s.budget()).all(|d| d.set.is_none()));
         // Nothing left to clear: no change, no undo step.
         let steps = s.can_undo();
-        assert_eq!(s.edit(|b| assign_value(b, &rows, "set", None)), Ok(0));
+        assert_eq!(
+            s.edit("Test edit", |b| assign_value(b, &rows, "set", None)),
+            Ok(0)
+        );
         assert_eq!(s.can_undo(), steps);
     }
 
@@ -889,12 +1099,16 @@ mod tests {
             (&[rows[1], rows[3]], "currency", Some("CAD"), "lines"),
         ];
         for (ids, field, value, want) in cases {
-            let err = s.edit(|b| assign_value(b, ids, field, value)).unwrap_err();
+            let err = s
+                .edit("Test edit", |b| assign_value(b, ids, field, value))
+                .unwrap_err();
             assert!(err.contains(want), "{field} {value:?}: {err}");
             assert_eq!(s.budget(), &before);
         }
         let err = s
-            .edit(|b| assign_value(b, &[rows[1]], "set", Some("Stage A")))
+            .edit("Test edit", |b| {
+                assign_value(b, &[rows[1]], "set", Some("Stage A"))
+            })
             .unwrap_err();
         assert!(err.contains("set"), "{err}");
         assert_eq!(s.budget(), &before);
@@ -927,7 +1141,7 @@ mod tests {
     fn make_range_numbers_a_new_range_in_the_account() {
         let mut s = session();
         let rows = mixed(&mut s); // [line, subtotal, line, adjustment]
-        let n = s.edit(|b| make_range(b, &rows)).unwrap();
+        let n = s.edit("Test edit", |b| make_range(b, &rows)).unwrap();
         assert_eq!(n, 1);
         let b = s.budget().clone();
         assert_eq!(row(&b, rows[0]).fringe_range, Some(1));
@@ -941,23 +1155,28 @@ mod tests {
 
         // The same rows again: already that range, so nothing changes.
         let undo_before = s.can_undo();
-        assert_eq!(s.edit(|b| make_range(b, &rows)), Ok(1));
+        assert_eq!(s.edit("Test edit", |b| make_range(b, &rows)), Ok(1));
         assert_eq!(s.budget(), &b);
         assert_eq!(s.can_undo(), undo_before);
 
         // Lines on both sides of an unselected subtotal row still qualify.
         s.undo();
-        assert_eq!(s.edit(|b| make_range(b, &[rows[0], rows[2]])), Ok(1));
+        assert_eq!(
+            s.edit("Test edit", |b| make_range(b, &[rows[0], rows[2]])),
+            Ok(1)
+        );
         assert_eq!(row(s.budget(), rows[3]).fringe_range, None);
 
         // Part of an existing range becomes a new range with its own number.
         let last = s
-            .edit(|b| edit::add_detail(b, "20-01", None, RowKind::Line))
+            .edit("Test edit", |b| {
+                edit::add_detail(b, "20-01", None, RowKind::Line)
+            })
             .unwrap();
         let all = [rows.clone(), vec![last]].concat();
         // 1 is taken by the first two lines, so the whole run gets 2.
-        assert_eq!(s.edit(|b| make_range(b, &all)), Ok(2));
-        assert_eq!(s.edit(|b| make_range(b, &all[2..])), Ok(3));
+        assert_eq!(s.edit("Test edit", |b| make_range(b, &all)), Ok(2));
+        assert_eq!(s.edit("Test edit", |b| make_range(b, &all[2..])), Ok(3));
         assert_eq!(row(s.budget(), rows[0]).fringe_range, Some(2));
         assert_eq!(row(s.budget(), rows[2]).fringe_range, Some(3));
         assert_eq!(row(s.budget(), rows[3]).fringe_range, Some(3));
@@ -969,7 +1188,7 @@ mod tests {
         // Two lines of 20,000 with a 10% fringe capped at 25,000 of wages:
         // apart, each pays 2,000; as one earner they pay 2,500 between them.
         let mut s = session();
-        s.edit(|b| {
+        s.edit("Test edit", |b| {
             b.fringes.insert(
                 "CAPPED".into(),
                 Fringe {
@@ -986,21 +1205,26 @@ mod tests {
         .unwrap();
         let first = ids(s.budget(), "50-01")[0];
         let second = s
-            .edit(|b| edit::add_detail(b, "50-01", Some(first), RowKind::Line))
+            .edit("Test edit", |b| {
+                edit::add_detail(b, "50-01", Some(first), RowKind::Line)
+            })
             .unwrap();
         let rows = [first, second];
         for id in rows {
             for (f, v) in [(Field::Amount, "1"), (Field::Rate, "20000")] {
-                s.edit(|b| edit::set_detail_field(b, id, f, v)).unwrap();
+                s.edit("Test edit", |b| edit::set_detail_field(b, id, f, v))
+                    .unwrap();
             }
         }
-        s.edit(|b| apply_tag(b, &rows, "fringes", "CAPPED", true))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            apply_tag(b, &rows, "fringes", "CAPPED", true)
+        })
+        .unwrap();
         let fringe = |s: &mut Session| s.selection(&rows).fringes["CAPPED"];
         assert_eq!(fringe(&mut s), 400_000);
-        s.edit(|b| make_range(b, &rows)).unwrap();
+        s.edit("Test edit", |b| make_range(b, &rows)).unwrap();
         assert_eq!(fringe(&mut s), 250_000);
-        s.edit(|b| clear_range(b, &rows)).unwrap();
+        s.edit("Test edit", |b| clear_range(b, &rows)).unwrap();
         assert_eq!(fringe(&mut s), 400_000);
     }
 
@@ -1018,15 +1242,15 @@ mod tests {
             (vec![rows[0], 999_999], "999999"),
         ];
         for (ids, want) in cases {
-            let err = s.edit(|b| make_range(b, &ids)).unwrap_err();
+            let err = s.edit("Test edit", |b| make_range(b, &ids)).unwrap_err();
             assert!(err.contains(want), "{ids:?}: {err}");
             assert_eq!(s.budget(), &before);
         }
         // Nothing to remove.
-        let err = s.edit(|b| clear_range(b, &rows)).unwrap_err();
+        let err = s.edit("Test edit", |b| clear_range(b, &rows)).unwrap_err();
         assert!(err.contains("fringe range"), "{err}");
-        assert!(s.edit(|b| clear_range(b, &[999_999])).is_err());
-        assert!(s.edit(|b| clear_range(b, &[])).is_err());
+        assert!(s.edit("Test edit", |b| clear_range(b, &[999_999])).is_err());
+        assert!(s.edit("Test edit", |b| clear_range(b, &[])).is_err());
         assert_eq!(s.budget(), &before);
     }
 
@@ -1034,9 +1258,9 @@ mod tests {
     fn remove_range_clears_only_the_selected_rows() {
         let mut s = session();
         let rows = mixed(&mut s);
-        s.edit(|b| make_range(b, &rows)).unwrap();
+        s.edit("Test edit", |b| make_range(b, &rows)).unwrap();
         let before = s.budget().clone();
-        assert_eq!(s.edit(|b| clear_range(b, &rows[2..])), Ok(2));
+        assert_eq!(s.edit("Test edit", |b| clear_range(b, &rows[2..])), Ok(2));
         assert_eq!(row(s.budget(), rows[0]).fringe_range, Some(1));
         assert_eq!(row(s.budget(), rows[2]).fringe_range, None);
         assert_eq!(row(s.budget(), rows[3]).fringe_range, None);
@@ -1084,14 +1308,22 @@ mod tests {
     fn the_summary_reflects_the_selected_rows() {
         let mut s = session();
         let rows = mixed(&mut s); // [line, subtotal, line, adjustment]
-        s.edit(|b| apply_tag(b, &rows[..1], "fringes", "PENSION", true))
-            .unwrap();
-        s.edit(|b| apply_tag(b, &rows[..1], "groups", "Crew", true))
-            .unwrap();
-        s.edit(|b| assign_value(b, &rows[2..3], "set", Some("Stage A")))
-            .unwrap();
-        s.edit(|b| assign_value(b, &rows[2..3], "currency", Some("CAD")))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            apply_tag(b, &rows[..1], "fringes", "PENSION", true)
+        })
+        .unwrap();
+        s.edit("Test edit", |b| {
+            apply_tag(b, &rows[..1], "groups", "Crew", true)
+        })
+        .unwrap();
+        s.edit("Test edit", |b| {
+            assign_value(b, &rows[2..3], "set", Some("Stage A"))
+        })
+        .unwrap();
+        s.edit("Test edit", |b| {
+            assign_value(b, &rows[2..3], "currency", Some("CAD"))
+        })
+        .unwrap();
         let b = s.budget().clone();
         let sum = summary(&b, rows.clone(), |ids| s.selection(ids));
 
@@ -1126,7 +1358,7 @@ mod tests {
         assert_eq!(sum.range_blocked, None);
 
         // After making the range: "remove" applies, "make" says why not.
-        s.edit(|b| make_range(b, &rows)).unwrap();
+        s.edit("Test edit", |b| make_range(b, &rows)).unwrap();
         let b = s.budget().clone();
         let sum = summary(&b, rows.clone(), |ids| s.selection(ids));
         assert_eq!(sum.in_range, 3);
@@ -1144,9 +1376,10 @@ mod tests {
     fn a_suppressed_group_counts_its_lines_but_no_dollars() {
         let mut s = session();
         let hold = serde_json::from_value(serde_json::json!({"in_budget_total": false})).unwrap();
-        s.edit(|b| edit::set_group(b, "Hold", &hold)).unwrap();
+        s.edit("Test edit", |b| edit::set_group(b, "Hold", &hold))
+            .unwrap();
         let rows = ids(s.budget(), "13-01");
-        s.edit(|b| apply_tag(b, &rows, "groups", "Hold", true))
+        s.edit("Test edit", |b| apply_tag(b, &rows, "groups", "Hold", true))
             .unwrap();
         let b = s.budget().clone();
         let sum = summary(&b, rows, |ids| s.selection(ids));
@@ -1159,7 +1392,7 @@ mod tests {
     fn the_summary_is_plain_json() {
         let mut s = session();
         let rows = ids(s.budget(), "13-01");
-        s.edit(|b| {
+        s.edit("Test edit", |b| {
             b.sets.insert("Stage B".into(), SetDef::default());
             Ok(())
         })
@@ -1182,5 +1415,178 @@ mod tests {
             }
         }
         no_floats(&v);
+    }
+
+    #[test]
+    fn clear_takes_every_fringe_or_group_off_the_rows_that_carry_them() {
+        let mut b = budget();
+        let rows = ids(&b, "21-01");
+        apply_tag(&mut b, &rows, "fringes", "PENSION", true).unwrap();
+        apply_tag(&mut b, &rows, "groups", "Crew", true).unwrap();
+        // A name only left on a row (say, from an edited file) goes too.
+        b.categories_mut()
+            .flat_map(|c| &mut c.accounts)
+            .flat_map(|a| &mut a.details)
+            .find(|d| d.id == rows[0])
+            .unwrap()
+            .groups
+            .insert("Gone".into());
+        let other = ids(&b, "20-01")[0];
+        let before_other = row(&b, other);
+
+        assert_eq!(clear_tags(&mut b, &rows, "fringes"), Ok(rows.len()));
+        assert!(rows.iter().all(|id| row(&b, *id).fringes.is_empty()));
+        assert!(rows.iter().all(|id| row(&b, *id).groups.contains("Crew")));
+        assert_eq!(clear_tags(&mut b, &rows, "groups"), Ok(rows.len()));
+        assert!(rows.iter().all(|id| row(&b, *id).groups.is_empty()));
+        assert_eq!(
+            row(&b, other),
+            before_other,
+            "rows not selected are left alone"
+        );
+        // Nothing left to clear: no change.
+        assert_eq!(clear_tags(&mut b, &rows, "groups"), Ok(0));
+    }
+
+    #[test]
+    fn bad_clears_are_refused_and_change_nothing() {
+        let b0 = budget();
+        let rows = ids(&b0, "21-01");
+        let mut b = b0.clone();
+        assert!(clear_tags(&mut b, &rows, "set").is_err());
+        assert!(clear_tags(&mut b, &[], "fringes").is_err());
+        assert!(clear_tags(&mut b, &[999_999], "fringes").is_err());
+        // A subtotal row takes no fringes.
+        let mut s = session();
+        let mixed_rows = mixed(&mut s);
+        let mut b2 = s.budget().clone();
+        assert!(clear_tags(&mut b2, &mixed_rows[1..2], "fringes").is_err());
+        assert_eq!(&b2, s.budget());
+        assert_eq!(b, b0);
+    }
+
+    #[test]
+    fn replace_tags_sets_exactly_the_chosen_tags() {
+        let mut b = budget();
+        let mut s = session();
+        let rows = mixed(&mut s); // [line, subtotal, line, adjustment]
+        b.clone_from(s.budget());
+        apply_tag(&mut b, &rows, "groups", "Crew", true).unwrap();
+        assign_value(&mut b, &rows, "location", Some("Toronto")).unwrap();
+        let tags = TagsInput {
+            fringes: vec!["PENSION".into()],
+            groups: Vec::new(),
+            set: Some("Stage A".into()),
+            location: None,
+            currency: Some("CAD".into()),
+        };
+        assert_eq!(replace_row_tags(&mut b, &rows, &tags), Ok(3));
+        for id in [rows[0], rows[2]] {
+            let d = row(&b, id);
+            assert_eq!(d.fringes, ["PENSION".to_string()].into());
+            assert!(d.groups.is_empty() && d.location.is_none());
+            assert_eq!(d.set.as_deref(), Some("Stage A"));
+            assert_eq!(d.currency.as_deref(), Some("CAD"));
+        }
+        // The adjustment takes the set but no fringes or currency.
+        let adj = row(&b, rows[3]);
+        assert!(adj.fringes.is_empty() && adj.currency.is_none());
+        assert_eq!(adj.set.as_deref(), Some("Stage A"));
+        // The base currency is stored as none; empty tags clear everything.
+        let none = TagsInput {
+            currency: Some(b.base_currency.clone()),
+            ..TagsInput::default()
+        };
+        replace_row_tags(&mut b, &rows, &none).unwrap();
+        let d = row(&b, rows[0]);
+        assert!(d.fringes.is_empty() && d.set.is_none() && d.currency.is_none());
+    }
+
+    #[test]
+    fn replace_tags_refuses_unknown_names_and_changes_nothing() {
+        let b0 = budget();
+        let rows = ids(&b0, "21-01");
+        let mut b = b0.clone();
+        for tags in [
+            TagsInput {
+                fringes: vec!["NOPE".into()],
+                ..TagsInput::default()
+            },
+            TagsInput {
+                set: Some("Stage Z".into()),
+                ..TagsInput::default()
+            },
+            TagsInput {
+                currency: Some("EUR".into()),
+                ..TagsInput::default()
+            },
+        ] {
+            assert!(replace_row_tags(&mut b, &rows, &tags).is_err());
+        }
+        assert!(replace_row_tags(&mut b, &[], &TagsInput::default()).is_err());
+        assert_eq!(b, b0);
+        let unknown = serde_json::from_value::<TagsInput>(serde_json::json!({"notes": []}));
+        assert!(unknown.is_err(), "unknown fields are refused");
+    }
+
+    #[test]
+    fn the_summary_splits_fringe_dollars_into_percent_and_flat() {
+        let mut b = budget();
+        edit::set_fringe(
+            &mut b,
+            "KIT",
+            &serde_json::from_value(serde_json::json!({"kind": "flat", "rate": "25"})).unwrap(),
+        )
+        .unwrap();
+        let rows = ids(&b, "21-01");
+        apply_tag(&mut b, &rows, "fringes", "KIT", true).unwrap();
+        apply_tag(&mut b, &rows, "fringes", "PENSION", true).unwrap();
+        let mut s = Session::with_budget(b.clone(), None);
+        let sum = summary(&b, rows.clone(), |ids| s.selection(ids));
+        let lines = rows
+            .iter()
+            .filter(|id| row(&b, **id).kind == RowKind::Line)
+            .count();
+        assert!(lines > 0);
+        assert_eq!(sum.flat_fringes, sum.fringes["KIT"].total);
+        assert_eq!(
+            sum.percent_fringes,
+            sum.fringes["PAYROLL"].total + sum.fringes["PENSION"].total
+        );
+        assert!(sum.flat_fringes > 0 && sum.percent_fringes > 0);
+        assert_eq!(
+            sum.percent_fringes + sum.flat_fringes,
+            sum.totals.lines.fringe_total
+        );
+    }
+
+    /// The new commands are registered, listed and allowed in both windows
+    /// (the panel and the charges tab draw in the tools window too).
+    #[test]
+    fn apply_and_charge_preview_commands_are_wired() {
+        const APP_RS: &str = include_str!("app.rs");
+        const BUILD_RS: &str = include_str!("../build.rs");
+        const MAIN: &str = include_str!("../capabilities/main.json");
+        const TOOLS: &str = include_str!("../capabilities/tools.json");
+        for (handler, c) in [
+            ("crate::apply::clear_from_rows,", "clear_from_rows"),
+            (
+                "crate::apply::replace_tags_on_rows,",
+                "replace_tags_on_rows",
+            ),
+            ("            preview_charge,", "preview_charge"),
+        ] {
+            assert!(APP_RS.contains(handler), "{c} not in generate_handler!");
+            assert!(
+                BUILD_RS.contains(&format!("\"{c}\",")),
+                "{c} not in build.rs"
+            );
+            let allow = format!("\"allow-{}\"", c.replace('_', "-"));
+            assert!(MAIN.contains(&allow), "{c} not allowed for the main window");
+            assert!(
+                TOOLS.contains(&allow),
+                "{c} not allowed for the tools window"
+            );
+        }
     }
 }

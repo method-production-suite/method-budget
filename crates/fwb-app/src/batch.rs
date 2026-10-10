@@ -104,7 +104,7 @@ mod tests {
             cell(ids[1], "amount", "3"),
             cell(ids[1], "x", "2"),
         ];
-        assert_eq!(s.edit(|b| set_cells(b, &edits)), Ok(4));
+        assert_eq!(s.edit("Test edit", |b| set_cells(b, &edits)), Ok(4));
         assert!(s.can_undo());
         assert_eq!(detail(&s, ids[0]).description, "Camera operator");
         assert_eq!(detail(&s, ids[0]).rate.0, "1250");
@@ -133,7 +133,7 @@ mod tests {
             cell(ids[1], "amount", "5"),
             cell(ids[1], "rate", "40"),
         ];
-        batched.edit(|b| set_cells(b, &edits)).unwrap();
+        batched.edit("Test edit", |b| set_cells(b, &edits)).unwrap();
         for e in &edits {
             single
                 .set_detail_field(e.row_id, &e.field, &e.value)
@@ -163,12 +163,14 @@ mod tests {
 
         // The bad cell comes last, after good ones.
         let unknown_row = vec![cell(ids[0], "rate", "99"), cell(999_999, "rate", "1")];
-        assert!(s.edit(|b| set_cells(b, &unknown_row)).is_err());
+        assert!(s.edit("Test edit", |b| set_cells(b, &unknown_row)).is_err());
         assert_eq!(s.budget(), &original);
         assert!(!s.can_undo());
 
         let unknown_field = vec![cell(ids[0], "rate", "99"), cell(ids[0], "salary", "1")];
-        let err = s.edit(|b| set_cells(b, &unknown_field)).unwrap_err();
+        let err = s
+            .edit("Test edit", |b| set_cells(b, &unknown_field))
+            .unwrap_err();
         assert!(err.contains("salary"), "{err}");
         assert_eq!(s.budget(), &original);
         assert!(!s.is_dirty());
@@ -194,17 +196,17 @@ mod tests {
         let before = s.budget().clone();
         let ids = lines(&s, 1);
         let edits = vec![cell(ids[0], "rate", "5"), cell(sub, "rate", "5")];
-        assert!(s.edit(|b| set_cells(b, &edits)).is_err());
+        assert!(s.edit("Test edit", |b| set_cells(b, &edits)).is_err());
         assert_eq!(s.budget(), &before);
         // A subtotal's description is fine.
         let ok = vec![cell(sub, "description", "Prep")];
-        assert_eq!(s.edit(|b| set_cells(b, &ok)), Ok(1));
+        assert_eq!(s.edit("Test edit", |b| set_cells(b, &ok)), Ok(1));
     }
 
     #[test]
     fn an_empty_batch_is_not_an_edit() {
         let mut s = Session::new();
-        assert_eq!(s.edit(|b| set_cells(b, &[])), Ok(0));
+        assert_eq!(s.edit("Test edit", |b| set_cells(b, &[])), Ok(0));
         assert!(!s.can_undo());
         assert!(!s.is_dirty());
     }

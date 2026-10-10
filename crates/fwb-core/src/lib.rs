@@ -10,19 +10,23 @@ pub mod comparison;
 pub mod decimal;
 pub mod edit;
 pub mod expr;
+pub mod folders;
 pub mod model;
 pub mod order;
 pub mod presets;
 pub mod rename;
+pub mod renumber;
 pub mod report;
 pub mod report_preset;
 pub mod sample;
+pub mod share;
 pub mod starter;
+pub mod subbudget;
 pub mod usage;
 pub mod versions;
 
 pub use calc::breakdown::{selection_totals, SelectionTotals};
-pub use calc::{recalc, CalcError, ErrorKind, RecalcOptions};
+pub use calc::{charge_preview, recalc, CalcError, ErrorKind, RecalcOptions};
 pub use compare::{variance, Change, Variance};
 pub use comparison::{
     compare, compare_account, AccountComparison, Aggregate, CompareAccount, CompareCategory,

@@ -67,6 +67,27 @@ pub fn save_version(
     id
 }
 
+/// Saves `content` (another budget's content, such as a shared copy that
+/// came back) as a new version at the end of the list and returns its id.
+/// The current content doesn't change.
+pub fn add_version(
+    b: &mut Budget,
+    name: impl Into<String>,
+    created: impl Into<String>,
+    note: Option<String>,
+    content: crate::model::BudgetSnapshot,
+) -> VersionId {
+    let id = next_id(b);
+    b.versions.push(Version {
+        id,
+        name: name.into(),
+        created: created.into(),
+        note,
+        budget: Arc::new(content),
+    });
+    id
+}
+
 /// The name given to the automatic version saved before a restore.
 pub fn before_restore_name(restored: &str) -> String {
     format!("Before restoring \"{restored}\"")
@@ -94,8 +115,13 @@ pub fn restore_version(
     let blocks = std::mem::take(&mut b.line_presets);
     let display = std::mem::take(&mut b.display);
     let order = std::mem::take(&mut b.setup_order);
+    let folders = std::mem::take(&mut b.setup_folders);
+    // Where the budget came from is about the file, not its content.
+    let provenance = b.provenance.take();
     *b = content.into_budget(versions);
     b.setup_order = order;
+    b.setup_folders = folders;
+    b.provenance = provenance;
     b.report_presets = presets;
     b.tag_presets = tags;
     b.line_presets = blocks;

@@ -419,6 +419,71 @@ function clearValue(list) {
   });
 }
 
+/** Takes every fringe (or group) off the selected lines. */
+function clearAll(list) {
+  act((s) => {
+    if (!list.eligible(s)) return null;
+    const next = { ...s, [list.id]: {} };
+    for (const [k, t] of Object.entries(obj(s[list.id]))) next[list.id][k] = { ...t, count: 0, total: 0 };
+    return ['clear_from_rows', { rowIds: s.rows, field: list.field }, next];
+  });
+}
+
+/**
+ * Replace tags: a form like a tag preset's editor that sets exactly the
+ * ticked fringes and groups and the picked set, location and currency on the
+ * selected lines. It starts from what every selected line already shares.
+ */
+async function replaceTags(anchor) {
+  if (st.busy) return;
+  const s = await freshSummary();
+  if (!s || !s.rows.length || !s.costed) return;
+  const b = budget();
+  const base = str(b.base_currency);
+  const fields = [];
+  const shared = (listId, eligible) =>
+    Object.keys(obj(s[listId])).filter((n) => eligible > 0 && tally(s, listId, n).count >= eligible);
+  const checks = (kind, label, defs, on) => {
+    for (const n of orderedNames(b, kind === 'f' ? 'fringes' : 'groups')) {
+      if (!Object.prototype.hasOwnProperty.call(obj(defs), n)) continue;
+      fields.push({ key: `${kind}:${n}`, label: `${label} ${n}`, type: 'check', value: on.includes(n) });
+    }
+  };
+  checks('f', 'Fringe', b.fringes, shared('fringes', s.lines));
+  checks('g', 'Group', b.groups, shared('groups', s.costed));
+  const pick = (key, label, listId, defs, eligible, noneLabel) => {
+    const names = orderedNames(b, listId).filter((n) => Object.prototype.hasOwnProperty.call(obj(defs), n));
+    const one = shared(listId, eligible).find((n) => names.includes(n)) || '';
+    fields.push({ key, label, type: 'select', options: [['', noneLabel], ...names.map((n) => [n, n])], value: one });
+  };
+  pick('set', 'Set', 'sets', b.sets, s.costed, 'None');
+  pick('location', 'Location', 'locations', b.locations, s.costed, 'None');
+  pick('currency', 'Currency', 'currencies', b.currencies, s.lines, `${base || 'Base'} (base currency)`);
+  const rows = s.rows;
+  await anchoredForm({
+    anchor,
+    title: 'Replace tags',
+    message: `${scopeLabel(st.summaryScope || scope(), s)}: their fringes, groups, set, location and currency become exactly these.`,
+    fields,
+    submitText: 'Replace',
+    onSubmit: (v) => {
+      const chosen = (prefix) =>
+        Object.keys(v)
+          .filter((k) => k.startsWith(prefix) && v[k] === true)
+          .map((k) => k.slice(prefix.length));
+      const tags = { fringes: chosen('f:'), groups: chosen('g:') };
+      for (const k of ['set', 'location', 'currency']) tags[k] = v[k] ? v[k] : null;
+      st.error = '';
+      return call('replace_tags_on_rows', { rowIds: rows, tags });
+    },
+  });
+  if (anchor.isConnected) anchor.focus();
+  else {
+    const again = byKey('apply:replace-tags');
+    if (again) again.focus();
+  }
+}
+
 function makeRange() {
   act((s) => (s.range_blocked === null ? ['make_fringe_range', { rowIds: s.rows }, null] : null));
 }
@@ -515,6 +580,11 @@ function drawHead(host) {
       stat('Effective', !s ? '' : s.fringe_percent === null ? 'n/a' : `${twoPlaces(s.fringe_percent)}%`, 'Fringe dollars as a percent of the line totals'),
     );
     box.append(stats);
+    const replace = button('Replace tags…', 'setup-btn apply-btn', 'apply:replace-tags', () => replaceTags(replace), {
+      title: 'Set exactly the fringes, groups, set, location and currency the selected lines carry',
+      enabled: Boolean(s && s.costed),
+    });
+    box.append(el('div', { class: 'apply-range' }, replace));
   }
   if (st.error) box.append(el('p', { class: 'setup-error apply-error', text: st.error, attrs: { role: 'alert' } }));
   host.replaceChildren(box);
@@ -609,7 +679,17 @@ function tools(list, s, eligible) {
   onlyBtn.removeAttribute('aria-disabled'); // a view toggle, never busy
   row.append(input, showSelect(list.id, draw, `apply:show:${list.id}`), onlyBtn);
 
-  if (!list.multi) {
+  if (list.multi) {
+    const what = list.id === 'fringes' ? 'fringes' : 'groups';
+    const any = Object.keys(obj(s[list.id])).some((k) => tally(s, list.id, k).count > 0);
+    row.append(
+      button('Clear', 'apply-pill', `apply:clear:${list.id}`, () => clearAll(list), {
+        label: `Take every ${list.what} off the selected lines`,
+        title: `Take all ${what} off the selected lines`,
+        enabled: eligible > 0 && any,
+      }),
+    );
+  } else {
     const base = str(budget().base_currency);
     const hasValue =
       list.id === 'currencies'
@@ -817,6 +897,8 @@ function fringeFoot(s) {
     el(
       'p',
       { class: 'apply-stats' },
+      stat('Percent', money(s.percent_fringes || 0), 'Dollars from percentage fringes on the selected lines'),
+      stat('Flat', money(s.flat_fringes || 0), 'Dollars from flat fringes on the selected lines'),
       stat('Fringe total', money(t.fringe_total)),
       stat('Effective', s.fringe_percent === null ? 'n/a' : `${twoPlaces(s.fringe_percent)}%`, 'Fringe dollars as a percent of the line totals'),
     ),

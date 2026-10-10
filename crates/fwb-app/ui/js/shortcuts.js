@@ -35,6 +35,8 @@ export const SHORTCUTS = [
   { id: 'file.save', group: 'File', label: 'Save', keys: 'mod+s', scope: 'app' },
   { id: 'file.save_as', group: 'File', label: 'Save as a new file', keys: 'mod+shift+s', scope: 'app' },
   { id: 'file.new_from_template', group: 'File', label: 'New budget from a template (any budget file): its chart, setup and settings, in a new tab', scope: 'menu' },
+  { id: 'file.new_sub_budget', group: 'File', label: 'New sub-budget: a filtered copy by categories, accounts, groups, sets and locations, in a new tab', scope: 'menu' },
+  { id: 'file.save_share_copy', group: 'File', label: 'Save a copy for sharing: a snapshot named by title, version and date, optionally without notes or private info, that opens read-only', scope: 'menu' },
   { id: 'file.save_as_template', group: 'File', label: 'Save a copy of the budget as a template: no lines, info, baseline, versions or notes', scope: 'menu' },
   { id: 'file.import_setup', group: 'File', label: 'Import setup items from another budget file, with what they need', scope: 'menu' },
   { id: 'file.import_spreadsheet', group: 'File', label: 'Import lines from an Excel workbook, CSV or tab-delimited file, mapping its columns to budget fields', scope: 'menu' },
@@ -132,6 +134,9 @@ export const SHORTCUTS = [
   { id: 'view.panel.right', group: 'View', label: 'Dock the tools panel at the right', scope: 'menu' },
   { id: 'view.panel.bottom', group: 'View', label: 'Dock the tools panel at the bottom', scope: 'menu' },
   { id: 'view.panel.window', group: 'View', label: 'Pop the tools panel out into its own window', scope: 'menu' },
+  // Split view (pane.js): two panes of budget tabs side by side.
+  { id: 'view.split_right', group: 'View', label: 'Split right: a second pane of budget tabs (or, when split, go to the other pane)', keys: 'mod+shift+backslash', scope: 'app' },
+  { id: 'view.close_split', group: 'View', label: 'Close the split: every tab back in one strip', scope: 'menu' },
   // Display choices, saved for you (display.js). Cmd+= and Cmd+- insert rows,
   // so the zoom keys add Option.
   { id: 'view.formulas', group: 'View', label: 'Selected cells show their formulas instead of values, or not', keys: 'mod+alt+f', scope: 'app' },
@@ -151,6 +156,8 @@ export const SHORTCUTS = [
   { id: 'view.tab.locations', group: 'View', label: 'Tools: Locations', keys: 'mod+5', scope: 'app' },
   { id: 'view.tab.currencies', group: 'View', label: 'Tools: Currency', keys: 'mod+6', scope: 'app' },
   { id: 'view.tab.notes', group: 'View', label: 'Tools: Notes (notes on the line, account or category, and every note as a checklist)', scope: 'menu' },
+  { id: 'view.tab.history', group: 'View', label: 'Tools: History (every change you can undo; go back to one, or save it as a version)', scope: 'menu' },
+  { id: 'view.tab.library', group: 'View', label: 'Tools: Library (your setup library: copy setup items into this budget or save them to it)', scope: 'menu' },
   { id: 'view.tab.charges', group: 'View', label: 'Tools: Budget, Charges', keys: 'mod+/', scope: 'app' },
   { id: 'view.tab.credits', group: 'View', label: 'Tools: Budget, Credits', keys: 'mod+backslash', scope: 'app' },
   { id: 'view.tab.info', group: 'View', label: 'Tools: Budget, Info', scope: 'menu' },
@@ -165,6 +172,7 @@ export const SHORTCUTS = [
   { id: 'window.prev_tab', group: 'Window', label: 'Previous budget tab', keys: ['mod+shift+[', 'ctrl+shift+tab'], scope: 'grid', anywhere: true },
   { id: 'window.first_tab', group: 'Window', label: 'First budget tab', keys: 'mod+1', scope: 'grid', anywhere: true },
   { id: 'window.second_tab', group: 'Window', label: 'Second budget tab', keys: 'mod+2', scope: 'grid', anywhere: true },
+  { id: 'window.move_to_other_pane', group: 'Window', label: 'Move the budget tab to the other pane (split view)', scope: 'menu' },
   { id: 'tabs.keys', group: 'Window', label: 'On a budget tab: the previous or next tab (also Home, End)', keys: ['left', 'right'], scope: 'builtin' },
   { id: 'tabs.move', group: 'Window', label: 'On a budget tab: move it left or right (or drag it)', keys: ['alt+shift+left', 'alt+shift+right'], scope: 'builtin' },
 

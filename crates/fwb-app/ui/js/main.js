@@ -16,6 +16,14 @@
 // budget it is and lists the tabs, and switching tabs swaps in that budget's
 // view. Each tab remembers its level, category, account, cursor, scroll and
 // footer counters here; Rust remembers its account on screen and its undo.
+//
+// Split view (roadmap 2.26; pane.js): the window can show two panes, each
+// with its own tabs, breadcrumb, grid and footer. Each pane keeps where it is
+// in a Pane; `state` and `grid` below read and write the pane in use (`cur`),
+// which is the target pane (the one last clicked or focused) but for a
+// moment while another pane is drawn (withPane). So every command, key and
+// menu item acts on the target, as with one pane. The other pane follows
+// edits to its budget with its own view (pane_view: its own account).
 
 import { invoke, connected, setDefaultArgs } from './api.js';
 import { el, $, isTextField } from './dom.js';
@@ -40,73 +48,135 @@ import { renderTools, selectToolsTab, focusToolsKey, toolsLayout, setToolsLayout
 import { openFind, findStep } from './find.js';
 import { printReport } from './report.js';
 import { showReportSetup } from './reportsetup.js';
-import { SHORTCUTS, matchShortcut, menuRunsAppKeys, shortcutById, withShortcut } from './shortcuts.js';
+import { SHORTCUTS, matchShortcut, menuRunsAppKeys, shortcutById, shortcutText, withShortcut } from './shortcuts.js';
 import { isHelpOpen, toggleHelp, closeHelp } from './help.js';
-import { openMenu, updateMenu, closeMenu, isMenuOpen, setMenuAnchor } from './menu.js';
+import { openMenu, updateMenu, closeMenu, isMenuOpen, setMenuAnchor, openContextMenu } from './menu.js';
 import { readPref, writePref } from './prefs.js';
 import { setRules, dynamicStyles } from './sheet.js';
 import { initSafety } from './safety.js';
 import { initQuickEntry, editAssist, commitDetailCell, editNote, fringeRange, showFormula } from './quickentry.js';
 import { initRowFormat, toggleStyle, indent, setColor, clearFormatting, PALETTE } from './rowformat.js';
-import { initContextMenu, initContextMenuPresets } from './context.js';
+import { initContextMenu, initContextMenuPresets, watchContextMenu } from './context.js';
 import { initClipboard, copyEvent, cellsCopied, pasteEvent, copyRows, pasteRows } from './clipboard.js';
-import { initTabs, renderTabs, focusTab, tabsHaveFocus } from './tabs.js';
+import { createTabStrip } from './tabs.js';
+import { firstPane, secondPane, layoutPanes, isSplitLayout, markTarget, moveFormulaBar } from './pane.js';
+import { localStamp } from './versions.js';
 import { showVersions } from './versions.js';
 import { showCompare } from './compare.js';
 import { importSetup, newFromTemplate, saveAsTemplate } from './importsetup.js';
 import { importSpreadsheet } from './sheetimport.js';
+import { saveShareCopy, newSubBudget, renderShareBanner, offerReturnedCopy } from './sharing.js';
 import { displayCommands, userDisplay, withoutZeroRows } from './display.js';
 
-const state = {
-  doc: null, // the budget on screen (its tab is in front)
-  tabs: [], // every open budget's tab, in order (the view's `tabs`)
-  view: null,
-  ix: null,
-  level: 'topsheet', // 'topsheet' | 'accounts' | 'details'
-  cat: null, // { code, ti }
-  acct: null, // { code, ai }
-  panelOpen: true, // the tools panel shows (docked, or its window)
-  position: readPosition(), // 'right', 'bottom' or 'window' (saved per user)
-  selection: null, // { count, totals } on the detail grid
-  memory: {}, // level -> row key to return to
-  columns: readColumnChoices(), // optional detail column -> shown (saved per user)
-  // Net totals for the footer's change counters: when the file was opened or
-  // created (start), after the latest command (prev), and the latest edit's effect.
-  changes: null, // { start, prev, last }
-};
+// The panes (pane.js): the first is always there, the second once the window
+// has been split. `target` is the pane commands act on; `cur` the pane `state`
+// and `grid` reach (the target, but while withPane draws another pane).
+const panes = [firstPane(), null];
+let target = panes[0];
+let cur = panes[0];
 
-// Where each tab not in front was left: doc id -> { level, cat, acct,
-// memory, changes, cursor, col, scroll }.
-const tabMemory = new Map();
+/** The pane in use. */
+function P() {
+  return cur;
+}
+
+/** Runs `fn` with `pane` as the pane in use (drawing a pane that isn't the target). */
+function withPane(pane, fn) {
+  const was = cur;
+  cur = pane;
+  try {
+    return fn();
+  } finally {
+    cur = was;
+  }
+}
+
+// What a pane keeps (pane.js, Pane.st): the budget on screen in it (`doc`, its
+// tab in front there), its view and index, the level ('topsheet' | 'accounts'
+// | 'details'), category { code, ti }, account { code, ai }, the selection's
+// { count, totals }, level -> row key to return to (`memory`), and the footer's
+// change counters { start, prev, last }: net totals when the file was opened
+// or created, after the latest command, and the latest edit's effect.
+const PANE_FIELDS = new Set(['doc', 'view', 'ix', 'level', 'cat', 'acct', 'selection', 'memory', 'changes']);
+
+const state = new Proxy(
+  {
+    tabs: [], // every open budget's tab, in order (the view's `tabs`)
+    panelOpen: true, // the tools panel shows (docked, or its window)
+    position: readPosition(), // 'right', 'bottom' or 'window' (saved per user)
+    columns: readColumnChoices(), // optional detail column -> shown (saved per user)
+  },
+  {
+    get: (shared, k) => (PANE_FIELDS.has(k) ? cur.st[k] : shared[k]),
+    set: (shared, k, v) => {
+      if (PANE_FIELDS.has(k)) cur.st[k] = v;
+      else shared[k] = v;
+      return true;
+    },
+  },
+);
 
 // Every command names the budget on screen, so one sent just as another tab
 // comes to the front still reaches the budget the user was looking at.
 setDefaultArgs(() => (state.doc === null ? {} : { doc: state.doc }));
 
-const grid = new Grid($('grid-host'), {
-  onCommit: (rowKey, colKey, value) => commitCell(rowKey, colKey, value),
-  onCommitMany: (rowKeys, colKey, value) => commitMany(rowKeys, colKey, value),
-  onActivate: (rowKey) => drillDown(rowKey),
-  onEscape: () => goUp(),
-  onSelect: (keys) => selectionChanged(keys),
-  onClearCells: (cells) => clearCells(cells),
-  onPastEnd: () => {
-    if (state.level === 'details') insertRow('line');
+/** A pane's grid: its callbacks run with that pane in use. */
+function makeGrid(pane) {
+  const on =
+    (fn) =>
+    (...args) =>
+      withPane(pane, () => fn(...args));
+  return new Grid(pane.host, {
+    onCommit: on((rowKey, colKey, value) => commitCell(rowKey, colKey, value)),
+    onCommitMany: on((rowKeys, colKey, value) => commitMany(rowKeys, colKey, value)),
+    onActivate: on((rowKey) => drillDown(rowKey)),
+    onEscape: on(() => goUp()),
+    onSelect: on((keys) => selectionChanged(keys)),
+    onClearCells: on((cells) => clearCells(cells)),
+    onPastEnd: on(() => {
+      if (state.level === 'details') insertRow('line');
+    }),
+    // Shift+Tab from the first cell reaches the column menu button.
+    onTabOut: on(() => {
+      const b = pane.host.querySelector('.col-chooser');
+      if (b) b.focus();
+      return Boolean(b);
+    }),
+    // Type-ahead in setup-backed cells, and the formula bar (quickentry.js):
+    // the target pane's cursor only.
+    onEditStart: on((editor) => editAssist(editor)),
+    onCursor: on((at) => {
+      if (pane !== target) return;
+      showFormula(at);
+      cursorMoved();
+    }),
+    enterMovesDown: false,
+  });
+}
+panes[0].grid = makeGrid(panes[0]);
+
+// The grid in use. Display choices (zoom, formulas in a selection) go to
+// every pane's grid.
+const EVERY_GRID = new Set(['setZoom', 'setShowFormulas']);
+const grid = new Proxy(
+  {},
+  {
+    get: (_, k) => {
+      if (EVERY_GRID.has(k)) {
+        return (...args) => {
+          for (const p of panes) if (p && p.grid) p.grid[k](...args);
+        };
+      }
+      const g = cur.grid;
+      const v = g[k];
+      return typeof v === 'function' ? v.bind(g) : v;
+    },
+    set: (_, k, v) => {
+      cur.grid[k] = v;
+      return true;
+    },
   },
-  // Shift+Tab from the first cell reaches the column menu button.
-  onTabOut: () => {
-    const b = $('grid-host').querySelector('.col-chooser');
-    if (b) b.focus();
-    return Boolean(b);
-  },
-  // Type-ahead in setup-backed cells, and the formula bar (quickentry.js).
-  onEditStart: (editor) => editAssist(editor),
-  onCursor: (at) => {
-    showFormula(at);
-    cursorMoved();
-  },
-  enterMovesDown: false,
-});
+);
 
 initQuickEntry({ grid, view: () => state.view, level: () => state.level, act, call, toast });
 // Per-user display choices (display.js): grid zoom, formulas in a selection.
@@ -116,7 +186,7 @@ grid.setShowFormulas(userDisplay().formulasInSelection);
 initRowFormat({ grid, view: () => state.view, level: () => state.level, act });
 // Its items call the commands directly: not through run(), whose guard against
 // a key and its menu item both arriving would drop a key pressed right after.
-initContextMenu({ grid, host: $('grid-host'), view: () => state.view, level: () => state.level, run: (id) => COMMANDS[id] && COMMANDS[id](), act, toast });
+initContextMenu({ grid, host: () => P().host, view: () => state.view, level: () => state.level, run: (id) => COMMANDS[id] && COMMANDS[id](), act, toast });
 // The right-click menu's preset submenus (presets.js) need the selection, and
 // a call that rejects so a form can show its message.
 initContextMenuPresets({ selection: () => currentSelection(), call: (cmd, args, opts) => call(cmd, args, opts) });
@@ -144,17 +214,28 @@ async function act(cmd, args = {}, opts = {}) {
 }
 
 function apply(view, opts = {}) {
-  if (Array.isArray(view.tabs) && view.tabs.length) setTabs(view.tabs);
-  const front = state.tabs.find((t) => t.active);
-  // A reply about a budget that isn't in front (one saved or closed from its
-  // tab): its tab, drawn above, is all it changes.
-  if (front && view.doc !== front.id) return;
+  if (Array.isArray(view.tabs) && view.tabs.length) state.tabs = view.tabs;
+  // Which pane draws it (split view): the target, unless it is the other
+  // pane's own view. A reply about a budget that isn't in front (one saved or
+  // closed from its tab): its tab is all it changes.
+  const pane = routeView(view, opts);
+  if (pane) withPane(pane, () => applyHere(view, opts));
+  followOtherPane(pane, view);
+}
+
+/** Draws `view` in the pane in use. */
+function applyHere(view, opts = {}) {
+  // Waiting for this pane's own account (refocus): that view comes next.
+  if (P().refocusing && !opts.refocused) return;
   let switched = false;
   if (view.doc !== state.doc) {
     // Another tab came to the front (or the first view arrived).
     if (state.doc !== null) leaveTab();
     opts = { ...enterTab(view.doc), ...opts };
     switched = true;
+    // Split view: the budget's account on screen in Rust may be the one the
+    // other pane last showed; this pane asks for its own, then draws.
+    if (refocus(view, opts)) return;
   }
   // Rows a command just made (a line block inserted from the tools panel):
   // the cursor goes to the first one.
@@ -170,11 +251,13 @@ function apply(view, opts = {}) {
   if (switched) closeMenu();
   render(opts);
   if (opts.scroll) {
-    $('grid-host').scrollTop = opts.scroll.top;
-    $('grid-host').scrollLeft = opts.scroll.left;
+    P().host.scrollTop = opts.scroll.top;
+    P().host.scrollLeft = opts.scroll.left;
   }
   // The selected rows' totals may have changed even if the selection didn't.
   if (state.level === 'details') requestSelectionTotals(grid.selectedKeys());
+  // A returned copy next to the budget it came from: offer once (sharing.js).
+  if (switched) offerReturnedCopy(view, sharingCtx());
 }
 
 // Commands that return a view without changing the budget.
@@ -191,6 +274,15 @@ const NOT_EDITS = new Set([
   'open_pending',
   'open_recovered',
   'template_new',
+  // Split view (src/tabs.rs): the panes changed, not the budget.
+  'split_view',
+  'close_split',
+  'set_target_pane',
+  'move_tab_in_pane',
+  'move_to_pane',
+  'pane_view',
+  'share_copy_editable',
+  'sub_budget_new',
 ]);
 
 /**
@@ -261,13 +353,16 @@ function render(opts = {}) {
   const v = state.view;
   if (!v) return;
   const { entry, ai } = resolveNav();
-  renderTitle(v);
+  if (cur === target) renderTitle(v);
   renderCrumbs(entry, ai);
   renderBanner(v);
+  // A copy saved for sharing: read-only, and where it came from (sharing.js);
+  // the target pane's budget, split.
+  if (cur === target) renderShareBanner(v, sharingCtx());
   renderActions();
 
   const ix = state.ix;
-  $('grid-host').dataset.level = state.level;
+  P().host.dataset.level = state.level;
   if (state.level === 'topsheet') {
     grid.h.enterMovesDown = false;
     grid.setData(withColumnMenu(topsheetColumns(ix, state.columns)), zeroFiltered(topsheetRows(ix), opts), opts);
@@ -285,7 +380,7 @@ function render(opts = {}) {
     }
     grid.setData(cols, rows, opts);
   }
-  renderPanel();
+  if (cur === target) renderPanel();
   renderFooterNow();
 }
 
@@ -345,7 +440,7 @@ function crumbStep(id, label, delta, cmd) {
         const fromKeyboard = e.detail === 0;
         stepAccount(delta);
         if (fromKeyboard) {
-          const again = $('crumbs').querySelector(`[data-crumb="${id}"]`);
+          const again = P().crumbs.querySelector(`[data-crumb="${id}"]`);
           if (again) again.focus();
         }
       },
@@ -400,11 +495,11 @@ function renderCrumbs(entry, ai) {
       ),
     );
   }
-  $('crumbs').replaceChildren(...parts);
+  P().crumbs.replaceChildren(...parts);
 }
 
 function renderBanner(v) {
-  const banner = $('banner');
+  const banner = P().banner;
   if (!v.error) {
     banner.hidden = true;
     banner.replaceChildren();
@@ -438,7 +533,7 @@ function button(label, onClick, { title = '', cmd = '', danger = false } = {}) {
 }
 
 function renderActions() {
-  const bar = $('actions');
+  const bar = P().actions;
   if (state.level === 'topsheet') {
     bar.replaceChildren(
       button('Add category', addCategory),
@@ -498,6 +593,9 @@ function toolsCtx() {
     jumpTo: (entry) => jumpTo(entry),
     // A short message under the grid (a rename says how many places changed).
     toast: (message) => toast(message),
+    // The History tab (history.js): jumps and saving a step run here, like Undo.
+    historyJump: (to) => historyJump(to),
+    historySave: (step, name) => historySave(step, name),
   };
 }
 
@@ -519,7 +617,7 @@ function currentSelection() {
 function renderFooterNow() {
   const c = state.changes;
   const changes = c && c.start !== null && c.prev !== null ? { session: c.prev - c.start, last: c.last } : null;
-  renderFooter($('footer'), state.view, state.level === 'details' ? state.selection : null, {
+  renderFooter(P().footer, state.view, state.level === 'details' ? state.selection : null, {
     context: footerContext(),
     changes,
   });
@@ -599,6 +697,7 @@ async function openAccount(ti, ai, rowKey = null, col = 'description') {
   if (!a) return;
   const target = { ti, ai };
   opening = target;
+  const pane = P();
   let v;
   try {
     v = await invoke('focus_account', { category: c.cat.code, ti, account: a.code, ai });
@@ -609,6 +708,16 @@ async function openAccount(ti, ai, rowKey = null, col = 'description') {
     if (opening === target) opening = null;
   }
   if (!v || !v.account) return;
+  // Another pane became the target meanwhile: this pane still opens it.
+  if (pane !== cur) {
+    withPane(pane, () => landAccount(v, c, rowKey, col));
+    return;
+  }
+  landAccount(v, c, rowKey, col);
+}
+
+/** Draws account `v.account` (just fetched) in the pane in use. */
+function landAccount(v, c, rowKey, col) {
   state.memory.topsheet = `t${v.account.ti}`;
   state.memory.accounts = `a${v.account.ai}`;
   state.cat = { code: c.cat.code, ti: v.account.ti };
@@ -616,7 +725,7 @@ async function openAccount(ti, ai, rowKey = null, col = 'description') {
   state.level = 'details';
   state.selection = null;
   const land = rowKey ? { focusKey: rowKey } : { focusFirst: true };
-  apply(v, { cmd: 'focus_account', ...land, focusCol: col, resetSelection: true });
+  apply(v, { cmd: 'focus_account', ...land, focusCol: col, resetSelection: true, pane: P() });
   grid.focus();
 }
 
@@ -678,15 +787,19 @@ function commitMany(rowKeys, colKey, value) {
 // ---------------------------------------------------------------------------
 // Several cells at once: clear, paste, cut, fill down (detail grid)
 
-/** Sets detail cells as one undo step. cells: [{ rowKey, colKey, value }]. */
-function setCells(cells) {
+/**
+ * Sets detail cells as one undo step. cells: [{ rowKey, colKey, value }].
+ * `action` ('paste', 'fill', 'cut', 'clear') names the step in the History
+ * list (src/history.rs).
+ */
+function setCells(cells, action = null) {
   const edits = cells.map((c) => ({ rowId: Number(c.rowKey.slice(1)), field: c.colKey, value: c.value }));
-  return act('set_cells', { edits });
+  return act('set_cells', { edits, action });
 }
 
-function clearCells(cells) {
+function clearCells(cells, action = 'clear') {
   if (state.level === 'details') {
-    setCells(cells.map((c) => ({ ...c, value: '' })));
+    setCells(cells.map((c) => ({ ...c, value: '' })), action);
     return;
   }
   // Category and account lists: one cell at a time, the cursor's.
@@ -697,7 +810,7 @@ function clearCells(cells) {
 function fillDown() {
   if (state.level !== 'details') return;
   const cells = grid.fillDownTargets();
-  if (cells.length) setCells(cells);
+  if (cells.length) setCells(cells, 'fill');
   grid.focus();
 }
 
@@ -726,7 +839,7 @@ function pasteText(text) {
     return;
   }
   const { cells, rowsShort } = grid.pasteTargets(matrix);
-  if (cells.length) setCells(cells.map((c) => ({ ...c, value: pasteValue(c.colKey, c.value) })));
+  if (cells.length) setCells(cells.map((c) => ({ ...c, value: pasteValue(c.colKey, c.value) })), 'paste');
   if (rowsShort) {
     const rows = rowsShort === 1 ? '1 pasted row' : `${rowsShort} pasted rows`;
     toast(`${rows} didn't fit below the last line. Insert lines, then paste again.`);
@@ -737,7 +850,7 @@ function pasteText(text) {
 function gridHasClipboard() {
   if (isHelpOpen() || isModalOpen() || grid.editor) return false;
   const a = document.activeElement;
-  return !a || a === document.body || a === $('grid-host');
+  return !a || a === document.body || a === P().host;
 }
 
 function wireClipboard() {
@@ -760,7 +873,7 @@ function wireClipboard() {
   };
   document.addEventListener('copy', (e) => copy(e));
   document.addEventListener('cut', (e) => {
-    if (copy(e, true)) clearCells(grid.editableCells());
+    if (copy(e, true)) clearCells(grid.editableCells(), 'cut');
   });
   document.addEventListener('paste', (e) => {
     if (!gridHasClipboard() || !e.clipboardData) return;
@@ -778,8 +891,10 @@ function wireClipboard() {
 let selTimer = null;
 let selSeq = 0;
 function selectionChanged(keys) {
-  document.dispatchEvent(new CustomEvent('fwb:selection')); // the tools panel (apply.js, notes.js)
-  broadcastSelection();
+  if (cur === target) {
+    document.dispatchEvent(new CustomEvent('fwb:selection')); // the tools panel (apply.js, notes.js)
+    broadcastSelection();
+  }
   if (state.level !== 'details') return;
   requestSelectionTotals(keys);
 }
@@ -794,14 +909,19 @@ function requestSelectionTotals(keys) {
   const ids = keys.filter((k) => k.startsWith('r')).map((k) => Number(k.slice(1)));
   state.selection = { count: ids.length, totals: state.selection ? state.selection.totals : null };
   renderFooterNow();
-  clearTimeout(selTimer);
-  const seq = ++selSeq;
-  selTimer = setTimeout(async () => {
+  // Each pane asks for its own (its budget, its rows).
+  const pane = P();
+  const doc = state.doc;
+  clearTimeout(pane.selTimer);
+  const seq = (pane.selSeq = (pane.selSeq || 0) + 1);
+  pane.selTimer = setTimeout(async () => {
     try {
-      const totals = await invoke('selection_totals', { rowIds: ids });
-      if (seq !== selSeq || state.level !== 'details') return;
-      state.selection = { count: ids.length, totals };
-      renderFooterNow();
+      const totals = await invoke('selection_totals', { rowIds: ids, doc });
+      withPane(pane, () => {
+        if (seq !== pane.selSeq || state.level !== 'details' || state.doc !== doc) return;
+        state.selection = { count: ids.length, totals };
+        renderFooterNow();
+      });
     } catch (e) {
       toast(e);
     }
@@ -993,17 +1113,22 @@ async function deleteAccount() {
 
 function setTabs(tabs) {
   state.tabs = tabs;
-  renderTabs(tabs);
+  drawStrips();
 }
 
 /** Remembers where this tab was left, to come back to it. */
 function leaveTab() {
   if (!state.tabs.some((t) => t.id === state.doc)) {
-    tabMemory.delete(state.doc); // closed
+    P().tabMemory.delete(state.doc); // closed
     return;
   }
-  const host = $('grid-host');
-  tabMemory.set(state.doc, {
+  P().tabMemory.set(state.doc, whereHere());
+}
+
+/** Where the pane in use is: its level, category, account, cursor, scroll. */
+function whereHere() {
+  const host = P().host;
+  return {
     level: state.level,
     cat: state.cat,
     acct: state.acct,
@@ -1012,7 +1137,7 @@ function leaveTab() {
     cursor: grid.cursorKey(),
     col: grid.cursorColKey(),
     scroll: { top: host.scrollTop, left: host.scrollLeft },
-  });
+  };
 }
 
 /**
@@ -1022,13 +1147,13 @@ function leaveTab() {
 function enterTab(doc) {
   state.doc = doc;
   state.selection = null;
-  const m = tabMemory.get(doc);
+  const m = P().tabMemory.get(doc);
   if (!m) {
     resetNav();
     state.changes = null;
     return { focusKey: 't0', resetSelection: true, fresh: true };
   }
-  tabMemory.delete(doc);
+  P().tabMemory.delete(doc);
   state.level = m.level;
   state.cat = m.cat;
   state.acct = m.acct;
@@ -1041,45 +1166,60 @@ function enterTab(doc) {
 // arrives steps on from there.
 let switching = null;
 
-/** Brings budget `id`'s tab to the front. `keepFocus`: the tab strip keeps the keyboard. */
-async function switchTo(id, { keepFocus = false } = {}) {
+/**
+ * Brings budget `id`'s tab to the front. `keepFocus`: the tab strip keeps the
+ * keyboard. `pane`: the pane whose strip it was picked in (split view; it
+ * becomes the target); without one, the tab comes forward where it is.
+ */
+async function switchTo(id, { keepFocus = false, pane = null } = {}) {
   if (typeof id !== 'number' || !state.tabs.some((t) => t.id === id)) return;
+  if (pane && pane !== target) setTarget(pane);
   if (id === (switching === null ? state.doc : switching)) {
-    if (keepFocus) focusTab(id);
+    if (keepFocus) target.strip.focus(id);
     return;
   }
   if (grid.editor) grid.commitEdit(null);
   switching = id;
   try {
-    await act('switch_tab', { doc: id });
+    await act('switch_tab', pane && isSplit() ? { doc: id, pane: pane.index } : { doc: id });
   } finally {
     if (switching === id) switching = null;
   }
-  if (keepFocus) focusTab(id);
+  if (keepFocus) target.strip.focus(id);
   else grid.focus();
 }
 
-/** The next (1) or previous (-1) tab, wrapping round. */
+/** The next (1) or previous (-1) tab of the target pane, wrapping round. */
 function stepTab(delta) {
-  const n = state.tabs.length;
+  const ids = paneTabs(target);
+  const n = ids.length;
   const from = switching === null ? state.doc : switching;
-  const i = state.tabs.findIndex((t) => t.id === from);
+  const i = ids.indexOf(from);
   if (n < 2 || i < 0) return;
-  switchTo(state.tabs[(i + delta + n) % n].id, { keepFocus: tabsHaveFocus() });
+  switchTo(ids[(i + delta + n) % n], { keepFocus: tabsHaveFocus(), pane: target });
 }
 
-/** The tab at place `i` (Cmd+1, Cmd+2). */
+/** The target pane's tab at place `i` (Cmd+1, Cmd+2). */
 function tabAt(i) {
-  const t = state.tabs[i];
-  if (t) switchTo(t.id, { keepFocus: tabsHaveFocus() });
+  const id = paneTabs(target)[i];
+  if (id !== undefined) switchTo(id, { keepFocus: tabsHaveFocus(), pane: target });
 }
 
-/** Moves budget `id`'s tab to place `to`. */
-async function moveTab(id, to) {
+/** True when keyboard focus is on a tab strip. */
+function tabsHaveFocus() {
+  return panes.some((p) => p && p.strip && p.strip.hasFocus());
+}
+
+/** Moves budget `id`'s tab to place `to` (in `pane`'s strip, split). */
+async function moveTab(id, to, pane = target) {
   try {
-    const tabs = await invoke('move_tab', { doc: id, to });
-    if (Array.isArray(tabs)) setTabs(tabs);
-    focusTab(id);
+    if (isSplit()) {
+      await call('move_tab_in_pane', { pane: pane.index, doc: id, to });
+    } else {
+      const tabs = await invoke('move_tab', { doc: id, to });
+      if (Array.isArray(tabs)) setTabs(tabs);
+    }
+    pane.strip.focus(id);
   } catch (e) {
     toast(e);
   }
@@ -1128,15 +1268,18 @@ function unsavedDialog(name) {
  * asks Save, Close Without Saving or Cancel. The last tab closes the window
  * instead, which asks about unsaved changes in Rust.
  */
-async function closeTab(id = state.doc) {
-  if (state.tabs.length <= 1) {
+async function closeTab(id = state.doc, pane = target) {
+  // Split, with the budget in the other pane too: only this tab goes.
+  const both = isSplit() && panes.every((p) => paneTabs(p).includes(id));
+  if (state.tabs.length <= 1 && !both) {
     closeWindow();
     return;
   }
   if (grid.editor) grid.commitEdit(null);
+  const where = isSplit() ? { pane: pane.index } : {};
   let r;
   try {
-    r = await invoke('close_tab', { doc: id, discard: false });
+    r = await invoke('close_tab', { doc: id, discard: false, ...where });
     if (r && r.unsaved) {
       const tab = state.tabs.find((t) => t.id === id);
       const choice = await unsavedDialog(tab ? tab.label : 'This budget');
@@ -1144,9 +1287,9 @@ async function closeTab(id = state.doc) {
         const v = await call('save_budget', { saveAs: false, doc: id });
         // Cancelled, or not written (the file changed outside the app).
         if (!v || v.file.dirty) return grid.focus();
-        r = await invoke('close_tab', { doc: id, discard: false });
+        r = await invoke('close_tab', { doc: id, discard: false, ...where });
       } else if (choice === 'discard') {
-        r = await invoke('close_tab', { doc: id, discard: true });
+        r = await invoke('close_tab', { doc: id, discard: true, ...where });
       } else {
         return grid.focus();
       }
@@ -1160,7 +1303,7 @@ async function closeTab(id = state.doc) {
     return;
   }
   if (r && r.closed && r.view) apply(r.view, { cmd: 'close_tab' });
-  tabMemory.delete(id);
+  pane.tabMemory.delete(id);
   grid.focus();
 }
 
@@ -1304,16 +1447,18 @@ function togglePanel() {
 let toolsFocus = null;
 
 /** Opens the tools panel on a tab and puts focus on the tab. */
-function showTab(tab) {
+function showTab(tab, focus = null) {
   const key = selectToolsTab(tab);
+  // `focus`: a control in the tab to focus instead of the tab itself.
+  const target = key && focus ? focus : key;
   state.panelOpen = true;
   if (state.position === 'window') {
-    toolsFocus = key;
+    toolsFocus = target;
     openToolsWindow(true).then(sendToolsState);
     return;
   }
   renderPanel();
-  focusToolsKey(key);
+  if (!focusToolsKey(target)) focusToolsKey(key);
 }
 
 /**
@@ -1712,13 +1857,13 @@ function openColumnMenu(anchor) {
     label: 'Columns',
     checkable: true,
     items: columnMenuItems(),
-    returnFocus: () => $('grid-host').querySelector('.col-chooser'),
+    returnFocus: () => P().host.querySelector('.col-chooser'),
     onPick: (item) => {
       const col = OPTIONAL_DETAIL_COLUMNS.find((c) => c.key === item.id);
       if (!col) return;
       state.columns = { ...state.columns, [col.key]: !columnShown(col, state.columns, columnContext()) };
       writePref('detailColumns', state.columns);
-      render();
+      renderAll();
       updateMenu(columnMenuItems());
     },
   });
@@ -1816,11 +1961,15 @@ const COMMANDS = {
 for (const s of SHORTCUTS) {
   if (s.id.startsWith('view.tab.')) COMMANDS[s.id] = () => showTab(s.id.slice('view.tab.'.length));
 }
+// The topsheet's right-click Create charge and Create credit: the tab, with
+// the new item's name box focused (topsheet-setup.js's add form).
+COMMANDS['budget.create_charge'] = () => showTab('charges', JSON.stringify(['add', 'charges', 'name']));
+COMMANDS['budget.create_credit'] = () => showTab('credits', JSON.stringify(['add', 'credits', 'name']));
 // File > Open Recent and File > Revert to Backup (safety.js).
 Object.assign(COMMANDS, safety.commands);
 // View: formulas in a selection, zero accounts, totals' cents, grid zoom
 // (display.js; per-user choices).
-Object.assign(COMMANDS, displayCommands({ grid, render: () => render(), toast }));
+Object.assign(COMMANDS, displayCommands({ grid, render: () => renderAll(), toast }));
 // Format: text style of the selected detail lines (rowformat.js).
 Object.assign(COMMANDS, {
   'format.bold': () => toggleStyle('bold'),
@@ -1948,6 +2097,37 @@ Object.assign(COMMANDS, {
   'file.import_setup': () => startFromBudget(importSetup, 'import_setup'),
 });
 
+// File > Save a Copy for Sharing… and New Sub-Budget… (sharing.js;
+// src/sharing.rs).
+Object.assign(COMMANDS, {
+  'file.save_share_copy': () => {
+    if (grid.editor) grid.commitEdit(null);
+    if (state.view) saveShareCopy(sharingCtx());
+  },
+  'file.new_sub_budget': () => {
+    if (grid.editor) grid.commitEdit(null);
+    if (state.view) newSubBudget(sharingCtx());
+  },
+});
+
+/** What sharing.js needs from the shell. */
+function sharingCtx() {
+  return {
+    view: () => state.view,
+    doc: () => state.doc,
+    tabs: () => state.tabs,
+    invoke,
+    apply: (v) => apply(v, { cmd: 'share_copy' }),
+    toast,
+    focus: () => grid.focus(),
+    // The original in front, comparing it with the copy.
+    compare: async (original, copy) => {
+      await switchTo(original);
+      if (state.doc === original) openCompare({ tab: copy });
+    },
+  };
+}
+
 // File > Import Spreadsheet…: lines from a workbook, CSV or tab-delimited
 // file with a column mapping (sheetimport.js; src/sheet_import.rs). The
 // account on screen is the default for rows without one.
@@ -1979,7 +2159,7 @@ function openVersions() {
   showVersions({ view: () => state.view, call: (cmd, args) => call(cmd, args), compare: (id) => openCompare({ version: id }) });
 }
 
-/** The compare screen for the budget on screen (`opts.version`: just that version). */
+/** The compare screen for the budget on screen (`opts.version`: just that version; `opts.tab`: just that open budget). */
 function openCompare(opts = {}) {
   if (grid.editor) grid.commitEdit(null);
   if (!state.view) return;
@@ -2122,6 +2302,15 @@ function listenToEvents() {
     if (setToolsLayout(layout) && state.position !== 'window') renderPanel();
   });
   on('tools-geometry', saveGeometry);
+  // The tools window's History tab (of the budget it drew): undo or redo to a
+  // step, or save one as a version (history.js).
+  on('tools-history', (p) => {
+    if (!p || typeof p !== 'object' || p.doc !== state.doc) return;
+    if (p.action === 'jump' && Number.isSafeInteger(p.to) && p.to >= 0) historyJump(p.to);
+    else if (p.action === 'save' && Number.isSafeInteger(p.step) && p.step >= 0 && typeof p.name === 'string') {
+      historySave(p.step, p.name).catch((e) => toast(e));
+    }
+  });
   // A noted line, from the tools window's Notes tab (of the budget it drew).
   on('tools-jump', (entry) => {
     if (entry && typeof entry === 'object' && 'doc' in entry && entry.doc !== state.doc) return;
@@ -2158,7 +2347,7 @@ function onKeyDown(e) {
   const editing = Boolean(grid.editor);
   const inField = isTextField(active);
   // A button in the grid's header row (the column menu) is not the grid.
-  const inGrid = $('grid-host').contains(active) && !(active.closest && active.closest('thead'));
+  const inGrid = P().host.contains(active) && !(active.closest && active.closest('thead'));
   const bodyFocused = !active || active === document.body;
 
   // The cell editor answers its own keys first: Enter, Tab, Escape, arrows,
@@ -2178,9 +2367,8 @@ function onKeyDown(e) {
   // menu button goes back to the grid.
   const chrome =
     $('panel').contains(active) ||
-    $('crumbs').contains(active) ||
-    $('tabbar').contains(active) ||
-    (active && active.closest && active.closest('#grid-host thead'));
+    panes.some((p) => p && (p.crumbs.contains(active) || p.tabbar.contains(active))) ||
+    (active && active.closest && active.closest('.grid-host thead'));
   if (e.key === 'Escape' && !inField && chrome) {
     e.preventDefault();
     grid.focus();
@@ -2195,16 +2383,397 @@ function onKeyDown(e) {
 }
 
 // ---------------------------------------------------------------------------
+// Split view (roadmap 2.26; pane.js, src/docs.rs): two panes side by side,
+// each with its own tabs, breadcrumb, grid and footer. Rust keeps which tabs
+// are in which pane and which pane is the target (every view's `panes`);
+// this keeps where each pane is. The target is the pane last clicked or
+// focused: the toolbar, the menus, the keys, the tools panel and the formula
+// bar act on it. A budget can be in both panes: one session, two views, so
+// an edit in one pane shows in the other (which fetches its own view, at its
+// own account: pane_view).
+
+// The window's panes as the latest view gave them (src/docs.rs, PanesInfo).
+let layout = { split: false, target: 0, panes: [{ tabs: [], front: null }] };
+// set_target_pane calls on their way: until they are answered, views from
+// earlier commands don't move the target back.
+let targetCalls = 0;
+
+function isSplit() {
+  return layout.split && Boolean(panes[1]);
+}
+
+/** Budget ids in `pane`'s strip, in order. */
+function paneTabs(pane) {
+  if (!isSplit()) return state.tabs.map((t) => t.id);
+  const info = layout.panes[pane.index];
+  return info ? info.tabs.slice() : [];
+}
+
+/** The budget in front in `pane`. */
+function paneFront(pane) {
+  if (!isSplit()) {
+    const t = state.tabs.find((x) => x.active);
+    return t ? t.id : null;
+  }
+  const info = layout.panes[pane.index];
+  return info ? info.front : null;
+}
+
+/** Each pane's strip draws its own tabs, its budget in front marked. */
+function drawStrips() {
+  for (const p of panes) {
+    if (!p || !p.strip) continue;
+    if (p.index === 1 && !isSplit()) continue;
+    const front = paneFront(p);
+    const byId = new Map(state.tabs.map((t) => [t.id, t]));
+    const list = paneTabs(p)
+      .map((id) => byId.get(id))
+      .filter(Boolean)
+      .map((t) => ({ ...t, active: t.id === front }));
+    p.strip.render(list);
+  }
+}
+
+/** The second pane, made the first time the window splits. */
+function ensureSecondPane() {
+  if (panes[1]) return panes[1];
+  const p = secondPane();
+  p.grid = makeGrid(p);
+  p.grid.setZoom(userDisplay().zoom);
+  p.grid.setShowFormulas(userDisplay().formulasInSelection);
+  p.strip = createTabStrip(p.tabbar, stripHandlers(p));
+  watchContextMenu(p.host);
+  panes[1] = p;
+  return p;
+}
+
+/**
+ * Takes the panes a view gives (split or not, each pane's tabs and front,
+ * the target) and returns the pane to draw the view in, or null when no
+ * pane shows its budget in front.
+ */
+function routeView(view, opts) {
+  const info = view.panes;
+  if (info && Array.isArray(info.panes) && info.panes.length) setLayout(info);
+  drawStrips();
+  // A pane's own view (pane_view), or an account it asked for.
+  if (opts.pane) return paneFront(opts.pane) === view.doc || opts.pane.st.doc === null ? opts.pane : null;
+  const front = paneFront(target);
+  return front === null || front === view.doc ? target : null;
+}
+
+/** Lays the window out as `info` says (two panes or one) and follows its target. */
+function setLayout(info) {
+  const was = isSplit();
+  layout = info;
+  const split = Boolean(info.split);
+  if (split && !was) {
+    const second = ensureSecondPane();
+    layoutPanes(panes[0], second);
+  } else if (!split && was) {
+    mergePanes();
+  }
+  // The target, unless a click has just picked another one (its call is on
+  // the way).
+  const t = split ? panes[info.target] || panes[0] : panes[0];
+  if (t !== target && (targetCalls === 0 || !split)) adoptTarget(t);
+  markTarget(panes, target);
+}
+
+/**
+ * Back to one pane: the first pane carries on, showing the target's budget
+ * where the target pane had it. Every budget comes back where it was last
+ * seen: where a pane shows it now (the target's view first), else where the
+ * target pane, then the other one, left it.
+ */
+function mergePanes() {
+  const [first, second] = panes;
+  const fromSecond = target === second;
+  const now = (p) => (p && p.st.doc !== null ? [p.st.doc, withPane(p, () => whereHere())] : null);
+  const order = fromSecond ? [first, second] : [second, first]; // the later wins
+  const merged = new Map();
+  for (const p of order) if (p) for (const [doc, m] of p.tabMemory) merged.set(doc, m);
+  for (const p of order) {
+    const n = now(p);
+    if (n) merged.set(n[0], n[1]);
+  }
+  first.tabMemory = merged;
+  // The first pane takes up the target's budget from there.
+  first.st.doc = null;
+  layoutPanes(first, null);
+  if (second) {
+    second.tabMemory.clear();
+    Object.assign(second.st, { doc: null, view: null, ix: null, level: 'topsheet', cat: null, acct: null, selection: null, memory: {}, changes: null });
+  }
+  adoptTarget(first);
+}
+
+/**
+ * A budget just came to the front in the pane in use, remembered on an
+ * account other than the one `view` carries (another pane moved the
+ * budget's account on screen): asks for the view with its own account (the
+ * target moves Rust's account on screen, the other pane only looks) and
+ * returns true; it is drawn when that arrives.
+ */
+function refocus(view, opts) {
+  const s = state;
+  if (s.level !== 'details' || !s.acct || !s.cat) return false;
+  const a = view.account;
+  if (a && a.code === s.acct.code && a.ti === s.cat.ti) return false;
+  const pane = P();
+  const args = { doc: s.doc, category: s.cat.code, ti: s.cat.ti, account: s.acct.code, ai: s.acct.ai };
+  const cmd = pane === target ? 'focus_account' : 'pane_view';
+  pane.refocusing = true;
+  invoke(cmd, args)
+    .then((v) => {
+      pane.refocusing = false;
+      if (v && pane.st.doc === v.doc) apply(v, { ...opts, cmd, pane, refocused: true });
+    })
+    .catch((e) => {
+      pane.refocusing = false;
+      toast(e);
+    });
+  return true;
+}
+
+/** Makes `p` the target without telling Rust (it told us). */
+function adoptTarget(p) {
+  const old = target;
+  if (cur === old) cur = p;
+  target = p;
+  markTarget(panes, target);
+  moveFormulaBar(target);
+}
+
+/**
+ * Makes `p` the target (a click or focus in it): the toolbar, the tools
+ * panel and the formula bar follow it, and Rust brings its budget forward
+ * with its account on screen.
+ */
+function setTarget(p) {
+  if (!p || p === target || !isSplit()) return;
+  const old = target;
+  if (old.grid && old.grid.editor) withPane(old, () => old.grid.commitEdit(null));
+  closeMenu();
+  adoptTarget(p);
+  cur = p;
+  if (state.view) {
+    renderTitle(state.view);
+    renderPanel();
+    showFormula(grid.cursorCell());
+    document.dispatchEvent(new CustomEvent('fwb:selection'));
+    document.dispatchEvent(new CustomEvent('fwb:cursor'));
+    broadcastSelection();
+  }
+  targetCalls += 1;
+  invoke('set_target_pane', { pane: p.index, ...accountArgs(p) })
+    .then((v) => {
+      targetCalls -= 1;
+      if (v) apply(v, { cmd: 'set_target_pane', quiet: true });
+    })
+    .catch((e) => {
+      targetCalls -= 1;
+      toast(e);
+    });
+}
+
+/** The account `p` shows, as focus_account names it (nulls: none). */
+function accountArgs(p) {
+  const s = p.st;
+  if (s.level === 'details' && s.acct && s.cat) return { category: s.cat.code, ti: s.cat.ti, account: s.acct.code, ai: s.acct.ai };
+  return { category: null, ti: null, account: null, ai: null };
+}
+
+// The other pane's views on their way, so changes arriving meanwhile fetch once more.
+const following = new Map(); // pane -> { busy, again }
+
+/**
+ * After a view of a budget is drawn in `pane`: the other pane catches up
+ * when it shows the same budget (with this view when it shows no account or
+ * the same one, else with its own view), and fetches its own budget's view
+ * when what is in front there changed (a tab moved or closed).
+ */
+function followOtherPane(pane, view) {
+  if (!isSplit()) return;
+  for (const p of panes) {
+    if (!p || p === pane) continue;
+    const front = paneFront(p);
+    if (front === null) continue;
+    if (p.st.doc !== front) {
+      fetchPaneView(p);
+      continue;
+    }
+    if (front !== view.doc || !p.st.view || p.st.view.rev === view.rev) continue;
+    const a = p.st.acct;
+    const shown = view.account;
+    const same = p.st.level !== 'details' || (a && shown && shown.code === a.code && p.st.cat && shown.ti === p.st.cat.ti);
+    if (same) withPane(p, () => applyHere(view, { cmd: 'view-changed' }));
+    else fetchPaneView(p);
+  }
+}
+
+/** Fetches `p`'s budget in front with `p`'s own account (pane_view), once at a time. */
+async function fetchPaneView(p) {
+  const f = following.get(p) || { busy: false, again: false };
+  following.set(p, f);
+  if (f.busy) {
+    f.again = true;
+    return;
+  }
+  f.busy = true;
+  try {
+    do {
+      f.again = false;
+      const doc = paneFront(p);
+      if (doc === null || p === target) break;
+      // Where it was left (a budget coming to the front there), or where it is.
+      const m = p.st.doc === doc ? null : p.tabMemory.get(doc);
+      const at = p.st.doc === doc ? p : { st: m ? { level: m.level, cat: m.cat, acct: m.acct } : { level: 'topsheet' } };
+      try {
+        const v = await invoke('pane_view', { doc, ...accountArgs(at) });
+        if (v && p !== target) apply(v, { cmd: p.st.doc === doc ? 'view-changed' : 'pane_view', pane: p });
+      } catch (e) {
+        toast(e);
+      }
+    } while (f.again);
+  } finally {
+    f.busy = false;
+  }
+}
+
+/** Redraws every pane (a display choice or the columns changed). */
+function renderAll() {
+  for (const p of panes) {
+    if (!p || !p.st.view) continue;
+    if (p.index === 1 && !isSplit()) continue;
+    withPane(p, () => render());
+  }
+}
+
+/** What a pane's tab strip does (tabs.js). */
+function stripHandlers(pane) {
+  return {
+    switchTo: (id, opts) => switchTo(id, { ...opts, pane }),
+    close: (id) => closeTab(id, pane),
+    add: () => {
+      setTarget(pane);
+      doNew();
+    },
+    move: (id, to) => moveTab(id, to, pane),
+    moveToOther: (id, to) => moveToOtherPane(id, pane, to),
+    menu: (id, at) => tabMenu(id, pane, at),
+  };
+}
+
+/** View > Split Right: a second pane showing the budget in front too, where this pane is. */
+async function splitRight() {
+  if (isSplit()) {
+    // Split already: the other pane becomes the target.
+    const other = panes[1 - target.index];
+    setTarget(other);
+    grid.focus();
+    return;
+  }
+  if (grid.editor) grid.commitEdit(null);
+  const second = ensureSecondPane();
+  if (state.doc !== null) second.tabMemory.set(state.doc, whereHere());
+  await act('split_view');
+  grid.focus();
+}
+
+/** View > Close Split: every tab back in one strip. */
+async function closeSplit() {
+  if (!isSplit()) return;
+  if (grid.editor) grid.commitEdit(null);
+  await act('close_split');
+  grid.focus();
+}
+
+/**
+ * Moves budget `id`'s tab from `from` to the other pane (at place `to`
+ * there, or the end), where it comes to the front, where it was left.
+ */
+async function moveToOtherPane(id, from = target, to = null) {
+  if (!isSplit()) return;
+  const into = panes[1 - from.index];
+  if (paneTabs(from).length < 2) {
+    toast("A pane's only tab can't move to the other pane.");
+    return;
+  }
+  if (grid.editor) grid.commitEdit(null);
+  // It comes up in the other pane where it was in this one.
+  const m = from.st.doc === id ? withPane(from, () => whereHere()) : from.tabMemory.get(id);
+  if (m && into.st.doc !== id) into.tabMemory.set(id, m);
+  await act('move_to_pane', { doc: id, from: from.index, to: typeof to === 'number' ? to : null });
+  from.tabMemory.delete(id);
+  grid.focus();
+}
+
+/** A tab's right-click menu: close it, move it to the other pane, split or merge. */
+function tabMenu(id, pane, at) {
+  const lone = paneTabs(pane).length < 2;
+  const items = [{ label: 'Close Tab', shortcut: shortcutText('file.close_tab'), run: () => closeTab(id, pane) }, { separator: true }];
+  if (isSplit()) {
+    items.push({
+      label: 'Move to Other Pane',
+      title: lone ? "A pane's only tab can't move" : 'Show this budget in the other pane instead',
+      disabled: lone,
+      run: () => moveToOtherPane(id, pane),
+    });
+    items.push({ label: 'Close Split', run: () => closeSplit() });
+  } else {
+    items.push({
+      label: 'Split Right',
+      shortcut: shortcutText('view.split_right'),
+      title: 'Show this budget in a second pane at the right too',
+      run: async () => {
+        if (id !== state.doc) await switchTo(id, { pane });
+        if (state.doc === id) splitRight();
+      },
+    });
+  }
+  openContextMenu(at, { label: 'Tab actions', items, returnFocus: () => pane.strip.focus(id) });
+}
+
+// The History tab (history.js): every undo step of the target's budget.
+
+/** Undoes or redoes the target's budget to `to` steps applied. */
+async function historyJump(to) {
+  if (grid.editor) grid.commitEdit(null);
+  await act('history_jump', { to });
+}
+
+/** Saves the target's budget as it was at step `step` as version `name`; rejects with a message. */
+function historySave(step, name) {
+  return call('history_save_version', { step, name, note: null, created: localStamp() });
+}
+
+/** A click or focus in a pane makes it the target. */
+function wireSplit() {
+  const pick = (e) => {
+    if (!isSplit()) return;
+    const p = panes.find((x) => x && x.contains(e.target));
+    if (p && p !== target) setTarget(p);
+  };
+  document.addEventListener('pointerdown', pick, true);
+  document.addEventListener('focusin', pick, true);
+}
+
+Object.assign(COMMANDS, {
+  'view.split_right': () => splitRight(),
+  'view.close_split': () => closeSplit(),
+  'window.move_to_other_pane': () => {
+    if (state.doc !== null) moveToOtherPane(state.doc, target);
+  },
+});
+
+// ---------------------------------------------------------------------------
 // Start
 
 function wire() {
   wirePanelResizer();
-  initTabs($('tabbar'), {
-    switchTo: (id, opts) => switchTo(id, opts),
-    close: (id) => closeTab(id),
-    add: () => doNew(),
-    move: (id, to) => moveTab(id, to),
-  });
+  panes[0].strip = createTabStrip(panes[0].tabbar, stripHandlers(panes[0]));
+  wireSplit();
   $('btn-new').addEventListener('click', doNew);
   $('btn-open').addEventListener('click', doOpen);
   $('btn-save').addEventListener('click', () => doSave(false));

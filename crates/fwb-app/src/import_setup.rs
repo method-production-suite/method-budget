@@ -150,9 +150,9 @@ pub struct ItemRef {
     pub name: String,
 }
 
-type Key = (What, String);
+pub(crate) type Key = (What, String);
 
-fn item_ref(k: &Key) -> ItemRef {
+pub(crate) fn item_ref(k: &Key) -> ItemRef {
     ItemRef {
         kind: k.0.key().to_string(),
         name: k.1.clone(),
@@ -160,7 +160,7 @@ fn item_ref(k: &Key) -> ItemRef {
 }
 
 /// Every setup item in `b`, by kind, in review order.
-fn all_items(b: &Budget) -> Vec<Key> {
+pub(crate) fn all_items(b: &Budget) -> Vec<Key> {
     let mut out = Vec::new();
     for w in What::ALL {
         let names: Vec<String> = match w {
@@ -341,7 +341,7 @@ fn needs(b: &Budget, w: What, name: &str) -> BTreeSet<Key> {
 }
 
 /// `start` with everything it needs in `b`, however deep.
-fn closure(b: &Budget, start: impl IntoIterator<Item = Key>) -> BTreeSet<Key> {
+pub(crate) fn closure(b: &Budget, start: impl IntoIterator<Item = Key>) -> BTreeSet<Key> {
     let mut seen: BTreeSet<Key> = BTreeSet::new();
     let mut todo: Vec<Key> = start.into_iter().collect();
     while let Some(k) = todo.pop() {
@@ -409,7 +409,7 @@ fn status_of(src: &Budget, here: &Budget, w: What, name: &str) -> Status {
 }
 
 /// Item `name` of kind `w` in `b`, in words (empty when `b` has none).
-fn describe(b: &Budget, w: What, name: &str) -> String {
+pub(crate) fn describe(b: &Budget, w: What, name: &str) -> String {
     match w {
         What::Global => b.globals.get(name).map(clipboard::describe_global),
         What::Fringe => b.fringes.get(name).map(clipboard::describe_fringe),
@@ -1237,7 +1237,11 @@ pub fn import_setup<R: Runtime>(
         .get(token)
         .ok_or("Another file was picked since. Import again.")?;
     let mut s = state.lock_doc(doc)?;
-    let counts = s.edit(|b| import(b, &src, &picks, &resolutions))?;
+    let label = format!(
+        "Import {} of setup",
+        crate::history::count(picks.len(), "item", "items")
+    );
+    let counts = s.edit(label, |b| import(b, &src, &picks, &resolutions))?;
     Ok(ImportDone {
         view: finish(&window, &mut s, None),
         message: counts.message(),
@@ -1315,6 +1319,8 @@ mod tests {
             excluded_groups: ["OT".to_string()].into(),
             excluded_categories: BTreeSet::new(),
             excluded_accounts: BTreeSet::new(),
+            label_percent: false,
+            label_excluded: false,
         });
         b.credits.push(Credit {
             name: "State".into(),
@@ -1428,7 +1434,9 @@ mod tests {
         let mut s = Session::new();
         let before = s.budget().clone();
         let done = s
-            .edit(|b| import(b, &src, &[pick("credit", "State")], &[]))
+            .edit("Test edit", |b| {
+                import(b, &src, &[pick("credit", "State")], &[])
+            })
             .unwrap();
         let b = s.budget();
         assert_eq!(b.credits.len(), 1);
@@ -1687,7 +1695,7 @@ mod tests {
         let mut other = Session::new();
         other.save_to(&path).unwrap();
         other
-            .edit(|b| crate::edit::set_global(b, "UNSAVED", "1"))
+            .edit("Test edit", |b| crate::edit::set_global(b, "UNSAVED", "1"))
             .unwrap();
         let mut docs = Docs::default();
         let first = docs.active();

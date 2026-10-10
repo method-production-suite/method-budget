@@ -400,6 +400,8 @@ pub fn budget(spec: &SampleSpec) -> Budget {
             excluded_groups: group(2).into_iter().collect(),
             excluded_categories: first_cat.into_iter().collect(),
             excluded_accounts: some_account.into_iter().collect(),
+            label_percent: false,
+            label_excluded: false,
         },
         Charge {
             name: "Completion bond".into(),
@@ -410,6 +412,8 @@ pub fn budget(spec: &SampleSpec) -> Budget {
             excluded_groups: group(3).into_iter().collect(),
             excluded_categories: BTreeSet::new(),
             excluded_accounts: BTreeSet::new(),
+            label_percent: false,
+            label_excluded: false,
         },
         Charge {
             name: "Overhead fee".into(),
@@ -423,6 +427,8 @@ pub fn budget(spec: &SampleSpec) -> Budget {
             excluded_groups: group(4).into_iter().collect(),
             excluded_categories: BTreeSet::new(),
             excluded_accounts: BTreeSet::new(),
+            label_percent: false,
+            label_excluded: false,
         },
     ];
     let mut credit_rows = vec![CreditRow {

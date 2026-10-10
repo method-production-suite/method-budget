@@ -126,10 +126,16 @@ pub fn set_setup_order<R: Runtime>(
     names: Vec<String>,
 ) -> Result<View, String> {
     let kind = parse_kind(&kind)?;
-    edit_budget(&window, &state, doc, |b| {
-        fwb_core::order::set_order(b, kind, &names);
-        Ok(())
-    })
+    edit_budget(
+        &window,
+        &state,
+        doc,
+        format!("Reorder {}", kind.name()),
+        |b| {
+            fwb_core::order::set_order(b, kind, &names);
+            Ok(())
+        },
+    )
 }
 
 /// Moves item `name` `by` places (negative is up) in its table's order.
@@ -158,7 +164,13 @@ pub fn move_setup_item<R: Runtime>(
     let kind = parse_kind(&kind)?;
     let mut s = state.lock_doc(doc)?;
     let key = format!("setup-order\u{1}{}\u{1}{name}", kind.name());
-    s.edit_merging(&key, |b| {
+    let label = format!(
+        "Move {} {} {}",
+        kind.name(),
+        name.trim(),
+        if by < 0 { "up" } else { "down" }
+    );
+    s.edit_merging(&key, label, |b| {
         move_item(b, kind, &name, by).map(|()| ((), key.clone()))
     })?;
     Ok(finish(&window, &mut s, None))
@@ -175,9 +187,13 @@ pub fn set_short_code<R: Runtime>(
     code: String,
 ) -> Result<View, String> {
     let kind = parse_kind(&kind)?;
-    edit_budget(&window, &state, doc, |b| {
-        crate::edit::set_short_code(b, kind, &name, &code)
-    })
+    edit_budget(
+        &window,
+        &state,
+        doc,
+        format!("Set the short code of {}", name.trim()),
+        |b| crate::edit::set_short_code(b, kind, &name, &code),
+    )
 }
 
 #[cfg(test)]
@@ -203,7 +219,7 @@ mod tests {
     #[test]
     fn counts_and_totals_follow_the_lines() {
         let mut s = Session::new();
-        s.edit(|b| {
+        s.edit("Test edit", |b| {
             edit::set_set(
                 b,
                 "INT",
@@ -270,7 +286,7 @@ mod tests {
     #[test]
     fn deleting_in_use_items_from_lines() {
         let mut s = Session::new();
-        s.edit(|b| {
+        s.edit("Test edit", |b| {
             edit::set_currency(
                 b,
                 "CAD",
@@ -285,8 +301,10 @@ mod tests {
         })
         .unwrap();
         // A currency in use is refused, unless its lines move to the base.
-        assert!(s.edit(|b| edit::delete_currency(b, "CAD")).is_err());
-        s.edit(|b| edit::delete_currency_with(b, "CAD", true))
+        assert!(s
+            .edit("Test edit", |b| edit::delete_currency(b, "CAD"))
+            .is_err());
+        s.edit("Test edit", |b| edit::delete_currency_with(b, "CAD", true))
             .unwrap();
         assert!(!s.budget().currencies.contains_key("CAD"));
         assert!(edit::details(s.budget()).all(|d| d.currency.is_none()));
@@ -301,7 +319,8 @@ mod tests {
                 .filter(|d| d.unit == "Week")
                 .count()
         );
-        s.edit(|b| edit::delete_unit_with(b, "Week", true)).unwrap();
+        s.edit("Test edit", |b| edit::delete_unit_with(b, "Week", true))
+            .unwrap();
         assert!(edit::details(s.budget()).all(|d| d.unit != "Week"
             && d.unit2 != "Week"
             && d.unit3 != "Week"
@@ -313,7 +332,7 @@ mod tests {
     #[test]
     fn order_is_saved_moved_and_follows_renames_and_deletes() {
         let mut s = Session::new();
-        s.edit(|b| {
+        s.edit("Test edit", |b| {
             for n in ["A", "B", "C"] {
                 b.sets.insert(n.into(), SetDef::default());
             }
@@ -321,7 +340,7 @@ mod tests {
         })
         .unwrap();
         let names = |s: &Session| fwb_core::order::ordered(s.budget(), SetupKind::Set);
-        s.edit(|b| {
+        s.edit("Test edit", |b| {
             fwb_core::order::set_order(b, SetupKind::Set, &["C".into(), "A".into()]);
             Ok(())
         })
@@ -333,18 +352,26 @@ mod tests {
             fwb_core::order::ordered(&back, SetupKind::Set),
             ["C", "A", "B"]
         );
-        s.edit(|b| move_item(b, SetupKind::Set, "B", -1)).unwrap();
-        assert_eq!(names(&s), ["C", "B", "A"]);
-        assert!(s.edit(|b| move_item(b, SetupKind::Set, "C", -1)).is_err());
-        assert!(s.edit(|b| move_item(b, SetupKind::Set, "nope", 1)).is_err());
-        s.edit(|b| fwb_core::rename(b, SetupKind::Set, "B", "Bee").map_err(|e| e.to_string()))
+        s.edit("Test edit", |b| move_item(b, SetupKind::Set, "B", -1))
             .unwrap();
+        assert_eq!(names(&s), ["C", "B", "A"]);
+        assert!(s
+            .edit("Test edit", |b| move_item(b, SetupKind::Set, "C", -1))
+            .is_err());
+        assert!(s
+            .edit("Test edit", |b| move_item(b, SetupKind::Set, "nope", 1))
+            .is_err());
+        s.edit("Test edit", |b| {
+            fwb_core::rename(b, SetupKind::Set, "B", "Bee").map_err(|e| e.to_string())
+        })
+        .unwrap();
         assert_eq!(names(&s), ["C", "Bee", "A"]);
-        s.edit(|b| edit::delete_set(b, "C")).unwrap();
+        s.edit("Test edit", |b| edit::delete_set(b, "C")).unwrap();
         assert_eq!(names(&s), ["Bee", "A"]);
         assert_eq!(s.budget().setup_order.sets, ["Bee", "A"]);
         // Back to name order: nothing kept, nothing written.
-        s.edit(|b| move_item(b, SetupKind::Set, "Bee", 1)).unwrap();
+        s.edit("Test edit", |b| move_item(b, SetupKind::Set, "Bee", 1))
+            .unwrap();
         assert!(s.budget().setup_order.is_empty());
         assert!(!s.file_text().contains("setup_order"));
         assert_eq!(parse_kind("fringes").unwrap(), SetupKind::Fringe);
@@ -363,44 +390,76 @@ mod tests {
             unit: None,
             short_code: code.map(String::from),
         };
-        s.edit(|b| edit::set_fringe(b, "FICA tax", &fringe(Some(" FICA "))))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            edit::set_fringe(b, "FICA tax", &fringe(Some(" FICA ")))
+        })
+        .unwrap();
         assert_eq!(
             s.budget().fringes["FICA tax"].short_code.as_deref(),
             Some("FICA")
         );
         // Edited without a code: kept.
-        s.edit(|b| edit::set_fringe(b, "FICA tax", &fringe(None)))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            edit::set_fringe(b, "FICA tax", &fringe(None))
+        })
+        .unwrap();
         assert_eq!(
             s.budget().fringes["FICA tax"].short_code.as_deref(),
             Some("FICA")
         );
         // Taken (any case), the name of another, a comma, too long: refused.
         assert!(s
-            .edit(|b| edit::set_fringe(b, "Other", &fringe(Some("fica"))))
+            .edit("Test edit", |b| edit::set_fringe(
+                b,
+                "Other",
+                &fringe(Some("fica"))
+            ))
             .is_err());
         assert!(s
-            .edit(|b| edit::set_short_code(b, SetupKind::Fringe, "FICA tax", "PAYROLL"))
+            .edit("Test edit", |b| edit::set_short_code(
+                b,
+                SetupKind::Fringe,
+                "FICA tax",
+                "PAYROLL"
+            ))
             .is_err());
         assert!(s
-            .edit(|b| edit::set_short_code(b, SetupKind::Fringe, "FICA tax", "A,B"))
+            .edit("Test edit", |b| edit::set_short_code(
+                b,
+                SetupKind::Fringe,
+                "FICA tax",
+                "A,B"
+            ))
             .is_err());
         let long = "X".repeat(edit::MAX_SHORT_CODE_CHARS + 1);
         assert!(s
-            .edit(|b| edit::set_short_code(b, SetupKind::Fringe, "FICA tax", &long))
+            .edit("Test edit", |b| edit::set_short_code(
+                b,
+                SetupKind::Fringe,
+                "FICA tax",
+                &long
+            ))
             .is_err());
         assert!(s
-            .edit(|b| edit::set_short_code(b, SetupKind::Set, "x", "y"))
+            .edit("Test edit", |b| edit::set_short_code(
+                b,
+                SetupKind::Set,
+                "x",
+                "y"
+            ))
             .is_err());
         // Its own code again is fine; blank clears.
-        s.edit(|b| edit::set_short_code(b, SetupKind::Fringe, "FICA tax", "FICA"))
-            .unwrap();
-        s.edit(|b| edit::set_short_code(b, SetupKind::Fringe, "FICA tax", " "))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            edit::set_short_code(b, SetupKind::Fringe, "FICA tax", "FICA")
+        })
+        .unwrap();
+        s.edit("Test edit", |b| {
+            edit::set_short_code(b, SetupKind::Fringe, "FICA tax", " ")
+        })
+        .unwrap();
         assert_eq!(s.budget().fringes["FICA tax"].short_code, None);
         // Groups too; a rename keeps the code and the lines' references.
-        s.edit(|b| {
+        s.edit("Test edit", |b| {
             edit::set_group(
                 b,
                 "Hold",
@@ -412,7 +471,7 @@ mod tests {
             )
         })
         .unwrap();
-        s.edit(|b| {
+        s.edit("Test edit", |b| {
             rows(b)[0].groups.insert("Hold".into());
             fwb_core::rename(b, SetupKind::Group, "Hold", "On hold")
                 .map(|_| ())

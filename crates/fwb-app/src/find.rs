@@ -853,7 +853,12 @@ pub fn replace<R: Runtime>(
     with: Option<String>,
 ) -> Result<Replaced, String> {
     let mut updated = 0;
-    let view = edit_budget(&window, &state, doc, |b| {
+    let label = format!(
+        "Replace {} with {}",
+        crate::history::count(targets.len(), "match", "matches"),
+        with.as_deref().unwrap_or("nothing").trim()
+    );
+    let view = edit_budget(&window, &state, doc, label, |b| {
         updated = replace_in(b, &query, &targets, with.as_deref())?;
         Ok(())
     })?;
@@ -1294,7 +1299,9 @@ mod tests {
         let query = q("description", "camera");
         let found = search(s.budget(), &query).unwrap();
         let n = s
-            .edit(|b| replace_in(b, &query, &targets(&found), Some("Lens")))
+            .edit("Test edit", |b| {
+                replace_in(b, &query, &targets(&found), Some("Lens"))
+            })
             .unwrap();
         assert_eq!(n, 5);
         assert!(s.can_undo());
@@ -1312,12 +1319,16 @@ mod tests {
         let query = q("fringe", "FICA");
         let found = search(s.budget(), &query).unwrap();
         // Line 5 loses FICA after the search.
-        s.edit(|b| edit::set_detail_field(b, 5, edit::Field::Fringes, ""))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            edit::set_detail_field(b, 5, edit::Field::Fringes, "")
+        })
+        .unwrap();
         let before = s.budget().clone();
         let undo_depth = s.can_undo();
         let err = s
-            .edit(|b| replace_in(b, &query, &targets(&found), Some("PENSION")))
+            .edit("Test edit", |b| {
+                replace_in(b, &query, &targets(&found), Some("PENSION"))
+            })
             .unwrap_err();
         assert!(err.contains("no longer match"), "{err}");
         assert_eq!(s.budget(), &before);
@@ -1418,7 +1429,9 @@ mod tests {
         let found = search(s.budget(), &query).unwrap();
         assert!(found.count > 0);
         let n = s
-            .edit(|b| replace_in(b, &query, &targets(&found), Some("SHOOT_WEEKS * 5")))
+            .edit("Test edit", |b| {
+                replace_in(b, &query, &targets(&found), Some("SHOOT_WEEKS * 5"))
+            })
             .unwrap();
         assert_eq!(n, found.hits.len());
         let v = serde_json::to_value(s.view_with(None)).unwrap();

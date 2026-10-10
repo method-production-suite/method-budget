@@ -113,9 +113,13 @@ fn rejected_edits_change_nothing() {
     let mut s = Session::new();
     assert!(s.set_detail_field(999_999, "rate", "1").is_err());
     assert!(s.set_detail_field(1, "bogus", "1").is_err());
-    assert!(s.edit(|b| edit::set_global(b, "9lives", "1")).is_err());
     assert!(s
-        .edit(|b| edit::add_account(b, "21", "21-01", "Dup", None))
+        .edit("Test edit", |b| edit::set_global(b, "9lives", "1"))
+        .is_err());
+    assert!(s
+        .edit("Test edit", |b| edit::add_account(
+            b, "21", "21-01", "Dup", None
+        ))
         .is_err());
     assert!(!s.can_undo() && !s.is_dirty());
 }
@@ -222,7 +226,8 @@ fn adding_and_deleting_rows() {
     s.set_detail_field(sub, "description", "Staff subtotal")
         .unwrap();
 
-    s.edit(|b| edit::delete_details(b, &[line, adj])).unwrap();
+    s.edit("Test edit", |b| edit::delete_details(b, &[line, adj]))
+        .unwrap();
     assert_eq!(ids_in(&s, "20-01"), [ids[0], ids[1], sub]);
     assert!(s.add_detail("20-01", Some(9999), "line").is_err());
     assert!(s.add_detail("20-01", None, "header").is_err());
@@ -232,7 +237,7 @@ fn adding_and_deleting_rows() {
 fn bulk_field_edits_are_one_undo_step() {
     let mut s = Session::new();
     let ids = ids_in(&s, "21-01");
-    s.edit(|b| {
+    s.edit("Test edit", |b| {
         edit::set_group(
             b,
             "Second unit",
@@ -244,8 +249,10 @@ fn bulk_field_edits_are_one_undo_step() {
         )
     })
     .unwrap();
-    s.edit(|b| edit::set_rows_field(b, &ids, edit::Field::Groups, "Second unit"))
-        .unwrap();
+    s.edit("Test edit", |b| {
+        edit::set_rows_field(b, &ids, edit::Field::Groups, "Second unit")
+    })
+    .unwrap();
     let v = view(&mut s);
     assert_eq!(
         v["report"]["groups"]["Second unit"]["active"]["details_total"],
@@ -268,10 +275,12 @@ fn groups_out_of_the_total_grey_rows_and_drop_their_money() {
         description: "Alternate camera".into(),
         in_budget_total: on,
     };
-    s.edit(|b| edit::set_group(b, "Alt", &g(true))).unwrap();
+    s.edit("Test edit", |b| edit::set_group(b, "Alt", &g(true)))
+        .unwrap();
     s.set_detail_field(id, "groups", "Alt").unwrap();
     let full = account(&view(&mut s), "21-01")["total"].as_i64().unwrap();
-    s.edit(|b| edit::set_group(b, "Alt", &g(false))).unwrap();
+    s.edit("Test edit", |b| edit::set_group(b, "Alt", &g(false)))
+        .unwrap();
     let v = view(&mut s);
     let row = &account(&v, "21-01")["rows"][1];
     assert_eq!(row["included"], false);
@@ -281,7 +290,8 @@ fn groups_out_of_the_total_grey_rows_and_drop_their_money() {
         full - 3_000_000
     );
     // Deleting the group untags the row and brings the money back.
-    s.edit(|b| edit::delete_group(b, "Alt")).unwrap();
+    s.edit("Test edit", |b| edit::delete_group(b, "Alt"))
+        .unwrap();
     let v = view(&mut s);
     assert_eq!(account(&v, "21-01")["total"].as_i64().unwrap(), full);
     assert!(v["budget"]["topsheet"][6]["accounts"][0]["details"][1]
@@ -292,12 +302,14 @@ fn groups_out_of_the_total_grey_rows_and_drop_their_money() {
 #[test]
 fn globals_set_evaluate_and_delete_by_freezing() {
     let mut s = Session::new();
-    s.edit(|b| edit::set_global(b, "SHOOT_DAYS", "30")).unwrap();
+    s.edit("Test edit", |b| edit::set_global(b, "SHOOT_DAYS", "30"))
+        .unwrap();
     let v = view(&mut s);
     assert_eq!(v["report"]["globals"]["SHOOT_WEEKS"], "6");
     let before = v["report"]["grand_total"].clone();
 
-    s.edit(|b| edit::delete_global(b, "SHOOT_WEEKS")).unwrap();
+    s.edit("Test edit", |b| edit::delete_global(b, "SHOOT_WEEKS"))
+        .unwrap();
     let v = view(&mut s);
     assert!(v["budget"]["globals"].get("SHOOT_WEEKS").is_none());
     assert_eq!(
@@ -308,16 +320,22 @@ fn globals_set_evaluate_and_delete_by_freezing() {
     assert_eq!(lead["amount"], "6 + 1");
 
     // A broken global is flagged but can still be deleted.
-    s.edit(|b| edit::set_global(b, "BROKEN", "1 +")).unwrap();
+    s.edit("Test edit", |b| edit::set_global(b, "BROKEN", "1 +"))
+        .unwrap();
     let v = view(&mut s);
     assert_eq!(v["issues"][0]["target"]["kind"], "global");
     assert_eq!(v["issues"][0]["target"]["name"], "BROKEN");
     assert_eq!(v["partial"], true);
-    s.edit(|b| edit::delete_global(b, "BROKEN")).unwrap();
+    s.edit("Test edit", |b| edit::delete_global(b, "BROKEN"))
+        .unwrap();
     assert!(view(&mut s)["error"].is_null());
 
-    assert!(s.edit(|b| edit::set_global(b, "X", "  ")).is_err());
-    assert!(s.edit(|b| edit::delete_global(b, "NOPE")).is_err());
+    assert!(s
+        .edit("Test edit", |b| edit::set_global(b, "X", "  "))
+        .is_err());
+    assert!(s
+        .edit("Test edit", |b| edit::delete_global(b, "NOPE"))
+        .is_err());
 }
 
 #[test]
@@ -331,7 +349,7 @@ fn fringes_units_and_currencies() {
         cutoff: Some("100,000".into()),
         unit: None,
     };
-    s.edit(|b| edit::set_fringe(b, "PENSION", &pension))
+    s.edit("Test edit", |b| edit::set_fringe(b, "PENSION", &pension))
         .unwrap();
     let director = ids_in(&s, "12-01")[0];
     s.set_detail_field(director, "fringes", "PAYROLL, PENSION")
@@ -352,13 +370,14 @@ fn fringes_units_and_currencies() {
         cutoff: None,
         unit: Some("Day".into()),
     };
-    s.edit(|b| edit::set_fringe(b, "MEAL", &meal)).unwrap();
+    s.edit("Test edit", |b| edit::set_fringe(b, "MEAL", &meal))
+        .unwrap();
     assert!(s
-        .edit(|b| edit::set_fringe(b, "A,B", &meal))
+        .edit("Test edit", |b| edit::set_fringe(b, "A,B", &meal))
         .unwrap_err()
         .contains("commas"));
     assert!(s
-        .edit(|b| edit::set_fringe(
+        .edit("Test edit", |b| edit::set_fringe(
             b,
             "BAD",
             &FringeInput {
@@ -369,7 +388,8 @@ fn fringes_units_and_currencies() {
         .is_err());
 
     // Deleting a fringe takes it off every row.
-    s.edit(|b| edit::delete_fringe(b, "PENSION")).unwrap();
+    s.edit("Test edit", |b| edit::delete_fringe(b, "PENSION"))
+        .unwrap();
     assert!(view(&mut s)["error"].is_null());
     let d = s
         .budget()
@@ -385,10 +405,11 @@ fn fringes_units_and_currencies() {
         description: String::new(),
         hours: Some("12".into()),
     };
-    s.edit(|b| edit::set_unit(b, "Shift", &unit)).unwrap();
+    s.edit("Test edit", |b| edit::set_unit(b, "Shift", &unit))
+        .unwrap();
     assert_eq!(view(&mut s)["budget"]["units"]["Shift"]["hours"], "12");
     assert!(s
-        .edit(|b| edit::set_unit(
+        .edit("Test edit", |b| edit::set_unit(
             b,
             "Bad",
             &UnitInput {
@@ -397,14 +418,16 @@ fn fringes_units_and_currencies() {
             }
         ))
         .is_err());
-    s.edit(|b| edit::delete_unit(b, "Shift")).unwrap();
+    s.edit("Test edit", |b| edit::delete_unit(b, "Shift"))
+        .unwrap();
 
     let eur = CurrencyInput {
         description: "Euro".into(),
         symbol: "€".into(),
         rate: "1.1".into(),
     };
-    s.edit(|b| edit::set_currency(b, "EUR", &eur)).unwrap();
+    s.edit("Test edit", |b| edit::set_currency(b, "EUR", &eur))
+        .unwrap();
     let mix = ids_in(&s, "41-01")[0];
     s.set_detail_field(mix, "currency", "EUR").unwrap();
     let v = view(&mut s);
@@ -413,15 +436,15 @@ fn fringes_units_and_currencies() {
     assert_eq!(row["local_total"], 2_000_000);
     assert_eq!(row["total"], 2_200_000);
     assert!(s
-        .edit(|b| edit::delete_currency(b, "EUR"))
+        .edit("Test edit", |b| edit::delete_currency(b, "EUR"))
         .unwrap_err()
         .contains("1 line uses EUR"));
     assert!(s
-        .edit(|b| edit::set_currency(b, "USD", &eur))
+        .edit("Test edit", |b| edit::set_currency(b, "USD", &eur))
         .unwrap_err()
         .contains("base currency"));
     assert!(s
-        .edit(|b| edit::set_currency(
+        .edit("Test edit", |b| edit::set_currency(
             b,
             "JPY",
             &CurrencyInput {
@@ -431,17 +454,20 @@ fn fringes_units_and_currencies() {
         ))
         .is_err());
     s.set_detail_field(mix, "currency", "").unwrap();
-    s.edit(|b| edit::delete_currency(b, "EUR")).unwrap();
+    s.edit("Test edit", |b| edit::delete_currency(b, "EUR"))
+        .unwrap();
 }
 
 #[test]
 fn categories_accounts_and_production_totals() {
     let mut s = Session::new();
     // Codes are normalized by the budget's coding pattern.
-    s.edit(|b| edit::add_category(b, "6", "Other", None))
+    s.edit("Test edit", |b| edit::add_category(b, "6", "Other", None))
         .unwrap();
-    s.edit(|b| edit::add_account(b, "06", "6-1", "Publicity", None))
-        .unwrap();
+    s.edit("Test edit", |b| {
+        edit::add_account(b, "06", "6-1", "Publicity", None)
+    })
+    .unwrap();
     let v = view(&mut s);
     let last = v["budget"]["topsheet"]
         .as_array()
@@ -452,7 +478,7 @@ fn categories_accounts_and_production_totals() {
     assert_eq!(last["code"], "06");
     assert_eq!(last["accounts"][0]["code"], "06-01");
     assert!(s
-        .edit(|b| edit::add_category(b, "06", "Again", None))
+        .edit("Test edit", |b| edit::add_category(b, "06", "Again", None))
         .unwrap_err()
         .contains("already exists"));
 
@@ -464,8 +490,10 @@ fn categories_accounts_and_production_totals() {
     // After the last production total, so it counts below the line.
     let atl_btl = v["report"]["atl_btl"].as_i64().unwrap();
 
-    s.edit(|b| edit::add_production_total(b, "Total publicity", None))
-        .unwrap();
+    s.edit("Test edit", |b| {
+        edit::add_production_total(b, "Total publicity", None)
+    })
+    .unwrap();
     let v = view(&mut s);
     assert_eq!(
         v["report"]["levels"].as_array().unwrap().last().unwrap()["total"],
@@ -475,18 +503,27 @@ fn categories_accounts_and_production_totals() {
 
     // Renumber and rename keep the accounts.
     let idx = v["budget"]["topsheet"].as_array().unwrap().len() - 2;
-    s.edit(|b| edit::update_topsheet_row(b, idx, Some("60"), "Publicity"))
-        .unwrap();
-    s.edit(|b| edit::update_account(b, "06-01", "60-01", "Unit publicist"))
-        .unwrap();
+    s.edit("Test edit", |b| {
+        edit::update_topsheet_row(b, idx, Some("60"), "Publicity")
+    })
+    .unwrap();
+    s.edit("Test edit", |b| {
+        edit::update_account(b, "06-01", "60-01", "Unit publicist")
+    })
+    .unwrap();
     assert_eq!(ids_in(&s, "60-01"), [id]);
     assert!(s
-        .edit(|b| edit::update_account(b, "60-01", "50-01", "Clash"))
+        .edit("Test edit", |b| edit::update_account(
+            b, "60-01", "50-01", "Clash"
+        ))
         .is_err());
 
-    s.edit(|b| edit::delete_account(b, "60-01")).unwrap();
-    s.edit(|b| edit::delete_topsheet_row(b, idx + 1)).unwrap();
-    s.edit(|b| edit::delete_topsheet_row(b, idx)).unwrap();
+    s.edit("Test edit", |b| edit::delete_account(b, "60-01"))
+        .unwrap();
+    s.edit("Test edit", |b| edit::delete_topsheet_row(b, idx + 1))
+        .unwrap();
+    s.edit("Test edit", |b| edit::delete_topsheet_row(b, idx))
+        .unwrap();
     assert_eq!(s.budget(), &fwb_core::starter::budget());
 }
 
@@ -509,7 +546,8 @@ fn save_open_round_trip_and_dirty_flag() {
     let dir = temp_dir();
     let path = dir.join("film.fwb");
     let mut s = Session::new();
-    s.edit(|b| edit::set_title(b, "Round Trip")).unwrap();
+    s.edit("Test edit", |b| edit::set_title(b, "Round Trip"))
+        .unwrap();
     assert!(s.is_dirty());
     s.save_to(&path).unwrap();
     assert!(!s.is_dirty());
@@ -593,7 +631,7 @@ fn refused<T: std::fmt::Debug>(
 ) -> String {
     let before = s.budget().clone();
     let (undo, dirty) = (s.can_undo(), s.is_dirty());
-    let e = s.edit(f).unwrap_err();
+    let e = s.edit("Test edit", f).unwrap_err();
     assert_eq!(
         s.budget(),
         &before,
@@ -609,7 +647,7 @@ fn one_step<T: std::fmt::Debug>(
     f: impl FnOnce(&mut Budget) -> edit::EditResult<T>,
 ) -> T {
     let before = s.budget().clone();
-    let out = s.edit(f).unwrap();
+    let out = s.edit("Test edit", f).unwrap();
     assert_ne!(s.budget(), &before, "the edit changed nothing");
     let after = s.budget().clone();
     assert!(s.undo());
@@ -732,7 +770,7 @@ fn a_charge_keeps_an_exclusion_whose_group_is_gone() {
     let mut s = Session::new();
     // A file can name a group the budget no longer has; editing the charge's
     // other fields must still work.
-    s.edit(|b| {
+    s.edit("Test edit", |b| {
         b.charges[0].excluded_groups.insert("Old".into());
         Ok(())
     })
@@ -757,7 +795,7 @@ fn a_charge_keeps_an_exclusion_whose_group_is_gone() {
 #[test]
 fn credits_reduce_the_net_total() {
     let mut s = Session::new();
-    s.edit(|b| {
+    s.edit("Test edit", |b| {
         edit::set_group(
             b,
             "Local",
@@ -1001,7 +1039,9 @@ fn fringe_posting_coding_and_currencies() {
     assert_eq!(v["budget"]["account_coding"]["account_width"], 4);
     assert_eq!(v["budget"]["account_coding"]["separator"], ".");
     let code = s
-        .edit(|b| edit::add_account(b, "21", "21-7", "Grip", None))
+        .edit("Test edit", |b| {
+            edit::add_account(b, "21", "21-7", "Grip", None)
+        })
         .unwrap();
     assert_eq!(code, "21.0007");
     refused(&mut s, |b| edit::set_account_coding(b, [2, 0, 2, 0], None));
@@ -1010,7 +1050,7 @@ fn fringe_posting_coding_and_currencies() {
     });
 
     // Currencies.
-    s.edit(|b| {
+    s.edit("Test edit", |b| {
         edit::set_currency(
             b,
             "EUR",
@@ -1034,7 +1074,7 @@ fn fringe_posting_coding_and_currencies() {
     one_step(&mut s, |b| edit::set_totals_currency(b, None));
     assert!(view(&mut s)["budget"]["totals_currency"].is_null());
     // The base currency as the totals currency means "none".
-    s.edit(|b| edit::set_totals_currency(b, Some("EUR")))
+    s.edit("Test edit", |b| edit::set_totals_currency(b, Some("EUR")))
         .unwrap();
     one_step(&mut s, |b| edit::set_totals_currency(b, Some("CAD")));
     assert_eq!(s.budget().totals_currency, None);
@@ -1061,7 +1101,8 @@ fn baseline_lock_shows_variance_and_clear_removes_it() {
     s.set_detail_field(added, "amount", "1").unwrap();
     s.set_detail_field(added, "rate", "100").unwrap();
     let gone = ids_in(&s, "21-01")[0];
-    s.edit(|b| edit::delete_details(b, &[gone])).unwrap();
+    s.edit("Test edit", |b| edit::delete_details(b, &[gone]))
+        .unwrap();
 
     let v = view(&mut s);
     let var = &v["variance"];
@@ -1105,7 +1146,7 @@ fn baseline_is_refused_while_the_budget_has_errors() {
     assert!(e.contains("NOPE"), "{e}");
     // With a baseline locked earlier, partial totals still give a variance.
     s.set_detail_field(id, "amount", "1").unwrap();
-    s.edit(edit::lock_baseline).unwrap();
+    s.edit("Test edit", edit::lock_baseline).unwrap();
     s.set_detail_field(id, "amount", "NOPE * 2").unwrap();
     let v = view(&mut s);
     assert_eq!(v["partial"], true);

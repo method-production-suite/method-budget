@@ -42,6 +42,8 @@ pub fn strip(b: &Budget, keep_lines: bool, title: &str) -> Budget {
     t.info.clear();
     t.baseline = None;
     t.versions.clear();
+    // A template is nobody's copy: a shared copy's stamp would open it read-only.
+    t.provenance = None;
     for c in t.categories_mut() {
         c.notes.clear();
         for a in &mut c.accounts {
@@ -274,7 +276,7 @@ mod tests {
         let path = dir.join("t.fwb");
         let mut s = Session::new();
         s.save_to(&path).unwrap();
-        s.edit(|b| crate::edit::set_global(b, "UNSAVED", "1"))
+        s.edit("Test edit", |b| crate::edit::set_global(b, "UNSAVED", "1"))
             .unwrap();
         let state = AppState::with(Docs::with(s));
         assert!(read(&state, &path).unwrap().globals.contains_key("UNSAVED"));

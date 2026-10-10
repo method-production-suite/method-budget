@@ -575,6 +575,8 @@ fn rewrite(b: &mut Budget, kind: SetupKind, from: &str, to: &str) -> usize {
     }
     // Its place in a hand-made order (not a reference: not counted).
     crate::order::rename_in(b, kind, from, to);
+    // And its folder (the library's folders, not counted either).
+    crate::folders::rename_item(b, crate::folders::kind_of(kind), from, to);
     n
 }
 
@@ -665,6 +667,8 @@ mod tests {
             excluded_groups: ["Crew".to_string()].into(),
             excluded_categories: BTreeSet::new(),
             excluded_accounts: BTreeSet::new(),
+            label_percent: false,
+            label_excluded: false,
         });
         b.credits.push(Credit {
             name: "Credit".into(),

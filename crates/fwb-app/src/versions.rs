@@ -162,9 +162,13 @@ pub fn save_version<R: Runtime>(
     note: Option<String>,
     created: String,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| {
-        save(b, &name, note.as_deref(), &created)
-    })
+    edit_budget(
+        &window,
+        &state,
+        doc,
+        format!("Save version {}", name.trim()),
+        |b| save(b, &name, note.as_deref(), &created),
+    )
 }
 
 /// Restores version `id` (one undo step; the replaced content is kept as an
@@ -177,7 +181,16 @@ pub fn restore_version<R: Runtime>(
     id: VersionId,
     created: String,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| restore(b, id, &created))
+    crate::app::edit_budget_as(
+        &window,
+        &state,
+        doc,
+        |b| match b.version(id) {
+            Some(v) => format!("Restore version {}", v.name),
+            None => "Restore a version".to_string(),
+        },
+        |b| restore(b, id, &created),
+    )
 }
 
 #[tauri::command]
@@ -188,7 +201,13 @@ pub fn rename_version<R: Runtime>(
     id: VersionId,
     name: String,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| rename(b, id, &name))
+    edit_budget(
+        &window,
+        &state,
+        doc,
+        format!("Rename a version to {}", name.trim()),
+        |b| rename(b, id, &name),
+    )
 }
 
 #[tauri::command]
@@ -198,7 +217,16 @@ pub fn delete_version<R: Runtime>(
     doc: Option<DocId>,
     id: VersionId,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| delete(b, id))
+    crate::app::edit_budget_as(
+        &window,
+        &state,
+        doc,
+        |b| match b.version(id) {
+            Some(v) => format!("Delete version {}", v.name),
+            None => "Delete a version".to_string(),
+        },
+        |b| delete(b, id),
+    )
 }
 
 #[cfg(test)]
@@ -273,25 +301,28 @@ mod tests {
     fn save_rename_delete_are_each_one_undo_step() {
         let mut s = Session::new();
         let id = s
-            .edit(|b| save(b, " First pass ", Some("for the studio"), AT))
+            .edit("Test edit", |b| {
+                save(b, " First pass ", Some("for the studio"), AT)
+            })
             .unwrap();
         let v = s.budget().version(id).unwrap();
         assert_eq!(
             (v.name.as_str(), v.created.as_str(), v.note.as_deref()),
             ("First pass", AT, Some("for the studio"))
         );
-        assert!(s.edit(|b| save(b, "", None, AT)).is_err());
-        assert!(s.edit(|b| save(b, "x", None, "now")).is_err());
+        assert!(s.edit("Test edit", |b| save(b, "", None, AT)).is_err());
+        assert!(s.edit("Test edit", |b| save(b, "x", None, "now")).is_err());
 
-        s.edit(|b| rename(b, id, "Studio draft")).unwrap();
+        s.edit("Test edit", |b| rename(b, id, "Studio draft"))
+            .unwrap();
         assert_eq!(s.budget().version(id).unwrap().name, "Studio draft");
-        assert!(s.edit(|b| rename(b, id + 7, "x")).is_err());
+        assert!(s.edit("Test edit", |b| rename(b, id + 7, "x")).is_err());
         s.undo();
         assert_eq!(s.budget().version(id).unwrap().name, "First pass");
 
-        s.edit(|b| delete(b, id)).unwrap();
+        s.edit("Test edit", |b| delete(b, id)).unwrap();
         assert!(s.budget().versions.is_empty());
-        assert!(s.edit(|b| delete(b, id)).is_err());
+        assert!(s.edit("Test edit", |b| delete(b, id)).is_err());
         s.undo();
         assert_eq!(s.budget().versions.len(), 1);
         s.undo();
@@ -304,11 +335,13 @@ mod tests {
         let mut s = Session::new();
         let row = first_line(&s);
         let before = first_rate(&s);
-        let v1 = s.edit(|b| save(b, "Approved", None, AT)).unwrap();
+        let v1 = s
+            .edit("Test edit", |b| save(b, "Approved", None, AT))
+            .unwrap();
         s.set_detail_field(row, "rate", "123").unwrap();
         let edited = s.budget().clone();
 
-        let auto = s.edit(|b| restore(b, v1, AT)).unwrap();
+        let auto = s.edit("Test edit", |b| restore(b, v1, AT)).unwrap();
         assert_eq!(first_rate(&s), before, "the version's content is back");
         let names: Vec<&str> = s
             .budget()
@@ -330,12 +363,12 @@ mod tests {
         assert_eq!(first_rate(&s), before);
 
         // Restoring the automatic version also brings the edit back.
-        s.edit(|b| restore(b, auto, AT)).unwrap();
+        s.edit("Test edit", |b| restore(b, auto, AT)).unwrap();
         assert_eq!(first_rate(&s), "123");
         assert_eq!(s.budget().versions.len(), 3);
 
-        assert!(s.edit(|b| restore(b, 999, AT)).is_err());
-        assert!(s.edit(|b| restore(b, v1, "soon")).is_err());
+        assert!(s.edit("Test edit", |b| restore(b, 999, AT)).is_err());
+        assert!(s.edit("Test edit", |b| restore(b, v1, "soon")).is_err());
     }
 
     #[test]
@@ -344,7 +377,8 @@ mod tests {
         // of it, so they must not be copied again with every keystroke.
         let mut s = Session::new();
         for i in 0..3 {
-            s.edit(|b| save(b, &format!("v{i}"), None, AT)).unwrap();
+            s.edit("Test edit", |b| save(b, &format!("v{i}"), None, AT))
+                .unwrap();
         }
         let copy = s.budget().clone();
         for (a, b) in s.budget().versions.iter().zip(&copy.versions) {

@@ -137,6 +137,10 @@ pub struct CreditRowTotals {
     pub net: Cents,
     /// Unrounded; rows are summed before rounding.
     pub credit: Dec,
+    /// How far the row is under its cap (positive) or over it (negative),
+    /// unrounded: the cap less the net spend for a cap on the spend, the cap
+    /// less the uncapped credit for a cap on the credit. `None` with no cap.
+    pub cap_variance: Option<Dec>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

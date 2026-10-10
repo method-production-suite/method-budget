@@ -56,6 +56,8 @@ pub fn percent_charge(name: &str, p: &str) -> Charge {
         excluded_groups: BTreeSet::new(),
         excluded_categories: BTreeSet::new(),
         excluded_accounts: BTreeSet::new(),
+        label_percent: false,
+        label_excluded: false,
     }
 }
 

@@ -19,8 +19,9 @@
 //   menu               a menu item chosen while this window was in front
 // and sent to the main window: tools-ready, tools-position (a dock button),
 // tools-layout (tabs moved: the main window keeps the preference),
-// tools-jump (a noted line to go to) and menu (keys and menu items for the
-// main window: Save, Undo, grid commands...).
+// tools-jump (a noted line to go to), tools-history (the History tab: undo
+// or redo to a step, or save one as a version) and menu (keys and menu items
+// for the main window: Save, Undo, grid commands...).
 //
 // Keys: text fields keep their own editing keys; app keys go to the menu bar
 // on macOS (whose items come here first) and are handled here on Windows and
@@ -100,6 +101,10 @@ function ctx() {
     jumpTo: (entry) => emitTo('main', 'tools-jump', { ...entry, doc: state.view ? state.view.doc : null }),
     onLayout: (layout) => emitTo('main', 'tools-layout', layout),
     toast: (message) => toast(message),
+    // The History tab: jumping and saving a step run in the main window,
+    // like Undo (history.js).
+    historyJump: (to) => emitTo('main', 'tools-history', { doc: state.view ? state.view.doc : null, action: 'jump', to }),
+    historySave: (step, name) => emitTo('main', 'tools-history', { doc: state.view ? state.view.doc : null, action: 'save', step, name }),
   };
 }
 

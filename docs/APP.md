@@ -60,8 +60,27 @@ menu lists every open budget, the one in front ticked. The window title names th
 front. The next start reopens the files that were open as tabs, in order, with the same one
 in front; budgets that never had a file come back through their recovery copies (below).
 
-Two budgets side by side in one window (split view, behavior note 04) is not built yet:
-see "Not yet" below.
+**Split view.** View > Split Right (Shift+Cmd+\\; Cmd+\\ is the Credits tab) splits the
+window into two panes side by side (decisions.md, entry 40; behavior note 04). Each pane
+has its own tab strip, breadcrumb, level buttons, grid and footer totals. The new pane at
+the right shows the budget in front too, at the same level and account, so the same budget
+can be in both panes: two views of one budget, one undo history, an edit in either showing
+in both. One pane is the **target**, the one last clicked or focused: it has an accent line
+along its tab strip and its tab in front in bold (the other pane's tab in front is in plain
+weight). The toolbar (Save, Undo, Versions...), the menus, every key, the tools panel
+(docked or in its window), the formula bar and the window title act on the target. New
+and Open put the budget in the target pane. Ctrl+Tab, Cmd+1 and Cmd+2 step through the
+target pane's tabs. Window > Move Tab to Other Pane, **Move to Other Pane** on a tab's
+right-click menu (Shift+F10 or the menu key on a focused tab), or dragging a tab onto the
+other pane's strip moves it there, where it comes to the front where it was left; a pane's
+only tab can't move. Closing a tab the other pane also shows only takes it from that pane;
+a pane whose last tab closes goes away. Drag the divider between the panes (or focus it
+and use Left and Right, Shift for bigger steps; Enter or a double-click splits evenly); its
+place is remembered for you. View > Close Split (also on a tab's menu, which offers Split
+Right when the window isn't split) puts every tab back in one strip, the first pane's tabs
+then the second's, with the target's budget in front; each budget comes back where it was
+last seen. With the window split already, Split Right goes to the other pane. The split,
+which files are in which pane and the target are reopened at the next start.
 
 The window has three levels, with a breadcrumb above the grid:
 
@@ -217,8 +236,9 @@ fringe (every group or fringe, checked when every selected line has it, a dash w
 do; choosing one puts it on them all, or takes it off, as the apply panel does). On the
 account list: Cut, Copy, Paste; Open account; Insert, Rename (edits the name in place) and
 Delete account. On the topsheet: Cut, Copy, Paste; Open category; Insert category,
-Insert production total, Rename, Delete; and Add or apply a charge, Add or apply a credit
-(the Charges and Credits tabs). All three levels have Move up and Move down. A right-click on a total row offers only the inserts, and
+Insert production total, Rename, Delete; Create charge… and Create credit… (the Charges or
+Credits tab with the new item's name box focused, ready to type); and Add or apply a charge,
+Add or apply a credit (the Charges and Credits tabs). All three levels have Move up and Move down. A right-click on a total row offers only the inserts, and
 one inside the cell editor gets the system's own text menu. Paste from the menu goes
 through the web view's paste command; where the web view asks first, or refuses, the key
 (Cmd+V) always works.
@@ -276,7 +296,8 @@ or created.
 The panel is two tab panes. Docked at the right they are stacked; docked at the bottom
 they sit side by side under a grid that gets the window's whole width; popped out they are
 stacked in a window called Tools. The first pane starts with **Fringes, Groups, Globals,
-Units, Presets and Find**, the second with **Sets, Locations, Currency, Notes and Budget**; Budget has tabs of
+Units, Presets and Find**, the second with **Sets, Locations, Currency, Notes, Budget,
+Library** (the setup library, below) **and History** (below); Budget has tabs of
 its own: **Charges, Credits, Info, Settings and Baseline**. Drag a tab along its strip to
 reorder it, or onto the other pane's strip to move it there (a bar shows where it will
 land); from the keyboard, Option+Shift+Left and Right move the focused tab along its pane
@@ -302,7 +323,8 @@ or accounts. Next to each item are its dollars within the selection: a fringe's 
 dollars, and for groups, sets, locations and currencies the selected lines' totals (a group
 that is out of the budget total says so instead). Its tooltip has its description and what
 it comes to across the whole budget. The foot of the fringe list shows the selection's
-fringe total and effective percent.
+fringe dollars from percentage fringes and from flat fringes, their total, and the effective
+percent.
 
 A click on an item's **checkbox** (or Space when it has focus) puts it on every selected
 line that can take it, or takes it off them all when every one already has it. A click on
@@ -310,8 +332,14 @@ the item's **name** only selects it (highlighted, with focus), and a **double-cl
 name**, or Enter or F2, opens its editor next to it; Delete (or Backspace) asks, next to the
 item, before deleting it. Up and Down move through the list. Sets, locations and currencies
 are one per line (round checkboxes): picking one replaces each line's old value, and Clear
-takes it off (for a currency: back to the base currency). Fringes and currencies go on
-lines; groups, sets and locations on lines and adjustments; other rows are skipped.
+takes it off (for a currency: back to the base currency). On the fringe and group lists,
+**Clear** takes every fringe (or every group) off the selected lines at once, names left on
+lines from an edited file included. **Replace tags…** under the selection's totals opens a
+form like a tag preset's editor: a box per fringe and group and a pick for the set, location
+and currency, starting from what every selected line already shares; Replace makes the
+selected lines' tags exactly those (an empty part clears it), as a tag preset's replace does.
+Fringes and currencies go on lines; groups, sets and locations on lines and adjustments;
+other rows are skipped.
 **Make range** turns the selected lines into one fringe range with a number new in that
 account; they must be next to each other in one account, with at least two lines
 (unselected subtotal rows in between are fine, since they never break a range). **Remove
@@ -384,6 +412,27 @@ renaming back gives the identical budget. Saved versions keep their own names.
 |---|---|---|
 | `rename_setup_item` | `kind` (`global`, `fringe`, `group`, `unit`, `set`, `location` or `currency`), `from`, `to` | View, with `name` (the new name) and `places` (how many places were rewritten) |
 
+**Renumbering accounts** (roadmap 2.20, decisions.md entry 39). Applying a new pattern in
+Budget > Settings > Account numbers first works out what every category, account and
+category fringe account number would become. When nothing would change, the pattern is
+simply applied. Otherwise a preview opens under the form: a table of numbers now and
+after (unchanged ones greyed, ones that don't fit in red), any conflicts (a number that
+doesn't fit, two numbers that would become one) and warnings (a fringe account that would
+share a number with an account), then **Renumber accounts to the new pattern** (off while
+there are conflicts), **Change the pattern only** (numbers keep their spelling) or
+**Cancel** (Escape). Renumbering is one undo step: the pattern, every category and
+account number, and what names them (charges' excluded categories and accounts and their
+account, credits' accounts, report presets' left-out categories and accounts, the
+baseline's keys, so Orig and Var still match). A number is split on its separator (or by
+the current widths when it has none); each part is padded with zeros or loses leading
+zeros to fit its new width, never cut. Saved versions keep their own numbers. If the
+category or account on screen was renumbered, the grid goes back to the topsheet.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `renumber_preview` | `category_width`, `account_width`, `sub_width`, `set_width`, `separator` (as `set_account_coding`) | `{categories, accounts, fringe_accounts, conflicts, warnings, changes}`: each change `{old, new}` (`new` empty when it doesn't fit), conflicts and warnings as sentences |
+| `renumber_accounts` | the same | View (refused, nothing changed, on any conflict) |
+
 The command is in `src/rename.rs`; the engine does the work (`fwb_core::rename`).
 
 **Globals and Units** are edited in place, as before: a global's formula (with its current
@@ -410,7 +459,29 @@ in this window's local storage, and blank signs nothing. Every change is one und
 
 **Budget.** Charges, credits, budget info, settings (currencies, fringe posting, account
 numbers, what new lines copy, numbers on screen) and the baseline, as in the setup tabs
-before. **Numbers on screen** (saved in the budget, one undo step per change): the rate
+before. **Charges**: two switches per charge, saved in the budget, add to its topsheet label
+(screen and printed): the percent (percent charges, "Contingency 10%") and the amount left
+out ("(excluding 25,000.00)"). "Left out of this charge" lists every group with a box and
+the group's own amount in the charge's base as the totals stand now (its counted lines, with
+their fringes unless fringes post by budget), the typed amounts, categories and accounts,
+and the total left out (each line once). While a percent, a flat amount or a left-out amount
+is being typed, the charge's total in its heading is figured from the typed text before
+Enter commits it (`preview_charge`, about a tenth of a second after the last key); a value
+that isn't a number yet dims the old total. **Credits**: each row shows its spend, the
+fringes left out of it, the net spend the percent applies to, the credit (rounded for
+display; its tooltip has the exact figure, since rows add up before rounding), and with a
+cap, how far the row is under or over it (spend for a cap on the spend, credit for a cap on
+the credit).
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `preview_charge` | `index` (`null` for a new charge), `charge` (as `set_charge`) | `{name, base, excluded, amount}`, figured on the current totals; nothing changes |
+| `clear_from_rows` | `rowIds`, `field` (`fringes` or `groups`) | View |
+| `replace_tags_on_rows` | `rowIds`, `tags` (`{fringes, groups, set, location, currency}`: names the budget defines; `null` values and empty lists clear; the base currency is none) | View |
+
+`set_charge` takes `label_percent` and `label_excluded` (left out: the charge keeps its own
+setting). A credit row's report entry has `cap_variance` (unrounded currency units like
+`credit`; positive under the cap, negative over it, `null` with no cap). **Numbers on screen** (saved in the budget, one undo step per change): the rate
 cutoff and decimals below and at or above it, whether a rate's global decimals win, and
 whether the topsheet shows the above- and below-the-line summary rows and the net total.
 
@@ -550,6 +621,24 @@ The lean view lists line blocks without their rows: `budget.line_presets` is
 `[{ name, count }]` (the rows and their setup stay in Rust until a block is inserted).
 Tag presets are in the view in the file's shape.
 
+### History
+
+The **History** tab (second tools pane; View > Tools Tab > History) lists every change to
+the target budget that Undo can take back, oldest first (decisions.md, entry 40). Each step
+is named by the command that made it, the way the grid names things: "Edit rate on 21-01
+line 3", "Paste 12 rows", "Fill down 5 cells in 20-01", "Rename fringe FICA to Payroll",
+"Delete 2 lines from 20-01", "Move 3 lines down", "Save version Approved", with the time it
+was made (and the date, when it isn't today). The first row, **Start**, is the budget as it
+was opened or created (or, past the 200 steps kept, the oldest state still kept). The
+current step is highlighted; steps after it, the ones Redo would bring back, are fainter.
+Click a step (or Enter on it) to undo or redo to just after it, as one change. **Version…**
+on a step (shown on the current step and the one under the pointer or with focus; Right
+from a step reaches it) asks for a name and saves the budget as it was at that step as a
+version (File > Versions…) without changing the budget as it is now; the save is one undo
+step, as any version save, so it drops the steps Redo would have brought back. Up and Down
+move between steps, Home and End to the ends. In the tools window, a click or a version
+save runs in the main window, as Undo does.
+
 ### Find and replace
 
 Edit > Find (Cmd+F) shows the tools panel's **Find** tab, wherever the panel is, with focus
@@ -626,6 +715,8 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 | Next, previous budget tab | Shift+Cmd+], Shift+Cmd+[ (or Ctrl+Tab, Ctrl+Shift+Tab) | Ctrl+Shift+], Ctrl+Shift+[ (or Ctrl+Tab, Ctrl+Shift+Tab) |
 | First, second budget tab | Cmd+1, Cmd+2 | Ctrl+1, Ctrl+2 |
 | On a budget tab: the previous or next tab; move the tab | Left, Right (also Home, End); Option+Shift+Left, Right | Left, Right (also Home, End); Alt+Shift+Left, Right |
+| On a budget tab: its menu (close, move to the other pane, split) | Shift+F10 or the menu key (or a right-click) | Shift+F10 or the menu key (or a right-click) |
+| Split Right (split already: go to the other pane) | Shift+Cmd+\\ | Ctrl+Shift+\\ |
 | Undo, Redo (in a text field: its typing) | Cmd+Z, Shift+Cmd+Z | Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z |
 | Cut, Copy, Paste cells (tab-separated, like a spreadsheet; with whole rows selected, the rows with everything on them, below) | Cmd+X, Cmd+C, Cmd+V | Ctrl+X, Ctrl+C, Ctrl+V |
 | Select every row | Cmd+A | Ctrl+A |
@@ -842,6 +933,118 @@ status `new`, `same` or `differs`; `needs` every item it brings, however deep). 
 last file picked is kept; `import_setup` is refused, nothing changed, when another file was
 picked since, a pick isn't in that budget, a choice is unknown, or the import would pass a
 budget's limit on presets.
+
+### Sharing copies and sub-budgets
+
+**Save a Copy for Sharing…** (File menu; roadmap 2.21, decisions.md entry 39) writes a
+snapshot for someone else: the budget as it is, or one of its saved versions (with the
+current presets and display settings). Tick what to leave out: notes (on lines, accounts,
+categories and in line blocks), budget info fields, saved versions, the original totals,
+and setup items nothing uses (removed until none is left; what tag and report presets
+name stays, so no total moves). An optional note goes with it. Rust's Save dialog
+suggests `<title> - <version> - <date>.fwb` in the budget's folder; a file open in a tab is
+refused. The copy carries a `provenance` (docs/FORMAT.md): shared copy, the source title,
+the version's name, when it was saved, the app version and the note. The budget and its
+own file don't change.
+
+**A shared copy opens read-only.** A banner under the breadcrumb says where it came from
+(and its note), and every edit is refused with one message (Rust refuses it in the
+session, whatever sends it); printing, exporting, finding and comparing work as usual.
+**Make Editable Copy** opens the same budget in a new tab with no file, stamped as an
+editable copy. When the budget a shared or editable copy came from is open (matched by
+title, trimmed and ignoring case: the copy carries no path), the first time the copy comes
+to the front the app asks: **Compare With Original** (the compare screen, with the
+original as the base and the copy ticked) or **Store as a Version…** (the copy's content
+saved as a new version of the original, named in a small form, its note saying when the
+copy was made; one undo step in the original), or Not Now. The shared copy's banner keeps
+both buttons while the original is open.
+
+**New Sub-Budget…** (File menu; roadmap 2.22) opens a filtered copy of the budget in front
+in a new tab: tick categories (all their accounts come along, ticked and locked) and
+single accounts; nothing ticked keeps every category. Then groups, sets and locations: a
+line is kept when it has any ticked value of each kind that has a tick, or "Lines with no
+group" (set, location) for lines without one. Subtotal and separator rows stay while
+their account keeps a line. Options: leave out accounts with no lines left, take the
+fringes off every line (the fringe table stays; totals change), leave out notes. Versions
+and the baseline stay behind. The sub-budget is titled after its parent ("Big Show (sub-budget)") and has no
+file, like a template, and is stamped with its parent's title and a line saying what it keeps. Totals
+are worked out normally: there is no fringe lock yet.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `share_copy_save` | `version` (id or `null`), `leaveOut` (`{notes, info, versions, baseline, unused_setup}`), `note`, `saved` (the page's local time, ISO 8601); shows the Save dialog | `{name, path}`, or `null` when cancelled |
+| `share_copy_editable` | none | View of the new tab |
+| `share_copy_original` | none | `{doc, label}` of the open budget the copy came from, or `null` |
+| `share_copy_store` | `original` (its doc id), `name`, `created` | View of the original (one undo step there) |
+| `sub_budget_new` | `spec` (`{categories, accounts, groups, sets, locations, skip_empty_accounts, drop_fringes, drop_notes}`, each tag kind `{values, include_untagged}`), `saved` | View of the new tab |
+
+### Setup library
+
+Your own library of setup items to reuse across budgets (roadmap 2.15, decisions.md entries
+15 and 37): the local-first equivalent of a cloud setup library. **The library is a budget
+file**: our ordinary `.fwb` format with setup and no lines, plus folders per kind
+(`setup_folders`, FORMAT.md). It starts empty (no units, fringes or anything else: we ship
+no library data) and opens in the app like any other budget, so it can live in a synced
+folder or a git repository of your choosing.
+
+**The Library tab** (in the tools panel's second pane by default; draggable like any tab;
+View > Tools Tab > Library). With no library yet it explains itself and offers **Create
+Library…** (Rust asks for a folder and makes `My Film Wizard Library.fwb` there, or uses
+the one already there) and **Use Existing Library…** (any `.fwb`, in Rust's Open dialog).
+The choice is remembered for you in `library.json` in the app's data folder; **Change…**
+and **New…** switch libraries at any time. Then the tab shows the library's name, a kind
+picker (globals, fringes, groups, units, sets, locations, currencies, charges, credits, tag
+presets, line blocks, report presets, each with its count), a folder picker (All folders,
+Unfiled, then the kind's folders) and a filter on names and definitions. Each item shows
+its definition in words (its tooltip adds what it brings along), a tick box, and its folder
+when All folders is shown.
+
+- **Add to This Budget…** copies the ticked items (or the item double-clicked, pressed Enter
+  on, or right-clicked) into the budget in front, after Import Setup's review: what each
+  item needs comes along (a fringe's unit and its rate's globals, a global's globals, a
+  charge's groups...), each item says **New**, **Same here** or **Different here**, and an
+  item that differs keeps this budget's version unless you pick **Use the library's
+  version** or **Add the library's as** a new name. One undo step. The three budget settings
+  are never library items.
+- **Save to Library…** (at the foot of the tab, for any of this budget's setup items, ticked
+  in the review, several at once) and **Save to Library…** in a setup list's right-click
+  menu (Fringes, Groups, Globals, Units, Sets, Locations, Currency: that item and what it
+  needs, ticked) copy the other way, after the same review turned round: an item the
+  library has set up differently keeps **the library's version** by default, or **Replace
+  it with this budget's**, or **Add this budget's as** a new name. New items land in no
+  folder. The library file is written at once (not an undo step of the budget).
+- **Folders**: New Folder…, Rename Folder… and Delete Folder… (the folder shown; its items
+  stay, unfiled), and **Move To…** (or Move To in an item's right-click menu) for the ticked
+  items. Folder names are unique per kind ignoring case, up to 60 characters.
+
+**No live link.** Every copy is one-time: changing an item in the library later doesn't
+change budgets it was copied into, or the other way round. **Writes** read the library
+file, change it and write it back through a temporary file renamed into place. **Open as a
+tab**: when the library file is also open as a budget tab, the Library tab reads it from
+there (its unsaved changes count) and adding from it works, but every change to it from the
+Library tab (saving to it, folders, moving) is refused with a message saying to make the
+change in that tab or close it first, so one file never has two writers; adding into the
+library's own tab from the Library tab is refused too. A library that has been moved or
+can't be read says so, with Change… and New… to fix it.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `library_view` | none | the library (below) |
+| `library_create` | none (shows Rust's folder dialog) | `{library, message}`, or `null` when cancelled |
+| `library_choose` | none (shows Rust's Open dialog) | `{library, message}`, or `null` when cancelled |
+| `library_add_preview` | `picks` (`[{kind, name}]`) | Import Setup's review (`token`, `source`, `items`, `notes`) plus `picked` |
+| `library_add` | `token`, `picks`, `resolutions` (as `import_setup`) | `{view, message}`, one undo step |
+| `library_save_preview` | `picks` (`[{kind, name}]`, or `null` for every item) | the review plus `picked` |
+| `library_save` | `token`, `picks`, `resolutions` | `{library, message}` |
+| `library_folder` | `kind`, `action` (`create`, `rename`, `delete`), `name`, `to` | `{library, message}` |
+| `library_move` | `kind`, `names`, `folder` (`null`: unfiled) | `{library, message}` |
+
+The library is `{configured, name, location, problem, in_tab, kinds}`, `kinds` being
+`[{kind, folders, items: [{name, folder, definition, needs}]}]`. A review's token names
+the library as the review saw it; adding or saving with it is refused ("The library changed
+since") once the library has been written since. The Library tab works in the tools window
+too (its commands are in `capabilities/tools.json`); the dialogs are Rust's, parented to
+the window that asked.
 
 ### Versions and comparing
 
@@ -1200,7 +1403,9 @@ keeps the permissions of the file it replaces. A failed write leaves the old fil
 
 **Reopening tabs.** The files open as tabs, in tab order, and which one is in front are kept
 in the data folder's `tabs.json`, rewritten whenever a tab opens, closes, moves, comes to the
-front or is saved under a new name. The next start opens them again (files that are gone or
+front or is saved under a new name. Split, it also keeps which of those files are in which
+pane, each pane's budget in front and the target pane (by place in the list; a pane left
+with no file means one pane). The next start opens them again (files that are gone or
 can't be read are left out) before the window asks for its first view; with none, it starts
 with an Untitled budget as before. Budgets that never had a file aren't listed: their
 unsaved work comes back as a recovered budget. A recovered budget whose file was reopened
@@ -1248,12 +1453,15 @@ changed outside the app; the page brings its tab forward and shows the dialog ab
 
 ```
 crates/fwb-app/
-  src/session.rs     one open budget: Budget, file path, dirty flag, undo/redo patches,
-                     the account on screen, the recalc cache, autosave and recovery state
+  src/session.rs     one open budget: Budget, file path, dirty flag, undo/redo patches
+                     (each step labeled and timed), the account on screen, the recalc
+                     cache, autosave and recovery state
   src/docs.rs        every open budget (one Session per tab) in tab order, the one in
-                     front, and the lock the commands go through
-  src/tabs.rs        the tab commands, the Window menu's list of budgets, remembering
-                     the open files for the next start
+                     front, split view's panes and target, and the lock the commands go
+                     through
+  src/tabs.rs        the tab and split view commands, the Window menu's list of budgets,
+                     remembering the open files (and panes) for the next start
+  src/history.rs     the History tab: step labels, the list, jumps, a step as a version
   src/edit.rs        every edit as a function on &mut Budget (validates, then applies)
   src/diagnose.rs    lenient recalc: flags every bad cell instead of stopping at the first
   src/report_dto.rs  serde shapes for fwb_core::Report (the engine stays serde-free)
@@ -1268,6 +1476,9 @@ crates/fwb-app/
                      (status, what each needs), importing the picks as one undo step
   src/templates.rs   New From Template and Save as Template: a budget stripped to its
                      chart, setup and settings
+  src/library.rs     the personal setup library: which file it is (library.json), its
+                     view, copying items in and out through Import Setup's review, its
+                     folders, atomic writes, refusing changes while it is open as a tab
   src/sheet_import.rs  Import Spreadsheet: the picked file kept by token, the mapping
                      dialog's preview and the import (fwb_format::import does the work)
   src/menu.rs        native menu bar, built from the same table as ui/js/shortcuts.js
@@ -1281,6 +1492,10 @@ crates/fwb-app/
   src/moverows.rs    moving lines, accounts and topsheet rows one place, keeping fringe
                      ranges whole; quick presses join one undo step
   src/rename.rs      renaming a setup item everywhere (fwb_core::rename does the work)
+  src/renumber.rs    renumbering accounts to a new pattern: the preview and the one-step
+                     renumbering (fwb_core::renumber does the work)
+  src/sharing.rs     copies for sharing (Save dialog, provenance, read-only, editable
+                     copies, returned copies stored as versions) and sub-budgets
   src/versions.rs    the Versions dialog's commands: save, restore, rename, delete, each
                      one undo step, with names, notes and times checked
   src/compare.rs     the compare screen's commands: budgets copied out of tabs, versions
@@ -1341,6 +1556,8 @@ account.
   `name`, `path`, `dirty`, `conflict`, `active`). A page draws only the view of the budget
   in front; a reply about another one (a background tab saved or closed) only redraws the
   tabs.
+- `panes`: the window's panes (`split`, `target`, and per pane its `tabs` as ids in its
+  order and its `front`): one pane with every tab, or split view's two.
 
 | Command | Arguments | Returns |
 |---|---|---|
@@ -1351,9 +1568,30 @@ account.
 | `move_tab` | `doc`, `to` (its place afterwards) | the tabs |
 | `close_tab` | `doc`, `discard` | `{closed, unsaved, last, view}`: closed (view: the budget now in front); or not, because of unsaved changes (ask, then again with `discard`, or save first) or because it is the last tab (close the window) |
 | `list_tabs` | none | the tabs |
+| `switch_tab` (split) | `doc`, `pane` | View of that budget, in front in that pane, which becomes the target |
+| `close_tab` (split) | `doc`, `discard`, `pane` | as above; when the other pane shows the budget too, only this pane's tab goes |
+| `split_view` | none | View: a second pane showing the budget in front too, the target |
+| `close_split` | none | View: one pane again, the target's budget in front |
+| `set_target_pane` | `pane`, `category`, `ti`, `account`, `ai` | View of that pane's budget in front, with that account on screen |
+| `move_tab_in_pane` | `pane`, `doc`, `to` | View (the budget in front) |
+| `move_to_pane` | `doc`, `from`, `to` (or `null`: the end) | View: in front in the other pane, the target |
+| `pane_view` | `doc`, `category`, `ti`, `account`, `ai` | View of that budget at that account; changes nothing, tells no other window |
+| `history_list` | `doc` | `{steps: [{label, at, done}], current, trimmed}`: every undo step oldest first, `at` in milliseconds since 1970, `current` how many are applied |
+| `history_jump` | `doc`, `to` | View after undoing or redoing to `to` steps applied |
+| `history_save_version` | `doc`, `step`, `name`, `note`, `created` | View: the budget as it was at `step` saved as a version (one undo step) |
 
 Every budget command also takes `doc` (above). The account on screen is per budget, so
-coming back to a tab brings its account's rows with the view.
+coming back to a tab brings its account's rows with the view. In split view it follows
+the target pane: `set_target_pane` sets it, and the other pane draws its own account with
+`pane_view` (only when it shows the same budget at another account), so the view stays
+lean and an edit costs one more view at most.
+
+Every accepted edit names its undo step (`Session::edit(label, f)`; `edit_budget` and
+`edit_budget_as` in `app.rs` for the commands): the label says what the command did, the
+way the grid names things, and goes with the step through undo and redo, with the wall
+clock time it was made. `set_cells` takes `action` (`paste`, `fill`, `cut`, `clear`) for
+its label; anything else is an edit. `Session::budget_at` reads the budget at any step
+without changing it (the steps are walked on the budget and walked back).
 
 `focus_account` sets the account whose rows every later view carries; the UI calls it when
 it opens an account (and with nothing when it leaves one). Rust finds the account by code
@@ -1408,6 +1646,9 @@ setup items, the note editor, the fringe range keys and the formula bar),
 `clipboard.js` (copy, cut and paste of whole rows, and the paste review),
 `versions.js` (the Versions dialog), `compare.js` with `compare.css` (the compare screen;
 `compare.css` also sizes the Orig and Var columns),
+`sharing.js` with `sharing.css` (Save a Copy for Sharing, the shared copy's banner and the
+returned-copy question, New Sub-Budget; `sharing.css` also draws `renumber.js`'s preview in
+Budget > Settings > Account numbers),
 `prefs.js` (per-user display choices in local storage: visible columns, the tools panel's
 place, size and tabs), `display.js` with `display.css` (how numbers show: formula values,
 rate and global decimals, totals with or without cents, hidden-factor marks, zero rows,
@@ -1419,7 +1660,18 @@ fringe, group, set, location and currency lists), `setup.js` (globals and units,
 helpers the Budget tabs in `topsheet-setup.js` share), `setuplist.js` (what every setup
 list shares: counts, Show, the name sort, dragging and moving items, the delete question),
 `order.js` (a table's order and short codes, also used by the grid, the type-ahead and
-reports), `notes.js` (the Notes tab) and `find.js` (the Find tab); `tools.css` lays it out. Commands run one at a time, in order.
+reports), `notes.js` (the Notes tab), `find.js` (the Find tab) and `history.js` (the
+History tab); `tools.css` lays it out. Commands run one at a time, in order.
+
+**Split view** (`pane.js`): each pane is a `Pane` holding where it is (budget, level,
+category, account, the footer's counters, each tab's memory), its grid and its tab strip
+(`tabs.js` makes one per pane, `createTabStrip`). `main.js`'s `state` and `grid` read the
+pane in use: the target, except while another pane is drawn (`withPane`), so every
+command, key and menu item reaches the target as before split view. A view is drawn in the
+pane Rust says is the target (or the pane that asked for it); the other pane follows its
+budget (the same view, or its own `pane_view`). Split, the first pane's strip and footer
+move into a column beside the second pane's, and the one formula bar moves to the target;
+closing the split puts them back where `index.html` has them.
 
 **Two windows.** Popped out, the panel runs in a second web view on the same page and the
 same Rust budgets, and follows the budget in front in the main window. After any command
@@ -1435,7 +1687,9 @@ window never hears events meant for the other: the main window sends `selection-
 (level, row keys, cursor, account) and `tools-state` (that and the tab layout, when the
 tools window says `tools-ready`); the tools window sends `tools-position` (a dock button),
 `tools-layout` (tabs moved; the main window keeps the preference), `tools-jump` (a noted
-line) and `menu` (keys and menu items for the main window). Rust sends `tools-geometry`
+line), `tools-history` (the History tab: undo or redo to a step, or save one as a version,
+for the budget it drew) and `menu` (keys and menu items for the main window). Split, the
+tools window follows the target pane's budget, which is the one in front in Rust. Rust sends `tools-geometry`
 (where the tools window is, remembered by the main window) and `tools-closed` (it closed:
 the panel docks back). A menu item chosen while the tools window is in front goes to it
 first (`src/menu.rs`): it keeps Undo, Redo and Select All for its own text fields and the
@@ -1475,10 +1729,12 @@ untrusted (a budget file is data from anywhere).
   `capabilities/tools.json` grants the tools window, by its label, only what the panel
   calls: `get_view`, the selection summary and the apply edits, the setup tables, the
   Budget tabs, notes and the notes list, the setup lists' counts, order and short codes,
-  find and replace, and listening for and
-  sending events. It
-  can't open, save, print, undo, use the clipboard or recovery, open, close, switch or move
-  budget tabs, or open or close windows;
+  find and replace, the setup library's commands (its own folder and Open dialogs among
+  them, shown by Rust), the History tab's list of undo steps (`history_list`), and
+  listening for and sending events. It
+  can't open, save, print, undo (or jump in the history: the History tab asks the main
+  window), use the clipboard or recovery, open, close, switch or move budget tabs, split
+  or merge the panes, or open or close windows;
   its keys for those go to the main window as menu commands, which the main window runs as
   if chosen from its own menu bar. A Rust test checks that every command the panel's
   scripts name is granted and nothing else is. `build.rs` lists those commands in an app manifest,
@@ -1505,7 +1761,17 @@ untrusted (a budget file is data from anywhere).
   New From Template and Save as Template show the native dialogs from Rust and only take
   "keep the lines" from the page. Import Spreadsheet is the same: Rust shows the Open
   dialog and reads the file; the page gets its name (never its path) and names it by a
-  token afterwards (only the last file picked is kept).
+  token afterwards (only the last file picked is kept). The setup library is picked or
+  made in Rust's Open and folder dialogs and remembered in the app's own `library.json`;
+  the page names it never (only its items, folders and a review's token), and every write
+  to it is atomic.
+  Save a Copy for Sharing is the same: Rust shows the Save dialog (the page can only
+  suggest what to leave out and a note) and refuses a budget open in a tab. A shared copy
+  carries no path: its provenance names its source by title only, so nothing about the
+  sender's disk travels with it, and a returned copy is matched to an open budget by that
+  title, in Rust. Read-only is enforced in Rust (`Session::edit` refuses every change to a
+  budget stamped as a shared copy), not by the page hiding controls; the stamp is a
+  request in an open file format, not a lock.
 - **Imported spreadsheets are untrusted** and are read by our own code with limits: a file
   over 50 MB is refused before it is read in full; a ZIP gives out at most 200 MB of
   decompressed data in all, an entry is decoded into at most the size its directory
@@ -1546,14 +1812,14 @@ least 14 days old when added (`python3 scripts/check-crate-ages.py --only-change
 
 ## Not yet
 
-**Split view** (two budgets side by side in one window, each pane with its own tabs,
-breadcrumb and grid, the tools acting on the pane in front; behavior note 04) comes later.
-Tabs are built so it can: every budget is already its own document with its own account on
-screen, and commands already name their budget (`doc`), so a second pane would be a second
-grid that sends a different `doc`.
+Split view is two panes side by side only (no vertical split, no third pane), with one
+tools panel for the target (the reference docks tools under each pane). It needs a live
+check: Shift+Cmd+\\ and the View and Window menu items reaching the page in the system web
+views, dragging a tab between the strips with a real pointer, the tools window following
+the target, and the panes coming back at the next start. The History tab needs a live
+check in the tools window and with a long history.
 
-Moving rows by drag, editing fringe ranges in the grid, renumbering accounts when the
-coding pattern changes, import from other tools' own formats (spreadsheets import, see
+Moving rows by drag, editing fringe ranges in the grid, import from other tools' own formats (spreadsheets import, see
 Importing spreadsheets), single-instance handling on Windows and Linux,
 the macOS system recent documents list, a mark on copied rows, and the total change a
 paste will cause in its review. Printing, the Windows/Linux menu keys, Copy Rows from
@@ -1568,6 +1834,9 @@ at once), of going to a compared row in another tab, and of printing a wide comp
 Find needs a live check of its keys in the system web views (Cmd+F and Shift+Cmd+F through
 the menu, F3 reaching the page on a Mac whose function keys control the system) and of the
 Find tab in the tools window.
+The setup library needs a live check of its folder and Open dialogs (also from the tools
+window), the Library tab in the tools window and at the bottom, and Save to Library in the
+setup lists' right-click menus (its logic is tested in Rust, the tab in a browser harness).
 Import Setup From, New From Template and Save as Template need a live check of their
 native dialogs and of the review with a large library budget (the review's logic and
 dialog are tested in Rust and in a browser harness).
@@ -1603,3 +1872,8 @@ Moving rows and renaming need a live check: Option+Up and Option+Down reaching t
 the system web views (Alt+Up and Alt+Down on Windows and Linux), the Edit menu's Move Up and
 Move Down, and the rename forms and right-click menus in the tools window (all checked in a
 browser harness against the real Rust session).
+Renumbering accounts, Save a Copy for Sharing, the read-only banner and New Sub-Budget need
+a live check in the app: the Save dialog's suggested name, opening a shared copy from the
+Finder, the returned-copy question when the original is open, and the renumber preview in
+the tools window (logic tested in Rust, the dialogs, banner and preview in a browser
+harness).

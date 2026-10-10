@@ -1,6 +1,6 @@
 {
   "identifier": "tools",
-  "description": "The tools window (the tools panel popped out of the main window) may call only the commands the panel uses: the selection summary and applying items to the selected lines, the setup tables, the budget tabs (charges, credits, info, settings, baseline), a line's note and the list of notes, the tag presets and line blocks (saving, applying, inserting and arranging them), and get_view; and send and receive events between the two windows. No file, save, undo or window commands: it passes those keys to the main window.",
+  "description": "The tools window (the tools panel popped out of the main window) may call only the commands the panel uses: the selection summary and applying items to the selected lines, the setup tables, the budget tabs (charges, credits, info, settings with renumbering accounts to a new pattern, baseline), a line's note and the list of notes, the tag presets and line blocks (saving, applying, inserting and arranging them), the personal setup library (its view, copying items to and from it, its folders, and picking its file in Rust's own dialogs: no path comes from the page), the History tab's list of undo steps (jumping and saving a step go to the main window), and get_view; and send and receive events between the two windows. No file, save, undo or window commands: it passes those keys to the main window.",
   "windows": [
     "tools"
   ],
@@ -9,6 +9,8 @@
     "allow-apply-summary",
     "allow-apply-to-rows",
     "allow-assign-to-rows",
+    "allow-clear-from-rows",
+    "allow-replace-tags-on-rows",
     "allow-make-fringe-range",
     "allow-clear-fringe-range",
     "allow-set-fringe",
@@ -29,6 +31,7 @@
     "allow-set-unit",
     "allow-delete-unit",
     "allow-set-charge",
+    "allow-preview-charge",
     "allow-delete-charge",
     "allow-move-charge",
     "allow-set-credit",
@@ -63,6 +66,18 @@
     "allow-rename-setup-item",
     "allow-find",
     "allow-replace",
+    "allow-renumber-preview",
+    "allow-renumber-accounts",
+    "allow-history-list",
+    "allow-library-view",
+    "allow-library-create",
+    "allow-library-choose",
+    "allow-library-add-preview",
+    "allow-library-add",
+    "allow-library-save-preview",
+    "allow-library-save",
+    "allow-library-folder",
+    "allow-library-move",
     "core:event:allow-listen",
     "core:event:allow-emit-to"
   ]

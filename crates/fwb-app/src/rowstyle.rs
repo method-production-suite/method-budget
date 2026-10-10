@@ -178,7 +178,9 @@ pub fn set_row_style<R: Runtime>(
         return Err("bad row style: expected JSON arguments".into());
     };
     let input = RowStyleInput::from_json(args)?;
-    edit_budget(&window, &state, doc, |b| apply_row_style(b, &input))
+    edit_budget(&window, &state, doc, "Format lines", |b| {
+        apply_row_style(b, &input)
+    })
 }
 
 /// `{name, color: string | null}`.
@@ -190,9 +192,13 @@ pub fn set_group_color<R: Runtime>(
     name: String,
     color: Option<String>,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| {
-        apply_group_color(b, &name, color.as_deref())
-    })
+    edit_budget(
+        &window,
+        &state,
+        doc,
+        format!("Color group {}", name.trim()),
+        |b| apply_group_color(b, &name, color.as_deref()),
+    )
 }
 
 /// `{name, group: {description, in_budget_total}, color: string | null}`:
@@ -206,9 +212,13 @@ pub fn update_group<R: Runtime>(
     group: GroupInput,
     color: Option<String>,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| {
-        apply_group_update(b, &name, &group, color.as_deref())
-    })
+    edit_budget(
+        &window,
+        &state,
+        doc,
+        format!("Edit group {}", name.trim()),
+        |b| apply_group_update(b, &name, &group, color.as_deref()),
+    )
 }
 
 #[cfg(test)]
@@ -278,15 +288,17 @@ mod tests {
         let mut s = Session::new();
         let (_, a, b) = two_rows(&s);
         let before = s.view().report;
-        s.edit(|bud| {
+        s.edit("Test edit", |bud| {
             apply_row_style(
                 bud,
                 &style(json!({"rowIds": [a, b], "bold": true, "indent": 2, "color": "#ABCDEF"})),
             )
         })
         .unwrap();
-        s.edit(|bud| apply_row_style(bud, &style(json!({"rowIds": [b], "italic": true}))))
-            .unwrap();
+        s.edit("Test edit", |bud| {
+            apply_row_style(bud, &style(json!({"rowIds": [b], "italic": true})))
+        })
+        .unwrap();
         for id in [a, b] {
             let d = row(&s, id);
             assert!(d.bold);
@@ -296,8 +308,10 @@ mod tests {
         assert!(!row(&s, a).italic && row(&s, b).italic);
         assert_eq!(s.view().report, before, "style never changes totals");
 
-        s.edit(|bud| apply_row_style(bud, &style(json!({"rowIds": [a], "color": null}))))
-            .unwrap();
+        s.edit("Test edit", |bud| {
+            apply_row_style(bud, &style(json!({"rowIds": [a], "color": null})))
+        })
+        .unwrap();
         assert_eq!(row(&s, a).color, None);
         assert_eq!(row(&s, b).color.as_deref(), Some("#abcdef"));
 
@@ -328,13 +342,18 @@ mod tests {
             json!({"rowIds": [a, 999_999], "bold": true}),
         ] {
             let input = style(bad.clone());
-            assert!(s.edit(|bud| apply_row_style(bud, &input)).is_err(), "{bad}");
+            assert!(
+                s.edit("Test edit", |bud| apply_row_style(bud, &input))
+                    .is_err(),
+                "{bad}"
+            );
             assert_eq!(s.budget(), &original, "{bad}");
         }
         assert!(!s.can_undo() && !s.is_dirty());
         // Indent 4 is the deepest allowed.
         let ok = style(json!({"rowIds": [a], "indent": 4}));
-        s.edit(|bud| apply_row_style(bud, &ok)).unwrap();
+        s.edit("Test edit", |bud| apply_row_style(bud, &ok))
+            .unwrap();
         assert_eq!(row(&s, a).indent, 4);
     }
 
@@ -343,17 +362,21 @@ mod tests {
         let mut s = Session::new();
         let (_, a, b) = two_rows(&s);
         let set = style(json!({"rowIds": [a], "indent": 3}));
-        s.edit(|bud| apply_row_style(bud, &set)).unwrap();
+        s.edit("Test edit", |bud| apply_row_style(bud, &set))
+            .unwrap();
 
         // Mixed depths keep their shape; the deepest stops at the limit.
         let more = style(json!({"rowIds": [a, b], "indentBy": 1}));
-        s.edit(|bud| apply_row_style(bud, &more)).unwrap();
+        s.edit("Test edit", |bud| apply_row_style(bud, &more))
+            .unwrap();
         assert_eq!((row(&s, a).indent, row(&s, b).indent), (4, 1));
-        s.edit(|bud| apply_row_style(bud, &more)).unwrap();
+        s.edit("Test edit", |bud| apply_row_style(bud, &more))
+            .unwrap();
         assert_eq!((row(&s, a).indent, row(&s, b).indent), (4, 2));
 
         let less = style(json!({"rowIds": [a, b], "indentBy": -3}));
-        s.edit(|bud| apply_row_style(bud, &less)).unwrap();
+        s.edit("Test edit", |bud| apply_row_style(bud, &less))
+            .unwrap();
         assert_eq!((row(&s, a).indent, row(&s, b).indent), (1, 0));
 
         // One undo step per command.
@@ -362,10 +385,12 @@ mod tests {
 
         // Nothing left to move: no change, no undo step.
         let at_zero = style(json!({"rowIds": [b], "indent": 0}));
-        s.edit(|bud| apply_row_style(bud, &at_zero)).unwrap();
+        s.edit("Test edit", |bud| apply_row_style(bud, &at_zero))
+            .unwrap();
         let (unchanged, rev) = (s.budget().clone(), s.view_rev());
         let out = style(json!({"rowIds": [b], "indentBy": -1}));
-        s.edit(|bud| apply_row_style(bud, &out)).unwrap();
+        s.edit("Test edit", |bud| apply_row_style(bud, &out))
+            .unwrap();
         assert_eq!(s.budget(), &unchanged);
         assert_eq!(s.view_rev(), rev, "no change, no new revision");
 
@@ -379,7 +404,7 @@ mod tests {
             let input = RowStyleInput::from_json(&bad);
             let refused = match input {
                 Err(_) => true,
-                Ok(i) => s.edit(|bud| apply_row_style(bud, &i)).is_err(),
+                Ok(i) => s.edit("Test edit", |bud| apply_row_style(bud, &i)).is_err(),
             };
             assert!(refused, "{bad}");
         }
@@ -394,35 +419,45 @@ mod tests {
             description: "Option A".into(),
             in_budget_total: true,
         };
-        s.edit(|b| edit::set_group(b, "Alt", &g)).unwrap();
-        s.edit(|b| apply_group_color(b, "Alt", Some("#123456")))
+        s.edit("Test edit", |b| edit::set_group(b, "Alt", &g))
             .unwrap();
+        s.edit("Test edit", |b| {
+            apply_group_color(b, "Alt", Some("#123456"))
+        })
+        .unwrap();
 
         let next = GroupInput {
             short_code: None,
             description: "  Option B ".into(),
             in_budget_total: false,
         };
-        s.edit(|b| apply_group_update(b, "Alt", &next, Some("#ABCDEF")))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            apply_group_update(b, "Alt", &next, Some("#ABCDEF"))
+        })
+        .unwrap();
         let got = &s.budget().groups["Alt"];
         assert_eq!(got.description, "Option B");
         assert!(!got.in_budget_total);
         assert_eq!(got.color.as_deref(), Some("#abcdef"));
 
         // Clearing the color keeps the rest.
-        s.edit(|b| apply_group_update(b, "Alt", &next, None))
+        s.edit("Test edit", |b| apply_group_update(b, "Alt", &next, None))
             .unwrap();
         assert_eq!(s.budget().groups["Alt"].color, None);
         assert_eq!(s.budget().groups["Alt"].description, "Option B");
 
         let before = s.budget().clone();
         assert!(s
-            .edit(|b| apply_group_update(b, "Gone", &next, None))
+            .edit("Test edit", |b| apply_group_update(b, "Gone", &next, None))
             .is_err());
         assert!(!s.budget().groups.contains_key("Gone"));
         assert!(s
-            .edit(|b| apply_group_update(b, "Alt", &g, Some("red")))
+            .edit("Test edit", |b| apply_group_update(
+                b,
+                "Alt",
+                &g,
+                Some("red")
+            ))
             .is_err());
         assert_eq!(s.budget(), &before);
 
@@ -471,9 +506,12 @@ mod tests {
             description: "Option A".into(),
             in_budget_total: true,
         };
-        s.edit(|b| edit::set_group(b, "Alt", &g)).unwrap();
-        s.edit(|b| apply_group_color(b, "Alt", Some("#00FF7F")))
+        s.edit("Test edit", |b| edit::set_group(b, "Alt", &g))
             .unwrap();
+        s.edit("Test edit", |b| {
+            apply_group_color(b, "Alt", Some("#00FF7F"))
+        })
+        .unwrap();
         assert_eq!(s.budget().groups["Alt"].color.as_deref(), Some("#00ff7f"));
 
         // Editing the group elsewhere keeps its color.
@@ -482,19 +520,25 @@ mod tests {
             description: "Option A, revised".into(),
             in_budget_total: false,
         };
-        s.edit(|b| edit::set_group(b, "Alt", &g2)).unwrap();
+        s.edit("Test edit", |b| edit::set_group(b, "Alt", &g2))
+            .unwrap();
         assert_eq!(s.budget().groups["Alt"].color.as_deref(), Some("#00ff7f"));
 
         let before = s.budget().clone();
         assert!(s
-            .edit(|b| apply_group_color(b, "Alt", Some("#00ff7")))
+            .edit("Test edit", |b| apply_group_color(b, "Alt", Some("#00ff7")))
             .is_err());
         assert!(s
-            .edit(|b| apply_group_color(b, "Nope", Some("#000000")))
+            .edit("Test edit", |b| apply_group_color(
+                b,
+                "Nope",
+                Some("#000000")
+            ))
             .is_err());
         assert_eq!(s.budget(), &before);
 
-        s.edit(|b| apply_group_color(b, "Alt", None)).unwrap();
+        s.edit("Test edit", |b| apply_group_color(b, "Alt", None))
+            .unwrap();
         assert_eq!(s.budget().groups["Alt"].color, None);
         assert!(s.undo());
         assert_eq!(s.budget().groups["Alt"].color.as_deref(), Some("#00ff7f"));
@@ -528,8 +572,8 @@ mod tests {
         assert!(s.set_detail_field(id, "description", "x").is_err());
         assert!(s.set_detail_field(id, "rate", "1").is_err());
         let input = style(json!({"rowIds": [id], "color": "#808080"}));
-        s.edit(|b| apply_row_style(b, &input)).unwrap();
-        s.edit(|b| {
+        s.edit("Test edit", |b| apply_row_style(b, &input)).unwrap();
+        s.edit("Test edit", |b| {
             crate::notes::add(b, &crate::notes::NoteOwner::Row(id), "Day 2", "", None).map(|_| ())
         })
         .unwrap();

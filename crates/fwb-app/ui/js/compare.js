@@ -153,6 +153,11 @@ export function showCompare(ctx, opts = {}) {
     m.sources = [{ kind: 'version', id: opts.version }];
     m.open = new Set();
   }
+  // Just that open budget (a returned copy, from sharing.js).
+  if (typeof opts.tab === 'number' && opts.tab !== base) {
+    m.sources = [{ kind: 'tab', doc: opts.tab }];
+    m.open = new Set();
+  }
   // Drop what has gone since: closed tabs, deleted versions.
   const tabIds = new Set((ctx.tabs() || []).map((t) => t.id));
   const versionIds = new Set(versionsOf(view).map((v) => v.id));

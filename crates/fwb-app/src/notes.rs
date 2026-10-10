@@ -291,7 +291,7 @@ pub fn add_note<R: Runtime>(
     created: String,
     author: Option<String>,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| {
+    edit_budget(&window, &state, doc, "Add a note", |b| {
         add(b, &owner, &text, &created, author.as_deref()).map(|_| ())
     })
 }
@@ -307,7 +307,7 @@ pub fn update_note<R: Runtime>(
     text: String,
     edited: String,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| {
+    edit_budget(&window, &state, doc, "Edit a note", |b| {
         update(b, &owner, id, &text, &edited)
     })
 }
@@ -321,7 +321,9 @@ pub fn delete_note<R: Runtime>(
     owner: NoteOwner,
     id: NoteId,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| remove(b, &owner, id))
+    edit_budget(&window, &state, doc, "Delete a note", |b| {
+        remove(b, &owner, id)
+    })
 }
 
 /// `{owner, id, done}`.
@@ -334,7 +336,17 @@ pub fn set_note_done<R: Runtime>(
     id: NoteId,
     done: bool,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| mark_done(b, &owner, id, done))
+    edit_budget(
+        &window,
+        &state,
+        doc,
+        if done {
+            "Check off a note"
+        } else {
+            "Uncheck a note"
+        },
+        |b| mark_done(b, &owner, id, done),
+    )
 }
 
 #[cfg(test)]
@@ -355,7 +367,7 @@ mod tests {
         let on_row = NoteOwner::Row(row);
         let on_acct = NoteOwner::Account(acct.clone());
         let on_cat = NoteOwner::Category(cat.clone());
-        s.edit(|b| {
+        s.edit("Test edit", |b| {
             add(
                 b,
                 &on_row,
@@ -365,12 +377,18 @@ mod tests {
             )
         })
         .unwrap();
-        s.edit(|b| add(b, &on_row, "Union minimum", "2026-10-09T11:00:00Z", None))
-            .unwrap();
-        s.edit(|b| add(b, &on_acct, "Whole account to review", "t", None))
-            .unwrap();
-        s.edit(|b| add(b, &on_cat, "Category note", "t", Some("")))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            add(b, &on_row, "Union minimum", "2026-10-09T11:00:00Z", None)
+        })
+        .unwrap();
+        s.edit("Test edit", |b| {
+            add(b, &on_acct, "Whole account to review", "t", None)
+        })
+        .unwrap();
+        s.edit("Test edit", |b| {
+            add(b, &on_cat, "Category note", "t", Some(""))
+        })
+        .unwrap();
         let mut b = s.budget().clone();
         let notes = notes_mut(&mut b, &on_row).unwrap().clone();
         assert_eq!(notes.len(), 2);
@@ -380,7 +398,7 @@ mod tests {
         assert_eq!(notes[0].created, "2026-10-09T10:00:00Z");
 
         // Edit stamps; the same text changes nothing; blank removes.
-        s.edit(|b| {
+        s.edit("Test edit", |b| {
             update(
                 b,
                 &on_row,
@@ -391,21 +409,29 @@ mod tests {
         })
         .unwrap();
         let rev = s.view_rev();
-        s.edit(|b| update(b, &on_row, 1, "Check the rate again", "later"))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            update(b, &on_row, 1, "Check the rate again", "later")
+        })
+        .unwrap();
         assert_eq!(s.view_rev(), rev, "nothing changed, no undo step");
         let mut b = s.budget().clone();
         let n = &notes_mut(&mut b, &on_row).unwrap()[0];
         assert_eq!(n.edited.as_deref(), Some("2026-10-10T09:00:00Z"));
-        s.edit(|b| mark_done(b, &on_row, 2, true)).unwrap();
-        s.edit(|b| update(b, &on_row, 1, "  ", "x")).unwrap();
+        s.edit("Test edit", |b| mark_done(b, &on_row, 2, true))
+            .unwrap();
+        s.edit("Test edit", |b| update(b, &on_row, 1, "  ", "x"))
+            .unwrap();
         let mut b = s.budget().clone();
         let left = notes_mut(&mut b, &on_row).unwrap();
         assert_eq!(left.len(), 1);
         assert!(left[0].done);
         // A new note takes the next id, never a deleted one's place... the
         // highest left is 2, so 3.
-        assert_eq!(s.edit(|b| add(b, &on_row, "x", "", None)).unwrap(), 3);
+        assert_eq!(
+            s.edit("Test edit", |b| add(b, &on_row, "x", "", None))
+                .unwrap(),
+            3
+        );
 
         // The list: category, account, then the line's, in budget order.
         let list = budget_notes(s.budget());
@@ -429,22 +455,43 @@ mod tests {
         let (_, _, row) = first_row(&s);
         let on_row = NoteOwner::Row(row);
         let before = s.budget().clone();
-        assert!(s.edit(|b| add(b, &on_row, "   ", "", None)).is_err());
+        assert!(s
+            .edit("Test edit", |b| add(b, &on_row, "   ", "", None))
+            .is_err());
         let long = "x".repeat(MAX_NOTE_CHARS + 1);
-        assert!(s.edit(|b| add(b, &on_row, &long, "", None)).is_err());
+        assert!(s
+            .edit("Test edit", |b| add(b, &on_row, &long, "", None))
+            .is_err());
         let author = "a".repeat(MAX_AUTHOR_CHARS + 1);
-        assert!(s.edit(|b| add(b, &on_row, "x", "", Some(&author))).is_err());
         assert!(s
-            .edit(|b| add(b, &NoteOwner::Row(999_999), "x", "", None))
+            .edit("Test edit", |b| add(b, &on_row, "x", "", Some(&author)))
             .is_err());
         assert!(s
-            .edit(|b| add(b, &NoteOwner::Account("nope".into()), "x", "", None))
+            .edit("Test edit", |b| add(
+                b,
+                &NoteOwner::Row(999_999),
+                "x",
+                "",
+                None
+            ))
             .is_err());
-        assert!(s.edit(|b| remove(b, &on_row, 1)).is_err());
-        assert!(s.edit(|b| mark_done(b, &on_row, 1, true)).is_err());
+        assert!(s
+            .edit("Test edit", |b| add(
+                b,
+                &NoteOwner::Account("nope".into()),
+                "x",
+                "",
+                None
+            ))
+            .is_err());
+        assert!(s.edit("Test edit", |b| remove(b, &on_row, 1)).is_err());
+        assert!(s
+            .edit("Test edit", |b| mark_done(b, &on_row, 1, true))
+            .is_err());
         assert_eq!(s.budget(), &before);
         let longest = "é".repeat(MAX_NOTE_CHARS);
-        s.edit(|b| add(b, &on_row, &longest, "", None)).unwrap();
+        s.edit("Test edit", |b| add(b, &on_row, &longest, "", None))
+            .unwrap();
         let list = budget_notes(s.budget());
         assert_eq!(list[0].note.chars().count(), NOTE_PREVIEW_CHARS);
         assert!(list[0].more);

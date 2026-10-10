@@ -17,6 +17,7 @@ use fwb_core::{
 };
 use fwb_core::{Band, BandField, FontSize, ReportColumn, ReportPreset, ReportSection, ReportSpec};
 use fwb_core::{LinePreset, SetupItems, TagPreset};
+use fwb_core::{Provenance, ProvenanceKind};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -175,6 +176,8 @@ pub(crate) struct FileBudget {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     totals_currency: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    provenance: Option<FileProvenance>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     account_coding: Option<FileCoding>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     fringe_posting: Option<FilePosting>,
@@ -210,6 +213,8 @@ pub(crate) struct FileBudget {
     display: Option<FileDisplay>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     setup_order: Option<FileSetupOrder>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    setup_folders: BTreeMap<String, BTreeMap<String, Vec<String>>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     report_presets: Vec<FileReportPreset>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -248,8 +253,11 @@ impl From<&Budget> for FileBudget {
             tag_presets,
             line_presets,
             setup_order: _,
+            setup_folders: _,
+            provenance,
         } = b;
         FileBudget {
+            provenance: provenance.as_ref().map(FileProvenance::from),
             title: title.clone(),
             base_currency: base_currency.clone(),
             totals_currency: totals_currency.clone(),
@@ -282,6 +290,8 @@ impl From<&Budget> for FileBudget {
             setup_order: Some(fwb_core::order::normalized_all(b))
                 .filter(|o| !o.is_empty())
                 .map(FileSetupOrder::from),
+            // Only names that exist, each once; left out when no kind has a folder.
+            setup_folders: fwb_core::folders::normalized(b).0,
             report_presets: report_presets.iter().map(FileReportPreset::from).collect(),
             tag_presets: tag_presets.iter().map(FileTagPreset::from).collect(),
             line_presets: line_presets.iter().map(FileLinePreset::from).collect(),
@@ -330,6 +340,8 @@ impl From<FileBudget> for Budget {
             baseline: f.baseline.map(Baseline::from),
             display: f.display.map(DisplayPrefs::from).unwrap_or_default(),
             setup_order: f.setup_order.map(SetupOrder::from).unwrap_or_default(),
+            setup_folders: fwb_core::folders::SetupFolders(f.setup_folders),
+            provenance: f.provenance.map(Provenance::from),
             versions: f.versions.into_iter().map(Version::from).collect(),
             report_presets: f
                 .report_presets
@@ -338,6 +350,72 @@ impl From<FileBudget> for Budget {
                 .collect(),
             tag_presets: f.tag_presets.into_iter().map(TagPreset::from).collect(),
             line_presets: f.line_presets.into_iter().map(LinePreset::from).collect(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Provenance (where a shared copy or a sub-budget came from)
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FileProvenanceKind {
+    SharedCopy,
+    EditableCopy,
+    SubBudget,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileProvenance {
+    kind: FileProvenanceKind,
+    source_title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source_version: Option<String>,
+    saved: String,
+    app_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    note: Option<String>,
+}
+
+impl From<&Provenance> for FileProvenance {
+    fn from(p: &Provenance) -> FileProvenance {
+        let Provenance {
+            kind,
+            source_title,
+            source_version,
+            saved,
+            app_version,
+            note,
+        } = p;
+        FileProvenance {
+            kind: match kind {
+                ProvenanceKind::SharedCopy => FileProvenanceKind::SharedCopy,
+                ProvenanceKind::EditableCopy => FileProvenanceKind::EditableCopy,
+                ProvenanceKind::SubBudget => FileProvenanceKind::SubBudget,
+            },
+            source_title: source_title.clone(),
+            source_version: source_version.clone(),
+            saved: saved.clone(),
+            app_version: app_version.clone(),
+            note: note.clone(),
+        }
+    }
+}
+
+impl From<FileProvenance> for Provenance {
+    fn from(f: FileProvenance) -> Provenance {
+        Provenance {
+            kind: match f.kind {
+                FileProvenanceKind::SharedCopy => ProvenanceKind::SharedCopy,
+                FileProvenanceKind::EditableCopy => ProvenanceKind::EditableCopy,
+                FileProvenanceKind::SubBudget => ProvenanceKind::SubBudget,
+            },
+            source_title: f.source_title,
+            source_version: f.source_version,
+            saved: f.saved,
+            app_version: f.app_version,
+            note: f.note,
         }
     }
 }
@@ -649,6 +727,16 @@ impl<'de> Deserialize<'de> for FileSnapshot {
         if b.setup_order.is_some() {
             return Err(de::Error::custom(
                 "a version's budget cannot have a setup order",
+            ));
+        }
+        if !b.setup_folders.is_empty() {
+            return Err(de::Error::custom(
+                "a version's budget cannot have setup folders",
+            ));
+        }
+        if b.provenance.is_some() {
+            return Err(de::Error::custom(
+                "a version's budget cannot have a provenance",
             ));
         }
         if b.display.is_some() {
@@ -1434,6 +1522,8 @@ struct ChargeCommon {
     excluded_groups: BTreeSet<String>,
     excluded_categories: BTreeSet<String>,
     excluded_accounts: BTreeSet<String>,
+    label_percent: bool,
+    label_excluded: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -1454,6 +1544,10 @@ enum FileCharge {
         excluded_categories: BTreeSet<String>,
         #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
         excluded_accounts: BTreeSet<String>,
+        #[serde(default, skip_serializing_if = "is_false")]
+        label_percent: bool,
+        #[serde(default, skip_serializing_if = "is_false")]
+        label_excluded: bool,
     },
     Flat {
         name: String,
@@ -1472,6 +1566,10 @@ enum FileCharge {
         excluded_categories: BTreeSet<String>,
         #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
         excluded_accounts: BTreeSet<String>,
+        #[serde(default, skip_serializing_if = "is_false")]
+        label_percent: bool,
+        #[serde(default, skip_serializing_if = "is_false")]
+        label_excluded: bool,
     },
 }
 
@@ -1486,6 +1584,8 @@ impl From<&Charge> for FileCharge {
             excluded_groups,
             excluded_categories,
             excluded_accounts,
+            label_percent,
+            label_excluded,
         } = c;
         let c = ChargeCommon {
             name: name.clone(),
@@ -1501,6 +1601,8 @@ impl From<&Charge> for FileCharge {
             excluded_groups: excluded_groups.clone(),
             excluded_categories: excluded_categories.clone(),
             excluded_accounts: excluded_accounts.clone(),
+            label_percent: *label_percent,
+            label_excluded: *label_excluded,
         };
         match kind {
             ChargeKind::Percent(p) => FileCharge::Percent {
@@ -1512,6 +1614,8 @@ impl From<&Charge> for FileCharge {
                 excluded_groups: c.excluded_groups,
                 excluded_categories: c.excluded_categories,
                 excluded_accounts: c.excluded_accounts,
+                label_percent: c.label_percent,
+                label_excluded: c.label_excluded,
             },
             ChargeKind::Flat { amount, currency } => FileCharge::Flat {
                 name: c.name,
@@ -1523,6 +1627,8 @@ impl From<&Charge> for FileCharge {
                 excluded_groups: c.excluded_groups,
                 excluded_categories: c.excluded_categories,
                 excluded_accounts: c.excluded_accounts,
+                label_percent: c.label_percent,
+                label_excluded: c.label_excluded,
             },
         }
     }
@@ -1540,6 +1646,8 @@ impl From<FileCharge> for Charge {
                 excluded_groups,
                 excluded_categories,
                 excluded_accounts,
+                label_percent,
+                label_excluded,
             } => (
                 ChargeCommon {
                     name,
@@ -1549,6 +1657,8 @@ impl From<FileCharge> for Charge {
                     excluded_groups,
                     excluded_categories,
                     excluded_accounts,
+                    label_percent,
+                    label_excluded,
                 },
                 ChargeKind::Percent(percent.0),
             ),
@@ -1562,6 +1672,8 @@ impl From<FileCharge> for Charge {
                 excluded_groups,
                 excluded_categories,
                 excluded_accounts,
+                label_percent,
+                label_excluded,
             } => (
                 ChargeCommon {
                     name,
@@ -1571,6 +1683,8 @@ impl From<FileCharge> for Charge {
                     excluded_groups,
                     excluded_categories,
                     excluded_accounts,
+                    label_percent,
+                    label_excluded,
                 },
                 ChargeKind::Flat { amount, currency },
             ),
@@ -1588,6 +1702,8 @@ impl From<FileCharge> for Charge {
             excluded_groups: c.excluded_groups,
             excluded_categories: c.excluded_categories,
             excluded_accounts: c.excluded_accounts,
+            label_percent: c.label_percent,
+            label_excluded: c.label_excluded,
         }
     }
 }

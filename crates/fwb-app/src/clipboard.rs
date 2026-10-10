@@ -49,6 +49,17 @@ pub enum Content {
     Categories(Vec<Category>),
 }
 
+/// "12 rows", "1 account", "2 categories": what a step label says was cut
+/// or pasted.
+fn content_phrase(c: &Content) -> String {
+    let (one, many) = match c {
+        Content::Rows(_) => ("row", "rows"),
+        Content::Accounts(_) => ("account", "accounts"),
+        Content::Categories(_) => ("category", "categories"),
+    };
+    crate::history::count(c.count(), one, many)
+}
+
 impl Content {
     /// `rows`, `accounts` or `categories`.
     pub fn what(&self) -> &'static str {
@@ -1408,7 +1419,8 @@ pub fn clip_cut<R: Runtime>(
     let mut s = state.lock_doc(doc)?;
     let content = take(s.budget(), &pick)?;
     let clip = Clip::new(s.budget(), content, on_clipboard.then_some(text.as_str()));
-    s.edit(|b| cut(b, &pick))?;
+    let label = format!("Cut {}", content_phrase(&clip.content));
+    s.edit(label, |b| cut(b, &pick))?;
     clipboard.set(clip);
     Ok(finish(&window, &mut s, None))
 }
@@ -1449,7 +1461,8 @@ pub fn clip_paste<R: Runtime>(
         .filter(|c| c.token == token)
         .ok_or("Something else was copied since. Paste again.")?;
     let mut s = state.lock_doc(doc)?;
-    let pasted = s.edit(|b| paste(b, &clip, &target, &resolutions))?;
+    let label = format!("Paste {}", content_phrase(&clip.content));
+    let pasted = s.edit(label, |b| paste(b, &clip, &target, &resolutions))?;
     let first = match clip.content {
         Content::Rows(_) => pasted.rows.first().copied(),
         _ => None,
@@ -1686,7 +1699,9 @@ mod tests {
         assert_eq!(p.same, clip.setup.fringes.len() + 1 + 6 + 2 + 1 + 1 + 1);
 
         let pasted = s
-            .edit(|b| paste(b, &clip, &into_account("20-01", Some(7)), &[]))
+            .edit("Test edit", |b| {
+                paste(b, &clip, &into_account("20-01", Some(7)), &[])
+            })
             .unwrap();
         let acct = account(s.budget(), "20-01");
         // 6, then the two copies, then 7 (above the cursor row, 7).
@@ -1779,7 +1794,9 @@ mod tests {
         assert_eq!(fica.copied, "FICA_RATE% up to 168,600.00; Social security");
 
         let pasted = dst
-            .edit(|b| paste(b, &clip, &into_account("20-01", None), &[]))
+            .edit("Test edit", |b| {
+                paste(b, &clip, &into_account("20-01", None), &[])
+            })
             .unwrap();
         let b = dst.budget();
         assert_eq!(b.fringes["FICA"], src.budget().fringes["FICA"]);
@@ -2010,7 +2027,9 @@ mod tests {
             before_account: Some("20-01".into()),
             ..Target::default()
         };
-        let pasted = s.edit(|b| paste(b, &clip, &target, &[])).unwrap();
+        let pasted = s
+            .edit("Test edit", |b| paste(b, &clip, &target, &[]))
+            .unwrap();
         assert_eq!(pasted.accounts, ["20-02", "20-03"]);
         let cat: Vec<&str> = s
             .budget()
@@ -2074,7 +2093,7 @@ mod tests {
         let before = s.budget().clone();
         let end = before.topsheet.len();
         let pasted = s
-            .edit(|b| paste(b, &clip, &Target::default(), &[]))
+            .edit("Test edit", |b| paste(b, &clip, &Target::default(), &[]))
             .unwrap();
         // 20, 21 and 22 are taken: 23, with its account as 23-01.
         assert_eq!(pasted.categories, [end]);
@@ -2088,7 +2107,7 @@ mod tests {
         );
         // Again, at the top: 24.
         let again = s
-            .edit(|b| {
+            .edit("Test edit", |b| {
                 paste(
                     b,
                     &clip,
@@ -2159,11 +2178,13 @@ mod tests {
         let before = s.budget().clone();
         let pick = rows(&[6]);
         let clip = copy(s.budget(), &pick);
-        s.edit(|b| cut(b, &pick)).unwrap();
+        s.edit("Test edit", |b| cut(b, &pick)).unwrap();
         assert_eq!(ids(s.budget(), "20-01"), [7]);
         // The paste is a step of its own.
-        s.edit(|b| paste(b, &clip, &into_account("21-01", None), &[]))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            paste(b, &clip, &into_account("21-01", None), &[])
+        })
+        .unwrap();
         assert_eq!(account(s.budget(), "21-01").details.len(), 3);
         assert!(s.undo());
         assert_eq!(ids(s.budget(), "20-01"), [7]);
@@ -2270,7 +2291,9 @@ mod tests {
         assert!(review.review, "B's FICA differs from A's");
         assert_eq!(review.source, "Source");
         let pasted = s
-            .edit(|bud| paste(bud, &clip, &into_account("20-01", None), &[]))
+            .edit("Test edit", |bud| {
+                paste(bud, &clip, &into_account("20-01", None), &[])
+            })
             .unwrap();
         assert_eq!(pasted.rows.len(), 2);
         drop(s);

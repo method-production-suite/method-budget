@@ -135,6 +135,9 @@ pub struct CreditRowDto {
     pub excluded_fringes: Cents,
     pub net: Cents,
     pub credit: String,
+    /// Under the row's cap (positive) or over it (negative), unrounded, in
+    /// currency units like `credit`; `None` with no cap.
+    pub cap_variance: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -278,6 +281,7 @@ impl From<&CreditRowTotals> for CreditRowDto {
             excluded_fringes: r.excluded_fringes,
             net: r.net,
             credit: dec(r.credit),
+            cap_variance: r.cap_variance.map(dec),
         }
     }
 }

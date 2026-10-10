@@ -29,6 +29,21 @@ pub fn rename_item(
     Ok((to.trim().to_string(), places))
 }
 
+/// A kind of setup item as a step label names it ("fringe", "global"); an
+/// unknown kind is just "item" (the rename refuses it anyway).
+fn kind_noun(kind: &str) -> &'static str {
+    match kind {
+        "global" => "global",
+        "fringe" => "fringe",
+        "group" => "group",
+        "unit" => "unit",
+        "set" => "set",
+        "location" => "location",
+        "currency" => "currency",
+        _ => "item",
+    }
+}
+
 /// The view after a rename, the new name, and how many places were rewritten.
 #[derive(Clone, Debug, Serialize)]
 pub struct Renamed {
@@ -49,7 +64,13 @@ pub fn rename_setup_item<R: Runtime>(
     to: String,
 ) -> Result<Renamed, String> {
     let mut out = (String::new(), 0);
-    let view = edit_budget(&window, &state, doc, |b| {
+    let label = format!(
+        "Rename {} {} to {}",
+        kind_noun(&kind),
+        from.trim(),
+        to.trim()
+    );
+    let view = edit_budget(&window, &state, doc, label, |b| {
         out = rename_item(b, &kind, &from, &to)?;
         Ok(())
     })?;
@@ -87,7 +108,7 @@ mod tests {
     fn a_rename_is_one_undo_step_and_undoes_cleanly() {
         let mut s = Session::new();
         let id = first_line(s.budget());
-        s.edit(|b| {
+        s.edit("Test edit", |b| {
             crate::edit::set_global(b, "DAYS", "5")?;
             crate::edit::set_detail_field(b, id, crate::edit::Field::Amount, "DAYS*2")?;
             crate::edit::set_group(
@@ -101,13 +122,17 @@ mod tests {
         let before = s.budget().clone();
         let total = s.totals().1.report.as_ref().map(|r| r.net_total);
         let (name, n) = s
-            .edit(|b| rename_item(b, "global", "DAYS", " BUILD_DAYS "))
+            .edit("Test edit", |b| {
+                rename_item(b, "global", "DAYS", " BUILD_DAYS ")
+            })
             .unwrap();
         assert_eq!((name.as_str(), n), ("BUILD_DAYS", 1));
         assert_eq!(row(s.budget(), id).amount.0, "BUILD_DAYS*2");
         assert_eq!(s.totals().1.report.as_ref().map(|r| r.net_total), total);
-        s.edit(|b| rename_item(b, "group", "Crew", "Shoot crew"))
-            .unwrap();
+        s.edit("Test edit", |b| {
+            rename_item(b, "group", "Crew", "Shoot crew")
+        })
+        .unwrap();
         assert!(row(s.budget(), id).groups.contains("Shoot crew"));
         assert!(s.undo() && s.undo());
         assert_eq!(*s.budget(), before);
@@ -116,20 +141,23 @@ mod tests {
     #[test]
     fn refusals_say_why_and_change_nothing() {
         let mut s = Session::new();
-        s.edit(|b| crate::edit::set_global(b, "DAYS", "5")).unwrap();
+        s.edit("Test edit", |b| crate::edit::set_global(b, "DAYS", "5"))
+            .unwrap();
         let before = s.budget().clone();
         let e = s
-            .edit(|b| rename_item(b, "global", "DAYS", "2x"))
+            .edit("Test edit", |b| rename_item(b, "global", "DAYS", "2x"))
             .unwrap_err();
         assert!(e.contains("can't be a global name"), "{e}");
         let e = s
-            .edit(|b| rename_item(b, "unit", "Day", "Week"))
+            .edit("Test edit", |b| rename_item(b, "unit", "Day", "Week"))
             .unwrap_err();
         assert!(e.contains("already a unit named Week"), "{e}");
-        let e = s.edit(|b| rename_item(b, "thing", "a", "b")).unwrap_err();
+        let e = s
+            .edit("Test edit", |b| rename_item(b, "thing", "a", "b"))
+            .unwrap_err();
         assert!(e.contains("unknown kind"), "{e}");
         let e = s
-            .edit(|b| rename_item(b, "fringe", "NOPE", "b"))
+            .edit("Test edit", |b| rename_item(b, "fringe", "NOPE", "b"))
             .unwrap_err();
         assert!(e.contains("no longer exists"), "{e}");
         assert_eq!(*s.budget(), before);

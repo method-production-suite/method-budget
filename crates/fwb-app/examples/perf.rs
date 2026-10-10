@@ -247,7 +247,8 @@ fn main() {
             })
             .collect();
         run(&mut s, &mut parts, |s| {
-            s.edit(|b| batch::set_cells(b, &edits)).unwrap();
+            s.edit("Test edit", |b| batch::set_cells(b, &edits))
+                .unwrap();
         });
     }
     parts.print("set_cells, 500 cells");

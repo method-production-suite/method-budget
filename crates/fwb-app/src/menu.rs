@@ -44,7 +44,7 @@ pub const WINDOW_MENU: &str = tauri::menu::WINDOW_SUBMENU_ID;
 pub const WINDOW_MENU: &str = "window";
 /// The last of the Window menu's own items; the open budgets follow it,
 /// after a separator.
-pub const LAST_WINDOW_ITEM: &str = "window.second_tab";
+pub const LAST_WINDOW_ITEM: &str = "window.move_to_other_pane";
 
 /// One menu entry. Keys use the shortcut list's syntax (`mod+shift+s`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -110,10 +110,14 @@ pub const FILE: &[Entry] = &[
     item("file.open", "Open…", "mod+o"),
     // Starting from another budget (src/templates.rs, src/import_setup.rs).
     plain("file.new_from_template", "New From Template…"),
+    // A filtered copy in a new tab (src/sharing.rs).
+    plain("file.new_sub_budget", "New Sub-Budget…"),
     SEP,
     item("file.save", "Save", "mod+s"),
     item("file.save_as", "Save As…", "mod+shift+s"),
     plain("file.save_as_template", "Save as Template…"),
+    // A snapshot for someone else, opened read-only (src/sharing.rs).
+    plain("file.save_share_copy", "Save a Copy for Sharing…"),
     SEP,
     plain("file.import_setup", "Import Setup From…"),
     // Detail lines from a spreadsheet, with a column mapping (src/sheet_import.rs).
@@ -224,6 +228,11 @@ pub const VIEW: &[Entry] = &[
     Entry::ToolsPanel,
     Entry::SetupTabs,
     SEP,
+    // Split view: two panes of budget tabs side by side (ui/js/pane.js,
+    // src/docs.rs). Cmd+\ is the Credits tab.
+    item("view.split_right", "Split Right", "mod+shift+backslash"),
+    plain("view.close_split", "Close Split"),
+    SEP,
     // Per-user display choices (ui/js/display.js). Cmd+= inserts a subtotal,
     // so zooming is Option+Cmd+= and Option+Cmd+-.
     item(
@@ -265,6 +274,8 @@ pub const SETUP_TABS: &[Entry] = &[
     item("view.tab.locations", "Locations", "mod+5"),
     item("view.tab.currencies", "Currency", "mod+6"),
     plain("view.tab.notes", "Notes"),
+    plain("view.tab.library", "Library"),
+    plain("view.tab.history", "History"),
     SEP,
     item("view.tab.charges", "Charges", "mod+/"),
     item("view.tab.credits", "Credits", "mod+backslash"),
@@ -280,7 +291,10 @@ pub const WINDOW: &[Entry] = &[
     item("window.next_tab", "Show Next Tab", "mod+shift+]"),
     item("window.prev_tab", "Show Previous Tab", "mod+shift+["),
     item("window.first_tab", "First Tab", "mod+1"),
-    item(LAST_WINDOW_ITEM, "Second Tab", "mod+2"),
+    item("window.second_tab", "Second Tab", "mod+2"),
+    SEP,
+    // Split view (ui/js/pane.js): the budget in front to the other pane.
+    plain(LAST_WINDOW_ITEM, "Move Tab to Other Pane"),
     SEP,
 ];
 

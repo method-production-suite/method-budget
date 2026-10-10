@@ -9,6 +9,8 @@
 // lists in apply.js.)
 
 import { displaySettingsGroup } from './display-settings.js';
+import { invoke } from './api.js';
+import { applyCoding, pendingRenumber, previewBox } from './renumber.js';
 
 export const EXTRA_TABS = [
   { id: 'charges', label: 'Charges' },
@@ -294,6 +296,8 @@ function chargeInput(c0) {
     excluded_groups: arr(c.excluded_groups).map(k.str),
     excluded_categories: arr(c.excluded_categories).map(k.str),
     excluded_accounts: arr(c.excluded_accounts).map(k.str),
+    label_percent: c.label_percent === true,
+    label_excluded: c.label_excluded === true,
   };
 }
 
@@ -340,7 +344,8 @@ function renderCharges(panel) {
     if (!c.applied) figs.append(k.el('span', 'setup-muted', 'Not applied'));
     else if (entry) {
       const t = k.el('span', 'setup-num', k.formatCents(entry.amount));
-      t.title = `On ${k.formatCents(entry.base)}, less ${k.formatCents(entry.excluded)} left out`;
+      t.title = chargeTitle(entry, false);
+      t.dataset.key = fk('total');
       figs.append(t);
     }
     head.append(
@@ -383,6 +388,7 @@ function renderCharges(panel) {
         num: true,
         onCommit: commit('percent', (v) => ({ percent: v.trim() })),
       });
+      livePreview(pct, i);
       grid.append(k.field('Percent', pct, { extra: '%' }));
     } else {
       const amount = k.textInput({
@@ -391,6 +397,7 @@ function renderCharges(panel) {
         num: true,
         onCommit: commit('amount', (v) => ({ amount: v.trim() })),
       });
+      livePreview(amount, i);
       grid.append(k.field('Amount', amount));
       const cur = k.selectInput({
         fieldKey: fk('currency'),
@@ -407,7 +414,20 @@ function renderCharges(panel) {
       onCommit: commit('account', (v) => ({ account: v.trim() === '' ? null : v.trim() })),
     });
     grid.append(k.field('Posts to account', account, { wide: c.kind === 'percent' }));
-    li.append(head, grid, chargeExclusions(i, c, ik));
+    // What the topsheet label shows besides the name (display only).
+    if (c.kind === 'percent') {
+      grid.append(
+        checkbox(fk('label-percent'), c.label_percent, 'Show the percent on the topsheet', (v) =>
+          k.run(ik, () => chargeArgs(i, { label_percent: v }), { restore: [fk('label-percent'), !v] }),
+        ),
+      );
+    }
+    grid.append(
+      checkbox(fk('label-excluded'), c.label_excluded, 'Show the amount left out on the topsheet', (v) =>
+        k.run(ik, () => chargeArgs(i, { label_excluded: v }), { restore: [fk('label-excluded'), !v] }),
+      ),
+    );
+    li.append(head, grid, chargeExclusions(i, c, ik, entry));
     k.finishItem(li, ik, issuesAt('charge', i), null);
     ul.append(li);
   });
@@ -453,6 +473,8 @@ function renderCharges(panel) {
               excluded_groups: [],
               excluded_categories: [],
               excluded_accounts: [],
+              label_percent: false,
+              label_excluded: false,
             },
           },
         ];
@@ -461,7 +483,122 @@ function renderCharges(panel) {
   );
 }
 
-function chargeExclusions(i, c, ik) {
+// Every group with a box to leave it out of the charge, and the group's own
+// amount in the charge's base from the current totals. A group the charge
+// names that the budget no longer has stays listed until it is unticked.
+function groupGrid(i, c, ik) {
+  const fk = (f) => k.key('charges', i, f);
+  const wrap = k.el('div', 'setup-field setup-field-wide');
+  const head = k.el('span', 'setup-label', 'Groups');
+  head.id = k.nextId();
+  const grid = k.el('div', 'tss-excl');
+  grid.setAttribute('role', 'group');
+  grid.setAttribute('aria-labelledby', head.id);
+  const defs = obj(k.budget().groups);
+  const names = withKept(groupNames(), c.excluded_groups);
+  if (!names.length) grid.append(k.el('span', 'tss-chips-empty', 'No groups yet'));
+  for (const name of names) {
+    const row = k.el('div', 'tss-excl-row');
+    const box = k.el('input', 'setup-check');
+    box.type = 'checkbox';
+    box.id = k.nextId();
+    box.checked = c.excluded_groups.includes(name);
+    box.dataset.key = fk(`excl-group-${name}`);
+    box.addEventListener('change', () => {
+      const on = box.checked;
+      k.run(ik, () => chargeArgs(i, (cur) => ({ excluded_groups: on ? [...cur.excluded_groups.filter((g) => g !== name), name] : cur.excluded_groups.filter((g) => g !== name) })), {
+        restore: [fk(`excl-group-${name}`), !on],
+      });
+    });
+    const label = k.el('label', 'tss-excl-name', name);
+    label.htmlFor = box.id;
+    const known = Object.prototype.hasOwnProperty.call(defs, name);
+    const amount = known ? groupInBase(name) : null;
+    const total = k.el('span', 'setup-num tss-excl-total', known ? (amount === null ? '' : k.formatCents(amount)) : 'Not in this budget');
+    if (!known) total.classList.add('setup-muted');
+    else if (obj(defs[name]).in_budget_total === false) total.title = 'Left out of the budget total, so nothing to leave out here';
+    else total.title = 'The group’s lines in the base, as the totals stand now';
+    row.append(box, label, total);
+    grid.append(row);
+  }
+  wrap.append(head, grid);
+  return wrap;
+}
+
+// The head figure's tooltip: what the charge is figured on.
+function chargeTitle(t, typing) {
+  const on = `On ${k.formatCents(t.base)}, less ${k.formatCents(t.excluded)} left out`;
+  return typing ? `${on} (with the value being typed)` : on;
+}
+
+// A group's own amount in a charge's base: its counted lines' totals, with
+// their fringes unless fringes post outside the above- and below-the-line
+// totals (Budget > Settings). Null when the group isn't in the report.
+function groupInBase(name) {
+  const g = obj(obj(k.report() && k.report().groups)[name]);
+  const a = obj(g.active);
+  if (isNone(a.details_total)) return null;
+  const posting = obj(k.budget().fringe_posting).kind;
+  return (Number(a.details_total) || 0) + (posting === 'budget' ? 0 : Number(a.fringe_total) || 0);
+}
+
+// Live preview: while a charge's percent, amount or a left-out amount is
+// being typed, its total (and what it leaves out) is figured from the typed
+// text, before Enter commits it. Charges whose total isn't shown (not
+// applied) have nothing to update.
+const preview = { timer: null, seq: 0 };
+const PREVIEW_MS = 120;
+
+function livePreview(input, i) {
+  input.addEventListener('input', () => {
+    clearTimeout(preview.timer);
+    preview.timer = setTimeout(() => runPreview(i), PREVIEW_MS);
+  });
+}
+
+// Charge `i` as the editor shows it right now: the saved charge with every
+// typed-but-not-committed value in its place.
+function draftCharge(i) {
+  const cur = chargeInput(arr(k.budget().charges)[i]);
+  const typed = (f) => {
+    const e = k.findByData('key', k.key('charges', i, f));
+    return e && typeof e.value === 'string' ? e.value : null;
+  };
+  if (cur.kind === 'percent') {
+    const v = typed('percent');
+    if (v !== null) cur.percent = v.trim();
+  } else {
+    const v = typed('amount');
+    if (v !== null) cur.amount = v.trim();
+  }
+  cur.excluded_amounts = cur.excluded_amounts.map((x, n) => {
+    const v = typed(`amount-value-${n}`);
+    return v === null ? x : { ...x, amount: v.trim() };
+  });
+  return cur;
+}
+
+async function runPreview(i) {
+  const total = k.findByData('key', k.key('charges', i, 'total'));
+  if (!total) return;
+  const seq = ++preview.seq;
+  try {
+    const t = await invoke('preview_charge', { index: i, charge: draftCharge(i) });
+    if (seq !== preview.seq || !total.isConnected) return;
+    total.textContent = k.formatCents(t.amount);
+    total.title = chargeTitle(t, true);
+    total.classList.remove('tss-stale');
+    const out = k.findByData('key', k.key('charges', i, 'excluded'));
+    if (out) out.textContent = k.formatCents(t.excluded);
+  } catch {
+    // Not a number yet: keep the last total, marked as not current.
+    if (seq !== preview.seq || !total.isConnected) return;
+    total.classList.add('tss-stale');
+    total.title = 'Finish typing a number to see the new total';
+  }
+}
+
+function chargeExclusions(i, c, ik, entry) {
   const fk = (f) => k.key('charges', i, f);
   const count =
     c.excluded_groups.length + c.excluded_amounts.length + (c.kind === 'percent' ? c.excluded_categories.length + c.excluded_accounts.length : 0);
@@ -474,7 +611,7 @@ function chargeExclusions(i, c, ik) {
       options: withKept(options, c[f]),
       onChange: (list) => k.run(ik, () => chargeArgs(i, { [f]: list })),
     });
-  body.append(pick('excluded_groups', 'Groups', groupNames()));
+  body.append(groupGrid(i, c, ik));
   if (c.kind === 'percent') {
     body.append(pick('excluded_categories', 'Categories', categoryCodes()));
     body.append(pick('excluded_accounts', 'Accounts', accountCodes()));
@@ -517,6 +654,7 @@ function chargeExclusions(i, c, ik) {
       k.run(ik, () => chargeArgs(i, (cur) => ({ excluded_amounts: cur.excluded_amounts.filter((_, j) => j !== n) }))),
       `Remove amount ${n + 1}`,
     );
+    livePreview(amt, i);
     row.append(desc, amt, del);
     rows.append(row);
   });
@@ -529,6 +667,15 @@ function chargeExclusions(i, c, ik) {
   rows.append(add);
   amounts.append(rows);
   body.append(amounts);
+  if (entry) {
+    // Everything left out together: each line once, even when several rules
+    // pick it.
+    const all = k.el('p', 'setup-hint setup-field-wide tss-excl-all');
+    const n = k.el('span', 'setup-num', k.formatCents(entry.excluded));
+    n.dataset.key = fk('excluded');
+    all.append(k.el('span', null, 'Left out in all: '), n);
+    body.append(all);
+  }
   return section(`charge-${i}`, count ? `Left out of this charge (${count})` : 'Left out of this charge', body);
 }
 
@@ -711,11 +858,6 @@ function creditRow(i, n, row, raw, entry, ik) {
   head.append(k.el('span', 'tss-row-num', `Row ${n + 1}`));
   const figs = k.el('span', 'setup-figs');
   const rt = entry && Array.isArray(entry.rows) ? obj(entry.rows[n]) : null;
-  if (rt && !isNone(rt.net)) {
-    const t = k.el('span', 'setup-muted', `On ${k.formatCents(rt.net)}`);
-    t.title = `Spend ${k.formatCents(rt.gross)}, less ${k.formatCents(rt.excluded_fringes)} of fringes left out`;
-    figs.append(t);
-  }
   head.append(
     figs,
     button('×', 'setup-del', fk('del'), () => k.run(ik, () => creditArgs(i, (cur) => ({ rows: cur.rows.filter((_, j) => j !== n) }))), `Delete row ${n + 1}`),
@@ -820,8 +962,54 @@ function creditRow(i, n, row, raw, entry, ik) {
       }),
     );
   }
-  li.append(head, grid);
+  li.append(head);
+  if (rt && !isNone(rt.net)) li.append(creditFigures(rt, row));
+  li.append(grid);
   return li;
+}
+
+// Dollars as a decimal string ("1307.375") rounded half away from zero to
+// cents, for showing an unrounded credit figure. Null when not a number.
+function dollarsToCents(v) {
+  const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(k.str(v));
+  if (!m) return null;
+  const frac = (m[3] || '').padEnd(3, '0');
+  let cents = BigInt(m[2]) * 100n + BigInt(frac.slice(0, 2));
+  if (Number(frac[2]) >= 5) cents += 1n;
+  return m[1] && cents !== 0n ? -cents : cents;
+}
+
+function money(v) {
+  const c = dollarsToCents(v);
+  return c === null ? k.str(v) : k.formatCents(c);
+}
+
+// A credit row's figures from the totals: its spend, the fringes left out of
+// it, the net it is figured on, the credit, and how far it is from its cap.
+function creditFigures(rt, row) {
+  const figs = k.el('p', 'setup-figs tss-row-figs');
+  const fig = (label, text, title) => {
+    const f = k.el('span', 'tss-fig');
+    f.append(k.el('span', 'setup-muted', label), k.el('span', 'setup-num', text));
+    if (title) f.title = title;
+    figs.append(f);
+  };
+  fig('Spend', k.formatCents(rt.gross), 'The row’s spend before fringes are left out');
+  fig('Fringes out', k.formatCents(rt.excluded_fringes), 'Fringes left out of the spend');
+  fig('Net', k.formatCents(rt.net), 'The spend the percent applies to');
+  fig('Credit', money(rt.credit), `Exactly ${k.formatDecimal(rt.credit)}; rows are added before rounding`);
+  if (!isNone(rt.cap_variance) && row.cap.kind !== 'none') {
+    const what = row.cap.kind === 'qualified_spend' ? 'Spend' : 'Credit';
+    const c = dollarsToCents(rt.cap_variance);
+    const exact = `Exactly ${k.formatDecimal(rt.cap_variance)} against the cap`;
+    if (c === null) fig('Cap', k.str(rt.cap_variance), exact);
+    else if (c === 0n) fig('Cap', 'At the cap', exact);
+    else {
+      const over = c < 0n;
+      fig(over ? `${what} over the cap by` : `${what} under the cap by`, k.formatCents(over ? -c : c), exact);
+    }
+  }
+  return figs;
 }
 
 // ---------------------------------------------------------------------------
@@ -1137,6 +1325,18 @@ function codingForm() {
     const same = Object.keys(q).every((f) => q[f] === p[f]);
     apply.hidden = same;
   };
+  // A renumber preview still open (renumber.js) keeps the pattern it is for.
+  const open = pendingRenumber(k.view() && k.view().doc);
+  if (open) {
+    for (const f of Object.keys(sels)) sels[f].value = String(open.q[f]);
+    sep.value = open.q.separator;
+  }
+  const reset = () => {
+    for (const f of Object.keys(sels)) sels[f].value = String(p[f]);
+    sep.value = p.separator;
+    update();
+    sels.category_width.focus();
+  };
   for (const s of [...Object.values(sels), sep]) s.addEventListener('change', update);
   update();
 
@@ -1150,9 +1350,13 @@ function codingForm() {
       problem.hidden = false;
       return;
     }
-    k.setFocusKey(k.key('settings', 'coding', 'category_width'));
-    k.run(ck, () => ['set_account_coding', { ...q, separator: q.separator === '' ? null : q.separator }], {
-      onError: () => k.setFocusKey(null),
+    // Offers to renumber the accounts when any number would change.
+    applyCoding(k, ck, q, form, {
+      onProblem: (text) => {
+        problem.textContent = text;
+        problem.hidden = false;
+      },
+      onCancel: reset,
     });
   });
   const actions = k.el('div', 'setup-add-actions tss-coding-actions');
@@ -1162,9 +1366,10 @@ function codingForm() {
     grid,
     actions,
     problem,
-    k.el('p', 'setup-hint tss-note', 'Numbers you type from now on are read and written with this pattern. Numbers already in the budget keep their spelling.'),
+    k.el('p', 'setup-hint tss-note', 'Numbers you type from now on are read and written with this pattern. When numbers already in the budget would change, Apply offers to renumber them.'),
   );
   if (k.state().errors.has(ck)) form.append(k.errorLine(k.state().errors.get(ck)));
+  if (open) form.append(previewBox(k, ck, open, reset));
   return form;
 }
 
