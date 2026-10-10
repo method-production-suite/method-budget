@@ -600,3 +600,25 @@ body.setup-dragging * {
 .setup-item.is-dragging {
   opacity: 0.55;
 }
+
+/* The tools panel's compact Units tab: a unit's plural and hours as text
+   (setup.js; they are edited in the Budget Setup window). */
+.setup-unit-facts {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* The compact tabs' list tools: the sort at the left, then Show and the
+   Setup button (Budget Setup, setup.js). */
+.setup-compact .setup-listtools {
+  justify-content: flex-start;
+}
+
+.setup-compact .setup-listtools > :first-child {
+  margin-right: auto;
+}

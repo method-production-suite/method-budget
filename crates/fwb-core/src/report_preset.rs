@@ -160,6 +160,10 @@ pub enum ReportSection {
     Locations,
     /// The currencies with their rates.
     Currencies,
+    /// Budget, baseline, actual to date, estimate to complete, estimate at
+    /// completion, variance and percent spent per account, category and
+    /// the topsheet (see [`crate::actuals`]).
+    CostReport,
 }
 
 names!(ReportSection {
@@ -176,6 +180,7 @@ names!(ReportSection {
     Sets = "sets",
     Locations = "locations",
     Currencies = "currencies",
+    CostReport = "cost_report",
 });
 
 /// An optional column of the detail pages (the grid's columns, plus the

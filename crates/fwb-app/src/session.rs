@@ -288,6 +288,10 @@ pub struct Session {
     merge: Option<(String, Instant, u64)>,
     /// Older undo steps were dropped (more than [`UNDO_LIMIT`]).
     trimmed: bool,
+    /// The actuals summed by account, kept until they or the account pattern
+    /// change, so an edit's view costs one pass over the accounts, not over
+    /// every transaction (src/actuals.rs).
+    rollups: crate::actuals::RollupCache,
 }
 
 /// What autosave needs to know about one open budget.
@@ -356,6 +360,7 @@ impl Session {
             safety,
             merge: None,
             trimmed: false,
+            rollups: crate::actuals::RollupCache::default(),
         }
     }
 
@@ -882,7 +887,9 @@ impl Session {
             can_undo: self.can_undo(),
             can_redo: self.can_redo(),
         };
-        View::build(&mut self.budget, &st, focus, None)
+        let mut view = View::build(&mut self.budget, &st, focus, None);
+        view.cost = self.cost(focus, false);
+        view
     }
 
     /// The view, noting a row an edit just created so the UI can select it.
@@ -898,7 +905,9 @@ impl Session {
             can_undo: self.can_undo(),
             can_redo: self.can_redo(),
         };
-        View::build(&mut self.budget, &st, focus, created_row)
+        let mut view = View::build(&mut self.budget, &st, focus, created_row);
+        view.cost = self.cost(focus, false);
+        view
     }
 
     /// Everything, every row (for printing).
@@ -913,7 +922,47 @@ impl Session {
             can_undo: self.can_undo(),
             can_redo: self.can_redo(),
         };
-        FullView::build(&mut self.budget, &st)
+        let mut view = FullView::build(&mut self.budget, &st);
+        view.cost = self.cost(None, true);
+        view
+    }
+
+    /// The cost figures a view carries when the budget has actuals: every
+    /// account, category and summary row, and the line sums of the account
+    /// at `focus` (every line's with `all_lines`). The rollup over the
+    /// transactions is cached (see `rollups`).
+    fn cost(
+        &mut self,
+        focus: Option<(usize, usize)>,
+        all_lines: bool,
+    ) -> Option<crate::actuals::CostDto> {
+        if self.budget.actuals.is_empty() {
+            return None;
+        }
+        let roll = self.rollups.get(&self.budget);
+        let report = self.outcome.as_ref()?.report.as_ref()?;
+        let shown: BTreeSet<RowId> = match focus {
+            Some((ti, ai)) if !all_lines => match self.budget.topsheet.get(ti) {
+                Some(TopsheetRow::Category(c)) => c
+                    .accounts
+                    .get(ai)
+                    .map(|a| a.details.iter().map(|d| d.id).collect())
+                    .unwrap_or_default(),
+                _ => BTreeSet::new(),
+            },
+            _ => BTreeSet::new(),
+        };
+        Some(crate::actuals::cost_dto(
+            &self.budget,
+            report,
+            roll.as_deref(),
+            |id| all_lines || shown.contains(&id),
+        ))
+    }
+
+    /// How many times the actuals were rolled up (for tests of the cache).
+    pub fn rollups_computed(&self) -> u64 {
+        self.rollups.computed
     }
 
     /// The budget with its (cached) lenient recalc, borrowed together.

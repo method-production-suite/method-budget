@@ -1560,14 +1560,16 @@ mod tests {
         );
     }
 
-    /// The new commands are registered, listed and allowed in both windows
-    /// (the panel and the charges tab draw in the tools window too).
+    /// The new commands are registered, listed and allowed where they are
+    /// used: the apply edits in the tools window too, the charge preview in
+    /// the Budget Setup window (its Charges tab, src/setupwin.rs).
     #[test]
     fn apply_and_charge_preview_commands_are_wired() {
         const APP_RS: &str = include_str!("app.rs");
         const BUILD_RS: &str = include_str!("../build.rs");
         const MAIN: &str = include_str!("../capabilities/main.json");
         const TOOLS: &str = include_str!("../capabilities/tools.json");
+        const SETUP: &str = include_str!("../capabilities/setup.json");
         for (handler, c) in [
             ("crate::apply::clear_from_rows,", "clear_from_rows"),
             (
@@ -1583,9 +1585,14 @@ mod tests {
             );
             let allow = format!("\"allow-{}\"", c.replace('_', "-"));
             assert!(MAIN.contains(&allow), "{c} not allowed for the main window");
+            let (window, caps) = if c == "preview_charge" {
+                ("Budget Setup", SETUP)
+            } else {
+                ("tools", TOOLS)
+            };
             assert!(
-                TOOLS.contains(&allow),
-                "{c} not allowed for the tools window"
+                caps.contains(&allow),
+                "{c} not allowed for the {window} window"
             );
         }
     }

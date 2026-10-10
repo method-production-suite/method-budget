@@ -444,12 +444,53 @@ fn gen_display(rng: &mut Rng) -> DisplayPrefs {
     }
 }
 
+/// Actuals: transactions with every optional field, imports and every
+/// estimate-to-complete method.
+fn gen_actuals(rng: &mut Rng) -> fwb_core::actuals::Actuals {
+    use fwb_core::actuals::{Actuals, EtcMethod, ImportBatch, Transaction};
+    let mut a = Actuals::default();
+    for i in 0..rng.below(4) {
+        a.transactions.push(std::sync::Arc::new(Transaction {
+            id: if rng.chance(5) { u64::MAX } else { i },
+            date: rng.pick(&["", "2026-09-30", "not a date"]).into(),
+            account: rng.text(),
+            line: rng.chance(50).then(|| rng.below(100)),
+            tags: rng.texts(),
+            vendor: rng.text(),
+            description: rng.text(),
+            reference: rng.text(),
+            amount: rng.cents(),
+            batch: rng.chance(60).then(|| rng.below(4)),
+        }));
+    }
+    for i in 0..rng.below(3) {
+        a.batches.push(ImportBatch {
+            id: i,
+            file: rng.text(),
+            imported: rng.pick(&["", "2026-10-09T14:30:00-07:00"]).into(),
+            rows: rng.below(1000),
+        });
+    }
+    for _ in 0..rng.below(4) {
+        let m = match rng.below(3) {
+            0 => EtcMethod::BudgetMinusActual,
+            1 => EtcMethod::Manual(rng.cents()),
+            _ => EtcMethod::PercentComplete(rng.dec()),
+        };
+        a.etc.insert(rng.text(), m);
+    }
+    a
+}
+
 /// A budget whose versions hold other random content.
 fn gen_budget(rng: &mut Rng) -> Budget {
     let mut b = gen_content(rng);
     gen_tool_presets(rng, &mut b);
     b.display = gen_display(rng);
     gen_order(rng, &mut b);
+    if rng.chance(40) {
+        b.actuals = std::sync::Arc::new(gen_actuals(rng));
+    }
     for _ in 0..rng.below(3) {
         let (content, _) = gen_content(rng).into_parts();
         b.versions.push(Version {
@@ -547,6 +588,9 @@ fn generator_covers_every_variant_and_field() {
         "group",
         "qualified_spend",
         "credit",
+        "budget_minus_actual",
+        "manual",
+        "percent_complete",
     ];
     for k in kinds {
         assert!(
@@ -634,6 +678,18 @@ fn generator_covers_every_variant_and_field() {
         "grand_total",
         "net_total",
         "separator",
+        "actuals",
+        "transactions",
+        "batches",
+        "etc",
+        "file",
+        "imported",
+        "line",
+        "tags",
+        "vendor",
+        "reference",
+        "batch",
+        "percent",
     ];
     for f in fields {
         assert!(

@@ -731,6 +731,33 @@
   font-weight: 700;
 }
 
+/* Cost report (js/report.js costReportSection): six or seven figures
+   columns, in em so big figures fit at every type size; landscape gives the
+   description the most room. Over-budget variances print bold. */
+
+.fwb-report .rpt-cost col.c-code2 { width: 5em; }
+.fwb-report .rpt-cost col.c-cm { width: 7.2em; }
+.fwb-report .rpt-cost col.c-pct { width: 5.6em; }
+
+.fwb-report .rpt-cost tr.rpt-cost-cat td {
+  padding-top: 7pt;
+  border-bottom: 0.75pt solid #000;
+  font-weight: 700;
+}
+
+.fwb-report .rpt-cost tr.rpt-cost-sum.first td {
+  padding-top: 6pt;
+  border-top: 1.5pt solid #000;
+}
+
+.fwb-report .rpt-cost tr.rpt-cost-grand td {
+  border-top: 1.5pt solid #000;
+}
+
+.fwb-report .rpt-cost td.over {
+  font-weight: 700;
+}
+
 .fwb-report .rpt-notes td.note-text {
   white-space: pre-line;
 }

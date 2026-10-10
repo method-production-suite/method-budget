@@ -1,7 +1,15 @@
-// Setup tables drawn in place: globals and units (tabs of the tools panel,
-// tools.js), and the kit of helpers the Budget tab's own tabs use
-// (topsheet-setup.js: charges, credits, info, settings, baseline). Fringes,
-// groups, sets, locations and currencies are lists in apply.js.
+// Setup tables drawn in place: globals and units, and the kit of helpers the
+// budget's own setup tabs use (topsheet-setup.js: charges, credits, info,
+// settings, baseline). Fringes, groups, sets, locations and currencies are
+// lists in apply.js.
+//
+// The Budget Setup window (setupwin.js) draws every one of these in full.
+// The tools panel (tools.js) draws Globals and Units compact
+// (renderSetupTab's `compact`): each global's name, formula and value, each
+// unit's name, plural and hours, with renaming, deleting and adding kept,
+// while a global's details form and a unit's fields are left to Budget Setup
+// (a Setup button, and Edit in Budget Setup on a name's right-click menu,
+// open it there: ctx.openSetup).
 //
 // tools.js draws the whole panel on every view: setupBegin() before, then
 // renderSetupTab() for each of these tabs on screen, then setupEnd() swaps
@@ -61,6 +69,9 @@ const state = {
 
 let uid = 0;
 
+// True while drawing a compact tab (the tools panel's Globals and Units).
+let compact = false;
+
 /**
  * Starts drawing the panel into `container` (the element that stays on the
  * page): notes where focus is so setupEnd() can put it back.
@@ -75,13 +86,28 @@ export function setupBegin(container, view, ctx) {
   return focus;
 }
 
-/** Draws setup tab `tab` (globals, units, or one of the Budget tab's) into `panel`. */
-export function renderSetupTab(panel, tab) {
+/**
+ * Draws setup tab `tab` (globals, units, or one of the budget's own setup
+ * tabs) into `panel`; with `compact`, the tools panel's short form of
+ * Globals or Units.
+ */
+export function renderSetupTab(panel, tab, opts = {}) {
   state.shown.push(tab);
   panel.classList.add('setup-panel');
-  if (tab === 'globals') renderGlobals(panel);
-  else if (tab === 'units') renderUnits(panel);
-  else renderExtraTab(tab, panel, kit());
+  compact = Boolean(opts && opts.compact) && (tab === 'globals' || tab === 'units');
+  if (compact) panel.classList.add('setup-compact');
+  try {
+    if (tab === 'globals') renderGlobals(panel);
+    else if (tab === 'units') renderUnits(panel);
+    else renderExtraTab(tab, panel, kit());
+  } finally {
+    compact = false;
+  }
+}
+
+/** The way to `table` (and item `name`) in Budget Setup, when this window has one. */
+function canOpenSetup() {
+  return Boolean(state.ctx && typeof state.ctx.openSetup === 'function');
 }
 
 /** Swaps the newly drawn panel `root` in and restores focus. */
@@ -649,9 +675,11 @@ function checkName(name, existing, what) {
 function renderGlobals(panel) {
   const b = budget();
   const r = report();
-  panel.append(
-    el('p', 'setup-intro', 'Named numbers you can use in any formula, like DAYS * 5. A global can use other globals.'),
-  );
+  if (!compact) {
+    panel.append(
+      el('p', 'setup-intro', 'Named numbers you can use in any formula, like DAYS * 5. A global can use other globals.'),
+    );
+  }
   const shownList = listNames(state.view, 'globals');
   const movable = canReorder('globals', shownList.filtered);
   const items = shownList.names.map((n) => [n, own(b.globals, n)]);
@@ -721,8 +749,9 @@ function renderGlobals(panel) {
         neighborKey: neighbor('globals', names, i, addKey),
       }),
     );
-    // Description, unit, decimals, show by name and folder (display-settings.js).
-    li.append(globalInfoBlock(kit(), name, ik));
+    // Description, unit, decimals, show by name and folder (display-settings.js):
+    // in Budget Setup, not in the compact panel tab.
+    if (!compact) li.append(globalInfoBlock(kit(), name, ik));
     finishItem(li, ik, issues, input);
     ul.append(li);
   });
@@ -764,13 +793,15 @@ function unitArgs(name, patch) {
 
 function renderUnits(panel) {
   const b = budget();
-  panel.append(
-    el(
-      'p',
-      'setup-intro',
-      'Units for quantities on lines. Hours lets flat fringes convert between time units; leave it blank for units like Flat.',
-    ),
-  );
+  if (!compact) {
+    panel.append(
+      el(
+        'p',
+        'setup-intro',
+        'Units for quantities on lines. Hours lets flat fringes convert between time units; leave it blank for units like Flat.',
+      ),
+    );
+  }
   const shownList = listNames(state.view, 'units');
   const movable = canReorder('units', shownList.filtered);
   const items = shownList.names.map((n) => [n, own(b.units, n)]);
@@ -804,6 +835,16 @@ function renderUnits(panel) {
         neighborKey: neighbor('units', names, i, key('add', 'units')),
       }),
     );
+    if (compact) {
+      // Its plural and hours as text; they are edited in Budget Setup.
+      const hasHours = u.hours !== undefined && u.hours !== null && u.hours !== '';
+      const facts = [str(u.plural), hasHours ? `${u.hours} ${Number(u.hours) === 1 ? 'hour' : 'hours'}` : ''].filter(Boolean).join(', ');
+      if (facts) head.insertBefore(el('span', 'setup-desc setup-unit-facts', facts), figs);
+      li.append(head);
+      finishItem(li, ik, issuesFor('unit', name), null);
+      ul.append(li);
+      return;
+    }
     const grid = el('div', 'setup-fields');
     const pl = textInput({
       fieldKey: key('units', name, 'plural'),
@@ -873,6 +914,17 @@ function listTools(table, sort = true) {
   wantUsage(state.view);
   const row = el('div', 'setup-listtools');
   row.append(sort ? sortButton(table, 'Name', redrawLists, key('sort', table)) : el('span'), showSelect(table, redrawLists, key('show', table)));
+  if (compact && canOpenSetup()) {
+    const label = table === 'globals' ? 'globals' : 'units';
+    const go = el('button', 'apply-pill setup-open-setup', 'Setup');
+    go.type = 'button';
+    go.dataset.key = key('open-setup', table);
+    go.dataset.nobusy = '1';
+    go.title = `Every detail of the ${label}, with the library, in the Budget Setup window`;
+    go.setAttribute('aria-label', `Edit ${label} in Budget Setup`);
+    go.addEventListener('click', () => state.ctx.openSetup(table, null));
+    row.append(go);
+  }
   return row;
 }
 
@@ -945,6 +997,7 @@ function renameable(nameEl, kind, name, itemKey, focusAfter) {
   nameEl.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     if (isBusy() || !state.ctx) return;
+    const table = kind === 'global' ? 'globals' : 'units';
     itemMenu(e, {
       kind,
       name,
@@ -955,6 +1008,7 @@ function renameable(nameEl, kind, name, itemKey, focusAfter) {
         const del = findByData('key', key('del', itemKey));
         if (del) del.click();
       },
+      extra: canOpenSetup() ? [{ label: 'Edit in Budget Setup', title: `Show this ${kind} in the Budget Setup window`, run: () => state.ctx.openSetup(table, name) }] : [],
     });
   });
   return nameEl;

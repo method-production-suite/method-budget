@@ -113,18 +113,26 @@ pub fn restore_version(
     let presets = std::mem::take(&mut b.report_presets);
     let tags = std::mem::take(&mut b.tag_presets);
     let blocks = std::mem::take(&mut b.line_presets);
+    let ot = std::mem::take(&mut b.ot_patterns);
     let display = std::mem::take(&mut b.display);
     let order = std::mem::take(&mut b.setup_order);
     let folders = std::mem::take(&mut b.setup_folders);
     // Where the budget came from is about the file, not its content.
     let provenance = b.provenance.take();
+    // How versions are stored is a file setting.
+    let compact = b.compact_versions;
+    // Actuals are the production's spending, not budget content.
+    let actuals = std::mem::take(&mut b.actuals);
     *b = content.into_budget(versions);
+    b.actuals = actuals;
     b.setup_order = order;
     b.setup_folders = folders;
     b.provenance = provenance;
+    b.compact_versions = compact;
     b.report_presets = presets;
     b.tag_presets = tags;
     b.line_presets = blocks;
+    b.ot_patterns = ot;
     b.display = display;
     Ok(auto)
 }

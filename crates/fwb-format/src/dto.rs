@@ -7,6 +7,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+use fwb_core::actuals::{Actuals, EtcMethod, ImportBatch, Transaction};
 use fwb_core::coding::AccountCoding;
 use fwb_core::order::SetupOrder;
 use fwb_core::{
@@ -210,6 +211,8 @@ pub(crate) struct FileBudget {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     baseline: Option<FileBaseline>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    actuals: Option<FileActuals>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     display: Option<FileDisplay>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     setup_order: Option<FileSetupOrder>,
@@ -222,7 +225,11 @@ pub(crate) struct FileBudget {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     line_presets: Vec<FileLinePreset>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    versions: Vec<FileVersion>,
+    ot_patterns: Vec<FileOtPattern>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    compact_versions: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) versions: Vec<FileVersion>,
 }
 
 impl From<&Budget> for FileBudget {
@@ -249,15 +256,19 @@ impl From<&Budget> for FileBudget {
             baseline,
             display,
             versions,
+            compact_versions,
             report_presets,
             tag_presets,
             line_presets,
+            ot_patterns,
             setup_order: _,
             setup_folders: _,
             provenance,
+            actuals,
         } = b;
         FileBudget {
             provenance: provenance.as_ref().map(FileProvenance::from),
+            actuals: (!actuals.is_empty()).then(|| FileActuals::from(&**actuals)),
             title: title.clone(),
             base_currency: base_currency.clone(),
             totals_currency: totals_currency.clone(),
@@ -295,6 +306,10 @@ impl From<&Budget> for FileBudget {
             report_presets: report_presets.iter().map(FileReportPreset::from).collect(),
             tag_presets: tag_presets.iter().map(FileTagPreset::from).collect(),
             line_presets: line_presets.iter().map(FileLinePreset::from).collect(),
+            ot_patterns: ot_patterns.iter().cloned().map(FileOtPattern).collect(),
+            compact_versions: *compact_versions,
+            // Full copies; `to_string` turns them into deltas when
+            // `compact_versions` is on (crate::delta).
             versions: versions.iter().map(FileVersion::from).collect(),
         }
     }
@@ -342,7 +357,11 @@ impl From<FileBudget> for Budget {
             setup_order: f.setup_order.map(SetupOrder::from).unwrap_or_default(),
             setup_folders: fwb_core::folders::SetupFolders(f.setup_folders),
             provenance: f.provenance.map(Provenance::from),
-            versions: f.versions.into_iter().map(Version::from).collect(),
+            actuals: std::sync::Arc::new(f.actuals.map(Actuals::from).unwrap_or_default()),
+            compact_versions: f.compact_versions,
+            // Rebuilt by `crate::delta::read_versions` (`from_str` takes them
+            // out first); a version's own budget never has any.
+            versions: Vec::new(),
             report_presets: f
                 .report_presets
                 .into_iter()
@@ -350,6 +369,7 @@ impl From<FileBudget> for Budget {
                 .collect(),
             tag_presets: f.tag_presets.into_iter().map(TagPreset::from).collect(),
             line_presets: f.line_presets.into_iter().map(LinePreset::from).collect(),
+            ot_patterns: f.ot_patterns.into_iter().map(|p| p.0).collect(),
         }
     }
 }
@@ -684,21 +704,58 @@ fn read_notes(legacy: Option<String>, notes: Vec<FileNote>) -> Vec<Note> {
 // ---------------------------------------------------------------------------
 // Versions
 
-/// A named copy of the budget's content.
+/// A named copy of the budget's content: a full `budget`, or a `delta`
+/// against another budget object (crate::delta). Exactly one of the two.
 #[derive(Serialize, Deserialize)]
+#[serde(try_from = "RawVersion")]
+pub(crate) struct FileVersion {
+    pub id: u64,
+    pub name: String,
+    pub created: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget: Option<FileSnapshot>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delta: Option<crate::delta::FileDelta>,
+}
+
+/// A version as read, before checking it has a budget or a delta.
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct FileVersion {
+struct RawVersion {
     id: u64,
     name: String,
     created: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     note: Option<String>,
-    budget: FileSnapshot,
+    #[serde(default)]
+    budget: Option<FileSnapshot>,
+    #[serde(default)]
+    delta: Option<crate::delta::FileDelta>,
+}
+
+impl TryFrom<RawVersion> for FileVersion {
+    type Error = &'static str;
+    fn try_from(r: RawVersion) -> Result<FileVersion, &'static str> {
+        match (&r.budget, &r.delta) {
+            (Some(_), Some(_)) => Err("a version has either a budget or a delta, not both"),
+            (None, None) => Err("missing field `budget` (or `delta`)"),
+            _ => Ok(FileVersion {
+                id: r.id,
+                name: r.name,
+                created: r.created,
+                note: r.note,
+                budget: r.budget,
+                delta: r.delta,
+            }),
+        }
+    }
 }
 
 /// A version's budget: the same object as the top-level budget, except that
 /// it may not have `versions` of its own.
-struct FileSnapshot(FileBudget);
+pub(crate) struct FileSnapshot(pub FileBudget);
 
 impl Serialize for FileSnapshot {
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
@@ -714,6 +771,11 @@ impl<'de> Deserialize<'de> for FileSnapshot {
                 "a version's budget cannot have versions of its own",
             ));
         }
+        if b.compact_versions {
+            return Err(de::Error::custom(
+                "a version's budget cannot have compact_versions",
+            ));
+        }
         if !b.report_presets.is_empty() {
             return Err(de::Error::custom(
                 "a version's budget cannot have report presets",
@@ -722,6 +784,11 @@ impl<'de> Deserialize<'de> for FileSnapshot {
         if !b.tag_presets.is_empty() || !b.line_presets.is_empty() {
             return Err(de::Error::custom(
                 "a version's budget cannot have tag presets or line blocks",
+            ));
+        }
+        if !b.ot_patterns.is_empty() {
+            return Err(de::Error::custom(
+                "a version's budget cannot have overtime patterns",
             ));
         }
         if b.setup_order.is_some() {
@@ -744,6 +811,9 @@ impl<'de> Deserialize<'de> for FileSnapshot {
                 "a version's budget cannot have display settings",
             ));
         }
+        if b.actuals.is_some() {
+            return Err(de::Error::custom("a version's budget cannot have actuals"));
+        }
         Ok(FileSnapshot(b))
     }
 }
@@ -763,21 +833,8 @@ impl From<&Version> for FileVersion {
             created: created.clone(),
             note: note.clone(),
             // A snapshot has no versions, so this never writes nested ones.
-            budget: FileSnapshot(FileBudget::from(&budget.to_budget())),
-        }
-    }
-}
-
-impl From<FileVersion> for Version {
-    fn from(f: FileVersion) -> Version {
-        // Nested versions were rejected while reading, so none are dropped here.
-        let (content, _) = Budget::from(f.budget.0).into_parts();
-        Version {
-            id: f.id,
-            name: f.name,
-            created: f.created,
-            note: f.note,
-            budget: std::sync::Arc::new(content),
+            budget: Some(FileSnapshot(FileBudget::from(&budget.to_budget()))),
+            delta: None,
         }
     }
 }
@@ -1895,6 +1952,168 @@ impl From<FileBaseline> for Baseline {
 }
 
 // ---------------------------------------------------------------------------
+// Actuals (transactions from accounting, estimates to complete;
+// fwb_core::actuals)
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileActuals {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    batches: Vec<FileBatch>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    transactions: Vec<FileTransaction>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    etc: BTreeMap<String, FileEtc>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileBatch {
+    id: u64,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    file: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    imported: String,
+    rows: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileTransaction {
+    id: u64,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    date: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    account: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    line: Option<RowId>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    tags: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    vendor: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    description: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    reference: String,
+    amount: Cents,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    batch: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum FileEtc {
+    BudgetMinusActual {},
+    Manual { amount: Cents },
+    PercentComplete { percent: DecStr },
+}
+
+impl From<&Actuals> for FileActuals {
+    fn from(a: &Actuals) -> FileActuals {
+        let Actuals {
+            transactions,
+            batches,
+            etc,
+        } = a;
+        FileActuals {
+            batches: batches
+                .iter()
+                .map(|b| {
+                    let ImportBatch {
+                        id,
+                        file,
+                        imported,
+                        rows,
+                    } = b;
+                    FileBatch {
+                        id: *id,
+                        file: file.clone(),
+                        imported: imported.clone(),
+                        rows: *rows,
+                    }
+                })
+                .collect(),
+            transactions: transactions
+                .iter()
+                .map(|t| {
+                    let Transaction {
+                        id,
+                        date,
+                        account,
+                        line,
+                        tags,
+                        vendor,
+                        description,
+                        reference,
+                        amount,
+                        batch,
+                    } = &**t;
+                    FileTransaction {
+                        id: *id,
+                        date: date.clone(),
+                        account: account.clone(),
+                        line: *line,
+                        tags: tags.clone(),
+                        vendor: vendor.clone(),
+                        description: description.clone(),
+                        reference: reference.clone(),
+                        amount: *amount,
+                        batch: *batch,
+                    }
+                })
+                .collect(),
+            etc: map(etc, |m| match m {
+                EtcMethod::BudgetMinusActual => FileEtc::BudgetMinusActual {},
+                EtcMethod::Manual(amount) => FileEtc::Manual { amount: *amount },
+                EtcMethod::PercentComplete(p) => FileEtc::PercentComplete {
+                    percent: DecStr(*p),
+                },
+            }),
+        }
+    }
+}
+
+impl From<FileActuals> for Actuals {
+    fn from(f: FileActuals) -> Actuals {
+        Actuals {
+            batches: f
+                .batches
+                .into_iter()
+                .map(|b| ImportBatch {
+                    id: b.id,
+                    file: b.file,
+                    imported: b.imported,
+                    rows: b.rows,
+                })
+                .collect(),
+            transactions: f
+                .transactions
+                .into_iter()
+                .map(|t| {
+                    std::sync::Arc::new(Transaction {
+                        id: t.id,
+                        date: t.date,
+                        account: t.account,
+                        line: t.line,
+                        tags: t.tags,
+                        vendor: t.vendor,
+                        description: t.description,
+                        reference: t.reference,
+                        amount: t.amount,
+                        batch: t.batch,
+                    })
+                })
+                .collect(),
+            etc: unmap(f.etc, |m| match m {
+                FileEtc::BudgetMinusActual {} => EtcMethod::BudgetMinusActual,
+                FileEtc::Manual { amount } => EtcMethod::Manual(amount),
+                FileEtc::PercentComplete { percent } => EtcMethod::PercentComplete(percent.0),
+            }),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Report presets (saved report setups; fwb_core::report_preset)
 
 /// A saved report setup: a name, the default flag and the spec's fields, all
@@ -1963,6 +2182,7 @@ enum FileSection {
     Sets,
     Locations,
     Currencies,
+    CostReport,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -2052,7 +2272,7 @@ macro_rules! same_variants {
 
 same_variants!(ReportSection <-> FileSection {
     Topsheet, Accounts, Detail, Fringes, Globals, Groups, Notes, Info, Chart, Units, Sets,
-    Locations, Currencies,
+    Locations, Currencies, CostReport,
 });
 same_variants!(ReportColumn <-> FileColumn {
     Amount, Unit, X, Unit2, Rate, Unit3, Currency, X4, Unit4, Fringes, FringePercent,
@@ -2527,5 +2747,87 @@ impl From<FileBlockRow> for Detail {
             note,
             notes,
         })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Overtime patterns (fwb_core::overtime)
+
+/// One overtime band: its multiplier, and how many hours it covers (left
+/// out on the last band, which covers the rest).
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileOtBand {
+    multiplier: DecStr,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hours: Option<DecStr>,
+}
+
+/// A saved overtime pattern as written.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileOtPatternRaw {
+    name: String,
+    straight_hours: DecStr,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    bands: Vec<FileOtBand>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sixth_day: Option<DecStr>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    seventh_day: Option<DecStr>,
+}
+
+/// A saved overtime pattern, checked when read (the same rules as saving
+/// one in the app).
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(try_from = "FileOtPatternRaw", into = "FileOtPatternRaw")]
+pub(crate) struct FileOtPattern(pub(crate) fwb_core::overtime::OtPattern);
+
+impl From<FileOtPattern> for FileOtPatternRaw {
+    fn from(p: FileOtPattern) -> FileOtPatternRaw {
+        let fwb_core::overtime::OtPattern {
+            name,
+            straight_hours,
+            bands,
+            sixth_day,
+            seventh_day,
+        } = p.0;
+        FileOtPatternRaw {
+            name,
+            straight_hours: DecStr(straight_hours),
+            bands: bands
+                .into_iter()
+                .map(|b| FileOtBand {
+                    multiplier: DecStr(b.multiplier),
+                    hours: b.hours.map(DecStr),
+                })
+                .collect(),
+            sixth_day: sixth_day.map(DecStr),
+            seventh_day: seventh_day.map(DecStr),
+        }
+    }
+}
+
+impl TryFrom<FileOtPatternRaw> for FileOtPattern {
+    type Error = String;
+
+    fn try_from(f: FileOtPatternRaw) -> Result<FileOtPattern, String> {
+        let p = fwb_core::overtime::OtPattern {
+            name: f.name,
+            straight_hours: f.straight_hours.0,
+            bands: f
+                .bands
+                .into_iter()
+                .map(|b| fwb_core::overtime::OtBand {
+                    multiplier: b.multiplier.0,
+                    hours: b.hours.map(|h| h.0),
+                })
+                .collect(),
+            sixth_day: f.sixth_day.map(|d| d.0),
+            seventh_day: f.seventh_day.map(|d| d.0),
+        };
+        p.validate_all()
+            .map_err(|e| format!("overtime pattern {:?}: {e}", p.name))?;
+        Ok(FileOtPattern(p))
     }
 }

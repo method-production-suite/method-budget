@@ -63,6 +63,7 @@ pub struct ShareInput {
     pub versions: bool,
     pub baseline: bool,
     pub unused_setup: bool,
+    pub actuals: bool,
 }
 
 impl From<ShareInput> for ShareOptions {
@@ -73,6 +74,7 @@ impl From<ShareInput> for ShareOptions {
             drop_versions: i.versions,
             drop_baseline: i.baseline,
             drop_unused_setup: i.unused_setup,
+            drop_actuals: i.actuals,
         }
     }
 }

@@ -27,6 +27,8 @@ pub struct ShareOptions {
     pub drop_baseline: bool,
     /// Setup items nothing uses (see [`prune_unused_setup`]).
     pub drop_unused_setup: bool,
+    /// The actuals: transactions, imports and estimates to complete.
+    pub drop_actuals: bool,
 }
 
 /// A copy of `b` (or of its version `version`) for sharing, without what
@@ -52,9 +54,12 @@ pub fn share_copy(
             out.report_presets = b.report_presets.clone();
             out.tag_presets = b.tag_presets.clone();
             out.line_presets = b.line_presets.clone();
+            out.ot_patterns = b.ot_patterns.clone();
             out.display = b.display.clone();
             out.setup_order = b.setup_order.clone();
             out.setup_folders = b.setup_folders.clone();
+            // Actuals aren't version content: a version's copy has today's.
+            out.actuals = b.actuals.clone();
             (out, Some(v.name.clone()))
         }
     };
@@ -69,6 +74,9 @@ pub fn share_copy(
     }
     if opts.drop_baseline {
         out.baseline = None;
+    }
+    if opts.drop_actuals {
+        out.actuals = Default::default();
     }
     if opts.drop_unused_setup {
         prune_unused_setup(&mut out);
@@ -305,9 +313,11 @@ mod tests {
             drop_versions: true,
             drop_baseline: true,
             drop_unused_setup: true,
+            drop_actuals: true,
         };
         let c = share_copy(&b, None, &opts, AT, "0.0.1", None).unwrap();
         assert!(c.info.is_empty() && c.versions.is_empty() && c.baseline.is_none());
+        assert!(c.actuals.is_empty());
         assert!(c.categories().all(|c| c.notes.is_empty()
             && c.accounts
                 .iter()

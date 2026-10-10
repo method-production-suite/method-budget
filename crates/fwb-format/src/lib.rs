@@ -10,6 +10,8 @@
 //! assert_eq!(fwb_format::from_str(&text).unwrap(), b);
 //! ```
 
+/// Version deltas: versions written as changes (`compact_versions`).
+mod delta;
 mod dto;
 /// Spreadsheet export (Excel workbook, CSV, tab-delimited). Not the native
 /// format: a one-way copy of the evaluated budget for other tools.
@@ -35,10 +37,14 @@ pub const FORMAT_VERSION: u64 = 1;
 /// The output is deterministic: equal budgets give byte-identical text, and
 /// `to_string(&from_str(&to_string(b))?) == to_string(b)`.
 pub fn to_string(b: &Budget) -> String {
+    let mut budget = FileBudget::from(b);
+    if b.compact_versions {
+        delta::compact(b, &mut budget.versions);
+    }
     let doc = FileDoc {
         format: FORMAT_NAME.into(),
         version: FORMAT_VERSION,
-        budget: FileBudget::from(b),
+        budget,
     };
     // Only string and integer map keys, so serializing cannot fail.
     let mut s = serde_json::to_string_pretty(&doc).expect("budget always serializes");
@@ -77,8 +83,13 @@ pub fn from_str(s: &str) -> Result<Budget, FormatError> {
         },
         None => return Err(FormatError::BadVersion { found: None }),
     }
-    let doc: FileDoc = serde_json::from_str(s).map_err(|e| FormatError::from_json(s, &e))?;
-    Ok(doc.budget.into())
+    let mut doc: FileDoc = serde_json::from_str(s).map_err(|e| FormatError::from_json(s, &e))?;
+    // Versions may be deltas against the budget or each other, so they are
+    // rebuilt once the rest is read.
+    let versions = std::mem::take(&mut doc.budget.versions);
+    let mut b: Budget = doc.budget.into();
+    b.versions = delta::read_versions(&b, versions)?;
+    Ok(b)
 }
 
 /// Why a file could not be read.
@@ -102,6 +113,14 @@ pub enum FormatError {
     BadVersion { found: Option<String> },
     /// The file was written by a newer format version than this build reads.
     NewerVersion { found: u64, supported: u64 },
+    /// A saved version written as a delta (`compact_versions`) can't be
+    /// rebuilt: its patch doesn't fit its base, or the result isn't a valid
+    /// budget. `index` is its place in `budget.versions`.
+    VersionDelta {
+        index: usize,
+        name: String,
+        message: String,
+    },
 }
 
 impl FormatError {
@@ -148,6 +167,15 @@ impl fmt::Display for FormatError {
             FormatError::BadVersion { found: Some(v) } => write!(
                 f,
                 "invalid format version {v}: expected a whole number such as 1"
+            ),
+            FormatError::VersionDelta {
+                index,
+                name,
+                message,
+            } => write!(
+                f,
+                "budget.versions[{index}] ({}): {message}",
+                serde_json::Value::String(name.clone())
             ),
             FormatError::NewerVersion { found, supported } => write!(
                 f,

@@ -1211,6 +1211,8 @@ pub fn run() {
         .manage(crate::import_setup::ImportSources::default())
         // The spreadsheet picked to import lines from (src/sheet_import.rs).
         .manage(crate::sheet_import::SheetSources::default())
+        // The accounting export picked to import actuals from (src/actuals.rs).
+        .manage(crate::actuals::ActualsSources::default())
         // Which budget change the other window has heard about (src/tools.rs).
         .manage(crate::tools::Broadcast::default());
 
@@ -1235,6 +1237,8 @@ pub fn run() {
             // The tools window: remember where it is, dock the panel back when
             // it closes, and close it with the main window (src/tools.rs).
             crate::tools::on_window_event(window, event);
+            // The Budget Setup window, likewise (src/setupwin.rs).
+            crate::setupwin::on_window_event(window, event);
             // Leaving the app autosaves now rather than in a few seconds.
             // Going from the main window to the tools window (or back) isn't
             // leaving: focus lands on the other window a moment later.
@@ -1372,6 +1376,9 @@ pub fn run() {
             crate::tools::tools_window,
             crate::tools::close_tools_window,
             crate::tools::notes_list,
+            // The Budget Setup window (src/setupwin.rs)
+            crate::setupwin::setup_window,
+            crate::setupwin::close_setup_window,
             // Versions saved in the budget, and comparing budgets
             // (src/versions.rs, src/compare.rs)
             crate::versions::save_version,
@@ -1386,6 +1393,11 @@ pub fn run() {
             crate::compare::compare_budgets,
             crate::compare::compare_detail,
             crate::compare::compare_pick_files,
+            // What Changed and Merge Changes From (src/diffmerge.rs)
+            crate::diffmerge::what_changed,
+            crate::diffmerge::merge_preview,
+            crate::diffmerge::merge_apply,
+            crate::diffmerge::merge_pick_file,
             // Budgets as tabs (src/tabs.rs)
             crate::tabs::new_tab,
             crate::tabs::switch_tab,
@@ -1435,6 +1447,16 @@ pub fn run() {
             crate::sheet_import::sheet_import_pick,
             crate::sheet_import::sheet_import_preview,
             crate::sheet_import::sheet_import,
+            // Actuals and the cost report (src/actuals.rs)
+            crate::actuals::actuals_pick,
+            crate::actuals::actuals_preview,
+            crate::actuals::actuals_import,
+            crate::actuals::actuals_list,
+            crate::actuals::actuals_update,
+            crate::actuals::actuals_delete,
+            crate::actuals::actuals_remove_batch,
+            crate::actuals::actuals_set_etc,
+            crate::actuals::actuals_lines,
             // Renumbering accounts to a new pattern (src/renumber.rs)
             crate::renumber::renumber_preview,
             crate::renumber::renumber_accounts,
@@ -1454,6 +1476,13 @@ pub fn run() {
             crate::library::library_save,
             crate::library::library_folder,
             crate::library::library_move,
+            // Explain This Number (src/explain.rs)
+            crate::explain::explain_number,
+            // The overtime helper (src/overtime.rs)
+            crate::overtime::ot_calculate,
+            crate::overtime::ot_apply,
+            crate::overtime::ot_save_pattern,
+            crate::overtime::ot_delete_pattern,
         ])
         .setup(|app| {
             // Autosave, recovery, backups, recent files, and the budgets that

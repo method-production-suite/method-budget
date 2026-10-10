@@ -273,6 +273,18 @@ export function renderLibrary(host, view, ctx) {
   draw(host);
 }
 
+/**
+ * Shows kind `kind` (one of LIBRARY_KINDS) from now on, at every folder: the
+ * Budget Setup window's library beside a table (setupwin.js). Not saved as
+ * the Library tab's choice.
+ */
+export function setLibraryKind(kind) {
+  if (!KIND_IDS.includes(kind) || kind === st.kind) return;
+  st.kind = kind;
+  st.folder = ALL;
+  st.ticked = new Set();
+}
+
 function redraw() {
   if (st.host && st.host.isConnected) draw(st.host);
 }

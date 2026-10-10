@@ -16,12 +16,15 @@
 //                      when this window says tools-ready, and with a tab to
 //                      focus when a tab key or menu item asked for one
 //   selection-changed  the grid's selection and cursor, and which budget
+//   tools-find         a line count clicked in the Budget Setup window: the
+//                      Find tab shows that item's uses
 //   menu               a menu item chosen while this window was in front
 // and sent to the main window: tools-ready, tools-position (a dock button),
 // tools-layout (tabs moved: the main window keeps the preference),
 // tools-jump (a noted line to go to), tools-history (the History tab: undo
-// or redo to a step, or save one as a version) and menu (keys and menu items
-// for the main window: Save, Undo, grid commands...).
+// or redo to a step, or save one as a version), tools-setup (a Setup button:
+// the main window opens Budget Setup on that table) and menu (keys and menu
+// items for the main window: Save, Undo, grid commands, the Budget Setup keys...).
 //
 // Keys: text fields keep their own editing keys; app keys go to the menu bar
 // on macOS (whose items come here first) and are handled here on Windows and
@@ -31,7 +34,9 @@
 
 import { invoke, connected, setDefaultArgs } from './api.js';
 import { $, el, isTextField } from './dom.js';
-import { renderTools, setToolsLayout, toolsLayout, selectToolsTab, focusToolsKey } from './tools.js';
+import { renderTools, setToolsLayout, toolsLayout, selectToolsTab, focusToolsKey, findUses } from './tools.js';
+import { setExplainTarget } from './explain.js';
+import { isSetupTab } from './setuptabs.js';
 import { openFind, findStep } from './find.js';
 import { matchShortcut, menuRunsAppKeys, shortcutById } from './shortcuts.js';
 import { isModalOpen } from './modal.js';
@@ -105,6 +110,8 @@ function ctx() {
     // like Undo (history.js).
     historyJump: (to) => emitTo('main', 'tools-history', { doc: state.view ? state.view.doc : null, action: 'jump', to }),
     historySave: (step, name) => emitTo('main', 'tools-history', { doc: state.view ? state.view.doc : null, action: 'save', step, name }),
+    // Budget Setup is the main window's to open (it keeps its place and tab).
+    openSetup: (tab, item) => emitTo('main', 'tools-setup', { tab, item }),
   };
 }
 
@@ -206,8 +213,14 @@ function onMenu(id) {
     return;
   }
   if (isModalOpen()) return; // a small editor is open: it has the keys
-  if (id.startsWith('view.tab.')) {
+  // The Budget Setup keys open that window (the main window does it); the
+  // other tab items show a tab here.
+  if (id.startsWith('view.tab.') && !isSetupTab(id.slice('view.tab.'.length))) {
     showTab(id.slice('view.tab.'.length));
+    return;
+  }
+  if (id.startsWith('view.tool.')) {
+    showTab(id.slice('view.tool.'.length));
     return;
   }
   if (Object.prototype.hasOwnProperty.call(FIND_COMMANDS, id)) {
@@ -258,11 +271,16 @@ async function listen() {
       if (!p || typeof p !== 'object') return;
       if (p.layout) setToolsLayout(p.layout);
       if (p.selection) state.selection = p.selection;
+      // Explain This Number… in the main window (main.js explainCell).
+      if (p.explain) setExplainTarget(p.explain, state.view ? state.view.doc : null);
       render();
       if (p.selection) setSelection(p.selection);
       // Edit > Find or Find and Replace in the main window (main.js showFind).
       if (p.focus === 'find:open' || p.focus === 'find:open-replace') openFind({ replace: p.focus === 'find:open-replace' });
       else if (p.focus) focusToolsKey(p.focus);
+    }),
+    on('tools-find', (p) => {
+      if (p && typeof p === 'object' && typeof p.table === 'string' && typeof p.name === 'string') findUses(p.table, p.name);
     }),
     on('menu', onMenu),
   ]);

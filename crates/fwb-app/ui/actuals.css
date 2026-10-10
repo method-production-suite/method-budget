@@ -1,0 +1,162 @@
+/* Actuals and the cost report (js/actuals.js, js/actualsimport.js, the
+   grid's cost columns in js/levels.js). The import dialog reuses Import
+   Spreadsheet's styles (sheetimport.css) and the tab reuses the Find tab's
+   rows and the setup lists' inputs (tools.css, setup.css); only what they
+   don't cover is here. Colors come from the tokens in styles.css, so dark
+   mode follows them. No inline styles anywhere (the CSP). */
+
+/* ------------------------------------------------------------------------ */
+/* The grid's cost columns: the same width as Orig and Var. */
+
+.grid col.c-act,
+.grid col.c-etc,
+.grid col.c-eac,
+.grid col.c-cvar { width: 120px; }
+
+.grid col.c-spent { width: 84px; }
+
+/* An over-budget row's EAC variance. */
+.grid td.cost-over {
+  color: var(--danger);
+}
+
+/* ------------------------------------------------------------------------ */
+/* The Actuals tab */
+
+.actuals {
+  display: grid;
+  gap: 10px;
+}
+
+.actuals-head p,
+.actuals-hint,
+.actuals-empty,
+.actuals-error {
+  margin: 0;
+}
+
+.actuals-summary {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.actuals-totals {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.actuals-over {
+  color: var(--danger);
+}
+
+.actuals-hint,
+.actuals-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.actuals-error {
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.actuals-etc {
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.actuals-heading {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actuals-figs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 4px 8px;
+}
+
+.actuals-fig {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.actuals-fig-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.actuals-fig-value {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actuals-fig.actuals-over .actuals-fig-value {
+  color: var(--danger);
+}
+
+.actuals-filters {
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.actuals-filters .setup-input {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.actuals-list {
+  display: grid;
+  gap: 4px;
+}
+
+.actuals-where {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.actuals-where > span:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actuals-amount {
+  flex: 0 0 auto;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.actuals-actions {
+  flex-wrap: wrap;
+}
+
+.actuals-batches summary {
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.actuals-import {
+  align-items: center;
+}
+
+.actuals-import-text {
+  cursor: default;
+}
+
+.modal.actuals-dialog {
+  width: 460px;
+}

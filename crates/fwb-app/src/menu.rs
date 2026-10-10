@@ -122,11 +122,17 @@ pub const FILE: &[Entry] = &[
     plain("file.import_setup", "Import Setup From…"),
     // Detail lines from a spreadsheet, with a column mapping (src/sheet_import.rs).
     plain("file.import_spreadsheet", "Import Spreadsheet…"),
+    // Actual costs from an accounting export (src/actuals.rs).
+    plain("file.import_actuals", "Import Actuals…"),
     SEP,
     // Named versions inside the budget, and comparing budgets (src/versions.rs,
     // src/compare.rs).
     plain("file.versions", "Versions…"),
     plain("file.compare", "Compare Budgets…"),
+    // What changed since another budget, and merging a returned copy
+    // (src/diffmerge.rs).
+    plain("file.what_changed", "What Changed…"),
+    plain("file.merge", "Merge Changes From…"),
     SEP,
     item("file.print_budget", "Print…", "mod+p"),
     item("file.print_topsheet", "Print Topsheet…", "mod+shift+p"),
@@ -169,6 +175,10 @@ pub const EDIT: &[Entry] = &[
     item("edit.note", "Add Note…", "mod+shift+space"),
     item("edit.make_range", "Make Fringe Range", "mod+r"),
     item("edit.remove_range", "Remove Fringe Range", "mod+shift+r"),
+    // How a total is worked out, and the overtime helper (ui/js/explain.js,
+    // ui/js/overtime.js; the tools panel's Explain and Overtime tabs).
+    item("edit.explain", "Explain This Number…", "mod+e"),
+    plain("edit.overtime", "Overtime Helper…"),
     SEP,
     // Find and replace: the Find tab of the tools panel (ui/js/find.js).
     item("edit.find", "Find…", "mod+f"),
@@ -257,25 +267,38 @@ pub const TOOLS_PANEL: &[Entry] = &[
     plain("view.panel.right", "Dock at Right"),
     plain("view.panel.bottom", "Dock at Bottom"),
     plain("view.panel.window", "Pop Out into a Window"),
+    SEP,
+    // The panel's tabs, in its default order (ui/js/tools.js): the compact
+    // apply lists show here; their full editors are in Budget Setup.
+    plain("view.tool.fringes", "Fringes"),
+    plain("view.tool.groups", "Groups"),
+    plain("view.tool.globals", "Globals"),
+    plain("view.tool.units", "Units"),
+    plain("view.tab.presets", "Presets"),
+    SEP,
+    plain("view.tool.sets", "Sets"),
+    plain("view.tool.locations", "Locations"),
+    plain("view.tool.currencies", "Currency"),
+    plain("view.tab.notes", "Notes"),
+    plain("view.tab.library", "Library"),
+    plain("view.tab.history", "History"),
+    plain("view.tab.actuals", "Actuals"),
 ];
 
-/// The tools panel's tabs, in the panel's default order (ui/js/tools.js):
-/// the top pane, the bottom pane, then the Budget tab's own tabs. Their keys
-/// are the ones long-time users of other budgeting tools already know
-/// (decisions.md, entry 15).
+/// View > Budget Setup: the Budget Setup window (src/setupwin.rs), and each
+/// of its tabs. Their keys are the ones long-time users of other budgeting
+/// tools already know (decisions.md, entries 15 and 42): there they open the
+/// setup window on that table too.
 pub const SETUP_TABS: &[Entry] = &[
+    plain("view.setup", "Open Budget Setup"),
+    SEP,
     item("view.tab.fringes", "Fringes", "mod+3"),
     item("view.tab.groups", "Groups", "mod+4"),
     item("view.tab.globals", "Globals", "mod+g"),
     item("view.tab.units", "Units", "mod+7"),
-    plain("view.tab.presets", "Presets"),
-    SEP,
     item("view.tab.sets", "Sets", "mod+8"),
     item("view.tab.locations", "Locations", "mod+5"),
     item("view.tab.currencies", "Currency", "mod+6"),
-    plain("view.tab.notes", "Notes"),
-    plain("view.tab.library", "Library"),
-    plain("view.tab.history", "History"),
     SEP,
     item("view.tab.charges", "Charges", "mod+/"),
     item("view.tab.credits", "Credits", "mod+backslash"),
@@ -285,7 +308,7 @@ pub const SETUP_TABS: &[Entry] = &[
 ];
 
 /// Budgets open as tabs: the next and previous tab, and the first two
-/// (Cmd+3 to Cmd+9 are the tools tabs). The open budgets are listed after
+/// (Cmd+3 to Cmd+9 are the Budget Setup tabs). The open budgets are listed after
 /// these (src/tabs.rs). Ctrl+Tab and Ctrl+Shift+Tab work too (shortcuts.js).
 pub const WINDOW: &[Entry] = &[
     item("window.next_tab", "Show Next Tab", "mod+shift+]"),
@@ -357,7 +380,7 @@ fn append<R: Runtime>(
                 menu.append(&panel)?;
             }
             Entry::SetupTabs => {
-                let tabs = Submenu::new(app, "Tools Tab", true)?;
+                let tabs = Submenu::new(app, "Budget Setup", true)?;
                 append(app, &tabs, SETUP_TABS)?;
                 menu.append(&tabs)?;
             }
@@ -460,13 +483,15 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 }
 
 /// Answers a menu item (other than Quit): Close Window here, everything else
-/// in a web view: the tools window's when it is in front (it answers the
-/// panel's own items, undo in its text fields among them, and passes the rest
-/// to the main window), else the main window's.
+/// in a web view: the tools window's or the Budget Setup window's when it is
+/// in front (each answers its own items, undo in its text fields among them,
+/// and passes the rest to the main window), else the main window's.
 pub fn handle<R: Runtime>(app: &AppHandle<R>, id: &str) {
     let tools_in_front = crate::tools::tools_in_front(app);
-    let target = crate::tools::menu_target(tools_in_front);
-    if id == CLOSE || (id == CLOSE_TAB && tools_in_front) {
+    // The Budget Setup window, like the tools window (src/setupwin.rs).
+    let setup_in_front = crate::setupwin::in_front(app);
+    let target = crate::setupwin::menu_target(tools_in_front, setup_in_front);
+    if id == CLOSE || (id == CLOSE_TAB && (tools_in_front || setup_in_front)) {
         // The window in front closes: the main one asks about unsaved
         // changes on its way out (CloseRequested); the tools one docks the
         // panel back.

@@ -21,6 +21,9 @@ treat it as `application/json`.
 - Fields at their default value are left out, so files stay small and diffs stay focused.
 - Readers are strict: an unknown field is an error, so typos are caught instead of
   silently ignored.
+- Detail rows keep their `id` through every edit and move, and accounts and setup items
+  keep their numbers and names, so two budgets can be compared and merged by identity
+  rather than by position (`fwb diff`, `fwb merge` and a git merge driver: docs/MERGE.md).
 
 ## Top level
 
@@ -114,12 +117,15 @@ Fields in written order:
 | `charges`         | list of [charges](#charge) | Contractual charges, in application order. |
 | `credits`         | list of [credits](#credit) | Applied credits (incentives), in application order. |
 | `baseline`        | [baseline](#baseline) | Frozen totals for comparison. Left out when there is none. |
+| `actuals`         | [actuals](#actuals) | Actual costs from accounting and estimates to complete. Left out when there are none. |
 | `display`         | [display settings](#display-settings) | How numbers show on screen. Left out when every setting is the default. |
 | `setup_order`     | [setup order](#setup-order) | Hand-made display order of the setup tables. Left out when every table is in name order. |
 | `setup_folders`   | [setup folders](#setup-folders) | Folders of setup items per kind (the personal library's). Left out when no kind has a folder. |
 | `report_presets`  | list of [report presets](#report-preset) | Saved report setups, in the user's order. Left out when there are none. |
 | `tag_presets`     | list of [tag presets](#tag-preset) | Saved bundles of line tags, in the user's order. Left out when there are none. |
 | `line_presets`    | list of [line blocks](#line-block) | Saved blocks of rows to insert, in the user's order. Left out when there are none. |
+| `ot_patterns`     | list of [overtime patterns](#overtime-pattern) | Saved overtime patterns for the overtime helper, in the user's order. Left out when there are none. |
+| `compact_versions` | `true` or `false` | Write `versions` as changes instead of full copies ([version deltas](#version-deltas)). A file setting, not content. Default `false`, left out then. |
 | `versions`        | list of [versions](#version) | Named copies of the budget, oldest first. Left out when there are none. |
 
 A new budget in Film Wizard Budgeting starts with a set of editable starter units (Allow,
@@ -416,6 +422,68 @@ budget can show what changed. Rows are matched by id, accounts and categories by
 | `grand_total` | cents, **required** | |
 | `net_total`   | cents, **required** | |
 
+### Actuals
+
+Actual costs brought in from an accounting system (payments, invoices, journal lines), the
+imports they came in with, and per-account estimate-to-complete overrides, for the cost
+report (docs/decisions.md, entry 45). About the production's spending, not the budget's
+content: a [version](#version) never has them (a reader rejects one that does), and
+restoring a version keeps the current ones. Fields in written order, each left out when
+empty; `actuals` is left out when all three are:
+
+| Field          | Type | Notes |
+|----------------|------|-------|
+| `batches`      | list of [import batches](#import-batch) | Oldest first. |
+| `transactions` | list of [transactions](#transaction) | In the order they came in. |
+| `etc`          | map of [ETC methods](#etc-method) | Keyed by account number (an account in the chart, or a category fringe account when fringes post by category). An account without one uses budget minus actual. |
+
+#### Import batch
+
+One import, so it can be taken back out whole.
+
+| Field      | Type | Notes |
+|------------|------|-------|
+| `id`       | integer, **required** | Unsigned 64-bit. The application keeps ids unique; the reader does not check. |
+| `file`     | text | The imported file's name (never its path). |
+| `imported` | text | When, as an ISO 8601 date-time such as `"2026-10-09T14:30:00-07:00"`. Stored as given. |
+| `rows`     | integer, **required** | How many transactions it brought in. |
+
+#### Transaction
+
+| Field         | Type | Notes |
+|---------------|------|-------|
+| `id`          | integer, **required** | Unsigned 64-bit. The application keeps ids unique (it edits and deletes by id); the reader does not check. |
+| `date`        | text | `YYYY-MM-DD`, or left out when unknown. Stored as given (the application writes real dates only). |
+| `account`     | text | The account number as the budget's pattern writes it, or left out for none. A number the chart doesn't have is kept (the transaction counts as unassigned until the chart has it). |
+| `line`        | optional row id | The detail row it pays for. |
+| `tags`        | name set | Free-form labels. |
+| `vendor`      | text | |
+| `description` | text | |
+| `reference`   | text | Invoice, purchase order or check number. |
+| `amount`      | cents, **required** | Always written. Positive is a cost; a refund or credit is negative. |
+| `batch`       | optional integer | The import it came in with; left out for one entered by hand. |
+
+#### ETC method
+
+A tagged object (`kind` first):
+
+| `kind`                | Fields | Meaning |
+|-----------------------|--------|---------|
+| `budget_minus_actual` | none | What is left of the budget, never past zero (the same as no entry). |
+| `manual`              | `amount` cents, **required** | A typed estimate to complete. |
+| `percent_complete`    | `percent` decimal, **required** | The account is this far along (more than 0, at most 100), so it ends at actual / percent, rounded once to the cent. A reader keeps any value; the application treats one out of range as budget minus actual. |
+
+```json
+"actuals": {
+  "batches": [{ "id": 1, "file": "september.csv", "imported": "2026-10-09T14:30:00-07:00", "rows": 2 }],
+  "transactions": [
+    { "id": 1, "date": "2026-09-01", "account": "10-01", "line": 1, "tags": ["PO"], "vendor": "Writer", "description": "First draft", "reference": "INV-1", "amount": 2500000, "batch": 1 },
+    { "id": 2, "account": "77-01", "amount": -1234, "batch": 1 }
+  ],
+  "etc": { "11-01": { "kind": "percent_complete", "percent": "37.5" }, "12-01": { "kind": "manual", "amount": 10000 } }
+}
+```
+
 ### Display settings
 
 How the budget shows numbers on screen, saved with it. Display only: no stored value or
@@ -515,18 +583,22 @@ or compared later. Fields in written order:
 | `name`    | text, **required** | |
 | `created` | text, **required** | When the version was saved, as an ISO 8601 date-time such as `"2026-10-09T14:30:00Z"`. Stored as given; the reader does not check it. |
 | `note`    | optional text | |
-| `budget`  | object, **required** | A [budget](#budget) object with every field except `versions`, `report_presets`, `tag_presets`, `line_presets`, `display`, `setup_order`, `setup_folders` and `provenance`: a version cannot contain versions, presets, display settings, a setup order, setup folders or a provenance, and a reader rejects one that does. |
+| `budget`  | object | A [budget](#budget) object with every field except `versions`, `compact_versions`, `report_presets`, `tag_presets`, `line_presets`, `ot_patterns`, `display`, `setup_order`, `setup_folders`, `provenance` and `actuals`: a version cannot contain versions, presets, overtime patterns, display settings, a setup order, setup folders, a provenance or actuals, and a reader rejects one that does. |
+| `delta`   | object | Instead of `budget`: the version written as changes ([version deltas](#version-deltas)). |
+
+Exactly one of `budget` and `delta` is required.
 
 Restoring a version in the application first saves the current content as another version
 (named `Before restoring "<name>"`), so a restore can be undone.
 
-**File size.** Each version is a complete copy of the budget's content (every category,
-account and row), so a file with N versions is roughly N + 1 times the size of the budget
-alone. That is deliberate for version 1: versions are simple, self-contained and survive
-any later edit. Row ids inside a version are the ids the rows had when it was saved, which
+**File size.** Written in full, each version is a complete copy of the budget's content
+(every category, account and row), so a file with N versions is roughly N + 1 times the
+size of the budget alone: simple, self-contained, and readable by every version 1
+reader. A budget with `compact_versions` on writes versions as
+[deltas](#version-deltas) instead, which costs about one copy plus what changed. Row ids inside a version are the ids the rows had when it was saved, which
 is what lets the application match rows between a version and the current budget.
 
-Example (inside `budget`, after `baseline`):
+Example (inside `budget`, after `baseline`), a version written in full:
 
 ```json
 "versions": [
@@ -565,6 +637,76 @@ Example (inside `budget`, after `baseline`):
 ]
 ```
 
+### Version deltas
+
+With the budget's `compact_versions` set to `true`, a writer may write a version as a
+`delta` instead of a full `budget`, so that many versions don't make the file many times
+bigger. Loading gives exactly the same versions either way: a reader rebuilds every
+version's full budget, and a delta is purely a way of writing it. The setting is off by
+default, and a file with it off is unchanged (see [Versioning](#versioning)); a reader
+that predates deltas rejects a file that uses them, as it rejects any field it doesn't
+know, rather than misreading it.
+
+A delta is an object with two fields, both **required**:
+
+| Field   | Type | Notes |
+|---------|------|-------|
+| `base`  | `"budget"` or `"next"` | What the changes apply to. `"budget"`: the budget's own content. `"next"`: the version right after this one in the list. |
+| `patch` | list of operations | A JSON Patch (RFC 6902) that turns the base into this version's budget. |
+
+The **base** is always a budget object exactly as the reference writer writes it, in
+canonical form: for `"budget"`, the file's top-level budget with every field a version
+can't have left out (`versions`, `compact_versions`, the presets, `display`,
+`setup_order`, `setup_folders`, `provenance`, `actuals`); for `"next"`, the next
+version's budget (rebuilt first if it is a delta too). The newest version's base must be
+`"budget"`. The reference writer gives the newest version `"budget"` and every older one
+`"next"`, so each delta holds what changed between neighbors, and it writes a version in
+full wherever a delta wouldn't be smaller.
+
+Each **operation** is an object, fields in written order:
+
+| Field   | Type | Notes |
+|---------|------|-------|
+| `op`    | `"add"`, `"remove"` or `"replace"`, **required** | As RFC 6902 defines them. (`move`, `copy` and `test` are not used and are rejected.) |
+| `path`  | text, **required** | A JSON Pointer (RFC 6901) into the budget object: `/title`, `/topsheet/2/accounts/0/details/3/rate`. `~1` is `/` and `~0` is `~` in a name. |
+| `value` | any JSON value | **Required** for `add` and `replace`, not allowed for `remove`. |
+
+Operations apply in order, each to the result of the ones before it. An array index in a
+path must exist (`add` may also use the length, or `-`, to append). The patched object
+is then read like a full version's `budget`, with every rule above: unknown fields, a
+version's forbidden fields, bad decimals and so on are errors. A delta that doesn't fit
+its base (a path that isn't there, a remove with a value) is an error naming the version,
+such as `budget.versions[3] ("Studio draft"): patch operation 0: ...`; nothing is
+guessed.
+
+```json
+"compact_versions": true,
+"versions": [
+  {
+    "id": 1,
+    "name": "Studio draft",
+    "created": "2026-10-09T14:30:00Z",
+    "delta": {
+      "base": "next",
+      "patch": [
+        { "op": "replace", "path": "/topsheet/0/accounts/0/details/0/rate", "value": "4500" }
+      ]
+    }
+  },
+  {
+    "id": 2,
+    "name": "Locked",
+    "created": "2026-10-12T09:00:00Z",
+    "delta": {
+      "base": "budget",
+      "patch": [
+        { "op": "replace", "path": "/title", "value": "Short Film (locked)" }
+      ]
+    }
+  }
+]
+```
+
 ### Report preset
 
 A saved report setup ("preset"): which sections print and in what order, which categories
@@ -577,7 +719,7 @@ that does), and restoring a version keeps the current ones. Fields in written or
 |-------|------|-------|
 | `name` | text, **required** | The application keeps names unique (ignoring case and surrounding spaces), 1 to 80 characters; the reader does not check. |
 | `default` | boolean, default `false` | The preset the application's Print dialog opens with. The application keeps at most one; a reader that finds several uses the first. |
-| `sections` | list of section names | In print order, each once: `"topsheet"`, `"accounts"` (each category's accounts with their totals), `"detail"`, `"fringes"`, `"globals"`, `"groups"` (with their totals), `"notes"` (every note on categories, accounts and lines, each with its date and author), `"info"` (budget information), `"chart"` (chart of accounts: every category and account code with its name), `"units"`, `"sets"` (with their totals), `"locations"` (with their totals), `"currencies"`. |
+| `sections` | list of section names | In print order, each once: `"topsheet"`, `"accounts"` (each category's accounts with their totals), `"detail"`, `"fringes"`, `"globals"`, `"groups"` (with their totals), `"notes"` (every note on categories, accounts and lines, each with its date and author), `"info"` (budget information), `"chart"` (chart of accounts: every category and account code with its name), `"units"`, `"sets"` (with their totals), `"locations"` (with their totals), `"currencies"`, `"cost_report"` (budget, baseline, actual, estimate to complete, estimate at completion, variance and percent spent per account, category and the topsheet; see [actuals](#actuals)). |
 | `excluded_categories` | name set | Category codes left out of the account and detail sections and the notes list. The topsheet always lists every category. |
 | `excluded_accounts` | name set | Account codes left out the same way. |
 | `skip_empty_accounts` | boolean, default `false` | Leave out accounts with no rows. |
@@ -705,6 +847,41 @@ always wins.
 ]
 ```
 
+### Overtime pattern
+
+A named overtime pattern for the overtime helper: straight time, then overtime bands, and
+optional sixth and seventh day multipliers. Every number is the user's; nothing about any
+union or guild is built in. Tools, not budget content, like tag presets: a
+[version](#version) never has them, and restoring a version keeps the current ones.
+Fields in written order:
+
+| Field            | Type | Notes |
+|------------------|------|-------|
+| `name`           | text, **required** | 1 to 80 characters, no spaces at either end. The application keeps names unique within the list. |
+| `straight_hours` | decimal, **required** | Hours a day paid at straight time before overtime starts, 0 to 24. |
+| `bands`          | list of bands | The overtime bands after the straight time, in order. Left out when there are none (every hour is straight time). |
+| `sixth_day`      | optional decimal | On a sixth day worked in a week every hour is paid at least this multiple (a band above it still wins). More than 0, at most 10. Left out means a sixth day is a regular day. |
+| `seventh_day`    | optional decimal | The same for a seventh day. |
+
+A **band** has `multiplier` (decimal, more than 0 and at most 10) and `hours` (decimal,
+more than 0 and at most 24): how many hours, after the straight time and the bands before
+it, are paid at that multiple of the straight rate. The last band leaves out `hours`: it
+covers every hour left. Every other band must have it. A reader rejects a pattern that
+breaks these rules.
+
+```json
+"ot_patterns": [
+  {
+    "name": "Crew 12s",
+    "straight_hours": "8",
+    "bands": [{ "multiplier": "1.5", "hours": "4" }, { "multiplier": "2" }],
+    "sixth_day": "1.5"
+  }
+]
+```
+
+That is "8 hours straight time, then 1.5x after 8, 2x after 12; sixth day 1.5x".
+
 ## Reading rules
 
 A reader that follows this document should:
@@ -785,6 +962,16 @@ valid. Loading and saving it in Film Wizard Budgeting normalizes it.
   don't use them are unchanged.
 - Version 1, additive (2026-10): budget [`provenance`](#provenance) (where a shared copy or
   a sub-budget came from). Left out when there is none, so other files are unchanged.
+- Version 1, additive (2026-10): budget `compact_versions` and version `delta`
+  ([version deltas](#version-deltas): versions written as JSON Patches against the
+  budget or the next version). Off by default and left out then, so files that don't
+  turn it on are unchanged; a version's `budget` is no longer required when it has a
+  `delta`.
+- Version 1, additive (2026-10): budget [`ot_patterns`](#overtime-pattern) (saved overtime
+  patterns). Left out when there are none, so files without them are unchanged.
+- Version 1, additive (2026-10): budget [`actuals`](#actuals) (transactions, import
+  batches and estimate-to-complete methods) and report preset section `"cost_report"`.
+  Left out when there are none, so files without them are unchanged.
 
 ## Complete example
 

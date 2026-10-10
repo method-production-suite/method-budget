@@ -155,6 +155,8 @@ pub fn sub_budget(parent: &Budget, spec: &SubBudgetSpec) -> Result<Budget, SubBu
     let mut b = parent.clone();
     b.versions.clear();
     b.baseline = None;
+    // The parent's actuals describe the whole production, like its baseline.
+    b.actuals = Default::default();
     let whole_chart = spec.categories.is_empty() && spec.accounts.is_empty();
     let filtering_lines =
         spec.groups.is_active() || spec.sets.is_active() || spec.locations.is_active();

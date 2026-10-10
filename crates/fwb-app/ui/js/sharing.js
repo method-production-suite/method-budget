@@ -72,6 +72,9 @@ export function saveShareCopy(ctx) {
       const vers = check('Saved versions');
       const base = check('Original totals (baseline)');
       const unused = check('Setup items nothing uses');
+      // Only a budget with actuals has them to leave out (the view's cost figures say so).
+      const hasActuals = Boolean(view.cost);
+      const acts = check('Actuals (transactions and estimates to complete)');
       const note = el('textarea', { class: 'modal-input share-note', attrs: { id: nextId('share-note'), rows: '3', maxlength: '10000' } });
       const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
       error.hidden = true;
@@ -90,6 +93,7 @@ export function saveShareCopy(ctx) {
               versions: vers.box.checked,
               baseline: base.box.checked,
               unused_setup: unused.box.checked,
+              actuals: hasActuals && acts.box.checked,
             },
             note: note.value,
             saved: localStamp(),
@@ -114,8 +118,22 @@ export function saveShareCopy(ctx) {
           class: 'modal-message',
           text: 'Saves a snapshot of this budget to a new file to send to someone. The copy opens read-only and says where it came from. This budget and its file are not changed.',
         }),
-        el('label', { class: 'modal-field', attrs: { for: what.id } }, el('span', { text: 'Share' }), what),
-        el('fieldset', { class: 'share-fieldset' }, el('legend', { text: 'Leave out' }), notes.row, info.row, vers.row, base.row, unused.row),
+        // With no versions there is nothing to pick, so say what gets shared
+        // instead of showing a one-item list.
+        versions.length
+          ? el('label', { class: 'modal-field', attrs: { for: what.id } }, el('span', { text: 'Share' }), what)
+          : el('p', { class: 'modal-message', text: 'Shares the budget as it is now. To share an earlier state, save it as a version first and it shows up here.' }),
+        el(
+          'fieldset',
+          { class: 'share-fieldset' },
+          el('legend', { text: 'Leave out' }),
+          notes.row,
+          info.row,
+          ...(versions.length ? [vers.row] : []),
+          base.row,
+          ...(hasActuals ? [acts.row] : []),
+          unused.row,
+        ),
         el('label', { class: 'modal-field', attrs: { for: note.id } }, el('span', { text: 'Note for the copy (optional)' }), note),
         error,
         el('div', { class: 'modal-actions' }, cancel, ok),

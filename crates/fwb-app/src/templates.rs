@@ -42,6 +42,8 @@ pub fn strip(b: &Budget, keep_lines: bool, title: &str) -> Budget {
     t.info.clear();
     t.baseline = None;
     t.versions.clear();
+    // Actuals are one production's spending.
+    t.actuals = Default::default();
     // A template is nobody's copy: a shared copy's stamp would open it read-only.
     t.provenance = None;
     for c in t.categories_mut() {

@@ -49,6 +49,7 @@ export const SECTIONS = [
   { key: 'sets', label: 'Sets with totals' },
   { key: 'locations', label: 'Locations with totals' },
   { key: 'currencies', label: 'Currencies' },
+  { key: 'cost_report', label: 'Cost report' },
 ];
 const SECTION_KEYS = new Set(SECTIONS.map((s) => s.key));
 
@@ -1403,6 +1404,102 @@ function currenciesSection(ctx) {
   return [simpleTable('Currencies', 'rpt-currencies', spec, rows)];
 }
 
+// --- Cost report (actuals; src/actuals.rs) ---
+
+/** "12.5" (Rust's percent spent) as "12.50%". */
+function pct(p) {
+  if (p === null || p === undefined || p === '') return '';
+  const t = String(p);
+  const neg = t.startsWith('-');
+  const [int, frac = ''] = (neg ? t.slice(1) : t).split('.');
+  return `${neg ? '-' : ''}${decimal(`${int}.${frac.padEnd(2, '0').slice(0, 2)}`)}%`;
+}
+
+/**
+ * Budget, baseline (when the budget has one), actual, ETC, EAC, variance
+ * and percent spent for every account, category fringe account, category,
+ * production level and summary row, from the view's cost figures. Accounts
+ * the spec leaves out are left out; totals never change.
+ */
+function costReportSection(ctx) {
+  const cost = ctx.view && ctx.view.cost && Array.isArray(ctx.view.cost.categories) ? ctx.view.cost : null;
+  const withBase = Boolean(cost && cost.total && cost.total.baseline !== null && cost.total.baseline !== undefined);
+  const spec = [
+    ['Acct #', 'c-code2'],
+    ['Description', 'c-desc'],
+    ['Budget', 'c-cm', 'num'],
+    ...(withBase ? [['Baseline', 'c-cm', 'num']] : []),
+    ['Actual', 'c-cm', 'num'],
+    ['ETC', 'c-cm', 'num'],
+    ['EAC', 'c-cm', 'num'],
+    ['Variance', 'c-cm', 'num'],
+    ['% Spent', 'c-pct', 'num'],
+  ];
+  const rows = [];
+  if (!cost) {
+    rows.push(emptyRow('This budget has no actuals. File > Import Actuals… brings them in from an accounting export.', spec.length));
+    return [simpleTable('Cost report', 'rpt-cost', spec, rows)];
+  }
+  const figs = (f) => {
+    if (!f) return spec.slice(2).map(() => td('', 'num'));
+    return [
+      td(m(f.budget), 'num'),
+      ...(withBase ? [td(m(f.baseline), 'num base')] : []),
+      td(m(f.actual), 'num'),
+      td(m(f.etc), 'num'),
+      td(m(f.eac), 'num'),
+      td(m(f.variance), `num${f.over ? ' over' : ''}`),
+      td(pct(f.percent), 'num'),
+    ];
+  };
+  const line = (cls, code, label, f, keep = false) => {
+    rows.push(row(el('tr', { class: `rpt-row ${cls}` }, td(code, 'code'), td(label, cls.includes('total') ? 'name' : 'txt'), ...figs(f)), keep));
+  };
+  for (const it of ctx.items) {
+    if (it.kind === 'level') {
+      const lc = cost.levels[it.li];
+      if (lc && lc.posted_fringes) line('rpt-cost-other', '', 'Fringes', lc.posted_fringes);
+      if (lc && it.row.name) line('rpt-st-total rpt-cost-level', '', it.row.name, lc.figures);
+      continue;
+    }
+    const cc = cost.categories[it.ci];
+    if (!cc || ctx.exCats.has(it.row.code || '')) continue;
+    const accts = accountsOf(ctx, it);
+    const cap = td('', 'cat', spec.length);
+    cap.append(el('span', { class: 'cat-code', text: it.row.code || '' }), el('span', { class: 'cat-name', text: it.row.name || '' }));
+    rows.push(row(el('tr', { class: 'rpt-cost-cat' }, cap), true));
+    for (const { acct, ai } of accts) {
+      const ac = cc.accounts[ai];
+      if (ac) line('rpt-cost-acct', acct.code || '', acct.name || '', ac.figures);
+    }
+    if (cc.fringe_account) line('rpt-cost-acct', cc.fringe_account.code, 'Fringes', cc.fringe_account.figures);
+    line('rpt-st-total', '', `Total ${catLabel(it.row)}`, cc.figures);
+  }
+  const sum = [];
+  sum.push(['Total above-the-line', cost.total_atl]);
+  sum.push(['Total below-the-line', cost.total_btl]);
+  sum.push(['Total above and below-the-line', cost.atl_btl]);
+  if (cost.budget_fringes) sum.push(['Total fringes', cost.budget_fringes.figures]);
+  (cost.charges || []).forEach((c, i) => sum.push([ctx.r && ctx.r.charges && ctx.r.charges[i] ? chargeLabel(ctx.b, ctx.r.charges[i], i, money) : c.name, c.figures]));
+  if (cost.unassigned && cost.unassigned.count) sum.push(['Unassigned actuals', cost.unassigned]);
+  sum.forEach(([label, f], i) => line(i === 0 ? 'rpt-cost-sum first' : 'rpt-cost-sum', '', label, f, true));
+  line('rpt-st-total rpt-cost-grand', '', 'Grand total', cost.total);
+  rows.push(
+    row(
+      el(
+        'tr',
+        { class: 'rpt-note-row' },
+        td(
+          `Actual: ${cost.transactions} ${cost.transactions === 1 ? 'transaction' : 'transactions'} imported. ETC is the estimate to complete (budget minus actual unless set per account), EAC the estimate at completion (actual plus ETC), Variance the budget minus EAC: amounts in parentheses are over budget. Unassigned actuals have an account number this budget doesn't have.`,
+          'note',
+          spec.length,
+        ),
+      ),
+    ),
+  );
+  return [simpleTable('Cost report', 'rpt-cost', spec, rows)];
+}
+
 const BUILD = {
   topsheet,
   accounts: accountLevel,
@@ -1417,6 +1514,7 @@ const BUILD = {
   sets: setsSection,
   locations: locationsSection,
   currencies: currenciesSection,
+  cost_report: costReportSection,
 };
 
 // ---------------------------------------------------------------------------

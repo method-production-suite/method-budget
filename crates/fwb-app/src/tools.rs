@@ -168,6 +168,17 @@ impl Area {
 /// opens centered instead of out of reach. Nonsense (not a number, negative)
 /// falls back to the defaults.
 pub fn placement(g: Option<Geometry>, areas: &[Area]) -> ((f64, f64), Option<(f64, f64)>) {
+    placement_sized(g, areas, DEFAULT_SIZE, MIN_SIZE)
+}
+
+/// [`placement`] for a window with its own default and smallest size (the
+/// Budget Setup window, src/setupwin.rs).
+pub fn placement_sized(
+    g: Option<Geometry>,
+    areas: &[Area],
+    default_size: (f64, f64),
+    min_size: (f64, f64),
+) -> ((f64, f64), Option<(f64, f64)>) {
     let side = |v: f64, min: f64, default: f64| {
         if v.is_finite() && v > 0.0 {
             v.clamp(min, MAX_SIDE)
@@ -176,11 +187,11 @@ pub fn placement(g: Option<Geometry>, areas: &[Area]) -> ((f64, f64), Option<(f6
         }
     };
     let Some(g) = g else {
-        return (DEFAULT_SIZE, None);
+        return (default_size, None);
     };
     let size = (
-        side(g.width, MIN_SIZE.0, DEFAULT_SIZE.0),
-        side(g.height, MIN_SIZE.1, DEFAULT_SIZE.1),
+        side(g.width, min_size.0, default_size.0),
+        side(g.height, min_size.1, default_size.1),
     );
     let reachable = g.x.is_finite() && g.y.is_finite() && {
         // A point on the title bar, a little in from the left edge.
@@ -191,7 +202,7 @@ pub fn placement(g: Option<Geometry>, areas: &[Area]) -> ((f64, f64), Option<(f6
 }
 
 /// Every screen's work area, in logical pixels.
-fn screen_areas<R: Runtime>(app: &AppHandle<R>) -> Vec<Area> {
+pub(crate) fn screen_areas<R: Runtime>(app: &AppHandle<R>) -> Vec<Area> {
     let Some(main) = app.get_webview_window(MAIN) else {
         return Vec::new();
     };
@@ -211,9 +222,9 @@ fn screen_areas<R: Runtime>(app: &AppHandle<R>) -> Vec<Area> {
         .collect()
 }
 
-/// The tools window's place and size now, or `None` while it is minimized
+/// A window's place and size now, or `None` while it is minimized
 /// (zero size) or can't be asked.
-fn geometry_of<R: Runtime>(window: &Window<R>) -> Option<Geometry> {
+pub(crate) fn geometry_of<R: Runtime>(window: &Window<R>) -> Option<Geometry> {
     let scale = window.scale_factor().ok()?;
     let at = window.outer_position().ok()?.to_logical::<f64>(scale);
     let size = window.inner_size().ok()?;
@@ -484,11 +495,12 @@ mod tests {
                 "{c} not allowed for the main window"
             );
         }
-        // Both capabilities are in force.
+        // Every window's capability is in force (the Budget Setup window's
+        // own is src/setupwin.rs).
         let conf: serde_json::Value = serde_json::from_str(CONF).unwrap();
         assert_eq!(
             conf["app"]["security"]["capabilities"],
-            serde_json::json!(["main", "tools"])
+            serde_json::json!(["main", "tools", "setup"])
         );
     }
 
@@ -551,17 +563,23 @@ mod tests {
             include_str!("../ui/js/tools.js"),
             include_str!("../ui/js/toolswin.js"),
             include_str!("../ui/js/apply.js"),
+            // Compact Globals and Units (the full tables, charges, credits,
+            // info, settings and the baseline are the Budget Setup window's,
+            // src/setupwin.rs: topsheet-setup.js, display-settings.js and
+            // renumber.js are not the panel's).
             include_str!("../ui/js/setup.js"),
-            include_str!("../ui/js/topsheet-setup.js"),
             include_str!("../ui/js/notes.js"),
             include_str!("../ui/js/find.js"),
             include_str!("../ui/js/rename.js"),
             include_str!("../ui/js/presets.js"),
             include_str!("../ui/js/setuplist.js"),
-            include_str!("../ui/js/display-settings.js"),
             include_str!("../ui/js/history.js"),
-            // The Settings tab's renumber preview.
-            include_str!("../ui/js/renumber.js"),
+            // The Explain and Overtime tabs.
+            include_str!("../ui/js/explain.js"),
+            include_str!("../ui/js/overtime.js"),
+            // The Actuals tab (importing is the main window's File menu,
+            // actualsimport.js).
+            include_str!("../ui/js/actuals.js"),
             // The Library tab (its reviews run its own commands, never
             // importsetup.js's import_setup).
             include_str!("../ui/js/library.js"),

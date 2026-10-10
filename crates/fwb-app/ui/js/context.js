@@ -17,10 +17,17 @@ import { isHelpOpen } from './help.js';
 import { PALETTE, paletteColor, selectedDetails, styleState } from './rowformat.js';
 import { presetMenu, blockMenu } from './presets.js';
 
-// { grid, host, view(), level(), run(id), act(cmd, args), toast(message) }
+// { grid, host, view(), level(), run(id), act(cmd, args), toast(message),
+//   explainable(row, colKey), explain(row, colKey) }
 // `host` is the grid's host element, or a function giving the one in use
 // (split view has a grid per pane; main.js points `grid` at the target's).
+// explainable and explain: whether a cell shows a total Explain This
+// Number… can explain, and explaining it (explain.js, through main.js).
 let ctx = null;
+
+// The cell the menu was opened on ({ row, colKey }, any row, a total row
+// too), for Explain This Number…
+let menuCell = null;
 
 const SEP = { separator: true };
 
@@ -77,6 +84,7 @@ function onContextMenu(e) {
   e.preventDefault();
   if (isModalOpen() || isHelpOpen() || isContextMenuOpen()) return;
   const h = grid.hit(e);
+  menuCell = typeof grid.peek === 'function' ? grid.peek(e) : null;
   if (h) {
     if (grid.editor) grid.commitEdit(null);
     const keys = grid.selectedKeys();
@@ -117,7 +125,9 @@ export function openAtCursor() {
   }
   x = Math.max(box.left + 4, Math.min(x, box.right - 8));
   y = Math.max(box.top + 24, Math.min(y, box.bottom - 8));
-  show({ x, y }, grid.cursorRow() !== null);
+  const row = grid.cursorRow();
+  menuCell = row ? { row, colKey: grid.cursorColKey() } : null;
+  show({ x, y }, row !== null);
 }
 
 function show(at, onRow) {
@@ -134,6 +144,7 @@ function show(at, onRow) {
     items = topsheetItems(onRow);
     label = 'Topsheet actions';
   }
+  items = [...explainItems(), ...items];
   openContextMenu(at, { label, items: tidy(items), returnFocus: () => ctx.grid.focus() });
 }
 
@@ -260,6 +271,22 @@ function tagItems(field, rows) {
   return out;
 }
 
+/**
+ * Explain This Number… first, when the menu's cell shows a total (any row,
+ * total rows included): how it is worked out, in the Explain tab.
+ */
+function explainItems() {
+  const c = menuCell;
+  if (!c || typeof ctx.explainable !== 'function' || !ctx.explainable(c.row, c.colKey)) return [];
+  return [
+    cmd('edit.explain', 'Explain This Number…', {
+      title: 'Every step of how this total is worked out, in the Explain tab',
+      run: () => ctx.explain(c.row, c.colKey),
+    }),
+    SEP,
+  ];
+}
+
 /** Move up and Move down: the selected rows one place (src/moverows.rs). */
 function moveItems() {
   return [SEP, cmd('edit.move_up', 'Move up'), cmd('edit.move_down', 'Move down')];
@@ -293,6 +320,11 @@ function detailItems(onRow) {
     { label: 'Apply group', items: tagItems('groups', rows) },
     { label: 'Apply fringe', items: tagItems('fringes', rows) },
     ...presetItems(true),
+    SEP,
+    cmd('edit.overtime', 'Overtime helper…', {
+      disabled: !rows.some((d) => kindOf(d) === 'line'),
+      title: 'Work out the line with overtime and write it in (the Overtime tab)',
+    }),
   ];
 }
 
@@ -316,10 +348,10 @@ function accountItems(onRow) {
 function topsheetItems(onRow) {
   const inserts = [cmd('insert.category', 'Insert category…'), cmd('insert.production_total', 'Insert production total…')];
   const setup = [
-    cmd('budget.create_charge', 'Create charge…', { title: 'Open the charges tab with a new charge ready to name' }),
-    cmd('budget.create_credit', 'Create credit…', { title: 'Open the credits tab with a new credit ready to name' }),
-    cmd('view.tab.charges', 'Add or apply a charge…', { title: 'Open the charges tab: add a charge, or turn one on or off' }),
-    cmd('view.tab.credits', 'Add or apply a credit…', { title: 'Open the credits tab: add a credit, or turn one on or off' }),
+    cmd('budget.create_charge', 'Create charge…', { title: 'Open Budget Setup on charges with a new charge ready to name' }),
+    cmd('budget.create_credit', 'Create credit…', { title: 'Open Budget Setup on credits with a new credit ready to name' }),
+    cmd('view.tab.charges', 'Add or apply a charge…', { title: 'Open Budget Setup on charges: add a charge, or turn one on or off' }),
+    cmd('view.tab.credits', 'Add or apply a credit…', { title: 'Open Budget Setup on credits: add a credit, or turn one on or off' }),
   ];
   const row = onRow ? ctx.grid.cursorRow() : null;
   if (!row) return [...inserts, SEP, ...setup];

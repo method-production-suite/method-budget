@@ -109,7 +109,7 @@ impl CompareFiles {
         }
     }
 
-    fn get(&self, token: u64) -> Option<(String, String, Arc<Budget>)> {
+    pub(crate) fn get(&self, token: u64) -> Option<(String, String, Arc<Budget>)> {
         self.lock()
             .files
             .iter()

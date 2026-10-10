@@ -91,6 +91,11 @@ pub struct Budget {
     /// Named full copies of the budget's content, oldest first. See
     /// [`crate::versions`] for saving and restoring them.
     pub versions: Vec<Version>,
+    /// Save the versions as changes against each other instead of full
+    /// copies, so many versions don't bloat the file (docs/FORMAT.md,
+    /// "Version deltas"). A file setting, not content: versions don't carry
+    /// it, and loading always gives full versions either way.
+    pub compact_versions: bool,
     /// Saved report setups, in the order the user keeps them. Layout only,
     /// not content: versions don't carry them (see [`crate::report_preset`]).
     pub report_presets: Vec<crate::report_preset::ReportPreset>,
@@ -110,6 +115,15 @@ pub struct Budget {
     /// sub-budget (see [`Provenance`]). About the file, not content:
     /// versions don't carry it.
     pub provenance: Option<Provenance>,
+    /// Actual costs from accounting and estimates to complete (see
+    /// [`crate::actuals`]). About the production's spending, not the
+    /// budget's content: versions don't carry them. Shared, so copying a
+    /// budget for undo copies a pointer.
+    pub actuals: Arc<crate::actuals::Actuals>,
+    /// Saved overtime patterns for the overtime helper, in the user's
+    /// order (see [`crate::overtime`]). Tools, not content, like tag
+    /// presets: versions don't carry them.
+    pub ot_patterns: Vec<crate::overtime::OtPattern>,
 }
 
 impl Budget {
@@ -136,12 +150,15 @@ impl Budget {
             baseline: None,
             display: DisplayPrefs::default(),
             versions: Vec::new(),
+            compact_versions: false,
             report_presets: Vec::new(),
             tag_presets: Vec::new(),
             line_presets: Vec::new(),
             setup_order: crate::order::SetupOrder::default(),
             setup_folders: crate::folders::SetupFolders::default(),
             provenance: None,
+            actuals: Arc::default(),
+            ot_patterns: Vec::new(),
         }
     }
 
@@ -787,12 +804,15 @@ impl Budget {
             baseline,
             display: _,
             versions: _,
+            compact_versions: _,
             report_presets: _,
             tag_presets: _,
             line_presets: _,
             setup_order: _,
             setup_folders: _,
             provenance: _,
+            actuals: _,
+            ot_patterns: _,
         } = self;
         BudgetSnapshot {
             title: title.clone(),
@@ -842,12 +862,15 @@ impl Budget {
             baseline,
             display: _,
             versions,
+            compact_versions: _,
             report_presets: _,
             tag_presets: _,
             line_presets: _,
             setup_order: _,
             setup_folders: _,
             provenance: _,
+            actuals: _,
+            ot_patterns: _,
         } = self;
         let content = BudgetSnapshot {
             title,
@@ -963,12 +986,15 @@ impl BudgetSnapshot {
             baseline,
             display: DisplayPrefs::default(),
             versions,
+            compact_versions: false,
             report_presets: Vec::new(),
             tag_presets: Vec::new(),
             line_presets: Vec::new(),
             setup_order: crate::order::SetupOrder::default(),
             setup_folders: crate::folders::SetupFolders::default(),
             provenance: None,
+            actuals: Arc::default(),
+            ot_patterns: Vec::new(),
         }
     }
 

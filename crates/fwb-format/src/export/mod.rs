@@ -3,7 +3,8 @@
 //!
 //! [`workbook`] turns a budget and its report into [`Sheet`]s: Topsheet,
 //! Accounts, Detail and the setup tables (Globals, Fringes, Groups, Units,
-//! Currencies, Sets, Locations). The writers ([`csv`], [`xlsx`]) only
+//! Currencies, Sets, Locations), plus Cost Report and Actuals for a budget
+//! with actuals. The writers ([`csv`], [`xlsx`]) only
 //! serialize those tables, so every format carries the same figures.
 //!
 //! Money stays integer cents until it is written, then becomes an exact
@@ -80,6 +81,10 @@ pub const SHEET_NAMES: [&str; 10] = [
     "Sets",
     "Locations",
 ];
+
+/// Sheets a budget with actuals also gets, after [`SHEET_NAMES`]: its cost
+/// report and its transactions (fwb_core::actuals).
+pub const ACTUALS_SHEETS: [&str; 2] = ["Cost Report", "Actuals"];
 
 /// The sheet that the tab-delimited flavor writes.
 pub const DETAIL: &str = "Detail";

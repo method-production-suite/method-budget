@@ -26,6 +26,14 @@
 // returns the row ids, which the edit commands then take, so a click acts on
 // exactly the rows the panel shows.
 //
+// The Budget Setup window (setupwin.js) draws the same lists as setup tables
+// (ctx.mode 'setup'): every column of each item's definition, a footer of
+// budget-wide totals for fringes, and the same editing, adding, deleting,
+// renaming and ordering, but no selection, so no summary is fetched there
+// and nothing is applied. In the tools panel each list shows the item's key
+// figure (a fringe's rate, a currency's rate) and a Setup button and
+// right-click item that open the item in Budget Setup (ctx.openSetup).
+//
 // tools.js calls applyView() on every render, then mounts what it shows:
 // applyHeadHost() (what is selected, with its totals) and applyListHost(id)
 // for each list tab on screen. A fresh summary redraws just those. ctx.call
@@ -214,6 +222,28 @@ function mounted() {
   return [...st.heads, ...st.lists.values()].filter((h) => h.isConnected);
 }
 
+/** True in the Budget Setup window: setup tables, nothing to apply. */
+function setupMode() {
+  return Boolean(st.ctx && st.ctx.mode === 'setup');
+}
+
+/** A rate with at least two places: "18.5" -> "18.50", "0.125" stays. */
+function rateText(s) {
+  const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(str(s));
+  if (!m) return str(s);
+  const frac = m[3] || '';
+  return `${m[1]}${m[2]}.${frac.length >= 2 ? frac : frac.padEnd(2, '0')}`;
+}
+
+/** A fringe's rate as the lists show it: "18.50%", "25.00 USD per Day". */
+function fringeRate(def) {
+  if (str(def.rate) === '') return '';
+  if (def.kind !== 'flat') return `${rateText(def.rate)}%`;
+  const base = str(budget().base_currency);
+  const unit = str(def.unit);
+  return `${rateText(def.rate)}${base ? ` ${base}` : ''} per ${unit || 'line'}`;
+}
+
 function visible() {
   return mounted().some((h) => !h.closest('[hidden]'));
 }
@@ -311,7 +341,8 @@ function schedule(ms = DEBOUNCE_MS) {
 }
 
 async function fetchSummary() {
-  if (!visible()) return;
+  // The setup window has no selection: never a summary, never applying.
+  if (setupMode() || !visible()) return;
   const sc = scope();
   const sig = sigOf(sc);
   const gen = st.gen;
@@ -603,6 +634,10 @@ function stat(label, value, title = '') {
 const NO_SUMMARY = { rows: [], lines: 0, costed: 0, in_range: 0, range_blocked: '', fringe_percent: null, totals: {} };
 
 function drawList(host, list) {
+  if (setupMode()) {
+    drawSetupList(host, list);
+    return;
+  }
   const s = shownSummary() || NO_SUMMARY;
   const defs = obj(list.defs(budget()));
   const names = Object.keys(defs);
@@ -704,6 +739,9 @@ function tools(list, s, eligible) {
       }),
     );
   }
+  // Last: the list's table in Budget Setup.
+  const setup = setupButton(list);
+  if (setup) row.append(setup);
   return row;
 }
 
@@ -782,7 +820,7 @@ function item(list, s, name, def, eligible, movable = false) {
       name,
       str(def.short_code) ? el('span', { class: 'apply-code', text: str(def.short_code), title: 'Short code: the grid shows it for this item' }) : null,
     ),
-    el('span', { class: 'apply-desc', text: str(def.description) }),
+    keyFigure(list, name, def),
     state === 'some' ? el('span', { class: 'apply-count', text: `${t.count}/${eligible}`, attrs: { 'aria-hidden': 'true' } }) : null,
     el('span', { class: `apply-num apply-amt${off ? ' apply-off' : ''}`, text: amount }),
     el('span', { class: 'setup-sr', text: [info.join('; '), amount].filter(Boolean).join('. '), attrs: { id: infoId } }),
@@ -812,7 +850,10 @@ function item(list, s, name, def, eligible, movable = false) {
       ctx: renameCtx(),
       edit: () => editItem(list, name),
       remove: () => deleteItem(list, name),
-      extra: list.id === 'fringes' || list.id === 'groups' ? [{ label: 'Short code…', title: 'A short code the grid shows instead of the name', run: () => editCode(list, name) }] : [],
+      extra: [
+        ...(list.id === 'fringes' || list.id === 'groups' ? [{ label: 'Short code…', title: 'A short code the grid shows instead of the name', run: () => editCode(list, name) }] : []),
+        ...openInSetup(list, name),
+      ],
       onRenamed: (to) => {
         st.selected[list.id] = to;
         focusAfter(itemKey(list.id, to), list.id);
@@ -918,6 +959,279 @@ function fringeFoot(s) {
   if (ranged) range.append(el('span', { class: 'apply-hint', text: `${plural(ranged, 'row', 'rows')} in a range` }));
   foot.append(range);
   return foot;
+}
+
+// ---------------------------------------------------------------------------
+// The way to Budget Setup from the panel, and the panel's key figures
+
+/** The tools row's Setup button: the list's table in Budget Setup. */
+function setupButton(list) {
+  if (!st.ctx || typeof st.ctx.openSetup !== 'function') return null;
+  const b = button('Setup', 'apply-pill', `apply:setup:${list.id}`, () => st.ctx.openSetup(list.id, st.selected[list.id] || null), {
+    label: `Edit ${list.label.toLowerCase()} in Budget Setup`,
+    title: `Every column of ${list.label.toLowerCase()}, with the library, in the Budget Setup window`,
+  });
+  b.removeAttribute('aria-disabled'); // opens a window, never busy
+  return b;
+}
+
+/** The right-click menu's way to item `name` in Budget Setup. */
+function openInSetup(list, name) {
+  if (!st.ctx || typeof st.ctx.openSetup !== 'function') return [];
+  return [{ label: 'Edit in Budget Setup', title: `Show this ${list.what} in the Budget Setup window`, run: () => st.ctx.openSetup(list.id, name) }];
+}
+
+/**
+ * What a panel row shows after the name: a fringe's rate, a currency's rate,
+ * else the description (always in the row's tooltip too).
+ */
+function keyFigure(list, name, def) {
+  let text = str(def.description);
+  if (list.id === 'fringes') text = fringeRate(def);
+  else if (list.id === 'currencies' && str(def.rate)) text = `${rateText(def.rate)}`;
+  return el('span', { class: 'apply-desc', text, title: str(def.description) || undefined });
+}
+
+// ---------------------------------------------------------------------------
+// Setup tables (the Budget Setup window)
+
+const SETUP_INTROS = {
+  fringes: 'Fringes add to the lines that carry them: a percent of pay, up to an optional cutoff per earner, or a flat amount per line or per unit of time.',
+  groups: 'Groups gather lines from any account for reports and totals. A group that does not count in the total leaves its lines out of the budget total.',
+  sets: 'Sets mark lines with the set they belong to, for reports and totals.',
+  locations: 'Locations mark lines with where the work happens, for reports and totals.',
+  currencies: 'Currencies other than the base currency, each with its rate. Lines in another currency are converted at that rate.',
+};
+
+/** The columns after the name, as heads: [label, title]. */
+const SETUP_HEADS = {
+  fringes: [
+    ['Description', ''],
+    ['Rate', 'Percent of pay, or a flat amount per line or per unit of time'],
+    ['Cutoff', 'The most pay per earner a percent fringe is figured on'],
+  ],
+  groups: [
+    ['Description', ''],
+    ['Color', 'The color its lines show in'],
+    ['Total', 'Whether its lines count in the budget total'],
+  ],
+  sets: [['Description', '']],
+  locations: [
+    ['Description', ''],
+    ['Place', 'City, region and country'],
+  ],
+  currencies: [
+    ['Rate', 'What one unit is worth in the base currency'],
+    ['Symbol', ''],
+    ['Description', ''],
+  ],
+};
+
+/** An item's cells after its name: [text, title]. */
+function setupCells(list, name, def) {
+  if (list.id === 'fringes') {
+    const cutoff = def.kind !== 'flat' && def.cutoff !== undefined && def.cutoff !== null ? money(def.cutoff) : '';
+    return [[str(def.description), ''], [fringeRate(def), ''], [cutoff, cutoff ? 'Pay per earner above this earns no fringe' : '']];
+  }
+  if (list.id === 'groups') {
+    const hex = typeof def.color === 'string' ? def.color.toLowerCase() : '';
+    const named = paletteColor(hex);
+    const color = named ? named.label : hex;
+    const off = def.in_budget_total === false;
+    return [[str(def.description), ''], [color, ''], [off ? 'Not counted' : 'Counted', off ? 'Its lines are left out of the budget total' : '']];
+  }
+  if (list.id === 'locations') {
+    const place = ['city', 'region', 'country'].map((k) => str(def[k]).trim()).filter(Boolean).join(', ');
+    return [[str(def.description), ''], [place, '']];
+  }
+  if (list.id === 'currencies') {
+    const base = str(budget().base_currency);
+    const rate = str(def.rate) ? `${rateText(def.rate)}${base ? ` ${base}` : ''}` : '';
+    return [[rate, rate ? `1 ${name} = ${rate}` : ''], [str(def.symbol), ''], [str(def.description), '']];
+  }
+  return [[str(def.description), '']];
+}
+
+function drawSetupList(host, list) {
+  const defs = obj(list.defs(budget()));
+  const names = Object.keys(defs);
+  host.setAttribute('aria-busy', st.busy ? 'true' : 'false');
+  host.classList.add('apply-setup', `apply-setup-${list.id}`);
+  wantUsage(st.view);
+  const parts = [];
+  let intro = SETUP_INTROS[list.id] || '';
+  if (list.id === 'currencies' && str(budget().base_currency)) intro += ` The base currency is ${str(budget().base_currency)}.`;
+  if (intro) parts.push(el('p', { class: 'setup-intro', text: intro }));
+
+  const q = str(st.filters[list.id]).trim().toLowerCase();
+  if (names.length) parts.push(setupTools(list));
+  const { names: shown, filtered } = listNames(
+    st.view,
+    list.id,
+    (n) => {
+      if (!q) return true;
+      const def = obj(defs[n]);
+      return [n, def.description, def.short_code, def.city, def.region, def.country, def.symbol].some((v) => str(v).toLowerCase().includes(q));
+    },
+    { textFilter: Boolean(q) },
+  );
+  const movable = canReorder(list.id, filtered);
+  const ul = el('ul', { class: 'apply-items', attrs: { 'aria-label': list.label }, data: { list: list.id } });
+  for (const n of shown) ul.append(setupItem(list, n, obj(defs[n]), movable));
+  ul.append(addRow(list));
+  if (names.length) parts.push(setupColHead(list));
+  if (!names.length) parts.push(el('p', { class: 'setup-empty', text: list.none }));
+  else if (!shown.length) parts.push(el('p', { class: 'setup-empty', text: 'Nothing matches the filter.' }));
+  parts.push(ul);
+  if (list.id === 'fringes' && names.length) parts.push(setupFringeFoot(defs));
+  if (st.error) parts.push(el('p', { class: 'setup-error apply-error', text: st.error, attrs: { role: 'alert' } }));
+  host.replaceChildren(...parts);
+}
+
+/** Above a setup table: its filter and the Show choice. */
+function setupTools(list) {
+  const row = el('div', { class: 'apply-tools' });
+  const input = el('input', {
+    class: 'setup-input apply-filter',
+    attrs: {
+      type: 'text',
+      placeholder: 'Filter',
+      'aria-label': `Filter ${list.label.toLowerCase()}`,
+      autocomplete: 'off',
+      spellcheck: 'false',
+      autocapitalize: 'off',
+      autocorrect: 'off',
+    },
+    data: { key: `apply:filter:${list.id}` },
+  });
+  input.value = str(st.filters[list.id]);
+  input.addEventListener('input', (e) => {
+    st.filters[list.id] = input.value;
+    if (!e.isComposing) draw();
+  });
+  input.addEventListener('compositionend', () => {
+    st.filters[list.id] = input.value;
+    draw();
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && input.value) {
+      e.preventDefault();
+      e.stopPropagation();
+      st.filters[list.id] = '';
+      draw();
+    }
+  });
+  row.append(input, showSelect(list.id, draw, `apply:show:${list.id}`));
+  return row;
+}
+
+function setupColHead(list) {
+  const heads = (SETUP_HEADS[list.id] || []).map(([label, title]) => el('span', { class: 'apply-colhead-cell', text: label, title: title || undefined }));
+  return el(
+    'div',
+    { class: 'apply-colhead' },
+    el('span'),
+    el('span', { class: 'apply-colhead-row' }, el('span', { class: 'apply-colhead-cell' }, sortButton(list.id, 'Name', draw, `apply:sort:${list.id}`)), ...heads),
+    el('span', { class: 'apply-colhead-num', text: 'Lines', title: 'Lines using it in the whole budget; click a count to find them' }),
+    el('span', { class: 'apply-colhead-num', text: 'Budget', title: 'Its dollars in the whole budget' }),
+  );
+}
+
+/** One row of a setup table: a click selects it, a double-click (Enter, F2) edits it. */
+function setupItem(list, name, def, movable) {
+  const key = itemKey(list.id, name);
+  const infoId = nextId();
+  const cells = setupCells(list, name, def);
+  const tip = [str(def.description), budgetWide(list, name, def), 'Double-click to edit'].filter(Boolean).join('\n');
+  const b = el(
+    'button',
+    {
+      class: 'apply-check apply-row',
+      title: tip,
+      attrs: { type: 'button', 'aria-label': name, 'aria-describedby': infoId, 'aria-keyshortcuts': `Enter F2 Delete ${MOVE_KEYS}` },
+      data: { key, nobusy: '1' },
+    },
+    el(
+      'span',
+      { class: 'apply-name' },
+      name,
+      str(def.short_code) ? el('span', { class: 'apply-code', text: str(def.short_code), title: 'Short code: the grid shows it for this item' }) : null,
+    ),
+    ...cells.map(([text, title]) => el('span', { class: 'apply-cell', text, title: title || text || undefined })),
+    el('span', { class: 'setup-sr', text: cells.map(([t]) => t).filter(Boolean).join('; '), attrs: { id: infoId } }),
+  );
+  b.addEventListener('click', () => select(list.id, name, b));
+  b.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    editItem(list, name);
+  });
+  b.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    select(list.id, name, b);
+    itemMenu(e, {
+      kind: list.what,
+      name,
+      anchor: b,
+      ctx: renameCtx(),
+      edit: () => editItem(list, name),
+      remove: () => deleteItem(list, name),
+      extra: list.id === 'fringes' || list.id === 'groups' ? [{ label: 'Short code…', title: 'A short code the grid shows instead of the name', run: () => editCode(list, name) }] : [],
+      onRenamed: (to) => {
+        st.selected[list.id] = to;
+        focusAfter(itemKey(list.id, to), list.id);
+      },
+    });
+  });
+  b.addEventListener('keydown', (e) => {
+    if (moveKey(e, list.id, name, movable, (cmd, args) => call(cmd, args).then(() => focusAfter(key, list.id)))) return;
+    const plain = !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey;
+    if ((e.key === 'Enter' || e.key === 'F2') && plain) {
+      e.preventDefault();
+      editItem(list, name);
+      return;
+    }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && plain) {
+      e.preventDefault();
+      deleteItem(list, name);
+      return;
+    }
+    moveFocus(e, b);
+  });
+  const off = list.id === 'groups' && def.in_budget_total === false;
+  const total = totalText(st.view, list.id, name);
+  const li = el(
+    'li',
+    { class: 'apply-item', data: { name } },
+    dragHandle(list.id, name, movable, (cmd, args) => call(cmd, args)),
+    b,
+    usesButton(st.view, list.id, name, `apply:uses:${list.id}:${name}`),
+    el('span', { class: `apply-num apply-total${off ? ' apply-off' : ''}`, text: total, title: off && total ? 'Not in the budget total' : undefined }),
+  );
+  if (st.selected[list.id] === name) li.classList.add('is-selected');
+  return li;
+}
+
+/** Under the fringe table: the budget's fringe dollars from percent and flat fringes. */
+function setupFringeFoot(defs) {
+  const r = obj(report().fringes);
+  let percent = 0;
+  let flat = 0;
+  for (const [n, def] of Object.entries(defs)) {
+    const t = Number(obj(r[n]).total) || 0;
+    if (obj(def).kind === 'flat') flat += t;
+    else percent += t;
+  }
+  return el(
+    'div',
+    { class: 'apply-foot' },
+    el(
+      'p',
+      { class: 'apply-stats' },
+      stat('Percent', money(percent), 'Fringe dollars from percent fringes in the whole budget'),
+      stat('Flat', money(flat), 'Fringe dollars from flat fringes in the whole budget'),
+      stat('Fringe total', money(percent + flat), 'Every fringe dollar in the budget'),
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------

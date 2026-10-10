@@ -3,16 +3,20 @@
 //! Clean-room: written from how film budgets work and from observed behaviour of
 //! budgeting tools, never from proprietary code or binaries. See CLEAN-ROOM.md.
 
+pub mod actuals;
 pub mod calc;
 pub mod coding;
 pub mod compare;
 pub mod comparison;
 pub mod decimal;
+pub mod diff;
 pub mod edit;
 pub mod expr;
 pub mod folders;
+pub mod merge;
 pub mod model;
 pub mod order;
+pub mod overtime;
 pub mod presets;
 pub mod rename;
 pub mod renumber;
@@ -26,6 +30,7 @@ pub mod usage;
 pub mod versions;
 
 pub use calc::breakdown::{selection_totals, SelectionTotals};
+pub use calc::explain;
 pub use calc::{charge_preview, recalc, CalcError, ErrorKind, RecalcOptions};
 pub use compare::{variance, Change, Variance};
 pub use comparison::{

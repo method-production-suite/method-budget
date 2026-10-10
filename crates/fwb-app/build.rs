@@ -112,6 +112,9 @@ const COMMANDS: &[&str] = &[
     "tools_window",
     "close_tools_window",
     "notes_list",
+    // The Budget Setup window (src/setupwin.rs)
+    "setup_window",
+    "close_setup_window",
     // Versions saved in the budget, and comparing budgets (src/versions.rs,
     // src/compare.rs)
     "save_version",
@@ -125,6 +128,11 @@ const COMMANDS: &[&str] = &[
     "compare_budgets",
     "compare_detail",
     "compare_pick_files",
+    // What Changed and Merge Changes From (src/diffmerge.rs)
+    "what_changed",
+    "merge_preview",
+    "merge_apply",
+    "merge_pick_file",
     // Budgets as tabs (src/tabs.rs)
     "new_tab",
     "switch_tab",
@@ -173,6 +181,16 @@ const COMMANDS: &[&str] = &[
     "sheet_import_pick",
     "sheet_import_preview",
     "sheet_import",
+    // Actuals and the cost report (src/actuals.rs)
+    "actuals_pick",
+    "actuals_preview",
+    "actuals_import",
+    "actuals_list",
+    "actuals_update",
+    "actuals_delete",
+    "actuals_remove_batch",
+    "actuals_set_etc",
+    "actuals_lines",
     // Renumbering accounts to a new pattern (src/renumber.rs)
     "renumber_preview",
     "renumber_accounts",
@@ -192,6 +210,13 @@ const COMMANDS: &[&str] = &[
     "library_save",
     "library_folder",
     "library_move",
+    // Explain This Number (src/explain.rs)
+    "explain_number",
+    // The overtime helper (src/overtime.rs)
+    "ot_calculate",
+    "ot_apply",
+    "ot_save_pattern",
+    "ot_delete_pattern",
 ];
 
 fn main() {

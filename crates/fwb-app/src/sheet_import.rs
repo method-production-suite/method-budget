@@ -635,8 +635,9 @@ pub fn import_new(b: &Budget, book: &Book, req: &Request) -> Result<(Session, St
     Ok((s, msg))
 }
 
-/// Reads the file at `path` for import: at most [`MAX_FILE_BYTES`].
-fn read_capped(path: &std::path::Path) -> Result<Vec<u8>, String> {
+/// Reads the file at `path` for import: at most [`MAX_FILE_BYTES`] (Import
+/// Actuals reads its files the same way, src/actuals.rs).
+pub(crate) fn read_capped(path: &std::path::Path) -> Result<Vec<u8>, String> {
     let f = std::fs::File::open(path).map_err(|e| format!("Couldn't open the file: {e}"))?;
     let mut bytes = Vec::new();
     f.take(MAX_FILE_BYTES as u64 + 1)

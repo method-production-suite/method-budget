@@ -38,13 +38,15 @@ import {
   columnShown,
   OPTIONAL_DETAIL_COLUMNS,
   BASELINE_COLUMNS,
+  COST_COLUMNS,
   topsheetRows,
   accountRows,
   detailRows,
 } from './levels.js';
 import { renderFooter } from './footer.js';
 import { formDialog, confirmDialog, customDialog, isModalOpen } from './modal.js';
-import { renderTools, selectToolsTab, focusToolsKey, toolsLayout, setToolsLayout } from './tools.js';
+import { renderTools, selectToolsTab, focusToolsKey, toolsLayout, setToolsLayout, findUses } from './tools.js';
+import { isSetupTab } from './setuptabs.js';
 import { openFind, findStep } from './find.js';
 import { printReport } from './report.js';
 import { showReportSetup } from './reportsetup.js';
@@ -63,10 +65,13 @@ import { firstPane, secondPane, layoutPanes, isSplitLayout, markTarget, moveForm
 import { localStamp } from './versions.js';
 import { showVersions } from './versions.js';
 import { showCompare } from './compare.js';
+import { showWhatChanged, showMerge } from './diffmerge.js';
 import { importSetup, newFromTemplate, saveAsTemplate } from './importsetup.js';
 import { importSpreadsheet } from './sheetimport.js';
+import { importActuals } from './actualsimport.js';
 import { saveShareCopy, newSubBudget, renderShareBanner, offerReturnedCopy } from './sharing.js';
 import { displayCommands, userDisplay, withoutZeroRows } from './display.js';
+import { setExplainTarget, explainTargetAt } from './explain.js';
 
 // The panes (pane.js): the first is always there, the second once the window
 // has been split. `target` is the pane commands act on; `cur` the pane `state`
@@ -186,7 +191,18 @@ grid.setShowFormulas(userDisplay().formulasInSelection);
 initRowFormat({ grid, view: () => state.view, level: () => state.level, act });
 // Its items call the commands directly: not through run(), whose guard against
 // a key and its menu item both arriving would drop a key pressed right after.
-initContextMenu({ grid, host: () => P().host, view: () => state.view, level: () => state.level, run: (id) => COMMANDS[id] && COMMANDS[id](), act, toast });
+initContextMenu({
+  grid,
+  host: () => P().host,
+  view: () => state.view,
+  level: () => state.level,
+  run: (id) => COMMANDS[id] && COMMANDS[id](),
+  act,
+  toast,
+  // Explain This Number… on the cell right-clicked (explain.js).
+  explainable: (row, colKey) => Boolean(explainTargetFor(row, colKey)),
+  explain: (row, colKey) => explainCell(row, colKey),
+});
 // The right-click menu's preset submenus (presets.js) need the selection, and
 // a call that rejects so a form can show its message.
 initContextMenuPresets({ selection: () => currentSelection(), call: (cmd, args, opts) => call(cmd, args, opts) });
@@ -365,7 +381,7 @@ function render(opts = {}) {
   P().host.dataset.level = state.level;
   if (state.level === 'topsheet') {
     grid.h.enterMovesDown = false;
-    grid.setData(withColumnMenu(topsheetColumns(ix, state.columns)), zeroFiltered(topsheetRows(ix), opts), opts);
+    grid.setData(withColumnMenu(topsheetColumns(ix, state.columns)), zeroFiltered(topsheetRows(ix, state.columns), opts), opts);
   } else if (state.level === 'accounts') {
     grid.h.enterMovesDown = false;
     grid.setData(withColumnMenu(accountColumns(ix, state.columns)), zeroFiltered(accountRows(ix, entry), opts), opts);
@@ -596,6 +612,8 @@ function toolsCtx() {
     // The History tab (history.js): jumps and saving a step run here, like Undo.
     historyJump: (to) => historyJump(to),
     historySave: (step, name) => historySave(step, name),
+    // A setup table's full editor, in the Budget Setup window.
+    openSetup: (tab, item) => openSetup(tab, item),
   };
 }
 
@@ -1546,8 +1564,9 @@ function sendToolsState() {
   if (state.position !== 'window') return;
   const sel = currentSelection();
   lastSelectionSig = JSON.stringify(sel);
-  emitTo('tools', 'tools-state', { selection: sel, layout: toolsLayout(), focus: toolsFocus });
+  emitTo('tools', 'tools-state', { selection: sel, layout: toolsLayout(), focus: toolsFocus, explain: toolsExplain });
   toolsFocus = null;
+  toolsExplain = null;
 }
 
 // The grid's selection as last sent to the tools window.
@@ -1655,6 +1674,74 @@ async function refreshView() {
 }
 
 let geometryTimer = null;
+
+// ---------------------------------------------------------------------------
+// The Budget Setup window (setupwin.js, src/setupwin.rs): every setup table's
+// full editor. This window remembers its tab, place and size (per user), and
+// tells it what to show.
+
+// What the setup window shows once its page is listening: { tab, item, focus }.
+let setupPending = null;
+
+function readSetupTab() {
+  const t = readPref('setupTab', 'fringes');
+  return isSetupTab(t) ? t : 'fringes';
+}
+
+/** A remembered window place from prefs, or null when there is none or it is nonsense. */
+function geometryPref(name) {
+  const g = readPref(name, null);
+  return g && typeof g === 'object' && ['x', 'y', 'width', 'height'].every((k) => typeof g[k] === 'number' && Number.isFinite(g[k]))
+    ? { x: g.x, y: g.y, width: g.width, height: g.height }
+    : null;
+}
+
+/**
+ * Opens the Budget Setup window, or brings it forward, on `tab` (the one it
+ * showed last when none), with item `item` or the control with data-key
+ * `focus` focused.
+ */
+async function openSetup(tab = null, item = null, focus = null) {
+  if (isSetupTab(tab)) writePref('setupTab', tab);
+  const msg = {
+    tab: isSetupTab(tab) ? tab : readSetupTab(),
+    item: typeof item === 'string' ? item : null,
+    focus: typeof focus === 'string' ? focus : null,
+  };
+  setupPending = msg;
+  try {
+    const existed = await invoke('setup_window', { show: true, geometry: geometryPref('setupWindow') });
+    // A window already there is listening; a new one says setup-ready.
+    if (existed) emitTo('setup', 'setup-state', msg);
+  } catch (e) {
+    toast(e);
+  }
+}
+
+/** An item's line count was clicked in the setup window: Find shows its uses, wherever the panel is. */
+function findUsesFromSetup(p) {
+  if (!p || typeof p !== 'object' || typeof p.table !== 'string' || typeof p.name !== 'string') return;
+  state.panelOpen = true;
+  if (state.position === 'window') {
+    openToolsWindow(true).then(() => emitTo('tools', 'tools-find', { table: p.table, name: p.name }));
+    return;
+  }
+  renderPanel();
+  findUses(p.table, p.name);
+}
+
+let setupGeometryTimer = null;
+
+/** The setup window moved or was resized: remember where. */
+function saveSetupGeometry(g) {
+  if (!g || typeof g !== 'object') return;
+  clearTimeout(setupGeometryTimer);
+  setupGeometryTimer = setTimeout(() => {
+    if (['x', 'y', 'width', 'height'].every((k) => typeof g[k] === 'number' && Number.isFinite(g[k]))) {
+      writePref('setupWindow', { x: g.x, y: g.y, width: g.width, height: g.height });
+    }
+  }, 250);
+}
 
 /** The tools window moved or was resized: remember where (src/tools.rs). */
 function saveGeometry(g) {
@@ -1799,14 +1886,17 @@ function readColumnChoices() {
   const saved = readPref('detailColumns', null);
   const out = {};
   if (saved && typeof saved === 'object') {
-    for (const c of OPTIONAL_DETAIL_COLUMNS) if (typeof saved[c.key] === 'boolean') out[c.key] = saved[c.key];
+    for (const c of [...OPTIONAL_DETAIL_COLUMNS, ...COST_COLUMNS]) if (typeof saved[c.key] === 'boolean') out[c.key] = saved[c.key];
   }
   return out;
 }
 
-/** What the column choices depend on: whether the budget has a baseline (Orig and Var). */
+/**
+ * What the column choices depend on: whether the budget has a baseline (Orig
+ * and Var) and actuals (the cost report columns, levels.js).
+ */
 function columnContext() {
-  return { baseline: Boolean(state.ix && state.ix.variance) };
+  return { baseline: Boolean(state.ix && state.ix.variance), cost: Boolean(state.ix && state.ix.cost) };
 }
 
 function gridDetailColumns() {
@@ -1818,17 +1908,18 @@ function gridDetailColumns() {
  * and Var) sits in the Acct # header, as it does in the # header of lines.
  */
 function withColumnMenu(cols) {
-  if (!columnContext().baseline) return cols;
+  const ctx = columnContext();
+  if (!ctx.baseline && !ctx.cost) return cols;
   const head = (label) => () => el('span', { class: 'col-head-menu' }, columnMenuButton(), el('span', { text: label }));
   return cols.map((c) => (c.key === 'code' ? { ...c, head: head(c.label) } : c));
 }
 
-/** The column menu: every optional column on the lines, Orig and Var elsewhere. */
+/** The column menu: every optional column on the lines, Orig, Var and the cost columns elsewhere. */
 function columnMenuItems() {
   const ctx = columnContext();
-  const list = state.level === 'details' ? OPTIONAL_DETAIL_COLUMNS : BASELINE_COLUMNS;
+  const list = state.level === 'details' ? OPTIONAL_DETAIL_COLUMNS : [...BASELINE_COLUMNS, ...COST_COLUMNS];
   return list
-    .filter((c) => !c.baseline || ctx.baseline)
+    .filter((c) => (!c.baseline || ctx.baseline) && (!c.cost || ctx.cost))
     .map((c) => ({
       id: c.key,
       label: c.name || c.label,
@@ -1859,7 +1950,7 @@ function openColumnMenu(anchor) {
     items: columnMenuItems(),
     returnFocus: () => P().host.querySelector('.col-chooser'),
     onPick: (item) => {
-      const col = OPTIONAL_DETAIL_COLUMNS.find((c) => c.key === item.id);
+      const col = OPTIONAL_DETAIL_COLUMNS.find((c) => c.key === item.id) || COST_COLUMNS.find((c) => c.key === item.id);
       if (!col) return;
       state.columns = { ...state.columns, [col.key]: !columnShown(col, state.columns, columnContext()) };
       writePref('detailColumns', state.columns);
@@ -1958,13 +2049,22 @@ const COMMANDS = {
   'file.close': closeWindow,
   'app.quit': closeWindow,
 };
+// View > Budget Setup's tabs (and their keys) open the Budget Setup window on
+// that tab; the other view.tab items and View > Tools Panel's tabs show a tab
+// of the tools panel.
 for (const s of SHORTCUTS) {
-  if (s.id.startsWith('view.tab.')) COMMANDS[s.id] = () => showTab(s.id.slice('view.tab.'.length));
+  if (s.id.startsWith('view.tab.')) {
+    const tab = s.id.slice('view.tab.'.length);
+    COMMANDS[s.id] = isSetupTab(tab) ? () => openSetup(tab) : () => showTab(tab);
+  } else if (s.id.startsWith('view.tool.')) {
+    COMMANDS[s.id] = () => showTab(s.id.slice('view.tool.'.length));
+  }
 }
-// The topsheet's right-click Create charge and Create credit: the tab, with
-// the new item's name box focused (topsheet-setup.js's add form).
-COMMANDS['budget.create_charge'] = () => showTab('charges', JSON.stringify(['add', 'charges', 'name']));
-COMMANDS['budget.create_credit'] = () => showTab('credits', JSON.stringify(['add', 'credits', 'name']));
+COMMANDS['view.setup'] = () => openSetup();
+// The topsheet's right-click Create charge and Create credit: Budget Setup
+// on that tab, with the new item's name box focused (topsheet-setup.js's add form).
+COMMANDS['budget.create_charge'] = () => openSetup('charges', null, JSON.stringify(['add', 'charges', 'name']));
+COMMANDS['budget.create_credit'] = () => openSetup('credits', null, JSON.stringify(['add', 'credits', 'name']));
 // File > Open Recent and File > Revert to Backup (safety.js).
 Object.assign(COMMANDS, safety.commands);
 // View: formulas in a selection, zero accounts, totals' cents, grid zoom
@@ -2002,6 +2102,35 @@ Object.assign(COMMANDS, {
   'edit.move_up': () => moveSelected(-1),
   'edit.move_down': () => moveSelected(1),
 });
+
+// Edit > Explain This Number (the cursor cell's total, in the Explain tab:
+// explain.js) and Overtime Helper (the Overtime tab: overtime.js).
+Object.assign(COMMANDS, {
+  'edit.explain': () => explainCell(grid.cursorRow(), grid.cursorColKey()),
+  'edit.overtime': () => showTab('overtime'),
+});
+
+/** The total a grid cell shows, as the Explain tab names it, or null. */
+function explainTargetFor(row, colKey) {
+  if (!state.ix || !row) return null;
+  const cat = state.cat ? findCategory(state.ix, state.cat.code, state.cat.ti) : null;
+  return explainTargetAt({ level: state.level, row, colKey, ix: state.ix, cat, ai: state.acct ? state.acct.ai : null });
+}
+
+// A total to explain in the tools window, sent with the panel's state.
+let toolsExplain = null;
+
+/** Opens the Explain tab on the total a cell shows. */
+function explainCell(row, colKey) {
+  const t = explainTargetFor(row, colKey);
+  if (!t) {
+    toast('Put the cursor on a total to explain it.');
+    return;
+  }
+  setExplainTarget(t, state.doc);
+  toolsExplain = state.position === 'window' ? t : null;
+  showTab('explain');
+}
 
 // One move at a time, each built from the newest view (accounts and
 // topsheet rows are named by place, which a move changes). A held key adds
@@ -2065,6 +2194,55 @@ Object.assign(COMMANDS, {
   'file.versions': () => openVersions(),
   'file.compare': () => openCompare(),
 });
+
+// File > What Changed… and Merge Changes From… (diffmerge.js;
+// src/diffmerge.rs).
+Object.assign(COMMANDS, {
+  'file.what_changed': () => {
+    if (grid.editor) grid.commitEdit(null);
+    if (state.view) showWhatChanged(diffMergeCtx());
+  },
+  'file.merge': () => {
+    if (grid.editor) grid.commitEdit(null);
+    if (state.view) showMerge(diffMergeCtx());
+  },
+});
+
+/** What diffmerge.js needs from the shell. */
+function diffMergeCtx() {
+  return {
+    doc: () => state.doc,
+    view: () => state.view,
+    tabs: () => state.tabs,
+    invoke,
+    apply: (v) => apply(v, { cmd: 'merge_apply' }),
+    toast,
+    go: (target) => goToChange(target),
+  };
+}
+
+/**
+ * Goes to a change picked in What Changed (diffmerge.js): a setup tab, the
+ * Versions dialog, a category on the topsheet, an account in its category's
+ * list, or a row's cell.
+ */
+function goToChange(go) {
+  if (!go || typeof go !== 'object') return;
+  if (go.kind === 'setup') {
+    const run = COMMANDS[`view.tab.${go.tab}`];
+    if (run) run();
+    return;
+  }
+  if (go.kind === 'versions') {
+    openVersions();
+    return;
+  }
+  if (go.kind === 'category') {
+    jumpTo({ kind: 'category', ti: go.ti, category: go.category });
+    return;
+  }
+  jumpTo({ ti: go.ti, ai: go.ai, account: go.account, row_id: go.row_id, field: go.field || null });
+}
 
 // File > Export: an Excel workbook, CSV files or tab-delimited detail. Rust
 // shows the Save dialog and writes the files (src/export.rs).
@@ -2145,6 +2323,22 @@ Object.assign(COMMANDS, {
   },
 });
 
+// File > Import Actuals…: transactions from an accounting export for the
+// cost report (actualsimport.js; src/actuals.rs). One undo step; the Actuals
+// tab lists them and can remove the import.
+Object.assign(COMMANDS, {
+  'file.import_actuals': () => {
+    if (grid.editor) grid.commitEdit(null);
+    if (!state.view) return;
+    importActuals({
+      invoke,
+      apply: (v) => apply(v, { cmd: 'actuals_import' }),
+      toast,
+      focus: () => grid.focus(),
+    });
+  },
+});
+
 /** Runs one of importsetup.js's commands for the budget on screen. */
 function startFromBudget(run, cmd) {
   if (grid.editor) grid.commitEdit(null);
@@ -2207,6 +2401,7 @@ async function goToCompared(place) {
 for (const [id, cmd, label] of [
   ['btn-versions', 'file.versions', 'Versions: save, restore and compare named copies of this budget'],
   ['btn-compare', 'file.compare', 'Compare this budget with others, or with its versions'],
+  ['btn-setup', 'view.setup', 'Budget Setup: every setup table, charges, credits and the budget settings, in a window of their own'],
 ]) {
   const b = $(id);
   if (!b) continue;
@@ -2315,6 +2510,27 @@ function listenToEvents() {
   on('tools-jump', (entry) => {
     if (entry && typeof entry === 'object' && 'doc' in entry && entry.doc !== state.doc) return;
     jumpTo(entry);
+  });
+  // The tools window's way to Budget Setup (its Setup buttons).
+  on('tools-setup', (p) => {
+    if (p && typeof p === 'object') openSetup(p.tab, p.item);
+  });
+  // The Budget Setup window (src/setupwin.rs): what to show once it listens,
+  // the tab it shows, a line count clicked there, Escape there, its place,
+  // and its closing (focus back to the grid).
+  on('setup-ready', () => {
+    emitTo('setup', 'setup-state', setupPending || { tab: readSetupTab(), item: null, focus: null });
+    setupPending = null;
+  });
+  on('setup-tab', (tab) => {
+    if (isSetupTab(tab)) writePref('setupTab', tab);
+  });
+  on('setup-find', findUsesFromSetup);
+  on('setup-close', () => invoke('close_setup_window').catch(() => {}));
+  on('setup-geometry', saveSetupGeometry);
+  on('setup-closed', () => {
+    setupPending = null;
+    if (!isModalOpen()) grid.focus();
   });
 }
 

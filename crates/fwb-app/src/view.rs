@@ -66,6 +66,10 @@ pub struct View {
     /// The window's panes: one, or two side by side (split view), each
     /// pane's tabs and the one in front, and which pane is the target.
     pub panes: Option<crate::docs::PanesInfo>,
+    /// Cost figures (actual, estimate to complete...) when the budget has
+    /// actuals: every account, category and summary row, and the lines of
+    /// `account` (src/actuals.rs). The session fills it in.
+    pub cost: Option<crate::actuals::CostDto>,
 }
 
 /// One account in full: its rows in file-format JSON and their totals.
@@ -102,6 +106,8 @@ pub struct FullView {
     pub can_undo: bool,
     pub can_redo: bool,
     pub variance: Option<VarianceDto>,
+    /// Cost figures with every line's sums, when the budget has actuals.
+    pub cost: Option<crate::actuals::CostDto>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -216,14 +222,17 @@ fn line_preset_entry(p: &LinePreset) -> serde_json::Value {
 }
 
 /// Takes the heavy parts out of a budget (detail rows, the baseline's row
-/// totals, versions, line blocks) and puts them back when dropped, even on a
-/// panic, so the outline can be written without copying the budget.
+/// totals, versions, line blocks, actuals) and puts them back when dropped,
+/// even on a panic, so the outline can be written without copying the budget.
 struct Stripped<'a> {
     b: &'a mut Budget,
     details: Vec<Vec<Detail>>,
     baseline_rows: Option<BTreeMap<RowId, Cents>>,
     versions: Vec<Version>,
     line_presets: Vec<LinePreset>,
+    /// The transactions go to the page through the Actuals tab's list and
+    /// the cost figures, never in the outline.
+    actuals: std::sync::Arc<fwb_core::actuals::Actuals>,
     keep_details: bool,
 }
 
@@ -244,12 +253,14 @@ impl<'a> Stripped<'a> {
         };
         let versions = std::mem::take(&mut b.versions);
         let line_presets = std::mem::take(&mut b.line_presets);
+        let actuals = std::mem::take(&mut b.actuals);
         Stripped {
             b,
             details,
             baseline_rows,
             versions,
             line_presets,
+            actuals,
             keep_details,
         }
     }
@@ -273,6 +284,7 @@ impl Drop for Stripped<'_> {
         }
         self.b.versions = std::mem::take(&mut self.versions);
         self.b.line_presets = std::mem::take(&mut self.line_presets);
+        self.b.actuals = std::mem::take(&mut self.actuals);
     }
 }
 
@@ -464,6 +476,7 @@ impl View {
             doc: 0,
             tabs: Vec::new(),
             panes: None,
+            cost: None,
         }
     }
 }
@@ -482,6 +495,7 @@ impl FullView {
             file: st.file(),
             can_undo: st.can_undo,
             can_redo: st.can_redo,
+            cost: None,
         }
     }
 }

@@ -22,6 +22,7 @@ use crate::Cents;
 
 pub mod breakdown;
 pub mod cache;
+pub mod explain;
 pub(crate) mod fringes;
 pub(crate) mod lines;
 #[cfg(test)]

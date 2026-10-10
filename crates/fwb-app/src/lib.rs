@@ -7,15 +7,18 @@
 //! without giving up on the first bad cell, and [`view`] is what the UI draws.
 //! The UI itself is static HTML/CSS/JS in `ui/`; see docs/APP.md.
 
+pub mod actuals;
 pub mod app;
 pub mod apply;
 pub mod batch;
 pub mod clipboard;
 pub mod compare;
 pub mod diagnose;
+pub mod diffmerge;
 pub mod display;
 pub mod docs;
 pub mod edit;
+pub mod explain;
 pub mod export;
 pub mod find;
 pub mod history;
@@ -24,6 +27,7 @@ pub mod library;
 pub mod menu;
 pub mod moverows;
 pub mod notes;
+pub mod overtime;
 #[cfg(target_os = "macos")]
 mod pdf_mac;
 pub mod presets;
@@ -37,6 +41,7 @@ pub mod safety;
 pub mod safety_app;
 pub mod session;
 pub mod setup_lists;
+pub mod setupwin;
 pub mod sharing;
 pub mod sheet_import;
 pub mod tabs;

@@ -21,7 +21,8 @@
       "freezePrototype": true,
       "capabilities": [
         "main",
-        "tools"
+        "tools",
+        "setup"
       ]
     }
   },

@@ -1,0 +1,199 @@
+/* What Changed and Merge Changes From (js/diffmerge.js). The dialogs use the
+   compare screen's frame and left column (compare.css); this is the list of
+   changes, the money tables and the conflicts. Colors come from the tokens
+   in styles.css, so dark mode follows them. No inline styles (the CSP). */
+
+.wc-host {
+  padding: 12px 16px 24px;
+}
+
+.wc-summary {
+  margin: 0 0 8px;
+}
+
+.wc-host .cmp-note {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.wc-cand {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.wc-cand input {
+  accent-color: var(--accent);
+}
+
+/* Changes, grouped under their headings. */
+
+.wc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0 14px;
+}
+
+.wc-group-head,
+.mg-head {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mg-head {
+  margin-top: 14px;
+}
+
+.wc-items,
+.mg-conflicts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wc-item {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.wc-item:hover {
+  background: var(--row-hover);
+}
+
+.wc-kind {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.wc-item.is-added .wc-kind {
+  color: var(--accent);
+}
+
+.wc-item.is-removed .wc-kind {
+  color: var(--danger);
+}
+
+.wc-text {
+  overflow-wrap: anywhere;
+}
+
+.wc-go {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wc-go:hover,
+.wc-go:focus-visible {
+  text-decoration: underline;
+}
+
+/* Money before and after. */
+
+table.wc-money {
+  border-collapse: collapse;
+  margin: 8px 0 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wc-money caption {
+  padding-bottom: 4px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.wc-money th,
+.wc-money td {
+  height: 24px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border-soft);
+  white-space: nowrap;
+}
+
+.wc-money thead th {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.wc-money th.wc-money-name {
+  font-weight: normal;
+  text-align: left;
+}
+
+.wc-money .num {
+  text-align: right;
+}
+
+.wc-delta {
+  font-weight: 600;
+}
+
+.wc-delta.is-down {
+  color: var(--danger);
+}
+
+/* Conflicts: what, what it was, and a side to pick. */
+
+.mg-conflict {
+  padding: 6px 6px 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.mg-what {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.mg-base {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.mg-opts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.mg-opt {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.mg-opt:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--selection);
+}
+
+.mg-opt input {
+  accent-color: var(--accent);
+}
+
+.mg-opt-label {
+  font-weight: 600;
+}
+
+.mg-opt-value {
+  overflow-wrap: anywhere;
+}

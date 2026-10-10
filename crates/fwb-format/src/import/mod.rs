@@ -23,9 +23,12 @@
 //! [`MAX_CELL_CHARS`]) keep a hostile file from using up memory; a table cut
 //! short by them says so ([`Table::truncated`]).
 
+pub mod actuals;
 pub mod csvread;
 pub mod inflate;
 pub mod mapping;
+/// A column mapping saved as a JSON file (`fwb import --mapping`).
+pub mod mapping_file;
 pub mod merge;
 pub mod xlsxread;
 pub mod xml;

@@ -2,17 +2,22 @@
 // window) or side by side (docked at the bottom), decisions.md entry 21.
 //
 // Default tabs: Fringes, Groups, Globals, Units, Presets and Find in the first pane; Sets,
-// Locations, Currency, Notes, Budget and Library in the second. Budget has its own
-// tabs: Charges, Credits, Info, Settings and Baseline. A tab can be dragged
+// Locations, Currency, Notes, Library and History in the second. A tab can be dragged
 // to another place in its pane or to the other pane (or moved with
-// Option+Shift+arrows); the arrangement, each pane's tab and the Budget tab's
-// tab are remembered (prefs.js). The header shows what is selected in the
-// grid and three buttons for where the panel goes.
+// Option+Shift+arrows); the arrangement and each pane's tab are remembered
+// (prefs.js). The header shows what is selected in the grid and three
+// buttons for where the panel goes.
+//
+// The tabs are for applying and browsing: each setup table's full editor,
+// and the budget's own setup (charges, credits, info, settings, baseline),
+// are in the Budget Setup window (setupwin.js, decisions.md entry 42), which
+// ctx.openSetup opens. A layout saved before that with a Budget tab loses
+// it (normalizeLayout drops tabs it doesn't know).
 //
 // renderTools(host, view, ctx) draws everything on every new view, as the
 // side panel always has: lists of fringes, groups, sets, locations and
-// currencies come from apply.js, globals, units and the Budget tabs from
-// setup.js and topsheet-setup.js, notes from notes.js, find and replace from
+// currencies come from apply.js, compact globals and units from setup.js,
+// notes from notes.js, find and replace from
 // find.js, tag presets and line blocks from presets.js, the setup library
 // from library.js, the undo history from history.js. ctx:
 //   call(cmd, args)      runs a command and redraws from its view
@@ -27,6 +32,7 @@
 //   toast(message)       a short message (a rename says what it changed)
 //   historyJump(to)      the History tab: undo or redo to `to` steps applied
 //   historySave(step, name)  the History tab: a step saved as a version
+//   openSetup(tab, item) the Budget Setup window on `tab` (and item `item`)
 //
 // Nothing here uses inline styles or innerHTML: drag feedback is classes,
 // icons are SVG elements built with DOM calls.
@@ -35,13 +41,17 @@ import { el, isMac } from './dom.js';
 import { readPref, writePref } from './prefs.js';
 import { applyView, applyHeadHost, applyListHost, APPLY_LISTS } from './apply.js';
 import { setupBegin, renderSetupTab, setupEnd } from './setup.js';
-import { EXTRA_TABS } from './topsheet-setup.js';
 import { renderNotes } from './notes.js';
 import { renderFind, findFor } from './find.js';
 import { onUsage, setFindHook } from './setuplist.js';
 import { renderPresets } from './presets.js';
 import { renderLibrary } from './library.js';
 import { renderHistory } from './history.js';
+// Explain This Number and the overtime helper (explain.js, overtime.js).
+import { renderExplain } from './explain.js';
+import { renderOvertime } from './overtime.js';
+// Actuals and estimates to complete (actuals.js).
+import { renderActuals } from './actuals.js';
 
 const TOOL_TABS = [
   { id: 'fringes', label: 'Fringes' },
@@ -53,23 +63,20 @@ const TOOL_TABS = [
   { id: 'locations', label: 'Locations' },
   { id: 'currencies', label: 'Currency' },
   { id: 'notes', label: 'Notes' },
-  { id: 'budget', label: 'Budget' },
   { id: 'find', label: 'Find' },
   { id: 'library', label: 'Library' },
   { id: 'history', label: 'History' },
+  { id: 'explain', label: 'Explain' },
+  { id: 'overtime', label: 'Overtime' },
+  { id: 'actuals', label: 'Actuals' },
 ];
-
-/** The Budget tab's own tabs. */
-const BUDGET_TABS = EXTRA_TABS;
 
 const PANES = ['top', 'bottom'];
 const TAB_IDS = TOOL_TABS.map((t) => t.id);
-const BUDGET_IDS = BUDGET_TABS.map((t) => t.id);
 
 const DEFAULT_LAYOUT = Object.freeze({
-  panes: { top: ['fringes', 'groups', 'globals', 'units', 'presets', 'find'], bottom: ['sets', 'locations', 'currencies', 'notes', 'budget', 'library', 'history'] },
+  panes: { top: ['fringes', 'groups', 'globals', 'units', 'presets', 'find', 'explain'], bottom: ['sets', 'locations', 'currencies', 'notes', 'library', 'history', 'overtime', 'actuals'] },
   active: { top: 'fringes', bottom: 'sets' },
-  budget: 'charges',
 });
 
 const POSITIONS = [
@@ -79,8 +86,9 @@ const POSITIONS = [
 ];
 
 /**
- * A layout with every tab exactly once: unknown tabs dropped, missing ones
- * added to the second pane, each pane's tab one it has.
+ * A layout with every tab exactly once: unknown tabs dropped (the old Budget
+ * tab among them: its tabs are in Budget Setup now), missing ones added to
+ * their default pane, each pane's tab one it has.
  */
 function normalizeLayout(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
@@ -98,8 +106,7 @@ function normalizeLayout(raw) {
   const activeIn = src.active && typeof src.active === 'object' ? src.active : {};
   const active = {};
   for (const p of PANES) active[p] = panes[p].includes(activeIn[p]) ? activeIn[p] : panes[p][0] || null;
-  const budget = BUDGET_IDS.includes(src.budget) ? src.budget : DEFAULT_LAYOUT.budget;
-  return { panes, active, budget };
+  return { panes, active };
 }
 
 let layout = normalizeLayout(readPref('toolsLayout', null));
@@ -124,22 +131,15 @@ function saveLayout() {
 }
 
 /**
- * Shows `tab` in its pane (a Budget tab: the Budget tab, on that tab). Returns
- * the key of its tab button, to focus once the panel is drawn, or null.
+ * Shows `tab` in its pane. Returns the key of its tab button, to focus once
+ * the panel is drawn, or null (not a tab of the panel).
  */
 export function selectToolsTab(tab) {
-  let id = tab;
-  let key = `tools:tab:${tab}`;
-  if (BUDGET_IDS.includes(tab)) {
-    layout.budget = tab;
-    id = 'budget';
-    key = `tools:subtab:${tab}`;
-  }
-  const pane = PANES.find((p) => layout.panes[p].includes(id));
+  const pane = PANES.find((p) => layout.panes[p].includes(tab));
   if (!pane) return null;
-  layout.active[pane] = id;
+  layout.active[pane] = tab;
   writePref('toolsLayout', layout);
-  return key;
+  return `tools:tab:${tab}`;
 }
 
 /** Focuses the control with data-key `key` in the drawn panel (a tab). */
@@ -159,11 +159,17 @@ let last = null;
 onUsage(() => rerender());
 
 // A setup list's line count was clicked: Find shows the item's uses.
-setFindHook((table, name) => {
+setFindHook((table, name) => findUses(table, name));
+
+/**
+ * The Find tab, showing where item `name` of `table` is used: a line count
+ * clicked here, or in the Budget Setup window (main.js, toolswin.js).
+ */
+export function findUses(table, name) {
   if (!selectToolsTab('find')) return;
   rerender();
   findFor(table, name);
-});
+}
 // True right after a drag, so the click that ends it doesn't select the tab.
 let dragged = false;
 
@@ -273,7 +279,7 @@ function pane(which, view, ctx) {
 
 function content(body, id, view, ctx) {
   if (APPLY_LISTS.includes(id)) body.append(applyListHost(id));
-  else if (id === 'globals' || id === 'units') renderSetupTab(body, id);
+  else if (id === 'globals' || id === 'units') renderSetupTab(body, id, { compact: true });
   else if (id === 'notes') {
     const host = el('div', { class: 'notes' });
     renderNotes(host, view, ctx);
@@ -294,7 +300,19 @@ function content(body, id, view, ctx) {
     const host = el('div', { class: 'history-host' });
     renderHistory(host, view, ctx);
     body.append(host);
-  } else if (id === 'budget') budgetTab(body);
+  } else if (id === 'explain') {
+    const host = el('div', { class: 'explain-host' });
+    renderExplain(host, view, ctx);
+    body.append(host);
+  } else if (id === 'overtime') {
+    const host = el('div', { class: 'overtime-host' });
+    renderOvertime(host, view, ctx);
+    body.append(host);
+  } else if (id === 'actuals') {
+    const host = el('div', { class: 'actuals-host' });
+    renderActuals(host, view, ctx);
+    body.append(host);
+  }
 }
 
 function tabLabel(id) {
@@ -471,56 +489,4 @@ function paintDrop(target) {
     n.classList.remove('drop-before', 'drop-after', 'drop-end');
   }
   if (target && target.el) target.el.classList.add(`drop-${target.side}`);
-}
-
-// ---------------------------------------------------------------------------
-// The Budget tab and its own tabs
-
-function budgetTab(body) {
-  const sub = BUDGET_IDS.includes(layout.budget) ? layout.budget : BUDGET_IDS[0];
-  const strip = el('div', { class: 'tools-subtabs', attrs: { role: 'tablist', 'aria-label': 'Budget' } });
-  BUDGET_TABS.forEach((t, i) => {
-    const on = t.id === sub;
-    const b = el('button', {
-      class: 'tools-subtab',
-      text: t.label,
-      attrs: {
-        type: 'button',
-        role: 'tab',
-        id: `tools-subtab-${t.id}`,
-        'aria-selected': String(on),
-        'aria-controls': 'tools-subpanel',
-        tabindex: on ? '0' : '-1',
-      },
-      data: { key: `tools:subtab:${t.id}`, nobusy: '1' },
-    });
-    const go = (id) => {
-      if (layout.budget !== id) {
-        layout.budget = id;
-        saveLayout();
-        rerender();
-      }
-      focusToolsKey(`tools:subtab:${id}`);
-    };
-    b.addEventListener('click', () => go(t.id));
-    b.addEventListener('keydown', (e) => {
-      if (e.altKey || e.metaKey || e.ctrlKey) return;
-      const n = BUDGET_TABS.length;
-      let j = null;
-      if (e.key === 'ArrowRight') j = (i + 1) % n;
-      else if (e.key === 'ArrowLeft') j = (i - 1 + n) % n;
-      else if (e.key === 'Home') j = 0;
-      else if (e.key === 'End') j = n - 1;
-      if (j === null) return;
-      e.preventDefault();
-      go(BUDGET_TABS[j].id);
-    });
-    strip.append(b);
-  });
-  const panel = el('div', {
-    class: 'tools-subpanel',
-    attrs: { role: 'tabpanel', id: 'tools-subpanel', 'aria-labelledby': `tools-subtab-${sub}` },
-  });
-  renderSetupTab(panel, sub);
-  body.append(strip, panel);
 }

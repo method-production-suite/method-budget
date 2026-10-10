@@ -93,6 +93,20 @@ pub fn percent_of(c: Cents, percent: Dec) -> Option<Cents> {
     Cents::try_from(div_round(n, SCALE * 100)?).ok()
 }
 
+/// The whole that `c` is `percent` percent of (`c * 100 / percent`), rounded
+/// once to cents. `None` when `percent` is zero or on overflow.
+pub fn whole_from_percent(c: Cents, percent: Dec) -> Option<Cents> {
+    let n = (c as i128).checked_mul(100)?.checked_mul(SCALE)?;
+    Cents::try_from(div_round(n, percent.0)?).ok()
+}
+
+/// `part` as a percentage of `whole`, rounded once to two decimal places
+/// (`1, 3` is `33.33`). `None` when `whole` is zero.
+pub fn percent_ratio(part: Cents, whole: Cents) -> Option<Dec> {
+    let hundredths = div_round((part as i128).checked_mul(10_000)?, whole as i128)?;
+    hundredths.checked_mul(SCALE / 100).map(Dec)
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ParseDecError {
     Invalid,
@@ -212,5 +226,28 @@ mod tests {
     #[test]
     fn divide_by_zero_is_none() {
         assert_eq!(Dec::ONE.checked_div(Dec::ZERO), None);
+    }
+
+    #[test]
+    fn percent_helpers_round_once() {
+        // 40% complete with 1,000.00 spent: 2,500.00 at completion.
+        assert_eq!(whole_from_percent(100_000, d("40")), Some(250_000));
+        // 1.00 is 30% of 3.333..., rounded once to 3.33.
+        assert_eq!(whole_from_percent(100, d("30")), Some(333));
+        // 0.01 is 0.3% of 3.333...: 3.33.
+        assert_eq!(whole_from_percent(1, d("0.3")), Some(333));
+        // Exactly half a cent rounds away from zero: 0.05 / 20% = 0.25,
+        // 0.01 / 40% = 0.025 -> 0.03, and -0.025 -> -0.03.
+        assert_eq!(whole_from_percent(1, d("40")), Some(3));
+        assert_eq!(whole_from_percent(-1, d("40")), Some(-3));
+        assert_eq!(whole_from_percent(5, Dec::ZERO), None);
+        assert_eq!(percent_ratio(1, 3), Some(d("33.33")));
+        assert_eq!(percent_ratio(2, 3), Some(d("66.67")));
+        assert_eq!(percent_ratio(-1, 8), Some(d("-12.5")));
+        assert_eq!(percent_ratio(15, 10), Some(d("150")));
+        assert_eq!(percent_ratio(1, 0), None);
+        // Half a hundredth of a percent rounds away from zero.
+        assert_eq!(percent_ratio(1, 80_000), Some(d("0")));
+        assert_eq!(percent_ratio(1, 20_000), Some(d("0.01")));
     }
 }

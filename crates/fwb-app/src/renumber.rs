@@ -104,8 +104,8 @@ pub fn apply(b: &mut fwb_core::Budget, widths: [u8; 4], separator: Option<&str>)
 }
 
 // ---------------------------------------------------------------------------
-// Commands (registered in app.rs, build.rs and both capabilities: the
-// Settings tab can be in the tools window)
+// Commands (registered in app.rs, build.rs, and the main window's and the
+// Budget Setup window's capabilities: the Settings tab is in Budget Setup)
 
 /// What renumbering budget `doc` to the pattern would do. Changes nothing.
 /// Each width is its own argument, as for `set_account_coding`.

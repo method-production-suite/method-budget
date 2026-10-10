@@ -40,8 +40,11 @@ export const SHORTCUTS = [
   { id: 'file.save_as_template', group: 'File', label: 'Save a copy of the budget as a template: no lines, info, baseline, versions or notes', scope: 'menu' },
   { id: 'file.import_setup', group: 'File', label: 'Import setup items from another budget file, with what they need', scope: 'menu' },
   { id: 'file.import_spreadsheet', group: 'File', label: 'Import lines from an Excel workbook, CSV or tab-delimited file, mapping its columns to budget fields', scope: 'menu' },
+  { id: 'file.import_actuals', group: 'File', label: 'Import actual costs from an accounting export (Excel, CSV or tab-delimited), matched to accounts, for the cost report', scope: 'menu' },
   { id: 'file.versions', group: 'File', label: 'Versions: save, restore, rename and compare named copies of the budget', scope: 'menu' },
   { id: 'file.compare', group: 'File', label: 'Compare the budget with open budgets, its versions or other files', scope: 'menu' },
+  { id: 'file.what_changed', group: 'File', label: 'What changed: every change since a version, the saved file, an open budget or another file, in plain words, with the money it moved', scope: 'menu' },
+  { id: 'file.merge', group: 'File', label: 'Merge changes from a returned copy: both sides’ changes since the version it was shared from; pick a side where they clash', scope: 'menu' },
   { id: 'file.print_budget', group: 'File', label: 'Print: choose sections and layout, preview, save as PDF', keys: 'mod+p', scope: 'app' },
   { id: 'file.print_topsheet', group: 'File', label: 'Print the topsheet', keys: 'mod+shift+p', scope: 'app' },
   // File > Export: spreadsheets of the budget (src/export.rs).
@@ -74,6 +77,9 @@ export const SHORTCUTS = [
   { id: 'edit.note', group: 'Edit', label: 'Add a dated note to the line, account or category', keys: 'mod+shift+space', scope: 'grid' },
   { id: 'edit.make_range', group: 'Edit', label: 'Make the selected lines one fringe range', keys: 'mod+r', scope: 'grid' },
   { id: 'edit.remove_range', group: 'Edit', label: 'Take the selected lines out of their fringe range', keys: 'mod+shift+r', scope: 'grid' },
+  // How a total is worked out (explain.js) and the overtime helper (overtime.js).
+  { id: 'edit.explain', group: 'Edit', label: 'Explain the total under the cursor: every step of how it is worked out, in the Explain tab', keys: 'mod+e', scope: 'grid' },
+  { id: 'edit.overtime', group: 'Edit', label: 'Overtime helper: work out a day or week of a labor line with overtime, and write it into the line', scope: 'menu' },
   // Find and replace: the Find tab of the tools panel (find.js). Cmd+G is
   // the Globals tab, so the next and previous result are F3 and Shift+F3
   // (and Enter and Shift+Enter in the Find box).
@@ -145,24 +151,35 @@ export const SHORTCUTS = [
   { id: 'view.zoom_in', group: 'View', label: 'Zoom the grid in', keys: 'mod+alt+=', scope: 'app' },
   { id: 'view.zoom_out', group: 'View', label: 'Zoom the grid out', keys: 'mod+alt+-', scope: 'app' },
   { id: 'view.zoom_reset', group: 'View', label: 'Grid at actual size', keys: 'mod+alt+0', scope: 'app' },
-  // Tools tabs take the keys long-time users of other budgeting tools have in
-  // their hands (decisions.md, entry 15).
-  { id: 'view.tab.fringes', group: 'View', label: 'Tools: Fringes', keys: 'mod+3', scope: 'app' },
-  { id: 'view.tab.groups', group: 'View', label: 'Tools: Groups', keys: 'mod+4', scope: 'app' },
-  { id: 'view.tab.globals', group: 'View', label: 'Tools: Globals', keys: 'mod+g', scope: 'app' },
-  { id: 'view.tab.units', group: 'View', label: 'Tools: Units', keys: 'mod+7', scope: 'app' },
+  // Budget Setup (setupwin.js): the window, and each of its tabs, with the
+  // keys long-time users of other budgeting tools have in their hands
+  // (decisions.md, entries 15 and 42).
+  { id: 'view.setup', group: 'View', label: 'Budget Setup: every setup table, charges, credits and the budget settings, in a window of their own', scope: 'menu' },
+  { id: 'view.tab.fringes', group: 'View', label: 'Budget Setup: Fringes', keys: 'mod+3', scope: 'app' },
+  { id: 'view.tab.groups', group: 'View', label: 'Budget Setup: Groups', keys: 'mod+4', scope: 'app' },
+  { id: 'view.tab.globals', group: 'View', label: 'Budget Setup: Globals', keys: 'mod+g', scope: 'app' },
+  { id: 'view.tab.units', group: 'View', label: 'Budget Setup: Units', keys: 'mod+7', scope: 'app' },
+  { id: 'view.tab.sets', group: 'View', label: 'Budget Setup: Sets', keys: 'mod+8', scope: 'app' },
+  { id: 'view.tab.locations', group: 'View', label: 'Budget Setup: Locations', keys: 'mod+5', scope: 'app' },
+  { id: 'view.tab.currencies', group: 'View', label: 'Budget Setup: Currency', keys: 'mod+6', scope: 'app' },
+  { id: 'view.tab.charges', group: 'View', label: 'Budget Setup: Charges', keys: 'mod+/', scope: 'app' },
+  { id: 'view.tab.credits', group: 'View', label: 'Budget Setup: Credits', keys: 'mod+backslash', scope: 'app' },
+  { id: 'view.tab.info', group: 'View', label: 'Budget Setup: Info', scope: 'menu' },
+  { id: 'view.tab.settings', group: 'View', label: 'Budget Setup: Settings (budget preferences)', keys: 'mod+9', scope: 'app' },
+  { id: 'view.tab.baseline', group: 'View', label: 'Budget Setup: Baseline', scope: 'menu' },
+  // The tools panel's tabs (tools.js): the apply lists and browsing.
+  { id: 'view.tool.fringes', group: 'View', label: 'Tools: Fringes (apply to the selected lines)', scope: 'menu' },
+  { id: 'view.tool.groups', group: 'View', label: 'Tools: Groups (apply to the selected lines)', scope: 'menu' },
+  { id: 'view.tool.globals', group: 'View', label: 'Tools: Globals', scope: 'menu' },
+  { id: 'view.tool.units', group: 'View', label: 'Tools: Units', scope: 'menu' },
   { id: 'view.tab.presets', group: 'View', label: 'Tools: Presets (tag presets and line blocks)', scope: 'menu' },
-  { id: 'view.tab.sets', group: 'View', label: 'Tools: Sets', keys: 'mod+8', scope: 'app' },
-  { id: 'view.tab.locations', group: 'View', label: 'Tools: Locations', keys: 'mod+5', scope: 'app' },
-  { id: 'view.tab.currencies', group: 'View', label: 'Tools: Currency', keys: 'mod+6', scope: 'app' },
+  { id: 'view.tool.sets', group: 'View', label: 'Tools: Sets (apply to the selected lines)', scope: 'menu' },
+  { id: 'view.tool.locations', group: 'View', label: 'Tools: Locations (apply to the selected lines)', scope: 'menu' },
+  { id: 'view.tool.currencies', group: 'View', label: 'Tools: Currency (apply to the selected lines)', scope: 'menu' },
   { id: 'view.tab.notes', group: 'View', label: 'Tools: Notes (notes on the line, account or category, and every note as a checklist)', scope: 'menu' },
   { id: 'view.tab.history', group: 'View', label: 'Tools: History (every change you can undo; go back to one, or save it as a version)', scope: 'menu' },
   { id: 'view.tab.library', group: 'View', label: 'Tools: Library (your setup library: copy setup items into this budget or save them to it)', scope: 'menu' },
-  { id: 'view.tab.charges', group: 'View', label: 'Tools: Budget, Charges', keys: 'mod+/', scope: 'app' },
-  { id: 'view.tab.credits', group: 'View', label: 'Tools: Budget, Credits', keys: 'mod+backslash', scope: 'app' },
-  { id: 'view.tab.info', group: 'View', label: 'Tools: Budget, Info', scope: 'menu' },
-  { id: 'view.tab.settings', group: 'View', label: 'Tools: Budget, Settings (budget preferences)', keys: 'mod+9', scope: 'app' },
-  { id: 'view.tab.baseline', group: 'View', label: 'Tools: Budget, Baseline', scope: 'menu' },
+  { id: 'view.tab.actuals', group: 'View', label: 'Tools: Actuals (imported transactions, imports, and each account’s estimate to complete)', scope: 'menu' },
   // The tools panel's tab strips (tools.js).
   { id: 'tools.tab_keys', group: 'View', label: 'Tools tabs: the previous or next tab in the pane', keys: ['left', 'right'], scope: 'builtin' },
   { id: 'tools.move_tab', group: 'View', label: 'Tools tabs: move the tab left or right, or to the other pane', keys: ['alt+shift+left', 'alt+shift+right', 'alt+shift+up', 'alt+shift+down'], scope: 'builtin' },

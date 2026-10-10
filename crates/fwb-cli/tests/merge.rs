@@ -1,0 +1,156 @@
+//! `fwb diff`, `fwb merge` and `fwb merge-driver` end to end
+//! (docs/MERGE.md).
+
+use std::path::PathBuf;
+use std::process::{Command, Output};
+
+fn fwb(args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_fwb"))
+        .args(args)
+        .output()
+        .expect("fwb runs")
+}
+
+fn out(o: &Output) -> String {
+    String::from_utf8_lossy(&o.stdout).into_owned()
+}
+
+fn err(o: &Output) -> String {
+    String::from_utf8_lossy(&o.stderr).into_owned()
+}
+
+fn code(o: &Output) -> i32 {
+    o.status.code().expect("exited")
+}
+
+/// A fresh folder for one test, with a starter budget as `base.fwb`.
+struct Dir(PathBuf);
+
+impl Dir {
+    fn new(name: &str) -> Dir {
+        let p = std::env::temp_dir().join(format!("fwb-merge-it-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&p);
+        std::fs::create_dir_all(&p).unwrap();
+        let d = Dir(p);
+        assert_eq!(code(&fwb(&["new", &d.path("base.fwb")])), 0);
+        d
+    }
+
+    fn path(&self, name: &str) -> String {
+        self.0.join(name).to_string_lossy().into_owned()
+    }
+
+    fn read(&self, name: &str) -> String {
+        std::fs::read_to_string(self.path(name)).unwrap()
+    }
+
+    /// A copy of the base with the `n`-th `"rate": "<from>"` set to `to`.
+    fn edited(&self, name: &str, edits: &[(&str, &str)]) -> String {
+        let mut text = self.read("base.fwb");
+        for (from, to) in edits {
+            let needle = format!("\"rate\": \"{from}\"");
+            assert!(text.contains(&needle), "{needle}");
+            text = text.replacen(&needle, &format!("\"rate\": \"{to}\""), 1);
+        }
+        std::fs::write(self.path(name), text).unwrap();
+        self.path(name)
+    }
+}
+
+impl Drop for Dir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+#[test]
+fn diff_prints_plain_words_and_json() {
+    let d = Dir::new("diff");
+    let base = d.path("base.fwb");
+    let new = d.edited("new.fwb", &[("50000", "55000")]);
+    let o = fwb(&["diff", &base, &new]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let text = out(&o);
+    assert!(
+        text.contains("line 1: rate 50,000.00 -> 55,000.00 (+5,000.00 to"),
+        "{text}"
+    );
+    assert!(text.contains("Grand total"), "{text}");
+    let o = fwb(&["diff", &base, &new, "--json"]);
+    assert_eq!(code(&o), 0);
+    let json = out(&o);
+    assert!(json.contains("\"kind\": \"changed\""), "{json}");
+    assert!(json.contains("\"field\": \"rate\""), "{json}");
+    // The same file: nothing, and --exit-code says so.
+    let o = fwb(&["diff", &base, &base, "--exit-code"]);
+    assert_eq!(code(&o), 0);
+    assert_eq!(out(&o), "No changes.\n");
+    let o = fwb(&["diff", &base, &new, "--exit-code"]);
+    assert_eq!(code(&o), 1);
+    assert!(out(&o).contains("rate"));
+    // Usage.
+    assert_eq!(code(&fwb(&["diff", &base])), 2);
+}
+
+#[test]
+fn merge_takes_both_sides_and_lists_conflicts() {
+    let d = Dir::new("merge");
+    let base = d.path("base.fwb");
+    let ours = d.edited("ours.fwb", &[("50000", "55000")]);
+    let theirs = d.edited("theirs.fwb", &[("75000", "80000")]);
+    let merged = d.path("merged.fwb");
+    let o = fwb(&["merge", &base, &ours, &theirs, "-o", &merged]);
+    assert_eq!(code(&o), 0, "{}{}", out(&o), err(&o));
+    let text = d.read("merged.fwb");
+    assert!(text.contains("\"rate\": \"55000\"") && text.contains("\"rate\": \"80000\""));
+
+    // The same rate both ways: a conflict, ours kept, exit 1.
+    let theirs = d.edited("theirs2.fwb", &[("50000", "60000")]);
+    let o = fwb(&["merge", &base, &ours, &theirs, "-o", &merged]);
+    assert_eq!(code(&o), 1);
+    assert!(
+        out(&o).contains("rate: ours 55,000.00, theirs 60,000.00, was 50,000.00 (took ours)"),
+        "{}",
+        out(&o)
+    );
+    assert!(
+        err(&o).contains("1 conflict settled for ours"),
+        "{}",
+        err(&o)
+    );
+    assert!(d.read("merged.fwb").contains("\"rate\": \"55000\""));
+    let o = fwb(&["merge", &base, &ours, &theirs, "-o", &merged, "--theirs"]);
+    assert_eq!(code(&o), 1);
+    assert!(d.read("merged.fwb").contains("\"rate\": \"60000\""));
+
+    // Usage.
+    assert_eq!(code(&fwb(&["merge", &base, &ours, &theirs])), 2);
+    assert_eq!(
+        code(&fwb(&[
+            "merge", &base, &ours, &theirs, "-o", &merged, "--ours", "--theirs"
+        ])),
+        2
+    );
+}
+
+#[test]
+fn merge_driver_writes_ours_in_place() {
+    let d = Dir::new("driver");
+    let base = d.path("base.fwb");
+    let ours = d.edited("ours.fwb", &[("50000", "55000")]);
+    let theirs = d.edited("theirs.fwb", &[("75000", "80000")]);
+    let o = fwb(&["merge-driver", &base, &ours, &theirs, "budget.fwb"]);
+    assert_eq!(code(&o), 0, "{}{}", out(&o), err(&o));
+    let text = d.read("ours.fwb");
+    assert!(text.contains("\"rate\": \"55000\"") && text.contains("\"rate\": \"80000\""));
+    // A conflict: exit 1 so git marks the file conflicted.
+    let theirs = d.edited("theirs2.fwb", &[("50000", "60000")]);
+    let o = fwb(&["merge-driver", &base, &ours, &theirs, "budget.fwb"]);
+    assert_eq!(code(&o), 1);
+    assert!(err(&o).contains("budget.fwb"), "{}", err(&o));
+    // No common base (added on both branches).
+    std::fs::write(d.path("empty.fwb"), "").unwrap();
+    let o = fwb(&["merge-driver", &d.path("empty.fwb"), &ours, &theirs]);
+    assert_eq!(code(&o), 1);
+    assert!(err(&o).contains("no common base"), "{}", err(&o));
+}

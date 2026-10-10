@@ -55,8 +55,58 @@ export function indexView(view) {
   // Original (baseline) vs current, when the budget has a baseline: every
   // category and account, and the rows of the account on screen.
   const variance = view.variance && typeof view.variance === 'object' ? view.variance : null;
+  // Cost figures (actual, ETC, EAC...) when the budget has actuals: in step
+  // with the report's categories and levels (src/actuals.rs).
+  const cost = view.cost && typeof view.cost === 'object' && Array.isArray(view.cost.categories) ? view.cost : null;
 
-  return { b, r, topsheet, cats, levels, cellIssues, accountHasIssue, categoryHasIssue, variance };
+  return { b, r, topsheet, cats, levels, cellIssues, accountHasIssue, categoryHasIssue, variance, cost };
+}
+
+// ---------------------------------------------------------------------------
+// Cost report columns (Actual, ETC, EAC, EAC Var, % Spent): on the topsheet
+// and the account list when the budget has actuals (view.cost), before Total
+// like Orig and Var; the lines get Actual (transactions assigned to a line).
+// Shown until the user hides them from the column menu; never without
+// actuals. An over-budget row's EAC variance is marked (cost-over).
+
+/** "12.5" (Rust's percent with up to two places) as "12.50%". */
+export function percentText(p) {
+  if (p === null || p === undefined || p === '') return '';
+  const s = String(p);
+  const neg = s.startsWith('-');
+  const [int, frac = ''] = (neg ? s.slice(1) : s).split('.');
+  return `${neg ? '-' : ''}${decimal(`${int}.${frac.padEnd(2, '0').slice(0, 2)}`)}%`;
+}
+
+/** The cost cells for one row's figures ({ budget, actual, etc, eac, variance, percent, over, count }). */
+export function costCells(f, opts = {}) {
+  if (!f || typeof f !== 'object') return {};
+  const n = typeof f.count === 'number' ? f.count : 0;
+  const act = { text: money(f.actual), title: `${n} ${n === 1 ? 'transaction' : 'transactions'}` };
+  const out = {
+    act,
+    etc: { text: money(f.etc), title: opts.method ? opts.method : 'Estimate to complete' },
+    eac: { text: money(f.eac), title: 'Estimate at completion: actual plus estimate to complete' },
+    cvar: { text: money(f.variance), title: f.over ? 'Over budget: the estimate at completion is more than the budget' : 'Budget minus the estimate at completion' },
+    spent: { text: percentText(f.percent), title: 'Actual as a percentage of the budget' },
+  };
+  if (f.over) out.cvar.cls = 'cost-over';
+  return out;
+}
+
+/** How an account's estimate to complete is worked out, in words, for a tooltip. */
+function methodText(m) {
+  if (!m || typeof m !== 'object') return 'Estimate to complete: budget minus actual';
+  if (m.kind === 'manual') return `Estimate to complete: typed (${money(m.amount)})`;
+  if (m.kind === 'percent_complete') return `Estimate to complete: ${m.percent}% complete`;
+  return 'Estimate to complete: budget minus actual';
+}
+
+/** The cost figures of category `ci` and its account `ai` (null when there are none). */
+function costOf(ix, ci, ai = null) {
+  const c = ix.cost && ix.cost.categories ? ix.cost.categories[ci] : null;
+  if (!c) return null;
+  return ai === null ? c : c.accounts[ai] || null;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,8 +187,10 @@ const PROBLEM = 'Some cells inside have problems; totals count them as blank.';
  * Show or Hide Zero Accounts): it totals 0, has no problem cells, and wasn't
  * different when the baseline was locked.
  */
-function isZero(total, bad, change) {
+function isZero(total, bad, change, cost = null) {
   if (total !== 0 || bad) return false;
+  // A row with actuals or an estimate to complete isn't empty.
+  if (cost && cost.figures && (cost.figures.actual !== 0 || cost.figures.etc !== 0)) return false;
   return !(change && typeof change.original === 'number' && change.original !== 0);
 }
 
@@ -153,9 +205,9 @@ export const TOPSHEET_COLUMNS = [
   { key: 'total', label: 'Total', cls: 'num' },
 ];
 
-/** Columns with the shown Orig and Var columns put before Total. */
+/** Columns with the shown Orig and Var (and cost) columns put before Total. */
 function withBaselineColumns(cols, choices, ctx) {
-  const extra = BASELINE_COLUMNS.filter((c) => columnShown(c, choices, ctx)).map(({ key, label, cls, title }) => ({ key, label, cls, title }));
+  const extra = [...BASELINE_COLUMNS, ...COST_COLUMNS].filter((c) => columnShown(c, choices, ctx)).map(({ key, label, cls, title }) => ({ key, label, cls, title }));
   if (!extra.length) return cols;
   const at = cols.findIndex((c) => c.key === 'total');
   return [...cols.slice(0, at), ...extra, ...cols.slice(at)];
@@ -163,17 +215,19 @@ function withBaselineColumns(cols, choices, ctx) {
 
 /** Topsheet columns, with Orig and Var when the budget has a baseline (and they aren't hidden). */
 export function topsheetColumns(ix, choices) {
-  return withBaselineColumns(TOPSHEET_COLUMNS, choices, { baseline: Boolean(ix.variance) });
+  return withBaselineColumns(TOPSHEET_COLUMNS, choices, { baseline: Boolean(ix.variance), cost: Boolean(ix.cost) });
 }
 
-export function topsheetRows(ix) {
+export function topsheetRows(ix, choices = null) {
   const r = ix.r;
   const rows = [];
+  const lvCost = (lv) => (ix.cost && lv && ix.cost.levels[lv.li]) || null;
   for (const [ti, row] of ix.topsheet.entries()) {
     if (row.kind === 'production_total') {
       const lv = ix.levels.find((l) => l.ti === ti);
+      const lc = lvCost(lv);
       if (lv && lv.rep && lv.rep.posted_fringes) {
-        rows.push(staticRow(`f${ti}`, 'posted', 'Fringes', lv.rep.posted_fringes));
+        rows.push(staticRow(`f${ti}`, 'posted', 'Fringes', lv.rep.posted_fringes, lc ? costCells(lc.posted_fringes) : {}));
       }
       rows.push({
         key: `t${ti}`,
@@ -184,12 +238,14 @@ export function topsheetRows(ix) {
           code: {},
           name: { text: row.name, edit: row.name },
           total: lv && lv.rep ? moneyCell(lv.rep.total) : NA,
+          ...(lc ? costCells(lc.figures) : {}),
         },
       });
       continue;
     }
     const c = ix.cats.find((x) => x.ti === ti);
     const bad = ix.categoryHasIssue(ti);
+    const cc = c ? costOf(ix, c.ci) : null;
     rows.push({
       key: `t${ti}`,
       cls: 'category',
@@ -201,25 +257,35 @@ export function topsheetRows(ix) {
         name: noted({ text: row.name, edit: row.name }, row.notes),
         total: c && c.rep ? moneyCell(c.rep.total, bad ? { error: PROBLEM } : {}) : NA,
         ...(ix.variance ? varianceCells(ix.variance.categories[row.code]) : {}),
+        ...(cc ? costCells(cc.figures) : {}),
       },
-      zero: Boolean(c && c.rep) && isZero(c.rep.total, bad, ix.variance && ix.variance.categories[row.code]),
+      zero: Boolean(c && c.rep) && isZero(c.rep.total, bad, ix.variance && ix.variance.categories[row.code], cc),
     });
   }
   if (!r) return rows;
+  const cost = ix.cost;
+  const costShown = Boolean(cost) && COST_COLUMNS.some((col) => columnShown(col, choices, { cost: true }));
 
   // The budget's display settings can leave out the summary rows and the
   // net total (Budget > Settings). Display only.
   const disp = budgetDisplay(ix.b);
   if (disp.summary_rows) {
-    rows.push(staticRow('s-atl', 'summary first', 'Total above-the-line', r.total_atl));
-    rows.push(staticRow('s-btl', 'summary', 'Total below-the-line', r.total_btl));
-    rows.push(staticRow('s-atlbtl', 'summary', 'Total above and below-the-line', r.atl_btl));
+    rows.push(staticRow('s-atl', 'summary first', 'Total above-the-line', r.total_atl, cost ? costCells(cost.total_atl) : {}));
+    rows.push(staticRow('s-btl', 'summary', 'Total below-the-line', r.total_btl, cost ? costCells(cost.total_btl) : {}));
+    rows.push(staticRow('s-atlbtl', 'summary', 'Total above and below-the-line', r.atl_btl, cost ? costCells(cost.atl_btl) : {}));
   }
-  if (r.budget_fringes) rows.push(staticRow('s-fr', disp.summary_rows ? 'summary' : 'summary first', 'Total fringes', r.budget_fringes));
+  if (r.budget_fringes) rows.push(staticRow('s-fr', disp.summary_rows ? 'summary' : 'summary first', 'Total fringes', r.budget_fringes, cost && cost.budget_fringes ? costCells(cost.budget_fringes.figures) : {}));
   r.charges.forEach((c, i) => {
-    rows.push(staticRow(`s-ch${i}`, 'summary charge', chargeLabel(ix.b, c, i, money), c.amount));
+    rows.push(staticRow(`s-ch${i}`, 'summary charge', chargeLabel(ix.b, c, i, money), c.amount, cost && cost.charges[i] ? costCells(cost.charges[i].figures) : {}));
   });
-  rows.push(staticRow('s-grand', 'summary grand', 'Grand total', r.grand_total, ix.variance ? varianceCells(ix.variance.grand_total) : {}));
+  // Transactions no account in the chart claims: in the actual, never in the budget.
+  if (costShown && cost.unassigned && cost.unassigned.count) {
+    const row = staticRow('s-unassigned', 'summary cost-unassigned', 'Unassigned actuals', null, costCells(cost.unassigned));
+    row.cells.total = { text: '', title: 'Not in the budget: transactions whose account number isn’t in the chart' };
+    row.cells.name.title = 'Transactions whose account number isn’t in the chart, or have none (the Actuals tab lists them)';
+    rows.push(row);
+  }
+  rows.push(staticRow('s-grand', 'summary grand', 'Grand total', r.grand_total, { ...(ix.variance ? varianceCells(ix.variance.grand_total) : {}), ...(cost ? costCells(cost.total) : {}) }));
   r.credits.forEach((c, i) => {
     rows.push(staticRow(`s-cr${i}`, 'summary credit', `Less ${c.name}`, -c.amount));
   });
@@ -256,7 +322,7 @@ const FRINGE_POSTED = {
 export function accountColumns(ix, choices) {
   const title = FRINGE_POSTED[postingKind(ix)] || FRINGE_POSTED.category;
   const cols = ACCOUNT_COLUMNS.map((c) => (c.key === 'fringe_total' ? { ...c, title } : c));
-  return withBaselineColumns(cols, choices, { baseline: Boolean(ix.variance) });
+  return withBaselineColumns(cols, choices, { baseline: Boolean(ix.variance), cost: Boolean(ix.cost) });
 }
 
 /** How fringes post: 'budget', 'production_level', 'category' or 'account'. */
@@ -273,6 +339,7 @@ export function accountRows(ix, entry) {
   const rows = accounts.map((a, ai) => {
     const ar = rep ? rep.accounts[ai] : null;
     const bad = ix.accountHasIssue(entry.ti, ai);
+    const ac = costOf(ix, entry.ci, ai);
     return {
       key: `a${ai}`,
       code: a.code,
@@ -285,10 +352,12 @@ export function accountRows(ix, entry) {
         fringe_total: ar ? { text: ar.fringe_total ? money(ar.fringe_total) : '', cls: frCls } : NA,
         total: ar ? moneyCell(ar.total, bad ? { error: PROBLEM } : {}) : NA,
         ...(ix.variance ? varianceCells(ix.variance.accounts[a.code]) : {}),
+        ...(ac ? costCells(ac.figures, { method: methodText(ac.method) }) : {}),
       },
-      zero: Boolean(ar) && isZero(ar.total, bad, ix.variance && ix.variance.accounts[a.code]),
+      zero: Boolean(ar) && isZero(ar.total, bad, ix.variance && ix.variance.accounts[a.code], ac),
     };
   });
+  const catCost = costOf(ix, entry.ci);
   // Posting by category: the category's fringe account, read-only, before the total.
   if (rep && rep.fringe_account) {
     rows.push({
@@ -299,6 +368,7 @@ export function accountRows(ix, entry) {
         code: { text: rep.fringe_account.code },
         name: { text: 'Fringes', title: 'Fringes earned by every account in this category' },
         total: moneyCell(rep.fringe_account.amount),
+        ...(catCost && catCost.fringe_account ? costCells(catCost.fringe_account.figures, { method: methodText(catCost.fringe_account.method) }) : {}),
       },
     });
   }
@@ -311,6 +381,7 @@ export function accountRows(ix, entry) {
       fringe_total: rep ? { text: money(rep.fringe_total), cls: frCls } : NA,
       total: rep ? moneyCell(rep.total) : NA,
       ...(ix.variance ? varianceCells(ix.variance.categories[entry.cat.code]) : {}),
+      ...(catCost ? costCells(catCost.figures) : {}),
     },
   });
   return rows;
@@ -346,6 +417,8 @@ export const DETAIL_COLUMNS = [
   // With a baseline only (`baseline: true`), shown by default then.
   { key: 'orig', label: 'Orig', name: 'Orig (original total)', cls: 'num', title: 'The total when the baseline was locked', width: 120, min: 96, optional: true, on: 'baseline', baseline: true },
   { key: 'var', label: 'Var', name: 'Var (change since the baseline)', cls: 'num', title: 'How far the total has moved since the baseline was locked', width: 120, min: 96, optional: true, on: 'baseline', baseline: true },
+  // With actuals only (`cost: true`), shown by default then: the transactions assigned to each line.
+  { key: 'act', label: 'Actual', name: 'Actual (actual to date)', cls: 'num', title: 'Actual to date: the imported transactions (on a line, those assigned to it)', width: 120, min: 96, optional: true, on: 'cost', cost: true },
   { key: 'total', label: 'Total', cls: 'num', width: 130, min: 116, pin: 'right' },
 ];
 
@@ -356,6 +429,18 @@ export const OPTIONAL_DETAIL_COLUMNS = DETAIL_COLUMNS.filter((c) => c.optional);
 export const BASELINE_COLUMNS = DETAIL_COLUMNS.filter((c) => c.baseline);
 
 /**
+ * The cost report columns the topsheet and the account list show when the
+ * budget has actuals (Actual is also a detail column, for lines).
+ */
+export const COST_COLUMNS = [
+  DETAIL_COLUMNS.find((c) => c.key === 'act'),
+  { key: 'etc', label: 'ETC', name: 'ETC (estimate to complete)', cls: 'num', title: 'Estimate to complete: budget minus actual unless the Actuals tab sets another way', optional: true, on: 'cost', cost: true },
+  { key: 'eac', label: 'EAC', name: 'EAC (estimate at completion)', cls: 'num', title: 'Estimate at completion: actual plus estimate to complete', optional: true, on: 'cost', cost: true },
+  { key: 'cvar', label: 'EAC Var', name: 'EAC Var (budget minus EAC)', cls: 'num', title: 'Budget minus the estimate at completion; marked when over budget', optional: true, on: 'cost', cost: true },
+  { key: 'spent', label: '% Spent', name: '% Spent (actual of budget)', cls: 'num', title: 'Actual as a percentage of the budget', optional: true, on: 'cost', cost: true },
+];
+
+/**
  * Whether an optional column shows, given saved choices ({ key: boolean })
  * and `ctx.baseline` (the budget has a baseline). Orig and Var never show
  * without one, and show with one unless the user hid them.
@@ -363,8 +448,10 @@ export const BASELINE_COLUMNS = DETAIL_COLUMNS.filter((c) => c.baseline);
 export function columnShown(col, choices, ctx = {}) {
   if (!col.optional) return true;
   if (col.baseline && !ctx.baseline) return false;
+  if (col.cost && !ctx.cost) return false;
   const v = choices ? choices[col.key] : undefined;
   if (typeof v === 'boolean') return v;
+  if (col.on === 'cost') return Boolean(ctx.cost);
   return col.on === 'baseline' ? Boolean(ctx.baseline) : col.on;
 }
 
@@ -459,6 +546,17 @@ export function fringeRangeMarks(details, rows) {
   });
   close();
   return marks;
+}
+
+/**
+ * The account's whole actual on its total row (every transaction coded to
+ * it, assigned to a line or not), when the budget has actuals.
+ */
+function acctActual(ix, entry, ai) {
+  const ac = costOf(ix, entry.ci, ai);
+  if (!ac) return {};
+  const f = ac.figures;
+  return { act: { text: money(f.actual), title: `The account's actual to date (${f.count} ${f.count === 1 ? 'transaction' : 'transactions'}; lines show the ones assigned to them)` } };
 }
 
 /** A line with nothing typed in it yet (a newly inserted one): no description and no numbers. */
@@ -617,6 +715,10 @@ export function detailRows(ix, entry, ai, full, shown = null) {
     // Effective fringe percent: blank when the line has no total, or neither
     // fringes nor fringe dollars (0.00% still shows a fringe that earned nothing).
     if (ix.variance && rr && (line || kind === 'adjustment')) Object.assign(cells, varianceCells(ix.variance.rows[d.id]));
+    if (ix.cost && (line || kind === 'adjustment')) {
+      const got = ix.cost.lines ? ix.cost.lines[d.id] : null;
+      if (got) cells.act = { text: money(got.amount), title: `${got.count} ${got.count === 1 ? 'transaction' : 'transactions'} assigned to this line` };
+    }
     if (rr && line && rr.included && rr.total && (rr.fringe_total || (d.fringes || []).length)) {
       const parts = Object.entries(rr.fringes).map(([n, c]) => `${n}: ${fringePercent(c, rr.total)}`);
       cells.fringe_pct = { text: fringePercent(rr.fringe_total, rr.total), cls: 'muted', title: parts.join('\n') };
@@ -640,6 +742,7 @@ export function detailRows(ix, entry, ai, full, shown = null) {
       fringe_total: ar ? { text: money(ar.fringe_total), cls: 'muted' } : NA,
       fringe_pct: ar && ar.details_total && ar.fringe_total ? { text: fringePercent(ar.fringe_total, ar.details_total), cls: 'muted' } : {},
       ...(withFringes ? {} : acctChange),
+      ...(acctActual(ix, entry, ai)),
     },
   });
   if (withFringes) {

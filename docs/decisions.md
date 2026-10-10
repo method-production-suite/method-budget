@@ -1155,3 +1155,363 @@ Roadmap 2.26 (behavior note 04) and 2.23, with the calls they needed:
 - **Not yet**: more than two panes or a vertical split; per-pane tools panels (the
   reference docks the tools under each pane when split); keeping a step saved as a version
   from dropping the redo steps.
+
+## 41. The scriptable command line and version deltas as built (2026-10-09)
+
+Roadmap 3.12 and 3.4 (decision 17 left deltas for later):
+
+- **One module per subcommand.** `fwb` is a tiny dispatcher (`src/main.rs`, a table of
+  name, usage and function) over `src/cmd/<name>.rs`, with shared flag parsing, exit
+  codes and atomic writes in `src/cli.rs`, so new commands (diff, merge, explain,
+  actuals) are one file and one table entry each. It depends on `fwb-core` and
+  `fwb-format` only, never the app, and adds no crates (JSON output is written by hand).
+- **Exit codes are a contract** (docs/CLI.md): 0 ok, 1 failed, 2 usage, 3 edit refused
+  with nothing written. Every file a command writes goes through a temporary file and a
+  rename.
+- **Headless reports reuse the export's figures.** `fwb report` builds sections from a
+  saved preset with the same tables the spreadsheet export makes (decision 30), so a
+  report and an export never disagree, and filters never change totals (decision 28).
+  HTML is one self-contained print-ready page; text is fixed-width; CSV is the sections
+  one after another.
+- **PDF: our own small writer, not the app's.** The app's PDF is AppKit printing its web
+  view (decision 28), which needs a window. A typeset PDF without one would need font
+  metrics and layout we don't have, so the command line sets the plain-text layout in
+  Courier (a standard PDF font: nothing embedded, every reader has it, and a fixed
+  advance keeps figures aligned) on Letter pages with the preset's header, footer and
+  "Page X of Y": about 250 lines of std, PDF 1.4, WinAnsi text. Shading and colors stay
+  with the HTML and the app.
+- **Edits are a line-oriented script, not a query language.** `fwb apply` runs commands
+  (`set global`, `set fringe ... rate|cutoff`, `set line ROW FIELD VALUE`, `add`/`remove
+  tag`, `rename`, `apply`/`remove charge`, `set title`, `set compact_versions`) against a
+  copy; every line must succeed and the result must recalculate, or nothing is written.
+  Rows are named by id (`#17`, stable) or by account and position (`21-01:3`, as the grid
+  numbers them; `21-01:*` for every line). `fwb set` is one such command from a path
+  (`line.21-01:3.rate`). Renames call the engine's own rename (decision 32). `remove
+  charge` stops a charge counting rather than deleting it, so it can be applied again.
+  `--dry-run` prints `fwb diff`'s summary of what would change.
+- **Import reuses the app's importer** (decision 36) with a small JSON mapping file
+  (sheet, header row, field-to-column by letter or number, the two cautious switches);
+  without one, the header is found and columns guessed as the dialog does.
+- **Version deltas are opt-in per file.** FORMAT.md's rule is additive-only within
+  version 1 and strict readers: a new field must be left out at its default so older
+  readers keep working. So deltas sit behind a budget-level `compact_versions` switch, off
+  by default: files without it are byte-identical to before, and an older reader shown a
+  compact file refuses it cleanly (unknown field) rather than misreading it. A format
+  version 2 was rejected: it would make every file unreadable to older builds for a
+  feature most files don't need.
+- **Deltas are JSON Patches between neighbors.** Each version is an RFC 6902 patch
+  (add, remove, replace) against the version after it, the newest against the budget
+  itself, computed on the canonical JSON (common prefix and suffix, then a longest common
+  subsequence of array elements, edited elements patched inside when that is smaller).
+  A standard patch means any tool can rebuild versions without our code. The writer keeps
+  a full copy wherever a delta isn't smaller. Reading rebuilds every version as a full
+  `Arc<BudgetSnapshot>` and reads the patched object as strictly as a full version, so
+  the rest of the program never sees a delta; a patch that doesn't fit is an error naming
+  the version. Ten versions of the 5,000-row sample: 26 MB in full, 2.0 MB as deltas
+  (the budget alone is 2.0 MB).
+- **Not yet**: a switch for `compact_versions` in the app (the CLI's `fwb set ...
+  compact_versions true` turns it on; the app keeps it once set); the PDF's proportional
+  fonts, shading and the topsheet page column; scripted adding and deleting of rows and
+  accounts; a per-command JSON output for `set` and `apply`.
+
+## 42. The Budget Setup window and a compact tools panel (2026-10-09, Sam)
+
+Sam's live testing found the panel's Budget tab (charges, credits, info, settings,
+baseline) too big for a pane, and asked to match the reference product's balance: one setup
+window with the full editor of every setup table, and tool tabs in the main window made
+small and quick for applying (behavior notes 07, 09, 12, 23, 24, and the 2026 notes 01 and
+06, which win on the pane). As built:
+
+- **One Budget Setup window**, a sibling of the tools window (decision 24): a second web
+  view labelled `setup` on the same page (`index.html?panel=setup`, `setupwin.js`), made in
+  Rust (`src/setupwin.rs`) with a fixed page, calling the same commands on the same budgets.
+  It follows the budget in front (the target pane's when split): its commands name the
+  budget it drew, and `view-changed` reaches it like any window, so it refreshes on edits
+  made elsewhere and when another tab comes forward. The main window owns its tab, place and
+  size (per user, in the web view's storage) and tells it what to show (`setup-state`). A
+  sibling window rather than a mode of the tools window, because both can be open at once
+  and a window's capability is tied to its label: one more label, one more capability file,
+  and the tools window's code untouched but for its Setup buttons.
+- **Its tabs**: Fringes, Groups, Globals, Units, Sets, Locations, Currency, Charges,
+  Credits, Info, Settings and Baseline, each the full editor, reused rather than rewritten.
+  The five tag lists are `apply.js`'s lists drawn as setup tables (every column of the
+  definition: a fringe's description, rate, unit and cutoff; a group's color and whether it
+  counts; a location's place; a currency's rate and symbol), with the same in-place
+  editing, adding, deleting, renaming, ordering, short codes and in-use counts, a footer of
+  the budget's percent and flat fringe dollars, and no selection, so the summary is never
+  fetched there and nothing is applied. Globals and Units are `setup.js`'s full tables
+  (a global's details form included); the rest are `topsheet-setup.js`'s, renumbering
+  preview included. The setup library sits beside each table (`library.js`, set to the
+  table's kind) when the window is at least 860 pixels wide. Budget folders are not in this
+  step: the budget has no folders for items yet (the library's are shown in its rail).
+- **Ways in**: a Setup button on the toolbar, View > Budget Setup (Open Budget Setup and one
+  item per tab), and the setup keys long-time users know (Cmd+3 to Cmd+9, Cmd+G, Cmd+/,
+  Cmd+\\), which now open Budget Setup on their tab from any window instead of a panel tab.
+  The topsheet's Create charge and Create credit open it on that tab with the new item's
+  name box focused; Set up fringes and groups on the grid's menus open it on that table.
+  Escape (when no form, menu or uncommitted typing wants it) and Close Window or Close Tab
+  close it, and the main window takes focus back into the grid.
+- **The panel is for applying and browsing.** The Budget tab is gone (a saved layout that
+  had it simply loses it). Fringes, Groups, Sets, Locations and Currency keep their
+  checkboxes, selection dollars, line counts, filter, Applied only and Clear, now show a
+  fringe's or currency's rate as the key figure (the description moved to the tooltip),
+  and gain a Setup button and an Edit in Budget Setup item on the right-click menu. Their
+  double-click quick editor stays (decision 22 already covers editing where an item is
+  listed; it is a small form, not a bulky one). Globals stay editable in place (formula,
+  rename, delete, add) without the details form; Units show their plural and hours as text
+  (edited in Budget Setup). Presets, Find, Notes, History and Library stay as they were:
+  they act on the selection, the grid or the library, not on a table's definitions, and
+  are already compact. The panel's own tabs are listed under View > Tools Panel, without
+  keys.
+- **Strict capabilities.** `capabilities/setup.json` grants the setup window exactly what
+  its scripts call, minus the apply half of `apply.js` (a test checks both directions and
+  that setup mode never fetches a summary): the setup tables, charges, credits, info,
+  settings and renumbering, the baseline, and the library's commands. No selection edits,
+  notes, find, history, files, undo, tabs or windows; its other keys go to the main window
+  as menu commands. The tools window lost the commands only the Budget tab used
+  (charges, credits, info, settings, renumbering, the baseline, the numbers-on-screen
+  settings and a global's details), since the panel no longer calls them.
+- **Not yet**: the budget's own folders for setup items (the reference's folder rail inside
+  the budget); per-item selection inside a table for Move To and bulk delete; a line count
+  click in Budget Setup brings up Find in the panel but leaves the setup window in front.
+
+## 43. Explain this number and the overtime helper as built (2026-10-09)
+
+Roadmap 3.5 and 3.10.
+
+- **Explain this number** (`fwb_core::explain`, src/explain.rs, ui/js/explain.js,
+  `fwb explain`). Any total (a line, a subtotal row, a line's fringes or one fringe on it,
+  an account's total, lines or fringes, a category and its fringes, a production level and
+  its posted fringes, ATL, BTL, both, total fringes, each charge, the grand total, each
+  credit, all credits, the net total, one fringe across the budget) gives a tree of steps.
+  A **sum** adds the steps under it; a **value** is worked out from the notes under it;
+  a **note** explains and counts for nothing; a step can be **less** (credits under the
+  net total). The tree is **worked out again from the budget**, with the engine's own
+  pieces (formula evaluation, `earners`, `allocate`, `percent_of`, `mul_cents`), not copied
+  from the report, so a test can hold it to the report: on every total of the 5,000-line
+  sample, of smaller samples under every posting mode with exclude and only filters, and of
+  the hand-checked fixture, the signed sum of the leaves equals the number shown, and every
+  sum adds up. The explainer recalculates first (errors are the engine's), then works out
+  every line once; any number of totals are explained from that.
+- What it says: each line as amount, X, 4X and rate with globals by name and value
+  (`SHOOT_DAYS + PREP_DAYS = 40 (PREP_DAYS = 10, SHOOT_DAYS = 30) Days`), the quantity, the
+  product, the currency conversion and **every rounding** shown as unrounded to rounded,
+  half away from zero; an adjustment's base with the lines in its window; a left-out line
+  with the group (In budget total off) or report filter that left it out and what it would
+  be; each percent fringe with the earner's earnings, the cutoff, for a range the lines that
+  share it and **how much of the cutoff each line used** (the capped base split pro rata by
+  largest remainder, the same split the engine gives the fringe), the exact share and the
+  allocated cents; each flat fringe once per line or per unit with the hours conversion,
+  and why it fell back to once; where fringes post, wherever that decides what a total
+  holds; a charge's base, each excluded account with the rules that caught it (each line
+  counted once) and typed amounts; a credit's rows (gross with the accounts it came from,
+  excluded fringes, net, percent, caps), the rows added unrounded, the overall cap, the
+  discount and the one rounding.
+- **On demand only.** Nothing runs on an edit; RecalcCache and the reference engine are
+  untouched. In the app the command explains from the budget the totals on screen came
+  from (the sanitized copy when cells have problems, said as partial). What crosses the
+  bridge stays small: a step that can be explained on its own sends its children only near
+  the top (depth 2); deeper ones, and a note that points at another total (a line's
+  fringes, a charge's base), arrive closed with `more` and are fetched when opened. A grand
+  total of 5,000 lines sends under 400 steps.
+- In the app: **Explain This Number…** first in the right-click menu on any money cell at
+  every level, total rows the cursor can't reach included (grid.js `peek`), Edit > Explain
+  This Number…, and **Cmd+E** (Ctrl+E) on the cursor cell (free in the shortcut list and
+  the menu bar). It opens the **Explain** tab (first pane, after Find; saved layouts get it
+  added), a collapsible tree with plain-words lines and amounts; a click goes to the
+  step's line, account or category (the notes and find jump); keys as a tree. The tree is
+  asked for again when the budget changes, keeping what was open. With the panel popped
+  out the target goes with the panel's state. `fwb explain file.fwb <total>` names totals
+  as `21-01`, `21-01/lines`, `21-01/fringes`, `21`, `21/fringes`, `21-01:3`, `#ID`,
+  `level:`, `charge:`, `credit:`, `fringe:`, `atl`, `btl`, `atl+btl`, `fringes`, `credits`,
+  `grand` (or `topsheet`), `net`; `--depth N` cuts the printout.
+- **Overtime helper** (`fwb_core::overtime`, src/overtime.rs, ui/js/overtime.js). User
+  driven, no union or guild rules shipped. A pattern is straight-time hours, then bands
+  ("4 hours at 1.5x", the last band "the rest at 2x"; stored as hours per band, so there is
+  nothing to keep in order), and optional sixth and seventh day multipliers. On a sixth or
+  seventh day every hour is paid at least the day's multiple and a band above it still
+  wins (`max`), which covers both "time and a half all day" and "double time after 12 on
+  the sixth day" without more settings. Hours past a last band that has hours keep its
+  multiple. Inputs: straight-time hourly rate, hours a day (more than 0, at most 24), days a
+  week (1 to 7; days 6 and 7 get their multipliers when set, else they are regular days).
+- **Exact decimals, rounding once per line.** Pay is hours x rate x multiple in `Dec`,
+  never rounded by the helper. Writing **as the rate** puts the day's (one regular day) or
+  the week's pay into the line's rate as the exact decimal, so the line rounds once as
+  every line does. Writing **as split lines** makes one line per multiple, each keeping the
+  line's amount, units, X, 4X, currency and tags with its part of the pay as its rate (each
+  line rounds once), the first keeping the line's id and notes, new ids after the highest
+  in the budget, and all of them in **one fringe range** (the line's own, else the next
+  free number) so percent fringe cutoffs still treat them as one person (tested: the
+  category total matches the single-rate line). One multiple only: the rate is written.
+  Either way one undo step.
+- **Patterns** are saved in the budget by name (`ot_patterns`, docs/FORMAT.md, "Overtime
+  pattern"; additive, left out when empty), checked when read, tools not content like tag
+  presets: versions don't carry them, restoring keeps them, a version that has them is
+  rejected, a shared copy of a version takes the current ones. The tab follows the cursor
+  line, previews as you type (`ot_calculate`), and saves, updates and deletes patterns.
+- New commands `explain_number`, `ot_calculate`, `ot_apply`, `ot_save_pattern`,
+  `ot_delete_pattern` are in build.rs and both capabilities (the tabs can be in the tools
+  window); the panel test's script list includes explain.js and overtime.js.
+- **Not yet**: explaining group, set and location totals, the selection footer, or the
+  Orig and Var columns; a pattern applied to many lines at once; per-day schedules (a week
+  of different day lengths); meal penalties, turnaround and minimum calls (they are rules a
+  user could want, but each needs its own design).
+
+## 44. Budget diff and three-way merge as built (2026-10-09)
+
+Roadmap 3.1 and 3.2 (docs/MERGE.md), with the calls they needed:
+
+- **Identity, never position.** Rows match by id; accounts and categories by number, then
+  (a renumbered one) by the rows or accounts they hold, then by name within a matched
+  category; production totals, setup items, charges and credits by name (the n-th of a
+  repeated name with the n-th); versions by id and saved time. A renumber reads as
+  renumbered, not as an account removed and another added. A row that changed place in
+  its account is "moved" only when it falls outside a longest common run of rows (a
+  longest increasing subsequence), so one row dragged up doesn't mark every row it passed.
+- **Words come from the engine.** Each change carries its fields before and after and a
+  sentence in the grid's terms (`21-01 line 3: rate 1,200.00 -> 1,350.00 (+1,500.00 to
+  21-01)`, line numbers as the `#` column counts); rates read as money, formulas as
+  typed, tags as `+FICA -WGA`, notes as counts. The CLI, `fwb apply --dry-run` and the app
+  print the same sentences.
+- **Money comes from totals, not from the changes.** Both budgets are totalled and every
+  account, category fringe account, category and topsheet line that moved is listed. The
+  engine recalculates (`diff`), or takes the caller's reports (`diff_with`), so the app
+  passes its lenient totals and a budget with a bad cell still shows money. A budget that
+  can't be totalled leaves the money out and says so.
+- **Tools aren't content**, as for versions: display settings, presets, setup order and
+  folders, overtime patterns, compact versions and the provenance are not listed by a
+  diff. Actuals are, in a few words. In the app, a version compared with the budget borrows
+  the budget's versions and actuals, which a version never holds.
+- **Merge granularity: field by field.** Different rows, different fields of one row and
+  different fields of one setup item merge on their own; tag sets and a charge's
+  exclusions merge name by name; notes note by note. The same field changed both ways is a
+  conflict; so is deleted on one side and changed on the other.
+- **A container deleted on one side and changed on the other is one conflict**, not one
+  per row: keep it (as the side that changed it has it, its rows included) or delete it
+  (with everything in it, except rows the deleting side moved elsewhere first). Asking row
+  by row would offer half an account.
+- **Conflicts take ours by default, every one listed with base, ours and theirs.** Keys
+  are stable for the same three budgets, so the app shows the conflicts, the user picks per
+  item and the merge is worked out again with those picks. "Ours" is the budget being
+  merged into: the file the user owns.
+- **New rows with one id are two rows.** Each copy numbers new rows from the highest it
+  has, so independent additions usually collide. Identical rows (same fields, same
+  account) are one; otherwise theirs get fresh ids above every id in all three budgets
+  (versions included, as decision 17 requires). Versions saved on both sides the same way.
+- **Order: whoever reordered wins**; what the other side added goes after the row or
+  account it followed there. Both reordering one list differently is a conflict (pick an
+  order), never an interleaving.
+- **The provenance is always ours** (it is about the file being merged into); settings and
+  tools merge as whole values. The merged budget is recalculated, never summed from
+  deltas, and a merged budget that can't be totalled while both sides can is reported.
+- **Property-tested** (random budgets and edits): diff(a, a) is empty;
+  merge(base, x, base) = merge(base, base, x) = merge(base, x, x) = x; edits that don't
+  overlap merge cleanly, commute, and equal applying both edit sets one after the other
+  (so the merged totals are that budget's recalculated totals); any two edit sets merge
+  into a budget with unique row ids and every conflict can be picked either way. 4,000
+  cases pass; the suite runs 300. A 5,000-row diff or merge takes about 30 ms with the
+  files read.
+- **A returned shared copy merges against what was sent.** The copy's provenance names
+  the version it was shared from (decision 39); that version is the base, but first worked
+  out as sent: what the copy left out isn't recorded, so it is read from the copy (no base
+  note in it means notes were left out; likewise info, the baseline and unused setup), the
+  base's versions are those both the copy and the original still have (an original's
+  deleted version can come back; a reviewer's never goes), and its tools are the copy's.
+  A copy saved from the budget as it stood has no version to go back to: the user picks
+  the file that was sent (or a version, or an open budget).
+- **git**: `fwb merge-driver %O %A %B %P` writes a valid budget over ours even with
+  conflicts (settled for ours, listed on stderr) and exits 1, so git marks the file
+  conflicted without conflict markers that would make it unreadable; it is opened in the
+  app and settled there. An empty base (added on both branches) is refused. `fwb merge`
+  exits 1 when conflicts were settled (its own code under decision 41's contract), and
+  writes the file either way.
+- **In the app**: File > What Changed… (against the saved file, a version, an open budget
+  or a file; a click goes to the row's cell, the account, the category, the setup tab or the
+  Versions dialog) and File > Merge Changes From… (the copy, the base, a preview with a
+  side to pick per conflict, one undo step worked out on the budget as it is then). Both
+  reuse the compare screen's frame and its file tokens; four new commands, main window only.
+- **Not yet**: merging from a returned copy's banner; matching renumbered accounts across a
+  width change by what they hold when they hold no rows (they match by name instead);
+  merging actuals transaction by transaction (they merge as a whole); a three-way view of
+  one row.
+
+## 45. Actuals and the cost report as built (2026-10-09)
+
+Roadmap 3.7 (inventory 24 and "Gaps and pain points": no actuals or cost reports in the
+reference), with the calls it needed:
+
+- **Actuals live in the budget, but aren't its content.** `Budget::actuals` holds the
+  transactions (date, account number, optional line, tags, vendor, description, reference,
+  amount in cents, the import it came with), the import batches (file name, when, how many)
+  and per-account estimate-to-complete methods. Like presets and the setup order they are
+  not version content: versions never hold them and restoring a version keeps today's, since
+  money already spent doesn't change with a budget revision. Templates and sub-budgets leave
+  them out (they describe one production, like the baseline); Save a Copy for Sharing can
+  leave them out (vendor payments are often private); renumbering accounts carries
+  transactions and overrides with their accounts by the same rule as the baseline (a
+  transaction on a number the chart doesn't have keeps its spelling when it would start
+  naming a live account).
+- **Copies stay cheap.** The actuals are an `Arc` in the budget and each transaction an
+  `Arc` too: copying a budget for an edit's undo costs one pointer, a changed copy keeps the
+  unchanged transactions shared (so 200 undo steps of transaction edits hold pointers, not
+  200 ledgers), and the undo patch's comparison stops at equal pointers.
+- **Edits stay instant (decision 18).** The cost report needs one pass over every
+  transaction (summing them by account and line) and one over the accounts. The session
+  caches the first, keyed by the actuals' `Arc` (kept alive by the cache, so a pointer
+  match can only be the same actuals) and the account pattern; a line edit only redoes the
+  pass over the accounts. Measured (release, 5,000-row sample, 20,000 transactions): a
+  one-cell edit with its view takes 4.31 ms against 4.23 ms without actuals, the rollup is
+  never redone during line edits, the cost report from a rollup takes 0.04 ms. The view
+  carries the cost figures of every account (about 21 KB for 80 accounts) and the line sums
+  of the account on screen only; the transactions themselves never go out with a view (the
+  Actuals tab asks for a filtered page of them).
+- **The figures.** Budget is each row's total as the topsheet shows it. Actual is the sum of
+  the transactions on the account's number, compared as the budget's pattern writes it
+  (`1101` is `11-01`); when two accounts share a number the first in the chart gets them, so
+  nothing counts twice. ETC is per account: budget minus actual, never past zero in the
+  budget's own direction (an account over budget has nothing left to spend; a negative
+  budget is a credit still to come), a manual amount, or percent complete (EAC = actual /
+  percent, rounded once half away from zero, the one division in the module, done in i128
+  by `decimal::whole_from_percent`). EAC = actual + ETC, variance = budget - EAC (negative is
+  over), percent spent = actual / budget to two places (`decimal::percent_ratio`, rounded
+  once; none for a zero budget). Categories, levels and the totals add up their parts'
+  figures in integer cents, so every column sums exactly (property-tested over every posting
+  mode with random transactions and overrides). Category fringe accounts are rows of their
+  own (transactions can be coded to `11-99`); fringes posted by budget or level and charges
+  have no account to code to and keep their whole budget to complete; transactions whose
+  number the chart lacks (or have none) are the unassigned actuals, in the total actual with
+  nothing to complete. Credits are left out: a cost report is gross spending.
+- **Importing reuses the spreadsheet readers**, with its own field list and mapping
+  (`fwb_format::import::actuals`): date, account, amount or debit and credit, vendor,
+  description, reference, tags. Dates take every shape accounting exports write (workbook
+  serials in the 1900 system, ISO, compact, slashes, dots, month names); slash dates are
+  read month first unless the column has a date only day-first can read (or the user says
+  so). Account numbers that don't fit the pattern are kept as written and listed, never cut
+  short. Unmatched numbers default to **keep unassigned**, not skip: nothing is lost, the
+  cost report shows them apart, and adding the account later picks them up. A row with no
+  date and no account, or a "Total..." label and no date, is a total row and skipped, since
+  importing a report's totals would double the actuals.
+- **Duplicates by date, account, amount and description** (trimmed, spaces collapsed,
+  capitals ignored), the brief's key. Rows matching a transaction already in the budget are
+  skipped by default, so importing the same file twice adds nothing; rows repeating an
+  earlier row of the same file are imported by default, since two equal purchases on one
+  day are real. Both are listed in the review with a switch each.
+- **One import, one undo step, one batch.** The batch keeps the file's name and the page's
+  local time; removing it takes out every transaction still carrying it, edited ones
+  included (the confirmation says so).
+- **On screen like Orig and Var.** Actual, ETC, EAC, EAC Var and % Spent go before Total on
+  the topsheet and the account list, shown by default once there are actuals and hidden or
+  shown one by one from the column menu (decision 27's convention); lines get Actual (the
+  transactions assigned to them) and the account's total row its whole actual. Over budget
+  is the EAC variance in the danger color on screen and bold on paper. The Actuals tab is a
+  tools panel tab (its commands are the tools window's too; importing stays in the main
+  window's File menu, like Import Spreadsheet); its estimate-to-complete form follows the
+  grid's cursor account.
+- **Printed and exported.** A Cost report section in the report setup (accounts left out of
+  a report leave the listing, never the totals, decision 28) and, for a budget with actuals,
+  Cost Report and Actuals sheets in File > Export and `fwb export` (both after the ten
+  standard sheets, so positional readers keep theirs).
+- **Not yet**: entering a transaction by hand, ETC overrides on charges, purchase orders and
+  commitments, actuals by period (a cost report as of a date), matching a re-import whose
+  unmatched numbers were mapped differently the first time (the duplicate key compares the
+  account the transaction ended up in).

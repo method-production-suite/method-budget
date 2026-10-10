@@ -525,8 +525,41 @@ pub fn renumber(b: &mut Budget, to: AccountCoding) -> Result<RenumberPlan, Renum
         base.categories = carry_keys(&base.categories, &cats, &cat_new, cat_conv);
         base.accounts = carry_keys(&base.accounts, &accts, &acct_new, acct_conv);
     }
+    if !b.actuals.is_empty() {
+        carry_actuals(
+            std::sync::Arc::make_mut(&mut b.actuals),
+            &accts,
+            &acct_new,
+            acct_conv,
+        );
+    }
     b.account_coding = to;
     Ok(plan)
+}
+
+/// Transactions and estimate-to-complete overrides follow their accounts.
+/// A transaction coded to a number not in the chart is carried over by the
+/// same rule, but keeps its spelling when it would start naming a live
+/// account it never named (it stays unassigned).
+fn carry_actuals(
+    a: &mut crate::actuals::Actuals,
+    live: &BTreeMap<String, String>,
+    live_new: &BTreeSet<String>,
+    convert: impl Fn(&str) -> Result<String, String> + Copy,
+) {
+    for t in &mut a.transactions {
+        if t.account.is_empty() {
+            continue;
+        }
+        let new = match carry_ref(&t.account, live, live_new, convert) {
+            Carried::Keep(n) => n,
+            Carried::Clash(_) => continue,
+        };
+        if new != t.account {
+            std::sync::Arc::make_mut(t).account = new;
+        }
+    }
+    a.etc = carry_keys(&a.etc, live, live_new, convert);
 }
 
 #[cfg(test)]

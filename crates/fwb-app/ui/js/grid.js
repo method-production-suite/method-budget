@@ -1299,6 +1299,18 @@ export class Grid {
     }
   }
 
+  /**
+   * The row spec and column key of the cell under a mouse event, selectable
+   * or not (a total row), or null: what "Explain This Number…" explains.
+   */
+  peek(e) {
+    const td = e.target && e.target.closest ? e.target.closest('td') : null;
+    if (!td || !this.table.contains(td)) return null;
+    const row = this.rows[Number(td.parentElement.dataset.row)];
+    const col = this.columns[Number(td.dataset.col)];
+    return row && col ? { row, colKey: col.key } : null;
+  }
+
   hit(e) {
     const td = e.target.closest('td');
     if (!td || !this.table.contains(td)) return null;

@@ -13,20 +13,28 @@ pub fn workbook(b: &Budget, r: &Report) -> Result<Workbook, ExportError> {
     if !lines_up(b, r) {
         return Err(ExportError::ReportMismatch);
     }
+    let mut sheets = vec![
+        topsheet(b, r),
+        accounts(b, r),
+        detail(b, r),
+        globals(b, r),
+        fringes(b, r),
+        groups(b, r),
+        units(b),
+        currencies(b, r),
+        sets(b, r),
+        locations(b, r),
+    ];
+    // A budget with actuals also gets its cost report and transactions.
+    if !b.actuals.is_empty() {
+        if let Some(c) = fwb_core::actuals::cost_report_of(b, r) {
+            sheets.push(cost_report(&c));
+        }
+        sheets.push(actuals(b));
+    }
     Ok(Workbook {
         title: b.title.clone(),
-        sheets: vec![
-            topsheet(b, r),
-            accounts(b, r),
-            detail(b, r),
-            globals(b, r),
-            fringes(b, r),
-            groups(b, r),
-            units(b),
-            currencies(b, r),
-            sets(b, r),
-            locations(b, r),
-        ],
+        sheets,
     })
 }
 
@@ -532,6 +540,173 @@ fn locations(b: &Budget, r: &Report) -> Sheet {
             "Details Total",
             "Fringe Total",
             "Total",
+        ]),
+        rows,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Actuals (only for a budget that has them)
+
+/// Cost Report: every account, category fringe account and category with
+/// its budget, baseline, actual, ETC, EAC, variance and percent spent, then
+/// the production levels, the summary rows, unassigned actuals and the
+/// grand total (fwb_core::actuals::cost_report).
+fn cost_report(c: &fwb_core::actuals::CostReport) -> Sheet {
+    use fwb_core::actuals::{CostFigures, EtcMethod};
+    let mut rows = Vec::new();
+    let method = |m: Option<EtcMethod>| match m {
+        None | Some(EtcMethod::BudgetMinusActual) => Cell::Empty,
+        Some(EtcMethod::Manual(_)) => Cell::text("Manual"),
+        Some(EtcMethod::PercentComplete(p)) => Cell::text(format!("{p}% complete")),
+    };
+    let mut row = |kind: &str, code: &str, name: &str, f: &CostFigures, m: Cell| {
+        rows.push(vec![
+            Cell::text(kind),
+            Cell::text(code),
+            Cell::text(name),
+            Cell::Money(f.budget),
+            money_or_empty(f.baseline),
+            Cell::Money(f.actual),
+            Cell::Int(f.count),
+            Cell::Money(f.etc),
+            m,
+            Cell::Money(f.eac),
+            Cell::Money(f.variance),
+            number_or_empty(f.percent_spent),
+        ]);
+    };
+    for lv in &c.levels {
+        for cat in c.categories.get(lv.start..lv.end).unwrap_or_default() {
+            for a in &cat.accounts {
+                row("Account", &a.code, &a.name, &a.figures, method(a.method));
+            }
+            if let Some(fa) = &cat.fringe_account {
+                row(
+                    "Fringe Account",
+                    &fa.code,
+                    &fa.name,
+                    &fa.figures,
+                    method(fa.method),
+                );
+            }
+            row("Category", &cat.code, &cat.name, &cat.figures, Cell::Empty);
+        }
+        if let Some(f) = &lv.posted_fringes {
+            row("Fringes", "", "Fringes", f, Cell::Empty);
+        }
+        if !lv.name.is_empty() {
+            row("Production Total", "", &lv.name, &lv.figures, Cell::Empty);
+        }
+    }
+    row(
+        "Total",
+        "",
+        "Total above-the-line",
+        &c.total_atl,
+        Cell::Empty,
+    );
+    row(
+        "Total",
+        "",
+        "Total below-the-line",
+        &c.total_btl,
+        Cell::Empty,
+    );
+    row(
+        "Total",
+        "",
+        "Total above and below-the-line",
+        &c.atl_btl,
+        Cell::Empty,
+    );
+    if let Some(f) = &c.budget_fringes {
+        row("Fringes", "", &f.name, &f.figures, Cell::Empty);
+    }
+    for ch in &c.charges {
+        row("Charge", "", &ch.name, &ch.figures, Cell::Empty);
+    }
+    if c.unassigned.count > 0 {
+        row(
+            "Unassigned",
+            "",
+            "Unassigned actuals",
+            &c.unassigned,
+            Cell::Empty,
+        );
+    }
+    row("Total", "", "Grand total", &c.total, Cell::Empty);
+    Sheet {
+        name: "Cost Report",
+        columns: columns(&[
+            "Type",
+            "Code",
+            "Description",
+            "Budget",
+            "Baseline",
+            "Actual",
+            "Transactions",
+            "Estimate to Complete",
+            "ETC Method",
+            "Estimate at Completion",
+            "Variance",
+            "Percent Spent",
+        ]),
+        rows,
+    }
+}
+
+/// Actuals: every transaction, in the order they came in, with the name of
+/// its account (empty when the chart doesn't have it) and the line it pays
+/// for, if any.
+fn actuals(b: &Budget) -> Sheet {
+    let chart = fwb_core::actuals::chart(b);
+    let coding = b.account_coding;
+    let lines: BTreeMap<fwb_core::RowId, &str> = b
+        .categories()
+        .flat_map(|c| &c.accounts)
+        .flat_map(|a| &a.details)
+        .map(|d| (d.id, d.description.as_str()))
+        .collect();
+    let files: BTreeMap<u64, &str> = b
+        .actuals
+        .batches
+        .iter()
+        .map(|x| (x.id, x.file.as_str()))
+        .collect();
+    let rows = b
+        .actuals
+        .transactions
+        .iter()
+        .map(|t| {
+            let entry = chart.get(&fwb_core::actuals::normalize_code(&coding, &t.account));
+            vec![
+                Cell::text(&t.date),
+                Cell::text(&t.account),
+                Cell::text(entry.map_or("", |e| e.name.as_str())),
+                Cell::text(&t.vendor),
+                Cell::text(&t.description),
+                Cell::text(&t.reference),
+                list(&t.tags),
+                Cell::Money(t.amount),
+                Cell::text(t.line.and_then(|l| lines.get(&l).copied()).unwrap_or("")),
+                Cell::text(t.batch.and_then(|x| files.get(&x).copied()).unwrap_or("")),
+            ]
+        })
+        .collect();
+    Sheet {
+        name: "Actuals",
+        columns: columns(&[
+            "Date",
+            "Account",
+            "Account Name",
+            "Vendor",
+            "Description",
+            "Reference",
+            "Tags",
+            "Amount",
+            "Line",
+            "Imported From",
         ]),
         rows,
     }

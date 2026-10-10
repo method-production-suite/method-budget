@@ -24,3 +24,4 @@ id_rsa*
 
 # Scratch budgets at the repo root (test files, personal budgets)
 /*.fwb
+/Test Library/
