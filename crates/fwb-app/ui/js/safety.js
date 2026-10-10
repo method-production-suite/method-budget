@@ -126,7 +126,7 @@ export function showBackupsDialog(name, entries, { restore, reveal }) {
  * The budget's file changed outside the app (a sync service, another
  * computer, another app) since it was opened or last saved. Autosave into it
  * is paused until a choice is made. `keep()`, `load()` and `copy()` carry
- * out the three choices; Decide Later (or Escape) just closes.
+ * out the three choices (`keep` is null on a read-only copy); Decide Later (or Escape) just closes.
  */
 export function showConflictDialog(name, { keep, load, copy }) {
   customDialog((close) => {
@@ -151,7 +151,8 @@ export function showConflictDialog(name, { keep, load, copy }) {
       el(
         'ul',
         { class: 'safety-list' },
-        item(['Keep mine', 'Save this budget over the file. The version on disk is kept in Backups first.'], choice('Keep Mine', keep)),
+        // A read-only shared copy has nothing of its own to keep (keep is null).
+        keep ? item(['Keep mine', 'Save this budget over the file. The version on disk is kept in Backups first.'], choice('Keep Mine', keep)) : null,
         item(['Load theirs', 'Open the version on disk. This budget is kept in Backups first, and Undo brings it back.'], choice('Load Theirs', load)),
         item(['Save mine as a copy', 'Save this budget as a new file and leave the one on disk as it is.'], choice('Save Mine As…', copy)),
       ),
@@ -225,8 +226,11 @@ export function initSafety(ctx) {
           }
           ctx.grid.focus();
         };
+        const view = ctx.view && ctx.view();
+        const p = view && view.budget && view.budget.provenance;
+        const readOnly = !!p && p.kind === 'shared_copy';
         showConflictDialog(name, {
-          keep: () => resolveWith('keep'),
+          keep: readOnly ? null : () => resolveWith('keep'),
           load: () => resolveWith('load'),
           copy: () => ctx.saveAs(),
         });

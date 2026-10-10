@@ -340,6 +340,9 @@ pub fn resolve(
     let backup_failed =
         |e: std::io::Error| format!("Couldn't keep a backup ({e}), so nothing was changed.");
     match choice {
+        // A read-only shared copy has nothing of its own to keep: saving it
+        // would only write the stale copy over the newer file.
+        Resolve::KeepMine if s.is_read_only() => return Err(crate::sharing::READ_ONLY.into()),
         Resolve::KeepMine => {
             backups.back_up(&path, None).map_err(backup_failed)?;
             s.backed_up(&path);
@@ -1867,6 +1870,15 @@ mod tests {
         newer.title = "The newer copy".into();
         std::fs::write(&path, fwb_format::to_string(&newer)).unwrap();
 
+        // Keep Mine is refused: it would write the stale copy over the newer one.
+        assert_eq!(
+            resolve(&state, &safety, None, Resolve::KeepMine),
+            Err(crate::sharing::READ_ONLY.to_string())
+        );
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            fwb_format::to_string(&newer)
+        );
         resolve(&state, &safety, None, Resolve::LoadTheirs).unwrap();
         let mut s = state.lock();
         assert_eq!(s.budget().title, "The newer copy");
