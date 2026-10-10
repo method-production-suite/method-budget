@@ -171,9 +171,10 @@ function listen(name, fn) {
 
 /**
  * Sets up saving safety in the page. `ctx`: { grid, toast, call, view(),
- * openBy(cmd, args) (asks about unsaved changes, then opens the budget the
- * command returns), fileState(rev, file) (autosave saved into the file),
- * saveAs() (File > Save As) }.
+ * openBy(cmd, args) (opens the budget the command returns, in a tab),
+ * fileState({doc, rev, file, tabs}) (a budget was saved without a command:
+ * autosave), saveAs() (File > Save As), showDoc(doc) (brings a budget's tab
+ * to the front), doc() (the budget in front) }.
  * Returns { commands, start }: menu command handlers by id, and what to run
  * once the first view is drawn.
  */
@@ -194,42 +195,51 @@ export function initSafety(ctx) {
     });
   }
   listen('autosave-changed', setToggle);
-  listen('file-state', (p) => p && ctx.fileState(p.rev, p.file));
+  listen('file-state', (p) => p && typeof p === 'object' && ctx.fileState(p));
   listen('autosave-error', (msg) => ctx.toast(msg));
   listen('open-request', () => openRequested());
-  listen('external-change', (name) => externalChange(name));
+  listen('external-change', (p) => p && typeof p === 'object' && externalChange(p));
 
-  // The file changed outside the app: ask once at a time, after any dialog.
+  // A budget's file changed outside the app ({doc, name}): ask about one at a
+  // time, after any dialog, with that budget's tab in front.
+  const waiting = []; // budgets still to ask about, in the order they came
   let asking = false;
-  async function externalChange(name) {
+  async function externalChange(p) {
+    if (!waiting.some((w) => w.doc === p.doc)) waiting.push({ doc: p.doc, name: String(p.name || '') });
     if (asking) return;
     asking = true;
     try {
-      if (isHelpOpen()) closeHelp();
-      while (isModalOpen()) await new Promise((r) => setTimeout(r, 300));
-      if (ctx.grid.editor) ctx.grid.commitEdit(null);
-      const resolveWith = async (choice) => {
-        try {
-          await ctx.call('resolve_external_change', { choice });
-        } catch (e) {
-          ctx.toast(e);
-        }
-        ctx.grid.focus();
-      };
-      showConflictDialog(String(name || ''), {
-        keep: () => resolveWith('keep'),
-        load: () => resolveWith('load'),
-        copy: () => ctx.saveAs(),
-      });
-      // One question at a time: more news of the same change waits it out.
-      while (isModalOpen()) await new Promise((r) => setTimeout(r, 300));
+      while (waiting.length) {
+        if (isHelpOpen()) closeHelp();
+        while (isModalOpen()) await new Promise((r) => setTimeout(r, 300));
+        const { doc, name } = waiting.shift();
+        if (ctx.grid.editor) ctx.grid.commitEdit(null);
+        if (typeof doc === 'number' && doc !== ctx.doc()) await ctx.showDoc(doc);
+        // Closed meanwhile, or couldn't come to the front: nothing to ask.
+        if (typeof doc === 'number' && doc !== ctx.doc()) continue;
+        const resolveWith = async (choice) => {
+          try {
+            await ctx.call('resolve_external_change', { choice, doc });
+          } catch (e) {
+            ctx.toast(e);
+          }
+          ctx.grid.focus();
+        };
+        showConflictDialog(name, {
+          keep: () => resolveWith('keep'),
+          load: () => resolveWith('load'),
+          copy: () => ctx.saveAs(),
+        });
+        // One question at a time.
+        while (isModalOpen()) await new Promise((r) => setTimeout(r, 300));
+      }
     } finally {
       asking = false;
     }
   }
 
   // A file from the system (double-click, Open With): wait for any dialog,
-  // finish a cell edit, then ask about unsaved changes and open it.
+  // finish a cell edit, then open it in a tab.
   let opening = false;
   async function openRequested() {
     if (opening) return;

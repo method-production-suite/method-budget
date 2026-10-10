@@ -16,7 +16,7 @@ use fwb_core::{Budget, NewLineDefaults, RowId};
 use serde::Deserialize;
 use tauri::{Runtime, State, WebviewWindow};
 
-use crate::app::{edit_budget, AppState};
+use crate::app::{edit_budget, AppState, DocId};
 use crate::edit::{self, CurrencyInput, EditResult, Field, LocationInput, SetInput, UnitInput};
 use crate::view::View;
 
@@ -158,13 +158,14 @@ pub fn apply_new_line_defaults(b: &mut Budget, d: &NewLineDefaultsInput) -> Edit
 pub fn set_cell_creating<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     row_id: RowId,
     field: String,
     value: String,
     create: CreateInput,
 ) -> Result<View, String> {
     let field = Field::parse(&field)?;
-    edit_budget(&window, &state, |b| {
+    edit_budget(&window, &state, doc, |b| {
         create_and_set(b, row_id, field, &value, &create)
     })
 }
@@ -174,9 +175,12 @@ pub fn set_cell_creating<R: Runtime>(
 pub fn set_new_line_defaults<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     defaults: NewLineDefaultsInput,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, |b| apply_new_line_defaults(b, &defaults))
+    edit_budget(&window, &state, doc, |b| {
+        apply_new_line_defaults(b, &defaults)
+    })
 }
 
 #[cfg(test)]

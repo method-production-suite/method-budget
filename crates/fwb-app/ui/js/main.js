@@ -1,6 +1,6 @@
 // App shell: holds the current view, which level is showing, the toolbar,
-// breadcrumb, keyboard shortcuts and menu commands, and wires the grid, side
-// panel and footer.
+// the budget tabs, breadcrumb, keyboard shortcuts and menu commands, and wires
+// the grid, side panel and footer.
 //
 // Rust owns the budget. Every change is a command that returns a fresh view;
 // this file only decides what to ask for and redraws from what comes back.
@@ -10,8 +10,14 @@
 // Every keyboard shortcut and menu item runs a command from COMMANDS by id
 // (ids and keys: shortcuts.js). A key press and a menu click reach the same
 // function, so they always do the same thing.
+//
+// Several budgets can be open, one per tab (tabs.js; src/docs.rs). Every
+// command names the budget on screen (`doc`, api.js), every view says which
+// budget it is and lists the tabs, and switching tabs swaps in that budget's
+// view. Each tab remembers its level, category, account, cursor, scroll and
+// footer counters here; Rust remembers its account on screen and its undo.
 
-import { invoke, connected } from './api.js';
+import { invoke, connected, setDefaultArgs } from './api.js';
 import { el, $, isTextField } from './dom.js';
 import { Grid, parseTSV } from './grid.js';
 import {
@@ -28,7 +34,7 @@ import {
   detailRows,
 } from './levels.js';
 import { renderFooter } from './footer.js';
-import { formDialog, confirmDialog, isModalOpen } from './modal.js';
+import { formDialog, confirmDialog, customDialog, isModalOpen } from './modal.js';
 import { renderTools, selectToolsTab, focusToolsKey, toolsLayout, setToolsLayout } from './tools.js';
 import { printReport } from './report.js';
 import { SHORTCUTS, matchShortcut, menuRunsAppKeys, shortcutById, withShortcut } from './shortcuts.js';
@@ -41,8 +47,11 @@ import { initQuickEntry, editAssist, commitDetailCell, editNote, fringeRange, sh
 import { initRowFormat, toggleStyle, indent, setColor, clearFormatting, PALETTE } from './rowformat.js';
 import { initContextMenu } from './context.js';
 import { initClipboard, copyEvent, cellsCopied, pasteEvent, copyRows, pasteRows } from './clipboard.js';
+import { initTabs, renderTabs, focusTab, tabsHaveFocus } from './tabs.js';
 
 const state = {
+  doc: null, // the budget on screen (its tab is in front)
+  tabs: [], // every open budget's tab, in order (the view's `tabs`)
   view: null,
   ix: null,
   level: 'topsheet', // 'topsheet' | 'accounts' | 'details'
@@ -57,6 +66,14 @@ const state = {
   // created (start), after the latest command (prev), and the latest edit's effect.
   changes: null, // { start, prev, last }
 };
+
+// Where each tab not in front was left: doc id -> { level, cat, acct,
+// memory, changes, cursor, col, scroll }.
+const tabMemory = new Map();
+
+// Every command names the budget on screen, so one sent just as another tab
+// comes to the front still reaches the budget the user was looking at.
+setDefaultArgs(() => (state.doc === null ? {} : { doc: state.doc }));
 
 const grid = new Grid($('grid-host'), {
   onCommit: (rowKey, colKey, value) => commitCell(rowKey, colKey, value),
@@ -113,19 +130,48 @@ async function act(cmd, args = {}, opts = {}) {
 }
 
 function apply(view, opts = {}) {
-  const same = state.view && state.view.rev === view.rev;
+  if (Array.isArray(view.tabs) && view.tabs.length) setTabs(view.tabs);
+  const front = state.tabs.find((t) => t.active);
+  // A reply about a budget that isn't in front (one saved or closed from its
+  // tab): its tab, drawn above, is all it changes.
+  if (front && view.doc !== front.id) return;
+  let switched = false;
+  if (view.doc !== state.doc) {
+    // Another tab came to the front (or the first view arrived).
+    if (state.doc !== null) leaveTab();
+    opts = { ...enterTab(view.doc), ...opts };
+    switched = true;
+  }
+  const same = !switched && state.view && state.view.rev === view.rev;
   state.view = view;
   state.ix = indexView(view);
   trackChanges(view, opts);
   // Leaving an account (focus_account with none) changes nothing on screen.
   if (opts.quiet && same) return;
+  if (switched) closeMenu();
   render(opts);
+  if (opts.scroll) {
+    $('grid-host').scrollTop = opts.scroll.top;
+    $('grid-host').scrollLeft = opts.scroll.left;
+  }
   // The selected rows' totals may have changed even if the selection didn't.
   if (state.level === 'details') requestSelectionTotals(grid.selectedKeys());
 }
 
 // Commands that return a view without changing the budget.
-const NOT_EDITS = new Set(['get_view', 'save_budget', 'focus_account', 'flush_autosave']);
+const NOT_EDITS = new Set([
+  'get_view',
+  'save_budget',
+  'focus_account',
+  'flush_autosave',
+  'switch_tab',
+  'new_tab',
+  'close_tab',
+  'open_budget',
+  'open_recent',
+  'open_pending',
+  'open_recovered',
+]);
 
 /**
  * Footer change counters. `opts.fresh` (a file opened or created) starts
@@ -421,9 +467,10 @@ function toolsCtx() {
   };
 }
 
-/** What the tools panel needs to know about the grid. */
+/** What the tools panel needs to know about the grid (and which budget it is). */
 function currentSelection() {
   return {
+    doc: state.doc,
     level: state.level,
     keys: grid.selectedKeys(),
     cat: state.cat,
@@ -904,19 +951,183 @@ async function deleteAccount() {
 }
 
 // ---------------------------------------------------------------------------
-// Files and history
+// Budget tabs (tabs.js draws the strip; src/tabs.rs keeps the budgets)
 
-async function discardOk() {
-  // With Autosave on, unsaved changes go into the file first (src/safety_app.rs).
-  if (state.view && state.view.file.dirty) await act('flush_autosave');
-  if (!state.view || !state.view.file.dirty) return true;
-  return confirmDialog({
-    title: 'Unsaved changes',
-    message: 'This budget has changes that are not saved. Continue and lose them?',
-    confirmText: 'Discard changes',
-    danger: true,
+function setTabs(tabs) {
+  state.tabs = tabs;
+  renderTabs(tabs);
+}
+
+/** Remembers where this tab was left, to come back to it. */
+function leaveTab() {
+  if (!state.tabs.some((t) => t.id === state.doc)) {
+    tabMemory.delete(state.doc); // closed
+    return;
+  }
+  const host = $('grid-host');
+  tabMemory.set(state.doc, {
+    level: state.level,
+    cat: state.cat,
+    acct: state.acct,
+    memory: { ...state.memory },
+    changes: state.changes,
+    cursor: grid.cursorKey(),
+    col: grid.cursorColKey(),
+    scroll: { top: host.scrollTop, left: host.scrollLeft },
   });
 }
+
+/**
+ * Makes budget `doc` the one on screen: where its tab was left, or the
+ * topsheet for a budget not seen yet. Returns options for drawing it.
+ */
+function enterTab(doc) {
+  state.doc = doc;
+  state.selection = null;
+  const m = tabMemory.get(doc);
+  if (!m) {
+    resetNav();
+    state.changes = null;
+    return { focusKey: 't0', resetSelection: true, fresh: true };
+  }
+  tabMemory.delete(doc);
+  state.level = m.level;
+  state.cat = m.cat;
+  state.acct = m.acct;
+  state.memory = m.memory;
+  state.changes = m.changes;
+  return { focusKey: m.cursor, focusCol: m.col, resetSelection: true, scroll: m.scroll };
+}
+
+// The tab on its way to the front, so Ctrl+Tab pressed again before it
+// arrives steps on from there.
+let switching = null;
+
+/** Brings budget `id`'s tab to the front. `keepFocus`: the tab strip keeps the keyboard. */
+async function switchTo(id, { keepFocus = false } = {}) {
+  if (typeof id !== 'number' || !state.tabs.some((t) => t.id === id)) return;
+  if (id === (switching === null ? state.doc : switching)) {
+    if (keepFocus) focusTab(id);
+    return;
+  }
+  if (grid.editor) grid.commitEdit(null);
+  switching = id;
+  try {
+    await act('switch_tab', { doc: id });
+  } finally {
+    if (switching === id) switching = null;
+  }
+  if (keepFocus) focusTab(id);
+  else grid.focus();
+}
+
+/** The next (1) or previous (-1) tab, wrapping round. */
+function stepTab(delta) {
+  const n = state.tabs.length;
+  const from = switching === null ? state.doc : switching;
+  const i = state.tabs.findIndex((t) => t.id === from);
+  if (n < 2 || i < 0) return;
+  switchTo(state.tabs[(i + delta + n) % n].id, { keepFocus: tabsHaveFocus() });
+}
+
+/** The tab at place `i` (Cmd+1, Cmd+2). */
+function tabAt(i) {
+  const t = state.tabs[i];
+  if (t) switchTo(t.id, { keepFocus: tabsHaveFocus() });
+}
+
+/** Moves budget `id`'s tab to place `to`. */
+async function moveTab(id, to) {
+  try {
+    const tabs = await invoke('move_tab', { doc: id, to });
+    if (Array.isArray(tabs)) setTabs(tabs);
+    focusTab(id);
+  } catch (e) {
+    toast(e);
+  }
+}
+
+/**
+ * Asks what to do with unsaved changes before a tab closes: resolves
+ * 'save', 'discard' or null (keep the tab).
+ */
+function unsavedDialog(name) {
+  return new Promise((resolve) => {
+    let answer = null;
+    customDialog(
+      (close) => {
+        const pick = (choice) => {
+          answer = choice;
+          close();
+        };
+        const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
+        const discard = el('button', { class: 'btn btn-danger-text', text: 'Close Without Saving', attrs: { type: 'button' } });
+        const save = el('button', { class: 'btn btn-primary', text: 'Save', attrs: { type: 'button', 'data-autofocus': true } });
+        cancel.addEventListener('click', () => pick(null));
+        discard.addEventListener('click', () => pick('discard'));
+        save.addEventListener('click', () => pick('save'));
+        return el(
+          'div',
+          { class: 'modal', attrs: { role: 'dialog', 'aria-labelledby': 'unsaved-title', 'aria-describedby': 'unsaved-message' } },
+          el('h2', { class: 'modal-title', text: 'Unsaved changes', attrs: { id: 'unsaved-title' } }),
+          el('p', {
+            class: 'modal-message',
+            text: `"${name}" has changes that are not saved. Save them before closing the tab?`,
+            attrs: { id: 'unsaved-message' },
+          }),
+          el('div', { class: 'modal-actions' }, discard, el('span', { class: 'spacer' }), cancel, save),
+        );
+      },
+      // Escape or a click outside: keep the tab.
+      { onClose: () => resolve(answer) },
+    );
+  });
+}
+
+/**
+ * Closes budget `id`'s tab (Cmd+W: the one in front). Unsaved changes are
+ * autosaved into the file first when Autosave is on; what is still unsaved
+ * asks Save, Close Without Saving or Cancel. The last tab closes the window
+ * instead, which asks about unsaved changes in Rust.
+ */
+async function closeTab(id = state.doc) {
+  if (state.tabs.length <= 1) {
+    closeWindow();
+    return;
+  }
+  if (grid.editor) grid.commitEdit(null);
+  let r;
+  try {
+    r = await invoke('close_tab', { doc: id, discard: false });
+    if (r && r.unsaved) {
+      const tab = state.tabs.find((t) => t.id === id);
+      const choice = await unsavedDialog(tab ? tab.label : 'This budget');
+      if (choice === 'save') {
+        const v = await call('save_budget', { saveAs: false, doc: id });
+        // Cancelled, or not written (the file changed outside the app).
+        if (!v || v.file.dirty) return grid.focus();
+        r = await invoke('close_tab', { doc: id, discard: false });
+      } else if (choice === 'discard') {
+        r = await invoke('close_tab', { doc: id, discard: true });
+      } else {
+        return grid.focus();
+      }
+    }
+  } catch (e) {
+    toast(e);
+    return grid.focus();
+  }
+  if (r && r.last) {
+    closeWindow();
+    return;
+  }
+  if (r && r.closed && r.view) apply(r.view, { cmd: 'close_tab' });
+  tabMemory.delete(id);
+  grid.focus();
+}
+
+// ---------------------------------------------------------------------------
+// Files and history
 
 function resetNav() {
   state.level = 'topsheet';
@@ -926,22 +1137,20 @@ function resetNav() {
   state.selection = null;
 }
 
+/** New (and New Tab): a fresh budget in a new tab. */
 async function doNew() {
-  if (!(await discardOk())) return grid.focus();
-  resetNav();
-  await act('new_budget', {}, { resetSelection: true, focusKey: 't0', fresh: true });
+  if (grid.editor) grid.commitEdit(null);
+  await act('new_tab');
   grid.focus();
 }
 
+/** Open: the chosen file in a new tab (or its own tab, when it is open). */
 async function doOpen() {
-  if (!(await discardOk())) return grid.focus();
+  if (grid.editor) grid.commitEdit(null);
   try {
     // Resolves null when the user cancels the dialog.
     const v = await invoke('open_budget');
-    if (v) {
-      resetNav();
-      apply(v, { resetSelection: true, focusKey: 't0', fresh: true });
-    }
+    if (v) apply(v, { cmd: 'open_budget' });
   } catch (e) {
     toast(e);
   }
@@ -949,6 +1158,7 @@ async function doOpen() {
 }
 
 async function doSave(saveAs) {
+  if (grid.editor) grid.commitEdit(null);
   await act('save_budget', { saveAs });
   grid.focus();
 }
@@ -964,16 +1174,12 @@ function doRedo() {
 // Saving safety: Autosave, recovered budgets, backups, Open Recent and files
 // the system opens (safety.js, src/safety_app.rs).
 
-/** Opens the budget `cmd` returns (null: nothing), asking about unsaved changes first. */
+/** Opens the budget `cmd` returns (null: nothing) in a tab: its own when it is open already. */
 async function openBy(cmd, args = {}) {
-  await act('get_view'); // edits still on their way land first
-  if (!(await discardOk())) return grid.focus();
+  if (grid.editor) grid.commitEdit(null);
   try {
     const v = await invoke(cmd, args);
-    if (v) {
-      resetNav();
-      apply(v, { resetSelection: true, focusKey: 't0', fresh: true });
-    }
+    if (v) apply(v, { cmd });
   } catch (e) {
     toast(e);
   }
@@ -987,13 +1193,18 @@ const safety = initSafety({
   openBy,
   saveAs: () => doSave(true),
   view: () => state.view,
-  // Autosave saved into the file: only the file state changed.
-  fileState: (rev, file) => {
-    if (state.view && state.view.rev === rev) {
-      state.view.file = file;
+  // A budget was saved into its file without a command (autosave, Save All
+  // on the way out): only its tab and file state changed.
+  fileState: (p) => {
+    if (Array.isArray(p.tabs) && p.tabs.length) setTabs(p.tabs);
+    if (state.view && p.doc === state.doc && state.view.rev === p.rev) {
+      state.view.file = p.file;
       renderTitle(state.view);
     }
   },
+  // Brings budget `doc`'s tab to the front (a question about it is coming).
+  showDoc: (doc) => switchTo(doc),
+  doc: () => state.doc,
 });
 
 /**
@@ -1182,7 +1393,8 @@ async function refreshView() {
     do {
       refreshAgain = false;
       try {
-        const v = await invoke('get_view');
+        // The budget on screen; the one in front if it has gone meanwhile.
+        const v = await invoke('get_view').catch(() => invoke('get_view', { doc: null }));
         // An edit made in the tools window: it counts in the footer's changes.
         if (v) apply(v, { cmd: 'view-changed' });
       } catch (e) {
@@ -1437,6 +1649,12 @@ function selectAll() {
 
 const COMMANDS = {
   'file.new': () => doNew(),
+  'file.new_tab': () => doNew(),
+  'file.close_tab': () => closeTab(),
+  'window.next_tab': () => stepTab(1),
+  'window.prev_tab': () => stepTab(-1),
+  'window.first_tab': () => tabAt(0),
+  'window.second_tab': () => tabAt(1),
   'file.open': () => doOpen(),
   'file.save': () => doSave(false),
   'file.save_as': () => doSave(true),
@@ -1526,6 +1744,13 @@ function leftToBrowser(id) {
 }
 
 function onMenu(id) {
+  // Window > a budget: bring its tab to the front.
+  if (typeof id === 'string' && id.startsWith('window.doc.')) {
+    if (isModalOpen()) return;
+    if (isHelpOpen()) closeHelp();
+    switchTo(Number(id.slice('window.doc.'.length)));
+    return;
+  }
   if (typeof id !== 'string' || !COMMANDS[id]) return;
   if (isHelpOpen() && id !== 'help.shortcuts') closeHelp();
   // A dialog is open: only field commands (undo typing in it) make sense.
@@ -1534,13 +1759,14 @@ function onMenu(id) {
   // the page (Linux), the key was meant for the field (Ctrl+Backspace deletes a
   // word, not rows). The cell editor still takes the ones without a text meaning.
   const sc = shortcutById(id);
-  if (sc && sc.scope === 'grid' && isTextField(document.activeElement) && (sc.text || !grid.editor)) return;
+  if (sc && sc.scope === 'grid' && !sc.anywhere && isTextField(document.activeElement) && (sc.text || !grid.editor)) return;
   run(id, 'menu');
 }
 
 /**
- * Close Window and Quit from the keyboard on Windows and Linux: closing the
- * (only) window goes through the same unsaved-changes question in Rust.
+ * Close Window and Quit from the keyboard on Windows and Linux (and Close Tab
+ * on the last tab): closing the window goes through the same unsaved-changes
+ * question in Rust, about every tab.
  */
 function closeWindow() {
   const w = window.__TAURI__ && window.__TAURI__.window;
@@ -1562,6 +1788,8 @@ function listenToEvents() {
   if (!events || typeof events.listen !== 'function') return;
   const on = (name, fn) => events.listen(name, (e) => fn(e.payload), { target: 'main' }).catch((err) => toast(err));
   on('menu', onMenu);
+  // Another window changed a budget ({doc, rev}): what is on screen is fetched
+  // again (with its tab's dirty dot and every other tab).
   on('view-changed', () => refreshView());
   on('tools-ready', () => sendToolsState());
   on('tools-closed', () => {
@@ -1573,7 +1801,11 @@ function listenToEvents() {
     if (setToolsLayout(layout) && state.position !== 'window') renderPanel();
   });
   on('tools-geometry', saveGeometry);
-  on('tools-jump', jumpTo);
+  // A noted line, from the tools window's Notes tab (of the budget it drew).
+  on('tools-jump', (entry) => {
+    if (entry && typeof entry === 'object' && 'doc' in entry && entry.doc !== state.doc) return;
+    jumpTo(entry);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1594,7 +1826,8 @@ function onShortcutKey(e, sc, { editing, inField }) {
   if (inField && sc.text) return;
   // Cancelling also keeps the key from reaching the menu bar a second time.
   e.preventDefault();
-  if (inField && !editing) return; // a setup or dialog field: not meant for the grid
+  // A setup or dialog field: not meant for the grid (tab keys work anywhere).
+  if (inField && !editing && !sc.anywhere) return;
   run(sc.id, 'key');
 }
 
@@ -1622,7 +1855,11 @@ function onKeyDown(e) {
 
   // Escape on a setup panel tab or button, a breadcrumb button or the column
   // menu button goes back to the grid.
-  const chrome = $('panel').contains(active) || $('crumbs').contains(active) || (active && active.closest && active.closest('#grid-host thead'));
+  const chrome =
+    $('panel').contains(active) ||
+    $('crumbs').contains(active) ||
+    $('tabbar').contains(active) ||
+    (active && active.closest && active.closest('#grid-host thead'));
   if (e.key === 'Escape' && !inField && chrome) {
     e.preventDefault();
     grid.focus();
@@ -1641,6 +1878,12 @@ function onKeyDown(e) {
 
 function wire() {
   wirePanelResizer();
+  initTabs($('tabbar'), {
+    switchTo: (id, opts) => switchTo(id, opts),
+    close: (id) => closeTab(id),
+    add: () => doNew(),
+    move: (id, to) => moveTab(id, to),
+  });
   $('btn-new').addEventListener('click', doNew);
   $('btn-open').addEventListener('click', doOpen);
   $('btn-save').addEventListener('click', () => doSave(false));
@@ -1649,8 +1892,8 @@ function wire() {
   $('btn-redo').addEventListener('click', doRedo);
   $('btn-panel').addEventListener('click', togglePanel);
   const tips = {
-    'btn-new': ['New budget', 'file.new'],
-    'btn-open': ['Open a budget', 'file.open'],
+    'btn-new': ['New budget, in a new tab', 'file.new'],
+    'btn-open': ['Open a budget, in a new tab', 'file.open'],
     'btn-save': ['Save', 'file.save'],
     'btn-saveas': ['Save as a new file', 'file.save_as'],
     'btn-undo': ['Undo', 'edit.undo'],

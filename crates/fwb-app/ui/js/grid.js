@@ -1113,6 +1113,8 @@ export class Grid {
         else this.setCursor(this.cur.row, this.columns.length - 1, { extend: e.shiftKey });
         return true;
       case 'Tab':
+        // Ctrl+Tab steps budget tabs (main.js).
+        if (e.ctrlKey || e.metaKey) return false;
         if (e.shiftKey && this.cur.row === 0 && this.cur.col === 0 && this.h.onTabOut && this.h.onTabOut(-1)) return true;
         this.move(0, e.shiftKey ? -1 : 1, { wrap: true });
         return true;
@@ -1167,6 +1169,8 @@ export class Grid {
         else this.commitEdit(this.h.enterMovesDown ? (e.shiftKey ? 'up' : 'down') : null);
         return true;
       case 'Tab':
+        // Ctrl+Tab steps budget tabs (main.js commits the edit first).
+        if (e.ctrlKey || e.metaKey) return false;
         this.commitEdit(e.shiftKey ? 'left' : 'right');
         return true;
       case 'Escape':

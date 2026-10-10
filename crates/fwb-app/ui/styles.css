@@ -92,7 +92,7 @@ button {
 
 .app {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   grid-template-columns: minmax(0, 1fr);
   height: 100vh;
 }
@@ -157,6 +157,207 @@ button {
   padding: 8px 12px 12px;
   background: var(--surface);
   border-left: 1px solid var(--border);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Budget tabs (js/tabs.js): one per open budget, under the toolbar */
+
+.tabbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  padding: 4px 8px 0;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.tabbar-tabs {
+  position: relative; /* offsetLeft of a tab is within the strip */
+  flex: 0 1 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.tabbar-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.doc-tab {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  max-width: 220px;
+  margin-bottom: -1px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: var(--radius) var(--radius) 0 0;
+  color: var(--text-muted);
+}
+
+.doc-tab:hover {
+  color: var(--text);
+  background: var(--row-hover);
+}
+
+.doc-tab.is-active {
+  color: var(--text);
+  background: var(--bg);
+  border-color: var(--border);
+}
+
+.doc-tab-btn {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 5px 4px 5px 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.doc-tab.is-active .doc-tab-btn {
+  font-weight: 600;
+}
+
+.doc-tab-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: var(--radius);
+}
+
+.doc-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-tab-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* The close button shows on the tab in front and the one under the pointer;
+   elsewhere it keeps its room, so tabs don't shift on hover. */
+.doc-tab-close {
+  flex: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin: 0 5px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  visibility: hidden;
+}
+
+.doc-tab.is-active .doc-tab-close,
+.doc-tab:hover .doc-tab-close {
+  visibility: visible;
+}
+
+.doc-tab-close:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* Dragging a tab: where it will land. */
+body.tabs-dragging,
+body.tabs-dragging .doc-tab-btn {
+  cursor: grabbing;
+}
+
+.doc-tab.is-dragging {
+  opacity: 0.5;
+}
+
+.doc-tab.drop-before::before,
+.doc-tab.drop-after::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 2px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+.doc-tab.drop-before::before {
+  left: -2px;
+}
+
+.doc-tab.drop-after::after {
+  right: -2px;
+}
+
+.tabbar-scroll,
+.tabbar-new {
+  flex: none;
+  appearance: none;
+  align-self: center;
+  width: 22px;
+  height: 22px;
+  margin-bottom: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tabbar-scroll:hover:not(:disabled),
+.tabbar-new:hover {
+  background: var(--row-hover);
+  color: var(--text);
+}
+
+.tabbar-scroll:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Small chevrons, drawn like the breadcrumb's. */
+.tabbar-scroll::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+}
+
+.tabbar-scroll-left::before {
+  transform: translateX(1px) rotate(135deg);
+}
+
+.tabbar-scroll-right::before {
+  transform: translateX(-1px) rotate(-45deg);
 }
 
 /* ------------------------------------------------------------------------ */

@@ -376,3 +376,45 @@ Decision 21's layout, with the calls it needed:
   turns off while Tauri's file-drop handling is on; Option+Shift+arrows move a tab from the
   keyboard. The two panes split the height (or width) evenly; a divider between them can
   come later.
+
+## 25. Budget tabs as built (2026-10-09)
+
+Decision 19's "several budgets open as tabs in one window", with the calls it needed:
+
+- **One document per tab, all in Rust.** The app state holds every open budget as its own
+  `Session` (budget, file, dirty flag, undo and redo, autosave timing, recovery copy,
+  backups, the file's stamp for outside changes, the account on screen) with an id, in tab
+  order, one of them in front. Every command works on the budget in front unless its `doc`
+  argument names another, and each window sends the budget it is showing with every command,
+  so an edit made just as another tab comes to the front lands where the user was looking.
+  Ids are never reused, and revs are never shared between budgets, so "a new rev" still
+  means "something to redraw" for the other window. The row clipboard stays one for the app
+  (decision 23).
+- **Opening never replaces.** New, Open, Open Recent, a recovered budget and a file from the
+  Finder each open in a new tab; a file already open just has its tab brought forward (paths
+  compared once links are resolved), and an untouched Untitled budget alone in the window
+  gives its tab up, as editors do. So New and Open no longer ask about unsaved changes. A
+  recovered budget takes the place of its own file's tab when that was reopened untouched.
+- **Closing asks only what autosave couldn't settle.** Close Tab autosaves first, then asks
+  Save, Close Without Saving or Cancel in the page. Closing the window or quitting autosaves
+  every tab, then asks once in a native dialog that names each budget left: Save All (the
+  default; untitled budgets get their own Save dialog, and a cancel or a failure stops it
+  with nothing closed), Discard All, Cancel. Cmd+W closes the tab, the window on the last
+  one; Close Window moves to Shift+Cmd+W, as in browsers and other tabbed apps.
+- **Keys.** Ctrl+Tab and Ctrl+Shift+Tab, and Shift+Cmd+] and Shift+Cmd+[, step through the
+  tabs; Cmd+1 and Cmd+2 (free since decision 15) go to the first and second. Cmd+3 to Cmd+9
+  stay the tools tabs. The shortcut list gained a `ctrl` key (Control on a Mac too) and an
+  `anywhere` flag for grid commands that also work from a text field, since these keys mean
+  nothing there.
+- **What a tab shows.** The file's name without `.fwb`, or the budget's title before it has
+  a file; a dot for unsaved changes; the close button on the tab in front and the one under
+  the pointer; the title and path in its tooltip. The Window menu lists every budget, the
+  one in front ticked. The window title is the budget in front.
+- **Each tab comes back where it was left**: level, category, account, cursor, scroll and the
+  footer's change counters are kept in the page per tab; Rust keeps each budget's account on
+  screen, so its rows come with the view.
+- **The next start reopens the files**, in tab order with the same one in front, from
+  `tabs.json` in the app's data folder (paths only, rewritten when the list changes). Budgets
+  with no file come back through their recovery copies, never from this list.
+- **Split view is later** (behavior note 04): a second pane would be a second grid sending a
+  different `doc`; nothing about tabs needs to change for it.

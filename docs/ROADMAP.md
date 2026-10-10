@@ -33,7 +33,7 @@ printing of the topsheet and detail through the system print dialog. It stays fa
 lines. Not there yet: autosave, recent files and opening a `.fwb` from Finder, any way to
 set bold, italic, indent, color or a note from the app (the commands exist, the UI only
 shows them), versions and compare screens, find and replace, copying rows with their tags,
-a right-click menu, more than one budget open, report choices beyond "topsheet" or "all",
+a right-click menu, split view (budgets now open as tabs), report choices beyond "topsheet" or "all",
 signed installers, and import from the reference product (waiting on the export test).
 
 ---
@@ -128,7 +128,7 @@ What Sam needs to do real work every day. Ordered by priority.
 | 1.6 | **Style and note editing in the app**: bold, italic, indent, line color, group color, and a notes editor (side panel, Shift+Cmd+Space, click the note mark) for lines; engine and commands already exist | 01, 19, D16 | [partial] | M | 1.5, decision 11 |
 | 1.7 | **Shortcut parity pass**: setup keys, Cmd+Left/Right sibling steps on the account list too (stepping categories), range, adjustment, note and bold keys, visible prev/next buttons on the deepest crumb | 01, 02, 03, 09, 14, 17, 19, 20 | [partial] | S | decision 2 |
 | 1.8 | **Copy and paste rows with their tags**: our own clipboard payload (plus TSV for spreadsheets) carrying fringes, groups, set, location, currency, notes, style and ranges; "paste as new rows" above the cursor; accounts and categories with their lines | 20, inv 18 | [missing] | L | 1.9 for cross-budget |
-| 1.9 | **Budget tabs in one window** (Sam's call), each tab its own undo; copying between tabs is normal clipboard work; paste conflict review; split view later | 04, 20, inv 16 | [missing] | M | decisions 8, 12 |
+| 1.9 | **Budget tabs in one window** (Sam's call), each tab its own undo; copying between tabs is normal clipboard work; paste conflict review; split view later. Built (decision 25): a tab per budget with its own undo, autosave, recovery and backups; open, new, close with the unsaved question, reorder by drag, Ctrl+Tab, Shift+Cmd+] and [, Cmd+1 and Cmd+2, a Window menu, the tools panel and its window following the tab in front, one question about every unsaved tab on quit, the tabs reopened at the next start. Split view is 2.26; the keys and the close question need a live check | 04, 20, inv 16 | [have] | M | decisions 8, 12 |
 | 1.10 | **Move rows**: move up or down by key, cut and paste rows as rows, keep fringe ranges whole | APP, inv 18 | [missing] | S | 1.8 |
 | 1.11 | **Find and replace**: typed search (go to account number, description, fringe, global, group, set, location, unit, currency, notes), results by account with the matching column, jump to each, replace or remove in checked results only, token-exact for globals, one undo step | 18, inv 5, 17 | [missing] | L | none |
 | 1.12 | **Versions screen**: save a version, list, rename, add a note, restore (reversible), delete | 01, D17, inv 14 | [partial] | M | none |
@@ -186,6 +186,7 @@ total to the cent exists in spirit (D4 property tests); keep it explicit (02).
 | 2.23 | **History list**: every undo step listed, jump back, or branch it into a version | inv 15 | [missing] | M | 1.12 |
 | 2.24 | **Group rules as budget settings** (only if decision 3 changes) | 14, 24 | [missing] | M | decision 3 |
 | 2.25 | **Windows and Linux live check**: printing, menu keys, installers, file association | APP | [partial] | M | none |
+| 2.26 | **Split view**: two budget tabs side by side in one window, each pane with its own tab strip, breadcrumb and grid; one pane is the target (dot and bold tab) and the toolbar and tools act on it; move a tab to the other pane; exit merges the panes. Later, by Sam's call; tabs were built for it (every command already names its budget) | 04 | [missing] | M | 1.9 |
 
 ---
 

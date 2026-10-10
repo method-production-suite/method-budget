@@ -8,7 +8,10 @@
 //! event goes to it instead (`toolswin.js` answers its own text fields and tab
 //! items and passes the rest to `main.js`; src/tools.rs). Two ids are answered
 //! here in Rust instead: [`QUIT`] goes through the unsaved-changes guard, and
-//! [`CLOSE`] closes the window in front (the main one asks first).
+//! [`CLOSE`] closes the window in front (the main one asks first). [`CLOSE_TAB`]
+//! closes the tools window when it is in front, else goes to `main.js`, which
+//! closes the budget's tab. The Window menu ends with the open budgets
+//! (src/tabs.rs fills that list in).
 //!
 //! Who answers a key press: on macOS the web page sees a key first and the
 //! menu's key equivalent fires only if the page didn't handle it. So `main.js`
@@ -31,6 +34,17 @@ pub const EVENT: &str = "menu";
 pub const QUIT: &str = "app.quit";
 /// Close the window, which asks about unsaved changes on its way out.
 pub const CLOSE: &str = "file.close";
+/// Close the budget's tab (the window, when it is the only one; the tools
+/// window, when it is in front).
+pub const CLOSE_TAB: &str = "file.close_tab";
+/// The Window menu's id (on macOS, the one the system adds its window list to).
+#[cfg(target_os = "macos")]
+pub const WINDOW_MENU: &str = tauri::menu::WINDOW_SUBMENU_ID;
+#[cfg(not(target_os = "macos"))]
+pub const WINDOW_MENU: &str = "window";
+/// The last of the Window menu's own items; the open budgets follow it,
+/// after a separator.
+pub const LAST_WINDOW_ITEM: &str = "window.second_tab";
 
 /// One menu entry. Keys use the shortcut list's syntax (`mod+shift+s`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -90,6 +104,7 @@ const fn plain(id: &'static str, label: &'static str) -> Entry {
 
 pub const FILE: &[Entry] = &[
     item("file.new", "New", "mod+n"),
+    item("file.new_tab", "New Tab", "mod+t"),
     item("file.open", "Open…", "mod+o"),
     SEP,
     item("file.save", "Save", "mod+s"),
@@ -98,7 +113,8 @@ pub const FILE: &[Entry] = &[
     item("file.print_topsheet", "Print Topsheet…", "mod+shift+p"),
     item("file.print_budget", "Print Budget…", "mod+p"),
     SEP,
-    item(CLOSE, "Close Window", "mod+w"),
+    item(CLOSE_TAB, "Close Tab", "mod+w"),
+    item(CLOSE, "Close Window", "mod+shift+w"),
 ];
 
 /// Windows and Linux end the File menu with Quit; macOS has it in the app menu.
@@ -207,6 +223,17 @@ pub const SETUP_TABS: &[Entry] = &[
     plain("view.tab.baseline", "Baseline"),
 ];
 
+/// Budgets open as tabs: the next and previous tab, and the first two
+/// (Cmd+3 to Cmd+9 are the tools tabs). The open budgets are listed after
+/// these (src/tabs.rs). Ctrl+Tab and Ctrl+Shift+Tab work too (shortcuts.js).
+pub const WINDOW: &[Entry] = &[
+    item("window.next_tab", "Show Next Tab", "mod+shift+]"),
+    item("window.prev_tab", "Show Previous Tab", "mod+shift+["),
+    item("window.first_tab", "First Tab", "mod+1"),
+    item(LAST_WINDOW_ITEM, "Second Tab", "mod+2"),
+    SEP,
+];
+
 pub const HELP: &[Entry] = &[item("help.shortcuts", "Keyboard Shortcuts", "mod+shift+/")];
 
 /// A shortcut-list key spec as a Tauri accelerator: `mod+shift+s` is
@@ -215,6 +242,8 @@ pub fn accelerator(spec: &str) -> String {
     spec.split('+')
         .map(|part| match part {
             "mod" => "CmdOrCtrl".to_string(),
+            "ctrl" => "Ctrl".to_string(),
+            "tab" => "Tab".to_string(),
             "shift" => "Shift".to_string(),
             "alt" => "Alt".to_string(),
             "enter" => "Enter".to_string(),
@@ -340,14 +369,16 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     menu.append(&submenu(app, "&Go", GO)?)?;
     menu.append(&submenu(app, "&View", VIEW)?)?;
 
+    let window = Submenu::with_id(app, WINDOW_MENU, "&Window", true)?;
     #[cfg(target_os = "macos")]
     {
-        let window = Submenu::with_id(app, tauri::menu::WINDOW_SUBMENU_ID, "Window", true)?;
         window.append(&PredefinedMenuItem::minimize(app, None)?)?;
         window.append(&PredefinedMenuItem::maximize(app, None)?)?;
         window.append(&PredefinedMenuItem::fullscreen(app, None)?)?;
-        menu.append(&window)?;
+        window.append(&PredefinedMenuItem::separator(app)?)?;
     }
+    append(app, &window, WINDOW)?;
+    menu.append(&window)?;
 
     let help = Submenu::with_id(app, HELP_SUBMENU_ID, "&Help", true)?;
     append(app, &help, HELP)?;
@@ -364,14 +395,22 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 /// panel's own items, undo in its text fields among them, and passes the rest
 /// to the main window), else the main window's.
 pub fn handle<R: Runtime>(app: &AppHandle<R>, id: &str) {
-    let target = crate::tools::menu_target(crate::tools::tools_in_front(app));
-    if id == CLOSE {
+    let tools_in_front = crate::tools::tools_in_front(app);
+    let target = crate::tools::menu_target(tools_in_front);
+    if id == CLOSE || (id == CLOSE_TAB && tools_in_front) {
         // The window in front closes: the main one asks about unsaved
         // changes on its way out (CloseRequested); the tools one docks the
         // panel back.
         if let Some(w) = app.get_webview_window(target) {
             let _ = w.close();
         }
+        return;
+    }
+    if id.starts_with(crate::tabs::DOC_PREFIX) {
+        // Window > a budget: the main window brings its tab forward. The
+        // item ticked or unticked itself, so the list is drawn again.
+        crate::tabs::redraw_window_menu(app);
+        let _ = app.emit_to(crate::tools::MAIN, EVENT, id);
         return;
     }
     let _ = app.emit_to(target, EVENT, id);
@@ -396,6 +435,7 @@ mod tests {
             VIEW,
             TOOLS_PANEL,
             SETUP_TABS,
+            WINDOW,
             HELP,
         ]
         .iter()
@@ -506,6 +546,9 @@ mod tests {
         assert_eq!(accelerator("mod+g"), "CmdOrCtrl+G");
         assert_eq!(accelerator("mod+alt+right"), "CmdOrCtrl+Alt+Right");
         assert_eq!(accelerator("mod+shift+i"), "CmdOrCtrl+Shift+I");
+        assert_eq!(accelerator("mod+t"), "CmdOrCtrl+T");
+        assert_eq!(accelerator("mod+shift+]"), "CmdOrCtrl+Shift+]");
+        assert_eq!(accelerator("ctrl+shift+tab"), "Ctrl+Shift+Tab");
     }
 
     #[test]

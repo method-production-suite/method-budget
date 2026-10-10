@@ -1,12 +1,13 @@
-//! Tauri glue: app state, the commands the UI invokes, native file dialogs, and
-//! the unsaved-changes guard on close and quit.
+//! Tauri glue: the commands the UI invokes, native file dialogs, and the
+//! unsaved-changes guard on close and quit.
 //!
 //! Security notes (see docs/APP.md): file paths only ever come from native
 //! dialogs shown here in Rust, never from the web view; every command works on
-//! the one budget in [`AppState`]; navigation away from the bundled UI is blocked.
+//! one of the open budgets in [`AppState`] (the one in front, or the one its
+//! `doc` argument names: src/docs.rs); navigation away from the bundled UI is
+//! blocked.
 
 use std::path::PathBuf;
-use std::sync::{Mutex, MutexGuard};
 
 use fwb_core::RowId;
 use tauri::{AppHandle, Manager, Runtime, State, WebviewWindow};
@@ -14,6 +15,7 @@ use tauri_plugin_dialog::{
     DialogExt, MessageDialogButtons, MessageDialogKind, MessageDialogResult,
 };
 
+pub use crate::docs::{AppState, DocGuard, DocId};
 use crate::edit::{self, CurrencyInput, FringeInput, GroupInput, UnitInput};
 use crate::edit::{ChargeInput, CreditInput, InfoInput, LocationInput, SetInput};
 use crate::report_dto::SelectionDto;
@@ -23,19 +25,6 @@ use crate::view::{Focus, FullView, View};
 const APP_NAME: &str = "Film Wizard Budgeting";
 const FILTER_NAME: &str = "Film Wizard budget";
 
-#[derive(Default)]
-pub struct AppState {
-    session: Mutex<Session>,
-}
-
-impl AppState {
-    pub(crate) fn lock(&self) -> MutexGuard<'_, Session> {
-        // A panic mid-command can't leave the budget half-edited (edits apply
-        // to a copy), so a poisoned lock is still safe to use.
-        self.session.lock().unwrap_or_else(|e| e.into_inner())
-    }
-}
-
 type CmdResult<T = View> = Result<T, String>;
 
 pub(crate) fn window_title(s: &Session) -> String {
@@ -43,53 +32,69 @@ pub(crate) fn window_title(s: &Session) -> String {
     format!("{}{edited} - {APP_NAME}", s.display_name())
 }
 
-/// The view after a command, with the main window's title kept in sync
-/// (whichever window sent the command), and the other windows told when the
-/// budget changed (src/tools.rs).
+/// The view after a command, with the tabs listed and the main window's
+/// title kept in sync with the budget in front (whichever window sent the
+/// command), and the other windows told when the budget changed
+/// (src/tools.rs). The Window menu and the list of tabs to reopen next time
+/// follow (src/tabs.rs).
 pub(crate) fn finish<R: Runtime>(
     window: &WebviewWindow<R>,
-    s: &mut Session,
+    s: &mut DocGuard<'_>,
     created: Option<RowId>,
 ) -> View {
-    if let Some(main) = window.app_handle().get_webview_window(crate::tools::MAIN) {
-        let _ = main.set_title(&window_title(s));
+    if s.is_active() {
+        if let Some(main) = window.app_handle().get_webview_window(crate::tools::MAIN) {
+            let _ = main.set_title(&window_title(s));
+        }
     }
-    let view = s.view_with(created);
-    crate::tools::changed(window, view.rev);
+    let mut view = s.view_with(created);
+    view.doc = s.id();
+    view.tabs = s.docs().tabs();
+    crate::tools::changed(window, view.doc, view.rev);
+    crate::tabs::after_command(window.app_handle(), s.docs());
     view
 }
 
 fn apply<R: Runtime, T>(
     window: &WebviewWindow<R>,
     state: &AppState,
+    doc: Option<DocId>,
     f: impl FnOnce(&mut Session) -> edit::EditResult<T>,
 ) -> CmdResult {
-    let mut s = state.lock();
+    let mut s = state.lock_doc(doc)?;
     f(&mut s)?;
     Ok(finish(window, &mut s, None))
 }
 
-/// Runs a pure budget edit as one undo step.
+/// Runs a pure budget edit as one undo step, on budget `doc` (`None`: the
+/// one in front).
 pub(crate) fn edit_budget<R: Runtime, T>(
     window: &WebviewWindow<R>,
     state: &AppState,
+    doc: Option<DocId>,
     f: impl FnOnce(&mut fwb_core::Budget) -> edit::EditResult<T>,
 ) -> CmdResult {
-    apply(window, state, |s| s.edit(f))
+    apply(window, state, doc, |s| s.edit(f))
 }
 
 // ---------------------------------------------------------------------------
 // Views
 
+/// The view of budget `doc` (`None`: the one in front, which the tools window
+/// asks for to follow the main window's tabs).
 #[tauri::command]
-pub fn get_view<R: Runtime>(window: WebviewWindow<R>, state: State<'_, AppState>) -> View {
-    finish(&window, &mut state.lock(), None)
+pub fn get_view<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+) -> CmdResult {
+    Ok(finish(&window, &mut state.lock_doc(doc)?, None))
 }
 
 /// Everything, every row: for printing. Other commands return the lean view.
 #[tauri::command]
-pub fn get_full_view(state: State<'_, AppState>) -> FullView {
-    state.lock().full_view()
+pub fn get_full_view(state: State<'_, AppState>, doc: Option<DocId>) -> CmdResult<FullView> {
+    Ok(state.lock_doc(doc)?.full_view())
 }
 
 /// Shows an account: its rows go out with this and every later view, until
@@ -100,12 +105,13 @@ pub fn get_full_view(state: State<'_, AppState>) -> FullView {
 pub fn focus_account<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     category: Option<String>,
     ti: Option<usize>,
     account: Option<String>,
     ai: Option<usize>,
-) -> View {
-    let mut s = state.lock();
+) -> CmdResult {
+    let mut s = state.lock_doc(doc)?;
     let focus = category.zip(account).map(|(category, account)| Focus {
         category,
         ti: ti.unwrap_or(usize::MAX),
@@ -113,23 +119,15 @@ pub fn focus_account<R: Runtime>(
         ai: ai.unwrap_or(usize::MAX),
     });
     s.set_focus(focus);
-    finish(&window, &mut s, None)
+    Ok(finish(&window, &mut s, None))
 }
 
 // ---------------------------------------------------------------------------
 // Files
 
-/// Replaces the budget with a fresh starter. The UI confirms first when there
-/// are unsaved changes.
-#[tauri::command]
-pub fn new_budget<R: Runtime>(window: WebviewWindow<R>, state: State<'_, AppState>) -> View {
-    // The old budget's recovery copy goes with it (src/safety_app.rs).
-    crate::safety_app::replace_session(&state, &window.state(), Session::new());
-    let mut s = state.lock();
-    finish(&window, &mut s, None)
-}
-
-/// Shows an Open dialog and loads the chosen file. `None` if cancelled.
+/// Shows an Open dialog and opens the chosen file in a new tab (or brings its
+/// tab to the front when it is open already; an untouched Untitled budget
+/// gives its tab up to it). `None` if cancelled.
 #[tauri::command]
 pub async fn open_budget<R: Runtime>(
     window: WebviewWindow<R>,
@@ -153,23 +151,45 @@ pub async fn open_budget<R: Runtime>(
         return Ok(None);
     };
     let path = picked.into_path().map_err(|e| e.to_string())?;
-    // Opens it, drops the old budget's recovery copy, lists it in Open Recent.
-    crate::safety_app::open_path(&state, &window.state(), &path)?;
+    // Opens it in a tab and lists it in Open Recent (src/safety_app.rs).
+    let id = crate::safety_app::open_path(&state, &window.state(), &path)?;
     crate::safety_app::refresh_menu(window.app_handle());
-    let mut s = state.lock();
-    Ok(Some(finish(&window, &mut s, None)))
+    Ok(Some(finish(&window, &mut state.lock_doc(Some(id))?, None)))
 }
 
-/// Saves to the current file, or asks where (always, with `save_as`).
-/// `None` if the user cancelled the dialog.
+/// Saves budget `doc` (`None`: the one in front) to its file, or asks where
+/// (always, with `save_as`). `None` if the user cancelled the dialog; the
+/// view's `file.dirty` stays true when the file changed outside the app and
+/// nothing was written (the page asks what to do).
 #[tauri::command]
 pub async fn save_budget<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
     save_as: bool,
+    doc: Option<DocId>,
 ) -> CmdResult<Option<View>> {
+    let id = state.lock_doc(doc)?.id();
+    if save_doc(&window, &state, id, save_as, None)?.is_none() {
+        return Ok(None);
+    }
+    crate::safety_app::refresh_menu(window.app_handle());
+    Ok(Some(finish(&window, &mut state.lock_doc(Some(id))?, None)))
+}
+
+/// Saves budget `id` to its file, or asks where (always, with `save_as`;
+/// `dialog_title` names the budget when several are being saved). Shows
+/// dialogs, so never call it on the main thread. `None` when the user
+/// cancelled; `Some(false)` when the file changed outside the app and nothing
+/// was written (the page has been told and asks what to do).
+fn save_doc<R: Runtime>(
+    window: &WebviewWindow<R>,
+    state: &AppState,
+    id: DocId,
+    save_as: bool,
+    dialog_title: Option<&str>,
+) -> CmdResult<Option<bool>> {
     let (current, suggested) = {
-        let s = state.lock();
+        let s = state.lock_doc(Some(id))?;
         let title = s.budget().title.trim().to_string();
         let suggested = match s.path().and_then(|p| p.file_stem()) {
             Some(stem) => stem.to_string_lossy().into_owned(),
@@ -180,23 +200,24 @@ pub async fn save_budget<R: Runtime>(
     let path = match current {
         Some(p) if !save_as => {
             // A budget recovered after a crash asks before replacing its file.
-            if !crate::safety_app::confirm_overwrite(&window, &state) {
+            if !crate::safety_app::confirm_overwrite(window, state, id) {
                 return Ok(None);
             }
             p
         }
         _ => {
+            let title = match dialog_title {
+                Some(t) => t.to_string(),
+                None if save_as => "Save budget as".to_string(),
+                None => "Save budget".to_string(),
+            };
             let mut dialog = window
                 .dialog()
                 .file()
-                .set_title(if save_as {
-                    "Save budget as"
-                } else {
-                    "Save budget"
-                })
+                .set_title(title)
                 .add_filter(FILTER_NAME, &["fwb"])
                 .set_file_name(format!("{}.fwb", safe_file_stem(&suggested)))
-                .set_parent(&window);
+                .set_parent(window);
             if let Some(dir) = current.as_deref().and_then(|p| p.parent()) {
                 dialog = dialog.set_directory(dir);
             }
@@ -210,10 +231,7 @@ pub async fn save_budget<R: Runtime>(
     // recovery copy and lists the file in Open Recent (src/safety_app.rs).
     // If the file changed outside the app, nothing is written and the page
     // asks what to do instead.
-    crate::safety_app::save_from(&window, &state, &path)?;
-    crate::safety_app::refresh_menu(window.app_handle());
-    let mut s = state.lock();
-    Ok(Some(finish(&window, &mut s, None)))
+    crate::safety_app::save_from(window, state, id, &path).map(Some)
 }
 
 /// A file name stem from a budget title: path separators and other characters
@@ -249,17 +267,25 @@ fn with_fwb_extension(mut p: PathBuf) -> PathBuf {
 // History
 
 #[tauri::command]
-pub fn undo<R: Runtime>(window: WebviewWindow<R>, state: State<'_, AppState>) -> View {
-    let mut s = state.lock();
+pub fn undo<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+) -> CmdResult {
+    let mut s = state.lock_doc(doc)?;
     s.undo();
-    finish(&window, &mut s, None)
+    Ok(finish(&window, &mut s, None))
 }
 
 #[tauri::command]
-pub fn redo<R: Runtime>(window: WebviewWindow<R>, state: State<'_, AppState>) -> View {
-    let mut s = state.lock();
+pub fn redo<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+) -> CmdResult {
+    let mut s = state.lock_doc(doc)?;
     s.redo();
-    finish(&window, &mut s, None)
+    Ok(finish(&window, &mut s, None))
 }
 
 // ---------------------------------------------------------------------------
@@ -269,30 +295,35 @@ pub fn redo<R: Runtime>(window: WebviewWindow<R>, state: State<'_, AppState>) ->
 pub fn set_title<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     title: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::set_title(b, &title))
+    edit_budget(&window, &state, doc, |b| edit::set_title(b, &title))
 }
 
 #[tauri::command]
 pub fn add_category<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     code: String,
     name: String,
     at: Option<usize>,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::add_category(b, &code, &name, at))
+    edit_budget(&window, &state, doc, |b| {
+        edit::add_category(b, &code, &name, at)
+    })
 }
 
 #[tauri::command]
 pub fn add_production_total<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
     at: Option<usize>,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| {
+    edit_budget(&window, &state, doc, |b| {
         edit::add_production_total(b, &name, at)
     })
 }
@@ -301,11 +332,12 @@ pub fn add_production_total<R: Runtime>(
 pub fn update_topsheet_row<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     index: usize,
     code: Option<String>,
     name: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| {
+    edit_budget(&window, &state, doc, |b| {
         edit::update_topsheet_row(b, index, code.as_deref(), &name)
     })
 }
@@ -314,21 +346,25 @@ pub fn update_topsheet_row<R: Runtime>(
 pub fn delete_topsheet_row<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     index: usize,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::delete_topsheet_row(b, index))
+    edit_budget(&window, &state, doc, |b| {
+        edit::delete_topsheet_row(b, index)
+    })
 }
 
 #[tauri::command]
 pub fn add_account<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     category_code: String,
     code: String,
     name: String,
     after: Option<String>,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| {
+    edit_budget(&window, &state, doc, |b| {
         edit::add_account(b, &category_code, &code, &name, after.as_deref())
     })
 }
@@ -337,11 +373,12 @@ pub fn add_account<R: Runtime>(
 pub fn update_account<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     code: String,
     new_code: String,
     name: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| {
+    edit_budget(&window, &state, doc, |b| {
         edit::update_account(b, &code, &new_code, &name)
     })
 }
@@ -350,9 +387,10 @@ pub fn update_account<R: Runtime>(
 pub fn delete_account<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     code: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::delete_account(b, &code))
+    edit_budget(&window, &state, doc, |b| edit::delete_account(b, &code))
 }
 
 // ---------------------------------------------------------------------------
@@ -362,11 +400,12 @@ pub fn delete_account<R: Runtime>(
 pub fn set_detail_field<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     row_id: RowId,
     field: String,
     value: String,
 ) -> CmdResult {
-    apply(&window, &state, |s| {
+    apply(&window, &state, doc, |s| {
         s.set_detail_field(row_id, &field, &value)
     })
 }
@@ -375,12 +414,13 @@ pub fn set_detail_field<R: Runtime>(
 pub fn set_rows_field<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     row_ids: Vec<RowId>,
     field: String,
     value: String,
 ) -> CmdResult {
     let field = edit::Field::parse(&field)?;
-    edit_budget(&window, &state, |b| {
+    edit_budget(&window, &state, doc, |b| {
         edit::set_rows_field(b, &row_ids, field, &value)
     })
 }
@@ -389,11 +429,12 @@ pub fn set_rows_field<R: Runtime>(
 pub fn add_detail<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     account_code: String,
     after: Option<RowId>,
     kind: String,
 ) -> CmdResult {
-    let mut s = state.lock();
+    let mut s = state.lock_doc(doc)?;
     let id = s.add_detail(&account_code, after, &kind)?;
     Ok(finish(&window, &mut s, Some(id)))
 }
@@ -402,14 +443,19 @@ pub fn add_detail<R: Runtime>(
 pub fn delete_details<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     row_ids: Vec<RowId>,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::delete_details(b, &row_ids))
+    edit_budget(&window, &state, doc, |b| edit::delete_details(b, &row_ids))
 }
 
 #[tauri::command]
-pub fn selection_totals(state: State<'_, AppState>, row_ids: Vec<RowId>) -> SelectionDto {
-    state.lock().selection(&row_ids)
+pub fn selection_totals(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    row_ids: Vec<RowId>,
+) -> CmdResult<SelectionDto> {
+    Ok(state.lock_doc(doc)?.selection(&row_ids))
 }
 
 // ---------------------------------------------------------------------------
@@ -419,95 +465,111 @@ pub fn selection_totals(state: State<'_, AppState>, row_ids: Vec<RowId>) -> Sele
 pub fn set_global<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
     formula: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::set_global(b, &name, &formula))
+    edit_budget(&window, &state, doc, |b| {
+        edit::set_global(b, &name, &formula)
+    })
 }
 
 #[tauri::command]
 pub fn delete_global<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::delete_global(b, &name))
+    edit_budget(&window, &state, doc, |b| edit::delete_global(b, &name))
 }
 
 #[tauri::command]
 pub fn set_fringe<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
     fringe: FringeInput,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::set_fringe(b, &name, &fringe))
+    edit_budget(&window, &state, doc, |b| {
+        edit::set_fringe(b, &name, &fringe)
+    })
 }
 
 #[tauri::command]
 pub fn delete_fringe<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::delete_fringe(b, &name))
+    edit_budget(&window, &state, doc, |b| edit::delete_fringe(b, &name))
 }
 
 #[tauri::command]
 pub fn set_group<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
     group: GroupInput,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::set_group(b, &name, &group))
+    edit_budget(&window, &state, doc, |b| edit::set_group(b, &name, &group))
 }
 
 #[tauri::command]
 pub fn delete_group<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::delete_group(b, &name))
+    edit_budget(&window, &state, doc, |b| edit::delete_group(b, &name))
 }
 
 #[tauri::command]
 pub fn set_unit<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
     unit: UnitInput,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::set_unit(b, &name, &unit))
+    edit_budget(&window, &state, doc, |b| edit::set_unit(b, &name, &unit))
 }
 
 #[tauri::command]
 pub fn delete_unit<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::delete_unit(b, &name))
+    edit_budget(&window, &state, doc, |b| edit::delete_unit(b, &name))
 }
 
 #[tauri::command]
 pub fn set_currency<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     code: String,
     currency: CurrencyInput,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::set_currency(b, &code, &currency))
+    edit_budget(&window, &state, doc, |b| {
+        edit::set_currency(b, &code, &currency)
+    })
 }
 
 #[tauri::command]
 pub fn delete_currency<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     code: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::delete_currency(b, &code))
+    edit_budget(&window, &state, doc, |b| edit::delete_currency(b, &code))
 }
 
 // ---------------------------------------------------------------------------
@@ -518,141 +580,163 @@ pub fn delete_currency<R: Runtime>(
 pub fn set_charge<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     index: Option<usize>,
     charge: ChargeInput,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::set_charge(b, index, &charge))
+    edit_budget(&window, &state, doc, |b| {
+        edit::set_charge(b, index, &charge)
+    })
 }
 
 #[tauri::command]
 pub fn delete_charge<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     index: usize,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::delete_charge(b, index))
+    edit_budget(&window, &state, doc, |b| edit::delete_charge(b, index))
 }
 
 #[tauri::command]
 pub fn move_charge<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     index: usize,
     to: usize,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::move_charge(b, index, to))
+    edit_budget(&window, &state, doc, |b| edit::move_charge(b, index, to))
 }
 
 #[tauri::command]
 pub fn set_credit<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     index: Option<usize>,
     credit: CreditInput,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::set_credit(b, index, &credit))
+    edit_budget(&window, &state, doc, |b| {
+        edit::set_credit(b, index, &credit)
+    })
 }
 
 #[tauri::command]
 pub fn delete_credit<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     index: usize,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::delete_credit(b, index))
+    edit_budget(&window, &state, doc, |b| edit::delete_credit(b, index))
 }
 
 #[tauri::command]
 pub fn move_credit<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     index: usize,
     to: usize,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::move_credit(b, index, to))
+    edit_budget(&window, &state, doc, |b| edit::move_credit(b, index, to))
 }
 
 #[tauri::command]
 pub fn set_set<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
     set: SetInput,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::set_set(b, &name, &set))
+    edit_budget(&window, &state, doc, |b| edit::set_set(b, &name, &set))
 }
 
 #[tauri::command]
 pub fn delete_set<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::delete_set(b, &name))
+    edit_budget(&window, &state, doc, |b| edit::delete_set(b, &name))
 }
 
 #[tauri::command]
 pub fn set_location<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
     location: LocationInput,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::set_location(b, &name, &location))
+    edit_budget(&window, &state, doc, |b| {
+        edit::set_location(b, &name, &location)
+    })
 }
 
 #[tauri::command]
 pub fn delete_location<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::delete_location(b, &name))
+    edit_budget(&window, &state, doc, |b| edit::delete_location(b, &name))
 }
 
 #[tauri::command]
 pub fn set_info<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
     value: InfoInput,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::set_info(b, &name, &value))
+    edit_budget(&window, &state, doc, |b| edit::set_info(b, &name, &value))
 }
 
 #[tauri::command]
 pub fn delete_info<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::delete_info(b, &name))
+    edit_budget(&window, &state, doc, |b| edit::delete_info(b, &name))
 }
 
 #[tauri::command]
 pub fn set_fringe_posting<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     mode: String,
     suffix: Option<String>,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| {
+    edit_budget(&window, &state, doc, |b| {
         edit::set_fringe_posting(b, &mode, suffix.as_deref())
     })
 }
 
 /// Arguments are snake_case here (`category_width`...), matching the file format.
+/// Each width is its own argument, as the page sends them.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command(rename_all = "snake_case")]
 pub fn set_account_coding<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     category_width: u8,
     account_width: u8,
     sub_width: u8,
     set_width: u8,
     separator: Option<String>,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| {
+    edit_budget(&window, &state, doc, |b| {
         edit::set_account_coding(
             b,
             [category_width, account_width, sub_width, set_width],
@@ -665,18 +749,20 @@ pub fn set_account_coding<R: Runtime>(
 pub fn set_base_currency<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     code: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| edit::set_base_currency(b, &code))
+    edit_budget(&window, &state, doc, |b| edit::set_base_currency(b, &code))
 }
 
 #[tauri::command]
 pub fn set_totals_currency<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     code: Option<String>,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| {
+    edit_budget(&window, &state, doc, |b| {
         edit::set_totals_currency(b, code.as_deref())
     })
 }
@@ -685,16 +771,18 @@ pub fn set_totals_currency<R: Runtime>(
 pub fn lock_baseline<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
 ) -> CmdResult {
-    edit_budget(&window, &state, edit::lock_baseline)
+    edit_budget(&window, &state, doc, edit::lock_baseline)
 }
 
 #[tauri::command]
 pub fn clear_baseline<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
 ) -> CmdResult {
-    edit_budget(&window, &state, edit::clear_baseline)
+    edit_budget(&window, &state, doc, edit::clear_baseline)
 }
 
 // ---------------------------------------------------------------------------
@@ -705,50 +793,123 @@ pub fn clear_baseline<R: Runtime>(
 pub fn set_cells<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     edits: Vec<crate::batch::CellEdit>,
 ) -> CmdResult {
-    edit_budget(&window, &state, |b| crate::batch::set_cells(b, &edits))
+    edit_budget(&window, &state, doc, |b| crate::batch::set_cells(b, &edits))
 }
 
 // ---------------------------------------------------------------------------
-// Unsaved-changes guard
+// Unsaved-changes guard: closing the window or quitting asks once about every
+// budget with unsaved changes.
 
-const KEEP_EDITING: &str = "Keep editing";
-const DISCARD: &str = "Close without saving";
+/// The question when budgets `names` have unsaved changes: the message, and
+/// the labels of the save, discard and cancel buttons.
+pub(crate) fn close_question(names: &[String]) -> (String, [&'static str; 3]) {
+    if let [one] = names {
+        return (
+            format!("\"{one}\" has unsaved changes. Save them before closing? If you don't, they will be lost."),
+            ["Save", "Discard", "Cancel"],
+        );
+    }
+    let list: Vec<String> = names.iter().map(|n| format!("\u{2022} {n}")).collect();
+    (
+        format!(
+            "{} budgets have unsaved changes:\n\n{}\n\nSave them before closing? If you don't, they will be lost.",
+            names.len(),
+            list.join("\n")
+        ),
+        ["Save All", "Discard All", "Cancel"],
+    )
+}
 
-/// Asks before throwing away unsaved changes; runs `then` if the user agrees
-/// (or there was nothing to lose). Never blocks the event loop.
-fn confirm_discard<R: Runtime>(app: &AppHandle<R>, then: impl FnOnce() + Send + 'static) {
-    // With Autosave on, unsaved changes go into the file first (src/safety_app.rs).
-    let saved = crate::safety_app::save_before_leaving(app);
-    let dirty = !saved && app.state::<AppState>().lock().is_dirty();
-    if !dirty {
+/// Asks before closing with unsaved changes, in one question about every
+/// budget that has them: Save All, Discard All or Cancel. Runs `then` once
+/// nothing unsaved is left (saved, thrown away on purpose, or nothing to
+/// lose). Never blocks the event loop.
+fn confirm_close<R: Runtime>(app: &AppHandle<R>, then: impl FnOnce() + Send + 'static) {
+    // With Autosave on, unsaved changes go into their files first
+    // (src/safety_app.rs); what is left is untitled or can't be autosaved.
+    let dirty = crate::safety_app::save_before_leaving(app);
+    if dirty.is_empty() {
         then();
         return;
     }
+    let names: Vec<String> = {
+        let state = app.state::<AppState>();
+        let docs = state.docs();
+        dirty
+            .iter()
+            .filter_map(|id| docs.get(*id).map(Session::tab_label))
+            .collect()
+    };
+    let (message, [save, discard, cancel]) = close_question(&names);
     let mut dialog = app
         .dialog()
-        .message("This budget has unsaved changes. If you close it now, they will be lost.")
+        .message(message)
         .title("Unsaved changes")
         .kind(MessageDialogKind::Warning)
-        // The safe choice comes first so it's the default (Enter). Only an
-        // explicit click on the discard button throws work away; Escape,
-        // closing the alert or anything unexpected keeps editing.
-        .buttons(MessageDialogButtons::OkCancelCustom(
-            KEEP_EDITING.into(),
-            DISCARD.into(),
+        // Saving comes first, so it is the default (Enter); Escape and
+        // closing the alert cancel. Only an explicit click on the discard
+        // button throws work away.
+        .buttons(MessageDialogButtons::YesNoCancelCustom(
+            save.into(),
+            discard.into(),
+            cancel.into(),
         ));
-    if let Some(w) = app.get_webview_window("main") {
+    if let Some(w) = app.get_webview_window(crate::tools::MAIN) {
         dialog = dialog.parent(&w);
     }
     let handle = app.clone();
-    dialog.show_with_result(move |choice| {
-        if choice == MessageDialogResult::Custom(DISCARD.into()) {
-            // Thrown away on purpose: no recovery copy of it either.
+    dialog.show_with_result(move |choice| match choice {
+        MessageDialogResult::Custom(c) if c == save => {
+            // Save dialogs wait for the user, so not on the event loop.
+            std::thread::spawn(move || {
+                if save_all(&handle, &dirty) {
+                    then();
+                }
+            });
+        }
+        MessageDialogResult::Custom(c) if c == discard => {
+            // Thrown away on purpose: no recovery copies of them either.
             crate::safety_app::discarded(&handle);
             then();
         }
+        _ => {}
     });
+}
+
+/// Save All, on the way out: each budget in `ids` into its file, an untitled
+/// one where its Save dialog says. Stops at the first one that isn't saved
+/// (its dialog cancelled, its file changed outside the app, a failed write),
+/// so nothing closes. True when every one was saved.
+fn save_all<R: Runtime>(app: &AppHandle<R>, ids: &[DocId]) -> bool {
+    let Some(window) = app.get_webview_window(crate::tools::MAIN) else {
+        return false;
+    };
+    let state = app.state::<AppState>();
+    for &id in ids {
+        let Some(label) = state.docs().get(id).map(Session::tab_label) else {
+            continue; // closed meanwhile
+        };
+        let title = format!("Save \"{label}\"");
+        match save_doc(&window, &state, id, false, Some(&title)) {
+            Ok(Some(true)) => crate::safety_app::tell_saved(app, id),
+            Ok(_) => return false,
+            Err(e) => {
+                window
+                    .dialog()
+                    .message(format!("{e}\n\nNothing was closed."))
+                    .title("Couldn't save")
+                    .kind(MessageDialogKind::Error)
+                    .parent(&window)
+                    .blocking_show();
+                return false;
+            }
+        }
+    }
+    crate::safety_app::refresh_menu(app);
+    true
 }
 
 /// Only the bundled UI may load in the web view: no navigating to other
@@ -770,6 +931,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(nav_guard)
         .manage(AppState::default())
+        // The Window menu's list of budgets (src/tabs.rs).
+        .manage(crate::tabs::TabMenu::default())
         // The row clipboard: one for the app, shared by every budget (src/clipboard.rs).
         .manage(crate::clipboard::ClipboardState::default())
         // Which budget change the other window has heard about (src/tools.rs).
@@ -783,7 +946,7 @@ pub fn run() {
             let id = event.id().as_ref();
             if id == crate::menu::QUIT {
                 let handle = app.clone();
-                confirm_discard(app, move || handle.exit(0));
+                confirm_close(app, move || handle.exit(0));
             } else if !crate::safety_app::handle_menu(app, id) {
                 // Open Recent's Clear Menu and the Autosave check are answered
                 // in src/safety_app.rs.
@@ -813,15 +976,15 @@ pub fn run() {
                 let app = window.app_handle().clone();
                 std::thread::spawn(move || crate::safety_app::check_external(&app));
             }
-            // Only the main window asks about unsaved changes; closing the
-            // tools window just docks the panel.
+            // Only the main window asks about unsaved changes (in every
+            // tab); closing the tools window just docks the panel.
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == crate::tools::MAIN
-                    && window.state::<AppState>().lock().is_dirty()
+                    && !window.state::<AppState>().docs().dirty().is_empty()
                 {
                     api.prevent_close();
                     let w = window.clone();
-                    confirm_discard(window.app_handle(), move || {
+                    confirm_close(window.app_handle(), move || {
                         let _ = w.destroy();
                     });
                 }
@@ -831,7 +994,6 @@ pub fn run() {
             get_view,
             get_full_view,
             focus_account,
-            new_budget,
             open_budget,
             save_budget,
             undo,
@@ -919,13 +1081,21 @@ pub fn run() {
             crate::tools::tools_window,
             crate::tools::close_tools_window,
             crate::tools::notes_list,
+            // Budgets as tabs (src/tabs.rs)
+            crate::tabs::new_tab,
+            crate::tabs::switch_tab,
+            crate::tabs::move_tab,
+            crate::tabs::close_tab,
+            crate::tabs::list_tabs,
         ])
         .setup(|app| {
+            // Autosave, recovery, backups, recent files, and the budgets that
+            // were open as tabs last time (src/safety_app.rs).
+            crate::safety_app::init(app.handle());
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.set_title(&window_title(&app.state::<AppState>().lock()));
             }
-            // Autosave, recovery, backups, recent files (src/safety_app.rs).
-            crate::safety_app::init(app.handle());
+            crate::tabs::after_command(app.handle(), &app.state::<AppState>().docs());
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -974,6 +1144,21 @@ mod tests {
             with_fwb_extension(PathBuf::from("/x/v1.2")),
             PathBuf::from("/x/v1.2.fwb")
         );
+    }
+
+    #[test]
+    fn closing_asks_about_every_unsaved_budget_at_once() {
+        let (one, buttons) = close_question(&["Pilot".to_string()]);
+        assert!(one.contains("\"Pilot\" has unsaved changes"), "{one}");
+        assert_eq!(buttons, ["Save", "Discard", "Cancel"]);
+        let (two, buttons) = close_question(&["Pilot".into(), "Untitled feature".into()]);
+        assert!(two.starts_with("2 budgets have unsaved changes"), "{two}");
+        assert!(
+            two.contains("\u{2022} Pilot\n\u{2022} Untitled feature"),
+            "{two}"
+        );
+        assert_eq!(buttons, ["Save All", "Discard All", "Cancel"]);
+        assert!(!two.contains('\u{2014}'), "no em dashes");
     }
 
     #[test]

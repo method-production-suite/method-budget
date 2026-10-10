@@ -336,6 +336,26 @@ impl Session {
             .unwrap_or_else(|| "Untitled.fwb".to_string())
     }
 
+    /// What the budget's tab (and the Window menu) calls it: the file's
+    /// name without `.fwb`, or the budget's title while it has no file.
+    pub fn tab_label(&self) -> String {
+        if let Some(stem) = self.path.as_deref().and_then(Path::file_stem) {
+            return stem.to_string_lossy().into_owned();
+        }
+        let title = self.budget.title.trim();
+        if title.is_empty() {
+            "Untitled".to_string()
+        } else {
+            title.to_string()
+        }
+    }
+
+    /// Never changed since it was started or read: no edits, nothing to
+    /// undo or redo (an Open may take the place of an untouched Untitled).
+    pub fn is_untouched(&self) -> bool {
+        self.rev == 0 && self.saved_rev == 0 && self.undo.is_empty() && self.redo.is_empty()
+    }
+
     /// Reads a budget file and starts a fresh session on it.
     pub fn open(path: &Path) -> Result<Session, String> {
         let (budget, stamp) = read_budget(path)?;
@@ -487,6 +507,14 @@ impl Session {
     /// The current view revision (what the next view's `rev` will be).
     pub fn view_rev(&self) -> u64 {
         self.view_rev
+    }
+
+    /// Whether the budget lives in the file at `path` (the same file by
+    /// another spelling of its path counts too).
+    pub fn is_file(&self, path: &Path) -> bool {
+        self.path
+            .as_deref()
+            .is_some_and(|p| safety::same_file(p, path))
     }
 
     /// The file part of a view: name, path, unsaved changes.

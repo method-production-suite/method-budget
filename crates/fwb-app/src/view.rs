@@ -57,6 +57,12 @@ pub struct View {
     pub variance: Option<VarianceDto>,
     /// The account on screen (see `focus_account`), in full.
     pub account: Option<AccountView>,
+    /// Which open budget this is (src/docs.rs). The app fills this in, and
+    /// `tabs`, after each command; a view made outside the app has 0 and no
+    /// tabs.
+    pub doc: crate::docs::DocId,
+    /// Every open budget's tab, in tab order.
+    pub tabs: Vec<crate::docs::TabInfo>,
 }
 
 /// One account in full: its rows in file-format JSON and their totals.
@@ -425,6 +431,8 @@ impl View {
             can_redo: st.can_redo,
             created_row,
             account,
+            doc: 0,
+            tabs: Vec::new(),
         }
     }
 }

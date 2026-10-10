@@ -1,6 +1,6 @@
 {
   "identifier": "main",
-  "description": "The main window may call the app's own budget commands, open, hide and close the tools window, listen for the native menu's events, send events to the tools window, open the print sheet and close itself (which asks about unsaved changes), and nothing else: no file system, shell, network or dialog access from the web view (dialogs are opened by Rust).",
+  "description": "The main window may call the app's own budget commands (every open budget, as tabs), open, hide and close the tools window, listen for the native menu's events, send events to the tools window, open the print sheet and close itself (which asks about unsaved changes), and nothing else: no file system, shell, network or dialog access from the web view (dialogs are opened by Rust).",
   "windows": [
     "main"
   ],
@@ -8,7 +8,6 @@
     "allow-get-view",
     "allow-get-full-view",
     "allow-focus-account",
-    "allow-new-budget",
     "allow-open-budget",
     "allow-save-budget",
     "allow-undo",
@@ -86,6 +85,11 @@
     "allow-tools-window",
     "allow-close-tools-window",
     "allow-notes-list",
+    "allow-new-tab",
+    "allow-switch-tab",
+    "allow-move-tab",
+    "allow-close-tab",
+    "allow-list-tabs",
     "core:event:allow-listen",
     "core:event:allow-emit-to",
     "core:webview:allow-print",

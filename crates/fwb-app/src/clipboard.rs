@@ -4,7 +4,7 @@
 //! - **The clip.** Copying whole rows (detail lines, accounts on the account
 //!   list, categories on the topsheet) keeps a copy of them in Rust, in
 //!   [`ClipboardState`]: one clipboard for the whole app, shared by every
-//!   budget (and every tab, once budgets open as tabs), holding every field
+//!   budget open as a tab (and every window), holding every field
 //!   of every row plus the definitions of every setup item they use, with
 //!   what those use in turn. The page puts the rows' tab-separated text on
 //!   the system clipboard for other apps; that exact text is the clip's key.
@@ -34,7 +34,7 @@ use fwb_core::{
 use serde::{Deserialize, Serialize};
 use tauri::{Runtime, State, WebviewWindow};
 
-use crate::app::{finish, AppState};
+use crate::app::{finish, AppState, DocId};
 use crate::edit::{self, EditResult};
 use crate::view::View;
 
@@ -1376,12 +1376,13 @@ pub fn paste(
 pub fn clip_copy(
     state: State<'_, AppState>,
     clipboard: State<'_, ClipboardState>,
+    doc: Option<DocId>,
     pick: Pick,
     text: String,
     on_clipboard: bool,
 ) -> Result<ClipInfo, String> {
     let clip = {
-        let s = state.lock();
+        let s = state.lock_doc(doc)?;
         let content = take(s.budget(), &pick)?;
         Clip::new(s.budget(), content, on_clipboard.then_some(text.as_str()))
     };
@@ -1396,11 +1397,12 @@ pub fn clip_cut<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
     clipboard: State<'_, ClipboardState>,
+    doc: Option<DocId>,
     pick: Pick,
     text: String,
     on_clipboard: bool,
 ) -> Result<View, String> {
-    let mut s = state.lock();
+    let mut s = state.lock_doc(doc)?;
     let content = take(s.budget(), &pick)?;
     let clip = Clip::new(s.budget(), content, on_clipboard.then_some(text.as_str()));
     s.edit(|b| cut(b, &pick))?;
@@ -1416,12 +1418,15 @@ pub fn clip_cut<R: Runtime>(
 pub fn clip_preview(
     state: State<'_, AppState>,
     clipboard: State<'_, ClipboardState>,
+    doc: Option<DocId>,
     text: Option<String>,
-) -> Option<Preview> {
+) -> Result<Option<Preview>, String> {
     // Never hold both locks: take the clip, then the budget.
-    let clip = clipboard.for_paste(text.as_deref())?;
-    let s = state.lock();
-    Some(preview(s.budget(), &clip))
+    let Some(clip) = clipboard.for_paste(text.as_deref()) else {
+        return Ok(None);
+    };
+    let s = state.lock_doc(doc)?;
+    Ok(Some(preview(s.budget(), &clip)))
 }
 
 /// `{token, target, resolutions}`: pastes the reviewed copy, as one undo
@@ -1431,6 +1436,7 @@ pub fn clip_paste<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
     clipboard: State<'_, ClipboardState>,
+    doc: Option<DocId>,
     token: u64,
     target: Target,
     resolutions: Vec<Resolution>,
@@ -1439,7 +1445,7 @@ pub fn clip_paste<R: Runtime>(
         .current()
         .filter(|c| c.token == token)
         .ok_or("Something else was copied since. Paste again.")?;
-    let mut s = state.lock();
+    let mut s = state.lock_doc(doc)?;
     let pasted = s.edit(|b| paste(b, &clip, &target, &resolutions))?;
     let first = match clip.content {
         Content::Rows(_) => pasted.rows.first().copied(),
@@ -2227,6 +2233,53 @@ mod tests {
             .iter()
             .all(|id| before_row(&euro, *id).currency.is_none()));
         assert!(!euro.currencies.contains_key("EUR"));
+    }
+
+    /// Budgets open as tabs share the one clipboard: rows copied in one tab
+    /// paste into another, with the review against that tab's setup, and
+    /// each tab keeps its own undo.
+    #[test]
+    fn one_clipboard_serves_every_tab() {
+        let state = crate::docs::AppState::with(crate::docs::Docs::with(Session::with_budget(
+            source(),
+            None,
+        )));
+        let clipboard = ClipboardState::default();
+        let a = state.docs().active();
+        let b = state.docs().add(Session::with_budget(conflicted(), None));
+        // Copied in A while B is in front (a command naming its tab).
+        {
+            let s = state.lock_doc(Some(a)).unwrap();
+            let content = take(s.budget(), &rows(&[6, 7])).unwrap();
+            clipboard.set(Clip::new(s.budget(), content, Some("Line producer\n")));
+        }
+        let before_a = state.docs().get(a).unwrap().budget().clone();
+        // Pasted in B, as the commands do it: the clip first, then the budget.
+        let clip = clipboard.for_paste(Some("Line producer\n")).unwrap();
+        let mut s = state.lock();
+        assert_eq!(s.id(), b);
+        let review = preview(s.budget(), &clip);
+        assert!(review.review, "B's FICA differs from A's");
+        assert_eq!(review.source, "Source");
+        let pasted = s
+            .edit(|bud| paste(bud, &clip, &into_account("20-01", None), &[]))
+            .unwrap();
+        assert_eq!(pasted.rows.len(), 2);
+        drop(s);
+        assert_eq!(
+            state.docs().get(a).unwrap().budget(),
+            &before_a,
+            "the source is untouched"
+        );
+        assert!(!state.docs().get(a).unwrap().can_undo());
+        // Undo in B takes the paste back, and only there.
+        assert!(state.lock().undo());
+        assert!(!state.lock().can_undo());
+        assert_eq!(state.lock().budget(), &conflicted());
+        // The clip is still there for a third tab.
+        let c = state.docs().add(Session::new());
+        assert!(clipboard.for_paste(None).is_some());
+        assert_eq!(state.lock().id(), c);
     }
 
     #[test]

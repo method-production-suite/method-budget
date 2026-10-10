@@ -9,7 +9,11 @@
 //! place in the list, a recovery copy by its key and a backup by its file
 //! name, and each is checked against what is actually there.
 //!
-//! Locks: `Safety::writer` is always taken before the session's lock, never
+//! Every open budget (each tab, src/docs.rs) has its own autosave timing,
+//! recovery copy, backups and file stamp; autosave passes over all of them.
+//! The files open as tabs are remembered for the next start (`tabs.json`).
+//!
+//! Locks: `Safety::writer` is always taken before the budgets' lock, never
 //! while holding it, so autosave, saves and opening files can't deadlock.
 
 use std::path::{Path, PathBuf};
@@ -24,9 +28,10 @@ use tauri_plugin_dialog::{
     DialogExt, MessageDialogButtons, MessageDialogKind, MessageDialogResult,
 };
 
-use crate::app::{finish, window_title, AppState};
+use crate::app::{finish, window_title, AppState, DocId};
+use crate::docs::{Docs, TabInfo};
 use crate::safety::{
-    BackupEntry, Backups, RecentFiles, RecoveryEntry, RecoveryStore, Settings, BACKUP_GAP,
+    BackupEntry, Backups, OpenTabs, RecentFiles, RecoveryEntry, RecoveryStore, Settings, BACKUP_GAP,
 };
 use crate::session::Session;
 use crate::view::{FileDto, View};
@@ -48,15 +53,17 @@ pub const REVERT_BACKUP: &str = "file.revert_backup";
 /// Events to the web view.
 /// A file to open arrived from the system; the payload is its name.
 pub const OPEN_REQUEST: &str = "open-request";
-/// Autosave saved into the file: `{ rev, file }` (the view's `file`).
+/// A budget was saved into its file without a command's view (autosave,
+/// Save All on the way out): `{ doc, rev, file, tabs }` (the view's `doc`,
+/// `file` and `tabs`).
 pub const FILE_STATE: &str = "file-state";
 /// The Autosave switch changed (from the menu); the payload is on or off.
 pub const AUTOSAVE_CHANGED: &str = "autosave-changed";
 /// Autosave couldn't write into the file; the payload is the message.
 pub const AUTOSAVE_ERROR: &str = "autosave-error";
-/// The budget's file changed outside the app; autosave into it is paused
-/// until the user chooses (`resolve_external_change`). The payload is the
-/// file's name.
+/// A budget's file changed outside the app; autosave into it is paused
+/// until the user chooses (`resolve_external_change`). The payload is
+/// `{ doc, name }`: which budget, and its file's name.
 pub const EXTERNAL_CHANGE: &str = "external-change";
 
 /// A file the system asked to open before the app finished starting (macOS
@@ -75,12 +82,14 @@ pub struct Safety {
     settings_file: Option<PathBuf>,
     settings: Mutex<Settings>,
     recent: Mutex<RecentFiles>,
+    /// The files open as tabs, for the next start.
+    open_tabs: Mutex<OpenTabs>,
     /// Held while writing or removing recovery copies and saving.
     writer: Mutex<()>,
     /// A file the system asked us to open, waiting for the web view.
     pending_open: Mutex<Option<PathBuf>>,
-    /// The user chose to throw the open budget's changes away (closing or
-    /// quitting): don't keep a recovery copy of them on the way out.
+    /// The user chose to throw every open budget's changes away (closing or
+    /// quitting): don't keep recovery copies of them on the way out.
     discarded: AtomicBool,
     /// The last autosave problem reported, so it is said once.
     last_error: Mutex<Option<String>>,
@@ -105,6 +114,7 @@ impl Safety {
             settings_file,
             settings: Mutex::new(settings),
             recent: Mutex::new(RecentFiles::load(dir.map(|d| d.join("recent.json")))),
+            open_tabs: Mutex::new(OpenTabs::load(dir.map(|d| d.join("tabs.json")))),
             writer: Mutex::new(()),
             pending_open: Mutex::new(None),
             discarded: AtomicBool::new(false),
@@ -146,6 +156,13 @@ impl Safety {
     pub fn recent_paths(&self) -> Vec<PathBuf> {
         lock(&self.recent).paths().to_vec()
     }
+
+    /// Remembers the files open as tabs (and which one is in front) for the
+    /// next start. Best effort.
+    pub fn remember_tabs(&self, docs: &Docs) {
+        let (files, active) = docs.files();
+        let _ = lock(&self.open_tabs).remember(&files, active);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -170,15 +187,37 @@ pub enum Autosaved {
     Conflict,
 }
 
-/// One autosave pass at `now`. `force` skips the waiting (the window lost
-/// focus, the app is closing, a budget is about to be replaced).
-pub fn autosave_pass(state: &AppState, safety: &Safety, now: Instant, force: bool) -> Autosaved {
+/// One autosave pass over every open budget at `now`, in tab order.
+/// `force` skips the waiting (the window lost focus, the app is closing).
+pub fn autosave_pass(
+    state: &AppState,
+    safety: &Safety,
+    now: Instant,
+    force: bool,
+) -> Vec<(DocId, Autosaved)> {
+    let ids = state.docs().ids();
+    ids.into_iter()
+        .map(|id| (id, autosave_doc(state, safety, Some(id), now, force)))
+        .collect()
+}
+
+/// One autosave pass over budget `doc` (`None`: the one in front) at `now`.
+/// `force` skips the waiting (closing its tab, before leaving the app).
+pub fn autosave_doc(
+    state: &AppState,
+    safety: &Safety,
+    doc: Option<DocId>,
+    now: Instant,
+    force: bool,
+) -> Autosaved {
     let _w = lock(&safety.writer);
     if safety.discarded.load(Ordering::SeqCst) {
         // Closing or quitting without saving: write nothing more.
         return Autosaved::Nothing;
     }
-    let mut s = state.lock();
+    let Ok(mut s) = state.lock_doc(doc) else {
+        return Autosaved::Nothing; // closed meanwhile
+    };
     if s.recovery_stale() {
         safety.remove_recovery(s.recovery_key());
         s.recovery_removed();
@@ -229,13 +268,19 @@ pub fn autosave_pass(state: &AppState, safety: &Safety, now: Instant, force: boo
     }
 }
 
-/// An explicit Save (or Save As) to `path`: back up what is there, write the
-/// budget atomically, and drop the recovery copy. The budget is unchanged on
-/// failure. False, with nothing written, when `path` is the budget's own
-/// file and it changed outside the app (the user chooses what to do).
-pub fn save(state: &AppState, safety: &Safety, path: &Path) -> Result<bool, String> {
+/// An explicit Save (or Save As) of budget `doc` (`None`: the one in front)
+/// to `path`: back up what is there, write the budget atomically, and drop
+/// the recovery copy. The budget is unchanged on failure. False, with nothing
+/// written, when `path` is the budget's own file and it changed outside the
+/// app (the user chooses what to do).
+pub fn save(
+    state: &AppState,
+    safety: &Safety,
+    doc: Option<DocId>,
+    path: &Path,
+) -> Result<bool, String> {
     let _w = lock(&safety.writer);
-    let mut s = state.lock();
+    let mut s = state.lock_doc(doc)?;
     if s.path() == Some(path) && (s.in_conflict() || s.changed_on_disk()) {
         s.set_conflict(true);
         return Ok(false);
@@ -260,12 +305,18 @@ pub enum Resolve {
     LoadTheirs,
 }
 
-/// Settles a file changed outside the app. The other version is always
-/// backed up first; if that fails, nothing changes. ("Save mine as a copy"
-/// is Save As, which leaves the file alone.)
-pub fn resolve(state: &AppState, safety: &Safety, choice: Resolve) -> Result<(), String> {
+/// Settles a file changed outside the app, for budget `doc` (`None`: the
+/// one in front). The other version is always backed up first; if that
+/// fails, nothing changes. ("Save mine as a copy" is Save As, which leaves
+/// the file alone.)
+pub fn resolve(
+    state: &AppState,
+    safety: &Safety,
+    doc: Option<DocId>,
+    choice: Resolve,
+) -> Result<(), String> {
     let _w = lock(&safety.writer);
-    let mut s = state.lock();
+    let mut s = state.lock_doc(doc)?;
     let path = s.path().ok_or("This budget has no file.")?.to_path_buf();
     let backups = safety
         .backups
@@ -293,27 +344,59 @@ pub fn resolve(state: &AppState, safety: &Safety, choice: Resolve) -> Result<(),
     Ok(())
 }
 
-/// Makes `next` the open budget. The old one's recovery copy goes: the user
-/// saved it or chose to leave its changes behind.
-pub fn replace_session(state: &AppState, safety: &Safety, next: Session) {
-    let _w = lock(&safety.writer);
-    let old = std::mem::replace(&mut *state.lock(), next);
-    safety.remove_recovery(old.recovery_key());
+/// A new tab with a fresh starter budget, in front.
+pub fn new_tab(state: &AppState) -> DocId {
+    state.docs().add(Session::new())
 }
 
-/// Opens the budget at `path` in place of the current one, and lists it in
-/// Open Recent. A file that can't be read leaves everything as it was.
-pub fn open_path(state: &AppState, safety: &Safety, path: &Path) -> Result<(), String> {
-    let opened = Session::open(path)?;
-    replace_session(state, safety, opened);
+/// Opens `next` as a budget in front: in the place of tab `instead` when
+/// given (that tab's recovery copy goes: it had nothing worth keeping), else
+/// in a new tab.
+fn put_in_front(
+    state: &AppState,
+    safety: &Safety,
+    next: Session,
+    instead: Option<DocId>,
+) -> Result<DocId, String> {
+    let _w = lock(&safety.writer);
+    let mut docs = state.docs();
+    Ok(match instead {
+        Some(old) => {
+            let (id, gone) = docs.replace(old, next)?;
+            safety.remove_recovery(gone.recovery_key());
+            id
+        }
+        None => docs.add(next),
+    })
+}
+
+/// Opens the budget at `path` in a new tab, in front, and lists it in Open
+/// Recent. A file that is open already just has its tab brought to the
+/// front; an untouched Untitled budget alone in the window gives its tab up
+/// to the file. A file that can't be read leaves everything as it was.
+pub fn open_path(state: &AppState, safety: &Safety, path: &Path) -> Result<DocId, String> {
+    let open = state.docs().find_file(path);
+    let id = match open {
+        Some(id) => {
+            state.docs().switch(id)?;
+            id
+        }
+        None => {
+            let opened = Session::open(path)?;
+            let instead = state.docs().lone_untouched();
+            put_in_front(state, safety, opened, instead)?
+        }
+    };
     let _ = lock(&safety.recent).add(path);
-    Ok(())
+    Ok(id)
 }
 
 /// Opens recovery copy `key` as an unsaved budget pointing at its original
-/// file, and makes the copy this run's own (it stays until saved or
-/// discarded).
-pub fn open_recovery(state: &AppState, safety: &Safety, key: &str) -> Result<(), String> {
+/// file, in front, and makes the copy this run's own (it stays until saved
+/// or discarded). It takes the place of its own file's tab when that tab has
+/// nothing of its own yet (reopened at the start, untouched), else of an
+/// untouched Untitled budget alone in the window, else it gets a new tab.
+pub fn open_recovery(state: &AppState, safety: &Safety, key: &str) -> Result<DocId, String> {
     let store = safety
         .store
         .as_ref()
@@ -321,20 +404,104 @@ pub fn open_recovery(state: &AppState, safety: &Safety, key: &str) -> Result<(),
     let (text, meta) = store.read(key).map_err(|e| e.to_string())?;
     let budget = fwb_format::from_str(&text)
         .map_err(|e| format!("The recovered budget can't be read: {e}"))?;
-    let session = Session::recovered(budget, meta.path.map(PathBuf::from), meta.key.clone());
+    let path = meta.path.map(PathBuf::from);
+    let instead = {
+        let docs = state.docs();
+        path.as_deref()
+            .and_then(|p| docs.find_file(p))
+            .filter(|id| docs.get(*id).is_some_and(Session::is_untouched))
+            .or_else(|| docs.lone_untouched())
+    };
+    let session = Session::recovered(budget, path, meta.key.clone());
     {
         let _w = lock(&safety.writer);
         let _ = store.adopt(key);
-        let old = std::mem::replace(&mut *state.lock(), session);
-        safety.remove_recovery(old.recovery_key());
     }
-    Ok(())
+    put_in_front(state, safety, session, instead)
 }
 
-/// Replaces the budget's content with backup `id` of its file, as one edit
-/// (undo brings the content back; autosave or Save writes it).
-pub fn restore(state: &AppState, safety: &Safety, id: &str) -> Result<(), String> {
-    let mut s = state.lock();
+/// What closing a tab came to.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Closed {
+    /// Closed (its recovery copy, if any, went with it).
+    Closed,
+    /// It has unsaved changes: ask, then close it with `discard` (or save).
+    Unsaved,
+    /// The only tab: close the window instead.
+    Last,
+}
+
+/// Closes budget `id`'s tab. Unsaved changes stop it unless `discard` (the
+/// user chose to throw them away; with Autosave on the caller autosaves
+/// first, so only what can't be autosaved is left).
+pub fn close_doc(
+    state: &AppState,
+    safety: &Safety,
+    id: DocId,
+    discard: bool,
+) -> Result<Closed, String> {
+    let _w = lock(&safety.writer);
+    let mut docs = state.docs();
+    let s = docs.get(id).ok_or("That budget has been closed.")?;
+    if docs.len() == 1 {
+        return Ok(Closed::Last);
+    }
+    if s.is_dirty() && !discard {
+        return Ok(Closed::Unsaved);
+    }
+    let gone = docs.remove(id)?;
+    // Saved, or thrown away on purpose: no recovery copy either way.
+    safety.remove_recovery(gone.recovery_key());
+    Ok(Closed::Closed)
+}
+
+/// Reopens the files that were open as tabs when the app last ran, in their
+/// order, with the one in front again in front. Files that are gone or can't
+/// be read are left out. Done before the page asks for its first view, in
+/// place of the starting Untitled budget; with nothing to reopen, that stays.
+pub fn restore_tabs(state: &AppState, safety: &Safety) -> usize {
+    let (files, active) = lock(&safety.open_tabs).files();
+    let mut opened: Vec<(usize, Session)> = Vec::new();
+    for (i, p) in files.iter().enumerate() {
+        if let Ok(s) = Session::open(p) {
+            opened.push((i, s));
+        }
+    }
+    let n = opened.len();
+    let front = active.and_then(|a| opened.iter().position(|(i, _)| *i == a));
+    let _w = lock(&safety.writer);
+    let mut docs = state.docs();
+    let mut instead = docs.lone_untouched();
+    let mut ids = Vec::with_capacity(n);
+    for (_, s) in opened {
+        let id = match instead.take() {
+            Some(old) => match docs.replace(old, s) {
+                Ok((id, gone)) => {
+                    safety.remove_recovery(gone.recovery_key());
+                    id
+                }
+                Err(_) => continue,
+            },
+            None => docs.add(s),
+        };
+        ids.push(id);
+    }
+    if let Some(&id) = ids.get(front.unwrap_or(0)) {
+        let _ = docs.switch(id);
+    }
+    ids.len()
+}
+
+/// Replaces budget `doc`'s content (`None`: the one in front) with backup
+/// `id` of its file, as one edit (undo brings the content back; autosave or
+/// Save writes it).
+pub fn restore(
+    state: &AppState,
+    safety: &Safety,
+    doc: Option<DocId>,
+    id: &str,
+) -> Result<(), String> {
+    let mut s = state.lock_doc(doc)?;
     let path = s
         .path()
         .ok_or("This budget has no backups yet.")?
@@ -364,15 +531,17 @@ pub fn path_from_args(args: impl IntoIterator<Item = std::ffi::OsString>) -> Opt
 // ---------------------------------------------------------------------------
 // Tauri wiring
 
-/// Sets everything up when the app starts: the data folder, the menu's
-/// recent list and Autosave check, a file named on the command line, and
-/// the autosave timer.
+/// Sets everything up when the app starts: the data folder, the budgets
+/// that were open as tabs last time, the menu's recent list and Autosave
+/// check, a file named on the command line, and the autosave timer.
 pub fn init<R: Runtime>(app: &AppHandle<R>) {
     let dir = app.path().app_local_data_dir().ok();
     if let Some(d) = &dir {
         let _ = crate::safety::create_private_dir(d);
     }
     app.manage(Safety::new(dir.as_deref()));
+    // The budgets that were open as tabs last time, before the page asks.
+    restore_tabs(&app.state::<AppState>(), &app.state::<Safety>());
     refresh_menu(app);
     let early = lock(&EARLY_OPEN).take();
     if let Some(p) = early.or_else(|| path_from_args(std::env::args_os().skip(1))) {
@@ -385,22 +554,45 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) {
     });
 }
 
-/// Runs an autosave pass and tells the window what happened.
+/// Runs an autosave pass over every open budget and tells the window what
+/// happened.
 pub fn autosave_now<R: Runtime>(app: &AppHandle<R>, force: bool) {
     let state = app.state::<AppState>();
     let safety = app.state::<Safety>();
-    match autosave_pass(&state, &safety, Instant::now(), force) {
+    for (id, done) in autosave_pass(&state, &safety, Instant::now(), force) {
+        tell_autosaved(app, id, done);
+    }
+}
+
+/// Autosaves budget `id` now, if anything is unsaved (before its tab
+/// closes), and tells the window what happened.
+pub fn autosave_one<R: Runtime>(app: &AppHandle<R>, id: DocId) {
+    let done = autosave_doc(
+        &app.state::<AppState>(),
+        &app.state::<Safety>(),
+        Some(id),
+        Instant::now(),
+        true,
+    );
+    tell_autosaved(app, id, done);
+}
+
+fn tell_autosaved<R: Runtime>(app: &AppHandle<R>, id: DocId, done: Autosaved) {
+    let safety = app.state::<Safety>();
+    match done {
         Autosaved::File => {
             *lock(&safety.last_error) = None;
-            let s = state.lock();
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.set_title(&window_title(&s));
-            }
-            let _ = app.emit_to("main", FILE_STATE, FileState::of(&s));
+            tell_saved(app, id);
         }
         Autosaved::Conflict => {
-            let name = state.lock().display_name();
-            let _ = app.emit_to("main", EXTERNAL_CHANGE, name);
+            let name = app
+                .state::<AppState>()
+                .docs()
+                .get(id)
+                .map(Session::display_name);
+            if let Some(name) = name {
+                let _ = app.emit_to("main", EXTERNAL_CHANGE, ExternalChange { doc: id, name });
+            }
         }
         Autosaved::Failed(msg) => {
             let mut last = lock(&safety.last_error);
@@ -417,53 +609,87 @@ pub fn autosave_now<R: Runtime>(app: &AppHandle<R>, force: bool) {
     }
 }
 
-/// The window has focus again: if the budget's file changed outside the app
+/// Budget `id` was saved into its file outside a command (autosave, Save All
+/// on the way out): the window's title (when it is in front) and the page's
+/// tab and file state follow.
+pub fn tell_saved<R: Runtime>(app: &AppHandle<R>, id: DocId) {
+    let state = app.state::<AppState>();
+    let Ok(s) = state.lock_doc(Some(id)) else {
+        return;
+    };
+    if s.is_active() {
+        if let Some(w) = app.get_webview_window("main") {
+            let _ = w.set_title(&window_title(&s));
+        }
+    }
+    let _ = app.emit_to("main", FILE_STATE, FileState::of(&s, id, s.docs().tabs()));
+}
+
+/// The window has focus again: if a budget's file changed outside the app
 /// meanwhile, ask now rather than at the next save. (Once the user chose
 /// Decide Later, the question comes back with the next Save, not on every
 /// return to the window.)
 pub fn check_external<R: Runtime>(app: &AppHandle<R>) {
     let state = app.state::<AppState>();
-    let name = {
-        let mut s = state.lock();
-        if s.in_conflict() || !s.changed_on_disk() {
-            return;
+    let changed: Vec<ExternalChange> = {
+        let mut docs = state.docs();
+        let mut out = Vec::new();
+        for id in docs.ids() {
+            let Some(s) = docs.get_mut(id) else { continue };
+            if s.in_conflict() || !s.changed_on_disk() {
+                continue;
+            }
+            s.set_conflict(true);
+            out.push(ExternalChange {
+                doc: id,
+                name: s.display_name(),
+            });
         }
-        s.set_conflict(true);
-        s.display_name()
+        out
     };
-    let _ = app.emit_to("main", EXTERNAL_CHANGE, name);
+    for c in changed {
+        let _ = app.emit_to("main", EXTERNAL_CHANGE, c);
+    }
 }
 
-/// An explicit Save from the Save command: when the file changed outside the
-/// app, nothing is written and the page asks what to do.
+/// An explicit Save of budget `id` from the Save command: when the file
+/// changed outside the app, nothing is written, the page asks what to do,
+/// and this is false.
 pub fn save_from<R: Runtime>(
     window: &WebviewWindow<R>,
     state: &AppState,
+    id: DocId,
     path: &Path,
-) -> Result<(), String> {
-    if !save(state, &window.state::<Safety>(), path)? {
-        let name = state.lock().display_name();
-        let _ = window.emit_to("main", EXTERNAL_CHANGE, name);
+) -> Result<bool, String> {
+    let saved = save(state, &window.state::<Safety>(), Some(id), path)?;
+    if !saved {
+        let name = state.lock_doc(Some(id))?.display_name();
+        let _ = window.emit_to("main", EXTERNAL_CHANGE, ExternalChange { doc: id, name });
     }
-    Ok(())
+    Ok(saved)
 }
 
-/// Before closing or quitting with unsaved changes: with Autosave on, save
-/// them into the file. True when nothing unsaved is left.
-pub fn save_before_leaving<R: Runtime>(app: &AppHandle<R>) -> bool {
+/// Before closing or quitting: with Autosave on, every budget's unsaved
+/// changes go into its file. The budgets still unsaved afterwards (untitled
+/// ones, Autosave off, a file changed outside the app), in tab order.
+pub fn save_before_leaving<R: Runtime>(app: &AppHandle<R>) -> Vec<DocId> {
     autosave_now(app, true);
-    !app.state::<AppState>().lock().is_dirty()
+    app.state::<AppState>().docs().dirty()
 }
 
-/// The user chose to close or quit without saving: drop the recovery copy.
+/// The user chose to close or quit without saving: drop every recovery copy.
 pub fn discarded<R: Runtime>(app: &AppHandle<R>) {
     let safety = app.state::<Safety>();
     safety.discarded.store(true, Ordering::SeqCst);
     let state = app.state::<AppState>();
     let _w = lock(&safety.writer);
-    let mut s = state.lock();
-    safety.remove_recovery(s.recovery_key());
-    s.recovery_removed();
+    let mut docs = state.docs();
+    for id in docs.ids() {
+        if let Some(s) = docs.get_mut(id) {
+            safety.remove_recovery(s.recovery_key());
+            s.recovery_removed();
+        }
+    }
 }
 
 /// The app is exiting. Changes the user didn't throw away are kept (into
@@ -480,16 +706,18 @@ pub fn on_exit<R: Runtime>(app: &AppHandle<R>) {
     autosave_now(app, true);
     let state = app.state::<AppState>();
     let _w = lock(&safety.writer);
-    let mut s = state.lock();
-    if !s.is_dirty() {
-        safety.remove_recovery(s.recovery_key());
-        s.recovery_removed();
+    let mut docs = state.docs();
+    for id in docs.ids() {
+        if let Some(s) = docs.get_mut(id).filter(|s| !s.is_dirty()) {
+            safety.remove_recovery(s.recovery_key());
+            s.recovery_removed();
+        }
     }
 }
 
 /// The system asked to open `paths` (macOS: double-click, Open With, a drop
-/// on the Dock icon). The first one is opened, after the web view has asked
-/// about unsaved changes.
+/// on the Dock icon). The first one is opened in a tab (the web view asks
+/// for it with `open_pending`, after finishing any edit).
 pub fn on_opened<R: Runtime>(app: &AppHandle<R>, paths: Vec<PathBuf>) {
     let Some(path) = paths.into_iter().find(|p| p.is_file()) else {
         return;
@@ -511,20 +739,32 @@ pub fn on_opened<R: Runtime>(app: &AppHandle<R>, paths: Vec<PathBuf>) {
     let _ = app.emit_to("main", OPEN_REQUEST, name);
 }
 
-/// What the web view hears after an autosave into the file.
+/// What the web view hears after a save it didn't ask for (autosave, Save
+/// All on the way out).
 #[derive(Serialize, Clone)]
 struct FileState {
+    doc: DocId,
     rev: u64,
     file: FileDto,
+    tabs: Vec<TabInfo>,
 }
 
 impl FileState {
-    fn of(s: &Session) -> FileState {
+    fn of(s: &Session, doc: DocId, tabs: Vec<TabInfo>) -> FileState {
         FileState {
+            doc,
             rev: s.view_rev(),
             file: s.file_info(),
+            tabs,
         }
     }
+}
+
+/// What the web view hears when a budget's file changed outside the app.
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+struct ExternalChange {
+    doc: DocId,
+    name: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -646,16 +886,21 @@ pub fn set_autosave<R: Runtime>(app: AppHandle<R>, on: bool) -> bool {
     on
 }
 
-/// Autosaves now if anything is unsaved (before New or Open ask about
-/// unsaved changes, so with Autosave on there is nothing to lose).
+/// Autosaves budget `doc` (`None`: the one in front) now, if anything is
+/// unsaved, and gives its view.
 #[tauri::command]
-pub fn flush_autosave<R: Runtime>(window: WebviewWindow<R>, state: State<'_, AppState>) -> View {
-    autosave_now(window.app_handle(), true);
-    finish(&window, &mut state.lock(), None)
+pub fn flush_autosave<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+) -> CmdResult {
+    let id = state.lock_doc(doc)?.id();
+    autosave_one(window.app_handle(), id);
+    Ok(finish(&window, &mut state.lock_doc(Some(id))?, None))
 }
 
-/// Opens the file the system asked to open, if there is one (the web view
-/// has already asked about unsaved changes).
+/// Opens the file the system asked to open, if there is one, in a tab (its
+/// own tab, if it is open already).
 #[tauri::command]
 pub fn open_pending<R: Runtime>(
     window: WebviewWindow<R>,
@@ -665,12 +910,13 @@ pub fn open_pending<R: Runtime>(
     let Some(path) = lock(&safety.pending_open).take() else {
         return Ok(None);
     };
-    open_path(&state, &safety, &path)?;
+    let id = open_path(&state, &safety, &path)?;
     refresh_menu(window.app_handle());
-    Ok(Some(finish(&window, &mut state.lock(), None)))
+    Ok(Some(finish(&window, &mut state.lock_doc(Some(id))?, None)))
 }
 
-/// Opens File > Open Recent's `index`-th file.
+/// Opens File > Open Recent's `index`-th file in a tab (its own tab, if it
+/// is open already).
 #[tauri::command]
 pub fn open_recent<R: Runtime>(
     window: WebviewWindow<R>,
@@ -684,8 +930,8 @@ pub fn open_recent<R: Runtime>(
     let opened = open_path(&state, &safety, &path);
     // A file that has gone drops out of the menu either way.
     refresh_menu(window.app_handle());
-    opened?;
-    Ok(Some(finish(&window, &mut state.lock(), None)))
+    let id = opened?;
+    Ok(Some(finish(&window, &mut state.lock_doc(Some(id))?, None)))
 }
 
 /// Recovery copies left by a run of the app that didn't finish (a crash, a
@@ -699,7 +945,7 @@ pub fn recovery_list(safety: State<'_, Safety>) -> Vec<RecoveryEntry> {
         .unwrap_or_default()
 }
 
-/// Opens recovery copy `key` as an unsaved budget.
+/// Opens recovery copy `key` as an unsaved budget, in a tab.
 #[tauri::command]
 pub fn open_recovered<R: Runtime>(
     window: WebviewWindow<R>,
@@ -707,8 +953,8 @@ pub fn open_recovered<R: Runtime>(
     safety: State<'_, Safety>,
     key: String,
 ) -> CmdResult {
-    open_recovery(&state, &safety, &key)?;
-    Ok(finish(&window, &mut state.lock(), None))
+    let id = open_recovery(&state, &safety, &key)?;
+    Ok(finish(&window, &mut state.lock_doc(Some(id))?, None))
 }
 
 /// Deletes recovery copy `key` (only one that is listed); returns the rest.
@@ -723,36 +969,43 @@ pub fn discard_recovered(safety: State<'_, Safety>, key: String) -> Vec<Recovery
     recovery_list(safety)
 }
 
-/// The open budget's file's backups, newest first.
+/// Budget `doc`'s file's backups (`None`: the one in front), newest first.
 #[tauri::command]
-pub fn backup_list(state: State<'_, AppState>, safety: State<'_, Safety>) -> Vec<BackupEntry> {
-    let path = state.lock().path().map(PathBuf::from);
-    match (&safety.backups, path) {
+pub fn backup_list(
+    state: State<'_, AppState>,
+    safety: State<'_, Safety>,
+    doc: Option<DocId>,
+) -> CmdResult<Vec<BackupEntry>> {
+    let path = state.lock_doc(doc)?.path().map(PathBuf::from);
+    Ok(match (&safety.backups, path) {
         (Some(b), Some(p)) => b.entries(&p),
         _ => Vec::new(),
-    }
+    })
 }
 
-/// Puts backup `id`'s content in place of the budget's, as one undo step.
+/// Puts backup `id`'s content in place of budget `doc`'s (`None`: the one
+/// in front), as one undo step.
 #[tauri::command]
 pub fn restore_backup<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
     safety: State<'_, Safety>,
+    doc: Option<DocId>,
     id: String,
 ) -> CmdResult {
-    restore(&state, &safety, &id)?;
-    Ok(finish(&window, &mut state.lock(), None))
+    restore(&state, &safety, doc, &id)?;
+    Ok(finish(&window, &mut state.lock_doc(doc)?, None))
 }
 
-/// Settles a file changed outside the app: `choice` is `keep` (save this
-/// budget over it, its version backed up first) or `load` (load its version,
-/// this one backed up first).
+/// Settles a file changed outside the app, for budget `doc` (`None`: the one
+/// in front): `choice` is `keep` (save this budget over it, its version
+/// backed up first) or `load` (load its version, this one backed up first).
 #[tauri::command]
 pub fn resolve_external_change<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
     safety: State<'_, Safety>,
+    doc: Option<DocId>,
     choice: String,
 ) -> CmdResult {
     let choice = match choice.as_str() {
@@ -760,17 +1013,21 @@ pub fn resolve_external_change<R: Runtime>(
         "load" => Resolve::LoadTheirs,
         other => return Err(format!("Unknown choice {other:?}.")),
     };
-    resolve(&state, &safety, choice)?;
-    Ok(finish(&window, &mut state.lock(), None))
+    resolve(&state, &safety, doc, choice)?;
+    Ok(finish(&window, &mut state.lock_doc(doc)?, None))
 }
 
-/// Shows the open budget's backups folder (or the folder of all backups) in
-/// Finder, Explorer or the file manager.
+/// Shows budget `doc`'s backups folder (`None`: the one in front; else the
+/// folder of all backups) in Finder, Explorer or the file manager.
 #[tauri::command]
-pub fn reveal_backups(state: State<'_, AppState>, safety: State<'_, Safety>) -> CmdResult<()> {
+pub fn reveal_backups(
+    state: State<'_, AppState>,
+    safety: State<'_, Safety>,
+    doc: Option<DocId>,
+) -> CmdResult<()> {
     let backups = safety.backups.as_ref().ok_or("There are no backups yet.")?;
     let folder = state
-        .lock()
+        .lock_doc(doc)?
         .path()
         .map(|p| backups.folder(p))
         .filter(|f| f.is_dir())
@@ -792,9 +1049,15 @@ pub fn reveal_backups(state: State<'_, AppState>, safety: State<'_, Safety>) -> 
 
 /// A recovered budget's first save into its original file asks first.
 /// True to go ahead.
-pub fn confirm_overwrite<R: Runtime>(window: &WebviewWindow<R>, state: &AppState) -> bool {
+pub fn confirm_overwrite<R: Runtime>(
+    window: &WebviewWindow<R>,
+    state: &AppState,
+    id: DocId,
+) -> bool {
     let name = {
-        let s = state.lock();
+        let Ok(s) = state.lock_doc(Some(id)) else {
+            return false;
+        };
         if !s.needs_overwrite_confirm() {
             return true;
         }
@@ -853,17 +1116,23 @@ mod tests {
 
         // Nothing unsaved: nothing written.
         assert_eq!(
-            autosave_pass(&state, &safety, later(60), false),
+            autosave_doc(&state, &safety, None, later(60), false),
             Autosaved::Nothing
         );
         retitle(&state, "One");
         // Not quiet long enough yet.
         assert_eq!(
-            autosave_pass(&state, &safety, Instant::now(), false),
+            autosave_doc(&state, &safety, None, Instant::now(), false),
             Autosaved::Nothing
         );
         assert_eq!(
-            autosave_pass(&state, &safety, later(AUTOSAVE_QUIET.as_secs()), false),
+            autosave_doc(
+                &state,
+                &safety,
+                None,
+                later(AUTOSAVE_QUIET.as_secs()),
+                false
+            ),
             Autosaved::Recovery
         );
         assert_eq!(files(&rec, "fwb"), 1);
@@ -873,12 +1142,12 @@ mod tests {
         );
         // Written once per change.
         assert_eq!(
-            autosave_pass(&state, &safety, later(60), false),
+            autosave_doc(&state, &safety, None, later(60), false),
             Autosaved::Nothing
         );
         retitle(&state, "Two");
         assert_eq!(
-            autosave_pass(&state, &safety, later(60), false),
+            autosave_doc(&state, &safety, None, later(60), false),
             Autosaved::Recovery
         );
         assert_eq!(files(&rec, "fwb"), 1, "the same copy, rewritten");
@@ -888,7 +1157,7 @@ mod tests {
         state.lock().undo();
         assert!(!state.lock().is_dirty());
         assert_eq!(
-            autosave_pass(&state, &safety, later(60), false),
+            autosave_doc(&state, &safety, None, later(60), false),
             Autosaved::Removed
         );
         assert_eq!(files(&rec, "fwb"), 0);
@@ -896,11 +1165,11 @@ mod tests {
         // Saving (Save As) removes the copy too, and lists the file.
         retitle(&state, "Three");
         assert_eq!(
-            autosave_pass(&state, &safety, later(60), true),
+            autosave_doc(&state, &safety, None, later(60), true),
             Autosaved::Recovery
         );
         let path = dir.join("film.fwb");
-        save(&state, &safety, &path).unwrap();
+        save(&state, &safety, None, &path).unwrap();
         assert_eq!(files(&rec, "fwb"), 0);
         assert!(!state.lock().is_dirty());
         assert_eq!(safety.recent_paths(), [path.canonicalize().unwrap()]);
@@ -915,15 +1184,15 @@ mod tests {
         assert!(safety.autosave_on(), "on by default");
         let state = AppState::default();
         let path = dir.join("film.fwb");
-        save(&state, &safety, &path).unwrap();
+        save(&state, &safety, None, &path).unwrap();
 
         retitle(&state, "Autosaved");
         assert_eq!(
-            autosave_pass(&state, &safety, Instant::now(), false),
+            autosave_doc(&state, &safety, None, Instant::now(), false),
             Autosaved::Nothing
         );
         assert_eq!(
-            autosave_pass(&state, &safety, later(5), false),
+            autosave_doc(&state, &safety, None, later(5), false),
             Autosaved::File
         );
         assert!(!state.lock().is_dirty());
@@ -942,7 +1211,7 @@ mod tests {
         assert!(state.lock().undo());
         assert!(state.lock().is_dirty());
         assert_eq!(
-            autosave_pass(&state, &safety, later(5), true),
+            autosave_doc(&state, &safety, None, later(5), true),
             Autosaved::File
         );
         let on_disk = fwb_format::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
@@ -953,12 +1222,12 @@ mod tests {
         // Restoring a backup (the file as first saved) is one edit, undoable.
         retitle(&state, "Autosaved again");
         let id = backups.entries(&path)[0].id.clone();
-        restore(&state, &safety, &id).unwrap();
+        restore(&state, &safety, None, &id).unwrap();
         assert_eq!(state.lock().budget().title, "Untitled feature");
         assert!(state.lock().undo());
         assert_eq!(state.lock().budget().title, "Autosaved again");
         assert!(state.lock().can_undo());
-        assert!(restore(&state, &safety, "nope.fwb").is_err());
+        assert!(restore(&state, &safety, None, "nope.fwb").is_err());
 
         // Autosave off: a recovery copy instead, the file untouched.
         safety.set_autosave(false);
@@ -969,7 +1238,7 @@ mod tests {
         let before = std::fs::read_to_string(&path).unwrap();
         retitle(&state, "Not in the file");
         assert_eq!(
-            autosave_pass(&state, &safety, later(5), false),
+            autosave_doc(&state, &safety, None, later(5), false),
             Autosaved::Recovery
         );
         assert_eq!(std::fs::read_to_string(&path).unwrap(), before);
@@ -985,11 +1254,11 @@ mod tests {
         let state = AppState::default();
         let path = dir.join("gone").join("film.fwb");
         std::fs::create_dir(dir.join("gone")).unwrap();
-        save(&state, &safety, &path).unwrap();
+        save(&state, &safety, None, &path).unwrap();
         std::fs::remove_dir_all(dir.join("gone")).unwrap();
         retitle(&state, "Changed");
         assert!(matches!(
-            autosave_pass(&state, &safety, later(5), false),
+            autosave_doc(&state, &safety, None, later(5), false),
             Autosaved::Failed(_)
         ));
         assert!(state.lock().is_dirty());
@@ -1007,10 +1276,10 @@ mod tests {
             let safety = Safety::new(Some(&dir));
             safety.set_autosave(false);
             let state = AppState::default();
-            save(&state, &safety, &path).unwrap();
+            save(&state, &safety, None, &path).unwrap();
             retitle(&state, "Unsaved work");
             assert_eq!(
-                autosave_pass(&state, &safety, later(5), false),
+                autosave_doc(&state, &safety, None, later(5), false),
                 Autosaved::Recovery
             );
             // Its own copy isn't offered while it runs.
@@ -1034,14 +1303,14 @@ mod tests {
         // Autosave doesn't write into the original file until a save says so.
         let before = std::fs::read_to_string(&path).unwrap();
         assert_eq!(
-            autosave_pass(&state, &safety, later(60), true),
+            autosave_doc(&state, &safety, None, later(60), true),
             Autosaved::Nothing
         );
         assert_eq!(std::fs::read_to_string(&path).unwrap(), before);
         // Now it is this run's: another run starting doesn't offer it.
         assert!(Safety::new(Some(&dir)).store.unwrap().list().is_empty());
 
-        save(&state, &safety, &path).unwrap();
+        save(&state, &safety, None, &path).unwrap();
         assert!(!state.lock().needs_overwrite_confirm());
         assert_eq!(
             files(&dir.join("Recovery"), "fwb"),
@@ -1053,27 +1322,329 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    fn write_budget(path: &Path, title: &str) {
+        let mut b = fwb_core::starter::budget();
+        b.title = title.into();
+        std::fs::write(path, fwb_format::to_string(&b)).unwrap();
+    }
+
     #[test]
-    fn replacing_the_budget_drops_its_recovery_copy() {
-        let dir = temp_dir("app-replace");
+    fn opening_a_file_adds_a_tab_or_finds_its_tab() {
+        let dir = temp_dir("app-open-tabs");
         let safety = Safety::new(Some(&dir));
         let state = AppState::default();
-        retitle(&state, "Throw away");
+        let other = dir.join("other.fwb");
+        write_budget(&other, "Other");
+
+        // An untouched Untitled budget alone in the window gives its tab up.
+        let untitled = state.docs().active();
+        let first = open_path(&state, &safety, &other).unwrap();
+        assert_eq!(state.docs().ids(), [first]);
+        assert_ne!(first, untitled);
+
+        // A touched one keeps its tab (and its recovery copy).
+        let state = AppState::default();
+        retitle(&state, "Keep me");
+        let untitled = state.docs().active();
         assert_eq!(
-            autosave_pass(&state, &safety, later(5), false),
+            autosave_doc(&state, &safety, None, later(5), false),
             Autosaved::Recovery
         );
-        let other = dir.join("other.fwb");
-        std::fs::write(&other, fwb_format::to_string(&fwb_core::starter::budget())).unwrap();
-        open_path(&state, &safety, &other).unwrap();
-        assert_eq!(files(&dir.join("Recovery"), "fwb"), 0);
+        let opened = open_path(&state, &safety, &other).unwrap();
+        assert_eq!(state.docs().ids(), [untitled, opened]);
         assert_eq!(state.lock().path(), Some(other.as_path()));
-        assert!(open_path(&state, &safety, &dir.join("missing.fwb")).is_err());
         assert_eq!(
-            state.lock().path(),
-            Some(other.as_path()),
-            "unchanged on failure"
+            files(&dir.join("Recovery"), "fwb"),
+            1,
+            "the untitled one's copy stays"
         );
+
+        // The same file again (by another spelling): its tab comes forward,
+        // nothing is read again.
+        state
+            .lock_doc(Some(opened))
+            .unwrap()
+            .edit(|b| edit::set_title(b, "Edited here"))
+            .unwrap();
+        state.docs().switch(untitled).unwrap();
+        let again = open_path(&state, &safety, &dir.join(".").join("other.fwb")).unwrap();
+        assert_eq!(again, opened);
+        assert_eq!(state.docs().len(), 2);
+        assert_eq!(state.lock().budget().title, "Edited here");
+
+        // A file that can't be read changes nothing.
+        assert!(open_path(&state, &safety, &dir.join("missing.fwb")).is_err());
+        assert_eq!(state.docs().ids(), [untitled, opened]);
+        assert_eq!(state.docs().active(), opened, "unchanged on failure");
+
+        // New makes a new tab every time.
+        let fresh = new_tab(&state);
+        assert_eq!(state.docs().ids(), [untitled, opened, fresh]);
+        drop(safety);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn every_tab_autosaves_recovers_and_undoes_on_its_own() {
+        let dir = temp_dir("app-tabs-autosave");
+        let safety = Safety::new(Some(&dir));
+        let state = AppState::default();
+        let film = dir.join("film.fwb");
+        write_budget(&film, "Film");
+        // Edit the untitled one first (so the file doesn't take its tab),
+        // then the file's.
+        let untitled = state.docs().active();
+        retitle(&state, "Draft");
+        let saved = open_path(&state, &safety, &film).unwrap();
+        assert_eq!(state.docs().ids(), [untitled, saved]);
+        state
+            .lock_doc(Some(saved))
+            .unwrap()
+            .edit(|b| edit::set_title(b, "Film, edited"))
+            .unwrap();
+        assert_eq!(state.docs().dirty(), [untitled, saved]);
+
+        // One pass: the file's budget into its file, the untitled one into
+        // its own recovery copy.
+        let done = autosave_pass(&state, &safety, later(5), false);
+        assert_eq!(
+            done,
+            [(untitled, Autosaved::Recovery), (saved, Autosaved::File)]
+        );
+        assert_eq!(title_on_disk(&film), "Film, edited");
+        assert_eq!(files(&dir.join("Recovery"), "fwb"), 1);
+        assert_eq!(state.docs().dirty(), [untitled]);
+        // Backups are per file.
+        assert_eq!(Backups::new(&dir.join("Backups")).entries(&film).len(), 1);
+
+        // Undo is per tab: undoing in one leaves the other alone.
+        assert!(state.lock_doc(Some(untitled)).unwrap().undo());
+        assert_eq!(
+            state.lock_doc(Some(untitled)).unwrap().budget().title,
+            "Untitled feature"
+        );
+        assert_eq!(
+            state.lock_doc(Some(saved)).unwrap().budget().title,
+            "Film, edited"
+        );
+        assert!(state.lock_doc(Some(saved)).unwrap().can_undo());
+        assert!(!state.lock_doc(Some(untitled)).unwrap().can_undo());
+        // Back at its start: its copy goes on the next pass.
+        let done = autosave_pass(&state, &safety, later(5), false);
+        assert_eq!(done[0], (untitled, Autosaved::Removed));
+        assert_eq!(files(&dir.join("Recovery"), "fwb"), 0);
+        drop(safety);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn closing_a_tab_asks_only_about_unsaved_work() {
+        let dir = temp_dir("app-close-tab");
+        let safety = Safety::new(Some(&dir));
+        let state = AppState::default();
+        let only = state.docs().active();
+        assert_eq!(
+            close_doc(&state, &safety, only, false).unwrap(),
+            Closed::Last
+        );
+
+        let film = dir.join("film.fwb");
+        write_budget(&film, "Film");
+        retitle(&state, "Draft");
+        let saved = open_path(&state, &safety, &film).unwrap();
+        // Clean: closes; the untitled one comes to the front.
+        assert_eq!(
+            close_doc(&state, &safety, saved, false).unwrap(),
+            Closed::Closed
+        );
+        assert_eq!(state.docs().ids(), [only]);
+        let saved = open_path(&state, &safety, &film).unwrap();
+
+        // Unsaved (an untitled draft with a recovery copy): asks first.
+        assert_eq!(
+            autosave_doc(&state, &safety, Some(only), later(5), false),
+            Autosaved::Recovery
+        );
+        assert_eq!(
+            close_doc(&state, &safety, only, false).unwrap(),
+            Closed::Unsaved
+        );
+        assert_eq!(state.docs().len(), 2);
+        // Thrown away on purpose: closed, its recovery copy gone with it.
+        assert_eq!(
+            close_doc(&state, &safety, only, true).unwrap(),
+            Closed::Closed
+        );
+        assert_eq!(state.docs().ids(), [saved]);
+        assert_eq!(files(&dir.join("Recovery"), "fwb"), 0);
+        assert!(
+            close_doc(&state, &safety, only, true).is_err(),
+            "already closed"
+        );
+
+        // With Autosave on, a file's budget is saved first and closes clean.
+        let other = dir.join("other.fwb");
+        write_budget(&other, "Other");
+        let o = open_path(&state, &safety, &other).unwrap();
+        state
+            .lock_doc(Some(o))
+            .unwrap()
+            .edit(|b| edit::set_title(b, "Other, edited"))
+            .unwrap();
+        assert_eq!(
+            autosave_doc(&state, &safety, Some(o), Instant::now(), true),
+            Autosaved::File
+        );
+        assert_eq!(
+            close_doc(&state, &safety, o, false).unwrap(),
+            Closed::Closed
+        );
+        assert_eq!(title_on_disk(&other), "Other, edited");
+        drop(safety);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn crash_recovery_gives_each_tab_back() {
+        let dir = temp_dir("app-crash-tabs");
+        let film = dir.join("film.fwb");
+        write_budget(&film, "Film");
+        {
+            // A run with two tabs of unsaved work, Autosave off, then a crash.
+            let safety = Safety::new(Some(&dir));
+            safety.set_autosave(false);
+            let state = AppState::default();
+            retitle(&state, "Untitled draft");
+            let f = open_path(&state, &safety, &film).unwrap();
+            state
+                .lock_doc(Some(f))
+                .unwrap()
+                .edit(|b| edit::set_title(b, "Film, unsaved"))
+                .unwrap();
+            let done = autosave_pass(&state, &safety, later(5), false);
+            assert!(
+                done.iter().all(|(_, d)| *d == Autosaved::Recovery),
+                "{done:?}"
+            );
+            assert_eq!(files(&dir.join("Recovery"), "fwb"), 2, "one copy per tab");
+            // The next start would reopen the file.
+            safety.remember_tabs(&state.docs());
+        }
+        let safety = Safety::new(Some(&dir));
+        let state = AppState::default();
+        // The file comes back as it is on disk...
+        assert_eq!(restore_tabs(&state, &safety), 1);
+        let reopened = state.docs().active();
+        assert_eq!(state.lock().budget().title, "Film");
+        let listed = safety.store.as_ref().unwrap().list();
+        assert_eq!(listed.len(), 2);
+        // ...and its recovered copy takes the place of that untouched tab.
+        let film_key = listed
+            .iter()
+            .find(|e| e.path.is_some())
+            .unwrap()
+            .key
+            .clone();
+        let draft_key = listed
+            .iter()
+            .find(|e| e.path.is_none())
+            .unwrap()
+            .key
+            .clone();
+        let recovered = open_recovery(&state, &safety, &film_key).unwrap();
+        assert_eq!(state.docs().len(), 1);
+        assert_ne!(recovered, reopened);
+        assert_eq!(state.lock().budget().title, "Film, unsaved");
+        assert!(state.lock().needs_overwrite_confirm());
+        // The untitled draft gets a tab of its own.
+        let draft = open_recovery(&state, &safety, &draft_key).unwrap();
+        assert_eq!(state.docs().ids(), [recovered, draft]);
+        assert_eq!(state.lock().budget().title, "Untitled draft");
+        assert!(state.lock().is_dirty() && state.lock().path().is_none());
+        drop(safety);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn the_next_start_reopens_the_files_that_were_open() {
+        let dir = temp_dir("app-restore");
+        let (a, b, gone) = (dir.join("a.fwb"), dir.join("b.fwb"), dir.join("gone.fwb"));
+        for p in [&a, &b, &gone] {
+            write_budget(p, &p.file_stem().unwrap().to_string_lossy());
+        }
+        {
+            let safety = Safety::new(Some(&dir));
+            let state = AppState::default();
+            open_path(&state, &safety, &a).unwrap();
+            new_tab(&state); // untitled: not reopened
+            open_path(&state, &safety, &gone).unwrap();
+            let bb = open_path(&state, &safety, &b).unwrap();
+            state.docs().move_tab(bb, 1).unwrap();
+            safety.remember_tabs(&state.docs());
+        }
+        std::fs::remove_file(&gone).unwrap();
+        let safety = Safety::new(Some(&dir));
+        let state = AppState::default();
+        assert_eq!(
+            restore_tabs(&state, &safety),
+            2,
+            "the missing file is left out"
+        );
+        let labels: Vec<String> = state.docs().tabs().into_iter().map(|t| t.label).collect();
+        assert_eq!(labels, ["a", "b"], "in tab order");
+        assert_eq!(
+            state.lock().budget().title,
+            "b",
+            "the one in front is in front"
+        );
+        assert!(state.docs().dirty().is_empty());
+
+        // Nothing to reopen: the starting Untitled budget stays.
+        let empty = temp_dir("app-restore-none");
+        let safety = Safety::new(Some(&empty));
+        let state = AppState::default();
+        assert_eq!(restore_tabs(&state, &safety), 0);
+        assert_eq!(state.docs().len(), 1);
+        drop(safety);
+        std::fs::remove_dir_all(&dir).unwrap();
+        std::fs::remove_dir_all(&empty).unwrap();
+    }
+
+    #[test]
+    fn saving_and_conflicts_are_per_tab() {
+        let dir = temp_dir("app-tab-conflict");
+        let safety = Safety::new(Some(&dir));
+        let state = AppState::default();
+        let (one, two) = (dir.join("one.fwb"), dir.join("two.fwb"));
+        write_budget(&one, "One");
+        write_budget(&two, "Two");
+        let a = open_path(&state, &safety, &one).unwrap();
+        let b = open_path(&state, &safety, &two).unwrap();
+        for (id, t) in [(a, "One, mine"), (b, "Two, mine")] {
+            state
+                .lock_doc(Some(id))
+                .unwrap()
+                .edit(|bud| edit::set_title(bud, t))
+                .unwrap();
+        }
+        write_theirs(&one, "One, theirs");
+        // Only the changed file's tab is held back; the other saves.
+        let done = autosave_pass(&state, &safety, later(5), false);
+        assert_eq!(done, [(a, Autosaved::Conflict), (b, Autosaved::File)]);
+        assert!(state.docs().tabs()[0].conflict && !state.docs().tabs()[1].conflict);
+        // Settled for that tab only, with the other in front.
+        assert_eq!(state.docs().active(), b);
+        resolve(&state, &safety, Some(a), Resolve::LoadTheirs).unwrap();
+        assert_eq!(state.docs().get(a).unwrap().budget().title, "One, theirs");
+        assert_eq!(state.lock().budget().title, "Two, mine");
+        // An explicit Save names its tab.
+        state
+            .lock_doc(Some(a))
+            .unwrap()
+            .edit(|bud| edit::set_title(bud, "One, again"))
+            .unwrap();
+        assert!(save(&state, &safety, Some(a), &one).unwrap());
+        assert_eq!(title_on_disk(&one), "One, again");
         drop(safety);
         std::fs::remove_dir_all(&dir).unwrap();
     }
@@ -1097,7 +1668,7 @@ mod tests {
         let safety = Safety::new(Some(&dir));
         let state = AppState::default();
         let path = dir.join("film.fwb");
-        assert!(save(&state, &safety, &path).unwrap());
+        assert!(save(&state, &safety, None, &path).unwrap());
         retitle(&state, "Mine");
         write_theirs(&path, "Theirs, from the other computer");
         (dir, safety, state, path)
@@ -1107,7 +1678,7 @@ mod tests {
     fn outside_changes_pause_autosave_and_block_save() {
         let (dir, safety, state, path) = conflicted("app-outside");
         assert_eq!(
-            autosave_pass(&state, &safety, later(5), false),
+            autosave_doc(&state, &safety, None, later(5), false),
             Autosaved::Conflict
         );
         assert_eq!(title_on_disk(&path), "Theirs, from the other computer");
@@ -1117,17 +1688,17 @@ mod tests {
         // Paused: later passes and edits never write into the file, and the
         // question isn't raised again by autosave.
         assert_eq!(
-            autosave_pass(&state, &safety, later(60), true),
+            autosave_doc(&state, &safety, None, later(60), true),
             Autosaved::Nothing
         );
         retitle(&state, "Mine, edited more");
         assert_eq!(
-            autosave_pass(&state, &safety, later(60), false),
+            autosave_doc(&state, &safety, None, later(60), false),
             Autosaved::Recovery
         );
         assert_eq!(title_on_disk(&path), "Theirs, from the other computer");
         // An explicit Save into the file is refused too.
-        assert!(!save(&state, &safety, &path).unwrap());
+        assert!(!save(&state, &safety, None, &path).unwrap());
         assert_eq!(title_on_disk(&path), "Theirs, from the other computer");
         drop(safety);
         std::fs::remove_dir_all(&dir).unwrap();
@@ -1136,8 +1707,8 @@ mod tests {
     #[test]
     fn keep_mine_backs_up_theirs_then_saves_over_it() {
         let (dir, safety, state, path) = conflicted("app-keep");
-        assert!(!save(&state, &safety, &path).unwrap());
-        resolve(&state, &safety, Resolve::KeepMine).unwrap();
+        assert!(!save(&state, &safety, None, &path).unwrap());
+        resolve(&state, &safety, None, Resolve::KeepMine).unwrap();
         assert_eq!(title_on_disk(&path), "Mine");
         let s = state.lock();
         assert!(!s.in_conflict() && !s.is_dirty());
@@ -1149,7 +1720,7 @@ mod tests {
         // Autosave carries on into the file.
         retitle(&state, "Mine again");
         assert_eq!(
-            autosave_pass(&state, &safety, later(5), false),
+            autosave_doc(&state, &safety, None, later(5), false),
             Autosaved::File
         );
         assert_eq!(title_on_disk(&path), "Mine again");
@@ -1161,10 +1732,10 @@ mod tests {
     fn load_theirs_backs_up_mine_and_undo_brings_it_back() {
         let (dir, safety, state, path) = conflicted("app-load");
         assert_eq!(
-            autosave_pass(&state, &safety, later(5), false),
+            autosave_doc(&state, &safety, None, later(5), false),
             Autosaved::Conflict
         );
-        resolve(&state, &safety, Resolve::LoadTheirs).unwrap();
+        resolve(&state, &safety, None, Resolve::LoadTheirs).unwrap();
         {
             let s = state.lock();
             assert_eq!(s.budget().title, "Theirs, from the other computer");
@@ -1182,7 +1753,7 @@ mod tests {
         assert_eq!(state.lock().budget().title, "Mine");
         assert!(state.lock().is_dirty());
         assert_eq!(
-            autosave_pass(&state, &safety, later(5), false),
+            autosave_doc(&state, &safety, None, later(5), false),
             Autosaved::File
         );
         drop(safety);
@@ -1193,7 +1764,7 @@ mod tests {
     fn save_mine_as_a_copy_leaves_theirs_alone() {
         let (dir, safety, state, path) = conflicted("app-copy");
         let copy = dir.join("film (mine).fwb");
-        assert!(save(&state, &safety, &copy).unwrap());
+        assert!(save(&state, &safety, None, &copy).unwrap());
         assert_eq!(title_on_disk(&path), "Theirs, from the other computer");
         assert_eq!(title_on_disk(&copy), "Mine");
         let s = state.lock();
@@ -1210,7 +1781,7 @@ mod tests {
         let safety = Safety::new(Some(&dir));
         let state = AppState::default();
         let path = dir.join("film.fwb");
-        save(&state, &safety, &path).unwrap();
+        save(&state, &safety, None, &path).unwrap();
         // A sync service rewrites the same bytes with a new time.
         let later_time = std::time::SystemTime::now() + Duration::from_secs(30);
         std::fs::File::options()
@@ -1221,14 +1792,14 @@ mod tests {
             .unwrap();
         retitle(&state, "Edited");
         assert_eq!(
-            autosave_pass(&state, &safety, later(5), false),
+            autosave_doc(&state, &safety, None, later(5), false),
             Autosaved::File
         );
         // Moved away or deleted: the next save puts it back.
         std::fs::remove_file(&path).unwrap();
         retitle(&state, "Edited again");
         assert_eq!(
-            autosave_pass(&state, &safety, later(5), false),
+            autosave_doc(&state, &safety, None, later(5), false),
             Autosaved::File
         );
         assert_eq!(title_on_disk(&path), "Edited again");

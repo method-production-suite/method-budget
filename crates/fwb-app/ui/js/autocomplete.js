@@ -349,6 +349,8 @@ export class Assist {
       case 'Enter':
       case 'Tab': {
         if (e.isComposing) return false;
+        // Ctrl+Tab steps budget tabs (main.js), not through the list.
+        if (e.key === 'Tab' && (e.ctrlKey || e.metaKey)) return false;
         const a = this.state.active;
         if (a < 0) {
           this.hide();

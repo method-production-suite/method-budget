@@ -35,6 +35,34 @@ macOS and Windows use the system web view (WebKit and WebView2) and need nothing
 
 ## Using it
 
+**Budget tabs.** Several budgets can be open at once, one per tab in the strip under the
+toolbar (decisions.md, entries 19 and 25). A tab shows the file's name without `.fwb`, or
+the budget's title before it has a file; a dot means unsaved changes; the tab in front,
+and the one under the pointer, show a close button (×). Its tooltip has the title, the
+full path and whether the file changed outside the app. Click a tab to bring it to the
+front: the grid, breadcrumb, tools panel (docked or in its window), formula bar and footer
+all switch to that budget, and each tab comes back where it was left (level, category,
+account, cursor, scroll, and the footer's This session and Last change). Each budget has
+its own undo, autosave, recovery copy and backups; the row clipboard is shared. New
+(Cmd+N) and New Tab (Cmd+T) open a starter budget in a new tab, and so does the **+**
+button at the end of the strip. Open, Open Recent, a recovered budget and a `.fwb`
+double-clicked in the Finder open in a new tab; a file that is open already just has its
+tab brought forward, and an untouched Untitled budget alone in the window gives its tab up
+to the file. Close Tab (Cmd+W), the × or a middle-click closes a tab: with Autosave on its
+changes go into its file first, and whatever is still unsaved asks **Save**, **Close
+Without Saving** or **Cancel**. Cmd+W on the last tab closes the window. Drag a tab (or
+Option+Shift+Left and Right on a focused tab) to move it. Ctrl+Tab and Ctrl+Shift+Tab, or
+Shift+Cmd+] and Shift+Cmd+[, go to the next and previous tab; Cmd+1 and Cmd+2 to the first
+and second (Cmd+3 to Cmd+9 are the tools tabs); Left, Right, Home and End move between tabs
+while one has the keyboard, and Escape goes back to the grid. When the tabs don't fit, the
+strip scrolls sideways (the mouse wheel too), with arrow buttons at its ends. The Window
+menu lists every open budget, the one in front ticked. The window title names the budget in
+front. The next start reopens the files that were open as tabs, in order, with the same one
+in front; budgets that never had a file come back through their recovery copies (below).
+
+Two budgets side by side in one window (split view, behavior note 04) is not built yet:
+see "Not yet" below.
+
 The window has three levels, with a breadcrumb above the grid:
 
 1. **Topsheet**: categories with their totals, production totals (the first one ends
@@ -290,17 +318,20 @@ The tools window and the Notes tab use these commands, in `src/tools.rs`:
 
 ### Keyboard and menus
 
-Everything has a key, and the menu bar (File, Edit, Insert, Format, Go, View, Help) lists the same
+Everything has a key, and the menu bar (File, Edit, Insert, Format, Go, View, Window, Help) lists the same
 commands with the same keys. Help > Keyboard Shortcuts (Shift+Cmd+/ or Ctrl+Shift+/) shows the full
 list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the menu bar
 (`src/menu.rs`) uses the same ids and keys, and a Rust test fails if they drift apart.
 
 | Action | macOS | Windows and Linux |
 |---|---|---|
-| New, Open | Cmd+N, Cmd+O | Ctrl+N, Ctrl+O |
+| New budget (in a new tab), New tab, Open (in a new tab) | Cmd+N, Cmd+T, Cmd+O | Ctrl+N, Ctrl+T, Ctrl+O |
 | Save, Save As | Cmd+S, Shift+Cmd+S | Ctrl+S, Ctrl+Shift+S |
 | Print the budget (topsheet and detail), the topsheet | Cmd+P, Shift+Cmd+P | Ctrl+P, Ctrl+Shift+P |
-| Close the window, Quit | Cmd+W, Cmd+Q | Ctrl+W, Ctrl+Q |
+| Close the budget's tab (the window, on the last tab), Close the window, Quit | Cmd+W, Shift+Cmd+W, Cmd+Q | Ctrl+W, Ctrl+Shift+W, Ctrl+Q |
+| Next, previous budget tab | Shift+Cmd+], Shift+Cmd+[ (or Ctrl+Tab, Ctrl+Shift+Tab) | Ctrl+Shift+], Ctrl+Shift+[ (or Ctrl+Tab, Ctrl+Shift+Tab) |
+| First, second budget tab | Cmd+1, Cmd+2 | Ctrl+1, Ctrl+2 |
+| On a budget tab: the previous or next tab; move the tab | Left, Right (also Home, End); Option+Shift+Left, Right | Left, Right (also Home, End); Alt+Shift+Left, Right |
 | Undo, Redo (in a text field: its typing) | Cmd+Z, Shift+Cmd+Z | Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z |
 | Cut, Copy, Paste cells (tab-separated, like a spreadsheet; with whole rows selected, the rows with everything on them, below) | Cmd+X, Cmd+C, Cmd+V | Ctrl+X, Ctrl+C, Ctrl+V |
 | Select every row | Cmd+A | Ctrl+A |
@@ -375,9 +406,18 @@ Close Window and Quit from the menu are answered in Rust (both ask about unsaved
 their keys on Windows and Linux close the window from the page, which asks the same way.
 Menu items are never disabled: Undo and Redo also serve text fields, and each command does
 nothing where it doesn't apply. While a dialog is open, the menu only reaches its fields.
+The budget tab keys (next, previous, first, second) are grid commands that also work from a
+text field outside the grid, since they mean nothing there, and Ctrl+Tab passes through the
+cell editor and the type-ahead list (the edit is committed first). Close Tab from the menu
+closes the tools window when that is in front, as Close Window does.
 
-Closing the window or quitting with unsaved changes asks first (with Autosave on, they
-are saved into the file instead, below).
+Closing the window or quitting asks once about every budget with unsaved changes: with
+Autosave on, changes go into their files first, so the question lists only what is left
+(untitled budgets, Autosave off, a file changed outside the app). It is a native dialog
+naming each budget, with **Save All** (the default: each budget into its file, an untitled
+one through its own Save dialog; a cancelled dialog or a failed save stops it and nothing
+closes), **Discard All** (no recovery copies either) and **Cancel**. With one budget it
+reads Save, Discard, Cancel.
 
 ### Copy and paste rows
 
@@ -423,8 +463,8 @@ Escape or a click outside changes nothing. Items that only a kept item would hav
 (say a unit used by a copied fringe whose own version is kept here) are still added.
 
 **One clipboard for the app.** The copied rows live in Rust (`src/clipboard.rs`), not in
-the page, so a paste reaches any budget open in the app (budgets opening as tabs will
-share it). The clipboard text is the key: a paste whose text isn't the rows' text (any copy
+the page, so a paste reaches any budget open in the app: rows copied in one tab paste into
+another, with the review against that budget's setup. The clipboard text is the key: a paste whose text isn't the rows' text (any copy
 since, here or elsewhere, replaced it) is a paste of cells, and the copied rows are
 forgotten; copying cells forgets them too. No custom clipboard formats are used (WebKit
 doesn't keep them reliably), and nothing extra goes into the text, so spreadsheets get
@@ -454,7 +494,8 @@ As, or File > Autosave (one setting for the app, kept in its data folder). With 
 budget that has a file is saved into that file 3 seconds after you stop changing it (at
 most 30 seconds after the first unsaved change while you keep going), and right away when
 the app loses focus (moving between the main window and the tools window doesn't count),
-when you close or quit, and before New, Open or Open Recent. The
+when you close its tab, and when you close the window or quit. Every open budget (every
+tab) is timed and saved on its own, in front or not. The
 unsaved-changes mark clears after each autosave. Undo and Redo keep working across
 autosaves (an undo is a change like any other and is saved in turn). A budget never saved
 (Untitled) can't be saved into a file: it gets a recovery copy instead (below), and the
@@ -464,7 +505,9 @@ the disk is full), the app says so once and keeps a recovery copy.
 **Changes made outside the app.** Because autosave writes the file often, the app never
 writes over a version it hasn't seen. When it opens or writes a budget file it notes the
 file's size, modification time and a hash of its content; before every autosave and every
-Save into that file, and whenever the window gets focus back, it compares. If another
+Save into that file, and whenever the window gets focus back, it compares, for every open
+budget. A budget in a tab that isn't in front has its tab brought forward before the
+question, one budget at a time. If another
 program changed the file meanwhile (a sync service such as Dropbox or iCloud, another
 computer, another app), nothing is written, autosave into that file pauses (a recovery copy
 keeps the unsaved work safe), and a dialog, "This budget was changed outside Film Wizard",
@@ -490,8 +533,8 @@ unsaved changes on the same timing.
 in the app's data folder (`Recovery/`, readable only by you: 0700 folder, 0600 files on
 macOS and Linux), one per open budget, each a `.fwb` with a small `.json` beside it (the
 original path, title and time). A copy is deleted when the budget is saved, when undo
-takes it back to the saved state, when you close or quit and choose not to save, and when
-another budget replaces it (New, Open) after you agreed to lose the changes. Quitting
+takes it back to the saved state, when you close its tab or the window (or quit) and choose
+not to save, and when an untouched Untitled budget gives its tab up to a file. Quitting
 without the guard (logging out, the system quitting the app) keeps the changes: into the
 file with Autosave on, else into a recovery copy.
 
@@ -521,15 +564,23 @@ settings and recent lists) goes to a temporary file in the same folder, is flush
 then renamed over the target (and the folder flushed, on macOS and Linux). A budget file
 keeps the permissions of the file it replaces. A failed write leaves the old file whole.
 
+**Reopening tabs.** The files open as tabs, in tab order, and which one is in front are kept
+in the data folder's `tabs.json`, rewritten whenever a tab opens, closes, moves, comes to the
+front or is saved under a new name. The next start opens them again (files that are gone or
+can't be read are left out) before the window asks for its first view; with none, it starts
+with an Untitled budget as before. Budgets that never had a file aren't listed: their
+unsaved work comes back as a recovered budget. A recovered budget whose file was reopened
+untouched takes that tab's place.
+
 **File > Open Recent** lists the last 10 budgets opened or saved (newest first, each once;
 two files with one name show their folder), kept in the data folder's `recent.json`. Files
 that no longer exist drop off when the menu is refreshed (every open and save). Clear Menu
 empties it. macOS's own system-wide recent documents list is not updated.
 
 **Opening from the system.** Double-clicking a `.fwb` file, Open With, or dropping one on
-the Dock icon opens it: on macOS the app receives an open event, on Windows and Linux the
-path arrives on the command line. If the app is running with unsaved changes, it asks
-first, as Open does. When several files arrive at once, the first one opens. On macOS a
+the Dock icon opens it in a tab (its own tab, when it is open already): on macOS the app
+receives an open event, on Windows and Linux the path arrives on the command line. Nothing
+is asked: no budget is replaced. When several files arrive at once, the first one opens. On macOS a
 second double-click goes to the running app. On Windows and Linux there is no
 single-instance handling: a second launch with a path starts a second copy of the app with
 that file (each copy has its own recovery copies and doesn't offer the other's).
@@ -541,28 +592,34 @@ The app's data folder is the platform's local app data folder for
 | Command | Arguments | Returns |
 |---|---|---|
 | `autosave_setting`, `set_autosave` | `on` (set) | the setting |
-| `flush_autosave` | none | View (autosaved now, if anything was unsaved) |
-| `open_pending` | none | View of a file the system asked to open, or `null` |
-| `open_recent` | `index` (its place in Open Recent) | View, or `null` |
+| `flush_autosave` | `doc` | View (autosaved now, if anything was unsaved) |
+| `open_pending` | none | View of a file the system asked to open (in a tab), or `null` |
+| `open_recent` | `index` (its place in Open Recent) | View (in a tab), or `null` |
 | `recovery_list` | none | `[{ key, path, name, title, saved_at_ms }]`, newest first |
-| `open_recovered`, `discard_recovered` | `key` | View; the remaining list |
-| `backup_list` | none | `[{ id, saved_at_ms, bytes }]` for the open budget's file |
-| `restore_backup` | `id` | View |
-| `reveal_backups` | none | nothing (opens the folder) |
-| `resolve_external_change` | `choice`: `keep` or `load` | View |
+| `open_recovered`, `discard_recovered` | `key` | View (in a tab); the remaining list |
+| `backup_list` | `doc` | `[{ id, saved_at_ms, bytes }]` for that budget's file |
+| `restore_backup` | `doc`, `id` | View |
+| `reveal_backups` | `doc` | nothing (opens the folder) |
+| `resolve_external_change` | `doc`, `choice`: `keep` or `load` | View |
 
-Rust tells the page about autosave with events: `file-state` (`{ rev, file }` after an
-autosave into the file; the page updates the title if `rev` is still current),
-`autosave-changed`, `autosave-error`, `open-request` (a file from the system; the page
-asks about unsaved changes, then calls `open_pending`) and `external-change` (the file
-changed outside the app; the page shows the dialog above).
+`doc` is optional everywhere (the budget in front when left out; below). Rust tells the page
+about autosave with events: `file-state` (`{ doc, rev, file, tabs }` after a save the page
+didn't ask for: autosave, or Save All on the way out; the page redraws the tabs and updates
+the title if `doc` is in front and `rev` is still current), `autosave-changed`,
+`autosave-error`, `open-request` (a file from the system; the page finishes any cell edit,
+then calls `open_pending`) and `external-change` (`{ doc, name }`: that budget's file
+changed outside the app; the page brings its tab forward and shows the dialog above).
 
 ## Architecture
 
 ```
 crates/fwb-app/
   src/session.rs     one open budget: Budget, file path, dirty flag, undo/redo patches,
-                     the account on screen, the recalc cache
+                     the account on screen, the recalc cache, autosave and recovery state
+  src/docs.rs        every open budget (one Session per tab) in tab order, the one in
+                     front, and the lock the commands go through
+  src/tabs.rs        the tab commands, the Window menu's list of budgets, remembering
+                     the open files for the next start
   src/edit.rs        every edit as a function on &mut Budget (validates, then applies)
   src/diagnose.rs    lenient recalc: flags every bad cell instead of stopping at the first
   src/report_dto.rs  serde shapes for fwb_core::Report (the engine stays serde-free)
@@ -579,17 +636,24 @@ crates/fwb-app/
   src/safety.rs      saving safety as plain files: atomic writes, recovery copies,
                      backups, settings, the recent list (tested with temporary folders)
   src/safety_app.rs  its Tauri side: autosave timer, recovery and backup commands, Open
-                     Recent and Autosave menu items, files opened by the system
-  src/app.rs         Tauri glue: commands, file dialogs, close and quit guard, menu events
+                     Recent and Autosave menu items, files opened by the system, opening
+                     budgets in tabs and closing them, reopening the tabs at the start
+  src/app.rs         Tauri glue: commands, file dialogs, the close and quit guard (one
+                     question about every unsaved tab), menu events
   examples/perf.rs   timings on a large sample budget (fwb_core::sample), and canned
                      replies for a UI harness (perf dump DIR)
   ui/                index.html, styles.css, setup.css, js/*.js (ES modules, no build step)
   capabilities/      what each window's web view may call (main.json, tools.json)
 ```
 
-**Rust owns the budget.** The app state is one `Session` behind a mutex. The web view never
-holds the real budget; it sends a command (`set_detail_field`, `add_detail`, `set_global`,
-`undo`, ...) and gets back a `View`.
+**Rust owns the budgets.** The app state (`src/docs.rs`) holds every open budget, one
+`Session` each, in tab order with an id per document and one of them in front, behind one
+mutex. The web view never holds a real budget; it sends a command (`set_detail_field`,
+`add_detail`, `set_global`, `undo`, ...) and gets back a `View`. Every command works on the
+budget in front unless its optional `doc` argument names another; each window passes the
+budget it is showing as `doc` with every command (`api.js`), so a command sent just as
+another tab comes to the front still lands on the budget the user was looking at. A `doc`
+that has been closed is refused with a message, nothing changed.
 
 **What crosses the bridge.** Budgets run to thousands of lines, so a view carries what the
 screen needs, not the whole budget (decisions.md, entry 18). Its size depends on the
@@ -613,11 +677,23 @@ account.
   `categories`, `grand_total`, `net_total`, `rows` for `account`'s rows only, and
   `rows_changed` (rows that moved, anywhere).
 - `file` (`name`, `path`, `dirty`), `can_undo`, `can_redo`, and `created_row` after an insert.
+- `doc`: which open budget this is, and `tabs`: every tab in order (`id`, `label`, `title`,
+  `name`, `path`, `dirty`, `conflict`, `active`). A page draws only the view of the budget
+  in front; a reply about another one (a background tab saved or closed) only redraws the
+  tabs.
 
 | Command | Arguments | Returns |
 |---|---|---|
 | `focus_account` | `category`, `ti`, `account`, `ai` (all `null`: no account) | View with that account |
 | `get_full_view` | none | everything: the whole budget, every row's totals, every problem |
+| `new_tab` | none | View of a starter budget in a new tab, in front |
+| `switch_tab` | `doc` | View of that budget, now in front |
+| `move_tab` | `doc`, `to` (its place afterwards) | the tabs |
+| `close_tab` | `doc`, `discard` | `{closed, unsaved, last, view}`: closed (view: the budget now in front); or not, because of unsaved changes (ask, then again with `discard`, or save first) or because it is the last tab (close the window) |
+| `list_tabs` | none | the tabs |
+
+Every budget command also takes `doc` (above). The account on screen is per budget, so
+coming back to a tab brings its account's rows with the view.
 
 `focus_account` sets the account whose rows every later view carries; the UI calls it when
 it opens an account (and with nothing when it leaves one). Rust finds the account by code
@@ -653,7 +729,8 @@ and shows totals marked as partial. The budget keeps what the user typed.
 `selection_totals` command.
 
 **The UI** is a handful of ES modules with no dependencies: `main.js` (state, navigation,
-shortcuts), `grid.js` (a generic keyboard grid used at all three levels), `levels.js`
+shortcuts, and where each tab was left), `tabs.js` (the tab strip: switching, closing,
+dragging, scrolling), `grid.js` (a generic keyboard grid used at all three levels), `levels.js`
 (turns a View into rows and columns), `footer.js`,
 `modal.js`, `format.js` (money and decimal display), `api.js` (the command queue),
 `dom.js`, `shortcuts.js` (the one list of shortcuts, shared with the Rust menu and checked
@@ -677,10 +754,14 @@ helpers the Budget tabs in `topsheet-setup.js` share) and `notes.js` (the Notes 
 `tools.css` lays it out. Commands run one at a time, in order.
 
 **Two windows.** Popped out, the panel runs in a second web view on the same page and the
-same Rust session; every command works on the one budget either way. After any command
-that changes the budget (a new view `rev`), Rust sends `view-changed` to every window but
-the one that sent the command, and that window fetches a fresh view (`get_view`); a change
-made in the tools window counts in the main window's Last change like any other edit. The
+same Rust budgets, and follows the budget in front in the main window. After any command
+whose view is news (a new view `rev`: the budget changed, or another tab came to the front,
+since revs are never shared between budgets), Rust sends `view-changed` (`{doc, rev}`) to
+every window but the one that sent the command, and that window fetches a fresh view: the
+main window its own budget, the tools window the one in front (`get_view` with no `doc`).
+The tools window's commands name the budget it drew, and a reply about a budget no longer in
+front makes it fetch again; the selection it hears carries the budget too. A change made in
+the tools window counts in the main window's Last change like any other edit. The
 pages also talk directly, each listening only under its own label (`main` or `tools`) so a
 window never hears events meant for the other: the main window sends `selection-changed`
 (level, row keys, cursor, account) and `tools-state` (that and the tab layout, when the
@@ -721,11 +802,13 @@ untrusted (a budget file is data from anywhere).
   The guard is a plugin hook, so it covers every web view, the tools window included; that
   window is made in Rust with a fixed page (`index.html?panel=1`), never a URL from the page.
 - **Least privilege for the web view.** `capabilities/main.json` grants the main window
-  only the app's own budget commands (and sending events to the tools window).
+  only the app's own budget commands, the tab commands among them (and sending events to the
+  tools window).
   `capabilities/tools.json` grants the tools window, by its label, only what the panel
   calls: `get_view`, the selection summary and the apply edits, the setup tables, the
   Budget tabs, a line's note and the notes list, and listening for and sending events. It
-  can't open, save, print, undo, use the clipboard or recovery, or open or close windows;
+  can't open, save, print, undo, use the clipboard or recovery, open, close, switch or move
+  budget tabs, or open or close windows;
   its keys for those go to the main window as menu commands, which the main window runs as
   if chosen from its own menu bar. A Rust test checks that every command the panel's
   scripts name is granted and nothing else is. `build.rs` lists those commands in an app manifest,
@@ -739,7 +822,9 @@ untrusted (a budget file is data from anywhere).
   it into place, so a failed save never leaves half a file. Other paths come from the
   operating system (open events, the command line) or the app's own data folder (Open
   Recent, recovery copies, backups); the web view names those only by their place in the
-  list, a recovery key or a backup's file name, each checked against what is there.
+  list, a recovery key or a backup's file name, each checked against what is there, and an
+  open budget by its document id, which is only ever a number checked against the open
+  tabs. The files reopened at the start come from the app's own `tabs.json`.
   Show Backups Folder runs the system's `open`, `explorer` or `xdg-open` from Rust on a
   folder Rust chose.
 - **Budget text is never markup.** The UI builds the page with DOM calls and puts every
@@ -758,6 +843,12 @@ least 14 days old when added (`python3 scripts/check-crate-ages.py --only-change
 
 ## Not yet
 
+**Split view** (two budgets side by side in one window, each pane with its own tabs,
+breadcrumb and grid, the tools acting on the pane in front; behavior note 04) comes later.
+Tabs are built so it can: every budget is already its own document with its own account on
+screen, and commands already name their budget (`doc`), so a second pane would be a second
+grid that sends a different `doc`.
+
 Moving rows by drag, editing fringe ranges in the grid, original/variance columns in the
 grid (the data is in `view.variance`; reports already print it), renaming setup entries (add
 the new one, then delete the old), renumbering accounts when the coding pattern changes,
@@ -767,3 +858,6 @@ paste will cause in its review. Printing, the Windows/Linux menu keys, Copy Rows
 the menu bar reaching the system clipboard, and the tools window (placement on a second
 screen, keys while it is in front, closing with the main window) still need a live check.
 The two tool panes split their height evenly; there is no divider to drag between them yet.
+Budget tabs need a live check too: Ctrl+Tab and Shift+Cmd+] reaching the page in the
+system web views, the Window menu's list, the close question (Save All with an untitled
+budget), reopening the tabs at the next start, and the tools window following the tabs.

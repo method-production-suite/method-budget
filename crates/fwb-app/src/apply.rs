@@ -19,7 +19,7 @@ use fwb_core::{Budget, Dec, Detail, RowId, RowKind, TopsheetRow};
 use serde::Serialize;
 use tauri::{Runtime, State, WebviewWindow};
 
-use crate::app::{edit_budget, AppState};
+use crate::app::{edit_budget, AppState, DocId};
 use crate::edit::{details, EditResult};
 use crate::report_dto::SelectionDto;
 use crate::session::SelectionIndex;
@@ -584,16 +584,17 @@ pub fn summary(
 // Commands (registered in app.rs, build.rs and capabilities/main.json)
 
 /// The panel's numbers for a selection: rows by id, whole accounts by
-/// number, whole categories by topsheet position. Never fails: rows and
-/// accounts that are gone are left out.
+/// number, whole categories by topsheet position. Rows and accounts that are
+/// gone are left out; only a closed budget (`doc`) is refused.
 #[tauri::command]
 pub fn apply_summary(
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     row_ids: Option<Vec<RowId>>,
     accounts: Option<Vec<String>>,
     categories: Option<Vec<usize>>,
-) -> ApplySummary {
-    let mut s = state.lock();
+) -> Result<ApplySummary, String> {
+    let mut s = state.lock_doc(doc)?;
     let (budget, outcome) = s.totals();
     let rows = rows_under(
         budget,
@@ -603,7 +604,7 @@ pub fn apply_summary(
     );
     // Rows are looked up once for every total the panel shows.
     let index = SelectionIndex::new(budget, outcome);
-    summary(budget, rows, |ids| index.totals(ids))
+    Ok(summary(budget, rows, |ids| index.totals(ids)))
 }
 
 /// Puts a fringe or group on the rows (`on`), or takes it off.
@@ -611,12 +612,13 @@ pub fn apply_summary(
 pub fn apply_to_rows<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     row_ids: Vec<RowId>,
     field: String,
     name: String,
     on: bool,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, |b| {
+    edit_budget(&window, &state, doc, |b| {
         apply_tag(b, &row_ids, &field, &name, on)
     })
 }
@@ -626,11 +628,12 @@ pub fn apply_to_rows<R: Runtime>(
 pub fn assign_to_rows<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     row_ids: Vec<RowId>,
     field: String,
     value: Option<String>,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, |b| {
+    edit_budget(&window, &state, doc, |b| {
         assign_value(b, &row_ids, &field, value.as_deref())
     })
 }
@@ -639,18 +642,20 @@ pub fn assign_to_rows<R: Runtime>(
 pub fn make_fringe_range<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     row_ids: Vec<RowId>,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, |b| make_range(b, &row_ids))
+    edit_budget(&window, &state, doc, |b| make_range(b, &row_ids))
 }
 
 #[tauri::command]
 pub fn clear_fringe_range<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     row_ids: Vec<RowId>,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, |b| clear_range(b, &row_ids))
+    edit_budget(&window, &state, doc, |b| clear_range(b, &row_ids))
 }
 
 #[cfg(test)]

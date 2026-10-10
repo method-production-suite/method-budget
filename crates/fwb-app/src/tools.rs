@@ -4,13 +4,16 @@
 //! or the bottom, or pops out into a window of its own labelled [`TOOLS`]. That
 //! window loads the same bundled page as the main one with `?panel=1`
 //! ([`TOOLS_PAGE`]) and draws only the panel. Both windows call the same
-//! commands on the one budget in `AppState`, so there is nothing to merge:
+//! commands on the same budgets in `AppState`, so there is nothing to merge:
 //! each command's reply goes to the window that sent it, and every other
-//! window hears about the change and asks for a fresh view.
+//! window hears about the change and asks for a fresh view. The panel
+//! follows the budget in front: its commands name the budget it drew
+//! (`doc`), and a change of tab is news like any other.
 //!
 //! Events from Rust:
-//! - [`VIEW_CHANGED`] (the view's new `rev`) to every window except the one
-//!   whose command changed the budget (see [`changed`]). Pages listen for it
+//! - [`VIEW_CHANGED`] (`{doc, rev}`: which budget, and its view's new `rev`)
+//!   to every window except the one whose command changed the budget or
+//!   brought another tab to the front (see [`changed`]). Pages listen for it
 //!   under their own label, never "any", so a window never hears its own.
 //! - [`TOOLS_CLOSED`] to the main window when the tools window goes (its
 //!   close button, Close Window while it is in front), so the panel docks back.
@@ -34,7 +37,7 @@ use tauri::{
     WebviewWindowBuilder, Window, WindowEvent,
 };
 
-use crate::app::AppState;
+use crate::app::{AppState, DocId};
 
 /// The main window's label (tauri.conf.json).
 pub const MAIN: &str = "main";
@@ -79,9 +82,18 @@ pub fn is_other(target: &EventTarget, caller: &str) -> bool {
     }
 }
 
-/// After a command: if the budget changed (a new `rev`), tells every window
-/// but the one that sent the command, which already has the new view.
-pub(crate) fn changed<R: Runtime>(window: &WebviewWindow<R>, rev: u64) {
+/// What [`VIEW_CHANGED`] says: which budget changed, and its new view rev.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct ViewChanged {
+    pub doc: DocId,
+    pub rev: u64,
+}
+
+/// After a command: if what it gave is news (a new `rev`: the budget
+/// changed, or another tab came to the front, since revs are never shared
+/// between budgets), tells every window but the one that sent the command,
+/// which already has the new view.
+pub(crate) fn changed<R: Runtime>(window: &WebviewWindow<R>, doc: DocId, rev: u64) {
     let Some(news) = window.try_state::<Broadcast>() else {
         return;
     };
@@ -91,7 +103,9 @@ pub(crate) fn changed<R: Runtime>(window: &WebviewWindow<R>, rev: u64) {
     let caller = window.label().to_string();
     let _ = window
         .app_handle()
-        .emit_filter(VIEW_CHANGED, rev, |t| is_other(t, &caller));
+        .emit_filter(VIEW_CHANGED, ViewChanged { doc, rev }, |t| {
+            is_other(t, &caller)
+        });
 }
 
 /// Where a menu command goes: the tools window when it is in front (it runs
@@ -348,10 +362,14 @@ pub fn notes(b: &Budget) -> Vec<NoteEntry> {
     out
 }
 
-/// The Notes tab's list: every line in the budget with a note.
+/// The Notes tab's list: every line in budget `doc` (`None`: the one in
+/// front) with a note.
 #[tauri::command]
-pub fn notes_list(state: State<'_, AppState>) -> Vec<NoteEntry> {
-    notes(state.lock().budget())
+pub fn notes_list(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+) -> Result<Vec<NoteEntry>, String> {
+    Ok(notes(state.lock_doc(doc)?.budget()))
 }
 
 #[cfg(test)]
@@ -623,7 +641,10 @@ mod tests {
             granted_cmds.push(cmd);
         }
         for never in [
-            "new_budget",
+            "new_tab",
+            "switch_tab",
+            "move_tab",
+            "close_tab",
             "open_budget",
             "save_budget",
             "undo",

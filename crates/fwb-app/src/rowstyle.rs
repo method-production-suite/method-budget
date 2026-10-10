@@ -13,7 +13,7 @@ use serde::{Deserialize, Deserializer};
 use tauri::ipc::{InvokeBody, Request};
 use tauri::{Runtime, State, WebviewWindow};
 
-use crate::app::{edit_budget, AppState};
+use crate::app::{edit_budget, AppState, DocId};
 use crate::edit::{EditResult, GroupInput};
 use crate::view::View;
 
@@ -190,13 +190,14 @@ pub fn apply_group_update(
 pub fn set_row_style<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     request: Request<'_>,
 ) -> Result<View, String> {
     let InvokeBody::Json(args) = request.body() else {
         return Err("bad row style: expected JSON arguments".into());
     };
     let input = RowStyleInput::from_json(args)?;
-    edit_budget(&window, &state, |b| apply_row_style(b, &input))
+    edit_budget(&window, &state, doc, |b| apply_row_style(b, &input))
 }
 
 /// `{rowId, note: string | null}`.
@@ -204,10 +205,11 @@ pub fn set_row_style<R: Runtime>(
 pub fn set_row_note<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     row_id: RowId,
     note: Option<String>,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, |b| {
+    edit_budget(&window, &state, doc, |b| {
         apply_row_note(b, row_id, note.as_deref())
     })
 }
@@ -217,10 +219,11 @@ pub fn set_row_note<R: Runtime>(
 pub fn set_group_color<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
     color: Option<String>,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, |b| {
+    edit_budget(&window, &state, doc, |b| {
         apply_group_color(b, &name, color.as_deref())
     })
 }
@@ -231,11 +234,12 @@ pub fn set_group_color<R: Runtime>(
 pub fn update_group<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
+    doc: Option<DocId>,
     name: String,
     group: GroupInput,
     color: Option<String>,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, |b| {
+    edit_budget(&window, &state, doc, |b| {
         apply_group_update(b, &name, &group, color.as_deref())
     })
 }

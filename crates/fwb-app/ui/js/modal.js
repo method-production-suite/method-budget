@@ -374,9 +374,10 @@ function placePopover(form, anchor) {
  * A dialog whose content the caller builds (lists with a button per item:
  * the recovered budgets and backups dialogs in safety.js). `build(close)`
  * returns the dialog element (a `.modal`). Escape, or a click outside, calls
- * `close`, which is also returned.
+ * `close`, which is also returned. `onClose` runs once it has closed, however
+ * it closed.
  */
-export function customDialog(build) {
+export function customDialog(build, { onClose = null } = {}) {
   const root = $('modal-root');
   const previous = document.activeElement;
   let backdrop = null;
@@ -385,6 +386,7 @@ export function customDialog(build) {
     open = null;
     backdrop.remove();
     if (previous && previous.focus) previous.focus({ preventScroll: true });
+    if (onClose) onClose();
   };
   const box = build(close);
   box.addEventListener('keydown', (e) => {

@@ -16,6 +16,7 @@
 //!                             they were on disk before each save replaced them
 //! recent.json                 File > Open Recent
 //! settings.json               the Autosave switch
+//! tabs.json                   the budgets open as tabs, to reopen next time
 //! ```
 
 use std::fs::{self, File, OpenOptions};
@@ -208,6 +209,16 @@ pub fn write_atomically(path: &Path, bytes: &[u8], access: Access) -> io::Result
         let _ = d.sync_all();
     }
     Ok(())
+}
+
+/// Whether two paths name the same file: the same path, or the same file
+/// once links and `..` are resolved (only files that exist can be resolved).
+pub fn same_file(a: &Path, b: &Path) -> bool {
+    a == b
+        || matches!(
+            (fs::canonicalize(a), fs::canonicalize(b)),
+            (Ok(x), Ok(y)) if x == y
+        )
 }
 
 fn remove_if_present(path: &Path) -> io::Result<()> {
@@ -790,9 +801,115 @@ impl RecentFiles {
     }
 }
 
+// ---------------------------------------------------------------------------
+// The budgets open as tabs, reopened at the next start
+
+#[derive(Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+struct TabsJson {
+    files: Vec<String>,
+    active: Option<usize>,
+}
+
+/// The files open as tabs (in tab order) and which of them is in front, kept
+/// in `tabs.json` so the next start reopens them. Budgets without a file
+/// aren't listed: they come back through their recovery copies.
+#[derive(Debug, Default)]
+pub struct OpenTabs {
+    file: Option<PathBuf>,
+    /// What the file holds now, so an unchanged list isn't written again.
+    saved: TabsJson,
+}
+
+impl OpenTabs {
+    /// Reads the list from `file`; missing or unreadable is an empty list.
+    pub fn load(file: Option<PathBuf>) -> OpenTabs {
+        let saved = file
+            .as_deref()
+            .and_then(|f| fs::read_to_string(f).ok())
+            .and_then(|t| serde_json::from_str::<TabsJson>(&t).ok())
+            .unwrap_or_default();
+        OpenTabs { file, saved }
+    }
+
+    /// The files to reopen, in tab order, and the place of the one in front
+    /// among them.
+    pub fn files(&self) -> (Vec<PathBuf>, Option<usize>) {
+        let files: Vec<PathBuf> = self
+            .saved
+            .files
+            .iter()
+            .filter(|s| !s.is_empty())
+            .map(PathBuf::from)
+            .collect();
+        let active = self.saved.active.filter(|&i| i < files.len());
+        (files, active)
+    }
+
+    /// Remembers `files` (tab order) with `active` in front; writes only
+    /// when that differs from what is kept.
+    pub fn remember(&mut self, files: &[PathBuf], active: Option<usize>) -> io::Result<()> {
+        let next = TabsJson {
+            files: files
+                .iter()
+                .filter_map(|p| p.to_str().map(str::to_string))
+                .collect(),
+            active,
+        };
+        if next == self.saved {
+            return Ok(());
+        }
+        if let Some(file) = &self.file {
+            if let Some(dir) = file.parent() {
+                create_private_dir(dir)?;
+            }
+            let bytes = serde_json::to_vec_pretty(&next).map_err(io::Error::other)?;
+            write_atomically(file, &bytes, Access::Private)?;
+        }
+        self.saved = next;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    #[test]
+    fn open_tabs_are_kept_between_runs() {
+        let dir = temp_dir("tabs");
+        let file = dir.join("tabs.json");
+        let mut t = OpenTabs::load(Some(file.clone()));
+        assert_eq!(t.files(), (Vec::new(), None));
+        let (a, b) = (dir.join("a.fwb"), dir.join("b.fwb"));
+        t.remember(&[a.clone(), b.clone()], Some(1)).unwrap();
+        let again = OpenTabs::load(Some(file.clone()));
+        assert_eq!(again.files(), (vec![a.clone(), b.clone()], Some(1)));
+        // Unchanged: not written again.
+        fs::remove_file(&file).unwrap();
+        t.remember(&[a.clone(), b.clone()], Some(1)).unwrap();
+        assert!(!file.exists(), "nothing changed, nothing written");
+        // A front tab past the end (or untitled, not listed) means none.
+        t.remember(std::slice::from_ref(&a), None).unwrap();
+        assert_eq!(OpenTabs::load(Some(file.clone())).files(), (vec![a], None));
+        fs::write(&file, r#"{"files": ["x.fwb"], "active": 7}"#).unwrap();
+        assert_eq!(OpenTabs::load(Some(file.clone())).files().1, None);
+        fs::write(&file, "not json").unwrap();
+        assert_eq!(OpenTabs::load(Some(file)).files(), (Vec::new(), None));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn same_file_sees_through_other_spellings() {
+        let dir = temp_dir("same");
+        let f = dir.join("film.fwb");
+        fs::write(&f, "{}").unwrap();
+        assert!(same_file(&f, &f));
+        fs::create_dir(dir.join("x")).unwrap();
+        assert!(same_file(&f, &dir.join("x").join("..").join("film.fwb")));
+        assert!(!same_file(&f, &dir.join("other.fwb")));
+        fs::remove_dir_all(&dir).unwrap();
+    }
 
     /// A fresh empty folder under the system's temporary folder.
     pub(crate) fn temp_dir(tag: &str) -> PathBuf {

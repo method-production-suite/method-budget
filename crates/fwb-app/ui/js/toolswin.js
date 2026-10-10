@@ -1,15 +1,21 @@
 // The tools window: the tools panel popped out of the main window
 // (src/tools.rs). It loads the same page as the main window with ?panel=1
 // (boot.js) and draws only the panel (tools.js), with the same commands on
-// the same budget in Rust.
+// the same budgets in Rust.
+//
+// It follows the budget in front in the main window: it fetches the view
+// with no `doc` (the one in front), and every command it sends names the
+// budget it drew (api.js), so an edit made just as the main window switches
+// tabs lands where the user meant.
 //
 // Keeping in step with the main window, by events listened for under this
 // window's label ("tools"):
-//   view-changed       the main window changed the budget: fetch the view
+//   view-changed       the main window changed a budget or brought another
+//                      tab to the front ({doc, rev}): fetch the view
 //   tools-state        the main window's selection and the tab layout, sent
 //                      when this window says tools-ready, and with a tab to
 //                      focus when a tab key or menu item asked for one
-//   selection-changed  the grid's selection and cursor
+//   selection-changed  the grid's selection and cursor, and which budget
 //   menu               a menu item chosen while this window was in front
 // and sent to the main window: tools-ready, tools-position (a dock button),
 // tools-layout (tabs moved: the main window keeps the preference),
@@ -21,7 +27,7 @@
 // Linux; the tab keys show a tab here; everything else goes to the main
 // window. Close Window (Cmd+W) closes this window, which docks the panel back.
 
-import { invoke, connected } from './api.js';
+import { invoke, connected, setDefaultArgs } from './api.js';
 import { $, el, isTextField } from './dom.js';
 import { renderTools, setToolsLayout, toolsLayout, selectToolsTab, focusToolsKey } from './tools.js';
 import { matchShortcut, menuRunsAppKeys, shortcutById } from './shortcuts.js';
@@ -33,6 +39,9 @@ const state = {
 };
 
 const NO_SELECTION = { level: 'topsheet', keys: [], cat: null, cursor: null, account: null };
+
+// Every command names the budget this window drew.
+setDefaultArgs(() => (state.view && typeof state.view.doc === 'number' ? { doc: state.view.doc } : {}));
 
 // ---------------------------------------------------------------------------
 // The page
@@ -68,8 +77,14 @@ function emitTo(target, name, payload) {
 async function call(cmd, args = {}) {
   const v = await invoke(cmd, args);
   if (v && typeof v === 'object' && 'budget' in v) {
-    state.view = v;
-    render();
+    const front = Array.isArray(v.tabs) ? v.tabs.find((t) => t.active) : null;
+    if (front && front.id !== v.doc) {
+      // The main window brought another budget forward meanwhile: follow it.
+      refresh();
+    } else {
+      state.view = v;
+      render();
+    }
   }
   return v;
 }
@@ -80,7 +95,7 @@ function ctx() {
     selection: () => state.selection || NO_SELECTION,
     position: 'window',
     setPosition: (where) => emitTo('main', 'tools-position', where),
-    jumpTo: (entry) => emitTo('main', 'tools-jump', entry),
+    jumpTo: (entry) => emitTo('main', 'tools-jump', { ...entry, doc: state.view ? state.view.doc : null }),
     onLayout: (layout) => emitTo('main', 'tools-layout', layout),
   };
 }
@@ -104,7 +119,8 @@ async function refresh() {
     do {
       refreshAgain = false;
       try {
-        const v = await invoke('get_view');
+        // The budget in front, whichever this window drew last.
+        const v = await invoke('get_view', { doc: null });
         if (v && typeof v === 'object' && 'budget' in v) {
           state.view = v;
           render();
@@ -122,11 +138,13 @@ async function refresh() {
 function setSelection(sel) {
   if (!sel || typeof sel !== 'object') return;
   state.selection = sel;
-  // The Notes tab reads the line from the account on screen: fetch it when
-  // the main window moved to another account.
+  // Another budget came to the front, or (the Notes tab reads the line from
+  // the account on screen) the main window moved to another account: fetch
+  // the view.
   const a = sel.account;
   const shown = state.view && state.view.account;
-  if (sel.level === 'details' && a && (!shown || shown.code !== a.code)) refresh();
+  const otherDoc = state.view && typeof sel.doc === 'number' && sel.doc !== state.view.doc;
+  if (otherDoc || (sel.level === 'details' && a && (!shown || shown.code !== a.code))) refresh();
   document.dispatchEvent(new CustomEvent('fwb:selection'));
   document.dispatchEvent(new CustomEvent('fwb:cursor'));
 }
@@ -167,11 +185,13 @@ function onMenu(id) {
     showTab(id.slice('view.tab.'.length));
     return;
   }
-  // A grid key while typing in a field was meant for the field.
+  // A grid key while typing in a field was meant for the field (the budget
+  // tab keys mean nothing there, so they go on).
   const sc = shortcutById(id);
-  if (sc && sc.scope === 'grid' && inField) return;
-  // Close Window here (Ctrl+W on Windows and Linux) docks the panel back.
-  if (id === 'file.close') {
+  if (sc && sc.scope === 'grid' && inField && !sc.anywhere) return;
+  // Close Window or Close Tab here (Ctrl+W on Windows and Linux) closes this
+  // window, which docks the panel back.
+  if (id === 'file.close' || id === 'file.close_tab') {
     emitTo('main', 'tools-position', 'right');
     return;
   }
@@ -190,9 +210,10 @@ function onKeyDown(e) {
     onMenu(sc.id);
     return;
   }
-  // Grid commands: a text field keeps its keys; otherwise the main window's
-  // grid gets them (cancelled here so the menu bar doesn't run them twice).
-  if (inField) return;
+  // Grid commands: a text field keeps its keys (but for the budget tab keys);
+  // otherwise the main window's grid gets them (cancelled here so the menu
+  // bar doesn't run them twice).
+  if (inField && !sc.anywhere) return;
   e.preventDefault();
   onMenu(sc.id);
 }
@@ -225,7 +246,7 @@ async function start() {
   }
   await listen();
   try {
-    state.view = await invoke('get_view');
+    state.view = await invoke('get_view', { doc: null });
   } catch (e) {
     toast(e);
   }

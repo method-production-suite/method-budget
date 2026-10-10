@@ -10,7 +10,6 @@ const COMMANDS: &[&str] = &[
     "get_view",
     "get_full_view",
     "focus_account",
-    "new_budget",
     "open_budget",
     "save_budget",
     "undo",
@@ -98,6 +97,12 @@ const COMMANDS: &[&str] = &[
     "tools_window",
     "close_tools_window",
     "notes_list",
+    // Budgets as tabs (src/tabs.rs)
+    "new_tab",
+    "switch_tab",
+    "move_tab",
+    "close_tab",
+    "list_tabs",
 ];
 
 fn main() {

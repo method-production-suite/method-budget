@@ -3,7 +3,8 @@
 // fails if the two drift apart, so keep one entry per line.
 //
 // Keys are written once for both platforms: `mod` is Command on macOS and Ctrl
-// on Windows and Linux; `alt` is Option on macOS. An entry with `mac` and
+// on Windows and Linux; `alt` is Option on macOS; `ctrl` is the Control key
+// everywhere (so Ctrl on Windows and Linux too). An entry with `mac` and
 // `other` instead of `keys` differs by platform; a list gives alternatives
 // (the first is the one menus show).
 //
@@ -21,18 +22,22 @@
 //               select its text) instead of the budget.
 // text: true    The keys also mean something in a text field (move the caret,
 //               delete a word), so a text field keeps them.
+// anywhere: true  A grid command that also works from a text field outside
+//               the grid (a tools panel field): the keys mean nothing there.
 
 import { isMac } from './dom.js';
 
 export const SHORTCUTS = [
   // File
-  { id: 'file.new', group: 'File', label: 'New budget', keys: 'mod+n', scope: 'app' },
-  { id: 'file.open', group: 'File', label: 'Open a budget', keys: 'mod+o', scope: 'app' },
+  { id: 'file.new', group: 'File', label: 'New budget (in a new tab)', keys: 'mod+n', scope: 'app' },
+  { id: 'file.new_tab', group: 'File', label: 'New tab (a new budget)', keys: 'mod+t', scope: 'app' },
+  { id: 'file.open', group: 'File', label: 'Open a budget (in a new tab)', keys: 'mod+o', scope: 'app' },
   { id: 'file.save', group: 'File', label: 'Save', keys: 'mod+s', scope: 'app' },
   { id: 'file.save_as', group: 'File', label: 'Save as a new file', keys: 'mod+shift+s', scope: 'app' },
   { id: 'file.print_budget', group: 'File', label: 'Print the budget (topsheet and detail)', keys: 'mod+p', scope: 'app' },
   { id: 'file.print_topsheet', group: 'File', label: 'Print the topsheet', keys: 'mod+shift+p', scope: 'app' },
-  { id: 'file.close', group: 'File', label: 'Close the window', keys: 'mod+w', scope: 'app' },
+  { id: 'file.close_tab', group: 'File', label: 'Close the budget tab (the window, when it is the last one)', keys: 'mod+w', scope: 'app' },
+  { id: 'file.close', group: 'File', label: 'Close the window (every tab)', keys: 'mod+shift+w', scope: 'app' },
   { id: 'app.quit', group: 'File', label: 'Quit', keys: 'mod+q', scope: 'app' },
 
   // Edit
@@ -124,12 +129,20 @@ export const SHORTCUTS = [
   { id: 'tools.tab_keys', group: 'View', label: 'Tools tabs: the previous or next tab in the pane', keys: ['left', 'right'], scope: 'builtin' },
   { id: 'tools.move_tab', group: 'View', label: 'Tools tabs: move the tab left or right, or to the other pane', keys: ['alt+shift+left', 'alt+shift+right', 'alt+shift+up', 'alt+shift+down'], scope: 'builtin' },
 
+  // Window: budgets open as tabs (tabs.js). Cmd+3 to Cmd+9 are the tools tabs.
+  { id: 'window.next_tab', group: 'Window', label: 'Next budget tab', keys: ['mod+shift+]', 'ctrl+tab'], scope: 'grid', anywhere: true },
+  { id: 'window.prev_tab', group: 'Window', label: 'Previous budget tab', keys: ['mod+shift+[', 'ctrl+shift+tab'], scope: 'grid', anywhere: true },
+  { id: 'window.first_tab', group: 'Window', label: 'First budget tab', keys: 'mod+1', scope: 'grid', anywhere: true },
+  { id: 'window.second_tab', group: 'Window', label: 'Second budget tab', keys: 'mod+2', scope: 'grid', anywhere: true },
+  { id: 'tabs.keys', group: 'Window', label: 'On a budget tab: the previous or next tab (also Home, End)', keys: ['left', 'right'], scope: 'builtin' },
+  { id: 'tabs.move', group: 'Window', label: 'On a budget tab: move it left or right (or drag it)', keys: ['alt+shift+left', 'alt+shift+right'], scope: 'builtin' },
+
   // Help
   { id: 'help.shortcuts', group: 'Help', label: 'Show this list of shortcuts', keys: 'mod+shift+/', scope: 'app' },
 ];
 
 /** Groups in the order the shortcut sheet shows them. */
-export const GROUPS = ['File', 'Edit', 'Cells', 'Insert', 'Format', 'Go', 'View', 'Help'];
+export const GROUPS = ['File', 'Edit', 'Cells', 'Insert', 'Format', 'Go', 'View', 'Window', 'Help'];
 
 /** On macOS the native menu answers `app` keys; elsewhere main.js does. */
 export const menuRunsAppKeys = isMac;
@@ -190,7 +203,7 @@ const PC_NAMES = {
 function parse(spec) {
   const parts = spec.toLowerCase().split('+');
   const key = parts.pop();
-  return { key, mod: parts.includes('mod'), shift: parts.includes('shift'), alt: parts.includes('alt') };
+  return { key, mod: parts.includes('mod'), ctrl: parts.includes('ctrl'), shift: parts.includes('shift'), alt: parts.includes('alt') };
 }
 
 /** One key spec for display: "⇧⌘S" on a Mac, "Ctrl+Shift+S" elsewhere. */
@@ -198,11 +211,11 @@ export function keyText(spec) {
   const p = parse(spec);
   if (isMac) {
     const k = MAC_NAMES[p.key] || p.key.toUpperCase();
-    return (p.alt ? '⌥' : '') + (p.shift ? '⇧' : '') + (p.mod ? '⌘' : '') + k;
+    return (p.ctrl ? '⌃' : '') + (p.alt ? '⌥' : '') + (p.shift ? '⇧' : '') + (p.mod ? '⌘' : '') + k;
   }
   const k = PC_NAMES[p.key] || p.key.toUpperCase();
   const mods = [];
-  if (p.mod) mods.push('Ctrl');
+  if (p.mod || p.ctrl) mods.push('Ctrl');
   if (p.alt) mods.push('Alt');
   if (p.shift) mods.push('Shift');
   return [...mods, k].join('+');
@@ -271,9 +284,12 @@ function keyMatches(e, k) {
 /** True when a key event is exactly this spec (no extra modifiers). */
 export function matches(e, spec) {
   const p = parse(spec);
-  const mod = isMac ? e.metaKey : e.ctrlKey;
-  const stray = isMac ? e.ctrlKey : e.metaKey;
-  if (stray || mod !== p.mod || e.shiftKey !== p.shift || e.altKey !== p.alt) return false;
+  if (isMac) {
+    if (e.metaKey !== p.mod || e.ctrlKey !== p.ctrl) return false;
+  } else if (e.metaKey || e.ctrlKey !== (p.mod || p.ctrl)) {
+    return false;
+  }
+  if (e.shiftKey !== p.shift || e.altKey !== p.alt) return false;
   // AltGr (Ctrl+Alt on Windows) types characters on many layouts; never a shortcut.
   if (typeof e.getModifierState === 'function' && e.getModifierState('AltGraph')) return false;
   return keyMatches(e, p.key);
