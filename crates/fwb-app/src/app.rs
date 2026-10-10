@@ -43,14 +43,20 @@ pub(crate) fn window_title(s: &Session) -> String {
     format!("{}{edited} - {APP_NAME}", s.display_name())
 }
 
-/// The view after a command, with the native title kept in sync.
+/// The view after a command, with the main window's title kept in sync
+/// (whichever window sent the command), and the other windows told when the
+/// budget changed (src/tools.rs).
 pub(crate) fn finish<R: Runtime>(
     window: &WebviewWindow<R>,
     s: &mut Session,
     created: Option<RowId>,
 ) -> View {
-    let _ = window.set_title(&window_title(s));
-    s.view_with(created)
+    if let Some(main) = window.app_handle().get_webview_window(crate::tools::MAIN) {
+        let _ = main.set_title(&window_title(s));
+    }
+    let view = s.view_with(created);
+    crate::tools::changed(window, view.rev);
+    view
 }
 
 fn apply<R: Runtime, T>(
@@ -765,7 +771,9 @@ pub fn run() {
         .plugin(nav_guard)
         .manage(AppState::default())
         // The row clipboard: one for the app, shared by every budget (src/clipboard.rs).
-        .manage(crate::clipboard::ClipboardState::default());
+        .manage(crate::clipboard::ClipboardState::default())
+        // Which budget change the other window has heard about (src/tools.rs).
+        .manage(crate::tools::Broadcast::default());
 
     // The menu bar (src/menu.rs). Quit asks about unsaved changes first, like
     // closing the window; every other item goes to menu::handle.
@@ -785,18 +793,32 @@ pub fn run() {
 
     builder
         .on_window_event(|window, event| {
-            // Leaving the window autosaves now rather than in a few seconds.
+            // The tools window: remember where it is, dock the panel back when
+            // it closes, and close it with the main window (src/tools.rs).
+            crate::tools::on_window_event(window, event);
+            // Leaving the app autosaves now rather than in a few seconds.
+            // Going from the main window to the tools window (or back) isn't
+            // leaving: focus lands on the other window a moment later.
             if let tauri::WindowEvent::Focused(false) = event {
                 let app = window.app_handle().clone();
-                std::thread::spawn(move || crate::safety_app::autosave_now(&app, true));
+                std::thread::spawn(move || {
+                    std::thread::sleep(crate::tools::FOCUS_SETTLE);
+                    if !crate::tools::app_in_front(&app) {
+                        crate::safety_app::autosave_now(&app, true);
+                    }
+                });
             }
             // Back in the window: ask now if the file changed outside meanwhile.
             if let tauri::WindowEvent::Focused(true) = event {
                 let app = window.app_handle().clone();
                 std::thread::spawn(move || crate::safety_app::check_external(&app));
             }
+            // Only the main window asks about unsaved changes; closing the
+            // tools window just docks the panel.
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.state::<AppState>().lock().is_dirty() {
+                if window.label() == crate::tools::MAIN
+                    && window.state::<AppState>().lock().is_dirty()
+                {
                     api.prevent_close();
                     let w = window.clone();
                     confirm_discard(window.app_handle(), move || {
@@ -893,6 +915,10 @@ pub fn run() {
             crate::safety_app::restore_backup,
             crate::safety_app::reveal_backups,
             crate::safety_app::resolve_external_change,
+            // The tools panel's own window and its Notes tab (src/tools.rs)
+            crate::tools::tools_window,
+            crate::tools::close_tools_window,
+            crate::tools::notes_list,
         ])
         .setup(|app| {
             if let Some(w) = app.get_webview_window("main") {

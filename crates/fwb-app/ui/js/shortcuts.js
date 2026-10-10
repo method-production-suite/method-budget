@@ -100,22 +100,29 @@ export const SHORTCUTS = [
   { id: 'go.next_account', group: 'Go', label: 'Next account', keys: ['mod+right', 'mod+]'], scope: 'grid', text: true },
   { id: 'go.prev_account', group: 'Go', label: 'Previous account', keys: ['mod+left', 'mod+['], scope: 'grid', text: true },
 
-  // View
-  { id: 'view.toggle_panel', group: 'View', label: 'Show or hide the setup panel', keys: 'mod+alt+s', scope: 'app' },
-  // Setup tabs take the keys long-time users of other budgeting tools have in
+  // View: the tools panel (tools.js), wherever it is
+  { id: 'view.toggle_panel', group: 'View', label: 'Show or hide the tools panel (docked or in its window)', keys: 'mod+alt+s', scope: 'app' },
+  { id: 'view.panel.right', group: 'View', label: 'Dock the tools panel at the right', scope: 'menu' },
+  { id: 'view.panel.bottom', group: 'View', label: 'Dock the tools panel at the bottom', scope: 'menu' },
+  { id: 'view.panel.window', group: 'View', label: 'Pop the tools panel out into its own window', scope: 'menu' },
+  // Tools tabs take the keys long-time users of other budgeting tools have in
   // their hands (decisions.md, entry 15).
-  { id: 'view.tab.globals', group: 'View', label: 'Setup: Globals', keys: 'mod+g', scope: 'app' },
-  { id: 'view.tab.fringes', group: 'View', label: 'Setup: Fringes', keys: 'mod+3', scope: 'app' },
-  { id: 'view.tab.groups', group: 'View', label: 'Setup: Groups', keys: 'mod+4', scope: 'app' },
-  { id: 'view.tab.units', group: 'View', label: 'Setup: Units', keys: 'mod+7', scope: 'app' },
-  { id: 'view.tab.currencies', group: 'View', label: 'Setup: Currencies', keys: 'mod+6', scope: 'app' },
-  { id: 'view.tab.sets', group: 'View', label: 'Setup: Sets', keys: 'mod+8', scope: 'app' },
-  { id: 'view.tab.locations', group: 'View', label: 'Setup: Locations', keys: 'mod+5', scope: 'app' },
-  { id: 'view.tab.charges', group: 'View', label: 'Setup: Charges', keys: 'mod+/', scope: 'app' },
-  { id: 'view.tab.credits', group: 'View', label: 'Setup: Credits', keys: 'mod+backslash', scope: 'app' },
-  { id: 'view.tab.info', group: 'View', label: 'Setup: Info', scope: 'menu' },
-  { id: 'view.tab.settings', group: 'View', label: 'Setup: Settings (budget preferences)', keys: 'mod+9', scope: 'app' },
-  { id: 'view.tab.baseline', group: 'View', label: 'Setup: Baseline', scope: 'menu' },
+  { id: 'view.tab.fringes', group: 'View', label: 'Tools: Fringes', keys: 'mod+3', scope: 'app' },
+  { id: 'view.tab.groups', group: 'View', label: 'Tools: Groups', keys: 'mod+4', scope: 'app' },
+  { id: 'view.tab.globals', group: 'View', label: 'Tools: Globals', keys: 'mod+g', scope: 'app' },
+  { id: 'view.tab.units', group: 'View', label: 'Tools: Units', keys: 'mod+7', scope: 'app' },
+  { id: 'view.tab.sets', group: 'View', label: 'Tools: Sets', keys: 'mod+8', scope: 'app' },
+  { id: 'view.tab.locations', group: 'View', label: 'Tools: Locations', keys: 'mod+5', scope: 'app' },
+  { id: 'view.tab.currencies', group: 'View', label: 'Tools: Currency', keys: 'mod+6', scope: 'app' },
+  { id: 'view.tab.notes', group: 'View', label: 'Tools: Notes (the line’s note, and every noted line)', scope: 'menu' },
+  { id: 'view.tab.charges', group: 'View', label: 'Tools: Budget, Charges', keys: 'mod+/', scope: 'app' },
+  { id: 'view.tab.credits', group: 'View', label: 'Tools: Budget, Credits', keys: 'mod+backslash', scope: 'app' },
+  { id: 'view.tab.info', group: 'View', label: 'Tools: Budget, Info', scope: 'menu' },
+  { id: 'view.tab.settings', group: 'View', label: 'Tools: Budget, Settings (budget preferences)', keys: 'mod+9', scope: 'app' },
+  { id: 'view.tab.baseline', group: 'View', label: 'Tools: Budget, Baseline', scope: 'menu' },
+  // The tools panel's tab strips (tools.js).
+  { id: 'tools.tab_keys', group: 'View', label: 'Tools tabs: the previous or next tab in the pane', keys: ['left', 'right'], scope: 'builtin' },
+  { id: 'tools.move_tab', group: 'View', label: 'Tools tabs: move the tab left or right, or to the other pane', keys: ['alt+shift+left', 'alt+shift+right', 'alt+shift+up', 'alt+shift+down'], scope: 'builtin' },
 
   // Help
   { id: 'help.shortcuts', group: 'Help', label: 'Show this list of shortcuts', keys: 'mod+shift+/', scope: 'app' },

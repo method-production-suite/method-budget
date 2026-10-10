@@ -1,29 +1,31 @@
-// Apply panel: what the selected lines carry, and a click to change it.
+// The apply lists: fringes, groups, sets, locations and currencies, each one
+// a tab of the tools panel (tools.js) that is both the item's setup table and
+// the way to put items on the selected lines.
 //
-// The first section of the side panel. For fringes, groups, sets, locations
-// and currencies it lists every defined item with a three-state checkbox that
-// reflects the grid's selection (every selected line has it, some do, none
-// do) and the item's dollars within the selection. Clicking adds the item to
-// every selected line, or takes it off when they all have it. Sets,
-// locations and currencies are one per line: picking one replaces the
-// line's old value. Fringe ranges are made and removed here too.
+// Every defined item is listed with a three-state checkbox that reflects the
+// grid's selection (every selected line has it, some do, none do) and the
+// item's dollars within the selection. A click on the checkbox (or Space)
+// adds the item to every selected line, or takes it off when they all have
+// it. Sets, locations and currencies are one per line: picking one replaces
+// the line's old value. A click on the item's name only selects it; a
+// double-click on the name (or Enter or F2) edits the item in a small form
+// next to it, Delete removes it (after asking), and the row at the bottom of
+// each list adds a new one. Fringe ranges are made and removed at the foot of
+// the fringe list.
 //
 // On the topsheet and the account list, the selection is every line under
 // the selected categories or accounts. Rust resolves that (apply_summary) and
 // returns the row ids, which the edit commands then take, so a click acts on
 // exactly the rows the panel shows.
 //
-// Double-clicking an item (or Enter or F2 on it) opens a small editor for the
-// item itself, next to it: a fringe's kind, rate, cutoff or unit and
-// description; a group's description, color and "counts in the total"; a
-// set's, location's or currency's details. Saving is one command, so one undo
-// step. A double-click's first click has already toggled the item, so the
-// double-click undoes that toggle first (only if nothing else changed since).
-//
-// setup.js mounts the panel with renderApply(host, view, ctx); main.js fires
-// a "fwb:selection" event on the document when the grid selection changes.
-// Budget text only reaches the page through textContent (dom.js el()), and
-// styling is classes from apply.css: no inline styles, no innerHTML.
+// tools.js calls applyView() on every render, then mounts what it shows:
+// applyHeadHost() (what is selected, with its totals) and applyListHost(id)
+// for each list tab on screen. A fresh summary redraws just those. ctx.call
+// runs a command (main.js's, or the tools window's own) and ctx.selection()
+// gives the grid's selection; a "fwb:selection" event on the document says it
+// changed. Budget text only reaches the page through textContent (dom.js
+// el()), and styling is classes from apply.css: no inline styles, no
+// innerHTML.
 
 import { invoke } from './api.js';
 import { el } from './dom.js';
@@ -35,6 +37,7 @@ const LISTS = [
   {
     id: 'fringes',
     label: 'Fringes',
+    what: 'fringe',
     field: 'fringes',
     multi: true,
     defs: (b) => b.fringes,
@@ -45,6 +48,7 @@ const LISTS = [
   {
     id: 'groups',
     label: 'Groups',
+    what: 'group',
     field: 'groups',
     multi: true,
     defs: (b) => b.groups,
@@ -54,7 +58,8 @@ const LISTS = [
   },
   {
     id: 'sets',
-    label: 'Set',
+    label: 'Sets',
+    what: 'set',
     field: 'set',
     multi: false,
     defs: (b) => b.sets,
@@ -64,7 +69,8 @@ const LISTS = [
   },
   {
     id: 'locations',
-    label: 'Location',
+    label: 'Locations',
+    what: 'location',
     field: 'location',
     multi: false,
     defs: (b) => b.locations,
@@ -75,6 +81,7 @@ const LISTS = [
   {
     id: 'currencies',
     label: 'Currency',
+    what: 'currency',
     field: 'currency',
     multi: false,
     defs: (b) => b.currencies,
@@ -84,11 +91,13 @@ const LISTS = [
   },
 ];
 
+/** The tools panel tabs this file draws. */
+export const APPLY_LISTS = LISTS.map((l) => l.id);
+
 const ARIA = { all: 'true', some: 'mixed', none: 'false' };
 const DEBOUNCE_MS = 60;
 
 const st = {
-  host: null,
   view: null,
   ctx: null,
   gen: 0, // bumped for every new view
@@ -102,18 +111,40 @@ const st = {
   error: '',
   filters: {},
   onlyApplied: {},
-  closed: new Set(),
-  lastToggle: null, // { key, at, done }: the latest click's toggle, for a double-click to undo
+  selected: {}, // list id -> the item name last clicked (highlighted)
+  heads: [], // mounted head hosts
+  lists: new Map(), // list id -> mounted host
 };
 
-/** Draws the panel into `host` and asks Rust for fresh numbers. */
-export function renderApply(host, view, ctx) {
+/**
+ * A new render of the tools panel: the view and context it draws from. The
+ * hosts it mounts next are drawn at once and redrawn when numbers arrive.
+ */
+export function applyView(view, ctx) {
   if (view !== st.view) st.gen += 1;
-  st.host = host;
   st.view = view && typeof view === 'object' ? view : {};
   st.ctx = ctx || {};
-  draw();
+  st.heads = [];
+  st.lists = new Map();
   schedule();
+}
+
+/** A host showing what is selected and its totals (the panel's header). */
+export function applyHeadHost() {
+  const host = el('div', { class: 'apply-head-host' });
+  st.heads.push(host);
+  drawHead(host);
+  return host;
+}
+
+/** A host showing list `id` (a tab's content). */
+export function applyListHost(id) {
+  const list = LISTS.find((l) => l.id === id);
+  const host = el('div', { class: 'apply apply-tab', attrs: { 'aria-busy': st.busy ? 'true' : 'false' } });
+  if (!list) return host;
+  st.lists.set(id, host);
+  drawList(host, list);
+  return host;
 }
 
 document.addEventListener('fwb:selection', () => {
@@ -133,6 +164,10 @@ function str(v) {
 
 function budget() {
   return obj(st.view && st.view.budget);
+}
+
+function report() {
+  return obj(st.view && st.view.report);
 }
 
 function byteOrder(a, b) {
@@ -156,8 +191,12 @@ function twoPlaces(s) {
   return `${m[1]}${m[2]}.${(m[3] || '').padEnd(2, '0').slice(0, 2)}`;
 }
 
+function mounted() {
+  return [...st.heads, ...st.lists.values()].filter((h) => h.isConnected);
+}
+
 function visible() {
-  return Boolean(st.host && st.host.isConnected && !st.host.closest('[hidden]'));
+  return mounted().some((h) => !h.closest('[hidden]'));
 }
 
 function stateOf(count, eligible) {
@@ -170,6 +209,22 @@ function tally(s, list, name) {
   return t ? { count: Number(t.count) || 0, total: t.total } : { count: 0, total: 0 };
 }
 
+function itemKey(listId, name) {
+  return `apply:item:${listId}:${name}`;
+}
+
+function addKey(listId) {
+  return `apply:add:${listId}`;
+}
+
+function byKey(key) {
+  for (const h of mounted()) {
+    const found = [...h.querySelectorAll('[data-key]')].find((e) => e.dataset.key === key);
+    if (found) return found;
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // The selection
 
@@ -180,10 +235,10 @@ function tally(s, list, name) {
  */
 function scope() {
   const out = { rowIds: [], accounts: [], categories: [] };
-  const sel = typeof st.ctx.selection === 'function' ? st.ctx.selection() : null;
+  const sel = st.ctx && typeof st.ctx.selection === 'function' ? st.ctx.selection() : null;
   if (!sel || !Array.isArray(sel.keys)) return out;
   const top = Array.isArray(budget().topsheet) ? budget().topsheet : [];
-  const index = (k, prefix) => (k.startsWith(prefix) ? Number(k.slice(prefix.length)) : NaN);
+  const index = (k, prefix) => (typeof k === 'string' && k.startsWith(prefix) ? Number(k.slice(prefix.length)) : NaN);
   if (sel.level === 'details') {
     out.rowIds = sel.keys.map((k) => index(k, 'r')).filter(Number.isSafeInteger);
   } else if (sel.level === 'accounts') {
@@ -208,7 +263,7 @@ function sigOf(sc) {
   return JSON.stringify(sc);
 }
 
-/** "All lines in 13 Cast", "All lines in 3 accounts", "4 rows". */
+/** "All lines in 13 Cast", "All lines in 3 accounts", "4 rows selected". */
 function scopeLabel(sc, s) {
   const top = Array.isArray(budget().topsheet) ? budget().topsheet : [];
   const named = (x) => `${str(x.code)} ${str(x.name)}`.trim();
@@ -237,7 +292,7 @@ function schedule(ms = DEBOUNCE_MS) {
 }
 
 async function fetchSummary() {
-  if (!st.host) return;
+  if (!visible()) return;
   const sc = scope();
   const sig = sigOf(sc);
   const gen = st.gen;
@@ -266,8 +321,18 @@ async function freshSummary() {
   return st.summary && st.summarySig === sig ? st.summary : null;
 }
 
+/** The summary to draw from: it describes the current selection, else none yet. */
+function shownSummary() {
+  return st.summary && st.summarySig === sigOf(scope()) ? st.summary : null;
+}
+
 // ---------------------------------------------------------------------------
 // Edits
+
+function call(cmd, args) {
+  if (!st.ctx || typeof st.ctx.call !== 'function') return Promise.reject('Not connected');
+  return st.ctx.call(cmd, args);
+}
 
 /**
  * Runs one edit: `plan(summary)` returns [command, args, patched summary] or
@@ -288,8 +353,7 @@ async function act(plan) {
       st.summary = patched;
       draw();
     }
-    if (typeof st.ctx.call !== 'function') throw new Error('Not connected');
-    const v = await st.ctx.call(cmd, args);
+    const v = await call(cmd, args);
     return v && v.rev !== undefined ? v.rev : null;
   } catch (e) {
     st.error = errText(e);
@@ -355,7 +419,7 @@ function nextId() {
 
 function captureFocus() {
   const a = document.activeElement;
-  if (!a || !st.host || !st.host.contains(a) || !a.dataset || !a.dataset.key) return null;
+  if (!a || !a.dataset || !a.dataset.key || !mounted().some((h) => h.contains(a))) return null;
   const info = { key: a.dataset.key };
   if (typeof a.selectionStart === 'number') {
     info.start = a.selectionStart;
@@ -366,7 +430,7 @@ function captureFocus() {
 
 function restoreFocus(info) {
   if (!info) return;
-  const target = [...st.host.querySelectorAll('[data-key]')].find((e) => e.dataset.key === info.key);
+  const target = byKey(info.key);
   if (!target) return;
   target.focus({ preventScroll: true });
   if (info.start !== undefined && typeof target.setSelectionRange === 'function') {
@@ -394,57 +458,47 @@ function button(text, cls, key, onClick, { label = '', title = '', enabled = tru
   return b;
 }
 
+/** Redraws every mounted host (new numbers, a new filter, busy or not). */
 function draw() {
-  const host = st.host;
-  if (!host) return;
-  uid = 0;
   const focus = captureFocus();
-  const s = st.summary;
-  // Label and numbers change together: both describe the summary's selection
-  // (the current one only until the first summary arrives).
-  const sc = s && st.summaryScope ? st.summaryScope : scope();
-  const root = el('div', { class: 'apply', attrs: { 'aria-busy': st.busy ? 'true' : 'false' } });
-  root.append(head(sc, s));
-  if (st.error) root.append(el('p', { class: 'setup-error apply-error', text: st.error, attrs: { role: 'alert' } }));
-  if (s && s.rows.length) {
-    for (const list of LISTS) root.append(section(list, s));
+  for (const h of st.heads) if (h.isConnected) drawHead(h);
+  for (const [id, h] of st.lists) {
+    const list = LISTS.find((l) => l.id === id);
+    if (h.isConnected && list) drawList(h, list);
   }
-  host.replaceChildren(root);
   restoreFocus(focus);
 }
 
-function head(sc, s) {
-  const box = el('div', { class: 'apply-head' });
+function drawHead(host) {
+  const s = shownSummary();
+  // Label and numbers change together: both describe the summary's selection
+  // (the current one only until the first summary arrives).
+  const sc = s && st.summaryScope ? st.summaryScope : scope();
   const nothing = !sc.rowIds.length && !sc.accounts.length && !sc.categories.length;
+  const box = el('div', { class: 'apply-head' });
   if (nothing) {
     box.append(
       el('p', { class: 'apply-scope', text: 'Nothing selected' }),
-      el('p', {
-        class: 'apply-hint',
-        text: 'Select lines in the grid, or a category or account, to see and change their fringes, groups, set, location and currency.',
-      }),
+      el('p', { class: 'apply-hint', text: 'Select lines, an account or a category to apply items to them.' }),
     );
-    return box;
-  }
-  if (s && !s.rows.length) {
+  } else if (s && !s.rows.length) {
     box.append(
       el('p', { class: 'apply-scope', text: scopeLabel(sc, s) }),
       el('p', { class: 'apply-hint', text: 'There are no lines here yet.' }),
     );
-    return box;
-  }
-  box.append(el('p', { class: 'apply-scope', text: scopeLabel(sc, s) }));
-  if (s) {
-    const t = obj(obj(s.totals).lines);
+  } else {
+    box.append(el('p', { class: 'apply-scope', text: scopeLabel(sc, s), title: scopeLabel(sc, s) }));
+    const t = obj(obj(s && s.totals).lines);
     const stats = el('p', { class: 'apply-stats' });
     stats.append(
-      stat('Lines', money(t.details_total)),
-      stat('Fringes', money(t.fringe_total)),
-      stat('Effective', s.fringe_percent === null ? 'n/a' : `${twoPlaces(s.fringe_percent)}%`, 'Fringe dollars as a percent of the line totals'),
+      stat('Lines', s ? money(t.details_total) : ''),
+      stat('Fringes', s ? money(t.fringe_total) : ''),
+      stat('Effective', !s ? '' : s.fringe_percent === null ? 'n/a' : `${twoPlaces(s.fringe_percent)}%`, 'Fringe dollars as a percent of the line totals'),
     );
     box.append(stats);
   }
-  return box;
+  if (st.error) box.append(el('p', { class: 'setup-error apply-error', text: st.error, attrs: { role: 'alert' } }));
+  host.replaceChildren(box);
 }
 
 function stat(label, value, title = '') {
@@ -456,51 +510,19 @@ function stat(label, value, title = '') {
   );
 }
 
-function section(list, s) {
+/** An empty summary: nothing selected (or not known yet), so nothing can be applied. */
+const NO_SUMMARY = { rows: [], lines: 0, costed: 0, in_range: 0, range_blocked: '', fringe_percent: null, totals: {} };
+
+function drawList(host, list) {
+  const s = shownSummary() || NO_SUMMARY;
   const defs = obj(list.defs(budget()));
   const names = Object.keys(defs).sort(byteOrder);
   const eligible = Number(list.eligible(s)) || 0;
-  const open = !st.closed.has(list.id);
-  const bodyId = nextId();
-  const applied = names.filter((n) => tally(s, list.id, n).count > 0).length;
+  host.setAttribute('aria-busy', st.busy ? 'true' : 'false');
+  const parts = [];
 
-  const sec = el('section', { class: 'apply-list', attrs: { 'aria-label': list.label } });
-  const toggleBtn = el(
-    'button',
-    {
-      class: 'apply-fold',
-      attrs: { type: 'button', 'aria-expanded': String(open), 'aria-controls': bodyId },
-      data: { key: `apply:fold:${list.id}`, nobusy: '1' },
-      on: {
-        click: () => {
-          if (st.closed.has(list.id)) st.closed.delete(list.id);
-          else st.closed.add(list.id);
-          draw();
-        },
-      },
-    },
-    el('span', { class: 'apply-fold-mark', attrs: { 'aria-hidden': 'true' } }),
-    el('span', { class: 'apply-title', text: list.label }),
-    applied ? el('span', { class: 'apply-badge', text: String(applied), title: `${plural(applied, 'item', 'items')} on the selection` }) : null,
-  );
-  const edit = button('Edit', 'apply-link', `apply:edit:${list.id}`, () => st.ctx.setTab && st.ctx.setTab(list.id), {
-    label: `Edit the ${list.label.toLowerCase()} list`,
-    title: `Open the ${list.label.toLowerCase()} setup tab`,
-  });
-  edit.removeAttribute('aria-disabled'); // switching tabs is never busy
-  sec.append(el('div', { class: 'apply-list-head' }, toggleBtn, edit));
-
-  const body = el('div', { class: 'apply-body', attrs: { id: bodyId } });
-  body.hidden = !open;
-  sec.append(body);
-  if (!open) return sec;
-
-  if (!names.length) {
-    body.append(el('p', { class: 'setup-empty', text: `${list.none} Add them under Edit.` }));
-    return sec;
-  }
-  body.append(tools(list, s, eligible));
-  if (!eligible) body.append(el('p', { class: 'apply-hint', text: list.noTakers }));
+  if (names.length) parts.push(tools(list, s, eligible));
+  if (names.length && s.rows.length && !eligible) parts.push(el('p', { class: 'apply-hint', text: list.noTakers }));
 
   const q = str(st.filters[list.id]).trim().toLowerCase();
   const only = Boolean(st.onlyApplied[list.id]);
@@ -509,14 +531,14 @@ function section(list, s) {
     if (only && tally(s, list.id, n).count === 0) return false;
     return !q || n.toLowerCase().includes(q) || str(def.description).toLowerCase().includes(q);
   });
-  const ul = el('ul', { class: 'apply-items', attrs: { 'aria-label': list.label } });
+  const ul = el('ul', { class: 'apply-items', attrs: { 'aria-label': list.label }, data: { list: list.id } });
   for (const n of shown) ul.append(item(list, s, n, obj(defs[n]), eligible));
-  body.append(ul);
-  if (!shown.length) {
-    body.append(el('p', { class: 'setup-empty', text: only ? 'None of these are on the selection.' : 'Nothing matches the filter.' }));
-  }
-  if (list.id === 'fringes') body.append(fringeFoot(s));
-  return sec;
+  ul.append(addRow(list));
+  if (!names.length) parts.push(el('p', { class: 'setup-empty', text: list.none }));
+  else if (!shown.length) parts.push(el('p', { class: 'setup-empty', text: only ? 'None of these are on the selection.' : 'Nothing matches the filter.' }));
+  parts.push(ul);
+  if (list.id === 'fringes' && s.rows.length) parts.push(fringeFoot(s));
+  host.replaceChildren(...parts);
 }
 
 function tools(list, s, eligible) {
@@ -566,7 +588,7 @@ function tools(list, s, eligible) {
       list.id === 'currencies'
         ? tally(s, 'currencies', base).count < eligible
         : Object.keys(obj(s[list.id])).some((k) => tally(s, list.id, k).count > 0);
-    const what = list.label.toLowerCase();
+    const what = list.what;
     row.append(
       button('Clear', 'apply-pill', `apply:clear:${list.id}`, () => clearValue(list), {
         label: list.id === 'currencies' ? `Use the base currency on the selected lines` : `Clear the ${what} on the selected lines`,
@@ -578,6 +600,30 @@ function tools(list, s, eligible) {
   return row;
 }
 
+/** What an item adds up to across the whole budget, for its tooltip. */
+function budgetWide(list, name, def) {
+  const r = report();
+  if (list.id === 'fringes') {
+    const f = obj(r.fringes)[name];
+    if (!f) return '';
+    const uses = Number(f.uses) || 0;
+    return uses ? `Whole budget: ${plural(uses, 'line', 'lines')}, ${money(f.total)}` : 'Not used in the budget';
+  }
+  if (list.id === 'groups') {
+    const g = obj(obj(r.groups)[name]);
+    const bd = def.in_budget_total === false ? g.full : g.active;
+    if (!bd) return '';
+    const total = (Number(bd.details_total) || 0) + (Number(bd.fringe_total) || 0);
+    return `Whole budget: ${money(total)}${def.in_budget_total === false ? ', not in the total' : ''}`;
+  }
+  if (list.id === 'sets' || list.id === 'locations') {
+    const bd = obj(r[list.id])[name];
+    if (!bd) return 'Not used in the budget';
+    return `Whole budget: ${money((Number(bd.details_total) || 0) + (Number(bd.fringe_total) || 0))}`;
+  }
+  return '';
+}
+
 function item(list, s, name, def, eligible) {
   const t = tally(s, list.id, name);
   const state = stateOf(t.count, eligible);
@@ -587,22 +633,25 @@ function item(list, s, name, def, eligible) {
   const info = [];
   if (state === 'some') info.push(`on ${t.count} of ${plural(eligible, 'line', 'lines')}`);
   if (str(def.description)) info.push(str(def.description));
+  const key = itemKey(list.id, name);
+  const tip = [str(def.description), budgetWide(list, name, def), 'Click the box to apply; double-click the name to edit'].filter(Boolean).join('\n');
 
   const b = el(
     'button',
     {
       class: `apply-check${list.multi ? '' : ' apply-radio'}`,
-      title: str(def.description) || undefined,
+      title: tip,
       attrs: {
         type: 'button',
         role: 'checkbox',
         'aria-checked': ARIA[state],
         'aria-label': name,
         'aria-describedby': infoId,
+        'aria-keyshortcuts': 'Space Enter F2 Delete',
       },
-      data: { key: `apply:item:${list.id}:${name}`, nobusy: '1' },
+      data: { key, nobusy: '1' },
     },
-    el('span', { class: 'apply-box', attrs: { 'aria-hidden': 'true' } }),
+    el('span', { class: 'apply-boxhit', attrs: { 'aria-hidden': 'true' } }, el('span', { class: 'apply-box' })),
     el('span', { class: 'apply-name', text: name }),
     el('span', { class: 'apply-desc', text: str(def.description) }),
     state === 'some' ? el('span', { class: 'apply-count', text: `${t.count}/${eligible}`, attrs: { 'aria-hidden': 'true' } }) : null,
@@ -610,32 +659,79 @@ function item(list, s, name, def, eligible) {
     el('span', { class: 'setup-sr', text: [info.join('; '), amount].filter(Boolean).join('. '), attrs: { id: infoId } }),
   );
   if (!eligible || st.busy) b.setAttribute('aria-disabled', 'true');
-  const key = b.dataset.key;
   b.addEventListener('click', (e) => {
-    // The second click of a double-click opens the editor (below), no toggle.
-    if (e.detail > 1 || b.getAttribute('aria-disabled') === 'true') return;
-    st.lastToggle = { key, at: performance.now(), done: toggle(list, name) };
+    // The box (or Space) applies; a click on the name only selects the item.
+    const onBox = e.detail === 0 || (e.target instanceof Element && e.target.closest('.apply-boxhit'));
+    select(list.id, name, b);
+    if (!onBox || b.getAttribute('aria-disabled') === 'true') return;
+    toggle(list, name);
   });
   b.addEventListener('dblclick', (e) => {
+    // Two clicks on the box are two ticks, as with any checkbox.
+    if (e.target instanceof Element && e.target.closest('.apply-boxhit')) return;
     e.preventDefault();
-    undoToggle(key).then(() => editItem(list, name));
+    editItem(list, name);
   });
   b.addEventListener('keydown', (e) => {
-    if ((e.key === 'Enter' || e.key === 'F2') && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+    const plain = !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey;
+    if ((e.key === 'Enter' || e.key === 'F2') && plain) {
       e.preventDefault();
       editItem(list, name);
       return;
     }
-    const step = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
-    if (!step) return;
-    const items = [...b.closest('.apply-items').querySelectorAll('.apply-check')];
-    const next = items[items.indexOf(b) + step];
-    if (next) {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && plain) {
       e.preventDefault();
-      next.focus();
+      deleteItem(list, name);
+      return;
     }
+    moveFocus(e, b);
   });
-  return el('li', { class: `apply-item apply-${state}` }, b);
+  const li = el('li', { class: `apply-item apply-${state}` }, b);
+  if (st.selected[list.id] === name) li.classList.add('is-selected');
+  return li;
+}
+
+/** Up and Down (Home and End) move between a list's items and its add row. */
+function moveFocus(e, from) {
+  const ul = from.closest('.apply-items');
+  if (!ul) return;
+  const items = [...ul.querySelectorAll('.apply-check, .apply-add-btn')];
+  const i = items.indexOf(from);
+  let j = null;
+  if (e.key === 'ArrowDown') j = i + 1;
+  else if (e.key === 'ArrowUp') j = i - 1;
+  else if (e.key === 'Home') j = 0;
+  else if (e.key === 'End') j = items.length - 1;
+  if (j === null || !items[j]) return;
+  e.preventDefault();
+  const to = items[j];
+  const listId = ul.dataset.list;
+  const name = to.getAttribute('aria-label');
+  if (to.classList.contains('apply-check') && listId && name !== null) select(listId, name, to);
+  else to.focus();
+}
+
+/** Marks item `name` as the one picked in its list, without redrawing. */
+function select(listId, name, b) {
+  st.selected[listId] = name;
+  const ul = b.closest('.apply-items');
+  if (ul) for (const li of ul.querySelectorAll('.apply-item.is-selected')) li.classList.remove('is-selected');
+  const li = b.closest('.apply-item');
+  if (li) li.classList.add('is-selected');
+  if (document.activeElement !== b) b.focus({ preventScroll: true });
+}
+
+function addRow(list) {
+  const b = el('button', {
+    class: 'apply-add-btn',
+    text: `New ${list.what}…`,
+    title: `Add a ${list.what} to this budget`,
+    attrs: { type: 'button' },
+    data: { key: addKey(list.id), nobusy: '1' },
+    on: { click: () => addItem(list) },
+  });
+  b.addEventListener('keydown', (e) => moveFocus(e, b));
+  return el('li', { class: 'apply-add' }, b);
 }
 
 function fringeFoot(s) {
@@ -667,31 +763,7 @@ function fringeFoot(s) {
 }
 
 // ---------------------------------------------------------------------------
-// Editing an item in place: double-click, or Enter or F2 on it
-
-/**
- * The first click of a double-click toggled the item. Undoes that toggle, but
- * only when it was this item's, it went through, and nothing else has changed
- * the budget since (the view's rev is still the one the toggle produced).
- */
-async function undoToggle(key) {
-  const t = st.lastToggle;
-  st.lastToggle = null;
-  if (!t || t.key !== key || performance.now() - t.at > 2000) return;
-  const rev = await t.done;
-  if (rev === null || rev === undefined || !st.view || st.view.rev !== rev) return;
-  try {
-    await st.ctx.call('undo', {}, { revert: true });
-  } catch (e) {
-    st.error = errText(e);
-    draw();
-  }
-}
-
-function itemButton(key) {
-  if (!st.host) return null;
-  return [...st.host.querySelectorAll('.apply-check')].find((b) => b.dataset.key === key) || null;
-}
+// Editing, adding and deleting an item where it is listed
 
 /** Money typed as "176,000.00" or "(12.50)" as plain text for a command; null when blank. */
 function moneyText(s) {
@@ -715,56 +787,56 @@ function timeUnits(current) {
   return out;
 }
 
+const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)$/;
+
+function fringeFields(def) {
+  const base = str(budget().base_currency);
+  const unit = def.unit === undefined || def.unit === null ? '' : String(def.unit);
+  return [
+    { key: 'kind', label: 'Kind', type: 'select', options: [['percent', 'Percent of pay'], ['flat', 'Flat amount']], value: def.kind === 'flat' ? 'flat' : 'percent' },
+    { key: 'rate', label: 'Rate', value: str(def.rate), placeholder: '18.5', suffix: (v) => (v.kind === 'flat' ? base : '%') },
+    {
+      key: 'cutoff',
+      label: 'Cutoff (pay per earner)',
+      value: def.cutoff === undefined || def.cutoff === null ? '' : money(def.cutoff),
+      placeholder: 'None',
+      showIf: (v) => v.kind !== 'flat',
+    },
+    {
+      key: 'unit',
+      label: 'Charged per',
+      type: 'select',
+      options: [['', 'Line'], ...timeUnits(unit).map((u) => [u, u])],
+      value: unit,
+      showIf: (v) => v.kind === 'flat',
+    },
+    { key: 'description', label: 'Description', value: str(def.description) },
+  ];
+}
+
+function fringeInput(v) {
+  return {
+    kind: v.kind === 'flat' ? 'flat' : 'percent',
+    description: v.description,
+    rate: v.rate.trim(),
+    cutoff: v.kind === 'flat' ? null : moneyText(v.cutoff),
+    unit: v.kind === 'flat' && v.unit ? v.unit : null,
+  };
+}
+
 // Per list: the editor's fields for item `name` (its definition `def`), and
 // build(values) -> [command, args]. One command each, so one undo step.
 const EDITORS = {
-  fringes: (name, def) => {
-    const base = str(budget().base_currency);
-    const unit = def.unit === undefined || def.unit === null ? '' : String(def.unit);
-    return {
-      what: 'Fringe',
-      fields: [
-        { key: 'kind', label: 'Kind', type: 'select', options: [['percent', 'Percent of pay'], ['flat', 'Flat amount']], value: def.kind === 'flat' ? 'flat' : 'percent' },
-        { key: 'rate', label: 'Rate', value: str(def.rate), suffix: (v) => (v.kind === 'flat' ? base : '%') },
-        {
-          key: 'cutoff',
-          label: 'Cutoff (pay per earner)',
-          value: def.cutoff === undefined || def.cutoff === null ? '' : money(def.cutoff),
-          placeholder: 'None',
-          showIf: (v) => v.kind !== 'flat',
-        },
-        {
-          key: 'unit',
-          label: 'Charged per',
-          type: 'select',
-          options: [['', 'Line'], ...timeUnits(unit).map((u) => [u, u])],
-          value: unit,
-          showIf: (v) => v.kind === 'flat',
-        },
-        { key: 'description', label: 'Description', value: str(def.description) },
-      ],
-      build: (v) => [
-        'set_fringe',
-        {
-          name,
-          fringe: {
-            kind: v.kind === 'flat' ? 'flat' : 'percent',
-            description: v.description,
-            rate: v.rate.trim(),
-            cutoff: v.kind === 'flat' ? null : moneyText(v.cutoff),
-            unit: v.kind === 'flat' && v.unit ? v.unit : null,
-          },
-        },
-      ],
-    };
-  },
+  fringes: (name, def) => ({
+    fields: fringeFields(def),
+    build: (v) => ['set_fringe', { name, fringe: fringeInput(v) }],
+  }),
   groups: (name, def) => {
     const current = typeof def.color === 'string' ? def.color.toLowerCase() : '';
     const ours = paletteColor(current);
     const options = [{ id: '', label: 'No color', cls: 'sw-none' }, ...PALETTE.map((c) => ({ id: c.id, label: c.label, cls: `sw-${c.id}` }))];
     if (current && !ours) options.push({ id: 'keep', label: `Keep its color (${current})`, cls: 'sw-keep' });
     return {
-      what: 'Group',
       fields: [
         { key: 'description', label: 'Description', value: str(def.description) },
         { key: 'counted', label: 'Counts in total', type: 'check', value: def.in_budget_total !== false },
@@ -784,21 +856,18 @@ const EDITORS = {
     };
   },
   sets: (name, def) => ({
-    what: 'Set',
     fields: [{ key: 'description', label: 'Description', value: str(def.description) }],
     build: (v) => ['set_set', { name, set: { description: v.description } }],
   }),
   locations: (name, def) => ({
-    what: 'Location',
     fields: ['description', 'city', 'region', 'country'].map((k) => ({ key: k, label: k[0].toUpperCase() + k.slice(1), value: str(def[k]) })),
     build: (v) => ['set_location', { name, location: { description: v.description, city: v.city, region: v.region, country: v.country } }],
   }),
   currencies: (name, def) => {
     const base = str(budget().base_currency);
     return {
-      what: 'Currency',
       fields: [
-        { key: 'rate', label: `Rate (${base || 'base'} per 1 ${name})`, value: str(def.rate) },
+        { key: 'rate', label: `Rate (${base || 'base'} per 1 ${name || 'unit'})`, value: str(def.rate), placeholder: '1.08' },
         { key: 'symbol', label: 'Symbol', value: str(def.symbol) },
         { key: 'description', label: 'Description', value: str(def.description) },
       ],
@@ -807,28 +876,169 @@ const EDITORS = {
   },
 };
 
+/** What a new item of each list asks for, and the command that adds it. */
+const ADDERS = {
+  fringes: {
+    fields: () => fringeFields({}),
+    build: (name, v) => ['set_fringe', { name, fringe: fringeInput(v) }],
+    check: (v) => (v.rate.trim() === '' ? 'Enter a rate.' : null),
+  },
+  groups: {
+    fields: () => [
+      { key: 'description', label: 'Description', value: '' },
+      { key: 'counted', label: 'Counts in total', type: 'check', value: true },
+    ],
+    build: (name, v) => ['set_group', { name, group: { description: v.description, in_budget_total: Boolean(v.counted) } }],
+  },
+  sets: {
+    fields: () => [{ key: 'description', label: 'Description', value: '', placeholder: 'Interior, night' }],
+    build: (name, v) => ['set_set', { name, set: { description: v.description.trim() } }],
+  },
+  locations: {
+    fields: () => EDITORS.locations('', {}).fields,
+    build: (name, v) => ['set_location', { name, location: { description: v.description, city: v.city, region: v.region, country: v.country } }],
+  },
+  currencies: {
+    fields: () => EDITORS.currencies('', {}).fields,
+    build: (code, v) => ['set_currency', { code, currency: { description: v.description, symbol: v.symbol, rate: v.rate.trim() } }],
+    check: (v) => {
+      const rate = v.rate.trim();
+      if (rate === '') return 'Enter a rate.';
+      if (!DECIMAL.test(rate) || Number(rate) <= 0) return 'The rate must be a number above 0, like 1.08.';
+      return null;
+    },
+  },
+};
+
+/** Why `name` can't be a new item of `list`, or null. */
+function badName(list, name) {
+  const defs = obj(list.defs(budget()));
+  const has = Object.prototype.hasOwnProperty.call(defs, name);
+  if (list.id === 'currencies') {
+    if (name === '') return 'Enter a currency code.';
+    if (name.includes(',')) return 'Codes can’t contain commas.';
+    if (name === str(budget().base_currency)) return `${name} is the base currency.`;
+    if (has) return `${name} is already in the list.`;
+    return null;
+  }
+  if (name === '') return `Enter a ${list.what} name.`;
+  if (name.includes(',')) return 'Names can’t contain commas.';
+  if (has) return `There is already a ${list.what} named ${name}.`;
+  return null;
+}
+
+/** Focuses item `key` once the panel has redrawn, or the list's add row. */
+function focusAfter(key, listId) {
+  const b = byKey(key) || byKey(addKey(listId));
+  if (b) b.focus({ preventScroll: false });
+}
+
 /** Opens the editor for item `name` of `list` next to it. */
 function editItem(list, name) {
   const defs = obj(list.defs(budget()));
   const spec = EDITORS[list.id];
   if (!spec || !Object.prototype.hasOwnProperty.call(defs, name)) return;
-  const { what, fields, build } = spec(name, obj(defs[name]));
-  const key = `apply:item:${list.id}:${name}`;
+  const { fields, build } = spec(name, obj(defs[name]));
+  const key = itemKey(list.id, name);
   const start = Object.fromEntries(fields.map((f) => [f.key, f.type === 'check' ? Boolean(f.value) : str(f.value)]));
   const unchanged = JSON.stringify(build(start));
+  const what = list.what[0].toUpperCase() + list.what.slice(1);
+  let deleting = false;
   anchoredForm({
-    anchor: itemButton(key),
+    anchor: byKey(key),
     title: `${what} ${name}`,
     fields,
+    extra: {
+      text: 'Delete…',
+      title: `Delete this ${list.what}`,
+      run: () => {
+        deleting = true;
+      },
+    },
     onSubmit: (v) => {
       const step = build(v);
       // Nothing changed: no command, no undo step.
       if (JSON.stringify(step) === unchanged) return Promise.resolve();
-      if (typeof st.ctx.call !== 'function') return Promise.reject('Not connected');
-      return st.ctx.call(step[0], step[1]);
+      return call(step[0], step[1]);
     },
   }).then(() => {
-    const again = itemButton(key);
-    if (again) again.focus({ preventScroll: true });
+    if (deleting) deleteItem(list, name);
+    else focusAfter(key, list.id);
   });
+}
+
+/** The question to ask before deleting, and the command. */
+function deletePlan(list, name, def) {
+  const r = report();
+  if (list.id === 'fringes') {
+    const uses = Number(obj(obj(r.fringes)[name]).uses) || 0;
+    return {
+      message: uses ? `It comes off the ${plural(uses, 'line', 'lines')} it is applied to.` : 'No lines use it.',
+      step: ['delete_fringe', { name }],
+    };
+  }
+  if (list.id === 'groups') {
+    return {
+      message: def.in_budget_total === false ? 'Its lines lose the tag and count in the total again.' : 'Its lines lose the tag.',
+      step: ['delete_group', { name }],
+    };
+  }
+  if (list.id === 'sets') return { message: 'Lines tagged with it lose the tag.', step: ['delete_set', { name }] };
+  if (list.id === 'locations') return { message: 'Lines tagged with it lose the tag.', step: ['delete_location', { name }] };
+  return {
+    message: 'It can’t be deleted while lines, charges or the totals use it.',
+    step: ['delete_currency', { code: name }],
+  };
+}
+
+/** Asks, next to the item, before deleting it; one command, one undo step. */
+function deleteItem(list, name) {
+  const defs = obj(list.defs(budget()));
+  if (!Object.prototype.hasOwnProperty.call(defs, name)) return;
+  const key = itemKey(list.id, name);
+  // Focus goes to the next item after a delete (else the one before, else the add row).
+  const ul = byKey(key) && byKey(key).closest('.apply-items');
+  const order = ul ? [...ul.querySelectorAll('.apply-check')].map((b) => b.dataset.key) : [];
+  const i = order.indexOf(key);
+  const neighbor = order[i + 1] || order[i - 1] || addKey(list.id);
+  const { message, step } = deletePlan(list, name, obj(defs[name]));
+  let done = false;
+  anchoredForm({
+    anchor: byKey(key),
+    title: `Delete ${list.what} ${name}?`,
+    message,
+    submitText: 'Delete',
+    danger: true,
+    onSubmit: () =>
+      call(step[0], step[1]).then(() => {
+        done = true;
+        if (st.selected[list.id] === name) delete st.selected[list.id];
+      }),
+  }).then(() => focusAfter(done ? neighbor : key, list.id));
+}
+
+/** Opens the form for a new item of `list`, next to its add row. */
+function addItem(list) {
+  const spec = ADDERS[list.id];
+  if (!spec) return;
+  const nameField = list.id === 'currencies'
+    ? { key: 'name', label: 'Code', value: '', placeholder: 'EUR' }
+    : { key: 'name', label: 'Name', value: '' };
+  let added = null;
+  anchoredForm({
+    anchor: byKey(addKey(list.id)),
+    title: `New ${list.what}`,
+    fields: [nameField, ...spec.fields()],
+    submitText: 'Add',
+    onSubmit: (v) => {
+      const name = v.name.trim();
+      const bad = badName(list, name) || (spec.check ? spec.check(v) : null);
+      if (bad) return Promise.reject(bad);
+      const [cmd, args] = spec.build(name, v);
+      return call(cmd, args).then(() => {
+        added = name;
+        st.selected[list.id] = name;
+      });
+    },
+  }).then(() => focusAfter(added === null ? addKey(list.id) : itemKey(list.id, added), list.id));
 }

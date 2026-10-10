@@ -1,42 +1,6 @@
-/* Topsheet setup tabs (sets, locations, charges, credits, info, settings,
-   baseline). Builds on setup.css; uses only the app's :root tokens. Every
-   class here is prefixed with tss-. */
-
-/* Twelve tabs don't fit on one line in the panel: let them wrap instead of
-   scrolling out of sight. */
-/* Section switch above the tab strip (Tables / Budget). */
-.setup-sections {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  margin-bottom: 8px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.setup-section {
-  flex: 1;
-  padding: 4px 8px;
-  border: 0;
-  border-radius: calc(var(--radius) - 2px);
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.setup-section[aria-pressed='true'] {
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 600;
-}
-
-.setup-section:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
+/* The tools panel's Budget tab (charges, credits, info, settings, baseline).
+   Builds on setup.css; uses only the app's :root tokens. Every class here is
+   prefixed with tss-. */
 
 .tss-heading {
   margin: 0 0 4px;

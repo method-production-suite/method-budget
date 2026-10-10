@@ -18,6 +18,7 @@ pub mod rowstyle;
 pub mod safety;
 pub mod safety_app;
 pub mod session;
+pub mod tools;
 pub mod view;
 
 pub use app::run;

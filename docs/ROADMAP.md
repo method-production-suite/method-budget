@@ -155,7 +155,7 @@ total to the cent exists in spirit (D4 property tests); keep it explicit (02).
 
 | # | Item | Source | Status | Size | Depends |
 |---|---|---|---|---|---|
-| 1.22 | **Tools panel rebuild**: two stacked tab panes (Apply and Tables merged; checkbox applies, double-click edits), Budget sub-tabs, drag tabs between panes, dock right (default) / bottom / pop-out window, remembered | Sam's mock review, decision 21 | [missing] | L | inline editing (in progress) |
+| 1.22 | **Tools panel rebuild**: two stacked tab panes (Apply and Tables merged; checkbox applies, double-click edits), Budget sub-tabs, drag tabs between panes, dock right (default) / bottom / pop-out window, remembered. Built (decision 24); the pop-out window needs a live check | Sam's mock review, decision 21 | [have] | L | inline editing (in progress) |
 
 ## Phase 2: Parity and polish
 
@@ -177,7 +177,7 @@ total to the cent exists in spirit (D4 property tests); keep it explicit (02).
 | 2.14 | **Line-block presets**: save lines (with a checklist of fields) and insert copies at the cursor, one undo step | 05, inv 13 | [missing] | M | 1.19 |
 | 2.15 | **Personal setup library**: an open library file in a folder Sam picks, folders per kind, copy in and out with dependencies and a conflict review, no live link | 07, 09, 11, 24, inv 12 | [missing] | L | 1.20, decision 15 |
 | 2.16 | **Charges and credits polish**: percent and excluded amount in the topsheet label, exclusion grid with live group totals, preview that includes the cell being typed, credit rows showing gross, excluded fringes, net and variance to cap, "create charge" from the topsheet menu | 11, 23, inv 9, 10 | [partial] | M | 1.5 |
-| 2.17 | **Two tools at once and dock at the bottom**, so the grid gets full width beside a setup list | 01, 04, 06, inv 18 | [missing] | M | none |
+| 2.17 | **Two tools at once and dock at the bottom**, so the grid gets full width beside a setup list (done with 1.22) | 01, 04, 06, inv 18 | [have] | M | none |
 | 2.18 | **Display preferences**: rate decimals with a cutoff band, totals decimals, hide zero accounts, show or hide summary rows and the net total, grid zoom | 17, inv 1, 18, 22 | [missing] | M | none |
 | 2.19 | **Hidden-factor marker**: flag a line whose hidden X, 4X, unit or currency column changes its total | inv 2, 23 | [missing] | S | none |
 | 2.20 | **Renumber accounts when the coding pattern changes** | APP, inv 11 | [missing] | M | none |

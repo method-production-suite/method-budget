@@ -11,7 +11,8 @@
     <link rel="stylesheet" href="apply.css">
     <link rel="stylesheet" href="quickentry.css">
     <link rel="stylesheet" href="context.css">
-    <script type="module" src="js/main.js"></script>
+    <link rel="stylesheet" href="tools.css">
+    <script type="module" src="js/boot.js"></script>
   </head>
   <body>
     <div class="app">
@@ -31,10 +32,10 @@
           <span class="doc-name" id="doc-name"></span>
           <span class="doc-dirty" id="doc-dirty" title="Unsaved changes" hidden></span>
         </div>
-        <button type="button" class="btn" id="btn-panel" aria-pressed="true" aria-controls="panel">Setup</button>
+        <button type="button" class="btn" id="btn-panel" aria-pressed="true" aria-controls="panel">Tools</button>
       </header>
 
-      <div class="workspace">
+      <div class="workspace" id="workspace">
         <main class="main">
           <nav class="crumbs" id="crumbs" aria-label="Budget level"></nav>
           <div class="banner" id="banner" role="status" hidden></div>
@@ -45,7 +46,7 @@
           </div>
           <div class="grid-host" id="grid-host" aria-label="Budget grid"></div>
         </main>
-        <aside class="panel" id="panel" aria-label="Budget setup"></aside>
+        <aside class="panel" id="panel" aria-label="Tools"></aside>
       </div>
 
       <footer class="footer" id="footer"></footer>

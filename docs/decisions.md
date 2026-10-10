@@ -287,13 +287,13 @@ remembered.
   value); a dark window shows the dark one through static CSS keyed on the row's color
   class. Colors that came in some other way show as stored, and the group editor keeps
   them unless another is picked.
-- **Double-click in the apply panel.** A click ticks or unticks an item at once, as before,
-  and a double-click edits the item. The first click of a double-click has already
-  toggled it, so the double-click undoes that one step (only when it is still the latest
-  change) before opening the editor, and the footer's Last change is put back. Delaying
-  every click until a double-click can be ruled out would slow the panel's main action;
-  decision 21's merged layout (the check box applies, double-click edits) removes the
-  overlap when it lands.
+- **Double-click in the apply lists** (revised with decision 21's layout, entry 24). Only
+  the checkbox ticks or unticks an item (a click on the box, or Space); a click on the
+  item's name only selects it, and a double-click on the name (or Enter or F2) edits it. So
+  a double-click never toggles anything and there is nothing to take back. (Until the
+  layout landed, a click anywhere on the item toggled it, and a double-click undid that
+  first click's toggle before opening the editor; that workaround is gone.) A double-click
+  on the box itself is two ticks, as with any checkbox.
 - **Topsheet and account list.** A double-click on a number or a description edits it in
   place; a double-click elsewhere on the row, or Enter, still opens it.
 - **Cut, Copy and Paste from the right-click menu** fire the same clipboard events as the
@@ -332,3 +332,47 @@ remembered.
   the same segment, wrapping round; a pasted category's accounts move under its number.
   Lines in the source's base currency count in the target's base currency (the review
   says so when the two differ).
+
+## 24. The tools panel as built (2026-10-09)
+
+Decision 21's layout, with the calls it needed:
+
+- **One list per item kind, both halves in it.** Fringes, Groups, Sets, Locations and
+  Currency are each a tab listing every item with its checkbox for the selection, its
+  dollars in the selection, and the item's own editor. What the old setup tabs showed
+  about the whole budget (a fringe's line count and total, a group's or set's total) moved
+  to the item's tooltip. Deleting moved to the Delete key on an item and a Delete button
+  in its editor, each asking next to the item first; adding is a "New ..." row at the
+  bottom of every list (Globals and Units included), opening the same small form with the
+  name first. Globals and Units keep their in-place rows.
+- **The selection's totals sit in the panel header**, shared by both panes, with the three
+  place buttons; the fringe list's foot keeps the fringe total, effective percent and the
+  range buttons.
+- **Two windows, one session.** The popped-out panel is a second web view on the same page
+  (`?panel=1`) calling the same commands; nothing is copied or merged. Rust tells the
+  other windows when a command changed the budget (a new view `rev`), and they fetch a
+  fresh view, so each window always draws Rust's current budget. Pages listen only under
+  their own label: Tauri hands every event to listeners registered for "any" window,
+  which would make a window hear its own changes and the other window's menu commands.
+- **The main window owns the panel's preferences** (place, size, tab layout, the tools
+  window's geometry). The tools window sends its tab changes over, so nothing depends on
+  the two web views sharing local storage.
+- **The tools window is an ordinary window**, not always on top and not attached to the
+  main one, so it can sit on a second screen and stay put. Rust places it where it was
+  only if its title bar would be on a screen that is there now (else centered), drops the
+  menu bar Windows and Linux would give it, closes it with the main window, and docks the
+  panel back at the right when it closes on its own. Close Window closes whichever window
+  is in front. Autosave on losing focus (decision 20) waits a moment and skips it when
+  focus only moved to the other window: that isn't leaving the app.
+- **Keys in the tools window** follow the main window's rules: text fields keep their
+  editing keys, the tab keys work there, and the rest (Save, Undo, grid commands) go to
+  the main window as menu commands; the menu bar does the same while it is in front. Undo
+  of the budget therefore always runs in the main window, where its footer counters live.
+- **Its own capability.** `capabilities/tools.json` grants the tools window only the
+  commands the panel's scripts call (a test compares the two lists both ways), plus
+  listening for and sending events. No file, save, print, undo, clipboard, recovery or
+  window commands.
+- **Tabs are dragged with pointer events**, not HTML drag and drop, which Windows' web view
+  turns off while Tauri's file-drop handling is on; Option+Shift+arrows move a tab from the
+  keyboard. The two panes split the height (or width) evenly; a divider between them can
+  come later.

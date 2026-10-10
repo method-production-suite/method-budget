@@ -1,14 +1,14 @@
-// Topsheet setup tabs: charges, credits, sets, locations, budget info,
-// settings (currencies, fringe posting, account numbers) and the baseline.
+// The tools panel's Budget tab and its own tabs: charges, credits, budget
+// info, settings (currencies, fringe posting, account numbers, new lines) and
+// the baseline.
 //
-// These tabs live in the setup panel. setup.js owns the panel, the tab bar, the
-// command queue and focus handling, and passes its helpers in as `kit`, so
-// every tab looks and behaves the same. Budget text only reaches the page
-// through textContent and input values, never innerHTML.
+// tools.js draws the Budget tab's tab strip; setup.js owns the command queue
+// and focus handling and passes its helpers in as `kit`, so every tab looks
+// and behaves the same. Budget text only reaches the page through
+// textContent and input values, never innerHTML. (Sets and locations are
+// lists in apply.js.)
 
 export const EXTRA_TABS = [
-  { id: 'sets', label: 'Sets' },
-  { id: 'locations', label: 'Locations' },
   { id: 'charges', label: 'Charges' },
   { id: 'credits', label: 'Credits' },
   { id: 'info', label: 'Info' },
@@ -37,8 +37,6 @@ const openSections = new Set();
 export function renderExtraTab(tab, panel, kit) {
   k = kit;
   const render = {
-    sets: renderSets,
-    locations: renderLocations,
     charges: renderCharges,
     credits: renderCredits,
     info: renderInfo,
@@ -272,174 +270,6 @@ function withKept(options, picked) {
   const out = [...options];
   for (const p of picked) if (!out.includes(p)) out.push(p);
   return out;
-}
-
-// ---------------------------------------------------------------------------
-// Sets and locations
-
-function breakdownStat(label, bd) {
-  const b = obj(bd);
-  let total;
-  try {
-    total = BigInt(b.details_total || 0) + BigInt(b.fringe_total || 0);
-  } catch {
-    return null;
-  }
-  const wrap = k.el('span', 'setup-stat');
-  wrap.append(k.el('span', 'setup-muted', label), k.el('span', 'setup-num', k.formatCents(total)));
-  wrap.title = `Lines ${k.formatCents(b.details_total || 0)} plus fringes ${k.formatCents(b.fringe_total || 0)}`;
-  return wrap;
-}
-
-function setArgs(name, patch) {
-  const s = obj(k.own(k.budget().sets, name));
-  return ['set_set', { name, set: { description: k.str(s.description), ...patch } }];
-}
-
-function renderSets(panel) {
-  const b = k.budget();
-  const r = k.report();
-  panel.append(intro('Sets tag lines with the scene or build they are for, so you can see what each one costs.'));
-  const items = k.entries(b.sets);
-  const names = items.map(([n]) => n);
-  if (!items.length) panel.append(k.emptyNote('No sets yet.'));
-  const ul = k.list('Sets');
-  items.forEach(([name, s0], i) => {
-    const s = obj(s0);
-    const ik = k.key('sets', name);
-    const li = k.itemShell(ik, 'setup-block');
-    const head = k.el('div', 'setup-head');
-    const nameEl = k.el('span', 'setup-name', name);
-    nameEl.title = name;
-    const figs = k.el('span', 'setup-figs');
-    const totals = r ? k.own(r.sets, name) : undefined;
-    const stat = totals ? breakdownStat('Total', totals) : null;
-    if (stat) figs.append(stat);
-    else if (r) figs.append(k.el('span', 'setup-muted', 'Not used'));
-    head.append(
-      nameEl,
-      figs,
-      k.deleteButton({
-        itemKey: ik,
-        name,
-        what: 'set',
-        confirmText: `Delete set ${name}? Lines tagged with it lose the tag.`,
-        build: () => ['delete_set', { name }],
-        neighborKey: k.neighbor('sets', names, i, k.key('add', 'sets', 'name')),
-      }),
-    );
-    const grid = k.el('div', 'setup-fields');
-    const desc = k.textInput({
-      fieldKey: k.key('sets', name, 'description'),
-      value: k.str(s.description),
-      onCommit: (v, old) =>
-        k.run(ik, () => setArgs(name, { description: v }), { restore: [k.key('sets', name, 'description'), old] }),
-    });
-    grid.append(k.field('Description', desc, { wide: true }));
-    li.append(head, grid);
-    k.finishItem(li, ik, [], null);
-    ul.append(li);
-  });
-  if (items.length) panel.append(ul);
-  panel.append(
-    k.addForm('sets', {
-      title: 'New set',
-      fields: [
-        k.addInput('sets', 'name', { label: 'Name', placeholder: 'Diner' }),
-        k.addInput('sets', 'description', { label: 'Description', placeholder: 'Interior, night' }),
-      ],
-      validate: (v) => {
-        const bad = k.checkName(v.name.trim(), b.sets, 'set');
-        return bad ? ['name', bad] : null;
-      },
-      build: (v) => ['set_set', { name: v.name.trim(), set: { description: v.description.trim() } }],
-    }),
-  );
-}
-
-function locationArgs(name, patch) {
-  const l = obj(k.own(k.budget().locations, name));
-  return [
-    'set_location',
-    {
-      name,
-      location: {
-        description: k.str(l.description),
-        city: k.str(l.city),
-        region: k.str(l.region),
-        country: k.str(l.country),
-        ...patch,
-      },
-    },
-  ];
-}
-
-function renderLocations(panel) {
-  const b = k.budget();
-  const r = k.report();
-  panel.append(intro('Places you shoot. Tag lines with a location to see what each one costs.'));
-  const items = k.entries(b.locations);
-  const names = items.map(([n]) => n);
-  if (!items.length) panel.append(k.emptyNote('No locations yet.'));
-  const ul = k.list('Locations');
-  items.forEach(([name, l0], i) => {
-    const l = obj(l0);
-    const ik = k.key('locations', name);
-    const li = k.itemShell(ik, 'setup-block');
-    const head = k.el('div', 'setup-head');
-    const nameEl = k.el('span', 'setup-name', name);
-    nameEl.title = name;
-    const figs = k.el('span', 'setup-figs');
-    const totals = r ? k.own(r.locations, name) : undefined;
-    const stat = totals ? breakdownStat('Total', totals) : null;
-    if (stat) figs.append(stat);
-    else if (r) figs.append(k.el('span', 'setup-muted', 'Not used'));
-    head.append(
-      nameEl,
-      figs,
-      k.deleteButton({
-        itemKey: ik,
-        name,
-        what: 'location',
-        confirmText: `Delete location ${name}? Lines tagged with it lose the tag.`,
-        build: () => ['delete_location', { name }],
-        neighborKey: k.neighbor('locations', names, i, k.key('add', 'locations', 'name')),
-      }),
-    );
-    const input = (f) =>
-      k.textInput({
-        fieldKey: k.key('locations', name, f),
-        value: k.str(l[f]),
-        onCommit: (v, old) =>
-          k.run(ik, () => locationArgs(name, { [f]: v }), { restore: [k.key('locations', name, f), old] }),
-      });
-    const grid = k.el('div', 'setup-fields');
-    grid.append(k.field('Description', input('description'), { wide: true }));
-    const place = k.el('div', 'setup-fields setup-field-wide tss-fields-3');
-    place.append(k.field('City', input('city')), k.field('Region', input('region')), k.field('Country', input('country')));
-    grid.append(place);
-    li.append(head, grid);
-    k.finishItem(li, ik, [], null);
-    ul.append(li);
-  });
-  if (items.length) panel.append(ul);
-  panel.append(
-    k.addForm('locations', {
-      title: 'New location',
-      fields: [
-        k.addInput('locations', 'name', { label: 'Name', placeholder: 'Stage 4' }),
-        k.addInput('locations', 'city', { label: 'City', placeholder: 'Burbank' }),
-      ],
-      validate: (v) => {
-        const bad = k.checkName(v.name.trim(), b.locations, 'location');
-        return bad ? ['name', bad] : null;
-      },
-      build: (v) => [
-        'set_location',
-        { name: v.name.trim(), location: { description: '', city: v.city.trim(), region: '', country: '' } },
-      ],
-    }),
-  );
 }
 
 // ---------------------------------------------------------------------------

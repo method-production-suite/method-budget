@@ -173,8 +173,11 @@ export function anchoredDialog({ anchor, title, message = '', label, value = '',
  * field while it returns false. Enter saves from any field, Escape cancels.
  * `onSubmit(values)` returns a promise; if it rejects, the message shows and
  * the form stays open. Resolves true when saved, false when cancelled.
+ * With no fields it is a question next to the item (`danger` makes the
+ * button red). `extra` ({ text, title, run }) adds a button at the left that
+ * closes the form (resolving false) and then calls `run`.
  */
-export function anchoredForm({ anchor, title, message = '', fields = [], submitText = 'Save', onSubmit }) {
+export function anchoredForm({ anchor, title, message = '', fields = [], submitText = 'Save', danger = false, extra = null, onSubmit }) {
   return new Promise((resolve) => {
     const root = $('modal-root');
     const previous = document.activeElement;
@@ -188,8 +191,11 @@ export function anchoredForm({ anchor, title, message = '', fields = [], submitT
     box.append(...parts.map((p) => p.wrap));
     form.append(box, error);
     const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
-    const ok = el('button', { class: 'btn btn-primary', text: submitText, attrs: { type: 'submit' } });
-    form.append(el('div', { class: 'modal-actions' }, cancel, ok));
+    const ok = el('button', { class: danger ? 'btn btn-danger' : 'btn btn-primary', text: submitText, attrs: { type: 'submit' } });
+    const more = extra
+      ? el('button', { class: 'btn btn-quiet btn-danger-text popover-extra', text: extra.text, title: extra.title || undefined, attrs: { type: 'button' } })
+      : null;
+    form.append(el('div', { class: 'modal-actions' }, more, cancel, ok));
     const backdrop = el('div', { class: 'popover-backdrop' }, form);
 
     const values = () => Object.fromEntries(parts.map((p) => [p.key, p.get()]));
@@ -209,6 +215,12 @@ export function anchoredForm({ anchor, title, message = '', fields = [], submitT
       resolve(result);
     };
     cancel.addEventListener('click', () => close(false));
+    if (more) {
+      more.addEventListener('click', () => {
+        close(false);
+        extra.run();
+      });
+    }
     backdrop.addEventListener('mousedown', (e) => {
       if (e.target === backdrop) close(false);
     });
@@ -217,7 +229,7 @@ export function anchoredForm({ anchor, title, message = '', fields = [], submitT
         e.preventDefault();
         e.stopPropagation();
         close(false);
-      } else if (e.key === 'Enter' && !e.isComposing && e.target !== cancel && e.target !== ok) {
+      } else if (e.key === 'Enter' && !e.isComposing && e.target !== cancel && e.target !== ok && e.target !== more) {
         // Enter saves from any field, a pop-up list or a color chip included.
         e.preventDefault();
         form.requestSubmit();

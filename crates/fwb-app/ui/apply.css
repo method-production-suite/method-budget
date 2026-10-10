@@ -1,10 +1,11 @@
-/* Apply panel (ui/js/apply.js): what the selected lines carry.
+/* The apply lists (ui/js/apply.js): the tools panel's fringes, groups,
+   sets, locations and currency tabs, and the panel header's selection.
    Uses only the app's :root tokens and the setup panel's controls; every
    class of its own is prefixed with apply-. */
 
 .apply {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -59,68 +60,8 @@
   margin: 0;
 }
 
-/* One list: fringes, groups, set, location or currency */
+/* A list's filter, "Applied only" and Clear */
 
-.apply-list {
-  border-top: 1px solid var(--border);
-  padding-top: 4px;
-}
-
-.apply-list-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.apply-fold {
-  appearance: none;
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  padding: 3px 2px;
-  border: 0;
-  border-radius: var(--radius);
-  background: none;
-  font: inherit;
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-}
-
-.apply-fold-mark::before {
-  content: "";
-  display: inline-block;
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 5px solid var(--text-muted);
-  vertical-align: middle;
-}
-
-.apply-fold[aria-expanded="false"] .apply-fold-mark::before {
-  transform: rotate(-90deg);
-}
-
-.apply-title {
-  font-weight: 600;
-  font-size: 12.5px;
-}
-
-.apply-badge {
-  min-width: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
-  background: var(--selection);
-  color: var(--text);
-  font-size: 11px;
-  line-height: 16px;
-  text-align: center;
-}
-
-.apply-link,
 .apply-pill {
   appearance: none;
   flex: 0 0 auto;
@@ -135,7 +76,6 @@
   cursor: pointer;
 }
 
-.apply-link:hover,
 .apply-pill:hover:not([aria-disabled="true"]) {
   background: var(--row-hover);
 }
@@ -156,18 +96,10 @@
   cursor: default;
 }
 
-.apply-fold:focus-visible,
-.apply-link:focus-visible,
 .apply-pill:focus-visible,
 .apply-check:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -1px;
-}
-
-.apply-body {
-  display: grid;
-  gap: 4px;
-  padding: 2px 0 6px;
 }
 
 .apply-tools {
@@ -188,13 +120,15 @@
   padding: 0;
 }
 
-/* One item: a three-state checkbox (a round one for one-per-line lists) */
+/* One item: a three-state checkbox (a round one for one-per-line lists).
+   The box applies; the rest of the row selects the item, and a double-click
+   there edits it. */
 
 .apply-check {
   appearance: none;
   position: relative;
   display: grid;
-  grid-template-columns: 14px minmax(0, auto) minmax(0, 1fr) auto auto;
+  grid-template-columns: 20px minmax(0, auto) minmax(0, 1fr) auto auto;
   align-items: center;
   column-gap: 6px;
   width: 100%;
@@ -210,17 +144,38 @@
   cursor: pointer;
 }
 
-.apply-check:hover:not([aria-disabled="true"]) {
+.apply-check:hover {
   background: var(--row-hover);
 }
 
-.apply-check[aria-disabled="true"] {
+.apply-check[aria-disabled="true"] .apply-box {
+  opacity: 0.45;
+}
+
+.apply-boxhit {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin: -2px 0 -2px -3px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.apply-boxhit:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.apply-check[aria-disabled="true"] .apply-boxhit {
   cursor: default;
 }
 
-.apply-check[aria-disabled="true"] .apply-box,
-.apply-check[aria-disabled="true"] .apply-name {
-  opacity: 0.55;
+.apply-check[aria-disabled="true"] .apply-boxhit:hover {
+  background: none;
+}
+
+.apply-item.is-selected > .apply-check {
+  background: var(--selection);
 }
 
 .apply-box {
@@ -340,6 +295,6 @@
   cursor: default;
 }
 
-.apply[aria-busy="true"] .apply-check {
+.apply[aria-busy="true"] .apply-boxhit {
   cursor: progress;
 }

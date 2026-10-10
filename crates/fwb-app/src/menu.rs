@@ -4,8 +4,11 @@
 //! `ui/js/shortcuts.js` (a test below fails if the two drift apart). Choosing
 //! one sends its id to the web view as a [`EVENT`] event, and `main.js` runs
 //! the same handler the keyboard shortcut runs, so a menu click and a key
-//! press always do the same thing. Two ids are answered here in Rust instead:
-//! [`QUIT`] and [`CLOSE`] both go through the unsaved-changes guard.
+//! press always do the same thing. While the tools window is in front the
+//! event goes to it instead (`toolswin.js` answers its own text fields and tab
+//! items and passes the rest to `main.js`; src/tools.rs). Two ids are answered
+//! here in Rust instead: [`QUIT`] goes through the unsaved-changes guard, and
+//! [`CLOSE`] closes the window in front (the main one asks first).
 //!
 //! Who answers a key press: on macOS the web page sees a key first and the
 //! menu's key equivalent fires only if the page didn't handle it. So `main.js`
@@ -43,7 +46,9 @@ pub enum Entry {
     Cut,
     Copy,
     Paste,
-    /// The setup panel's tabs, as a submenu.
+    /// The tools panel: show or hide it, and where it goes, as a submenu.
+    ToolsPanel,
+    /// The tools panel's tabs, as a submenu.
     SetupTabs,
     /// Format > Text Color, as a submenu.
     TextColors,
@@ -167,22 +172,34 @@ pub const GO: &[Entry] = &[
     item("go.prev_account", "Previous Account", "mod+left"),
 ];
 
-pub const VIEW: &[Entry] = &[
-    item("view.toggle_panel", "Toggle Setup Panel", "mod+alt+s"),
-    Entry::SetupTabs,
+pub const VIEW: &[Entry] = &[Entry::ToolsPanel, Entry::SetupTabs];
+
+/// View > Tools Panel: show or hide it wherever it is, and its three places
+/// (docked at the right, docked at the bottom, its own window). The panel
+/// header has the same three as buttons (ui/js/tools.js).
+pub const TOOLS_PANEL: &[Entry] = &[
+    item("view.toggle_panel", "Show or Hide Tools Panel", "mod+alt+s"),
+    SEP,
+    plain("view.panel.right", "Dock at Right"),
+    plain("view.panel.bottom", "Dock at Bottom"),
+    plain("view.panel.window", "Pop Out into a Window"),
 ];
 
-/// The setup panel's tabs, in the panel's order (ui/js/setup.js and
-/// ui/js/topsheet-setup.js). Their keys are the ones long-time users of
-/// other budgeting tools already know (decisions.md, entry 15).
+/// The tools panel's tabs, in the panel's default order (ui/js/tools.js):
+/// the top pane, the bottom pane, then the Budget tab's own tabs. Their keys
+/// are the ones long-time users of other budgeting tools already know
+/// (decisions.md, entry 15).
 pub const SETUP_TABS: &[Entry] = &[
-    item("view.tab.globals", "Globals", "mod+g"),
     item("view.tab.fringes", "Fringes", "mod+3"),
     item("view.tab.groups", "Groups", "mod+4"),
+    item("view.tab.globals", "Globals", "mod+g"),
     item("view.tab.units", "Units", "mod+7"),
-    item("view.tab.currencies", "Currencies", "mod+6"),
+    SEP,
     item("view.tab.sets", "Sets", "mod+8"),
     item("view.tab.locations", "Locations", "mod+5"),
+    item("view.tab.currencies", "Currency", "mod+6"),
+    plain("view.tab.notes", "Notes"),
+    SEP,
     item("view.tab.charges", "Charges", "mod+/"),
     item("view.tab.credits", "Credits", "mod+backslash"),
     plain("view.tab.info", "Info"),
@@ -241,8 +258,13 @@ fn append<R: Runtime>(
             Entry::Cut => menu.append(&PredefinedMenuItem::cut(app, None)?)?,
             Entry::Copy => menu.append(&PredefinedMenuItem::copy(app, None)?)?,
             Entry::Paste => menu.append(&PredefinedMenuItem::paste(app, None)?)?,
+            Entry::ToolsPanel => {
+                let panel = Submenu::new(app, "Tools Panel", true)?;
+                append(app, &panel, TOOLS_PANEL)?;
+                menu.append(&panel)?;
+            }
             Entry::SetupTabs => {
-                let tabs = Submenu::new(app, "Setup Tab", true)?;
+                let tabs = Submenu::new(app, "Tools Tab", true)?;
                 append(app, &tabs, SETUP_TABS)?;
                 menu.append(&tabs)?;
             }
@@ -338,16 +360,21 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 }
 
 /// Answers a menu item (other than Quit): Close Window here, everything else
-/// in the web view.
+/// in a web view: the tools window's when it is in front (it answers the
+/// panel's own items, undo in its text fields among them, and passes the rest
+/// to the main window), else the main window's.
 pub fn handle<R: Runtime>(app: &AppHandle<R>, id: &str) {
+    let target = crate::tools::menu_target(crate::tools::tools_in_front(app));
     if id == CLOSE {
-        if let Some(w) = app.get_webview_window("main") {
-            // Raises CloseRequested, so unsaved changes are asked about.
+        // The window in front closes: the main one asks about unsaved
+        // changes on its way out (CloseRequested); the tools one docks the
+        // panel back.
+        if let Some(w) = app.get_webview_window(target) {
             let _ = w.close();
         }
         return;
     }
-    let _ = app.emit_to("main", EVENT, id);
+    let _ = app.emit_to(target, EVENT, id);
 }
 
 #[cfg(test)]
@@ -367,6 +394,7 @@ mod tests {
             TEXT_COLORS,
             GO,
             VIEW,
+            TOOLS_PANEL,
             SETUP_TABS,
             HELP,
         ]

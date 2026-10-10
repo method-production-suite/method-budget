@@ -109,7 +109,8 @@ Columns are sized to the window: when there isn't room for every column at its u
 width, they all narrow toward a minimum (numbers keep room for their digits; long text is
 cut with an ellipsis, in full on hover) before the grid scrolls sideways, and while it
 scrolls, # and Description stay at the left and Total at the right. At 1280 pixels wide
-with the side panel open, the default columns fit without scrolling.
+with the tools panel docked at the right, the default columns fit without scrolling (docked
+at the bottom, the grid has the window's whole width).
 
 **Row styles.** The Format menu (and the grid's right-click menu) styles the selected
 lines: Bold (Cmd+B) and Italic (Shift+Cmd+I) go on, or off when every selected line has
@@ -155,10 +156,10 @@ Styles, notes and group colors are these commands, in `src/rowstyle.rs`:
 | `set_group_color` | `name`, `color` (`#rrggbb` or `null`) | View |
 | `update_group` | `name` (an existing group), `group` (`{ description, in_budget_total }`), `color` (`#rrggbb` or `null`): all three as one undo step | View |
 
-The side panel edits the budget's setup tables: globals (with their current values),
-fringes, groups (with the "in budget total" switch), units and currencies. Drag its left
-edge to make it wider or narrower (or focus the edge and use the arrow keys; double-click
-for the standard width); the width is remembered. Option+Cmd+S hides and shows it.
+The tools panel (below) holds the budget's setup tables and puts fringes, groups, sets,
+locations and currencies on the selected lines. It docks at the right (the default) or at
+the bottom, or pops out into a window of its own. Option+Cmd+S hides and shows it wherever
+it is.
 
 The footer shows the above-the-line, below-the-line, grand and net totals. Drilled down,
 it adds the current account's total and its category's total, each labeled with code and
@@ -169,43 +170,90 @@ and **Last change** is how much the most recent edit moved the net total (0 for 
 that moves no money; an undo shows the reverse). Both start at 0 when a budget is opened
 or created.
 
-### Apply panel
+### Tools panel
 
-The side panel opens on **Apply**: the half of setup that works on the selected lines
-rather than on the tables. It lists every fringe, group, set, location and currency with a
-checkbox that reflects the grid's selection: checked when every selected line has it, a
-dash when some do (with how many), empty when none do. On the topsheet and the account
-list, the selection is every line under the selected categories or accounts. Next to each
-item are its dollars within the selection: a fringe's own dollars, and for groups, sets,
-locations and currencies the selected lines' totals (a group that is out of the budget
-total says so instead). The top of the panel and the foot of the fringe list show the
-selection's line total, fringe total and effective fringe percent (fringe dollars over
-line totals).
+The panel is two tab panes. Docked at the right they are stacked; docked at the bottom
+they sit side by side under a grid that gets the window's whole width; popped out they are
+stacked in a window called Tools. The first pane starts with **Fringes, Groups, Globals and
+Units**, the second with **Sets, Locations, Currency, Notes and Budget**; Budget has tabs of
+its own: **Charges, Credits, Info, Settings and Baseline**. Drag a tab along its strip to
+reorder it, or onto the other pane's strip to move it there (a bar shows where it will
+land); from the keyboard, Option+Shift+Left and Right move the focused tab along its pane
+and Option+Shift+Up and Down move it to the first or second pane. A pane whose tabs have
+all moved away keeps an empty strip to drag one back to. The arrangement, each pane's tab
+and Budget's tab are remembered for you (in the web view's local storage, not in the
+budget). The View > Tools Tab items and their keys (Cmd+3 Fringes, Cmd+G Globals...) show
+a tab wherever it is now and put focus on it.
 
-Clicking an item puts it on every selected line that can take it, or takes it off them all
-when every one already has it. Sets, locations and currencies are one per line (round
-checkboxes): picking one replaces each line's old value, and Clear takes it off (for a
-currency: back to the base currency). Fringes and currencies go on lines; groups, sets and
-locations on lines and adjustments; other rows are skipped. **Make range** turns the
-selected lines into one fringe range with a number new in that account; they must be next
-to each other in one account, with at least two lines (unselected subtotal rows in between
-are fine, since they never break a range). **Remove range** takes the selected lines out of
-their ranges. Each list has a filter box, an "Applied only" switch and an Edit link to its
-setup tab. Every click is one undo step.
+The header shows what is selected in the grid (`3 rows selected`, `All lines in 20
+Production staff`) with its line total, fringe total and effective fringe percent, and three
+small buttons for where the panel goes: **Dock at right**, **Dock at bottom** and **Pop out
+into a window** (also View > Tools Panel, with Show or Hide). The choice is remembered.
+Docked, drag the panel's edge to make it wider (at the right) or taller (at the bottom), or
+focus the edge and use the arrow keys (Shift for bigger steps); double-click it for the
+standard size. Each place keeps its own size.
 
-**Editing an item where it is listed.** Double-click an item, or press Enter or F2 on it
-(Space still ticks it), to edit the item itself in a small box next to it: a fringe's kind,
-rate, cutoff (percent) or what it is charged per (flat) and description; a group's
-description, "counts in total" switch and line color (No color or one of the eight
-colors; a color set some other way is kept unless another is picked); a set's description;
-a location's description, city, region and country; a currency's rate, symbol and
-description. Enter saves, Escape or Cancel closes it, a refused value keeps it open with the
-message, and saving with nothing changed does nothing. Each save is one command, so one
-undo step (a group's three fields go together through `update_group`). The first click of
-a double-click has already ticked or unticked the item, so the double-click takes that
-back first (an undo of that one step, only when nothing else changed since), leaving the
-lines as they were and the footer's Last change as it was. Units and globals aren't in the
-apply panel; their setup tabs edit them in place.
+**The lists.** Fringes, Groups, Sets, Locations and Currency each list every item the budget
+defines, with a checkbox that reflects the grid's selection: checked when every selected
+line has it, a dash when some do (with how many, `2/5`), empty when none do. On the
+topsheet and the account list, the selection is every line under the selected categories
+or accounts. Next to each item are its dollars within the selection: a fringe's own
+dollars, and for groups, sets, locations and currencies the selected lines' totals (a group
+that is out of the budget total says so instead). Its tooltip has its description and what
+it comes to across the whole budget. The foot of the fringe list shows the selection's
+fringe total and effective percent.
+
+A click on an item's **checkbox** (or Space when it has focus) puts it on every selected
+line that can take it, or takes it off them all when every one already has it. A click on
+the item's **name** only selects it (highlighted, with focus), and a **double-click on the
+name**, or Enter or F2, opens its editor next to it; Delete (or Backspace) asks, next to the
+item, before deleting it. Up and Down move through the list. Sets, locations and currencies
+are one per line (round checkboxes): picking one replaces each line's old value, and Clear
+takes it off (for a currency: back to the base currency). Fringes and currencies go on
+lines; groups, sets and locations on lines and adjustments; other rows are skipped.
+**Make range** turns the selected lines into one fringe range with a number new in that
+account; they must be next to each other in one account, with at least two lines
+(unselected subtotal rows in between are fine, since they never break a range). **Remove
+range** takes the selected lines out of their ranges. Each list has a filter box and an
+"Applied only" switch. Every click is one undo step.
+
+**Editing an item where it is listed.** The editor holds a fringe's kind, rate, cutoff
+(percent) or what it is charged per (flat) and description; a group's description, "counts
+in total" switch and line color (No color or one of the eight colors; a color set some
+other way is kept unless another is picked); a set's description; a location's
+description, city, region and country; a currency's rate, symbol and description. Enter
+saves, Escape or Cancel closes it, a refused value keeps it open with the message, and
+saving with nothing changed does nothing. Each save is one command, so one undo step (a
+group's three fields go together through `update_group`). The editor's **Delete…** asks
+before deleting, as the Delete key does. The row at the bottom of every list (**New
+fringe…**, **New group…**, and so on) opens the same kind of form for a new item, name
+first; a name already in use, or with a comma, is refused there.
+
+**Globals and Units** are edited in place, as before: a global's formula (with its current
+value beside it), a unit's plural, hours and description; Enter or leaving the box saves,
+Escape puts the old text back, and the × asks before deleting. **New global…** and **New
+unit…** at the bottom add one.
+
+**Notes.** The Notes tab shows the note on the line under the grid's cursor, in a box you
+can type in: Save (or Cmd+Enter) keeps it, Revert (or Escape) puts back what is saved, and
+an empty note is removed. It is the same note as Edit > Note. Below it, **Noted lines**
+lists every line in the budget with a note (account, line number, description and the start
+of the note); a click opens that line's account with the line selected.
+
+**Budget.** Charges, credits, budget info, settings (currencies, fringe posting, account
+numbers, what new lines copy) and the baseline, as in the setup tabs before.
+
+**The tools window.** Popped out, the panel is a window of its own (title Tools) that you
+can put anywhere, a second screen included; it opens where it was last, at the size it was
+(on a screen that is gone, centered). It works on the same budget: a change made in either
+window shows in the other at once, the panel follows the grid's selection in the main
+window, and a click on a noted line moves the main window's grid. Its header's Dock at right
+and Dock at bottom put the panel back; closing the window (its close button, or Close Window
+while it is in front) docks it at the right. Option+Cmd+S hides and shows it. Closing the
+main window closes it too. Keys in the tools window: text fields keep their own editing keys
+(Cmd+Z undoes typing there); the tab keys (Cmd+3...) show a tab in it; Close Window docks it;
+everything else (Save, Undo, Print, grid commands) goes to the main window, as the menu bar
+does while the tools window is in front.
 
 The commands live in `src/apply.rs`:
 
@@ -226,10 +274,19 @@ fringe range) and `range_blocked` (why Make range can't run, or `null`). Edits c
 everything before changing anything: an unknown name, a row that no longer exists, or a
 selection with no row that takes the field is refused and nothing changes.
 
-`setup.js` mounts `apply.js` as the panel's first section. `main.js` gives it the grid's
-selection (`selection()` in the panel context: level, row keys, current category) and fires
-a `fwb:selection` event on the document when the selection changes; the panel asks for a
-fresh summary on that event and on every new view.
+`tools.js` draws the panel and mounts `apply.js`'s lists and header. `main.js` gives it the
+grid's selection (`selection()` in the panel context: level, row keys, current category,
+cursor row and account) and fires `fwb:selection` and `fwb:cursor` events on the document
+when the selection or the cursor changes; the lists ask for a fresh summary on those and on
+every new view, and the Notes tab redraws its line.
+
+The tools window and the Notes tab use these commands, in `src/tools.rs`:
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `tools_window` | `show` (true shows it, making it if needed, and brings it to the front; false hides it), `geometry` (`{x, y, width, height}` in logical pixels, or `null`: where it opens the first time) | nothing |
+| `close_tools_window` | none | nothing |
+| `notes_list` | none | `[{ row_id, ti, ai, category, account, account_name, line, description, note, more }]`, every line with a note in budget order; `note` is cut to 280 characters (`more` says so) |
 
 ### Keyboard and menus
 
@@ -270,11 +327,15 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 | In a type-ahead list: move, take the name, close it | Up, Down; Enter or Tab; Escape | Up, Down; Enter or Tab; Escape |
 | Open a breadcrumb jump list or the column menu (on its button) | Down or Enter | Down or Enter |
 | The column menu button | Shift+Tab from the first cell | Shift+Tab from the first cell |
-| Show or hide the setup panel | Option+Cmd+S | Ctrl+Alt+S |
-| Widen or narrow the setup panel (on its edge; Shift for bigger steps) | Left, Right | Left, Right |
-| Setup: Globals, Fringes, Groups, Locations (Escape returns to the grid) | Cmd+G, Cmd+3, Cmd+4, Cmd+5 | Ctrl+G, Ctrl+3, Ctrl+4, Ctrl+5 |
-| Setup: Currencies, Units, Sets, Settings | Cmd+6, Cmd+7, Cmd+8, Cmd+9 | Ctrl+6, Ctrl+7, Ctrl+8, Ctrl+9 |
-| Setup: Credits, Charges | Cmd+\\, Cmd+/ | Ctrl+\\, Ctrl+/ |
+| Show or hide the tools panel (docked or its window) | Option+Cmd+S | Ctrl+Alt+S |
+| Resize the docked tools panel (on its edge; Shift for bigger steps): wider or narrower at the right, taller or shorter at the bottom | Left, Right; Up, Down | Left, Right; Up, Down |
+| Tools: Globals, Fringes, Groups, Locations (Escape returns to the grid) | Cmd+G, Cmd+3, Cmd+4, Cmd+5 | Ctrl+G, Ctrl+3, Ctrl+4, Ctrl+5 |
+| Tools: Currency, Units, Sets, Budget > Settings | Cmd+6, Cmd+7, Cmd+8, Cmd+9 | Ctrl+6, Ctrl+7, Ctrl+8, Ctrl+9 |
+| Tools: Budget > Credits, Budget > Charges | Cmd+\\, Cmd+/ | Ctrl+\\, Ctrl+/ |
+| On a tools tab: the previous or next tab in its pane (also Home, End) | Left, Right | Left, Right |
+| On a tools tab: move it along its pane; to the first or second pane | Option+Shift+Left, Right; Option+Shift+Up, Down | Alt+Shift+Left, Right; Alt+Shift+Up, Down |
+| On a list item: apply it to the selection; edit it; delete it; move up or down | Space; Enter or F2; Delete; Up, Down | Space; Enter or F2; Delete; Up, Down |
+| In the Notes tab: save the note; put back the saved note | Cmd+Enter; Escape | Ctrl+Enter; Escape |
 | Keyboard shortcuts | Shift+Cmd+/ | Ctrl+Shift+/ |
 
 The row keys (Cmd+I insert, Cmd+D delete, Cmd+= subtotal, Cmd+minus adjustment, Cmd+R
@@ -283,8 +344,8 @@ Cmd+\\ credits, Cmd+/ charges) follow the habits of people coming from other bud
 tools, so the shortcut sheet moved to Shift+Cmd+/ and Cmd+1 and Cmd+2 have no setup tab;
 fill down is on Shift+Cmd+D instead of the spreadsheet Cmd+D. Insert > Account, Category and Production Total have no key; they go to the level they
 belong to first and open the same dialog as the buttons. Insert > Separator has no key
-either; it adds a separator row below the cursor on the detail grid. Info, Settings and
-Baseline tabs are in View > Setup Tab. Cmd+I inserts a line, so italic is Shift+Cmd+I;
+either; it adds a separator row below the cursor on the detail grid. The Notes, Info and
+Baseline tabs are in View > Tools Tab; where the panel goes is in View > Tools Panel. Cmd+I inserts a line, so italic is Shift+Cmd+I;
 Cmd+[ and Cmd+] step accounts, so indenting is Option+Cmd+Right and Left. Format > Text
 Color and Clear Formatting have no key.
 
@@ -301,7 +362,7 @@ topsheet and account lists take one pasted cell at a time.
 **Who answers a key.** A menu item and its key run the same function in `main.js`, by id.
 On macOS the web page sees a key first and the menu's key equivalent fires only if the page
 didn't handle it, so `main.js` leaves app-level keys (file commands, undo and redo, select
-all, the setup panel, help) to the menu and handles grid keys itself, which stops the menu
+all, the tools panel, help) to the menu and handles grid keys itself, which stops the menu
 from firing too. On Windows and Linux `main.js` handles every key and ignores a menu event
 that repeats a key it handled in the last 400 ms. Cut, Copy and Paste are the stock menu
 items everywhere: text fields edit natively, and the grid answers the browser's `copy`,
@@ -392,7 +453,8 @@ choice is unknown.
 As, or File > Autosave (one setting for the app, kept in its data folder). With it on, a
 budget that has a file is saved into that file 3 seconds after you stop changing it (at
 most 30 seconds after the first unsaved change while you keep going), and right away when
-the window loses focus, when you close or quit, and before New, Open or Open Recent. The
+the app loses focus (moving between the main window and the tools window doesn't count),
+when you close or quit, and before New, Open or Open Recent. The
 unsaved-changes mark clears after each autosave. Undo and Redo keep working across
 autosaves (an undo is a change like any other and is saved in turn). A budget never saved
 (Untitled) can't be saved into a file: it gets a recovery copy instead (below), and the
@@ -512,6 +574,8 @@ crates/fwb-app/
   src/clipboard.rs   copy and paste whole rows, accounts and categories with the setup
                      they use: the app's one row clipboard, the paste review, the paste
   src/menu.rs        native menu bar, built from the same table as ui/js/shortcuts.js
+  src/tools.rs       the tools panel's own window: opening, hiding and placing it, telling
+                     the other window when the budget changed, the Notes tab's list
   src/safety.rs      saving safety as plain files: atomic writes, recovery copies,
                      backups, settings, the recent list (tested with temporary folders)
   src/safety_app.rs  its Tauri side: autosave timer, recovery and backup commands, Open
@@ -520,7 +584,7 @@ crates/fwb-app/
   examples/perf.rs   timings on a large sample budget (fwb_core::sample), and canned
                      replies for a UI harness (perf dump DIR)
   ui/                index.html, styles.css, setup.css, js/*.js (ES modules, no build step)
-  capabilities/      what the web view may call
+  capabilities/      what each window's web view may call (main.json, tools.json)
 ```
 
 **Rust owns the budget.** The app state is one `Session` behind a mutex. The web view never
@@ -590,24 +654,43 @@ and shows totals marked as partial. The budget keeps what the user typed.
 
 **The UI** is a handful of ES modules with no dependencies: `main.js` (state, navigation,
 shortcuts), `grid.js` (a generic keyboard grid used at all three levels), `levels.js`
-(turns a View into rows and columns), `setup.js` (the side panel), `footer.js`,
+(turns a View into rows and columns), `footer.js`,
 `modal.js`, `format.js` (money and decimal display), `api.js` (the command queue),
 `dom.js`, `shortcuts.js` (the one list of shortcuts, shared with the Rust menu and checked
-by a test), `help.js` (the shortcut sheet), `topsheet-setup.js` (charges, credits, sets,
-locations, info, settings and baseline tabs), `report.js` with `print.css` (printable
+by a test), `help.js` (the shortcut sheet), `topsheet-setup.js` (the Budget tab's
+charges, credits, info, settings and baseline), `report.js` with `print.css` (printable
 reports), `menu.js` (the small popup menus: breadcrumb jump lists and the column menu, and
 the right-click menu with its submenus), `context.js` (what the right-click menu offers at
 each level, opened by the mouse, Shift+F10 or the menu key), `rowformat.js` (bold, italic,
 indent, text color and the color palette; `context.css` draws the menu, the palette and
-the apply panel's small editors),
+the tools panel's small editors),
 `autocomplete.js` (the type-ahead list on a cell editor, a listbox the editor drives with
 `aria-activedescendant`), `quickentry.js` (wires it to the grid, sends edits that add
 setup items, the note editor, the fringe range keys and the formula bar),
 `clipboard.js` (copy, cut and paste of whole rows, and the paste review),
-`prefs.js` (per-user display choices in local storage: visible columns, panel width) and
-`sheet.js` (styles worked out at run time, below). The side panel opens on Apply (`apply.js`, the selected lines) and groups the
-setup tabs into Tables and Budget. Commands run one at a
-time, in order.
+`prefs.js` (per-user display choices in local storage: visible columns, the tools panel's
+place, size and tabs) and `sheet.js` (styles worked out at run time, below). `boot.js`
+starts `main.js`, or `toolswin.js` in the tools window (the page loaded with `?panel=1`).
+The tools panel is `tools.js` (panes, tabs, dragging, the header) with `apply.js` (the
+fringe, group, set, location and currency lists), `setup.js` (globals and units, and the
+helpers the Budget tabs in `topsheet-setup.js` share) and `notes.js` (the Notes tab);
+`tools.css` lays it out. Commands run one at a time, in order.
+
+**Two windows.** Popped out, the panel runs in a second web view on the same page and the
+same Rust session; every command works on the one budget either way. After any command
+that changes the budget (a new view `rev`), Rust sends `view-changed` to every window but
+the one that sent the command, and that window fetches a fresh view (`get_view`); a change
+made in the tools window counts in the main window's Last change like any other edit. The
+pages also talk directly, each listening only under its own label (`main` or `tools`) so a
+window never hears events meant for the other: the main window sends `selection-changed`
+(level, row keys, cursor, account) and `tools-state` (that and the tab layout, when the
+tools window says `tools-ready`); the tools window sends `tools-position` (a dock button),
+`tools-layout` (tabs moved; the main window keeps the preference), `tools-jump` (a noted
+line) and `menu` (keys and menu items for the main window). Rust sends `tools-geometry`
+(where the tools window is, remembered by the main window) and `tools-closed` (it closed:
+the panel docks back). A menu item chosen while the tools window is in front goes to it
+first (`src/menu.rs`): it keeps Undo, Redo and Select All for its own text fields and the
+tab items, and passes the rest on.
 
 The grid redraws by patching: a row whose content is unchanged keeps its element, so an
 edit touches the rows it changed, and scroll position, focus and an open cell editor stay
@@ -635,8 +718,17 @@ untrusted (a budget file is data from anywhere).
   the panel keeps its standard width and lines show without color.
 - **Navigation is locked** to the bundled UI (`tauri://localhost`, or `http://tauri.localhost`
   on Windows) by a small navigation guard, so a link or dropped URL can't load another page.
+  The guard is a plugin hook, so it covers every web view, the tools window included; that
+  window is made in Rust with a fixed page (`index.html?panel=1`), never a URL from the page.
 - **Least privilege for the web view.** `capabilities/main.json` grants the main window
-  only the app's own budget commands. `build.rs` lists those commands in an app manifest,
+  only the app's own budget commands (and sending events to the tools window).
+  `capabilities/tools.json` grants the tools window, by its label, only what the panel
+  calls: `get_view`, the selection summary and the apply edits, the setup tables, the
+  Budget tabs, a line's note and the notes list, and listening for and sending events. It
+  can't open, save, print, undo, use the clipboard or recovery, or open or close windows;
+  its keys for those go to the main window as menu commands, which the main window runs as
+  if chosen from its own menu bar. A Rust test checks that every command the panel's
+  scripts name is granted and nothing else is. `build.rs` lists those commands in an app manifest,
   which turns on Tauri's access control for them: anything not listed is refused. The web
   view gets no file system, shell, HTTP or dialog permissions; there is no fs or shell
   plugin registered. (`tauri-plugin-dialog` depends on the fs plugin crate as a library,
@@ -671,5 +763,7 @@ grid (the data is in `view.variance`; reports already print it), renaming setup 
 the new one, then delete the old), renumbering accounts when the coding pattern changes,
 import from other tools, find and replace, single-instance handling on Windows and Linux,
 the macOS system recent documents list, a mark on copied rows, and the total change a
-paste will cause in its review. Printing, the Windows/Linux menu keys, and Copy Rows from
-the menu bar reaching the system clipboard still need a live check.
+paste will cause in its review. Printing, the Windows/Linux menu keys, Copy Rows from
+the menu bar reaching the system clipboard, and the tools window (placement on a second
+screen, keys while it is in front, closing with the main window) still need a live check.
+The two tool panes split their height evenly; there is no divider to drag between them yet.

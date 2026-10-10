@@ -29,7 +29,7 @@ import {
 } from './levels.js';
 import { renderFooter } from './footer.js';
 import { formDialog, confirmDialog, isModalOpen } from './modal.js';
-import { renderSetup } from './setup.js';
+import { renderTools, selectToolsTab, focusToolsKey, toolsLayout, setToolsLayout } from './tools.js';
 import { printReport } from './report.js';
 import { SHORTCUTS, matchShortcut, menuRunsAppKeys, shortcutById, withShortcut } from './shortcuts.js';
 import { isHelpOpen, toggleHelp, closeHelp } from './help.js';
@@ -48,8 +48,8 @@ const state = {
   level: 'topsheet', // 'topsheet' | 'accounts' | 'details'
   cat: null, // { code, ti }
   acct: null, // { code, ai }
-  tab: 'apply', // side panel tab; 'apply' is the apply panel (apply.js)
-  panelOpen: true,
+  panelOpen: true, // the tools panel shows (docked, or its window)
+  position: readPosition(), // 'right', 'bottom' or 'window' (saved per user)
   selection: null, // { count, totals } on the detail grid
   memory: {}, // level -> row key to return to
   columns: readColumnChoices(), // optional detail column -> shown (saved per user)
@@ -76,7 +76,10 @@ const grid = new Grid($('grid-host'), {
   },
   // Type-ahead in setup-backed cells, and the formula bar (quickentry.js).
   onEditStart: (editor) => editAssist(editor),
-  onCursor: (at) => showFormula(at),
+  onCursor: (at) => {
+    showFormula(at);
+    cursorMoved();
+  },
   enterMovesDown: false,
 });
 
@@ -142,17 +145,7 @@ function trackChanges(view, opts) {
     c.prev = net;
     return;
   }
-  if (!NOT_EDITS.has(opts.cmd)) {
-    // `revert` (an undo that takes back a toggle the user didn't mean: the
-    // first click of a double-click in the apply panel) puts back the last
-    // change from before that toggle.
-    if (opts.revert && c.before !== undefined) {
-      c.last = c.before;
-    } else {
-      c.before = c.last;
-      c.last = net - c.prev;
-    }
-  }
+  if (!NOT_EDITS.has(opts.cmd)) c.last = net - c.prev;
   c.prev = net;
 }
 
@@ -400,22 +393,46 @@ function renderActions() {
   }
 }
 
+/**
+ * The tools panel (tools.js), docked at the right or the bottom. Popped out,
+ * the docked place stays empty and the tools window draws the panel; this
+ * window sends it the grid's selection.
+ */
 function renderPanel() {
   const panel = $('panel');
-  panel.hidden = !state.panelOpen;
-  if (resizer) resizer.hidden = !state.panelOpen || !dynamicStyles;
+  const docked = state.position !== 'window';
+  $('workspace').classList.toggle('tools-bottom', state.position === 'bottom');
+  panel.hidden = !state.panelOpen || !docked;
+  syncResizer();
   $('btn-panel').setAttribute('aria-pressed', String(state.panelOpen));
-  if (!state.panelOpen || !state.view) return;
-  renderSetup(panel, state.view, {
+  if (!docked) broadcastSelection();
+  if (panel.hidden || !state.view) return;
+  renderTools(panel, state.view, toolsCtx());
+}
+
+function toolsCtx() {
+  return {
     call: (cmd, args, opts) => call(cmd, args, opts),
-    tab: state.tab,
-    // Apply panel: the grid's selected row keys at the current level.
-    selection: () => ({ level: state.level, keys: grid.selectedKeys(), cat: state.cat }),
-    setTab: (tab) => {
-      state.tab = tab;
-      renderPanel();
-    },
-  });
+    // The grid's selected row keys at the current level, and the cursor row.
+    selection: currentSelection,
+    position: state.position,
+    setPosition: (where) => setPosition(where),
+    jumpTo: (entry) => jumpTo(entry),
+  };
+}
+
+/** What the tools panel needs to know about the grid. */
+function currentSelection() {
+  return {
+    level: state.level,
+    keys: grid.selectedKeys(),
+    cat: state.cat,
+    cursor: grid.cursorKey(),
+    account:
+      state.level === 'details' && state.acct && state.cat
+        ? { code: state.acct.code, ai: state.acct.ai, ti: state.cat.ti }
+        : null,
+  };
 }
 
 function renderFooterNow() {
@@ -491,7 +508,7 @@ let opening = null;
  * (from anywhere). The view carries only the account on screen, so this asks
  * Rust for it first and draws when it arrives.
  */
-async function openAccount(ti, ai) {
+async function openAccount(ti, ai, rowKey = null) {
   const c = state.ix.cats.find((x) => x.ti === ti);
   const a = c && (c.cat.accounts || [])[ai];
   if (!a) return;
@@ -513,7 +530,8 @@ async function openAccount(ti, ai) {
   state.acct = { code: v.account.code, ai: v.account.ai };
   state.level = 'details';
   state.selection = null;
-  apply(v, { cmd: 'focus_account', focusFirst: true, focusCol: 'description', resetSelection: true });
+  const land = rowKey ? { focusKey: rowKey } : { focusFirst: true };
+  apply(v, { cmd: 'focus_account', ...land, focusCol: 'description', resetSelection: true });
   grid.focus();
 }
 
@@ -675,7 +693,8 @@ function wireClipboard() {
 let selTimer = null;
 let selSeq = 0;
 function selectionChanged(keys) {
-  document.dispatchEvent(new CustomEvent('fwb:selection')); // apply panel (apply.js)
+  document.dispatchEvent(new CustomEvent('fwb:selection')); // the tools panel (apply.js, notes.js)
+  broadcastSelection();
   if (state.level !== 'details') return;
   requestSelectionTotals(keys);
 }
@@ -998,101 +1017,309 @@ async function doPrint(kind) {
 }
 
 // ---------------------------------------------------------------------------
-// View: setup panel
+// View: the tools panel, docked at the right (the default) or the bottom, or
+// popped out into its own window (src/tools.rs). Where it is is saved per user.
 
-function togglePanel() {
+// A function declaration, not a const: `state` reads it before this line runs.
+function positions() {
+  return ['right', 'bottom', 'window'];
+}
+
+function readPosition() {
+  const p = readPref('toolsPosition', 'right');
+  return positions().includes(p) ? p : 'right';
+}
+
+function panelHasFocus() {
   const a = document.activeElement;
-  const hadFocus = $('panel').contains(a) || a === resizer;
+  return $('panel').contains(a) || a === resizer;
+}
+
+/** Shows or hides the panel wherever it is (Option+Cmd+S). */
+function togglePanel() {
+  const hadFocus = panelHasFocus();
   state.panelOpen = !state.panelOpen;
+  if (state.position === 'window') openToolsWindow(state.panelOpen);
   renderPanel();
   if (!state.panelOpen && hadFocus) grid.focus();
 }
 
-/** Opens the setup panel on a tab and puts focus on the tab. */
+// The tab to focus in the tools window once it has the layout.
+let toolsFocus = null;
+
+/** Opens the tools panel on a tab and puts focus on the tab. */
 function showTab(tab) {
-  state.tab = tab;
+  const key = selectToolsTab(tab);
   state.panelOpen = true;
+  if (state.position === 'window') {
+    toolsFocus = key;
+    openToolsWindow(true).then(sendToolsState);
+    return;
+  }
   renderPanel();
-  const button = document.getElementById(`setup-tab-${tab}`);
-  if (button) button.focus();
+  focusToolsKey(key);
+}
+
+/**
+ * Moves the panel: 'right' or 'bottom' docks it in this window, 'window' pops
+ * it out. Showing it if it was hidden. `fromTools`: asked by the tools window
+ * (its dock buttons) or because it closed.
+ */
+function setPosition(where, { fromTools = false } = {}) {
+  if (!positions().includes(where)) return;
+  const was = state.position;
+  if (where === was && state.panelOpen) return;
+  const hadFocus = panelHasFocus();
+  state.position = where;
+  state.panelOpen = true;
+  writePref('toolsPosition', where);
+  sizePanel();
+  renderPanel();
+  if (where === 'window') {
+    openToolsWindow(true).then(sendToolsState);
+    if (hadFocus) grid.focus();
+    return;
+  }
+  if (was === 'window') invoke('close_tools_window').catch(() => {});
+  if (hadFocus || fromTools) focusToolsKey(`tools:place:${where}`);
+}
+
+/** Shows (made if needed, where it was last) or hides the tools window. */
+async function openToolsWindow(show) {
+  const g = readPref('toolsWindow', null);
+  const geometry =
+    g && typeof g === 'object' && ['x', 'y', 'width', 'height'].every((k) => typeof g[k] === 'number' && Number.isFinite(g[k]))
+      ? { x: g.x, y: g.y, width: g.width, height: g.height }
+      : null;
+  try {
+    await invoke('tools_window', { show, geometry });
+  } catch (e) {
+    toast(e);
+    if (show && state.position === 'window') {
+      // No window: keep the panel where it can be used.
+      state.position = 'right';
+      writePref('toolsPosition', 'right');
+      sizePanel();
+      renderPanel();
+    }
+  }
+}
+
+function emitTo(target, name, payload) {
+  const events = window.__TAURI__ && window.__TAURI__.event;
+  if (!events || typeof events.emitTo !== 'function') return Promise.resolve();
+  return events.emitTo(target, name, payload).catch(() => {});
+}
+
+/** Everything the tools window needs to draw: the selection and the layout. */
+function sendToolsState() {
+  if (state.position !== 'window') return;
+  const sel = currentSelection();
+  lastSelectionSig = JSON.stringify(sel);
+  emitTo('tools', 'tools-state', { selection: sel, layout: toolsLayout(), focus: toolsFocus });
+  toolsFocus = null;
+}
+
+// The grid's selection as last sent to the tools window.
+let lastSelectionSig = '';
+let selectionTimer = null;
+
+/** Sends the grid's selection to the tools window when it changed. */
+function broadcastSelection() {
+  if (state.position !== 'window' || !state.panelOpen) return;
+  clearTimeout(selectionTimer);
+  selectionTimer = setTimeout(() => {
+    const sel = currentSelection();
+    const sig = JSON.stringify(sel);
+    if (sig === lastSelectionSig) return;
+    lastSelectionSig = sig;
+    emitTo('tools', 'selection-changed', sel);
+  }, 30);
+}
+
+/** The grid's cursor moved: the Notes tab shows that line's note. */
+function cursorMoved() {
+  document.dispatchEvent(new CustomEvent('fwb:cursor'));
+  broadcastSelection();
+}
+
+/** Goes to a line from the Notes tab's list: its account, with the line selected. */
+function jumpTo(entry) {
+  if (!entry || typeof entry !== 'object' || !state.ix) return;
+  const id = Number(entry.row_id);
+  if (!Number.isSafeInteger(id)) return;
+  let target = null;
+  const c = state.ix.cats.find((x) => x.ti === entry.ti);
+  const a = c && (c.cat.accounts || [])[entry.ai];
+  if (a && a.code === entry.account) target = { ti: entry.ti, ai: entry.ai };
+  for (const x of target ? [] : state.ix.cats) {
+    const i = (x.cat.accounts || []).findIndex((y) => y.code === entry.account);
+    if (i >= 0) {
+      target = { ti: x.ti, ai: i };
+      break;
+    }
+  }
+  if (!target) {
+    toast('That line is no longer in the budget.');
+    return;
+  }
+  if (grid.editor) grid.commitEdit(null);
+  openAccount(target.ti, target.ai, `r${id}`);
+}
+
+// Another window changed the budget (src/tools.rs): fetch the view, once even
+// if several changes arrive while it is on its way.
+let refreshing = false;
+let refreshAgain = false;
+
+async function refreshView() {
+  if (refreshing) {
+    refreshAgain = true;
+    return;
+  }
+  refreshing = true;
+  try {
+    do {
+      refreshAgain = false;
+      try {
+        const v = await invoke('get_view');
+        // An edit made in the tools window: it counts in the footer's changes.
+        if (v) apply(v, { cmd: 'view-changed' });
+      } catch (e) {
+        toast(e);
+      }
+    } while (refreshAgain);
+  } finally {
+    refreshing = false;
+  }
+}
+
+let geometryTimer = null;
+
+/** The tools window moved or was resized: remember where (src/tools.rs). */
+function saveGeometry(g) {
+  if (!g || typeof g !== 'object') return;
+  clearTimeout(geometryTimer);
+  geometryTimer = setTimeout(() => {
+    if (['x', 'y', 'width', 'height'].every((k) => typeof g[k] === 'number' && Number.isFinite(g[k]))) {
+      writePref('toolsWindow', { x: g.x, y: g.y, width: g.width, height: g.height });
+    }
+  }, 250);
 }
 
 // ---------------------------------------------------------------------------
-// View: the setup panel's width (drag its edge; saved per user)
+// View: the docked panel's size (drag its edge; saved per user): its width at
+// the right, its height at the bottom.
 
-const PANEL_DEFAULT = 380; // styles.css .panel
-const PANEL_MIN = 260;
+const SIZES = {
+  // styles.css .panel and tools.css .workspace.tools-bottom > .panel
+  right: { pref: 'panelWidth', rule: 'panel-width', fallback: 380, min: 260, max: () => Math.min(760, window.innerWidth - 480) },
+  bottom: { pref: 'panelHeight', rule: 'panel-height', fallback: 300, min: 160, max: () => window.innerHeight - 260 },
+};
 let resizer = null;
-let panelWidth = null; // null: the default width
+const panelSize = { right: null, bottom: null }; // null: the default size
 
-function panelMax() {
-  return Math.max(PANEL_MIN, Math.min(760, window.innerWidth - 480));
+function sizeOf(where) {
+  return SIZES[where === 'bottom' ? 'bottom' : 'right'];
 }
 
-/** Sets the panel's width (null: back to the default). Saves it when `save`. */
-function setPanelWidth(w, { save = false } = {}) {
-  panelWidth = w === null ? null : Math.round(Math.max(PANEL_MIN, Math.min(w, panelMax())));
-  setRules('panel-width', panelWidth === null ? '' : `.workspace > .panel { width: ${panelWidth}px; }`);
-  if (resizer) {
-    resizer.setAttribute('aria-valuenow', String(panelWidth === null ? PANEL_DEFAULT : panelWidth));
-    resizer.setAttribute('aria-valuemax', String(panelMax()));
-  }
-  if (save) writePref('panelWidth', panelWidth);
+function panelMax(where) {
+  const s = sizeOf(where);
+  return Math.max(s.min, s.max());
 }
 
-function currentPanelWidth() {
-  return panelWidth === null ? $('panel').getBoundingClientRect().width || PANEL_DEFAULT : panelWidth;
+/** Sets the docked panel's size (null: back to the default). Saves it when `save`. */
+function setPanelSize(where, n, { save = false } = {}) {
+  const s = sizeOf(where);
+  const key = where === 'bottom' ? 'bottom' : 'right';
+  const v = n === null ? null : Math.round(Math.max(s.min, Math.min(n, panelMax(where))));
+  panelSize[key] = v;
+  const rule = key === 'bottom' ? `.workspace.tools-bottom > .panel { height: ${v}px; }` : `.workspace > .panel { width: ${v}px; }`;
+  setRules(s.rule, v === null ? '' : rule);
+  if (save) writePref(s.pref, v);
+  syncResizer();
+}
+
+function currentPanelSize(where) {
+  const key = where === 'bottom' ? 'bottom' : 'right';
+  if (panelSize[key] !== null) return panelSize[key];
+  const r = $('panel').getBoundingClientRect();
+  return (key === 'bottom' ? r.height : r.width) || sizeOf(where).fallback;
+}
+
+/** Reapplies the saved sizes (the window was resized, or the panel moved). */
+function sizePanel() {
+  for (const k of ['right', 'bottom']) if (panelSize[k] !== null) setPanelSize(k, panelSize[k]);
+  syncResizer();
+}
+
+/** The edge's role, label and numbers follow where the panel is. */
+function syncResizer() {
+  if (!resizer) return;
+  const panel = $('panel');
+  resizer.hidden = panel.hidden || !dynamicStyles;
+  const bottom = state.position === 'bottom';
+  const s = sizeOf(state.position);
+  const key = bottom ? 'bottom' : 'right';
+  resizer.setAttribute('aria-orientation', bottom ? 'horizontal' : 'vertical');
+  resizer.setAttribute('aria-label', bottom ? 'Tools panel height' : 'Tools panel width');
+  resizer.title = `Drag to resize the tools panel; double-click for the standard ${bottom ? 'height' : 'width'}`;
+  resizer.setAttribute('aria-valuemin', String(s.min));
+  resizer.setAttribute('aria-valuemax', String(panelMax(state.position)));
+  resizer.setAttribute('aria-valuenow', String(panelSize[key] === null ? s.fallback : panelSize[key]));
 }
 
 function wirePanelResizer() {
   resizer = el('div', {
     class: 'panel-resizer',
-    title: 'Drag to resize the setup panel; double-click for the standard width',
-    attrs: {
-      role: 'separator',
-      tabindex: '0',
-      'aria-orientation': 'vertical',
-      'aria-controls': 'panel',
-      'aria-label': 'Setup panel width',
-      'aria-valuemin': String(PANEL_MIN),
-      'aria-valuemax': String(panelMax()),
-      'aria-valuenow': String(PANEL_DEFAULT),
-    },
+    attrs: { role: 'separator', tabindex: '0', 'aria-controls': 'panel' },
   });
   $('panel').before(resizer);
-  const saved = readPref('panelWidth', null);
-  if (typeof saved === 'number' && Number.isFinite(saved)) setPanelWidth(saved);
+  for (const k of ['right', 'bottom']) {
+    const saved = readPref(SIZES[k].pref, null);
+    if (typeof saved === 'number' && Number.isFinite(saved)) setPanelSize(k, saved);
+  }
+  syncResizer();
 
   resizer.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     e.preventDefault();
-    const startX = e.clientX;
-    const startW = currentPanelWidth();
+    const where = state.position;
+    const bottom = where === 'bottom';
+    const start = bottom ? e.clientY : e.clientX;
+    const startSize = currentPanelSize(where);
     resizer.setPointerCapture(e.pointerId);
-    document.body.classList.add('panel-resizing');
-    const move = (ev) => setPanelWidth(startW + (startX - ev.clientX));
+    document.body.classList.add(bottom ? 'panel-resizing-y' : 'panel-resizing');
+    // The panel grows as its edge moves away from it: left at the right, up at the bottom.
+    const move = (ev) => setPanelSize(where, startSize + (start - (bottom ? ev.clientY : ev.clientX)));
     const end = () => {
       resizer.removeEventListener('pointermove', move);
       resizer.removeEventListener('pointerup', end);
       resizer.removeEventListener('pointercancel', end);
-      document.body.classList.remove('panel-resizing');
-      if (panelWidth !== null) writePref('panelWidth', panelWidth);
+      document.body.classList.remove('panel-resizing', 'panel-resizing-y');
+      const key = bottom ? 'bottom' : 'right';
+      if (panelSize[key] !== null) writePref(sizeOf(where).pref, panelSize[key]);
     };
     resizer.addEventListener('pointermove', move);
     resizer.addEventListener('pointerup', end);
     resizer.addEventListener('pointercancel', end);
   });
-  resizer.addEventListener('dblclick', () => setPanelWidth(null, { save: true }));
-  // Left makes the panel wider (the edge moves left), Right narrower; Shift for
-  // bigger steps; Home and End for the narrowest and widest; Escape to the grid.
+  resizer.addEventListener('dblclick', () => setPanelSize(state.position, null, { save: true }));
+  // At the right, Left makes the panel wider (the edge moves left) and Right
+  // narrower; at the bottom, Up makes it taller and Down shorter. Shift for
+  // bigger steps; Home and End for the smallest and biggest; Escape to the grid.
   resizer.addEventListener('keydown', (e) => {
+    const where = state.position;
+    const bottom = where === 'bottom';
     const step = e.shiftKey ? 80 : 20;
-    const w = currentPanelWidth();
+    const n = currentPanelSize(where);
+    const grow = bottom ? 'ArrowUp' : 'ArrowLeft';
+    const shrink = bottom ? 'ArrowDown' : 'ArrowRight';
     let next = null;
-    if (e.key === 'ArrowLeft') next = w + step;
-    else if (e.key === 'ArrowRight') next = w - step;
-    else if (e.key === 'Home') next = PANEL_MIN;
-    else if (e.key === 'End') next = panelMax();
+    if (e.key === grow) next = n + step;
+    else if (e.key === shrink) next = n - step;
+    else if (e.key === 'Home') next = sizeOf(where).min;
+    else if (e.key === 'End') next = panelMax(where);
     else if (e.key === 'Escape') {
       e.preventDefault();
       grid.focus();
@@ -1100,11 +1327,9 @@ function wirePanelResizer() {
     } else return;
     e.preventDefault();
     e.stopPropagation();
-    setPanelWidth(next, { save: true });
+    setPanelSize(where, next, { save: true });
   });
-  window.addEventListener('resize', () => {
-    if (panelWidth !== null) setPanelWidth(panelWidth);
-  });
+  window.addEventListener('resize', sizePanel);
 }
 
 // ---------------------------------------------------------------------------
@@ -1238,6 +1463,9 @@ const COMMANDS = {
   'go.next_account': () => stepAccount(1),
   'go.prev_account': () => stepAccount(-1),
   'view.toggle_panel': togglePanel,
+  'view.panel.right': () => setPosition('right'),
+  'view.panel.bottom': () => setPosition('bottom'),
+  'view.panel.window': () => setPosition('window'),
   'help.shortcuts': toggleHelp,
   // The menu items are answered in Rust; these run only for the keys on
   // Windows and Linux, where the page sees them first.
@@ -1323,10 +1551,29 @@ function closeWindow() {
   }
 }
 
-function listenToMenu() {
+/**
+ * Events for this window: menu commands (from the menu bar, or keys the tools
+ * window passes on), and the tools window's news (src/tools.rs). Listened for
+ * under this window's label, so events meant for the tools window, and this
+ * window's own view changes, never arrive here.
+ */
+function listenToEvents() {
   const events = window.__TAURI__ && window.__TAURI__.event;
   if (!events || typeof events.listen !== 'function') return;
-  events.listen('menu', (e) => onMenu(e.payload)).catch((err) => toast(err));
+  const on = (name, fn) => events.listen(name, (e) => fn(e.payload), { target: 'main' }).catch((err) => toast(err));
+  on('menu', onMenu);
+  on('view-changed', () => refreshView());
+  on('tools-ready', () => sendToolsState());
+  on('tools-closed', () => {
+    // Closed by its own close button (or Close Window): the panel docks back.
+    if (state.position === 'window') setPosition('right', { fromTools: true });
+  });
+  on('tools-position', (where) => setPosition(where, { fromTools: true }));
+  on('tools-layout', (layout) => {
+    if (setToolsLayout(layout) && state.position !== 'window') renderPanel();
+  });
+  on('tools-geometry', saveGeometry);
+  on('tools-jump', jumpTo);
 }
 
 // ---------------------------------------------------------------------------
@@ -1408,12 +1655,12 @@ function wire() {
     'btn-saveas': ['Save as a new file', 'file.save_as'],
     'btn-undo': ['Undo', 'edit.undo'],
     'btn-redo': ['Redo', 'edit.redo'],
-    'btn-panel': ['Show or hide the setup panel', 'view.toggle_panel'],
+    'btn-panel': ['Show or hide the tools panel', 'view.toggle_panel'],
   };
   for (const [id, [label, cmd]] of Object.entries(tips)) $(id).title = withShortcut(label, cmd);
   window.addEventListener('keydown', onKeyDown);
   wireClipboard();
-  listenToMenu();
+  listenToEvents();
 }
 
 async function start() {
@@ -1429,6 +1676,8 @@ async function start() {
     toast(e);
   }
   grid.focus();
+  // Popped out last time: the tools window opens where it was.
+  if (state.position === 'window' && state.panelOpen) openToolsWindow(true).then(sendToolsState);
   await safety.start(); // a file to open, budgets to recover
 }
 

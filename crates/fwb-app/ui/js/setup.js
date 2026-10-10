@@ -1,40 +1,20 @@
-// Setup panel: globals, fringes, groups, units and currencies.
+// Setup tables drawn in place: globals and units (tabs of the tools panel,
+// tools.js), and the kit of helpers the Budget tab's own tabs use
+// (topsheet-setup.js: charges, credits, info, settings, baseline). Fringes,
+// groups, sets, locations and currencies are lists in apply.js.
 //
-// renderSetup(container, view, ctx) rebuilds the panel from scratch on every
-// call. Budget text only ever reaches the page through textContent and input
-// values (never innerHTML), and styling is done with classes from setup.css.
+// tools.js draws the whole panel on every view: setupBegin() before, then
+// renderSetupTab() for each of these tabs on screen, then setupEnd() swaps
+// the new panel in and puts focus back. Budget text only ever reaches the
+// page through textContent and input values (never innerHTML), and styling is
+// done with classes from setup.css.
 //
 // Edits commit on Enter or blur and Escape puts the old value back. Commands run
 // one at a time through a queue, and each one is built from the newest view when
 // it runs, so two quick edits to the same item never undo each other.
 
-import { EXTRA_TABS, renderExtraTab } from './topsheet-setup.js';
-import { renderApply } from './apply.js';
-
-const TABS = [
-  // The apply panel (apply.js): what the selected lines carry. No tab strip.
-  { id: 'apply', label: 'Apply' },
-  { id: 'globals', label: 'Globals' },
-  { id: 'fringes', label: 'Fringes' },
-  { id: 'groups', label: 'Groups' },
-  { id: 'units', label: 'Units' },
-  { id: 'currencies', label: 'Currencies' },
-  // Sets, locations, charges, credits, info, settings, baseline.
-  ...EXTRA_TABS,
-];
-
-// Tabs are split into sections so the strip fits one row: the apply panel
-// (first, and the default: it's what is used while editing lines), reusable
-// tables lines refer to, and settings for the budget as a whole.
-const SECTIONS = [
-  { id: 'apply', label: 'Apply', tabs: ['apply'] },
-  { id: 'tables', label: 'Tables', tabs: ['globals', 'fringes', 'groups', 'units', 'currencies', 'sets', 'locations'] },
-  { id: 'budget', label: 'Budget', tabs: ['charges', 'credits', 'info', 'settings', 'baseline'] },
-];
-
-function sectionOf(tab) {
-  return SECTIONS.find((s) => s.tabs.includes(tab)) || SECTIONS[0];
-}
+import { renderExtraTab } from './topsheet-setup.js';
+import { anchoredForm } from './modal.js';
 
 const GLOBAL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)$/;
@@ -55,30 +35,41 @@ const state = {
   drafts: {},
   // Rejected-call messages by item key (or "add" key), shown until the next try.
   errors: new Map(),
-  // Tab shown last time; switching tabs drops old error messages.
-  tab: null,
+  // Tabs shown last time; showing other tabs drops old error messages.
+  tabs: '',
+  shown: [],
 };
 
 let uid = 0;
 
-export function renderSetup(container, view, ctx) {
+/**
+ * Starts drawing the panel into `container` (the element that stays on the
+ * page): notes where focus is so setupEnd() can put it back.
+ */
+export function setupBegin(container, view, ctx) {
   const focus = captureFocus(container);
   state.container = container;
   state.view = view && typeof view === 'object' ? view : {};
   state.ctx = ctx;
+  state.shown = [];
   uid = 0;
+  return focus;
+}
 
-  const tab = TABS.some((t) => t.id === (ctx && ctx.tab)) ? ctx.tab : 'apply';
-  if (tab !== state.tab) state.errors.clear();
-  state.tab = tab;
-  const root = el('div', 'setup');
-  if (tab === 'apply') {
-    const host = el('div', 'setup-panel apply-host');
-    renderApply(host, state.view, ctx);
-    root.append(renderSections(tab), host);
-  } else {
-    root.append(renderSections(tab), renderTabs(tab), renderPanel(tab));
-  }
+/** Draws setup tab `tab` (globals, units, or one of the Budget tab's) into `panel`. */
+export function renderSetupTab(panel, tab) {
+  state.shown.push(tab);
+  panel.classList.add('setup-panel');
+  if (tab === 'globals') renderGlobals(panel);
+  else if (tab === 'units') renderUnits(panel);
+  else renderExtraTab(tab, panel, kit());
+}
+
+/** Swaps the newly drawn panel `root` in and restores focus. */
+export function setupEnd(container, root, focus) {
+  const tabs = state.shown.join(' ');
+  if (tabs !== state.tabs) state.errors.clear();
+  state.tabs = tabs;
   // One swap, so a scrolled parent keeps its position.
   state.swapping = true;
   try {
@@ -192,15 +183,6 @@ function centsToText(c) {
   return `${neg ? '-' : ''}${(n / 100n).toString()}.${(n % 100n).toString().padStart(2, '0')}`;
 }
 
-// Money as typed ("150,000", "(12.50)") to text the backend parses.
-function moneyInput(s) {
-  let t = s.replace(/[,\s]/g, '');
-  if (t === '') return null;
-  const m = /^\((.*)\)$/.exec(t);
-  if (m) t = `-${m[1]}`;
-  return t;
-}
-
 // Decimal string with its whole part grouped: "1234.5" to "1,234.5".
 function formatDecimal(s) {
   const m = /^(-?)(\d+)(\.\d+)?$/.exec(str(s));
@@ -235,8 +217,8 @@ function captureFocus(container) {
   if (explicit) return { key: explicit };
   if (inside && a.dataset && a.dataset.key) {
     const info = { key: a.dataset.key };
-    if (a.dataset.orig !== undefined && a.value !== a.dataset.orig) {
-      info.value = a.value;
+    if (a.dataset.orig !== undefined && a.value !== a.dataset.orig) info.value = a.value;
+    if (typeof a.selectionStart === 'number') {
       info.start = a.selectionStart;
       info.end = a.selectionEnd;
     }
@@ -248,7 +230,7 @@ function captureFocus(container) {
 function restoreFocus(container, info) {
   if (!info) return;
   let target = findByData('key', info.key);
-  if (!target) target = container.querySelector('.setup-tab[aria-selected="true"]');
+  if (!target) target = container.querySelector('[role="tab"][aria-selected="true"]');
   if (!target) return;
   if (info.value !== undefined && 'value' in target) target.value = info.value;
   target.focus({ preventScroll: true });
@@ -274,8 +256,7 @@ function applyBusy() {
   const c = state.container;
   if (!c) return;
   const busy = isBusy();
-  const panel = c.querySelector('.setup-panel');
-  if (panel) panel.setAttribute('aria-busy', busy ? 'true' : 'false');
+  for (const panel of c.querySelectorAll('.setup-panel')) panel.setAttribute('aria-busy', busy ? 'true' : 'false');
   for (const b of c.querySelectorAll('button')) {
     if (b.dataset.nobusy) continue;
     if (busy) b.setAttribute('aria-disabled', 'true');
@@ -522,87 +503,7 @@ function neighbor(tab, names, i, addKey) {
 }
 
 // ---------------------------------------------------------------------------
-// Tabs and panel
-
-// Remembers the last tab used in each section, so switching back returns there.
-const lastTab = {};
-
-function renderSections(active) {
-  const current = sectionOf(active);
-  lastTab[current.id] = active;
-  const bar = el('div', 'setup-sections');
-  bar.setAttribute('role', 'group');
-  bar.setAttribute('aria-label', 'Setup section');
-  for (const s of SECTIONS) {
-    const b = el('button', 'setup-section', s.label);
-    b.type = 'button';
-    b.dataset.key = key('section', s.id);
-    b.dataset.nobusy = '1';
-    b.setAttribute('aria-pressed', s.id === current.id ? 'true' : 'false');
-    b.addEventListener('click', () => {
-      if (s.id === current.id) return;
-      const tab = lastTab[s.id] || s.tabs[0];
-      state.focusKey = key('section', s.id);
-      if (state.ctx && typeof state.ctx.setTab === 'function') state.ctx.setTab(tab);
-    });
-    bar.append(b);
-  }
-  return bar;
-}
-
-function renderTabs(active) {
-  const ids = sectionOf(active).tabs;
-  const tabs = TABS.filter((t) => ids.includes(t.id));
-  const bar = el('div', 'setup-tabs');
-  bar.setAttribute('role', 'tablist');
-  bar.setAttribute('aria-label', 'Budget setup');
-  const go = (id) => {
-    if (id === active) return;
-    state.focusKey = key('tab', id);
-    if (state.ctx && typeof state.ctx.setTab === 'function') state.ctx.setTab(id);
-  };
-  tabs.forEach((t, i) => {
-    const b = el('button', 'setup-tab', t.label);
-    b.type = 'button';
-    b.id = `setup-tab-${t.id}`;
-    b.setAttribute('role', 'tab');
-    b.setAttribute('aria-selected', t.id === active ? 'true' : 'false');
-    b.setAttribute('aria-controls', 'setup-panel');
-    b.tabIndex = t.id === active ? 0 : -1;
-    b.dataset.key = key('tab', t.id);
-    b.dataset.nobusy = '1';
-    b.addEventListener('click', () => go(t.id));
-    b.addEventListener('keydown', (e) => {
-      let j = null;
-      if (e.key === 'ArrowRight') j = (i + 1) % tabs.length;
-      else if (e.key === 'ArrowLeft') j = (i - 1 + tabs.length) % tabs.length;
-      else if (e.key === 'Home') j = 0;
-      else if (e.key === 'End') j = tabs.length - 1;
-      if (j === null) return;
-      e.preventDefault();
-      go(tabs[j].id);
-    });
-    bar.append(b);
-  });
-  return bar;
-}
-
-function renderPanel(tab) {
-  const panel = el('div', 'setup-panel');
-  panel.id = 'setup-panel';
-  panel.setAttribute('role', 'tabpanel');
-  panel.setAttribute('aria-labelledby', `setup-tab-${tab}`);
-  const render = {
-    globals: renderGlobals,
-    fringes: renderFringes,
-    groups: renderGroups,
-    units: renderUnits,
-    currencies: renderCurrencies,
-  }[tab];
-  if (render) render(panel);
-  else renderExtraTab(tab, panel, kit());
-  return panel;
-}
+// Lists
 
 function list(label) {
   const ul = el('ul', 'setup-list');
@@ -734,7 +635,7 @@ function renderGlobals(panel) {
   );
   const items = entries(b.globals);
   const names = items.map(([n]) => n);
-  const addKey = key('add', 'globals', 'name');
+  const addKey = key('add', 'globals');
 
   if (!items.length) {
     panel.append(emptyNote('No globals yet.'));
@@ -788,337 +689,18 @@ function renderGlobals(panel) {
   });
   if (items.length) panel.append(ul);
 
-  const hint = el('p', 'setup-hint', 'Letters, digits and _, not starting with a digit.');
-  hint.id = nextId();
-  const nameField = addInput('globals', 'name', { label: 'Name', placeholder: 'SHOOT_DAYS', hintId: hint.id });
-  const nameInput = nameField.querySelector('input');
-  const check = () => {
-    const v = nameInput.value.trim();
-    const bad = v !== '' && !GLOBAL_NAME.test(v);
-    hint.classList.toggle('setup-hint-bad', bad);
-    if (bad) nameInput.setAttribute('aria-invalid', 'true');
-    else nameInput.removeAttribute('aria-invalid');
-  };
-  nameInput.addEventListener('input', check);
-  check();
   panel.append(
-    addForm('globals', {
-      title: 'New global',
-      fields: [nameField, addInput('globals', 'formula', { label: 'Formula', placeholder: '30' })],
-      hint,
-      validate: (v) => {
-        const name = v.name.trim();
-        if (name === '') return ['name', 'Enter a global name.'];
-        if (!GLOBAL_NAME.test(name)) return ['name', `“${name}” can’t be a global name.`];
-        if (own(b.globals, name) !== undefined) return ['name', `There is already a global named ${name}.`];
-        if (v.formula.trim() === '') return ['formula', 'Enter a formula or number.'];
-        return null;
-      },
-      build: (v) => ['set_global', { name: v.name.trim(), formula: v.formula.trim() }],
-    }),
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Fringes
-
-function fringeArgs(name, patch) {
-  const f = own(budget().fringes, name) || {};
-  const out = {
-    kind: f.kind === 'flat' ? 'flat' : 'percent',
-    description: str(f.description),
-    rate: str(f.rate),
-    cutoff: f.cutoff === undefined || f.cutoff === null ? null : centsToText(f.cutoff),
-    unit: f.unit === undefined || f.unit === null ? null : String(f.unit),
-    ...patch,
-  };
-  if (out.kind === 'percent') out.unit = null;
-  else out.cutoff = null;
-  return ['set_fringe', { name, fringe: out }];
-}
-
-function timeUnits(current) {
-  const names = entries(budget().units)
-    .filter(([, u]) => u && typeof u === 'object' && u.hours !== undefined && u.hours !== null)
-    .map(([n]) => n);
-  if (current && !names.includes(current)) names.push(current);
-  return names;
-}
-
-function renderFringes(panel) {
-  const b = budget();
-  const r = report();
-  const base = baseCode();
-  panel.append(
-    el(
-      'p',
-      'setup-intro',
-      'Costs added on top of the lines they are applied to: a percent of pay, or a flat amount per line or per unit of time.',
-    ),
-  );
-  const items = entries(b.fringes);
-  const names = items.map(([n]) => n);
-  if (!items.length) panel.append(emptyNote('No fringes yet.'));
-
-  const ul = list('Fringes');
-  items.forEach(([name, f0], i) => {
-    const f = f0 && typeof f0 === 'object' ? f0 : {};
-    const ik = key('fringes', name);
-    const li = itemShell(ik, 'setup-block');
-    const kind = f.kind === 'flat' ? 'flat' : 'percent';
-    const sum = r ? own(r.fringes, name) : undefined;
-    const uses = sum && Number.isFinite(sum.uses) ? sum.uses : null;
-
-    const head = el('div', 'setup-head');
-    const nameEl = el('span', 'setup-name', name);
-    nameEl.title = name;
-    const figs = el('span', 'setup-figs');
-    if (uses !== null) figs.append(el('span', 'setup-muted', uses ? plural(uses, 'line', 'lines') : 'Not used'));
-    if (sum && sum.total !== undefined) {
-      const t = el('span', 'setup-num', formatCents(sum.total));
-      t.title = 'Total of this fringe';
-      figs.append(t);
-    }
-    head.append(
-      nameEl,
-      figs,
-      deleteButton({
-        itemKey: ik,
-        name,
-        what: 'fringe',
-        confirmText: uses
-          ? `Delete fringe ${name}? It comes off the ${plural(uses, 'line', 'lines')} it is applied to.`
-          : `Delete fringe ${name}?`,
-        build: () => ['delete_fringe', { name }],
-        neighborKey: neighbor('fringes', names, i, key('add', 'fringes', 'name')),
-      }),
-    );
-
-    const grid = el('div', 'setup-fields');
-    const kindSel = selectInput({
-      fieldKey: key('fringes', name, 'kind'),
-      value: kind,
-      options: [
-        ['percent', 'Percent of pay'],
-        ['flat', 'Flat amount'],
-      ],
-      onCommit: (v, old) =>
-        run(ik, () => fringeArgs(name, { kind: v }), { restore: [key('fringes', name, 'kind'), old] }),
-    });
-    const rate = textInput({
-      fieldKey: key('fringes', name, 'rate'),
-      value: str(f.rate),
-      num: true,
-      onCommit: (v, old) =>
-        run(ik, () => fringeArgs(name, { rate: v }), { restore: [key('fringes', name, 'rate'), old] }),
-    });
-    grid.append(field('Kind', kindSel), field('Rate', rate, { extra: kind === 'percent' ? '%' : base }));
-
-    if (kind === 'percent') {
-      const shown = f.cutoff === undefined || f.cutoff === null ? '' : formatCents(f.cutoff);
-      const cutoff = textInput({
-        fieldKey: key('fringes', name, 'cutoff'),
-        value: shown,
-        num: true,
-        placeholder: 'None',
-        onCommit: (v, old) =>
-          run(ik, () => fringeArgs(name, { cutoff: moneyInput(v) }), {
-            restore: [key('fringes', name, 'cutoff'), old],
-          }),
-      });
-      const fc = field('Cutoff (pay per earner)', cutoff, { wide: true });
-      grid.append(fc);
-    } else {
-      const current = f.unit === undefined || f.unit === null ? '' : String(f.unit);
-      const per = selectInput({
-        fieldKey: key('fringes', name, 'unit'),
-        value: current,
-        options: [['', 'Line'], ...timeUnits(current).map((u) => [u, u])],
-        onCommit: (v, old) =>
-          run(ik, () => fringeArgs(name, { unit: v === '' ? null : v }), {
-            restore: [key('fringes', name, 'unit'), old],
-          }),
-      });
-      grid.append(field('Charged per', per, { wide: true }));
-    }
-
-    const desc = textInput({
-      fieldKey: key('fringes', name, 'description'),
-      value: str(f.description),
-      onCommit: (v, old) =>
-        run(ik, () => fringeArgs(name, { description: v }), {
-          restore: [key('fringes', name, 'description'), old],
-        }),
-    });
-    grid.append(field('Description', desc, { wide: true }));
-    li.append(head, grid);
-    finishItem(li, ik, issuesFor('fringe', name), rate);
-    ul.append(li);
-  });
-  if (items.length) panel.append(ul);
-
-  panel.append(
-    addForm('fringes', {
-      title: 'New fringe',
-      fields: [
-        addInput('fringes', 'name', { label: 'Name', placeholder: 'Payroll' }),
-        addSelect('fringes', 'kind', 'Kind', [
-          ['percent', 'Percent'],
-          ['flat', 'Flat'],
-        ]),
-        addInput('fringes', 'rate', { label: 'Rate', placeholder: '18.5', num: true }),
-      ],
-      validate: (v) => {
-        const bad = checkName(v.name.trim(), b.fringes, 'fringe');
-        if (bad) return ['name', bad];
-        if (v.rate.trim() === '') return ['rate', 'Enter a rate.'];
-        return null;
-      },
-      build: (v) => [
-        'set_fringe',
-        {
-          name: v.name.trim(),
-          fringe: {
-            kind: v.kind === 'flat' ? 'flat' : 'percent',
-            description: '',
-            rate: v.rate.trim(),
-            cutoff: null,
-            unit: null,
-          },
-        },
-      ],
-    }),
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Groups
-
-function groupArgs(name, patch) {
-  const g = own(budget().groups, name) || {};
-  return [
-    'set_group',
-    {
-      name,
-      group: {
-        description: str(g.description),
-        in_budget_total: g.in_budget_total !== false,
-        ...patch,
-      },
-    },
-  ];
-}
-
-function breakdownTotal(bd) {
-  if (!bd || typeof bd !== 'object') return null;
-  try {
-    return BigInt(bd.details_total || 0) + BigInt(bd.fringe_total || 0);
-  } catch {
-    return null;
-  }
-}
-
-function stat(label, bd, help) {
-  const wrap = el('span', 'setup-stat');
-  const total = breakdownTotal(bd);
-  wrap.append(el('span', 'setup-muted', label), el('span', 'setup-num', total === null ? '' : formatCents(total)));
-  if (total !== null) {
-    wrap.title = `${help}: lines ${formatCents(bd.details_total || 0)} plus fringes ${formatCents(bd.fringe_total || 0)}`;
-  }
-  return wrap;
-}
-
-function renderGroups(panel) {
-  const b = budget();
-  const r = report();
-  panel.append(
-    el(
-      'p',
-      'setup-intro',
-      'Tags for lines. Untick Counts in total to show a group’s lines without adding them to the budget.',
-    ),
-  );
-  const items = entries(b.groups);
-  const names = items.map(([n]) => n);
-  if (!items.length) panel.append(emptyNote('No groups yet.'));
-
-  const ul = list('Groups');
-  items.forEach(([name, g0], i) => {
-    const g = g0 && typeof g0 === 'object' ? g0 : {};
-    const ik = key('groups', name);
-    const li = itemShell(ik, 'setup-block');
-    const counted = g.in_budget_total !== false;
-    const totals = r ? own(r.groups, name) : undefined;
-
-    const head = el('div', 'setup-head');
-    const nameEl = el('span', 'setup-name', name);
-    nameEl.title = name;
-    head.append(
-      nameEl,
-      el('span', 'setup-figs'),
-      deleteButton({
-        itemKey: ik,
-        name,
-        what: 'group',
-        confirmText: counted
-          ? `Delete group ${name}? Its lines lose the tag.`
-          : `Delete group ${name}? Its lines lose the tag and count in the total again.`,
-        build: () => ['delete_group', { name }],
-        neighborKey: neighbor('groups', names, i, key('add', 'groups', 'name')),
-      }),
-    );
-
-    const grid = el('div', 'setup-fields');
-    const boxKey = key('groups', name, 'in_budget_total');
-    const box = el('input', 'setup-check');
-    box.type = 'checkbox';
-    box.id = nextId();
-    box.checked = counted;
-    box.dataset.key = boxKey;
-    box.addEventListener('change', () => {
-      const v = box.checked;
-      run(ik, () => groupArgs(name, { in_budget_total: v }), { restore: [boxKey, !v] });
-    });
-    const boxLabel = el('label', 'setup-check-label', 'Counts in total');
-    boxLabel.htmlFor = box.id;
-    const boxWrap = el('div', 'setup-field setup-field-wide setup-check-row');
-    boxWrap.append(box, boxLabel);
-
-    const desc = textInput({
-      fieldKey: key('groups', name, 'description'),
-      value: str(g.description),
-      onCommit: (v, old) =>
-        run(ik, () => groupArgs(name, { description: v }), {
-          restore: [key('groups', name, 'description'), old],
-        }),
-    });
-    grid.append(boxWrap, field('Description', desc, { wide: true }));
-    if (!counted) li.classList.add('setup-item-off');
-    li.append(head);
-    if (totals) {
-      const stats = el('div', 'setup-stats');
-      stats.append(
-        stat('Full', totals.full, 'Every tagged line'),
-        stat('Counted', totals.active, 'Tagged lines that count in the budget'),
-      );
-      li.append(stats);
-    }
-    li.append(grid);
-    finishItem(li, ik, issuesFor('group', name), null);
-    ul.append(li);
-  });
-  if (items.length) panel.append(ul);
-
-  panel.append(
-    addForm('groups', {
-      title: 'New group',
-      fields: [addInput('groups', 'name', { label: 'Name', placeholder: 'Second unit' })],
-      validate: (v) => {
-        const bad = checkName(v.name.trim(), b.groups, 'group');
-        return bad ? ['name', bad] : null;
-      },
-      build: (v) => ['set_group', { name: v.name.trim(), group: { description: '', in_budget_total: true } }],
-    }),
+    addRow('globals', 'global', [
+      { key: 'name', label: 'Name (letters, digits and _, not starting with a digit)', value: '', placeholder: 'SHOOT_DAYS' },
+      { key: 'formula', label: 'Formula', value: '', placeholder: '30' },
+    ], (v) => {
+      const name = v.name.trim();
+      if (name === '') return 'Enter a global name.';
+      if (!GLOBAL_NAME.test(name)) return `“${name}” can’t be a global name.`;
+      if (own(budget().globals, name) !== undefined) return `There is already a global named ${name}.`;
+      if (v.formula.trim() === '') return 'Enter a formula or number.';
+      return null;
+    }, (v) => [['set_global', { name: v.name.trim(), formula: v.formula.trim() }], key('globals', v.name.trim(), 'formula')]),
   );
 }
 
@@ -1171,7 +753,7 @@ function renderUnits(panel) {
         what: 'unit',
         confirmText: `Delete unit ${name}? Lines keep the name, but it stops converting for flat fringes.`,
         build: () => ['delete_unit', { name }],
-        neighborKey: neighbor('units', names, i, key('add', 'units', 'name')),
+        neighborKey: neighbor('units', names, i, key('add', 'units')),
       }),
     );
     const grid = el('div', 'setup-fields');
@@ -1208,150 +790,68 @@ function renderUnits(panel) {
   if (items.length) panel.append(ul);
 
   panel.append(
-    addForm('units', {
-      title: 'New unit',
-      fields: [
-        addInput('units', 'name', { label: 'Name', placeholder: 'Night' }),
-        addInput('units', 'plural', { label: 'Plural', placeholder: 'Nights' }),
-        addInput('units', 'hours', { label: 'Hours', placeholder: 'None', num: true }),
-      ],
-      validate: (v) => {
-        const bad = checkName(v.name.trim(), b.units, 'unit');
-        if (bad) return ['name', bad];
-        const h = v.hours.trim();
-        if (h !== '' && !DECIMAL.test(h)) return ['hours', 'Hours must be a number, like 10 or 7.5.'];
-        return null;
-      },
-      build: (v) => [
+    addRow('units', 'unit', [
+      { key: 'name', label: 'Name', value: '', placeholder: 'Night' },
+      { key: 'plural', label: 'Plural', value: '', placeholder: 'Nights' },
+      { key: 'hours', label: 'Hours (blank for units like Flat)', value: '', placeholder: 'None' },
+      { key: 'description', label: 'Description', value: '' },
+    ], (v) => {
+      const bad = checkName(v.name.trim(), budget().units, 'unit');
+      if (bad) return bad;
+      const h = v.hours.trim();
+      if (h !== '' && !DECIMAL.test(h)) return 'Hours must be a number, like 10 or 7.5.';
+      return null;
+    }, (v) => [
+      [
         'set_unit',
         {
           name: v.name.trim(),
-          unit: { plural: v.plural.trim(), description: '', hours: v.hours.trim() === '' ? null : v.hours.trim() },
+          unit: { plural: v.plural.trim(), description: v.description.trim(), hours: v.hours.trim() === '' ? null : v.hours.trim() },
         },
       ],
-    }),
+      key('units', v.name.trim(), 'plural'),
+    ]),
   );
 }
 
 // ---------------------------------------------------------------------------
-// Currencies
+// Adding an item: the row at the bottom of a list opens a small form next to it
 
-function currencyArgs(code, patch) {
-  const c = own(budget().currencies, code) || {};
-  return [
-    'set_currency',
-    {
-      code,
-      currency: {
-        description: str(c.description),
-        symbol: str(c.symbol),
-        rate: str(c.rate),
-        ...patch,
+/**
+ * The "New ..." row at the bottom of a list. `fields` are anchoredForm's;
+ * `check(values)` returns a message or null; `build(values)` returns
+ * [[command, args], key of the control to focus once it is added].
+ */
+function addRow(tab, what, fields, check, build) {
+  const b = el('button', 'apply-add-btn', `New ${what}…`);
+  b.type = 'button';
+  b.title = `Add a ${what} to this budget`;
+  b.dataset.key = key('add', tab);
+  b.dataset.nobusy = '1';
+  b.addEventListener('click', () => {
+    let focus = null;
+    anchoredForm({
+      anchor: b,
+      title: `New ${what}`,
+      fields,
+      submitText: 'Add',
+      onSubmit: (v) => {
+        const bad = check(v);
+        if (bad) return Promise.reject(bad);
+        const [[cmd, args], then] = build(v);
+        if (!state.ctx || typeof state.ctx.call !== 'function') return Promise.reject('Not connected');
+        return state.ctx.call(cmd, args).then(() => {
+          focus = then;
+        });
       },
-    },
-  ];
-}
-
-function renderCurrencies(panel) {
-  const b = budget();
-  const base = baseCode();
-  const intro = el('div', 'setup-intro');
-  const baseLine = el('p', 'setup-base');
-  baseLine.append(el('span', 'setup-muted', 'Base currency '), el('strong', null, base || 'not set'));
-  intro.append(
-    baseLine,
-    el(
-      'p',
-      null,
-      `Totals are worked out in ${base || 'the base currency'}. A rate is how many ${base || 'base units'} one unit of the other currency is worth.`,
-    ),
-  );
-  panel.append(intro);
-  const items = entries(b.currencies);
-  const names = items.map(([n]) => n);
-  if (!items.length) panel.append(emptyNote('No other currencies yet.'));
-
-  const ul = list('Currencies');
-  items.forEach(([code, c0], i) => {
-    const c = c0 && typeof c0 === 'object' ? c0 : {};
-    const ik = key('currencies', code);
-    const li = itemShell(ik, 'setup-block');
-    const head = el('div', 'setup-head');
-    const nameEl = el('span', 'setup-name', code);
-    nameEl.title = code;
-    const figs = el('span', 'setup-figs');
-    const direction = el('span', 'setup-muted', str(c.rate) === '' ? '' : `1 ${code} = ${formatDecimal(c.rate)} ${base}`);
-    direction.id = nextId();
-    figs.append(direction);
-    head.append(
-      nameEl,
-      figs,
-      deleteButton({
-        itemKey: ik,
-        name: code,
-        what: 'currency',
-        confirmText: `Delete currency ${code}? It can\u2019t be deleted while lines, charges or the totals use it.`,
-        build: () => ['delete_currency', { code }],
-        neighborKey: neighbor('currencies', names, i, key('add', 'currencies', 'code')),
-      }),
-    );
-    const grid = el('div', 'setup-fields');
-    const rate = textInput({
-      fieldKey: key('currencies', code, 'rate'),
-      value: str(c.rate),
-      num: true,
-      onCommit: (v, old) =>
-        run(ik, () => currencyArgs(code, { rate: v.trim() }), {
-          restore: [key('currencies', code, 'rate'), old],
-        }),
+    }).then(() => {
+      const target = findByData('key', focus || key('add', tab));
+      if (target) target.focus();
     });
-    const sym = textInput({
-      fieldKey: key('currencies', code, 'symbol'),
-      value: str(c.symbol),
-      onCommit: (v, old) =>
-        run(ik, () => currencyArgs(code, { symbol: v }), { restore: [key('currencies', code, 'symbol'), old] }),
-    });
-    const desc = textInput({
-      fieldKey: key('currencies', code, 'description'),
-      value: str(c.description),
-      onCommit: (v, old) =>
-        run(ik, () => currencyArgs(code, { description: v }), {
-          restore: [key('currencies', code, 'description'), old],
-        }),
-    });
-    rate.setAttribute('aria-describedby', direction.id);
-    grid.classList.add('setup-fields-3');
-    grid.append(field('Rate', rate), field('Symbol', sym), field('Description', desc));
-    li.append(head, grid);
-    finishItem(li, ik, issuesFor('currency', code), rate);
-    ul.append(li);
   });
-  if (items.length) panel.append(ul);
-
-  panel.append(
-    addForm('currencies', {
-      title: 'New currency',
-      fields: [
-        addInput('currencies', 'code', { label: 'Code', placeholder: 'EUR' }),
-        addInput('currencies', 'rate', { label: `Rate (${base || 'base'} per 1)`, placeholder: '1.08', num: true }),
-      ],
-      validate: (v) => {
-        const code = v.code.trim();
-        if (code === '') return ['code', 'Enter a currency code.'];
-        if (code.includes(',')) return ['code', 'Codes can’t contain commas.'];
-        if (code === base) return ['code', `${code} is the base currency.`];
-        if (own(b.currencies, code) !== undefined) return ['code', `${code} is already in the list.`];
-        const rate = v.rate.trim();
-        if (rate === '') return ['rate', 'Enter a rate.'];
-        if (!DECIMAL.test(rate) || Number(rate) <= 0) return ['rate', 'The rate must be a number above 0, like 1.08.'];
-        return null;
-      },
-      build: (v) => [
-        'set_currency',
-        { code: v.code.trim(), currency: { description: '', symbol: '', rate: v.rate.trim() } },
-      ],
-    }),
-  );
+  const wrap = el('div', 'setup-add-row');
+  wrap.append(b);
+  return wrap;
 }
 
 // ---------------------------------------------------------------------------

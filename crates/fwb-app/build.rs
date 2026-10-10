@@ -1,8 +1,9 @@
 //! Generates Tauri's context and the permission set for our own commands.
 //!
 //! Listing the commands here turns on Tauri's access control for them: a
-//! command must be listed here *and* allowed in `capabilities/main.json`, or
-//! the web view can't call it. Keep this list in step with
+//! command must be listed here *and* allowed in the calling window's
+//! capability (`capabilities/main.json`, or `capabilities/tools.json` for the
+//! tools window), or that web view can't call it. Keep this list in step with
 //! `tauri::generate_handler!` in `src/app.rs`.
 
 const COMMANDS: &[&str] = &[
@@ -93,6 +94,10 @@ const COMMANDS: &[&str] = &[
     "restore_backup",
     "reveal_backups",
     "resolve_external_change",
+    // The tools panel's own window and its Notes tab (src/tools.rs)
+    "tools_window",
+    "close_tools_window",
+    "notes_list",
 ];
 
 fn main() {
