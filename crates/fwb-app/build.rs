@@ -116,9 +116,33 @@ const COMMANDS: &[&str] = &[
     "save_report_preset",
     "delete_report_preset",
     "print_report",
+    // Spreadsheet export: Excel, CSV, tab-delimited (src/export.rs)
+    "export_budget",
+    // Tag presets and line blocks (src/presets.rs)
+    "save_tag_preset",
+    "tag_preset_from_line",
+    "apply_tag_preset",
+    "save_line_preset",
+    "line_preset_preview",
+    "insert_line_preset",
+    "rename_tool_preset",
+    "delete_tool_preset",
+    "move_tool_preset",
+    // Moving rows up and down (src/moverows.rs)
+    "move_rows",
+    "move_accounts",
+    "move_topsheet_rows",
+    // Renaming setup items everywhere (src/rename.rs)
+    "rename_setup_item",
     // Find and replace (src/find.rs)
     "find",
     "replace",
+    // Import setup from another budget, templates (src/import_setup.rs,
+    // src/templates.rs)
+    "import_setup_pick",
+    "import_setup",
+    "template_new",
+    "template_save",
 ];
 
 fn main() {

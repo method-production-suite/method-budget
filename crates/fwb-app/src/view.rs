@@ -15,7 +15,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use fwb_core::{Budget, Cents, Detail, Report, RowId, TopsheetRow, Version};
+use fwb_core::{Budget, Cents, Detail, LinePreset, Report, RowId, TopsheetRow, Version};
 use serde::Serialize;
 
 use crate::diagnose::{error_message, Issue, Outcome, Target};
@@ -201,14 +201,21 @@ fn version_entry(v: &Version) -> serde_json::Value {
     o
 }
 
+/// A line block as the views list it: its name and how many rows it holds
+/// (the rows and their setup stay in Rust until the block is inserted).
+fn line_preset_entry(p: &LinePreset) -> serde_json::Value {
+    serde_json::json!({ "name": p.name, "count": p.rows.len() })
+}
+
 /// Takes the heavy parts out of a budget (detail rows, the baseline's row
-/// totals, versions) and puts them back when dropped, even on a panic, so
-/// the outline can be written without copying the budget.
+/// totals, versions, line blocks) and puts them back when dropped, even on a
+/// panic, so the outline can be written without copying the budget.
 struct Stripped<'a> {
     b: &'a mut Budget,
     details: Vec<Vec<Detail>>,
     baseline_rows: Option<BTreeMap<RowId, Cents>>,
     versions: Vec<Version>,
+    line_presets: Vec<LinePreset>,
     keep_details: bool,
 }
 
@@ -228,11 +235,13 @@ impl<'a> Stripped<'a> {
             b.baseline.as_mut().map(|bl| std::mem::take(&mut bl.rows))
         };
         let versions = std::mem::take(&mut b.versions);
+        let line_presets = std::mem::take(&mut b.line_presets);
         Stripped {
             b,
             details,
             baseline_rows,
             versions,
+            line_presets,
             keep_details,
         }
     }
@@ -255,11 +264,13 @@ impl Drop for Stripped<'_> {
             }
         }
         self.b.versions = std::mem::take(&mut self.versions);
+        self.b.line_presets = std::mem::take(&mut self.line_presets);
     }
 }
 
-/// The budget's JSON with versions listed but not included; without rows
-/// (each account gets `lines` instead) unless `with_rows`.
+/// The budget's JSON with versions and line blocks listed but not
+/// included; without rows (each account gets `lines` instead) unless
+/// `with_rows`.
 fn budget_value(b: &mut Budget, with_rows: bool) -> serde_json::Value {
     let lines: Vec<usize> = b
         .categories()
@@ -267,6 +278,7 @@ fn budget_value(b: &mut Budget, with_rows: bool) -> serde_json::Value {
         .map(|a| a.details.len())
         .collect();
     let versions: Vec<serde_json::Value> = b.versions.iter().map(version_entry).collect();
+    let blocks: Vec<serde_json::Value> = b.line_presets.iter().map(line_preset_entry).collect();
     let mut json = {
         let s = Stripped::new(b, with_rows);
         budget_json(s.b)
@@ -293,6 +305,9 @@ fn budget_value(b: &mut Budget, with_rows: bool) -> serde_json::Value {
     }
     if !versions.is_empty() {
         json["versions"] = versions.into();
+    }
+    if !blocks.is_empty() {
+        json["line_presets"] = blocks.into();
     }
     json
 }

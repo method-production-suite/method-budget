@@ -323,9 +323,53 @@ fn gen_content(rng: &mut Rng) -> Budget {
     b
 }
 
+/// Tag presets and line blocks (top level only: versions never hold them).
+fn gen_tool_presets(rng: &mut Rng, b: &mut Budget) {
+    b.tag_presets = (0..rng.below(3))
+        .map(|_| TagPreset {
+            name: rng.text(),
+            fringes: rng.texts(),
+            groups: rng.texts(),
+            set: rng.opt_text(),
+            location: rng.opt_text(),
+            currency: rng.opt_text(),
+        })
+        .collect();
+    b.line_presets = (0..rng.below(3))
+        .map(|_| {
+            // Block rows have no id of their own: 0 in memory.
+            let rows = (0..rng.below(4)).map(|_| gen_detail(rng, 0)).collect();
+            let setup = if rng.chance(30) {
+                SetupItems::default()
+            } else {
+                let from = gen_content(rng);
+                SetupItems {
+                    fringes: from.fringes,
+                    groups: from.groups,
+                    globals: from.globals,
+                    units: if rng.chance(50) {
+                        from.units
+                    } else {
+                        BTreeMap::new()
+                    },
+                    sets: from.sets,
+                    locations: from.locations,
+                    currencies: from.currencies,
+                }
+            };
+            LinePreset {
+                name: rng.text(),
+                rows,
+                setup,
+            }
+        })
+        .collect();
+}
+
 /// A budget whose versions hold other random content.
 fn gen_budget(rng: &mut Rng) -> Budget {
     let mut b = gen_content(rng);
+    gen_tool_presets(rng, &mut b);
     for _ in 0..rng.below(3) {
         let (content, _) = gen_content(rng).into_parts();
         b.versions.push(Version {
@@ -371,8 +415,28 @@ fn output_is_deterministic() {
 fn generator_covers_every_variant_and_field() {
     let mut all = String::new();
     let (mut group_colors, mut row_colors) = (0, 0);
+    // Tag preset parts and line blocks share field names with the budget:
+    // count them on their own.
+    let mut tag_parts = [0usize; 5];
+    let (mut block_rows, mut block_setups, mut block_units) = (0, 0, 0);
     for seed in 1..=CASES {
         let b = gen_budget(&mut Rng(seed));
+        for p in &b.tag_presets {
+            for (n, has) in tag_parts.iter_mut().zip([
+                !p.fringes.is_empty(),
+                !p.groups.is_empty(),
+                p.set.is_some(),
+                p.location.is_some(),
+                p.currency.is_some(),
+            ]) {
+                *n += usize::from(has);
+            }
+        }
+        for p in &b.line_presets {
+            block_rows += p.rows.len();
+            block_setups += usize::from(!p.setup.is_empty());
+            block_units += usize::from(!p.setup.units.is_empty());
+        }
         group_colors += b.groups.values().filter(|g| g.color.is_some()).count();
         row_colors += b
             .categories()
@@ -384,6 +448,8 @@ fn generator_covers_every_variant_and_field() {
     }
     // `color` is a field of both groups and detail rows: check each.
     assert!(group_colors > 0 && row_colors > 0);
+    assert!(tag_parts.iter().all(|&n| n > 0), "{tag_parts:?}");
+    assert!(block_rows > 0 && block_setups > 0 && block_units > 0);
     let kinds = [
         "text",
         "number",
@@ -425,6 +491,9 @@ fn generator_covers_every_variant_and_field() {
         "charges",
         "credits",
         "baseline",
+        "tag_presets",
+        "line_presets",
+        "setup",
         "versions",
         "created",
         "plural",

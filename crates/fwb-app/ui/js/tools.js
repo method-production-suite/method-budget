@@ -1,7 +1,7 @@
 // The tools panel: two tab panes stacked (docked at the right, or in its own
 // window) or side by side (docked at the bottom), decisions.md entry 21.
 //
-// Default tabs: Fringes, Groups, Globals, Units and Find in the first pane; Sets,
+// Default tabs: Fringes, Groups, Globals, Units, Presets and Find in the first pane; Sets,
 // Locations, Currency, Notes and Budget in the second. Budget has its own
 // tabs: Charges, Credits, Info, Settings and Baseline. A tab can be dragged
 // to another place in its pane or to the other pane (or moved with
@@ -13,7 +13,7 @@
 // side panel always has: lists of fringes, groups, sets, locations and
 // currencies come from apply.js, globals, units and the Budget tabs from
 // setup.js and topsheet-setup.js, notes from notes.js, find and replace from
-// find.js. ctx:
+// find.js, tag presets and line blocks from presets.js. ctx:
 //   call(cmd, args)      runs a command and redraws from its view
 //   selection()          the grid's { level, keys, cat, cursor }
 //   position             'right', 'bottom' or 'window'
@@ -23,6 +23,7 @@
 //                        means an account's name or number)
 //   onLayout(layout)     the tab arrangement changed (the tools window tells
 //                        the main window, which keeps the preference)
+//   toast(message)       a short message (a rename says what it changed)
 //
 // Nothing here uses inline styles or innerHTML: drag feedback is classes,
 // icons are SVG elements built with DOM calls.
@@ -34,12 +35,14 @@ import { setupBegin, renderSetupTab, setupEnd } from './setup.js';
 import { EXTRA_TABS } from './topsheet-setup.js';
 import { renderNotes } from './notes.js';
 import { renderFind } from './find.js';
+import { renderPresets } from './presets.js';
 
 const TOOL_TABS = [
   { id: 'fringes', label: 'Fringes' },
   { id: 'groups', label: 'Groups' },
   { id: 'globals', label: 'Globals' },
   { id: 'units', label: 'Units' },
+  { id: 'presets', label: 'Presets' },
   { id: 'sets', label: 'Sets' },
   { id: 'locations', label: 'Locations' },
   { id: 'currencies', label: 'Currency' },
@@ -56,7 +59,7 @@ const TAB_IDS = TOOL_TABS.map((t) => t.id);
 const BUDGET_IDS = BUDGET_TABS.map((t) => t.id);
 
 const DEFAULT_LAYOUT = Object.freeze({
-  panes: { top: ['fringes', 'groups', 'globals', 'units', 'find'], bottom: ['sets', 'locations', 'currencies', 'notes', 'budget'] },
+  panes: { top: ['fringes', 'groups', 'globals', 'units', 'presets', 'find'], bottom: ['sets', 'locations', 'currencies', 'notes', 'budget'] },
   active: { top: 'fringes', bottom: 'sets' },
   budget: 'charges',
 });
@@ -260,6 +263,10 @@ function content(body, id, view, ctx) {
   } else if (id === 'find') {
     const host = el('div', { class: 'find' });
     renderFind(host, view, ctx);
+    body.append(host);
+  } else if (id === 'presets') {
+    const host = el('div', { class: 'presets-host' });
+    renderPresets(host, view, ctx);
     body.append(host);
   } else if (id === 'budget') budgetTab(body);
 }

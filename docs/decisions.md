@@ -530,3 +530,178 @@ Roadmap 1.15 and 2.3 to 2.6 (behavior notes 15 and 19), as built:
 - **Not yet**: paper sizes other than Letter, a "detail starts on page N" topsheet column,
   setup tables beyond fringes, globals and groups (units, sets, locations, currencies,
   chart of accounts), dragging column widths on the preview.
+
+## 29. Starting from another budget: import setup and templates (2026-10-09)
+
+Roadmap 1.20 (behavior notes 07 and 24, decision 15), as built:
+
+- **Import from a budget file, no library format yet.** File > Import Setup From… picks any
+  `.fwb` in Rust's Open dialog (a file open in a tab is read from the tab, unsaved changes
+  and all; a budget can't import from itself) and reviews every item in it. The personal
+  library (2.15) can later be a budget file used this way.
+- **What can come over**: globals, fringes, groups, units, sets, locations, currencies,
+  charges, credits, tag presets, line blocks, report presets, and three budget settings
+  (account numbering, fringe posting, new-line defaults). Not the chart of accounts, lines,
+  budget info, base or totals currency, baseline or versions: those belong to a production,
+  and rows already travel by copy and paste (decision 23).
+- **The paste review's rules, reused** (src/clipboard.rs): same name is the same item;
+  missing items are added; an item that differs keeps this budget's version (decision 12)
+  unless the user picks the imported one or "add it under a new name" (`Name (2)`, globals
+  `NAME_2`), which every imported item that refers to it then uses (a fringe's rate, a
+  global's formula, a charge's excluded groups, a credit's groups and fringes, a tag preset,
+  a line block's rows and its own copy of their setup, a report preset's groups).
+  Currencies and settings take no new name; a setting comes in only with "use the imported
+  version". Charges and credits match by exact name, presets ignoring case (as their names
+  are kept unique); a replaced one keeps its place, a replaced report preset keeps being the
+  default if it was, and an added one never is. The other budget's base currency is never
+  imported, and flat charges in it count in this budget's base currency.
+- **Dependencies come along, shown.** Each item in the review lists everything it needs in
+  the source, however deep (a fringe's flat unit and its rate's globals, a global's globals,
+  a charge's excluded groups and currency, a credit's groups and excluded fringes, a tag
+  preset's tags, what a line block's rows use, a report preset's groups). Ticking an item
+  ticks those, locked while something ticked needs them; Rust walks the same closure again
+  when importing, so the page can't leave one out. Each kind has a box to tick all of it.
+- **One undo step**, worked out completely before anything changes, so a refusal (an item
+  gone, an unknown choice, more presets than a budget keeps) changes nothing. The page names
+  the source by a token, never a path; only the last file picked is kept.
+- **A template is just a budget.** New From Template… opens any `.fwb` in a new tab with its
+  chart (categories, accounts, production totals), setup, presets and settings, and without
+  its detail lines, budget info, baseline, versions and line notes; "keep the detail lines"
+  keeps the lines without their notes. It is titled Untitled and has no file, so the first
+  Save asks where, and like a New budget it starts with no unsaved changes. Save as
+  Template… writes the budget in front, stripped the same way, to a new file named in Rust's
+  Save dialog and titled after it; the budget and its own file don't change, and a file open
+  in a tab is refused. No template format, folder or built-in templates: our own starter
+  budget (`fwb_core::starter`) remains what New opens.
+
+## 30. Spreadsheet export as built (2026-10-09)
+
+Roadmap 2.1 (inventory section 21: what accounting and payroll tools take in):
+
+- **One set of tables, three writers.** `fwb_format::export` turns a budget and its report
+  into plain tables (Topsheet, Accounts, Detail, Globals, Fringes, Groups, Units,
+  Currencies, Sets, Locations); the Excel, CSV and tab-delimited writers only serialize
+  them, so every format carries the same figures. It lives in `fwb-format` so `fwb-core`
+  stays dependency-free, and it is a one-way copy for other tools, not a second native
+  format.
+- **No new crates.** An .xlsx is a ZIP of XML parts, so we write both ourselves: stored
+  (uncompressed) ZIP entries with a compile-time CRC-32 table and a fixed 1980-01-01
+  timestamp (the same budget gives the same bytes), and the minimal SpreadsheetML parts
+  (content types, relationships, workbook, styles, shared strings, one part per sheet,
+  core and app properties). Stored entries make a bigger file (about 3 MB for a 5,000-row
+  budget); deflate can come later if that matters.
+- **Money is exact.** Cents become a decimal string (`1234.56`) without ever passing
+  through a float; the workbook stores that string as the cell's number with a
+  `#,##0.00;(#,##0.00)` format (the app's own negatives in parentheses). Decimals are
+  written as the engine holds them. Text is always a shared string, never a formula.
+- **The export is the budget's real figures.** Unfiltered (every group as the budget sets
+  it), and refused while any cell has a problem, because the grid then counts those cells
+  as blank. The app takes the tables from its cached recalc; `fwb export` recalculates.
+- **Detail is every row**, subtotals, adjustments and separators included (with their
+  kind), so its row count is the budget's. Totals stay summable: a subtotal row's running
+  total is in its own Subtotal column, not Total, and a category fringe account's amount is
+  in Total only. An adjustment's rate is the amount it is a percentage of, worked out the
+  way the engine does.
+- **CSV and tab-delimited.** CSV is RFC 4180 (CRLF, quoting only when needed). Tab-delimited
+  is for importers that read field by field, so it never quotes; tabs and line breaks in a
+  field become spaces. Both neutralize text a spreadsheet would run as a formula (a
+  leading `=`, `+`, `-`, `@`, tab or CR gets a `'`, plain numbers like `-5` excepted),
+  because a budget file can come from anyone. The app's CSV files start with a byte order
+  mark (Excel needs it for accented letters); its tab-delimited file doesn't (importers
+  may not expect one); `fwb export --bom` adds it on request.
+- **Files.** CSV is one file per table, `<name> - <Table>.csv` beside the name chosen in
+  the Save dialog (one dialog, predictable names), instead of a folder picker. The path
+  always comes from the Save dialog, the format's extension is forced, each file is written
+  atomically, and an export never replaces a budget open in a tab; `fwb export` refuses to
+  write over the budget it reads.
+- **Not yet**: deflate compression, a choice of filters (groups) for the export, Original
+  and Variance columns, budget info and charges/credits as their own sheets.
+
+## 31. Tag presets and line blocks as built (2026-10-09)
+
+Roadmap 1.19 and 2.14 (behavior note 05, decision 15), as built:
+
+- **In the budget, as tools.** `tag_presets` and `line_presets` are additive budget fields,
+  left out when empty (FORMAT.md). Like report presets they are not content: versions
+  don't carry them, a version holding some is rejected, and restoring a version keeps the
+  current ones. Names are unique ignoring case, up to 80 characters; a budget keeps up to
+  200 tag presets and 100 blocks of up to 500 rows.
+- **Add never takes away; Replace is exact.** Add joins the preset's fringes and groups
+  with the line's, and fills set, location and currency only where the line has none (a
+  base-currency line has none), so Add can't change a choice already made. Replace makes
+  all five tags exactly the preset's: an empty part clears that tag. We chose "fill only
+  when empty" over "overwrite" for Add because overwriting a set or location is what
+  Replace is for, and Add stays safe to use on a mixed selection. Row eligibility follows
+  the apply lists (fringes and currency on lines; groups, set and location on lines and
+  adjustments). One undo step; no change, no step.
+- **A preset that names something gone is refused, not half applied.** Deleting a fringe,
+  group, set or location takes it off lines but not off presets; applying such a preset
+  says which items are missing and changes nothing, and the editor shows them to untick.
+  Renames don't follow into presets (there is no rename of setup items yet).
+- **Blocks reuse the paste of copied rows.** Inserting a block is the clipboard's paste
+  (src/clipboard.rs) of the block's rows: new ids above the cursor line, fringe ranges new
+  in the account, missing setup added, one undo step. A block keeps its own copy of the
+  setup its rows use (taken with the clipboard's dependency walk), only to offer back an
+  item the budget no longer has; the review lists just those, and an item set up
+  differently now keeps the budget's version without asking, since the block came from
+  this budget. Block rows are stored without ids; their fringe ranges are numbered 1, 2...
+  within the block.
+- **The checklist when saving a block** is four boxes (amount/X/rate/4X, units, tags with
+  fringe ranges, notes), each starting unticked when none of the lines use it.
+  Descriptions, row kinds and text styles always come along. A tag preset made from a
+  line has a box per tag, ticked when the line has it.
+- **Lean views** list blocks as `{name, count}`; rows and setup stay in Rust.
+- **Not yet**: reordering presets with the mouse (Option+Shift+Up and Down only), editing
+  a block's rows in place, presets in a personal library (2.15).
+
+## 32. Moving rows and renaming setup items as built (2026-10-09)
+
+Roadmap 1.10 and 1.18 (decision 7), with the calls they needed:
+
+- **Option+Up and Option+Down move rows**, at all three levels: lines within their account,
+  accounts within their category, categories and production totals on the topsheet. The
+  keys were free (Option+Shift+arrows are the tools tabs', Cmd+arrows change level and
+  step accounts); text fields keep them for the caret. Any selection, contiguous or not:
+  each selected row steps past the nearest unselected row, selected rows keep their order,
+  rows at the edge stay and the rest close up. Nothing moving is no change and no undo step.
+- **Fringe ranges are never split.** A range whose lines are all selected moves whole, with
+  the subtotal and separator rows between its lines (they join the selection). A selected
+  line from a range whose other lines stay behind leaves the range (its number cleared),
+  and the lines staying behind count as one block that a moving row steps over in one
+  press, never landing inside. The alternatives were refusing the move (annoying when a
+  line is simply in the wrong place) or dragging the range along (moves lines nobody
+  selected). Ranges that were already interleaved in a file join into one block.
+- **Quick presses are one undo step**: `Session::edit_merging` joins an edit to the
+  previous step when that step was made by it less than a second ago, nothing happened
+  since (no other edit, undo or redo: the rev is unchanged), and it names the same rows
+  (each move hands out the key the next press must bring). The joined step is rebuilt from
+  where the run began, so a run that ends where it started leaves no step at all and the
+  dirty mark goes back. Holding the key sends at most one press behind the one running.
+  Accounts and topsheet rows are named by place, so each press is built from the newest
+  view; the reply gives the moved rows' new places (or ids) and the grid selects them.
+- **Renaming rewrites references and keeps names in the file** (decision 7). The engine
+  does it (`fwb_core::rename`): globals token by token the way the formula reader splits
+  them, with the rest of each formula kept byte for byte (not reprinted through the parse
+  tree, which would respace formulas and break "rename and back gives the same file");
+  fringes, groups, units, sets, locations and currencies everywhere they are named,
+  including charges, credits, report presets' group filters, tag presets and line blocks.
+  A line block's saved copies of setup are filed under the new name too: they are matched
+  to the block's rows by name, so leaving them under the old one would stop an insert from
+  adding back an item the budget has since lost. Their definitions stay as saved.
+- **The new name must be free**: not another item of the kind and not a name already used
+  without an item behind it (a unit typed on lines, a global a formula names, a copy in a
+  line block). Allowing it would merge two names, which renaming back couldn't undo.
+  Property-tested on generated budgets: every total is unchanged, and renaming back gives
+  the identical budget, for every kind including the base currency.
+- **Where to rename**: the apply lists' editor gets the name as its first field (a new name
+  renames first, then any other change is saved under it: two undo steps when both change,
+  since a rename is its own command); right-click on a list item, or on a global's or
+  unit's name, offers Rename everywhere; a global's or unit's name opens the form on a
+  double-click, Enter or F2; Find's replace panel links to it for the item searched for;
+  the base currency field in Settings now renames through it too (it used
+  `set_base_currency`, which left lines that named the old code pointing nowhere), so the
+  tools window no longer needs `set_base_currency`. Each rename says how many places
+  changed. Saved versions keep their own names: they record the budget as it was.
+- **Not yet**: dragging rows by the # column (the grid draws only rows near the viewport
+  on long accounts, so a drag would need its own auto-scroll and drop marks), and moving
+  lines between accounts other than by cut and paste.

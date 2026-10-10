@@ -346,6 +346,7 @@
 }
 
 .setup-btn:focus-visible,
+.setup-name:focus-visible,
 .setup-del:focus-visible,
 .setup-check:focus-visible {
   outline: 2px solid var(--accent);

@@ -236,7 +236,7 @@ fn save_doc<R: Runtime>(
 
 /// A file name stem from a budget title: path separators and other characters
 /// file systems reject become spaces.
-fn safe_file_stem(title: &str) -> String {
+pub(crate) fn safe_file_stem(title: &str) -> String {
     let cleaned: String = title
         .chars()
         .map(|c| match c {
@@ -253,7 +253,7 @@ fn safe_file_stem(title: &str) -> String {
     }
 }
 
-fn with_fwb_extension(mut p: PathBuf) -> PathBuf {
+pub(crate) fn with_fwb_extension(mut p: PathBuf) -> PathBuf {
     let has = p.extension().is_some_and(|e| e.eq_ignore_ascii_case("fwb"));
     if !has {
         let mut name = p.file_name().unwrap_or_default().to_os_string();
@@ -937,6 +937,8 @@ pub fn run() {
         .manage(crate::clipboard::ClipboardState::default())
         // Files picked for the compare screen, read once (src/compare.rs).
         .manage(crate::compare::CompareFiles::default())
+        // The budget picked to import setup from (src/import_setup.rs).
+        .manage(crate::import_setup::ImportSources::default())
         // Which budget change the other window has heard about (src/tools.rs).
         .manage(crate::tools::Broadcast::default());
 
@@ -1102,9 +1104,33 @@ pub fn run() {
             crate::reports::save_report_preset,
             crate::reports::delete_report_preset,
             crate::reports::print_report,
+            // Spreadsheet export: Excel, CSV, tab-delimited (src/export.rs)
+            crate::export::export_budget,
+            // Tag presets and line blocks (src/presets.rs)
+            crate::presets::save_tag_preset,
+            crate::presets::tag_preset_from_line,
+            crate::presets::apply_tag_preset,
+            crate::presets::save_line_preset,
+            crate::presets::line_preset_preview,
+            crate::presets::insert_line_preset,
+            crate::presets::rename_tool_preset,
+            crate::presets::delete_tool_preset,
+            crate::presets::move_tool_preset,
             // Find and replace (src/find.rs)
             crate::find::find,
             crate::find::replace,
+            // Moving rows up and down (src/moverows.rs)
+            crate::moverows::move_rows,
+            crate::moverows::move_accounts,
+            crate::moverows::move_topsheet_rows,
+            // Renaming a setup item everywhere (src/rename.rs)
+            crate::rename::rename_setup_item,
+            // Import setup from another budget, templates (src/import_setup.rs,
+            // src/templates.rs)
+            crate::import_setup::import_setup_pick,
+            crate::import_setup::import_setup,
+            crate::templates::template_new,
+            crate::templates::template_save,
         ])
         .setup(|app| {
             // Autosave, recovery, backups, recent files, and the budgets that

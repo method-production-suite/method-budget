@@ -15,6 +15,7 @@ use fwb_core::{
     UnitDef, Version,
 };
 use fwb_core::{Band, BandField, FontSize, ReportColumn, ReportPreset, ReportSection, ReportSpec};
+use fwb_core::{LinePreset, SetupItems, TagPreset};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -205,6 +206,10 @@ pub(crate) struct FileBudget {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     report_presets: Vec<FileReportPreset>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    tag_presets: Vec<FileTagPreset>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    line_presets: Vec<FileLinePreset>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     versions: Vec<FileVersion>,
 }
 
@@ -231,6 +236,8 @@ impl From<&Budget> for FileBudget {
             baseline,
             versions,
             report_presets,
+            tag_presets,
+            line_presets,
         } = b;
         FileBudget {
             title: title.clone(),
@@ -255,6 +262,8 @@ impl From<&Budget> for FileBudget {
             credits: credits.iter().map(FileCredit::from).collect(),
             baseline: baseline.as_ref().map(FileBaseline::from),
             report_presets: report_presets.iter().map(FileReportPreset::from).collect(),
+            tag_presets: tag_presets.iter().map(FileTagPreset::from).collect(),
+            line_presets: line_presets.iter().map(FileLinePreset::from).collect(),
             versions: versions.iter().map(FileVersion::from).collect(),
         }
     }
@@ -296,6 +305,8 @@ impl From<FileBudget> for Budget {
                 .into_iter()
                 .map(ReportPreset::from)
                 .collect(),
+            tag_presets: f.tag_presets.into_iter().map(TagPreset::from).collect(),
+            line_presets: f.line_presets.into_iter().map(LinePreset::from).collect(),
         }
     }
 }
@@ -336,6 +347,11 @@ impl<'de> Deserialize<'de> for FileSnapshot {
         if !b.report_presets.is_empty() {
             return Err(de::Error::custom(
                 "a version's budget cannot have report presets",
+            ));
+        }
+        if !b.tag_presets.is_empty() || !b.line_presets.is_empty() {
+            return Err(de::Error::custom(
+                "a version's budget cannot have tag presets or line blocks",
             ));
         }
         Ok(FileSnapshot(b))
@@ -1691,5 +1707,315 @@ impl From<FileReportPreset> for ReportPreset {
                 footer: f.footer.map(Band::from),
             },
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tag presets and line blocks (fwb_core::presets)
+
+/// A saved bundle of line tags. Every part is left out when empty.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FileTagPreset {
+    name: String,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    fringes: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    groups: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    set: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    location: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    currency: Option<String>,
+}
+
+impl From<&TagPreset> for FileTagPreset {
+    fn from(p: &TagPreset) -> FileTagPreset {
+        let TagPreset {
+            name,
+            fringes,
+            groups,
+            set,
+            location,
+            currency,
+        } = p;
+        FileTagPreset {
+            name: name.clone(),
+            fringes: fringes.clone(),
+            groups: groups.clone(),
+            set: set.clone(),
+            location: location.clone(),
+            currency: currency.clone(),
+        }
+    }
+}
+
+impl From<FileTagPreset> for TagPreset {
+    fn from(f: FileTagPreset) -> TagPreset {
+        TagPreset {
+            name: f.name,
+            fringes: f.fringes,
+            groups: f.groups,
+            set: f.set,
+            location: f.location,
+            currency: f.currency,
+        }
+    }
+}
+
+/// A saved block of rows, with the setup items they use.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileLinePreset {
+    name: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    rows: Vec<FileBlockRow>,
+    #[serde(default, skip_serializing_if = "FileSetupItems::is_empty")]
+    setup: FileSetupItems,
+}
+
+impl From<&LinePreset> for FileLinePreset {
+    fn from(p: &LinePreset) -> FileLinePreset {
+        let LinePreset { name, rows, setup } = p;
+        FileLinePreset {
+            name: name.clone(),
+            rows: rows.iter().map(FileBlockRow::from).collect(),
+            setup: FileSetupItems::from(setup),
+        }
+    }
+}
+
+impl From<FileLinePreset> for LinePreset {
+    fn from(f: FileLinePreset) -> LinePreset {
+        LinePreset {
+            name: f.name,
+            rows: f.rows.into_iter().map(Detail::from).collect(),
+            setup: SetupItems::from(f.setup),
+        }
+    }
+}
+
+/// Setup items in the shapes the budget's own tables use. Each table is
+/// left out when empty.
+#[derive(Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileSetupItems {
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    currencies: BTreeMap<String, FileCurrency>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    units: BTreeMap<String, FileUnit>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    globals: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    fringes: BTreeMap<String, FileFringe>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    groups: BTreeMap<String, FileGroup>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    sets: BTreeMap<String, FileSet>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    locations: BTreeMap<String, FileLocation>,
+}
+
+impl FileSetupItems {
+    fn is_empty(&self) -> bool {
+        self.currencies.is_empty()
+            && self.units.is_empty()
+            && self.globals.is_empty()
+            && self.fringes.is_empty()
+            && self.groups.is_empty()
+            && self.sets.is_empty()
+            && self.locations.is_empty()
+    }
+}
+
+impl From<&SetupItems> for FileSetupItems {
+    fn from(s: &SetupItems) -> FileSetupItems {
+        let SetupItems {
+            fringes,
+            groups,
+            globals,
+            units,
+            sets,
+            locations,
+            currencies,
+        } = s;
+        FileSetupItems {
+            currencies: map(currencies, FileCurrency::from),
+            units: map(units, FileUnit::from),
+            globals: map(globals, |f| f.0.clone()),
+            fringes: map(fringes, FileFringe::from),
+            groups: map(groups, FileGroup::from),
+            sets: map(sets, FileSet::from),
+            locations: map(locations, FileLocation::from),
+        }
+    }
+}
+
+impl From<FileSetupItems> for SetupItems {
+    fn from(f: FileSetupItems) -> SetupItems {
+        SetupItems {
+            fringes: unmap(f.fringes, Fringe::from),
+            groups: unmap(f.groups, Group::from),
+            globals: unmap(f.globals, Formula),
+            units: unmap(f.units, UnitDef::from),
+            sets: unmap(f.sets, SetDef::from),
+            locations: unmap(f.locations, Location::from),
+            currencies: unmap(f.currencies, Currency::from),
+        }
+    }
+}
+
+/// A row in a line block: a [detail row](FileDetail) without an `id` (the
+/// copies inserted get new ones). Converted through [`FileDetail`], so the
+/// two always agree field for field.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileBlockRow {
+    #[serde(default, skip_serializing_if = "FileRowKind::is_line")]
+    kind: FileRowKind,
+    description: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    amount: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    unit: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    x: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    unit2: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    rate: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    unit3: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    x4: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    unit4: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    currency: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    fringe_range: Option<u32>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    fringes: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    groups: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    set: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    location: Option<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    bold: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    italic: bool,
+    #[serde(default, skip_serializing_if = "is_zero_u8")]
+    indent: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    color: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    note: Option<String>,
+}
+
+impl From<&Detail> for FileBlockRow {
+    fn from(d: &Detail) -> FileBlockRow {
+        let FileDetail {
+            id: _,
+            kind,
+            description,
+            amount,
+            unit,
+            x,
+            unit2,
+            rate,
+            unit3,
+            x4,
+            unit4,
+            currency,
+            fringe_range,
+            fringes,
+            groups,
+            set,
+            location,
+            bold,
+            italic,
+            indent,
+            color,
+            note,
+        } = FileDetail::from(d);
+        FileBlockRow {
+            kind,
+            description,
+            amount,
+            unit,
+            x,
+            unit2,
+            rate,
+            unit3,
+            x4,
+            unit4,
+            currency,
+            fringe_range,
+            fringes,
+            groups,
+            set,
+            location,
+            bold,
+            italic,
+            indent,
+            color,
+            note,
+        }
+    }
+}
+
+impl From<FileBlockRow> for Detail {
+    /// The row with id 0: a block's rows have none.
+    fn from(r: FileBlockRow) -> Detail {
+        let FileBlockRow {
+            kind,
+            description,
+            amount,
+            unit,
+            x,
+            unit2,
+            rate,
+            unit3,
+            x4,
+            unit4,
+            currency,
+            fringe_range,
+            fringes,
+            groups,
+            set,
+            location,
+            bold,
+            italic,
+            indent,
+            color,
+            note,
+        } = r;
+        Detail::from(FileDetail {
+            id: 0,
+            kind,
+            description,
+            amount,
+            unit,
+            x,
+            unit2,
+            rate,
+            unit3,
+            x4,
+            unit4,
+            currency,
+            fringe_range,
+            fringes,
+            groups,
+            set,
+            location,
+            bold,
+            italic,
+            indent,
+            color,
+            note,
+        })
     }
 }

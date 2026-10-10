@@ -113,6 +113,8 @@ Fields in written order:
 | `credits`         | list of [credits](#credit) | Applied credits (incentives), in application order. |
 | `baseline`        | [baseline](#baseline) | Frozen totals for comparison. Left out when there is none. |
 | `report_presets`  | list of [report presets](#report-preset) | Saved report setups, in the user's order. Left out when there are none. |
+| `tag_presets`     | list of [tag presets](#tag-preset) | Saved bundles of line tags, in the user's order. Left out when there are none. |
+| `line_presets`    | list of [line blocks](#line-block) | Saved blocks of rows to insert, in the user's order. Left out when there are none. |
 | `versions`        | list of [versions](#version) | Named copies of the budget, oldest first. Left out when there are none. |
 
 A new budget in Film Wizard Budgeting starts with a set of editable starter units (Allow,
@@ -361,7 +363,7 @@ or compared later. Fields in written order:
 | `name`    | text, **required** | |
 | `created` | text, **required** | When the version was saved, as an ISO 8601 date-time such as `"2026-10-09T14:30:00Z"`. Stored as given; the reader does not check it. |
 | `note`    | optional text | |
-| `budget`  | object, **required** | A [budget](#budget) object with every field except `versions` and `report_presets`: a version cannot contain versions or report presets, and a reader rejects one that does. |
+| `budget`  | object, **required** | A [budget](#budget) object with every field except `versions`, `report_presets`, `tag_presets` and `line_presets`: a version cannot contain versions or presets, and a reader rejects one that does. |
 
 Restoring a version in the application first saves the current content as another version
 (named `Before restoring "<name>"`), so a restore can be undone.
@@ -477,6 +479,70 @@ Example (inside `budget`, after `baseline` and before `versions`):
 ]
 ```
 
+### Tag preset
+
+A named bundle of a line's tags, put on lines by the application in one of two ways: added
+(fringes and groups joined with the line's own; set, location and currency filled in only
+where the line has none) or replacing (the line's five tags become exactly the preset's,
+an empty part clearing that tag). Like report presets, tag presets are tools, not budget
+content: a [version](#version) never has them, and restoring a version keeps the current
+ones. Fields in written order, each part left out when empty:
+
+| Field      | Type | Notes |
+|------------|------|-------|
+| `name`     | text, **required** | The application keeps names unique within the list, ignoring case, and up to 80 characters; the reader does not check. |
+| `fringes`  | name set | Fringe names. |
+| `groups`   | name set | Group names. |
+| `set`      | optional text | A set name. |
+| `location` | optional text | A location name. |
+| `currency` | optional text | A currency code. Left out means the base currency. |
+
+The names refer to the budget's own setup tables; the reader does not check that they
+exist (the application refuses to apply a preset that names a missing item).
+
+```json
+"tag_presets": [
+  { "name": "Union crew", "fringes": ["PAYROLL", "PENSION"], "groups": ["Crew"], "location": "Toronto" }
+]
+```
+
+### Line block
+
+A named block of rows the application inserts copies of. Tools, not budget content, like
+tag presets: a [version](#version) never has them. Fields in written order:
+
+| Field   | Type | Notes |
+|---------|------|-------|
+| `name`  | text, **required** | Unique within the list, ignoring case, as for tag presets. |
+| `rows`  | list of block rows | The rows in order. Left out when empty. |
+| `setup` | object | The setup items the rows use, as defined when the block was saved, with what those use in turn. Left out when empty. |
+
+A **block row** is a [detail row](#detail-row) without `id`: inserted copies get new ids.
+Every other field is the same, with the same defaults; `fringe_range` numbers group the
+block's own rows and are renumbered for the account a copy lands in.
+
+`setup` holds the budget's own tables, each left out when empty, in this order:
+`currencies`, `units`, `globals`, `fringes`, `groups`, `sets`, `locations`, each a map in
+the shape the [budget](#budget) uses. The application uses it only to add back an item the
+budget no longer has when the block is inserted; the budget's own definition of an item
+always wins.
+
+```json
+"line_presets": [
+  {
+    "name": "Prep week",
+    "rows": [
+      { "description": "Coordinator", "amount": "5", "unit": "Day", "rate": "DAY_RATE", "fringes": ["PAYROLL"] },
+      { "kind": "subtotal", "description": "Prep" }
+    ],
+    "setup": {
+      "globals": { "DAY_RATE": "450" },
+      "fringes": { "PAYROLL": { "kind": "percent", "rate": "18" } }
+    }
+  }
+]
+```
+
 ## Reading rules
 
 A reader that follows this document should:
@@ -531,6 +597,9 @@ valid. Loading and saving it in Film Wizard Budgeting normalizes it.
   unchanged.
 - Version 1, additive (2026-10): budget `report_presets` (saved report setups). Left out
   when there are none, so files without presets are unchanged.
+- Version 1, additive (2026-10): budget `tag_presets` (saved bundles of line tags) and
+  `line_presets` (saved blocks of rows, with the setup they use). Left out when there are
+  none, so files without them are unchanged.
 
 ## Complete example
 

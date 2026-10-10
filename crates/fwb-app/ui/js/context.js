@@ -15,6 +15,7 @@ import { shortcutText } from './shortcuts.js';
 import { isModalOpen } from './modal.js';
 import { isHelpOpen } from './help.js';
 import { PALETTE, paletteColor, selectedDetails, styleState } from './rowformat.js';
+import { presetMenu, blockMenu } from './presets.js';
 
 // { grid, host, view(), level(), run(id), act(cmd, args), toast(message) }
 let ctx = null;
@@ -25,6 +26,32 @@ export function initContextMenu(context) {
   ctx = context;
   ctx.host.addEventListener('contextmenu', onContextMenu);
   window.addEventListener('keydown', onKey);
+}
+
+// { selection(), call(cmd, args, opts) } for the preset submenus (main.js).
+let presets = null;
+
+export function initContextMenuPresets(context) {
+  presets = context;
+}
+
+/**
+ * Apply preset > (every level) and Insert line block > (detail lines): the
+ * submenus presets.js builds, for the grid's selection.
+ */
+function presetItems(blocks) {
+  if (!presets) return [];
+  const c = {
+    view: ctx.view(),
+    sel: presets.selection(),
+    call: presets.call,
+    toast: ctx.toast,
+    anchor: () => ctx.grid.cellFor(ctx.grid.cursorKey(), ctx.grid.cursorColKey()) || ctx.host,
+    openTab: () => ctx.run('view.tab.presets'),
+  };
+  const out = [SEP, { label: 'Apply preset', items: presetMenu(c) }];
+  if (blocks) out.push({ label: 'Insert line block', items: blockMenu(c) });
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +248,11 @@ function tagItems(field, rows) {
   return out;
 }
 
+/** Move up and Move down: the selected rows one place (src/moverows.rs). */
+function moveItems() {
+  return [SEP, cmd('edit.move_up', 'Move up'), cmd('edit.move_down', 'Move down')];
+}
+
 function detailItems(onRow) {
   const inserts = [
     cmd('insert.line', 'Insert line'),
@@ -239,6 +271,7 @@ function detailItems(onRow) {
     SEP,
     ...inserts,
     cmd('edit.delete_rows', rows.length > 1 ? `Delete ${rows.length} rows` : 'Delete row'),
+    ...moveItems(),
     SEP,
     { label: 'Format', items: formatItems(styleState(rows)) },
     cmd('edit.note', hasNote ? 'Edit note…' : 'Add note…'),
@@ -250,6 +283,7 @@ function detailItems(onRow) {
     cmd('edit.remove_range', 'Remove fringe range', { disabled: !rows.some((d) => typeof d.fringe_range === 'number') }),
     { label: 'Apply group', items: tagItems('groups', rows) },
     { label: 'Apply fringe', items: tagItems('fringes', rows) },
+    ...presetItems(true),
   ];
 }
 
@@ -264,6 +298,8 @@ function accountItems(onRow) {
     insert,
     { label: 'Rename account', run: rename },
     cmd('edit.delete_rows', 'Delete account'),
+    ...moveItems(),
+    ...presetItems(false),
   ];
 }
 
@@ -284,7 +320,9 @@ function topsheetItems(onRow) {
     ...inserts,
     { label: category ? 'Rename category' : 'Rename production total', run: rename },
     cmd('edit.delete_rows', category ? 'Delete category…' : 'Delete production total'),
+    ...moveItems(),
     SEP,
     ...setup,
+    ...(category ? presetItems(false) : []),
   ];
 }

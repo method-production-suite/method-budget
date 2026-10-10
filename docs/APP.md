@@ -181,10 +181,35 @@ do; choosing one puts it on them all, or takes it off, as the apply panel does).
 account list: Cut, Copy, Paste; Open account; Insert, Rename (edits the name in place) and
 Delete account. On the topsheet: Cut, Copy, Paste; Open category; Insert category,
 Insert production total, Rename, Delete; and Add or apply a charge, Add or apply a credit
-(the Charges and Credits tabs). A right-click on a total row offers only the inserts, and
+(the Charges and Credits tabs). All three levels have Move up and Move down. A right-click on a total row offers only the inserts, and
 one inside the cell editor gets the system's own text menu. Paste from the menu goes
 through the web view's paste command; where the web view asks first, or refuses, the key
 (Cmd+V) always works.
+
+**Moving rows.** Option+Up and Option+Down (Alt on Windows and Linux; Edit > Move Up and
+Move Down; Move up and Move down in the right-click menu) move the selected rows one place:
+lines within their account, accounts within their category, categories and production
+totals on the topsheet. Any selection works, contiguous or not: each selected row steps past
+the nearest row that isn't selected, the selected rows keep their order, rows already at the
+top or bottom stay there and the rest close up behind them. The moved rows stay selected
+and the cursor stays on its row, so pressing again keeps going. Presses of the same rows
+less than a second apart are one undo step (holding the key is one step, and a run that
+ends where it started leaves none). **Fringe ranges stay whole**: a range whose lines are
+all selected moves as it is, with the subtotal and separator rows between its lines; a
+selected line from a range whose other lines stay behind leaves the range, and the lines
+left behind are stepped over as one block, so no line ever lands inside a range it isn't
+in. Moving a subtotal or adjustment row changes which lines it adds up, as it would by
+hand. Moving lines between accounts is cut and paste (Edit > Cut Rows, Paste Rows).
+Dragging rows by the # column isn't built.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `move_rows` | `rowIds` (all in one account), `by` (`-1` up, `1` down) | View, with `moved` (the moved rows' ids in their new order: the selection plus any subtotal or separator rows inside a range that moved whole) and `changed` |
+| `move_accounts` | `codes` (all in one category), `by` | View, with `moved` (their new places in the category) and `changed` |
+| `move_topsheet_rows` | `indexes` (topsheet places), `by` | View, with `moved` (their new places) and `changed` |
+
+All three are in `src/moverows.rs` and work through `Session::edit_merging`, which joins
+quick repeats of one edit into one undo step.
 
 Styles, notes and group colors are these commands, in `src/rowstyle.rs`:
 
@@ -214,7 +239,7 @@ or created.
 The panel is two tab panes. Docked at the right they are stacked; docked at the bottom
 they sit side by side under a grid that gets the window's whole width; popped out they are
 stacked in a window called Tools. The first pane starts with **Fringes, Groups, Globals,
-Units and Find**, the second with **Sets, Locations, Currency, Notes and Budget**; Budget has tabs of
+Units, Presets and Find**, the second with **Sets, Locations, Currency, Notes and Budget**; Budget has tabs of
 its own: **Charges, Credits, Info, Settings and Baseline**. Drag a tab along its strip to
 reorder it, or onto the other pane's strip to move it there (a bar shows where it will
 land); from the keyboard, Option+Shift+Left and Right move the focused tab along its pane
@@ -268,6 +293,29 @@ before deleting, as the Delete key does. The row at the bottom of every list (**
 fringe…**, **New group…**, and so on) opens the same kind of form for a new item, name
 first; a name already in use, or with a comma, is refused there.
 
+**Renaming an item everywhere.** The editor's first field is the item's name (a currency's
+code): a new name renames it, and every line, formula and setting that names it follows,
+as one undo step (another change saved with it is a second step), and a message says how
+many places changed. A right-click on a list item offers Edit…, **Rename everywhere…** and
+Delete…. A global's or unit's name in its tab does the same: double-click it, or Enter or
+F2 on it, or right-click it. What follows a rename: a global in every formula (other
+globals, fringe rates, Amount, X, Rate and 4X), only as that whole name and with the rest
+of each formula as typed; a fringe on lines and in credits' excluded fringes; a group on
+lines, in charges' excluded groups, the credits based on it, and report presets' group
+filters, keeping its color; a unit in all four unit columns and flat fringes; a set or
+location on lines; a currency on lines, flat charges and the totals currency. Tag presets
+and line blocks follow too (a block's saved copies of setup are filed under the new name).
+Renaming the base currency (Budget > Settings) works the same way. The new name has to be
+free: not another item, and not a name something already uses without an item behind it
+(a unit typed on lines, a global a formula names), so a rename never merges two names and
+renaming back gives the identical budget. Saved versions keep their own names.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `rename_setup_item` | `kind` (`global`, `fringe`, `group`, `unit`, `set`, `location` or `currency`), `from`, `to` | View, with `name` (the new name) and `places` (how many places were rewritten) |
+
+The command is in `src/rename.rs`; the engine does the work (`fwb_core::rename`).
+
 **Globals and Units** are edited in place, as before: a global's formula (with its current
 value beside it), a unit's plural, hours and description; Enter or leaving the box saves,
 Escape puts the old text back, and the × asks before deleting. **New global…** and **New
@@ -281,6 +329,43 @@ of the note); a click opens that line's account with the line selected.
 
 **Budget.** Charges, credits, budget info, settings (currencies, fringe posting, account
 numbers, what new lines copy) and the baseline, as in the setup tabs before.
+
+**Presets** (View > Tools Tab > Presets, and the grid's right-click menu). Both kinds are
+kept in the budget, so they travel with the file; versions don't carry them and restoring
+a version keeps the current ones.
+
+- **Tag presets** bundle a line's tags: fringes, groups, set, location and currency, any of
+  them empty. **Save tags as preset…** (in the tab, or Apply preset > in the right-click
+  menu) takes the cursor line's tags, with a box per tag to leave one out, under a name
+  (unique ignoring case, up to 80 characters). Each preset is listed with what it holds and
+  two buttons for the selection (the selected lines, or every line under the selected
+  accounts or categories, as for the lists): **Add** puts the preset's fringes and groups on
+  next to the lines' own, and its set, location and currency only on lines that have none
+  (a line in the base currency has none); it never takes anything off or changes a value a
+  line already has. **Replace** makes the lines' fringes, groups, set, location and currency
+  exactly the preset's, so a part the preset leaves empty is cleared. Fringes and currencies
+  go on lines, groups, sets and locations on lines and adjustments, as with the lists. Each
+  use is one undo step; a preset that names something the budget no longer has (a deleted
+  fringe, say) is refused, naming it, and nothing changes. F2 or a double-click on the
+  name edits a preset: its name, a box for every fringe and group, and the set, location
+  and currency (a name the budget no longer has is shown so it can be unticked).
+- **Line blocks** keep copies of rows. **Save lines as block…** takes the selected lines,
+  with boxes for what to keep: amount, X, rate and 4X; units; tags (fringes, groups, set,
+  location, currency and fringe ranges); notes. A box starts unticked when none of the
+  lines use it. Descriptions, row kinds and text styles always come along. **Insert** puts
+  copies above the cursor line (at the end of the account when the cursor is on no line):
+  new row ids, fringe ranges numbered new in the account, one undo step, the cursor on the
+  first new line. A block also keeps the definitions of the setup items its rows use (with
+  what those use: a fringe's flat unit, the globals in a formula); when the budget no longer
+  has one, the paste review ("Copy and paste rows", below) lists it first and Insert adds it back with the rows,
+  or Cancel leaves everything as it was. An item set up differently now keeps the budget's
+  own version, without asking. F2 renames a block.
+
+Keys on a focused preset or block: Enter adds (a block: inserts), Shift+Enter replaces, F2
+edits, Delete asks and deletes, Up and Down move through the list, Option+Shift+Up and Down
+move it in its list. The right-click menu has **Apply preset >** (each preset, with Add tags
+and Replace tags) at every level, and **Insert line block >** on detail lines, each ending
+with the save item and a way to this tab.
 
 **The tools window.** Popped out, the panel is a window of its own (title Tools) that you
 can put anywhere, a second screen included; it opens where it was last, at the size it was
@@ -327,6 +412,26 @@ The tools window and the Notes tab use these commands, in `src/tools.rs`:
 | `close_tools_window` | none | nothing |
 | `notes_list` | none | `[{ row_id, ti, ai, category, account, account_name, line, description, note, more }]`, every line with a note in budget order; `note` is cut to 280 characters (`more` says so) |
 
+The Presets tab and the right-click submenus (`ui/js/presets.js`) use these, in
+`src/presets.rs`; the main window and the tools window may both call them. Every one
+that changes the budget is one undo step and returns the View; a refusal changes nothing.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `save_tag_preset` | `index` (`null`: a new one at the end), `preset` (the file's shape, docs/FORMAT.md "Tag preset") | View |
+| `tag_preset_from_line` | `rowId`, `name`, `parts` (`{fringes, groups, set, location, currency}` booleans, each true when left out) | View |
+| `apply_tag_preset` | `index`, `mode` (`add` or `replace`), `rowIds`, `accounts`, `categories` (as for `apply_summary`; rows, accounts and categories must exist) | View |
+| `save_line_preset` | `name`, `rowIds`, `keep` (`{formulas, units, tags, notes}` booleans, each true when left out) | View |
+| `line_preset_preview` | `index` | the paste review's preview, listing only the setup items the block would add back (`review` false when there are none) |
+| `insert_line_preset` | `index`, `account`, `beforeRow` (`null`: the account's end) | View, with `created_row` the first new row |
+| `rename_tool_preset` | `which` (`tags` or `lines`), `index`, `name` | View |
+| `delete_tool_preset` | `which`, `index` | View |
+| `move_tool_preset` | `which`, `index`, `to` | View |
+
+The lean view lists line blocks without their rows: `budget.line_presets` is
+`[{ name, count }]` (the rows and their setup stay in Rust until a block is inserted).
+Tag presets are in the view in the file's shape.
+
 ### Find and replace
 
 Edit > Find (Cmd+F) shows the tools panel's **Find** tab, wherever the panel is, with focus
@@ -368,8 +473,10 @@ the base currency), or puts a global's current value in its place, as deleting a
 does (decisions.md, entry 12). Account numbers are found but not replaced (they change in
 the account list). A replace is refused, with nothing changed and the reason shown, when a
 checked place no longer matches (the budget changed meanwhile), the new global or item
-doesn't exist, the formula can't be read, or nothing would change. Renaming a setup item
-everywhere is a different thing and isn't built yet (below).
+doesn't exist, the formula can't be read, or nothing would change. Replacing swaps one item
+for another in the places checked; to give the global or item itself a new name everywhere,
+the replace panel has **Rename everywhere…** for the one being searched for (see Renaming an
+item everywhere, above), and the search follows the new name.
 
 Popped out, the Find tab works in the tools window: its results move the main window's
 grid, and Cmd+F and F3 in the main window go to it.
@@ -421,6 +528,7 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 | Indent the selected lines more, less | Option+Cmd+Right, Option+Cmd+Left | Ctrl+Alt+Right, Ctrl+Alt+Left |
 | Open the right-click menu at the cursor cell | Shift+F10 (or Control-click, or the menu key) | Shift+F10 (or the menu key) |
 | Make the selected lines one fringe range; take them out of their range | Cmd+R; Shift+Cmd+R | Ctrl+R; Ctrl+Shift+R |
+| Move the selected lines, accounts or topsheet rows up, down one place | Option+Up, Option+Down | Alt+Up, Alt+Down |
 | Up a level; down a level (also Enter) | Cmd+Up; Cmd+Down | Ctrl+Up; Ctrl+Down |
 | Go to the topsheet | Shift+Cmd+Up | Ctrl+Shift+Up |
 | Next, previous account (across categories, wrapping; also the ‹ › buttons; not while editing a cell, where they move the caret) | Cmd+Right, Cmd+Left (or Cmd+], Cmd+[) | Ctrl+Right, Ctrl+Left (or Ctrl+], Ctrl+[) |
@@ -435,6 +543,7 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 | On a tools tab: the previous or next tab in its pane (also Home, End) | Left, Right | Left, Right |
 | On a tools tab: move it along its pane; to the first or second pane | Option+Shift+Left, Right; Option+Shift+Up, Down | Alt+Shift+Left, Right; Alt+Shift+Up, Down |
 | On a list item: apply it to the selection; edit it; delete it; move up or down | Space; Enter or F2; Delete; Up, Down | Space; Enter or F2; Delete; Up, Down |
+| On a global's or unit's name: rename it everywhere | Enter or F2 (or double-click) | Enter or F2 (or double-click) |
 | In the Notes tab: save the note; put back the saved note | Cmd+Enter; Escape | Ctrl+Enter; Escape |
 | Find (the tools panel's Find tab); Find and Replace | Cmd+F; Shift+Cmd+F | Ctrl+F; Ctrl+Shift+F |
 | Next, previous find result (from anywhere); in the Find box | F3, Shift+F3; Enter, Shift+Enter | F3, Shift+F3; Enter, Shift+Enter |
@@ -558,6 +667,61 @@ different base currency) and `review` (whether to show it). `clip_paste` is refu
 nothing changed, when another copy replaced the reviewed one, the target is gone, or a
 choice is unknown.
 
+### Starting from another budget
+
+**Import Setup From…** (File menu) brings setup items from another budget file into the
+budget in front (decisions.md, entry 29). Rust shows the Open dialog and reads the file; a
+file that is open in a tab is read from the tab, so its unsaved changes count, and the
+budget in front can't import from itself. A review then lists every item in that budget,
+grouped by kind: globals, fringes, groups, units, sets, locations, currencies, charges,
+credits, tag presets, line blocks, report presets, and the budget settings (account
+numbering, fringe posting, new-line defaults). Each says how it stands here: **New**,
+**Same here**, or **Different here** with both definitions in words. Tick what to bring;
+a kind's own box ticks all of it. What a ticked item needs comes with it and is shown
+ticked and locked, saying what it comes with: a fringe's flat unit and the globals in its
+rate, the globals a global names (however deep), a charge's excluded groups and currency,
+a credit's groups and excluded fringes, a tag preset's tags, what a line block's rows use,
+a report preset's groups. For each item that differs and is coming in, the choice is the
+paste review's (decision 12): **Keep this budget's version** (the default), **Use the
+imported version** (it replaces this budget's, for everything that uses it), or **Add the
+imported one as** a new name (`OT (2)`, globals `DAYS_2`), which the imported items that
+refer to it then use. Currencies and settings can't take a new name; a setting that
+differs comes in only with "Use the imported version". A replaced charge, credit or preset
+keeps its place in the list, and a replaced report preset stays the default if it was; an
+added report preset is never the default. A currency that is this budget's base currency
+isn't imported (flat charges in the other budget's base currency count in this one's, and
+the review says so). Import is one undo step and says how many items were added,
+replaced and kept. Nothing about lines, accounts or categories is imported (copy and paste
+rows does that).
+
+**New From Template…** (File menu) starts a new budget in a new tab from any budget file:
+its categories, accounts and production totals, its setup (globals, fringes, groups,
+units, sets, locations, currencies, charges, credits, tag, line and report presets) and its
+settings (account numbering, fringe posting, new-line defaults, base and totals
+currencies). Its detail lines, budget info, baseline, versions and line notes are left
+out; "Keep the detail lines" keeps the lines (without their notes). The new budget is
+called Untitled and has no file, so the first Save asks where; the budget it came from is
+not touched (an open one is read from its tab). **Save as Template…** writes the budget in
+front to a new file, stripped the same way and titled after the file, without changing the
+budget or its own file; it won't write over a file open in a tab. A template is an
+ordinary `.fwb`: there is no template format and no template folder.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `import_setup_pick` | none (shows the Open dialog) | the review, or `null` when cancelled |
+| `import_setup` | `token` (from the review), `picks` (`[{kind, name}]`, settings with an empty name), `resolutions` (`[{kind, name, choice}]`, choice `keep`, `imported` or `rename`) | `{view, message, added, replaced, kept}` |
+| `template_new` | `keepLines` (shows the Open dialog) | View of the new tab, or `null` when cancelled |
+| `template_save` | `keepLines` (shows the Save dialog) | `{name, path}`, or `null` when cancelled |
+
+The review has `token`, `source` (the file's or tab's name), `path`, `notes` and `items`
+(`[{kind, name, status, imported, here, rename_to, needs}]`: kind `global`, `fringe`,
+`group`, `unit`, `set`, `location`, `currency`, `charge`, `credit`, `tag_preset`,
+`line_preset`, `report_preset`, `account_coding`, `fringe_posting` or `new_line_defaults`;
+status `new`, `same` or `differs`; `needs` every item it brings, however deep). Only the
+last file picked is kept; `import_setup` is refused, nothing changed, when another file was
+picked since, a pick isn't in that budget, a choice is unknown, or the import would pass a
+budget's limit on presets.
+
 ### Versions and comparing
 
 **Versions** (File > Versions…, or Versions in the toolbar) are named copies of the
@@ -676,6 +840,61 @@ For other screens, `ui/js/report.js` lays out and prints any table the same way:
 pages, repeating its header row on each, with the standard header and footer.
 `renderReport(container, view, spec)` and `printReport(view, spec, {pdf})` take a report
 spec (a preset's fields) or the older `"topsheet"`, `"detail"` or `"both"`.
+
+### Exporting spreadsheets
+
+**File > Export** has three items, each asking where to save with a native Save dialog
+(in the budget's folder, named after its file or, untitled, its title):
+
+- **Excel Workbook…** writes one `.xlsx` with a sheet per table: Topsheet, Accounts,
+  Detail, Globals, Fringes, Groups, Units, Currencies, Sets and Locations.
+- **CSV Files…** writes the same tables as one CSV file each, named from the name chosen:
+  `Pilot.csv` gives `Pilot - Topsheet.csv`, `Pilot - Accounts.csv` and so on, beside it.
+  They start with a UTF-8 byte order mark, so Excel reads accented letters.
+- **Tab-Delimited Detail…** writes the Detail table alone as tab-delimited text (`.txt`,
+  no byte order mark), the shape accounting and payroll importers take.
+
+What the tables hold:
+
+- **Topsheet**: type, code, description and total for each category in topsheet order,
+  posted fringe rows, production totals, the above-, below- and above-and-below-the-line
+  totals, budget-wide fringes, each applied charge (with its account), the grand total,
+  each applied credit (as a negative), the net total, and the totals in the totals currency
+  when one is set.
+- **Accounts**: category code and name, account code and name, details total, fringe total
+  and total for every account; a category's fringe account (fringes posted by category)
+  follows its accounts. The Total column adds up to the categories' totals.
+- **Detail**: one row per row of every account (lines, subtotals, adjustments and
+  separators, with the kind), in budget order: category, account and its name, line
+  number, description, the amount and rate as typed and their values, unit, X, the rate
+  unit, currency, 4X and their units, the running subtotal on subtotal rows, the line total
+  in the base currency, its fringes and the fringe dollars it earned, groups, set,
+  location, note, whether it counts toward the total (`Yes`/`No`) and its row id. An
+  adjustment's rate is the amount it is a percentage of.
+- **Setup tables**: globals with their formulas and values; fringes with type, rate (as
+  typed and its value), cutoff or unit, lines and total; groups with their switch and
+  totals (every tagged line, and what counts toward the budget); units with hours;
+  currencies with their rate in the base currency; sets and locations with their totals.
+
+Figures are the budget's own, unfiltered: every group as the budget sets it. Money is
+exact: integer cents written as a decimal (`1234.56`), never through a float; in the
+workbook it is a number with a `#,##0.00;(#,##0.00)` format (negatives in parentheses, as
+the app shows them), decimals are numbers as the engine holds them, and text is always a
+string, never a formula. Each sheet's header row is bold and stays in place when
+scrolling, and column widths follow the content. CSV follows RFC 4180 (commas, CRLF,
+quotes only when needed); tab-delimited text never quotes, so tabs and line breaks inside a
+field become spaces. In both, text a spreadsheet would run as a formula (starting with `=`,
+`+`, `-` or `@`) gets a leading `'` unless it is a plain number.
+
+A budget with a cell the engine can't evaluate is not exported (the message names the
+first problem): the grid counts such cells as blank, and an export must carry the real
+figures. Each file is written atomically, and an export never replaces a budget that is
+open in a tab. The same tables come from the command line:
+`fwb export <file.fwb> --format xlsx|csv|tsv --out <path> [--bom]`.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `export_budget` | `format` (`"xlsx"`, `"csv"` or `"tsv"`; shows the Save dialog) | `{done, files}`: `done` false when cancelled; `files` the names written |
 
 ## Saving and recovery
 
@@ -820,11 +1039,18 @@ crates/fwb-app/
                      cell with the edit (one undo step); the new-line defaults setting
   src/clipboard.rs   copy and paste whole rows, accounts and categories with the setup
                      they use: the app's one row clipboard, the paste review, the paste
+  src/import_setup.rs  Import Setup From: the review of another budget's setup items
+                     (status, what each needs), importing the picks as one undo step
+  src/templates.rs   New From Template and Save as Template: a budget stripped to its
+                     chart, setup and settings
   src/menu.rs        native menu bar, built from the same table as ui/js/shortcuts.js
   src/tools.rs       the tools panel's own window: opening, hiding and placing it, telling
                      the other window when the budget changed, the Notes tab's list
   src/find.rs        find and replace: typed search over a budget, replacing in the
                      checked results as one undo step
+  src/moverows.rs    moving lines, accounts and topsheet rows one place, keeping fringe
+                     ranges whole; quick presses join one undo step
+  src/rename.rs      renaming a setup item everywhere (fwb_core::rename does the work)
   src/versions.rs    the Versions dialog's commands: save, restore, rename, delete, each
                      one undo step, with names, notes and times checked
   src/compare.rs     the compare screen's commands: budgets copied out of tabs, versions
@@ -833,6 +1059,8 @@ crates/fwb-app/
                      printing a report to the print sheet or a PDF file
   src/pdf_mac.rs     macOS: AppKit's print operation on the web view, into a PDF file
                      with no panel or through the print sheet (Objective-C runtime calls)
+  src/export.rs      File > Export: the budget's tables (fwb_format::export) as an Excel
+                     workbook, CSV files or tab-delimited detail, through a Save dialog
   src/safety.rs      saving safety as plain files: atomic writes, recovery copies,
                      backups, settings, the recent list (tested with temporary folders)
   src/safety_app.rs  its Tauri side: autosave timer, recovery and backup commands, Open
@@ -1030,9 +1258,14 @@ untrusted (a budget file is data from anywhere).
   open budget by its document id, which is only ever a number checked against the open
   tabs. The files reopened at the start come from the app's own `tabs.json`. A report's
   PDF is written where the native Save dialog shown by Rust says; the page can only
-  suggest a file name. Files to
+  suggest a file name. Exports (`export_budget`) are the same: the page names only the
+  format, Rust shows the Save dialog, forces the format's extension, writes atomically and
+  refuses a path that is a budget open in a tab. Files to
   compare with are picked in the same native dialog, read in Rust and named by the page
-  only by a token Rust gave out (the last 32 picked are kept); versions by their id.
+  only by a token Rust gave out (the last 32 picked are kept); versions by their id. The
+  same goes for the budget to import setup from (the last one picked) and for templates:
+  New From Template and Save as Template show the native dialogs from Rust and only take
+  "keep the lines" from the page.
   Show Backups Folder runs the system's `open`, `explorer` or `xdg-open` from Rust on a
   folder Rust chose.
 - **Budget text is never markup.** The UI builds the page with DOM calls and puts every
@@ -1063,10 +1296,8 @@ Tabs are built so it can: every budget is already its own document with its own 
 screen, and commands already name their budget (`doc`), so a second pane would be a second
 grid that sends a different `doc`.
 
-Moving rows by drag, editing fringe ranges in the grid, renaming setup entries (add
-the new one, then delete the old), renumbering accounts when the coding pattern changes,
-import from other tools, renaming a global or setup item everywhere (find and replace swaps
-one for another in the places checked), single-instance handling on Windows and Linux,
+Moving rows by drag, editing fringe ranges in the grid, renumbering accounts when the
+coding pattern changes, import from other tools, single-instance handling on Windows and Linux,
 the macOS system recent documents list, a mark on copied rows, and the total change a
 paste will cause in its review. Printing, the Windows/Linux menu keys, Copy Rows from
 the menu bar reaching the system clipboard, and the tools window (placement on a second
@@ -1080,6 +1311,9 @@ at once), of going to a compared row in another tab, and of printing a wide comp
 Find needs a live check of its keys in the system web views (Cmd+F and Shift+Cmd+F through
 the menu, F3 reaching the page on a Mac whose function keys control the system) and of the
 Find tab in the tools window.
+Import Setup From, New From Template and Save as Template need a live check of their
+native dialogs and of the review with a large library budget (the review's logic and
+dialog are tested in Rust and in a browser harness).
 Reports need a live check in the app: Print… and Save as PDF… through the native print
 operation (checked here only in a hidden test web view: each page box is one sheet,
 portrait and landscape, with backgrounds and colors), the print sheet's orientation, and
@@ -1087,3 +1321,16 @@ the setup dialog's keys. Paper is Letter only for now (A4 and Legal would be a l
 choice), there is no "detail starts on page N" column on the topsheet yet, and Windows and
 Linux print with `window.print()` and the page's own `@page` size and zero margins
 (untested there; Save as PDF is the print dialog's PDF choice on those systems).
+The Presets tab and its right-click submenus need a live check in the app (keys and the
+review in the tools window included; the logic is tested in Rust and the tab, forms,
+review and menus in a browser harness). Presets follow a rename of a setup item, but
+deleting a fringe, group, set or location leaves its name in tag presets (applying one
+then says what is missing). Line blocks are reordered from the keyboard only.
+Exports need a live check: File > Export's Save dialogs, and the workbook opened in Excel
+and Numbers (checked here by reading it back: ZIP CRCs, every part well-formed with
+`xmllint` and Python's parser, content types and relationships complete, every cell's
+type, style and value matching the CSV and tab-delimited files of the same budget).
+Moving rows and renaming need a live check: Option+Up and Option+Down reaching the page in
+the system web views (Alt+Up and Alt+Down on Windows and Linux), the Edit menu's Move Up and
+Move Down, and the rename forms and right-click menus in the tools window (all checked in a
+browser harness against the real Rust session).

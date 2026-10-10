@@ -674,6 +674,8 @@ mod tests {
             include_str!("../ui/js/topsheet-setup.js"),
             include_str!("../ui/js/notes.js"),
             include_str!("../ui/js/find.js"),
+            include_str!("../ui/js/rename.js"),
+            include_str!("../ui/js/presets.js"),
         ];
         let mut named = std::collections::BTreeSet::new();
         for js in panel_js {

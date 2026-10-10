@@ -127,6 +127,46 @@ fn lex(src: &str) -> Result<Vec<(usize, Tok)>, ParseError> {
     Ok(out)
 }
 
+/// `src` with every global-name token equal to `from` replaced by `to`, and
+/// how many were replaced. Tokens are split as the lexer splits them (a run
+/// of digits and dots is a number; a letter or `_` starts a name that runs on
+/// through letters, digits and `_`), so `DAYS` is never touched inside
+/// `SHOOT_DAYS` or `DAYS2`. Everything else is kept byte for byte, spacing
+/// included, and formulas that don't parse are rewritten the same way: what
+/// they name is still a reference. Parsing the result gives what
+/// [`Expr::rename`] gives on the parsed original.
+pub fn rename_var(src: &str, from: &str, to: &str) -> (String, usize) {
+    let bytes = src.as_bytes();
+    let mut out = String::with_capacity(src.len());
+    let mut n = 0;
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i];
+        let start = i;
+        if c.is_ascii_digit() || c == b'.' {
+            while i < bytes.len() && (bytes[i].is_ascii_digit() || bytes[i] == b'.') {
+                i += 1;
+            }
+            out.push_str(&src[start..i]);
+        } else if c.is_ascii_alphabetic() || c == b'_' {
+            while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
+                i += 1;
+            }
+            if &src[start..i] == from {
+                out.push_str(to);
+                n += 1;
+            } else {
+                out.push_str(&src[start..i]);
+            }
+        } else {
+            let ch = src[i..].chars().next().unwrap_or('?');
+            out.push(ch);
+            i += ch.len_utf8();
+        }
+    }
+    (out, n)
+}
+
 /// Longest formula accepted, in bytes not counting spaces (so a formula's
 /// printed form, which adds spaces, is always accepted too). Bounds the tree's
 /// size and depth, so evaluating, printing or dropping it can't exhaust the
@@ -305,6 +345,21 @@ impl Expr {
         }
     }
 
+    /// This expression with every reference to global `from` naming `to`
+    /// instead: [`Expr::substitute`] with a name in place of a value.
+    pub fn rename(&self, from: &str, to: &str) -> Expr {
+        match self {
+            Expr::Var(n) if n == from => Expr::Var(to.to_string()),
+            Expr::Num(_) | Expr::Var(_) => self.clone(),
+            Expr::Neg(e) => Expr::Neg(Box::new(e.rename(from, to))),
+            Expr::Bin(op, a, b) => Expr::Bin(
+                *op,
+                Box::new(a.rename(from, to)),
+                Box::new(b.rename(from, to)),
+            ),
+        }
+    }
+
     fn prec(&self) -> u8 {
         match self {
             Expr::Bin(Op::Add | Op::Sub, ..) => 1,
@@ -478,6 +533,37 @@ mod tests {
         let mut v = BTreeSet::new();
         Expr::parse("A * (B + A) - 3").unwrap().vars(&mut v);
         assert_eq!(v.into_iter().collect::<Vec<_>>(), ["A", "B"]);
+    }
+
+    #[test]
+    fn renaming_a_name_keeps_everything_else_as_typed() {
+        assert_eq!(rename_var("DAYS*2", "DAYS", "SHOOT"), ("SHOOT*2".into(), 1));
+        assert_eq!(
+            rename_var("(DAYS+1)/ DAYS", "DAYS", "D"),
+            ("(D+1)/ D".into(), 2)
+        );
+        // Never inside a longer name, and numbers stay numbers.
+        assert_eq!(
+            rename_var("SHOOT_DAYS + DAYS2 + 1.5", "DAYS", "X"),
+            ("SHOOT_DAYS + DAYS2 + 1.5".into(), 0)
+        );
+        assert_eq!(rename_var("2DAYS", "DAYS", "X"), ("2X".into(), 1));
+        // Formulas that don't parse are still rewritten; other text is kept.
+        assert_eq!(rename_var("DAYS * é", "DAYS", "X"), ("X * é".into(), 1));
+        for (src, from, to) in [
+            ("A * (B - A)", "A", "LONGER_NAME"),
+            ("-(A+B)/A", "B", "C"),
+            ("WEEKS * 5 + WEEKS", "WEEKS", "W"),
+        ] {
+            let (out, _) = rename_var(src, from, to);
+            assert_eq!(
+                Expr::parse(&out).unwrap(),
+                Expr::parse(src).unwrap().rename(from, to),
+                "{src}"
+            );
+            // And back again, byte for byte.
+            assert_eq!(rename_var(&out, to, from).0, src);
+        }
     }
 
     #[test]

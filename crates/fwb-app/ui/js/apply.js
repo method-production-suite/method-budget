@@ -10,7 +10,9 @@
 // the line's old value. A click on the item's name only selects it; a
 // double-click on the name (or Enter or F2) edits the item in a small form
 // next to it, Delete removes it (after asking), and the row at the bottom of
-// each list adds a new one. Fringe ranges are made and removed at the foot of
+// each list adds a new one. The editor's Name (Code) field, or Rename
+// everywhere in the item's right-click menu, renames it with every line and
+// setting that uses it (rename.js). Fringe ranges are made and removed at the foot of
 // the fringe list.
 //
 // On the topsheet and the account list, the selection is every line under
@@ -32,6 +34,7 @@ import { el } from './dom.js';
 import { money } from './format.js';
 import { anchoredForm } from './modal.js';
 import { PALETTE, paletteColor } from './rowformat.js';
+import { renameProblem, renamedText, itemMenu } from './rename.js';
 
 const LISTS = [
   {
@@ -672,6 +675,23 @@ function item(list, s, name, def, eligible) {
     e.preventDefault();
     editItem(list, name);
   });
+  // Right-click: Edit, Rename everywhere, Delete.
+  b.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    select(list.id, name, b);
+    itemMenu(e, {
+      kind: list.what,
+      name,
+      anchor: b,
+      ctx: renameCtx(),
+      edit: () => editItem(list, name),
+      remove: () => deleteItem(list, name),
+      onRenamed: (to) => {
+        st.selected[list.id] = to;
+        focusAfter(itemKey(list.id, to), list.id);
+      },
+    });
+  });
   b.addEventListener('keydown', (e) => {
     const plain = !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey;
     if ((e.key === 'Enter' || e.key === 'F2') && plain) {
@@ -933,21 +953,37 @@ function focusAfter(key, listId) {
   if (b) b.focus({ preventScroll: false });
 }
 
-/** Opens the editor for item `name` of `list` next to it. */
+/** What rename.js needs from this panel. */
+function renameCtx() {
+  return {
+    call: (cmd, args) => call(cmd, args),
+    toast: (m) => st.ctx && typeof st.ctx.toast === 'function' && st.ctx.toast(m),
+    budget: () => budget(),
+  };
+}
+
+/**
+ * Opens the editor for item `name` of `list` next to it. Its first field is
+ * the name (a currency's code): a new one renames the item everywhere first
+ * (rename.js; its own undo step), then any other change is saved under it.
+ */
 function editItem(list, name) {
   const defs = obj(list.defs(budget()));
   const spec = EDITORS[list.id];
   if (!spec || !Object.prototype.hasOwnProperty.call(defs, name)) return;
-  const { fields, build } = spec(name, obj(defs[name]));
+  const def = obj(defs[name]);
+  const { fields, build } = spec(name, def);
   const key = itemKey(list.id, name);
   const start = Object.fromEntries(fields.map((f) => [f.key, f.type === 'check' ? Boolean(f.value) : str(f.value)]));
   const unchanged = JSON.stringify(build(start));
   const what = list.what[0].toUpperCase() + list.what.slice(1);
+  const nameField = { key: 'newName', label: list.id === 'currencies' ? 'Code' : 'Name', value: name };
   let deleting = false;
+  let now = name;
   anchoredForm({
     anchor: byKey(key),
     title: `${what} ${name}`,
-    fields,
+    fields: [nameField, ...fields],
     extra: {
       text: 'Delete…',
       title: `Delete this ${list.what}`,
@@ -955,15 +991,25 @@ function editItem(list, name) {
         deleting = true;
       },
     },
-    onSubmit: (v) => {
-      const step = build(v);
-      // Nothing changed: no command, no undo step.
-      if (JSON.stringify(step) === unchanged) return Promise.resolve();
-      return call(step[0], step[1]);
+    onSubmit: async (v) => {
+      const to = str(v.newName).trim();
+      const other = JSON.stringify(build(v)) !== unchanged;
+      if (to !== now) {
+        const bad = renameProblem(list.what, now, to, budget());
+        if (bad) throw bad;
+        const reply = await call('rename_setup_item', { kind: list.what, from: now, to });
+        renameCtx().toast(renamedText(list.what, now, reply));
+        now = reply && typeof reply.name === 'string' ? reply.name : to;
+        if (st.selected[list.id] === name) st.selected[list.id] = now;
+      }
+      // Nothing else changed: no command, no undo step.
+      if (!other) return;
+      const step = spec(now, def).build(v);
+      await call(step[0], step[1]);
     },
   }).then(() => {
     if (deleting) deleteItem(list, name);
-    else focusAfter(key, list.id);
+    else focusAfter(itemKey(list.id, now), list.id);
   });
 }
 

@@ -1,0 +1,88 @@
+/* Import Setup From…: the review of a budget's setup items (js/importsetup.js).
+   The rows reuse the paste review's list (.safety-list in styles.css) and the
+   report setup's checkboxes (.rs-check in reportsetup.css). */
+
+.modal.imp-dialog {
+  width: 620px;
+  max-height: calc(100vh - 48px);
+}
+
+.imp-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  max-height: 55vh;
+  overflow: auto;
+}
+
+.imp-kind {
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.imp-kind:first-child {
+  margin-top: 0;
+}
+
+.safety-list.imp-list {
+  max-height: none;
+  overflow: visible;
+}
+
+.imp-tick {
+  display: flex;
+  align-items: center;
+  flex: none;
+  cursor: pointer;
+}
+
+.imp-tick input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.imp-item .safety-item-main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.imp-item .safety-item-main > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.imp-status {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 400;
+}
+
+.imp-status.imp-differs {
+  color: var(--note);
+}
+
+.imp-status.imp-new {
+  color: var(--accent);
+}
+
+.imp-comes {
+  font-style: italic;
+}
+
+.imp-choice {
+  width: 230px;
+}
+
+.imp-choice:disabled {
+  opacity: 0.55;
+}
+
+.imp-summary {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}

@@ -66,6 +66,8 @@ pub enum Entry {
     SetupTabs,
     /// Format > Text Color, as a submenu.
     TextColors,
+    /// File > Export, as a submenu.
+    Export,
 }
 
 use Entry::Separator as SEP;
@@ -106,9 +108,14 @@ pub const FILE: &[Entry] = &[
     item("file.new", "New", "mod+n"),
     item("file.new_tab", "New Tab", "mod+t"),
     item("file.open", "Open…", "mod+o"),
+    // Starting from another budget (src/templates.rs, src/import_setup.rs).
+    plain("file.new_from_template", "New From Template…"),
     SEP,
     item("file.save", "Save", "mod+s"),
     item("file.save_as", "Save As…", "mod+shift+s"),
+    plain("file.save_as_template", "Save as Template…"),
+    SEP,
+    plain("file.import_setup", "Import Setup From…"),
     SEP,
     // Named versions inside the budget, and comparing budgets (src/versions.rs,
     // src/compare.rs).
@@ -117,9 +124,18 @@ pub const FILE: &[Entry] = &[
     SEP,
     item("file.print_budget", "Print…", "mod+p"),
     item("file.print_topsheet", "Print Topsheet…", "mod+shift+p"),
+    Entry::Export,
     SEP,
     item(CLOSE_TAB, "Close Tab", "mod+w"),
     item(CLOSE, "Close Window", "mod+shift+w"),
+];
+
+/// File > Export: the budget as spreadsheets, each through a Save dialog
+/// (src/export.rs).
+pub const EXPORT: &[Entry] = &[
+    plain("file.export_xlsx", "Excel Workbook…"),
+    plain("file.export_csv", "CSV Files…"),
+    plain("file.export_tsv", "Tab-Delimited Detail…"),
 ];
 
 /// Windows and Linux end the File menu with Quit; macOS has it in the app menu.
@@ -140,6 +156,9 @@ pub const EDIT: &[Entry] = &[
     SEP,
     item("edit.fill_down", "Fill Down", "mod+shift+d"),
     item("edit.delete_rows", "Delete Rows", "mod+d"),
+    // Rows one place up or down (src/moverows.rs).
+    item("edit.move_up", "Move Up", "alt+up"),
+    item("edit.move_down", "Move Down", "alt+down"),
     SEP,
     item("edit.note", "Note…", "mod+shift+space"),
     item("edit.make_range", "Make Fringe Range", "mod+r"),
@@ -221,6 +240,7 @@ pub const SETUP_TABS: &[Entry] = &[
     item("view.tab.groups", "Groups", "mod+4"),
     item("view.tab.globals", "Globals", "mod+g"),
     item("view.tab.units", "Units", "mod+7"),
+    plain("view.tab.presets", "Presets"),
     SEP,
     item("view.tab.sets", "Sets", "mod+8"),
     item("view.tab.locations", "Locations", "mod+5"),
@@ -312,6 +332,11 @@ fn append<R: Runtime>(
                 let colors = Submenu::new(app, "Text Color", true)?;
                 append(app, &colors, TEXT_COLORS)?;
                 menu.append(&colors)?;
+            }
+            Entry::Export => {
+                let export = Submenu::new(app, "Export", true)?;
+                append(app, &export, EXPORT)?;
+                menu.append(&export)?;
             }
         }
     }
@@ -437,6 +462,7 @@ mod tests {
     fn items() -> Vec<Entry> {
         [
             FILE,
+            EXPORT,
             FILE_QUIT,
             EDIT,
             INSERT,
@@ -563,6 +589,7 @@ mod tests {
         assert_eq!(accelerator("f3"), "F3");
         assert_eq!(accelerator("shift+f3"), "Shift+F3");
         assert_eq!(accelerator("mod+shift+f"), "CmdOrCtrl+Shift+F");
+        assert_eq!(accelerator("alt+down"), "Alt+Down");
     }
 
     #[test]

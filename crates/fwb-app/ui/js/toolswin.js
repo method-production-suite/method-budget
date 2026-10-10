@@ -99,6 +99,7 @@ function ctx() {
     setPosition: (where) => emitTo('main', 'tools-position', where),
     jumpTo: (entry) => emitTo('main', 'tools-jump', { ...entry, doc: state.view ? state.view.doc : null }),
     onLayout: (layout) => emitTo('main', 'tools-layout', layout),
+    toast: (message) => toast(message),
   };
 }
 

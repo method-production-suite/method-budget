@@ -1,0 +1,51 @@
+/* The Presets tab (ui/js/presets.js): tag presets and line blocks. Laid out
+   like the apply lists (apply.css): the item's name and what it holds, then
+   its buttons. Uses only the app's :root tokens and the apply and setup
+   classes; every class of its own is prefixed with preset. */
+
+.presets .notes-heading {
+  margin: 4px 0 0;
+}
+
+.preset-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: 4px;
+}
+
+.preset-block {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.preset-name {
+  appearance: none;
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  align-items: center;
+  column-gap: 6px;
+  min-width: 0;
+  min-height: 24px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  text-align: left;
+  cursor: default;
+}
+
+.preset-name:hover {
+  background: var(--row-hover);
+}
+
+.preset-name:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.presets[aria-busy="true"] .setup-btn {
+  cursor: progress;
+}

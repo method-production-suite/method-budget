@@ -314,9 +314,10 @@ function choiceSelect(item) {
  * Shows what pasting will add and what is set up differently here, with a
  * choice for each difference (this budget's version unless changed).
  * Resolves with the choices ([{ kind, name, choice }]) on Paste, or null on
- * Cancel, Escape or a click outside.
+ * Cancel, Escape or a click outside. `action` names the button and the
+ * title ('Insert' for a line block, presets.js).
  */
-export function review(p) {
+export function review(p, { action = 'Paste' } = {}) {
   return new Promise((resolve) => {
     let settled = false;
     const finish = (value) => {
@@ -331,7 +332,7 @@ export function review(p) {
     customDialog((closeDialog) => {
       const parts = [];
       const from = p.source ? ` from ${p.source}` : '';
-      parts.push(el('h2', { class: 'modal-title', text: `Paste ${count(p.count, p.what)}${from}`, attrs: { id: 'clip-review-title' } }));
+      parts.push(el('h2', { class: 'modal-title', text: `${action} ${count(p.count, p.what)}${from}`, attrs: { id: 'clip-review-title' } }));
       if (differs.length) {
         parts.push(
           el('p', {
@@ -357,7 +358,7 @@ export function review(p) {
       }
       for (const note of p.notes || []) parts.push(el('p', { class: 'modal-message', text: note }));
       const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
-      const ok = el('button', { class: 'btn btn-primary', text: 'Paste', attrs: { type: 'button', 'data-autofocus': true } });
+      const ok = el('button', { class: 'btn btn-primary', text: action, attrs: { type: 'button', 'data-autofocus': true } });
       cancel.addEventListener('click', () => {
         finish(null);
         closeDialog();

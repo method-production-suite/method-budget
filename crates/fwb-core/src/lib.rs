@@ -11,6 +11,8 @@ pub mod decimal;
 pub mod edit;
 pub mod expr;
 pub mod model;
+pub mod presets;
+pub mod rename;
 pub mod report;
 pub mod report_preset;
 pub mod sample;
@@ -28,6 +30,11 @@ pub use comparison::{
 pub use decimal::Dec;
 pub use edit::delete_global;
 pub use model::*;
+pub use presets::{
+    LinePreset, SetupItems, TagPreset, MAX_BLOCK_ROWS, MAX_LINE_PRESETS, MAX_TAG_PRESETS,
+    MAX_TOOL_PRESET_NAME_CHARS,
+};
+pub use rename::{rename, RenameError, SetupKind};
 pub use report::*;
 pub use report_preset::{
     Band, BandField, FontSize, PresetError, ReportColumn, ReportPreset, ReportSection, ReportSpec,

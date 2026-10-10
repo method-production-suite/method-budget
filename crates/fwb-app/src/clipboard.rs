@@ -533,7 +533,7 @@ pub fn cut(b: &mut Budget, pick: &Pick) -> EditResult {
 // The review: how each setup item the clip uses stands in the target
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Status {
+pub(crate) enum Status {
     /// Not in the target: it will be added.
     Add,
     /// The same definition in the target: nothing to do.
@@ -549,7 +549,7 @@ struct Entry {
     status: Status,
 }
 
-fn status<T: PartialEq>(copied: Option<&T>, here: Option<&T>) -> Status {
+pub(crate) fn status<T: PartialEq>(copied: Option<&T>, here: Option<&T>) -> Status {
     match here {
         None => Status::Add,
         Some(h) if Some(h) == copied => Status::Same,
@@ -706,7 +706,7 @@ pub fn preview(b: &Budget, clip: &Clip) -> Preview {
     }
 }
 
-fn money(c: Cents) -> String {
+pub(crate) fn money(c: Cents) -> String {
     let a = c.unsigned_abs();
     let digits = (a / 100).to_string();
     let mut grouped = String::new();
@@ -738,7 +738,7 @@ fn words(parts: &[&str], fallback: &str) -> String {
     }
 }
 
-fn describe_fringe(f: &Fringe) -> String {
+pub(crate) fn describe_fringe(f: &Fringe) -> String {
     let rate = f.rate.0.trim();
     let how = match &f.kind {
         FringeKind::Percent { cutoff: None } => format!("{rate}% with no cutoff"),
@@ -749,7 +749,7 @@ fn describe_fringe(f: &Fringe) -> String {
     words(&[how.as_str(), f.description.as_str()], "")
 }
 
-fn describe_group(g: &Group) -> String {
+pub(crate) fn describe_group(g: &Group) -> String {
     let counted = if g.in_budget_total {
         "counted in the total"
     } else {
@@ -763,11 +763,11 @@ fn describe_group(g: &Group) -> String {
     words(&[counted, color.as_str(), g.description.as_str()], "")
 }
 
-fn describe_global(f: &Formula) -> String {
+pub(crate) fn describe_global(f: &Formula) -> String {
     format!("= {}", f.0.trim())
 }
 
-fn describe_unit(u: &UnitDef) -> String {
+pub(crate) fn describe_unit(u: &UnitDef) -> String {
     let hours = match u.hours {
         Some(h) => format!("{h} hours"),
         None => "not a time unit".to_string(),
@@ -783,11 +783,11 @@ fn describe_unit(u: &UnitDef) -> String {
     )
 }
 
-fn describe_set(s: &SetDef) -> String {
+pub(crate) fn describe_set(s: &SetDef) -> String {
     words(&[s.description.as_str()], "no description")
 }
 
-fn describe_location(l: &Location) -> String {
+pub(crate) fn describe_location(l: &Location) -> String {
     words(
         &[
             l.description.as_str(),
@@ -799,7 +799,7 @@ fn describe_location(l: &Location) -> String {
     )
 }
 
-fn describe_currency(c: &Currency) -> String {
+pub(crate) fn describe_currency(c: &Currency) -> String {
     let rate = format!("rate {}", c.rate);
     let symbol = if c.symbol.trim().is_empty() {
         String::new()
@@ -889,17 +889,17 @@ pub struct Pasted {
 /// Names the pasted content and setup use instead of the copied ones (the
 /// "add it under a new name" choices).
 #[derive(Debug, Default)]
-struct Renames {
-    fringes: BTreeMap<String, String>,
-    groups: BTreeMap<String, String>,
-    globals: BTreeMap<String, String>,
-    units: BTreeMap<String, String>,
-    sets: BTreeMap<String, String>,
-    locations: BTreeMap<String, String>,
+pub(crate) struct Renames {
+    pub(crate) fringes: BTreeMap<String, String>,
+    pub(crate) groups: BTreeMap<String, String>,
+    pub(crate) globals: BTreeMap<String, String>,
+    pub(crate) units: BTreeMap<String, String>,
+    pub(crate) sets: BTreeMap<String, String>,
+    pub(crate) locations: BTreeMap<String, String>,
 }
 
 impl Renames {
-    fn of(&mut self, kind: Kind) -> Option<&mut BTreeMap<String, String>> {
+    pub(crate) fn of(&mut self, kind: Kind) -> Option<&mut BTreeMap<String, String>> {
         match kind {
             Kind::Fringe => Some(&mut self.fringes),
             Kind::Group => Some(&mut self.groups),
@@ -912,12 +912,12 @@ impl Renames {
     }
 }
 
-fn renamed(map: &BTreeMap<String, String>, name: &str) -> String {
+pub(crate) fn renamed(map: &BTreeMap<String, String>, name: &str) -> String {
     map.get(name).cloned().unwrap_or_else(|| name.to_string())
 }
 
 /// A copied row as it lands: references renamed, the base currency as none.
-fn rewrite(d: &mut Detail, r: &Renames, base: &str) {
+pub(crate) fn rewrite(d: &mut Detail, r: &Renames, base: &str) {
     if !r.fringes.is_empty() {
         d.fringes = d.fringes.iter().map(|n| renamed(&r.fringes, n)).collect();
     }
@@ -944,7 +944,7 @@ fn rewrite(d: &mut Detail, r: &Renames, base: &str) {
 }
 
 /// Puts the copied item `from` into `b` as `to`, with the names it uses renamed.
-fn write(b: &mut Budget, s: &Setup, kind: Kind, from: &str, to: &str, r: &Renames) {
+pub(crate) fn write(b: &mut Budget, s: &Setup, kind: Kind, from: &str, to: &str, r: &Renames) {
     let to = to.to_string();
     match kind {
         Kind::Fringe => {

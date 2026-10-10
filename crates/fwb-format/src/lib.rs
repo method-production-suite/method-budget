@@ -11,6 +11,9 @@
 //! ```
 
 mod dto;
+/// Spreadsheet export (Excel workbook, CSV, tab-delimited). Not the native
+/// format: a one-way copy of the evaluated budget for other tools.
+pub mod export;
 
 use std::fmt;
 
@@ -297,6 +300,20 @@ pub fn report_preset_to_value(p: &fwb_core::ReportPreset) -> serde_json::Value {
 pub fn report_preset_from_value(v: serde_json::Value) -> Result<fwb_core::ReportPreset, String> {
     serde_json::from_value::<dto::FileReportPreset>(v)
         .map(fwb_core::ReportPreset::from)
+        .map_err(|e| e.to_string())
+}
+
+/// A tag preset as the file writes it: one entry of the budget's
+/// `tag_presets` (docs/FORMAT.md, "Tag preset"). For the app, which sends and
+/// receives tag presets in this shape.
+pub fn tag_preset_to_value(p: &fwb_core::TagPreset) -> serde_json::Value {
+    serde_json::to_value(dto::FileTagPreset::from(p)).expect("a tag preset always serializes")
+}
+
+/// Reads a tag preset in the file's shape, as strictly as a file is read.
+pub fn tag_preset_from_value(v: serde_json::Value) -> Result<fwb_core::TagPreset, String> {
+    serde_json::from_value::<dto::FileTagPreset>(v)
+        .map(fwb_core::TagPreset::from)
         .map_err(|e| e.to_string())
 }
 

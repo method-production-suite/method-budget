@@ -965,7 +965,12 @@ function renderSettings(panel) {
   const baseInput = k.textInput({
     fieldKey: k.key('settings', 'base'),
     value: base,
-    onCommit: (v, old) => k.run(ik, () => ['set_base_currency', { code: v.trim() }], { restore: [k.key('settings', 'base'), old] }),
+    // Renaming the base currency renames it on every line, charge and
+    // setting that names it too (src/rename.rs), as one undo step.
+    onCommit: (v, old) =>
+      k.run(ik, () => ['rename_setup_item', { kind: 'currency', from: k.baseCode(), to: v.trim() }], {
+        restore: [k.key('settings', 'base'), old],
+      }),
   });
   const totals = k.selectInput({
     fieldKey: k.key('settings', 'totals'),

@@ -32,6 +32,7 @@ The command line:
 ```bash
 cargo run -p fwb-cli -- new my-film.fwb
 cargo run -p fwb-cli -- show my-film.fwb
+cargo run -p fwb-cli -- export my-film.fwb --format xlsx --out my-film.xlsx   # or csv, tsv
 ```
 Budgets are saved as `.fwb` files: plain, documented JSON ([docs/FORMAT.md](docs/FORMAT.md)).
 

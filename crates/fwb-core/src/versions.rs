@@ -87,10 +87,15 @@ pub fn restore_version(
     let content = (*target.budget).clone();
     let auto = save_version(b, name, created, None);
     let versions = std::mem::take(&mut b.versions);
-    // Report presets are layout, not content: the current ones stay.
+    // Report, tag and line presets are tools, not content: the current ones
+    // stay.
     let presets = std::mem::take(&mut b.report_presets);
+    let tags = std::mem::take(&mut b.tag_presets);
+    let blocks = std::mem::take(&mut b.line_presets);
     *b = content.into_budget(versions);
     b.report_presets = presets;
+    b.tag_presets = tags;
+    b.line_presets = blocks;
     Ok(auto)
 }
 

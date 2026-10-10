@@ -17,7 +17,8 @@
 // many places changed. A global is replaced by another global, a number or a
 // formula, as a whole name inside the formula; an item by another one.
 // Remove takes an item off the checked lines, or puts a global's current
-// value in its place.
+// value in its place. Rename everywhere gives the global or item itself a
+// new name, with every reference to it (rename.js), and the search follows.
 //
 // tools.js calls renderFind(host, view, ctx) on every render; ctx.call runs a
 // command and redraws from its view, ctx.jumpTo(entry) goes to a result.
@@ -27,6 +28,7 @@ import { invoke } from './api.js';
 import { el } from './dom.js';
 import { rank, canonicalName } from './autocomplete.js';
 import { withShortcut } from './shortcuts.js';
+import { renameItem } from './rename.js';
 
 const SCOPES = [
   { id: 'description', label: 'Description', kind: 'text', hint: 'Text in line descriptions' },
@@ -718,7 +720,44 @@ function replaceForm(scope) {
   sec.append(row);
   const list = suggestionList('with', input);
   if (list) sec.append(list);
+  const link = renameLink(scope);
+  if (link) sec.append(link);
   return sec;
+}
+
+/**
+ * "Rename everywhere…" for the global or item being searched for (when it
+ * exists): replacing swaps it for another one in the checked places, this
+ * gives it a new name everywhere.
+ */
+function renameLink(scope) {
+  if (scope.kind === 'text') return null;
+  const q = query();
+  if (!q) return null;
+  const name = q.text;
+  const table = scope.kind === 'global' ? 'globals' : scope.table;
+  const isBase = scope.id === 'currency' && name === str(budget().base_currency);
+  if (!isBase && !Object.prototype.hasOwnProperty.call(obj(budget()[table]), name)) return null;
+  const b = button('Rename everywhere…', 'find:rename', {
+    title: `Give ${name} a new name, with every line, formula and setting that uses it`,
+  });
+  b.addEventListener('click', () => {
+    if (b.getAttribute('aria-disabled') === 'true' || !st.ctx || typeof st.ctx.call !== 'function') return;
+    renameItem({
+      anchor: b,
+      kind: scope.id,
+      name,
+      ctx: { call: (cmd, args) => st.ctx.call(cmd, args), toast: st.ctx.toast, budget },
+    }).then((to) => {
+      if (to === null) return;
+      // Keep looking for it, under its new name.
+      st.text = to;
+      searchSoon();
+      draw();
+    });
+  });
+  setDisabled(b, st.busy);
+  return el('div', { class: 'find-row find-rename' }, b);
 }
 
 function status() {

@@ -23,6 +23,10 @@ use crate::view::{Focus, FullView, View, ViewState};
 /// Undo steps kept. Each step keeps only what its edit changed (see [`Patch`]).
 pub const UNDO_LIMIT: usize = 200;
 
+/// How soon a repeat of a merging edit must come to join its undo step
+/// ([`Session::edit_merging`]).
+pub const MERGE_WINDOW: std::time::Duration = std::time::Duration::from_millis(1000);
+
 /// View revisions, unique across sessions in this process, so a new or
 /// opened budget never reuses an old number.
 static NEXT_VIEW_REV: AtomicU64 = AtomicU64::new(1);
@@ -225,6 +229,9 @@ pub struct Session {
     cache: RecalcCache,
     /// Autosave and recovery bookkeeping (src/safety.rs).
     safety: SafetyState,
+    /// The last [`Session::edit_merging`] step: the key the next one must
+    /// bring to join it, when it was made, and the rev it left.
+    merge: Option<(String, Instant, u64)>,
 }
 
 /// What autosave needs to know about one open budget.
@@ -291,6 +298,7 @@ impl Session {
             view_rev: next_view_rev(),
             cache: RecalcCache::new(),
             safety,
+            merge: None,
         }
     }
 
@@ -546,6 +554,60 @@ impl Session {
             self.next_rev += 1;
             self.changed();
         }
+        Ok(out)
+    }
+
+    /// Like [`Session::edit`], but quick repeats join one undo step: when the
+    /// previous step was made by this method less than [`MERGE_WINDOW`] ago,
+    /// nothing has changed since (no other edit, undo or redo), and it handed
+    /// out `key`, this edit joins that step. `f` returns its result and the
+    /// key the next edit must bring to join this one. Moving rows uses it, so
+    /// holding Option+Down is one undo step, not one per row passed. A run
+    /// that ends where it started leaves no step at all.
+    pub fn edit_merging<T>(
+        &mut self,
+        key: &str,
+        f: impl FnOnce(&mut Budget) -> EditResult<(T, String)>,
+    ) -> EditResult<T> {
+        let now = Instant::now();
+        let joins = matches!(&self.merge, Some((k, at, rev))
+            if k == key && *rev == self.rev && now.duration_since(*at) < MERGE_WINDOW)
+            && !self.undo.is_empty();
+        if !joins {
+            let before = self.rev;
+            let (out, next_key) = self.edit(f)?;
+            // Only a step this made can be joined: one that changed nothing
+            // left someone else's step on top.
+            self.merge = (self.rev != before).then_some((next_key, now, self.rev));
+            return Ok(out);
+        }
+        let mut next = self.budget.clone();
+        let (out, next_key) = f(&mut next)?;
+        if next == self.budget {
+            self.merge = Some((next_key, now, self.rev));
+            return Ok(out);
+        }
+        // Back to where the step began, then one step from there to here.
+        let Some(top) = self.undo.pop() else {
+            unreachable!("checked above")
+        };
+        let _ = top.patch.apply(&mut self.budget);
+        let start = std::mem::replace(&mut self.budget, next);
+        match Patch::between(start, &mut self.budget) {
+            Some(patch) => {
+                self.undo.push(Snapshot {
+                    patch,
+                    rev: top.rev,
+                });
+                self.redo.clear();
+                self.rev = self.next_rev;
+                self.next_rev += 1;
+            }
+            None => self.rev = top.rev,
+        }
+        self.changed();
+        // Back where it began: no step of ours is left to join.
+        self.merge = (self.rev != top.rev).then_some((next_key, now, self.rev));
         Ok(out)
     }
 

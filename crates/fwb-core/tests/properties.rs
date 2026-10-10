@@ -656,3 +656,102 @@ fn restoring_a_version_brings_back_its_totals() {
         assert_eq!(b.versions.len(), 3, "seed {seed}");
     }
 }
+
+/// Every amount in a report, in order, with no names: what a rename keeps.
+fn amounts(r: &Report) -> Vec<Cents> {
+    let mut out = vec![
+        r.grand_total,
+        r.net_total,
+        r.total_atl,
+        r.total_btl,
+        r.budget_fringes,
+        r.credits_total,
+    ];
+    for c in &r.categories {
+        out.extend([c.details_total, c.fringe_total, c.total]);
+        for a in &c.accounts {
+            out.extend([a.details_total, a.fringe_total, a.total]);
+            for row in &a.rows {
+                out.extend([row.local_total, row.total, row.fringe_total]);
+                // Keyed by fringe name: the order may change with a name.
+                let mut f: Vec<Cents> = row.fringes.values().copied().collect();
+                f.sort_unstable();
+                out.extend(f);
+            }
+        }
+    }
+    out.extend(r.charges.iter().map(|c| c.amount));
+    out.extend(r.credits.iter().map(|c| c.amount));
+    out
+}
+
+#[test]
+fn renaming_any_setup_item_keeps_every_total_and_renaming_back_undoes_it() {
+    use fwb_core::rename::references;
+    let renames = [
+        (SetupKind::Global, "DAYS", "PREP_DAYS"),
+        (SetupKind::Global, "WEEKS", "W"),
+        (SetupKind::Fringe, "PCT", "Pension"),
+        (SetupKind::Fringe, "DAILY", "Per diem"),
+        (SetupKind::Group, "A", "Crew"),
+        (SetupKind::Group, "OFF", "Cut"),
+        (SetupKind::Unit, "Day", "Shoot day"),
+        (SetupKind::Set, "S1", "Set one"),
+        (SetupKind::Currency, "GBP", "UKP"),
+        (SetupKind::Currency, "USD", "US$"),
+    ];
+    for seed in 1..=CASES {
+        let mut b = gen_budget(&mut Rng(seed));
+        b.sets.insert("S1".into(), SetDef::default());
+        // A tag preset, and a line block of the first account's rows with
+        // copies of the setup they use: both follow a rename.
+        b.tag_presets.push(TagPreset {
+            name: "tags".into(),
+            fringes: set(&["PCT", "DAILY"]),
+            groups: set(&["A"]),
+            set: Some("S1".into()),
+            location: None,
+            currency: Some("GBP".into()),
+        });
+        let rows: Vec<Detail> = b
+            .categories()
+            .flat_map(|c| &c.accounts)
+            .flat_map(|a| &a.details)
+            .take(6)
+            .cloned()
+            .collect();
+        let setup = SetupItems {
+            globals: b.globals.clone(),
+            fringes: b.fringes.clone(),
+            groups: b.groups.clone(),
+            units: b.units.clone(),
+            sets: b.sets.clone(),
+            currencies: b.currencies.clone(),
+            ..SetupItems::default()
+        };
+        b.line_presets.push(LinePreset {
+            name: "block".into(),
+            rows,
+            setup,
+        });
+        let before = recalc(&b, &RecalcOptions::default()).unwrap();
+        for (kind, from, to) in renames {
+            let mut e = b.clone();
+            let n = rename(&mut e, kind, from, to)
+                .unwrap_or_else(|err| panic!("seed {seed} {kind:?} {from}: {err}"));
+            assert_eq!(n, references(&b, kind, from), "seed {seed} {kind:?}");
+            let after = recalc(&e, &RecalcOptions::default())
+                .unwrap_or_else(|err| panic!("seed {seed} {kind:?} {from}: {err}"));
+            assert_eq!(amounts(&after), amounts(&before), "seed {seed} {kind:?}");
+            if kind == SetupKind::Group {
+                assert_eq!(after.groups[to], before.groups[from], "seed {seed}");
+            }
+            assert_eq!(
+                rename(&mut e, kind, to, from),
+                Ok(n),
+                "seed {seed} {kind:?}"
+            );
+            assert_eq!(e, b, "seed {seed} {kind:?} back");
+        }
+    }
+}

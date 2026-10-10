@@ -9,12 +9,16 @@
 // page through textContent and input values (never innerHTML), and styling is
 // done with classes from setup.css.
 //
+// A global's or unit's name renames it everywhere (rename.js): double-click
+// it, or Enter or F2 on it, or its right-click menu.
+//
 // Edits commit on Enter or blur and Escape puts the old value back. Commands run
 // one at a time through a queue, and each one is built from the newest view when
 // it runs, so two quick edits to the same item never undo each other.
 
 import { renderExtraTab } from './topsheet-setup.js';
 import { anchoredForm } from './modal.js';
+import { renameItem, itemMenu } from './rename.js';
 
 const GLOBAL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)$/;
@@ -651,8 +655,7 @@ function renderGlobals(panel) {
     const ik = key('globals', name);
     const li = itemShell(ik, 'setup-grow');
     const issues = issuesFor('global', name);
-    const nameEl = el('span', 'setup-name', name);
-    nameEl.title = name;
+    const nameEl = renameable(el('span', 'setup-name', name), 'global', name, ik, (to) => key('globals', to, 'formula'));
     const input = textInput({
       fieldKey: key('globals', name, 'formula'),
       value: str(formula),
@@ -742,8 +745,7 @@ function renderUnits(panel) {
     const ik = key('units', name);
     const li = itemShell(ik, 'setup-block');
     const head = el('div', 'setup-head');
-    const nameEl = el('span', 'setup-name', name);
-    nameEl.title = name;
+    const nameEl = renameable(el('span', 'setup-name', name), 'unit', name, ik, (to) => key('units', to, 'plural'));
     head.append(
       nameEl,
       el('span', 'setup-figs'),
@@ -812,6 +814,64 @@ function renderUnits(panel) {
       key('units', v.name.trim(), 'plural'),
     ]),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Renaming a global or unit from its name
+
+/**
+ * Makes an item's name the way to rename it: focusable, double-click or
+ * Enter or F2 opens the Rename form, and a right-click menu offers Rename
+ * and Delete. `focusAfter(to)` is the key of the control to focus once it
+ * is renamed.
+ */
+function renameable(nameEl, kind, name, itemKey, focusAfter) {
+  nameEl.title = `${name}\nDouble-click to rename it everywhere`;
+  nameEl.tabIndex = 0;
+  nameEl.dataset.key = key('name', itemKey);
+  nameEl.setAttribute('role', 'button');
+  nameEl.setAttribute('aria-label', `Rename ${kind} ${name}`);
+  nameEl.setAttribute('aria-keyshortcuts', 'Enter F2');
+  const ctx = () => ({
+    call: (cmd, args) => state.ctx.call(cmd, args),
+    toast: (m) => state.ctx && typeof state.ctx.toast === 'function' && state.ctx.toast(m),
+    budget,
+  });
+  const after = (to) => {
+    if (to === null) return;
+    const f = findByData('key', focusAfter(to));
+    if (f) f.focus();
+  };
+  const rename = () => {
+    if (isBusy() || !state.ctx || typeof state.ctx.call !== 'function') return;
+    renameItem({ anchor: nameEl, kind, name, ctx: ctx() }).then(after);
+  };
+  nameEl.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    rename();
+  });
+  nameEl.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === 'F2') && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+      e.preventDefault();
+      rename();
+    }
+  });
+  nameEl.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (isBusy() || !state.ctx) return;
+    itemMenu(e, {
+      kind,
+      name,
+      anchor: nameEl,
+      ctx: ctx(),
+      onRenamed: after,
+      remove: () => {
+        const del = findByData('key', key('del', itemKey));
+        if (del) del.click();
+      },
+    });
+  });
+  return nameEl;
 }
 
 // ---------------------------------------------------------------------------

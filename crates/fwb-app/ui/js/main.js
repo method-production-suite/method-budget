@@ -48,11 +48,12 @@ import { setRules, dynamicStyles } from './sheet.js';
 import { initSafety } from './safety.js';
 import { initQuickEntry, editAssist, commitDetailCell, editNote, fringeRange, showFormula } from './quickentry.js';
 import { initRowFormat, toggleStyle, indent, setColor, clearFormatting, PALETTE } from './rowformat.js';
-import { initContextMenu } from './context.js';
+import { initContextMenu, initContextMenuPresets } from './context.js';
 import { initClipboard, copyEvent, cellsCopied, pasteEvent, copyRows, pasteRows } from './clipboard.js';
 import { initTabs, renderTabs, focusTab, tabsHaveFocus } from './tabs.js';
 import { showVersions } from './versions.js';
 import { showCompare } from './compare.js';
+import { importSetup, newFromTemplate, saveAsTemplate } from './importsetup.js';
 
 const state = {
   doc: null, // the budget on screen (its tab is in front)
@@ -111,6 +112,9 @@ initRowFormat({ grid, view: () => state.view, level: () => state.level, act });
 // Its items call the commands directly: not through run(), whose guard against
 // a key and its menu item both arriving would drop a key pressed right after.
 initContextMenu({ grid, host: $('grid-host'), view: () => state.view, level: () => state.level, run: (id) => COMMANDS[id] && COMMANDS[id](), act, toast });
+// The right-click menu's preset submenus (presets.js) need the selection, and
+// a call that rejects so a form can show its message.
+initContextMenuPresets({ selection: () => currentSelection(), call: (cmd, args, opts) => call(cmd, args, opts) });
 // Copy and paste whole rows with everything on them (clipboard.js).
 initClipboard({ grid, level: () => state.level, ix: () => state.ix, cat: () => state.cat, acct: () => state.acct, act, render, toast });
 
@@ -147,6 +151,11 @@ function apply(view, opts = {}) {
     opts = { ...enterTab(view.doc), ...opts };
     switched = true;
   }
+  // Rows a command just made (a line block inserted from the tools panel):
+  // the cursor goes to the first one.
+  if (opts.focusCreated && typeof view.created_row === 'number') {
+    opts = { ...opts, focusKey: `r${view.created_row}`, focusCol: 'description' };
+  }
   const same = !switched && state.view && state.view.rev === view.rev;
   state.view = view;
   state.ix = indexView(view);
@@ -176,6 +185,7 @@ const NOT_EDITS = new Set([
   'open_recent',
   'open_pending',
   'open_recovered',
+  'template_new',
 ]);
 
 /**
@@ -469,6 +479,8 @@ function toolsCtx() {
     position: state.position,
     setPosition: (where) => setPosition(where),
     jumpTo: (entry) => jumpTo(entry),
+    // A short message under the grid (a rename says how many places changed).
+    toast: (message) => toast(message),
   };
 }
 
@@ -1797,12 +1809,113 @@ Object.assign(COMMANDS, {
   'edit.find_previous': () => stepFind(-1),
 });
 
+// Edit > Move Up and Move Down (Option+Up, Option+Down): the selected lines,
+// accounts or topsheet rows one place (src/moverows.rs).
+Object.assign(COMMANDS, {
+  'edit.move_up': () => moveSelected(-1),
+  'edit.move_down': () => moveSelected(1),
+});
+
+// One move at a time, each built from the newest view (accounts and
+// topsheet rows are named by place, which a move changes). A held key adds
+// at most one press behind the one running, so moves never pile up.
+let moveQueue = Promise.resolve();
+let movesWaiting = 0;
+
+function moveSelected(by) {
+  if (!state.view || movesWaiting > 1) return;
+  movesWaiting += 1;
+  moveQueue = moveQueue
+    .then(() => moveOnce(by))
+    .catch((e) => toast(e))
+    .finally(() => {
+      movesWaiting -= 1;
+    });
+}
+
+async function moveOnce(by) {
+  const keys = grid.selectedKeys();
+  const cursor = grid.cursorKey();
+  let cmd;
+  let args;
+  let keyFor;
+  if (state.level === 'details') {
+    const ids = keys.filter((k) => /^r\d+$/.test(k)).map((k) => Number(k.slice(1)));
+    if (!ids.length) return;
+    [cmd, args, keyFor] = ['move_rows', { rowIds: ids, by }, (id) => `r${id}`];
+  } else if (state.level === 'accounts') {
+    const entry = state.cat ? findCategory(state.ix, state.cat.code, state.cat.ti) : null;
+    const accts = entry ? entry.cat.accounts || [] : [];
+    const codes = keys
+      .filter((k) => /^a\d+$/.test(k))
+      .map((k) => accts[Number(k.slice(1))])
+      .filter(Boolean)
+      .map((a) => a.code);
+    if (!codes.length) return;
+    [cmd, args, keyFor] = ['move_accounts', { codes, by }, (i) => `a${i}`];
+  } else {
+    const indexes = keys.filter((k) => /^t\d+$/.test(k)).map((k) => Number(k.slice(1)));
+    if (!indexes.length) return;
+    [cmd, args, keyFor] = ['move_topsheet_rows', { indexes, by }, (i) => `t${i}`];
+  }
+  const v = await call(cmd, args);
+  if (!v || !Array.isArray(v.moved)) return;
+  // The moved rows stay selected and the cursor stays on its row: lines
+  // keep their keys; accounts and topsheet rows are found by their order
+  // among the selected ones, which a move keeps.
+  const moved = v.moved.map(keyFor);
+  let at = cursor;
+  if (state.level !== 'details') {
+    const i = keys.indexOf(cursor);
+    at = moved[i >= 0 ? i : 0] || cursor;
+  }
+  grid.selectRows(moved, at);
+}
+
 // File > Versions… and File > Compare Budgets…, and their toolbar buttons
 // (versions.js, compare.js).
 Object.assign(COMMANDS, {
   'file.versions': () => openVersions(),
   'file.compare': () => openCompare(),
 });
+
+// File > Export: an Excel workbook, CSV files or tab-delimited detail. Rust
+// shows the Save dialog and writes the files (src/export.rs).
+Object.assign(COMMANDS, {
+  'file.export_xlsx': () => doExport('xlsx'),
+  'file.export_csv': () => doExport('csv'),
+  'file.export_tsv': () => doExport('tsv'),
+});
+
+/** Exports the budget on screen (after any queued edits) as `format`. */
+async function doExport(format) {
+  if (grid.editor) grid.commitEdit(null);
+  if (!state.view) return;
+  try {
+    const r = await invoke('export_budget', { format });
+    if (r && r.done && Array.isArray(r.files) && r.files.length) {
+      toast(r.files.length === 1 ? `Exported ${r.files[0]}.` : `Exported ${r.files.length} files: ${r.files.join(', ')}.`);
+    }
+  } catch (e) {
+    toast(e);
+  }
+  grid.focus();
+}
+
+// File > New From Template…, Save as Template… and Import Setup From…
+// (importsetup.js; src/templates.rs, src/import_setup.rs).
+Object.assign(COMMANDS, {
+  'file.new_from_template': () => startFromBudget(newFromTemplate, 'template_new'),
+  'file.save_as_template': () => startFromBudget(saveAsTemplate, 'template_save'),
+  'file.import_setup': () => startFromBudget(importSetup, 'import_setup'),
+});
+
+/** Runs one of importsetup.js's commands for the budget on screen. */
+function startFromBudget(run, cmd) {
+  if (grid.editor) grid.commitEdit(null);
+  if (!state.view) return;
+  run({ invoke, apply: (v) => apply(v, { cmd }), toast, focus: () => grid.focus() });
+}
 
 /** The Versions dialog for the budget on screen. */
 function openVersions() {

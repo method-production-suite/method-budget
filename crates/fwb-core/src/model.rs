@@ -89,6 +89,12 @@ pub struct Budget {
     /// Saved report setups, in the order the user keeps them. Layout only,
     /// not content: versions don't carry them (see [`crate::report_preset`]).
     pub report_presets: Vec<crate::report_preset::ReportPreset>,
+    /// Saved bundles of line tags, in the user's order. Tools, not content:
+    /// versions don't carry them (see [`crate::presets`]).
+    pub tag_presets: Vec<crate::presets::TagPreset>,
+    /// Saved blocks of rows to insert, in the user's order. Tools, not
+    /// content, like tag presets.
+    pub line_presets: Vec<crate::presets::LinePreset>,
 }
 
 impl Budget {
@@ -114,6 +120,8 @@ impl Budget {
             baseline: None,
             versions: Vec::new(),
             report_presets: Vec::new(),
+            tag_presets: Vec::new(),
+            line_presets: Vec::new(),
         }
     }
 
@@ -580,6 +588,8 @@ impl Budget {
             baseline,
             versions: _,
             report_presets: _,
+            tag_presets: _,
+            line_presets: _,
         } = self;
         BudgetSnapshot {
             title: title.clone(),
@@ -603,8 +613,8 @@ impl Budget {
         }
     }
 
-    /// Splits off the content, leaving the version list (and the report
-    /// presets, which are not content) behind.
+    /// Splits off the content, leaving the version list (and the report,
+    /// tag and line presets, which are not content) behind.
     pub fn into_parts(self) -> (BudgetSnapshot, Vec<Version>) {
         let Budget {
             title,
@@ -627,6 +637,8 @@ impl Budget {
             baseline,
             versions,
             report_presets: _,
+            tag_presets: _,
+            line_presets: _,
         } = self;
         let content = BudgetSnapshot {
             title,
@@ -696,7 +708,7 @@ impl BudgetSnapshot {
         self.clone().into_budget(Vec::new())
     }
 
-    /// This content as a budget carrying `versions` (and no report presets).
+    /// This content as a budget carrying `versions` (and no presets).
     pub fn into_budget(self, versions: Vec<Version>) -> Budget {
         let BudgetSnapshot {
             title,
@@ -739,6 +751,8 @@ impl BudgetSnapshot {
             baseline,
             versions,
             report_presets: Vec::new(),
+            tag_presets: Vec::new(),
+            line_presets: Vec::new(),
         }
     }
 

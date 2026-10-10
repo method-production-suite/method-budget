@@ -915,6 +915,24 @@ export class Grid {
     this.paintCursor();
   }
 
+  /**
+   * Selects the rows `keys` (those the grid has) with the cursor on
+   * `cursorKey` (when it has it), keeping the cursor's column. One key, or
+   * none, is just the cursor. Used after rows move, so the moved rows stay
+   * selected (main.js).
+   */
+  selectRows(keys, cursorKey = null) {
+    const want = new Set(keys);
+    const idx = this.nav.findIndex((i) => this.rows[i].key === cursorKey);
+    if (idx >= 0) this.cur.row = idx;
+    this.selected = new Set(this.nav.map((i) => this.rows[i].key).filter((k) => want.has(k)));
+    if (this.selected.size <= 1) this.selected.clear();
+    this.anchor = null;
+    this.anchorCol = null;
+    this.allCols = false;
+    this.paintCursor();
+  }
+
   /** Clears a multi-cell selection, keeping the cursor. False if there was none. */
   clearRange() {
     if (!this.hasRange() && this.selected.size === 0) return false;
