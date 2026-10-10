@@ -54,6 +54,8 @@ import { initTabs, renderTabs, focusTab, tabsHaveFocus } from './tabs.js';
 import { showVersions } from './versions.js';
 import { showCompare } from './compare.js';
 import { importSetup, newFromTemplate, saveAsTemplate } from './importsetup.js';
+import { importSpreadsheet } from './sheetimport.js';
+import { displayCommands, userDisplay, withoutZeroRows } from './display.js';
 
 const state = {
   doc: null, // the budget on screen (its tab is in front)
@@ -107,6 +109,9 @@ const grid = new Grid($('grid-host'), {
 });
 
 initQuickEntry({ grid, view: () => state.view, level: () => state.level, act, call, toast });
+// Per-user display choices (display.js): grid zoom, formulas in a selection.
+grid.setZoom(userDisplay().zoom);
+grid.setShowFormulas(userDisplay().formulasInSelection);
 // Format menu and keys (rowformat.js); the grid's right-click menu (context.js).
 initRowFormat({ grid, view: () => state.view, level: () => state.level, act });
 // Its items call the commands directly: not through run(), whose guard against
@@ -265,21 +270,33 @@ function render(opts = {}) {
   $('grid-host').dataset.level = state.level;
   if (state.level === 'topsheet') {
     grid.h.enterMovesDown = false;
-    grid.setData(withColumnMenu(topsheetColumns(ix, state.columns)), topsheetRows(ix), opts);
+    grid.setData(withColumnMenu(topsheetColumns(ix, state.columns)), zeroFiltered(topsheetRows(ix), opts), opts);
   } else if (state.level === 'accounts') {
     grid.h.enterMovesDown = false;
-    grid.setData(withColumnMenu(accountColumns(ix, state.columns)), accountRows(ix, entry), opts);
+    grid.setData(withColumnMenu(accountColumns(ix, state.columns)), zeroFiltered(accountRows(ix, entry), opts), opts);
   } else {
     grid.h.enterMovesDown = true;
-    const rows = detailRows(ix, entry, ai, v.account);
+    const cols = gridDetailColumns();
+    // The columns on screen decide which hidden factors get a marker.
+    const rows = detailRows(ix, entry, ai, v.account, new Set(cols.map((c) => c.key)));
     if (opts.focusFirst) {
       const first = rows.find((r) => r.selectable !== false);
       opts = { ...opts, focusKey: first ? first.key : null };
     }
-    grid.setData(gridDetailColumns(), rows, opts);
+    grid.setData(cols, rows, opts);
   }
   renderPanel();
   renderFooterNow();
+}
+
+/**
+ * Topsheet and account-list rows without the zero-balance ones, when the
+ * user hides them (View menu; display.js). The cursor's row stays, so a new
+ * account doesn't vanish under it.
+ */
+function zeroFiltered(rows, opts) {
+  if (!userDisplay().hideZero) return rows;
+  return withoutZeroRows(rows, [grid.cursorKey(), opts.focusKey].filter((k) => k !== null && k !== undefined));
 }
 
 function renderTitle(v) {
@@ -1412,13 +1429,31 @@ function cursorMoved() {
 }
 
 /**
- * Goes to a line from the Notes tab's list or a Find result: its account,
+ * Goes to a line from the Notes tab's list or a Find result (or, for a note
+ * on an account or a category, to that account or category): its account,
  * with the line selected (on the cell of `entry.field`, when given). A Find
  * result with no `row_id` is an account's name or number: the category's
  * account list, on that account. Resolves once it is on screen.
  */
 function jumpTo(entry) {
   if (!entry || typeof entry !== 'object' || !state.ix) return Promise.resolve();
+  // A category's own note (notes.js): the topsheet, on that category.
+  if (entry.kind === 'category') {
+    const c = state.ix.cats.find((x) => x.ti === entry.ti && x.cat.code === entry.category) || state.ix.cats.find((x) => x.cat.code === entry.category);
+    if (!c) {
+      toast('That category is no longer in the budget.');
+      return Promise.resolve();
+    }
+    if (grid.editor) grid.commitEdit(null);
+    state.memory.topsheet = `t${c.ti}`;
+    if (state.level === 'topsheet') {
+      render({ focusKey: `t${c.ti}` });
+      grid.focus();
+    } else {
+      goTo('topsheet');
+    }
+    return Promise.resolve();
+  }
   const accountOnly = entry.row_id === null || entry.row_id === undefined;
   const id = Number(entry.row_id);
   if (!accountOnly && !Number.isSafeInteger(id)) return Promise.resolve();
@@ -1783,6 +1818,9 @@ for (const s of SHORTCUTS) {
 }
 // File > Open Recent and File > Revert to Backup (safety.js).
 Object.assign(COMMANDS, safety.commands);
+// View: formulas in a selection, zero accounts, totals' cents, grid zoom
+// (display.js; per-user choices).
+Object.assign(COMMANDS, displayCommands({ grid, render: () => render(), toast }));
 // Format: text style of the selected detail lines (rowformat.js).
 Object.assign(COMMANDS, {
   'format.bold': () => toggleStyle('bold'),
@@ -1908,6 +1946,23 @@ Object.assign(COMMANDS, {
   'file.new_from_template': () => startFromBudget(newFromTemplate, 'template_new'),
   'file.save_as_template': () => startFromBudget(saveAsTemplate, 'template_save'),
   'file.import_setup': () => startFromBudget(importSetup, 'import_setup'),
+});
+
+// File > Import Spreadsheet…: lines from a workbook, CSV or tab-delimited
+// file with a column mapping (sheetimport.js; src/sheet_import.rs). The
+// account on screen is the default for rows without one.
+Object.assign(COMMANDS, {
+  'file.import_spreadsheet': () => {
+    if (grid.editor) grid.commitEdit(null);
+    if (!state.view) return;
+    importSpreadsheet({
+      invoke,
+      apply: (v) => apply(v, { cmd: 'sheet_import' }),
+      toast,
+      focus: () => grid.focus(),
+      account: () => (state.level === 'details' && state.acct ? state.acct.code : ''),
+    });
+  },
 });
 
 /** Runs one of importsetup.js's commands for the budget on screen. */

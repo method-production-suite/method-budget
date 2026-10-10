@@ -303,6 +303,15 @@
 .fwb-report .rpt-al.has-baseline col.c-money { width: 11em; }
 .fwb-report .rpt-ts.has-baseline col.c-code,
 .fwb-report .rpt-al.has-baseline col.c-code { width: 5.5em; }
+/* The topsheet's optional page column (where each category's detail starts). */
+.fwb-report .rpt-ts col.c-page { width: 4.5em; }
+/* With the page or fringes column as well, the figures columns give a little. */
+.fwb-report .rpt-ts.has-extra col.c-money { width: 10em; }
+.fwb-report .rpt-ts.has-extra col.c-code { width: 5em; }
+
+.fwb-report .rpt-ts td.muted-fig {
+  color: #333;
+}
 
 .fwb-report .rpt-ts td,
 .fwb-report .rpt-al td {
@@ -652,6 +661,18 @@
   background-repeat: no-repeat;
 }
 
+/* One line per account (collapse details). */
+
+.fwb-report .rpt-dt.collapsed tr.rpt-cat-head:not(:first-child) td.cat {
+  padding-top: 14pt;
+}
+
+.fwb-report .rpt-dt.collapsed .rpt-row.acct-line td {
+  padding-top: 2.4pt;
+  padding-bottom: 2.4pt;
+  font-size: 1.06em;
+}
+
 /* ------------------------------------------------------------------------- */
 /* Setup tables: fringes, globals, groups, notes, budget information         */
 
@@ -665,6 +686,27 @@
 .fwb-report .rpt-st col.c-wide { width: auto; }
 .fwb-report .rpt-st col.c-label { width: 26%; }
 .fwb-report .rpt-notes col.c-mid { width: 20%; }
+.fwb-report .rpt-st col.c-code2 { width: 7em; }
+.fwb-report .rpt-locations col.c-name2 { width: 16%; }
+
+/* Chart of accounts: categories bold, their accounts indented under them. */
+
+.fwb-report .rpt-chart tr.rpt-chart-cat td {
+  padding-top: 6pt;
+  border-bottom: 0.75pt solid #000;
+  font-weight: 700;
+}
+
+.fwb-report .rpt-chart tr.rpt-chart-acct td.txt {
+  padding-left: 14pt;
+}
+
+.fwb-report .rpt-chart tr.rpt-chart-level td {
+  padding-top: 6pt;
+  font-style: italic;
+  font-weight: 600;
+  border-bottom: 1.5pt solid #000;
+}
 
 .fwb-report .rpt-st td {
   padding-top: 2.4pt;
@@ -742,6 +784,14 @@
   background: #dedede;
 }
 
+/* Vertical rules between columns (layout option). Cells spanning several
+   columns get one rule at their left like any other. */
+
+.fwb-report.rules .rpt-table th + th,
+.fwb-report.rules .rpt-table td + td {
+  border-left: 0.5pt solid #b5b5b5;
+}
+
 /* ------------------------------------------------------------------------- */
 /* On screen: the setup dialog's preview (js/reportsetup.js) and the harness */
 
@@ -759,4 +809,11 @@
     background: #fff;
     box-shadow: 0 1px 3px rgb(0 0 0 / 0.35), 0 0 0 1px rgb(0 0 0 / 0.06);
   }
+}
+
+/* Dated notes: the notes list shows when each was written and by whom
+   above its text. */
+.fwb-report .rpt-notes .note-meta {
+  font-size: 0.85em;
+  color: #555;
 }

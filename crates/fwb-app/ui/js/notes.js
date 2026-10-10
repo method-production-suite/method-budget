@@ -1,31 +1,47 @@
-// The tools panel's Notes tab: the note on the line under the grid's cursor,
-// edited in place, and every line in the budget that has a note, each a
-// button that goes to the line.
+// The tools panel's Notes tab (roadmap 2.8): the dated notes on what the
+// grid's cursor is on, and every note in the budget as a review checklist.
 //
-// The line's note is the same note as Edit > Note (Shift+Cmd+Space): Save, or
-// Cmd/Ctrl+Enter, keeps it with set_row_note (one undo step), an empty note
-// removes it, Revert or Escape puts back what is saved. What is typed but not
-// saved is kept per line while the panel redraws. The list comes from
-// notes_list (src/tools.rs) and is fetched again when the budget changes.
+// On screen, top to bottom:
+// - The notes of the cursor's line (detail level) and of the account on
+//   screen; on the account list, the cursor's account and its category; on
+//   the topsheet, the cursor's category. Each note shows when it was written
+//   (and edited) and by whom, with Edit and Delete; below them a box adds a
+//   new one (Add, or Cmd/Ctrl+Enter). Editing saves with Save or
+//   Cmd/Ctrl+Enter, Escape or Cancel puts the text back; saving empty text
+//   deletes the note. Delete asks first. Every change is one undo step.
+// - "All notes": every note in the budget (notes_list, src/notes.rs), in
+//   budget order, each with a box that ticks it off as reviewed
+//   (set_note_done) and a button that goes to its line, account or
+//   category. "Open only" hides the ticked ones.
+// - "Your name on new notes": free text kept in this window's preferences
+//   (never sent anywhere but into the notes you add).
+//
+// Times are the page's clock as ISO 8601 text (UTC), shown in local time.
+// What is typed and not saved is kept per owner while the panel redraws.
 //
 // tools.js calls renderNotes(host, view, ctx) on every render; ctx.selection()
 // gives the grid's level and cursor row, ctx.call runs a command and
-// ctx.jumpTo(entry) opens the line's account with the line selected. Budget
-// text only reaches the page through textContent and input values.
+// ctx.jumpTo(entry) goes to a note's place. Budget text only reaches the
+// page through textContent and input values.
 
 import { invoke } from './api.js';
 import { el, isMac } from './dom.js';
+import { anchoredForm } from './modal.js';
+import { readPref, writePref } from './prefs.js';
 
 const st = {
   host: null,
   view: null,
   ctx: null,
-  list: null, // [{ row_id, ti, ai, category, account, account_name, line, description, note, more }]
+  list: null, // NoteEntry[] from notes_list
   listRev: null,
   listError: '',
-  drafts: new Map(), // row id -> text typed and not saved
+  drafts: new Map(), // `${ownerKey}|new` or `${ownerKey}|${id}` -> text typed and not saved
+  editing: new Set(), // `${ownerKey}|${id}` of notes open for editing
   error: '',
-  saving: false,
+  errorAt: '', // owner key the error is about
+  busy: false,
+  openOnly: false,
 };
 
 /** Draws the Notes tab into `host`. */
@@ -37,12 +53,28 @@ export function renderNotes(host, view, ctx) {
   if (st.listRev !== st.view.rev) fetchList();
 }
 
-// The cursor moved: show that line's note.
+/**
+ * Puts focus in the new-note box of the cursor's line (or account or
+ * category), once the tab is drawn. False when there is no such box.
+ */
+export function focusNewNote() {
+  if (!st.host || !st.host.isConnected) return false;
+  const box = st.host.querySelector('textarea[data-new="1"]');
+  if (!box) return false;
+  box.focus();
+  if (typeof box.scrollIntoView === 'function') box.scrollIntoView({ block: 'nearest' });
+  return true;
+}
+
+// The cursor moved: show what it is on now.
 for (const type of ['fwb:selection', 'fwb:cursor']) {
   document.addEventListener(type, () => {
     if (st.host && st.host.isConnected && !st.host.closest('[hidden]')) draw();
   });
 }
+
+// ---------------------------------------------------------------------------
+// Small helpers
 
 function obj(v) {
   return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
@@ -52,18 +84,94 @@ function str(v) {
   return v === undefined || v === null ? '' : String(v);
 }
 
-/** The line under the cursor: { id, num, detail, account } or null. */
-function cursorLine() {
-  const sel = typeof st.ctx.selection === 'function' ? st.ctx.selection() : null;
-  if (!sel || sel.level !== 'details') return null;
+function errText(e) {
+  if (typeof e === 'string') return e;
+  if (e && typeof e.message === 'string') return e.message;
+  return String(e);
+}
+
+function author() {
+  const a = readPref('noteAuthor', '');
+  return typeof a === 'string' ? a : '';
+}
+
+function now() {
+  return new Date().toISOString();
+}
+
+const STAMP = (() => {
+  try {
+    return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  } catch {
+    return null;
+  }
+})();
+
+/** An ISO time as local text; anything else as given ('' stays ''). */
+function when(iso) {
+  const s = str(iso);
+  if (!s) return '';
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime()) || !STAMP) return s;
+  return STAMP.format(d);
+}
+
+function ownerKey(owner) {
+  if (owner.row !== undefined) return `row:${owner.row}`;
+  if (owner.account !== undefined) return `account:${owner.account}`;
+  return `category:${owner.category}`;
+}
+
+function topsheet() {
+  const t = obj(st.view.budget).topsheet;
+  return Array.isArray(t) ? t : [];
+}
+
+function selection() {
+  return typeof st.ctx.selection === 'function' ? st.ctx.selection() : null;
+}
+
+/**
+ * What the Notes tab shows notes for, from the grid's cursor:
+ * [{ owner, title, notes }], first the cursor's own item.
+ */
+function targets() {
+  const sel = selection();
+  if (!sel) return [];
   const key = typeof sel.cursor === 'string' ? sel.cursor : Array.isArray(sel.keys) ? sel.keys[0] : null;
-  if (typeof key !== 'string' || !key.startsWith('r')) return null;
-  const id = Number(key.slice(1));
-  const account = obj(st.view.account);
-  const details = Array.isArray(account.details) ? account.details : [];
-  const i = details.findIndex((d) => d && d.id === id);
-  if (i < 0) return { id, num: null, detail: null, account };
-  return { id, num: i + 1, detail: details[i], account };
+  const top = topsheet();
+  const named = (x) => `${str(x.code)} ${str(x.name)}`.trim();
+  const out = [];
+  const pushAccount = (a) => {
+    if (a && a.code !== undefined) out.push({ owner: { account: str(a.code) }, title: `Account ${named(a)}`, notes: a.notes });
+  };
+  const pushCategory = (c) => {
+    if (c && c.kind !== 'production_total' && c.code !== undefined) out.push({ owner: { category: str(c.code) }, title: `Category ${named(c)}`, notes: c.notes });
+  };
+  if (sel.level === 'details') {
+    const account = obj(st.view.account);
+    const details = Array.isArray(account.details) ? account.details : [];
+    if (typeof key === 'string' && key.startsWith('r')) {
+      const id = Number(key.slice(1));
+      const i = details.findIndex((d) => d && d.id === id);
+      if (i >= 0) {
+        const d = details[i];
+        const what = str(d.description).trim();
+        out.push({ owner: { row: id }, title: `Line ${i + 1}${what ? `: ${what}` : ''}`, notes: d.notes });
+      }
+    }
+    const cat = top[account.ti];
+    pushAccount(cat && Array.isArray(cat.accounts) ? cat.accounts[account.ai] : null);
+  } else if (sel.level === 'accounts') {
+    const cat = sel.cat ? top[sel.cat.ti] : null;
+    if (cat && typeof key === 'string' && key.startsWith('a')) {
+      pushAccount((Array.isArray(cat.accounts) ? cat.accounts : [])[Number(key.slice(1))]);
+    }
+    pushCategory(cat);
+  } else if (sel.level === 'topsheet' && typeof key === 'string' && key.startsWith('t')) {
+    pushCategory(top[Number(key.slice(1))]);
+  }
+  return out;
 }
 
 async function fetchList() {
@@ -76,7 +184,7 @@ async function fetchList() {
     st.listError = '';
   } catch (e) {
     if (st.listRev !== rev) return;
-    st.listError = String(e);
+    st.listError = errText(e);
   }
   if (st.host && st.host.isConnected) draw();
 }
@@ -92,9 +200,13 @@ function captureFocus() {
   return info;
 }
 
+function byKey(key) {
+  return st.host ? [...st.host.querySelectorAll('[data-key]')].find((e) => e.dataset.key === key) || null : null;
+}
+
 function restoreFocus(info) {
   if (!info) return;
-  const t = [...st.host.querySelectorAll('[data-key]')].find((e) => e.dataset.key === info.key);
+  const t = byKey(info.key);
   if (!t) return;
   t.focus({ preventScroll: true });
   if (info.start !== undefined && typeof t.setSelectionRange === 'function') {
@@ -110,124 +222,289 @@ function draw() {
   const host = st.host;
   if (!host) return;
   const focus = captureFocus();
-  host.replaceChildren(lineSection(), listSection());
+  const parts = [];
+  const shown = targets();
+  if (!shown.length) {
+    parts.push(
+      el(
+        'section',
+        { class: 'notes-line' },
+        el('h3', { class: 'notes-heading', text: 'Notes' }),
+        el('p', { class: 'apply-hint', text: 'Select a line, an account or a category to see or write its notes.' }),
+      ),
+    );
+  }
+  shown.forEach((t, i) => parts.push(ownerSection(t, i)));
+  parts.push(listSection(), authorSection());
+  host.replaceChildren(...parts);
   restoreFocus(focus);
 }
 
-function heading(text, id) {
-  return el('h3', { class: 'notes-heading', text, attrs: { id } });
+// ---------------------------------------------------------------------------
+// Running commands
+
+async function run(okey, cmd, args) {
+  if (st.busy || typeof st.ctx.call !== 'function') return false;
+  st.busy = true;
+  st.error = '';
+  st.errorAt = okey;
+  try {
+    await st.ctx.call(cmd, args);
+    return true;
+  } catch (e) {
+    st.error = errText(e);
+    return false;
+  } finally {
+    st.busy = false;
+    draw();
+  }
 }
 
-function lineSection() {
-  const sec = el('section', { class: 'notes-line', attrs: { 'aria-labelledby': 'notes-line-h' } });
-  const line = cursorLine();
-  if (!line || !line.detail) {
-    sec.append(
-      heading('This line', 'notes-line-h'),
-      el('p', { class: 'apply-hint', text: line ? 'Loading the line…' : 'Select a line in an account to see or write its note.' }),
-    );
-    return sec;
+function modSave(e) {
+  return e.key === 'Enter' && (isMac ? e.metaKey : e.ctrlKey) && !e.isComposing;
+}
+
+function button(text, cls, key, onClick, { label = '', title = '' } = {}) {
+  const b = el('button', {
+    class: cls,
+    text,
+    title: title || undefined,
+    attrs: { type: 'button', 'aria-label': label || null },
+    data: { key, nobusy: '1' },
+  });
+  b.addEventListener('click', () => {
+    if (b.getAttribute('aria-disabled') !== 'true' && !st.busy) onClick();
+  });
+  return b;
+}
+
+// ---------------------------------------------------------------------------
+// One owner's notes
+
+function ownerSection(t, index) {
+  const okey = ownerKey(t.owner);
+  const hid = `notes-owner-h-${index}`;
+  const sec = el('section', { class: 'notes-line', attrs: { 'aria-labelledby': hid } });
+  sec.append(el('h3', { class: 'notes-heading', text: t.title, title: t.title, attrs: { id: hid } }));
+  const notes = (Array.isArray(t.notes) ? t.notes : []).filter((n) => n && typeof n.text === 'string');
+  if (notes.length) {
+    const ul = el('ul', { class: 'notes-cards', attrs: { 'aria-label': `Notes on ${t.title}` } });
+    for (const n of notes) ul.append(el('li', {}, card(t, okey, n)));
+    sec.append(ul);
   }
-  const d = line.detail;
-  const what = str(d.description).trim();
-  const title = `Line ${line.num}${what ? `: ${what}` : ''}`;
-  sec.append(heading(title, 'notes-line-h'));
-  const saved = typeof d.note === 'string' ? d.note : '';
-  const value = st.drafts.has(line.id) ? st.drafts.get(line.id) : saved;
-  const text = el('textarea', {
-    class: 'setup-input notes-text',
+  sec.append(newBox(t, okey, hid));
+  if (st.error && st.errorAt === okey) sec.append(el('p', { class: 'setup-error', text: st.error, attrs: { role: 'alert' } }));
+  return sec;
+}
+
+function meta(n) {
+  const parts = [];
+  const made = when(n.created);
+  parts.push(made || 'Undated');
+  if (n.author) parts.push(str(n.author));
+  if (n.edited) parts.push(`edited ${when(n.edited)}`);
+  if (n.done) parts.push('reviewed');
+  return parts.join(' · ');
+}
+
+function card(t, okey, n) {
+  const ekey = `${okey}|${n.id}`;
+  const box = el('div', { class: `notes-card${n.done ? ' is-done' : ''}` });
+  if (st.editing.has(ekey)) {
+    const saved = str(n.text);
+    const area = el('textarea', {
+      class: 'setup-input notes-text',
+      attrs: { rows: '4', spellcheck: 'true', 'aria-label': `Edit note on ${t.title}` },
+      data: { key: `notes:edit:${ekey}` },
+    });
+    area.value = st.drafts.has(ekey) ? st.drafts.get(ekey) : saved;
+    const done = () => {
+      st.editing.delete(ekey);
+      st.drafts.delete(ekey);
+    };
+    const save = async () => {
+      const text = area.value;
+      if (text === saved) {
+        done();
+        draw();
+        byKey(`notes:editbtn:${ekey}`)?.focus();
+        return;
+      }
+      const ok = await run(okey, 'update_note', { owner: t.owner, id: n.id, text, edited: now() });
+      if (ok) {
+        done();
+        draw();
+      }
+    };
+    const cancel = () => {
+      done();
+      draw();
+      byKey(`notes:editbtn:${ekey}`)?.focus();
+    };
+    area.addEventListener('input', () => st.drafts.set(ekey, area.value));
+    area.addEventListener('keydown', (e) => {
+      if (modSave(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        save();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        cancel();
+      }
+    });
+    box.append(
+      el('p', { class: 'notes-meta', text: meta(n) }),
+      area,
+      el(
+        'div',
+        { class: 'notes-actions' },
+        el('span', { class: 'apply-hint', text: `${isMac ? '⌘' : 'Ctrl+'}Enter saves; empty deletes it` }),
+        button('Cancel', 'setup-btn setup-btn-quiet', `notes:cancel:${ekey}`, cancel),
+        button('Save', 'setup-btn setup-btn-primary', `notes:save:${ekey}`, save),
+      ),
+    );
+    return box;
+  }
+  const del = button('Delete', 'setup-btn setup-btn-quiet notes-mini', `notes:del:${ekey}`, () => remove(t, okey, n, del), {
+    label: 'Delete this note',
+  });
+  box.append(
+    el('p', { class: 'notes-meta', text: meta(n) }),
+    el('p', { class: 'notes-body', text: str(n.text) }),
+    el(
+      'div',
+      { class: 'notes-card-actions' },
+      button('Edit', 'setup-btn setup-btn-quiet notes-mini', `notes:editbtn:${ekey}`, () => {
+        st.editing.add(ekey);
+        draw();
+        byKey(`notes:edit:${ekey}`)?.focus();
+      }, { label: 'Edit this note' }),
+      del,
+    ),
+  );
+  return box;
+}
+
+function remove(t, okey, n, anchor) {
+  anchoredForm({
+    anchor,
+    title: 'Delete this note?',
+    message: str(n.text).length > 120 ? `${str(n.text).slice(0, 120)}…` : str(n.text),
+    submitText: 'Delete',
+    danger: true,
+    onSubmit: () => st.ctx.call('delete_note', { owner: t.owner, id: n.id }),
+  }).then(() => {
+    const next = byKey(`notes:new:${okey}`);
+    if (next) next.focus({ preventScroll: true });
+  });
+}
+
+function newBox(t, okey, hid) {
+  const dkey = `${okey}|new`;
+  const area = el('textarea', {
+    class: 'setup-input notes-text notes-new',
     attrs: {
-      rows: '5',
+      rows: '3',
       spellcheck: 'true',
-      placeholder: 'No note. Type one here.',
-      'aria-labelledby': 'notes-line-h',
-      'aria-describedby': 'notes-hint',
+      placeholder: 'Add a note…',
+      'aria-label': `New note on ${t.title}`,
+      'aria-describedby': `${hid}-hint`,
     },
-    data: { key: 'notes:text', orig: saved },
+    data: { key: `notes:new:${okey}`, new: '1' },
   });
-  text.value = value;
-  const changed = () => text.value !== saved;
-  const save = el('button', {
+  area.value = st.drafts.get(dkey) || '';
+  const add = el('button', {
     class: 'setup-btn setup-btn-primary',
-    text: 'Save',
+    text: 'Add',
     attrs: { type: 'button' },
-    data: { key: 'notes:save', nobusy: '1' },
-  });
-  const revert = el('button', {
-    class: 'setup-btn setup-btn-quiet',
-    text: 'Revert',
-    attrs: { type: 'button' },
-    data: { key: 'notes:revert', nobusy: '1' },
+    data: { key: `notes:add:${okey}`, nobusy: '1' },
   });
   const paint = () => {
-    for (const b of [save, revert]) {
-      if (changed() && !st.saving) b.removeAttribute('aria-disabled');
-      else b.setAttribute('aria-disabled', 'true');
-    }
+    if (area.value.trim() && !st.busy) add.removeAttribute('aria-disabled');
+    else add.setAttribute('aria-disabled', 'true');
   };
-  const doSave = async () => {
-    if (!changed() || st.saving || typeof st.ctx.call !== 'function') return;
-    st.saving = true;
-    st.error = '';
-    paint();
-    const note = text.value;
-    try {
-      await st.ctx.call('set_row_note', { rowId: line.id, note: note.trim() ? note : null });
-      st.drafts.delete(line.id);
-    } catch (e) {
-      st.error = String(e);
-    } finally {
-      st.saving = false;
+  const submit = async () => {
+    const text = area.value;
+    if (!text.trim()) return;
+    const ok = await run(okey, 'add_note', { owner: t.owner, text, created: now(), author: author() || null });
+    if (ok) {
+      st.drafts.delete(dkey);
       draw();
+      byKey(`notes:new:${okey}`)?.focus({ preventScroll: true });
     }
   };
-  const doRevert = () => {
-    st.drafts.delete(line.id);
-    text.value = saved;
-    paint();
-  };
-  text.addEventListener('input', () => {
-    if (changed()) st.drafts.set(line.id, text.value);
-    else st.drafts.delete(line.id);
+  area.addEventListener('input', () => {
+    if (area.value) st.drafts.set(dkey, area.value);
+    else st.drafts.delete(dkey);
     paint();
   });
-  text.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (isMac ? e.metaKey : e.ctrlKey) && !e.isComposing) {
+  area.addEventListener('keydown', (e) => {
+    if (modSave(e)) {
       e.preventDefault();
       e.stopPropagation();
-      doSave();
-    } else if (e.key === 'Escape' && changed()) {
+      submit();
+    } else if (e.key === 'Escape' && area.value) {
       e.preventDefault();
       e.stopPropagation();
-      doRevert();
+      area.value = '';
+      st.drafts.delete(dkey);
+      paint();
     }
   });
-  save.addEventListener('click', () => {
-    if (save.getAttribute('aria-disabled') !== 'true') doSave();
-  });
-  revert.addEventListener('click', () => {
-    if (revert.getAttribute('aria-disabled') !== 'true') doRevert();
+  add.addEventListener('click', () => {
+    if (add.getAttribute('aria-disabled') !== 'true') submit();
   });
   paint();
-  sec.append(
-    text,
+  return el(
+    'div',
+    { class: 'notes-add' },
+    area,
     el(
       'div',
       { class: 'notes-actions' },
-      el('span', { class: 'apply-hint', text: `${isMac ? '⌘' : 'Ctrl+'}Enter saves; an empty note is removed`, attrs: { id: 'notes-hint' } }),
-      revert,
-      save,
+      el('span', { class: 'apply-hint', text: `${isMac ? '⌘' : 'Ctrl+'}Enter adds it`, attrs: { id: `${hid}-hint` } }),
+      add,
     ),
   );
-  if (st.error) sec.append(el('p', { class: 'setup-error', text: st.error, attrs: { role: 'alert' } }));
-  return sec;
+}
+
+// ---------------------------------------------------------------------------
+// Every note in the budget: the review checklist
+
+function entryWhere(n) {
+  const acct = `${str(n.account)} ${str(n.account_name)}`.trim();
+  if (n.kind === 'category') return `Category ${`${str(n.category)} ${str(n.category_name)}`.trim()}`;
+  if (n.kind === 'account') return `Account ${acct}`;
+  return `${acct} · line ${n.line}`;
+}
+
+function entryWhat(n) {
+  if (n.kind === 'row') return str(n.description).trim() || '(no description)';
+  if (n.kind === 'account') return str(n.account_name).trim() || str(n.account);
+  return str(n.category_name).trim() || str(n.category);
 }
 
 function listSection() {
   const list = st.list;
-  const count = list ? list.length : 0;
   const sec = el('section', { class: 'notes-all', attrs: { 'aria-labelledby': 'notes-all-h' } });
-  sec.append(heading(list ? `Noted lines (${count})` : 'Noted lines', 'notes-all-h'));
+  const open = list ? list.filter((n) => !n.done).length : 0;
+  const head = el(
+    'div',
+    { class: 'notes-all-head' },
+    el('h3', {
+      class: 'notes-heading',
+      text: list ? `All notes (${list.length}${list.length ? `, ${open} open` : ''})` : 'All notes',
+      attrs: { id: 'notes-all-h' },
+    }),
+  );
+  const only = button('Open only', 'apply-pill', 'notes:openonly', () => {
+    st.openOnly = !st.openOnly;
+    draw();
+  }, { title: 'Hide the notes ticked off as reviewed' });
+  only.setAttribute('aria-pressed', String(st.openOnly));
+  head.append(only);
+  sec.append(head);
   if (st.listError) {
     sec.append(el('p', { class: 'setup-error', text: st.listError, attrs: { role: 'alert' } }));
     return sec;
@@ -236,43 +513,82 @@ function listSection() {
     sec.append(el('p', { class: 'apply-hint', text: 'Loading…' }));
     return sec;
   }
-  if (!count) {
-    sec.append(el('p', { class: 'setup-empty', text: 'No line in this budget has a note yet.' }));
+  const shown = st.openOnly ? list.filter((n) => !n.done) : list;
+  if (!list.length) {
+    sec.append(el('p', { class: 'setup-empty', text: 'No notes in this budget yet.' }));
     return sec;
   }
-  const here = cursorLine();
-  const ul = el('ul', { class: 'notes-list', attrs: { 'aria-label': 'Lines with notes' } });
-  for (const n of list) {
-    const where = `${str(n.account)} ${str(n.account_name)}`.trim();
-    const desc = str(n.description).trim() || '(no description)';
-    const note = `${str(n.note)}${n.more ? '…' : ''}`;
-    const b = el(
+  if (!shown.length) {
+    sec.append(el('p', { class: 'setup-empty', text: 'Every note is ticked off.' }));
+    return sec;
+  }
+  const here = new Set(targets().map((t) => ownerKey(t.owner)));
+  const ul = el('ul', { class: 'notes-list', attrs: { 'aria-label': 'Every note in the budget' } });
+  for (const n of shown) {
+    const okey = ownerKey(n.owner || {});
+    const ekey = `${okey}|${n.id}`;
+    const check = el(
+      'button',
+      {
+        class: 'notes-check',
+        title: n.done ? 'Reviewed: click to mark it open again' : 'Tick it off as reviewed',
+        attrs: { type: 'button', role: 'checkbox', 'aria-checked': n.done ? 'true' : 'false', 'aria-label': `Reviewed: ${entryWhat(n)}` },
+        data: { key: `notes:done:${ekey}`, nobusy: '1' },
+      },
+      el('span', { class: 'apply-box', attrs: { 'aria-hidden': 'true' } }),
+    );
+    check.addEventListener('click', () => {
+      if (!st.busy) run('list', 'set_note_done', { owner: n.owner, id: n.id, done: !n.done });
+    });
+    const stamp = [when(n.created), str(n.author)].filter(Boolean).join(' · ');
+    const go = el(
       'button',
       {
         class: 'notes-entry',
-        title: `Go to line ${n.line} in ${where}`,
-        attrs: { type: 'button', 'aria-current': here && here.id === n.row_id ? 'true' : null },
-        data: { key: `notes:go:${n.row_id}`, nobusy: '1' },
+        title: `Go to ${entryWhere(n)}`,
+        attrs: { type: 'button', 'aria-current': here.has(okey) ? 'true' : null },
+        data: { key: `notes:go:${ekey}`, nobusy: '1' },
       },
-      el('span', { class: 'notes-where', text: `${where} · line ${n.line}` }),
-      el('span', { class: 'notes-desc', text: desc }),
-      el('span', { class: 'notes-snippet', text: note }),
+      el('span', { class: 'notes-where', text: stamp ? `${entryWhere(n)} · ${stamp}` : entryWhere(n) }),
+      el('span', { class: 'notes-desc', text: entryWhat(n) }),
+      el('span', { class: 'notes-snippet', text: `${str(n.note)}${n.more ? '…' : ''}` }),
     );
-    b.addEventListener('click', () => {
+    go.addEventListener('click', () => {
       if (typeof st.ctx.jumpTo === 'function') st.ctx.jumpTo(n);
     });
-    b.addEventListener('keydown', (e) => {
+    go.addEventListener('keydown', (e) => {
       const step = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
       if (!step) return;
       const all = [...ul.querySelectorAll('.notes-entry')];
-      const next = all[all.indexOf(b) + step];
+      const next = all[all.indexOf(go) + step];
       if (next) {
         e.preventDefault();
         next.focus();
       }
     });
-    ul.append(el('li', {}, b));
+    ul.append(el('li', { class: `notes-item${n.done ? ' is-done' : ''}` }, check, go));
   }
   sec.append(ul);
+  if (st.error && st.errorAt === 'list') sec.append(el('p', { class: 'setup-error', text: st.error, attrs: { role: 'alert' } }));
   return sec;
+}
+
+// ---------------------------------------------------------------------------
+// The name new notes are signed with
+
+function authorSection() {
+  const id = 'notes-author';
+  const input = el('input', {
+    class: 'setup-input notes-author-input',
+    attrs: { id, type: 'text', autocomplete: 'off', spellcheck: 'false', maxlength: '100', placeholder: 'Leave blank to sign nothing' },
+    data: { key: 'notes:author' },
+  });
+  input.value = author();
+  input.addEventListener('change', () => writePref('noteAuthor', input.value.trim()));
+  return el(
+    'section',
+    { class: 'notes-author' },
+    el('label', { class: 'setup-label', text: 'Your name on new notes', attrs: { for: id } }),
+    input,
+  );
 }

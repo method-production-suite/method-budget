@@ -237,6 +237,11 @@ pub struct CompareDto {
     pub sources: Vec<SourceDto>,
     pub categories: Vec<CategoryDto>,
     pub levels: Vec<LevelDto>,
+    /// Each charge, matched by name; a value is `None` where that budget
+    /// has no charge by that name.
+    pub charges: Vec<LevelDto>,
+    /// Each credit, the same way.
+    pub credits: Vec<LevelDto>,
     pub totals: TotalsDto,
 }
 
@@ -323,6 +328,22 @@ fn compare_dto(sources: Vec<SourceDto>, c: &Comparison) -> CompareDto {
             .map(|l| LevelDto {
                 name: l.name.clone(),
                 line: line_dto(&l.line),
+            })
+            .collect(),
+        charges: c
+            .charges
+            .iter()
+            .map(|x| LevelDto {
+                name: x.name.clone(),
+                line: line_dto(&x.line),
+            })
+            .collect(),
+        credits: c
+            .credits
+            .iter()
+            .map(|x| LevelDto {
+                name: x.name.clone(),
+                line: line_dto(&x.line),
             })
             .collect(),
         totals: TotalsDto {
@@ -718,6 +739,41 @@ mod tests {
             .unwrap();
         assert_eq!(d.matched_by, "description");
         assert!(d.rows.iter().all(|r| r.ids.iter().all(Option::is_some)));
+    }
+
+    #[test]
+    fn charges_list_one_by_one_beside_their_total() {
+        let fee = |name: &str, amount: i64| fwb_core::Charge {
+            name: name.into(),
+            account: None,
+            applied: true,
+            kind: fwb_core::ChargeKind::Flat {
+                amount,
+                currency: None,
+            },
+            excluded_amounts: Vec::new(),
+            excluded_groups: Default::default(),
+            excluded_categories: Default::default(),
+            excluded_accounts: Default::default(),
+        };
+        let mut a = fwb_core::starter::budget();
+        a.charges.clear();
+        a.credits.clear();
+        a.charges.push(fee("Insurance", 50_000));
+        let mut b = a.clone();
+        b.charges.push(fee("Bond", 20_000));
+        let c = fwb_core::compare(&[("A".into(), &a), ("B".into(), &b)]).unwrap();
+        let dto = compare_dto(Vec::new(), &c);
+        let names: Vec<&str> = dto.charges.iter().map(|x| x.name.as_str()).collect();
+        assert_eq!(names, ["Insurance", "Bond"]);
+        assert_eq!(dto.charges[0].line.values, [Some(50_000), Some(50_000)]);
+        assert_eq!(dto.charges[1].line.values, [None, Some(20_000)]);
+        assert_eq!(dto.charges[1].line.diffs[1].amount, 20_000);
+        assert_eq!(dto.totals.charges.values, [Some(50_000), Some(70_000)]);
+        assert!(dto.credits.is_empty());
+        let json = serde_json::to_value(&dto).unwrap();
+        assert_eq!(json["charges"][1]["name"], "Bond");
+        assert!(json["charges"][1]["line"]["values"][0].is_null());
     }
 
     #[test]

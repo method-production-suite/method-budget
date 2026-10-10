@@ -406,6 +406,7 @@ pub fn add_category(
         return Err(format!("category {code} already exists"));
     }
     let row = TopsheetRow::Category(Category {
+        notes: Vec::new(),
         code,
         name: name.trim().to_string(),
         accounts: Vec::new(),
@@ -496,6 +497,7 @@ pub fn add_account(
     cat.accounts.insert(
         at,
         Account {
+            notes: Vec::new(),
             code: code.clone(),
             name: name.trim().to_string(),
             details: Vec::new(),
@@ -563,7 +565,9 @@ pub fn delete_global(b: &mut Budget, name: &str) -> EditResult {
     }
     if fwb_core::delete_global(b, name).is_err() {
         b.globals.remove(name);
+        b.global_info.remove(name);
     }
+    fwb_core::order::forget(b, fwb_core::SetupKind::Global, name);
     Ok(())
 }
 
@@ -580,6 +584,83 @@ pub struct FringeInput {
     /// Flat fringes: unit name, blank for none.
     #[serde(default)]
     pub unit: Option<String>,
+    /// Short code: missing keeps the fringe's own, `""` clears it.
+    #[serde(default)]
+    pub short_code: Option<String>,
+}
+
+/// Longest short code, in characters.
+pub const MAX_SHORT_CODE_CHARS: usize = 16;
+
+/// A short code for item `name` of `kind` (fringe or group), as typed:
+/// `None` when blank. Refused when it has a comma (lines list items
+/// separated by commas), is too long, or is another item's code (ignoring
+/// case) or name.
+pub fn check_short_code(
+    b: &Budget,
+    kind: fwb_core::SetupKind,
+    name: &str,
+    typed: &str,
+) -> EditResult<Option<String>> {
+    let code = typed.trim();
+    if code.is_empty() {
+        return Ok(None);
+    }
+    let what = kind.name();
+    if code.contains(',') {
+        return Err("short codes can't contain commas".into());
+    }
+    let len = code.chars().count();
+    if len > MAX_SHORT_CODE_CHARS {
+        return Err(format!(
+            "that short code is {len} characters; short codes can be at most {MAX_SHORT_CODE_CHARS}"
+        ));
+    }
+    let others: Vec<(&String, Option<&String>)> = match kind {
+        fwb_core::SetupKind::Fringe => b
+            .fringes
+            .iter()
+            .map(|(n, f)| (n, f.short_code.as_ref()))
+            .collect(),
+        fwb_core::SetupKind::Group => b
+            .groups
+            .iter()
+            .map(|(n, g)| (n, g.short_code.as_ref()))
+            .collect(),
+        _ => return Err(format!("a {what} has no short code")),
+    };
+    for (other, their) in others {
+        if other == name {
+            continue;
+        }
+        if their.is_some_and(|c| c.to_lowercase() == code.to_lowercase()) {
+            return Err(format!(
+                "{code} is already the short code of the {what} {other}"
+            ));
+        }
+        if other == code {
+            return Err(format!("{code} is the name of another {what}"));
+        }
+    }
+    Ok(Some(code.to_string()))
+}
+
+/// Sets or clears (blank) the short code of fringe or group `name`.
+pub fn set_short_code(
+    b: &mut Budget,
+    kind: fwb_core::SetupKind,
+    name: &str,
+    typed: &str,
+) -> EditResult {
+    let code = check_short_code(b, kind, name, typed)?;
+    let slot = match kind {
+        fwb_core::SetupKind::Fringe => b.fringes.get_mut(name).map(|f| &mut f.short_code),
+        fwb_core::SetupKind::Group => b.groups.get_mut(name).map(|g| &mut g.short_code),
+        _ => return Err(format!("a {} has no short code", kind.name())),
+    };
+    let slot = slot.ok_or_else(|| format!("{} {name} no longer exists", kind.name()))?;
+    *slot = code;
+    Ok(())
 }
 
 pub fn set_fringe(b: &mut Budget, name: &str, f: &FringeInput) -> EditResult {
@@ -603,9 +684,14 @@ pub fn set_fringe(b: &mut Budget, name: &str, f: &FringeInput) -> EditResult {
         },
         other => return Err(format!("unknown fringe kind `{other}`")),
     };
+    let short_code = match f.short_code.as_deref() {
+        Some(typed) => check_short_code(b, fwb_core::SetupKind::Fringe, &name, typed)?,
+        None => b.fringes.get(&name).and_then(|old| old.short_code.clone()),
+    };
     b.fringes.insert(
         name,
         Fringe {
+            short_code,
             description: f.description.trim().to_string(),
             rate: Formula(f.rate.trim().to_string()),
             kind,
@@ -634,6 +720,7 @@ pub fn delete_fringe(b: &mut Budget, name: &str) -> EditResult {
             }
         }
     }
+    fwb_core::order::forget(b, fwb_core::SetupKind::Fringe, name);
     Ok(())
 }
 
@@ -642,15 +729,23 @@ pub struct GroupInput {
     #[serde(default)]
     pub description: String,
     pub in_budget_total: bool,
+    /// Short code: missing keeps the group's own, `""` clears it.
+    #[serde(default)]
+    pub short_code: Option<String>,
 }
 
 pub fn set_group(b: &mut Budget, name: &str, g: &GroupInput) -> EditResult {
     let name = check_name(name, "group")?;
     // Color has its own command (rowstyle::set_group_color); keep it here.
     let color = b.groups.get(&name).and_then(|old| old.color.clone());
+    let short_code = match g.short_code.as_deref() {
+        Some(typed) => check_short_code(b, fwb_core::SetupKind::Group, &name, typed)?,
+        None => b.groups.get(&name).and_then(|old| old.short_code.clone()),
+    };
     b.groups.insert(
         name,
         Group {
+            short_code,
             description: g.description.trim().to_string(),
             in_budget_total: g.in_budget_total,
             color,
@@ -684,6 +779,7 @@ pub fn delete_group(b: &mut Budget, name: &str) -> EditResult {
     for charge in &mut b.charges {
         charge.excluded_groups.remove(name);
     }
+    fwb_core::order::forget(b, fwb_core::SetupKind::Group, name);
     Ok(())
 }
 
@@ -724,10 +820,31 @@ pub fn set_unit(b: &mut Budget, name: &str, u: &UnitInput) -> EditResult {
 /// Deletes a unit definition. Rows keep their unit text; it just no longer
 /// converts for flat fringes.
 pub fn delete_unit(b: &mut Budget, name: &str) -> EditResult {
-    b.units
-        .remove(name)
-        .map(|_| ())
-        .ok_or_else(|| format!("unit {name} no longer exists"))
+    delete_unit_with(b, name, false)
+}
+
+/// Deletes a unit definition; with `clear_lines`, also blanks every unit
+/// column on a row that names it (so nothing is left naming a unit that
+/// isn't there). As one change.
+pub fn delete_unit_with(b: &mut Budget, name: &str, clear_lines: bool) -> EditResult {
+    if b.units.remove(name).is_none() {
+        return Err(format!("unit {name} no longer exists"));
+    }
+    if clear_lines {
+        for d in b
+            .categories_mut()
+            .flat_map(|c| &mut c.accounts)
+            .flat_map(|a| &mut a.details)
+        {
+            for u in [&mut d.unit, &mut d.unit2, &mut d.unit3, &mut d.unit4] {
+                if u == name {
+                    u.clear();
+                }
+            }
+        }
+    }
+    fwb_core::order::forget(b, fwb_core::SetupKind::Unit, name);
+    Ok(())
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -762,8 +879,26 @@ pub fn set_currency(b: &mut Budget, code: &str, c: &CurrencyInput) -> EditResult
 
 /// Deletes a currency. Refused while lines, charges or the totals use it.
 pub fn delete_currency(b: &mut Budget, code: &str) -> EditResult {
+    delete_currency_with(b, code, false)
+}
+
+/// Deletes a currency; with `move_lines`, lines in it go back to the base
+/// currency first (as one change). Still refused while charges or the
+/// totals use it.
+pub fn delete_currency_with(b: &mut Budget, code: &str, move_lines: bool) -> EditResult {
     if !b.currencies.contains_key(code) {
         return Err(format!("currency {code} no longer exists"));
+    }
+    if move_lines {
+        for d in b
+            .categories_mut()
+            .flat_map(|c| &mut c.accounts)
+            .flat_map(|a| &mut a.details)
+        {
+            if d.currency.as_deref() == Some(code) {
+                d.currency = None;
+            }
+        }
     }
     let lines = details(b)
         .filter(|d| d.currency.as_deref() == Some(code))
@@ -782,6 +917,7 @@ pub fn delete_currency(b: &mut Budget, code: &str) -> EditResult {
         return Err(format!("a charge is in {code}; change it first"));
     }
     b.currencies.remove(code);
+    fwb_core::order::forget(b, fwb_core::SetupKind::Currency, code);
     Ok(())
 }
 
@@ -1209,6 +1345,7 @@ pub fn delete_set(b: &mut Budget, name: &str) -> EditResult {
             }
         }
     }
+    fwb_core::order::forget(b, fwb_core::SetupKind::Set, name);
     Ok(())
 }
 
@@ -1250,6 +1387,7 @@ pub fn delete_location(b: &mut Budget, name: &str) -> EditResult {
             }
         }
     }
+    fwb_core::order::forget(b, fwb_core::SetupKind::Location, name);
     Ok(())
 }
 

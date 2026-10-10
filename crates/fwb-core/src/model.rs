@@ -63,6 +63,9 @@ pub struct Budget {
     pub currencies: BTreeMap<String, Currency>,
     /// Named values usable in any formula. May refer to each other, not cyclically.
     pub globals: BTreeMap<String, Formula>,
+    /// Descriptions, units and display settings of globals, by global name.
+    /// Only non-default entries for globals that exist are written out.
+    pub global_info: BTreeMap<String, GlobalInfo>,
     /// Units, keyed by singular name. Lines refer to them by name.
     pub units: BTreeMap<String, UnitDef>,
     /// Fringe definitions, keyed by the name details use to apply them.
@@ -83,6 +86,8 @@ pub struct Budget {
     pub credits: Vec<Credit>,
     /// Frozen totals to compare against ("original" vs current).
     pub baseline: Option<Baseline>,
+    /// How numbers show on screen. Not content: versions don't carry it.
+    pub display: DisplayPrefs,
     /// Named full copies of the budget's content, oldest first. See
     /// [`crate::versions`] for saving and restoring them.
     pub versions: Vec<Version>,
@@ -95,6 +100,9 @@ pub struct Budget {
     /// Saved blocks of rows to insert, in the user's order. Tools, not
     /// content, like tag presets.
     pub line_presets: Vec<crate::presets::LinePreset>,
+    /// Hand-made display order of the setup tables (see [`crate::order`]).
+    /// Layout, not content: versions don't carry it.
+    pub setup_order: crate::order::SetupOrder,
 }
 
 impl Budget {
@@ -106,6 +114,7 @@ impl Budget {
             info: BTreeMap::new(),
             currencies: BTreeMap::new(),
             globals: BTreeMap::new(),
+            global_info: BTreeMap::new(),
             units: default_units(),
             fringes: BTreeMap::new(),
             fringe_posting: FringePosting::default(),
@@ -118,10 +127,12 @@ impl Budget {
             charges: Vec::new(),
             credits: Vec::new(),
             baseline: None,
+            display: DisplayPrefs::default(),
             versions: Vec::new(),
             report_presets: Vec::new(),
             tag_presets: Vec::new(),
             line_presets: Vec::new(),
+            setup_order: crate::order::SetupOrder::default(),
         }
     }
 
@@ -176,6 +187,9 @@ pub struct UnitDef {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Fringe {
     pub description: String,
+    /// Optional short code shown in the grid's fringes column instead of
+    /// the name (`"FICA"`). Display only: lines refer to the fringe by name.
+    pub short_code: Option<String>,
     /// For `Percent`, the percentage (`"7.65"` is 7.65%). For `Flat`, the amount
     /// in base-currency units. May use globals.
     pub rate: Formula,
@@ -243,9 +257,80 @@ impl Default for NewLineDefaults {
     }
 }
 
+/// Most decimal places a display setting can ask for ([`GlobalInfo::decimals`],
+/// [`DisplayPrefs`] rate bands).
+pub const MAX_DISPLAY_DECIMALS: u8 = 8;
+
+/// What a global says about itself, besides its formula: a description, the
+/// unit its value is in, how its value is shown, and a folder to file it
+/// under. Display only: none of it changes any value or total. Keyed by the
+/// global's name in [`Budget::global_info`]; a global without an entry has
+/// the default (all empty).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct GlobalInfo {
+    pub description: String,
+    /// A unit name from [`Budget::units`] (`"Week"`), or empty for none.
+    pub unit: String,
+    /// Decimal places its value shows with, 0 to [`MAX_DISPLAY_DECIMALS`]
+    /// (padded with zeros or rounded half away from zero for display);
+    /// `None` shows the value as calculated.
+    pub decimals: Option<u8>,
+    /// Cells whose formula uses this global show the formula, not its value.
+    pub show_by_name: bool,
+    /// A folder (category) to file it under, or empty for none.
+    pub folder: String,
+}
+
+impl GlobalInfo {
+    pub fn is_default(&self) -> bool {
+        *self == GlobalInfo::default()
+    }
+}
+
+/// How the budget shows numbers on screen, saved with the file. Display only:
+/// none of it changes a stored value or a total (decisions.md, entry 2: the
+/// engine stays exact). Tools, not content, like report presets: versions
+/// don't carry it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DisplayPrefs {
+    /// Rates whose size is below this show with `rate_decimals_below`, the
+    /// rest with `rate_decimals_above`. `None`: every rate uses
+    /// `rate_decimals_above`.
+    pub rate_cutoff: Option<Dec>,
+    /// Decimal places for rates below the cutoff; `None` shows them as typed.
+    pub rate_decimals_below: Option<u8>,
+    /// Decimal places for rates at or above the cutoff (every rate when there
+    /// is no cutoff); `None` shows them as typed.
+    pub rate_decimals_above: Option<u8>,
+    /// A rate whose formula names a global with its own decimals shows with
+    /// the first such global's decimals instead of the band's.
+    pub rate_global_decimals: bool,
+    /// The topsheet shows the above-the-line, below-the-line and combined
+    /// summary rows.
+    pub summary_rows: bool,
+    /// The topsheet shows the net total (after credits).
+    pub net_total: bool,
+}
+
+impl Default for DisplayPrefs {
+    fn default() -> DisplayPrefs {
+        DisplayPrefs {
+            rate_cutoff: None,
+            rate_decimals_below: None,
+            rate_decimals_above: None,
+            rate_global_decimals: true,
+            summary_rows: true,
+            net_total: true,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Group {
     pub description: String,
+    /// Optional short code shown in the grid's groups column instead of the
+    /// name (`"NQ"`). Display only: lines refer to the group by name.
+    pub short_code: Option<String>,
     /// "In budget total". When false, every line tagged with this group is
     /// suppressed: shown, but counted as 0 everywhere.
     pub in_budget_total: bool,
@@ -285,6 +370,8 @@ pub struct Category {
     pub code: String,
     pub name: String,
     pub accounts: Vec<Account>,
+    /// Notes on the category itself, oldest first.
+    pub notes: Vec<Note>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -293,6 +380,62 @@ pub struct Account {
     pub code: String,
     pub name: String,
     pub details: Vec<Detail>,
+    /// Notes on the account itself, oldest first.
+    pub notes: Vec<Note>,
+}
+
+/// Identity of a [`Note`], unique within the list it is in (one row's,
+/// account's or category's notes).
+pub type NoteId = u64;
+
+/// One dated note on a detail row, an account or a category. Display data:
+/// never affects totals.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Note {
+    pub id: NoteId,
+    /// Plain text, up to [`MAX_NOTE_CHARS`] characters.
+    pub text: String,
+    /// When it was written, as an ISO 8601 date-time provided by the caller
+    /// (the engine never reads the clock). Empty when unknown: a note carried
+    /// over from a file that kept a single undated note per row.
+    pub created: String,
+    /// When its text last changed, if it has.
+    pub edited: Option<String>,
+    /// Who wrote it: free text from a local setting, if any.
+    pub author: Option<String>,
+    /// Ticked off in the notes review list.
+    pub done: bool,
+}
+
+impl Note {
+    /// An undated note with just its text.
+    pub fn plain(id: NoteId, text: impl Into<String>) -> Note {
+        Note {
+            id,
+            text: text.into(),
+            ..Note::default()
+        }
+    }
+}
+
+/// Every note's text, oldest first, with a blank line between them: one
+/// cell of a spreadsheet or the clipboard. Blank notes are skipped.
+pub fn notes_text(notes: &[Note]) -> String {
+    notes
+        .iter()
+        .map(|n| n.text.trim())
+        .filter(|t| !t.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
+/// The id a note added to `notes` gets: one past the highest there.
+pub fn next_note_id(notes: &[Note]) -> NoteId {
+    notes
+        .iter()
+        .map(|n| n.id)
+        .max()
+        .map_or(1, |m| m.saturating_add(1))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -321,7 +464,7 @@ impl RowKind {
 /// Deepest [`Detail::indent`] level.
 pub const MAX_INDENT: u8 = 4;
 
-/// Longest [`Detail::note`], in characters.
+/// Longest [`Note::text`], in characters.
 pub const MAX_NOTE_CHARS: usize = 10_000;
 
 /// One row in an account.
@@ -358,8 +501,8 @@ pub struct Detail {
     pub indent: u8,
     /// Text color as `#rrggbb`; overrides the color of the line's groups.
     pub color: Option<String>,
-    /// A plain-text note on the row, up to [`MAX_NOTE_CHARS`] characters.
-    pub note: Option<String>,
+    /// Notes on the row, oldest first.
+    pub notes: Vec<Note>,
 }
 
 impl Detail {
@@ -386,7 +529,7 @@ impl Detail {
             italic: false,
             indent: 0,
             color: None,
-            note: None,
+            notes: Vec::new(),
         }
     }
 
@@ -549,6 +692,7 @@ pub struct BudgetSnapshot {
     pub info: BTreeMap<String, InfoValue>,
     pub currencies: BTreeMap<String, Currency>,
     pub globals: BTreeMap<String, Formula>,
+    pub global_info: BTreeMap<String, GlobalInfo>,
     pub units: BTreeMap<String, UnitDef>,
     pub fringes: BTreeMap<String, Fringe>,
     pub fringe_posting: FringePosting,
@@ -574,6 +718,7 @@ impl Budget {
             info,
             currencies,
             globals,
+            global_info,
             units,
             fringes,
             fringe_posting,
@@ -586,10 +731,12 @@ impl Budget {
             charges,
             credits,
             baseline,
+            display: _,
             versions: _,
             report_presets: _,
             tag_presets: _,
             line_presets: _,
+            setup_order: _,
         } = self;
         BudgetSnapshot {
             title: title.clone(),
@@ -598,6 +745,7 @@ impl Budget {
             info: info.clone(),
             currencies: currencies.clone(),
             globals: globals.clone(),
+            global_info: global_info.clone(),
             units: units.clone(),
             fringes: fringes.clone(),
             fringe_posting: fringe_posting.clone(),
@@ -623,6 +771,7 @@ impl Budget {
             info,
             currencies,
             globals,
+            global_info,
             units,
             fringes,
             fringe_posting,
@@ -635,10 +784,12 @@ impl Budget {
             charges,
             credits,
             baseline,
+            display: _,
             versions,
             report_presets: _,
             tag_presets: _,
             line_presets: _,
+            setup_order: _,
         } = self;
         let content = BudgetSnapshot {
             title,
@@ -647,6 +798,7 @@ impl Budget {
             info,
             currencies,
             globals,
+            global_info,
             units,
             fringes,
             fringe_posting,
@@ -717,6 +869,7 @@ impl BudgetSnapshot {
             info,
             currencies,
             globals,
+            global_info,
             units,
             fringes,
             fringe_posting,
@@ -737,6 +890,7 @@ impl BudgetSnapshot {
             info,
             currencies,
             globals,
+            global_info,
             units,
             fringes,
             fringe_posting,
@@ -749,10 +903,12 @@ impl BudgetSnapshot {
             charges,
             credits,
             baseline,
+            display: DisplayPrefs::default(),
             versions,
             report_presets: Vec::new(),
             tag_presets: Vec::new(),
             line_presets: Vec::new(),
+            setup_order: crate::order::SetupOrder::default(),
         }
     }
 

@@ -973,6 +973,7 @@ mod tests {
             b.fringes.insert(
                 "CAPPED".into(),
                 Fringe {
+                    short_code: None,
                     description: String::new(),
                     rate: "10".into(),
                     kind: FringeKind::Percent {

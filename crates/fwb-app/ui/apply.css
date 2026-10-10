@@ -298,3 +298,71 @@
 .apply[aria-busy="true"] .apply-boxhit {
   cursor: progress;
 }
+
+/* In-use counts, budget totals, the name sort and reordering (setuplist.js).
+   Each item: a drag handle, the checkbox row, its line count (a click finds
+   them) and its dollars across the budget. */
+
+.apply-item,
+.apply-colhead {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) 34px 74px;
+  align-items: center;
+  column-gap: 4px;
+}
+
+.apply-colhead {
+  padding: 0 4px 2px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.apply-colhead-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  padding-right: 4px;
+}
+
+.apply-colhead-num {
+  text-align: right;
+}
+
+.apply-total {
+  text-align: right;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apply-code {
+  margin-left: 5px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.apply-item.drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.apply-item.drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.apply-item.is-dragging {
+  opacity: 0.55;
+}
+
+.apply-tools .setup-show {
+  flex: 0 0 auto;
+  width: auto;
+  height: 22px;
+  font-size: 12px;
+}

@@ -50,6 +50,9 @@ pub struct ReportSpec {
     /// Leave out the notes printed under detail lines (the notes section
     /// still lists them when it is included).
     pub skip_notes: bool,
+    /// Leave out notes ticked off as reviewed, under lines and in the
+    /// notes section.
+    pub skip_done_notes: bool,
     /// When not empty, detail pages print only the lines tagged with at
     /// least one of these groups.
     pub only_groups: BTreeSet<String>,
@@ -62,6 +65,16 @@ pub struct ReportSpec {
     pub shading: bool,
     /// Lines print in their own or their groups' colors (otherwise black).
     pub group_colors: bool,
+    /// Thin rules between the columns of every table.
+    pub vertical_rules: bool,
+    /// Detail pages print each account as one line (its code, name and
+    /// totals) instead of its rows.
+    pub collapse_details: bool,
+    /// The topsheet gets a column with each category's fringes.
+    pub topsheet_fringes: bool,
+    /// The topsheet gets a column with the page each category's detail
+    /// starts on.
+    pub topsheet_pages: bool,
     /// `None` means the standard header (title, section, date printed).
     pub header: Option<Band>,
     /// `None` means the standard footer (page number at the right).
@@ -80,12 +93,17 @@ impl Default for ReportSpec {
             skip_zero_accounts: false,
             skip_suppressed_lines: false,
             skip_notes: false,
+            skip_done_notes: false,
             only_groups: BTreeSet::new(),
             columns: None,
             landscape: false,
             font_size: FontSize::Medium,
             shading: false,
             group_colors: false,
+            vertical_rules: false,
+            collapse_details: false,
+            topsheet_fringes: false,
+            topsheet_pages: false,
             header: None,
             footer: None,
         }
@@ -132,6 +150,16 @@ pub enum ReportSection {
     Notes,
     /// Budget information: title, currencies, info fields.
     Info,
+    /// Every category and account code with its name, no figures.
+    Chart,
+    /// The units table.
+    Units,
+    /// The sets with their totals.
+    Sets,
+    /// The locations with their totals.
+    Locations,
+    /// The currencies with their rates.
+    Currencies,
 }
 
 names!(ReportSection {
@@ -143,6 +171,11 @@ names!(ReportSection {
     Groups = "groups",
     Notes = "notes",
     Info = "info",
+    Chart = "chart",
+    Units = "units",
+    Sets = "sets",
+    Locations = "locations",
+    Currencies = "currencies",
 });
 
 /// An optional column of the detail pages (the grid's columns, plus the
@@ -208,6 +241,8 @@ pub struct Band {
     pub left: Option<BandField>,
     pub center: Option<BandField>,
     pub right: Option<BandField>,
+    /// Printed on the first page only; later pages have none.
+    pub first_page_only: bool,
 }
 
 /// What a header or footer slot shows, worked out when the report is drawn.
@@ -219,12 +254,18 @@ pub enum BandField {
     Section,
     /// The date and time the report was drawn.
     Printed,
+    /// The date the report was drawn.
+    Date,
+    /// The time of day the report was drawn.
+    Time,
     /// The budget's file name.
     File,
     /// "Page 3 of 12".
     Page,
     /// A budget information field, by label (blank when there is none).
     Info(String),
+    /// A global's value, by name (blank when there is none).
+    Global(String),
     /// Text as typed.
     Text(String),
 }
@@ -294,7 +335,7 @@ impl ReportPreset {
                 .into_iter()
                 .flatten()
             {
-                if let BandField::Text(t) | BandField::Info(t) = field {
+                if let BandField::Text(t) | BandField::Info(t) | BandField::Global(t) = field {
                     if t.chars().count() > MAX_BAND_TEXT_CHARS {
                         return Err(PresetError::TextTooLong);
                     }
@@ -354,5 +395,27 @@ mod tests {
             ..Band::default()
         });
         assert_eq!(p.validate(), Err(PresetError::TextTooLong));
+        let mut p = ok_global();
+        assert_eq!(p.validate(), Ok(()));
+        p.spec.header.as_mut().unwrap().center =
+            Some(BandField::Global("g".repeat(MAX_BAND_TEXT_CHARS + 1)));
+        assert_eq!(p.validate(), Err(PresetError::TextTooLong));
+    }
+
+    fn ok_global() -> ReportPreset {
+        let mut spec = ReportSpec {
+            sections: ReportSection::ALL.to_vec(),
+            ..ReportSpec::default()
+        };
+        spec.header = Some(Band {
+            center: Some(BandField::Global("WEEKS".into())),
+            first_page_only: true,
+            ..Band::default()
+        });
+        ReportPreset {
+            name: "Everything".into(),
+            default: false,
+            spec,
+        }
     }
 }

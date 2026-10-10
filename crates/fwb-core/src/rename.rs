@@ -6,12 +6,14 @@
 //! - a **global**: other globals' formulas, fringe rates, and the Amount, X,
 //!   Rate and 4X formulas of every row, as whole name tokens (the way the
 //!   formula reader splits them, so `DAYS` never touches `SHOOT_DAYS`); the
-//!   rest of each formula is kept as typed;
+//!   rest of each formula is kept as typed; and report presets' header and
+//!   footer slots that show its value;
 //! - a **fringe**: rows' fringes, and credit rows' excluded fringes;
 //! - a **group**: rows' groups, charges' excluded groups, credit rows based on
 //!   it, and report presets' "only these groups" filters (its color and
 //!   other settings go with it);
-//! - a **unit**: rows' four unit columns, and flat fringes' unit;
+//! - a **unit**: rows' four unit columns, flat fringes' unit, and globals'
+//!   display unit ([`crate::model::GlobalInfo`]);
 //! - a **set** or a **location**: rows' set or location;
 //! - a **currency**: rows' currency, flat charges' currency and the totals
 //!   currency. The base currency can be renamed too (the budget's base code
@@ -42,6 +44,7 @@ use std::fmt;
 use crate::expr::{is_ident, rename_var};
 use crate::model::{Budget, ChargeKind, CreditSource, Detail, Formula, FringeKind, TopsheetRow};
 use crate::presets::{SetupItems, TagPreset};
+use crate::report_preset::{BandField, ReportSpec};
 
 /// The kinds of setup item that are referred to by name.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -203,6 +206,11 @@ pub fn references(b: &Budget, kind: SetupKind, name: &str) -> usize {
             let uses = |f: &Formula| uses_global(f, name);
             b.globals.values().filter(|f| uses(f)).count()
                 + b.fringes.values().filter(|f| uses(&f.rate)).count()
+                + b.report_presets
+                    .iter()
+                    .flat_map(|p| band_fields(&p.spec))
+                    .filter(|f| matches!(f, BandField::Global(g) if g == name))
+                    .count()
         }
         SetupKind::Fringe => b
             .credits
@@ -230,11 +238,13 @@ pub fn references(b: &Budget, kind: SetupKind, name: &str) -> usize {
                     .filter(|p| p.spec.only_groups.contains(name))
                     .count()
         }
-        SetupKind::Unit => b
-            .fringes
-            .values()
-            .filter(|f| matches!(&f.kind, FringeKind::Flat { unit } if has(unit)))
-            .count(),
+        SetupKind::Unit => {
+            b.fringes
+                .values()
+                .filter(|f| matches!(&f.kind, FringeKind::Flat { unit } if has(unit)))
+                .count()
+                + b.global_info.values().filter(|g| g.unit == name).count()
+        }
         SetupKind::Set | SetupKind::Location => 0,
         SetupKind::Currency => {
             b.charges
@@ -380,6 +390,15 @@ fn rekey_hit<V>(map: &mut BTreeMap<String, V>, from: &str, to: &str) -> bool {
     }
 }
 
+/// Every header and footer slot that shows something.
+fn band_fields(s: &ReportSpec) -> impl Iterator<Item = &BandField> {
+    [&s.header, &s.footer]
+        .into_iter()
+        .flatten()
+        .flat_map(|b| [&b.left, &b.center, &b.right])
+        .flatten()
+}
+
 /// Renames in one row's fields; returns how many changed.
 fn row_rewrite(d: &mut Detail, kind: SetupKind, from: &str, to: &str) -> usize {
     let mut n = 0;
@@ -475,11 +494,25 @@ fn rewrite(b: &mut Budget, kind: SetupKind, from: &str, to: &str) -> usize {
     match kind {
         SetupKind::Global => {
             rekey(&mut b.globals, from, to);
+            rekey(&mut b.global_info, from, to);
             for f in b.globals.values_mut() {
                 count(swap_formula(f, from, to));
             }
             for fr in b.fringes.values_mut() {
                 count(swap_formula(&mut fr.rate, from, to));
+            }
+            for p in &mut b.report_presets {
+                let s = &mut p.spec;
+                for band in [&mut s.header, &mut s.footer].into_iter().flatten() {
+                    for slot in [&mut band.left, &mut band.center, &mut band.right] {
+                        if let Some(BandField::Global(g)) = slot {
+                            if g == from {
+                                *g = to.to_string();
+                                count(true);
+                            }
+                        }
+                    }
+                }
             }
         }
         SetupKind::Fringe => {
@@ -517,6 +550,13 @@ fn rewrite(b: &mut Budget, kind: SetupKind, from: &str, to: &str) -> usize {
                     count(swap_opt(unit, from, to));
                 }
             }
+            // A global's unit (display only) follows too.
+            for g in b.global_info.values_mut() {
+                if g.unit == from {
+                    g.unit = to.to_string();
+                    count(true);
+                }
+            }
         }
         SetupKind::Set => rekey(&mut b.sets, from, to),
         SetupKind::Location => rekey(&mut b.locations, from, to),
@@ -533,6 +573,8 @@ fn rewrite(b: &mut Budget, kind: SetupKind, from: &str, to: &str) -> usize {
             count(swap_opt(&mut b.totals_currency, from, to));
         }
     }
+    // Its place in a hand-made order (not a reference: not counted).
+    crate::order::rename_in(b, kind, from, to);
     n
 }
 
@@ -559,6 +601,7 @@ mod tests {
         b.fringes.insert(
             "PEN".into(),
             Fringe {
+                short_code: None,
                 description: String::new(),
                 rate: "DAYS + 1".into(),
                 kind: FringeKind::Percent { cutoff: None },
@@ -567,6 +610,7 @@ mod tests {
         b.fringes.insert(
             "MEAL".into(),
             Fringe {
+                short_code: None,
                 description: String::new(),
                 rate: "12".into(),
                 kind: FringeKind::Flat {
@@ -577,6 +621,7 @@ mod tests {
         b.groups.insert(
             "Crew".into(),
             Group {
+                short_code: None,
                 description: "shooting crew".into(),
                 in_budget_total: true,
                 color: Some("#2060a0".into()),
@@ -598,9 +643,11 @@ mod tests {
         l2.unit3 = "Shift".into();
         l2.groups.insert("Crew".into());
         b.topsheet.push(TopsheetRow::Category(Category {
+            notes: Vec::new(),
             code: "20".into(),
             name: "Crew".into(),
             accounts: vec![Account {
+                notes: Vec::new(),
                 code: "20-01".into(),
                 name: "Grip".into(),
                 details: vec![l1, Detail::subtotal(3, "sub"), l2],
@@ -653,6 +700,31 @@ mod tests {
             .flat_map(|a| &a.details)
             .find(|d| d.id == id)
             .unwrap()
+    }
+
+    #[test]
+    fn a_global_in_a_report_header_follows_its_rename() {
+        use crate::report_preset::{Band, BandField};
+        let mut b = budget();
+        b.report_presets[0].spec.footer = Some(Band {
+            left: Some(BandField::Global("DAYS".into())),
+            right: Some(BandField::Global("SHOOT_DAYS".into())),
+            ..Band::default()
+        });
+        let refs = references(&b, SetupKind::Global, "DAYS");
+        let n = rename(&mut b, SetupKind::Global, "DAYS", "PREP_DAYS").unwrap();
+        // The three formula uses and the footer slot; never SHOOT_DAYS's slot.
+        assert_eq!(n, 4);
+        assert_eq!(refs, n);
+        let f = b.report_presets[0].spec.footer.as_ref().unwrap();
+        assert_eq!(f.left, Some(BandField::Global("PREP_DAYS".into())));
+        assert_eq!(f.right, Some(BandField::Global("SHOOT_DAYS".into())));
+        let mut back = b.clone();
+        rename(&mut back, SetupKind::Global, "PREP_DAYS", "DAYS").unwrap();
+        assert_eq!(
+            back.report_presets[0].spec.footer.as_ref().unwrap().left,
+            Some(BandField::Global("DAYS".into()))
+        );
     }
 
     #[test]

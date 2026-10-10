@@ -897,6 +897,7 @@ mod tests {
                 b.groups.insert(
                     format!("NEW{}", rng.below(5)),
                     Group {
+                        short_code: None,
                         description: String::new(),
                         in_budget_total: rng.below(2) == 0,
                         color: None,

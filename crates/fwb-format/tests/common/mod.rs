@@ -17,6 +17,7 @@ pub fn set(items: &[&str]) -> BTreeSet<String> {
 
 pub fn category(code: &str, name: &str, accounts: Vec<Account>) -> TopsheetRow {
     TopsheetRow::Category(Category {
+        notes: Vec::new(),
         code: code.into(),
         name: name.into(),
         accounts,
@@ -29,6 +30,7 @@ pub fn level(name: &str) -> TopsheetRow {
 
 pub fn account(code: &str, name: &str, details: Vec<Detail>) -> Account {
     Account {
+        notes: Vec::new(),
         code: code.into(),
         name: name.into(),
         details,
@@ -37,6 +39,7 @@ pub fn account(code: &str, name: &str, details: Vec<Detail>) -> Account {
 
 pub fn group(in_budget_total: bool) -> Group {
     Group {
+        short_code: None,
         description: String::new(),
         in_budget_total,
         color: None,
@@ -74,6 +77,7 @@ pub fn sample() -> Budget {
     b.fringes.insert(
         "FICA".into(),
         Fringe {
+            short_code: None,
             description: String::new(),
             rate: "7.65".into(),
             kind: FringeKind::Percent {
@@ -84,6 +88,7 @@ pub fn sample() -> Budget {
     b.fringes.insert(
         "PH".into(),
         Fringe {
+            short_code: None,
             description: String::new(),
             rate: "50".into(),
             kind: FringeKind::Flat {
@@ -235,6 +240,7 @@ pub fn rich() -> Budget {
     b.fringes.insert(
         "Pension".into(),
         Fringe {
+            short_code: None,
             description: String::new(),
             rate: "PENSION_RATE".into(),
             kind: FringeKind::Percent { cutoff: None },
@@ -243,6 +249,7 @@ pub fn rich() -> Budget {
     b.fringes.insert(
         "Meal".into(),
         Fringe {
+            short_code: None,
             description: "Per line".into(),
             rate: "".into(),
             kind: FringeKind::Flat { unit: None },

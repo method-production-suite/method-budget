@@ -8,11 +8,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use fwb_core::coding::AccountCoding;
+use fwb_core::order::SetupOrder;
 use fwb_core::{
     Account, Baseline, Budget, Category, Cents, Charge, ChargeKind, Credit, CreditCap, CreditRow,
-    CreditSource, Currency, Dec, Detail, Formula, Fringe, FringeKind, FringePosting, Group,
-    InfoValue, Location, NewLineDefaults, ProductionTotal, RowId, RowKind, SetDef, TopsheetRow,
-    UnitDef, Version,
+    CreditSource, Currency, Dec, Detail, DisplayPrefs, Formula, Fringe, FringeKind, FringePosting,
+    GlobalInfo, Group, InfoValue, Location, NewLineDefaults, Note, ProductionTotal, RowId, RowKind,
+    SetDef, TopsheetRow, UnitDef, Version,
 };
 use fwb_core::{Band, BandField, FontSize, ReportColumn, ReportPreset, ReportSection, ReportSpec};
 use fwb_core::{LinePreset, SetupItems, TagPreset};
@@ -188,6 +189,8 @@ pub(crate) struct FileBudget {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     globals: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    global_info: BTreeMap<String, FileGlobalInfo>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     fringes: BTreeMap<String, FileFringe>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     groups: BTreeMap<String, FileGroup>,
@@ -203,6 +206,10 @@ pub(crate) struct FileBudget {
     credits: Vec<FileCredit>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     baseline: Option<FileBaseline>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    display: Option<FileDisplay>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    setup_order: Option<FileSetupOrder>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     report_presets: Vec<FileReportPreset>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -222,6 +229,7 @@ impl From<&Budget> for FileBudget {
             info,
             currencies,
             globals,
+            global_info,
             units,
             fringes,
             fringe_posting,
@@ -234,10 +242,12 @@ impl From<&Budget> for FileBudget {
             charges,
             credits,
             baseline,
+            display,
             versions,
             report_presets,
             tag_presets,
             line_presets,
+            setup_order: _,
         } = b;
         FileBudget {
             title: title.clone(),
@@ -253,6 +263,12 @@ impl From<&Budget> for FileBudget {
             currencies: map(currencies, FileCurrency::from),
             units: map(units, FileUnit::from),
             globals: map(globals, |f| f.0.clone()),
+            // Only for globals that exist, and only what isn't the default.
+            global_info: global_info
+                .iter()
+                .filter(|(n, g)| globals.contains_key(*n) && !g.is_default())
+                .map(|(n, g)| (n.clone(), FileGlobalInfo::from(g)))
+                .collect(),
             fringes: map(fringes, FileFringe::from),
             groups: map(groups, FileGroup::from),
             sets: map(sets, FileSet::from),
@@ -261,6 +277,11 @@ impl From<&Budget> for FileBudget {
             charges: charges.iter().map(FileCharge::from).collect(),
             credits: credits.iter().map(FileCredit::from).collect(),
             baseline: baseline.as_ref().map(FileBaseline::from),
+            display: (*display != DisplayPrefs::default()).then(|| FileDisplay::from(display)),
+            // Only names that exist, and nothing when a table is in byte order.
+            setup_order: Some(fwb_core::order::normalized_all(b))
+                .filter(|o| !o.is_empty())
+                .map(FileSetupOrder::from),
             report_presets: report_presets.iter().map(FileReportPreset::from).collect(),
             tag_presets: tag_presets.iter().map(FileTagPreset::from).collect(),
             line_presets: line_presets.iter().map(FileLinePreset::from).collect(),
@@ -277,6 +298,14 @@ impl From<FileBudget> for Budget {
             totals_currency: f.totals_currency,
             info: unmap(f.info, InfoValue::from),
             currencies: unmap(f.currencies, Currency::from),
+            // An entry for a name that isn't a global is ignored.
+            global_info: f
+                .global_info
+                .into_iter()
+                .filter(|(n, _)| f.globals.contains_key(n))
+                .map(|(n, g)| (n, GlobalInfo::from(g)))
+                .filter(|(_, g)| !g.is_default())
+                .collect(),
             globals: unmap(f.globals, Formula),
             units: unmap(f.units, UnitDef::from),
             fringes: unmap(f.fringes, Fringe::from),
@@ -299,6 +328,8 @@ impl From<FileBudget> for Budget {
             charges: f.charges.into_iter().map(Charge::from).collect(),
             credits: f.credits.into_iter().map(Credit::from).collect(),
             baseline: f.baseline.map(Baseline::from),
+            display: f.display.map(DisplayPrefs::from).unwrap_or_default(),
+            setup_order: f.setup_order.map(SetupOrder::from).unwrap_or_default(),
             versions: f.versions.into_iter().map(Version::from).collect(),
             report_presets: f
                 .report_presets
@@ -307,6 +338,267 @@ impl From<FileBudget> for Budget {
                 .collect(),
             tag_presets: f.tag_presets.into_iter().map(TagPreset::from).collect(),
             line_presets: f.line_presets.into_iter().map(LinePreset::from).collect(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Global info and display settings (display only; never change a value)
+
+/// Decimal places for display: an integer from 0 to
+/// [`fwb_core::MAX_DISPLAY_DECIMALS`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Places(u8);
+
+impl Serialize for Places {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_u8(self.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for Places {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Places, D::Error> {
+        let n = u8::deserialize(d)?;
+        if n > fwb_core::MAX_DISPLAY_DECIMALS {
+            return Err(de::Error::custom(format!(
+                "decimal places must be 0 to {}, not {n}",
+                fwb_core::MAX_DISPLAY_DECIMALS
+            )));
+        }
+        Ok(Places(n))
+    }
+}
+
+/// What a global says about itself besides its formula. Each field is left
+/// out at its default; a global with nothing but defaults has no entry.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileGlobalInfo {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    description: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    unit: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    decimals: Option<Places>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    show_by_name: bool,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    folder: String,
+}
+
+impl From<&GlobalInfo> for FileGlobalInfo {
+    fn from(g: &GlobalInfo) -> FileGlobalInfo {
+        let GlobalInfo {
+            description,
+            unit,
+            decimals,
+            show_by_name,
+            folder,
+        } = g;
+        FileGlobalInfo {
+            description: description.clone(),
+            unit: unit.clone(),
+            decimals: decimals.map(Places),
+            show_by_name: *show_by_name,
+            folder: folder.clone(),
+        }
+    }
+}
+
+impl From<FileGlobalInfo> for GlobalInfo {
+    fn from(f: FileGlobalInfo) -> GlobalInfo {
+        GlobalInfo {
+            description: f.description,
+            unit: f.unit,
+            decimals: f.decimals.map(|p| p.0),
+            show_by_name: f.show_by_name,
+            folder: f.folder,
+        }
+    }
+}
+
+/// How numbers show on screen. Written only when some setting differs from
+/// the default; each field is left out at its default.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileDisplay {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rate_cutoff: Option<DecStr>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rate_decimals_below: Option<Places>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rate_decimals_above: Option<Places>,
+    #[serde(default = "yes", skip_serializing_if = "is_true")]
+    rate_global_decimals: bool,
+    #[serde(default = "yes", skip_serializing_if = "is_true")]
+    summary_rows: bool,
+    #[serde(default = "yes", skip_serializing_if = "is_true")]
+    net_total: bool,
+}
+
+impl From<&DisplayPrefs> for FileDisplay {
+    fn from(d: &DisplayPrefs) -> FileDisplay {
+        let DisplayPrefs {
+            rate_cutoff,
+            rate_decimals_below,
+            rate_decimals_above,
+            rate_global_decimals,
+            summary_rows,
+            net_total,
+        } = d;
+        FileDisplay {
+            rate_cutoff: rate_cutoff.map(DecStr),
+            rate_decimals_below: rate_decimals_below.map(Places),
+            rate_decimals_above: rate_decimals_above.map(Places),
+            rate_global_decimals: *rate_global_decimals,
+            summary_rows: *summary_rows,
+            net_total: *net_total,
+        }
+    }
+}
+
+impl From<FileDisplay> for DisplayPrefs {
+    fn from(f: FileDisplay) -> DisplayPrefs {
+        DisplayPrefs {
+            rate_cutoff: f.rate_cutoff.map(|d| d.0),
+            rate_decimals_below: f.rate_decimals_below.map(|p| p.0),
+            rate_decimals_above: f.rate_decimals_above.map(|p| p.0),
+            rate_global_decimals: f.rate_global_decimals,
+            summary_rows: f.summary_rows,
+            net_total: f.net_total,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Setup order (display only)
+
+/// Hand-made order of the setup tables, first to last. Each list is left
+/// out when its table is in byte order; the object when all are.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileSetupOrder {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    units: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    globals: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    fringes: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    groups: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    sets: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    locations: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    currencies: Vec<String>,
+}
+
+impl From<SetupOrder> for FileSetupOrder {
+    fn from(o: SetupOrder) -> FileSetupOrder {
+        let SetupOrder {
+            units,
+            globals,
+            fringes,
+            groups,
+            sets,
+            locations,
+            currencies,
+        } = o;
+        FileSetupOrder {
+            units,
+            globals,
+            fringes,
+            groups,
+            sets,
+            locations,
+            currencies,
+        }
+    }
+}
+
+impl From<FileSetupOrder> for SetupOrder {
+    fn from(f: FileSetupOrder) -> SetupOrder {
+        SetupOrder {
+            units: f.units,
+            globals: f.globals,
+            fringes: f.fringes,
+            groups: f.groups,
+            sets: f.sets,
+            locations: f.locations,
+            currencies: f.currencies,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Notes
+
+/// A dated note on a row, an account or a category.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileNote {
+    id: u64,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    created: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    edited: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    author: Option<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    done: bool,
+    text: String,
+}
+
+impl From<&Note> for FileNote {
+    fn from(n: &Note) -> FileNote {
+        let Note {
+            id,
+            text,
+            created,
+            edited,
+            author,
+            done,
+        } = n;
+        FileNote {
+            id: *id,
+            created: created.clone(),
+            edited: edited.clone(),
+            author: author.clone(),
+            done: *done,
+            text: text.clone(),
+        }
+    }
+}
+
+impl From<FileNote> for Note {
+    fn from(f: FileNote) -> Note {
+        Note {
+            id: f.id,
+            text: f.text,
+            created: f.created,
+            edited: f.edited,
+            author: f.author,
+            done: f.done,
+        }
+    }
+}
+
+fn file_notes(notes: &[Note]) -> Vec<FileNote> {
+    notes.iter().map(FileNote::from).collect()
+}
+
+/// A row's notes as read: an older file's single `note` (a string) first,
+/// as an undated note, then the `notes` list. The carried-over note gets the
+/// id after the list's highest, so ids stay unique.
+fn read_notes(legacy: Option<String>, notes: Vec<FileNote>) -> Vec<Note> {
+    let notes: Vec<Note> = notes.into_iter().map(Note::from).collect();
+    match legacy {
+        None => notes,
+        Some(text) => {
+            let mut out = vec![Note::plain(fwb_core::next_note_id(&notes), text)];
+            out.extend(notes);
+            out
         }
     }
 }
@@ -352,6 +644,16 @@ impl<'de> Deserialize<'de> for FileSnapshot {
         if !b.tag_presets.is_empty() || !b.line_presets.is_empty() {
             return Err(de::Error::custom(
                 "a version's budget cannot have tag presets or line blocks",
+            ));
+        }
+        if b.setup_order.is_some() {
+            return Err(de::Error::custom(
+                "a version's budget cannot have a setup order",
+            ));
+        }
+        if b.display.is_some() {
+            return Err(de::Error::custom(
+                "a version's budget cannot have display settings",
             ));
         }
         Ok(FileSnapshot(b))
@@ -618,6 +920,8 @@ enum FileFringe {
     Percent {
         #[serde(default, skip_serializing_if = "String::is_empty")]
         description: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        short_code: Option<String>,
         rate: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         cutoff: Option<Cents>,
@@ -625,6 +929,8 @@ enum FileFringe {
     Flat {
         #[serde(default, skip_serializing_if = "String::is_empty")]
         description: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        short_code: Option<String>,
         rate: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         unit: Option<String>,
@@ -635,18 +941,22 @@ impl From<&Fringe> for FileFringe {
     fn from(f: &Fringe) -> FileFringe {
         let Fringe {
             description,
+            short_code,
             rate,
             kind,
         } = f;
-        let (description, rate) = (description.clone(), rate.0.clone());
+        let (description, short_code, rate) =
+            (description.clone(), short_code.clone(), rate.0.clone());
         match kind {
             FringeKind::Percent { cutoff } => FileFringe::Percent {
                 description,
+                short_code,
                 rate,
                 cutoff: *cutoff,
             },
             FringeKind::Flat { unit } => FileFringe::Flat {
                 description,
+                short_code,
                 rate,
                 unit: unit.clone(),
             },
@@ -659,19 +969,23 @@ impl From<FileFringe> for Fringe {
         match f {
             FileFringe::Percent {
                 description,
+                short_code,
                 rate,
                 cutoff,
             } => Fringe {
                 description,
+                short_code,
                 rate: Formula(rate),
                 kind: FringeKind::Percent { cutoff },
             },
             FileFringe::Flat {
                 description,
+                short_code,
                 rate,
                 unit,
             } => Fringe {
                 description,
+                short_code,
                 rate: Formula(rate),
                 kind: FringeKind::Flat { unit },
             },
@@ -684,6 +998,8 @@ impl From<FileFringe> for Fringe {
 struct FileGroup {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     description: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    short_code: Option<String>,
     #[serde(default = "yes", skip_serializing_if = "is_true")]
     in_budget_total: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -694,11 +1010,13 @@ impl From<&Group> for FileGroup {
     fn from(g: &Group) -> FileGroup {
         let Group {
             description,
+            short_code,
             in_budget_total,
             color,
         } = g;
         FileGroup {
             description: description.clone(),
+            short_code: short_code.clone(),
             in_budget_total: *in_budget_total,
             color: color.clone(),
         }
@@ -709,6 +1027,7 @@ impl From<FileGroup> for Group {
     fn from(f: FileGroup) -> Group {
         Group {
             description: f.description,
+            short_code: f.short_code,
             in_budget_total: f.in_budget_total,
             color: f.color,
         }
@@ -803,6 +1122,8 @@ struct FileTopsheetRow {
     code: Option<String>,
     name: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    notes: Vec<FileNote>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     accounts: Vec<FileAccount>,
 }
 
@@ -813,6 +1134,8 @@ struct RawTopsheetRow {
     #[serde(default)]
     code: Option<String>,
     name: String,
+    #[serde(default)]
+    notes: Option<Vec<FileNote>>,
     #[serde(default)]
     accounts: Option<Vec<FileAccount>>,
 }
@@ -826,6 +1149,7 @@ impl TryFrom<RawTopsheetRow> for FileTopsheetRow {
                 kind: r.kind,
                 code: Some(r.code.ok_or("missing field `code` on a category row")?),
                 name: r.name,
+                notes: r.notes.unwrap_or_default(),
                 accounts: r.accounts.unwrap_or_default(),
             }),
             TopsheetKind::ProductionTotal => {
@@ -835,10 +1159,14 @@ impl TryFrom<RawTopsheetRow> for FileTopsheetRow {
                 if r.accounts.is_some() {
                     return Err("a production_total row has no `accounts`".into());
                 }
+                if r.notes.is_some() {
+                    return Err("a production_total row has no `notes`".into());
+                }
                 Ok(FileTopsheetRow {
                     kind: r.kind,
                     code: None,
                     name: r.name,
+                    notes: Vec::new(),
                     accounts: Vec::new(),
                 })
             }
@@ -853,16 +1181,19 @@ impl From<&TopsheetRow> for FileTopsheetRow {
                 code,
                 name,
                 accounts,
+                notes,
             }) => FileTopsheetRow {
                 kind: TopsheetKind::Category,
                 code: Some(code.clone()),
                 name: name.clone(),
+                notes: file_notes(notes),
                 accounts: accounts.iter().map(FileAccount::from).collect(),
             },
             TopsheetRow::ProductionTotal(ProductionTotal { name }) => FileTopsheetRow {
                 kind: TopsheetKind::ProductionTotal,
                 code: None,
                 name: name.clone(),
+                notes: Vec::new(),
                 accounts: Vec::new(),
             },
         }
@@ -876,6 +1207,7 @@ impl From<FileTopsheetRow> for TopsheetRow {
                 code: f.code.unwrap_or_default(),
                 name: f.name,
                 accounts: f.accounts.into_iter().map(Account::from).collect(),
+                notes: f.notes.into_iter().map(Note::from).collect(),
             }),
             TopsheetKind::ProductionTotal => {
                 TopsheetRow::ProductionTotal(ProductionTotal { name: f.name })
@@ -890,6 +1222,8 @@ struct FileAccount {
     code: String,
     name: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    notes: Vec<FileNote>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     details: Vec<FileDetail>,
 }
 
@@ -899,10 +1233,12 @@ impl From<&Account> for FileAccount {
             code,
             name,
             details,
+            notes,
         } = a;
         FileAccount {
             code: code.clone(),
             name: name.clone(),
+            notes: file_notes(notes),
             details: details.iter().map(FileDetail::from).collect(),
         }
     }
@@ -914,6 +1250,7 @@ impl From<FileAccount> for Account {
             code: f.code,
             name: f.name,
             details: f.details.into_iter().map(Detail::from).collect(),
+            notes: f.notes.into_iter().map(Note::from).collect(),
         }
     }
 }
@@ -977,8 +1314,12 @@ struct FileDetail {
     indent: u8,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     color: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Read only: older files kept one undated note per row, as a string.
+    /// It reads as the first of the row's `notes`; never written.
+    #[serde(default, skip_serializing)]
     note: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    notes: Vec<FileNote>,
 }
 
 impl From<&Detail> for FileDetail {
@@ -1005,7 +1346,7 @@ impl From<&Detail> for FileDetail {
             italic,
             indent,
             color,
-            note,
+            notes,
         } = d;
         FileDetail {
             id: *id,
@@ -1034,7 +1375,8 @@ impl From<&Detail> for FileDetail {
             italic: *italic,
             indent: *indent,
             color: color.clone(),
-            note: note.clone(),
+            note: None,
+            notes: file_notes(notes),
         }
     }
 }
@@ -1068,7 +1410,7 @@ impl From<FileDetail> for Detail {
             italic: f.italic,
             indent: f.indent,
             color: f.color,
-            note: f.note,
+            notes: read_notes(f.note, f.notes),
         }
     }
 }
@@ -1461,6 +1803,8 @@ pub(crate) struct FileReportPreset {
     skip_suppressed_lines: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     skip_notes: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    skip_done_notes: bool,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     only_groups: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1473,6 +1817,14 @@ pub(crate) struct FileReportPreset {
     shading: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     group_colors: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    vertical_rules: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    collapse_details: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    topsheet_fringes: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    topsheet_pages: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     header: Option<FileBand>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1490,6 +1842,11 @@ enum FileSection {
     Groups,
     Notes,
     Info,
+    Chart,
+    Units,
+    Sets,
+    Locations,
+    Currencies,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -1539,6 +1896,8 @@ struct FileBand {
     center: Option<FileBandField>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     right: Option<FileBandField>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    first_page_only: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -1547,9 +1906,12 @@ enum FileBandField {
     Title {},
     Section {},
     Printed {},
+    Date {},
+    Time {},
     File {},
     Page {},
     Info { label: String },
+    Global { name: String },
     Text { text: String },
 }
 
@@ -1573,7 +1935,8 @@ macro_rules! same_variants {
 }
 
 same_variants!(ReportSection <-> FileSection {
-    Topsheet, Accounts, Detail, Fringes, Globals, Groups, Notes, Info,
+    Topsheet, Accounts, Detail, Fringes, Globals, Groups, Notes, Info, Chart, Units, Sets,
+    Locations, Currencies,
 });
 same_variants!(ReportColumn <-> FileColumn {
     Amount, Unit, X, Unit2, Rate, Unit3, Currency, X4, Unit4, Fringes, FringePercent,
@@ -1587,11 +1950,14 @@ impl From<&BandField> for FileBandField {
             BandField::Title => FileBandField::Title {},
             BandField::Section => FileBandField::Section {},
             BandField::Printed => FileBandField::Printed {},
+            BandField::Date => FileBandField::Date {},
+            BandField::Time => FileBandField::Time {},
             BandField::File => FileBandField::File {},
             BandField::Page => FileBandField::Page {},
             BandField::Info(label) => FileBandField::Info {
                 label: label.clone(),
             },
+            BandField::Global(name) => FileBandField::Global { name: name.clone() },
             BandField::Text(text) => FileBandField::Text { text: text.clone() },
         }
     }
@@ -1603,9 +1969,12 @@ impl From<FileBandField> for BandField {
             FileBandField::Title {} => BandField::Title,
             FileBandField::Section {} => BandField::Section,
             FileBandField::Printed {} => BandField::Printed,
+            FileBandField::Date {} => BandField::Date,
+            FileBandField::Time {} => BandField::Time,
             FileBandField::File {} => BandField::File,
             FileBandField::Page {} => BandField::Page,
             FileBandField::Info { label } => BandField::Info(label),
+            FileBandField::Global { name } => BandField::Global(name),
             FileBandField::Text { text } => BandField::Text(text),
         }
     }
@@ -1617,11 +1986,13 @@ impl From<&Band> for FileBand {
             left,
             center,
             right,
+            first_page_only,
         } = b;
         FileBand {
             left: left.as_ref().map(FileBandField::from),
             center: center.as_ref().map(FileBandField::from),
             right: right.as_ref().map(FileBandField::from),
+            first_page_only: *first_page_only,
         }
     }
 }
@@ -1632,6 +2003,7 @@ impl From<FileBand> for Band {
             left: f.left.map(BandField::from),
             center: f.center.map(BandField::from),
             right: f.right.map(BandField::from),
+            first_page_only: f.first_page_only,
         }
     }
 }
@@ -1651,12 +2023,17 @@ impl From<&ReportPreset> for FileReportPreset {
             skip_zero_accounts,
             skip_suppressed_lines,
             skip_notes,
+            skip_done_notes,
             only_groups,
             columns,
             landscape,
             font_size,
             shading,
             group_colors,
+            vertical_rules,
+            collapse_details,
+            topsheet_fringes,
+            topsheet_pages,
             header,
             footer,
         } = spec;
@@ -1670,6 +2047,7 @@ impl From<&ReportPreset> for FileReportPreset {
             skip_zero_accounts: *skip_zero_accounts,
             skip_suppressed_lines: *skip_suppressed_lines,
             skip_notes: *skip_notes,
+            skip_done_notes: *skip_done_notes,
             only_groups: only_groups.clone(),
             columns: columns
                 .as_ref()
@@ -1678,6 +2056,10 @@ impl From<&ReportPreset> for FileReportPreset {
             font_size: (*font_size).into(),
             shading: *shading,
             group_colors: *group_colors,
+            vertical_rules: *vertical_rules,
+            collapse_details: *collapse_details,
+            topsheet_fringes: *topsheet_fringes,
+            topsheet_pages: *topsheet_pages,
             header: header.as_ref().map(FileBand::from),
             footer: footer.as_ref().map(FileBand::from),
         }
@@ -1697,12 +2079,17 @@ impl From<FileReportPreset> for ReportPreset {
                 skip_zero_accounts: f.skip_zero_accounts,
                 skip_suppressed_lines: f.skip_suppressed_lines,
                 skip_notes: f.skip_notes,
+                skip_done_notes: f.skip_done_notes,
                 only_groups: f.only_groups,
                 columns: f.columns.map(|c| c.into_iter().map(Into::into).collect()),
                 landscape: f.landscape,
                 font_size: f.font_size.into(),
                 shading: f.shading,
                 group_colors: f.group_colors,
+                vertical_rules: f.vertical_rules,
+                collapse_details: f.collapse_details,
+                topsheet_fringes: f.topsheet_fringes,
+                topsheet_pages: f.topsheet_pages,
                 header: f.header.map(Band::from),
                 footer: f.footer.map(Band::from),
             },
@@ -1911,8 +2298,11 @@ struct FileBlockRow {
     indent: u8,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     color: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Read only, as on a [`FileDetail`].
+    #[serde(default, skip_serializing)]
     note: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    notes: Vec<FileNote>,
 }
 
 impl From<&Detail> for FileBlockRow {
@@ -1939,7 +2329,8 @@ impl From<&Detail> for FileBlockRow {
             italic,
             indent,
             color,
-            note,
+            note: _,
+            notes,
         } = FileDetail::from(d);
         FileBlockRow {
             kind,
@@ -1962,7 +2353,8 @@ impl From<&Detail> for FileBlockRow {
             italic,
             indent,
             color,
-            note,
+            note: None,
+            notes,
         }
     }
 }
@@ -1992,6 +2384,7 @@ impl From<FileBlockRow> for Detail {
             indent,
             color,
             note,
+            notes,
         } = r;
         Detail::from(FileDetail {
             id: 0,
@@ -2016,6 +2409,7 @@ impl From<FileBlockRow> for Detail {
             indent,
             color,
             note,
+            notes,
         })
     }
 }

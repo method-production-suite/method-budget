@@ -612,7 +612,7 @@ pub fn store_line_block(
             d.fringe_range = None;
         }
         if !keep.notes {
-            d.note = None;
+            d.notes.clear();
         }
     }
     let setup = to_items(Setup::used_by(b, &rows));
@@ -845,6 +845,7 @@ mod tests {
         b.fringes.insert(
             "PENSION".into(),
             Fringe {
+                short_code: None,
                 description: String::new(),
                 rate: "5".into(),
                 kind: FringeKind::Percent { cutoff: None },
@@ -854,6 +855,7 @@ mod tests {
             b.groups.insert(
                 g.into(),
                 Group {
+                    short_code: None,
                     description: String::new(),
                     in_budget_total: true,
                     color: None,
@@ -1171,15 +1173,18 @@ mod tests {
         let mut s = Session::with_budget(budget(), None);
         let rows = ids(s.budget(), "20-01");
         s.edit(|b| crate::apply::make_range(b, &rows)).unwrap();
-        s.edit(|b| crate::rowstyle::apply_row_note(b, rows[0], Some("Prep and shoot")))
-            .unwrap();
+        s.edit(|b| {
+            let on = crate::notes::NoteOwner::Row(rows[0]);
+            crate::notes::add(b, &on, "Prep and shoot", "", None).map(|_| ())
+        })
+        .unwrap();
         s.edit(|b| store_line_block(b, "Staff", &rows, BlockFields::default()))
             .unwrap();
         let p = s.budget().line_presets[0].clone();
         assert_eq!(p.rows.len(), 2);
         assert!(p.rows.iter().all(|d| d.id == 0));
         assert_eq!(p.rows[0].description, "Line producer");
-        assert_eq!(p.rows[0].note.as_deref(), Some("Prep and shoot"));
+        assert_eq!(p.rows[0].notes[0].text, "Prep and shoot");
         assert_eq!(p.rows[0].fringe_range, Some(1));
         assert_eq!(p.rows[1].fringe_range, Some(1));
         // Every setup item the rows use, with what those use in turn.
@@ -1202,7 +1207,7 @@ mod tests {
         let p = &s.budget().line_presets[1];
         for d in &p.rows {
             assert!(d.amount.is_blank() && d.rate.is_blank() && d.unit.is_empty());
-            assert!(d.fringes.is_empty() && d.fringe_range.is_none() && d.note.is_none());
+            assert!(d.fringes.is_empty() && d.fringe_range.is_none() && d.notes.is_empty());
             assert!(!d.description.is_empty());
         }
         assert!(p.setup.is_empty());

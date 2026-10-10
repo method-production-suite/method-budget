@@ -37,6 +37,7 @@ export const SHORTCUTS = [
   { id: 'file.new_from_template', group: 'File', label: 'New budget from a template (any budget file): its chart, setup and settings, in a new tab', scope: 'menu' },
   { id: 'file.save_as_template', group: 'File', label: 'Save a copy of the budget as a template: no lines, info, baseline, versions or notes', scope: 'menu' },
   { id: 'file.import_setup', group: 'File', label: 'Import setup items from another budget file, with what they need', scope: 'menu' },
+  { id: 'file.import_spreadsheet', group: 'File', label: 'Import lines from an Excel workbook, CSV or tab-delimited file, mapping its columns to budget fields', scope: 'menu' },
   { id: 'file.versions', group: 'File', label: 'Versions: save, restore, rename and compare named copies of the budget', scope: 'menu' },
   { id: 'file.compare', group: 'File', label: 'Compare the budget with open budgets, its versions or other files', scope: 'menu' },
   { id: 'file.print_budget', group: 'File', label: 'Print: choose sections and layout, preview, save as PDF', keys: 'mod+p', scope: 'app' },
@@ -68,7 +69,7 @@ export const SHORTCUTS = [
   { id: 'edit.move_up', group: 'Edit', label: 'Move the selected rows up one place (lines, accounts, or topsheet rows)', keys: 'alt+up', scope: 'grid', text: true },
   { id: 'edit.move_down', group: 'Edit', label: 'Move the selected rows down one place', keys: 'alt+down', scope: 'grid', text: true },
   { id: 'grid.clear', group: 'Edit', label: 'Clear the selected cells', keys: ['backspace', 'delete'], scope: 'builtin' },
-  { id: 'edit.note', group: 'Edit', label: 'Add or edit the note on the line', keys: 'mod+shift+space', scope: 'grid' },
+  { id: 'edit.note', group: 'Edit', label: 'Add a dated note to the line, account or category', keys: 'mod+shift+space', scope: 'grid' },
   { id: 'edit.make_range', group: 'Edit', label: 'Make the selected lines one fringe range', keys: 'mod+r', scope: 'grid' },
   { id: 'edit.remove_range', group: 'Edit', label: 'Take the selected lines out of their fringe range', keys: 'mod+shift+r', scope: 'grid' },
   // Find and replace: the Find tab of the tools panel (find.js). Cmd+G is
@@ -131,6 +132,14 @@ export const SHORTCUTS = [
   { id: 'view.panel.right', group: 'View', label: 'Dock the tools panel at the right', scope: 'menu' },
   { id: 'view.panel.bottom', group: 'View', label: 'Dock the tools panel at the bottom', scope: 'menu' },
   { id: 'view.panel.window', group: 'View', label: 'Pop the tools panel out into its own window', scope: 'menu' },
+  // Display choices, saved for you (display.js). Cmd+= and Cmd+- insert rows,
+  // so the zoom keys add Option.
+  { id: 'view.formulas', group: 'View', label: 'Selected cells show their formulas instead of values, or not', keys: 'mod+alt+f', scope: 'app' },
+  { id: 'view.hide_zero', group: 'View', label: 'Hide or show categories and accounts that total zero', scope: 'menu' },
+  { id: 'view.totals_cents', group: 'View', label: 'Totals with cents, or rounded to whole amounts', scope: 'menu' },
+  { id: 'view.zoom_in', group: 'View', label: 'Zoom the grid in', keys: 'mod+alt+=', scope: 'app' },
+  { id: 'view.zoom_out', group: 'View', label: 'Zoom the grid out', keys: 'mod+alt+-', scope: 'app' },
+  { id: 'view.zoom_reset', group: 'View', label: 'Grid at actual size', keys: 'mod+alt+0', scope: 'app' },
   // Tools tabs take the keys long-time users of other budgeting tools have in
   // their hands (decisions.md, entry 15).
   { id: 'view.tab.fringes', group: 'View', label: 'Tools: Fringes', keys: 'mod+3', scope: 'app' },
@@ -141,7 +150,7 @@ export const SHORTCUTS = [
   { id: 'view.tab.sets', group: 'View', label: 'Tools: Sets', keys: 'mod+8', scope: 'app' },
   { id: 'view.tab.locations', group: 'View', label: 'Tools: Locations', keys: 'mod+5', scope: 'app' },
   { id: 'view.tab.currencies', group: 'View', label: 'Tools: Currency', keys: 'mod+6', scope: 'app' },
-  { id: 'view.tab.notes', group: 'View', label: 'Tools: Notes (the line’s note, and every noted line)', scope: 'menu' },
+  { id: 'view.tab.notes', group: 'View', label: 'Tools: Notes (notes on the line, account or category, and every note as a checklist)', scope: 'menu' },
   { id: 'view.tab.charges', group: 'View', label: 'Tools: Budget, Charges', keys: 'mod+/', scope: 'app' },
   { id: 'view.tab.credits', group: 'View', label: 'Tools: Budget, Credits', keys: 'mod+backslash', scope: 'app' },
   { id: 'view.tab.info', group: 'View', label: 'Tools: Budget, Info', scope: 'menu' },

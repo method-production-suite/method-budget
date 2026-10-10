@@ -145,6 +145,7 @@ fn row_style_separators_and_group_colors_round_trip() {
     b.groups.insert(
         "Alt".into(),
         Group {
+            short_code: None,
             description: String::new(),
             in_budget_total: false,
             color: Some("#336699".into()),
@@ -156,7 +157,14 @@ fn row_style_separators_and_group_colors_round_trip() {
     styled.italic = true;
     styled.indent = 2;
     styled.color = Some("#aa0000".into());
-    styled.note = Some("Rate per UPM\nconfirm".into());
+    styled.notes = vec![Note {
+        id: 2,
+        text: "Rate per UPM\nconfirm".into(),
+        created: "2026-10-09T14:30:00Z".into(),
+        edited: Some("2026-10-10T08:00:00Z".into()),
+        author: Some("Sam".into()),
+        done: true,
+    }];
     let mut italic_only = Detail::line(3, "", "", "", "");
     italic_only.italic = true;
     b.topsheet.push(category(
@@ -193,7 +201,7 @@ fn row_style_separators_and_group_colors_round_trip() {
         .collect();
     let row = &text[text.find("\"id\": 1,").unwrap()..];
     let at = |k: &str| row.find(&format!("\"{k}\":")).unwrap();
-    for w in ["location", "bold", "italic", "indent", "color", "note"].windows(2) {
+    for w in ["location", "bold", "italic", "indent", "color", "notes"].windows(2) {
         assert!(at(w[0]) < at(w[1]), "{} before {}", w[0], w[1]);
     }
     assert_eq!(keys.len(), 8);
@@ -275,7 +283,8 @@ fn files_without_new_fields_read_with_defaults() {
         .flat_map(|a| &a.details)
     {
         assert!(!d.bold && !d.italic && d.indent == 0);
-        assert_eq!((&d.color, &d.note), (&None, &None));
+        assert_eq!(&d.color, &None);
+        assert!(d.notes.is_empty());
         assert_ne!(d.kind, RowKind::Separator);
     }
     assert_eq!(b.new_line_defaults, NewLineDefaults::default());
@@ -335,4 +344,111 @@ fn no_versions_writes_no_versions_field() {
     let id = save_version(&mut b, "v", "t", None);
     delete_version(&mut b, id).unwrap();
     assert_eq!(fwb_format::to_string(&b), text);
+}
+
+#[test]
+fn a_single_note_from_an_older_file_reads_as_one_undated_note() {
+    let text = r#"{"format": "film-wizard-budget", "version": 1, "budget": {
+      "title": "Old", "base_currency": "USD",
+      "topsheet": [{"kind": "category", "code": "1", "name": "C", "accounts": [
+        {"code": "1-1", "name": "A", "details": [
+          {"id": 1, "description": "Grip", "note": "Rate per UPM"},
+          {"id": 2, "description": "Best boy", "note": "Old one",
+           "notes": [{"id": 1, "created": "2026-10-09T14:30:00Z", "text": "New one"}]},
+          {"id": 3, "description": "Dolly"}
+        ]}
+      ]}]
+    }}"#;
+    let b = fwb_format::from_str(text).unwrap();
+    let rows: Vec<&Detail> = b
+        .categories()
+        .flat_map(|c| &c.accounts)
+        .flat_map(|a| &a.details)
+        .collect();
+    assert_eq!(rows[0].notes, vec![Note::plain(1, "Rate per UPM")]);
+    // Both: the old note first, with an id after the list's.
+    assert_eq!(rows[1].notes.len(), 2);
+    assert_eq!(rows[1].notes[0], Note::plain(2, "Old one"));
+    assert_eq!(rows[1].notes[1].text, "New one");
+    assert_eq!(rows[1].notes[1].created, "2026-10-09T14:30:00Z");
+    assert!(rows[2].notes.is_empty());
+    // Written back as the new field only, and stable from then on.
+    let out = fwb_format::to_string(&b);
+    assert!(!out.contains("\"note\":"), "{out}");
+    assert!(out.contains("\"notes\": ["));
+    assert_eq!(fwb_format::from_str(&out).unwrap(), b);
+    // A line block's row reads the old field the same way.
+    let block = r#"{"format": "film-wizard-budget", "version": 1, "budget": {
+      "title": "Old", "base_currency": "USD",
+      "line_presets": [{"name": "B", "rows": [{"description": "x", "note": "kept"}]}]
+    }}"#;
+    let b = fwb_format::from_str(block).unwrap();
+    assert_eq!(
+        b.line_presets[0].rows[0].notes,
+        vec![Note::plain(1, "kept")]
+    );
+}
+
+#[test]
+fn notes_on_accounts_and_categories_short_codes_and_order_round_trip() {
+    let mut b = rich();
+    b.fringes.values_mut().next().unwrap().short_code = Some("FICA".into());
+    let note = Note {
+        id: 4,
+        text: "Ask the studio".into(),
+        created: "2026-10-09T10:00:00Z".into(),
+        edited: None,
+        author: None,
+        done: false,
+    };
+    for c in b.categories_mut() {
+        c.notes = vec![note.clone()];
+        for a in &mut c.accounts {
+            a.notes = vec![Note {
+                done: true,
+                ..note.clone()
+            }];
+        }
+    }
+    let names = fwb_core::order::names(&b, SetupKind::Fringe);
+    if names.len() > 1 {
+        let reversed: Vec<String> = names.iter().rev().cloned().collect();
+        fwb_core::order::set_order(&mut b, SetupKind::Fringe, &reversed);
+        assert!(!b.setup_order.is_empty());
+    }
+    let text = round_trip(&b);
+    let v: Value = serde_json::from_str(&text).unwrap();
+    let cat = &v["budget"]["topsheet"][0];
+    assert_eq!(
+        cat["notes"],
+        serde_json::json!([{"id": 4, "created": "2026-10-09T10:00:00Z", "text": "Ask the studio"}])
+    );
+    assert_eq!(cat["accounts"][0]["notes"][0]["done"], true);
+    assert!(text.contains("\"short_code\": \"FICA\""));
+    // A production total has no notes.
+    let bad = text.replacen(
+        "\"kind\": \"production_total\",",
+        "\"kind\": \"production_total\", \"notes\": [],",
+        1,
+    );
+    if bad != text {
+        assert!(fwb_format::from_str(&bad).is_err());
+    }
+}
+
+#[test]
+fn a_setup_order_in_byte_order_or_naming_nothing_is_left_out() {
+    let mut b = rich();
+    let names = fwb_core::order::names(&b, SetupKind::Fringe);
+    b.setup_order.fringes = names.clone();
+    b.setup_order.sets = vec!["no such set".into()];
+    let text = fwb_format::to_string(&b);
+    assert!(!text.contains("setup_order"), "{text}");
+    // A version's budget may not have one.
+    let doc = r#"{"format": "film-wizard-budget", "version": 1, "budget": {
+      "title": "T", "base_currency": "USD",
+      "versions": [{"id": 1, "name": "v", "created": "", "budget": {
+        "title": "T", "base_currency": "USD", "setup_order": {"sets": ["a"]}}}]
+    }}"#;
+    assert!(fwb_format::from_str(doc).is_err());
 }

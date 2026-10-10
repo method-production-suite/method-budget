@@ -705,3 +705,235 @@ Roadmap 1.10 and 1.18 (decision 7), with the calls they needed:
 - **Not yet**: dragging rows by the # column (the grid draws only rows near the viewport
   on long accounts, so a drag would need its own auto-scroll and drop marks), and moving
   lines between accounts other than by cut and paste.
+
+## 33. The rest of the report and compare items (2026-10-09)
+
+Roadmap 2.3 to 2.7, after an audit of what decisions 27 and 28 already built:
+
+- **Additive preset fields only** (FORMAT.md changelog): sections `chart`, `units`, `sets`,
+  `locations`, `currencies`; `vertical_rules`, `collapse_details`, `topsheet_fringes`,
+  `topsheet_pages`; a band's `first_page_only`; slot kinds `date`, `time` and `global`.
+  Each is left out at its default, so earlier presets and the golden file are unchanged.
+- **A slot still shows one thing.** The reference lets text and fields mix in one zone;
+  ours keeps one field per slot (decision 28) and adds separate date and time fields and a
+  global's value. Mixed text would need a small template language in the file; not worth
+  it until someone asks.
+- **A global in a header follows a rename** of that global (`fwb_core::rename`, counted
+  among its references), and a preset imported from another budget brings the globals its
+  bands show along with it, renamed with them.
+- **The topsheet's Page column is filled after the pages are dealt.** Its cells have a
+  fixed width and are measured empty, so writing the numbers in moves nothing and one
+  layout pass is enough. The number is the page with the category's heading on the
+  detail level; blank when the detail level doesn't print the category.
+- **One line per account** prints the account's code, name and total (original and
+  variance with a baseline) under each category's heading, with the category's totals.
+  The detail columns drop to #, description, total and the baseline's two, since there
+  are no line figures to show, and the categories run on instead of each starting a page,
+  which is the point of a short version. Line notes don't print in it (the notes section
+  still lists them).
+- **First page only** gives the later pages the band's room: the paginator works with the
+  first page's room and the later pages' room separately.
+- **Sets and locations totals** are the engine's, which count only lines in the budget
+  total (unlike groups' "every tagged line"); the section says so.
+- **Charges and credits per item in compare** are matched by name, trimmed and ignoring
+  case, like production totals: a charge only some budgets have shows `none` in the others
+  and `not in ...`, so differently named items list per budget. The totals lines stay.
+- **Page navigation** in the preview: first, previous, next, last and a page number to
+  type; the number follows scrolling. The preview pane is now positioned, so a page's
+  offset is measured from it (the Go to section list relied on that too).
+- **Not yet**: mixed text and fields in a slot, the budget's created and modified dates
+  (the file keeps none), one header design shared by several presets, charges and credits
+  as their own report sections, the reference's point sizes and "page break between
+  sections" switch (every section still starts a page).
+
+## 34. Globals' display info and display settings as built (2026-10-09)
+
+Roadmap 2.10, 2.18 and 2.19. Everything here is display only: the engine stays exact
+(entries 1 and 2) and nothing changes a stored value or a total (Rust tests check the
+report is identical after each new command).
+
+- **Cells show values.** A formula cell shows its value (sent per row of the account on
+  screen as `values`, evaluated in Rust from the report's globals, never in JavaScript),
+  in the formula color with the formula on hover, in the formula bar and while editing.
+  This is a change: formula cells used to show the formula. Globals set to **show by
+  name** keep their cells showing the formula. **View > Show or Hide Formulas in
+  Selection** (Option+Cmd+F, on by default as in the reference) shows formulas in every
+  cell of a selected range; a single cursor cell keeps its value (the formula bar shows
+  it). Copy, paste and fill down always use the formula as typed.
+- **Global info** (`global_info` in the file, content, so versions carry it): description,
+  unit (from the units table), decimals 0 to 8, show by name, folder. A separate map rather
+  than changing `globals` from formulas to objects, so every reader of `globals` (the
+  engine, find, reports, quick entry) is untouched. Renaming or deleting a global moves or
+  drops its entry; renaming a unit renames it on globals, and a global's unit counts as a
+  use of that unit name (so a rename can't merge two names). The writer leaves out entries
+  for names that aren't globals and the reader ignores them. Folders are a field only: the
+  Globals list doesn't group by folder yet (the custom order work may want to).
+- **Which settings live where.** In the budget (`display`, tools not content, like presets:
+  versions don't carry it and a restore keeps the current one): rate decimals with a cutoff
+  band, whether a rate's global decimals win, the topsheet's summary rows and net total,
+  because they describe how this budget reads (the reference keeps them per budget). Per
+  user, in local storage: totals with or without cents (the reference has it as a system
+  preference), hiding zero accounts, grid zoom and the formula view, because they are how
+  one person likes to look at any budget, and toggling them shouldn't dirty the file or
+  add undo steps.
+- **Rounding for display** is half away from zero, padded with zeros, done on the decimal
+  strings with BigInt (no floats). Rates: a size below the cutoff uses the below setting,
+  at or above it (or every rate with no cutoff) the above setting, "as typed" when unset;
+  a rate formula's first global with its own decimals wins unless switched off. Amount, X
+  and 4X formulas use their first global's decimals, else the value as calculated; plain
+  numbers stay as typed except rates.
+- **Hidden factors** mark only what can change a total: X or 4X other than blank or 1 (a
+  formula by its value; a failing one is already flagged as a problem) and a non-base
+  currency, when that column is hidden. The unit columns are labels in our engine (flat
+  fringes use the primary unit only), so a hidden unit never marks a line. The mark is a dot
+  in the # cell with the reason as its tooltip; reports don't draw it.
+- **Zoom** scales the grid's font, row heights and column widths (70% to 150%), not the CSS
+  `zoom` property, so the grid's measuring, windowing and pinned columns keep working.
+  Option+Cmd+= and Option+Cmd+minus because Cmd+= and Cmd+minus insert rows.
+- **Hiding zero accounts** keeps the row under the cursor, rows with problem cells, and rows
+  whose baseline original wasn't zero.
+- **Not yet**: reports and exports don't follow the screen settings (the report setup has
+  its own options); a global's unit doesn't fill in a line's unit; no grouping by folder.
+
+## 35. Dated notes, in-use counts, short codes and custom order as built (2026-10-09)
+
+Roadmap 2.8, 2.9, 2.11 and 2.12 (behavior notes 06, 09, 12, 14, 16, 19, 24; the notes
+model is the roadmap's call 11: several dated notes, no replies), with the calls they
+needed:
+
+- **Notes are a list on lines, accounts and categories.** `Detail::note` became
+  `notes: Vec<Note>`, and `Account` and `Category` got `notes` too. A note has an id
+  (unique within its list; a new one gets one past the highest there), its text, a
+  `created` time, an optional `edited` time and `author`, and `done` (ticked off in the
+  review list). Times are ISO 8601 text from the page, as for versions: Rust never reads
+  the clock for them. The author is free text from a local setting in the Notes tab (no
+  accounts, decision 14); it lives in the window's local storage, so the popped-out tools
+  window may not see a name typed in the main window. No replies or threads (low value for
+  one person's local file).
+- **The file keeps version 1.** The writer writes `notes` (left out when empty) and never
+  `note`; the reader still takes a row's old `note` string (detail rows and line block
+  rows) as one undated note at the front, with an id after the list's highest. The
+  alternative, keeping `note` for one note and adding `notes` for more, would have left two
+  places for the same thing forever. The golden file has no notes and is unchanged.
+- **Owners are addressed by identity, not position**: a row by id, an account by number,
+  a category by code (both unique in a budget), so a command sent from the tools window
+  lands on the right item even if the other window moved things. Four commands, each one
+  undo step: add, update (blank text deletes; the same text changes nothing), delete, done.
+- **Shift+Cmd+Space adds a note** to the line, account or category under the cursor (a
+  small dialog), at all three levels and in the right-click menus; editing and deleting are
+  the Notes tab's job, since there can be several. Find's Notes scope searches every note
+  on a line (not account or category notes); replacing that leaves a note empty removes
+  it. Templates drop every note; copied accounts and categories keep theirs; line blocks
+  keep their rows' notes when Notes is ticked.
+- **Reports print every note**, each with its date and author: a line's notes together
+  under its footnote number (cut at 700 characters there), and the notes list with
+  category and account notes before their lines'. `skip_done_notes` on a report preset
+  leaves reviewed ones out of both.
+- **In-use counts come from their own command** (`setup_usage`), fetched by the panel a
+  moment after the budget changes and only while a setup list is drawn, not sent with
+  every view (decision 18). One pass over the rows per table; a global's uses are the
+  name tokens in each formula, as the formula reader splits them. Lines count once per
+  row; "other" counts setup that names the item (globals and fringe rates for a global,
+  flat fringes and globals' units for a unit, credits and charges for a group, credits for
+  a fringe, charges and the totals currency for a currency). Used means either. Dollars
+  come from the report: a fringe's own fringe dollars; a group's, set's or location's lines
+  with their fringes (a group out of the total counted as if it were in); a currency's
+  lines in the base currency; none for globals and units.
+- **Deleting something in use takes it off the lines**, which is what deleting a fringe,
+  group, set or location already did; the question now says how many lines and the button
+  says so. A currency in use used to be refused: now `clearLines` moves its lines to the
+  base currency first (charges and the totals currency still refuse). A unit used to stay
+  on lines as plain text: with lines using it, the delete now blanks those unit cells, so
+  nothing names a unit that isn't there. A global still freezes its value into formulas.
+- **Short codes are display only.** `short_code` on fringes and groups, unique within its
+  kind ignoring case, never another item's name, no commas, up to 16 characters (checked
+  by the commands, not the reader). The grid's Fringes and Groups cells show codes where
+  items have them, with the names in the tooltip, while the cell's edit and copy value
+  stays the names, so editing, pasting and every reference still use names, and a rename
+  never touches a code. The type-ahead matches codes and puts the name in; a code typed
+  without it is not read as the item (it would be an unknown fringe, flagged).
+- **The order is an explicit list per table, omitted when alphabetical.** The tables stay
+  `BTreeMap`s sorted by name; `Budget::setup_order` keeps names first to last. Shown
+  order: listed names that exist, then the rest in byte order, so a new item lands last
+  and a stale name (deleted elsewhere, or in a restored version) is harmless. The writer
+  writes each table's full shown order, or nothing when that is byte order, so the file
+  never holds stale names. Deletes drop the name and renames rewrite it (not counted as a
+  place). Layout, not content, like display settings: versions don't carry it and
+  restoring one keeps the current order. The setup lists, the Apply lists, the type-ahead
+  (which keeps a hand-made order instead of sorting matches alphabetically) and printed
+  setup tables follow it. Dragging uses pointer events and a handle (as the tab strips
+  do); Option+Shift+Up and Down move the focused item, quick presses joining one undo
+  step (as moving rows does). The Name head's sort (A to Z, Z to A, back to the budget's
+  order) is a view and never changes the file. No moving while sorted or filtered, so
+  hidden items never move. Folders (behavior note 16) are not built.
+- **Not yet**: account and category notes in Find; a note's mark is not clickable (the
+  Notes tab follows the cursor instead); the author name isn't shared between the two
+  windows; reordering the base currency.
+
+## 36. Spreadsheet import with a column mapping as built (2026-10-09)
+
+Roadmap 2.2 (inventory section 24), built ahead of 1.16 as the generic part that 1.16 will
+reuse: nothing here guesses the reference product's export layouts (that waits on Sam's
+export test).
+
+- **Our own readers, no crates.** An .xlsx is a ZIP of XML, so `fwb_format::import` reads
+  it by hand: a DEFLATE decoder (RFC 1951: stored, fixed and dynamic Huffman blocks, after
+  the structure of Mark Adler's public-domain reference decoder), a ZIP reader working
+  from the central directory, a small XML tokenizer, and the SpreadsheetML parts found
+  through the package's relationships; plus RFC 4180 CSV and tab-delimited text with
+  delimiter sniffing and the usual encodings. The decoder is checked against zlib's own
+  streams (Python's standard library, committed as fixtures with the script that made
+  them), against a test-only encoder that builds random valid streams of every block
+  type, and on every truncation, bit flips and noise.
+- **Every file is hostile until read.** Limits: 50 MB per file, 200 MB decompressed per
+  workbook, an entry decoded into at most its declared size and refused unread when that
+  is over 1,000 times its compressed size (beyond 1 MB), CRCs checked, 10,000 entries,
+  100,000 rows, 256 columns, 2 million cells a sheet, 32,767 characters a cell, 128 MB of
+  cell text a workbook (shared strings are copied into cells, so a short file could
+  otherwise ask for gigabytes), XML nesting 128 deep. No DTDs and
+  no entities beyond the predefined five, so nothing is ever expanded or fetched.
+  Encrypted entries, ZIP64 and split archives are refused (no budget sheet needs them).
+- **Values, not formulas or styles.** A workbook's cached values are what its sheet shows;
+  reading Excel formulas would mean evaluating Excel. Number cells keep the digits the file
+  wrote and are rounded once to the engine's nine places (`0.30000000000000004` is 0.3);
+  dates come in as serial numbers. A text cell that is a formula our engine can work out
+  (its globals exist) is kept as a formula; anything else that isn't a number is left blank
+  and listed, never guessed.
+- **One column per field, guessed from titles.** Each field has a list of titles that mean
+  it (exact matches beat titles that contain one; each column is used once), so our own
+  export maps itself and a department sheet's `Acct #`, `Qty`, `Unit Price` and `Ext.
+  Total` come out right. We chose fields to columns (a select per field) over a select per
+  column because the preview shows lines as they will import, not the raw sheet. The
+  fields are where a line goes (category, account), what it holds (description, amount,
+  unit, X, rate, currency, 4X, fringes, groups, set, location, note) and the line total to
+  check, plus row kind and fringe range, which an exact round trip of our own export needs
+  (adjustment rows and fringe range cutoffs change totals); the export's
+  Detail sheet gained a Fringe Range column, added last so positional importers keep
+  their columns.
+- **Rows as budget sheets write them.** Account numbers go through the budget's account
+  numbering and match anywhere in the budget; one that doesn't fit is refused, never cut
+  short (cutting `110005` to `11-00` could merge two accounts). An empty account cell takes
+  the account above it, and a row with only an account (or an account and a description
+  over rows that leave the account blank) is a heading that names it. New accounts and
+  categories (when asked for) are placed after the last one numbered below them. Lines go
+  at the end of their accounts with new ids, fringe ranges new in the account (as pasting
+  does, decision 23). Missing names are added (fringes at 0%, currencies at a rate of 1,
+  said in the preview) or left off the line and listed; a fringe, group or currency the
+  budget lacks can't stay on a line, since the engine would refuse it.
+- **Defaults are cautious.** Adding accounts and adding setup items both start off, so a
+  typo in an account number shows as a skipped row instead of a new account; a saved
+  mapping keeps both choices.
+- **Reconciliation is the real calculation.** The preview applies the import to a copy and
+  recalculates, so each line's total is what the grid will show (adjustments see the lines
+  above them, groups suppress, currencies convert), compared with the sheet's line total
+  in cents; a subtotal row compares its running total.
+- **A new tab is New From Template of this budget plus the import.** It keeps the chart,
+  setup and settings that make the imported lines' totals mean something (fringes,
+  globals, currencies), and the import is its first undo step, so it starts unsaved. The
+  alternative, an empty chart built from the sheet alone, loses every fringe rate.
+- **Presets stay with the user.** Saved mappings live in the web view's storage (per user,
+  like the other display choices), matched by the header row's normalized titles; they
+  never go into a budget file, since the same sheet layout feeds many budgets.
+- **Not yet**: reading formulas or number formats, more than one column per field (such
+  as two description columns joined), a library of preset mappings to share, and the
+  reference product's own layouts (1.16).

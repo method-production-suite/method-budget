@@ -116,6 +116,8 @@ pub const FILE: &[Entry] = &[
     plain("file.save_as_template", "Save as Template…"),
     SEP,
     plain("file.import_setup", "Import Setup From…"),
+    // Detail lines from a spreadsheet, with a column mapping (src/sheet_import.rs).
+    plain("file.import_spreadsheet", "Import Spreadsheet…"),
     SEP,
     // Named versions inside the budget, and comparing budgets (src/versions.rs,
     // src/compare.rs).
@@ -160,7 +162,7 @@ pub const EDIT: &[Entry] = &[
     item("edit.move_up", "Move Up", "alt+up"),
     item("edit.move_down", "Move Down", "alt+down"),
     SEP,
-    item("edit.note", "Note…", "mod+shift+space"),
+    item("edit.note", "Add Note…", "mod+shift+space"),
     item("edit.make_range", "Make Fringe Range", "mod+r"),
     item("edit.remove_range", "Remove Fringe Range", "mod+shift+r"),
     SEP,
@@ -218,7 +220,24 @@ pub const GO: &[Entry] = &[
     item("go.prev_account", "Previous Account", "mod+left"),
 ];
 
-pub const VIEW: &[Entry] = &[Entry::ToolsPanel, Entry::SetupTabs];
+pub const VIEW: &[Entry] = &[
+    Entry::ToolsPanel,
+    Entry::SetupTabs,
+    SEP,
+    // Per-user display choices (ui/js/display.js). Cmd+= inserts a subtotal,
+    // so zooming is Option+Cmd+= and Option+Cmd+-.
+    item(
+        "view.formulas",
+        "Show or Hide Formulas in Selection",
+        "mod+alt+f",
+    ),
+    plain("view.hide_zero", "Show or Hide Zero Accounts"),
+    plain("view.totals_cents", "Totals With or Without Cents"),
+    SEP,
+    item("view.zoom_in", "Zoom In", "mod+alt+="),
+    item("view.zoom_out", "Zoom Out", "mod+alt+-"),
+    item("view.zoom_reset", "Actual Size", "mod+alt+0"),
+];
 
 /// View > Tools Panel: show or hide it wherever it is, and its three places
 /// (docked at the right, docked at the bottom, its own window). The panel
@@ -590,6 +609,9 @@ mod tests {
         assert_eq!(accelerator("shift+f3"), "Shift+F3");
         assert_eq!(accelerator("mod+shift+f"), "CmdOrCtrl+Shift+F");
         assert_eq!(accelerator("alt+down"), "Alt+Down");
+        assert_eq!(accelerator("mod+alt+="), "CmdOrCtrl+Alt+Equal");
+        assert_eq!(accelerator("mod+alt+-"), "CmdOrCtrl+Alt+Minus");
+        assert_eq!(accelerator("mod+alt+0"), "CmdOrCtrl+Alt+0");
     }
 
     #[test]

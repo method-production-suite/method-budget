@@ -2,7 +2,13 @@
 // full) into grid columns and rows for each of the three levels. Pure
 // functions: no DOM, no commands.
 
-import { money, decimal, names } from './format.js';
+import { decimal } from './format.js';
+import { tagCellText, notesTitle } from './order.js';
+import { totalText, numberCell, budgetDisplay, hiddenFactors } from './display.js';
+
+// Totals with the user's choice of decimals (display.js; 2 unless they chose
+// whole amounts). Never changes a value.
+const money = totalText;
 
 const NA = { text: '', placeholder: 'n/a', cls: 'na' };
 
@@ -108,6 +114,16 @@ function staticRow(key, cls, label, total, extra = {}) {
 
 const PROBLEM = 'Some cells inside have problems; totals count them as blank.';
 
+/**
+ * Whether a category or account row may be hidden as zero-balance (View >
+ * Show or Hide Zero Accounts): it totals 0, has no problem cells, and wasn't
+ * different when the baseline was locked.
+ */
+function isZero(total, bad, change) {
+  if (total !== 0 || bad) return false;
+  return !(change && typeof change.original === 'number' && change.original !== 0);
+}
+
 // ---------------------------------------------------------------------------
 // Topsheet
 
@@ -164,18 +180,24 @@ export function topsheetRows(ix) {
       activatable: true,
       cells: {
         code: { text: row.code, edit: row.code },
-        name: { text: row.name, edit: row.name },
+        name: noted({ text: row.name, edit: row.name }, row.notes),
         total: c && c.rep ? moneyCell(c.rep.total, bad ? { error: PROBLEM } : {}) : NA,
         ...(ix.variance ? varianceCells(ix.variance.categories[row.code]) : {}),
       },
+      zero: Boolean(c && c.rep) && isZero(c.rep.total, bad, ix.variance && ix.variance.categories[row.code]),
     });
   }
   if (!r) return rows;
 
-  rows.push(staticRow('s-atl', 'summary first', 'Total above-the-line', r.total_atl));
-  rows.push(staticRow('s-btl', 'summary', 'Total below-the-line', r.total_btl));
-  rows.push(staticRow('s-atlbtl', 'summary', 'Total above and below-the-line', r.atl_btl));
-  if (r.budget_fringes) rows.push(staticRow('s-fr', 'summary', 'Total fringes', r.budget_fringes));
+  // The budget's display settings can leave out the summary rows and the
+  // net total (Budget > Settings). Display only.
+  const disp = budgetDisplay(ix.b);
+  if (disp.summary_rows) {
+    rows.push(staticRow('s-atl', 'summary first', 'Total above-the-line', r.total_atl));
+    rows.push(staticRow('s-btl', 'summary', 'Total below-the-line', r.total_btl));
+    rows.push(staticRow('s-atlbtl', 'summary', 'Total above and below-the-line', r.atl_btl));
+  }
+  if (r.budget_fringes) rows.push(staticRow('s-fr', disp.summary_rows ? 'summary' : 'summary first', 'Total fringes', r.budget_fringes));
   r.charges.forEach((c, i) => {
     rows.push(staticRow(`s-ch${i}`, 'summary charge', c.name, c.amount));
   });
@@ -183,8 +205,8 @@ export function topsheetRows(ix) {
   r.credits.forEach((c, i) => {
     rows.push(staticRow(`s-cr${i}`, 'summary credit', `Less ${c.name}`, -c.amount));
   });
-  if (r.credits.length) rows.push(staticRow('s-net', 'summary grand', 'Net total', r.net_total, ix.variance ? varianceCells(ix.variance.net_total) : {}));
-  if (r.display) {
+  if (r.credits.length && disp.net_total) rows.push(staticRow('s-net', 'summary grand', 'Net total', r.net_total, ix.variance ? varianceCells(ix.variance.net_total) : {}));
+  if (r.display && disp.net_total) {
     const cur = r.totals_currency;
     rows.push(staticRow('s-disp', 'summary', `Net total in ${cur}`, r.display.net_total));
   }
@@ -241,11 +263,12 @@ export function accountRows(ix, entry) {
       activatable: true,
       cells: {
         code: { text: a.code, edit: a.code },
-        name: { text: a.name, edit: a.name },
+        name: noted({ text: a.name, edit: a.name }, a.notes),
         fringe_total: ar ? { text: ar.fringe_total ? money(ar.fringe_total) : '', cls: frCls } : NA,
         total: ar ? moneyCell(ar.total, bad ? { error: PROBLEM } : {}) : NA,
         ...(ix.variance ? varianceCells(ix.variance.accounts[a.code]) : {}),
       },
+      zero: Boolean(ar) && isZero(ar.total, bad, ix.variance && ix.variance.accounts[a.code]),
     };
   });
   // Posting by category: the category's fringe account, read-only, before the total.
@@ -332,14 +355,30 @@ export function detailColumns(choices, ctx = {}) {
   return DETAIL_COLUMNS.filter((c) => columnShown(c, choices, ctx));
 }
 
-const PLAIN_NUMBER = /^[+-]?(\d+\.?\d*|\.\d+)$/;
+/**
+ * A formula cell: plain numbers as typed (rates with the budget's rate
+ * decimals), formulas by their value unless a global in them is shown by
+ * name (display.js numberCell). `ctx` has the field, the row's evaluated
+ * values and the budget's globals, global info and display settings.
+ */
+function formulaCell(f, issue, ctx = {}) {
+  return numberCell(f, { ...ctx, value: ctx.values ? ctx.values[ctx.field] : undefined, issue });
+}
 
-/** A formula cell: plain numbers shown formatted, formulas as typed. */
-function formulaCell(f, issue) {
-  const s = f || '';
-  const t = s.trim();
-  const cell = { edit: s, text: PLAIN_NUMBER.test(t) ? decimal(t.replace(/^\+/, '')) : s };
-  if (t && !PLAIN_NUMBER.test(t)) cell.cls = 'formula';
+/** A cell with a note mark and the notes as its tooltip, when there are notes. */
+function noted(cell, notes) {
+  const title = notesTitle(notes);
+  return title ? { ...cell, cls: cell.cls ? `${cell.cls} has-note` : 'has-note', title } : cell;
+}
+
+/**
+ * A line's fringes or groups: short codes shown where the items have them
+ * (full names in the tooltip), names when editing or copying.
+ */
+function tagCell(b, table, list, issue) {
+  const t = tagCellText(b, table, list);
+  const cell = { text: t.text, edit: t.edit };
+  if (t.title) cell.title = t.title;
   if (issue) cell.error = issue;
   return cell;
 }
@@ -442,10 +481,13 @@ export function fringePercent(fringeCents, totalCents) {
 
 /**
  * The rows of account `ai` in category `entry`. `full` is the view's account
- * on screen ({ details, rows }): the account's rows in file-format JSON and
- * their totals (rows is null without totals).
+ * on screen ({ details, rows, values }): the account's rows in file-format
+ * JSON, their totals (rows is null without totals) and their formula cells'
+ * values. `shown` (a Set of detail column keys on screen) turns on the
+ * hidden-factor marker: a line whose hidden X, 4X or currency changes its
+ * total gets a mark in its # cell, with what it is on hover (never printed).
  */
-export function detailRows(ix, entry, ai, full) {
+export function detailRows(ix, entry, ai, full, shown = null) {
   const acct = (entry.cat.accounts || [])[ai];
   if (!acct) return [];
   const rep = entry.rep ? entry.rep.accounts[ai] : null;
@@ -454,6 +496,8 @@ export function detailRows(ix, entry, ai, full) {
   const ar = rep && Array.isArray(rowTotals) ? { ...rep, rows: rowTotals } : null;
   const base = ix.b.base_currency;
   const groups = ix.b.groups || {};
+  const values = full && Array.isArray(full.values) ? full.values : [];
+  const numCtx = { globals: ix.b.globals || {}, info: ix.b.global_info || {}, prefs: budgetDisplay(ix.b) };
 
   // The rate an adjustment row applies to: lines above it, back to the previous
   // counted adjustment (subtotal rows don't reset it), as the engine does.
@@ -488,15 +532,22 @@ export function detailRows(ix, entry, ai, full) {
       cls: rowClasses(d, rr, ranges[i]).join(' '),
       color: rowColor(d, groups),
     };
-    const note = typeof d.note === 'string' && d.note.trim() ? d.note : '';
+    const note = notesTitle(d.notes);
     const num = { text: String(i + 1), cls: 'muted' };
     if (ranges[i]) num.title = `Fringe range ${d.fringe_range}: percent fringe cutoffs apply to these lines together`;
+    const hidden = hiddenFactors(d, values[i], shown, base);
+    if (hidden.length) {
+      num.cls = 'muted hidden-factor';
+      const what = `A hidden column changes this line's total: ${hidden.join(', ')}`;
+      num.title = num.title ? `${what}\n${num.title}` : what;
+    }
+    const cellCtx = (field) => ({ ...numCtx, field, values: values[i] });
 
     // A separator is a drawn rule: nothing to edit or total, but it can be
     // selected and deleted. Editing moves past it (editSkip).
     if (kind === 'separator') {
       const description = { text: '', cls: 'rule' };
-      if (note) Object.assign(description, { cls: 'rule has-note', title: `Note: ${note}` });
+      if (note) Object.assign(description, { cls: 'rule has-note', title: note });
       return { ...style, editSkip: true, cells: { num, description } };
     }
 
@@ -506,25 +557,25 @@ export function detailRows(ix, entry, ai, full) {
     };
     if (note) {
       description.cls = 'has-note';
-      description.title = `Note: ${note}`;
+      description.title = note;
     }
     const cells = { num, description };
     if (!sub) {
-      cells.amount = formulaCell(d.amount, issues.amount);
+      cells.amount = formulaCell(d.amount, issues.amount, cellCtx('amount'));
       cells.unit = textCell(d.unit);
-      cells.x = formulaCell(d.x, issues.x);
+      cells.x = formulaCell(d.x, issues.x, cellCtx('x'));
       cells.unit2 = textCell(d.unit2);
-      cells.x4 = formulaCell(d.x4, issues.x4);
+      cells.x4 = formulaCell(d.x4, issues.x4, cellCtx('x4'));
       cells.unit4 = textCell(d.unit4);
-      cells.groups = textCell(names(d.groups), issues.groups);
+      cells.groups = tagCell(ix.b, 'groups', d.groups, issues.groups);
       cells.set = textCell(d.set);
       cells.location = textCell(d.location);
     }
     if (line) {
-      cells.rate = formulaCell(d.rate, issues.rate);
+      cells.rate = formulaCell(d.rate, issues.rate, cellCtx('rate'));
       cells.unit3 = textCell(d.unit3);
       cells.currency = textCell(d.currency, issues.currency);
-      cells.fringes = textCell(names(d.fringes), issues.fringes);
+      cells.fringes = tagCell(ix.b, 'fringes', d.fringes, issues.fringes);
     } else if (kind === 'adjustment') {
       cells.rate = adjBase.has(d.id)
         ? { text: money(adjBase.get(d.id)), cls: 'auto', title: 'Sum of the lines above, back to the previous adjustment' }

@@ -310,6 +310,7 @@ mod tests {
                     e.groups.insert(
                         "HOLD".into(),
                         Group {
+                            short_code: None,
                             description: String::new(),
                             in_budget_total: false,
                             color: None,

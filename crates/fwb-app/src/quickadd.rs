@@ -416,6 +416,7 @@ mod tests {
             b.groups.insert(
                 "Shoot".into(),
                 fwb_core::Group {
+                    short_code: None,
                     description: String::new(),
                     in_budget_total: true,
                     color: None,

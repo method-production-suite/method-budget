@@ -94,7 +94,7 @@ export function renameItem({ anchor, kind, name, ctx }) {
  * `edit` is given), Rename and Delete (when `remove` is given). `at` is the
  * mouse event or a point.
  */
-export function itemMenu(at, { kind, name, anchor, ctx, edit = null, remove = null, onRenamed = null }) {
+export function itemMenu(at, { kind, name, anchor, ctx, edit = null, remove = null, onRenamed = null, extra = [] }) {
   const info = RENAME_KINDS[kind];
   if (!info) return;
   const items = [];
@@ -107,6 +107,8 @@ export function itemMenu(at, { kind, name, anchor, ctx, edit = null, remove = nu
         if (to !== null && onRenamed) onRenamed(to);
       }),
   });
+  // More of the item's own actions (a fringe's or group's short code).
+  for (const x of extra) items.push(x);
   if (remove) items.push({ separator: true }, { label: 'Delete…', run: remove });
   const point = at && typeof at.clientX === 'number' ? { x: at.clientX, y: at.clientY } : at;
   openContextMenu(point, { label: `${info.what} ${name}`, items, returnFocus: () => anchor && anchor.focus && anchor.focus() });

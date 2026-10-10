@@ -28,6 +28,7 @@ import { el } from './dom.js';
 import { money, decimal } from './format.js';
 import { rowColor, fringePercent } from './levels.js';
 import { setRules } from './sheet.js';
+import { orderedNames } from './order.js';
 import { invoke, connected } from './api.js';
 
 // ---------------------------------------------------------------------------
@@ -43,6 +44,11 @@ export const SECTIONS = [
   { key: 'groups', label: 'Groups with totals' },
   { key: 'notes', label: 'Notes list' },
   { key: 'info', label: 'Budget information' },
+  { key: 'chart', label: 'Chart of accounts' },
+  { key: 'units', label: 'Units' },
+  { key: 'sets', label: 'Sets with totals' },
+  { key: 'locations', label: 'Locations with totals' },
+  { key: 'currencies', label: 'Currencies' },
 ];
 const SECTION_KEYS = new Set(SECTIONS.map((s) => s.key));
 
@@ -78,14 +84,17 @@ const COLUMN = new Map(REPORT_COLUMNS.map((c) => [c.key, c]));
  */
 export const STANDARD_COLUMNS = ['amount', 'unit', 'x', 'rate', 'currency', 'x4', 'fringes', 'original', 'variance'];
 
-/** What a header or footer slot can show (`info` and `text` carry a value). */
+/** What a header or footer slot can show (`info`, `global` and `text` carry a value). */
 export const BAND_FIELDS = [
   { kind: 'title', label: 'Budget title' },
   { kind: 'section', label: 'Section' },
-  { kind: 'printed', label: 'Date printed' },
+  { kind: 'printed', label: 'Date and time printed' },
+  { kind: 'date', label: 'Date printed' },
+  { kind: 'time', label: 'Time printed' },
   { kind: 'file', label: 'File name' },
   { kind: 'page', label: 'Page X of Y' },
   { kind: 'info', label: 'Budget info field' },
+  { kind: 'global', label: 'Global' },
   { kind: 'text', label: 'Text' },
 ];
 const BAND_KINDS = new Set(BAND_FIELDS.map((f) => f.kind));
@@ -113,9 +122,11 @@ function band(b) {
     const f = b[slot];
     if (!f || typeof f !== 'object' || !BAND_KINDS.has(f.kind)) continue;
     if (f.kind === 'info') out[slot] = { kind: 'info', label: String(f.label || '') };
+    else if (f.kind === 'global') out[slot] = { kind: 'global', name: String(f.name || '') };
     else if (f.kind === 'text') out[slot] = { kind: 'text', text: String(f.text || '') };
     else out[slot] = { kind: f.kind };
   }
+  if (b.first_page_only === true) out.first_page_only = true;
   return out;
 }
 
@@ -134,12 +145,17 @@ export function normalizeSpec(spec) {
     skip_zero_accounts: s.skip_zero_accounts === true,
     skip_suppressed_lines: s.skip_suppressed_lines === true,
     skip_notes: s.skip_notes === true,
+    skip_done_notes: s.skip_done_notes === true,
     only_groups: strings(s.only_groups),
     columns: Array.isArray(s.columns) ? strings(s.columns).filter((k) => COLUMN.has(k)) : null,
     landscape: s.landscape === true,
     font_size: FONT_SIZES.has(s.font_size) ? s.font_size : 'medium',
     shading: s.shading === true,
     group_colors: s.group_colors === true,
+    vertical_rules: s.vertical_rules === true,
+    collapse_details: s.collapse_details === true,
+    topsheet_fringes: s.topsheet_fringes === true,
+    topsheet_pages: s.topsheet_pages === true,
     header: band(s.header),
     footer: band(s.footer),
   };
@@ -154,13 +170,14 @@ export function compactSpec(spec) {
   const out = {};
   if (s.sections.length) out.sections = s.sections;
   for (const k of ['excluded_categories', 'excluded_accounts']) if (s[k].length) out[k] = [...s[k]].sort();
-  for (const k of ['skip_empty_accounts', 'skip_zero_accounts', 'skip_suppressed_lines', 'skip_notes']) if (s[k]) out[k] = true;
+  for (const k of ['skip_empty_accounts', 'skip_zero_accounts', 'skip_suppressed_lines', 'skip_notes', 'skip_done_notes']) if (s[k]) out[k] = true;
   if (s.only_groups.length) out.only_groups = [...s.only_groups].sort();
   if (s.columns) out.columns = s.columns;
   if (s.landscape) out.landscape = true;
   if (s.font_size !== 'medium') out.font_size = s.font_size;
   if (s.shading) out.shading = true;
   if (s.group_colors) out.group_colors = true;
+  for (const k of ['vertical_rules', 'collapse_details', 'topsheet_fringes', 'topsheet_pages']) if (s[k]) out[k] = true;
   if (s.header) out.header = s.header;
   if (s.footer) out.footer = s.footer;
   return out;
@@ -234,6 +251,22 @@ function printedAt(now) {
     });
   } catch {
     return now.toISOString().slice(0, 16).replace('T', ' ');
+  }
+}
+
+function printedDate(now) {
+  try {
+    return now.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  } catch {
+    return now.toISOString().slice(0, 10);
+  }
+}
+
+function printedTime(now) {
+  try {
+    return now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  } catch {
+    return now.toISOString().slice(11, 16);
   }
 }
 
@@ -362,12 +395,40 @@ function lineShown(ctx, d, rr) {
 }
 
 /**
+ * The notes on a line, account or category that print: not blank, and not
+ * ticked off as reviewed when the spec leaves those out.
+ */
+function printedNotes(ctx, notes) {
+  if (!Array.isArray(notes)) return [];
+  return notes.filter((n) => n && typeof n.text === 'string' && n.text.trim() && !(ctx.spec.skip_done_notes && n.done));
+}
+
+const NOTE_DATE = (() => {
+  try {
+    return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
+  } catch {
+    return null;
+  }
+})();
+
+/** "9 Oct 2026 · Sam · reviewed": when a note was written, by whom, and whether it is ticked off. */
+function noteMeta(n) {
+  const parts = [];
+  const d = n.created ? new Date(n.created) : null;
+  if (d && !Number.isNaN(d.getTime()) && NOTE_DATE) parts.push(NOTE_DATE.format(d));
+  else if (n.created) parts.push(String(n.created));
+  if (n.author) parts.push(String(n.author));
+  if (n.done) parts.push('reviewed');
+  return parts.join(' · ');
+}
+
+/**
  * Footnote numbers for the notes on printed lines, in budget order, so the
  * detail pages and the notes list agree whichever prints first.
  */
 function noteNumbers(ctx) {
   const out = new Map();
-  if (ctx.spec.skip_notes || !ctx.spec.sections.includes('detail')) return out;
+  if (ctx.spec.skip_notes || ctx.spec.collapse_details || !ctx.spec.sections.includes('detail')) return out;
   let n = 0;
   for (const it of ctx.items) {
     if (it.kind !== 'category') continue;
@@ -380,7 +441,7 @@ function noteNumbers(ctx) {
       });
       if (ctx.onlyGroups.size && shown === 0) continue;
       details.forEach((d, i) => {
-        if (d && typeof d.note === 'string' && d.note.trim() && lineShown(ctx, d, rows[i] || null)) {
+        if (d && printedNotes(ctx, d.notes).length && lineShown(ctx, d, rows[i] || null)) {
           n += 1;
           out.set(d.id, n);
         }
@@ -455,11 +516,31 @@ function topsheet(ctx) {
   const r = ctx.r;
   const base = ctx.baseline;
   const bc = baseCols(ctx);
-  const cols = ['c-code', 'c-name', 'c-money', ...bc.map(() => 'c-money')];
-  const head = el('tr', { class: 'rpt-cols' }, th('Acct #'), th('Description'), th('Total', 'num'), ...bc.map((k) => th(COLUMN.get(k).label, 'num')));
+  // Optional columns: the page each category's detail starts on, its fringes.
+  const pages = ctx.spec.topsheet_pages;
+  const fringes = ctx.spec.topsheet_fringes;
+  const cols = ['c-code', 'c-name', ...(pages ? ['c-page'] : []), ...(fringes ? ['c-money'] : []), 'c-money', ...bc.map(() => 'c-money')];
+  const head = el(
+    'tr',
+    { class: 'rpt-cols' },
+    th('Acct #'),
+    th('Description'),
+    pages ? th('Page', 'num') : null,
+    fringes ? th('Fringes', 'num') : null,
+    th('Total', 'num'),
+    ...bc.map((k) => th(COLUMN.get(k).label, 'num')),
+  );
   const rows = [];
-  const line = (cls, code, label, total, ch, keep = false) => {
-    const tr = el('tr', { class: cls }, td(code, 'code'), td(label, 'name'), td(m(total), 'num'), ...baseCells(ctx, bc, total, ch));
+  // extra: { page: category index whose detail page goes here, fringes: cents }
+  const line = (cls, code, label, total, ch, keep = false, extra = {}) => {
+    const tr = el('tr', { class: cls }, td(code, 'code'), td(label, 'name'));
+    if (pages) {
+      const cell = td('', 'num page');
+      if (extra.page !== undefined) ctx.pageCells.push({ ci: extra.page, cell });
+      tr.append(cell);
+    }
+    if (fringes) tr.append(td(extra.fringes ? money(extra.fringes) : '', 'num muted-fig'));
+    tr.append(td(m(total), 'num'), ...baseCells(ctx, bc, total, ch));
     rows.push(row(tr, keep));
   };
   const baseFor = (code) => (base && base.categories.get(code)) || null;
@@ -467,7 +548,7 @@ function topsheet(ctx) {
   for (const it of ctx.items) {
     if (it.kind === 'category') {
       catCodes[it.ci] = it.row.code;
-      line('cat', it.row.code || '', it.row.name || '', it.rep ? it.rep.total : null, baseFor(it.row.code));
+      line('cat', it.row.code || '', it.row.name || '', it.rep ? it.rep.total : null, baseFor(it.row.code), false, { page: it.ci, fringes: it.rep ? it.rep.fringe_total : 0 });
     } else {
       if (it.rep && it.rep.posted_fringes) line('posted', '', 'Fringes', it.rep.posted_fringes, null, true);
       // A level's original only when every category in it has one.
@@ -482,7 +563,12 @@ function topsheet(ctx) {
         }
         if (complete && !it.rep.posted_fringes) lvBase = { original: sum, variance: null };
       }
-      line('level', '', it.row.name || '', it.rep ? it.rep.total : null, lvBase);
+      // A level's fringes: what its categories' lines earned, wherever posted.
+      let lvFringes = 0;
+      if (fringes && it.rep && r && Array.isArray(r.categories)) {
+        for (let i = it.rep.start; i < it.rep.end; i++) lvFringes += (r.categories[i] && r.categories[i].fringe_total) || 0;
+      }
+      line('level', '', it.row.name || '', it.rep ? it.rep.total : null, lvBase, false, { fringes: lvFringes });
     }
   }
   // The summary stays together.
@@ -509,7 +595,7 @@ function topsheet(ctx) {
   }
   sum.forEach(([cls, label, total, ch], i) => line(cls, '', label, total, ch, i < sum.length - 1));
   if (ctx.items.length === 0) rows.unshift(row(el('tr', { class: 'rpt-row empty' }, td('This budget has no categories yet.', 'muted', cols.length))));
-  return [{ name: 'Topsheet', cls: `rpt-ts${bc.length ? ' has-baseline' : ''}`, cols, head, rows }];
+  return [{ name: 'Topsheet', cls: `rpt-ts${bc.length ? ' has-baseline' : ''}${pages || fringes ? ' has-extra' : ''}`, cols, head, rows }];
 }
 
 function accountLevel(ctx) {
@@ -554,7 +640,8 @@ function accountLevel(ctx) {
 /** The detail columns: { key, label, cls, w } for every printed column, in order. */
 function detailColumns(ctx) {
   const chosen = ctx.cols.filter((k) => COLUMN.has(k) && (!COLUMN.get(k).baseline || ctx.baseline));
-  const mid = chosen.filter((k) => !COLUMN.get(k).baseline).map((k) => COLUMN.get(k));
+  // One line per account has no line figures to show, only totals.
+  const mid = ctx.spec.collapse_details ? [] : chosen.filter((k) => !COLUMN.get(k).baseline).map((k) => COLUMN.get(k));
   const after = chosen.filter((k) => COLUMN.get(k).baseline).map((k) => COLUMN.get(k));
   return [
     { key: 'no', label: '#', cls: 'num', w: 28, keep: true },
@@ -812,7 +899,13 @@ function accountRows(ctx, dc, acct, ar, catRep) {
     lines.push(tr);
     const n = ctx.notes.get(d.id);
     if (n) {
-      const text = d.note.trim();
+      // Every printed note on the line, each with its date, cut short together.
+      const text = printedNotes(ctx, d.notes)
+        .map((x) => {
+          const meta = noteMeta(x);
+          return meta ? `${x.text.trim()} (${meta})` : x.text.trim();
+        })
+        .join('\n');
       const cut = text.length > FOOTNOTE_CHARS ? `${text.slice(0, FOOTNOTE_CHARS).trimEnd()}... (in full in the notes list)` : text;
       const cell = td('', 'fn-text', span - 1);
       cell.append(el('span', { class: 'rpt-fn', text: String(n) }), el('span', { class: 'fn-body', text: cut }));
@@ -855,6 +948,26 @@ function accountRows(ctx, dc, acct, ar, catRep) {
   return out;
 }
 
+/**
+ * An account collapsed to one line (the "one line per account" layout): its
+ * code and name across the line's columns, then its total and, with a
+ * baseline, its original and variance. `k` is its place in the category,
+ * for shading.
+ */
+function accountLine(ctx, dc, acct, ar, k) {
+  const ti = dc.findIndex((c) => c.key === 'total');
+  const lab = td('', 'desc', ti);
+  lab.append(el('span', { class: 'acct-code', text: acct.code || '' }), el('span', { class: 'desc-text', text: acct.name || '' }));
+  const tr = el('tr', { class: `rpt-row line acct-line${k % 2 ? ' alt' : ''}` }, lab, td(ar ? m(ar.total) : '', 'num total'));
+  const ch = ctx.baseline ? ctx.baseline.accounts.get(acct.code) || null : null;
+  for (const c of dc.slice(ti + 1)) {
+    let v = ch ? (c.key === 'original' ? ch.original : ch.variance) : null;
+    if (c.key === 'variance' && v === null && ch && ch.original !== null && ar && typeof ar.total === 'number') v = ar.total - ch.original;
+    tr.append(td(m(v), `num ${c.key === 'original' ? 'base' : 'var'}`));
+  }
+  return tr;
+}
+
 function detail(ctx) {
   const dc = detailColumns(ctx);
   ctx.detailWidths = detailWidths(dc, ctx.spec);
@@ -869,7 +982,9 @@ function detail(ctx) {
     const rows = [];
     const cap = td('', 'cat', dc.length);
     cap.append(el('span', { class: 'cat-code', text: cat.code || '' }), el('span', { class: 'cat-name', text: cat.name || '' }));
-    rows.push(row(el('tr', { class: 'rpt-cat-head' }, cap), true));
+    const capRow = el('tr', { class: 'rpt-cat-head' }, cap);
+    ctx.catHeads.set(capRow, it.ci);
+    rows.push(row(capRow, true));
     let printed = 0;
     for (const { acct, ar } of accountsOf(ctx, it)) {
       if (ctx.onlyGroups.size) {
@@ -877,7 +992,8 @@ function detail(ctx) {
         const rr = ar && Array.isArray(ar.rows) ? ar.rows : [];
         if (!details.some((d, i) => lineShown(ctx, d || {}, rr[i] || null))) continue;
       }
-      rows.push(...accountRows(ctx, dc, acct, ar, rep));
+      if (ctx.spec.collapse_details) rows.push(row(accountLine(ctx, dc, acct, ar, printed), false));
+      else rows.push(...accountRows(ctx, dc, acct, ar, rep));
       printed += 1;
     }
     if (printed === 0 && ctx.filtered) continue;
@@ -898,6 +1014,11 @@ function detail(ctx) {
     foot.push(sumRow(dc, `cat-total${rep && rep.fringe_account ? '' : ' first'}`, `Total ${catLabel(cat)}`, rep ? rep.total : null, null, ch));
     foot.forEach((tr, k) => rows.push(row(tr, k < foot.length - 1)));
     flows.push({ name: `Detail: ${catLabel(cat)}`, cls: 'rpt-dt', cols, head: head(), rows });
+  }
+  // One line per account: the categories run on, one after another, rather
+  // than each starting a page.
+  if (ctx.spec.collapse_details && flows.length) {
+    return [{ name: 'Detail, one line per account', cls: 'rpt-dt collapsed', cols, head: head(), rows: flows.flatMap((f) => f.rows) }];
   }
   if (flows.length === 0) {
     flows.push({ name: 'Detail', cls: 'rpt-dt', cols, head: head(), rows: [row(el('tr', { class: 'rpt-row empty' }, td('No categories in this report.', 'muted', dc.length)))] });
@@ -931,7 +1052,7 @@ function fringesSection(ctx) {
   ];
   const rows = [];
   let total = 0;
-  for (const name of Object.keys(fr).sort()) {
+  for (const name of orderedNames(ctx.b, 'fringes')) {
     const f = fr[name] || {};
     const sum = sums[name] || null;
     const pct = f.kind !== 'flat';
@@ -973,7 +1094,7 @@ function globalUses(ctx, names) {
 function globalsSection(ctx) {
   const g = ctx.b.globals && typeof ctx.b.globals === 'object' ? ctx.b.globals : {};
   const values = (ctx.r && ctx.r.globals) || {};
-  const names = Object.keys(g).sort();
+  const names = orderedNames(ctx.b, 'globals');
   const uses = globalUses(ctx, names);
   const spec = [
     ['Global', 'c-name2'],
@@ -1011,7 +1132,7 @@ function groupsSection(ctx) {
     ['Total', 'c-money', 'num'],
   ];
   const rows = [];
-  for (const name of Object.keys(groups).sort()) {
+  for (const name of orderedNames(ctx.b, 'groups')) {
     const gr = groups[name] || {};
     const s = sums[name] ? sums[name].full : null;
     let cls = 'rpt-row';
@@ -1054,20 +1175,35 @@ function notesSection(ctx) {
     ['Note', 'c-wide'],
   ];
   const rows = [];
+  // One note: its date, author and text, split to fit pages.
+  const add = (mark, whereCell, no, what, note) => {
+    const pieces = notePieces(note.text.trim());
+    const meta = noteMeta(note);
+    const text = td('', 'note-text');
+    if (meta) text.append(el('span', { class: 'note-meta', text: meta }), el('br'));
+    text.append(pieces[0]);
+    const first = el('tr', { class: `rpt-row rpt-note${note.done ? ' done' : ''}` }, td(mark, 'num mark'), whereCell, td(no, 'num'), td(what, 'txt'), text);
+    rows.push(row(first, pieces.length > 1));
+    pieces.slice(1).forEach((p, k) => {
+      rows.push(row(el('tr', { class: 'rpt-row rpt-note more' }, td('', ''), td('', ''), td('', ''), td('', ''), td(p, 'note-text')), k < pieces.length - 2));
+    });
+  };
+  const place = (code, name) => {
+    const c = td('', 'txt');
+    c.append(el('span', { class: 'acct-code', text: code || '' }), el('span', { text: name || '' }));
+    return c;
+  };
   for (const it of ctx.items) {
     if (it.kind !== 'category' || ctx.exCats.has(it.row.code || '')) continue;
+    for (const note of printedNotes(ctx, it.row.notes)) add('', place(it.row.code, it.row.name), '', 'Category', note);
     for (const { acct } of accountsOf(ctx, it)) {
+      for (const note of printedNotes(ctx, acct.notes)) add('', place(acct.code, acct.name), '', 'Account', note);
       const details = Array.isArray(acct.details) ? acct.details : [];
       details.forEach((d, i) => {
-        if (!d || typeof d.note !== 'string' || !d.note.trim()) return;
+        if (!d) return;
         const n = ctx.notes.get(d.id);
-        const pieces = notePieces(d.note.trim());
-        const acctCell = td('', 'txt');
-        acctCell.append(el('span', { class: 'acct-code', text: acct.code || '' }), el('span', { text: acct.name || '' }));
-        const first = el('tr', { class: 'rpt-row rpt-note' }, td(n ? String(n) : '', 'num mark'), acctCell, td(String(i + 1), 'num'), td(d.description || '', 'txt'), td(pieces[0], 'note-text'));
-        rows.push(row(first, pieces.length > 1));
-        pieces.slice(1).forEach((p, k) => {
-          rows.push(row(el('tr', { class: 'rpt-row rpt-note more' }, td('', ''), td('', ''), td('', ''), td('', ''), td(p, 'note-text')), k < pieces.length - 2));
+        printedNotes(ctx, d.notes).forEach((note, k) => {
+          add(n && k === 0 ? String(n) : '', place(acct.code, acct.name), String(i + 1), d.description || '', note);
         });
       });
     }
@@ -1122,12 +1258,149 @@ function infoSection(ctx) {
   const curs = b.currencies && typeof b.currencies === 'object' ? Object.entries(b.currencies) : [];
   if (curs.length) {
     headRow('Currencies');
-    for (const [code, c] of curs.sort(([a], [z]) => (a < z ? -1 : 1))) {
+    const at = new Map(orderedNames(b, 'currencies').map((n, i) => [n, i]));
+    for (const [code, c] of curs.sort(([a], [z]) => (at.get(a) ?? 0) - (at.get(z) ?? 0))) {
       const rate = c && c.rate !== undefined ? `1 ${code} = ${decimal(c.rate)} ${b.base_currency || ''}` : '';
       fact(code, [c && c.description, rate].filter(Boolean).join(', '));
     }
   }
   return [{ ...simpleTable('Budget information', 'rpt-info', spec, rows), head: null }];
+}
+
+// --- Chart of accounts and the other setup tables ---
+
+/** Every detail row of the budget, in order. */
+function* allDetails(ctx) {
+  for (const it of ctx.items) {
+    if (it.kind !== 'category') continue;
+    for (const a of Array.isArray(it.row.accounts) ? it.row.accounts : []) {
+      for (const d of Array.isArray(a && a.details) ? a.details : []) if (d) yield d;
+    }
+  }
+}
+
+/** How many rows `key(d)` gives each name for. */
+function countBy(ctx, key) {
+  const out = new Map();
+  for (const d of allDetails(ctx)) {
+    for (const n of new Set(key(d))) if (n) out.set(n, (out.get(n) || 0) + 1);
+  }
+  return out;
+}
+
+function chartSection(ctx) {
+  const spec = [
+    ['Acct #', 'c-code2'],
+    ['Description', 'c-desc'],
+    ['Accounts', 'c-short', 'num'],
+    ['Rows', 'c-short', 'num'],
+  ];
+  const rows = [];
+  for (const it of ctx.items) {
+    if (it.kind === 'level') {
+      rows.push(row(el('tr', { class: 'rpt-row rpt-chart-level' }, td('', 'code'), td(it.row.name || 'Production total', 'txt', 3))));
+      continue;
+    }
+    const accounts = Array.isArray(it.row.accounts) ? it.row.accounts : [];
+    const lines = accounts.reduce((a, x) => a + (Array.isArray(x && x.details) ? x.details.length : 0), 0);
+    rows.push(row(el('tr', { class: 'rpt-row rpt-chart-cat' }, td(it.row.code || '', 'code'), td(it.row.name || '', 'name'), td(String(accounts.length), 'num'), td(String(lines), 'num')), accounts.length > 0));
+    accounts.forEach((a0, k) => {
+      const a = a0 || {};
+      const n = Array.isArray(a.details) ? a.details.length : 0;
+      rows.push(row(el('tr', { class: 'rpt-row rpt-chart-acct' }, td(a.code || '', 'code'), td(a.name || '', 'txt'), td('', 'num'), td(String(n), 'num')), k === 0));
+    });
+  }
+  if (!rows.length) rows.push(emptyRow('This budget has no categories yet.', spec.length));
+  return [simpleTable('Chart of accounts', 'rpt-chart', spec, rows)];
+}
+
+function unitsSection(ctx) {
+  const units = ctx.b.units && typeof ctx.b.units === 'object' ? ctx.b.units : {};
+  const uses = countBy(ctx, (d) => [d.unit, d.unit2, d.unit3, d.unit4]);
+  const spec = [
+    ['Unit', 'c-name2'],
+    ['Plural', 'c-mid'],
+    ['Description', 'c-desc'],
+    ['Hours', 'c-short', 'num'],
+    ['Rows using it', 'c-mid', 'num'],
+  ];
+  const rows = Object.keys(units)
+    .sort()
+    .map((name) => {
+      const u = units[name] || {};
+      const hours = u.hours !== undefined && u.hours !== null && u.hours !== '' ? decimal(String(u.hours)) : '';
+      return row(el('tr', { class: 'rpt-row' }, td(name, 'name'), td(u.plural || '', 'txt'), td(u.description || '', 'txt'), td(hours, 'num'), td(String(uses.get(name) || 0), 'num')));
+    });
+  if (!rows.length) rows.push(emptyRow('This budget has no units.', spec.length));
+  return [simpleTable('Units', 'rpt-units', spec, rows)];
+}
+
+/** Sets or locations: each with its description, how many rows, and what they add up to. */
+function breakdownSection(ctx, { title, cls, table, key, sums, field, label, empty, place }) {
+  const items = table && typeof table === 'object' ? table : {};
+  const uses = countBy(ctx, (d) => [d[field]]);
+  const spec = [
+    [label, 'c-name2'],
+    ['Description', 'c-desc'],
+    ['Rows', 'c-short', 'num'],
+    ['Lines total', 'c-money', 'num'],
+    ['Fringes', 'c-money', 'num'],
+    ['Total', 'c-money', 'num'],
+  ];
+  const rows = [];
+  for (const name of key ? orderedNames(ctx.b, key) : Object.keys(items).sort()) {
+    const it = items[name] || {};
+    const sum = sums && sums[name] ? sums[name] : null;
+    const desc = [it.description, place ? place(it) : ''].filter(Boolean).join('; ');
+    rows.push(row(el('tr', { class: 'rpt-row' }, td(name, 'name'), td(desc, 'txt'), td(String(uses.get(name) || 0), 'num'), td(sum ? m(sum.details_total) : '', 'num'), td(sum ? m(sum.fringe_total) : '', 'num'), td(sum ? m(sum.details_total + sum.fringe_total) : '', 'num'))));
+  }
+  if (!rows.length) rows.push(emptyRow(empty, spec.length));
+  else rows.push(row(el('tr', { class: 'rpt-note-row' }, td('Totals count the tagged lines that are in the budget total.', 'note', spec.length))));
+  return [simpleTable(title, cls, spec, rows)];
+}
+
+function setsSection(ctx) {
+  return breakdownSection(ctx, { title: 'Sets', cls: 'rpt-sets', table: ctx.b.sets, key: 'sets', sums: ctx.r && ctx.r.sets, field: 'set', label: 'Set', empty: 'This budget has no sets.' });
+}
+
+function locationsSection(ctx) {
+  return breakdownSection(ctx, {
+    title: 'Locations',
+    cls: 'rpt-locations',
+    table: ctx.b.locations,
+    key: 'locations',
+    sums: ctx.r && ctx.r.locations,
+    field: 'location',
+    label: 'Location',
+    empty: 'This budget has no locations.',
+    place: (l) => [l.city, l.region, l.country].filter(Boolean).join(', '),
+  });
+}
+
+function currenciesSection(ctx) {
+  const b = ctx.b;
+  const base = b.base_currency || (ctx.r && ctx.r.base_currency) || '';
+  const curs = b.currencies && typeof b.currencies === 'object' ? b.currencies : {};
+  // A line with no currency is in the base currency.
+  const uses = countBy(ctx, (d) => [d.currency || base]);
+  const spec = [
+    ['Code', 'c-short'],
+    ['Description', 'c-desc'],
+    ['Symbol', 'c-short'],
+    ['Rate', 'c-mid'],
+    ['Rows', 'c-short', 'num'],
+  ];
+  const rows = [];
+  if (base) rows.push(row(el('tr', { class: 'rpt-row' }, td(base, 'name'), td('Base currency', 'txt'), td(curs[base] && curs[base].symbol ? curs[base].symbol : '', 'txt'), td('', 'txt'), td(String(uses.get(base) || 0), 'num'))));
+  for (const code of orderedNames(ctx.b, 'currencies')) {
+    if (code === base) continue;
+    const c = curs[code] || {};
+    const rate = c.rate !== undefined ? `1 ${code} = ${decimal(String(c.rate))} ${base}` : '';
+    rows.push(row(el('tr', { class: 'rpt-row' }, td(code, 'name'), td(c.description || '', 'txt'), td(c.symbol || '', 'txt'), td(rate, 'txt'), td(String(uses.get(code) || 0), 'num'))));
+  }
+  if (b.totals_currency) rows.push(row(el('tr', { class: 'rpt-note-row' }, td(`Totals are also shown in ${b.totals_currency}.`, 'note', spec.length))));
+  if (!rows.length) rows.push(emptyRow('This budget has no currencies.', spec.length));
+  return [simpleTable('Currencies', 'rpt-currencies', spec, rows)];
 }
 
 const BUILD = {
@@ -1139,6 +1412,11 @@ const BUILD = {
   groups: groupsSection,
   notes: notesSection,
   info: infoSection,
+  chart: chartSection,
+  units: unitsSection,
+  sets: setsSection,
+  locations: locationsSection,
+  currencies: currenciesSection,
 };
 
 // ---------------------------------------------------------------------------
@@ -1163,6 +1441,10 @@ function bandText(f, ctx, page) {
       return page.section || '';
     case 'printed':
       return `Printed ${ctx.printed}`;
+    case 'date':
+      return ctx.printedDate;
+    case 'time':
+      return ctx.printedTime;
     case 'file':
       return ctx.file || '';
     case 'page':
@@ -1170,6 +1452,10 @@ function bandText(f, ctx, page) {
     case 'info': {
       const v = ctx.b.info && ctx.b.info[f.label];
       return v ? `${f.label}: ${infoText(v)}` : '';
+    }
+    case 'global': {
+      const v = ctx.r && ctx.r.globals ? ctx.r.globals[f.name] : undefined;
+      return v !== undefined && v !== null ? `${f.name}: ${decimal(v)}` : '';
     }
     case 'text':
       return f.text || '';
@@ -1191,12 +1477,18 @@ function bandEmpty(b) {
   return !b || !(b.left || b.center || b.right);
 }
 
+/** Whether a band prints on page `n` (1-based): every page, or only the first. */
+function bandOn(b, n) {
+  return !bandEmpty(b) && (n === 1 || b.first_page_only !== true);
+}
+
 /** The report root's classes for this spec. */
 function rootClass(spec) {
   let c = `fwb-report fs-${spec.font_size}`;
   if (spec.landscape) c += ' landscape';
   if (spec.shading) c += ' shaded';
   if (spec.group_colors) c += ' colors';
+  if (spec.vertical_rules) c += ' rules';
   return c;
 }
 
@@ -1227,7 +1519,9 @@ function paginate(flows, spec, header, footer, ctx) {
       const cs = getComputedStyle(b);
       return b.getBoundingClientRect().height + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
     };
-    const avail = size.h - MARGIN.top - MARGIN.bottom - outer(hb) - outer(fb) - SLACK;
+    // A band on the first page only leaves later pages more room.
+    const availFirst = size.h - MARGIN.top - MARGIN.bottom - outer(hb) - outer(fb) - SLACK;
+    const availLater = size.h - MARGIN.top - MARGIN.bottom - (bandOn(header, 2) ? outer(hb) : 0) - (bandOn(footer, 2) ? outer(fb) : 0) - SLACK;
     if (hb) hb.remove();
     if (fb) fb.remove();
 
@@ -1245,11 +1539,13 @@ function paginate(flows, spec, header, footer, ctx) {
 
       let cur = { flow, intro: flow.intro || null, rows: [] };
       let used = introH + headH;
-      const room = avail - headH;
+      let avail = pages.length === 0 ? availFirst : availLater;
+      const room = Math.min(availFirst, availLater) - headH;
       const newPage = () => {
         pages.push(cur);
         cur = { flow, intro: null, rows: [] };
         used = headH;
+        avail = availLater;
       };
       const n = flow.rows.length;
       let i = 0;
@@ -1300,9 +1596,9 @@ function drawPages(container, dealt, spec, header, footer, ctx) {
     const sheet = el(
       'div',
       { class: 'rpt-page', data: { page: k + 1 } },
-      bandEmpty(header) ? null : drawBand(header, ctx, page, 'rpt-head'),
+      bandOn(header, k + 1) ? drawBand(header, ctx, page, 'rpt-head') : null,
       bodyBox,
-      bandEmpty(footer) ? null : drawBand(footer, ctx, page, 'rpt-foot'),
+      bandOn(footer, k + 1) ? drawBand(footer, ctx, page, 'rpt-foot') : null,
     );
     root.append(el('div', { class: 'rpt-sheet' }, sheet));
   });
@@ -1317,6 +1613,7 @@ function colorRules(colors) {
 function makeContext(view, spec) {
   const v = view || {};
   const { b, r, items } = index(v);
+  const now = new Date();
   const ctx = {
     view: v,
     b,
@@ -1324,7 +1621,9 @@ function makeContext(view, spec) {
     items,
     spec,
     title: (typeof b.title === 'string' && b.title.trim()) || 'Untitled budget',
-    printed: printedAt(new Date()),
+    printed: printedAt(now),
+    printedDate: printedDate(now),
+    printedTime: printedTime(now),
     file: v.file && typeof v.file.name === 'string' ? v.file.name : '',
     baseline: baselineOf(v),
     cellIssues: cellIssues(v),
@@ -1334,6 +1633,10 @@ function makeContext(view, spec) {
     onlyGroups: new Set(spec.only_groups),
     colors: new Set(),
     detailWidths: '',
+    // Topsheet page cells to fill once the pages are dealt: [{ ci, cell }],
+    // and the detail's category heading rows (row -> category index).
+    pageCells: [],
+    catHeads: new Map(),
     // Accounts are being left out, so a category with none left is skipped.
     filtered: spec.only_groups.length > 0 || spec.excluded_accounts.length > 0 || spec.skip_empty_accounts || spec.skip_zero_accounts,
   };
@@ -1361,7 +1664,28 @@ export function renderReport(container, view, spec = 'both') {
   const header = s.header || STANDARD_HEADER;
   const footer = s.footer || STANDARD_FOOTER;
   const dealt = paginate(flows, s, header, footer, ctx);
+  fillPageCells(ctx, dealt);
   return drawPages(container, dealt, s, header, footer, ctx);
+}
+
+/**
+ * The topsheet's page column: the page each category's detail starts on
+ * (blank when its detail doesn't print). The cells were measured empty and
+ * have a fixed width, so filling them in moves nothing.
+ */
+function fillPageCells(ctx, dealt) {
+  if (!ctx.pageCells.length) return;
+  const first = new Map();
+  dealt.forEach((p, k) => {
+    for (const tr of p.rows) {
+      const ci = ctx.catHeads.get(tr);
+      if (ci !== undefined && !first.has(ci)) first.set(ci, k + 1);
+    }
+  });
+  for (const { ci, cell } of ctx.pageCells) {
+    const n = first.get(ci);
+    cell.textContent = n ? String(n) : '';
+  }
 }
 
 /**

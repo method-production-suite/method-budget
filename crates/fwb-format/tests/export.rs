@@ -261,7 +261,10 @@ fn with_notes() -> Budget {
         .unwrap()
         .details[0];
     d.description = "=HYPERLINK(\"x\") , \"quoted\"".into();
-    d.note = Some("first line\r\nsecond, line\tTabbed \u{e9}".into());
+    d.notes = vec![fwb_core::Note::plain(
+        1,
+        "first line\r\nsecond, line\tTabbed \u{e9}",
+    )];
     b
 }
 

@@ -11,12 +11,14 @@ pub mod decimal;
 pub mod edit;
 pub mod expr;
 pub mod model;
+pub mod order;
 pub mod presets;
 pub mod rename;
 pub mod report;
 pub mod report_preset;
 pub mod sample;
 pub mod starter;
+pub mod usage;
 pub mod versions;
 
 pub use calc::breakdown::{selection_totals, SelectionTotals};
@@ -24,8 +26,8 @@ pub use calc::{recalc, CalcError, ErrorKind, RecalcOptions};
 pub use compare::{variance, Change, Variance};
 pub use comparison::{
     compare, compare_account, AccountComparison, Aggregate, CompareAccount, CompareCategory,
-    CompareLevel, CompareLine, CompareRow, CompareTotals, Comparison, Diff, RowMatch, MAX_COMPARED,
-    MIN_COMPARED,
+    CompareItem, CompareLevel, CompareLine, CompareRow, CompareTotals, Comparison, Diff, RowMatch,
+    MAX_COMPARED, MIN_COMPARED,
 };
 pub use decimal::Dec;
 pub use edit::delete_global;

@@ -262,9 +262,6 @@ function detailItems(onRow) {
   ];
   if (!onRow) return inserts;
   const rows = selectedDetails();
-  const cursor = ctx.grid.cursorRow();
-  const here = cursor ? rows.find((d) => `r${d.id}` === cursor.key) : null;
-  const hasNote = Boolean(here && typeof here.note === 'string' && here.note.trim());
   const costed = rows.filter((d) => kindOf(d) === 'line' || kindOf(d) === 'adjustment');
   return [
     ...clipboardItems(),
@@ -274,7 +271,7 @@ function detailItems(onRow) {
     ...moveItems(),
     SEP,
     { label: 'Format', items: formatItems(styleState(rows)) },
-    cmd('edit.note', hasNote ? 'Edit note…' : 'Add note…'),
+    cmd('edit.note', 'Add note…'),
     SEP,
     cmd('edit.make_range', 'Make fringe range', {
       disabled: costed.length < 2,
@@ -297,6 +294,7 @@ function accountItems(onRow) {
     SEP,
     insert,
     { label: 'Rename account', run: rename },
+    cmd('edit.note', 'Add note…'),
     cmd('edit.delete_rows', 'Delete account'),
     ...moveItems(),
     ...presetItems(false),
@@ -319,6 +317,7 @@ function topsheetItems(onRow) {
     SEP,
     ...inserts,
     { label: category ? 'Rename category' : 'Rename production total', run: rename },
+    category ? cmd('edit.note', 'Add note…') : null,
     cmd('edit.delete_rows', category ? 'Delete category…' : 'Delete production total'),
     ...moveItems(),
     SEP,

@@ -21,6 +21,7 @@ fn small() -> Budget {
     b.fringes.insert(
         "Payroll".into(),
         Fringe {
+            short_code: None,
             description: "Payroll taxes".into(),
             rate: "18.5".into(),
             kind: FringeKind::Percent {

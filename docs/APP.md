@@ -67,7 +67,8 @@ The window has three levels, with a breadcrumb above the grid:
 
 1. **Topsheet**: categories with their totals, production totals (the first one ends
    above-the-line), then the summary rows: above and below-the-line totals, charges, the
-   grand total, credits and the net total.
+   grand total, credits and the net total (Budget > Settings > Numbers on screen can leave
+   out the above and below-the-line rows and the net total).
 2. **Accounts** in one category with each account's fringes and total. When fringes post
    by category, the category's fringe account is a bold row before the category total;
    when they post by account, the Fringes column is part of each account's total.
@@ -112,12 +113,14 @@ Which tags is a budget setting saved in the file (Budget > Settings > New lines)
 by default, and optionally groups, set, location and currency. Subtotals, adjustments and
 separators copy nothing.
 
-**Notes and the formula bar.** Edit > Note (Shift+Cmd+Space) opens a small editor for the
-line's note next to its description: Save (or Cmd+Enter) keeps it, an empty note removes
-it, Escape cancels. The bar above the grid shows the selected cell as typed: a formula
+**Notes and the formula bar.** Edit > Add Note (Shift+Cmd+Space, or Add note… in the
+right-click menu) adds a dated note to what the cursor is on: the line on an account's
+lines, the account on the account list, the category on the topsheet. A small dialog
+opens next to it (it says how many notes the item has already): Add (or Cmd+Enter) keeps
+it, Escape cancels. The Notes tab (below) shows, edits, deletes and ticks off notes. The bar above the grid shows the selected cell as typed: a formula
 with its global names, a number unformatted, or a read-only cell's value.
 
-The commands live in `src/quickadd.rs` (notes use `set_row_note` in `src/rowstyle.rs`):
+The commands live in `src/quickadd.rs` (notes use `add_note` in `src/notes.rs`):
 
 | Command | Arguments | Returns |
 |---|---|---|
@@ -127,6 +130,37 @@ The commands live in `src/quickadd.rs` (notes use `set_row_note` in `src/rowstyl
 `set_cell_creating` is refused, with nothing changed, when the item already exists, the
 column doesn't hold that kind of item (units go in the unit columns, globals in amount, X,
 rate and 4X), the name or value isn't valid, or the row can't take the value.
+
+**Formulas and values.** A number cell holding a formula (`SHOOT_DAYS / 5`, `2 * 3`) shows
+its value, in the formula color, with the formula on hover and in the formula bar; editing
+the cell edits the formula. A global can be set to **show by name** (its details in the
+Globals tab): cells whose formula uses it show the formula instead. A global's own
+**decimals** set how its value shows, in the Globals tab and in the cells whose formula
+names it first. **View > Show or Hide Formulas in Selection** (Option+Cmd+F; on unless you
+turn it off, remembered for you) makes every cell of a selected range (Shift+arrows,
+Select All, several rows) show its formula while it stays selected, then its value again.
+Plain numbers show as typed. Rates follow the budget's rate decimals (Budget > Settings >
+Numbers on screen): a cutoff splits rates by size into two bands, each shown as typed or
+with 0 to 8 decimals (rounded half away from zero, padded with zeros), and a rate whose
+formula names a global with its own decimals shows those unless that switch is off. All of
+it is display only: values, totals, copy and paste and exports use the exact numbers.
+
+**Hidden factors.** When X, 4X or the currency column is hidden and a line's value there
+changes its total (an X or 4X other than blank or 1, by value for a formula; a currency
+other than the base one), the line's # cell gets a small red dot, and its tooltip names
+what the hidden column holds (`X is 2, Currency is EUR`). Show the column (or set it back)
+and the dot goes. The unit columns are labels and never change a total, so hiding them
+never marks a line. The dot is on screen only: reports don't print it.
+
+**Totals, zero accounts, zoom** (View menu, remembered for you, not in the budget). **Totals
+With or Without Cents** switches every total in the grid and the footer between cents and
+whole amounts (rounded half away from zero; the exact cents stay underneath). **Show or Hide
+Zero Accounts** leaves out the categories on the topsheet and the accounts in a category
+that total zero (unless they have a problem cell or were different when the baseline was
+locked); the row under the cursor stays, so a new account doesn't vanish as it is made.
+**Zoom In**, **Zoom Out** and **Actual Size** (Option+Cmd+=, Option+Cmd+minus,
+Option+Cmd+0; Cmd+= is Insert Subtotal) size the grid's text, rows and columns from 70% to
+150% in steps of 10%.
 
 **Detail grid columns.** The button in the grid's top-left corner (Shift+Tab from the
 first cell reaches it) opens the column menu: X, the three unit columns, currency, 4X,
@@ -161,8 +195,11 @@ value, and a dark window shows a lighter one. Bold, italic and indented lines (u
 takes its own color, else the color of its first group (by name) that has one; lines a
 group keeps out of the total are greyed and struck through. A separator row is drawn as a
 rule: it can be selected and deleted, has nothing to edit, and Enter after an edit moves
-past it (Insert > Separator, or the Insert separator button). A row with a note has a
-small mark in the corner of its description; the note is its tooltip. Lines that share a
+past it (Insert > Separator, or the Insert separator button). A row with notes has a
+small mark in the corner of its description, and an account or category with notes of its
+own has one on its name; the tooltip shows the first few notes. The Fringes and Groups
+columns show an item's short code instead of its name when it has one (`P&H, PAYROLL`),
+with the full names in the tooltip; editing or copying the cell gives the names. Lines that share a
 fringe range have a bracket in the # column. The printed report shows bold, italic, indent
 and separators too.
 
@@ -211,14 +248,14 @@ Dragging rows by the # column isn't built.
 All three are in `src/moverows.rs` and work through `Session::edit_merging`, which joins
 quick repeats of one edit into one undo step.
 
-Styles, notes and group colors are these commands, in `src/rowstyle.rs`:
+Styles and group colors are these commands, in `src/rowstyle.rs` (notes are under
+"Notes" in the tools panel, below):
 
 | Command | Arguments | Returns |
 |---|---|---|
 | `set_row_style` | `rowIds`, and any of `bold`, `italic`, `indent` (0 to 4), `indentBy` (-4 to 4: each row moves that many steps, kept within 0 to 4; not with `indent`) and `color` (`#rrggbb`, or `null` to clear); fields left out are left alone | View |
-| `set_row_note` | `rowId`, `note` (`null` or blank removes it) | View |
 | `set_group_color` | `name`, `color` (`#rrggbb` or `null`) | View |
-| `update_group` | `name` (an existing group), `group` (`{ description, in_budget_total }`), `color` (`#rrggbb` or `null`): all three as one undo step | View |
+| `update_group` | `name` (an existing group), `group` (`{ description, in_budget_total, short_code? }`), `color` (`#rrggbb` or `null`): all as one undo step | View |
 
 The tools panel (below) holds the budget's setup tables and puts fringes, groups, sets,
 locations and currencies on the selected lines. It docks at the right (the default) or at
@@ -278,12 +315,45 @@ lines; groups, sets and locations on lines and adjustments; other rows are skipp
 **Make range** turns the selected lines into one fringe range with a number new in that
 account; they must be next to each other in one account, with at least two lines
 (unselected subtotal rows in between are fine, since they never break a range). **Remove
-range** takes the selected lines out of their ranges. Each list has a filter box and an
-"Applied only" switch. Every click is one undo step.
+range** takes the selected lines out of their ranges. Each list has a filter box (it also
+matches descriptions and short codes) and an "Applied only" switch. Every click is one undo
+step.
+
+**Use counts, sorting and order** (every setup list: Fringes, Groups, Sets, Locations,
+Currency, Globals and Units). Each item shows how many lines use it across the budget, as
+a link: a click shows the Find tab searching for its uses (a global: its lines' formulas).
+The lists with dollars show the item's total across the budget beside it (a fringe: its
+fringe dollars; a group, set or location: its lines' totals with fringes, a group out of
+the total counted as if it were in; a currency: its lines' totals in the base currency);
+globals and units show the count only. The tooltip on a count also says when other setup
+uses the item (a global used by another global or a fringe rate, a unit by a flat fringe,
+a group by a credit or a charge). **Show** (All, Used or Unused) narrows the list; used
+means lines or other setup name it. The **Name** head cycles the list's sort on each
+click: A to Z, Z to A, then back to the budget's own order. The budget's order is saved in
+the file and followed by the Apply lists, the cell type-ahead and printed setup tables: drag
+an item by the dotted handle at its left, or press Option+Shift+Up or Down on it, to move
+it (quick key presses are one undo step). Moving is off while the list is sorted or
+filtered (text, Show or Applied only), so items that aren't shown never move. The counts
+come from Rust a moment after each change (`setup_usage`), not with every view.
+
+**Deleting something in use** says how many lines use it and what deleting does to them:
+a fringe, group, set or location comes off them ("Remove from 3 lines and delete"); a
+currency's lines go back to the base currency ("Move 3 lines and delete"; charges and the
+totals currency must still not use it); a unit is blanked in every unit column that names
+it; a global's formulas keep its value as a number. Cancel leaves everything as it was.
+Each is one undo step.
+
+**Short codes.** A fringe or group can have a short code (`FICA`, `NQ`): set it in the
+item's editor (Short code) or with **Short code…** in its right-click menu; empty removes
+it. Codes are unique within fringes or groups (ignoring case), never another item's name,
+without commas and up to 16 characters. The list shows the code beside the name, the grid
+shows it in the Fringes and Groups columns, and typing a code in those cells offers the
+item in the type-ahead (choosing it puts the name in). Lines always refer to items by
+name, so renaming an item keeps its code and nothing else changes.
 
 **Editing an item where it is listed.** The editor holds a fringe's kind, rate, cutoff
-(percent) or what it is charged per (flat) and description; a group's description, "counts
-in total" switch and line color (No color or one of the eight colors; a color set some
+(percent) or what it is charged per (flat), description and short code; a group's
+description, short code, "counts in total" switch and line color (No color or one of the eight colors; a color set some
 other way is kept unless another is picked); a set's description; a location's
 description, city, region and country; a currency's rate, symbol and description. Enter
 saves, Escape or Cancel closes it, a refused value keeps it open with the message, and
@@ -318,17 +388,39 @@ The command is in `src/rename.rs`; the engine does the work (`fwb_core::rename`)
 
 **Globals and Units** are edited in place, as before: a global's formula (with its current
 value beside it), a unit's plural, hours and description; Enter or leaving the box saves,
-Escape puts the old text back, and the × asks before deleting. **New global…** and **New
+Escape puts the old text back, and the × asks before deleting. Under each global, a
+**Details** line (it shows what is set) opens its description, unit (from the Units tab),
+decimals (as calculated, or 0 to 8), folder and **Show by name** switch; each change is
+one undo step and none changes a value. Renaming a unit renames it on globals too. **New global…** and **New
 unit…** at the bottom add one.
 
-**Notes.** The Notes tab shows the note on the line under the grid's cursor, in a box you
-can type in: Save (or Cmd+Enter) keeps it, Revert (or Escape) puts back what is saved, and
-an empty note is removed. It is the same note as Edit > Note. Below it, **Noted lines**
-lists every line in the budget with a note (account, line number, description and the start
-of the note); a click opens that line's account with the line selected.
+**Notes.** Lines, accounts and categories each keep a list of dated notes. The Notes tab
+shows the notes of what the grid's cursor is on: on an account's lines, the cursor's line
+and then the account; on the account list, the cursor's account and its category; on the
+topsheet, the cursor's category. Each note shows when it was written (and edited) and by
+whom, with **Edit** (Save or Cmd+Enter keeps it, Cancel or Escape puts the text back,
+saving empty text deletes the note) and **Delete** (asks first). The box under them adds a
+note (Add, or Cmd+Enter). Below, **All notes** is a review checklist: every note in the
+budget in budget order (a category's own, then each account's own and its lines'), with
+where it is, its date and author and the start of its text; the box beside each ticks it
+off as reviewed (and back), **Open only** hides the ticked ones, and a click goes to it
+(a line's account with the line selected, the account list on an account, the topsheet on
+a category). **Your name on new notes** at the bottom signs the notes you add; it is kept
+in this window's local storage, and blank signs nothing. Every change is one undo step.
 
 **Budget.** Charges, credits, budget info, settings (currencies, fringe posting, account
-numbers, what new lines copy) and the baseline, as in the setup tabs before.
+numbers, what new lines copy, numbers on screen) and the baseline, as in the setup tabs
+before. **Numbers on screen** (saved in the budget, one undo step per change): the rate
+cutoff and decimals below and at or above it, whether a rate's global decimals win, and
+whether the topsheet shows the above- and below-the-line summary rows and the net total.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `set_global_info` | `name`, `info` (`{description, unit, decimals, show_by_name, folder}`: `unit` empty or one of the budget's units, `decimals` `null` or 0 to 8; text trimmed, description up to 500 characters, folder up to 100 on one line) | View |
+| `set_display_prefs` | `prefs` (`{rate_cutoff, rate_decimals_below, rate_decimals_above, rate_global_decimals, summary_rows, net_total}`: the cutoff `null`, blank or a number above 0, decimals `null` or 0 to 8) | View |
+
+Both are in `src/display.rs`; a refused value changes nothing. The per-user choices (totals'
+cents, zero accounts, zoom, formulas in a selection) never reach Rust.
 
 **Presets** (View > Tools Tab > Presets, and the grid's right-click menu). Both kinds are
 kept in the budget, so they travel with the file; versions don't carry them and restoring
@@ -410,7 +502,33 @@ The tools window and the Notes tab use these commands, in `src/tools.rs`:
 |---|---|---|
 | `tools_window` | `show` (true shows it, making it if needed, and brings it to the front; false hides it), `geometry` (`{x, y, width, height}` in logical pixels, or `null`: where it opens the first time) | nothing |
 | `close_tools_window` | none | nothing |
-| `notes_list` | none | `[{ row_id, ti, ai, category, account, account_name, line, description, note, more }]`, every line with a note in budget order; `note` is cut to 280 characters (`more` says so) |
+| `notes_list` | none | Every note in budget order: `[{ owner, id, kind, ti, ai, row_id, category, category_name, account, account_name, line, description, note, more, created, edited, author, done }]`; `kind` is `row`, `account` or `category` (`ai`, `row_id` and `line` are `null` when they don't apply); `note` is cut to 280 characters (`more` says so) |
+
+Notes, in `src/notes.rs` (both windows may call them; each is one undo step and returns the
+View; a refusal changes nothing). `owner` is `{ "row": id }`, `{ "account": "11-01" }` or
+`{ "category": "11" }`; times are ISO 8601 text from the page (Rust never reads the clock
+for them):
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `add_note` | `owner`, `text` (not blank, up to 10,000 characters), `created`, `author` (optional, up to 100 characters; blank is none) | View |
+| `update_note` | `owner`, `id`, `text` (blank deletes the note; the same text changes nothing), `edited` | View |
+| `delete_note` | `owner`, `id` | View |
+| `set_note_done` | `owner`, `id`, `done` | View |
+
+The setup lists' counts, order and short codes, in `src/setup_lists.rs` (both windows):
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `setup_usage` | none | `{ table: { name: { lines, other, total } } }` for `units`, `globals`, `fringes`, `groups`, `sets`, `locations` and `currencies`: lines that name the item, other setup that does, and its dollars in cents (`null` for globals and units, and when totals can't be worked out) |
+| `set_setup_order` | `kind` (`fringe` or `fringes`, and so on), `names` (first to last; names the table doesn't have are skipped, the rest follow in name order) | View |
+| `move_setup_item` | `kind`, `name`, `by` (negative is up) | View (quick repeats on one item are one undo step) |
+| `set_short_code` | `kind` (`fringe` or `group`), `name`, `code` (blank clears) | View |
+
+`delete_unit` and `delete_currency` take `clearLines` (default false): blank the unit on
+the lines that name it, or put the currency's lines back in the base currency, before
+deleting, as one step. `set_fringe`'s `fringe` and `set_group`'s and `update_group`'s
+`group` take `short_code` (left out keeps the item's own; `""` clears it).
 
 The Presets tab and the right-click submenus (`ui/js/presets.js`) use these, in
 `src/presets.rs`; the main window and the tools window may both call them. Every one
@@ -464,7 +582,7 @@ again after every change to the budget, so places that no longer match drop out.
 one per account and **All results** above (a dash when some are checked). **Replace**
 changes the checked results only, all as one undo step, and says how many places changed
 (`4 updated`, until the budget changes again). Text is replaced inside the field (the
-matches only; an emptied note is removed). A global is replaced, only as that name, by
+matches only, in every note on the line; a note left empty is removed; notes on accounts and categories are not searched). A global is replaced, only as that name, by
 another global, a number or a formula (a formula goes in parentheses inside a longer
 formula: `(WEEKS * 5) / DAYS`; a cell that is only the global takes it as typed). A fringe,
 group, set, location, unit or currency is replaced by another one that exists (the Replace
@@ -523,7 +641,7 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 | Cancel an edit, clear the selection, or go up a level | Escape | Escape |
 | Insert a line below | Cmd+I | Ctrl+I |
 | Insert a subtotal, an adjustment | Cmd+=, Cmd+minus (or Option+Cmd+A) | Ctrl+=, Ctrl+minus (or Ctrl+Alt+A) |
-| Add or edit the line's note | Shift+Cmd+Space | Ctrl+Shift+Space |
+| Add a note to the line, account or category | Shift+Cmd+Space | Ctrl+Shift+Space |
 | Bold, italic on or off for the selected lines | Cmd+B, Shift+Cmd+I | Ctrl+B, Ctrl+Shift+I |
 | Indent the selected lines more, less | Option+Cmd+Right, Option+Cmd+Left | Ctrl+Alt+Right, Ctrl+Alt+Left |
 | Open the right-click menu at the cursor cell | Shift+F10 (or Control-click, or the menu key) | Shift+F10 (or the menu key) |
@@ -536,6 +654,8 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 | Open a breadcrumb jump list or the column menu (on its button) | Down or Enter | Down or Enter |
 | The column menu button | Shift+Tab from the first cell | Shift+Tab from the first cell |
 | Show or hide the tools panel (docked or its window) | Option+Cmd+S | Ctrl+Alt+S |
+| Selected cells show formulas instead of values, or not | Option+Cmd+F | Ctrl+Alt+F |
+| Zoom the grid in, out, actual size | Option+Cmd+=, Option+Cmd+minus, Option+Cmd+0 | Ctrl+Alt+=, Ctrl+Alt+minus, Ctrl+Alt+0 |
 | Resize the docked tools panel (on its edge; Shift for bigger steps): wider or narrower at the right, taller or shorter at the bottom | Left, Right; Up, Down | Left, Right; Up, Down |
 | Tools: Globals, Fringes, Groups, Locations (Escape returns to the grid) | Cmd+G, Cmd+3, Cmd+4, Cmd+5 | Ctrl+G, Ctrl+3, Ctrl+4, Ctrl+5 |
 | Tools: Currency, Units, Sets, Budget > Settings | Cmd+6, Cmd+7, Cmd+8, Cmd+9 | Ctrl+6, Ctrl+7, Ctrl+8, Ctrl+9 |
@@ -544,7 +664,8 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 | On a tools tab: move it along its pane; to the first or second pane | Option+Shift+Left, Right; Option+Shift+Up, Down | Alt+Shift+Left, Right; Alt+Shift+Up, Down |
 | On a list item: apply it to the selection; edit it; delete it; move up or down | Space; Enter or F2; Delete; Up, Down | Space; Enter or F2; Delete; Up, Down |
 | On a global's or unit's name: rename it everywhere | Enter or F2 (or double-click) | Enter or F2 (or double-click) |
-| In the Notes tab: save the note; put back the saved note | Cmd+Enter; Escape | Ctrl+Enter; Escape |
+| In the Notes tab: add or save a note; put back the saved text | Cmd+Enter; Escape | Ctrl+Enter; Escape |
+| In a setup list: move the item up or down in the budget's order | Option+Shift+Up / Down | Alt+Shift+Up / Down |
 | Find (the tools panel's Find tab); Find and Replace | Cmd+F; Shift+Cmd+F | Ctrl+F; Ctrl+Shift+F |
 | Next, previous find result (from anywhere); in the Find box | F3, Shift+F3; Enter, Shift+Enter | F3, Shift+F3; Enter, Shift+Enter |
 | Keyboard shortcuts | Shift+Cmd+/ | Ctrl+Shift+/ |
@@ -740,7 +861,8 @@ side by side with 1 to 15 others. At the left, tick what to compare with: open b
 open in a tab is added as that tab, so its unsaved changes count). The letters A, B, C...
 follow the order they were ticked. The comparison lists categories (▸ opens one to its
 accounts, and an account to its lines), each production total, above and below the line,
-all fringes, charges, the grand total, credits and the net total. Columns: each budget's
+all fringes, charges (each charge on its own line under their total, matched by name), the
+grand total, credits (the same) and the net total. Columns: each budget's
 total, its difference from this one and that as a percent of this one (Differences), and,
 ticked in the header, **Sum** and **Average** of the other budgets, **Variance** (their
 sum minus this one) and **Variance %** (of the average), as the reference product reads a
@@ -765,7 +887,8 @@ budget each letter is, through the report module's `printHtml`.
 | `compare_pick_files` | none (shows the Open dialog) | `[{source, label, path}]`, empty when cancelled |
 
 The comparison has `sources` (`{kind, label, doc, version, token, detail, partial}`, this
-budget first), `categories` (each with `accounts`), `levels` and `totals`; every figure is
+budget first), `categories` (each with `accounts`), `levels`, `charges` and `credits`
+(`{name, line}` each, matched by name, trimmed and ignoring case) and `totals`; every figure is
 a `line`: `values` (cents, `null` where a budget lacks it), `diffs` (`{amount, percent}`
 against this budget, percents as text with two decimals) and `agg` (`{sum, average,
 variance, percent}`). Categories, accounts and lines carry where they are in each budget
@@ -776,15 +899,20 @@ a file no longer at hand.
 ### Printing and reports
 
 **File > Print… (Cmd+P)** opens the report setup: the choices on the left, the report on
-the right exactly as it will print, page by page, redrawn as the choices change (the page
-count and a Go to section list sit above it). **File > Print Topsheet… (Shift+Cmd+P)**
+the right exactly as it will print, page by page, redrawn as the choices change. Above it:
+first, previous, next and last page buttons around the page shown (type a number to go
+there; it follows scrolling), the page count, and a Go to section list. **File > Print Topsheet… (Shift+Cmd+P)**
 still prints the topsheet straight away, with the standard layout.
 
 - **Sections, in print order**: topsheet, account level (each category's accounts with
   fringes and totals), detail level (each category starts a page), fringes (type, rate,
   cutoff or unit, how many lines use it, what it adds up to), globals (formula, value, how
   many lines use it), groups with totals (in the budget total or not, lines, lines total,
-  fringes, total), notes list and budget information. A checkbox prints a section, the
+  fringes, total), notes list, budget information, chart of accounts (every category and
+  account code with its name, account and row counts, production totals where they fall),
+  units (plural, description, hours, rows using it), sets and locations with totals (rows,
+  lines total, fringes, total of the lines in the budget total) and currencies (the base
+  first, then each with its symbol and rate, rows in it). A checkbox prints a section, the
   arrows move it.
 - **Categories and accounts**: a tree with a checkbox for every category (its accounts
   under the ▸) and an All box. It decides the account level, the detail level and the
@@ -793,6 +921,9 @@ still prints the topsheet straight away, with the standard layout.
   total, the notes under detail lines, and (when the budget has groups) every line not in
   the checked groups. Totals stay the budget's own; an account with rows left out says
   how many under its totals, and a category with nothing left to print is skipped.
+- **Topsheet columns**: Fringes (what each category's lines earn, wherever they post; a
+  production total sums its categories) and Page its detail starts on (filled in from the
+  laid-out pages; blank for a category whose detail doesn't print).
 - **Detail columns**: the grid's columns (amount, unit, X and its unit, rate and its unit,
   currency, 4X and its unit, fringes, fringe %, fringe $, groups, set, location) plus
   Original and Variance when the budget has a baseline (those print on the topsheet and
@@ -800,18 +931,26 @@ still prints the topsheet straight away, with the standard layout.
   usual set back. Money columns keep their width; the others give way to the description
   when the page is full.
 - **Layout**: portrait or landscape (Letter), type size small, medium or large, shading
-  (alternate lines tinted, totals darker) and lines in their group colors (a line's own
-  color first, as in the grid; otherwise black).
+  (alternate lines tinted, totals darker), lines in their group colors (a line's own
+  color first, as in the grid; otherwise black), lines between columns, and the detail
+  level as one line per account (code, name, total, original and variance; the
+  categories then run on instead of each starting a page, and line notes don't print).
 - **Header and footer**: three slots each (left, center, right), each nothing, the budget
-  title, the section, the date printed, the file name, Page X of Y, a budget information
-  field (Prep weeks, Shoot days, ...) or text you type. The standard ones: title, section
-  and date printed above, the page number below.
+  title, the section, the date and time printed, the date, the time, the file name, Page
+  X of Y, a budget information field (Prep weeks, Shoot days, ...), a global's value
+  (`SHOOT_DAYS: 25`; renaming the global follows) or text you type. Each band can print
+  on the first page only (later pages then use the room). The standard ones: title,
+  section and date printed above, the page number below.
 
-**Notes print.** A line's note gets a small number after its description on the detail
-pages, and the notes themselves follow the account's totals with the same numbers (a note
-longer than 700 characters is cut there and printed whole in the notes list). The notes
-list prints every note on the chosen accounts with its account, line number and line, and
-the same number when the detail pages print it.
+**Notes print.** A line with notes gets a small number after its description on the detail
+pages, and its notes follow the account's totals with the same number, each with its date
+and author (cut at 700 characters together there; printed whole in the notes list). The
+notes list prints every note on the chosen categories and accounts: each category's own
+notes, each account's own, then its lines' (with line number, line and the same number
+when the detail pages print it), each with its date, author and whether it is reviewed.
+**Leave out > Notes ticked off as reviewed** (`skip_done_notes`) leaves the reviewed ones
+out of both. Printed setup tables (fringes, globals, groups, sets, locations, currencies)
+follow the budget's own order.
 
 **Presets.** The setup can be kept in the budget as a named preset (the Preset list at the
 top): Save Preset saves it (in place, so typing a new name and saving renames it), Save as
@@ -869,8 +1008,10 @@ What the tables hold:
   number, description, the amount and rate as typed and their values, unit, X, the rate
   unit, currency, 4X and their units, the running subtotal on subtotal rows, the line total
   in the base currency, its fringes and the fringe dollars it earned, groups, set,
-  location, note, whether it counts toward the total (`Yes`/`No`) and its row id. An
-  adjustment's rate is the amount it is a percentage of.
+  location, note, whether it counts toward the total (`Yes`/`No`), its row id and its
+  fringe range number (lines with the same number in an account are one range; added
+  last so positional importers keep their columns). An adjustment's rate is the amount it
+  is a percentage of.
 - **Setup tables**: globals with their formulas and values; fringes with type, rate (as
   typed and its value), cutoff or unit, lines and total; groups with their switch and
   totals (every tagged line, and what counts toward the budget); units with hours;
@@ -895,6 +1036,90 @@ open in a tab. The same tables come from the command line:
 | Command | Arguments | Returns |
 |---|---|---|
 | `export_budget` | `format` (`"xlsx"`, `"csv"` or `"tsv"`; shows the Save dialog) | `{done, files}`: `done` false when cancelled; `files` the names written |
+
+### Importing spreadsheets
+
+**File > Import Spreadsheet…** adds detail lines from an Excel workbook (`.xlsx`), a CSV
+file or tab-delimited text (`.tsv`, `.txt`): any department's sheet, an old budget kept in
+Excel, or our own export. Rust shows the Open dialog and reads the file; then a dialog maps
+the sheet's columns to budget fields and shows what the import will do before anything
+changes:
+
+- **Sheet and header row.** A workbook's sheets are listed (hidden ones say so); the dialog
+  starts on the sheet whose column titles name the most fields (our own export's Detail
+  sheet). The header row is found among the first 30 rows (the row whose titles best name
+  fields, else the first row of text over a row of numbers) and can be changed, or set to
+  none; the list shows the top 12 rows to pick from.
+- **Columns.** Category number and name, account number and name, row kind, description,
+  amount, unit, X, rate, currency, 4X, fringes (names separated by commas), fringe range,
+  groups, set, location, note, and a line total that is only compared, never imported.
+  Each starts as guessed from the titles (`Acct #`, `Qty`, `Unit Price`, `Ext. Total`...;
+  our own export maps itself completely) and each select shows the column's letter, title
+  and first value.
+- **Saved mappings.** Save Mapping keeps the header row, columns and options under a name,
+  per user (in the web view's storage, like other per-user choices). A sheet whose header
+  row has the same titles (ignoring case, spaces and punctuation) starts with the newest
+  saved mapping for them, so a sheet laid out the same way next week is one click.
+- **Options.** Add accounts and categories this budget doesn't have (off: their rows are
+  skipped, and listed); add fringes, groups, units, sets, locations and currencies it
+  doesn't have (off: they are left off the lines, and listed; new fringes start at 0%,
+  new currencies at a rate of 1, and the preview says so); the account for rows without
+  one (the account on screen to start with); and where to import: **this budget**, as one
+  undo step, or **a new budget tab** that starts with this budget's categories, accounts,
+  setup and settings and no lines (as New From Template makes it), with the import as its
+  first undo step, so it starts with unsaved changes.
+- **Preview.** How many lines go into how many accounts, new accounts and categories,
+  skipped rows, the grand total now and after, then the first 25 lines as they will come
+  in with what each comes to; skipped rows and rows with something left out (each with its
+  row number and why), new accounts and categories, and setup items added or left off are
+  listed below. Import is disabled while nothing would be imported.
+- **Check against the sheet's totals.** With a line total column mapped, each imported
+  line's total (base currency, after import, as the budget calculates it; a subtotal row's
+  running total) is compared with the sheet's: how many lines were compared, how many
+  differ, the two sums and their difference, and the first 50 differing rows. Differing
+  rows are tinted in the preview table.
+
+How rows are read (`fwb_format::import::merge`): rows after the header row; rows empty in
+every mapped column are passed over. Account numbers are read with the budget's account
+numbering (`1105`, `11-5` and `11.05` are all `11-05` under the default pattern) and
+matched anywhere in the budget; a number that doesn't fit the pattern (too long, too many
+parts) is refused rather than cut short. An empty account cell takes the account above it.
+A row with an account or category and nothing for a line only sets the account for the
+rows below (a heading), as does a row with an account and only a description when the
+next row leaves the account blank (the description then names a new account). New
+accounts and categories are numbered by the pattern (a new account's category is the
+category column's, else the category part of its number) and placed after the last one
+numbered below them. Lines go at the end of their account, in sheet order, with new row
+ids; fringe range numbers get numbers new in the account. Amount, X, rate and 4X are read
+exactly (no floats): number cells as written, rounded to the engine's nine places; text
+with currency signs, thousands separators, `(5)` for -5 and `10%` for 0.1 (a semicolon
+CSV uses decimal commas, `1.234,56`); a formula is kept when its globals exist, otherwise
+the cell is left blank and the row says so. Names (fringes, groups, units, sets,
+locations, currencies) match exactly, else ignoring case when only one does; a unit also
+matches its plural (`Days` is `Day`); the base currency is no currency. Row kinds are
+line, subtotal, adjustment and separator; subtotal and separator rows keep no amounts and
+an adjustment keeps no rate (it is always the lines above it). A note becomes one note on
+the line.
+
+Reading the files (`fwb_format::import`, plain Rust, no crates): CSV per RFC 4180 with
+quoted fields, CRLF, LF or CR, a UTF-8 byte order mark dropped, UTF-16 with a byte order
+mark (Excel's Unicode Text), Windows-1252 when the bytes aren't UTF-8, and the delimiter
+(comma, tab or semicolon) taken from whichever splits the first lines most consistently;
+the `'` our export puts before formula-like text is taken off again. Workbooks: our own
+ZIP reader (stored and deflated entries, our own DEFLATE decoder), the parts found through
+the package's relationships, shared strings (rich text joined, phonetic guides left out),
+inline strings, numbers as written, booleans, formula results, errors as text, cells and
+rows without references, Excel's `_xHHHH_` escapes, and the Strict variant's namespaces.
+Dates come in as serial numbers (styles aren't read). An older `.xls` workbook is refused
+with a message to save it as `.xlsx` or CSV. Exporting a budget and importing the Detail
+sheet back (Excel, CSV or tab-delimited) into the same chart without lines gives exactly
+the same line totals and grand total (tested).
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `sheet_import_pick` | none (shows the Open dialog) | `{token, file, kind, sheets: [{name, hidden, rows, columns, truncated}], sheet, fields}`, or `null` when cancelled; `file` is the name only |
+| `sheet_import_preview` | `token`, `request` (`{sheet, header_row, mapping: {field: column}, detect_header, guess, create_accounts, create_setup, default_account, target}`, `target` `"new"` for a new tab) | the preview: `{header_row, signature, mapping, columns, raw, lines, line_count, skipped, skipped_count, warnings, warning_count, headings, new_categories, new_accounts, matched_accounts, added, dropped, notes, reconciliation, grand_total_before, grand_total_after, calc_error, truncated}`; changes nothing |
+| `sheet_import` | `token`, `request` | `{view, message}`: into the budget as one undo step, or a new tab in front |
 
 ## Saving and recovery
 
@@ -1043,9 +1268,14 @@ crates/fwb-app/
                      (status, what each needs), importing the picks as one undo step
   src/templates.rs   New From Template and Save as Template: a budget stripped to its
                      chart, setup and settings
+  src/sheet_import.rs  Import Spreadsheet: the picked file kept by token, the mapping
+                     dialog's preview and the import (fwb_format::import does the work)
   src/menu.rs        native menu bar, built from the same table as ui/js/shortcuts.js
   src/tools.rs       the tools panel's own window: opening, hiding and placing it, telling
                      the other window when the budget changed, the Notes tab's list
+  src/notes.rs       dated notes on lines, accounts and categories, and the budget-wide
+                     list the Notes tab shows as a review checklist
+  src/setup_lists.rs the setup lists' use counts and totals, their order, short codes
   src/find.rs        find and replace: typed search over a budget, replacing in the
                      checked results as one undo step
   src/moverows.rs    moving lines, accounts and topsheet rows one place, keeping fringe
@@ -1096,8 +1326,10 @@ account.
 - `report`: every total down to the account from `fwb_core::recalc`, with money as integer
   cents and decimals as strings, never floats. Accounts have no `rows` here.
 - `account`: the account on screen in full, or `null`: `ti` and `ai` (its topsheet index and
-  index in its category), `code`, `details` (its rows, file-format JSON) and `rows` (their
-  totals, as the report's rows would be, or `null` without totals).
+  index in its category), `code`, `details` (its rows, file-format JSON), `rows` (their
+  totals, as the report's rows would be, or `null` without totals) and `values` (per row,
+  the values of its formula cells, `{amount, x, rate, x4}` with blank, plain-number and
+  failing cells left out, or `null`; empty without totals; `src/display.rs`).
 - `error`, `partial`, `issues` (problems with globals, fringes, charges and the like, plus
   the cells of `account`), `issue_count` (all problems) and `issue_accounts`
   (`[ti, ai]` of every account with a problem cell, for the red outlines up the levels).
@@ -1177,12 +1409,17 @@ setup items, the note editor, the fringe range keys and the formula bar),
 `versions.js` (the Versions dialog), `compare.js` with `compare.css` (the compare screen;
 `compare.css` also sizes the Orig and Var columns),
 `prefs.js` (per-user display choices in local storage: visible columns, the tools panel's
-place, size and tabs) and `sheet.js` (styles worked out at run time, below). `boot.js`
+place, size and tabs), `display.js` with `display.css` (how numbers show: formula values,
+rate and global decimals, totals with or without cents, hidden-factor marks, zero rows,
+zoom and the formula view, and those View menu commands), `display-settings.js` (Budget >
+Settings > Numbers on screen and each global's details) and `sheet.js` (styles worked out at run time, below). `boot.js`
 starts `main.js`, or `toolswin.js` in the tools window (the page loaded with `?panel=1`).
 The tools panel is `tools.js` (panes, tabs, dragging, the header) with `apply.js` (the
 fringe, group, set, location and currency lists), `setup.js` (globals and units, and the
-helpers the Budget tabs in `topsheet-setup.js` share), `notes.js` (the Notes tab) and
-`find.js` (the Find tab); `tools.css` lays it out. Commands run one at a time, in order.
+helpers the Budget tabs in `topsheet-setup.js` share), `setuplist.js` (what every setup
+list shares: counts, Show, the name sort, dragging and moving items, the delete question),
+`order.js` (a table's order and short codes, also used by the grid, the type-ahead and
+reports), `notes.js` (the Notes tab) and `find.js` (the Find tab); `tools.css` lays it out. Commands run one at a time, in order.
 
 **Two windows.** Popped out, the panel runs in a second web view on the same page and the
 same Rust budgets, and follows the budget in front in the main window. After any command
@@ -1237,7 +1474,8 @@ untrusted (a budget file is data from anywhere).
   tools window).
   `capabilities/tools.json` grants the tools window, by its label, only what the panel
   calls: `get_view`, the selection summary and the apply edits, the setup tables, the
-  Budget tabs, a line's note and the notes list, find and replace, and listening for and
+  Budget tabs, notes and the notes list, the setup lists' counts, order and short codes,
+  find and replace, and listening for and
   sending events. It
   can't open, save, print, undo, use the clipboard or recovery, open, close, switch or move
   budget tabs, or open or close windows;
@@ -1265,7 +1503,25 @@ untrusted (a budget file is data from anywhere).
   only by a token Rust gave out (the last 32 picked are kept); versions by their id. The
   same goes for the budget to import setup from (the last one picked) and for templates:
   New From Template and Save as Template show the native dialogs from Rust and only take
-  "keep the lines" from the page.
+  "keep the lines" from the page. Import Spreadsheet is the same: Rust shows the Open
+  dialog and reads the file; the page gets its name (never its path) and names it by a
+  token afterwards (only the last file picked is kept).
+- **Imported spreadsheets are untrusted** and are read by our own code with limits: a file
+  over 50 MB is refused before it is read in full; a ZIP gives out at most 200 MB of
+  decompressed data in all, an entry is decoded into at most the size its directory
+  declares (more or less, or a CRC that doesn't match, is an error) and an entry declaring
+  more than 1,000 times its compressed size (beyond 1 MB) is refused unread; the DEFLATE
+  decoder bounds-checks every read, checks every code table and stops at its output cap
+  (tested with zlib's streams, randomly built streams, every truncation, bit flips, noise
+  and bombs); encrypted entries, ZIP64 and split archives are refused. The XML tokenizer
+  refuses any DTD (`<!DOCTYPE`) and any entity but the five predefined ones and character
+  references, so nothing is ever fetched or expanded, and limits nesting to 128 levels and
+  64 attributes per element. A sheet is read to at most 100,000 rows, 256 columns, 2
+  million cells (counting the blanks a row is padded with) and 32,767 characters a cell,
+  and a workbook to 128 MB of cell text (a shared string is copied into each cell using
+  it); the dialog says when a sheet was cut short. Imported text goes
+  into the budget as data (descriptions, names, notes), never as markup, and a cell is kept
+  as a formula only when the engine parses it and its globals exist.
   Show Backups Folder runs the system's `open`, `explorer` or `xdg-open` from Rust on a
   folder Rust chose.
 - **Budget text is never markup.** The UI builds the page with DOM calls and puts every
@@ -1297,7 +1553,8 @@ screen, and commands already name their budget (`doc`), so a second pane would b
 grid that sends a different `doc`.
 
 Moving rows by drag, editing fringe ranges in the grid, renumbering accounts when the
-coding pattern changes, import from other tools, single-instance handling on Windows and Linux,
+coding pattern changes, import from other tools' own formats (spreadsheets import, see
+Importing spreadsheets), single-instance handling on Windows and Linux,
 the macOS system recent documents list, a mark on copied rows, and the total change a
 paste will cause in its review. Printing, the Windows/Linux menu keys, Copy Rows from
 the menu bar reaching the system clipboard, and the tools window (placement on a second
@@ -1318,18 +1575,30 @@ Reports need a live check in the app: Print… and Save as PDF… through the na
 operation (checked here only in a hidden test web view: each page box is one sheet,
 portrait and landscape, with backgrounds and colors), the print sheet's orientation, and
 the setup dialog's keys. Paper is Letter only for now (A4 and Legal would be a layout
-choice), there is no "detail starts on page N" column on the topsheet yet, and Windows and
-Linux print with `window.print()` and the page's own `@page` size and zero margins
+choice), and Windows and Linux print with `window.print()` and the page's own `@page` size and zero margins
 (untested there; Save as PDF is the print dialog's PDF choice on those systems).
 The Presets tab and its right-click submenus need a live check in the app (keys and the
 review in the tools window included; the logic is tested in Rust and the tab, forms,
 review and menus in a browser harness). Presets follow a rename of a setup item, but
 deleting a fringe, group, set or location leaves its name in tag presets (applying one
 then says what is missing). Line blocks are reordered from the keyboard only.
+Import Spreadsheet needs a live check: the Open dialog, a real workbook saved by Excel and
+Numbers and CSV files from Excel on Windows (checked here with workbooks written by hand
+with Python's zipfile and our own exports, and the dialog in a browser harness against the
+real Rust preview and import). It reads values, not formulas or styles (a date comes in as
+its serial number, a number formatted with leading zeros loses them), maps one column per
+field, and keeps a saved mapping only in the web view's storage; 1.16 (the reference's own
+exports) will add readers for its layouts on top of it.
 Exports need a live check: File > Export's Save dialogs, and the workbook opened in Excel
 and Numbers (checked here by reading it back: ZIP CRCs, every part well-formed with
 `xmllint` and Python's parser, content types and relationships complete, every cell's
 type, style and value matching the CSV and tab-delimited files of the same budget).
+Display settings need a live check in the app: Option+Cmd+F, Option+Cmd+= and
+Option+Cmd+minus (and Option+Cmd+0) reaching the menu in the system web views, the View
+menu's toggles, the zoomed grid's scrolling on a long account, and the Globals details and
+Numbers on screen forms in the tools window (logic tested in Rust and in a browser harness).
+Report pages keep their own layout: they don't follow the screen's rate decimals, totals'
+cents or hidden summary rows yet.
 Moving rows and renaming need a live check: Option+Up and Option+Down reaching the page in
 the system web views (Alt+Up and Alt+Down on Windows and Linux), the Edit menu's Move Up and
 Move Down, and the rename forms and right-click menus in the tools window (all checked in a

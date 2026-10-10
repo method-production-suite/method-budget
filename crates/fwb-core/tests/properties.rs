@@ -95,7 +95,7 @@ fn gen_detail(rng: &mut Rng, id: RowId, range: Option<u32>) -> Detail {
         det.color = Some("#c04000".into());
     }
     if rng.chance(10) {
-        det.note = Some("check with UPM".into());
+        det.notes = vec![Note::plain(1, "check with UPM")];
     }
     det
 }
@@ -116,6 +116,7 @@ fn gen_budget(rng: &mut Rng) -> Budget {
         .insert("DAYS".into(), (rng.below(60) as i64 + 1).into());
     b.globals.insert("WEEKS".into(), "DAYS / 5".into());
     let fringe = |rate: &str, kind| Fringe {
+        short_code: None,
         description: String::new(),
         rate: rate.into(),
         kind,
@@ -453,7 +454,7 @@ fn separators_and_styling_change_nothing() {
                 d.italic = false;
                 d.indent = 0;
                 d.color = None;
-                d.note = None;
+                d.notes.clear();
             }
         }
         for opts in [
@@ -703,6 +704,17 @@ fn renaming_any_setup_item_keeps_every_total_and_renaming_back_undoes_it() {
     for seed in 1..=CASES {
         let mut b = gen_budget(&mut Rng(seed));
         b.sets.insert("S1".into(), SetDef::default());
+        // Display info on a global, naming a unit: it follows both renames.
+        if seed % 2 == 0 {
+            b.global_info.insert(
+                "DAYS".into(),
+                GlobalInfo {
+                    unit: "Day".into(),
+                    decimals: Some(1),
+                    ..GlobalInfo::default()
+                },
+            );
+        }
         // A tag preset, and a line block of the first account's rows with
         // copies of the setup they use: both follow a rename.
         b.tag_presets.push(TagPreset {

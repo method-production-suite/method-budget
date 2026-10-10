@@ -1,0 +1,214 @@
+/* File > Import Spreadsheet…: the mapping dialog (js/sheetimport.js). The
+   form parts reuse the dialogs' inputs (.modal-input, .modal-field in
+   styles.css) and the report setup's checkboxes (.rs-check in
+   reportsetup.css). */
+
+.modal.si-dialog {
+  width: 860px;
+  max-height: calc(100vh - 48px);
+}
+
+.si-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  max-height: 64vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.si-heading {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.si-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.si-field {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.si-field select {
+  min-width: 0;
+}
+
+.si-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.si-presets select {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.si-preset-name {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.si-map {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 16px;
+}
+
+.si-map-row {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.si-map-label {
+  color: var(--text-muted);
+}
+
+.si-col {
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+.si-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.si-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.si-account {
+  width: 140px;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+.si-target {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+}
+
+.si-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.si-summary p {
+  margin: 0;
+}
+
+.si-summary-main {
+  font-weight: 600;
+}
+
+.si-note {
+  margin: 0;
+  color: var(--note);
+  font-size: 12px;
+}
+
+.si-table-wrap {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.si-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.si-table th,
+.si-table td {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border-soft);
+  white-space: nowrap;
+  text-align: left;
+}
+
+.si-table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+.si-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.si-table .si-desc {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.si-table tr.si-differs td {
+  background: var(--danger-bg);
+}
+
+.si-more {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.si-recon {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.si-recon p {
+  margin: 0;
+}
+
+.si-ok {
+  color: var(--accent);
+}
+
+.si-bad {
+  color: var(--danger);
+}
+
+.si-notes {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+.si-notes li + li {
+  margin-top: 2px;
+}
+
+.si-details summary {
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.si-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

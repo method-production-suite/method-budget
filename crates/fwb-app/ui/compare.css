@@ -457,6 +457,12 @@ table.cmp-table {
   font-weight: 700;
 }
 
+/* One charge or credit, under its total. */
+.cmp-table tr.cmp-item td.cmp-name {
+  padding-left: 24px;
+  color: var(--text-muted);
+}
+
 .cmp-table tr.unmatched td.cmp-name {
   font-style: italic;
 }
@@ -486,6 +492,10 @@ table.cmp-table {
 .cmp-print tr.cmp-acct td.cmp-code,
 .cmp-print tr.cmp-acct td.cmp-name {
   padding-left: 8pt;
+}
+
+.cmp-print tr.cmp-item td.cmp-name {
+  padding-left: 12pt;
 }
 
 .cmp-print tr.cmp-line td.cmp-name,

@@ -473,3 +473,130 @@
 .setup-add-actions .setup-btn {
   flex: 0 0 auto;
 }
+
+/* Setup lists: the name sort, line counts, drag handles (setuplist.js) */
+
+.setup-sort {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.setup-sort:hover {
+  color: var(--text);
+}
+
+.setup-sort.is-sorted {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.setup-sort:focus-visible,
+.setup-uses:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.setup-uses {
+  appearance: none;
+  min-width: 26px;
+  height: 20px;
+  padding: 0 3px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.setup-uses.is-zero {
+  color: var(--text-muted);
+  text-decoration: none;
+  cursor: default;
+}
+
+.setup-uses:hover:not(.is-zero) {
+  background: var(--row-hover);
+}
+
+.setup-handle {
+  align-self: stretch;
+  width: 10px;
+  min-height: 18px;
+  border-radius: 2px;
+  background-image: radial-gradient(circle, var(--text-muted) 1px, transparent 1.3px);
+  background-size: 5px 5px;
+  background-position: 1px 2px;
+  opacity: 0.55;
+  cursor: grab;
+  touch-action: none;
+}
+
+.setup-handle:hover {
+  opacity: 1;
+}
+
+.setup-handle.is-off {
+  background-image: none;
+  cursor: default;
+}
+
+body.setup-dragging,
+body.setup-dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+.setup-listtools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 0 0 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.setup-show {
+  width: auto;
+  height: 22px;
+  font-size: 12px;
+}
+
+.setup-namewrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.setup-namewrap .setup-name {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.setup-item.drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.setup-item.drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.setup-item.is-dragging {
+  opacity: 0.55;
+}

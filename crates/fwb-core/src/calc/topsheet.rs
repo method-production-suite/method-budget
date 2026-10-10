@@ -360,11 +360,13 @@ mod tests {
 
     fn cat(code: &str, accounts: Vec<(&str, Vec<Detail>)>) -> TopsheetRow {
         TopsheetRow::Category(Category {
+            notes: Vec::new(),
             code: code.into(),
             name: format!("Category {code}"),
             accounts: accounts
                 .into_iter()
                 .map(|(code, details)| Account {
+                    notes: Vec::new(),
                     code: code.into(),
                     name: format!("Account {code}"),
                     details,
@@ -379,6 +381,7 @@ mod tests {
 
     fn group(in_budget_total: bool) -> Group {
         Group {
+            short_code: None,
             description: String::new(),
             in_budget_total,
             color: None,

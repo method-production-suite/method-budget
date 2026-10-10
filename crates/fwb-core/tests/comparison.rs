@@ -541,3 +541,48 @@ fn compare_rejects_too_few_or_too_many_budgets() {
     assert!(compare(&many).is_err());
     assert!(compare(&many[..MAX_COMPARED]).is_ok());
 }
+
+#[test]
+fn charges_and_credits_are_compared_one_by_one() {
+    let a = sample();
+    let ra = report(&a);
+    assert!(!ra.charges.is_empty() && !ra.credits.is_empty());
+    let mut b = sample();
+    // B renames its first charge in other case and spacing (still the same
+    // charge), and its first credit to something else (listed apart).
+    let first_charge = b.charges[0].name.clone();
+    b.charges[0].name = format!("  {} ", first_charge.to_uppercase());
+    let first_credit = b.credits[0].name.clone();
+    b.credits[0].name = "Other rebate".into();
+    let rb = report(&b);
+    let c = compare(&two(&a, &b)).unwrap();
+
+    let names: Vec<&str> = c.charges.iter().map(|x| x.name.as_str()).collect();
+    let want: Vec<&str> = ra.charges.iter().map(|x| x.name.as_str()).collect();
+    assert_eq!(names, want, "matched by name, the base's spelling");
+    for (i, item) in c.charges.iter().enumerate() {
+        assert_eq!(
+            item.line.values,
+            vec![Some(ra.charges[i].amount), Some(rb.charges[i].amount)]
+        );
+    }
+    // Per item adds up to the totals line.
+    let sum: i64 = c.charges.iter().map(|x| x.line.values[0].unwrap()).sum();
+    assert_eq!(Some(sum), c.totals.charges.values[0]);
+
+    let credit = |n: &str| c.credits.iter().find(|x| x.name == n).unwrap();
+    assert_eq!(
+        credit(&first_credit).line.values,
+        vec![Some(ra.credits[0].amount), None]
+    );
+    assert_eq!(
+        credit("Other rebate").line.values,
+        vec![None, Some(rb.credits[0].amount)]
+    );
+    assert_eq!(c.credits.len(), ra.credits.len() + 1);
+    assert_eq!(
+        c.credits.last().unwrap().name,
+        "Other rebate",
+        "new ones last"
+    );
+}

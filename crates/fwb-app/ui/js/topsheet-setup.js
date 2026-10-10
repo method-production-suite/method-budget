@@ -8,6 +8,8 @@
 // textContent and input values, never innerHTML. (Sets and locations are
 // lists in apply.js.)
 
+import { displaySettingsGroup } from './display-settings.js';
+
 export const EXTRA_TABS = [
   { id: 'charges', label: 'Charges' },
   { id: 'credits', label: 'Credits' },
@@ -1028,6 +1030,8 @@ function renderSettings(panel) {
   panel.append(fr);
 
   panel.append(newLinesGroup());
+  // Numbers on screen: rate decimals, summary rows, net total (display-settings.js).
+  panel.append(displaySettingsGroup(k));
   panel.append(codingForm());
 }
 

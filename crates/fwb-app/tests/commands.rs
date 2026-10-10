@@ -237,6 +237,7 @@ fn bulk_field_edits_are_one_undo_step() {
             b,
             "Second unit",
             &GroupInput {
+                short_code: None,
                 description: String::new(),
                 in_budget_total: true,
             },
@@ -263,6 +264,7 @@ fn groups_out_of_the_total_grey_rows_and_drop_their_money() {
     let mut s = Session::new();
     let id = ids_in(&s, "21-01")[1];
     let g = |on| GroupInput {
+        short_code: None,
         description: "Alternate camera".into(),
         in_budget_total: on,
     };
@@ -322,6 +324,7 @@ fn globals_set_evaluate_and_delete_by_freezing() {
 fn fringes_units_and_currencies() {
     let mut s = Session::new();
     let pension = FringeInput {
+        short_code: None,
         kind: "percent".into(),
         description: "Pension".into(),
         rate: "6".into(),
@@ -342,6 +345,7 @@ fn fringes_units_and_currencies() {
     assert_eq!(v["report"]["fringes"]["PENSION"]["uses"], 1);
 
     let meal = FringeInput {
+        short_code: None,
         kind: "flat".into(),
         description: String::new(),
         rate: "50".into(),
@@ -758,6 +762,7 @@ fn credits_reduce_the_net_total() {
             b,
             "Local",
             &GroupInput {
+                short_code: None,
                 description: String::new(),
                 in_budget_total: true,
             },

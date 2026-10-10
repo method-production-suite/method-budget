@@ -42,6 +42,11 @@
 //! and case-insensitive; the unnamed level after the last production total is
 //! not listed (the topsheet doesn't show it either).
 //!
+//! Charges and credits are compared one by one as well, matched by name the
+//! same way (trimmed, case-insensitive); one only some budgets have is
+//! `None` in the others, so differently named items list per budget. Their
+//! totals stay in [`CompareTotals`].
+//!
 //! Each matched category, account and row also says where it is in each
 //! budget (`at`, `ids`), so a caller can take the user to it.
 //!
@@ -149,7 +154,19 @@ pub struct Comparison {
     pub categories: Vec<CompareCategory>,
     /// Each production total, matched by name (see the module docs).
     pub levels: Vec<CompareLevel>,
+    /// Each charge, matched by name (see the module docs).
+    pub charges: Vec<CompareItem>,
+    /// Each credit, matched by name.
+    pub credits: Vec<CompareItem>,
     pub totals: CompareTotals,
+}
+
+/// One charge or credit across the budgets.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompareItem {
+    /// The name as written in the first budget that has it.
+    pub name: String,
+    pub line: CompareLine,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -378,6 +395,8 @@ pub fn compare(budgets: &[(String, &Budget)]) -> Result<Comparison, CalcError> {
 
     let mut cats: Matched<CodeKey, CatItem, usize> = Matched::new();
     let mut levels: Matched<String, String, ()> = Matched::new();
+    let mut charges: Matched<String, String, ()> = Matched::new();
+    let mut credits: Matched<String, String, ()> = Matched::new();
     for (i, ((_, b), r)) in budgets.iter().zip(&reports).enumerate() {
         let coding = &b.account_coding;
         for (ci, cat) in r.categories.iter().enumerate() {
@@ -411,6 +430,18 @@ pub fn compare(budgets: &[(String, &Budget)]) -> Result<Comparison, CalcError> {
             let key = lv.name.trim().to_lowercase();
             levels
                 .add(key, (n, i), (), lv.total, || lv.name.clone())
+                .ok_or_else(ovf)?;
+        }
+        for c in &r.charges {
+            let key = c.name.trim().to_lowercase();
+            charges
+                .add(key, (n, i), (), c.amount, || c.name.clone())
+                .ok_or_else(ovf)?;
+        }
+        for c in &r.credits {
+            let key = c.name.trim().to_lowercase();
+            credits
+                .add(key, (n, i), (), c.amount, || c.name.clone())
                 .ok_or_else(ovf)?;
         }
     }
@@ -447,6 +478,20 @@ pub fn compare(budgets: &[(String, &Budget)]) -> Result<Comparison, CalcError> {
         })
         .collect::<Result<Vec<_>, CalcError>>()?;
 
+    let items = |m: Matched<String, String, ()>| {
+        m.items
+            .into_iter()
+            .map(|e| {
+                Ok(CompareItem {
+                    name: e.item,
+                    line: line(e.values)?,
+                })
+            })
+            .collect::<Result<Vec<_>, CalcError>>()
+    };
+    let charge_items = items(charges)?;
+    let credit_items = items(credits)?;
+
     let fringes = reports
         .iter()
         .map(|r| crate::calc::sum(r.categories.iter().map(|c| c.fringe_total)))
@@ -462,6 +507,8 @@ pub fn compare(budgets: &[(String, &Budget)]) -> Result<Comparison, CalcError> {
         labels: budgets.iter().map(|(l, _)| l.clone()).collect(),
         categories,
         levels,
+        charges: charge_items,
+        credits: credit_items,
         totals: CompareTotals {
             total_atl: all(reports.iter().map(|r| r.total_atl))?,
             total_btl: all(reports.iter().map(|r| r.total_btl))?,

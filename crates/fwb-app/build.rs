@@ -58,11 +58,20 @@ const COMMANDS: &[&str] = &[
     "clear_baseline",
     // Several cells at once (paste, fill down, cut)
     "set_cells",
-    // Row style, notes, group colors (src/rowstyle.rs)
+    // Row style, group colors (src/rowstyle.rs)
     "set_row_style",
-    "set_row_note",
     "set_group_color",
     "update_group",
+    // Dated notes on lines, accounts and categories (src/notes.rs)
+    "add_note",
+    "update_note",
+    "delete_note",
+    "set_note_done",
+    // Setup lists: use counts, custom order, short codes (src/setup_lists.rs)
+    "setup_usage",
+    "set_setup_order",
+    "move_setup_item",
+    "set_short_code",
     // Apply panel: tag the selected rows, fringe ranges (src/apply.rs)
     "apply_summary",
     "apply_to_rows",
@@ -72,6 +81,9 @@ const COMMANDS: &[&str] = &[
     // Quick entry: add setup items from a cell, new-line defaults (src/quickadd.rs)
     "set_cell_creating",
     "set_new_line_defaults",
+    // Global info and display settings (src/display.rs)
+    "set_global_info",
+    "set_display_prefs",
     // Copy and paste whole rows, accounts and categories with their setup
     // (src/clipboard.rs)
     "clip_copy",
@@ -143,6 +155,10 @@ const COMMANDS: &[&str] = &[
     "import_setup",
     "template_new",
     "template_save",
+    // Import lines from a spreadsheet with a column mapping (src/sheet_import.rs)
+    "sheet_import_pick",
+    "sheet_import_preview",
+    "sheet_import",
 ];
 
 fn main() {

@@ -34,7 +34,8 @@ import { applyView, applyHeadHost, applyListHost, APPLY_LISTS } from './apply.js
 import { setupBegin, renderSetupTab, setupEnd } from './setup.js';
 import { EXTRA_TABS } from './topsheet-setup.js';
 import { renderNotes } from './notes.js';
-import { renderFind } from './find.js';
+import { renderFind, findFor } from './find.js';
+import { onUsage, setFindHook } from './setuplist.js';
 import { renderPresets } from './presets.js';
 
 const TOOL_TABS = [
@@ -146,6 +147,16 @@ export function focusToolsKey(key) {
 
 // The last render's arguments, for redrawing after a tab change.
 let last = null;
+
+// The setup lists' counts arrived, or their sort or Show choice changed.
+onUsage(() => rerender());
+
+// A setup list's line count was clicked: Find shows the item's uses.
+setFindHook((table, name) => {
+  if (!selectToolsTab('find')) return;
+  rerender();
+  findFor(table, name);
+});
 // True right after a drag, so the click that ends it doesn't select the tab.
 let dragged = false;
 

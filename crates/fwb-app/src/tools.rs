@@ -26,11 +26,10 @@
 //! tools window asks to dock, saves its layout, jumps to a noted line and
 //! forwards app keys (Save, Undo...) as menu commands. See docs/APP.md.
 //!
-//! [`notes_list`] is the Notes tab's list of every line with a note.
+//! [`notes_list`] is the Notes tab's list of every note (src/notes.rs).
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use fwb_core::{Budget, RowId, TopsheetRow};
 use serde::{Deserialize, Serialize};
 use tauri::{
     AppHandle, Emitter, EventTarget, Manager, Runtime, State, WebviewUrl, WebviewWindow,
@@ -307,76 +306,21 @@ pub fn on_window_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
 }
 
 // ---------------------------------------------------------------------------
-// The Notes tab: every line with a note
+// The Notes tab: every note in the budget
 
-/// Longest note text sent with the list; the line itself has the rest.
-pub const NOTE_PREVIEW_CHARS: usize = 280;
-
-/// One line with a note, and where it is (the topsheet index and the
-/// account's index in its category, as `focus_account` takes them).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-pub struct NoteEntry {
-    pub row_id: RowId,
-    pub ti: usize,
-    pub ai: usize,
-    pub category: String,
-    pub account: String,
-    pub account_name: String,
-    /// The row's number in its account, as the grid's # column shows it.
-    pub line: usize,
-    pub description: String,
-    /// The note, cut to [`NOTE_PREVIEW_CHARS`] characters.
-    pub note: String,
-    /// True when `note` was cut.
-    pub more: bool,
-}
-
-/// Every line with a note, in budget order. Blank notes are left out.
-pub fn notes(b: &Budget) -> Vec<NoteEntry> {
-    let mut out = Vec::new();
-    for (ti, row) in b.topsheet.iter().enumerate() {
-        let TopsheetRow::Category(c) = row else {
-            continue;
-        };
-        for (ai, a) in c.accounts.iter().enumerate() {
-            for (i, d) in a.details.iter().enumerate() {
-                let Some(note) = d.note.as_deref().filter(|n| !n.trim().is_empty()) else {
-                    continue;
-                };
-                let more = note.chars().count() > NOTE_PREVIEW_CHARS;
-                out.push(NoteEntry {
-                    row_id: d.id,
-                    ti,
-                    ai,
-                    category: c.code.clone(),
-                    account: a.code.clone(),
-                    account_name: a.name.clone(),
-                    line: i + 1,
-                    description: d.description.clone(),
-                    note: note.chars().take(NOTE_PREVIEW_CHARS).collect(),
-                    more,
-                });
-            }
-        }
-    }
-    out
-}
-
-/// The Notes tab's list: every line in budget `doc` (`None`: the one in
-/// front) with a note.
+/// The Notes tab's list: every note in budget `doc` (`None`: the one in
+/// front), on lines, accounts and categories (src/notes.rs).
 #[tauri::command]
 pub fn notes_list(
     state: State<'_, AppState>,
     doc: Option<DocId>,
-) -> Result<Vec<NoteEntry>, String> {
-    Ok(notes(state.lock_doc(doc)?.budget()))
+) -> Result<Vec<crate::notes::NoteEntry>, String> {
+    Ok(crate::notes::budget_notes(state.lock_doc(doc)?.budget()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::edit;
-    use crate::session::Session;
 
     #[test]
     fn a_view_is_news_once() {
@@ -499,69 +443,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn notes_lists_every_noted_line_in_budget_order() {
-        let mut s = Session::new();
-        let all: Vec<(usize, usize, RowId)> = s
-            .budget()
-            .topsheet
-            .iter()
-            .enumerate()
-            .filter_map(|(ti, r)| match r {
-                TopsheetRow::Category(c) => Some((ti, c)),
-                TopsheetRow::ProductionTotal(_) => None,
-            })
-            .flat_map(|(ti, c)| {
-                c.accounts
-                    .iter()
-                    .enumerate()
-                    .flat_map(move |(ai, a)| a.details.iter().map(move |d| (ti, ai, d.id)))
-            })
-            .collect();
-        assert!(all.len() > 3, "the starter budget has lines");
-        assert!(notes(s.budget()).is_empty());
-
-        let (last, first) = (all[all.len() - 1], all[1]);
-        s.edit(|b| crate::rowstyle::apply_row_note(b, last.2, Some("Check the rate")))
-            .unwrap();
-        s.edit(|b| crate::rowstyle::apply_row_note(b, first.2, Some("Union minimum")))
-            .unwrap();
-        // A blank note (from a file; the command removes one) is no note.
-        let blank = all[2].2;
-        s.edit(|b| {
-            for c in b.categories_mut() {
-                for a in &mut c.accounts {
-                    for d in &mut a.details {
-                        if d.id == blank {
-                            d.note = Some("  \n ".into());
-                        }
-                    }
-                }
-            }
-            edit::set_title(b, "Noted")
-        })
-        .unwrap();
-        let n = notes(s.budget());
-        assert_eq!(n.len(), 2, "{n:?}");
-        assert_eq!(n[0].row_id, first.2, "budget order, not the order noted");
-        assert_eq!((n[0].ti, n[0].ai), (first.0, first.1));
-        assert_eq!(n[0].note, "Union minimum");
-        assert!(!n[0].more);
-        assert_eq!(n[1].row_id, last.2);
-        assert!(n.iter().all(|e| e.row_id != blank));
-
-        // The row number is its place in the account, and the codes are its own.
-        let b = s.budget();
-        let TopsheetRow::Category(c) = &b.topsheet[n[0].ti] else {
-            panic!("not a category")
-        };
-        let a = &c.accounts[n[0].ai];
-        assert_eq!(a.details[n[0].line - 1].id, n[0].row_id);
-        assert_eq!(n[0].account, a.code);
-        assert_eq!(n[0].category, c.code);
-        assert_eq!(n[0].account_name, a.name);
-    }
-
     const APP_RS: &str = include_str!("app.rs");
     const BUILD_RS: &str = include_str!("../build.rs");
     const MAIN_CAPS: &str = include_str!("../capabilities/main.json");
@@ -676,6 +557,8 @@ mod tests {
             include_str!("../ui/js/find.js"),
             include_str!("../ui/js/rename.js"),
             include_str!("../ui/js/presets.js"),
+            include_str!("../ui/js/setuplist.js"),
+            include_str!("../ui/js/display-settings.js"),
         ];
         let mut named = std::collections::BTreeSet::new();
         for js in panel_js {
@@ -699,24 +582,5 @@ mod tests {
                 "{c} is granted but the panel never calls it"
             );
         }
-    }
-
-    #[test]
-    fn long_notes_are_cut_for_the_list() {
-        let mut s = Session::new();
-        let id = s
-            .budget()
-            .categories()
-            .flat_map(|c| &c.accounts)
-            .flat_map(|a| &a.details)
-            .next()
-            .unwrap()
-            .id;
-        let long = "é".repeat(NOTE_PREVIEW_CHARS + 20);
-        s.edit(|b| crate::rowstyle::apply_row_note(b, id, Some(&long)))
-            .unwrap();
-        let n = notes(s.budget());
-        assert_eq!(n[0].note.chars().count(), NOTE_PREVIEW_CHARS);
-        assert!(n[0].more);
     }
 }

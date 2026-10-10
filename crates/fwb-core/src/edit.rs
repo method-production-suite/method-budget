@@ -27,6 +27,7 @@ pub fn delete_global(b: &mut Budget, name: &str) -> Result<Option<Dec>, CalcErro
         return Ok(None);
     };
     b.globals.remove(name);
+    b.global_info.remove(name);
     for f in b.globals.values_mut() {
         freeze(f, name, value);
     }

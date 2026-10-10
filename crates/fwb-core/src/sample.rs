@@ -15,7 +15,7 @@ use crate::calc::{recalc, RecalcOptions};
 use crate::decimal::Dec;
 use crate::model::{
     Account, Baseline, Budget, Category, Charge, ChargeKind, Credit, CreditCap, CreditRow,
-    CreditSource, Currency, Detail, Formula, Fringe, FringeKind, Group, InfoValue, Location,
+    CreditSource, Currency, Detail, Formula, Fringe, FringeKind, Group, InfoValue, Location, Note,
     ProductionTotal, SetDef, TopsheetRow, UnitDef,
 };
 
@@ -197,6 +197,7 @@ pub fn budget(spec: &SampleSpec) -> Budget {
             name.clone(),
             Fringe {
                 description: format!("Sample fringe {i}"),
+                short_code: (i % 3 == 0).then(|| format!("F{i}")),
                 rate: rate.into(),
                 kind,
             },
@@ -211,6 +212,7 @@ pub fn budget(spec: &SampleSpec) -> Budget {
             name.clone(),
             Group {
                 description: format!("Sample group {i}"),
+                short_code: (i % 2 == 0).then(|| format!("G{i}")),
                 // One group is out of the budget total, as a "hold" group would be.
                 in_budget_total: i != 1,
                 color: (i % 4 == 0).then(|| format!("#{:06x}", rng.below(0xFF_FFFF))),
@@ -349,7 +351,7 @@ pub fn budget(spec: &SampleSpec) -> Budget {
                     0
                 };
                 if rng.chance(4) {
-                    d.note = Some("Check the deal memo".into());
+                    d.notes = vec![Note::plain(1, "Check the deal memo")];
                 }
                 details.push(d);
             }
@@ -357,12 +359,14 @@ pub fn budget(spec: &SampleSpec) -> Budget {
                 code: format!("{code}-{:02}", a + 1),
                 name: format!("{} {}", CATEGORY_NAMES[ci % CATEGORY_NAMES.len()], a + 1),
                 details,
+                notes: Vec::new(),
             });
         }
         topsheet.push(TopsheetRow::Category(Category {
             code,
             name: CATEGORY_NAMES[ci % CATEGORY_NAMES.len()].into(),
             accounts: accts,
+            notes: Vec::new(),
         }));
         if ci == 1 {
             topsheet.push(TopsheetRow::ProductionTotal(ProductionTotal {

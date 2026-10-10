@@ -369,7 +369,7 @@ fn field_text(d: &Detail, field: &str) -> String {
         "set" => d.set.clone().unwrap_or_default(),
         "location" => d.location.clone().unwrap_or_default(),
         "currency" => d.currency.clone().unwrap_or_default(),
-        "note" => d.note.clone().unwrap_or_default(),
+        "note" => fwb_core::notes_text(&d.notes),
         f => formula(d, f)
             .map(|x| x.0.clone())
             .or_else(|| unit(d, f).map(String::from))
@@ -435,7 +435,7 @@ impl Finder {
     fn row_matches(&self, d: &Detail, field: &str) -> bool {
         match (&self.want, self.scope) {
             (Want::Text(m), Scope::Description) => m.is_match(&d.description),
-            (Want::Text(m), Scope::Note) => d.note.as_deref().is_some_and(|n| m.is_match(n)),
+            (Want::Text(m), Scope::Note) => d.notes.iter().any(|n| m.is_match(&n.text)),
             (Want::Text(m), Scope::Formula) => formula(d, field).is_some_and(|f| m.is_match(&f.0)),
             (Want::Token(name), _) => {
                 formula(d, field).is_some_and(|f| !global_tokens(&f.0, name).is_empty())
@@ -652,15 +652,18 @@ impl Finder {
                     d.description = splice(&d.description, &m.ranges(&d.description), w);
                 }
                 Scope::Note => {
-                    let old = d.note.clone().unwrap_or_default();
-                    let new = splice(&old, &m.ranges(&old), w);
-                    let len = new.chars().count();
-                    if len > MAX_NOTE_CHARS {
-                        return Err(format!(
-                            "a note would be {len} characters; notes can be at most {MAX_NOTE_CHARS}"
-                        ));
+                    // In every note on the row; a note left blank goes.
+                    for n in &mut d.notes {
+                        let new = splice(&n.text, &m.ranges(&n.text), w);
+                        let len = new.chars().count();
+                        if len > MAX_NOTE_CHARS {
+                            return Err(format!(
+                                "a note would be {len} characters; notes can be at most {MAX_NOTE_CHARS}"
+                            ));
+                        }
+                        n.text = new;
                     }
-                    d.note = (!new.trim().is_empty()).then_some(new);
+                    d.notes.retain(|n| !n.text.trim().is_empty());
                 }
                 _ => {
                     let f = formula_mut(d, field).ok_or("not a formula")?;
@@ -907,6 +910,7 @@ mod tests {
             b.fringes.insert(
                 f.into(),
                 Fringe {
+                    short_code: None,
                     description: String::new(),
                     rate: "5".into(),
                     kind: FringeKind::Percent { cutoff: None },
@@ -917,6 +921,7 @@ mod tests {
             b.groups.insert(
                 g.into(),
                 Group {
+                    short_code: None,
                     description: String::new(),
                     in_budget_total: true,
                     color: None,
@@ -942,7 +947,7 @@ mod tests {
         l1.groups = ["Crew".to_string()].into();
         l1.set = Some("Stage A".into());
         l1.location = Some("Rome".into());
-        l1.note = Some("Ask about the camera rental".into());
+        l1.notes = vec![fwb_core::Note::plain(1, "Ask about the camera rental")];
         let mut l2 = Detail::line(2, "Camera assistant", "SHOOT_DAYS + DAYS2", "Day", "300");
         l2.fringes = ["FICA".to_string(), "PENSION".to_string()].into();
         l2.currency = Some("EUR".into());
@@ -956,15 +961,18 @@ mod tests {
 
         b.topsheet = vec![
             TopsheetRow::Category(Category {
+                notes: Vec::new(),
                 code: "20".into(),
                 name: "Production".into(),
                 accounts: vec![
                     Account {
+                        notes: Vec::new(),
                         code: "20-01".into(),
                         name: "Camera".into(),
                         details: vec![l1, l2, l3, sub],
                     },
                     Account {
+                        notes: Vec::new(),
                         code: "20-02".into(),
                         name: "Electric".into(),
                         details: vec![l5, adj],
@@ -975,9 +983,11 @@ mod tests {
                 name: "Total".into(),
             }),
             TopsheetRow::Category(Category {
+                notes: Vec::new(),
                 code: "30".into(),
                 name: "Post".into(),
                 accounts: vec![Account {
+                    notes: Vec::new(),
                     code: "30-01".into(),
                     name: "Camera tests".into(),
                     details: Vec::new(),
@@ -1260,7 +1270,7 @@ mod tests {
         let nq = q("note", "Ask about the camera rental");
         let found = search(&b, &nq).unwrap();
         replace_in(&mut b, &nq, &targets(&found), Some("")).unwrap();
-        assert_eq!(row(&b, 1).note, None);
+        assert!(row(&b, 1).notes.is_empty());
 
         // Account names, not numbers.
         let aq = q("account", "Camera");

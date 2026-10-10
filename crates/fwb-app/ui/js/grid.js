@@ -5,7 +5,9 @@
 // out through handlers; the new data comes back through setData().
 //
 // Row spec:  { key, cls, selectable = true, activatable = false, editSkip = false,
-//              color, cells: { [colKey]: { text, edit, cls, title, error, placeholder } } }
+//              color, cells: { [colKey]: { text, edit, cls, title, error, placeholder, alt } } }
+//   `alt` is what the cell shows instead of `text` while it is in a selected
+//   range and setShowFormulas(true) is on (a formula shown by its value).
 //   `edit` is the raw value to edit (a string); leave it undefined for
 //   read-only cells. `editSkip` rows (separators) can be selected, but moving
 //   on after an edit passes over them. `color` is a `#hex` text color.
@@ -140,6 +142,8 @@ export class Grid {
     this.tbody = null;
     this.rowEls = new Map(); // row key -> { tr, sig }
     this.marked = new Set(); // rows with cursor or selection marks
+    this.zoom = 1; // setZoom(): the grid's size, 1 is 100%
+    this.showFormulas = false; // setShowFormulas(): selected ranges show `alt`
 
     this.table = el('table', { class: `grid ${this.uid}`, attrs: { role: 'grid' } });
     host.replaceChildren(this.table);
@@ -197,7 +201,9 @@ export class Grid {
    * minimum, and only then a sideways scroll (with pinned columns in view).
    */
   fit() {
-    const cols = this.columns;
+    // Zoomed (setZoom), every column is that much wider.
+    const z = this.zoom || 1;
+    const cols = z === 1 ? this.columns : this.columns.map((c) => ({ ...c, width: c.width * z, min: c.min ? c.min * z : c.min }));
     const sized = cols.length > 0 && cols.every((c) => c.width > 0 && SAFE_KEY.test(c.key));
     if (!sized) {
       if (this.fitSig !== '') setRules(this.uid, '');
@@ -487,7 +493,7 @@ export class Grid {
         parts.push('\u0003');
         continue;
       }
-      parts.push(cell.text, cell.edit === undefined ? 'r' : 'e', cell.cls, cell.title, cell.error, cell.placeholder);
+      parts.push(cell.text, cell.edit === undefined ? 'r' : 'e', cell.cls, cell.title, cell.error, cell.placeholder, cell.alt);
     }
     return parts.join('\u0001');
   }
@@ -508,15 +514,75 @@ export class Grid {
       if (cell.edit !== undefined) td.classList.add('editable');
       else td.classList.add('ro');
       if (cell.error) td.classList.add('has-error');
-      const text = cell.text === undefined || cell.text === null ? '' : String(cell.text);
-      if (text === '' && cell.placeholder) {
-        td.append(el('span', { class: 'ph', text: cell.placeholder }));
-      } else {
-        td.textContent = text;
-      }
+      Grid.fillCell(td, cell);
       tr.append(td);
     });
     return tr;
+  }
+
+  /** Puts a cell's text (or its placeholder) in its element. */
+  static fillCell(td, cell) {
+    const text = cell.text === undefined || cell.text === null ? '' : String(cell.text);
+    if (text === '' && cell.placeholder) {
+      td.replaceChildren(el('span', { class: 'ph', text: cell.placeholder }));
+    } else {
+      td.textContent = text;
+    }
+  }
+
+  /**
+   * Shows the cell's `alt` text (its formula) in place of its value, or puts
+   * the value back. Never touches a cell being edited.
+   */
+  showAlt(tr, td, on) {
+    if (td.classList.contains('editing')) return;
+    const r = this.rows[Number(tr.dataset.row)];
+    const c = this.columns[Number(td.dataset.col)];
+    const cell = r && c ? r.cells[c.key] : null;
+    if (on) {
+      if (!cell || typeof cell.alt !== 'string') return;
+      td.textContent = cell.alt;
+      td.classList.add('alt-shown');
+    } else {
+      td.classList.remove('alt-shown');
+      if (cell) Grid.fillCell(td, cell);
+    }
+  }
+
+  /**
+   * Selected ranges show formulas (each cell's `alt`) instead of values, or
+   * not. Display only.
+   */
+  setShowFormulas(on) {
+    this.showFormulas = Boolean(on);
+    this.paintMarks();
+  }
+
+  /**
+   * Draws the grid at `z` times its size (text, row heights and column
+   * widths), 1 for 100%. Display only.
+   */
+  setZoom(z) {
+    const zoom = Number.isFinite(z) && z > 0 ? z : 1;
+    if (zoom === this.zoom) return;
+    this.zoom = zoom;
+    const px = (n) => `${Math.round(n * zoom * 100) / 100}px`;
+    setRules(
+      `${this.uid}-zoom`,
+      zoom === 1
+        ? ''
+        : [
+            `table.${this.uid} { font-size: ${px(13)}; }`,
+            `.${this.uid} th { height: ${px(30)}; font-size: ${px(12)}; }`,
+            `.${this.uid} td { height: ${px(28)}; }`,
+            `.${this.uid}-host { scroll-padding-top: ${px(32)}; }`,
+          ].join('\n'),
+    );
+    // Row heights are measured again once drawn.
+    this.rowH = 29 * zoom;
+    this.headH = 31 * zoom;
+    this.fitSig = null;
+    if (this.tbody) this.render();
   }
 
   /** Builds the column widths and header row, with an empty body. */
@@ -782,10 +848,14 @@ export class Grid {
     if (!this.marked) return;
     for (const tr of this.marked) {
       tr.classList.remove('sel');
-      for (const td of tr.cells) td.classList.remove('cursor', 'in-range');
+      for (const td of tr.cells) {
+        td.classList.remove('cursor', 'in-range');
+        if (td.classList.contains('alt-shown')) this.showAlt(tr, td, false);
+      }
     }
     this.marked.clear();
     const ranged = this.hasRange();
+    const alt = ranged && this.showFormulas;
     const [ca, cb] = this.colRange();
     const markable = (key) => {
       const tr = this.rowEl(key);
@@ -799,7 +869,13 @@ export class Grid {
       const tr = markable(k);
       if (!tr) continue;
       tr.classList.add('sel');
-      if (ranged) for (let ci = ca; ci <= cb; ci++) if (tr.cells[ci]) tr.cells[ci].classList.add('in-range');
+      if (ranged) {
+        for (let ci = ca; ci <= cb; ci++) {
+          if (!tr.cells[ci]) continue;
+          tr.cells[ci].classList.add('in-range');
+          if (alt) this.showAlt(tr, tr.cells[ci], true);
+        }
+      }
     }
     const k = this.cursorKey();
     const tr = k === null ? null : markable(k);

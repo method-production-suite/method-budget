@@ -15,6 +15,12 @@
 // setting that uses it (rename.js). Fringe ranges are made and removed at the foot of
 // the fringe list.
 //
+// Each item also shows how many lines use it (a click runs Find for them)
+// and its dollars across the budget; the list can show only used or unused
+// items, sort by name from its header, and be put in the budget's own order
+// by dragging or Option+Shift+Up and Down (setuplist.js). Fringes and groups
+// can have a short code, set in their editor, which the grid shows.
+//
 // On the topsheet and the account list, the selection is every line under
 // the selected categories or accounts. Rust resolves that (apply_summary) and
 // returns the row ids, which the edit commands then take, so a click acts on
@@ -35,6 +41,20 @@ import { money } from './format.js';
 import { anchoredForm } from './modal.js';
 import { PALETTE, paletteColor } from './rowformat.js';
 import { renameProblem, renamedText, itemMenu } from './rename.js';
+import { orderedNames } from './order.js';
+import {
+  wantUsage,
+  listNames,
+  canReorder,
+  sortButton,
+  showSelect,
+  usesButton,
+  totalText,
+  dragHandle,
+  moveKey,
+  MOVE_KEYS,
+  inUse,
+} from './setuplist.js';
 
 const LISTS = [
   {
@@ -171,10 +191,6 @@ function budget() {
 
 function report() {
   return obj(st.view && st.view.report);
-}
-
-function byteOrder(a, b) {
-  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 function errText(e) {
@@ -519,9 +535,10 @@ const NO_SUMMARY = { rows: [], lines: 0, costed: 0, in_range: 0, range_blocked: 
 function drawList(host, list) {
   const s = shownSummary() || NO_SUMMARY;
   const defs = obj(list.defs(budget()));
-  const names = Object.keys(defs).sort(byteOrder);
+  const names = Object.keys(defs);
   const eligible = Number(list.eligible(s)) || 0;
   host.setAttribute('aria-busy', st.busy ? 'true' : 'false');
+  wantUsage(st.view);
   const parts = [];
 
   if (names.length) parts.push(tools(list, s, eligible));
@@ -529,14 +546,21 @@ function drawList(host, list) {
 
   const q = str(st.filters[list.id]).trim().toLowerCase();
   const only = Boolean(st.onlyApplied[list.id]);
-  const shown = names.filter((n) => {
-    const def = obj(defs[n]);
-    if (only && tally(s, list.id, n).count === 0) return false;
-    return !q || n.toLowerCase().includes(q) || str(def.description).toLowerCase().includes(q);
-  });
+  const { names: shown, filtered } = listNames(
+    st.view,
+    list.id,
+    (n) => {
+      const def = obj(defs[n]);
+      if (only && tally(s, list.id, n).count === 0) return false;
+      return !q || n.toLowerCase().includes(q) || str(def.description).toLowerCase().includes(q) || str(def.short_code).toLowerCase().includes(q);
+    },
+    { textFilter: Boolean(q) || only },
+  );
+  const movable = canReorder(list.id, filtered);
   const ul = el('ul', { class: 'apply-items', attrs: { 'aria-label': list.label }, data: { list: list.id } });
-  for (const n of shown) ul.append(item(list, s, n, obj(defs[n]), eligible));
+  for (const n of shown) ul.append(item(list, s, n, obj(defs[n]), eligible, movable));
   ul.append(addRow(list));
+  if (names.length) parts.push(colHead(list));
   if (!names.length) parts.push(el('p', { class: 'setup-empty', text: list.none }));
   else if (!shown.length) parts.push(el('p', { class: 'setup-empty', text: only ? 'None of these are on the selection.' : 'Nothing matches the filter.' }));
   parts.push(ul);
@@ -583,7 +607,7 @@ function tools(list, s, eligible) {
   }, { title: 'Show only the items on the selected lines' });
   onlyBtn.setAttribute('aria-pressed', String(only));
   onlyBtn.removeAttribute('aria-disabled'); // a view toggle, never busy
-  row.append(input, onlyBtn);
+  row.append(input, showSelect(list.id, draw, `apply:show:${list.id}`), onlyBtn);
 
   if (!list.multi) {
     const base = str(budget().base_currency);
@@ -601,6 +625,23 @@ function tools(list, s, eligible) {
     );
   }
   return row;
+}
+
+/** The list's column heads: the name (a click cycles its sort) and what the numbers are. */
+function colHead(list) {
+  return el(
+    'div',
+    { class: 'apply-colhead' },
+    el('span'),
+    el(
+      'span',
+      { class: 'apply-colhead-name' },
+      sortButton(list.id, 'Name', draw, `apply:sort:${list.id}`),
+      el('span', { class: 'apply-colhead-num', text: 'Selected', title: 'Dollars on the selected lines' }),
+    ),
+    el('span', { class: 'apply-colhead-num', text: 'Lines', title: 'Lines using it in the whole budget; click a count to find them' }),
+    el('span', { class: 'apply-colhead-num', text: 'Budget', title: 'Its dollars in the whole budget' }),
+  );
 }
 
 /** What an item adds up to across the whole budget, for its tooltip. */
@@ -627,7 +668,7 @@ function budgetWide(list, name, def) {
   return '';
 }
 
-function item(list, s, name, def, eligible) {
+function item(list, s, name, def, eligible, movable = false) {
   const t = tally(s, list.id, name);
   const state = stateOf(t.count, eligible);
   const infoId = nextId();
@@ -650,12 +691,17 @@ function item(list, s, name, def, eligible) {
         'aria-checked': ARIA[state],
         'aria-label': name,
         'aria-describedby': infoId,
-        'aria-keyshortcuts': 'Space Enter F2 Delete',
+        'aria-keyshortcuts': `Space Enter F2 Delete ${MOVE_KEYS}`,
       },
       data: { key, nobusy: '1' },
     },
     el('span', { class: 'apply-boxhit', attrs: { 'aria-hidden': 'true' } }, el('span', { class: 'apply-box' })),
-    el('span', { class: 'apply-name', text: name }),
+    el(
+      'span',
+      { class: 'apply-name' },
+      name,
+      str(def.short_code) ? el('span', { class: 'apply-code', text: str(def.short_code), title: 'Short code: the grid shows it for this item' }) : null,
+    ),
     el('span', { class: 'apply-desc', text: str(def.description) }),
     state === 'some' ? el('span', { class: 'apply-count', text: `${t.count}/${eligible}`, attrs: { 'aria-hidden': 'true' } }) : null,
     el('span', { class: `apply-num apply-amt${off ? ' apply-off' : ''}`, text: amount }),
@@ -686,6 +732,7 @@ function item(list, s, name, def, eligible) {
       ctx: renameCtx(),
       edit: () => editItem(list, name),
       remove: () => deleteItem(list, name),
+      extra: list.id === 'fringes' || list.id === 'groups' ? [{ label: 'Short code…', title: 'A short code the grid shows instead of the name', run: () => editCode(list, name) }] : [],
       onRenamed: (to) => {
         st.selected[list.id] = to;
         focusAfter(itemKey(list.id, to), list.id);
@@ -693,6 +740,7 @@ function item(list, s, name, def, eligible) {
     });
   });
   b.addEventListener('keydown', (e) => {
+    if (moveKey(e, list.id, name, movable, (cmd, args) => call(cmd, args).then(() => focusAfter(key, list.id)))) return;
     const plain = !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey;
     if ((e.key === 'Enter' || e.key === 'F2') && plain) {
       e.preventDefault();
@@ -706,7 +754,15 @@ function item(list, s, name, def, eligible) {
     }
     moveFocus(e, b);
   });
-  const li = el('li', { class: `apply-item apply-${state}` }, b);
+  const total = totalText(st.view, list.id, name);
+  const li = el(
+    'li',
+    { class: `apply-item apply-${state}`, data: { name } },
+    dragHandle(list.id, name, movable, (cmd, args) => call(cmd, args)),
+    b,
+    usesButton(st.view, list.id, name, `apply:uses:${list.id}:${name}`),
+    el('span', { class: `apply-num apply-total${off ? ' apply-off' : ''}`, text: total, title: off && total ? 'Not in the budget total' : undefined }),
+  );
   if (st.selected[list.id] === name) li.classList.add('is-selected');
   return li;
 }
@@ -797,8 +853,7 @@ function moneyText(s) {
 /** Units with hours (what a flat fringe can be charged per), plus `current`. */
 function timeUnits(current) {
   const units = obj(budget().units);
-  const out = Object.keys(units)
-    .sort(byteOrder)
+  const out = orderedNames(budget(), 'units')
     .filter((n) => {
       const u = obj(units[n]);
       return u.hours !== undefined && u.hours !== null && u.hours !== '';
@@ -831,6 +886,7 @@ function fringeFields(def) {
       showIf: (v) => v.kind === 'flat',
     },
     { key: 'description', label: 'Description', value: str(def.description) },
+    { key: 'short_code', label: 'Short code (shown in the grid)', value: str(def.short_code), placeholder: 'None' },
   ];
 }
 
@@ -841,6 +897,7 @@ function fringeInput(v) {
     rate: v.rate.trim(),
     cutoff: v.kind === 'flat' ? null : moneyText(v.cutoff),
     unit: v.kind === 'flat' && v.unit ? v.unit : null,
+    short_code: str(v.short_code).trim(),
   };
 }
 
@@ -859,6 +916,7 @@ const EDITORS = {
     return {
       fields: [
         { key: 'description', label: 'Description', value: str(def.description) },
+        { key: 'short_code', label: 'Short code (shown in the grid)', value: str(def.short_code), placeholder: 'None' },
         { key: 'counted', label: 'Counts in total', type: 'check', value: def.in_budget_total !== false },
         { key: 'color', label: 'Line color', type: 'swatches', options, value: ours ? ours.id : current ? 'keep' : '' },
       ],
@@ -868,7 +926,7 @@ const EDITORS = {
           'update_group',
           {
             name,
-            group: { description: v.description, in_budget_total: Boolean(v.counted) },
+            group: { description: v.description, in_budget_total: Boolean(v.counted), short_code: str(v.short_code).trim() },
             color: v.color === 'keep' ? current : picked ? picked.light : null,
           },
         ];
@@ -906,9 +964,10 @@ const ADDERS = {
   groups: {
     fields: () => [
       { key: 'description', label: 'Description', value: '' },
+      { key: 'short_code', label: 'Short code (shown in the grid)', value: '', placeholder: 'None' },
       { key: 'counted', label: 'Counts in total', type: 'check', value: true },
     ],
-    build: (name, v) => ['set_group', { name, group: { description: v.description, in_budget_total: Boolean(v.counted) } }],
+    build: (name, v) => ['set_group', { name, group: { description: v.description, in_budget_total: Boolean(v.counted), short_code: str(v.short_code).trim() } }],
   },
   sets: {
     fields: () => [{ key: 'description', label: 'Description', value: '', placeholder: 'Interior, night' }],
@@ -1013,27 +1072,57 @@ function editItem(list, name) {
   });
 }
 
+/** Sets or clears a fringe's or group's short code, in a small form next to it (one undo step). */
+function editCode(list, name) {
+  const defs = obj(list.defs(budget()));
+  if (!Object.prototype.hasOwnProperty.call(defs, name)) return;
+  const key = itemKey(list.id, name);
+  anchoredForm({
+    anchor: byKey(key),
+    title: `Short code for ${list.what} ${name}`,
+    message: 'The grid shows it instead of the name. Leave it empty for none.',
+    fields: [{ key: 'code', label: 'Short code', value: str(obj(defs[name]).short_code), placeholder: 'FICA' }],
+    onSubmit: (v) => call('set_short_code', { kind: list.what, name, code: str(v.code).trim() }),
+  }).then(() => focusAfter(key, list.id));
+}
+
 /** The question to ask before deleting, and the command. */
 function deletePlan(list, name, def) {
   const r = report();
+  const use = inUse(st.view, list.id, name);
+  // The fringe's own count is in every view; the others wait for the counts.
+  const lines = list.id === 'fringes' ? Number(obj(obj(r.fringes)[name]).uses) || use.lines : use.lines;
+  const used = lines ? `${plural(lines, 'line uses', 'lines use')} it. ` : '';
+  const removeText = lines ? `Remove from ${plural(lines, 'line', 'lines')} and delete` : 'Delete';
   if (list.id === 'fringes') {
-    const uses = Number(obj(obj(r.fringes)[name]).uses) || 0;
     return {
-      message: uses ? `It comes off the ${plural(uses, 'line', 'lines')} it is applied to.` : 'No lines use it.',
+      message: lines ? `${used}Deleting takes it off them.` : 'No lines use it.',
+      submitText: removeText,
       step: ['delete_fringe', { name }],
     };
   }
   if (list.id === 'groups') {
+    const back = def.in_budget_total === false ? ' and they count in the total again' : '';
     return {
-      message: def.in_budget_total === false ? 'Its lines lose the tag and count in the total again.' : 'Its lines lose the tag.',
+      message: lines ? `${used}Deleting takes it off them${back}.` : 'No lines use it.',
+      submitText: removeText,
       step: ['delete_group', { name }],
     };
   }
-  if (list.id === 'sets') return { message: 'Lines tagged with it lose the tag.', step: ['delete_set', { name }] };
-  if (list.id === 'locations') return { message: 'Lines tagged with it lose the tag.', step: ['delete_location', { name }] };
+  if (list.id === 'sets' || list.id === 'locations') {
+    return {
+      message: lines ? `${used}Deleting takes it off them.` : 'No lines use it.',
+      submitText: removeText,
+      step: [list.id === 'sets' ? 'delete_set' : 'delete_location', { name }],
+    };
+  }
+  const base = str(budget().base_currency);
   return {
-    message: 'It can’t be deleted while lines, charges or the totals use it.',
-    step: ['delete_currency', { code: name }],
+    message: lines
+      ? `${plural(lines, 'line is', 'lines are')} in ${name}. Deleting puts ${lines === 1 ? 'it' : 'them'} back in ${base || 'the base currency'}. Charges and the totals currency must not use it.`
+      : 'It can’t be deleted while charges or the totals currency use it.',
+    submitText: lines ? `Move ${plural(lines, 'line', 'lines')} and delete` : 'Delete',
+    step: ['delete_currency', { code: name, clearLines: lines > 0 }],
   };
 }
 
@@ -1047,13 +1136,13 @@ function deleteItem(list, name) {
   const order = ul ? [...ul.querySelectorAll('.apply-check')].map((b) => b.dataset.key) : [];
   const i = order.indexOf(key);
   const neighbor = order[i + 1] || order[i - 1] || addKey(list.id);
-  const { message, step } = deletePlan(list, name, obj(defs[name]));
+  const { message, step, submitText } = deletePlan(list, name, obj(defs[name]));
   let done = false;
   anchoredForm({
     anchor: byKey(key),
     title: `Delete ${list.what} ${name}?`,
     message,
-    submitText: 'Delete',
+    submitText: submitText || 'Delete',
     danger: true,
     onSubmit: () =>
       call(step[0], step[1]).then(() => {

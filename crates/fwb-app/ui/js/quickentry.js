@@ -13,6 +13,7 @@ import { $ } from './dom.js';
 import { decimal } from './format.js';
 import { Assist, canonicalName } from './autocomplete.js';
 import { anchoredDialog } from './modal.js';
+import { orderedNames, hasCustomOrder } from './order.js';
 
 // { grid, view(), level(), act(cmd, args), call(cmd, args), toast(message) }
 let ctx = null;
@@ -58,47 +59,62 @@ function namesOf(kind) {
   return [];
 }
 
-function described(map) {
-  return Object.keys(map).map((name) => ({ name, hint: text(map[name] && map[name].description) }));
+/**
+ * A table's items for the type-ahead, in the budget's order, each with its
+ * description (and short code, which the type-ahead also matches).
+ */
+function described(tableName) {
+  const map = table(tableName);
+  return orderedNames(budget(), tableName).map((name) => {
+    const def = map[name] || {};
+    const code = typeof def.short_code === 'string' ? def.short_code : '';
+    const hint = [code, text(def.description)].filter(Boolean).join(' · ');
+    return code ? { name, hint, code } : { name, hint };
+  });
+}
+
+/** Whether the type-ahead keeps `tableName`'s own order (it has a hand-made one). */
+function ordered(tableName) {
+  return hasCustomOrder(budget(), tableName);
 }
 
 /** What the type-ahead offers in a detail column (see autocomplete.js), or null. */
 export function assistConfig(colKey) {
   if (UNIT_FIELDS.has(colKey)) {
     const units = table('units');
-    const candidates = Object.keys(units).map((name) => {
+    const candidates = orderedNames(budget(), 'units').map((name) => {
       const u = units[name] || {};
       const hours = u.hours !== undefined && u.hours !== null ? `${decimal(u.hours)} h` : '';
       return { name, hint: text(u.description) || hours };
     });
-    return { mode: 'whole', candidates, addKind: 'unit', addLabel: 'unit', label: 'Units' };
+    return { mode: 'whole', candidates, addKind: 'unit', addLabel: 'unit', label: 'Units', ordered: ordered('units') };
   }
   if (FORMULA_FIELDS.has(colKey)) {
     const v = ctx.view();
     const values = (v && v.report && v.report.globals) || {};
     const globals = table('globals');
-    const candidates = Object.keys(globals).map((name) => ({
+    const candidates = orderedNames(budget(), 'globals').map((name) => ({
       name,
       hint: values[name] !== undefined ? decimal(values[name]) : text(globals[name]),
     }));
-    return { mode: 'formula', candidates, addKind: 'global', label: 'Globals' };
+    return { mode: 'formula', candidates, addKind: 'global', label: 'Globals', ordered: ordered('globals') };
   }
   if (colKey === 'currency') {
     const base = text(budget().base_currency);
     const currencies = table('currencies');
-    const candidates = Object.keys(currencies).map((name) => {
+    const candidates = orderedNames(budget(), 'currencies').map((name) => {
       const c = currencies[name] || {};
       return { name, hint: text(c.description) || (c.rate !== undefined ? `${decimal(c.rate)} ${base}` : '') };
     });
     if (base) candidates.push({ name: base, hint: 'Base currency' });
-    return { mode: 'whole', candidates, addKind: 'currency', addLabel: 'currency', label: 'Currencies' };
+    return { mode: 'whole', candidates, addKind: 'currency', addLabel: 'currency', label: 'Currencies', ordered: ordered('currencies') };
   }
-  if (colKey === 'set') return { mode: 'whole', candidates: described(table('sets')), addKind: 'set', addLabel: 'set', label: 'Sets' };
+  if (colKey === 'set') return { mode: 'whole', candidates: described('sets'), addKind: 'set', addLabel: 'set', label: 'Sets', ordered: ordered('sets') };
   if (colKey === 'location') {
-    return { mode: 'whole', candidates: described(table('locations')), addKind: 'location', addLabel: 'location', label: 'Locations' };
+    return { mode: 'whole', candidates: described('locations'), addKind: 'location', addLabel: 'location', label: 'Locations', ordered: ordered('locations') };
   }
-  if (colKey === 'fringes') return { mode: 'list', candidates: described(table('fringes')), label: 'Fringes' };
-  if (colKey === 'groups') return { mode: 'list', candidates: described(table('groups')), label: 'Groups' };
+  if (colKey === 'fringes') return { mode: 'list', candidates: described('fringes'), label: 'Fringes', ordered: ordered('fringes') };
+  if (colKey === 'groups') return { mode: 'list', candidates: described('groups'), label: 'Groups', ordered: ordered('groups') };
   return null;
 }
 
@@ -179,28 +195,70 @@ function detailById(id) {
   return details.find((d) => d.id === id) || null;
 }
 
-/** Opens the note editor for the cursor's line, next to its description. */
+/**
+ * Adds a dated note (Shift+Cmd+Space, Edit > Add Note, the right-click menu)
+ * to what the cursor is on: the line on an account's lines, the account on
+ * the account list, the category on the topsheet. A small dialog next to its
+ * description or name; the Notes tab shows, edits and deletes the notes.
+ */
 export async function editNote() {
-  if (!ctx || ctx.level() !== 'details') return;
+  if (!ctx) return;
   const grid = ctx.grid;
   const row = grid.cursorRow();
-  if (!row || !String(row.key).startsWith('r')) return;
-  const rowId = Number(row.key.slice(1));
-  const d = detailById(rowId);
-  if (!d) return;
-  const had = typeof d.note === 'string' ? d.note : '';
-  const num = row.cells && row.cells.num ? row.cells.num.text : '';
-  const anchor = grid.cellFor(row.key, 'description') || grid.cellFor(row.key, grid.cursorColKey());
-  const what = text(d.description).trim();
+  if (!row) return;
+  const level = ctx.level();
+  const v = ctx.view() || {};
+  const top = Array.isArray(v.budget && v.budget.topsheet) ? v.budget.topsheet : [];
+  let owner = null;
+  let what = '';
+  let count = 0;
+  let col = 'name';
+  const noteCount = (notes) => (Array.isArray(notes) ? notes.filter((n) => n && text(n.text).trim()).length : 0);
+  if (level === 'details' && String(row.key).startsWith('r')) {
+    const rowId = Number(row.key.slice(1));
+    const d = detailById(rowId);
+    if (!d) return;
+    const num = row.cells && row.cells.num ? row.cells.num.text : '';
+    const desc = text(d.description).trim();
+    owner = { row: rowId };
+    what = desc ? `Line ${num}: ${desc}` : `Line ${num}`;
+    count = noteCount(d.notes);
+    col = 'description';
+  } else if (level === 'accounts' && String(row.key).startsWith('a')) {
+    const cat = top.find((c) => c && Array.isArray(c.accounts) && c.accounts.some((a) => a.code === row.code));
+    const a = cat ? cat.accounts.find((x) => x.code === row.code) : null;
+    if (!a) return;
+    owner = { account: text(a.code) };
+    what = `Account ${text(a.code)} ${text(a.name)}`.trim();
+    count = noteCount(a.notes);
+  } else if (level === 'topsheet' && row.kind === 'category') {
+    const c = top[row.ti];
+    if (!c) return;
+    owner = { category: text(c.code) };
+    what = `Category ${text(c.code)} ${text(c.name)}`.trim();
+    count = noteCount(c.notes);
+  } else {
+    return;
+  }
+  const anchor = grid.cellFor(row.key, col) || grid.cellFor(row.key, grid.cursorColKey());
+  const had = count ? ` (${count === 1 ? 'it has 1 note' : `it has ${count} notes`}; the Notes tab shows them)` : '';
+  let author = '';
+  try {
+    const a = JSON.parse(window.localStorage.getItem('fwb.noteAuthor') || '""');
+    author = typeof a === 'string' ? a : '';
+  } catch {
+    author = '';
+  }
   await anchoredDialog({
     anchor,
-    title: had ? 'Edit note' : 'Add note',
-    message: what ? `Line ${num}: ${what}` : `Line ${num}`,
-    label: 'Note (leave it empty to remove the note)',
-    value: had,
+    title: 'Add note',
+    message: `${what}${had}`,
+    label: 'Note',
+    value: '',
     multiline: true,
-    submitText: 'Save',
-    onSubmit: (note) => (note === had ? Promise.resolve() : ctx.call('set_row_note', { rowId, note: note.trim() ? note : null })),
+    submitText: 'Add',
+    onSubmit: (note) =>
+      note.trim() ? ctx.call('add_note', { owner, text: note, created: new Date().toISOString(), author: author || null }) : Promise.resolve(),
   });
   grid.focus();
 }

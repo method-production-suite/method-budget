@@ -281,9 +281,11 @@ fn detail(b: &Budget, r: &Report) -> Sheet {
                     list(&d.groups),
                     Cell::text(d.set.as_deref().unwrap_or("")),
                     Cell::text(d.location.as_deref().unwrap_or("")),
-                    Cell::text(d.note.as_deref().unwrap_or("")),
+                    Cell::text(fwb_core::notes_text(&d.notes)),
                     yes_no(rr.included),
                     Cell::Int(d.id),
+                    d.fringe_range
+                        .map_or(Cell::Empty, |n| Cell::Int(u64::from(n))),
                 ]);
             }
         }
@@ -318,6 +320,7 @@ fn detail(b: &Budget, r: &Report) -> Sheet {
             "Note",
             "Included",
             "Row ID",
+            "Fringe Range",
         ]),
         rows,
     }

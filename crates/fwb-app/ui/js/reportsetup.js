@@ -70,6 +70,7 @@ export async function showReportSetup(ctx) {
   const categories = (Array.isArray(b.topsheet) ? b.topsheet : []).filter((r) => r && r.kind !== 'production_total');
   const groupNames = Object.keys(b.groups && typeof b.groups === 'object' ? b.groups : {}).sort();
   const infoLabels = Object.keys(b.info && typeof b.info === 'object' ? b.info : {});
+  const globalNames = Object.keys(b.globals && typeof b.globals === 'object' ? b.globals : {}).sort();
 
   // The preset being edited (an index into presets, or null for a new setup).
   const def = presets.findIndex((p) => p.default === true);
@@ -84,6 +85,13 @@ export async function showReportSetup(ctx) {
   const pages = el('div', { class: 'rs-pages rpt-preview', attrs: { tabindex: '0', 'aria-label': 'Report preview' } });
   const pageCount = el('span', { class: 'rs-count', attrs: { 'aria-live': 'polite' } });
   const jump = el('select', { class: 'rs-jump', attrs: { 'aria-label': 'Go to a section of the preview' } });
+  // Page navigation: first, previous, the page shown (type a number), next, last.
+  const navBtn = (text, label) => el('button', { class: 'btn btn-quiet rs-nav', text, title: label, attrs: { type: 'button', 'aria-label': label } });
+  const firstBtn = navBtn('«', 'First page');
+  const prevBtn = navBtn('‹', 'Previous page');
+  const nextBtn = navBtn('›', 'Next page');
+  const lastBtn = navBtn('»', 'Last page');
+  const pageInput = el('input', { class: 'modal-input rs-page-input', attrs: { type: 'text', inputmode: 'numeric', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Page shown', size: '3' } });
   const status = el('p', { class: 'rs-status', attrs: { role: 'status' } });
   const presetSelect = el('select', { class: 'rs-preset', attrs: { 'aria-label': 'Report preset' } });
   const nameInput = el('input', { class: 'modal-input rs-name', attrs: { type: 'text', autocomplete: 'off', spellcheck: 'false', placeholder: 'Preset name', 'aria-label': 'Preset name', maxlength: '80' } });
@@ -104,6 +112,63 @@ export async function showReportSetup(ctx) {
 
   let timer = 0;
   let sections = [];
+  let pageTotal = 0;
+  let shown = 1;
+
+  /** The page at the top of the preview (the last one whose top has scrolled past). */
+  const pageInView = () => {
+    const sheets = pages.querySelectorAll('.rpt-sheet');
+    const top = pages.scrollTop + 24;
+    let n = 1;
+    sheets.forEach((sh, i) => {
+      if (sh.offsetTop <= top) n = i + 1;
+    });
+    return n;
+  };
+  const drawNav = () => {
+    if (document.activeElement !== pageInput) pageInput.value = pageTotal ? String(shown) : '';
+    firstBtn.disabled = prevBtn.disabled = shown <= 1;
+    nextBtn.disabled = lastBtn.disabled = shown >= pageTotal;
+  };
+  const goPage = (n) => {
+    if (!pageTotal) return;
+    const k = Math.min(Math.max(1, n), pageTotal);
+    const sheet = pages.querySelector(`.rpt-page[data-page="${k}"]`);
+    if (sheet) pages.scrollTop = sheet.parentElement.offsetTop - 16;
+    shown = k;
+    drawNav();
+  };
+  let navFrame = 0;
+  pages.addEventListener(
+    'scroll',
+    () => {
+      if (navFrame) return;
+      navFrame = requestAnimationFrame(() => {
+        navFrame = 0;
+        shown = pageInView();
+        drawNav();
+      });
+    },
+    { passive: true },
+  );
+  firstBtn.addEventListener('click', () => goPage(1));
+  prevBtn.addEventListener('click', () => goPage(shown - 1));
+  nextBtn.addEventListener('click', () => goPage(shown + 1));
+  lastBtn.addEventListener('click', () => goPage(pageTotal));
+  const typedPage = () => {
+    const n = Number.parseInt(pageInput.value, 10);
+    if (Number.isFinite(n)) goPage(n);
+    else drawNav();
+  };
+  pageInput.addEventListener('change', typedPage);
+  pageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      typedPage();
+    }
+  });
+  pageInput.addEventListener('blur', drawNav);
   const draw = () => {
     clearTimeout(timer);
     timer = 0;
@@ -113,9 +178,12 @@ export async function showReportSetup(ctx) {
     const width = Math.max(240, pages.clientWidth - 40);
     scalePreview(pages, width, spec.landscape);
     sections = out.sections;
-    pageCount.textContent = `${out.pages} ${out.pages === 1 ? 'page' : 'pages'}`;
+    pageTotal = out.pages;
+    pageCount.textContent = `of ${out.pages}`;
     jump.replaceChildren(el('option', { text: 'Go to section', attrs: { value: '' } }), ...sections.map((s, i) => el('option', { text: `${s.name} (page ${s.page})`, attrs: { value: String(i) } })));
     pages.scrollTop = top;
+    shown = Math.min(pageInView(), Math.max(1, pageTotal));
+    drawNav();
   };
   const redraw = () => {
     clearTimeout(timer);
@@ -127,6 +195,8 @@ export async function showReportSetup(ctx) {
     if (!s) return;
     const sheet = pages.querySelector(`.rpt-page[data-page="${s.page}"]`);
     if (sheet) pages.scrollTop = sheet.parentElement.offsetTop - 16;
+    shown = s.page;
+    drawNav();
   });
   // The pages don't depend on the pane's size, only their scale does.
   const resize = new ResizeObserver(() => {
@@ -260,6 +330,7 @@ export async function showReportSetup(ctx) {
       flag('skip_zero_accounts', 'Accounts that total zero'),
       flag('skip_suppressed_lines', 'Lines not in the budget total'),
       flag('skip_notes', 'Notes under detail lines'),
+      flag('skip_done_notes', 'Notes ticked off as reviewed'),
     ];
     if (groupNames.length) {
       const only = new Set(spec.only_groups);
@@ -341,8 +412,26 @@ export async function showReportSetup(ctx) {
       'Layout',
       orient,
       el('label', { class: 'rs-inline' }, el('span', { text: 'Type size' }), size),
-      check('Shading on alternate lines and totals', spec.shading, (v) => change(() => (spec.shading = v))),
-      check('Lines in their group colors', spec.group_colors, (v) => change(() => (spec.group_colors = v))),
+      check('Shading on alternate lines and totals', spec.shading, (v) => change(() => (spec.shading = v)), { key: 'shading' }),
+      check('Lines in their group colors', spec.group_colors, (v) => change(() => (spec.group_colors = v)), { key: 'colors' }),
+      check('Lines between columns', spec.vertical_rules, (v) => change(() => (spec.vertical_rules = v)), { key: 'rules' }),
+      check('Detail level: one line per account', spec.collapse_details, (v) => change(() => (spec.collapse_details = v)), {
+        key: 'collapse',
+        title: 'Each account prints as one line with its total instead of its lines',
+      }),
+    );
+  }
+
+  function topsheetGroup() {
+    const noDetail = !spec.sections.includes('detail');
+    return group(
+      'Topsheet columns',
+      check('Fringes', spec.topsheet_fringes, (v) => change(() => (spec.topsheet_fringes = v)), { key: 'ts-fringes', title: 'What each category’s lines earn in fringes, wherever they post' }),
+      check('Page its detail starts on', spec.topsheet_pages, (v) => change(() => (spec.topsheet_pages = v)), {
+        key: 'ts-pages',
+        title: noDetail ? 'Prints blank until the detail level is in the report' : 'The page of this printout where each category’s detail begins',
+      }),
+      noDetail && spec.topsheet_pages ? el('p', { class: 'rs-hint', text: 'Add the detail level to fill in the page numbers.' }) : null,
     );
   }
 
@@ -353,19 +442,23 @@ export async function showReportSetup(ctx) {
       ['', 'Nothing'],
       ['title', 'Budget title'],
       ['section', 'Section'],
-      ['printed', 'Date printed'],
+      ['printed', 'Date and time printed'],
+      ['date', 'Date printed'],
+      ['time', 'Time printed'],
       ['file', 'File name'],
       ['page', 'Page X of Y'],
       ...infoLabels.map((l) => [`info:${l}`, l]),
+      ...globalNames.map((g) => [`global:${g}`, `Global: ${g}`]),
       ['text', 'Text…'],
     ];
     if (f && f.kind === 'info' && !infoLabels.includes(f.label)) opts.splice(opts.length - 1, 0, [`info:${f.label}`, f.label]);
+    if (f && f.kind === 'global' && !globalNames.includes(f.name)) opts.splice(opts.length - 1, 0, [`global:${f.name}`, `Global: ${f.name} (not in this budget)`]);
     for (const [v, label] of opts) {
       const o = el('option', { text: label });
       o.value = v;
       sel.append(o);
     }
-    sel.value = !f ? '' : f.kind === 'info' ? `info:${f.label}` : f.kind;
+    sel.value = !f ? '' : f.kind === 'info' ? `info:${f.label}` : f.kind === 'global' ? `global:${f.name}` : f.kind;
     const text = el('input', { class: 'modal-input rs-text', attrs: { type: 'text', maxlength: '200', 'aria-label': `${which} ${slot} text`, placeholder: 'Text' } });
     text.value = f && f.kind === 'text' ? f.text : '';
     text.hidden = !(f && f.kind === 'text');
@@ -385,7 +478,8 @@ export async function showReportSetup(ctx) {
         text.focus();
         return;
       }
-      change(() => set(v === '' ? null : v.startsWith('info:') ? { kind: 'info', label: v.slice(5) } : { kind: v }));
+      const field = v === '' ? null : v.startsWith('info:') ? { kind: 'info', label: v.slice(5) } : v.startsWith('global:') ? { kind: 'global', name: v.slice(7) } : { kind: v };
+      change(() => set(field));
     });
     text.addEventListener('input', () => {
       set({ kind: 'text', text: text.value });
@@ -405,12 +499,24 @@ export async function showReportSetup(ctx) {
         spec.footer = null;
       }),
     );
+    const firstOnly = (key, label) =>
+      check(label, (spec[key] || {}).first_page_only === true, (v) =>
+        change(() => {
+          const next = { ...(spec[key] || (key === 'header' ? STANDARD_HEADER : STANDARD_FOOTER)) };
+          if (v) next.first_page_only = true;
+          else delete next.first_page_only;
+          spec[key] = next;
+        }),
+        { key: `${key}-first` },
+      );
     return group(
       'Header and footer',
       el('p', { class: 'rs-sub', text: 'Header' }),
       ...SLOTS.map(([s]) => fieldSelect(header, s, 'Header')),
+      firstOnly('header', 'Header on the first page only'),
       el('p', { class: 'rs-sub', text: 'Footer' }),
       ...SLOTS.map(([s]) => fieldSelect(footer, s, 'Footer')),
+      firstOnly('footer', 'Footer on the first page only'),
       reset,
     );
   }
@@ -419,7 +525,7 @@ export async function showReportSetup(ctx) {
     const scroll = left.scrollTop;
     const active = document.activeElement;
     const focusId = active && left.contains(active) ? active.id : '';
-    left.replaceChildren(sectionsGroup(), treeGroup(), leaveOutGroup(), columnsGroup(), layoutGroup(), bandsGroup());
+    left.replaceChildren(sectionsGroup(), treeGroup(), leaveOutGroup(), topsheetGroup(), columnsGroup(), layoutGroup(), bandsGroup());
     left.scrollTop = scroll;
     if (focusId) {
       const again = [...left.querySelectorAll('[id]')].find((n) => n.id === focusId);
@@ -545,7 +651,12 @@ export async function showReportSetup(ctx) {
         saveNewBtn,
         deleteBtn,
       );
-      const toolbar = el('div', { class: 'rs-previewbar' }, pageCount, jump);
+      const toolbar = el(
+        'div',
+        { class: 'rs-previewbar' },
+        el('div', { class: 'rs-nav-group', attrs: { role: 'group', 'aria-label': 'Pages' } }, firstBtn, prevBtn, el('span', { class: 'rs-page-label', text: 'Page' }), pageInput, pageCount, nextBtn, lastBtn),
+        jump,
+      );
       const box = el(
         'div',
         { class: 'modal rs-dialog', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'rs-title' } },
@@ -558,6 +669,7 @@ export async function showReportSetup(ctx) {
     {
       onClose: () => {
         clearTimeout(timer);
+        if (navFrame) cancelAnimationFrame(navFrame);
         resize.disconnect();
       },
     },

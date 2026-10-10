@@ -33,8 +33,9 @@ use crate::view::View;
 pub const UNTITLED: &str = "Untitled";
 
 /// `b` as a template titled `title`: chart, setup and settings kept; budget
-/// info, baseline and versions cleared; the detail rows dropped, or with
-/// `keep_lines` kept without their notes.
+/// info, baseline, versions and the notes on categories and accounts
+/// cleared; the detail rows dropped, or with `keep_lines` kept without their
+/// notes.
 pub fn strip(b: &Budget, keep_lines: bool, title: &str) -> Budget {
     let mut t = b.clone();
     t.title = title.trim().to_string();
@@ -42,10 +43,12 @@ pub fn strip(b: &Budget, keep_lines: bool, title: &str) -> Budget {
     t.baseline = None;
     t.versions.clear();
     for c in t.categories_mut() {
+        c.notes.clear();
         for a in &mut c.accounts {
+            a.notes.clear();
             if keep_lines {
                 for d in &mut a.details {
-                    d.note = None;
+                    d.notes.clear();
                 }
             } else {
                 a.details.clear();
@@ -191,8 +194,11 @@ mod tests {
             .insert("Director".into(), InfoValue::Text("Someone".into()));
         b.baseline = Some(Baseline::default());
         fwb_core::save_version(&mut b, "Draft", "2026-10-09T10:00:00Z", None);
-        let d = &mut b.categories_mut().next().unwrap().accounts[0].details[0];
-        d.note = Some("private".into());
+        let c = b.categories_mut().next().unwrap();
+        c.notes = vec![fwb_core::Note::plain(1, "category note")];
+        c.accounts[0].notes = vec![fwb_core::Note::plain(1, "account note")];
+        let d = &mut c.accounts[0].details[0];
+        d.notes = vec![fwb_core::Note::plain(1, "private")];
         b
     }
 
@@ -236,7 +242,10 @@ mod tests {
             .categories()
             .flat_map(|c| &c.accounts)
             .flat_map(|a| &a.details)
-            .all(|d| d.note.is_none()));
+            .all(|d| d.notes.is_empty()));
+        assert!(kept
+            .categories()
+            .all(|c| c.notes.is_empty() && c.accounts.iter().all(|a| a.notes.is_empty())));
         // The format round-trips it.
         let text = fwb_format::to_string(&t);
         assert_eq!(fwb_format::from_str(&text).unwrap(), t);

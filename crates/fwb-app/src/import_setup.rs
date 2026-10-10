@@ -282,8 +282,17 @@ fn needs(b: &Budget, w: What, name: &str) -> BTreeSet<Key> {
         }
         What::ReportPreset => {
             if let Some(i) = preset_index(b, w, name) {
-                for g in &b.report_presets[i].spec.only_groups {
+                let spec = &b.report_presets[i].spec;
+                for g in &spec.only_groups {
                     add(What::Group, g);
+                }
+                // A header or footer slot showing a global's value.
+                for band in [&spec.header, &spec.footer].into_iter().flatten() {
+                    for slot in [&band.left, &band.center, &band.right] {
+                        if let Some(fwb_core::BandField::Global(g)) = slot {
+                            add(What::Global, g);
+                        }
+                    }
                 }
             }
         }
@@ -1044,6 +1053,14 @@ pub fn import(
                     .iter()
                     .map(|g| clipboard::renamed(&renames.groups, g))
                     .collect();
+                let spec = &mut p.spec;
+                for band in [&mut spec.header, &mut spec.footer].into_iter().flatten() {
+                    for slot in [&mut band.left, &mut band.center, &mut band.right] {
+                        if let Some(fwb_core::BandField::Global(g)) = slot {
+                            *g = clipboard::renamed(&renames.globals, g);
+                        }
+                    }
+                }
                 match preset_index(b, w, &to) {
                     // Replacing keeps this budget's choice of default.
                     Some(j) => {
@@ -1252,6 +1269,7 @@ mod tests {
         b.fringes.insert(
             "FICA".into(),
             Fringe {
+                short_code: None,
                 description: "Social security".into(),
                 rate: "FICA_RATE".into(),
                 kind: FringeKind::Percent { cutoff: None },
@@ -1260,6 +1278,7 @@ mod tests {
         b.fringes.insert(
             "KIT".into(),
             Fringe {
+                short_code: None,
                 description: String::new(),
                 rate: "WEEKS * 10".into(),
                 kind: FringeKind::Flat {
@@ -1270,6 +1289,7 @@ mod tests {
         b.groups.insert(
             "OT".into(),
             Group {
+                short_code: None,
                 description: "Overtime".into(),
                 in_budget_total: true,
                 color: None,
@@ -1317,6 +1337,10 @@ mod tests {
             default: true,
             spec: ReportSpec {
                 only_groups: ["OT".to_string()].into(),
+                footer: Some(fwb_core::Band {
+                    left: Some(fwb_core::BandField::Global("WEEKS".into())),
+                    ..fwb_core::Band::default()
+                }),
                 ..ReportSpec::default()
             },
         });
@@ -1383,7 +1407,12 @@ mod tests {
         );
         assert_eq!(
             item(&p, "report_preset", "Crew").needs,
-            [pick("group", "OT")]
+            [
+                pick("global", "DAYS"),
+                pick("global", "WEEKS"),
+                pick("group", "OT")
+            ],
+            "a footer showing a global needs it, and what its formula names"
         );
         assert_eq!(item(&p, "fringe_posting", "").status, "differs");
         assert_eq!(item(&p, "fringe_posting", "").rename_to, None);
@@ -1426,6 +1455,7 @@ mod tests {
         here.groups.insert(
             "OT".into(),
             Group {
+                short_code: None,
                 description: "Other".into(),
                 in_budget_total: false,
                 color: None,

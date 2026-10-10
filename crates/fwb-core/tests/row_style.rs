@@ -77,6 +77,7 @@ fn separators_do_not_break_a_fringe_range() {
     b.fringes.insert(
         "PEN".into(),
         Fringe {
+            short_code: None,
             description: String::new(),
             rate: "10".into(),
             kind: FringeKind::Percent {
@@ -112,6 +113,7 @@ fn separators_are_never_counted_fringed_or_reported() {
     b.fringes.insert(
         "PCT".into(),
         Fringe {
+            short_code: None,
             description: String::new(),
             rate: "10".into(),
             kind: FringeKind::Percent { cutoff: None },
@@ -179,7 +181,7 @@ fn styling_changes_no_total() {
         d.italic = i % 3 == 0;
         d.indent = (i % 5) as u8;
         d.color = Some("#aa0000".into());
-        d.note = Some(format!("note {i}"));
+        d.notes = vec![Note::plain(1, format!("note {i}"))];
     }
     assert_eq!(run(&b), before);
 }
@@ -194,5 +196,6 @@ fn only_lines_and_adjustments_are_costed() {
     assert_eq!(s.kind, RowKind::Separator);
     assert!(s.description.is_empty());
     assert!(!s.bold && !s.italic && s.indent == 0);
-    assert_eq!((s.color, s.note), (None, None));
+    assert_eq!(s.color, None);
+    assert!(s.notes.is_empty());
 }

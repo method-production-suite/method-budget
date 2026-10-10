@@ -545,8 +545,12 @@ pub fn delete_unit<R: Runtime>(
     state: State<'_, AppState>,
     doc: Option<DocId>,
     name: String,
+    clear_lines: Option<bool>,
 ) -> CmdResult {
-    edit_budget(&window, &state, doc, |b| edit::delete_unit(b, &name))
+    // `clearLines`: also blank the unit columns that name it.
+    edit_budget(&window, &state, doc, |b| {
+        edit::delete_unit_with(b, &name, clear_lines.unwrap_or(false))
+    })
 }
 
 #[tauri::command]
@@ -568,8 +572,12 @@ pub fn delete_currency<R: Runtime>(
     state: State<'_, AppState>,
     doc: Option<DocId>,
     code: String,
+    clear_lines: Option<bool>,
 ) -> CmdResult {
-    edit_budget(&window, &state, doc, |b| edit::delete_currency(b, &code))
+    // `clearLines`: lines in it go back to the base currency first.
+    edit_budget(&window, &state, doc, |b| {
+        edit::delete_currency_with(b, &code, clear_lines.unwrap_or(false))
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -939,6 +947,8 @@ pub fn run() {
         .manage(crate::compare::CompareFiles::default())
         // The budget picked to import setup from (src/import_setup.rs).
         .manage(crate::import_setup::ImportSources::default())
+        // The spreadsheet picked to import lines from (src/sheet_import.rs).
+        .manage(crate::sheet_import::SheetSources::default())
         // Which budget change the other window has heard about (src/tools.rs).
         .manage(crate::tools::Broadcast::default());
 
@@ -1046,11 +1056,20 @@ pub fn run() {
             clear_baseline,
             // Several cells at once
             set_cells,
-            // Row style, notes, group colors
+            // Row style, group colors
             crate::rowstyle::set_row_style,
-            crate::rowstyle::set_row_note,
             crate::rowstyle::set_group_color,
             crate::rowstyle::update_group,
+            // Notes (src/notes.rs)
+            crate::notes::add_note,
+            crate::notes::update_note,
+            crate::notes::delete_note,
+            crate::notes::set_note_done,
+            // Setup lists (src/setup_lists.rs)
+            crate::setup_lists::setup_usage,
+            crate::setup_lists::set_setup_order,
+            crate::setup_lists::move_setup_item,
+            crate::setup_lists::set_short_code,
             // Apply panel (src/apply.rs)
             crate::apply::apply_summary,
             crate::apply::apply_to_rows,
@@ -1060,6 +1079,9 @@ pub fn run() {
             // Quick entry: add setup items from a cell, new-line defaults (src/quickadd.rs)
             crate::quickadd::set_cell_creating,
             crate::quickadd::set_new_line_defaults,
+            // Global info and display settings (src/display.rs)
+            crate::display::set_global_info,
+            crate::display::set_display_prefs,
             // Copy and paste whole rows, accounts and categories with their
             // setup (src/clipboard.rs)
             crate::clipboard::clip_copy,
@@ -1131,6 +1153,11 @@ pub fn run() {
             crate::import_setup::import_setup,
             crate::templates::template_new,
             crate::templates::template_save,
+            // Import lines from a spreadsheet with a column mapping
+            // (src/sheet_import.rs)
+            crate::sheet_import::sheet_import_pick,
+            crate::sheet_import::sheet_import_preview,
+            crate::sheet_import::sheet_import,
         ])
         .setup(|app| {
             // Autosave, recovery, backups, recent files, and the budgets that

@@ -43,22 +43,27 @@ function byName(a, b) {
 }
 
 /**
- * Candidates for `query`: names starting with it first, then names that
- * contain it elsewhere (`contains` false: prefix only), each group in
- * alphabetical order, ignoring case. `skip` names are left out.
+ * Candidates for `query`: names (or short codes, for candidates with a
+ * `code`) starting with it first, then names that contain it elsewhere
+ * (`contains` false: prefix only), each group in alphabetical order ignoring
+ * case, or in the candidates' own order with `ordered` (a setup table in the
+ * budget's hand-made order). `skip` names are left out.
  */
-export function rank(candidates, query, { contains = true, skip = null } = {}) {
+export function rank(candidates, query, { contains = true, skip = null, ordered = false } = {}) {
   const q = lower(query);
   const head = [];
   const rest = [];
   for (const c of candidates) {
     if (skip && skip.has(c.name)) continue;
     const n = lower(c.name);
-    if (n.startsWith(q)) head.push(c);
+    const k = c.code ? lower(c.code) : '';
+    if (n.startsWith(q) || (q && k && k.startsWith(q))) head.push(c);
     else if (contains && q && n.includes(q)) rest.push(c);
   }
-  head.sort(byName);
-  rest.sort(byName);
+  if (!ordered) {
+    head.sort(byName);
+    rest.sort(byName);
+  }
   return [...head, ...rest];
 }
 
@@ -111,7 +116,7 @@ export function suggest(config, value, caret) {
   if (config.mode === 'formula') {
     span = formulaToken(v, c);
     if (!span) return null;
-    matches = rank(candidates, span.token, { contains: false });
+    matches = rank(candidates, span.token, { contains: false, ordered: Boolean(config.ordered) });
   } else if (config.mode === 'list') {
     span = listToken(v, c);
     const others = new Set(
@@ -120,12 +125,12 @@ export function suggest(config, value, caret) {
         .map((x) => x.trim())
         .filter((x) => x && x !== span.token),
     );
-    matches = rank(candidates, span.token, { skip: others });
+    matches = rank(candidates, span.token, { skip: others, ordered: Boolean(config.ordered) });
     if (!span.token && !matches.length) return null;
   } else {
     span = { from: 0, to: v.length, token: v.trim() };
     if (!span.token) return null;
-    matches = rank(candidates, span.token);
+    matches = rank(candidates, span.token, { ordered: Boolean(config.ordered) });
   }
   const token = span.token;
   const exact = candidates.some((x) => lower(x.name) === lower(token));

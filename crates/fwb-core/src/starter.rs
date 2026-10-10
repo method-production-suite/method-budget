@@ -14,6 +14,7 @@ fn category(code: &str, name: &str, accounts: Vec<Account>) -> TopsheetRow {
         code: code.into(),
         name: name.into(),
         accounts,
+        notes: Vec::new(),
     })
 }
 
@@ -26,6 +27,7 @@ fn account(code: &str, name: &str, details: Vec<Detail>) -> Account {
         code: code.into(),
         name: name.into(),
         details,
+        notes: Vec::new(),
     }
 }
 
@@ -45,6 +47,7 @@ pub fn budget() -> Budget {
         "PAYROLL".into(),
         Fringe {
             description: "Payroll taxes (placeholder rate)".into(),
+            short_code: None,
             rate: "10".into(),
             kind: FringeKind::Percent { cutoff: None },
         },

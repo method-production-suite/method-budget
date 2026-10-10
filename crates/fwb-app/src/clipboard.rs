@@ -1279,6 +1279,7 @@ pub fn paste(
                 let new_code = free_account_code(&b.account_coding, &cat.code, &a.code, &taken)?;
                 taken.insert(new_code.clone());
                 out.push(Account {
+                    notes: a.notes.clone(),
                     code: new_code,
                     name: a.name.clone(),
                     details: a.details.iter().map(&mut fresh).collect(),
@@ -1304,12 +1305,14 @@ pub fn paste(
                         free_account_code(&b.account_coding, &cat_code, &a.code, &taken)?;
                     taken.insert(new_code.clone());
                     accounts.push(Account {
+                        notes: a.notes.clone(),
                         code: new_code,
                         name: a.name.clone(),
                         details: a.details.iter().map(&mut fresh).collect(),
                     });
                 }
                 out.push(Category {
+                    notes: c.notes.clone(),
                     code: cat_code,
                     name: c.name.clone(),
                     accounts,
@@ -1484,6 +1487,7 @@ mod tests {
         b.fringes.insert(
             "FICA".into(),
             Fringe {
+                short_code: None,
                 description: "Social security".into(),
                 rate: "FICA_RATE".into(),
                 kind: FringeKind::Percent {
@@ -1494,6 +1498,7 @@ mod tests {
         b.fringes.insert(
             "KIT".into(),
             Fringe {
+                short_code: None,
                 description: String::new(),
                 rate: "50".into(),
                 kind: FringeKind::Flat {
@@ -1512,6 +1517,7 @@ mod tests {
         b.groups.insert(
             "OT".into(),
             Group {
+                short_code: None,
                 description: "Overtime".into(),
                 in_budget_total: true,
                 color: Some("#aa0000".into()),
@@ -1548,7 +1554,7 @@ mod tests {
         lp.location = Some("Atlanta".into());
         lp.amount = "WEEKS + 1".into();
         lp.bold = true;
-        lp.note = Some("Prep and shoot".into());
+        lp.notes = vec![fwb_core::Note::plain(1, "Prep and shoot")];
         lp.fringe_range = Some(1);
         let ad = &mut rows[1];
         ad.fringes = ["FICA".to_string(), "KIT".to_string()].into();
@@ -1801,6 +1807,7 @@ mod tests {
         b.fringes.insert(
             "FICA".into(),
             Fringe {
+                short_code: None,
                 description: "Social security".into(),
                 rate: "6.2".into(),
                 kind: FringeKind::Percent { cutoff: None },
@@ -1809,6 +1816,7 @@ mod tests {
         b.groups.insert(
             "OT".into(),
             Group {
+                short_code: None,
                 description: "Overtime".into(),
                 in_budget_total: false,
                 color: None,

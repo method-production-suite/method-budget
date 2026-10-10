@@ -403,12 +403,14 @@ mod tests {
     fn budget(rows: Vec<Detail>) -> Budget {
         let mut b = Budget::new("t", "USD");
         let acct = |code: &str, details| Account {
+            notes: Vec::new(),
             code: code.into(),
             name: code.into(),
             details,
         };
         b.topsheet = vec![
             TopsheetRow::Category(Category {
+                notes: Vec::new(),
                 code: "10".into(),
                 name: "Above".into(),
                 accounts: vec![
@@ -419,6 +421,7 @@ mod tests {
             }),
             TopsheetRow::ProductionTotal(ProductionTotal { name: "ATL".into() }),
             TopsheetRow::Category(Category {
+                notes: Vec::new(),
                 code: "20".into(),
                 name: "Below".into(),
                 accounts: vec![acct("20-01", vec![line(91, None)])],

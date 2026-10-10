@@ -104,6 +104,7 @@ Fields in written order:
 | `currencies`      | map of [currencies](#currency) | Foreign currencies, keyed by code. |
 | `units`           | map of [units](#unit) | Keyed by singular name. Omitted means **no units**. |
 | `globals`         | map of formula | Named values usable in formulas, keyed by name. |
+| `global_info`     | map of [global info](#global-info) | Description, unit and display settings of globals, keyed by global name. Left out when no global has any. |
 | `fringes`         | map of [fringes](#fringe) | Keyed by the name detail rows use. |
 | `groups`          | map of [groups](#group) | Keyed by group name. |
 | `sets`            | map of [sets](#set) | Keyed by set name. |
@@ -112,6 +113,8 @@ Fields in written order:
 | `charges`         | list of [charges](#charge) | Contractual charges, in application order. |
 | `credits`         | list of [credits](#credit) | Applied credits (incentives), in application order. |
 | `baseline`        | [baseline](#baseline) | Frozen totals for comparison. Left out when there is none. |
+| `display`         | [display settings](#display-settings) | How numbers show on screen. Left out when every setting is the default. |
+| `setup_order`     | [setup order](#setup-order) | Hand-made display order of the setup tables. Left out when every table is in name order. |
 | `report_presets`  | list of [report presets](#report-preset) | Saved report setups, in the user's order. Left out when there are none. |
 | `tag_presets`     | list of [tag presets](#tag-preset) | Saved bundles of line tags, in the user's order. Left out when there are none. |
 | `line_presets`    | list of [line blocks](#line-block) | Saved blocks of rows to insert, in the user's order. Left out when there are none. |
@@ -192,20 +195,49 @@ Dates should be ISO 8601 (`YYYY-MM-DD`). The reader does not check the date text
 | `description` | text | |
 | `hours`       | optional decimal | How many hours one of this unit is. Left out for non-time units. |
 
+### Global info
+
+What a global says about itself besides its formula. Display only: none of it changes a
+value or a total. Each field is left out at its default, and a global whose fields are all
+at their default has no entry. An entry whose name is not in `globals` is ignored on read
+and never written.
+
+| Field          | Type | Notes |
+|----------------|------|-------|
+| `description`  | text | |
+| `unit`         | text | A unit name from `units` (`"Week"`), or empty for none. A unit renamed in the application is renamed here too. |
+| `decimals`     | integer | Decimal places the global's value shows with, `0` to `8` (rounded half away from zero, padded with zeros). Left out to show the value as calculated. Also used for cells whose formula names this global (see [display settings](#display-settings)). |
+| `show_by_name` | `true` or `false` | Cells whose formula names this global show the formula instead of its value. Default `false`. |
+| `folder`       | text | A folder (category) to file the global under, or empty for none. |
+
+```json
+"global_info": {
+  "SHOOT_DAYS": { "description": "Principal photography", "unit": "Day", "decimals": 0, "folder": "Schedule" }
+}
+```
+
 ### Fringe
 
 A tagged object:
 
 | `kind`    | Fields | Meaning |
 |-----------|--------|---------|
-| `percent` | `description` text; `rate` formula, **required**; `cutoff` optional cents | `rate` percent of each earner's pay (`"7.65"` is 7.65%), up to `cutoff` of pay when set. |
-| `flat`    | `description` text; `rate` formula, **required**; `unit` optional text | `rate` (in base currency) once per line, or per unit when `unit` and the line's unit both have hours. |
+| `percent` | `description` text; `short_code` optional text; `rate` formula, **required**; `cutoff` optional cents | `rate` percent of each earner's pay (`"7.65"` is 7.65%), up to `cutoff` of pay when set. |
+| `flat`    | `description` text; `short_code` optional text; `rate` formula, **required**; `unit` optional text | `rate` (in base currency) once per line, or per unit when `unit` and the line's unit both have hours. |
+
+`short_code` (both kinds, and groups) is a short label such as `"FICA"` that the
+application shows in the grid's fringes column instead of the name. Display only: lines
+always refer to a fringe by its name, so renaming one never touches its code, and a code
+is never read as a name. The application keeps codes unique within fringes (ignoring case),
+different from every other fringe's name, without commas, and up to 16 characters; the
+reader does not check.
 
 ### Group
 
 | Field             | Type | Notes |
 |-------------------|------|-------|
 | `description`     | text | |
+| `short_code`      | optional text | A short label the grid's groups column shows instead of the name, as for [fringes](#fringe). Display only. |
 | `in_budget_total` | boolean, default `true` | When `false`, every line tagged with the group is shown but counts as zero. |
 | `color`           | optional text | Display color for the text of tagged lines, written `"#rrggbb"`. A line's own `color` wins. Never affects totals. |
 
@@ -232,8 +264,8 @@ A tagged object:
 
 | `kind`             | Fields | Meaning |
 |--------------------|--------|---------|
-| `category`         | `code` text, **required**; `name` text, **required**; `accounts` list of [accounts](#account) | A budget category. |
-| `production_total` | `name` text, **required** | Subtotals every category since the previous production total. The first one ends above-the-line. A production total has no `code` or `accounts`. |
+| `category`         | `code` text, **required**; `name` text, **required**; `notes` list of [notes](#note); `accounts` list of [accounts](#account) | A budget category. |
+| `production_total` | `name` text, **required** | Subtotals every category since the previous production total. The first one ends above-the-line. A production total has no `code`, `notes` or `accounts`. |
 
 ### Account
 
@@ -241,6 +273,7 @@ A tagged object:
 |-----------|------|-------|
 | `code`    | text, **required** | Account number, e.g. `"11-01"`. |
 | `name`    | text, **required** | |
+| `notes`   | list of [notes](#note) | Notes on the account itself, oldest first. Left out when empty. |
 | `details` | list of [detail rows](#detail-row) | In display order. |
 
 ### Detail row
@@ -270,7 +303,7 @@ Fields in written order:
 | `italic`       | boolean, default `false` | Display style. |
 | `indent`       | integer 0 to 255, default `0` | Indent level. The application uses 0 to 4. |
 | `color`        | optional text | Text color, written `"#rrggbb"`. Overrides the color of the row's groups. |
-| `note`         | optional text | A plain-text note on the row. The application allows up to 10,000 characters. |
+| `notes`        | list of [notes](#note) | Dated notes on the row, oldest first. Left out when empty. |
 
 A line costs `amount x X x rate x 4X`. A subtotal row shows a running total and adds
 nothing. An adjustment row's rate is the sum of the lines above it (back to the previous
@@ -279,10 +312,37 @@ all math. It is never counted or fringed, it doesn't break a fringe range, and i
 reset a subtotal or adjustment window. Other fields on a separator row are kept but have
 no effect.
 
-`bold`, `italic`, `indent`, `color` and `note` are display only and never affect totals.
+`bold`, `italic`, `indent`, `color` and `notes` are display only and never affect totals.
 They apply to every kind of row. The file stores them as given: the application's own
 rules (colors are `#` plus 6 hex digits, indent 0 to 4, notes up to 10,000 characters)
 are checked by the application, not by the file reader.
+
+**Older files**: before dated notes, a row kept one plain note as the text field `note`.
+A reader still accepts it (on detail rows and line block rows) and reads it as one undated
+note at the front of the row's `notes`, with the id after the highest in `notes` (so `1`
+when there is no list). A writer never writes `note`: once saved, the row has `notes`
+only. Nothing else changed, so such a file is still format version 1.
+
+### Note
+
+A dated note on a detail row, an account or a category. Display only. Fields in written
+order:
+
+| Field     | Type | Notes |
+|-----------|------|-------|
+| `id`      | integer, **required** | Unsigned 64-bit integer. The application keeps ids unique within the list the note is in and gives a new note the id after the highest there; the reader does not check. |
+| `created` | text | When it was written, as an ISO 8601 date-time such as `"2026-10-09T14:30:00Z"`, as the application gave it. Left out when unknown (a note read from an older file's `note`). |
+| `edited`  | optional text | When its text last changed, the same way. |
+| `author`  | optional text | Who wrote it: free text from the application's local settings (there are no accounts). |
+| `done`    | boolean, default `false` | Ticked off in the notes review list. |
+| `text`    | text, **required** | Plain text. The application allows up to 10,000 characters. |
+
+```json
+"notes": [
+  { "id": 1, "created": "2026-10-09T14:30:00Z", "author": "Sam", "text": "Check the rate with the union" },
+  { "id": 2, "created": "2026-10-10T09:05:00Z", "edited": "2026-10-10T09:20:00Z", "done": true, "text": "Kit fee agreed" }
+]
+```
 
 ### Charge
 
@@ -352,6 +412,43 @@ budget can show what changed. Rows are matched by id, accounts and categories by
 | `grand_total` | cents, **required** | |
 | `net_total`   | cents, **required** | |
 
+### Display settings
+
+How the budget shows numbers on screen, saved with it. Display only: no stored value or
+total changes, and the engine keeps every value exact. Like presets, these are tools, not
+content: a [version](#version) never holds them, and restoring one keeps the current
+settings. Each field is left out at its default; the whole object is left out when every
+field is.
+
+| Field                  | Type | Notes |
+|------------------------|------|-------|
+| `rate_cutoff`          | optional decimal | Rates smaller than this (by size) use `rate_decimals_below`, the rest `rate_decimals_above`. Left out for no cutoff: every rate uses `rate_decimals_above`. |
+| `rate_decimals_below`  | optional integer | Decimal places, `0` to `8`, for rates below the cutoff. Left out to show them as typed. |
+| `rate_decimals_above`  | optional integer | Decimal places, `0` to `8`, for the other rates. Left out to show them as typed. |
+| `rate_global_decimals` | `true` or `false` | A rate whose formula names a global with its own `decimals` (the first such global) shows with those instead. Default `true`. |
+| `summary_rows`         | `true` or `false` | The topsheet shows the above-the-line, below-the-line and combined totals. Default `true`. |
+| `net_total`            | `true` or `false` | The topsheet shows the net total (after credits). Default `true`. |
+
+```json
+"display": { "rate_cutoff": "10", "rate_decimals_below": 4, "rate_decimals_above": 2, "summary_rows": false }
+```
+
+### Setup order
+
+The order the application shows each setup table in, first to last, when it isn't name
+order: an object with any of `units`, `globals`, `fringes`, `groups`, `sets`, `locations`
+and `currencies` (foreign currencies; the base currency is not in the table), each a list
+of names. A table shows its listed names that it still has, each once and in that order,
+then any other names in name order (so an item added later comes last). A writer lists
+every name of a table in its shown order, leaves a table out when that is name order, and
+leaves `setup_order` out when every table is. Display only: reports, the Apply lists and
+the type-ahead follow it; nothing else depends on it. Layout, not content: a
+[version](#version) never has one, and restoring a version keeps the current order.
+
+```json
+"setup_order": { "fringes": ["PAYROLL", "PENSION", "MEALS"] }
+```
+
 ### Version
 
 A named, full copy of the budget's content, saved inside the budget so it can be restored
@@ -363,7 +460,7 @@ or compared later. Fields in written order:
 | `name`    | text, **required** | |
 | `created` | text, **required** | When the version was saved, as an ISO 8601 date-time such as `"2026-10-09T14:30:00Z"`. Stored as given; the reader does not check it. |
 | `note`    | optional text | |
-| `budget`  | object, **required** | A [budget](#budget) object with every field except `versions`, `report_presets`, `tag_presets` and `line_presets`: a version cannot contain versions or presets, and a reader rejects one that does. |
+| `budget`  | object, **required** | A [budget](#budget) object with every field except `versions`, `report_presets`, `tag_presets`, `line_presets`, `display` and `setup_order`: a version cannot contain versions, presets, display settings or a setup order, and a reader rejects one that does. |
 
 Restoring a version in the application first saves the current content as another version
 (named `Before restoring "<name>"`), so a restore can be undone.
@@ -425,19 +522,24 @@ that does), and restoring a version keeps the current ones. Fields in written or
 |-------|------|-------|
 | `name` | text, **required** | The application keeps names unique (ignoring case and surrounding spaces), 1 to 80 characters; the reader does not check. |
 | `default` | boolean, default `false` | The preset the application's Print dialog opens with. The application keeps at most one; a reader that finds several uses the first. |
-| `sections` | list of section names | In print order, each once: `"topsheet"`, `"accounts"` (each category's accounts with their totals), `"detail"`, `"fringes"`, `"globals"`, `"groups"` (with their totals), `"notes"` (every note, by account and line), `"info"` (budget information). |
+| `sections` | list of section names | In print order, each once: `"topsheet"`, `"accounts"` (each category's accounts with their totals), `"detail"`, `"fringes"`, `"globals"`, `"groups"` (with their totals), `"notes"` (every note on categories, accounts and lines, each with its date and author), `"info"` (budget information), `"chart"` (chart of accounts: every category and account code with its name), `"units"`, `"sets"` (with their totals), `"locations"` (with their totals), `"currencies"`. |
 | `excluded_categories` | name set | Category codes left out of the account and detail sections and the notes list. The topsheet always lists every category. |
 | `excluded_accounts` | name set | Account codes left out the same way. |
 | `skip_empty_accounts` | boolean, default `false` | Leave out accounts with no rows. |
 | `skip_zero_accounts` | boolean, default `false` | Leave out accounts whose total is zero. |
 | `skip_suppressed_lines` | boolean, default `false` | Leave out lines that don't count in the budget total (a group on them is out of it). |
 | `skip_notes` | boolean, default `false` | Leave out the notes printed under detail lines (the notes section still lists them). |
+| `skip_done_notes` | boolean, default `false` | Leave out notes ticked off as reviewed, under lines and in the notes section. |
 | `only_groups` | name set | When not empty, detail pages print only the lines tagged with at least one of these groups. |
 | `columns` | optional list of column names | The optional detail columns in print order: `"amount"`, `"unit"`, `"x"`, `"unit2"`, `"rate"`, `"unit3"`, `"currency"`, `"x4"`, `"unit4"`, `"fringes"`, `"fringe_pct"`, `"fringe_total"`, `"groups"`, `"set"`, `"location"`, `"original"`, `"variance"` (the last two only print when the budget has a baseline, then on the topsheet and account level too). Left out means the standard set; `[]` means none (the line number, description and total always print). |
 | `landscape` | boolean, default `false` | Page orientation. |
 | `font_size` | text, default `"medium"` | `"small"`, `"medium"` or `"large"`. |
 | `shading` | boolean, default `false` | Alternate lines tinted, total rows darker. |
 | `group_colors` | boolean, default `false` | Lines print in their own or their groups' colors (otherwise black). |
+| `vertical_rules` | boolean, default `false` | Thin lines between the columns of every table. |
+| `collapse_details` | boolean, default `false` | The detail section prints each account as one line (code, name, total, and original and variance with a baseline) instead of its rows; categories then run on without starting a page each. |
+| `topsheet_fringes` | boolean, default `false` | The topsheet gets a Fringes column: what each category's lines earn in fringes, wherever they post (and each production total's sum of them). |
+| `topsheet_pages` | boolean, default `false` | The topsheet gets a Page column: the page of the printout where each category's detail starts (blank when it doesn't print). |
 | `header` | optional [band](#band) | Left out means the standard header (budget title, section, date printed); `{}` means none. |
 | `footer` | optional [band](#band) | Left out means the standard footer (page number at the right); `{}` means none. |
 
@@ -446,16 +548,21 @@ Unknown section or column names are errors, like unknown fields.
 #### Band
 
 A header or footer: three optional slots, `left`, `center` and `right`, each a tagged
-object saying what it shows, worked out when the report is drawn:
+object saying what it shows, worked out when the report is drawn, and
+`first_page_only` (boolean, default `false`): when true the band prints on the first page
+only, and later pages have none. Slots:
 
 | `kind` | Fields | Shows |
 |--------|--------|-------|
 | `title` | | The budget's title. |
 | `section` | | The section on the page (the topsheet, a category's detail, ...). |
 | `printed` | | The date and time the report was drawn. |
+| `date` | | The date the report was drawn. |
+| `time` | | The time of day the report was drawn. |
 | `file` | | The budget's file name. |
 | `page` | | "Page 3 of 12". |
 | `info` | `label` text, **required** | The budget information field with that label, if there is one. |
+| `global` | `name` text, **required** | That global's value, if the budget has it. Renaming the global renames it here. |
 | `text` | `text` text, **required** | The text as written (the application allows up to 200 characters). |
 
 Example (inside `budget`, after `baseline` and before `versions`):
@@ -600,6 +707,21 @@ valid. Loading and saving it in Film Wizard Budgeting normalizes it.
 - Version 1, additive (2026-10): budget `tag_presets` (saved bundles of line tags) and
   `line_presets` (saved blocks of rows, with the setup they use). Left out when there are
   none, so files without them are unchanged.
+- Version 1, additive (2026-10): report preset sections `"chart"`, `"units"`, `"sets"`,
+  `"locations"` and `"currencies"`; preset `vertical_rules`, `collapse_details`,
+  `topsheet_fringes` and `topsheet_pages`; band `first_page_only`; band slot kinds
+  `"date"`, `"time"` and `"global"`. Each is left out at its default, so presets that
+  don't use them are unchanged.
+- Version 1, additive (2026-10): budget `global_info` (a global's description, unit,
+  decimals, show-by-name switch and folder) and `display` (rate decimals with a cutoff,
+  topsheet summary rows and net total). Both are display only and left out at their
+  default, so files that don't use them are unchanged.
+- Version 1, additive (2026-10): dated [notes](#note) (`notes` on detail rows, line block
+  rows, accounts and categories), replacing the single `note` text on a row, which a
+  reader still accepts as one undated note and a writer no longer writes; fringe and group
+  `short_code`; budget `setup_order`; report preset `skip_done_notes`. All are left out at
+  their default, so files that don't use them are unchanged, and a file with an old
+  `note` changes only when it is saved again.
 
 ## Complete example
 

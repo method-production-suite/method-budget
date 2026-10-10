@@ -77,6 +77,11 @@ pub struct AccountView {
     /// One entry per row, in order (`report.categories[..].accounts[..].rows`
     /// in the full view), or `None` without totals.
     pub rows: Option<Vec<RowDto>>,
+    /// One entry per row, in order: the evaluated values of its formula
+    /// cells (`{amount, x, rate, x4}`, each left out when blank, a plain
+    /// number or in error), or `null` for a row with none. Empty without
+    /// totals. See [`crate::display::cell_values`].
+    pub values: Vec<Option<crate::display::CellValues>>,
 }
 
 /// Everything, for printing: the view as it was before the lean view.
@@ -324,6 +329,7 @@ fn details_value(b: &Budget, ti: usize, ai: usize) -> serde_json::Value {
     // a file holds them.
     let mut one = Budget::new("", b.base_currency.clone());
     one.topsheet.push(TopsheetRow::Category(fwb_core::Category {
+        notes: Vec::new(),
         code: cat.code.clone(),
         name: cat.name.clone(),
         accounts: vec![acct.clone()],
@@ -393,6 +399,12 @@ impl View {
                     .and_then(|r| r.categories.get(ci))
                     .and_then(|c| c.accounts.get(ai))
                     .map(|a| a.rows.iter().map(RowDto::from).collect()),
+                values: match (&b.topsheet[ti], report) {
+                    (TopsheetRow::Category(c), Some(r)) => {
+                        crate::display::cell_values(&c.accounts[ai].details, &r.globals)
+                    }
+                    _ => Vec::new(),
+                },
             }
         });
         let shown: BTreeSet<RowId> = focus

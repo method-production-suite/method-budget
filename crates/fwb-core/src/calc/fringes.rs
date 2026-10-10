@@ -259,9 +259,11 @@ mod tests {
     fn budget(details: Vec<Detail>) -> Budget {
         let mut b = Budget::new("Test", "USD");
         b.topsheet.push(TopsheetRow::Category(Category {
+            notes: Vec::new(),
             code: "1000".into(),
             name: "Crew".into(),
             accounts: vec![Account {
+                notes: Vec::new(),
                 code: "1100".into(),
                 name: "Camera".into(),
                 details,
@@ -293,6 +295,7 @@ mod tests {
 
     fn hold() -> (BTreeSet<String>, Group) {
         let g = Group {
+            short_code: None,
             description: String::new(),
             in_budget_total: false,
             color: None,
@@ -302,6 +305,7 @@ mod tests {
 
     fn pct(rate: &str, cutoff: Option<Cents>) -> Fringe {
         Fringe {
+            short_code: None,
             description: String::new(),
             rate: rate.into(),
             kind: FringeKind::Percent { cutoff },
@@ -310,6 +314,7 @@ mod tests {
 
     fn flat(rate: &str, unit: Option<&str>) -> Fringe {
         Fringe {
+            short_code: None,
             description: String::new(),
             rate: rate.into(),
             kind: FringeKind::Flat {
@@ -471,6 +476,7 @@ mod tests {
         b.groups.insert(
             "Hold".into(),
             Group {
+                short_code: None,
                 description: String::new(),
                 in_budget_total: false,
                 color: None,
@@ -612,6 +618,7 @@ mod tests {
         b.groups.insert(
             "Hold".into(),
             Group {
+                short_code: None,
                 description: String::new(),
                 in_budget_total: false,
                 color: None,

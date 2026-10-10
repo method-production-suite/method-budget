@@ -4,7 +4,7 @@
 // net total.
 
 import { el } from './dom.js';
-import { money } from './format.js';
+import { totalText as money } from './display.js';
 
 function stat(label, cents, cls = '', title = '') {
   const value = cents === null || cents === undefined ? 'n/a' : money(cents);

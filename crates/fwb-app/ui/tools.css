@@ -496,6 +496,134 @@ body.tools-dragging .tools-tab {
   overflow-wrap: anywhere;
 }
 
+/* Dated notes: one card per note, the review checklist, the author name */
+
+.notes-cards {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.notes-card {
+  padding: 5px 6px;
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--note);
+  border-radius: var(--radius);
+}
+
+.notes-card.is-done {
+  border-left-color: var(--border);
+}
+
+.notes-meta {
+  margin: 0 0 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.notes-body {
+  margin: 0;
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.notes-card.is-done .notes-body {
+  color: var(--text-muted);
+}
+
+.notes-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.setup-btn.notes-mini {
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11.5px;
+}
+
+.notes-new {
+  min-height: 52px;
+}
+
+.notes-all-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.notes-all-head .notes-heading {
+  margin-bottom: 4px;
+}
+
+.notes-item {
+  display: flex;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.notes-item .notes-entry {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-bottom: 0;
+}
+
+.notes-item.is-done .notes-snippet,
+.notes-item.is-done .notes-desc {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.notes-check {
+  appearance: none;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.notes-check:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.notes-check[aria-checked="true"] .apply-box {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.notes-check[aria-checked="true"] .apply-box::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--accent-text);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.notes-author {
+  display: grid;
+  gap: 3px;
+}
+
+.notes-author-input {
+  height: 24px;
+}
+
 /* ------------------------------------------------------------------------ */
 /* The Find tab (ui/js/find.js) */
 

@@ -233,10 +233,32 @@
 }
 
 .rs-pages {
+  /* Positioned, so the pages' offsetTop (page navigation) is measured from here. */
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   background: #8a9097;
+}
+
+.rs-nav-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rs-nav {
+  min-width: 24px;
+  padding: 1px 6px;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.rs-page-input {
+  width: 3.5em;
+  padding: 2px 4px;
+  font-size: 12px;
+  text-align: center;
 }
 
 .rs-pages:focus-visible {

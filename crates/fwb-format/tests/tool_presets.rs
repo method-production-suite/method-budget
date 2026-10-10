@@ -25,11 +25,12 @@ fn block() -> LinePreset {
     first.fringes = set(&["PAYROLL"]);
     first.fringe_range = Some(7);
     first.bold = true;
-    first.note = Some("Five prep days".into());
+    first.notes = vec![Note::plain(1, "Five prep days")];
     let mut setup = SetupItems::default();
     setup.fringes.insert(
         "PAYROLL".into(),
         Fringe {
+            short_code: None,
             description: String::new(),
             rate: "RATE_PCT".into(),
             kind: FringeKind::Percent { cutoff: None },
@@ -126,7 +127,7 @@ fn block_shape_has_no_row_ids() {
                 "fringe_range": 7,
                 "fringes": ["PAYROLL"],
                 "bold": true,
-                "note": "Five prep days"
+                "notes": [{"id": 1, "text": "Five prep days"}]
             },
             {"kind": "subtotal", "description": "Prep total"}
         ])

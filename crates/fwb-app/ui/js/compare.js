@@ -6,7 +6,8 @@
 // Left: what to compare with, a check box each; the letters A, B, C... follow
 // the order they were ticked. Right: categories (open one for its accounts,
 // an account for its lines), each production total, above and below the line,
-// fringes, charges, the grand total, credits and the net total. Columns: each
+// fringes, charges (each one under their total), the grand total, credits
+// (the same) and the net total. Columns: each
 // budget's total, then (decision 19) both each budget's difference from this
 // one (amount and percent of this one) and, when ticked, the other budgets'
 // Sum and Average, their Variance (sum minus this one) and Variance % (of the
@@ -556,9 +557,14 @@ export function showCompare(ctx, opts = {}) {
     body.append(summary(result.levels.length ? '' : 'first', 'Total above-the-line', t.total_atl));
     body.append(summary('', 'Total below-the-line', t.total_btl));
     body.append(summary('cmp-info', 'Fringes (all)', t.fringes, 'Every fringe dollar, wherever it posts; already inside the totals above'));
+    // Each charge and credit under its total, matched by name; one only some
+    // budgets have says which.
+    const items = (list, what) => (Array.isArray(list) ? list : []).forEach((x) => body.append(summary('cmp-item', x.name || `(unnamed ${what})`, x.line, `One ${what}, matched by name`)));
     body.append(summary('', 'Charges', t.charges, 'Contractual charges, added to the grand total'));
+    items(result.charges, 'charge');
     body.append(summary('grand', 'Grand total', t.grand_total));
     body.append(summary('', 'Credits', t.credits, 'Taken off the grand total'));
+    items(result.credits, 'credit');
     body.append(summary('grand', 'Net total', t.net_total));
 
     const table = el('table', { class: 'cmp-table' }, el('thead', {}, el('tr', {}, ...headCells(sources, plan))), body);

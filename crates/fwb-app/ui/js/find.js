@@ -125,6 +125,30 @@ export function openFind({ replace = false } = {}) {
   focusKey('find:text', { select: true });
 }
 
+/**
+ * Searches for the uses of setup item `name` of setup table `table`
+ * (`fringes`, `globals`...): the setup lists' line counts call it once the
+ * panel shows the Find tab. Find mode, focus in the search box.
+ */
+export function findFor(table, name) {
+  const scope = SCOPES.find((x) => x.table === table) || (table === 'globals' ? SCOPES.find((x) => x.id === 'global') : null);
+  if (!scope) return;
+  st.scope = scope.id;
+  st.text = String(name);
+  if (st.replace) {
+    st.replace = false;
+    st.message = '';
+  }
+  st.unchecked.clear();
+  st.current = null;
+  st.currentIndex = -1;
+  if (st.host && st.host.isConnected) {
+    draw();
+    search();
+  }
+  focusKey('find:text', { select: true });
+}
+
 /** True when there is something to search for (F3 then steps, not opens). */
 export function hasFindQuery() {
   return Boolean(query());

@@ -1,5 +1,5 @@
 //! Row semantics that never touch the math: text style (bold, italic, indent,
-//! color), per-row notes and group colors. Separator rows are added through
+//! color) and group colors (notes are in src/notes.rs). Separator rows are added through
 //! `add_detail` with kind `"separator"`.
 //!
 //! Each command is one undo step and either applies completely or returns a
@@ -8,7 +8,7 @@
 
 use std::collections::BTreeSet;
 
-use fwb_core::{Budget, Detail, RowId, MAX_INDENT, MAX_NOTE_CHARS};
+use fwb_core::{Budget, Detail, RowId, MAX_INDENT};
 use serde::{Deserialize, Deserializer};
 use tauri::ipc::{InvokeBody, Request};
 use tauri::{Runtime, State, WebviewWindow};
@@ -135,25 +135,6 @@ pub fn apply_row_style(b: &mut Budget, s: &RowStyleInput) -> EditResult {
     Ok(())
 }
 
-/// Sets or clears (`None`, or text that is only whitespace) a row's note. The
-/// text is kept as typed.
-pub fn apply_row_note(b: &mut Budget, id: RowId, note: Option<&str>) -> EditResult {
-    let note = note.filter(|n| !n.trim().is_empty());
-    if let Some(n) = note {
-        let len = n.chars().count();
-        if len > MAX_NOTE_CHARS {
-            return Err(format!(
-                "that note is {len} characters; notes can be at most {MAX_NOTE_CHARS}"
-            ));
-        }
-    }
-    let [d] = &mut rows_mut(b, &[id])?[..] else {
-        return Err(format!("row {id} is in the budget twice"));
-    };
-    d.note = note.map(String::from);
-    Ok(())
-}
-
 /// Sets or clears (`None`) the display color of a group's lines.
 pub fn apply_group_color(b: &mut Budget, name: &str, color: Option<&str>) -> EditResult {
     let color = color.map(check_color).transpose()?;
@@ -198,20 +179,6 @@ pub fn set_row_style<R: Runtime>(
     };
     let input = RowStyleInput::from_json(args)?;
     edit_budget(&window, &state, doc, |b| apply_row_style(b, &input))
-}
-
-/// `{rowId, note: string | null}`.
-#[tauri::command]
-pub fn set_row_note<R: Runtime>(
-    window: WebviewWindow<R>,
-    state: State<'_, AppState>,
-    doc: Option<DocId>,
-    row_id: RowId,
-    note: Option<String>,
-) -> Result<View, String> {
-    edit_budget(&window, &state, doc, |b| {
-        apply_row_note(b, row_id, note.as_deref())
-    })
 }
 
 /// `{name, color: string | null}`.
@@ -423,6 +390,7 @@ mod tests {
     fn group_update_is_one_step_and_needs_the_group() {
         let mut s = Session::new();
         let g = GroupInput {
+            short_code: None,
             description: "Option A".into(),
             in_budget_total: true,
         };
@@ -431,6 +399,7 @@ mod tests {
             .unwrap();
 
         let next = GroupInput {
+            short_code: None,
             description: "  Option B ".into(),
             in_budget_total: false,
         };
@@ -480,12 +449,7 @@ mod tests {
         const APP_RS: &str = include_str!("app.rs");
         const BUILD_RS: &str = include_str!("../build.rs");
         const CAPS: &str = include_str!("../capabilities/main.json");
-        for c in [
-            "set_row_style",
-            "set_row_note",
-            "set_group_color",
-            "update_group",
-        ] {
+        for c in ["set_row_style", "set_group_color", "update_group"] {
             assert!(
                 APP_RS.contains(&format!("crate::rowstyle::{c},")),
                 "{c} not in generate_handler!"
@@ -500,33 +464,10 @@ mod tests {
     }
 
     #[test]
-    fn notes() {
-        let mut s = Session::new();
-        let (_, a, _) = two_rows(&s);
-        s.edit(|b| apply_row_note(b, a, Some("  Ask about\nkit fee  ")))
-            .unwrap();
-        assert_eq!(row(&s, a).note.as_deref(), Some("  Ask about\nkit fee  "));
-        s.edit(|b| apply_row_note(b, a, Some("   "))).unwrap();
-        assert_eq!(row(&s, a).note, None, "blank clears");
-        s.edit(|b| apply_row_note(b, a, Some("x"))).unwrap();
-        s.edit(|b| apply_row_note(b, a, None)).unwrap();
-        assert_eq!(row(&s, a).note, None);
-
-        let longest = "\u{e9}".repeat(MAX_NOTE_CHARS);
-        s.edit(|b| apply_row_note(b, a, Some(&longest))).unwrap();
-        let before = s.budget().clone();
-        let too_long = format!("{longest}x");
-        assert!(s.edit(|b| apply_row_note(b, a, Some(&too_long))).is_err());
-        assert!(s.edit(|b| apply_row_note(b, 999_999, Some("x"))).is_err());
-        assert_eq!(s.budget(), &before);
-        assert!(s.undo());
-        assert_eq!(row(&s, a).note, None);
-    }
-
-    #[test]
     fn group_colors() {
         let mut s = Session::new();
         let g = GroupInput {
+            short_code: None,
             description: "Option A".into(),
             in_budget_total: true,
         };
@@ -537,6 +478,7 @@ mod tests {
 
         // Editing the group elsewhere keeps its color.
         let g2 = GroupInput {
+            short_code: None,
             description: "Option A, revised".into(),
             in_budget_total: false,
         };
@@ -587,7 +529,10 @@ mod tests {
         assert!(s.set_detail_field(id, "rate", "1").is_err());
         let input = style(json!({"rowIds": [id], "color": "#808080"}));
         s.edit(|b| apply_row_style(b, &input)).unwrap();
-        s.edit(|b| apply_row_note(b, id, Some("Day 2"))).unwrap();
+        s.edit(|b| {
+            crate::notes::add(b, &crate::notes::NoteOwner::Row(id), "Day 2", "", None).map(|_| ())
+        })
+        .unwrap();
 
         assert!(s.undo() && s.undo() && s.undo());
         assert!(edit::details(s.budget()).all(|d| d.id != id));

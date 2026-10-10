@@ -19,6 +19,21 @@
 import { renderExtraTab } from './topsheet-setup.js';
 import { anchoredForm } from './modal.js';
 import { renameItem, itemMenu } from './rename.js';
+import {
+  wantUsage,
+  listNames,
+  canReorder,
+  sortButton,
+  showSelect,
+  usesButton,
+  dragHandle,
+  moveKey,
+  MOVE_KEYS,
+  inUse,
+  redrawLists,
+} from './setuplist.js';
+import { globalValueText } from './display.js';
+import { globalInfoBlock } from './display-settings.js';
 
 const GLOBAL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)$/;
@@ -437,7 +452,7 @@ function finishItem(li, itemKey, issues, describe) {
 }
 
 // The delete button and its inline confirmation.
-function deleteButton({ itemKey, name, what, confirmText, build, neighborKey }) {
+function deleteButton({ itemKey, name, what, confirmText, build, neighborKey, confirmLabel = 'Delete' }) {
   const btn = el('button', 'setup-del', '×');
   btn.type = 'button';
   btn.dataset.key = key('del', itemKey);
@@ -457,7 +472,7 @@ function deleteButton({ itemKey, name, what, confirmText, build, neighborKey }) 
     box.setAttribute('aria-label', `Delete ${what} ${name}`);
     const text = el('p', 'setup-confirm-text', confirmText);
     text.id = nextId();
-    const yes = el('button', 'setup-btn setup-btn-danger', 'Delete');
+    const yes = el('button', 'setup-btn setup-btn-danger', confirmLabel);
     yes.type = 'button';
     yes.dataset.key = key('del-yes', itemKey);
     yes.setAttribute('aria-describedby', text.id);
@@ -637,16 +652,25 @@ function renderGlobals(panel) {
   panel.append(
     el('p', 'setup-intro', 'Named numbers you can use in any formula, like DAYS * 5. A global can use other globals.'),
   );
-  const items = entries(b.globals);
+  const shownList = listNames(state.view, 'globals');
+  const movable = canReorder('globals', shownList.filtered);
+  const items = shownList.names.map((n) => [n, own(b.globals, n)]);
   const names = items.map(([n]) => n);
   const addKey = key('add', 'globals');
+  if (Object.keys(b.globals || {}).length) panel.append(listTools('globals', false));
 
   if (!items.length) {
     panel.append(emptyNote('No globals yet.'));
   } else {
     const cols = el('div', 'setup-cols setup-grow');
-    cols.setAttribute('aria-hidden', 'true');
-    cols.append(el('span', null, 'Name'), el('span', null, 'Formula'), el('span', 'setup-right', 'Value'), el('span'));
+    // The Name head sorts the list (setuplist.js); the others are labels.
+    const hidden = (e) => {
+      e.setAttribute('aria-hidden', 'true');
+      return e;
+    };
+    const nameHead = el('span');
+    nameHead.append(sortButton('globals', 'Name', redrawLists, key('sort', 'globals')));
+    cols.append(nameHead, hidden(el('span', null, 'Formula')), hidden(el('span', 'setup-right', 'Value')), el('span'));
     panel.append(cols);
   }
 
@@ -654,8 +678,10 @@ function renderGlobals(panel) {
   items.forEach(([name, formula], i) => {
     const ik = key('globals', name);
     const li = itemShell(ik, 'setup-grow');
+    li.dataset.name = name;
     const issues = issuesFor('global', name);
     const nameEl = renameable(el('span', 'setup-name', name), 'global', name, ik, (to) => key('globals', to, 'formula'));
+    const nameCell = orderable(nameEl, 'globals', name, movable, ik);
     const input = textInput({
       fieldKey: key('globals', name, 'formula'),
       value: str(formula),
@@ -665,13 +691,21 @@ function renderGlobals(panel) {
         }),
     });
     const raw = r ? own(r.globals, name) : undefined;
+    // Shown with the global's own decimals, when it has them (display.js).
+    const gInfo = own(b.global_info, name);
     const value = issues.length
       ? el('span', 'setup-value setup-num setup-value-bad', 'Error')
-      : el('span', 'setup-value setup-num', raw === undefined ? '' : formatDecimal(raw));
+      : el('span', 'setup-value setup-num', raw === undefined ? '' : globalValueText(raw, gInfo));
     const shown = raw === undefined ? '' : formatDecimal(raw);
-    value.title = issues.length ? 'This global has a problem' : shown;
+    // Its unit on hover: the plural unless the value is exactly 1.
+    const unitDef = gInfo && gInfo.unit ? own(b.units, gInfo.unit) : undefined;
+    const unitWord = gInfo && gInfo.unit ? (raw !== '1' && unitDef && unitDef.plural ? unitDef.plural : gInfo.unit) : '';
+    const unitName = unitWord ? ` ${unitWord}` : '';
+    value.title = issues.length ? 'This global has a problem' : `${shown}${unitName}`;
+    const use = inUse(state.view, 'globals', name);
+    const usedBy = use.lines ? `${plural(use.lines, 'line uses', 'lines use')} it. ` : '';
     li.append(
-      nameEl,
+      nameCell,
       hiddenLabel(`Formula for ${name}`, input),
       input,
       value,
@@ -681,12 +715,14 @@ function renderGlobals(panel) {
         what: 'global',
         confirmText:
           shown && !issues.length
-            ? `Delete ${name}? Formulas that use it keep its current value (${shown}) as a plain number.`
-            : `Delete ${name}? Formulas that use it keep its current value as a plain number, where it has one.`,
+            ? `Delete ${name}? ${usedBy}Formulas that use it keep its current value (${shown}) as a plain number.`
+            : `Delete ${name}? ${usedBy}Formulas that use it keep its current value as a plain number, where it has one.`,
         build: () => ['delete_global', { name }],
         neighborKey: neighbor('globals', names, i, addKey),
       }),
     );
+    // Description, unit, decimals, show by name and folder (display-settings.js).
+    li.append(globalInfoBlock(kit(), name, ik));
     finishItem(li, ik, issues, input);
     ul.append(li);
   });
@@ -735,26 +771,36 @@ function renderUnits(panel) {
       'Units for quantities on lines. Hours lets flat fringes convert between time units; leave it blank for units like Flat.',
     ),
   );
-  const items = entries(b.units);
+  const shownList = listNames(state.view, 'units');
+  const movable = canReorder('units', shownList.filtered);
+  const items = shownList.names.map((n) => [n, own(b.units, n)]);
   const names = items.map(([n]) => n);
-  if (!items.length) panel.append(emptyNote('No units yet.'));
+  if (Object.keys(b.units || {}).length) panel.append(listTools('units'));
+  else panel.append(emptyNote('No units yet.'));
 
   const ul = list('Units');
   items.forEach(([name, u0], i) => {
     const u = u0 && typeof u0 === 'object' ? u0 : {};
     const ik = key('units', name);
     const li = itemShell(ik, 'setup-block');
+    li.dataset.name = name;
     const head = el('div', 'setup-head');
     const nameEl = renameable(el('span', 'setup-name', name), 'unit', name, ik, (to) => key('units', to, 'plural'));
+    const figs = el('span', 'setup-figs');
+    figs.append(usesButton(state.view, 'units', name, key('uses', ik)));
+    const use = inUse(state.view, 'units', name);
     head.append(
-      nameEl,
-      el('span', 'setup-figs'),
+      orderable(nameEl, 'units', name, movable, ik, false),
+      figs,
       deleteButton({
         itemKey: ik,
         name,
         what: 'unit',
-        confirmText: `Delete unit ${name}? Lines keep the name, but it stops converting for flat fringes.`,
-        build: () => ['delete_unit', { name }],
+        confirmText: use.lines
+          ? `Delete unit ${name}? ${plural(use.lines, 'line uses', 'lines use')} it; deleting blanks it on ${use.lines === 1 ? 'that line' : 'those lines'}.`
+          : `Delete unit ${name}? No lines use it.${use.other ? ' A flat fringe or a global that names it stops converting.' : ''}`,
+        confirmLabel: use.lines ? `Remove from ${plural(use.lines, 'line', 'lines')} and delete` : 'Delete',
+        build: () => ['delete_unit', { name, clearLines: use.lines > 0 }],
         neighborKey: neighbor('units', names, i, key('add', 'units')),
       }),
     );
@@ -814,6 +860,46 @@ function renderUnits(panel) {
       key('units', v.name.trim(), 'plural'),
     ]),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Counts, sorting and reordering (setuplist.js)
+
+/**
+ * Above a list: its name sort (unless the list's own column heads have it)
+ * and the Show choice. Asks for the counts.
+ */
+function listTools(table, sort = true) {
+  wantUsage(state.view);
+  const row = el('div', 'setup-listtools');
+  row.append(sort ? sortButton(table, 'Name', redrawLists, key('sort', table)) : el('span'), showSelect(table, redrawLists, key('show', table)));
+  return row;
+}
+
+function callCmd(cmd, args) {
+  if (!state.ctx || typeof state.ctx.call !== 'function') return Promise.reject(new Error('Not connected'));
+  return state.ctx.call(cmd, args);
+}
+
+/**
+ * An item's name with its drag handle (and, with `uses`, its line count),
+ * and Option+Shift+Up and Down on the name to move it.
+ */
+function orderable(nameEl, table, name, movable, itemKey, uses = true) {
+  const wrap = el('span', 'setup-namewrap');
+  wrap.append(dragHandle(table, name, movable, callCmd), nameEl);
+  if (uses) wrap.append(usesButton(state.view, table, name, key('uses', itemKey)));
+  const shortcuts = nameEl.getAttribute('aria-keyshortcuts');
+  nameEl.setAttribute('aria-keyshortcuts', shortcuts ? `${shortcuts} ${MOVE_KEYS}` : MOVE_KEYS);
+  nameEl.addEventListener('keydown', (e) => {
+    moveKey(e, table, name, movable, (cmd, args) =>
+      callCmd(cmd, args).then(() => {
+        const f = findByData('key', key('name', itemKey));
+        if (f) f.focus();
+      }),
+    );
+  });
+  return wrap;
 }
 
 // ---------------------------------------------------------------------------

@@ -19,6 +19,11 @@ fn full_preset() -> ReportPreset {
                 ReportSection::Globals,
                 ReportSection::Groups,
                 ReportSection::Notes,
+                ReportSection::Chart,
+                ReportSection::Units,
+                ReportSection::Sets,
+                ReportSection::Locations,
+                ReportSection::Currencies,
             ],
             excluded_categories: ["20".to_string()].into(),
             excluded_accounts: ["11-02".to_string(), "10-01".to_string()].into(),
@@ -26,6 +31,7 @@ fn full_preset() -> ReportPreset {
             skip_zero_accounts: true,
             skip_suppressed_lines: true,
             skip_notes: true,
+            skip_done_notes: true,
             only_groups: ["Alt".to_string()].into(),
             columns: Some(vec![
                 ReportColumn::Rate,
@@ -37,15 +43,21 @@ fn full_preset() -> ReportPreset {
             font_size: FontSize::Small,
             shading: true,
             group_colors: true,
+            vertical_rules: true,
+            collapse_details: true,
+            topsheet_fringes: true,
+            topsheet_pages: true,
             header: Some(Band {
                 left: Some(BandField::Info("Shoot days".into())),
-                center: None,
+                center: Some(BandField::Global("WEEKS".into())),
                 right: Some(BandField::Text("Confidential".into())),
+                first_page_only: true,
             }),
             footer: Some(Band {
                 left: Some(BandField::File),
                 center: Some(BandField::Printed),
                 right: Some(BandField::Page),
+                first_page_only: false,
             }),
         },
     }
@@ -107,22 +119,29 @@ fn full_preset_shape() {
         json!({
             "name": "Studio pack",
             "default": true,
-            "sections": ["info", "topsheet", "accounts", "detail", "fringes", "globals", "groups", "notes"],
+            "sections": ["info", "topsheet", "accounts", "detail", "fringes", "globals", "groups", "notes", "chart", "units", "sets", "locations", "currencies"],
             "excluded_categories": ["20"],
             "excluded_accounts": ["10-01", "11-02"],
             "skip_empty_accounts": true,
             "skip_zero_accounts": true,
             "skip_suppressed_lines": true,
             "skip_notes": true,
+            "skip_done_notes": true,
             "only_groups": ["Alt"],
             "columns": ["rate", "amount", "fringe_pct", "original"],
             "landscape": true,
             "font_size": "small",
             "shading": true,
             "group_colors": true,
+            "vertical_rules": true,
+            "collapse_details": true,
+            "topsheet_fringes": true,
+            "topsheet_pages": true,
             "header": {
                 "left": {"kind": "info", "label": "Shoot days"},
-                "right": {"kind": "text", "text": "Confidential"}
+                "center": {"kind": "global", "name": "WEEKS"},
+                "right": {"kind": "text", "text": "Confidential"},
+                "first_page_only": true
             },
             "footer": {
                 "left": {"kind": "file"},
@@ -144,6 +163,10 @@ fn presets_are_read_strictly() {
         json!({"name": "x", "header": {"middle": {"kind": "title"}}}),
         json!({"name": "x", "header": {"left": {"kind": "title", "text": "y"}}}),
         json!({"name": "x", "footer": {"left": {"kind": "clock"}}}),
+        json!({"name": "x", "footer": {"left": {"kind": "global"}}}),
+        json!({"name": "x", "footer": {"left": {"kind": "date", "name": "y"}}}),
+        json!({"name": "x", "footer": {"first_page_only": "yes"}}),
+        json!({"name": "x", "sections": ["chart_of_accounts"]}),
         json!({"sections": ["topsheet"]}),
         json!({"name": "x", "landscape": "yes"}),
     ] {
@@ -185,4 +208,18 @@ fn restoring_a_version_keeps_the_presets() {
     b.report_presets = vec![plain("Made later")];
     restore_version(&mut b, id, "2026-10-09T11:00:00Z").unwrap();
     assert_eq!(b.report_presets, vec![plain("Made later")]);
+}
+
+#[test]
+fn date_and_time_slots_round_trip() {
+    let v = json!({
+        "name": "Clock",
+        "header": {"left": {"kind": "date"}, "right": {"kind": "time"}}
+    });
+    let p = report_preset_from_value(v.clone()).unwrap();
+    let h = p.spec.header.as_ref().unwrap();
+    assert_eq!(h.left, Some(BandField::Date));
+    assert_eq!(h.right, Some(BandField::Time));
+    assert!(!h.first_page_only);
+    assert_eq!(report_preset_to_value(&p), v);
 }

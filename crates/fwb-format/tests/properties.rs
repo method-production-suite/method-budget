@@ -147,7 +147,44 @@ fn gen_detail(rng: &mut Rng, id: RowId) -> Detail {
         color: rng
             .chance(30)
             .then(|| rng.pick(&["#a0b1c2", "", "red"]).into()),
-        note: rng.opt_text(),
+        notes: gen_notes(rng),
+    }
+}
+
+/// Dated notes, as a row, account or category keeps them.
+fn gen_notes(rng: &mut Rng) -> Vec<Note> {
+    (0..rng.below(4).saturating_sub(1))
+        .map(|_| Note {
+            id: if rng.chance(5) {
+                u64::MAX
+            } else {
+                rng.below(9)
+            },
+            text: rng.text(),
+            created: rng.pick(&["2026-10-09T14:30:00Z", "", "not a time"]).into(),
+            edited: rng
+                .chance(30)
+                .then(|| rng.pick(&["2026-10-10T09:00:00Z", ""]).into()),
+            author: rng.opt_text(),
+            done: rng.chance(30),
+        })
+        .collect()
+}
+
+/// A hand-made order for some of the budget's setup tables.
+fn gen_order(rng: &mut Rng, b: &mut Budget) {
+    for &kind in SetupKind::ALL {
+        if !rng.chance(40) {
+            continue;
+        }
+        let mut names = fwb_core::order::names(b, kind);
+        for i in (1..names.len()).rev() {
+            names.swap(i, rng.below(i as u64 + 1) as usize);
+        }
+        if rng.chance(20) {
+            names.push("not an item".into());
+        }
+        fwb_core::order::set_order(b, kind, &names);
     }
 }
 
@@ -217,6 +254,23 @@ fn gen_content(rng: &mut Rng) -> Budget {
         rate: r.dec(),
     });
     b.globals = rng.map(Rng::formula);
+    // Info for some of the globals (only non-default info is kept in a file).
+    let names: Vec<String> = b.globals.keys().cloned().collect();
+    for name in names {
+        if !rng.chance(50) {
+            continue;
+        }
+        let g = GlobalInfo {
+            description: rng.text(),
+            unit: rng.text(),
+            decimals: rng.chance(50).then(|| rng.below(9) as u8),
+            show_by_name: rng.chance(50),
+            folder: rng.text(),
+        };
+        if !g.is_default() {
+            b.global_info.insert(name, g);
+        }
+    }
     if rng.chance(70) {
         b.units = rng.map(|r| UnitDef {
             plural: r.text(),
@@ -225,6 +279,7 @@ fn gen_content(rng: &mut Rng) -> Budget {
         });
     }
     b.fringes = rng.map(|r| Fringe {
+        short_code: r.opt_text(),
         description: r.text(),
         rate: r.formula(),
         kind: if r.chance(50) {
@@ -272,6 +327,7 @@ fn gen_content(rng: &mut Rng) -> Budget {
         };
     }
     b.groups = rng.map(|r| Group {
+        short_code: r.opt_text(),
         description: r.text(),
         in_budget_total: r.chance(50),
         color: r.chance(40).then(|| r.pick(&["#00ff7f", ""]).into()),
@@ -301,11 +357,16 @@ fn gen_content(rng: &mut Rng) -> Budget {
                         gen_detail(rng, row_id)
                     })
                     .collect();
-                account(&rng.text(), &rng.text(), details)
+                let mut a = account(&rng.text(), &rng.text(), details);
+                a.notes = gen_notes(rng);
+                a
             })
             .collect();
-        b.topsheet
-            .push(category(&rng.text(), &rng.text(), accounts));
+        let mut row = category(&rng.text(), &rng.text(), accounts);
+        if let TopsheetRow::Category(c) = &mut row {
+            c.notes = gen_notes(rng);
+        }
+        b.topsheet.push(row);
     }
     b.charges = (0..rng.below(4)).map(|_| gen_charge(rng)).collect();
     b.credits = (0..rng.below(3)).map(|_| gen_credit(rng)).collect();
@@ -366,10 +427,27 @@ fn gen_tool_presets(rng: &mut Rng, b: &mut Budget) {
         .collect();
 }
 
+/// Display settings (top level only: versions never hold them).
+fn gen_display(rng: &mut Rng) -> DisplayPrefs {
+    if rng.chance(40) {
+        return DisplayPrefs::default();
+    }
+    DisplayPrefs {
+        rate_cutoff: rng.chance(50).then(|| rng.dec()),
+        rate_decimals_below: rng.chance(50).then(|| rng.below(9) as u8),
+        rate_decimals_above: rng.chance(50).then(|| rng.below(9) as u8),
+        rate_global_decimals: rng.chance(50),
+        summary_rows: rng.chance(50),
+        net_total: rng.chance(50),
+    }
+}
+
 /// A budget whose versions hold other random content.
 fn gen_budget(rng: &mut Rng) -> Budget {
     let mut b = gen_content(rng);
     gen_tool_presets(rng, &mut b);
+    b.display = gen_display(rng);
+    gen_order(rng, &mut b);
     for _ in 0..rng.below(3) {
         let (content, _) = gen_content(rng).into_parts();
         b.versions.push(Version {
@@ -483,6 +561,16 @@ fn generator_covers_every_variant_and_field() {
         "currencies",
         "units",
         "globals",
+        "global_info",
+        "decimals",
+        "show_by_name",
+        "folder",
+        "display",
+        "rate_cutoff",
+        "rate_decimals_below",
+        "rate_decimals_above",
+        "rate_global_decimals",
+        "summary_rows",
         "fringes",
         "groups",
         "sets",
@@ -524,6 +612,13 @@ fn generator_covers_every_variant_and_field() {
         "indent",
         "color",
         "note",
+        "notes",
+        "text",
+        "edited",
+        "author",
+        "done",
+        "short_code",
+        "setup_order",
         "applied",
         "excluded_amounts",
         "excluded_groups",

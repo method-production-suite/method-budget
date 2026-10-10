@@ -302,7 +302,7 @@ export function saveBlockForm({ call, sel, view, anchor, onError, onSaved = () =
       type: 'check',
       value: has((r) => filled(r, ['fringes', 'groups', 'set', 'location', 'currency', 'fringe_range'])),
     },
-    { key: 'notes', label: 'Notes', type: 'check', value: has((r) => filled(r, ['note'])) },
+    { key: 'notes', label: 'Notes', type: 'check', value: has((r) => filled(r, ['notes'])) },
   ];
   let saved = false;
   return anchoredForm({
