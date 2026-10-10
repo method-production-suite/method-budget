@@ -110,8 +110,13 @@ pub const FILE: &[Entry] = &[
     item("file.save", "Save", "mod+s"),
     item("file.save_as", "Save As…", "mod+shift+s"),
     SEP,
+    // Named versions inside the budget, and comparing budgets (src/versions.rs,
+    // src/compare.rs).
+    plain("file.versions", "Versions…"),
+    plain("file.compare", "Compare Budgets…"),
+    SEP,
+    item("file.print_budget", "Print…", "mod+p"),
     item("file.print_topsheet", "Print Topsheet…", "mod+shift+p"),
-    item("file.print_budget", "Print Budget…", "mod+p"),
     SEP,
     item(CLOSE_TAB, "Close Tab", "mod+w"),
     item(CLOSE, "Close Window", "mod+shift+w"),
@@ -139,6 +144,12 @@ pub const EDIT: &[Entry] = &[
     item("edit.note", "Note…", "mod+shift+space"),
     item("edit.make_range", "Make Fringe Range", "mod+r"),
     item("edit.remove_range", "Remove Fringe Range", "mod+shift+r"),
+    SEP,
+    // Find and replace: the Find tab of the tools panel (ui/js/find.js).
+    item("edit.find", "Find…", "mod+f"),
+    item("edit.replace", "Find and Replace…", "mod+shift+f"),
+    item("edit.find_next", "Find Next", "f3"),
+    item("edit.find_previous", "Find Previous", "shift+f3"),
 ];
 
 pub const INSERT: &[Entry] = &[
@@ -549,6 +560,9 @@ mod tests {
         assert_eq!(accelerator("mod+t"), "CmdOrCtrl+T");
         assert_eq!(accelerator("mod+shift+]"), "CmdOrCtrl+Shift+]");
         assert_eq!(accelerator("ctrl+shift+tab"), "Ctrl+Shift+Tab");
+        assert_eq!(accelerator("f3"), "F3");
+        assert_eq!(accelerator("shift+f3"), "Shift+F3");
+        assert_eq!(accelerator("mod+shift+f"), "CmdOrCtrl+Shift+F");
     }
 
     #[test]

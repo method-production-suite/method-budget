@@ -43,6 +43,8 @@
     "allow-clear-baseline",
     "allow-set-row-note",
     "allow-notes-list",
+    "allow-find",
+    "allow-replace",
     "core:event:allow-listen",
     "core:event:allow-emit-to"
   ]

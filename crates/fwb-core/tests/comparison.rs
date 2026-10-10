@@ -414,3 +414,130 @@ fn versions_compare_with_the_current_budget() {
     assert_eq!(w.diffs[1].amount, 1_000_000);
     assert_eq!(w.diffs[1].percent, Some(d("6.666666667")));
 }
+
+#[test]
+fn production_levels_match_by_name() {
+    let a = sample();
+    let mut b = sample();
+    // B spells its first level in other case and spacing, and adds one more
+    // at the end (after which nothing follows, so no unnamed level either).
+    if let Some(TopsheetRow::ProductionTotal(p)) = b
+        .topsheet
+        .iter_mut()
+        .find(|r| matches!(r, TopsheetRow::ProductionTotal(_)))
+    {
+        p.name = "  total ABOVE-the-line ".into();
+    }
+    b.topsheet.push(level("Wrap"));
+    let c = compare(&two(&a, &b)).unwrap();
+    let names: Vec<&str> = c.levels.iter().map(|l| l.name.as_str()).collect();
+    let (ra, rb) = (report(&a), report(&b));
+    let mut want: Vec<&str> = ra
+        .levels
+        .iter()
+        .map(|l| l.name.as_str())
+        .filter(|n| !n.is_empty())
+        .collect();
+    want.push("Wrap");
+    assert_eq!(names, want);
+    assert_eq!(names[0], "Total Above-the-Line");
+    assert_eq!(
+        c.levels[0].line.values,
+        vec![Some(ra.levels[0].total), Some(rb.levels[0].total)]
+    );
+    let last = c.levels.last().unwrap();
+    assert_eq!(
+        last.line.values,
+        vec![None, Some(rb.levels.last().unwrap().total)]
+    );
+}
+
+#[test]
+fn places_say_where_each_item_is_in_each_budget() {
+    let a = sample();
+    let mut b = sample();
+    // B puts a new category first, so everything moves down one.
+    b.topsheet.insert(
+        0,
+        category(
+            "0500",
+            "Development",
+            vec![account("0510", "Rights", vec![])],
+        ),
+    );
+    let c = compare(&two(&a, &b)).unwrap();
+    let prod = c.categories.iter().find(|x| x.code == "2000").unwrap();
+    assert_eq!(prod.at, vec![Some(1), Some(2)]);
+    let crew = prod.accounts.iter().find(|x| x.code == "2100").unwrap();
+    assert_eq!(crew.at, vec![Some((1, 0)), Some((2, 0))]);
+    // A fringe account sits after the category's accounts.
+    let fr = prod.accounts.iter().find(|x| x.fringe_account).unwrap();
+    assert_eq!(fr.at, vec![Some((1, 1)), Some((2, 1))]);
+    let dev = c.categories.iter().find(|x| x.code == "0500").unwrap();
+    assert_eq!(dev.at, vec![None, Some(0)]);
+
+    let mut b2 = sample();
+    acct_mut(&mut b2, "2100").details[0].id = 400;
+    let by_desc = compare_account(&two(&a, &b2), "2100", RowMatch::Description).unwrap();
+    assert_eq!(by_desc.at, vec![Some((1, 0)), Some((1, 0))]);
+    assert_eq!(by_desc.rows[0].ids, vec![Some(2), Some(400)]);
+    let by_id = compare_account(&two(&a, &b2), "2100", RowMatch::Id).unwrap();
+    assert_eq!(by_id.rows[0].ids, vec![Some(2), None]);
+    assert!(by_id.rows.iter().any(|r| r.ids == vec![None, Some(400)]));
+}
+
+#[test]
+fn aggregates_are_sum_average_and_variance_against_the_average() {
+    let line = |values: Vec<Option<Cents>>| CompareLine {
+        diffs: vec![
+            Diff {
+                amount: 0,
+                percent: None
+            };
+            values.len()
+        ],
+        values,
+    };
+    // Base 100.00, others 120.00 and 90.00: sum 210, average 105, variance
+    // 210 - 100 = 110, percent 110 / 105.
+    let agg = line(vec![Some(10_000), Some(12_000), Some(9_000)])
+        .aggregate()
+        .unwrap();
+    assert_eq!(
+        (agg.sum, agg.average, agg.variance),
+        (21_000, 10_500, 11_000)
+    );
+    assert_eq!(agg.percent, Some(d("104.761904762")));
+
+    // One other budget: the variance is its difference, against itself.
+    let one = line(vec![Some(10_000), Some(8_000)]).aggregate().unwrap();
+    assert_eq!((one.sum, one.average, one.variance), (8_000, 8_000, -2_000));
+    assert_eq!(one.percent, Some(d("-25")));
+
+    // Missing values count as 0; an average rounds once, half away from zero.
+    let gaps = line(vec![None, Some(1), None, Some(0)])
+        .aggregate()
+        .unwrap();
+    assert_eq!((gaps.sum, gaps.average, gaps.variance), (1, 0, 1));
+    assert_eq!(gaps.percent, Some(d("300")));
+    let neg = line(vec![Some(0), Some(-1), Some(-2)]).aggregate().unwrap();
+    assert_eq!(neg.average, -2);
+    // The percent's sign follows the variance even when the sum is negative.
+    assert!(neg.percent.unwrap() < Dec::ZERO);
+
+    // Nothing to compare, or a zero sum.
+    assert_eq!(line(vec![Some(5)]).aggregate(), None);
+    assert_eq!(
+        line(vec![Some(5), Some(0)]).aggregate().unwrap().percent,
+        None
+    );
+}
+
+#[test]
+fn compare_rejects_too_few_or_too_many_budgets() {
+    let a = sample();
+    assert!(compare(&[("A".to_string(), &a)]).is_err());
+    let many: Vec<(String, &Budget)> = (0..=MAX_COMPARED).map(|i| (i.to_string(), &a)).collect();
+    assert!(compare(&many).is_err());
+    assert!(compare(&many[..MAX_COMPARED]).is_ok());
+}

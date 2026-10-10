@@ -935,6 +935,8 @@ pub fn run() {
         .manage(crate::tabs::TabMenu::default())
         // The row clipboard: one for the app, shared by every budget (src/clipboard.rs).
         .manage(crate::clipboard::ClipboardState::default())
+        // Files picked for the compare screen, read once (src/compare.rs).
+        .manage(crate::compare::CompareFiles::default())
         // Which budget change the other window has heard about (src/tools.rs).
         .manage(crate::tools::Broadcast::default());
 
@@ -1081,12 +1083,28 @@ pub fn run() {
             crate::tools::tools_window,
             crate::tools::close_tools_window,
             crate::tools::notes_list,
+            // Versions saved in the budget, and comparing budgets
+            // (src/versions.rs, src/compare.rs)
+            crate::versions::save_version,
+            crate::versions::restore_version,
+            crate::versions::rename_version,
+            crate::versions::delete_version,
+            crate::compare::compare_budgets,
+            crate::compare::compare_detail,
+            crate::compare::compare_pick_files,
             // Budgets as tabs (src/tabs.rs)
             crate::tabs::new_tab,
             crate::tabs::switch_tab,
             crate::tabs::move_tab,
             crate::tabs::close_tab,
             crate::tabs::list_tabs,
+            // Reports: saved presets, printing and PDF (src/reports.rs)
+            crate::reports::save_report_preset,
+            crate::reports::delete_report_preset,
+            crate::reports::print_report,
+            // Find and replace (src/find.rs)
+            crate::find::find,
+            crate::find::replace,
         ])
         .setup(|app| {
             // Autosave, recovery, backups, recent files, and the budgets that

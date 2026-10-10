@@ -97,12 +97,28 @@ const COMMANDS: &[&str] = &[
     "tools_window",
     "close_tools_window",
     "notes_list",
+    // Versions saved in the budget, and comparing budgets (src/versions.rs,
+    // src/compare.rs)
+    "save_version",
+    "restore_version",
+    "rename_version",
+    "delete_version",
+    "compare_budgets",
+    "compare_detail",
+    "compare_pick_files",
     // Budgets as tabs (src/tabs.rs)
     "new_tab",
     "switch_tab",
     "move_tab",
     "close_tab",
     "list_tabs",
+    // Reports: saved report presets, printing and PDF (src/reports.rs)
+    "save_report_preset",
+    "delete_report_preset",
+    "print_report",
+    // Find and replace (src/find.rs)
+    "find",
+    "replace",
 ];
 
 fn main() {

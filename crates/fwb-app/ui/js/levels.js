@@ -46,7 +46,27 @@ export function indexView(view) {
   const accountHasIssue = (ti, ai) => badAccounts.has(`${ti}:${ai}`);
   const categoryHasIssue = (ti) => badCategories.has(ti);
 
-  return { b, r, topsheet, cats, levels, cellIssues, accountHasIssue, categoryHasIssue };
+  // Original (baseline) vs current, when the budget has a baseline: every
+  // category and account, and the rows of the account on screen.
+  const variance = view.variance && typeof view.variance === 'object' ? view.variance : null;
+
+  return { b, r, topsheet, cats, levels, cellIssues, accountHasIssue, categoryHasIssue, variance };
+}
+
+// ---------------------------------------------------------------------------
+// Original and variance columns (Orig, Var): on every level when the budget
+// has a baseline (view.variance). Shown until the user hides them from the
+// column menu; never without a baseline.
+
+/** The Orig and Var cells for one compared figure ({ original, current, variance }). */
+export function varianceCells(ch) {
+  if (!ch || typeof ch !== 'object') return {};
+  const orig =
+    ch.original === null || ch.original === undefined
+      ? { text: '', placeholder: 'new', cls: 'muted', title: 'Added since the baseline was locked' }
+      : { text: money(ch.original), title: 'When the baseline was locked' };
+  const diff = ch.variance === null || ch.variance === undefined ? { ...NA } : { text: money(ch.variance), title: 'Change since the baseline was locked' };
+  return { orig, var: diff };
 }
 
 /** The category entry for a topsheet index, or null. */
@@ -99,6 +119,19 @@ export const TOPSHEET_COLUMNS = [
   { key: 'total', label: 'Total', cls: 'num' },
 ];
 
+/** Columns with the shown Orig and Var columns put before Total. */
+function withBaselineColumns(cols, choices, ctx) {
+  const extra = BASELINE_COLUMNS.filter((c) => columnShown(c, choices, ctx)).map(({ key, label, cls, title }) => ({ key, label, cls, title }));
+  if (!extra.length) return cols;
+  const at = cols.findIndex((c) => c.key === 'total');
+  return [...cols.slice(0, at), ...extra, ...cols.slice(at)];
+}
+
+/** Topsheet columns, with Orig and Var when the budget has a baseline (and they aren't hidden). */
+export function topsheetColumns(ix, choices) {
+  return withBaselineColumns(TOPSHEET_COLUMNS, choices, { baseline: Boolean(ix.variance) });
+}
+
 export function topsheetRows(ix) {
   const r = ix.r;
   const rows = [];
@@ -133,6 +166,7 @@ export function topsheetRows(ix) {
         code: { text: row.code, edit: row.code },
         name: { text: row.name, edit: row.name },
         total: c && c.rep ? moneyCell(c.rep.total, bad ? { error: PROBLEM } : {}) : NA,
+        ...(ix.variance ? varianceCells(ix.variance.categories[row.code]) : {}),
       },
     });
   }
@@ -145,11 +179,11 @@ export function topsheetRows(ix) {
   r.charges.forEach((c, i) => {
     rows.push(staticRow(`s-ch${i}`, 'summary charge', c.name, c.amount));
   });
-  rows.push(staticRow('s-grand', 'summary grand', 'Grand total', r.grand_total));
+  rows.push(staticRow('s-grand', 'summary grand', 'Grand total', r.grand_total, ix.variance ? varianceCells(ix.variance.grand_total) : {}));
   r.credits.forEach((c, i) => {
     rows.push(staticRow(`s-cr${i}`, 'summary credit', `Less ${c.name}`, -c.amount));
   });
-  if (r.credits.length) rows.push(staticRow('s-net', 'summary grand', 'Net total', r.net_total));
+  if (r.credits.length) rows.push(staticRow('s-net', 'summary grand', 'Net total', r.net_total, ix.variance ? varianceCells(ix.variance.net_total) : {}));
   if (r.display) {
     const cur = r.totals_currency;
     rows.push(staticRow('s-disp', 'summary', `Net total in ${cur}`, r.display.net_total));
@@ -174,10 +208,15 @@ const FRINGE_POSTED = {
   budget: "Fringes earned by lines in this account; they post to the budget's total fringes",
 };
 
-/** Account-list columns; the Fringes header says where the fringes post. */
-export function accountColumns(ix) {
+/**
+ * Account-list columns; the Fringes header says where the fringes post. Orig
+ * and Var come before Total when the budget has a baseline (and `choices`
+ * doesn't hide them).
+ */
+export function accountColumns(ix, choices) {
   const title = FRINGE_POSTED[postingKind(ix)] || FRINGE_POSTED.category;
-  return ACCOUNT_COLUMNS.map((c) => (c.key === 'fringe_total' ? { ...c, title } : c));
+  const cols = ACCOUNT_COLUMNS.map((c) => (c.key === 'fringe_total' ? { ...c, title } : c));
+  return withBaselineColumns(cols, choices, { baseline: Boolean(ix.variance) });
 }
 
 /** How fringes post: 'budget', 'production_level', 'category' or 'account'. */
@@ -205,6 +244,7 @@ export function accountRows(ix, entry) {
         name: { text: a.name, edit: a.name },
         fringe_total: ar ? { text: ar.fringe_total ? money(ar.fringe_total) : '', cls: frCls } : NA,
         total: ar ? moneyCell(ar.total, bad ? { error: PROBLEM } : {}) : NA,
+        ...(ix.variance ? varianceCells(ix.variance.accounts[a.code]) : {}),
       },
     };
   });
@@ -229,6 +269,7 @@ export function accountRows(ix, entry) {
       name: { text: `Total ${entry.cat.name || entry.cat.code}` },
       fringe_total: rep ? { text: money(rep.fringe_total), cls: frCls } : NA,
       total: rep ? moneyCell(rep.total) : NA,
+      ...(ix.variance ? varianceCells(ix.variance.categories[entry.cat.code]) : {}),
     },
   });
   return rows;
@@ -261,22 +302,34 @@ export const DETAIL_COLUMNS = [
   { key: 'groups', label: 'Groups', title: 'Groups, separated by commas', width: 130, min: 60, optional: true, on: true },
   { key: 'set', label: 'Set', width: 90, min: 60, optional: true, on: false },
   { key: 'location', label: 'Location', width: 110, min: 70, optional: true, on: false },
+  // With a baseline only (`baseline: true`), shown by default then.
+  { key: 'orig', label: 'Orig', name: 'Orig (original total)', cls: 'num', title: 'The total when the baseline was locked', width: 120, min: 96, optional: true, on: 'baseline', baseline: true },
+  { key: 'var', label: 'Var', name: 'Var (change since the baseline)', cls: 'num', title: 'How far the total has moved since the baseline was locked', width: 120, min: 96, optional: true, on: 'baseline', baseline: true },
   { key: 'total', label: 'Total', cls: 'num', width: 130, min: 116, pin: 'right' },
 ];
 
 /** The optional detail columns, for the column menu. */
 export const OPTIONAL_DETAIL_COLUMNS = DETAIL_COLUMNS.filter((c) => c.optional);
 
-/** Whether an optional column shows, given saved choices ({ key: boolean }). */
-export function columnShown(col, choices) {
+/** The Orig and Var columns, which every level can show when the budget has a baseline. */
+export const BASELINE_COLUMNS = DETAIL_COLUMNS.filter((c) => c.baseline);
+
+/**
+ * Whether an optional column shows, given saved choices ({ key: boolean })
+ * and `ctx.baseline` (the budget has a baseline). Orig and Var never show
+ * without one, and show with one unless the user hid them.
+ */
+export function columnShown(col, choices, ctx = {}) {
   if (!col.optional) return true;
+  if (col.baseline && !ctx.baseline) return false;
   const v = choices ? choices[col.key] : undefined;
-  return typeof v === 'boolean' ? v : col.on;
+  if (typeof v === 'boolean') return v;
+  return col.on === 'baseline' ? Boolean(ctx.baseline) : col.on;
 }
 
-/** The detail columns to draw, given saved choices. */
-export function detailColumns(choices) {
-  return DETAIL_COLUMNS.filter((c) => columnShown(c, choices));
+/** The detail columns to draw, given saved choices (and `ctx.baseline`). */
+export function detailColumns(choices, ctx = {}) {
+  return DETAIL_COLUMNS.filter((c) => columnShown(c, choices, ctx));
 }
 
 const PLAIN_NUMBER = /^[+-]?(\d+\.?\d*|\.\d+)$/;
@@ -494,6 +547,7 @@ export function detailRows(ix, entry, ai, full) {
     }
     // Effective fringe percent: blank when the line has no total, or neither
     // fringes nor fringe dollars (0.00% still shows a fringe that earned nothing).
+    if (ix.variance && rr && (line || kind === 'adjustment')) Object.assign(cells, varianceCells(ix.variance.rows[d.id]));
     if (rr && line && rr.included && rr.total && (rr.fringe_total || (d.fringes || []).length)) {
       const parts = Object.entries(rr.fringes).map(([n, c]) => `${n}: ${fringePercent(c, rr.total)}`);
       cells.fringe_pct = { text: fringePercent(rr.fringe_total, rr.total), cls: 'muted', title: parts.join('\n') };
@@ -503,6 +557,10 @@ export function detailRows(ix, entry, ai, full) {
   });
 
   const posting = postingKind(ix);
+  // The baseline keeps the account's total as the topsheet shows it: with
+  // its fringes only when they post to the account.
+  const acctChange = ix.variance ? varianceCells(ix.variance.accounts[acct.code]) : {};
+  const withFringes = posting === 'account' && ar;
   rows.push({
     key: 'acct-total',
     cls: 'summary first grand',
@@ -512,14 +570,15 @@ export function detailRows(ix, entry, ai, full) {
       total: ar ? moneyCell(ar.details_total) : NA,
       fringe_total: ar ? { text: money(ar.fringe_total), cls: 'muted' } : NA,
       fringe_pct: ar && ar.details_total && ar.fringe_total ? { text: fringePercent(ar.fringe_total, ar.details_total), cls: 'muted' } : {},
+      ...(withFringes ? {} : acctChange),
     },
   });
-  if (posting === 'account' && ar) {
+  if (withFringes) {
     rows.push({
       key: 'acct-total-fr',
       cls: 'summary',
       selectable: false,
-      cells: { description: { text: 'Total with fringes' }, total: moneyCell(ar.total) },
+      cells: { description: { text: 'Total with fringes' }, total: moneyCell(ar.total), ...acctChange },
     });
   }
   return rows;

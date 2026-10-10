@@ -24,11 +24,12 @@ import {
   indexView,
   findCategory,
   accountList,
-  TOPSHEET_COLUMNS,
+  topsheetColumns,
   accountColumns,
   detailColumns,
   columnShown,
   OPTIONAL_DETAIL_COLUMNS,
+  BASELINE_COLUMNS,
   topsheetRows,
   accountRows,
   detailRows,
@@ -36,7 +37,9 @@ import {
 import { renderFooter } from './footer.js';
 import { formDialog, confirmDialog, customDialog, isModalOpen } from './modal.js';
 import { renderTools, selectToolsTab, focusToolsKey, toolsLayout, setToolsLayout } from './tools.js';
+import { openFind, findStep } from './find.js';
 import { printReport } from './report.js';
+import { showReportSetup } from './reportsetup.js';
 import { SHORTCUTS, matchShortcut, menuRunsAppKeys, shortcutById, withShortcut } from './shortcuts.js';
 import { isHelpOpen, toggleHelp, closeHelp } from './help.js';
 import { openMenu, updateMenu, closeMenu, isMenuOpen, setMenuAnchor } from './menu.js';
@@ -48,6 +51,8 @@ import { initRowFormat, toggleStyle, indent, setColor, clearFormatting, PALETTE 
 import { initContextMenu } from './context.js';
 import { initClipboard, copyEvent, cellsCopied, pasteEvent, copyRows, pasteRows } from './clipboard.js';
 import { initTabs, renderTabs, focusTab, tabsHaveFocus } from './tabs.js';
+import { showVersions } from './versions.js';
+import { showCompare } from './compare.js';
 
 const state = {
   doc: null, // the budget on screen (its tab is in front)
@@ -250,10 +255,10 @@ function render(opts = {}) {
   $('grid-host').dataset.level = state.level;
   if (state.level === 'topsheet') {
     grid.h.enterMovesDown = false;
-    grid.setData(TOPSHEET_COLUMNS, topsheetRows(ix), opts);
+    grid.setData(withColumnMenu(topsheetColumns(ix, state.columns)), topsheetRows(ix), opts);
   } else if (state.level === 'accounts') {
     grid.h.enterMovesDown = false;
-    grid.setData(accountColumns(ix), accountRows(ix, entry), opts);
+    grid.setData(withColumnMenu(accountColumns(ix, state.columns)), accountRows(ix, entry), opts);
   } else {
     grid.h.enterMovesDown = true;
     const rows = detailRows(ix, entry, ai, v.account);
@@ -532,8 +537,12 @@ function drillDown(rowKey) {
   else if (state.level === 'accounts') openAccount(state.cat.ti, Number(rowKey.slice(1)));
 }
 
-/** Shows the accounts of the category at topsheet index `ti` (from anywhere). */
-function openCategory(ti) {
+/**
+ * Shows the accounts of the category at topsheet index `ti` (from anywhere);
+ * `land` ({ focusKey, focusCol }) puts the cursor on another account than the
+ * first.
+ */
+function openCategory(ti, land = null) {
   const c = state.ix.cats.find((x) => x.ti === ti);
   if (!c) return;
   const leaving = state.level === 'details';
@@ -541,7 +550,7 @@ function openCategory(ti) {
   state.cat = { code: c.cat.code, ti };
   state.level = 'accounts';
   state.selection = null;
-  render({ focusKey: 'a0', resetSelection: true });
+  render({ focusKey: 'a0', resetSelection: true, ...land });
   grid.focus();
   if (leaving) act('focus_account', {}, { quiet: true });
 }
@@ -555,7 +564,7 @@ let opening = null;
  * (from anywhere). The view carries only the account on screen, so this asks
  * Rust for it first and draws when it arrives.
  */
-async function openAccount(ti, ai, rowKey = null) {
+async function openAccount(ti, ai, rowKey = null, col = 'description') {
   const c = state.ix.cats.find((x) => x.ti === ti);
   const a = c && (c.cat.accounts || [])[ai];
   if (!a) return;
@@ -578,7 +587,7 @@ async function openAccount(ti, ai, rowKey = null) {
   state.level = 'details';
   state.selection = null;
   const land = rowKey ? { focusKey: rowKey } : { focusFirst: true };
-  apply(v, { cmd: 'focus_account', ...land, focusCol: 'description', resetSelection: true });
+  apply(v, { cmd: 'focus_account', ...land, focusCol: col, resetSelection: true });
   grid.focus();
 }
 
@@ -1227,6 +1236,13 @@ async function doPrint(kind) {
   grid.focus();
 }
 
+/** File > Print: the report setup dialog, with its preview, presets and PDF. */
+function openReportSetup() {
+  if (grid.editor) grid.commitEdit(null);
+  if (!state.view) return;
+  showReportSetup({ view: () => state.view, call: (cmd, args) => call(cmd, args), toast });
+}
+
 // ---------------------------------------------------------------------------
 // View: the tools panel, docked at the right (the default) or the bottom, or
 // popped out into its own window (src/tools.rs). Where it is is saved per user.
@@ -1269,6 +1285,35 @@ function showTab(tab) {
   }
   renderPanel();
   focusToolsKey(key);
+}
+
+/**
+ * Shows the Find tab in find or replace mode, with focus in its search box
+ * (in the tools window when the panel is popped out).
+ */
+function showFind(replace) {
+  selectToolsTab('find');
+  state.panelOpen = true;
+  if (state.position === 'window') {
+    toolsFocus = replace ? 'find:open-replace' : 'find:open';
+    openToolsWindow(true).then(sendToolsState);
+    return;
+  }
+  renderPanel();
+  openFind({ replace });
+}
+
+/**
+ * The next (1) or previous (-1) Find result (F3, Shift+F3), searched where
+ * the panel is; with nothing to find yet, the Find tab opens instead.
+ */
+function stepFind(delta) {
+  if (state.position === 'window') {
+    if (state.panelOpen) emitTo('tools', 'menu', delta > 0 ? 'edit.find_next' : 'edit.find_previous');
+    else showFind(false);
+    return;
+  }
+  if (!findStep(delta)) showFind(false);
 }
 
 /**
@@ -1354,11 +1399,18 @@ function cursorMoved() {
   broadcastSelection();
 }
 
-/** Goes to a line from the Notes tab's list: its account, with the line selected. */
+/**
+ * Goes to a line from the Notes tab's list or a Find result: its account,
+ * with the line selected (on the cell of `entry.field`, when given). A Find
+ * result with no `row_id` is an account's name or number: the category's
+ * account list, on that account. Resolves once it is on screen.
+ */
 function jumpTo(entry) {
-  if (!entry || typeof entry !== 'object' || !state.ix) return;
+  if (!entry || typeof entry !== 'object' || !state.ix) return Promise.resolve();
+  const accountOnly = entry.row_id === null || entry.row_id === undefined;
   const id = Number(entry.row_id);
-  if (!Number.isSafeInteger(id)) return;
+  if (!accountOnly && !Number.isSafeInteger(id)) return Promise.resolve();
+  const col = typeof entry.field === 'string' && entry.field ? entry.field : null;
   let target = null;
   const c = state.ix.cats.find((x) => x.ti === entry.ti);
   const a = c && (c.cat.accounts || [])[entry.ai];
@@ -1371,11 +1423,15 @@ function jumpTo(entry) {
     }
   }
   if (!target) {
-    toast('That line is no longer in the budget.');
-    return;
+    toast(accountOnly ? 'That account is no longer in the budget.' : 'That line is no longer in the budget.');
+    return Promise.resolve();
   }
   if (grid.editor) grid.commitEdit(null);
-  openAccount(target.ti, target.ai, `r${id}`);
+  if (accountOnly) {
+    openCategory(target.ti, { focusKey: `a${target.ai}`, focusCol: col || 'name' });
+    return Promise.resolve();
+  }
+  return openAccount(target.ti, target.ai, `r${id}`, col || 'description');
 }
 
 // Another window changed the budget (src/tools.rs): fetch the view, once even
@@ -1556,17 +1612,37 @@ function readColumnChoices() {
   return out;
 }
 
-function gridDetailColumns() {
-  return detailColumns(state.columns).map((c) => (c.key === 'num' ? { ...c, head: columnMenuButton } : c));
+/** What the column choices depend on: whether the budget has a baseline (Orig and Var). */
+function columnContext() {
+  return { baseline: Boolean(state.ix && state.ix.variance) };
 }
 
+function gridDetailColumns() {
+  return detailColumns(state.columns, columnContext()).map((c) => (c.key === 'num' ? { ...c, head: columnMenuButton } : c));
+}
+
+/**
+ * Topsheet and account-list columns: with a baseline, the column menu (Orig
+ * and Var) sits in the Acct # header, as it does in the # header of lines.
+ */
+function withColumnMenu(cols) {
+  if (!columnContext().baseline) return cols;
+  const head = (label) => () => el('span', { class: 'col-head-menu' }, columnMenuButton(), el('span', { text: label }));
+  return cols.map((c) => (c.key === 'code' ? { ...c, head: head(c.label) } : c));
+}
+
+/** The column menu: every optional column on the lines, Orig and Var elsewhere. */
 function columnMenuItems() {
-  return OPTIONAL_DETAIL_COLUMNS.map((c) => ({
-    id: c.key,
-    label: c.name || c.label,
-    title: c.title,
-    checked: columnShown(c, state.columns),
-  }));
+  const ctx = columnContext();
+  const list = state.level === 'details' ? OPTIONAL_DETAIL_COLUMNS : BASELINE_COLUMNS;
+  return list
+    .filter((c) => !c.baseline || ctx.baseline)
+    .map((c) => ({
+      id: c.key,
+      label: c.name || c.label,
+      title: c.title,
+      checked: columnShown(c, state.columns, ctx),
+    }));
 }
 
 function columnsIcon() {
@@ -1593,9 +1669,9 @@ function openColumnMenu(anchor) {
     onPick: (item) => {
       const col = OPTIONAL_DETAIL_COLUMNS.find((c) => c.key === item.id);
       if (!col) return;
-      state.columns = { ...state.columns, [col.key]: !columnShown(col, state.columns) };
+      state.columns = { ...state.columns, [col.key]: !columnShown(col, state.columns, columnContext()) };
       writePref('detailColumns', state.columns);
-      if (state.level === 'details') render();
+      render();
       updateMenu(columnMenuItems());
     },
   });
@@ -1659,7 +1735,7 @@ const COMMANDS = {
   'file.save': () => doSave(false),
   'file.save_as': () => doSave(true),
   'file.print_topsheet': () => doPrint('topsheet'),
-  'file.print_budget': () => doPrint('both'),
+  'file.print_budget': () => openReportSetup(),
   'edit.undo': () => fieldEdit('undo') || doUndo(),
   'edit.redo': () => fieldEdit('redo') || doRedo(),
   'edit.select_all': () => fieldEdit('selectAll') || selectAll(),
@@ -1712,6 +1788,83 @@ Object.assign(COMMANDS, {
   'edit.copy_rows': () => copyRows(false),
   'edit.paste_rows': () => pasteRows(),
 });
+// Edit > Find, Find and Replace, Find Next, Find Previous: the tools panel's
+// Find tab (find.js), wherever the panel is.
+Object.assign(COMMANDS, {
+  'edit.find': () => showFind(false),
+  'edit.replace': () => showFind(true),
+  'edit.find_next': () => stepFind(1),
+  'edit.find_previous': () => stepFind(-1),
+});
+
+// File > Versions… and File > Compare Budgets…, and their toolbar buttons
+// (versions.js, compare.js).
+Object.assign(COMMANDS, {
+  'file.versions': () => openVersions(),
+  'file.compare': () => openCompare(),
+});
+
+/** The Versions dialog for the budget on screen. */
+function openVersions() {
+  if (grid.editor) grid.commitEdit(null);
+  if (!state.view) return;
+  showVersions({ view: () => state.view, call: (cmd, args) => call(cmd, args), compare: (id) => openCompare({ version: id }) });
+}
+
+/** The compare screen for the budget on screen (`opts.version`: just that version). */
+function openCompare(opts = {}) {
+  if (grid.editor) grid.commitEdit(null);
+  if (!state.view) return;
+  showCompare(
+    {
+      doc: () => state.doc,
+      view: () => state.view,
+      tabs: () => state.tabs,
+      pickFiles: () => invoke('compare_pick_files'),
+      jump: (place) => goToCompared(place),
+    },
+    opts,
+  );
+}
+
+/**
+ * Goes to a row picked on the compare screen, in the open budget it names
+ * ({ doc, kind: 'category' | 'account' | 'row', ci, ai, rowId }; ci is the
+ * category's place among the categories, ai the account's in it, one past
+ * the last for a category's fringe account).
+ */
+async function goToCompared(place) {
+  if (!place || typeof place !== 'object') return;
+  if (grid.editor) grid.commitEdit(null);
+  if (typeof place.doc === 'number' && place.doc !== state.doc) {
+    await switchTo(place.doc);
+    if (state.doc !== place.doc) return;
+  }
+  const c = state.ix && state.ix.cats.find((x) => x.ci === place.ci);
+  if (!c) {
+    toast('That is no longer in the budget.');
+    return;
+  }
+  const n = (c.cat.accounts || []).length;
+  if (place.kind === 'category') {
+    openCategory(c.ti);
+  } else if (place.ai >= n) {
+    openCategory(c.ti, { focusKey: 'fa' });
+  } else {
+    await openAccount(c.ti, place.ai, place.kind === 'row' ? `r${place.rowId}` : null);
+  }
+  grid.focus();
+}
+
+for (const [id, cmd, label] of [
+  ['btn-versions', 'file.versions', 'Versions: save, restore and compare named copies of this budget'],
+  ['btn-compare', 'file.compare', 'Compare this budget with others, or with its versions'],
+]) {
+  const b = $(id);
+  if (!b) continue;
+  b.title = withShortcut(label, cmd);
+  b.addEventListener('click', () => COMMANDS[cmd]());
+}
 
 /** Commands that act on a focused text field (and so leave a cell edit open). */
 const FIELD_COMMANDS = new Set(SHORTCUTS.filter((s) => s.field).map((s) => s.id));

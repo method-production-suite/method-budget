@@ -24,12 +24,14 @@
 //
 // Keys: text fields keep their own editing keys; app keys go to the menu bar
 // on macOS (whose items come here first) and are handled here on Windows and
-// Linux; the tab keys show a tab here; everything else goes to the main
-// window. Close Window (Cmd+W) closes this window, which docks the panel back.
+// Linux; the tab keys show a tab here, and Find, Find and Replace, Find Next
+// and Find Previous work in the Find tab here; everything else goes to the
+// main window. Close Window (Cmd+W) closes this window, which docks the panel back.
 
 import { invoke, connected, setDefaultArgs } from './api.js';
 import { $, el, isTextField } from './dom.js';
 import { renderTools, setToolsLayout, toolsLayout, selectToolsTab, focusToolsKey } from './tools.js';
+import { openFind, findStep } from './find.js';
 import { matchShortcut, menuRunsAppKeys, shortcutById } from './shortcuts.js';
 import { isModalOpen } from './modal.js';
 
@@ -157,6 +159,23 @@ function showTab(tab) {
   emitTo('main', 'tools-layout', toolsLayout());
 }
 
+/** The Find tab, in find or replace mode, with focus in its search box. */
+function showFind(replace) {
+  if (!selectToolsTab('find')) return;
+  render();
+  openFind({ replace });
+  emitTo('main', 'tools-layout', toolsLayout());
+}
+
+// Find and replace live in this window while the panel is popped out: the
+// main window passes these on (find.js).
+const FIND_COMMANDS = {
+  'edit.find': () => showFind(false),
+  'edit.replace': () => showFind(true),
+  'edit.find_next': () => findStep(1) || showFind(false),
+  'edit.find_previous': () => findStep(-1) || showFind(false),
+};
+
 // ---------------------------------------------------------------------------
 // Menu commands and keys
 
@@ -183,6 +202,10 @@ function onMenu(id) {
   if (isModalOpen()) return; // a small editor is open: it has the keys
   if (id.startsWith('view.tab.')) {
     showTab(id.slice('view.tab.'.length));
+    return;
+  }
+  if (Object.prototype.hasOwnProperty.call(FIND_COMMANDS, id)) {
+    FIND_COMMANDS[id]();
     return;
   }
   // A grid key while typing in a field was meant for the field (the budget
@@ -231,7 +254,9 @@ async function listen() {
       if (p.selection) state.selection = p.selection;
       render();
       if (p.selection) setSelection(p.selection);
-      if (p.focus) focusToolsKey(p.focus);
+      // Edit > Find or Find and Replace in the main window (main.js showFind).
+      if (p.focus === 'find:open' || p.focus === 'find:open-replace') openFind({ replace: p.focus === 'find:open-replace' });
+      else if (p.focus) focusToolsKey(p.focus);
     }),
     on('menu', onMenu),
   ]);

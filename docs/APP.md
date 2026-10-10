@@ -140,6 +140,17 @@ scrolls, # and Description stay at the left and Total at the right. At 1280 pixe
 with the tools panel docked at the right, the default columns fit without scrolling (docked
 at the bottom, the grid has the window's whole width).
 
+**Original and variance columns.** When the budget has a baseline (Tools, Budget,
+Baseline: Lock), every level shows **Orig** (the total when the baseline was locked) and
+**Var** (how far it has moved since) just before Total: categories, the grand and net
+totals on the topsheet; accounts and the category total in an account list; each line
+and adjustment, and the account total, in the lines. A line added since shows `new`. The
+column menu hides or shows them, on the lines (with the other columns) and on the topsheet
+and account list (its button sits in the Acct # header there, and only while there is a
+baseline); the choice is one for all three levels. Without a baseline they never show.
+The account total's Orig is the topsheet's account total, so with fringes posted by
+account it sits on the "Total with fringes" row.
+
 **Row styles.** The Format menu (and the grid's right-click menu) styles the selected
 lines: Bold (Cmd+B) and Italic (Shift+Cmd+I) go on, or off when every selected line has
 them already; Indent More and Indent Less (Option+Cmd+Right and Left) move each line one
@@ -202,8 +213,8 @@ or created.
 
 The panel is two tab panes. Docked at the right they are stacked; docked at the bottom
 they sit side by side under a grid that gets the window's whole width; popped out they are
-stacked in a window called Tools. The first pane starts with **Fringes, Groups, Globals and
-Units**, the second with **Sets, Locations, Currency, Notes and Budget**; Budget has tabs of
+stacked in a window called Tools. The first pane starts with **Fringes, Groups, Globals,
+Units and Find**, the second with **Sets, Locations, Currency, Notes and Budget**; Budget has tabs of
 its own: **Charges, Credits, Info, Settings and Baseline**. Drag a tab along its strip to
 reorder it, or onto the other pane's strip to move it there (a bar shows where it will
 land); from the keyboard, Option+Shift+Left and Right move the focused tab along its pane
@@ -316,6 +327,64 @@ The tools window and the Notes tab use these commands, in `src/tools.rs`:
 | `close_tools_window` | none | nothing |
 | `notes_list` | none | `[{ row_id, ti, ai, category, account, account_name, line, description, note, more }]`, every line with a note in budget order; `note` is cut to 280 characters (`more` says so) |
 
+### Find and replace
+
+Edit > Find (Cmd+F) shows the tools panel's **Find** tab, wherever the panel is, with focus
+in its search box; Edit > Find and Replace (Shift+Cmd+F) shows it in replace mode (the
+**Replace…** switch in the tab does the same). A search looks for one kind of thing, picked
+in the menu above the box:
+
+- **Description**, **Formula text** (Amount, X, Rate and 4X as typed), **Notes** and
+  **Account name or number**: text, with **Match case** and **Whole word** (the text must
+  not run on into letters, digits or `_`).
+- **Global in formulas**: a global used in Amount, X, Rate or 4X, matched as a whole name
+  the way formulas are read, so `DAYS` never matches inside `SHOOT_DAYS` or `DAYS2`.
+- **Fringe**, **Group**, **Set**, **Location**, **Unit** (any of the four unit columns, each
+  its own result) and **Currency** on lines, by name. The base currency finds the lines
+  left blank, which use it.
+
+For globals and setup items the box offers the names as you type (Up and Down, Enter or
+Tab takes one, Escape closes the list; Enter on part of a name takes the first one offered),
+and capitals don't matter. Text searches run as you type. Results are grouped by category
+and account, with the account's count; each shows the line number and the column that
+matched, the line's description and what the cell holds. A click on a result opens its
+account with that cell selected (an account's name or number: the category's account list,
+on that account). Enter and Shift+Enter in the search box go to the next and previous
+result, keeping focus in the box; F3 and Shift+F3 do the same from anywhere (Cmd+G is the
+Globals tab), opening the Find tab when there is nothing to find yet. The count says how
+many places match; at most 1,000 are listed (the count says so), and the list is searched
+again after every change to the budget, so places that no longer match drop out.
+
+**Replacing.** In replace mode every result has a checkbox, all checked to begin with, with
+one per account and **All results** above (a dash when some are checked). **Replace**
+changes the checked results only, all as one undo step, and says how many places changed
+(`4 updated`, until the budget changes again). Text is replaced inside the field (the
+matches only; an emptied note is removed). A global is replaced, only as that name, by
+another global, a number or a formula (a formula goes in parentheses inside a longer
+formula: `(WEEKS * 5) / DAYS`; a cell that is only the global takes it as typed). A fringe,
+group, set, location, unit or currency is replaced by another one that exists (the Replace
+box offers them). **Remove** takes the item off the checked lines (a currency goes back to
+the base currency), or puts a global's current value in its place, as deleting a global
+does (decisions.md, entry 12). Account numbers are found but not replaced (they change in
+the account list). A replace is refused, with nothing changed and the reason shown, when a
+checked place no longer matches (the budget changed meanwhile), the new global or item
+doesn't exist, the formula can't be read, or nothing would change. Renaming a setup item
+everywhere is a different thing and isn't built yet (below).
+
+Popped out, the Find tab works in the tools window: its results move the main window's
+grid, and Cmd+F and F3 in the main window go to it.
+
+The commands live in `src/find.rs`:
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `find` | `query` (`{ scope, text, match_case, whole_word }`; scope `description`, `formula`, `global`, `fringe`, `group`, `set`, `location`, `unit`, `currency`, `note` or `account`) | `{ count, hits, truncated }`: `hits` are `[{ ti, ai, category, category_name, account, account_name, row_id, line, description, field, text }]` in budget order, at most 1,000; `row_id` is `null` for an account's own `code` or `name`; `description` and `text` are cut to 160 characters |
+| `replace` | `query` (as above), `targets` (`[{ row_id, account, field }]`, the checked results), `with` (the replacement; `null` removes) | View, with `updated` (how many places changed) |
+
+A search only reads and takes well under a millisecond on the 5,000-row sample budget
+(`examples/perf.rs` prints it); `find` is answered from the budget as it is, so it never
+waits for totals.
+
 ### Keyboard and menus
 
 Everything has a key, and the menu bar (File, Edit, Insert, Format, Go, View, Window, Help) lists the same
@@ -327,7 +396,7 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 |---|---|---|
 | New budget (in a new tab), New tab, Open (in a new tab) | Cmd+N, Cmd+T, Cmd+O | Ctrl+N, Ctrl+T, Ctrl+O |
 | Save, Save As | Cmd+S, Shift+Cmd+S | Ctrl+S, Ctrl+Shift+S |
-| Print the budget (topsheet and detail), the topsheet | Cmd+P, Shift+Cmd+P | Ctrl+P, Ctrl+Shift+P |
+| Print (the report setup, with its preview, presets and Save as PDF), Print Topsheet | Cmd+P, Shift+Cmd+P | Ctrl+P, Ctrl+Shift+P |
 | Close the budget's tab (the window, on the last tab), Close the window, Quit | Cmd+W, Shift+Cmd+W, Cmd+Q | Ctrl+W, Ctrl+Shift+W, Ctrl+Q |
 | Next, previous budget tab | Shift+Cmd+], Shift+Cmd+[ (or Ctrl+Tab, Ctrl+Shift+Tab) | Ctrl+Shift+], Ctrl+Shift+[ (or Ctrl+Tab, Ctrl+Shift+Tab) |
 | First, second budget tab | Cmd+1, Cmd+2 | Ctrl+1, Ctrl+2 |
@@ -367,6 +436,8 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 | On a tools tab: move it along its pane; to the first or second pane | Option+Shift+Left, Right; Option+Shift+Up, Down | Alt+Shift+Left, Right; Alt+Shift+Up, Down |
 | On a list item: apply it to the selection; edit it; delete it; move up or down | Space; Enter or F2; Delete; Up, Down | Space; Enter or F2; Delete; Up, Down |
 | In the Notes tab: save the note; put back the saved note | Cmd+Enter; Escape | Ctrl+Enter; Escape |
+| Find (the tools panel's Find tab); Find and Replace | Cmd+F; Shift+Cmd+F | Ctrl+F; Ctrl+Shift+F |
+| Next, previous find result (from anywhere); in the Find box | F3, Shift+F3; Enter, Shift+Enter | F3, Shift+F3; Enter, Shift+Enter |
 | Keyboard shortcuts | Shift+Cmd+/ | Ctrl+Shift+/ |
 
 The row keys (Cmd+I insert, Cmd+D delete, Cmd+= subtotal, Cmd+minus adjustment, Cmd+R
@@ -486,6 +557,125 @@ from), `items` (`[{kind, name, status, copied, here, rename_to}]`: status `add` 
 different base currency) and `review` (whether to show it). `clip_paste` is refused, with
 nothing changed, when another copy replaced the reviewed one, the target is gone, or a
 choice is unknown.
+
+### Versions and comparing
+
+**Versions** (File > Versions…, or Versions in the toolbar) are named copies of the
+budget kept inside its file (decisions.md, entries 17 and 27). Save Version takes a name
+(one line, up to 200 characters; it suggests `Version N`) and an optional note, and stamps
+the page's local time. The list, newest first, shows each version's name, when it was
+saved and its note, with **Compare** (the compare screen with just that version),
+**Restore…**, **Rename** (in place: Enter saves, Escape cancels) and **Delete…**. Restore
+and Delete ask on the version's own row. Restoring saves the budget as it is first, as
+`Before restoring "<name>"`, then puts the version in its place; every one of these is one
+undo step, so Undo takes back a whole restore (and its automatic version) at once.
+
+**Compare** (File > Compare Budgets…, or Compare in the toolbar) puts the budget in front
+side by side with 1 to 15 others. At the left, tick what to compare with: open budgets
+(tabs), versions of this budget, or files (Add Files… shows the Open dialog; a file that is
+open in a tab is added as that tab, so its unsaved changes count). The letters A, B, C...
+follow the order they were ticked. The comparison lists categories (▸ opens one to its
+accounts, and an account to its lines), each production total, above and below the line,
+all fringes, charges, the grand total, credits and the net total. Columns: each budget's
+total, its difference from this one and that as a percent of this one (Differences), and,
+ticked in the header, **Sum** and **Average** of the other budgets, **Variance** (their
+sum minus this one) and **Variance %** (of the average), as the reference product reads a
+comparison. A row missing from some budgets says `not in B, C`, and its missing figures say
+`none`. Lines match as the same line across versions of one budget, by description
+otherwise. A budget with problem cells is compared as its own grid totals it (the cells
+count as blank) and its header is marked. A click on a figure goes to that row in that
+budget when it is open in a tab; a click on a row's name goes to it in this budget (or the
+first open one that has it). Opening the comparison again brings back the same budgets.
+Column choices are kept per user. **Print…** and **Save as PDF…** lay the comparison out
+as shown (the columns ticked, the rows open) on landscape pages, with a legend of which
+budget each letter is, through the report module's `printHtml`.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `save_version` | `name`, `note` (optional), `created` (ISO 8601 local time) | View |
+| `restore_version` | `id`, `created` | View |
+| `rename_version` | `id`, `name` | View |
+| `delete_version` | `id` | View |
+| `compare_budgets` | `sources` (`[{kind: "tab", doc} \| {kind: "version", id} \| {kind: "file", token}]`, 1 to 15) | the comparison |
+| `compare_detail` | `sources`, `code` (an account) | one account's lines compared |
+| `compare_pick_files` | none (shows the Open dialog) | `[{source, label, path}]`, empty when cancelled |
+
+The comparison has `sources` (`{kind, label, doc, version, token, detail, partial}`, this
+budget first), `categories` (each with `accounts`), `levels` and `totals`; every figure is
+a `line`: `values` (cents, `null` where a budget lacks it), `diffs` (`{amount, percent}`
+against this budget, percents as text with two decimals) and `agg` (`{sum, average,
+variance, percent}`). Categories, accounts and lines carry where they are in each budget
+(`at`, `ids`). The selection is refused, nothing compared, when it is empty, has more than
+15, names a budget twice or this budget itself, or names a closed tab, a deleted version or
+a file no longer at hand.
+
+### Printing and reports
+
+**File > Print… (Cmd+P)** opens the report setup: the choices on the left, the report on
+the right exactly as it will print, page by page, redrawn as the choices change (the page
+count and a Go to section list sit above it). **File > Print Topsheet… (Shift+Cmd+P)**
+still prints the topsheet straight away, with the standard layout.
+
+- **Sections, in print order**: topsheet, account level (each category's accounts with
+  fringes and totals), detail level (each category starts a page), fringes (type, rate,
+  cutoff or unit, how many lines use it, what it adds up to), globals (formula, value, how
+  many lines use it), groups with totals (in the budget total or not, lines, lines total,
+  fringes, total), notes list and budget information. A checkbox prints a section, the
+  arrows move it.
+- **Categories and accounts**: a tree with a checkbox for every category (its accounts
+  under the ▸) and an All box. It decides the account level, the detail level and the
+  notes list; the topsheet always lists every category, so its totals add up.
+- **Leave out**: accounts with no lines, accounts that total zero, lines not in the budget
+  total, the notes under detail lines, and (when the budget has groups) every line not in
+  the checked groups. Totals stay the budget's own; an account with rows left out says
+  how many under its totals, and a category with nothing left to print is skipped.
+- **Detail columns**: the grid's columns (amount, unit, X and its unit, rate and its unit,
+  currency, 4X and its unit, fringes, fringe %, fringe $, groups, set, location) plus
+  Original and Variance when the budget has a baseline (those print on the topsheet and
+  account level too). #, description and total always print. Standard columns puts the
+  usual set back. Money columns keep their width; the others give way to the description
+  when the page is full.
+- **Layout**: portrait or landscape (Letter), type size small, medium or large, shading
+  (alternate lines tinted, totals darker) and lines in their group colors (a line's own
+  color first, as in the grid; otherwise black).
+- **Header and footer**: three slots each (left, center, right), each nothing, the budget
+  title, the section, the date printed, the file name, Page X of Y, a budget information
+  field (Prep weeks, Shoot days, ...) or text you type. The standard ones: title, section
+  and date printed above, the page number below.
+
+**Notes print.** A line's note gets a small number after its description on the detail
+pages, and the notes themselves follow the account's totals with the same numbers (a note
+longer than 700 characters is cut there and printed whole in the notes list). The notes
+list prints every note on the chosen accounts with its account, line number and line, and
+the same number when the detail pages print it.
+
+**Presets.** The setup can be kept in the budget as a named preset (the Preset list at the
+top): Save Preset saves it (in place, so typing a new name and saving renames it), Save as
+New keeps a copy under a new name, Delete removes it (Edit > Undo brings it back), and
+Default marks the one Print opens with (one at a time). Presets hold choices, never
+figures: a report is always drawn from the budget as it is. Each change is one undo step
+and marks the budget edited. Versions don't carry presets, and restoring a version keeps
+the current ones.
+
+**Print… and Save as PDF….** Print… opens the system print sheet with the orientation
+already set. Save as PDF… asks where to save and writes the PDF straight there, with no
+print sheet. Both print exactly the pages in the preview: the report is laid out by the app
+into Letter-sized pages, each with its own header, footer and page number, because the
+system web view repeats no table headings and prints no page numbers by itself (decisions
+entry 28).
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `save_report_preset` | `index` (the preset to replace, or `null` to add one), `preset` (FORMAT.md, "Report preset") | View |
+| `delete_report_preset` | `index` | View |
+| `print_report` | `pdf` (true: into a PDF file chosen in a Save dialog), `landscape`, `title` (the job's name and the suggested file name) | `{supported, done, file}`: `supported` false where the app prints with `window.print()` instead (not macOS); `done` false when cancelled; `file` the PDF's file name |
+
+For other screens, `ui/js/report.js` lays out and prints any table the same way:
+`renderHtml(container, table, opts)` and `printHtml(table, opts)` (`opts`: `title`,
+`section`, `landscape`, `fontSize`, `header`, `footer`, `pdf`) split a table's rows over
+pages, repeating its header row on each, with the standard header and footer.
+`renderReport(container, view, spec)` and `printReport(view, spec, {pdf})` take a report
+spec (a preset's fields) or the older `"topsheet"`, `"detail"` or `"both"`.
 
 ## Saving and recovery
 
@@ -633,6 +823,16 @@ crates/fwb-app/
   src/menu.rs        native menu bar, built from the same table as ui/js/shortcuts.js
   src/tools.rs       the tools panel's own window: opening, hiding and placing it, telling
                      the other window when the budget changed, the Notes tab's list
+  src/find.rs        find and replace: typed search over a budget, replacing in the
+                     checked results as one undo step
+  src/versions.rs    the Versions dialog's commands: save, restore, rename, delete, each
+                     one undo step, with names, notes and times checked
+  src/compare.rs     the compare screen's commands: budgets copied out of tabs, versions
+                     and picked files, compared after the lock is released
+  src/reports.rs     report presets saved in the budget (one undo step each), and
+                     printing a report to the print sheet or a PDF file
+  src/pdf_mac.rs     macOS: AppKit's print operation on the web view, into a PDF file
+                     with no panel or through the print sheet (Objective-C runtime calls)
   src/safety.rs      saving safety as plain files: atomic writes, recovery copies,
                      backups, settings, the recent list (tested with temporary folders)
   src/safety_app.rs  its Tauri side: autosave timer, recovery and backup commands, Open
@@ -736,7 +936,8 @@ dragging, scrolling), `grid.js` (a generic keyboard grid used at all three level
 `dom.js`, `shortcuts.js` (the one list of shortcuts, shared with the Rust menu and checked
 by a test), `help.js` (the shortcut sheet), `topsheet-setup.js` (the Budget tab's
 charges, credits, info, settings and baseline), `report.js` with `print.css` (printable
-reports), `menu.js` (the small popup menus: breadcrumb jump lists and the column menu, and
+reports, laid out into pages) and `reportsetup.js` with `reportsetup.css` (File > Print's
+setup dialog and its preview), `menu.js` (the small popup menus: breadcrumb jump lists and the column menu, and
 the right-click menu with its submenus), `context.js` (what the right-click menu offers at
 each level, opened by the mouse, Shift+F10 or the menu key), `rowformat.js` (bold, italic,
 indent, text color and the color palette; `context.css` draws the menu, the palette and
@@ -745,13 +946,15 @@ the tools panel's small editors),
 `aria-activedescendant`), `quickentry.js` (wires it to the grid, sends edits that add
 setup items, the note editor, the fringe range keys and the formula bar),
 `clipboard.js` (copy, cut and paste of whole rows, and the paste review),
+`versions.js` (the Versions dialog), `compare.js` with `compare.css` (the compare screen;
+`compare.css` also sizes the Orig and Var columns),
 `prefs.js` (per-user display choices in local storage: visible columns, the tools panel's
 place, size and tabs) and `sheet.js` (styles worked out at run time, below). `boot.js`
 starts `main.js`, or `toolswin.js` in the tools window (the page loaded with `?panel=1`).
 The tools panel is `tools.js` (panes, tabs, dragging, the header) with `apply.js` (the
 fringe, group, set, location and currency lists), `setup.js` (globals and units, and the
-helpers the Budget tabs in `topsheet-setup.js` share) and `notes.js` (the Notes tab);
-`tools.css` lays it out. Commands run one at a time, in order.
+helpers the Budget tabs in `topsheet-setup.js` share), `notes.js` (the Notes tab) and
+`find.js` (the Find tab); `tools.css` lays it out. Commands run one at a time, in order.
 
 **Two windows.** Popped out, the panel runs in a second web view on the same page and the
 same Rust budgets, and follows the budget in front in the main window. After any command
@@ -806,7 +1009,8 @@ untrusted (a budget file is data from anywhere).
   tools window).
   `capabilities/tools.json` grants the tools window, by its label, only what the panel
   calls: `get_view`, the selection summary and the apply edits, the setup tables, the
-  Budget tabs, a line's note and the notes list, and listening for and sending events. It
+  Budget tabs, a line's note and the notes list, find and replace, and listening for and
+  sending events. It
   can't open, save, print, undo, use the clipboard or recovery, open, close, switch or move
   budget tabs, or open or close windows;
   its keys for those go to the main window as menu commands, which the main window runs as
@@ -824,7 +1028,11 @@ untrusted (a budget file is data from anywhere).
   Recent, recovery copies, backups); the web view names those only by their place in the
   list, a recovery key or a backup's file name, each checked against what is there, and an
   open budget by its document id, which is only ever a number checked against the open
-  tabs. The files reopened at the start come from the app's own `tabs.json`.
+  tabs. The files reopened at the start come from the app's own `tabs.json`. A report's
+  PDF is written where the native Save dialog shown by Rust says; the page can only
+  suggest a file name. Files to
+  compare with are picked in the same native dialog, read in Rust and named by the page
+  only by a token Rust gave out (the last 32 picked are kept); versions by their id.
   Show Backups Folder runs the system's `open`, `explorer` or `xdg-open` from Rust on a
   folder Rust chose.
 - **Budget text is never markup.** The UI builds the page with DOM calls and puts every
@@ -833,6 +1041,12 @@ untrusted (a budget file is data from anywhere).
 - **Hostile files** can't crash the engine: formulas have length and nesting limits and
   globals are evaluated without recursion (see the engine's hardening tests). A file that
   can't be read shows the reader's message with its line, column and JSON path.
+- **Native printing code.** `src/pdf_mac.rs` is the app's only `unsafe` code: a handful of
+  Objective-C runtime calls (`objc_msgSend` with an exact function type per call, one small
+  delegate class registered once) to run AppKit's print operation on the main window's web
+  view, because no crate already in the build offers printing to a file. It never takes a
+  pointer or a selector from the page; it runs on the main thread inside Tauri's
+  `with_webview`, and the PDF's path comes from the Save dialog.
 
 ## Dependencies
 
@@ -849,10 +1063,10 @@ Tabs are built so it can: every budget is already its own document with its own 
 screen, and commands already name their budget (`doc`), so a second pane would be a second
 grid that sends a different `doc`.
 
-Moving rows by drag, editing fringe ranges in the grid, original/variance columns in the
-grid (the data is in `view.variance`; reports already print it), renaming setup entries (add
+Moving rows by drag, editing fringe ranges in the grid, renaming setup entries (add
 the new one, then delete the old), renumbering accounts when the coding pattern changes,
-import from other tools, find and replace, single-instance handling on Windows and Linux,
+import from other tools, renaming a global or setup item everywhere (find and replace swaps
+one for another in the places checked), single-instance handling on Windows and Linux,
 the macOS system recent documents list, a mark on copied rows, and the total change a
 paste will cause in its review. Printing, the Windows/Linux menu keys, Copy Rows from
 the menu bar reaching the system clipboard, and the tools window (placement on a second
@@ -861,3 +1075,15 @@ The two tool panes split their height evenly; there is no divider to drag betwee
 Budget tabs need a live check too: Ctrl+Tab and Shift+Cmd+] reaching the page in the
 system web views, the Window menu's list, the close question (Save All with an untitled
 budget), reopening the tabs at the next start, and the tools window following the tabs.
+Versions and the compare screen need a live check of the Add Files… dialog (several files
+at once), of going to a compared row in another tab, and of printing a wide comparison.
+Find needs a live check of its keys in the system web views (Cmd+F and Shift+Cmd+F through
+the menu, F3 reaching the page on a Mac whose function keys control the system) and of the
+Find tab in the tools window.
+Reports need a live check in the app: Print… and Save as PDF… through the native print
+operation (checked here only in a hidden test web view: each page box is one sheet,
+portrait and landscape, with backgrounds and colors), the print sheet's orientation, and
+the setup dialog's keys. Paper is Letter only for now (A4 and Legal would be a layout
+choice), there is no "detail starts on page N" column on the topsheet yet, and Windows and
+Linux print with `window.print()` and the page's own `@page` size and zero margins
+(untested there; Save as PDF is the print dialog's PDF choice on those systems).

@@ -34,7 +34,9 @@ export const SHORTCUTS = [
   { id: 'file.open', group: 'File', label: 'Open a budget (in a new tab)', keys: 'mod+o', scope: 'app' },
   { id: 'file.save', group: 'File', label: 'Save', keys: 'mod+s', scope: 'app' },
   { id: 'file.save_as', group: 'File', label: 'Save as a new file', keys: 'mod+shift+s', scope: 'app' },
-  { id: 'file.print_budget', group: 'File', label: 'Print the budget (topsheet and detail)', keys: 'mod+p', scope: 'app' },
+  { id: 'file.versions', group: 'File', label: 'Versions: save, restore, rename and compare named copies of the budget', scope: 'menu' },
+  { id: 'file.compare', group: 'File', label: 'Compare the budget with open budgets, its versions or other files', scope: 'menu' },
+  { id: 'file.print_budget', group: 'File', label: 'Print: choose sections and layout, preview, save as PDF', keys: 'mod+p', scope: 'app' },
   { id: 'file.print_topsheet', group: 'File', label: 'Print the topsheet', keys: 'mod+shift+p', scope: 'app' },
   { id: 'file.close_tab', group: 'File', label: 'Close the budget tab (the window, when it is the last one)', keys: 'mod+w', scope: 'app' },
   { id: 'file.close', group: 'File', label: 'Close the window (every tab)', keys: 'mod+shift+w', scope: 'app' },
@@ -58,6 +60,14 @@ export const SHORTCUTS = [
   { id: 'edit.note', group: 'Edit', label: 'Add or edit the note on the line', keys: 'mod+shift+space', scope: 'grid' },
   { id: 'edit.make_range', group: 'Edit', label: 'Make the selected lines one fringe range', keys: 'mod+r', scope: 'grid' },
   { id: 'edit.remove_range', group: 'Edit', label: 'Take the selected lines out of their fringe range', keys: 'mod+shift+r', scope: 'grid' },
+  // Find and replace: the Find tab of the tools panel (find.js). Cmd+G is
+  // the Globals tab, so the next and previous result are F3 and Shift+F3
+  // (and Enter and Shift+Enter in the Find box).
+  { id: 'edit.find', group: 'Edit', label: 'Find (the Find tab of the tools panel)', keys: 'mod+f', scope: 'app' },
+  { id: 'edit.replace', group: 'Edit', label: 'Find and replace', keys: 'mod+shift+f', scope: 'app' },
+  { id: 'edit.find_next', group: 'Edit', label: 'Go to the next find result', keys: 'f3', scope: 'grid', anywhere: true },
+  { id: 'edit.find_previous', group: 'Edit', label: 'Go to the previous find result', keys: 'shift+f3', scope: 'grid', anywhere: true },
+  { id: 'find.keys', group: 'Edit', label: 'In the Find box: the next or previous result', keys: ['enter', 'shift+enter'], scope: 'builtin' },
 
   // Moving around and editing cells
   { id: 'grid.move', group: 'Cells', label: 'Move between cells', keys: ['up', 'down', 'left', 'right'], scope: 'builtin' },
@@ -177,6 +187,7 @@ const MAC_NAMES = {
   home: 'Home',
   end: 'End',
   f2: 'F2',
+  f3: 'F3',
   f10: 'F10',
   space: 'Space',
   backslash: '\\',
@@ -195,6 +206,7 @@ const PC_NAMES = {
   home: 'Home',
   end: 'End',
   f2: 'F2',
+  f3: 'F3',
   f10: 'F10',
   space: 'Space',
   backslash: '\\',
@@ -249,6 +261,7 @@ const NAMED = {
   home: 'Home',
   end: 'End',
   f2: 'F2',
+  f3: 'F3',
   f10: 'F10',
   space: ' ',
   backslash: '\\',

@@ -5,6 +5,7 @@
 //! iteration order, and therefore output, is stable.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use crate::coding::AccountCoding;
 use crate::decimal::Dec;
@@ -85,6 +86,9 @@ pub struct Budget {
     /// Named full copies of the budget's content, oldest first. See
     /// [`crate::versions`] for saving and restoring them.
     pub versions: Vec<Version>,
+    /// Saved report setups, in the order the user keeps them. Layout only,
+    /// not content: versions don't carry them (see [`crate::report_preset`]).
+    pub report_presets: Vec<crate::report_preset::ReportPreset>,
 }
 
 impl Budget {
@@ -109,6 +113,7 @@ impl Budget {
             credits: Vec::new(),
             baseline: None,
             versions: Vec::new(),
+            report_presets: Vec::new(),
         }
     }
 
@@ -509,6 +514,11 @@ pub type VersionId = u64;
 /// A version is a full copy (every category, account and row), so each one
 /// adds about as much to the file as the budget itself. That is fine for v1;
 /// see docs/decisions.md.
+///
+/// The content is shared (`Arc`) and never changed in place: copying a budget
+/// (every edit works on a copy, for undo) copies a pointer per version, not
+/// every version's rows, and comparing two lists of the same versions stops at
+/// the pointers.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Version {
     pub id: VersionId,
@@ -518,7 +528,7 @@ pub struct Version {
     /// and stores this text as given.
     pub created: String,
     pub note: Option<String>,
-    pub budget: Box<BudgetSnapshot>,
+    pub budget: Arc<BudgetSnapshot>,
 }
 
 /// Everything in a [`Budget`] except its versions: what a [`Version`] stores.
@@ -569,6 +579,7 @@ impl Budget {
             credits,
             baseline,
             versions: _,
+            report_presets: _,
         } = self;
         BudgetSnapshot {
             title: title.clone(),
@@ -592,7 +603,8 @@ impl Budget {
         }
     }
 
-    /// Splits off the content, leaving the version list behind.
+    /// Splits off the content, leaving the version list (and the report
+    /// presets, which are not content) behind.
     pub fn into_parts(self) -> (BudgetSnapshot, Vec<Version>) {
         let Budget {
             title,
@@ -614,6 +626,7 @@ impl Budget {
             credits,
             baseline,
             versions,
+            report_presets: _,
         } = self;
         let content = BudgetSnapshot {
             title,
@@ -683,7 +696,7 @@ impl BudgetSnapshot {
         self.clone().into_budget(Vec::new())
     }
 
-    /// This content as a budget carrying `versions`.
+    /// This content as a budget carrying `versions` (and no report presets).
     pub fn into_budget(self, versions: Vec<Version>) -> Budget {
         let BudgetSnapshot {
             title,
@@ -725,6 +738,7 @@ impl BudgetSnapshot {
             credits,
             baseline,
             versions,
+            report_presets: Vec::new(),
         }
     }
 

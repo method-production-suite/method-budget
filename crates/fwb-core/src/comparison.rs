@@ -38,6 +38,17 @@
 //! fringes only under account posting), category figures are category totals,
 //! exactly as [`Baseline::capture`](crate::Baseline::capture) records them.
 //!
+//! Production levels (each production-total row) are matched by name, trimmed
+//! and case-insensitive; the unnamed level after the last production total is
+//! not listed (the topsheet doesn't show it either).
+//!
+//! Each matched category, account and row also says where it is in each
+//! budget (`at`, `ids`), so a caller can take the user to it.
+//!
+//! [`CompareLine::aggregate`] gives the other way of reading a comparison:
+//! the sum and average of every budget but the first, and their variance
+//! (that sum minus the first budget's value) as a percent of the average.
+//!
 //! # Detail level
 //!
 //! [`compare_account`] compares the rows of one account. Rows are matched by
@@ -80,12 +91,72 @@ pub struct CompareLine {
     pub diffs: Vec<Diff>,
 }
 
+/// Every budget but the first, taken together (see [`CompareLine::aggregate`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Aggregate {
+    /// Sum of the other budgets' values, a missing value counting as 0.
+    pub sum: Cents,
+    /// `sum` divided by how many other budgets there are, rounded once.
+    pub average: Cents,
+    /// `sum` minus the first budget's value (missing counts as 0).
+    pub variance: Cents,
+    /// `variance` as a percent of the average's size (exact, not of the
+    /// rounded `average`), so its sign follows `variance`. `None` when the
+    /// sum is 0.
+    pub percent: Option<Dec>,
+}
+
+impl CompareLine {
+    /// The other budgets taken together: their sum and average, and the sum
+    /// minus the first budget's value as a percent of the average. With one
+    /// other budget the variance is simply its difference from the first and
+    /// the percent is against that other budget. `None` with fewer than two
+    /// budgets, or on overflow.
+    pub fn aggregate(&self) -> Option<Aggregate> {
+        let others = self.values.get(1..).filter(|o| !o.is_empty())?;
+        let n = i64::try_from(others.len()).ok()?;
+        let sum = others
+            .iter()
+            .try_fold(0 as Cents, |acc, v| acc.checked_add(v.unwrap_or(0)))?;
+        let average = Dec::from_cents(sum)
+            .checked_div(Dec::from_int(n))?
+            .to_cents()?;
+        let base = self.values.first().copied().flatten().unwrap_or(0);
+        let variance = sum.checked_sub(base)?;
+        // variance / (sum / n) * 100 = variance * n * 100 / |sum|
+        let percent = if sum == 0 {
+            None
+        } else {
+            Some(
+                Dec::from_int(variance)
+                    .checked_mul(Dec::from_int(n.checked_mul(100)?))?
+                    .checked_div(Dec::from_int(sum.checked_abs()?))?,
+            )
+        };
+        Some(Aggregate {
+            sum,
+            average,
+            variance,
+            percent,
+        })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Comparison {
     /// The labels passed in, in order.
     pub labels: Vec<String>,
     pub categories: Vec<CompareCategory>,
+    /// Each production total, matched by name (see the module docs).
+    pub levels: Vec<CompareLevel>,
     pub totals: CompareTotals,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompareLevel {
+    /// The name as written in the first budget that has it.
+    pub name: String,
+    pub line: CompareLine,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -94,6 +165,9 @@ pub struct CompareCategory {
     pub code: String,
     pub name: String,
     pub line: CompareLine,
+    /// Per budget: where the category is in that budget's report
+    /// (`Report::categories` index; the first one when the code repeats).
+    pub at: Vec<Option<usize>>,
     pub accounts: Vec<CompareAccount>,
 }
 
@@ -106,6 +180,10 @@ pub struct CompareAccount {
     /// A category fringe account rather than a real account.
     pub fringe_account: bool,
     pub line: CompareLine,
+    /// Per budget: (report category index, account index in it). A fringe
+    /// account's index is one past the category's last account, where
+    /// account lists show it.
+    pub at: Vec<Option<(usize, usize)>>,
 }
 
 /// Budget-level figures. Every budget has all of them, so no value is `None`.
@@ -139,6 +217,9 @@ pub struct AccountComparison {
     /// for (and an empty name) when no budget has it.
     pub code: String,
     pub name: String,
+    /// Per budget: (report category index, account index in it), `None`
+    /// where the account is missing.
+    pub at: Vec<Option<(usize, usize)>>,
     pub rows: Vec<CompareRow>,
     /// Sum of the rows' totals (`None` where the account is missing).
     pub details_total: CompareLine,
@@ -155,6 +236,8 @@ pub struct CompareRow {
     /// Kind and description as in the first budget that has the row.
     pub kind: RowKind,
     pub description: String,
+    /// Per budget: the row's id there (the first match), `None` where it is missing.
+    pub ids: Vec<Option<RowId>>,
     /// Each budget's row total (0 for a row left out of the total).
     pub line: CompareLine,
 }
@@ -176,13 +259,21 @@ fn code_key(coding: &AccountCoding, code: &str) -> CodeKey {
     }
 }
 
-/// Items keyed by `K`, in first-seen order, each with a value per budget.
-struct Matched<K, T> {
-    index: BTreeMap<K, usize>,
-    items: Vec<(T, Vec<Option<Cents>>)>,
+/// One matched item: what describes it, a value per budget, and where it
+/// first turned up in each budget.
+struct Entry<T, P> {
+    item: T,
+    values: Vec<Option<Cents>>,
+    places: Vec<Option<P>>,
 }
 
-impl<K: Ord, T> Matched<K, T> {
+/// Items keyed by `K`, in first-seen order, each with a value per budget.
+struct Matched<K, T, P> {
+    index: BTreeMap<K, usize>,
+    items: Vec<Entry<T, P>>,
+}
+
+impl<K: Ord, T, P: Clone> Matched<K, T, P> {
     fn new() -> Self {
         Matched {
             index: BTreeMap::new(),
@@ -190,24 +281,30 @@ impl<K: Ord, T> Matched<K, T> {
         }
     }
 
-    /// Adds `value` for budget `i` of `n` under `key`, creating the item with
-    /// `make` the first time the key is seen. `None` on overflow.
+    /// Adds `value` for budget `i` of `n` under `key`, found at `place` in
+    /// that budget, creating the item with `make` the first time the key is
+    /// seen. `None` on overflow.
     fn add(
         &mut self,
         key: K,
-        n: usize,
-        i: usize,
+        (n, i): (usize, usize),
+        place: P,
         value: Cents,
         make: impl FnOnce() -> T,
     ) -> Option<&mut T> {
         let items = &mut self.items;
         let at = *self.index.entry(key).or_insert_with(|| {
-            items.push((make(), vec![None; n]));
+            items.push(Entry {
+                item: make(),
+                values: vec![None; n],
+                places: vec![None; n],
+            });
             items.len() - 1
         });
-        let (item, values) = &mut self.items[at];
-        values[i] = Some(values[i].unwrap_or(0).checked_add(value)?);
-        Some(item)
+        let e = &mut self.items[at];
+        e.values[i] = Some(e.values[i].unwrap_or(0).checked_add(value)?);
+        e.places[i].get_or_insert(place);
+        Some(&mut e.item)
     }
 }
 
@@ -259,10 +356,16 @@ fn reports(budgets: &[(String, &Budget)]) -> Result<Vec<Report>, CalcError> {
 // ---------------------------------------------------------------------------
 // Topsheet and account level
 
+/// An account's key: (is a fringe account, its code).
+type AccountKey = (bool, CodeKey);
+/// What describes an account: code and name as written, and whether it is a
+/// fringe account.
+type AccountItem = (String, String, bool);
+
 struct CatItem {
     code: String,
     name: String,
-    accounts: Matched<(bool, CodeKey), (String, String, bool)>,
+    accounts: Matched<AccountKey, AccountItem, (usize, usize)>,
 }
 
 /// Compares 2 to [`MAX_COMPARED`] budgets by category and account code. The
@@ -273,52 +376,76 @@ pub fn compare(budgets: &[(String, &Budget)]) -> Result<Comparison, CalcError> {
     let n = budgets.len();
     let ovf = || overflow("comparison");
 
-    let mut cats: Matched<CodeKey, CatItem> = Matched::new();
+    let mut cats: Matched<CodeKey, CatItem, usize> = Matched::new();
+    let mut levels: Matched<String, String, ()> = Matched::new();
     for (i, ((_, b), r)) in budgets.iter().zip(&reports).enumerate() {
         let coding = &b.account_coding;
-        for cat in &r.categories {
+        for (ci, cat) in r.categories.iter().enumerate() {
+            let key = code_key(coding, &cat.code);
             let item = cats
-                .add(code_key(coding, &cat.code), n, i, cat.total, || CatItem {
+                .add(key, (n, i), ci, cat.total, || CatItem {
                     code: cat.code.clone(),
                     name: cat.name.clone(),
                     accounts: Matched::new(),
                 })
                 .ok_or_else(ovf)?;
-            for acct in &cat.accounts {
+            for (ai, acct) in cat.accounts.iter().enumerate() {
                 let key = (false, code_key(coding, &acct.code));
                 item.accounts
-                    .add(key, n, i, acct.total, || {
+                    .add(key, (n, i), (ci, ai), acct.total, || {
                         (acct.code.clone(), acct.name.clone(), false)
                     })
                     .ok_or_else(ovf)?;
             }
             if let Some((code, amount)) = &cat.fringe_account {
                 let key = (true, code_key(coding, code));
+                let place = (ci, cat.accounts.len());
                 item.accounts
-                    .add(key, n, i, *amount, || (code.clone(), String::new(), true))
+                    .add(key, (n, i), place, *amount, || {
+                        (code.clone(), String::new(), true)
+                    })
                     .ok_or_else(ovf)?;
             }
+        }
+        for lv in r.levels.iter().filter(|l| !l.name.trim().is_empty()) {
+            let key = lv.name.trim().to_lowercase();
+            levels
+                .add(key, (n, i), (), lv.total, || lv.name.clone())
+                .ok_or_else(ovf)?;
         }
     }
 
     let mut categories = Vec::with_capacity(cats.items.len());
-    for (cat, values) in cats.items {
-        let mut accounts = Vec::with_capacity(cat.accounts.items.len());
-        for ((code, name, fringe_account), values) in cat.accounts.items {
+    for cat in cats.items {
+        let mut accounts = Vec::with_capacity(cat.item.accounts.items.len());
+        for a in cat.item.accounts.items {
+            let (code, name, fringe_account) = a.item;
             accounts.push(CompareAccount {
                 code,
                 name,
                 fringe_account,
-                line: line(values)?,
+                line: line(a.values)?,
+                at: a.places,
             });
         }
         categories.push(CompareCategory {
-            code: cat.code,
-            name: cat.name,
-            line: line(values)?,
+            code: cat.item.code,
+            name: cat.item.name,
+            line: line(cat.values)?,
+            at: cat.places,
             accounts,
         });
     }
+    let levels = levels
+        .items
+        .into_iter()
+        .map(|l| {
+            Ok(CompareLevel {
+                name: l.item,
+                line: line(l.values)?,
+            })
+        })
+        .collect::<Result<Vec<_>, CalcError>>()?;
 
     let fringes = reports
         .iter()
@@ -334,6 +461,7 @@ pub fn compare(budgets: &[(String, &Budget)]) -> Result<Comparison, CalcError> {
     Ok(Comparison {
         labels: budgets.iter().map(|(l, _)| l.clone()).collect(),
         categories,
+        levels,
         totals: CompareTotals {
             total_atl: all(reports.iter().map(|r| r.total_atl))?,
             total_btl: all(reports.iter().map(|r| r.total_btl))?,
@@ -369,18 +497,26 @@ pub fn compare_account(
     let ovf = || overflow("comparison");
 
     let mut found: Option<(String, String)> = None;
-    let mut rows: Matched<RowKey, (RowId, RowKind, String)> = Matched::new();
+    let mut rows: Matched<RowKey, (RowId, RowKind, String), RowId> = Matched::new();
     let (mut details, mut fringes, mut totals) = (vec![None; n], vec![None; n], vec![None; n]);
+    let mut at = vec![None; n];
     for (i, ((_, b), r)) in budgets.iter().zip(&reports).enumerate() {
         let want = code_key(&b.account_coding, code);
-        let Some(acct) = r
+        let Some((place, acct)) = r
             .categories
             .iter()
-            .flat_map(|c| &c.accounts)
-            .find(|a| code_key(&b.account_coding, &a.code) == want)
+            .enumerate()
+            .flat_map(|(ci, c)| {
+                c.accounts
+                    .iter()
+                    .enumerate()
+                    .map(move |(ai, a)| ((ci, ai), a))
+            })
+            .find(|(_, a)| code_key(&b.account_coding, &a.code) == want)
         else {
             continue;
         };
+        at[i] = Some(place);
         found.get_or_insert_with(|| (acct.code.clone(), acct.name.clone()));
         details[i] = Some(acct.details_total);
         fringes[i] = Some(acct.fringe_total);
@@ -405,7 +541,7 @@ pub fn compare_account(
                     RowKey::Description(text, *nth)
                 }
             };
-            rows.add(key, n, i, row.total, || {
+            rows.add(key, (n, i), row.id, row.total, || {
                 (row.id, row.kind, description.to_string())
             })
             .ok_or_else(ovf)?;
@@ -417,15 +553,18 @@ pub fn compare_account(
         labels: budgets.iter().map(|(l, _)| l.clone()).collect(),
         code,
         name,
+        at,
         rows: rows
             .items
             .into_iter()
-            .map(|((id, kind, description), values)| {
+            .map(|e| {
+                let (id, kind, description) = e.item;
                 Ok(CompareRow {
                     id,
                     kind,
                     description,
-                    line: line(values)?,
+                    ids: e.places,
+                    line: line(e.values)?,
                 })
             })
             .collect::<Result<_, CalcError>>()?,

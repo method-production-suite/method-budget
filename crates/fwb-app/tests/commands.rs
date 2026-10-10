@@ -1130,7 +1130,7 @@ fn lean_view_is_the_full_view_cut_down() {
         name: "First pass".into(),
         created: "2026-10-09T10:00:00Z".into(),
         note: Some("before notes".into()),
-        budget: Box::new(snapshot),
+        budget: std::sync::Arc::new(snapshot),
     });
     let mut s = Session::with_budget(b, None);
     let places: Vec<(usize, usize, String, String)> = s

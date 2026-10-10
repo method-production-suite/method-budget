@@ -337,7 +337,7 @@ fn gen_budget(rng: &mut Rng) -> Budget {
             name: rng.text(),
             created: rng.pick(&["2026-10-09T14:30:00Z", "", "not a time"]).into(),
             note: rng.opt_text(),
-            budget: Box::new(content),
+            budget: std::sync::Arc::new(content),
         });
     }
     b

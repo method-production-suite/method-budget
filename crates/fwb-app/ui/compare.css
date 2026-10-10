@@ -1,0 +1,516 @@
+/* Versions dialog (js/versions.js), the compare screen (js/compare.js) and the
+   grid's Orig and Var columns. Colors come from the tokens in styles.css, so
+   dark mode follows them. No inline styles anywhere (the CSP). */
+
+/* ------------------------------------------------------------------------ */
+/* Original and variance columns (levels.js): the same widths as the grid's
+   own where it can't size them itself. */
+
+.grid col.c-orig,
+.grid col.c-var { width: 130px; }
+
+.grid td.c-orig,
+.grid td.c-var {
+  color: var(--text-muted);
+}
+
+/* The column menu in the Acct # header (topsheet and account list). */
+.col-head-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Versions */
+
+.modal.versions-dialog {
+  width: 720px;
+}
+
+.versions-save {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.versions-note {
+  min-height: 32px;
+  resize: vertical;
+}
+
+.versions-save-actions {
+  display: flex;
+  padding-bottom: 1px;
+}
+
+.versions-empty {
+  margin: 0;
+  padding: 14px 10px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.versions-item.asking {
+  background: var(--surface-2);
+}
+
+.versions-item-note {
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.versions-question {
+  margin-top: 4px;
+  font-size: 12px;
+  white-space: normal;
+}
+
+.versions-rename {
+  width: 100%;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Compare screen: nearly the whole window, a list of budgets at the left and
+   the comparison at the right. */
+
+.modal.compare-dialog {
+  position: fixed;
+  inset: 20px;
+  width: auto;
+  max-width: none;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.cmp-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cmp-status {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.cmp-cols {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+}
+
+.cmp-cols-label {
+  color: var(--text-muted);
+}
+
+.cmp-col-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.cmp-col-choice input,
+.cmp-cand input {
+  accent-color: var(--accent);
+}
+
+.cmp-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+}
+
+/* The budgets to compare with. */
+
+.cmp-side {
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 12px 16px;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.cmp-side-count {
+  margin: 0 0 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.cmp-side-section + .cmp-side-section {
+  margin-top: 12px;
+}
+
+.cmp-side-head {
+  margin: 0 0 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cmp-side-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cmp-side-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.cmp-cand {
+  display: grid;
+  grid-template-columns: auto 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: var(--radius);
+  cursor: default;
+}
+
+.cmp-cand:hover {
+  background: var(--row-hover);
+}
+
+.cmp-cand.is-on {
+  background: var(--selection);
+}
+
+.cmp-letter {
+  color: var(--accent);
+  font-weight: 700;
+  text-align: center;
+}
+
+.cmp-cand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cmp-cand-name,
+.cmp-cand-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cmp-cand-sub {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.cmp-add-files {
+  margin-top: 6px;
+}
+
+/* The comparison. */
+
+.cmp-table-host {
+  min-height: 0;
+  overflow: auto;
+  background: var(--surface);
+  outline: none;
+}
+
+.cmp-empty {
+  margin: 0;
+  padding: 24px;
+  color: var(--text-muted);
+}
+
+.cmp-empty.is-error,
+.cmp-note.is-error {
+  color: var(--danger);
+}
+
+table.cmp-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: max-content;
+  min-width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.cmp-table th,
+.cmp-table td {
+  height: 28px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface);
+  white-space: nowrap;
+}
+
+.cmp-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 40px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  vertical-align: bottom;
+  padding-bottom: 4px;
+}
+
+.cmp-table th.num {
+  text-align: right;
+}
+
+.cmp-h-top,
+.cmp-h-name {
+  display: block;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmp-table th.num .cmp-h-top,
+.cmp-table th.num .cmp-h-name {
+  margin-left: auto;
+}
+
+.cmp-h-top {
+  color: var(--text);
+}
+
+.cmp-h-name {
+  font-weight: 400;
+}
+
+/* Account number and description stay in view while the figures scroll. */
+.cmp-table .cmp-code {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmp-table .cmp-name {
+  position: sticky;
+  left: 100px;
+  z-index: 1;
+  min-width: 220px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-right: 1px solid var(--border);
+}
+
+.cmp-table th.cmp-code,
+.cmp-table th.cmp-name {
+  z-index: 3;
+}
+
+.cmp-table td.num {
+  min-width: 112px;
+  text-align: right;
+}
+
+.cmp-table td.cmp-diff,
+.cmp-table td.cmp-pct {
+  color: var(--text-muted);
+}
+
+.cmp-table td.cmp-agg,
+.cmp-table th.cmp-agg {
+  background: var(--surface-ro);
+}
+
+.cmp-table td.none {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.cmp-table td.go {
+  cursor: pointer;
+}
+
+.cmp-table td.go:hover {
+  text-decoration: underline;
+}
+
+.cmp-toggle {
+  width: 20px;
+  height: 20px;
+  margin-right: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  line-height: 20px;
+}
+
+.cmp-toggle:hover {
+  background: var(--row-hover);
+  color: var(--text);
+}
+
+.cmp-go {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cmp-go:hover {
+  text-decoration: underline;
+}
+
+.cmp-missing {
+  margin-left: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: italic;
+}
+
+.cmp-table tr.cmp-cat td {
+  font-weight: 600;
+  background: var(--level-bg);
+}
+
+.cmp-table tr.cmp-acct td.cmp-code {
+  padding-left: 20px;
+}
+
+.cmp-table tr.cmp-acct td.cmp-name {
+  padding-left: 20px;
+}
+
+.cmp-table tr.cmp-fringe-acct td {
+  font-style: italic;
+}
+
+/* No toggle on a fringe account: its number lines up with the others'. */
+.cmp-table tr.cmp-fringe-acct td.cmp-code {
+  padding-left: 42px;
+}
+
+.cmp-table tr.cmp-line td.cmp-name,
+.cmp-table tr.cmp-line-total td.cmp-name,
+.cmp-table tr.cmp-detail-note td {
+  padding-left: 40px;
+}
+
+.cmp-table tr.cmp-line td {
+  background: var(--surface-ro);
+}
+
+.cmp-table tr.cmp-line-total td {
+  font-weight: 600;
+  background: var(--surface-ro);
+}
+
+.cmp-table tr.cmp-detail-note td {
+  color: var(--text-muted);
+  font-size: 12px;
+  background: var(--surface-ro);
+}
+
+.cmp-table tr.cmp-sum.first td {
+  border-top: 2px solid var(--border);
+}
+
+.cmp-table tr.cmp-level td {
+  font-weight: 600;
+}
+
+.cmp-table tr.cmp-info td {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.cmp-table tr.grand td {
+  font-weight: 700;
+}
+
+.cmp-table tr.unmatched td.cmp-name {
+  font-style: italic;
+}
+
+.cmp-table tbody tr:hover td {
+  background: var(--row-hover);
+}
+
+.cmp-table th.is-partial .cmp-h-top::after {
+  content: " !";
+  color: var(--danger);
+}
+
+/* The comparison on paper (Print… and Save as PDF…, through report.js
+   printHtml): weights and indents only; the report's own type and colors. */
+
+.cmp-print tr.cmp-cat td,
+.cmp-print tr.cmp-level td,
+.cmp-print tr.cmp-line-total td {
+  font-weight: 600;
+}
+
+.cmp-print tr.grand td {
+  font-weight: 700;
+}
+
+.cmp-print tr.cmp-acct td.cmp-code,
+.cmp-print tr.cmp-acct td.cmp-name {
+  padding-left: 8pt;
+}
+
+.cmp-print tr.cmp-line td.cmp-name,
+.cmp-print tr.cmp-line-total td.cmp-name,
+.cmp-print tr.cmp-detail-note td {
+  padding-left: 16pt;
+}
+
+.cmp-print td.none,
+.cmp-print tr.cmp-info td,
+.cmp-print tr.cmp-detail-note td,
+.cmp-print .cmp-missing {
+  font-style: italic;
+}
+
+.cmp-print .cmp-missing {
+  margin-left: 4pt;
+}
+
+.cmp-print tr.cmp-sum.first td {
+  border-top: 0.75pt solid #000;
+}
+
+.cmp-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2pt 14pt;
+}

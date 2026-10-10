@@ -418,3 +418,115 @@ Decision 19's "several budgets open as tabs in one window", with the calls it ne
   with no file come back through their recovery copies, never from this list.
 - **Split view is later** (behavior note 04): a second pane would be a second grid sending a
   different `doc`; nothing about tabs needs to change for it.
+
+## 26. Find and replace as built (2026-10-09)
+
+Behavior note 18 and roadmap 1.11, with the calls it needed:
+
+- **A tab in the tools panel**, not a bar over the grid: Find sits with the setup tables as
+  in the reference product, so it docks, moves between panes and pops out with them, and
+  its results can sit next to the grid while the grid is edited. Cmd+F and Shift+Cmd+F
+  open it (find or replace mode) wherever the panel is.
+- **Next and previous are F3 and Shift+F3** (and Enter and Shift+Enter in the search box):
+  Cmd+G stays the Globals tab (decision 15), so the usual Cmd+G and Shift+Cmd+G aren't
+  free.
+- **Typed, one kind of thing at a time**, as the reference product does, plus formula text
+  and notes, which it didn't show. Text has match case and whole word; names (globals and
+  setup items) match exactly, picked from suggestions. A global matches only as a whole
+  name the way the formula reader splits a formula, so `DAYS` never touches `SHOOT_DAYS`.
+- **Replace only what is checked**, every result checked to begin with, as one undo step,
+  with the count of places changed. Every checked place must still match when Replace
+  runs, or nothing changes: a result list a moment old never edits a cell that changed
+  since. Results are searched again after every change, so replaced places drop out.
+- **A global goes in as a name, a number or a formula**: inside a longer formula a formula
+  goes in parentheses so it means the same; a cell that is only the global takes it as
+  typed. **Remove** on a global puts its current value in its place, as deleting a global
+  does (decision 12), so no total moves; on an item it takes the item off the lines.
+- **Searching never waits for totals**: it reads the budget as it is, in budget order, in
+  well under a millisecond at 5,000 lines; at most 1,000 results are sent at once, with the
+  full count.
+- **Renaming a setup item everywhere is separate** (and not built): replace swaps one
+  existing item for another in the places checked; it never creates or renames one.
+
+## 27. Versions, compare and original columns as built (2026-10-09)
+
+Decisions 17 and 19 in the app, with the calls they needed:
+
+- **Versions share their content.** `Version::budget` is an `Arc<BudgetSnapshot>` (was a
+  `Box`): every edit works on a copy of the budget for undo, and copying N versions' rows on
+  every keystroke would undo decision 18. Now a copy costs a pointer per version, and
+  comparing two version lists stops at equal pointers. Content is never changed in place,
+  so nothing else changed; the file format is the same. Measured (release, this Mac, 5,000
+  rows): a one-cell edit with its view and JSON takes 3.4 ms with 10 versions, as with
+  none; copying and comparing 10 boxed versions alone took 8.7 ms more per edit.
+- **Every version command is one undo step**: save, rename, delete, and restore with its
+  automatic `Before restoring "<name>"` version, so Undo takes back a whole restore. Names
+  are one line, trimmed, 1 to 200 characters; notes up to 10,000 (as line notes), blank
+  meaning none; `created` is the page's local time with its offset, checked for shape only
+  (the engine still never reads the clock). Questions (restore, delete) are asked on the
+  version's own row in the dialog, since one dialog is open at a time.
+- **Compare sources**: the budget in front against 1 to 15 open tabs, versions of it, or
+  files picked in a native dialog from Rust (named afterwards by a token; the last 32 are
+  kept; a picked file open in a tab is that tab). Each is compared as its own grid totals
+  it, problem cells blank, and says so. Budgets are copied out under the lock and compared
+  after it, so a large comparison never holds other commands up (16 budgets of 5,000 rows:
+  about 210 ms in all, under 1 ms of it holding the lock; 84 KB of JSON). Lines match by id when
+  every budget is the base or one of its versions, else by description.
+- **Both readings (decision 19).** Each budget's difference from the base (amount, percent
+  of the base) is on by default; Sum and Average of the others, Variance (that sum minus the
+  base) and Variance % (of the average, exact rather than of the rounded average, its sign
+  following the variance) are optional columns. `CompareLine::aggregate` computes them in
+  the engine, in cents, the average rounded once; percents go to the page as text with two
+  decimals, rounded once.
+- **Engine additions**: production totals are compared, matched by name (trimmed,
+  case-insensitive; the unnamed level after the last one isn't listed, as the topsheet
+  doesn't show it); each matched category, account and line says where it is in each
+  budget (`at`, `ids`), so a click can go there. Charges and credits stay single total lines.
+- **Orig and Var** show at every level when there is a baseline, before Total (Total stays
+  the rightmost column, pinned on the lines), on by default then and hidden from the
+  column menu without one. One choice covers all three levels.
+- **Printing** goes through the report module's `printHtml`: the comparison as shown
+  (columns ticked, rows open), landscape, with a legend of which budget each letter is. It
+  is loaded when asked for, so the screen works without it.
+- **Not yet**: charges and credits per item.
+
+## 28. Reports: our own pages, presets in the budget, PDF without the print sheet (2026-10-09)
+
+Roadmap 1.15 and 2.3 to 2.6 (behavior notes 15 and 19), as built:
+
+- **We lay out the pages ourselves.** Checked in a hidden WKWebView printing to PDF: the
+  system web view repeats no `thead` on later pages, draws no `tfoot` per page, ignores
+  `@page` margin boxes (so no page numbers) and `@page` size, and prints fixed elements
+  once. So `report.js` measures every row once in a hidden page-wide box and deals rows
+  onto Letter-sized page boxes (816 by 1056 CSS pixels), each with its own header, column
+  headings and footer, keeping a heading with what follows (a category or account heading
+  with its first lines, the last line with the account's totals, the topsheet's summary
+  together). "Page X of Y" works everywhere because we count the pages. The preview in
+  the dialog is those same pages scaled down, so it is what prints.
+- **Each page box is one sheet.** WebKit lays a printed document out at least 1.25 times
+  the paper's width in CSS pixels and scales it to fit; a document exactly 96 px to the
+  inch wide (both orientations are) prints at 100%, page box for sheet. The print
+  operation is given Letter, the orientation and zero margins (the boxes carry their own).
+- **PDF without new crates.** Tauri's `print()` always shows the print sheet with the
+  shared page setup, and `createPDF` makes one tall unpaged page. AppKit's
+  `NSPrintOperation` on the web view (`printOperationWithPrintInfo:`, macOS 11+) with a
+  save disposition and a file URL writes a paginated PDF with no panel. We reach it with
+  plain Objective-C runtime calls (`src/pdf_mac.rs`, the app's only `unsafe` code): no
+  blocks, no struct returns, a one-method delegate class to hear when it is done. The same
+  call with the panel shown is Print, so the orientation is preset there too. Windows and
+  Linux keep `window.print()` and the dialog's own PDF choice for now.
+- **Presets live in the budget file** (`report_presets`, additive, left out when empty) as
+  layout only: sections in order, categories and accounts left out (listed as exclusions,
+  so new categories and accounts print until someone unticks them), what to skip,
+  columns, layout, header and footer. One default, enforced by the app. Versions don't
+  carry them and restoring keeps the current ones: a report layout is not budget content.
+  Each change is one undo step.
+- **Filters never change totals.** Leaving lines or accounts out of a report prints the
+  budget's own totals with a note saying rows were left out; the topsheet always lists
+  every category. A report is a view, not a recalculation.
+- **Notes print as numbered footnotes** under each account's totals (long ones cut at 700
+  characters there) and in full in the notes list, with matching numbers; a switch leaves
+  them off the detail pages for printouts that leave the office.
+- **Not yet**: paper sizes other than Letter, a "detail starts on page N" topsheet column,
+  setup tables beyond fringes, globals and groups (units, sets, locations, currencies,
+  chart of accounts), dragging column widths on the preview.

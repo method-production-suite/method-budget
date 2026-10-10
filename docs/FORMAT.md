@@ -112,6 +112,7 @@ Fields in written order:
 | `charges`         | list of [charges](#charge) | Contractual charges, in application order. |
 | `credits`         | list of [credits](#credit) | Applied credits (incentives), in application order. |
 | `baseline`        | [baseline](#baseline) | Frozen totals for comparison. Left out when there is none. |
+| `report_presets`  | list of [report presets](#report-preset) | Saved report setups, in the user's order. Left out when there are none. |
 | `versions`        | list of [versions](#version) | Named copies of the budget, oldest first. Left out when there are none. |
 
 A new budget in Film Wizard Budgeting starts with a set of editable starter units (Allow,
@@ -360,7 +361,7 @@ or compared later. Fields in written order:
 | `name`    | text, **required** | |
 | `created` | text, **required** | When the version was saved, as an ISO 8601 date-time such as `"2026-10-09T14:30:00Z"`. Stored as given; the reader does not check it. |
 | `note`    | optional text | |
-| `budget`  | object, **required** | A [budget](#budget) object with every field except `versions`: a version cannot contain versions, and a reader rejects one that does. |
+| `budget`  | object, **required** | A [budget](#budget) object with every field except `versions` and `report_presets`: a version cannot contain versions or report presets, and a reader rejects one that does. |
 
 Restoring a version in the application first saves the current content as another version
 (named `Before restoring "<name>"`), so a restore can be undone.
@@ -405,6 +406,72 @@ Example (inside `budget`, after `baseline`):
           ]
         }
       ]
+    }
+  }
+]
+```
+
+### Report preset
+
+A saved report setup ("preset"): which sections print and in what order, which categories
+and accounts, what to leave out, the detail columns, the page layout, and the header and
+footer. It holds no figures; a report is always drawn from the budget as it is. Presets are
+layout, not budget content: a [version](#version) never has them (a reader rejects one
+that does), and restoring a version keeps the current ones. Fields in written order:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `name` | text, **required** | The application keeps names unique (ignoring case and surrounding spaces), 1 to 80 characters; the reader does not check. |
+| `default` | boolean, default `false` | The preset the application's Print dialog opens with. The application keeps at most one; a reader that finds several uses the first. |
+| `sections` | list of section names | In print order, each once: `"topsheet"`, `"accounts"` (each category's accounts with their totals), `"detail"`, `"fringes"`, `"globals"`, `"groups"` (with their totals), `"notes"` (every note, by account and line), `"info"` (budget information). |
+| `excluded_categories` | name set | Category codes left out of the account and detail sections and the notes list. The topsheet always lists every category. |
+| `excluded_accounts` | name set | Account codes left out the same way. |
+| `skip_empty_accounts` | boolean, default `false` | Leave out accounts with no rows. |
+| `skip_zero_accounts` | boolean, default `false` | Leave out accounts whose total is zero. |
+| `skip_suppressed_lines` | boolean, default `false` | Leave out lines that don't count in the budget total (a group on them is out of it). |
+| `skip_notes` | boolean, default `false` | Leave out the notes printed under detail lines (the notes section still lists them). |
+| `only_groups` | name set | When not empty, detail pages print only the lines tagged with at least one of these groups. |
+| `columns` | optional list of column names | The optional detail columns in print order: `"amount"`, `"unit"`, `"x"`, `"unit2"`, `"rate"`, `"unit3"`, `"currency"`, `"x4"`, `"unit4"`, `"fringes"`, `"fringe_pct"`, `"fringe_total"`, `"groups"`, `"set"`, `"location"`, `"original"`, `"variance"` (the last two only print when the budget has a baseline, then on the topsheet and account level too). Left out means the standard set; `[]` means none (the line number, description and total always print). |
+| `landscape` | boolean, default `false` | Page orientation. |
+| `font_size` | text, default `"medium"` | `"small"`, `"medium"` or `"large"`. |
+| `shading` | boolean, default `false` | Alternate lines tinted, total rows darker. |
+| `group_colors` | boolean, default `false` | Lines print in their own or their groups' colors (otherwise black). |
+| `header` | optional [band](#band) | Left out means the standard header (budget title, section, date printed); `{}` means none. |
+| `footer` | optional [band](#band) | Left out means the standard footer (page number at the right); `{}` means none. |
+
+Unknown section or column names are errors, like unknown fields.
+
+#### Band
+
+A header or footer: three optional slots, `left`, `center` and `right`, each a tagged
+object saying what it shows, worked out when the report is drawn:
+
+| `kind` | Fields | Shows |
+|--------|--------|-------|
+| `title` | | The budget's title. |
+| `section` | | The section on the page (the topsheet, a category's detail, ...). |
+| `printed` | | The date and time the report was drawn. |
+| `file` | | The budget's file name. |
+| `page` | | "Page 3 of 12". |
+| `info` | `label` text, **required** | The budget information field with that label, if there is one. |
+| `text` | `text` text, **required** | The text as written (the application allows up to 200 characters). |
+
+Example (inside `budget`, after `baseline` and before `versions`):
+
+```json
+"report_presets": [
+  {
+    "name": "Studio pack",
+    "default": true,
+    "sections": ["topsheet", "accounts", "detail", "notes"],
+    "excluded_categories": ["90"],
+    "skip_zero_accounts": true,
+    "columns": ["amount", "unit", "rate", "fringes", "original", "variance"],
+    "landscape": true,
+    "shading": true,
+    "footer": {
+      "left": { "kind": "info", "label": "Shoot days" },
+      "right": { "kind": "page" }
     }
   }
 ]
@@ -462,6 +529,8 @@ valid. Loading and saving it in Film Wizard Budgeting normalizes it.
 - Version 1, additive (2026-10): budget `new_line_defaults` (what an inserted line copies
   from its neighbor). Left out at its default, so files that don't change it are
   unchanged.
+- Version 1, additive (2026-10): budget `report_presets` (saved report setups). Left out
+  when there are none, so files without presets are unchanged.
 
 ## Complete example
 

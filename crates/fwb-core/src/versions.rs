@@ -15,6 +15,7 @@
 
 use std::collections::BTreeSet;
 use std::fmt;
+use std::sync::Arc;
 
 use crate::model::{Budget, Version, VersionId};
 
@@ -61,7 +62,7 @@ pub fn save_version(
         name: name.into(),
         created: created.into(),
         note,
-        budget: Box::new(snapshot),
+        budget: Arc::new(snapshot),
     });
     id
 }
@@ -86,7 +87,10 @@ pub fn restore_version(
     let content = (*target.budget).clone();
     let auto = save_version(b, name, created, None);
     let versions = std::mem::take(&mut b.versions);
+    // Report presets are layout, not content: the current ones stay.
+    let presets = std::mem::take(&mut b.report_presets);
     *b = content.into_budget(versions);
+    b.report_presets = presets;
     Ok(auto)
 }
 

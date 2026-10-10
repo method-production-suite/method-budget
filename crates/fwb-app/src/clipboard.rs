@@ -1965,7 +1965,7 @@ mod tests {
             name: "v1".into(),
             created: "2026-10-09T00:00:00Z".into(),
             note: None,
-            budget: Box::new(snap),
+            budget: std::sync::Arc::new(snap),
         });
         let clip = copy(&b, &rows(&[6, 7]));
         let first = paste(&mut b, &clip, &into_account("20-01", None), &[]).unwrap();

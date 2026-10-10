@@ -236,7 +236,7 @@ fn new_line_defaults_round_trip_and_are_left_out_at_default() {
         name: "v1".into(),
         created: "2026-10-09T00:00:00Z".into(),
         note: None,
-        budget: Box::new(b.snapshot()),
+        budget: std::sync::Arc::new(b.snapshot()),
     });
     b.new_line_defaults = NewLineDefaults::default();
     let text = round_trip(&b);

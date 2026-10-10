@@ -285,6 +285,21 @@ fn unescape(raw: &[u8]) -> String {
     serde_json::from_slice(&quoted).unwrap_or_else(|_| String::from_utf8_lossy(raw).into_owned())
 }
 
+/// A report preset as the file writes it: one entry of the budget's
+/// `report_presets` (docs/FORMAT.md, "Report preset"). For the app, which
+/// sends and receives presets in this shape.
+pub fn report_preset_to_value(p: &fwb_core::ReportPreset) -> serde_json::Value {
+    serde_json::to_value(dto::FileReportPreset::from(p)).expect("a preset always serializes")
+}
+
+/// Reads a report preset in the file's shape, as strictly as a file is read
+/// (unknown fields are errors).
+pub fn report_preset_from_value(v: serde_json::Value) -> Result<fwb_core::ReportPreset, String> {
+    serde_json::from_value::<dto::FileReportPreset>(v)
+        .map(fwb_core::ReportPreset::from)
+        .map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

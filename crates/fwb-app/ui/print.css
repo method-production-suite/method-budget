@@ -1,7 +1,11 @@
 /* Film Wizard Budgeting: printable reports (js/report.js).
    Loaded for all media. Every report rule is scoped to .fwb-report, so nothing
-   here touches the app. On screen, #print-root is always hidden; in print, when
-   <html> has the "printing" class, only #print-root is shown. */
+   here touches the app. A report is a column of Letter-sized page boxes
+   (.rpt-page), each exactly one sheet of paper with its own header and
+   footer bands. On screen, #print-root is always hidden; in print, when
+   <html> has the "printing" class, only #print-root is shown. Sizes inside
+   the report are in em, so the report's font size (small, medium, large)
+   scales everything together. */
 
 #print-root {
   display: none;
@@ -9,19 +13,15 @@
 
 @media print {
   @page {
-    margin: 12mm 11mm 14mm;
-
-    @bottom-right {
-      content: "Page " counter(page) " of " counter(pages);
-      font: 7.5pt -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
-      color: #555;
-    }
+    margin: 0;
   }
 
   html.printing,
   html.printing body {
     height: auto !important;
     min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
     overflow: visible !important;
     background: #fff !important;
     color: #000 !important;
@@ -35,29 +35,48 @@
   html.printing #print-root {
     display: block !important;
   }
+
+  /* Each sheet is exactly one page of paper. Its width must be the page's
+     own, not clipped: WebKit lays a printed document out at least 1.25 times
+     as wide as the paper (in CSS pixels) and scales it down to fit, so a
+     document exactly 96 px to the inch wide prints at exactly 100%. */
+  html.printing #print-root .rpt-sheet {
+    width: 816px;
+    height: 1056px;
+    overflow: visible;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  html.printing #print-root .landscape .rpt-sheet {
+    width: 1056px;
+    height: 816px;
+  }
+
+  html.printing #print-root .rpt-sheet:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
 }
 
 /* ------------------------------------------------------------------------- */
-/* The report itself: black on white, system font, tabular figures.          */
+/* The report: black on white, system font, tabular figures.                 */
 
 .fwb-report {
   color-scheme: light;
-  background: #fff;
   color: #000;
-  font: 8.5pt/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  font-size: 8.5pt;
+  line-height: 1.35;
   font-variant-numeric: tabular-nums;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
   text-align: left;
 }
 
-@media screen {
-  .fwb-report {
-    max-width: 8.5in;
-    margin: 0 auto;
-    padding: 0.5in;
-  }
-}
+.fwb-report.fs-small { font-size: 7.5pt; }
+.fwb-report.fs-medium { font-size: 8.5pt; }
+.fwb-report.fs-large { font-size: 10pt; }
 
 .fwb-report *,
 .fwb-report *::before,
@@ -65,14 +84,100 @@
   box-sizing: border-box;
 }
 
-/* Title block */
+/* Pages: Letter at 96 px to the inch. js/report.js uses the same numbers. */
 
-.fwb-report .rpt-title-block {
-  margin: 0 0 16pt;
+.fwb-report .rpt-sheet {
+  overflow: hidden;
+}
+
+.fwb-report .rpt-page {
+  display: flex;
+  flex-direction: column;
+  width: 816px;
+  height: 1056px;
+  padding: 40px 48px 36px;
+  overflow: hidden;
+  background: #fff;
+  transform-origin: 0 0;
+}
+
+.fwb-report.landscape .rpt-page {
+  width: 1056px;
+  height: 816px;
+}
+
+.fwb-report .rpt-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Rows are measured here before they are dealt onto pages. */
+.fwb-report.rpt-measure {
+  position: absolute;
+  top: 0;
+  left: -30000px;
+  width: 720px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.fwb-report.rpt-measure.landscape {
+  width: 960px;
+}
+
+/* Header and footer bands: three slots across the page, one line each. */
+
+.fwb-report .rpt-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 12pt;
+  align-items: baseline;
+  flex: 0 0 auto;
+  font-size: 0.88em;
+  line-height: 1.3;
+  color: #333;
+}
+
+.fwb-report .rpt-band.rpt-head {
+  margin-bottom: 10pt;
+  padding-bottom: 3pt;
+  border-bottom: 0.75pt solid #000;
+}
+
+.fwb-report .rpt-band.rpt-foot {
+  margin-top: 8pt;
+}
+
+.fwb-report .rpt-slot {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fwb-report .rpt-slot.center {
+  text-align: center;
+  max-width: 60ch;
+}
+
+.fwb-report .rpt-slot.right {
+  text-align: right;
+}
+
+.fwb-report .rpt-slot.strong {
+  font-weight: 700;
+  color: #000;
+}
+
+/* Title block, on the first page */
+
+.fwb-report .rpt-intro {
+  padding-bottom: 14pt;
 }
 
 .fwb-report .rpt-kicker {
-  font-size: 8pt;
+  font-size: 0.94em;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -81,7 +186,7 @@
 
 .fwb-report .rpt-title {
   margin: 2pt 0 8pt;
-  font-size: 20pt;
+  font-size: 2.35em;
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.01em;
@@ -95,6 +200,10 @@
   margin: 0;
 }
 
+.fwb-report.landscape .rpt-facts {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .fwb-report .rpt-fact {
   display: flex;
   flex-direction: column;
@@ -102,7 +211,7 @@
 }
 
 .fwb-report .rpt-fact dt {
-  font-size: 7pt;
+  font-size: 0.82em;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #555;
@@ -110,7 +219,7 @@
 
 .fwb-report .rpt-fact dd {
   margin: 0;
-  font-size: 9pt;
+  font-size: 1.06em;
   overflow-wrap: anywhere;
 }
 
@@ -119,14 +228,7 @@
   padding: 6pt 8pt;
   border: 1.5pt solid #000;
   background: #eee;
-  font-size: 8.5pt;
   overflow-wrap: anywhere;
-}
-
-.fwb-report .rpt-empty {
-  margin: 12pt 0;
-  color: #555;
-  font-style: italic;
 }
 
 /* Tables */
@@ -150,89 +252,72 @@
   overflow-wrap: normal;
 }
 
-/* Running header: repeats at the top of every printed page. */
-
-.fwb-report .rpt-run {
-  padding: 0 0 5pt !important;
-  font-weight: 400;
-  text-align: left;
-}
-
-.fwb-report .rpt-run-inner {
-  display: flex;
-  align-items: baseline;
-  gap: 12pt;
-  padding-bottom: 3pt;
-  border-bottom: 0.75pt solid #000;
-  font-size: 7.5pt;
-  color: #333;
-}
-
-.fwb-report .rpt-run-title {
-  font-weight: 700;
-  color: #000;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fwb-report .rpt-run-section {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fwb-report .rpt-run-date {
-  white-space: nowrap;
+.fwb-report .rpt-table .muted {
+  color: #666;
+  font-style: italic;
 }
 
 .fwb-report .rpt-cols th {
   padding-top: 0;
   padding-bottom: 3pt;
   border-bottom: 0.75pt solid #000;
-  font-size: 7pt;
+  font-size: 0.82em;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #333;
   text-align: left;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .fwb-report .rpt-cols th.num {
   text-align: right;
 }
 
-/* On screen the running header only needs to show once. */
-@media screen {
-  .fwb-report .rpt-run-row {
-    display: none;
-  }
+.fwb-report .rpt-row.empty td {
+  padding-top: 6pt;
+  color: #666;
+  font-style: italic;
+}
+
+.fwb-report .cat-code,
+.fwb-report .acct-code {
+  display: inline-block;
+  margin-right: 8pt;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------------------------------- */
-/* Topsheet                                                                  */
+/* Topsheet and account level                                                */
 
-.fwb-report .rpt-ts .c-code { width: 12%; }
-.fwb-report .rpt-ts .c-name { width: auto; }
-.fwb-report .rpt-ts .c-money { width: 19%; }
-.fwb-report .rpt-ts.has-baseline .c-money { width: 15%; }
-.fwb-report .rpt-ts.has-baseline .c-code { width: 9%; }
+/* In em, so the columns grow with the type size and big figures always fit. */
+.fwb-report .rpt-ts col.c-code,
+.fwb-report .rpt-al col.c-code { width: 7em; }
+.fwb-report .rpt-ts col.c-name,
+.fwb-report .rpt-al col.c-name { width: auto; }
+.fwb-report .rpt-ts col.c-money,
+.fwb-report .rpt-al col.c-money { width: 12em; }
+.fwb-report .rpt-ts.has-baseline col.c-money,
+.fwb-report .rpt-al.has-baseline col.c-money { width: 11em; }
+.fwb-report .rpt-ts.has-baseline col.c-code,
+.fwb-report .rpt-al.has-baseline col.c-code { width: 5.5em; }
 
-.fwb-report .rpt-ts td {
+.fwb-report .rpt-ts td,
+.fwb-report .rpt-al td {
   padding-top: 2.4pt;
   padding-bottom: 2.4pt;
-  font-size: 9pt;
+  font-size: 1.06em;
 }
 
-.fwb-report .rpt-ts tr.cat td {
+.fwb-report .rpt-ts tr.cat td,
+.fwb-report .rpt-al tr.rpt-al-acct td {
   border-bottom: 0.5pt solid #d6d6d6;
 }
 
-.fwb-report .rpt-ts td.code {
+.fwb-report .rpt-ts td.code,
+.fwb-report .rpt-al td.code {
   color: #333;
 }
 
@@ -248,98 +333,87 @@
   font-weight: 700;
 }
 
-.fwb-report .rpt-ts td.base,
-.fwb-report .rpt-ts td.var {
+.fwb-report td.base,
+.fwb-report td.var {
   color: #333;
 }
 
-.fwb-report .rpt-ts-summary tr.first td {
+.fwb-report .rpt-ts tr.sum.first td {
   padding-top: 10pt;
   border-top: 1.5pt solid #000;
 }
 
-.fwb-report .rpt-ts-summary tr.strong td {
+.fwb-report .rpt-ts tr.sum.strong td {
   font-weight: 600;
 }
 
-.fwb-report .rpt-ts-summary tr.charge td.name,
-.fwb-report .rpt-ts-summary tr.credit td.name {
+.fwb-report .rpt-ts tr.sum.charge td.name,
+.fwb-report .rpt-ts tr.sum.credit td.name {
   padding-left: 12pt;
 }
 
-.fwb-report .rpt-ts-summary tr.grand td {
+.fwb-report .rpt-ts tr.sum.grand td {
   padding-top: 4pt;
   padding-bottom: 4pt;
   border-top: 0.75pt solid #000;
   border-bottom: 2.25pt double #000;
-  font-size: 10pt;
+  font-size: 1.18em;
   font-weight: 700;
 }
 
-.fwb-report .rpt-ts-summary tr.grand + tr.credit td {
+.fwb-report .rpt-ts tr.sum.grand + tr.sum.credit td {
   padding-top: 6pt;
 }
 
-.fwb-report .rpt-ts-summary tr.display td {
+.fwb-report .rpt-ts tr.sum.display td {
   color: #333;
-  font-size: 8.5pt;
 }
 
-.fwb-report .rpt-ts-summary tr.display.first td {
+.fwb-report .rpt-ts tr.sum.display.first td {
   padding-top: 8pt;
   border-top: 0;
 }
 
-/* ------------------------------------------------------------------------- */
-/* Detail                                                                    */
-
-.fwb-report .rpt-detail {
-  break-before: page;
-}
-
-.fwb-report .rpt-detail.first {
-  break-before: auto;
-}
-
-.fwb-report.kind-detail .rpt-detail-intro + .rpt-detail {
-  break-before: auto;
-}
-
-@media screen {
-  .fwb-report .rpt-detail {
-    margin-top: 28pt;
-  }
-}
-
-.fwb-report .rpt-dt .c-no { width: 4%; }
-.fwb-report .rpt-dt .c-desc { width: auto; }
-.fwb-report .rpt-dt .c-amt { width: 13%; }
-.fwb-report .rpt-dt .c-unit { width: 6%; }
-.fwb-report .rpt-dt .c-x { width: 6.5%; }
-.fwb-report .rpt-dt .c-rate { width: 9.5%; }
-.fwb-report .rpt-dt .c-cur { width: 5%; }
-.fwb-report .rpt-dt .c-x4 { width: 5.5%; }
-.fwb-report .rpt-dt .c-total { width: 12%; }
-.fwb-report .rpt-dt .c-fr { width: 10%; }
-
-.fwb-report .rpt-cat-head td.cat {
-  padding: 2pt 4pt 6pt;
-  font-size: 12pt;
+.fwb-report .rpt-al tr.rpt-al-cat td.cat {
+  padding-top: 10pt;
+  padding-bottom: 3pt;
+  border-bottom: 0.75pt solid #000;
+  font-size: 1.18em;
   font-weight: 700;
 }
 
-.fwb-report .cat-code,
-.fwb-report .acct-code {
-  display: inline-block;
-  margin-right: 8pt;
-  font-variant-numeric: tabular-nums;
+.fwb-report .rpt-al tr.rpt-al-cat:first-child td.cat {
+  padding-top: 2pt;
+}
+
+.fwb-report .rpt-al tr.rpt-al-fa td {
+  font-weight: 600;
+}
+
+.fwb-report .rpt-al tr.rpt-al-total td {
+  padding-bottom: 6pt;
+  border-top: 0.75pt solid #000;
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Detail (column widths come from report.js: report-detail-cols)            */
+
+.fwb-report .rpt-dt td {
+  border-bottom: 0;
+}
+
+.fwb-report .rpt-cat-head td.cat {
+  padding: 2pt 4pt 6pt;
+  font-size: 1.41em;
+  font-weight: 700;
 }
 
 .fwb-report .rpt-acct-head td.acct {
   padding-top: 7pt;
   padding-bottom: 2.5pt;
   border-bottom: 0.5pt solid #000;
-  font-size: 9pt;
+  font-size: 1.06em;
   font-weight: 700;
 }
 
@@ -349,11 +423,11 @@
 
 .fwb-report .rpt-row td.no {
   color: #777;
-  font-size: 7.5pt;
+  font-size: 0.88em;
 }
 
 .fwb-report .rpt-row td.formula {
-  font-size: 7.5pt;
+  font-size: 0.88em;
   font-style: italic;
   white-space: normal;
   overflow-wrap: break-word;
@@ -365,8 +439,9 @@
   color: #444;
 }
 
-.fwb-report .rpt-row td.fr {
-  font-size: 7pt;
+.fwb-report .rpt-row td.fr,
+.fwb-report .rpt-dt .rpt-row td.txt {
+  font-size: 0.82em;
   color: #444;
 }
 
@@ -376,12 +451,10 @@
 
 .fwb-report .rpt-row .local {
   display: block;
-  font-size: 6.5pt;
+  font-size: 0.76em;
   font-weight: 400;
   color: #555;
 }
-
-/* Subtotal and adjustment rows */
 
 .fwb-report .rpt-row.subtotal td {
   font-style: italic;
@@ -403,6 +476,11 @@
   font-style: normal;
 }
 
+/* The amount an adjustment is a percentage of, in the rate column. */
+.fwb-report .rpt-row.adjustment td.adj-base {
+  font-size: 0.88em;
+}
+
 /* Lines not counted in the total */
 
 .fwb-report .rpt-row.excluded td {
@@ -420,7 +498,7 @@
   padding: 0 3pt;
   border: 0.5pt solid #8a8a8a;
   border-radius: 2pt;
-  font-size: 6.5pt;
+  font-size: 0.76em;
   font-style: normal;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -438,14 +516,47 @@
   outline-offset: -1.5pt;
 }
 
-.fwb-report .rpt-row td.cur {
+.fwb-report .rpt-row td.cur,
+.fwb-report .rpt-row td.unit-col {
   white-space: nowrap;
+  overflow: hidden;
   overflow-wrap: normal;
+  text-overflow: ellipsis;
 }
 
-.fwb-report .rpt-row.empty td {
-  color: #777;
+/* Notes: a marker on the line, the note under the account's totals. */
+
+.fwb-report sup.rpt-fn {
+  margin-left: 2pt;
+  font-size: 0.72em;
+  font-weight: 700;
+  font-style: normal;
+  line-height: 0;
+}
+
+.fwb-report .rpt-fnote td {
+  padding-top: 0.8pt;
+  padding-bottom: 0.8pt;
+  font-size: 0.88em;
+  color: #222;
+}
+
+.fwb-report .rpt-fnote:first-of-type td,
+.fwb-report .rpt-sum + .rpt-fnote td,
+.fwb-report .rpt-note-row + .rpt-fnote td {
+  padding-top: 3pt;
+}
+
+.fwb-report .rpt-fnote .rpt-fn {
+  display: inline-block;
+  min-width: 1.2em;
+  margin-right: 0.5em;
+  font-weight: 700;
+}
+
+.fwb-report .rpt-fnote .fn-body {
   font-style: italic;
+  white-space: pre-line;
 }
 
 /* Account and category totals */
@@ -461,7 +572,7 @@
 }
 
 .fwb-report .rpt-sum .note {
-  font-size: 7pt;
+  font-size: 0.82em;
   color: #555;
 }
 
@@ -485,12 +596,13 @@
 
 .fwb-report .rpt-note-row td.note {
   padding-top: 1pt;
-  font-size: 7pt;
+  font-size: 0.82em;
   font-style: italic;
   color: #555;
 }
 
-.fwb-report .rpt-cat-foot tr.first td {
+.fwb-report .rpt-sum.fringe-acct.first td,
+.fwb-report .rpt-sum.cat-total.first td {
   padding-top: 10pt;
 }
 
@@ -499,39 +611,20 @@
 }
 
 .fwb-report .rpt-sum.cat-total td {
-  font-size: 10pt;
   font-weight: 700;
+}
+
+.fwb-report .rpt-sum.cat-total td.label {
+  font-size: 1.12em;
+}
+
+.fwb-report .rpt-sum.cat-total td.num {
+  font-size: 1.04em;
 }
 
 .fwb-report .rpt-sum.cat-total td.total {
   border-top: 0.75pt solid #000;
   border-bottom: 2.25pt double #000;
-}
-
-/* Page breaks: keep headings with what follows. */
-
-.fwb-report thead {
-  display: table-header-group;
-}
-
-.fwb-report tr {
-  break-inside: avoid;
-  page-break-inside: avoid;
-}
-
-.fwb-report .rpt-keep {
-  break-inside: avoid;
-  page-break-inside: avoid;
-}
-
-.fwb-report .rpt-cat-head,
-.fwb-report .rpt-acct-head {
-  break-after: avoid;
-  page-break-after: avoid;
-}
-
-.fwb-report .rpt-title-block {
-  break-inside: avoid;
 }
 
 /* Row styles and separators (js/report.js rowStyle). */
@@ -557,4 +650,113 @@
   background-size: 100% 0.5pt;
   background-position: center;
   background-repeat: no-repeat;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Setup tables: fringes, globals, groups, notes, budget information         */
+
+.fwb-report .rpt-st col.c-name2 { width: 18%; }
+.fwb-report .rpt-st col.c-desc { width: auto; }
+.fwb-report .rpt-st col.c-short { width: 8%; }
+.fwb-report .rpt-st col.c-num { width: 11%; }
+.fwb-report .rpt-st col.c-mid { width: 14%; }
+.fwb-report .rpt-st col.c-money { width: 11em; }
+.fwb-report .rpt-st col.c-mark { width: 5%; }
+.fwb-report .rpt-st col.c-wide { width: auto; }
+.fwb-report .rpt-st col.c-label { width: 26%; }
+.fwb-report .rpt-notes col.c-mid { width: 20%; }
+
+.fwb-report .rpt-st td {
+  padding-top: 2.4pt;
+  padding-bottom: 2.4pt;
+}
+
+.fwb-report .rpt-st td.name {
+  font-weight: 600;
+}
+
+.fwb-report .rpt-st tr.rpt-st-total td {
+  padding-top: 4pt;
+  border-top: 0.75pt solid #000;
+  font-weight: 700;
+}
+
+.fwb-report .rpt-st tr.rpt-st-total td.name {
+  text-align: right;
+}
+
+.fwb-report .rpt-notes td.mark {
+  font-weight: 700;
+}
+
+.fwb-report .rpt-notes td.note-text {
+  white-space: pre-line;
+}
+
+.fwb-report .rpt-notes tr.more td {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.fwb-report .rpt-info tr.rpt-info-head td {
+  padding-top: 10pt;
+  padding-bottom: 3pt;
+  border-bottom: 0.75pt solid #000;
+  font-size: 0.82em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fwb-report .rpt-info tr.rpt-info-head:first-child td {
+  padding-top: 0;
+}
+
+.fwb-report .rpt-info td.label {
+  color: #444;
+}
+
+/* Tables from other screens (printHtml): their own colgroup, our type. */
+
+.fwb-report .rpt-custom td,
+.fwb-report .rpt-custom th {
+  border-bottom: 0.5pt solid #e2e2e2;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Shading and line colors (layout options)                                  */
+
+.fwb-report.shaded .rpt-row.alt td,
+.fwb-report.shaded .rpt-st .rpt-row:nth-child(even) td,
+.fwb-report.shaded .rpt-al tr.rpt-al-acct:nth-child(even) td,
+.fwb-report.shaded .rpt-ts tr.cat:nth-child(even) td {
+  background: #f1f1f1;
+}
+
+.fwb-report.shaded .rpt-sum.acct-total td,
+.fwb-report.shaded .rpt-sum.cat-total td,
+.fwb-report.shaded .rpt-ts tr.level td,
+.fwb-report.shaded .rpt-ts tr.sum.grand td,
+.fwb-report.shaded .rpt-al tr.rpt-al-total td,
+.fwb-report.shaded .rpt-st tr.rpt-st-total td {
+  background: #dedede;
+}
+
+/* ------------------------------------------------------------------------- */
+/* On screen: the setup dialog's preview (js/reportsetup.js) and the harness */
+
+@media screen {
+  .rpt-preview .fwb-report.rpt-pages {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .rpt-preview .fwb-report .rpt-sheet {
+    flex: 0 0 auto;
+    background: #fff;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.35), 0 0 0 1px rgb(0 0 0 / 0.06);
+  }
 }

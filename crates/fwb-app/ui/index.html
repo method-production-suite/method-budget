@@ -7,11 +7,13 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="setup.css">
     <link rel="stylesheet" href="print.css">
+    <link rel="stylesheet" href="reportsetup.css">
     <link rel="stylesheet" href="topsheet-setup.css">
     <link rel="stylesheet" href="apply.css">
     <link rel="stylesheet" href="quickentry.css">
     <link rel="stylesheet" href="context.css">
     <link rel="stylesheet" href="tools.css">
+    <link rel="stylesheet" href="compare.css">
     <script type="module" src="js/boot.js"></script>
   </head>
   <body>
@@ -27,6 +29,10 @@
         <div class="toolbar-group" role="group" aria-label="History">
           <button type="button" class="btn" id="btn-undo" disabled>Undo</button>
           <button type="button" class="btn" id="btn-redo" disabled>Redo</button>
+        </div>
+        <div class="toolbar-group" role="group" aria-label="Versions and comparing">
+          <button type="button" class="btn" id="btn-versions">Versions</button>
+          <button type="button" class="btn" id="btn-compare">Compare</button>
         </div>
         <div class="doc">
           <span class="doc-name" id="doc-name"></span>

@@ -14,6 +14,7 @@ use fwb_core::{
     InfoValue, Location, NewLineDefaults, ProductionTotal, RowId, RowKind, SetDef, TopsheetRow,
     UnitDef, Version,
 };
+use fwb_core::{Band, BandField, FontSize, ReportColumn, ReportPreset, ReportSection, ReportSpec};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -202,6 +203,8 @@ pub(crate) struct FileBudget {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     baseline: Option<FileBaseline>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    report_presets: Vec<FileReportPreset>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     versions: Vec<FileVersion>,
 }
 
@@ -227,6 +230,7 @@ impl From<&Budget> for FileBudget {
             credits,
             baseline,
             versions,
+            report_presets,
         } = b;
         FileBudget {
             title: title.clone(),
@@ -250,6 +254,7 @@ impl From<&Budget> for FileBudget {
             charges: charges.iter().map(FileCharge::from).collect(),
             credits: credits.iter().map(FileCredit::from).collect(),
             baseline: baseline.as_ref().map(FileBaseline::from),
+            report_presets: report_presets.iter().map(FileReportPreset::from).collect(),
             versions: versions.iter().map(FileVersion::from).collect(),
         }
     }
@@ -286,6 +291,11 @@ impl From<FileBudget> for Budget {
             credits: f.credits.into_iter().map(Credit::from).collect(),
             baseline: f.baseline.map(Baseline::from),
             versions: f.versions.into_iter().map(Version::from).collect(),
+            report_presets: f
+                .report_presets
+                .into_iter()
+                .map(ReportPreset::from)
+                .collect(),
         }
     }
 }
@@ -323,6 +333,11 @@ impl<'de> Deserialize<'de> for FileSnapshot {
                 "a version's budget cannot have versions of its own",
             ));
         }
+        if !b.report_presets.is_empty() {
+            return Err(de::Error::custom(
+                "a version's budget cannot have report presets",
+            ));
+        }
         Ok(FileSnapshot(b))
     }
 }
@@ -356,7 +371,7 @@ impl From<FileVersion> for Version {
             name: f.name,
             created: f.created,
             note: f.note,
-            budget: Box::new(content),
+            budget: std::sync::Arc::new(content),
         }
     }
 }
@@ -1401,6 +1416,280 @@ impl From<FileBaseline> for Baseline {
             categories: f.categories,
             grand_total: f.grand_total,
             net_total: f.net_total,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Report presets (saved report setups; fwb_core::report_preset)
+
+/// A saved report setup: a name, the default flag and the spec's fields, all
+/// in one object.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FileReportPreset {
+    name: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    default: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    sections: Vec<FileSection>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    excluded_categories: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    excluded_accounts: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    skip_empty_accounts: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    skip_zero_accounts: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    skip_suppressed_lines: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    skip_notes: bool,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    only_groups: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    columns: Option<Vec<FileColumn>>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    landscape: bool,
+    #[serde(default, skip_serializing_if = "FileFontSize::is_medium")]
+    font_size: FileFontSize,
+    #[serde(default, skip_serializing_if = "is_false")]
+    shading: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    group_colors: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    header: Option<FileBand>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    footer: Option<FileBand>,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FileSection {
+    Topsheet,
+    Accounts,
+    Detail,
+    Fringes,
+    Globals,
+    Groups,
+    Notes,
+    Info,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FileColumn {
+    Amount,
+    Unit,
+    X,
+    Unit2,
+    Rate,
+    Unit3,
+    Currency,
+    X4,
+    Unit4,
+    Fringes,
+    #[serde(rename = "fringe_pct")]
+    FringePercent,
+    FringeTotal,
+    Groups,
+    Set,
+    Location,
+    Original,
+    Variance,
+}
+
+#[derive(Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FileFontSize {
+    Small,
+    #[default]
+    Medium,
+    Large,
+}
+
+impl FileFontSize {
+    fn is_medium(&self) -> bool {
+        *self == FileFontSize::Medium
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileBand {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    left: Option<FileBandField>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    center: Option<FileBandField>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    right: Option<FileBandField>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum FileBandField {
+    Title {},
+    Section {},
+    Printed {},
+    File {},
+    Page {},
+    Info { label: String },
+    Text { text: String },
+}
+
+macro_rules! same_variants {
+    ($a:ident <-> $b:ident { $($v:ident),+ $(,)? }) => {
+        impl From<$a> for $b {
+            fn from(x: $a) -> $b {
+                match x {
+                    $($a::$v => $b::$v),+
+                }
+            }
+        }
+        impl From<$b> for $a {
+            fn from(x: $b) -> $a {
+                match x {
+                    $($b::$v => $a::$v),+
+                }
+            }
+        }
+    };
+}
+
+same_variants!(ReportSection <-> FileSection {
+    Topsheet, Accounts, Detail, Fringes, Globals, Groups, Notes, Info,
+});
+same_variants!(ReportColumn <-> FileColumn {
+    Amount, Unit, X, Unit2, Rate, Unit3, Currency, X4, Unit4, Fringes, FringePercent,
+    FringeTotal, Groups, Set, Location, Original, Variance,
+});
+same_variants!(FontSize <-> FileFontSize { Small, Medium, Large });
+
+impl From<&BandField> for FileBandField {
+    fn from(f: &BandField) -> FileBandField {
+        match f {
+            BandField::Title => FileBandField::Title {},
+            BandField::Section => FileBandField::Section {},
+            BandField::Printed => FileBandField::Printed {},
+            BandField::File => FileBandField::File {},
+            BandField::Page => FileBandField::Page {},
+            BandField::Info(label) => FileBandField::Info {
+                label: label.clone(),
+            },
+            BandField::Text(text) => FileBandField::Text { text: text.clone() },
+        }
+    }
+}
+
+impl From<FileBandField> for BandField {
+    fn from(f: FileBandField) -> BandField {
+        match f {
+            FileBandField::Title {} => BandField::Title,
+            FileBandField::Section {} => BandField::Section,
+            FileBandField::Printed {} => BandField::Printed,
+            FileBandField::File {} => BandField::File,
+            FileBandField::Page {} => BandField::Page,
+            FileBandField::Info { label } => BandField::Info(label),
+            FileBandField::Text { text } => BandField::Text(text),
+        }
+    }
+}
+
+impl From<&Band> for FileBand {
+    fn from(b: &Band) -> FileBand {
+        let Band {
+            left,
+            center,
+            right,
+        } = b;
+        FileBand {
+            left: left.as_ref().map(FileBandField::from),
+            center: center.as_ref().map(FileBandField::from),
+            right: right.as_ref().map(FileBandField::from),
+        }
+    }
+}
+
+impl From<FileBand> for Band {
+    fn from(f: FileBand) -> Band {
+        Band {
+            left: f.left.map(BandField::from),
+            center: f.center.map(BandField::from),
+            right: f.right.map(BandField::from),
+        }
+    }
+}
+
+impl From<&ReportPreset> for FileReportPreset {
+    fn from(p: &ReportPreset) -> FileReportPreset {
+        let ReportPreset {
+            name,
+            default,
+            spec,
+        } = p;
+        let ReportSpec {
+            sections,
+            excluded_categories,
+            excluded_accounts,
+            skip_empty_accounts,
+            skip_zero_accounts,
+            skip_suppressed_lines,
+            skip_notes,
+            only_groups,
+            columns,
+            landscape,
+            font_size,
+            shading,
+            group_colors,
+            header,
+            footer,
+        } = spec;
+        FileReportPreset {
+            name: name.clone(),
+            default: *default,
+            sections: sections.iter().map(|&x| x.into()).collect(),
+            excluded_categories: excluded_categories.clone(),
+            excluded_accounts: excluded_accounts.clone(),
+            skip_empty_accounts: *skip_empty_accounts,
+            skip_zero_accounts: *skip_zero_accounts,
+            skip_suppressed_lines: *skip_suppressed_lines,
+            skip_notes: *skip_notes,
+            only_groups: only_groups.clone(),
+            columns: columns
+                .as_ref()
+                .map(|c| c.iter().map(|&x| x.into()).collect()),
+            landscape: *landscape,
+            font_size: (*font_size).into(),
+            shading: *shading,
+            group_colors: *group_colors,
+            header: header.as_ref().map(FileBand::from),
+            footer: footer.as_ref().map(FileBand::from),
+        }
+    }
+}
+
+impl From<FileReportPreset> for ReportPreset {
+    fn from(f: FileReportPreset) -> ReportPreset {
+        ReportPreset {
+            name: f.name,
+            default: f.default,
+            spec: ReportSpec {
+                sections: f.sections.into_iter().map(Into::into).collect(),
+                excluded_categories: f.excluded_categories,
+                excluded_accounts: f.excluded_accounts,
+                skip_empty_accounts: f.skip_empty_accounts,
+                skip_zero_accounts: f.skip_zero_accounts,
+                skip_suppressed_lines: f.skip_suppressed_lines,
+                skip_notes: f.skip_notes,
+                only_groups: f.only_groups,
+                columns: f.columns.map(|c| c.into_iter().map(Into::into).collect()),
+                landscape: f.landscape,
+                font_size: f.font_size.into(),
+                shading: f.shading,
+                group_colors: f.group_colors,
+                header: f.header.map(Band::from),
+                footer: f.footer.map(Band::from),
+            },
         }
     }
 }

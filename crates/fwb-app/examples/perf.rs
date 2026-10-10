@@ -276,4 +276,25 @@ fn main() {
     println!("  build                         {}", ms(t));
     println!("  build and JSON                {}", ms(j));
     println!("  JSON size                     {}", kb(size));
+
+    // Find (src/find.rs): a search over every row, with its reply as JSON.
+    println!("find (search and JSON):");
+    for (scope, text) in [
+        ("description", "operator"),
+        ("formula", "weeks"),
+        ("global", "SHOOT_DAYS"),
+        ("fringe", "FR01"),
+        ("unit", "Day"),
+    ] {
+        let q = fwb_app::find::FindQuery {
+            scope: scope.into(),
+            text: text.into(),
+            ..Default::default()
+        };
+        let t = time(|| {
+            serde_json::to_string(&fwb_app::find::search(s.budget(), &q).unwrap()).unwrap()
+        });
+        let n = fwb_app::find::search(s.budget(), &q).unwrap().count;
+        println!("  {scope:<12} {n:>6} found     {}", ms(t));
+    }
 }

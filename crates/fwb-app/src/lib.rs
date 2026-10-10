@@ -11,18 +11,24 @@ pub mod app;
 pub mod apply;
 pub mod batch;
 pub mod clipboard;
+pub mod compare;
 pub mod diagnose;
 pub mod docs;
 pub mod edit;
+pub mod find;
 pub mod menu;
+#[cfg(target_os = "macos")]
+mod pdf_mac;
 pub mod quickadd;
 pub mod report_dto;
+pub mod reports;
 pub mod rowstyle;
 pub mod safety;
 pub mod safety_app;
 pub mod session;
 pub mod tabs;
 pub mod tools;
+pub mod versions;
 pub mod view;
 
 pub use app::run;

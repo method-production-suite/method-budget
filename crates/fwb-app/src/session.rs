@@ -736,7 +736,7 @@ impl<'a> SelectionIndex<'a> {
 }
 
 /// Reads and parses a budget file, with the stamp of what was read.
-fn read_budget(path: &Path) -> Result<(Budget, safety::DiskStamp), String> {
+pub(crate) fn read_budget(path: &Path) -> Result<(Budget, safety::DiskStamp), String> {
     let bytes =
         std::fs::read(path).map_err(|e| format!("Couldn't read {}: {e}", path.display()))?;
     let text = std::str::from_utf8(&bytes).map_err(|_| {
@@ -790,7 +790,7 @@ mod tests {
             name: format!("v{id}"),
             created: "2026-10-09T00:00:00Z".into(),
             note: None,
-            budget: Box::new(b.snapshot()),
+            budget: std::sync::Arc::new(b.snapshot()),
         }
     }
 
