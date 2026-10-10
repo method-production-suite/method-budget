@@ -310,11 +310,13 @@ pub fn check_transaction(t: &Transaction) -> Result<(), ActualsError> {
 }
 
 /// An account number as the budget's pattern writes it; a number the
-/// pattern can't read is kept as typed (trimmed).
+/// pattern can't read, or could only read by cutting it short (`11-012`
+/// under `11-01`), is kept as typed (trimmed), so it never lands on an
+/// account it doesn't name.
 pub fn normalize_code(coding: &AccountCoding, code: &str) -> String {
     let t = code.trim();
-    if t.is_empty() {
-        return String::new();
+    if t.is_empty() || !coding.fits(t) {
+        return t.to_string();
     }
     coding.normalize(t).unwrap_or_else(|_| t.to_string())
 }
@@ -1376,6 +1378,39 @@ mod tests {
         assert_eq!(c.categories[1].accounts[0].figures.actual, 10_000);
         assert_eq!(c.categories[1].accounts[1].figures.actual, 0);
         assert_eq!(c.total.actual, 10_000);
+    }
+
+    #[test]
+    fn numbers_the_pattern_would_cut_short_stay_unassigned() {
+        let mut b = budget();
+        import(
+            &mut b,
+            vec![
+                tx("2026-09-01", "10-1", 100, "Padded: 10-01"),
+                tx("2026-09-02", "10-012", 2_000, "A piece too long"),
+                tx(
+                    "2026-09-03",
+                    "100123",
+                    30_000,
+                    "More digits than the pattern",
+                ),
+            ],
+        );
+        let c = report(&b);
+        assert_eq!(c.categories[0].accounts[0].figures.actual, 100);
+        assert_eq!(c.unassigned.actual, 32_000);
+        assert_eq!(
+            c.unassigned_codes.keys().collect::<Vec<_>>(),
+            ["10-012", "100123"]
+        );
+        assert_eq!(normalize_code(&b.account_coding, " 10-012 "), "10-012");
+        assert_eq!(normalize_code(&b.account_coding, "1001"), "10-01");
+        assert!(chart_code(&b, "10-012").is_err());
+        let unassigned = Filter {
+            unassigned: true,
+            ..Filter::default()
+        };
+        assert_eq!(filter(&b, &unassigned).len(), 2);
     }
 
     #[test]

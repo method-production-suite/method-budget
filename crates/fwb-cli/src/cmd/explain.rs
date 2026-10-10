@@ -2,9 +2,8 @@
 //! (roadmap 3.5; the engine's `fwb_core::explain`).
 
 use fwb_core::explain::{Explainer, Target};
-use fwb_core::RecalcOptions;
 
-use crate::cli::{load, CliError, Flags, Outcome};
+use crate::cli::{excluding, load, CliError, Flags, Outcome};
 
 pub const USAGE: &str = "  method explain <file.mthd> <total> [--depth N] [--exclude GROUP]...
       Explain how a total is worked out, as an indented tree whose leaves add
@@ -30,10 +29,7 @@ pub fn run(args: &[String]) -> Outcome {
         ),
         None => None,
     };
-    let mut opts = RecalcOptions::default();
-    for g in f.values("--exclude") {
-        opts.exclude_groups.insert(g.to_string());
-    }
+    let opts = excluding(&f);
     let b = load(path)?;
     let ex = Explainer::new(&b, &opts).map_err(|e| CliError::failed(format!("{path}: {e}")))?;
     let target = Target::parse(&b, ex.report(), what).map_err(|e| CliError::usage(e.0, USAGE))?;

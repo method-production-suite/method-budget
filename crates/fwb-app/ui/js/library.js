@@ -56,6 +56,7 @@ const st = {
   lib: null,
   sig: null,
   loading: false,
+  loadAgain: false,
   busy: false,
   error: '',
   kind: KIND_IDS.includes(readPref('libraryKind', 'fringe')) ? readPref('libraryKind', 'fringe') : 'fringe',
@@ -132,12 +133,22 @@ function setLibrary(lib) {
 }
 
 async function load() {
-  if (st.loading) return;
+  // Asked again while a load is on its way (the library changed meanwhile):
+  // load once more when it arrives, so the newest library is the one drawn.
+  if (st.loading) {
+    st.loadAgain = true;
+    return;
+  }
   st.loading = true;
   try {
-    setLibrary(await panelCall('library_view'));
-  } catch (e) {
-    st.error = String(e);
+    do {
+      st.loadAgain = false;
+      try {
+        setLibrary(await panelCall('library_view'));
+      } catch (e) {
+        st.error = String(e);
+      }
+    } while (st.loadAgain);
   } finally {
     st.loading = false;
     redraw();

@@ -6,9 +6,8 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use fwb_core::merge::{merge_with, Merged, Side};
-use fwb_core::Budget;
 
-use crate::cli::{exit, load, write_atomic, CliError, Flags, Outcome};
+use crate::cli::{exit, load, not_the_input, save, CliError, Flags, Outcome};
 
 pub const USAGE: &str =
     "  method merge <base.mthd> <ours.mthd> <theirs.mthd> -o <out.mthd> [--ours|--theirs]
@@ -28,8 +27,12 @@ pub fn run(args: &[String]) -> Outcome {
         .ok_or_else(|| CliError::usage("merge needs -o <out.mthd>", USAGE))?;
     let side = default_side(&f, USAGE)?;
     let (base, ours, theirs) = (load(&files[0])?, load(&files[1])?, load(&files[2])?);
+    // Never over one of the budgets being merged (merge-driver's job, not this one's).
+    for input in files {
+        not_the_input(input, Path::new(out), "merged")?;
+    }
     let m = merge_with(&base, &ours, &theirs, side, &Default::default());
-    write_merged(out, &m.budget)?;
+    save(out, &m.budget)?;
     finish(out, &m, side)
 }
 
@@ -40,10 +43,6 @@ pub fn default_side(f: &Flags, usage: &str) -> Result<Side, CliError> {
         (_, true) => Ok(Side::Theirs),
         _ => Ok(Side::Ours),
     }
-}
-
-pub fn write_merged(out: &str, b: &Budget) -> Result<(), CliError> {
-    write_atomic(Path::new(out), fwb_format::to_string(b).as_bytes())
 }
 
 /// The report: what was written, rows renumbered, a problem, every

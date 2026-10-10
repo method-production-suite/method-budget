@@ -273,7 +273,9 @@ pub fn autosave_doc(
 /// to `path`: back up what is there, write the budget atomically, and drop
 /// the recovery copy. The budget is unchanged on failure. False, with nothing
 /// written, when `path` is the budget's own file and it changed outside the
-/// app (the user chooses what to do).
+/// app (the user chooses what to do). Refused, with nothing written, when
+/// `path` is the file of another open budget: one writer per file, as for
+/// exports, templates and copies.
 pub fn save(
     state: &AppState,
     safety: &Safety,
@@ -282,6 +284,18 @@ pub fn save(
 ) -> Result<bool, String> {
     let _w = lock(&safety.writer);
     let mut s = state.lock_doc(doc)?;
+    let me = s.id();
+    let docs = s.docs();
+    if docs
+        .ids()
+        .into_iter()
+        .any(|id| id != me && docs.get(id).is_some_and(|o| o.is_file(path)))
+    {
+        return Err(
+            "That file is open in another tab. Close that tab first, or save under another name."
+                .into(),
+        );
+    }
     if s.path() == Some(path) && (s.in_conflict() || s.changed_on_disk()) {
         s.set_conflict(true);
         return Ok(false);
@@ -692,9 +706,20 @@ pub fn save_before_leaving<R: Runtime>(app: &AppHandle<R>) -> Vec<DocId> {
 
 /// The user chose to close or quit without saving: drop every recovery copy.
 pub fn discarded<R: Runtime>(app: &AppHandle<R>) {
-    let safety = app.state::<Safety>();
+    discard_all(&app.state::<AppState>(), &app.state::<Safety>());
+}
+
+/// The exit a Discard All was chosen for didn't happen (Restart to update
+/// couldn't install, src/updater.rs): the budgets are still open, so
+/// autosave and recovery copies take up again.
+pub fn discard_cancelled(safety: &Safety) {
+    safety.discarded.store(false, Ordering::SeqCst);
+}
+
+/// [`discarded`], without Tauri: nothing more is autosaved or kept as a
+/// recovery copy, and every recovery copy goes.
+pub fn discard_all(state: &AppState, safety: &Safety) {
     safety.discarded.store(true, Ordering::SeqCst);
-    let state = app.state::<AppState>();
     let _w = lock(&safety.writer);
     let mut docs = state.docs();
     for id in docs.ids() {
@@ -1628,6 +1653,44 @@ mod tests {
         std::fs::remove_dir_all(&empty).unwrap();
     }
 
+    /// Save As onto the file of another open budget is refused, as exports,
+    /// templates and copies are: two tabs writing one file would each find
+    /// the other's saves as changes made outside the app.
+    #[test]
+    fn save_as_never_writes_over_another_tabs_file() {
+        let dir = temp_dir("app-save-over-tab");
+        let safety = Safety::new(Some(&dir));
+        let state = AppState::default();
+        let (one, two) = (dir.join("one.mthd"), dir.join("two.mthd"));
+        write_budget(&one, "One");
+        write_budget(&two, "Two");
+        let a = open_path(&state, &safety, &one).unwrap();
+        let b = open_path(&state, &safety, &two).unwrap();
+        for (id, t) in [(a, "One, mine"), (b, "Two, mine")] {
+            state
+                .lock_doc(Some(id))
+                .unwrap()
+                .edit("Test edit", |bud| edit::set_title(bud, t))
+                .unwrap();
+        }
+        let refused = save(&state, &safety, Some(a), &two).unwrap_err();
+        assert!(refused.contains("open in another tab"), "{refused}");
+        // Another spelling of the same file is the same file.
+        let spelled = dir.join(".").join("two.mthd");
+        assert!(save(&state, &safety, Some(a), &spelled).is_err());
+        assert_eq!(title_on_disk(&two), "Two");
+        assert_eq!(state.lock_doc(Some(a)).unwrap().path(), Some(one.as_path()));
+        // Its own file, and a new name, save as ever.
+        assert!(save(&state, &safety, Some(a), &one).unwrap());
+        assert!(save(&state, &safety, Some(b), &two).unwrap());
+        let three = dir.join("three.mthd");
+        assert!(save(&state, &safety, Some(a), &three).unwrap());
+        assert_eq!(title_on_disk(&three), "One, mine");
+        assert_eq!(title_on_disk(&two), "Two, mine");
+        drop(safety);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
     #[test]
     fn saving_and_conflicts_are_per_tab() {
         let dir = temp_dir("app-tab-conflict");
@@ -1774,6 +1837,49 @@ mod tests {
             autosave_doc(&state, &safety, None, later(5), false),
             Autosaved::File
         );
+        drop(safety);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A copy saved for sharing opens read-only; when its file changes
+    /// outside the app (the sender's newer copy saved over it), Load Theirs
+    /// still brings the file's version in: reading its own file isn't an
+    /// edit. Refusing it would leave only Keep Mine, which writes the stale
+    /// copy over the newer one.
+    #[test]
+    fn load_theirs_works_on_a_read_only_shared_copy() {
+        let dir = temp_dir("app-load-shared");
+        let safety = Safety::new(Some(&dir));
+        let path = dir.join("shared.mthd");
+        let shared = fwb_core::share::share_copy(
+            &fwb_core::starter::budget(),
+            None,
+            &fwb_core::share::ShareOptions::default(),
+            "2026-10-09T14:30:00-07:00",
+            "0.1.0",
+            None,
+        )
+        .unwrap();
+        std::fs::write(&path, fwb_format::to_string(&shared)).unwrap();
+        let state = AppState::with(Docs::with(Session::open(&path).unwrap()));
+        assert!(state.lock().is_read_only());
+        let mut newer = shared.clone();
+        newer.title = "The newer copy".into();
+        std::fs::write(&path, fwb_format::to_string(&newer)).unwrap();
+
+        resolve(&state, &safety, None, Resolve::LoadTheirs).unwrap();
+        let mut s = state.lock();
+        assert_eq!(s.budget().title, "The newer copy");
+        assert!(s.is_read_only() && !s.is_dirty() && !s.in_conflict());
+        // Still read-only to the user's edits.
+        assert_eq!(
+            s.edit("Test edit", |b| edit::set_title(b, "Mine")),
+            Err(crate::sharing::READ_ONLY.to_string())
+        );
+        // Undo brings the copy as it was back.
+        assert!(s.undo());
+        assert_eq!(s.budget().title, shared.title);
+        drop(s);
         drop(safety);
         std::fs::remove_dir_all(&dir).unwrap();
     }

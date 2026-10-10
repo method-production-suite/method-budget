@@ -281,6 +281,24 @@ impl AccountCoding {
         })
     }
 
+    /// Whether `typed` reads without anything cut off: no separated piece
+    /// longer than its segment (rule 5) and, with no separator, no more
+    /// characters than the used segments hold (rule 4). It says nothing
+    /// about whether `typed` parses.
+    pub fn fits(&self, typed: &str) -> bool {
+        let typed = typed.trim();
+        let used = self.widths().into_iter().take(self.used());
+        if typed.chars().any(is_separator) {
+            typed
+                .split(is_separator)
+                .filter(|p| !p.is_empty())
+                .zip(used)
+                .all(|(p, (_, w))| p.len() <= usize::from(w))
+        } else {
+            typed.len() <= used.map(|(_, w)| usize::from(w)).sum()
+        }
+    }
+
     /// Formats segments with the pattern's separator, omitting unused segments and
     /// trailing empty ones. Segments are written as stored.
     pub fn format(&self, code: &AccountCode) -> String {
@@ -428,6 +446,21 @@ mod tests {
             pat(0, 2, 0, 0, None).parse("11"),
             Err(CodingError::CategoryRequired)
         );
+    }
+
+    #[test]
+    fn fits_says_whether_parsing_would_cut() {
+        let d = AccountCoding::default();
+        for ok in ["11-01", "1101", "11 - 5", "5", " 11.01 ", ""] {
+            assert!(d.fits(ok), "{ok:?}");
+        }
+        for cut in ["11-012", "011-01", "110123", "11010"] {
+            assert!(!d.fits(cut), "{cut:?}");
+            // Parsing reads them, by cutting.
+            assert!(d.parse(cut).is_ok(), "{cut:?}");
+        }
+        assert!(pat(2, 2, 2, 0, None).fits("11-01-55"));
+        assert!(!pat(2, 2, 2, 0, None).fits("1101555"));
     }
 
     #[test]

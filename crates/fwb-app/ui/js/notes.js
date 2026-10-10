@@ -28,6 +28,7 @@ import { invoke } from './api.js';
 import { el, isMac } from './dom.js';
 import { anchoredForm } from './modal.js';
 import { readPref, writePref } from './prefs.js';
+import { obj, str, errText } from './util.js';
 
 const st = {
   host: null,
@@ -53,42 +54,22 @@ export function renderNotes(host, view, ctx) {
   if (st.listRev !== st.view.rev) fetchList();
 }
 
-/**
- * Puts focus in the new-note box of the cursor's line (or account or
- * category), once the tab is drawn. False when there is no such box.
- */
-export function focusNewNote() {
-  if (!st.host || !st.host.isConnected) return false;
-  const box = st.host.querySelector('textarea[data-new="1"]');
-  if (!box) return false;
-  box.focus();
-  if (typeof box.scrollIntoView === 'function') box.scrollIntoView({ block: 'nearest' });
-  return true;
-}
-
-// The cursor moved: show what it is on now.
+// The cursor moved: show what it is on now. A move sends both events, one
+// after the other: draw once, after both.
+let drawSoon = false;
 for (const type of ['fwb:selection', 'fwb:cursor']) {
   document.addEventListener(type, () => {
-    if (st.host && st.host.isConnected && !st.host.closest('[hidden]')) draw();
+    if (drawSoon) return;
+    drawSoon = true;
+    queueMicrotask(() => {
+      drawSoon = false;
+      if (st.host && st.host.isConnected && !st.host.closest('[hidden]')) draw();
+    });
   });
 }
 
 // ---------------------------------------------------------------------------
 // Small helpers
-
-function obj(v) {
-  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
-}
-
-function str(v) {
-  return v === undefined || v === null ? '' : String(v);
-}
-
-function errText(e) {
-  if (typeof e === 'string') return e;
-  if (e && typeof e.message === 'string') return e.message;
-  return String(e);
-}
 
 function author() {
   const a = readPref('noteAuthor', '');

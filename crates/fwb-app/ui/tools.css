@@ -301,51 +301,6 @@ body.tools-dragging .tools-tab {
   font-size: 11.5px;
 }
 
-/* The Budget tab's own tabs. */
-.tools-subtabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  padding: 2px;
-  margin-bottom: 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface-2);
-}
-
-.tools-subtab {
-  flex: 1 1 auto;
-  appearance: none;
-  padding: 3px 6px;
-  border: 0;
-  border-radius: calc(var(--radius) - 2px);
-  background: transparent;
-  font: inherit;
-  font-size: 12px;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.tools-subtab:hover {
-  color: var(--text);
-}
-
-.tools-subtab[aria-selected="true"] {
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 600;
-  box-shadow: 0 0 0 1px var(--border);
-}
-
-.tools-subtab:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.tools-subpanel.setup-panel {
-  padding: 0;
-}
-
 /* The row at the bottom of a list that adds an item (apply.js, setup.js). */
 .apply-add {
   list-style: none;

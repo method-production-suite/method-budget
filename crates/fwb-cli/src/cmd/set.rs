@@ -26,20 +26,18 @@ pub fn op_for(path: &str, value: &str) -> Result<Op, CliError> {
     let bad = |what: String| CliError::usage(what, USAGE);
     Ok(match head {
         "title" if rest.is_empty() => Op::Title(value.to_string()),
-        "compact_versions" if rest.is_empty() => match value {
-            "true" | "yes" | "on" => Op::CompactVersions(true),
-            "false" | "no" | "off" => Op::CompactVersions(false),
-            _ => return Err(bad(format!("`{value}` is not true or false"))),
-        },
+        "compact_versions" if rest.is_empty() => {
+            Op::CompactVersions(script::flag(&v).map_err(bad)?)
+        }
         "global" if !rest.is_empty() => Op::Global(rest.to_string(), value.to_string()),
         "fringe" => match middle(rest, path)? {
             (name, "rate") => Op::FringeRate(name.to_string(), value.to_string()),
             (name, "cutoff") => {
-                // The script parser handles amounts and `none`.
+                // The script parser handles amounts and `none` (or "").
                 let line = format!(
                     "set fringe {} cutoff {}",
                     quote(name),
-                    if v.text.is_empty() {
+                    if v.is_none() {
                         "none".into()
                     } else {
                         quote(value)
@@ -64,14 +62,7 @@ pub fn op_for(path: &str, value: &str) -> Result<Op, CliError> {
             Op::Line(row, field.to_string(), v)
         }
         "charge" => match middle(rest, path)? {
-            (name, "applied") => {
-                let on = match value {
-                    "true" | "yes" | "on" => true,
-                    "false" | "no" | "off" => false,
-                    _ => return Err(bad(format!("`{value}` is not true or false"))),
-                };
-                Op::Charge(name.to_string(), on)
-            }
+            (name, "applied") => Op::Charge(name.to_string(), script::flag(&v).map_err(bad)?),
             (_, other) => return Err(bad(format!("a charge has no field `{other}`"))),
         },
         _ => return Err(bad(format!("`{path}` is not a path `method set` knows"))),
@@ -109,10 +100,23 @@ mod tests {
             op_for("fringe.FICA.cutoff", "1,000.50").unwrap(),
             Op::FringeCutoff("FICA".into(), Some(100_050))
         );
+        for clear in ["", "none"] {
+            assert_eq!(
+                op_for("fringe.FICA.cutoff", clear).unwrap(),
+                Op::FringeCutoff("FICA".into(), None)
+            );
+        }
         assert_eq!(
-            op_for("fringe.FICA.cutoff", "").unwrap(),
-            Op::FringeCutoff("FICA".into(), None)
+            op_for("compact_versions", "on").unwrap(),
+            Op::CompactVersions(true)
         );
+        for (path, value) in [("compact_versions", "maybe"), ("charge.C.applied", "2")] {
+            let e = op_for(path, value).unwrap_err();
+            assert_eq!(e.code, crate::cli::exit::USAGE);
+            assert!(e
+                .message
+                .starts_with(&format!("`{value}` is not true or false")));
+        }
         assert_eq!(
             op_for("line.11.00:2.rate", "900").unwrap(),
             Op::Line(

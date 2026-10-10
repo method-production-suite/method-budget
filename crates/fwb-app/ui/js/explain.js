@@ -38,11 +38,6 @@ const st = {
   focus: null, // path to focus after a redraw
 };
 
-/** The total the tab shows, or null. */
-export function explainTarget() {
-  return st.target;
-}
-
 /**
  * Explains `target` (a TargetDto: `{ kind, ... }`) in budget `doc` the next
  * time the tab is drawn; focus goes to the tree's first step.

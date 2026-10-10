@@ -29,6 +29,8 @@ pub fn run(args: &[String]) -> Outcome {
     } else {
         script_path
     };
+    // A script saved by Windows Notepad may start with a byte order mark.
+    let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
     let mut ops = Vec::new();
     for (i, line) in text.lines().enumerate() {
         let label = format!("{name} line {}", i + 1);

@@ -52,7 +52,6 @@
     "allow-delete-info",
     "allow-set-fringe-posting",
     "allow-set-account-coding",
-    "allow-set-base-currency",
     "allow-set-totals-currency",
     "allow-lock-baseline",
     "allow-clear-baseline",

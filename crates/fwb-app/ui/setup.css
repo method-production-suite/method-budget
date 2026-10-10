@@ -40,47 +40,6 @@
   color: var(--text-muted);
 }
 
-/* Tabs */
-
-.setup-tabs {
-  display: flex;
-  gap: 2px;
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.setup-tab {
-  flex: 0 0 auto;
-  appearance: none;
-  background: none;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  padding: 7px 7px 6px;
-  font: inherit;
-  font-size: 12.5px;
-  color: var(--text-muted);
-  cursor: pointer;
-  border-radius: var(--radius) var(--radius) 0 0;
-}
-
-.setup-tab:hover {
-  color: var(--text);
-  background: var(--row-hover);
-}
-
-.setup-tab[aria-selected="true"] {
-  color: var(--text);
-  font-weight: 600;
-  border-bottom-color: var(--accent);
-}
-
-.setup-tab:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
 /* Panel */
 
 .setup-panel {
@@ -97,15 +56,6 @@
   margin: 0 0 10px;
   display: grid;
   gap: 4px;
-}
-
-.setup-base {
-  color: var(--text);
-  font-size: 13px;
-}
-
-.setup-base strong {
-  font-weight: 600;
 }
 
 .setup-empty {
@@ -214,19 +164,6 @@
   font-size: 12px;
   min-width: 0;
   text-align: right;
-}
-
-.setup-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 14px;
-  font-size: 12px;
-}
-
-.setup-stat {
-  display: inline-flex;
-  gap: 4px;
-  white-space: nowrap;
 }
 
 .setup-fields {

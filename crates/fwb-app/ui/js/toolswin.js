@@ -271,9 +271,15 @@ async function listen() {
       if (!p || typeof p !== 'object') return;
       if (p.layout) setToolsLayout(p.layout);
       if (p.selection) state.selection = p.selection;
-      // Explain This Number… in the main window (main.js explainCell).
-      if (p.explain) setExplainTarget(p.explain, state.view ? state.view.doc : null);
-      render();
+      // Explain This Number… in the main window (main.js explainCell), on
+      // the main window's budget. When this window hasn't fetched that one
+      // yet (a tab switch just before), setSelection fetches it and draws:
+      // drawing the old one would explain the total in the wrong budget and
+      // then drop it.
+      const doc = p.selection && typeof p.selection.doc === 'number' ? p.selection.doc : state.view ? state.view.doc : null;
+      const stale = Boolean(state.view) && typeof doc === 'number' && doc !== state.view.doc;
+      if (p.explain) setExplainTarget(p.explain, doc);
+      if (!(p.explain && stale)) render();
       if (p.selection) setSelection(p.selection);
       // Edit > Find or Find and Replace in the main window (main.js showFind).
       if (p.focus === 'find:open' || p.focus === 'find:open-replace') openFind({ replace: p.focus === 'find:open-replace' });

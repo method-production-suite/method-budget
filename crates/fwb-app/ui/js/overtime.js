@@ -22,6 +22,7 @@ import { el } from './dom.js';
 import { invoke } from './api.js';
 import { decimal, money } from './format.js';
 import { anchoredForm } from './modal.js';
+import { obj, str } from './util.js';
 
 const BLANK_FORM = Object.freeze({
   pattern: '', // the saved pattern the form came from ('' for none)
@@ -70,14 +71,6 @@ for (const type of ['fwb:selection', 'fwb:cursor']) {
   document.addEventListener(type, () => {
     if (st.host && st.host.isConnected && st.host.querySelector('.overtime')) drawLine();
   });
-}
-
-function obj(v) {
-  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
-}
-
-function str(v) {
-  return v === undefined || v === null ? '' : String(v);
 }
 
 function errText(e) {

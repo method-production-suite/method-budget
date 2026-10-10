@@ -7,7 +7,7 @@ use std::path::Path;
 use fwb_core::{recalc, Budget, RecalcOptions};
 use fwb_format::import::{mapping_file, merge, read_file};
 
-use crate::cli::{load, money, write_atomic, CliError, Flags, Outcome};
+use crate::cli::{load, money, save, CliError, Flags, Outcome};
 
 pub const USAGE: &str =
     "  method import <sheet.xlsx|.csv|.txt> -o <out.mthd> [--mapping <mapping.json>]
@@ -156,7 +156,7 @@ pub fn run(args: &[String]) -> Outcome {
     if dry_run {
         report.push_str("dry run: nothing written\n");
     } else {
-        write_atomic(out_path, fwb_format::to_string(&b).as_bytes())?;
+        save(out, &b)?;
         let _ = writeln!(report, "wrote {out}");
     }
     Ok(report)

@@ -357,6 +357,13 @@ fn set_changes_one_value() {
     assert_eq!(total(&p, "charges_total"), "0.00");
     assert_eq!(code(&method(&["set", &p, "title", "New title"])), 0);
     assert!(read(&p).contains("\"title\": \"New title\""));
+    // A cutoff, then `none` clears it (docs/CLI.md).
+    let o = method(&["set", &p, "fringe.PAYROLL.cutoff", "150,000.00"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(read(&p).contains("\"cutoff\": 15000000"));
+    let o = method(&["set", &p, "fringe.PAYROLL.cutoff", "none"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(!read(&p).contains("\"cutoff\""));
 
     // Refused edits change nothing.
     let now = read(&p);
@@ -430,6 +437,32 @@ fn apply_runs_a_script_all_or_nothing() {
     assert!(read(&p).contains("\"DAYS\": \"32\""));
     let o = method_stdin(&["apply", &p, "-"], "# nothing\n");
     assert!(out(&o).contains("no changes"));
+
+    // A byte order mark (Windows Notepad) before the first command.
+    std::fs::write(&script, "\u{feff}set global DAYS 33\r\nset title BOM\r\n").unwrap();
+    let o = method(&["apply", &p, &script]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(read(&p).contains("\"DAYS\": \"33\""));
+}
+
+/// Writing a budget keeps its permissions: one only its owner may read stays
+/// that way after `fmt`, `set` and `apply`.
+#[cfg(unix)]
+#[test]
+fn writes_keep_the_file_permissions() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let d = Dir::new("perms");
+    let p = d.starter("a.mthd");
+    let mode = || std::fs::metadata(&p).unwrap().permissions().mode() & 0o777;
+    std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(code(&method(&["fmt", &p])), 0);
+    assert_eq!(mode(), 0o600);
+    assert_eq!(code(&method(&["set", &p, "title", "Private"])), 0);
+    assert_eq!(mode(), 0o600);
+    let o = method_stdin(&["apply", &p, "-"], "set title Still\n");
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert_eq!(mode(), 0o600);
+    assert!(read(&p).contains("\"title\": \"Still\""));
 }
 
 #[test]

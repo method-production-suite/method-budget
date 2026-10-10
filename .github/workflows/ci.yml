@@ -33,8 +33,8 @@ jobs:
         # docs/releases/<version>.md must agree on every push.
         run: cargo xtask check-version
   cooldown:
-    # Fails PRs that add crates published less than 14 days ago.
-    if: github.event_name == 'pull_request'
+    # Fails a pull request or a push that adds crates published less than 14 days ago
+    # (pushes too: most work lands on main directly, not through pull requests).
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -43,7 +43,28 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Check crate ages
-        run: python3 scripts/check-crate-ages.py --only-changed origin/main
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          # Compare with what the branch had before: main for a pull request, the
+          # pushed-over commit for a push, main for a new branch. When there is nothing
+          # to compare with (main itself force-pushed), every crate is checked.
+          if [ "$EVENT" = pull_request ]; then
+            base=origin/main
+          elif [ -n "${BEFORE:-}" ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            base="$BEFORE"
+          elif [ "$GITHUB_REF" != refs/heads/main ]; then
+            base=origin/main
+          else
+            base=""
+          fi
+          if [ -n "$base" ]; then
+            python3 scripts/check-crate-ages.py --only-changed "$base"
+          else
+            python3 scripts/check-crate-ages.py
+          fi
   site:
     # README.md and site/index.html must match docs/features.toml and the newest release
     # notes (docs/WEBSITE.md); the Claude Code hooks behind that rule must still work.

@@ -29,6 +29,7 @@ import { el } from './dom.js';
 import { rank, canonicalName } from './autocomplete.js';
 import { withShortcut } from './shortcuts.js';
 import { renameItem } from './rename.js';
+import { obj, str } from './util.js';
 
 const SCOPES = [
   { id: 'description', label: 'Description', kind: 'text', hint: 'Text in line descriptions' },
@@ -149,11 +150,6 @@ export function findFor(table, name) {
   focusKey('find:text', { select: true });
 }
 
-/** True when there is something to search for (F3 then steps, not opens). */
-export function hasFindQuery() {
-  return Boolean(query());
-}
-
 /**
  * Goes to the next (1) or previous (-1) result (F3, Shift+F3), searching
  * again first. False when there is nothing to search for.
@@ -166,14 +162,6 @@ export function findStep(delta) {
 
 // ---------------------------------------------------------------------------
 // Small helpers
-
-function obj(v) {
-  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
-}
-
-function str(v) {
-  return v === undefined || v === null ? '' : String(v);
-}
 
 function scopeInfo(id = st.scope) {
   return SCOPES.find((s) => s.id === id) || SCOPES[0];

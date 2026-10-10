@@ -32,12 +32,12 @@ use fwb_core::{
 };
 use serde::{Deserialize, Serialize};
 use tauri::{Runtime, State, WebviewWindow};
-use tauri_plugin_dialog::DialogExt;
 
 use crate::app::{finish, AppState, DocId};
 use crate::clipboard::{self, global_names, Kind, Renames, Setup, Status};
 use crate::docs::Docs;
 use crate::edit::EditResult;
+use crate::history::count;
 use crate::view::View;
 
 // ---------------------------------------------------------------------------
@@ -450,10 +450,6 @@ fn join(parts: Vec<String>, fallback: &str) -> String {
     } else {
         kept.join("; ")
     }
-}
-
-fn count(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
 }
 
 fn describe_charge(c: &Charge) -> String {
@@ -1192,19 +1188,9 @@ pub async fn import_setup_pick<R: Runtime>(
         let s = state.lock_doc(doc)?;
         (s.id(), s.path().and_then(|p| p.parent()).map(PathBuf::from))
     };
-    let mut dialog = window
-        .dialog()
-        .file()
-        .set_title("Import setup from")
-        .add_filter(crate::app::FILTER_NAME, fwb_format::EXTENSIONS)
-        .set_parent(&window);
-    if let Some(dir) = start {
-        dialog = dialog.set_directory(dir);
-    }
-    let Some(picked) = dialog.blocking_pick_file() else {
+    let Some(path) = crate::app::pick_budget(&window, "Import setup from", start)? else {
         return Ok(None);
     };
-    let path = picked.into_path().map_err(|e| e.to_string())?;
     let (label, budget) = read_source(&state.docs(), target, &path)?;
     let s = state.lock_doc(Some(target))?;
     let p = preview(s.budget(), &budget, 0, &label, &path.display().to_string());

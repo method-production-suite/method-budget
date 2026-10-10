@@ -22,11 +22,6 @@
   margin-top: 6px !important;
 }
 
-.tss-fields-3 {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr);
-  margin-top: 0;
-}
-
 .tss-info {
   grid-template-columns: 96px minmax(0, 1fr);
 }
@@ -339,17 +334,4 @@
 
 .tss-down {
   color: var(--accent);
-}
-
-/* Tabs share the row evenly and wrap to a second row in a narrow panel,
-   so no tab is ever hidden off the edge. */
-.setup-tabs {
-  flex-wrap: wrap;
-  overflow-x: visible;
-}
-
-.setup-tabs .setup-tab {
-  flex: 1 1 auto;
-  padding: 7px 4px 6px;
-  font-size: 12px;
 }

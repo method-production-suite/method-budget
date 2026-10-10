@@ -24,7 +24,8 @@
 #
 # Recovery is guaranteed for the forms this script recognizes: `git tag
 # -d`/`--delete`, `git push --delete`/`-d`, and pushing a tag deletion
-# (`:refs/tags/...`), checked before anything else that could block. A
+# (`:refs/tags/...`, when the same push sends no other tag), checked before
+# anything else that could block. A
 # guard that blocks the fix is worse than no guard, because it fires
 # exactly when someone is already undoing a mistake. This is a guarantee
 # about recognized forms, not literally every string that deletes a tag --
@@ -142,13 +143,23 @@ normalize_segment() {
 }
 
 # A normalized segment is a recognized recovery form: `git tag -d`,
-# `git tag --delete`, pushing a tag deletion (`:refs/tags/...` anywhere
-# in the segment), or `git push --delete`/`git push -d`.
+# `git tag --delete`, pushing a tag deletion (`:refs/tags/...`, with no
+# other tag pushed in the same segment), or `git push --delete`/`git push -d`.
 is_recovery_form() {
   local s="$1"
   if [[ "$s" =~ ^git[[:space:]]+tag[[:space:]]+-d([[:space:]]|$) ]]; then return 0; fi
   if [[ "$s" =~ ^git[[:space:]]+tag[[:space:]]+--delete([[:space:]]|$) ]]; then return 0; fi
-  if [[ "$s" == *":refs/tags/"* ]]; then return 0; fi
+  if [[ "$s" == *":refs/tags/"* ]]; then
+    # Only when every tag the segment pushes is a deletion: with the
+    # `:refs/tags/NAME` refspecs taken out, nothing tag-shaped may remain
+    # (`git push origin v9.9.9 :refs/tags/v0.0.1` creates v9.9.9).
+    local rest
+    rest="$(printf '%s' "$s" | sed -E 's#:refs/tags/[^[:space:]]*##g')"
+    if [[ "$rest" != *"--tags"* ]] && [[ "$rest" != *"--follow-tags"* ]] && [[ "$rest" != *"refs/tags/"* ]] \
+      && ! printf '%s' "$rest" | grep -qE 'v[0-9]+\.[0-9]+\.[0-9]+'; then
+      return 0
+    fi
+  fi
   if [[ "$s" =~ ^git[[:space:]]+push[[:space:]]+(--delete|-d)([[:space:]]|$) ]]; then return 0; fi
   return 1
 }

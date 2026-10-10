@@ -258,7 +258,7 @@ pub fn references(b: &Budget, kind: SetupKind, name: &str) -> usize {
 }
 
 fn uses_global(f: &Formula, name: &str) -> bool {
-    rename_var(&f.0, name, name).1 > 0
+    crate::usage::formula_names(&f.0).any(|n| n == name)
 }
 
 /// How many of one row's fields name `name` as an item of this kind.

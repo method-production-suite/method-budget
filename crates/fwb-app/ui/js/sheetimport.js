@@ -20,6 +20,7 @@ import { el } from './dom.js';
 import { customDialog } from './modal.js';
 import { money } from './format.js';
 import { readPref, writePref } from './prefs.js';
+import { plural } from './util.js';
 
 /** The fields' names in the dialog, by the key Rust uses. */
 export const FIELD_LABELS = {
@@ -139,11 +140,6 @@ export function requestFrom(st, extra = {}) {
     target: st.target,
     ...extra,
   };
-}
-
-/** One sentence per count, for the summary line. */
-function plural(n, one, many) {
-  return `${n} ${n === 1 ? one : many}`;
 }
 
 /** The column choices for a field's select: "C: Rate (450)". */

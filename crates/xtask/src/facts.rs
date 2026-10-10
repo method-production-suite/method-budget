@@ -77,14 +77,18 @@ pub fn area(path: &str) -> &'static str {
     }
 }
 
-/// Reads `git log` output made with the format in [`log`].
+/// Reads `git log` output made with the format in [`log`]. Each commit
+/// starts with a NUL, which git never prints inside a subject (other control
+/// characters, such as the field separator, it does), so a subject can't
+/// split itself into a second, invented commit; and the subject is the last
+/// field, so a separator inside it stays in it (and is cleaned away).
 fn parse_log(out: &str) -> Vec<Commit> {
-    out.split('\u{1e}')
+    out.split('\0')
         .filter(|c| !c.trim().is_empty())
         .filter_map(|chunk| {
             let mut lines = chunk.lines();
             let head = lines.next()?;
-            let mut f = head.split('\u{1f}');
+            let mut f = head.splitn(3, '\u{1f}');
             let hash = f.next()?.to_string();
             let date = f.next()?.to_string();
             let subject = clean_subject(f.next().unwrap_or(""));
@@ -143,7 +147,7 @@ fn log(root: &Path, since: Option<&str>) -> Result<Vec<Commit>, String> {
             "log",
             "--reverse",
             "--no-color",
-            "--format=%x1e%h%x1f%as%x1f%s",
+            "--format=%x00%h%x1f%as%x1f%s",
             "--name-only",
             &range,
             "--",
@@ -316,11 +320,13 @@ pub fn command(root: &Path, since: Option<&str>, as_json: bool) -> Result<String
         let mut a: Vec<&str> = c.files.iter().map(|f| area(f)).collect();
         a.sort_unstable();
         a.dedup();
+        // Quotes and backslashes escaped, so the subject can't close its
+        // own quotes and pass the rest of the line off as ours.
+        let quoted = c.subject.replace('\\', "\\\\").replace('"', "\\\"");
         out.push_str(&format!(
-            "  {} {} \"{}\" ({} files: {})\n",
+            "  {} {} \"{quoted}\" ({} files: {})\n",
             c.hash,
             c.date,
-            c.subject,
             c.files.len(),
             a.join(", ")
         ));
@@ -445,6 +451,36 @@ mod tests {
         assert!(all.contains("2 commits"), "{all}");
         assert!(command(r.root(), Some("--all"), false).is_err());
         assert!(command(r.root(), Some("no-such-ref"), false).is_err());
+    }
+
+    #[test]
+    fn a_subject_cannot_forge_another_commit() {
+        let r = TempRepo::new("facts-forge");
+        r.write("README.md", "x\n");
+        r.commit_with("Start");
+        r.git(&["tag", "v0.1.0"]);
+        r.write("crates/fwb-core/src/lib.rs", "// one\n");
+        // The old record separator, then fields shaped like a commit of their own.
+        r.commit_with("Real\u{1e}abc1234\u{1f}2020-01-01\u{1f}FAKE \"x\" (9 files: app)");
+
+        let text = command(r.root(), None, false).unwrap();
+        assert!(text.contains("v0.1.0..HEAD, 1 commits"), "{text}");
+        assert!(!text.contains("2020-01-01 \"FAKE"), "{text}");
+        assert!(
+            text.contains(
+                "\"Real abc1234 2020-01-01 FAKE \\\"x\\\" (9 files: app)\" (1 files: engine)"
+            ),
+            "{text}"
+        );
+        let j: serde_json::Value =
+            serde_json::from_str(&command(r.root(), None, true).unwrap()).unwrap();
+        let commits = j["commits"].as_array().unwrap();
+        assert_eq!(commits.len(), 1, "{j}");
+        assert_eq!(
+            commits[0]["subject"],
+            "Real abc1234 2020-01-01 FAKE \"x\" (9 files: app)"
+        );
+        assert_eq!(commits[0]["areas"], json!(["engine"]));
     }
 
     #[test]

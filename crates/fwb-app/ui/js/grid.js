@@ -1245,7 +1245,10 @@ export class Grid {
       default:
         break;
     }
-    if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) {
+    // AltGr (Ctrl+Alt on Windows) types characters on many layouts: they
+    // start an edit like any other typed character.
+    const altGr = typeof e.getModifierState === 'function' && e.getModifierState('AltGraph');
+    if (e.key.length === 1 && !e.metaKey && (!e.ctrlKey || altGr)) {
       return this.startEdit(e.key);
     }
     return false;

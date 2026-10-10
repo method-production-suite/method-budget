@@ -123,6 +123,15 @@ fn merge_takes_both_sides_and_lists_conflicts() {
     assert_eq!(code(&o), 1);
     assert!(d.read("merged.mthd").contains("\"rate\": \"60000\""));
 
+    // Never over one of the budgets being merged.
+    let before = d.read("base.mthd");
+    for input in [&base, &ours, &theirs] {
+        let o = method(&["merge", &base, &ours, &theirs, "-o", input]);
+        assert_eq!(code(&o), 1);
+        assert!(err(&o).contains("budget being merged"), "{}", err(&o));
+    }
+    assert_eq!(d.read("base.mthd"), before);
+
     // Usage.
     assert_eq!(code(&method(&["merge", &base, &ours, &theirs])), 2);
     assert_eq!(
@@ -153,4 +162,70 @@ fn merge_driver_writes_ours_in_place() {
     let o = method(&["merge-driver", &d.path("empty.mthd"), &ours, &theirs]);
     assert_eq!(code(&o), 1);
     assert!(err(&o).contains("no common base"), "{}", err(&o));
+}
+
+/// The driver as git runs it (docs/MERGE.md, "With git"): a real `git merge`
+/// of two branches that changed different rates of one budget, then two that
+/// changed the same one.
+#[test]
+fn merge_driver_under_git() {
+    let d = Dir::new("git");
+    let git = |args: &[&str]| -> Output {
+        Command::new("git")
+            .arg("-C")
+            .arg(&d.0)
+            .args(["-c", "user.name=Test", "-c", "user.email=test@example.com"])
+            .args(["-c", "commit.gpgsign=false"])
+            .args(args)
+            .output()
+            .expect("git runs")
+    };
+    let ok = |o: Output| assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    ok(git(&["init", "--quiet", "--initial-branch=main"]));
+    let driver = format!(
+        "\"{}\" merge-driver %O %A %B %P",
+        env!("CARGO_BIN_EXE_method")
+    );
+    ok(git(&["config", "merge.method-budget.driver", &driver]));
+    std::fs::write(d.0.join(".gitattributes"), "*.mthd merge=method-budget\n").unwrap();
+    std::fs::rename(d.path("base.mthd"), d.path("film.mthd")).unwrap();
+    ok(git(&["add", "-A"]));
+    ok(git(&["commit", "--quiet", "-m", "base"]));
+    let base = d.read("film.mthd");
+    let edit = |from: &str, to: &str| {
+        let text = d.read("film.mthd").replacen(
+            &format!("\"rate\": \"{from}\""),
+            &format!("\"rate\": \"{to}\""),
+            1,
+        );
+        std::fs::write(d.path("film.mthd"), text).unwrap();
+    };
+
+    ok(git(&["checkout", "--quiet", "-b", "theirs"]));
+    edit("75000", "80000");
+    ok(git(&["commit", "--quiet", "-am", "theirs"]));
+    ok(git(&["checkout", "--quiet", "main"]));
+    edit("50000", "55000");
+    ok(git(&["commit", "--quiet", "-am", "ours"]));
+    ok(git(&["merge", "--quiet", "--no-edit", "theirs"]));
+    let merged = d.read("film.mthd");
+    assert!(merged.contains("\"rate\": \"55000\"") && merged.contains("\"rate\": \"80000\""));
+    assert_eq!(code(&method(&["check", &d.path("film.mthd")])), 0);
+
+    // The same rate changed both ways: git reports a conflict, and the file
+    // is still a budget, settled for ours.
+    std::fs::write(d.path("film.mthd"), &base).unwrap();
+    ok(git(&["commit", "--quiet", "-am", "reset"]));
+    ok(git(&["checkout", "--quiet", "-b", "theirs2"]));
+    edit("50000", "60000");
+    ok(git(&["commit", "--quiet", "-am", "theirs2"]));
+    ok(git(&["checkout", "--quiet", "main"]));
+    edit("50000", "55000");
+    ok(git(&["commit", "--quiet", "-am", "ours2"]));
+    let o = git(&["merge", "--no-edit", "theirs2"]);
+    assert!(!o.status.success(), "the merge should stop on the conflict");
+    let status = String::from_utf8_lossy(&git(&["status", "--porcelain"]).stdout).into_owned();
+    assert!(status.contains("UU film.mthd"), "{status}");
+    assert!(d.read("film.mthd").contains("\"rate\": \"55000\""));
+    assert_eq!(code(&method(&["check", &d.path("film.mthd")])), 0);
 }

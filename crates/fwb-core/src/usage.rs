@@ -27,27 +27,7 @@ impl ItemUse {
 /// Every global-name token in a formula, as the formula reader splits them
 /// (a run of digits and dots is a number, a letter or `_` starts a name).
 pub fn formula_names(src: &str) -> impl Iterator<Item = &str> {
-    let bytes = src.as_bytes();
-    let mut i = 0;
-    std::iter::from_fn(move || {
-        while i < bytes.len() {
-            let c = bytes[i];
-            let start = i;
-            if c.is_ascii_digit() || c == b'.' {
-                while i < bytes.len() && (bytes[i].is_ascii_digit() || bytes[i] == b'.') {
-                    i += 1;
-                }
-            } else if c.is_ascii_alphabetic() || c == b'_' {
-                while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
-                    i += 1;
-                }
-                return Some(&src[start..i]);
-            } else {
-                i += src[i..].chars().next().map_or(1, char::len_utf8);
-            }
-        }
-        None
-    })
+    crate::expr::name_spans(src).map(move |r| &src[r])
 }
 
 /// The names of `kind` one row refers to, each once.

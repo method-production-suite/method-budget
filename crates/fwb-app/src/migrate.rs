@@ -365,6 +365,34 @@ mod tests {
         fs::remove_dir_all(&base).unwrap();
     }
 
+    /// Links in the old folder are left out, never followed: a link to a
+    /// folder or a file elsewhere copies nothing from there.
+    #[cfg(unix)]
+    #[test]
+    fn links_are_never_followed_out_of_the_old_folder() {
+        use std::os::unix::fs::symlink;
+        let base = temp_dir("migrate-links");
+        let old = old_folder(&base);
+        let outside = base.join("outside");
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(outside.join("secret.txt"), "not ours").unwrap();
+        symlink(&outside, old.join("Linked folder")).unwrap();
+        symlink(outside.join("secret.txt"), old.join("Recovery/linked.fwb")).unwrap();
+        let new = base.join("com.methodbudget.desktop");
+        let done = migrate_data_dir(&old, &new).unwrap();
+        assert_eq!(
+            done,
+            Outcome::Copied {
+                files: 9,
+                skipped: vec![]
+            }
+        );
+        assert!(fs::symlink_metadata(new.join("Linked folder")).is_err());
+        assert!(fs::symlink_metadata(new.join("Recovery/linked.fwb")).is_err());
+        assert_eq!(read(&new.join("Recovery/k1.fwb")), "{}");
+        fs::remove_dir_all(&base).unwrap();
+    }
+
     #[test]
     fn web_view_storage_copies_only_into_a_missing_folder() {
         let base = temp_dir("migrate-webkit");

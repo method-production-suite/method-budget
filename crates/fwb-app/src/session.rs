@@ -484,11 +484,13 @@ impl Session {
 
     /// Replaces the budget with the file's current content ("Load theirs"),
     /// as one edit so Undo brings this version back. Afterwards the budget
-    /// matches the file: no unsaved changes, no conflict.
+    /// matches the file: no unsaved changes, no conflict. A copy saved for
+    /// sharing (read-only) takes the file's version too: reading its own
+    /// file isn't editing it.
     pub fn load_from_disk(&mut self) -> Result<(), String> {
         let path = self.path.clone().ok_or("This budget has no file.")?;
         let (theirs, stamp) = read_budget(&path)?;
-        self.edit("Load the file's version", |b| {
+        self.edit_unchecked("Load the file's version", |b| {
             *b = theirs;
             Ok(())
         })?;
@@ -607,6 +609,16 @@ impl Session {
         f: impl FnOnce(&mut Budget) -> EditResult<T>,
     ) -> EditResult<T> {
         self.check_writable()?;
+        self.edit_unchecked(label, f)
+    }
+
+    /// [`Session::edit`] without the read-only check: only for what isn't
+    /// the user changing the budget ([`Session::load_from_disk`]).
+    fn edit_unchecked<T>(
+        &mut self,
+        label: impl Into<String>,
+        f: impl FnOnce(&mut Budget) -> EditResult<T>,
+    ) -> EditResult<T> {
         let mut next = self.budget.clone();
         let out = f(&mut next)?;
         let old = std::mem::replace(&mut self.budget, next);
@@ -692,10 +704,14 @@ impl Session {
         };
         let _ = top.patch.apply(&mut self.budget);
         let start = std::mem::replace(&mut self.budget, next);
+        // Like any edit, this drops what was undone, even when it comes back
+        // to where the step began: an undone step was made on top of this
+        // one, so redoing it from here would apply it to a budget it wasn't
+        // made from.
+        self.redo.clear();
         match Patch::between(start, &mut self.budget) {
             Some(patch) => {
                 self.push_step(patch, top.rev, label.into());
-                self.redo.clear();
                 self.rev = self.next_rev;
                 self.next_rev += 1;
             }
@@ -1453,5 +1469,56 @@ mod tests {
         s.undo();
         let r2 = s.view().rev;
         assert!(r2 != r0 && r2 != r1, "undo is a change too");
+    }
+
+    /// A merging edit that joins its step after another step was made on
+    /// top and undone drops that undone step, like any edit, even when it
+    /// comes back to where its step began. Redo would otherwise replay it on
+    /// a budget it wasn't made from.
+    #[test]
+    fn a_joined_step_drops_what_was_undone_since() {
+        let mut s = Session::with_budget(small_sample(8), None);
+        let start = s.budget().clone();
+        let id = edit::details(&start)
+            .find(|d| d.kind == RowKind::Line)
+            .unwrap()
+            .id;
+        let text = |b: &Budget| {
+            edit::details(b)
+                .find(|d| d.id == id)
+                .unwrap()
+                .description
+                .clone()
+        };
+        let before = text(&start);
+        let press = |s: &mut Session, value: &str| {
+            s.edit_merging("text", "Test edit", |b| {
+                edit::set_detail_field(b, id, edit::Field::Description, value)?;
+                Ok(((), "text".to_string()))
+            })
+            .unwrap();
+        };
+        press(&mut s, "Changed");
+        s.edit("Test edit", |b| edit::set_title(b, "Another edit"))
+            .unwrap();
+        assert!(s.undo());
+        // Within the window, back to where the merging step began.
+        press(&mut s, &before);
+        assert_eq!(*s.budget(), start);
+        assert!(!s.is_dirty());
+        assert!(!s.can_redo(), "the undone step went, as after any edit");
+        assert!(!s.redo());
+        assert_eq!(*s.budget(), start);
+
+        // Joining with a change drops it too (as it always did).
+        press(&mut s, "Changed");
+        s.edit("Test edit", |b| edit::set_title(b, "Another edit"))
+            .unwrap();
+        assert!(s.undo());
+        press(&mut s, "Changed again");
+        assert!(!s.can_redo());
+        assert_eq!(text(s.budget()), "Changed again");
+        assert!(s.undo());
+        assert_eq!(*s.budget(), start);
     }
 }

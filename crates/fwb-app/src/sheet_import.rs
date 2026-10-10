@@ -36,6 +36,7 @@ use tauri::{Runtime, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::app::{finish, AppState, DocId};
+use crate::history::count;
 use crate::session::Session;
 use crate::templates::{strip, UNTITLED};
 use crate::view::View;
@@ -292,7 +293,8 @@ fn row_kind(k: RowKind) -> &'static str {
     }
 }
 
-fn clip(s: &str, n: usize) -> String {
+/// `s` cut to `n` characters, with an ellipsis when it was longer.
+pub(crate) fn clip(s: &str, n: usize) -> String {
     match s.char_indices().nth(n) {
         Some((at, _)) => format!("{}\u{2026}", &s[..at]),
         None => s.to_string(),
@@ -581,28 +583,24 @@ pub fn preview_dto(b: &Budget, book: &Book, req: &Request) -> Result<PreviewDto,
     })
 }
 
-fn plural(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
-}
-
 /// The sentence an import ends with.
 pub fn message(plan: &Plan, applied: &merge::Applied) -> String {
     let accounts: std::collections::BTreeSet<&str> =
         plan.lines.iter().map(|l| l.account.as_str()).collect();
     let mut s = format!(
         "Imported {} into {}",
-        plural(plan.lines.len(), "line", "lines"),
-        plural(accounts.len(), "account", "accounts")
+        count(plan.lines.len(), "line", "lines"),
+        count(accounts.len(), "account", "accounts")
     );
     let mut added = Vec::new();
     if applied.accounts > 0 {
-        added.push(plural(applied.accounts, "new account", "new accounts"));
+        added.push(count(applied.accounts, "new account", "new accounts"));
     }
     if applied.categories > 0 {
-        added.push(plural(applied.categories, "new category", "new categories"));
+        added.push(count(applied.categories, "new category", "new categories"));
     }
     if applied.setup > 0 {
-        added.push(plural(applied.setup, "new setup item", "new setup items"));
+        added.push(count(applied.setup, "new setup item", "new setup items"));
     }
     if !added.is_empty() {
         s.push_str(&format!(" ({})", added.join(", ")));
@@ -611,7 +609,7 @@ pub fn message(plan: &Plan, applied: &merge::Applied) -> String {
     if !plan.skipped.is_empty() {
         s.push_str(&format!(
             " {} skipped.",
-            plural(plan.skipped.len(), "row was", "rows were")
+            count(plan.skipped.len(), "row was", "rows were")
         ));
     }
     s

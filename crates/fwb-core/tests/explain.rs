@@ -346,6 +346,16 @@ fn targets_parse_from_text() {
     for bad in ["nope", "charge:9", "2100:99", "#x", "2000/lines"] {
         assert!(p(bad).is_err(), "{bad}");
     }
+    // Spellings are normalized (`10-1` is `10-01`), but a number is never
+    // cut short to name an account it doesn't (`10-012` is not `10-01`).
+    let s = starter::budget();
+    let rs = recalc(&s, &RecalcOptions::default()).unwrap();
+    let ps = |t: &str| Target::parse(&s, &rs, t);
+    assert_eq!(ps("10-1").unwrap(), Target::Account { ci: 0, ai: 0 });
+    assert_eq!(ps("1001").unwrap(), Target::Account { ci: 0, ai: 0 });
+    for bad in ["10-012", "100123"] {
+        assert!(ps(bad).is_err(), "{bad}");
+    }
 }
 
 #[test]

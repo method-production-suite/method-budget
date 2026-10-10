@@ -25,6 +25,7 @@ import { invoke } from './api.js';
 import { el, isMac } from './dom.js';
 import { anchoredForm } from './modal.js';
 import { review } from './clipboard.js';
+import { obj, str, plural, errText } from './util.js';
 
 const st = {
   view: null,
@@ -38,30 +39,12 @@ const st = {
 // ---------------------------------------------------------------------------
 // Small helpers
 
-function obj(v) {
-  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
-}
-
-function str(v) {
-  return v === undefined || v === null ? '' : String(v);
-}
-
 function list(v) {
   return Array.isArray(v) ? v : [];
 }
 
 function byteOrder(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
-}
-
-function errText(e) {
-  if (typeof e === 'string') return e;
-  if (e && typeof e.message === 'string') return e.message;
-  return String(e);
-}
-
-function plural(n, one, many) {
-  return `${n} ${n === 1 ? one : many}`;
 }
 
 function budgetOf(view) {

@@ -99,19 +99,9 @@ pub async fn template_new<R: Runtime>(
         .path()
         .and_then(|p| p.parent())
         .map(PathBuf::from);
-    let mut dialog = window
-        .dialog()
-        .file()
-        .set_title("New budget from template")
-        .add_filter(crate::app::FILTER_NAME, fwb_format::EXTENSIONS)
-        .set_parent(&window);
-    if let Some(dir) = start {
-        dialog = dialog.set_directory(dir);
-    }
-    let Some(picked) = dialog.blocking_pick_file() else {
+    let Some(path) = crate::app::pick_budget(&window, "New budget from template", start)? else {
         return Ok(None);
     };
-    let path = picked.into_path().map_err(|e| e.to_string())?;
     let template = read(&state, &path)?;
     let id = open_new(&state, &template, keep_lines);
     Ok(Some(finish(&window, &mut state.lock_doc(Some(id))?, None)))

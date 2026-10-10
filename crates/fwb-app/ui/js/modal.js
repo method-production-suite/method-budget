@@ -12,6 +12,23 @@ export function isModalOpen() {
   return open !== null;
 }
 
+// The page behind an open dialog is inert, as behind the shortcut sheet
+// (help.js): Tab can't leave the dialog, and keys can't reach the grid or a
+// tools panel item under it. Only what this made inert is given back.
+let behind = [];
+
+function shutBehind() {
+  openBehind();
+  const root = $('modal-root');
+  behind = [...document.body.children].filter((n) => n !== root && n.id !== 'toast' && !n.inert);
+  for (const n of behind) n.inert = true;
+}
+
+function openBehind() {
+  for (const n of behind) n.inert = false;
+  behind = [];
+}
+
 /**
  * Shows a form. `fields`: [{ key, label, value, placeholder }].
  * `onSubmit(values)` returns a promise; if it rejects with a message, the
@@ -47,6 +64,7 @@ export function formDialog({ title, message = '', fields = [], submitText = 'OK'
     const close = (result) => {
       open = null;
       backdrop.remove();
+      openBehind();
       if (previous && previous.focus) previous.focus({ preventScroll: true });
       resolve(result);
     };
@@ -81,6 +99,7 @@ export function formDialog({ title, message = '', fields = [], submitText = 'OK'
     const first = fields.length ? inputs[fields[0].key] : ok;
     first.focus();
     if (first.select) first.select();
+    shutBehind();
   });
 }
 
@@ -124,6 +143,7 @@ export function anchoredDialog({ anchor, title, message = '', label, value = '',
       open = null;
       backdrop.remove();
       setRules('popover', '');
+      openBehind();
       if (previous && previous.focus) previous.focus({ preventScroll: true });
       resolve(result);
     };
@@ -159,6 +179,7 @@ export function anchoredDialog({ anchor, title, message = '', label, value = '',
     placePopover(form, anchor);
     input.focus();
     if (input.select) input.select();
+    shutBehind();
   });
 }
 
@@ -211,6 +232,7 @@ export function anchoredForm({ anchor, title, message = '', fields = [], submitT
       open = null;
       backdrop.remove();
       setRules('popover', '');
+      openBehind();
       if (previous && previous.isConnected && previous.focus) previous.focus({ preventScroll: true });
       resolve(result);
     };
@@ -255,6 +277,7 @@ export function anchoredForm({ anchor, title, message = '', fields = [], submitT
     const first = parts.find((p) => !p.wrap.hidden);
     if (first) first.focus();
     else ok.focus();
+    shutBehind();
   });
 }
 
@@ -385,6 +408,7 @@ export function customDialog(build, { onClose = null } = {}) {
     if (!backdrop || open !== backdrop) return;
     open = null;
     backdrop.remove();
+    openBehind();
     if (previous && previous.focus) previous.focus({ preventScroll: true });
     if (onClose) onClose();
   };
@@ -405,5 +429,6 @@ export function customDialog(build, { onClose = null } = {}) {
   // Focus the button marked data-autofocus (a safe one), else the first.
   const first = box.querySelector('[data-autofocus]') || box.querySelector('button');
   if (first) first.focus();
+  shutBehind();
   return close;
 }

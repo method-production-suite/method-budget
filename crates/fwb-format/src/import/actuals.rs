@@ -869,7 +869,9 @@ pub fn plan(b: &Budget, t: &Table, m: &Mapping, o: &Options) -> Plan {
         }
         let tags: BTreeSet<String> = cell_list(cell(r, Field::Tags))
             .into_iter()
-            .filter(|s| s.chars().count() <= actuals::MAX_TAG_CHARS)
+            .filter(|s| {
+                s.chars().count() <= actuals::MAX_TAG_CHARS && !s.chars().any(char::is_control)
+            })
             .take(actuals::MAX_TAGS)
             .collect();
         // The account: in the chart, or reviewed.
@@ -920,8 +922,33 @@ pub fn plan(b: &Budget, t: &Table, m: &Mapping, o: &Options) -> Plan {
                 }
             }
         };
+        let transaction = Transaction {
+            date,
+            account,
+            tags,
+            vendor,
+            description,
+            reference,
+            amount,
+            ..Transaction::default()
+        };
+        // Anything the budget would refuse (an account number too long to
+        // keep) leaves out the row, not the whole import.
+        if let Err(e) = actuals::check_transaction(&transaction) {
+            p.skipped.push(RowNote {
+                row,
+                message: e.to_string(),
+            });
+            continue;
+        }
         // Duplicates.
-        let dk = duplicate_key(&coding, &date, &account, amount, &description);
+        let dk = duplicate_key(
+            &coding,
+            &transaction.date,
+            &transaction.account,
+            amount,
+            &transaction.description,
+        );
         let dup = if existing.contains_key(&dk) {
             Some((None, o.skip_existing))
         } else {
@@ -933,10 +960,10 @@ pub fn plan(b: &Budget, t: &Table, m: &Mapping, o: &Options) -> Plan {
                 row,
                 repeats,
                 skipped,
-                date: date.clone(),
-                account: account.clone(),
+                date: transaction.date.clone(),
+                account: transaction.account.clone(),
                 amount,
-                description: description.clone(),
+                description: transaction.description.clone(),
             });
             if skipped {
                 continue;
@@ -944,20 +971,11 @@ pub fn plan(b: &Budget, t: &Table, m: &Mapping, o: &Options) -> Plan {
         }
         p.total = p.total.saturating_add(amount);
         if assigned {
-            p.accounts.insert(account.clone());
+            p.accounts.insert(transaction.account.clone());
         }
         p.transactions.push(Planned {
             row,
-            transaction: Transaction {
-                date,
-                account,
-                tags,
-                vendor,
-                description,
-                reference,
-                amount,
-                ..Transaction::default()
-            },
+            transaction,
             assigned,
         });
     }
@@ -1320,5 +1338,36 @@ mod tests {
             MAX_TEXT_CHARS
         );
         assert_eq!(p.warnings.len(), 1);
+    }
+
+    #[test]
+    fn what_a_plan_keeps_the_budget_takes() {
+        // Whatever a plan lists as imported must pass the engine's checks,
+        // or one odd row refuses the whole import.
+        let mut b = starter::budget();
+        let long_account = "9".repeat(80);
+        let t = table(&[
+            &["Account", "Description", "Amount", "Tags"],
+            &["10-01", "Fine", "1", "PO"],
+            &[&long_account, "Odd account", "2", ""],
+            &["10-01", "Odd tag", "3", "PO, a\tb"],
+        ]);
+        use Field::*;
+        let m = mapping(&[Account, Description, Amount, Tags]);
+        let (p, _) = import(
+            &mut b,
+            &t,
+            &m,
+            &Options::default(),
+            "ledger.csv",
+            "2026-10-09T12:00:00Z",
+        )
+        .unwrap();
+        assert_eq!(p.transactions.len(), 2);
+        assert_eq!(p.skipped.len(), 1);
+        assert_eq!(p.skipped[0].row, 3);
+        let tags = &p.transactions[1].transaction.tags;
+        assert_eq!(tags.iter().collect::<Vec<_>>(), ["PO"]);
+        assert_eq!(b.actuals.transactions.len(), 2);
     }
 }

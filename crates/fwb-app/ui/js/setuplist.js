@@ -24,6 +24,7 @@ import { invoke } from './api.js';
 import { el, isMac } from './dom.js';
 import { money } from './format.js';
 import { orderedNames, TABLE_KIND } from './order.js';
+import { obj, plural } from './util.js';
 
 const USAGE_DELAY_MS = 120;
 const DRAG_START_PX = 4;
@@ -39,14 +40,6 @@ const st = {
   listeners: new Set(),
   findHook: null,
 };
-
-function obj(v) {
-  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
-}
-
-function plural(n, one, many) {
-  return `${n} ${n === 1 ? one : many}`;
-}
 
 /** Calls `fn()` whenever new counts arrive. */
 export function onUsage(fn) {
@@ -229,12 +222,6 @@ export function totalText(view, table, name) {
   const u = usageOf(view, table, name);
   if (!u || u.total === null || u.total === undefined) return '';
   return money(Number(u.total));
-}
-
-/** How many lines use item `name` (0 until the counts arrive). */
-export function linesUsing(view, table, name) {
-  const u = usageOf(view, table, name);
-  return u ? Number(u.lines) || 0 : 0;
 }
 
 // ---------------------------------------------------------------------------

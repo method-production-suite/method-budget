@@ -18,8 +18,7 @@
 // opts), close(id), add(), move(id, to), moveToOther(id, to), menu(id,
 // at) }) returns { render(tabs), focus(id), hasFocus(), host }; render
 // draws the list Rust sends with every view (src/docs.rs, TabInfo), each
-// tab's `active` meaning in front in this strip. initTabs, renderTabs,
-// focusTab and tabsHaveFocus work on the first strip made, as before.
+// tab's `active` meaning in front in this strip.
 //
 // Budget text goes in with textContent only; drag feedback is classes (the
 // CSP allows no inline styles).
@@ -384,27 +383,4 @@ export function createTabStrip(host, handlers) {
   const self = { host, strip, render, focus, hasFocus, dropAt, paint };
   strips.push(self);
   return self;
-}
-
-// ---------------------------------------------------------------------------
-// The first strip, as before split view
-
-let first = null;
-
-/** Sets up the strip in `hostEl`. */
-export function initTabs(hostEl, handlers) {
-  first = createTabStrip(hostEl, handlers);
-  return first;
-}
-
-export function renderTabs(list) {
-  if (first) first.render(list);
-}
-
-export function focusTab(id) {
-  return first ? first.focus(id) : false;
-}
-
-export function tabsHaveFocus() {
-  return Boolean(first && first.hasFocus());
 }

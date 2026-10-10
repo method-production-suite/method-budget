@@ -342,15 +342,7 @@ pub fn diff_with(a: &Budget, ra: Option<&Report>, b: &Budget, rb: Option<&Report
 // Words and numbers
 
 /// `123456` cents as `1,234.56`; negatives with a minus.
-pub fn money(c: Cents) -> String {
-    let a = c.unsigned_abs();
-    let s = format!("{}.{:02}", group_digits(&(a / 100).to_string()), a % 100);
-    if c < 0 {
-        format!("-{s}")
-    } else {
-        s
-    }
-}
+pub use crate::calc::explain::money;
 
 /// `+1,234.56`, `-1,234.56`, `0.00`.
 pub fn signed(c: Cents) -> String {
@@ -359,17 +351,6 @@ pub fn signed(c: Cents) -> String {
     } else {
         money(c)
     }
-}
-
-fn group_digits(digits: &str) -> String {
-    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
-    for (i, ch) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i).is_multiple_of(3) {
-            out.push(',');
-        }
-        out.push(ch);
-    }
-    out
 }
 
 /// A formula as a person reads it: `blank`, the text as typed, or (for
@@ -382,18 +363,7 @@ pub(crate) fn formula_text(f: &str, money_like: bool) -> String {
     }
     if money_like {
         if let Ok(d) = t.parse::<crate::Dec>() {
-            let s = d.to_string();
-            let (sign, body) = match s.strip_prefix('-') {
-                Some(rest) => ("-", rest),
-                None => ("", s.as_str()),
-            };
-            let (int, frac) = body.split_once('.').unwrap_or((body, ""));
-            let frac = if frac.len() < 2 {
-                format!("{frac:0<2}")
-            } else {
-                frac.to_string()
-            };
-            return format!("{sign}{}.{frac}", group_digits(int));
+            return crate::calc::explain::dmoney(d);
         }
     }
     t.to_string()

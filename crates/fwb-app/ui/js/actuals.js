@@ -24,6 +24,7 @@ import { el } from './dom.js';
 import { invoke } from './api.js';
 import { money } from './format.js';
 import { customDialog, confirmDialog } from './modal.js';
+import { plural } from './util.js';
 
 const METHODS = [
   { id: 'budget_minus_actual', label: 'Budget minus actual' },
@@ -114,10 +115,6 @@ async function fetchList() {
 function refetchSoon() {
   clearTimeout(st.timer);
   st.timer = setTimeout(fetchList, 180);
-}
-
-function plural(n, one, many) {
-  return `${n} ${n === 1 ? one : many}`;
 }
 
 // ---------------------------------------------------------------------------

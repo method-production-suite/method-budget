@@ -1961,7 +1961,8 @@ shortcuts, and where each tab was left), `tabs.js` (the tab strip: switching, cl
 dragging, scrolling), `grid.js` (a generic keyboard grid used at all three levels), `levels.js`
 (turns a View into rows and columns), `footer.js`,
 `modal.js`, `format.js` (money and decimal display), `api.js` (the command queue),
-`dom.js`, `shortcuts.js` (the one list of shortcuts, shared with the Rust menu and checked
+`dom.js`, `util.js` (small shared helpers: plurals, error text), `panelsize.js` (the
+tools panel resizer and saved window sizes), `shortcuts.js` (the one list of shortcuts, shared with the Rust menu and checked
 by a test), `help.js` (the shortcut sheet), `topsheet-setup.js` (Budget Setup's
 charges, credits, info, settings and baseline), `report.js` with `print.css` (printable
 reports, laid out into pages) and `reportsetup.js` with `reportsetup.css` (File > Print's

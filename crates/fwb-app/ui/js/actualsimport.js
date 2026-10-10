@@ -22,6 +22,7 @@ import { customDialog } from './modal.js';
 import { money } from './format.js';
 import { readPref, writePref } from './prefs.js';
 import { localStamp } from './versions.js';
+import { plural } from './util.js';
 
 /** The fields' names in the dialog, by the key Rust uses. */
 export const FIELD_LABELS = {
@@ -119,10 +120,6 @@ export function requestFrom(st, extra = {}) {
     skip_repeats: st.skipRepeats,
     ...extra,
   };
-}
-
-function plural(n, one, many) {
-  return `${n} ${n === 1 ? one : many}`;
 }
 
 function columnLabel(c) {

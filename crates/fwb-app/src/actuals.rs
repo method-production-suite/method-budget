@@ -39,7 +39,9 @@ use tauri::{Runtime, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::app::{edit_budget, finish, AppState, DocId};
+use crate::history::count;
 use crate::session::Session;
+use crate::sheet_import::clip;
 use crate::view::View;
 
 /// Rows of the sheet shown raw, for picking the header row.
@@ -523,17 +525,6 @@ pub struct Imported {
     pub message: String,
 }
 
-fn clip(s: &str, n: usize) -> String {
-    match s.char_indices().nth(n) {
-        Some((at, _)) => format!("{}\u{2026}", &s[..at]),
-        None => s.to_string(),
-    }
-}
-
-fn plural(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
-}
-
 /// The sheet to start on: the visible one whose titles name the most
 /// actuals fields.
 fn best_sheet(book: &Book) -> usize {
@@ -824,8 +815,8 @@ pub fn message(p: &ia::Plan) -> String {
     let unassigned = p.transactions.iter().filter(|t| !t.assigned).count();
     let mut s = format!(
         "Imported {} into {}",
-        plural(p.transactions.len(), "transaction", "transactions"),
-        plural(p.accounts.len(), "account", "accounts")
+        count(p.transactions.len(), "transaction", "transactions"),
+        count(p.accounts.len(), "account", "accounts")
     );
     if unassigned > 0 {
         s.push_str(&format!(" ({unassigned} unassigned)"));
@@ -835,7 +826,7 @@ pub fn message(p: &ia::Plan) -> String {
     if skipped > 0 {
         s.push_str(&format!(
             " {} skipped.",
-            plural(skipped, "row was", "rows were")
+            count(skipped, "row was", "rows were")
         ));
     }
     s
@@ -1078,7 +1069,7 @@ pub fn edit_of(e: &EditInput) -> Result<TransactionEdit, String> {
 
 /// The undo step's name for an edit of `n` transactions.
 fn edit_label(b: &Budget, n: usize, e: &EditInput) -> String {
-    let what = plural(n, "actual", "actuals");
+    let what = count(n, "actual", "actuals");
     let only_account = e.account.is_some()
         && e.date.is_none()
         && e.tags.is_none()
@@ -1266,7 +1257,7 @@ pub fn actuals_delete<R: Runtime>(
     doc: Option<DocId>,
     ids: Vec<TransactionId>,
 ) -> Result<View, String> {
-    let label = format!("Delete {}", plural(ids.len(), "actual", "actuals"));
+    let label = format!("Delete {}", count(ids.len(), "actual", "actuals"));
     edit_budget(&window, &state, doc, label, |b| {
         actuals::delete_transactions(b, &ids)
             .map(|_| ())

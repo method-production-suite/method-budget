@@ -37,6 +37,16 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: The tagged commit is on main
+        # A tag pushed on a side branch must not build or draft a release.
+        # fetch-depth: 0 above fetched every branch, so origin/main is here
+        # (no second fetch: credentials are not kept after checkout).
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME points at a commit that is not on main"
+            exit 1
+          fi
       - name: The tag, the version and the notes agree
         run: cargo xtask check-version --tag "$GITHUB_REF_NAME"
 

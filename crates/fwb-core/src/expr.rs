@@ -136,35 +136,45 @@ fn lex(src: &str) -> Result<Vec<(usize, Tok)>, ParseError> {
 /// they name is still a reference. Parsing the result gives what
 /// [`Expr::rename`] gives on the parsed original.
 pub fn rename_var(src: &str, from: &str, to: &str) -> (String, usize) {
-    let bytes = src.as_bytes();
     let mut out = String::with_capacity(src.len());
     let mut n = 0;
-    let mut i = 0;
-    while i < bytes.len() {
-        let c = bytes[i];
-        let start = i;
-        if c.is_ascii_digit() || c == b'.' {
-            while i < bytes.len() && (bytes[i].is_ascii_digit() || bytes[i] == b'.') {
-                i += 1;
-            }
-            out.push_str(&src[start..i]);
-        } else if c.is_ascii_alphabetic() || c == b'_' {
-            while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
-                i += 1;
-            }
-            if &src[start..i] == from {
-                out.push_str(to);
-                n += 1;
-            } else {
-                out.push_str(&src[start..i]);
-            }
-        } else {
-            let ch = src[i..].chars().next().unwrap_or('?');
-            out.push(ch);
-            i += ch.len_utf8();
-        }
+    let mut kept = 0;
+    for r in name_spans(src).filter(|r| &src[r.clone()] == from) {
+        out.push_str(&src[kept..r.start]);
+        out.push_str(to);
+        kept = r.end;
+        n += 1;
     }
+    out.push_str(&src[kept..]);
     (out, n)
+}
+
+/// Where each global-name token of `src` is, split as the lexer splits them
+/// (see [`rename_var`]). Anything that is neither a number nor a name is
+/// stepped over a character at a time, so a formula that doesn't parse
+/// still gives every name in it.
+pub(crate) fn name_spans(src: &str) -> impl Iterator<Item = std::ops::Range<usize>> + '_ {
+    let bytes = src.as_bytes();
+    let mut i = 0;
+    std::iter::from_fn(move || {
+        while i < bytes.len() {
+            let c = bytes[i];
+            let start = i;
+            if c.is_ascii_digit() || c == b'.' {
+                while i < bytes.len() && (bytes[i].is_ascii_digit() || bytes[i] == b'.') {
+                    i += 1;
+                }
+            } else if c.is_ascii_alphabetic() || c == b'_' {
+                while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
+                    i += 1;
+                }
+                return Some(start..i);
+            } else {
+                i += src[i..].chars().next().map_or(1, char::len_utf8);
+            }
+        }
+        None
+    })
 }
 
 /// Longest formula accepted, in bytes not counting spaces (so a formula's
@@ -563,6 +573,15 @@ mod tests {
             );
             // And back again, byte for byte.
             assert_eq!(rename_var(&out, to, from).0, src);
+        }
+        // Renaming a name to itself finds exactly the names usage counts.
+        for src in ["A*(B+A)", "2A.5B__c é d1", "", "((", "x1.2.3y"] {
+            for name in crate::usage::formula_names(src) {
+                let count = crate::usage::formula_names(src)
+                    .filter(|n| *n == name)
+                    .count();
+                assert_eq!(rename_var(src, name, name), (src.to_string(), count));
+            }
         }
     }
 

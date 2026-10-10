@@ -42,6 +42,7 @@ import {
 } from './setuplist.js';
 import { globalValueText } from './display.js';
 import { globalInfoBlock } from './display-settings.js';
+import { str, plural, errText } from './util.js';
 
 const GLOBAL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)$/;
@@ -150,10 +151,6 @@ function own(obj, k) {
   return Object.prototype.hasOwnProperty.call(obj, k) ? obj[k] : undefined;
 }
 
-function str(v) {
-  return v === undefined || v === null ? '' : String(v);
-}
-
 function byteOrder(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
@@ -188,12 +185,6 @@ function issuesFor(kind, name) {
     const n = t.name !== undefined ? t.name : t.code;
     return n === name;
   });
-}
-
-function errText(e) {
-  if (typeof e === 'string') return e;
-  if (e && typeof e.message === 'string') return e.message;
-  return String(e);
 }
 
 function groupDigits(digits) {
@@ -233,10 +224,6 @@ function formatDecimal(s) {
   const m = /^(-?)(\d+)(\.\d+)?$/.exec(str(s));
   if (!m) return str(s);
   return `${m[1]}${groupDigits(m[2])}${m[3] || ''}`;
-}
-
-function plural(n, one, many) {
-  return `${n} ${n === 1 ? one : many}`;
 }
 
 function findByData(attr, value) {

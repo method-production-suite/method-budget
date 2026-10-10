@@ -125,11 +125,6 @@ export function varianceCells(ch) {
   return { orig, var: diff };
 }
 
-/** The category entry for a topsheet index, or null. */
-export function categoryAt(ix, ti) {
-  return ix.cats.find((c) => c.ti === ti) || null;
-}
-
 /** Finds a category by code, preferring the one at `ti` when codes repeat. */
 export function findCategory(ix, code, ti) {
   const same = ix.cats.filter((c) => c.cat.code === code);

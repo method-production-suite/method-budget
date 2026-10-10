@@ -31,12 +31,6 @@ function provenanceOf(view) {
   return p && typeof p === 'object' ? p : null;
 }
 
-/** Whether the budget in `view` is a copy saved for sharing (opened read-only). */
-export function isSharedCopy(view) {
-  const p = provenanceOf(view);
-  return Boolean(p && p.kind === 'shared_copy');
-}
-
 function check(label, checked = false) {
   const id = nextId('share-check');
   const box = el('input', { attrs: { type: 'checkbox', id } });

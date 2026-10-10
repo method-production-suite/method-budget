@@ -10,7 +10,7 @@
 use std::fmt;
 use std::path::Path;
 
-use fwb_core::{Budget, Cents};
+use fwb_core::{Budget, Cents, RecalcOptions};
 
 /// What a subcommand returns: text for stdout, or an error with its exit code.
 pub type Outcome = Result<String, CliError>;
@@ -208,6 +208,15 @@ impl Flags {
     }
 }
 
+/// Recalculation options with every `--exclude GROUP` the command was given.
+pub fn excluding(f: &Flags) -> RecalcOptions {
+    let mut opts = RecalcOptions::default();
+    for g in f.values("--exclude") {
+        opts.exclude_groups.insert(g.to_string());
+    }
+    opts
+}
+
 /// Reads and parses a budget file.
 pub fn load(path: &str) -> Result<Budget, CliError> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
@@ -221,8 +230,11 @@ pub fn save(path: &str, b: &Budget) -> Result<(), CliError> {
 
 /// Writes `bytes` to `path` through a temporary file in the same folder and a
 /// rename, so a reader never sees half a file and a failed write leaves the
-/// old file as it was.
+/// old file as it was. The new file keeps the old one's permissions (a
+/// budget only its owner may read stays that way) and is flushed to disk
+/// before the rename.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
+    use std::io::Write as _;
     let shown = path.display();
     let name = path
         .file_name()
@@ -232,7 +244,15 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
         name.to_string_lossy(),
         std::process::id()
     ));
-    let result = std::fs::write(&tmp, bytes).and_then(|()| std::fs::rename(&tmp, path));
+    let write = || -> std::io::Result<()> {
+        let mut file = std::fs::File::create(&tmp)?;
+        file.write_all(bytes)?;
+        if let Ok(old) = std::fs::metadata(path) {
+            file.set_permissions(old.permissions())?;
+        }
+        file.sync_all()
+    };
+    let result = write().and_then(|()| std::fs::rename(&tmp, path));
     if let Err(e) = result {
         let _ = std::fs::remove_file(&tmp);
         return Err(CliError::failed(format!("{shown}: {e}")));
@@ -377,6 +397,21 @@ mod tests {
         assert_eq!(std::fs::read(&p).unwrap(), b"two");
         assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
         assert!(write_atomic(&dir.join("missing").join("x"), b"z").is_err());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+            std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o600)).unwrap();
+            write_atomic(&p, b"three").unwrap();
+            assert_eq!(mode(&p), 0o600);
+            assert_eq!(std::fs::read(&p).unwrap(), b"three");
+            // A read-only file is replaced too, and stays read-only.
+            std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o400)).unwrap();
+            write_atomic(&p, b"four").unwrap();
+            assert_eq!(mode(&p), 0o400);
+            assert_eq!(std::fs::read(&p).unwrap(), b"four");
+            assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
+        }
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -433,6 +433,17 @@ pub fn flush_for_restart(state: &AppState, safety: &Safety, now: Instant) -> Flu
     }
 }
 
+/// Installing failed: the update stays ready for another try, and a Discard
+/// All chosen on the way to the restart is taken back. The app goes on
+/// running with those budgets open, so autosave and recovery copies take up
+/// again (otherwise nothing would be kept for the rest of the run).
+pub fn install_failed(machine: &mut Machine, safety: Option<&Safety>) -> Said {
+    if let Some(s) = safety {
+        crate::safety_app::discard_cancelled(s);
+    }
+    machine.install_failed()
+}
+
 // ---------------------------------------------------------------------------
 // Tauri wiring
 
@@ -655,7 +666,8 @@ fn install_and_restart<R: Runtime>(app: &AppHandle<R>) {
         Ok(()) => app.restart(),
         Err(_) => {
             *lock(&updates.pending) = pending;
-            let said = lock(&updates.machine).install_failed();
+            let safety = app.try_state::<Safety>();
+            let said = install_failed(&mut lock(&updates.machine), safety.as_deref());
             tell(app, Some(said));
         }
     }
@@ -788,7 +800,7 @@ pub fn release_notes() -> Option<NotesDto> {
 mod tests {
     use super::*;
     use crate::safety::tests::temp_dir;
-    use crate::safety_app::open_path;
+    use crate::safety_app::{autosave_doc, open_path};
     use crate::session::Session;
     use method_release::minisign::{fixture, PLACEHOLDER_PUBLIC_KEY};
 
@@ -1081,6 +1093,48 @@ mod tests {
         };
         assert_eq!(front(0), "b, edited");
         assert_eq!(front(1), "c, theirs");
+        drop(safety);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Discard All on the way to a restart that then fails to install: the
+    /// app goes on with the budgets open, and keeps their changes again
+    /// (recovery copies, autosave into files) rather than nothing for the
+    /// rest of the run.
+    #[test]
+    fn a_failed_install_takes_discard_all_back() {
+        let dir = temp_dir("updates-discarded");
+        let safety = Safety::new(Some(&dir));
+        let state = AppState::default();
+        let untitled = state.docs().active();
+        retitle(&state, untitled, "Draft");
+        crate::safety_app::discard_all(&state, &safety);
+        let now = Instant::now();
+        assert_eq!(
+            autosave_doc(&state, &safety, None, now, true),
+            Autosaved::Nothing,
+            "thrown away on the way out"
+        );
+        let mut m = Machine::default();
+        m.start_check(false);
+        m.checked(Ok(Some("0.2.0".into())));
+        m.downloaded(true);
+        m.start_install();
+        assert_eq!(install_failed(&mut m, Some(&safety)), Said::InstallFailed);
+        assert!(m.is_ready(), "ready for another try");
+        assert_eq!(
+            autosave_doc(&state, &safety, None, now, true),
+            Autosaved::Recovery
+        );
+        let a = dir.join("a.mthd");
+        write_budget(&a, "a");
+        let ia = open_path(&state, &safety, &a).unwrap();
+        retitle(&state, ia, "a, edited");
+        assert_eq!(
+            autosave_doc(&state, &safety, Some(ia), now, true),
+            Autosaved::File
+        );
+        assert_eq!(title_on_disk(&a), "a, edited");
         drop(safety);
         std::fs::remove_dir_all(&dir).unwrap();
     }

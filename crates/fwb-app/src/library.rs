@@ -643,19 +643,14 @@ pub async fn library_choose<R: Runtime>(
     state: State<'_, AppState>,
     library: State<'_, Library>,
 ) -> Result<Option<LibraryDone>, String> {
-    let mut dialog = window
-        .dialog()
-        .file()
-        .set_title("Choose your library")
-        .add_filter(crate::app::FILTER_NAME, fwb_format::EXTENSIONS)
-        .set_parent(&window);
-    if let Some(dir) = library.path().as_deref().and_then(Path::parent) {
-        dialog = dialog.set_directory(dir);
-    }
-    let Some(picked) = dialog.blocking_pick_file() else {
+    let start = library
+        .path()
+        .as_deref()
+        .and_then(Path::parent)
+        .map(PathBuf::from);
+    let Some(path) = crate::app::pick_budget(&window, "Choose your library", start)? else {
         return Ok(None);
     };
-    let path = picked.into_path().map_err(|e| e.to_string())?;
     read(&state.docs(), &path)?;
     library.set_path(path.clone())?;
     let view = library_view_at(&state.docs(), Some(&path));

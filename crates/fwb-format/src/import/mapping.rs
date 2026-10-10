@@ -410,7 +410,7 @@ pub fn parse_decimal(s: &str) -> Result<Dec, String> {
     if digits.is_empty() {
         return Ok(Dec::ZERO);
     }
-    if exp.abs() > 100 {
+    if exp.unsigned_abs() > 100 {
         return Err("is too large or too small".into());
     }
     // value = digits x 10^(exp - frac.len()); scaled by 10^9 for Dec.
@@ -424,14 +424,9 @@ pub fn parse_decimal(s: &str) -> Result<Dec, String> {
     } else {
         let cut = (-shift) as usize;
         if cut > digits.len() {
-            // Smaller than half a billionth: rounds to zero unless it is
-            // exactly at the next digit (which only happens when cut ==
-            // len + 1 and the first digit is 5 or more).
-            if cut == digits.len() + 1 && digits.as_bytes()[0] >= b'5' {
-                1
-            } else {
-                0
-            }
+            // Under a tenth of a billionth: less than half the last place
+            // `Dec` keeps, so it rounds to zero.
+            0
         } else {
             let (keep, drop) = digits.split_at(digits.len() - cut);
             let mut v: i128 = if keep.is_empty() {
@@ -590,6 +585,10 @@ mod tests {
         assert_eq!(parse_decimal("0.0000000004").unwrap(), Dec::ZERO);
         assert_eq!(parse_decimal("5E-10").unwrap(), d("0.000000001"));
         assert_eq!(parse_decimal("4.9E-10").unwrap(), Dec::ZERO);
+        // A tenth of a billionth or less is under half the last place.
+        assert_eq!(parse_decimal("5E-11").unwrap(), Dec::ZERO);
+        assert_eq!(parse_decimal("0.00000000009").unwrap(), Dec::ZERO);
+        assert_eq!(parse_decimal("-9.9E-11").unwrap(), Dec::ZERO);
         assert_eq!(parse_decimal("000.000").unwrap(), Dec::ZERO);
         assert_eq!(parse_decimal(".5").unwrap(), d("0.5"));
         assert_eq!(
@@ -597,7 +596,18 @@ mod tests {
             d("12345678901234567890")
         );
         for bad in [
-            "", ".", "-", "1.2.3", "1e", "e5", "1,5", "abc", "1e500", "1e-500",
+            "",
+            ".",
+            "-",
+            "1.2.3",
+            "1e",
+            "e5",
+            "1,5",
+            "abc",
+            "1e500",
+            "1e-500",
+            // The most negative exponent an i32 holds: refused, not a panic.
+            "1e-2147483648",
         ] {
             assert!(parse_decimal(bad).is_err(), "{bad}");
         }

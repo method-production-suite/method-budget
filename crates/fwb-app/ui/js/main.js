@@ -54,7 +54,7 @@ import { SHORTCUTS, matchShortcut, menuRunsAppKeys, shortcutById, shortcutText, 
 import { isHelpOpen, toggleHelp, closeHelp } from './help.js';
 import { openMenu, updateMenu, closeMenu, isMenuOpen, setMenuAnchor, openContextMenu } from './menu.js';
 import { readPref, writePref } from './prefs.js';
-import { setRules, dynamicStyles } from './sheet.js';
+import { wirePanelResizer, syncResizer, sizePanel, isResizer } from './panelsize.js';
 import { initSafety } from './safety.js';
 import { initUpdates } from './updates.js';
 import { initQuickEntry, editAssist, commitDetailCell, editNote, fringeRange, showFormula } from './quickentry.js';
@@ -1450,7 +1450,7 @@ function readPosition() {
 
 function panelHasFocus() {
   const a = document.activeElement;
-  return $('panel').contains(a) || a === resizer;
+  return $('panel').contains(a) || isResizer(a);
 }
 
 /** Shows or hides the panel wherever it is (Option+Cmd+S). */
@@ -1535,13 +1535,8 @@ function setPosition(where, { fromTools = false } = {}) {
 
 /** Shows (made if needed, where it was last) or hides the tools window. */
 async function openToolsWindow(show) {
-  const g = readPref('toolsWindow', null);
-  const geometry =
-    g && typeof g === 'object' && ['x', 'y', 'width', 'height'].every((k) => typeof g[k] === 'number' && Number.isFinite(g[k]))
-      ? { x: g.x, y: g.y, width: g.width, height: g.height }
-      : null;
   try {
-    await invoke('tools_window', { show, geometry });
+    await invoke('tools_window', { show, geometry: geometryPref('toolsWindow') });
   } catch (e) {
     toast(e);
     if (show && state.position === 'window') {
@@ -1674,8 +1669,6 @@ async function refreshView() {
   }
 }
 
-let geometryTimer = null;
-
 // ---------------------------------------------------------------------------
 // The Budget Setup window (setupwin.js, src/setupwin.rs): every setup table's
 // full editor. This window remembers its tab, place and size (per user), and
@@ -1689,13 +1682,37 @@ function readSetupTab() {
   return isSetupTab(t) ? t : 'fringes';
 }
 
-/** A remembered window place from prefs, or null when there is none or it is nonsense. */
-function geometryPref(name) {
-  const g = readPref(name, null);
+/** `g` as a window place { x, y, width, height }, or null when it is nonsense. */
+function geometryOf(g) {
   return g && typeof g === 'object' && ['x', 'y', 'width', 'height'].every((k) => typeof g[k] === 'number' && Number.isFinite(g[k]))
     ? { x: g.x, y: g.y, width: g.width, height: g.height }
     : null;
 }
+
+/** A remembered window place from prefs, or null when there is none or it is nonsense. */
+function geometryPref(name) {
+  return geometryOf(readPref(name, null));
+}
+
+/**
+ * Remembers a window's place under pref `name` when it moves or is resized
+ * (the tools window: src/tools.rs; Budget Setup: src/setupwin.rs), once it
+ * has stopped for a moment.
+ */
+function geometrySaver(name) {
+  let timer = null;
+  return (g) => {
+    if (!g || typeof g !== 'object') return;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const place = geometryOf(g);
+      if (place) writePref(name, place);
+    }, 250);
+  };
+}
+
+const saveGeometry = geometrySaver('toolsWindow');
+const saveSetupGeometry = geometrySaver('setupWindow');
 
 /**
  * Opens the Budget Setup window, or brings it forward, on `tab` (the one it
@@ -1729,155 +1746,6 @@ function findUsesFromSetup(p) {
   }
   renderPanel();
   findUses(p.table, p.name);
-}
-
-let setupGeometryTimer = null;
-
-/** The setup window moved or was resized: remember where. */
-function saveSetupGeometry(g) {
-  if (!g || typeof g !== 'object') return;
-  clearTimeout(setupGeometryTimer);
-  setupGeometryTimer = setTimeout(() => {
-    if (['x', 'y', 'width', 'height'].every((k) => typeof g[k] === 'number' && Number.isFinite(g[k]))) {
-      writePref('setupWindow', { x: g.x, y: g.y, width: g.width, height: g.height });
-    }
-  }, 250);
-}
-
-/** The tools window moved or was resized: remember where (src/tools.rs). */
-function saveGeometry(g) {
-  if (!g || typeof g !== 'object') return;
-  clearTimeout(geometryTimer);
-  geometryTimer = setTimeout(() => {
-    if (['x', 'y', 'width', 'height'].every((k) => typeof g[k] === 'number' && Number.isFinite(g[k]))) {
-      writePref('toolsWindow', { x: g.x, y: g.y, width: g.width, height: g.height });
-    }
-  }, 250);
-}
-
-// ---------------------------------------------------------------------------
-// View: the docked panel's size (drag its edge; saved per user): its width at
-// the right, its height at the bottom.
-
-const SIZES = {
-  // styles.css .panel and tools.css .workspace.tools-bottom > .panel
-  right: { pref: 'panelWidth', rule: 'panel-width', fallback: 380, min: 260, max: () => Math.min(760, window.innerWidth - 480) },
-  bottom: { pref: 'panelHeight', rule: 'panel-height', fallback: 300, min: 160, max: () => window.innerHeight - 260 },
-};
-let resizer = null;
-const panelSize = { right: null, bottom: null }; // null: the default size
-
-function sizeOf(where) {
-  return SIZES[where === 'bottom' ? 'bottom' : 'right'];
-}
-
-function panelMax(where) {
-  const s = sizeOf(where);
-  return Math.max(s.min, s.max());
-}
-
-/** Sets the docked panel's size (null: back to the default). Saves it when `save`. */
-function setPanelSize(where, n, { save = false } = {}) {
-  const s = sizeOf(where);
-  const key = where === 'bottom' ? 'bottom' : 'right';
-  const v = n === null ? null : Math.round(Math.max(s.min, Math.min(n, panelMax(where))));
-  panelSize[key] = v;
-  const rule = key === 'bottom' ? `.workspace.tools-bottom > .panel { height: ${v}px; }` : `.workspace > .panel { width: ${v}px; }`;
-  setRules(s.rule, v === null ? '' : rule);
-  if (save) writePref(s.pref, v);
-  syncResizer();
-}
-
-function currentPanelSize(where) {
-  const key = where === 'bottom' ? 'bottom' : 'right';
-  if (panelSize[key] !== null) return panelSize[key];
-  const r = $('panel').getBoundingClientRect();
-  return (key === 'bottom' ? r.height : r.width) || sizeOf(where).fallback;
-}
-
-/** Reapplies the saved sizes (the window was resized, or the panel moved). */
-function sizePanel() {
-  for (const k of ['right', 'bottom']) if (panelSize[k] !== null) setPanelSize(k, panelSize[k]);
-  syncResizer();
-}
-
-/** The edge's role, label and numbers follow where the panel is. */
-function syncResizer() {
-  if (!resizer) return;
-  const panel = $('panel');
-  resizer.hidden = panel.hidden || !dynamicStyles;
-  const bottom = state.position === 'bottom';
-  const s = sizeOf(state.position);
-  const key = bottom ? 'bottom' : 'right';
-  resizer.setAttribute('aria-orientation', bottom ? 'horizontal' : 'vertical');
-  resizer.setAttribute('aria-label', bottom ? 'Tools panel height' : 'Tools panel width');
-  resizer.title = `Drag to resize the tools panel; double-click for the standard ${bottom ? 'height' : 'width'}`;
-  resizer.setAttribute('aria-valuemin', String(s.min));
-  resizer.setAttribute('aria-valuemax', String(panelMax(state.position)));
-  resizer.setAttribute('aria-valuenow', String(panelSize[key] === null ? s.fallback : panelSize[key]));
-}
-
-function wirePanelResizer() {
-  resizer = el('div', {
-    class: 'panel-resizer',
-    attrs: { role: 'separator', tabindex: '0', 'aria-controls': 'panel' },
-  });
-  $('panel').before(resizer);
-  for (const k of ['right', 'bottom']) {
-    const saved = readPref(SIZES[k].pref, null);
-    if (typeof saved === 'number' && Number.isFinite(saved)) setPanelSize(k, saved);
-  }
-  syncResizer();
-
-  resizer.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    const where = state.position;
-    const bottom = where === 'bottom';
-    const start = bottom ? e.clientY : e.clientX;
-    const startSize = currentPanelSize(where);
-    resizer.setPointerCapture(e.pointerId);
-    document.body.classList.add(bottom ? 'panel-resizing-y' : 'panel-resizing');
-    // The panel grows as its edge moves away from it: left at the right, up at the bottom.
-    const move = (ev) => setPanelSize(where, startSize + (start - (bottom ? ev.clientY : ev.clientX)));
-    const end = () => {
-      resizer.removeEventListener('pointermove', move);
-      resizer.removeEventListener('pointerup', end);
-      resizer.removeEventListener('pointercancel', end);
-      document.body.classList.remove('panel-resizing', 'panel-resizing-y');
-      const key = bottom ? 'bottom' : 'right';
-      if (panelSize[key] !== null) writePref(sizeOf(where).pref, panelSize[key]);
-    };
-    resizer.addEventListener('pointermove', move);
-    resizer.addEventListener('pointerup', end);
-    resizer.addEventListener('pointercancel', end);
-  });
-  resizer.addEventListener('dblclick', () => setPanelSize(state.position, null, { save: true }));
-  // At the right, Left makes the panel wider (the edge moves left) and Right
-  // narrower; at the bottom, Up makes it taller and Down shorter. Shift for
-  // bigger steps; Home and End for the smallest and biggest; Escape to the grid.
-  resizer.addEventListener('keydown', (e) => {
-    const where = state.position;
-    const bottom = where === 'bottom';
-    const step = e.shiftKey ? 80 : 20;
-    const n = currentPanelSize(where);
-    const grow = bottom ? 'ArrowUp' : 'ArrowLeft';
-    const shrink = bottom ? 'ArrowDown' : 'ArrowRight';
-    let next = null;
-    if (e.key === grow) next = n + step;
-    else if (e.key === shrink) next = n - step;
-    else if (e.key === 'Home') next = sizeOf(where).min;
-    else if (e.key === 'End') next = panelMax(where);
-    else if (e.key === 'Escape') {
-      e.preventDefault();
-      grid.focus();
-      return;
-    } else return;
-    e.preventDefault();
-    e.stopPropagation();
-    setPanelSize(where, next, { save: true });
-  });
-  window.addEventListener('resize', sizePanel);
 }
 
 // ---------------------------------------------------------------------------
@@ -2780,6 +2648,8 @@ function setTarget(p) {
   cur = p;
   if (state.view) {
     renderTitle(state.view);
+    // The one share banner follows the target's budget, as the title does.
+    renderShareBanner(state.view, sharingCtx());
     renderPanel();
     showFormula(grid.cursorCell());
     document.dispatchEvent(new CustomEvent('fwb:selection'));
@@ -2992,7 +2862,7 @@ Object.assign(COMMANDS, {
 // Start
 
 function wire() {
-  wirePanelResizer();
+  wirePanelResizer({ position: () => state.position, focusGrid: () => grid.focus() });
   panes[0].strip = createTabStrip(panes[0].tabbar, stripHandlers(panes[0]));
   wireSplit();
   $('btn-new').addEventListener('click', doNew);

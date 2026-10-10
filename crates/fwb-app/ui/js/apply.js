@@ -63,6 +63,7 @@ import {
   MOVE_KEYS,
   inUse,
 } from './setuplist.js';
+import { obj, str, plural, errText } from './util.js';
 
 const LISTS = [
   {
@@ -185,30 +186,12 @@ document.addEventListener('fwb:selection', () => {
 // ---------------------------------------------------------------------------
 // Small helpers
 
-function obj(v) {
-  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
-}
-
-function str(v) {
-  return v === undefined || v === null ? '' : String(v);
-}
-
 function budget() {
   return obj(st.view && st.view.budget);
 }
 
 function report() {
   return obj(st.view && st.view.report);
-}
-
-function errText(e) {
-  if (typeof e === 'string') return e;
-  if (e && typeof e.message === 'string') return e.message;
-  return String(e);
-}
-
-function plural(n, one, many) {
-  return `${n} ${n === 1 ? one : many}`;
 }
 
 /** "18.5" -> "18.50", "10" -> "10.00": a percent string with two places. */

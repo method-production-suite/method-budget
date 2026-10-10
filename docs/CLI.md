@@ -19,7 +19,7 @@ shows (docs/RELEASING.md).
 
 Commands that write a file write it **atomically**: to a temporary file in the same
 folder, then renamed over the target, so a reader never sees half a file and a failed
-write leaves the old file as it was. No command ever writes over the budget it is reading
+write leaves the old file as it was. A replaced file keeps its permissions. No command ever writes over the budget it is reading
 from unless that is its job (`fmt`, `set`, `apply`).
 
 ## Exit codes
@@ -244,7 +244,8 @@ Three-way merge (roadmap 3.2; docs/MERGE.md): both budgets' changes since their 
 base. Different rows, fields and setup items merge on their own; the same field changed
 both ways, or something deleted on one side and changed on the other, is a conflict,
 settled for ours (or `--theirs`) and listed with the base, ours and theirs values. The
-merged budget is written either way. **Exit 1 when conflicts were settled** that way,
+merged budget is written either way, never over one of the three budgets (that is
+`merge-driver`'s job). **Exit 1 when conflicts were settled** that way,
 0 when there were none.
 
 ### `method merge-driver <base> <ours> <theirs> [<path>] [--theirs]`
@@ -257,8 +258,8 @@ and `git config merge.method-budget.driver "method merge-driver %O %A %B %P"` (d
 
 ## Edit scripts
 
-`method apply` reads one command per line. Blank lines and lines starting with `#` are
-skipped. Words are separated by spaces; put a value with spaces in double quotes, with
+`method apply` reads one command per line (UTF-8; a byte order mark at the start is
+ignored). Blank lines and lines starting with `#` are skipped. Words are separated by spaces; put a value with spaces in double quotes, with
 `\"` for a quote and `\\` for a backslash. A command with too many words is refused
 rather than guessed at.
 

@@ -91,7 +91,6 @@ export function secondPane() {
 let box = null; // .panes: both panes and the divider
 let firstColumn = null; // the first pane's column, split
 let divider = null;
-let onRatio = null;
 
 /** True when the window shows two panes. */
 export function isSplitLayout() {
@@ -181,12 +180,6 @@ export function setRatio(r, { save = false } = {}) {
   ratio = r === null ? 0.5 : clamp(r);
   applyRatio();
   if (save) writePref('splitRatio', ratio);
-  if (onRatio) onRatio(ratio);
-}
-
-/** `fn(ratio)` runs when the divider moves (main.js redraws nothing; grids refit themselves). */
-export function onRatioChange(fn) {
-  onRatio = typeof fn === 'function' ? fn : null;
 }
 
 function build() {

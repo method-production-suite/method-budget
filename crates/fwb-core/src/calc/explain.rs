@@ -319,7 +319,7 @@ pub fn money(c: Cents) -> String {
 }
 
 /// A decimal amount of money: at least two places, more when it has them.
-fn dmoney(d: Dec) -> String {
+pub(crate) fn dmoney(d: Dec) -> String {
     let s = d.to_string();
     let (sign, s) = match s.strip_prefix('-') {
         Some(r) => ("-", r),
@@ -2243,9 +2243,13 @@ impl Target {
 }
 
 /// An account by number: exactly as written, else as the budget's coding
-/// normalizes it (`11-5` is `11-05`).
+/// normalizes it (`11-5` is `11-05`), never by cutting it short.
 fn find_account(b: &Budget, code: &str) -> Option<Target> {
-    let norm = b.account_coding.normalize(code).ok();
+    let coding = &b.account_coding;
+    let norm = coding
+        .fits(code)
+        .then(|| coding.normalize(code).ok())
+        .flatten();
     for (ci, cat) in b.categories().enumerate() {
         for (ai, a) in cat.accounts.iter().enumerate() {
             if a.code == code || norm.as_deref() == Some(a.code.as_str()) {

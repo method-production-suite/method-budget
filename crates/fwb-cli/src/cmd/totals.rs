@@ -2,10 +2,10 @@
 
 use std::fmt::Write as _;
 
-use fwb_core::{recalc, Budget, Cents, RecalcOptions, Report};
+use fwb_core::{recalc, Budget, Cents, Report};
 use fwb_format::export::money_text;
 
-use crate::cli::{json_string, load, CliError, Flags, Outcome};
+use crate::cli::{excluding, json_string, load, CliError, Flags, Outcome};
 
 pub const USAGE: &str = "  method totals <file.mthd> [--json] [--exclude GROUP]...
       Print the totals, one `name<TAB>amount` line each (exact decimals), with
@@ -16,10 +16,7 @@ pub const USAGE: &str = "  method totals <file.mthd> [--json] [--exclude GROUP].
 pub fn run(args: &[String]) -> Outcome {
     let f = Flags::parse(args, &["--exclude"], &["--json"], USAGE)?;
     let path = &f.exactly(1, "the budget file", USAGE)?[0];
-    let mut opts = RecalcOptions::default();
-    for g in f.values("--exclude") {
-        opts.exclude_groups.insert(g.to_string());
-    }
+    let opts = excluding(&f);
     let b = load(path)?;
     let r = recalc(&b, &opts).map_err(|e| CliError::failed(format!("{path}: {e}")))?;
     Ok(if f.has("--json") {
@@ -152,7 +149,7 @@ pub fn json(b: &Budget, r: &Report) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fwb_core::starter;
+    use fwb_core::{starter, RecalcOptions};
 
     #[test]
     fn text_and_json_agree() {

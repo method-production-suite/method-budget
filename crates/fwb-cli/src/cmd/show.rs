@@ -2,9 +2,9 @@
 
 use std::fmt::Write as _;
 
-use fwb_core::{recalc, Budget, Cents, RecalcOptions, Report};
+use fwb_core::{recalc, Budget, Cents, Report};
 
-use crate::cli::{load, money, CliError, Flags, Outcome};
+use crate::cli::{excluding, load, money, CliError, Flags, Outcome};
 
 pub const USAGE: &str = "  method show <file.mthd> [--exclude GROUP]...
       Print the topsheet. --exclude leaves a group's lines out (repeatable).
@@ -13,10 +13,7 @@ pub const USAGE: &str = "  method show <file.mthd> [--exclude GROUP]...
 pub fn run(args: &[String]) -> Outcome {
     let f = Flags::parse(args, &["--exclude"], &[], USAGE)?;
     let path = &f.exactly(1, "the budget file", USAGE)?[0];
-    let mut opts = RecalcOptions::default();
-    for g in f.values("--exclude") {
-        opts.exclude_groups.insert(g.to_string());
-    }
+    let opts = excluding(&f);
     let b = load(path)?;
     let r = recalc(&b, &opts).map_err(|e| CliError::failed(format!("{path}: {e}")))?;
     Ok(topsheet(&b, &r))
@@ -69,7 +66,7 @@ pub fn topsheet(b: &Budget, r: &Report) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fwb_core::starter;
+    use fwb_core::{starter, RecalcOptions};
 
     #[test]
     fn starter_budget_recalcs_and_shows() {

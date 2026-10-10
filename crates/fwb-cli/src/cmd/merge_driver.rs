@@ -5,8 +5,8 @@
 
 use fwb_core::merge::merge_with;
 
-use super::merge::{default_side, finish, write_merged};
-use crate::cli::{load, CliError, Flags, Outcome};
+use super::merge::{default_side, finish};
+use crate::cli::{load, save, CliError, Flags, Outcome};
 
 pub const USAGE: &str = "  method merge-driver <base> <ours> <theirs> [<path>] [--theirs]
       For git (`%O %A %B %P`): merges into <ours> in place, conflicts settled
@@ -40,6 +40,6 @@ pub fn run(args: &[String]) -> Outcome {
     let ours = load(&files[1]).map_err(named)?;
     let theirs = load(&files[2]).map_err(named)?;
     let m = merge_with(&base, &ours, &theirs, side, &Default::default());
-    write_merged(&files[1], &m.budget)?;
+    save(&files[1], &m.budget)?;
     finish(shown, &m, side)
 }

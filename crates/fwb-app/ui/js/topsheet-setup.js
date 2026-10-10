@@ -11,14 +11,7 @@
 import { displaySettingsGroup } from './display-settings.js';
 import { invoke } from './api.js';
 import { applyCoding, pendingRenumber, previewBox } from './renumber.js';
-
-export const EXTRA_TABS = [
-  { id: 'charges', label: 'Charges' },
-  { id: 'credits', label: 'Credits' },
-  { id: 'info', label: 'Info' },
-  { id: 'settings', label: 'Settings' },
-  { id: 'baseline', label: 'Baseline' },
-];
+import { obj } from './util.js';
 
 const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -55,10 +48,6 @@ export function renderExtraTab(tab, panel, kit) {
 
 function arr(v) {
   return Array.isArray(v) ? v : [];
-}
-
-function obj(v) {
-  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
 }
 
 function isNone(v) {

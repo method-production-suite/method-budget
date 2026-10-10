@@ -21,7 +21,6 @@
 
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
-use std::path::Path;
 use std::str::FromStr;
 
 use fwb_core::rename::{rename, valid_name, SetupKind};
@@ -29,7 +28,7 @@ use fwb_core::{
     recalc, Budget, Cents, Dec, Detail, Formula, FringeKind, RecalcOptions, Report, RowId,
 };
 
-use crate::cli::{money, write_atomic, CliError, Outcome};
+use crate::cli::{money, CliError, Outcome};
 
 /// One word of a script line.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -48,7 +47,7 @@ impl Word {
     }
 
     /// The `none` keyword, or an empty value: "clear this".
-    fn is_none(&self) -> bool {
+    pub fn is_none(&self) -> bool {
         self.text.is_empty() || (!self.quoted && self.text == "none")
     }
 }
@@ -360,7 +359,8 @@ fn opt_shown(s: &Option<String>) -> String {
     s.as_deref().map_or_else(|| "none".into(), shown)
 }
 
-fn flag(w: &Word) -> Result<bool, String> {
+/// `true`/`yes`/`on` or `false`/`no`/`off`.
+pub fn flag(w: &Word) -> Result<bool, String> {
     match w.text.as_str() {
         "true" | "yes" | "on" => Ok(true),
         "false" | "no" | "off" => Ok(false),
@@ -685,7 +685,7 @@ pub fn run(path: &str, ops: &[(String, Op)], dry_run: bool) -> Outcome {
     if dry_run {
         out.push_str("dry run: nothing written\n");
     } else if changed {
-        write_atomic(Path::new(path), fwb_format::to_string(&after).as_bytes())?;
+        crate::cli::save(path, &after)?;
         let _ = writeln!(out, "wrote {path}");
     }
     Ok(out)

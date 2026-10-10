@@ -4,9 +4,10 @@
 Usage: python3 scripts/check-crate-ages.py [--days 14] [--lock Cargo.lock] [--only-changed REF]
 
 Looks up each locked crates.io version's publish date (one request per second, per
-crates.io's crawler policy) and lists any younger than the cooldown. With
---only-changed REF, only packages added or bumped since that git ref are checked.
-Stdlib only, so it runs anywhere Python 3 does.
+crates.io's crawler policy) and lists any younger than the cooldown. A package from
+anywhere else (a git repository, another registry) has no publish date to check, so it
+fails the check too: fail closed. With --only-changed REF, only packages added or bumped
+since that git ref are checked. Stdlib only, so it runs anywhere Python 3 does.
 """
 
 import argparse
@@ -21,12 +22,14 @@ import urllib.request
 UA = "method-budget cooldown check (https://github.com/ssandweiss/method-budget)"
 
 
-def registry_packages(lock_text):
+CRATES_IO = "registry+https://github.com/rust-lang/crates.io-index"
+
+
+def external_packages(lock_text):
+    """(name, version, source) of every locked package that isn't a workspace member."""
     lock = tomllib.loads(lock_text)
     return {
-        (p["name"], p["version"])
-        for p in lock.get("package", [])
-        if p.get("source", "").startswith("registry+https://github.com/rust-lang/crates.io-index")
+        (p["name"], p["version"], p["source"]) for p in lock.get("package", []) if p.get("source")
     }
 
 
@@ -47,16 +50,21 @@ def main():
     args = ap.parse_args()
 
     with open(args.lock) as f:
-        pkgs = registry_packages(f.read())
+        pkgs = external_packages(f.read())
     if args.only_changed:
         old = subprocess.run(
             ["git", "show", f"{args.only_changed}:{args.lock}"], capture_output=True, text=True
         )
         if old.returncode == 0:
-            pkgs -= registry_packages(old.stdout)
+            pkgs -= external_packages(old.stdout)
+
+    bad = []
+    for name, version, source in sorted(p for p in pkgs if p[2] != CRATES_IO):
+        print(f"{name:40} {version:16}  NOT FROM CRATES.IO ({source}): no publish date to check")
+        bad.append(f"{name} {version} ({source})")
+    pkgs = {(name, version) for name, version, source in pkgs if source == CRATES_IO}
 
     now = dt.datetime.now(dt.timezone.utc)
-    bad = []
     for i, (name, version) in enumerate(sorted(pkgs)):
         if i:
             time.sleep(1)
@@ -71,7 +79,7 @@ def main():
             bad.append(f"{name} {version} (yanked)")
         print(f"{name:40} {version:16} {age:5} days{flag}")
 
-    print(f"\nchecked {len(pkgs)} crates; {len(bad)} problem(s)")
+    print(f"\nchecked {len(pkgs)} crates.io crates; {len(bad)} problem(s)")
     if bad:
         print("downgrade with: cargo update -p NAME --precise VERSION")
         sys.exit(1)

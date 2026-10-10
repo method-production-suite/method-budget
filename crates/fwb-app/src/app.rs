@@ -158,23 +158,36 @@ pub async fn open_budget<R: Runtime>(
         .path()
         .and_then(|p| p.parent())
         .map(PathBuf::from);
+    let Some(path) = pick_budget(&window, "Open budget", start)? else {
+        return Ok(None);
+    };
+    // Opens it in a tab and lists it in Open Recent (src/safety_app.rs).
+    let id = crate::safety_app::open_path(&state, &window.state(), &path)?;
+    crate::safety_app::refresh_menu(window.app_handle());
+    Ok(Some(finish(&window, &mut state.lock_doc(Some(id))?, None)))
+}
+
+/// Rust's Open dialog for one budget file (`.mthd`, or the older `.fwb`),
+/// titled `title`, starting in folder `start`: the file picked, or `None`
+/// when cancelled. Blocks until the user answers: never on the main thread.
+pub(crate) fn pick_budget<R: Runtime>(
+    window: &WebviewWindow<R>,
+    title: &str,
+    start: Option<PathBuf>,
+) -> CmdResult<Option<PathBuf>> {
     let mut dialog = window
         .dialog()
         .file()
-        .set_title("Open budget")
+        .set_title(title)
         .add_filter(FILTER_NAME, fwb_format::EXTENSIONS)
-        .set_parent(&window);
+        .set_parent(window);
     if let Some(dir) = start {
         dialog = dialog.set_directory(dir);
     }
     let Some(picked) = dialog.blocking_pick_file() else {
         return Ok(None);
     };
-    let path = picked.into_path().map_err(|e| e.to_string())?;
-    // Opens it in a tab and lists it in Open Recent (src/safety_app.rs).
-    let id = crate::safety_app::open_path(&state, &window.state(), &path)?;
-    crate::safety_app::refresh_menu(window.app_handle());
-    Ok(Some(finish(&window, &mut state.lock_doc(Some(id))?, None)))
+    picked.into_path().map(Some).map_err(|e| e.to_string())
 }
 
 /// Saves budget `doc` (`None`: the one in front) to its file, or asks where
@@ -971,22 +984,6 @@ pub fn set_account_coding<R: Runtime>(
 }
 
 #[tauri::command]
-pub fn set_base_currency<R: Runtime>(
-    window: WebviewWindow<R>,
-    state: State<'_, AppState>,
-    doc: Option<DocId>,
-    code: String,
-) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        format!("Make {} the base currency", code.trim()),
-        |b| edit::set_base_currency(b, &code),
-    )
-}
-
-#[tauri::command]
 pub fn set_totals_currency<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
@@ -1339,7 +1336,6 @@ pub fn run() {
             delete_info,
             set_fringe_posting,
             set_account_coding,
-            set_base_currency,
             set_totals_currency,
             lock_baseline,
             clear_baseline,
@@ -1597,6 +1593,72 @@ mod tests {
         );
         assert_eq!(buttons, ["Save All", "Discard All", "Cancel"]);
         assert!(!two.contains('\u{2014}'), "no em dashes");
+    }
+
+    /// Every command is in `generate_handler!` above and in build.rs's list
+    /// (which turns access control on for it), the same set both ways, and
+    /// at least one window's capability allows it. A capability allows
+    /// nothing else but a few core permissions: no file system, shell,
+    /// dialog or updater plugin access from any page, and only the main
+    /// window prints and closes itself. (Which window gets which command is
+    /// tested beside each command.)
+    #[test]
+    fn commands_handlers_and_capabilities_agree() {
+        use std::collections::BTreeSet;
+        const BUILD_RS: &str = include_str!("../build.rs");
+        const APP_RS: &str = include_str!("app.rs");
+        let between = |text: &'static str, start: &str, end: &str| -> &'static str {
+            let from = text.split(start).nth(1).expect("start marker");
+            from.split(end).next().expect("end marker")
+        };
+        let code_lines = |text: &'static str| {
+            text.lines()
+                .map(str::trim)
+                .filter(|l| !l.is_empty() && !l.starts_with("//"))
+        };
+        let listed: BTreeSet<&str> = code_lines(between(BUILD_RS, "const COMMANDS", "];"))
+            .filter_map(|l| l.strip_prefix('"')?.strip_suffix("\","))
+            .collect();
+        let handled: BTreeSet<&str> = code_lines(between(APP_RS, "generate_handler![", "])"))
+            .map(|l| l.trim_end_matches(',').rsplit("::").next().unwrap())
+            .collect();
+        assert!(listed.len() > 100, "build.rs's list wasn't read");
+        assert_eq!(listed, handled, "build.rs and generate_handler! differ");
+
+        let mut allowed = BTreeSet::new();
+        for (window, json) in [
+            ("main", include_str!("../capabilities/main.json")),
+            ("tools", include_str!("../capabilities/tools.json")),
+            ("setup", include_str!("../capabilities/setup.json")),
+        ] {
+            let cap: serde_json::Value = serde_json::from_str(json).unwrap();
+            assert_eq!(cap["identifier"], window);
+            assert_eq!(cap["windows"], serde_json::json!([window]));
+            for p in cap["permissions"].as_array().unwrap() {
+                let p = p.as_str().expect("permissions are plain names");
+                if let Some(cmd) = p.strip_prefix("allow-") {
+                    let cmd = cmd.replace('-', "_");
+                    assert!(
+                        listed.contains(cmd.as_str()),
+                        "{window}: {p} isn't a command"
+                    );
+                    allowed.insert(cmd);
+                    continue;
+                }
+                let core = ["core:event:allow-listen", "core:event:allow-emit-to"];
+                let main_only = ["core:webview:allow-print", "core:window:allow-close"];
+                assert!(
+                    core.contains(&p) || (window == "main" && main_only.contains(&p)),
+                    "{window} is granted {p}"
+                );
+            }
+        }
+        let unreachable: Vec<&&str> = listed.iter().filter(|c| !allowed.contains(**c)).collect();
+        assert!(unreachable.is_empty(), "no window may call {unreachable:?}");
+        assert!(
+            !listed.contains("set_base_currency"),
+            "renaming the base currency goes through rename_setup_item (decisions.md)"
+        );
     }
 
     #[test]

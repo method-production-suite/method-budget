@@ -10,8 +10,7 @@
 //
 // Also: a short summary of an item's notes for a tooltip.
 
-/** The setup tables, by the key the file and the view use. */
-export const SETUP_TABLES = ['units', 'globals', 'fringes', 'groups', 'sets', 'locations', 'currencies'];
+import { obj } from './util.js';
 
 /** The kind name commands take for each table (`rename_setup_item`, `set_setup_order`...). */
 export const TABLE_KIND = {
@@ -23,10 +22,6 @@ export const TABLE_KIND = {
   locations: 'location',
   currencies: 'currency',
 };
-
-function obj(v) {
-  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
-}
 
 export function byteOrder(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
@@ -58,16 +53,6 @@ export function orderedNames(budget, table) {
   }
   for (const n of all) if (!seen.has(n)) out.push(n);
   return out;
-}
-
-/** `names` (any order) sorted as `table` shows them. */
-export function inTableOrder(budget, table, names) {
-  const at = new Map(orderedNames(budget, table).map((n, i) => [n, i]));
-  return [...names].sort((a, b) => {
-    const x = at.has(a) ? at.get(a) : Infinity;
-    const y = at.has(b) ? at.get(b) : Infinity;
-    return x !== y ? (x < y ? -1 : 1) : byteOrder(a, b);
-  });
 }
 
 /** A fringe's or group's short code, or ''. */
