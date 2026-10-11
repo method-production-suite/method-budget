@@ -5,11 +5,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::calc::arith::{percent_of, Money, Num};
 use crate::calc::{
-    breakdown, err, eval_globals, lines, overflow, row_at, sum, topsheet, CalcError, Ctx,
-    ErrorKind, RecalcOptions,
+    breakdown, err, lines, overflow, row_at, sum, topsheet, CalcError, Ctx, ErrorKind,
+    RecalcOptions,
 };
-use crate::decimal::{percent_of, Dec};
+use crate::decimal::Dec;
 use crate::model::{Account, Budget, Detail, Fringe, FringeKind, RowKind};
 use crate::report::{AccountTotals, CategoryTotals, Report, RowTotals};
 use crate::Cents;
@@ -21,7 +22,7 @@ fn apply_fringes(ctx: &Ctx, acct: &Account, rows: &mut [RowTotals]) -> Result<()
         r.fringes.clear();
         r.fringe_total = 0;
     }
-    let mut rates: BTreeMap<&str, (&Fringe, Dec)> = BTreeMap::new();
+    let mut rates: BTreeMap<&str, (&Fringe, Num)> = BTreeMap::new();
     for (i, d) in details.iter().enumerate() {
         if d.kind != RowKind::Line {
             continue;
@@ -70,7 +71,9 @@ fn apply_fringes(ctx: &Ctx, acct: &Account, rows: &mut [RowTotals]) -> Result<()
             if let Some(c) = cutoff {
                 base = base.min(c);
             }
-            let amount = percent_of(base, rate).ok_or_else(ovf)?;
+            let amount = percent_of(ctx.arith, base, rate)
+                .and_then(Money::to_cents)
+                .ok_or_else(ovf)?;
             let shares = super::fringes::allocate(amount, &weights).ok_or_else(ovf)?;
             for (&i, share) in lines.iter().zip(shares) {
                 rows[i].fringes.insert(name.to_string(), share);
@@ -88,7 +91,7 @@ fn apply_fringes(ctx: &Ctx, acct: &Account, rows: &mut [RowTotals]) -> Result<()
             if !matches!(f.kind, FringeKind::Flat { .. }) {
                 continue;
             }
-            let v = super::fringes::Factors::of(ctx, &acct.code, i, d, rows[i].quantity)?;
+            let v = super::fringes::Factors::of(ctx, &acct.code, i, d)?;
             let amount = super::fringes::flat_amount(ctx, &f.kind, d, v, rate)
                 .ok_or_else(|| overflow(row_at(&acct.code, i, d, &format!("fringe {name}"))))?;
             rows[i].fringes.insert(name.clone(), amount);
@@ -153,12 +156,8 @@ pub(crate) fn recalc(b: &Budget, opts: &RecalcOptions) -> Result<Report, CalcErr
         }
         _ => Dec::ONE,
     };
-    let ctx = Ctx {
-        b,
-        globals: eval_globals(b)?,
-        opts,
-        unfiltered: false,
-    };
+    let ctx = Ctx::new(b, opts)?;
+    let globals = ctx.shown_globals()?;
     let categories = eval_categories(&ctx)?;
     let ts = topsheet::finish(&ctx, categories)?;
     let full_ctx = Ctx {
@@ -177,7 +176,7 @@ pub(crate) fn recalc(b: &Budget, opts: &RecalcOptions) -> Result<Report, CalcErr
             .clone()
             .unwrap_or_else(|| b.base_currency.clone()),
         totals_rate,
-        globals: full_ctx.globals,
+        globals,
         categories: ts.categories,
         levels: ts.levels,
         budget_fringes: ts.budget_fringes,
@@ -243,6 +242,9 @@ mod tests {
                 ..SampleSpec::default()
             };
             let mut b = sample::budget(&spec);
+            if seed % 3 == 0 {
+                b.arithmetic = crate::model::Arithmetic::Exact;
+            }
             b.fringe_posting = match seed % 4 {
                 0 => FringePosting::Budget,
                 1 => FringePosting::ProductionLevel,
@@ -426,12 +428,6 @@ mod tests {
             ..SampleSpec::default()
         });
         let opts = RecalcOptions::default();
-        let ctx = Ctx {
-            b: &b,
-            globals: eval_globals(&b).unwrap(),
-            opts: &opts,
-            unfiltered: false,
-        };
         let cases = [
             "0",
             "12",
@@ -462,22 +458,53 @@ mod tests {
             "١٢",
             "5\u{a0}",
         ];
-        for src in cases {
-            let full = Expr::parse(src)
-                .ok()
-                .and_then(|e| e.eval(&|n| ctx.globals.get(n).copied()).ok());
-            if let Some(v) = ctx.eval_simple(src) {
-                assert_eq!(Some(v), full, "{src:?}");
+        for arith in crate::model::Arithmetic::ALL {
+            let mut b = b.clone();
+            b.arithmetic = arith;
+            let ctx = Ctx::new(&b, &opts).unwrap();
+            let dec = |n: &str| ctx.globals.get(n)?.shown();
+            let float = |n: &str| Some(ctx.globals.get(n)?.f64());
+            for src in cases {
+                let full = Expr::parse(src).ok().and_then(|e| match arith {
+                    crate::model::Arithmetic::Exact => e.eval(&dec).ok().map(Num::Dec),
+                    crate::model::Arithmetic::Mmb => e.eval_f64(&float).ok().map(Num::F64),
+                });
+                let quick = match arith {
+                    crate::model::Arithmetic::Exact => {
+                        crate::expr::quick_value(src, &dec).map(Num::Dec)
+                    }
+                    crate::model::Arithmetic::Mmb => {
+                        crate::expr::quick_value_f64(src, &float).map(Num::F64)
+                    }
+                };
+                if let Some(v) = quick {
+                    assert_eq!(Some(v), full, "{arith:?} {src:?}");
+                }
+                let via_eval = ctx.eval(&src.into(), Dec::ZERO, &|| String::new()).ok();
+                if !src.trim().is_empty() {
+                    assert_eq!(via_eval, full, "{arith:?} {src:?}");
+                }
             }
-            let via_eval = ctx.eval(&src.into(), Dec::ZERO, &|| String::new()).ok();
-            if !src.trim().is_empty() {
-                assert_eq!(via_eval, full, "{src:?}");
+            for (src, quick) in [("12", true), ("SHOOT_DAYS", true), ("NOPE", false)] {
+                assert_eq!(
+                    crate::expr::quick_value(src, &dec).is_some(),
+                    quick,
+                    "{src}"
+                );
+                assert_eq!(
+                    crate::expr::quick_value_f64(src, &float).is_some(),
+                    quick,
+                    "{src}"
+                );
+            }
+            assert!(crate::expr::quick_value("1.2.3", &dec).is_none());
+            // More than 9 places: only Movie Magic arithmetic reads it.
+            let precise = ctx.eval(&"0.0000000149".into(), Dec::ZERO, &|| String::new());
+            match arith {
+                crate::model::Arithmetic::Exact => assert!(precise.is_err()),
+                crate::model::Arithmetic::Mmb => assert_eq!(precise, Ok(Num::F64(1.49e-8))),
             }
         }
-        assert!(ctx.eval_simple("12").is_some());
-        assert!(ctx.eval_simple("SHOOT_DAYS").is_some());
-        assert!(ctx.eval_simple("NOPE").is_none());
-        assert!(ctx.eval_simple("1.2.3").is_none());
     }
 
     #[test]

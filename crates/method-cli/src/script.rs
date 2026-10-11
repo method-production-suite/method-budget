@@ -7,6 +7,7 @@
 //! # comments start a line with #
 //! set title "Feature, draft 3"
 //! set compact_versions true
+//! set arithmetic exact
 //! set global SHOOT_DAYS 32
 //! set fringe FICA rate 7.65
 //! set fringe FICA cutoff 168600.00
@@ -27,8 +28,8 @@ use std::str::FromStr;
 
 use method_core::rename::{rename, valid_name, SetupKind};
 use method_core::{
-    recalc, Budget, Cents, Dec, Detail, FlatBasis, Formula, FringeKind, RecalcOptions, Report,
-    RowId,
+    recalc, Arithmetic, Budget, Cents, Dec, Detail, FlatBasis, Formula, FringeKind, RecalcOptions,
+    Report, RowId,
 };
 
 use crate::cli::{money, CliError, Outcome};
@@ -192,6 +193,8 @@ pub enum Op {
     Charge(String, bool),
     /// Save versions as deltas (docs/FORMAT.md, "Version deltas").
     CompactVersions(bool),
+    /// How totals are worked out (docs/FORMAT.md, "Budget").
+    Arithmetic(Arithmetic),
 }
 
 fn need<'a>(w: &'a [Word], n: usize, form: &str) -> Result<&'a [Word], String> {
@@ -212,6 +215,11 @@ fn parse_money(s: &str) -> Result<Cents, String> {
     Ok(c)
 }
 
+/// An arithmetic by name (`mmb` or `exact`).
+pub fn arithmetic(s: &str) -> Result<Arithmetic, String> {
+    Arithmetic::parse(s).ok_or_else(|| format!("`{s}` is not an arithmetic: use mmb or exact"))
+}
+
 /// Parses one line. `Ok(None)` for a blank line or a comment.
 pub fn parse(line: &str) -> Result<Option<Op>, String> {
     let trimmed = line.trim_start();
@@ -228,6 +236,10 @@ pub fn parse(line: &str) -> Result<Option<Op>, String> {
         ["set", "compact_versions"] => {
             let w = need(&w, 3, "set compact_versions true|false")?;
             Op::CompactVersions(flag(&w[2])?)
+        }
+        ["set", "arithmetic"] => {
+            let w = need(&w, 3, "set arithmetic mmb|exact")?;
+            Op::Arithmetic(arithmetic(&w[2].text)?)
         }
         ["set", "global"] => {
             let w = need(&w, 4, "set global NAME FORMULA")?;
@@ -655,6 +667,14 @@ pub fn apply(b: &mut Budget, op: &Op) -> Result<Vec<String>, String> {
             log.push(format!("compact_versions {} -> {on}", b.compact_versions));
             b.compact_versions = *on;
         }
+        Op::Arithmetic(a) => {
+            log.push(format!(
+                "arithmetic {} -> {}",
+                b.arithmetic.name(),
+                a.name()
+            ));
+            b.arithmetic = *a;
+        }
         Op::Charge(name, applied) => {
             let c = b
                 .charges
@@ -805,6 +825,8 @@ mod tests {
         let ok = [
             "set title \"New title\"",
             "set compact_versions true",
+            "set arithmetic exact",
+            "set arithmetic mmb",
             "set global DAYS 30",
             "set fringe FICA rate 7.65",
             "set fringe FICA cutoff 168,600.00",

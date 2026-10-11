@@ -12,6 +12,11 @@ Short records of choices that shape the code. Newest last.
 - `Dec` multiply and divide round to 9 places. That can matter for repeating fractions:
   `35 / 3` is stored as `11.666666667`.
 
+**Amended 2026-10-10 (entry 55):** this is now the `exact` arithmetic, a per-budget
+setting. By default a budget works its formulas and money out in binary doubles, rounded to
+cents half up on the double, as the reference product does. Money is still `Cents` either
+way.
+
 ## 2. Where rounding happens (2026-10-08)
 
 Money is rounded to cents **once per detail line**, never in the rollups:
@@ -43,6 +48,10 @@ fringe per unit, whose division need not end, it shows the quotient to 9 places.
 hand-checked tutorial figures are unchanged. (What a flat fringe counts changed in entry
 54: the Amount, not the quantity, and the count is an exact fraction rounded once with the
 fringe, the same rule.)
+
+**Amended 2026-10-10 (entry 55):** these are the `exact` arithmetic's steps. The default,
+Movie Magic arithmetic, rounds once at the same places, but from doubles, half up on the
+double, and converts a foreign line before rounding it (so step 3 rounds once, not twice).
 
 ## 3. Fringe cutoffs are per earner (2026-10-08, revised)
 
@@ -1977,4 +1986,80 @@ figures for them (300.00 each).
   and insurance on the smaller base) and the net 272,234.14 (was 276,734.14). The export
   test plan's predictions are unchanged: none of its flat-fringed lines has X or 4X (Driver
   ZFLAT on 3 Zweeks is still 15 Zdays, 375.00; Driver kit on 2 Zallow still 25.00 once).
+
+## 55. Movie Magic arithmetic by default, exact decimals as an option (2026-10-10, the owner)
+
+The parity run of 2026-10-10 (imports/mmb-parity/2026-10-10, run-log.md and
+parity-report.md, item A1, A7, A8 and A9) showed the reference product, Movie Magic
+Budgeting 10, works its figures out in binary doubles, not in exact decimals. The owner's
+call, under the rule to match it as closely as possible: **match its arithmetic by
+default, and keep our exact decimals (entries 1 and 2) as a setting per budget.**
+
+- **The setting** is the budget's `arithmetic`: `mmb` (the default, also for every file
+  that doesn't say, so existing files change to it) or `exact`. It is content: versions
+  carry it, diff lists it with the budget settings, merge merges it like one, the recalc
+  cache starts over when it changes. FORMAT.md writes it only when it is `exact`;
+  `method set FILE arithmetic exact` and the script command `set arithmetic exact` switch
+  it.
+- **Movie Magic arithmetic, as checked**:
+  - Formulas, globals and every money step are doubles, each operation rounding to a
+    double. A line is `((Amount x X) x 4X) x Rate`, rounded to cents once like JavaScript's
+    `Math.round(v * 100) / 100`: `v * 100` in doubles, then the nearest whole number, a
+    half going toward plus infinity (Math.round's own rule, not `floor(x + 0.5)`, which
+    gets 0.49999999999999994 wrong). Checked: 1 x 1.005 is 1.00, 0.145 is 0.14, -1 x 0.125
+    is -0.12, 2.675 is 2.68 (2.67499999999999982... times 100 rounds to the double 267.5),
+    3 x 432.105 is
+    1,296.32, 1/3 (0.3333333333333333) x 30,000,000.015 is 10,000,000.00, 3 x
+    3,333,333,333,333.335 is 10,000,000,000,000.00. ZTEST01 grand total
+    10,000,010,005,314.61.
+  - A foreign line converts the unrounded amount and rounds once: 0.335 EUR at 3 is
+    1.0050000000000001, so 1.01 (we rounded to 0.34 EUR first: 1.02). The line's own
+    currency total still shows rounded (0.34).
+  - Globals are doubles: `17 / 3` is 5.666666666666667, and x 15,000,000 is
+    85,000,000.00 (9 places made it .01). A deleted global is frozen into formulas with the
+    shortest digits that give its double back, so no total moves.
+  - A number in a formula keeps every place it is written with: 100,000,000 x 0.0000000149
+    is 1.49. The file always kept formulas as typed; the formula reader now takes more than
+    9 places (exact arithmetic still refuses them, with "more than 9 decimal places").
+  - A percent fringe is `base x percent / 100` on the base's dollars: 12.5% of a 4,444.44
+    cutoff is 555.55499..., so 555.55 (the cutoff factor case V04-2). A flat fringe's count
+    is worked out first (`Amount x line unit hours / fringe unit hours`, left to right),
+    then times the rate: 0.06 per 12-hour Day on 1 Hour is 0.06 x 0.08333333333333333 =
+    0.004999999999999999, so 0.00 (F-19). A percent charge is the same as a percent fringe
+    (0.4425% of 22,600.00 is 100.01, of 21,800.00 96.47: those land above the half in
+    doubles, as they do exactly).
+  - An adjustment row takes its percent of the rows above added up in doubles, row by row
+    (the reference product stores that sum, 132,347.66999999998, as the row's rate).
+  - Credit rows are added up unrounded, capped and discounted, then rounded once, as
+    before, in doubles.
+  - Accounts, categories, levels, the grand and net totals stay integer sums of the
+    rounded cents, so rollups always agree.
+- **Not checked, chosen**: where the order of operations could matter and no figure
+  decided it, we multiply left to right as written above (percent: base x percent, then /
+  100; flat: count, then x rate; a capped flat count: Amount x line hours x hours a day /
+  Day hours / fringe hours; credits: percent of net, then / 100, then x (100 - discount) /
+  100). The most-hours-a-day cap and the `amount_counts` basis are ours, so their order is
+  ours too.
+- **Exact arithmetic is unchanged**, figure for figure (the same budgets give 1.01, 0.15,
+  -0.13, 9,999,999.99 and 10,000,000,000,000.01 on ZTEST01; 0.01 on F-19; 555.56; 1.02;
+  85,000,000.01).
+- **Shown values** stay decimals: a line's quantity and the report's globals are the
+  doubles rounded to 9 places for showing; the money they make is worked out from the
+  doubles.
+- **One place in the code**: `calc::arith` (`Num`, a decimal or a double; `Money`, an
+  unrounded amount, exact or a double; `mmb_cents`). The engine, the reference engine and
+  Explain all go through it, so the switch is in one place and Explain's leaves still add
+  up to every total in both arithmetics (the explain, property and reference tests run
+  both).
+- **Explain says the rule**: a line under the title ("Movie Magic arithmetic: binary
+  doubles, each amount rounded to cents once, half up on the double", or the exact rule),
+  and each Rounding step says what the double holds when that decides it ("1.005 is
+  1.00499999999999989341... as a binary double, so it rounds to 1.00 (Movie Magic
+  rounding: half up on the double)").
+- **Left as they were**: showing totals in another currency (`Report::in_totals_currency`)
+  still divides exactly, per total (the reference product converts and rounds each row,
+  parity report section B: a display change for later). Settings stored as decimals
+  (currency rates, charge and credit percents, unit hours, max hours a day) keep 9 places,
+  and the spreadsheet importers still round numbers to 9 places. The editor's lenient
+  recalc checks formulas in the budget's arithmetic.
 

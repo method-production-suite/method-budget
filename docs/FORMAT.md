@@ -65,7 +65,9 @@ large to store, and JSON numbers. Values are rounded half away from zero where t
 rounds (see `docs/decisions.md`), but the file stores them exactly.
 
 **Formulas** are not decimals: they keep exactly what was typed, so `"1200.50"` stays
-`"1200.50"`. An empty formula means "not filled in" (see [detail rows](#detail-row)).
+`"1200.50"`, and a number in one may have any number of decimal places
+(`"0.0000000149"`); how many count depends on the budget's [arithmetic](#arithmetic). An
+empty formula means "not filled in" (see [detail rows](#detail-row)).
 
 **Big integers.** Cents and row ids use the full 64-bit range. JavaScript and other
 readers that parse every number as a double lose precision above 2^53 (about 90 trillion
@@ -108,6 +110,7 @@ Fields in written order:
 | `provenance`      | [provenance](#provenance) | Where this budget came from, when it is a copy saved for sharing, a sub-budget or a [setup pack](#setup-packs). Left out otherwise. |
 | `account_coding`  | [account coding](#account-coding) | Left out when it is the default pattern. |
 | `fringe_posting`  | [fringe posting](#fringe-posting) | Left out when it is the default (by category, suffix `"99"`). |
+| `arithmetic`      | `"mmb"` or `"exact"` | How totals are worked out (see [arithmetic](#arithmetic)). Left out when `"mmb"`, which is also what a missing `arithmetic` means. |
 | `new_line_defaults` | [new-line defaults](#new-line-defaults) | Left out when it is the default (copy fringes only). |
 | `info`            | map of [info values](#info-value) | Budget information fields, keyed by label. |
 | `currencies`      | map of [currencies](#currency) | Foreign currencies, keyed by code. |
@@ -165,6 +168,19 @@ Where fringe totals appear. A tagged object:
 | `production_level` | none | One fringe row above each production total. |
 | `category`         | `suffix`: text, **required** | A fringe account at the end of each category, numbered from the category code and the suffix. |
 | `account`          | none | A fringe line at the end of each account. |
+
+### Arithmetic
+
+How the budget's totals are worked out (`docs/decisions.md`, entry 55). A budget setting;
+a [version](#version) keeps its own.
+
+| Value     | Meaning |
+|-----------|---------|
+| `"mmb"`   | The default, also for files without the field. As Movie Magic Budgeting works: formulas, globals and every money step (line totals, currency conversion, fringes, charges, credits, adjustment rows) are binary doubles, and each amount is rounded to cents once like JavaScript's `Math.round(v * 100) / 100`, a half going up on the double. So `1 x 1.005` is 1.00 (1.005 is 1.00499999999999989... as a double), `-1 x 0.125` is -0.12, and a global `17 / 3` is 5.666666666666667. A line in a foreign currency is converted before it is rounded. A number in a formula keeps every place it is written with. |
+| `"exact"` | Exact decimals: numbers keep 9 places, each amount is the exact product rounded to cents once, half away from zero (`1 x 1.005` is 1.01), and a foreign line is rounded in its own currency, then converted. A number in a formula with more than 9 places is an error. |
+
+Either way, account, category, level and grand totals are integer sums of the rounded
+cents, and credit rows are added up before the credit's one rounding.
 
 ### New-line defaults
 
@@ -249,8 +265,9 @@ Fields of a flat fringe, in written order after `rate`:
 | `cutoff` | optional cents | Kept, never used: cutoffs apply to percent fringes only. A fringe switched from percent to flat keeps its cutoff here, so it comes back if the fringe is switched back. |
 
 A flat fringe is always charged per line, never per [fringe range](#detail-row); its dollars
-are rounded to cents once per line, half away from zero, from the exact count (see
-`docs/decisions.md`, entries 2 and 54).
+are rounded to cents once per line, by the budget's [arithmetic](#arithmetic): from the
+exact count, half away from zero, or from the count worked out in doubles, half up on the
+double (see `docs/decisions.md`, entries 2, 54 and 55).
 
 ```json
 "fringes": {
@@ -339,7 +356,8 @@ Fields in written order:
 | `color`        | optional text | Text color, written `"#rrggbb"`. Overrides the color of the row's groups. |
 | `notes`        | list of [notes](#note) | Dated notes on the row, oldest first. Left out when empty. |
 
-A line costs `amount x X x rate x 4X`. A subtotal row shows a running total and adds
+A line costs `amount x X x rate x 4X`, worked out and rounded by the budget's
+[arithmetic](#arithmetic). A subtotal row shows a running total and adds
 nothing. An adjustment row's rate is the sum of the lines above it (back to the previous
 adjustment row). A separator row is a drawn rule line: it has no cost and is ignored by
 all math. It is never counted or fringed, it doesn't break a fringe range, and it doesn't
@@ -1087,6 +1105,12 @@ valid. Loading and saving it in Method Budget normalizes it.
   fringe without a `basis` now counts the Amount only, where it counted Amount x X x 4X
   before, so a flat fringe on a line with X or 4X filled in totals differently; give it
   `"basis": "quantity"` to keep the old figure.
+- Version 1, additive (2026-10): budget [`arithmetic`](#arithmetic) (`"mmb"` or
+  `"exact"`), left out at `"mmb"`. The engine changed with it (decisions.md, entry 55): a
+  file without the field is now worked out in Movie Magic arithmetic, where it was exact
+  before, so a figure that lands on or near a half cent can move by a cent (`1 x 1.005`
+  is 1.00, not 1.01); give it `"arithmetic": "exact"` to keep the old figures. Formulas
+  may now hold numbers with more than 9 decimal places.
 
 ## Complete example
 

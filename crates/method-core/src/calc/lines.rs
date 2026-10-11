@@ -2,8 +2,9 @@
 
 use std::collections::BTreeMap;
 
+use crate::calc::arith::{converted, Money, Window};
 use crate::calc::{err, overflow, row_at, CalcError, Ctx, ErrorKind};
-use crate::decimal::{mul_cents, Dec, Exact};
+use crate::decimal::Dec;
 use crate::model::{Account, RowKind};
 use crate::report::RowTotals;
 use crate::Cents;
@@ -13,7 +14,7 @@ pub(crate) fn eval_rows(ctx: &Ctx, acct: &Account) -> Result<Vec<RowTotals>, Cal
     let base = &ctx.b.base_currency;
     let mut out = Vec::with_capacity(acct.details.len());
     // Lines since the previous adjustment row (subtotal rows don't reset it).
-    let mut since_adjustment: Cents = 0;
+    let mut since_adjustment = Window::default();
     // Lines and adjustments since the previous subtotal row.
     let mut since_subtotal: Cents = 0;
 
@@ -57,34 +58,36 @@ pub(crate) fn eval_rows(ctx: &Ctx, acct: &Account) -> Result<Vec<RowTotals>, Cal
         let amount = ctx.eval(&d.amount, Dec::ZERO, &at("amount"))?;
         let x = ctx.eval(&d.x, Dec::ONE, &at("X"))?;
         let x4 = ctx.eval(&d.x4, Dec::ONE, &at("4X"))?;
-        let quantity = amount
+        let q = amount
             .checked_mul(x)
             .and_then(|q| q.checked_mul(x4))
             .ok_or_else(ovf)?;
+        let quantity = q.shown().ok_or_else(ovf)?;
         let included = ctx.includes(d, &at("groups"))?;
 
         let (currency, local_total, total) = match d.kind {
             RowKind::Adjustment => {
-                let t = mul_cents(since_adjustment, quantity).ok_or_else(ovf)?;
+                let t = since_adjustment
+                    .money(ctx.arith)
+                    .checked_mul(q)
+                    .and_then(Money::to_cents)
+                    .ok_or_else(ovf)?;
                 (base.clone(), t, t)
             }
             _ => {
                 let rate = ctx.eval(&d.rate, Dec::ZERO, &at("rate"))?;
-                // The exact product, rounded to cents once.
-                let local = Exact::dec(quantity)
-                    .checked_mul(rate)
-                    .and_then(Exact::to_cents)
-                    .ok_or_else(ovf)?;
+                // The product, rounded to cents once.
+                let line = Money::num(q).checked_mul(rate).ok_or_else(ovf)?;
+                let local = line.to_cents().ok_or_else(ovf)?;
                 match &d.currency {
                     Some(c) if c != base => {
                         let cur = ctx.b.currencies.get(c).ok_or_else(|| {
                             err(at("currency")(), ErrorKind::UnknownCurrency(c.clone()))
                         })?;
-                        (
-                            c.clone(),
-                            local,
-                            mul_cents(local, cur.rate).ok_or_else(ovf)?,
-                        )
+                        let t = converted(ctx.arith, line, local, cur.rate)
+                            .and_then(Money::to_cents)
+                            .ok_or_else(ovf)?;
+                        (c.clone(), local, t)
                     }
                     _ => (base.clone(), local, local),
                 }
@@ -98,9 +101,9 @@ pub(crate) fn eval_rows(ctx: &Ctx, acct: &Account) -> Result<Vec<RowTotals>, Cal
 
         // A left-out adjustment behaves as if deleted, so it doesn't reset the window.
         if d.kind == RowKind::Adjustment && included {
-            since_adjustment = 0;
+            since_adjustment.clear();
         } else {
-            since_adjustment = since_adjustment.checked_add(total).ok_or_else(ovf)?;
+            since_adjustment.add(total).ok_or_else(ovf)?;
         }
         since_subtotal = since_subtotal.checked_add(total).ok_or_else(ovf)?;
 

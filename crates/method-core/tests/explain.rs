@@ -10,8 +10,20 @@ use method_core::sample::{self, SampleSpec};
 use method_core::*;
 
 /// Every total of `b` explained, each tree's leaves summing to the number
-/// the report shows. Returns how many totals were checked.
+/// the report shows, in both arithmetics. Returns how many totals were
+/// checked.
 fn check_all(b: &Budget, opts: &RecalcOptions) -> usize {
+    let mut n = 0;
+    for arith in Arithmetic::ALL {
+        let mut b = b.clone();
+        b.arithmetic = arith;
+        n += check_one(&b, opts);
+    }
+    n
+}
+
+/// [`check_all`] in `b`'s own arithmetic.
+fn check_one(b: &Budget, opts: &RecalcOptions) -> usize {
     let ex = Explainer::new(b, opts).unwrap();
     let targets = ex.targets();
     let mut n = 0;
@@ -159,6 +171,7 @@ fn every_total_adds_up_with_every_flat_basis() {
 #[test]
 fn an_edge_line_shows_its_exact_product_and_one_rounding() {
     let mut b = sample();
+    b.arithmetic = Arithmetic::Exact;
     let d = b
         .categories_mut()
         .flat_map(|c| &mut c.accounts)
@@ -181,6 +194,42 @@ fn an_edge_line_shows_its_exact_product_and_one_rounding() {
         text.contains("0.0049999995 rounds half away from zero to 0.00"),
         "{text}"
     );
+    assert!(e.to_text(None).contains(
+        "(exact arithmetic: decimals, each amount rounded to cents once, half away from zero)"
+    ));
+}
+
+/// Movie Magic arithmetic: the line is a binary double, and Explain says
+/// what the double holds and how it rounds (decisions.md, entry 55).
+#[test]
+fn a_movie_magic_line_shows_its_double_and_rounding() {
+    let mut b = sample();
+    assert_eq!(b.arithmetic, Arithmetic::Mmb);
+    let d = b
+        .categories_mut()
+        .flat_map(|c| &mut c.accounts)
+        .flat_map(|a| &mut a.details)
+        .find(|d| d.id == 2)
+        .unwrap();
+    d.amount = "1".into();
+    d.x = "".into();
+    d.x4 = "".into();
+    d.rate = "1.005".into();
+    d.currency = None;
+    let e = explain(&b, &RecalcOptions::default(), &Target::Line(2)).unwrap();
+    assert_eq!(e.reported, 100);
+    let text = all_text(&e.root);
+    assert!(text.contains("Line: 1 x 1.005 = 1.005"), "{text}");
+    assert!(
+        text.contains(
+            "1.005 is 1.00499999999999989341... as a binary double, so it rounds to 1.00 (Movie Magic rounding: half up on the double)"
+        ),
+        "{text}"
+    );
+    let out = e.to_text(None);
+    assert!(out.contains(
+        "(Movie Magic arithmetic: binary doubles, each amount rounded to cents once, half up on the double)"
+    ), "{out}");
 }
 
 /// The first step (depth first) whose label is `label`.
@@ -229,7 +278,8 @@ fn a_line_shows_globals_quantity_and_rounding() {
 
 #[test]
 fn currency_and_adjustment_rows_show_their_working() {
-    let b = sample();
+    let mut b = sample();
+    b.arithmetic = Arithmetic::Exact;
     let opts = RecalcOptions::default();
     let cam = explain(&b, &opts, &Target::Line(5)).unwrap();
     let text = all_text(&cam.root);
@@ -250,6 +300,25 @@ fn currency_and_adjustment_rows_show_their_working() {
     let base = find(&adj.root, "Base").unwrap();
     assert_eq!(base.amount, Some(6_125_819));
     assert_eq!(base.children.len(), 3, "grip, overtime and the camera");
+
+    // Movie Magic: the same figures, worked in doubles; the adjustment's
+    // base is the rows added up in doubles.
+    b.arithmetic = Arithmetic::Mmb;
+    let cam = explain(&b, &opts, &Target::Line(5)).unwrap();
+    assert_eq!(cam.reported, 525_819);
+    let text = all_text(&cam.root);
+    assert!(
+        text.contains("7,203.00 CAD x 0.73 USD per CAD = 5,258.19 USD"),
+        "{text}"
+    );
+    let adj = explain(&b, &opts, &Target::Line(6)).unwrap();
+    assert_eq!(adj.reported, 612_582);
+    let text = all_text(&adj.root);
+    assert!(text.contains("added up in doubles"), "{text}");
+    assert!(
+        text.contains("rounds to 6,125.82 (Movie Magic rounding: half up on the double)"),
+        "{text}"
+    );
 }
 
 #[test]

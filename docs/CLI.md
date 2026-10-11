@@ -142,6 +142,7 @@ Changes one value and saves. Paths:
 |------|-------|
 | `title` | Text. |
 | `compact_versions` | `true` or `false`: save versions as deltas (docs/FORMAT.md, "Version deltas"). |
+| `arithmetic` | `mmb` (the default: totals worked out as Movie Magic Budgeting works them, in binary doubles) or `exact` (exact decimals, half away from zero). See decisions.md, entry 55. |
 | `global.NAME` | A formula. Adds the global when it's new. |
 | `fringe.NAME.rate` | A formula. |
 | `fringe.NAME.cutoff` | An amount (`168,600.00`), or `none`. Percent fringes only (`none` also clears a cutoff a flat fringe kept, which it never uses). |
@@ -261,7 +262,11 @@ Prints how one total is worked out, as an indented tree whose leaves add up to i
 (roadmap 3.5, decision 43; the app's Explain tab shows the same steps). Each step is
 `- label: the working in words  = amount`; a step in brackets, `[amount]`, only explains
 and adds nothing; `less` marks a step taken off. `--depth N` prints N levels (`...` marks
-what is left out). `<total>` is one of:
+what is left out). The line under the title states the budget's arithmetic and rounding
+rule (decisions.md, entry 55), and each Rounding step says how its amount rounded: half
+away from zero (exact), or half up on the binary double, with what the double holds
+when that decides it (`1.005 is 1.00499999999999989341... as a binary double, so it
+rounds to 1.00`). `<total>` is one of:
 
 | Total | Meaning |
 |-------|---------|
@@ -380,6 +385,7 @@ remove charge Insurance
 |---------|------|
 | `set title TEXT` | The budget's title. |
 | `set compact_versions true\|false` | Save versions as deltas. |
+| `set arithmetic mmb\|exact` | How totals are worked out (see `arithmetic` above). |
 | `set global NAME FORMULA` | Sets a global's formula, adding the global when it's new. |
 | `set fringe NAME rate FORMULA` | A fringe's rate. |
 | `set fringe NAME cutoff AMOUNT\|none` | A percent fringe's cutoff per earner; whole cents only. A flat fringe has none to set (`none` clears one it kept). |

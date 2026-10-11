@@ -2,7 +2,9 @@
 //!
 //! Same budget and options in, identical report out. Money is rounded to cents
 //! at the line (and once per fringe, charge and credit; see docs/decisions.md).
-//! Everything above that is integer addition, so rollups always agree.
+//! Everything above that is integer addition, so rollups always agree. How
+//! numbers are multiplied and rounded is the budget's [`Arithmetic`], all of
+//! it in [`arith`].
 //!
 //! Stages, each in its own module:
 //! 1. [`lines`]: evaluate every row of every account (formulas, currency,
@@ -16,10 +18,12 @@ use std::fmt;
 
 use crate::decimal::Dec;
 use crate::expr::{is_ident, EvalError, Expr, ParseError};
-use crate::model::{Budget, Detail, Formula, RowId};
+use crate::model::{Arithmetic, Budget, Detail, Formula, RowId};
 use crate::report::{AccountTotals, CategoryTotals, Report, RowTotals};
 use crate::Cents;
+use arith::Num;
 
+pub mod arith;
 pub mod breakdown;
 pub mod cache;
 pub mod explain;
@@ -110,31 +114,49 @@ pub(crate) fn sum(it: impl IntoIterator<Item = Cents>) -> Option<Cents> {
 /// Shared, read-only state for one recalc.
 pub(crate) struct Ctx<'a> {
     pub b: &'a Budget,
-    pub globals: BTreeMap<String, Dec>,
+    /// The budget's arithmetic (`b.arithmetic`).
+    pub arith: Arithmetic,
+    pub globals: BTreeMap<String, Num>,
     pub opts: &'a RecalcOptions,
     /// When true, ignore group suppression and options: used for "full" group totals.
     pub unfiltered: bool,
 }
 
-impl Ctx<'_> {
-    /// Evaluates a formula; a blank one is `blank`.
-    pub fn eval(&self, f: &Formula, blank: Dec, at: &dyn Fn() -> String) -> Result<Dec, CalcError> {
-        if f.is_blank() {
-            return Ok(blank);
-        }
-        if let Some(v) = self.eval_simple(&f.0) {
-            return Ok(v);
-        }
-        Expr::parse(&f.0)
-            .map_err(|e| err(at(), ErrorKind::Parse(e)))?
-            .eval(&|n| self.globals.get(n).copied())
-            .map_err(|e| err(at(), ErrorKind::Eval(e)))
+impl<'a> Ctx<'a> {
+    /// The counted (filtered) context for `b`, with its globals evaluated.
+    pub fn new(b: &'a Budget, opts: &'a RecalcOptions) -> Result<Ctx<'a>, CalcError> {
+        Ok(Ctx {
+            b,
+            arith: b.arithmetic,
+            globals: eval_globals(b)?,
+            opts,
+            unfiltered: false,
+        })
     }
 
-    /// Plain numbers and bare globals without a parse tree (see
-    /// [`crate::expr::quick_value`]).
-    fn eval_simple(&self, src: &str) -> Option<Dec> {
-        crate::expr::quick_value(src, &|n| self.globals.get(n).copied())
+    /// `d` in the budget's arithmetic.
+    pub fn num(&self, d: Dec) -> Num {
+        Num::of(self.arith, d)
+    }
+
+    /// Evaluates a formula in the budget's arithmetic; a blank one is
+    /// `blank`.
+    pub fn eval(&self, f: &Formula, blank: Dec, at: &dyn Fn() -> String) -> Result<Num, CalcError> {
+        if f.is_blank() {
+            return Ok(self.num(blank));
+        }
+        eval_in(self.arith, &f.0, &|n| self.globals.get(n).copied()).map_err(|e| err(at(), e))
+    }
+
+    /// The globals as decimals, as the report shows them.
+    pub fn shown_globals(&self) -> Result<BTreeMap<String, Dec>, CalcError> {
+        self.globals
+            .iter()
+            .map(|(n, v)| {
+                let d = v.shown().ok_or_else(|| overflow(format!("global {n}")))?;
+                Ok((n.clone(), d))
+            })
+            .collect()
     }
 
     /// Whether a line counts toward totals: not suppressed by a group with
@@ -166,6 +188,39 @@ impl Ctx<'_> {
     }
 }
 
+/// Formula `src` in `arith`: in decimals ([`Expr::eval`]) or in doubles
+/// ([`Expr::eval_f64`]), plain numbers and bare globals without a parse
+/// tree (see [`crate::expr::quick_value`]).
+pub(crate) fn eval_in(
+    arith: Arithmetic,
+    src: &str,
+    lookup: &dyn Fn(&str) -> Option<Num>,
+) -> Result<Num, ErrorKind> {
+    let quick = match arith {
+        Arithmetic::Exact => crate::expr::quick_value(src, &|n| lookup(n)?.shown()).map(Num::Dec),
+        Arithmetic::Mmb => {
+            crate::expr::quick_value_f64(src, &|n| Some(lookup(n)?.f64())).map(Num::F64)
+        }
+    };
+    if let Some(v) = quick {
+        return Ok(v);
+    }
+    let e = Expr::parse(src).map_err(ErrorKind::Parse)?;
+    eval_expr(arith, &e, lookup).map_err(ErrorKind::Eval)
+}
+
+/// A parsed formula in `arith`.
+fn eval_expr(
+    arith: Arithmetic,
+    e: &Expr,
+    lookup: &dyn Fn(&str) -> Option<Num>,
+) -> Result<Num, EvalError> {
+    match arith {
+        Arithmetic::Exact => e.eval(&|n| lookup(n)?.shown()).map(Num::Dec),
+        Arithmetic::Mmb => e.eval_f64(&|n| Some(lookup(n)?.f64())).map(Num::F64),
+    }
+}
+
 /// Where a row lives, for error messages.
 pub(crate) fn row_at(code: &str, idx: usize, d: &Detail, field: &str) -> String {
     format!(
@@ -175,7 +230,10 @@ pub(crate) fn row_at(code: &str, idx: usize, d: &Detail, field: &str) -> String 
     )
 }
 
-pub(crate) fn eval_globals(b: &Budget) -> Result<BTreeMap<String, Dec>, CalcError> {
+/// Every global's value in the budget's arithmetic: Movie Magic keeps a
+/// global as a double (`17/3` is 5.666666666666667), exact arithmetic as a
+/// 9-place decimal.
+pub(crate) fn eval_globals(b: &Budget) -> Result<BTreeMap<String, Num>, CalcError> {
     // Each global with the other globals it refers to (unknown names are left for
     // eval to report, with the global as context).
     let mut parsed: BTreeMap<&str, (Expr, Vec<&str>)> = BTreeMap::new();
@@ -196,7 +254,7 @@ pub(crate) fn eval_globals(b: &Budget) -> Result<BTreeMap<String, Dec>, CalcErro
 
     // Depth-first in name order, with an explicit stack so a long chain of
     // globals can't overflow the call stack.
-    let mut done: BTreeMap<String, Dec> = BTreeMap::new();
+    let mut done: BTreeMap<String, Num> = BTreeMap::new();
     for &root in parsed.keys() {
         if done.contains_key(root) {
             continue;
@@ -224,8 +282,7 @@ pub(crate) fn eval_globals(b: &Budget) -> Result<BTreeMap<String, Dec>, CalcErro
                 on_stack.insert(dep);
                 continue;
             }
-            let v = expr
-                .eval(&|n| done.get(n).copied())
+            let v = eval_expr(b.arithmetic, expr, &|n| done.get(n).copied())
                 .map_err(|e| err(format!("global {name}"), ErrorKind::Eval(e)))?;
             done.insert(name.to_string(), v);
             stack.pop();
@@ -386,12 +443,8 @@ fn recalc_with(
         }
         _ => Dec::ONE,
     };
-    let ctx = Ctx {
-        b,
-        globals: eval_globals(b)?,
-        opts,
-        unfiltered: false,
-    };
+    let ctx = Ctx::new(b, opts)?;
+    let globals = ctx.shown_globals()?;
     let categories = eval_categories_with(&ctx, cache.as_deref_mut())?;
     let ts = topsheet::finish(&ctx, categories)?;
 
@@ -409,7 +462,7 @@ fn recalc_with(
             .clone()
             .unwrap_or_else(|| b.base_currency.clone()),
         totals_rate,
-        globals: full_ctx.globals,
+        globals,
         categories: ts.categories,
         levels: ts.levels,
         budget_fringes: ts.budget_fringes,

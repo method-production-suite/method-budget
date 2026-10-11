@@ -712,7 +712,10 @@ The tab shows the total's name and amount, then a tree of steps that add up to i
 a sum adds the steps under it, a value is worked out from the plain-words lines under it,
 and notes only explain. A line reads "Amount: SHOOT_DAYS + PREP_DAYS = 40 (PREP_DAYS = 10,
 SHOOT_DAYS = 30) Days", "Line: 120 x 450 = 54,000.00", the currency conversion and every
-rounding ("6,125.819 rounds half away from zero to 6,125.82"); a line left out says which
+rounding, by the budget's arithmetic (decisions.md, entry 55: "1.005 is
+1.00499999999999989341... as a binary double, so it rounds to 1.00 (Movie Magic rounding:
+half up on the double)", or "6,125.819 rounds half away from zero to 6,125.82" for exact
+arithmetic); a line left out says which
 group or filter left it out and what it would be. Each fringe on a line shows percent or
 flat, the cutoff and how much of it each line of a range used, and its largest-remainder
 share; a flat fringe says what the line counts and why ("ZDAY 100.00 per Day x 25 Days

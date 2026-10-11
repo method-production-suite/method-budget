@@ -71,6 +71,9 @@ pub struct Budget {
     /// Fringe definitions, keyed by the name details use to apply them.
     pub fringes: BTreeMap<String, Fringe>,
     pub fringe_posting: FringePosting,
+    /// How totals are worked out: as Movie Magic Budgeting does (binary
+    /// doubles, the default) or in exact decimals (decisions.md, entry 55).
+    pub arithmetic: Arithmetic,
     /// How account numbers are segmented and written.
     pub account_coding: AccountCoding,
     /// What a line inserted in the editor copies from its neighbor.
@@ -143,6 +146,7 @@ impl Budget {
             units: default_units(),
             fringes: BTreeMap::new(),
             fringe_posting: FringePosting::default(),
+            arithmetic: Arithmetic::default(),
             account_coding: AccountCoding::default(),
             new_line_defaults: NewLineDefaults::default(),
             groups: BTreeMap::new(),
@@ -333,6 +337,52 @@ impl Default for FringePosting {
     fn default() -> FringePosting {
         FringePosting::Category {
             suffix: "99".into(),
+        }
+    }
+}
+
+/// How a budget works out its totals (decisions.md, entry 55). A budget
+/// setting, saved with the file; versions carry it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Arithmetic {
+    /// As Movie Magic Budgeting does: formulas, globals and every money
+    /// step in binary doubles, each amount rounded to cents once like
+    /// JavaScript's `Math.round(v * 100) / 100` (half up on the double), so
+    /// `1 x 1.005` is 1.00. The default, also for files that don't say.
+    #[default]
+    Mmb,
+    /// Exact decimals (9 places), each amount rounded to cents once, half
+    /// away from zero (decisions.md, entry 2), so `1 x 1.005` is 1.01.
+    Exact,
+}
+
+impl Arithmetic {
+    pub const ALL: [Arithmetic; 2] = [Arithmetic::Mmb, Arithmetic::Exact];
+
+    /// The name files and commands use: `mmb` or `exact`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Arithmetic::Mmb => "mmb",
+            Arithmetic::Exact => "exact",
+        }
+    }
+
+    /// The arithmetic named `name` (as [`Arithmetic::name`] writes it).
+    pub fn parse(name: &str) -> Option<Arithmetic> {
+        Arithmetic::ALL
+            .into_iter()
+            .find(|a| a.name() == name.trim())
+    }
+
+    /// The rounding rule in words, as Explain states it.
+    pub fn rule(self) -> &'static str {
+        match self {
+            Arithmetic::Mmb => {
+                "Movie Magic arithmetic: binary doubles, each amount rounded to cents once, half up on the double"
+            }
+            Arithmetic::Exact => {
+                "exact arithmetic: decimals, each amount rounded to cents once, half away from zero"
+            }
         }
     }
 }
@@ -856,6 +906,7 @@ pub struct BudgetSnapshot {
     pub units: BTreeMap<String, UnitDef>,
     pub fringes: BTreeMap<String, Fringe>,
     pub fringe_posting: FringePosting,
+    pub arithmetic: Arithmetic,
     pub account_coding: AccountCoding,
     pub new_line_defaults: NewLineDefaults,
     pub groups: BTreeMap<String, Group>,
@@ -882,6 +933,7 @@ impl Budget {
             units,
             fringes,
             fringe_posting,
+            arithmetic,
             account_coding,
             new_line_defaults,
             groups,
@@ -915,6 +967,7 @@ impl Budget {
             units: units.clone(),
             fringes: fringes.clone(),
             fringe_posting: fringe_posting.clone(),
+            arithmetic: *arithmetic,
             account_coding: *account_coding,
             new_line_defaults: *new_line_defaults,
             groups: groups.clone(),
@@ -941,6 +994,7 @@ impl Budget {
             units,
             fringes,
             fringe_posting,
+            arithmetic,
             account_coding,
             new_line_defaults,
             groups,
@@ -974,6 +1028,7 @@ impl Budget {
             units,
             fringes,
             fringe_posting,
+            arithmetic,
             account_coding,
             new_line_defaults,
             groups,
@@ -1045,6 +1100,7 @@ impl BudgetSnapshot {
             units,
             fringes,
             fringe_posting,
+            arithmetic,
             account_coding,
             new_line_defaults,
             groups,
@@ -1066,6 +1122,7 @@ impl BudgetSnapshot {
             units,
             fringes,
             fringe_posting,
+            arithmetic,
             account_coding,
             new_line_defaults,
             groups,

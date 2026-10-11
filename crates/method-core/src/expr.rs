@@ -6,11 +6,11 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
-use crate::decimal::{Dec, ParseDecError};
+use crate::decimal::{Dec, ParseDecError, DEC_PLACES};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Expr {
-    Num(Dec),
+    Num(Literal),
     Var(String),
     Neg(Box<Expr>),
     Bin(Op, Box<Expr>, Box<Expr>),
@@ -44,6 +44,9 @@ pub enum EvalError {
     UnknownGlobal(String),
     DivideByZero,
     Overflow,
+    /// A number written with more than [`DEC_PLACES`] places, under exact
+    /// arithmetic (Movie Magic arithmetic keeps them).
+    TooPrecise,
 }
 
 impl fmt::Display for EvalError {
@@ -52,6 +55,90 @@ impl fmt::Display for EvalError {
             EvalError::UnknownGlobal(n) => write!(f, "unknown global `{n}`"),
             EvalError::DivideByZero => f.write_str("divide by zero"),
             EvalError::Overflow => f.write_str("number too large"),
+            EvalError::TooPrecise => write!(
+                f,
+                "more than {DEC_PLACES} decimal places (exact arithmetic keeps {DEC_PLACES})"
+            ),
+        }
+    }
+}
+
+/// A number written in a formula: its value to [`DEC_PLACES`] places, for
+/// exact arithmetic, and the binary double nearest it, for Movie Magic
+/// arithmetic (decisions.md, entry 55). A number with more places than
+/// [`DEC_PLACES`] has only the double.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Literal {
+    dec: Option<Dec>,
+    /// The double's bits, so a literal compares exactly.
+    bits: u64,
+}
+
+impl Literal {
+    /// A number token as the lexer reads it: digits and at most one point.
+    /// More places than [`DEC_PLACES`] are kept (as a double only); a
+    /// number too large for a [`Dec`] is still refused.
+    fn parse(s: &str) -> Result<Literal, ParseDecError> {
+        let dec = match s.parse::<Dec>() {
+            Ok(d) => Some(d),
+            Err(ParseDecError::TooPrecise) => {
+                // Too large when its first places are.
+                let cut = s.find('.').map_or(s.len(), |p| p + 1 + DEC_PLACES);
+                s[..cut].parse::<Dec>()?;
+                None
+            }
+            Err(e) => return Err(e),
+        };
+        let f: f64 = s.parse().map_err(|_| ParseDecError::Invalid)?;
+        Ok(Literal {
+            dec,
+            bits: f.to_bits(),
+        })
+    }
+
+    /// `v` written with the shortest digits that read back as it: how a
+    /// global worked out in doubles is frozen into a formula.
+    pub fn from_f64(v: f64) -> Literal {
+        Literal {
+            dec: format!("{v}").parse().ok(),
+            bits: v.to_bits(),
+        }
+    }
+
+    /// The value to [`DEC_PLACES`] places; `None` when written with more.
+    pub fn dec(self) -> Option<Dec> {
+        self.dec
+    }
+
+    /// The binary double nearest the value.
+    pub fn f64(self) -> f64 {
+        f64::from_bits(self.bits)
+    }
+
+    fn is_negative(self) -> bool {
+        match self.dec {
+            Some(d) => d < Dec::ZERO,
+            None => self.f64() < 0.0,
+        }
+    }
+}
+
+impl From<Dec> for Literal {
+    fn from(d: Dec) -> Literal {
+        Literal {
+            dec: Some(d),
+            bits: d.to_f64().to_bits(),
+        }
+    }
+}
+
+impl fmt::Display for Literal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.dec {
+            Some(d) => write!(f, "{d}"),
+            // The shortest digits that read back as the same double, never
+            // with an exponent, so the lexer reads them.
+            None => write!(f, "{}", self.f64()),
         }
     }
 }
@@ -60,7 +147,7 @@ impl std::error::Error for EvalError {}
 
 #[derive(Clone, Debug, PartialEq)]
 enum Tok {
-    Num(Dec),
+    Num(Literal),
     Ident(String),
     Op(Op),
     LParen,
@@ -96,7 +183,7 @@ fn lex(src: &str) -> Result<Vec<(usize, Tok)>, ParseError> {
                 while i < bytes.len() && (bytes[i].is_ascii_digit() || bytes[i] == b'.') {
                     i += 1;
                 }
-                let n = src[start..i].parse::<Dec>().map_err(|e| ParseError {
+                let n = Literal::parse(&src[start..i]).map_err(|e| ParseError {
                     pos: start,
                     msg: match e {
                         ParseDecError::Invalid => "malformed number".into(),
@@ -282,6 +369,29 @@ impl Parser {
 /// [`Expr::parse`] and [`Expr::eval`] with their usual messages. When it
 /// gives a value, it is exactly what parsing and evaluating would give.
 pub fn quick_value(src: &str, lookup: &dyn Fn(&str) -> Option<Dec>) -> Option<Dec> {
+    match quick_token(src)? {
+        // Parsed the way the lexer parses it.
+        Quick::Num(t) => Literal::parse(t).ok()?.dec(),
+        Quick::Name(n) => lookup(n),
+    }
+}
+
+/// [`quick_value`] for Movie Magic arithmetic: exactly what
+/// [`Expr::eval_f64`] would give.
+pub fn quick_value_f64(src: &str, lookup: &dyn Fn(&str) -> Option<f64>) -> Option<f64> {
+    match quick_token(src)? {
+        Quick::Num(t) => Literal::parse(t).ok().map(Literal::f64),
+        Quick::Name(n) => lookup(n),
+    }
+}
+
+/// A formula that is one number token or one name.
+enum Quick<'a> {
+    Num(&'a str),
+    Name(&'a str),
+}
+
+fn quick_token(src: &str) -> Option<Quick<'_>> {
     // The lexer skips only spaces and tabs.
     let t = src.trim_matches([' ', '\t']);
     // Short enough that the length limit can't apply.
@@ -290,13 +400,12 @@ pub fn quick_value(src: &str, lookup: &dyn Fn(&str) -> Option<Dec>) -> Option<De
     }
     let first = t.as_bytes()[0];
     if t.bytes().all(|c| c.is_ascii_digit() || c == b'.') {
-        // One number token, parsed the way the lexer parses it.
-        return t.parse::<Dec>().ok();
+        return Some(Quick::Num(t));
     }
     if (first.is_ascii_alphabetic() || first == b'_')
         && t.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_')
     {
-        return lookup(t);
+        return Some(Quick::Name(t));
     }
     None
 }
@@ -339,18 +448,35 @@ impl Expr {
 
     /// This expression with every reference to `name` replaced by `value`.
     pub fn substitute(&self, name: &str, value: Dec) -> Expr {
+        // Negative as Neg(Num) so the printed text parses back to the same tree.
+        let num = match value.checked_neg() {
+            Some(pos) if value < Dec::ZERO => Expr::Neg(Box::new(Expr::Num(pos.into()))),
+            _ => Expr::Num(value.into()),
+        };
+        self.put(name, &num)
+    }
+
+    /// [`Expr::substitute`] with a double (Movie Magic arithmetic), written
+    /// with the shortest digits that read back as the same double.
+    pub fn substitute_f64(&self, name: &str, value: f64) -> Expr {
+        let num = if value < 0.0 {
+            Expr::Neg(Box::new(Expr::Num(Literal::from_f64(-value))))
+        } else {
+            Expr::Num(Literal::from_f64(value))
+        };
+        self.put(name, &num)
+    }
+
+    /// This expression with every reference to `name` replaced by `with`.
+    fn put(&self, name: &str, with: &Expr) -> Expr {
         match self {
-            // Negative as Neg(Num) so the printed text parses back to the same tree.
-            Expr::Var(n) if n == name => match value.checked_neg() {
-                Some(pos) if value < Dec::ZERO => Expr::Neg(Box::new(Expr::Num(pos))),
-                _ => Expr::Num(value),
-            },
+            Expr::Var(n) if n == name => with.clone(),
             Expr::Num(_) | Expr::Var(_) => self.clone(),
-            Expr::Neg(e) => Expr::Neg(Box::new(e.substitute(name, value))),
+            Expr::Neg(e) => Expr::Neg(Box::new(e.put(name, with))),
             Expr::Bin(op, a, b) => Expr::Bin(
                 *op,
-                Box::new(a.substitute(name, value)),
-                Box::new(b.substitute(name, value)),
+                Box::new(a.put(name, with)),
+                Box::new(b.put(name, with)),
             ),
         }
     }
@@ -375,7 +501,7 @@ impl Expr {
             Expr::Bin(Op::Add | Op::Sub, ..) => 1,
             Expr::Bin(Op::Mul | Op::Div, ..) => 2,
             Expr::Neg(_) => 3,
-            Expr::Num(n) if *n < Dec::ZERO => 3,
+            Expr::Num(n) if n.is_negative() => 3,
             Expr::Num(_) | Expr::Var(_) => 4,
         }
     }
@@ -411,7 +537,7 @@ impl Expr {
 
     pub fn eval(&self, lookup: &dyn Fn(&str) -> Option<Dec>) -> Result<Dec, EvalError> {
         match self {
-            Expr::Num(n) => Ok(*n),
+            Expr::Num(n) => n.dec().ok_or(EvalError::TooPrecise),
             Expr::Var(n) => lookup(n).ok_or_else(|| EvalError::UnknownGlobal(n.clone())),
             Expr::Neg(e) => e.eval(lookup)?.checked_neg().ok_or(EvalError::Overflow),
             Expr::Bin(op, a, b) => {
@@ -425,6 +551,33 @@ impl Expr {
                 }
                 .ok_or(EvalError::Overflow)
             }
+        }
+    }
+
+    /// The value in binary doubles, as Movie Magic arithmetic works it out
+    /// (decisions.md, entry 55): each number is the double nearest what was
+    /// written and each step rounds to a double. Dividing by zero, and a
+    /// result past the doubles' range, are errors as in [`Expr::eval`].
+    pub fn eval_f64(&self, lookup: &dyn Fn(&str) -> Option<f64>) -> Result<f64, EvalError> {
+        let v = match self {
+            Expr::Num(n) => n.f64(),
+            Expr::Var(n) => lookup(n).ok_or_else(|| EvalError::UnknownGlobal(n.clone()))?,
+            Expr::Neg(e) => -e.eval_f64(lookup)?,
+            Expr::Bin(op, a, b) => {
+                let (a, b) = (a.eval_f64(lookup)?, b.eval_f64(lookup)?);
+                match op {
+                    Op::Add => a + b,
+                    Op::Sub => a - b,
+                    Op::Mul => a * b,
+                    Op::Div if b == 0.0 => return Err(EvalError::DivideByZero),
+                    Op::Div => a / b,
+                }
+            }
+        };
+        if v.is_finite() {
+            Ok(v)
+        } else {
+            Err(EvalError::Overflow)
         }
     }
 }

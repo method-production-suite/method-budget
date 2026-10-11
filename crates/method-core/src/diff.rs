@@ -30,9 +30,9 @@ use std::fmt::Write as _;
 
 use crate::coding::AccountCoding;
 use crate::model::{
-    Account, Baseline, Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource, Currency,
-    Detail, FlatBasis, Fringe, FringeKind, FringePosting, GlobalInfo, Group, InfoValue, Location,
-    NewLineDefaults, Note, RowId, RowKind, SetDef, TopsheetRow, UnitDef, Version,
+    Account, Arithmetic, Baseline, Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource,
+    Currency, Detail, FlatBasis, Fringe, FringeKind, FringePosting, GlobalInfo, Group, InfoValue,
+    Location, NewLineDefaults, Note, RowId, RowKind, SetDef, TopsheetRow, UnitDef, Version,
 };
 use crate::report::Report;
 use crate::{recalc, Cents, Dec, RecalcOptions};
@@ -895,6 +895,13 @@ pub(crate) fn posting_text(p: &FringePosting) -> String {
     }
 }
 
+pub(crate) fn arithmetic_text(a: &Arithmetic) -> String {
+    match a {
+        Arithmetic::Mmb => "Movie Magic (binary doubles)".into(),
+        Arithmetic::Exact => "exact decimals".into(),
+    }
+}
+
 pub(crate) fn defaults_text(d: &NewLineDefaults) -> String {
     let on: Vec<&str> = [
         (d.fringes, "fringes"),
@@ -953,6 +960,7 @@ pub(crate) fn setting_fields(b: &Budget) -> Vec<Field> {
             "fringe posting",
             posting_text(&b.fringe_posting),
         ),
+        text("arithmetic", "arithmetic", arithmetic_text(&b.arithmetic)),
         text(
             "new_line_defaults",
             "new lines copy",

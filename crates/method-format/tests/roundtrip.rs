@@ -277,6 +277,87 @@ fn new_line_defaults_round_trip_and_are_left_out_at_default() {
     assert!(method_format::from_str(&extra).is_err());
 }
 
+/// `arithmetic` (decisions.md, entry 55): Movie Magic is the default, also
+/// for files that don't say, and is left out; `"exact"` is written, and a
+/// version keeps its own.
+#[test]
+fn arithmetic_round_trips_and_is_left_out_at_default() {
+    let mut b = rich();
+    assert_eq!(b.arithmetic, Arithmetic::Mmb);
+    let text = round_trip(&b);
+    assert!(!text.contains("\"arithmetic\""), "default is left out");
+
+    b.arithmetic = Arithmetic::Exact;
+    let text = round_trip(&b);
+    let v: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(v["budget"]["arithmetic"], "exact");
+    let pos = |k: &str| text.find(&format!("\"{k}\":")).unwrap();
+    assert!(pos("fringe_posting") < pos("arithmetic"));
+    assert!(pos("arithmetic") < pos("info"));
+
+    b.versions.push(Version {
+        id: 1,
+        name: "v1".into(),
+        created: "2026-10-10T00:00:00Z".into(),
+        note: None,
+        budget: std::sync::Arc::new(b.snapshot()),
+    });
+    b.arithmetic = Arithmetic::Mmb;
+    let text = round_trip(&b);
+    assert_eq!(
+        text.matches("\"arithmetic\"").count(),
+        1,
+        "only the version's"
+    );
+
+    let file = |body: &str| {
+        format!(
+            "{{\"format\": \"method-budget\", \"version\": 1, \"budget\": \
+             {{\"title\": \"T\", \"base_currency\": \"USD\"{body}}}}}"
+        )
+    };
+    let read = |body: &str| method_format::from_str(&file(body)).map(|b| b.arithmetic);
+    assert_eq!(read("").unwrap(), Arithmetic::Mmb);
+    assert_eq!(read(r#", "arithmetic": "mmb""#).unwrap(), Arithmetic::Mmb);
+    assert_eq!(
+        read(r#", "arithmetic": "exact""#).unwrap(),
+        Arithmetic::Exact
+    );
+    assert!(read(r#", "arithmetic": "float""#).is_err());
+    assert!(read(r#", "arithmetic": 1"#).is_err());
+}
+
+/// A formula keeps more than nine decimal places as typed, and Movie
+/// Magic arithmetic uses them all.
+#[test]
+fn formulas_keep_more_than_nine_places() {
+    let mut b = Budget::new("T", "USD");
+    b.topsheet.push(category(
+        "1100",
+        "C",
+        vec![account(
+            "1101",
+            "A",
+            vec![Detail::line(
+                1,
+                "Ten places",
+                "100000000",
+                "",
+                "0.0000000149",
+            )],
+        )],
+    ));
+    let text = round_trip(&b);
+    assert!(text.contains("\"rate\": \"0.0000000149\""), "{text}");
+    let back = method_format::from_str(&text).unwrap();
+    assert_eq!(
+        recalc(&back, &RecalcOptions::default())
+            .unwrap()
+            .grand_total,
+        149
+    );
+}
+
 #[test]
 fn files_without_new_fields_read_with_defaults() {
     let golden = include_str!("golden/small.json");

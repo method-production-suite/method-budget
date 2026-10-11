@@ -5,7 +5,9 @@
 //! total) [`Explainer::explain`] gives a tree of [`Step`]s that reproduces it
 //! exactly, in plain words: each line as amount x X x 4X x rate with globals
 //! shown by name and value, the currency conversion, every rounding step
-//! (unrounded to rounded, half away from zero), each fringe on each line
+//! (unrounded to rounded, by the budget's arithmetic: half away from zero,
+//! or half up on the binary double as Movie Magic rounds, saying what the
+//! double holds; decisions.md, entry 55), each fringe on each line
 //! (percent or flat, the cutoff and how much of it each line of a range used,
 //! the largest-remainder share), where fringes post, what a group or a
 //! report filter left out and why, a charge's base and exclusions, a credit's
@@ -23,14 +25,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+use super::arith::{converted, float_digits, float_text, percent_of, Money, Num, Window};
 use super::fringes::{allocate, earners, flat_count, CountFrom, Factor, Factors, FlatCount};
 use super::topsheet::{credit_cap, credit_keep, credit_row};
 use super::{recalc, CalcError, Ctx, RecalcOptions};
-use crate::decimal::{mul_cents, percent_of, Dec, Exact};
+use crate::decimal::{Dec, Exact};
 use crate::expr::Expr;
 use crate::model::{
-    Budget, ChargeKind, CreditCap, CreditSource, Detail, FlatBasis, Formula, FringeKind,
-    FringePosting, RowId, RowKind, TopsheetRow,
+    Arithmetic, Budget, ChargeKind, CreditCap, CreditSource, Detail, FlatBasis, Formula,
+    FringeKind, FringePosting, RowId, RowKind, TopsheetRow,
 };
 use crate::report::{Report, RowTotals};
 use crate::Cents;
@@ -237,14 +240,22 @@ pub struct Explanation {
     pub title: String,
     /// The number as the budget reports it.
     pub reported: Cents,
+    /// The arithmetic it is worked out in (the budget's).
+    pub arithmetic: Arithmetic,
     /// The working; its amount is `reported`.
     pub root: Step,
 }
 
 impl Explanation {
-    /// The tree as indented text, `depth` levels deep (`None`: all of it).
+    /// The tree as indented text, `depth` levels deep (`None`: all of it),
+    /// after a line saying which arithmetic and rounding rule it uses.
     pub fn to_text(&self, depth: Option<usize>) -> String {
-        let mut out = format!("{}: {}\n", self.title, money(self.reported));
+        let mut out = format!(
+            "{}: {}\n({})\n",
+            self.title,
+            money(self.reported),
+            self.arithmetic.rule()
+        );
         write_step(&mut out, &self.root, 0, depth);
         out
     }
@@ -359,18 +370,36 @@ fn group(digits: &str) -> String {
     out
 }
 
-/// "rounded half away from zero to X" when rounding changed `exact`.
-fn rounding(exact: impl Into<Exact>, rounded: Cents) -> Option<Step> {
-    let exact = exact.into();
-    (!exact.is_cents(rounded)).then(|| {
-        Step::note(
-            "Rounding",
-            format!(
+/// How `m` rounded to `rounded`, by the budget's arithmetic, when rounding
+/// changed it: "6,125.819 rounds half away from zero to 6,125.82", or for
+/// Movie Magic arithmetic "1.005 is 1.00499999999999989341... as a binary
+/// double, so it rounds to 1.00 (Movie Magic rounding: half up on the
+/// double)".
+fn rounding(m: impl Into<Money>, rounded: Cents) -> Option<Step> {
+    let m = m.into();
+    (!m.is_cents(rounded)).then(|| {
+        let text = match m {
+            Money::Exact(_) => format!(
                 "{} rounds half away from zero to {}",
-                dmoney(exact),
+                dmoney(m),
                 money(rounded)
             ),
-        )
+            Money::F64(v) => {
+                let held = float_digits(v);
+                let held = if held == float_text(v) {
+                    String::new()
+                } else {
+                    format!(" is {} as a binary double, so it", dmoney(held))
+                };
+                format!(
+                    "{}{held} rounds to {} (Movie Magic rounding: {})",
+                    dmoney(m),
+                    money(rounded),
+                    m.rule()
+                )
+            }
+        };
+        Step::note("Rounding", text)
     })
 }
 
@@ -409,12 +438,7 @@ impl<'a> Explainer<'a> {
     /// Recalculates `b` (errors are the engine's) and works out every line.
     pub fn new(b: &'a Budget, opts: &RecalcOptions) -> R<Explainer<'a>> {
         let report = recalc(b, opts)?;
-        let ctx = Ctx {
-            b,
-            globals: report.globals.clone(),
-            opts,
-            unfiltered: false,
-        };
+        let ctx = Ctx::new(b, opts)?;
         let mut accounts = Vec::new();
         for (ci, cat) in b.categories().enumerate() {
             let mut list = Vec::with_capacity(cat.accounts.len());
@@ -591,6 +615,7 @@ impl<'a> Explainer<'a> {
             target: t.clone(),
             title,
             reported,
+            arithmetic: self.b.arithmetic,
             root,
         })
     }
@@ -1262,11 +1287,9 @@ impl<'a> Explainer<'a> {
                     Step::note_amount("Excluded", "taken off the base", excluded).with(ex_children),
                 );
                 let net = base.checked_sub(excluded).ok_or_else(ovf)?;
-                let exact = Exact::cents(net)
-                    .checked_mul(*p)
-                    .map(Exact::percent)
-                    .ok_or_else(ovf)?;
-                let amount = percent_of(net, *p).ok_or_else(ovf)?;
+                let arith = self.b.arithmetic;
+                let exact = percent_of(arith, net, Num::of(arith, *p)).ok_or_else(ovf)?;
+                let amount = exact.to_cents().ok_or_else(ovf)?;
                 notes.push(Step::note(
                     "Charge",
                     format!(
@@ -1289,8 +1312,11 @@ impl<'a> Explainer<'a> {
                             .get(cur)
                             .ok_or_else(|| gone(&format!("currency {cur}")))?
                             .rate;
-                        let exact = Exact::cents(*amount).checked_mul(rate).ok_or_else(ovf)?;
-                        let conv = mul_cents(*amount, rate).ok_or_else(ovf)?;
+                        let arith = self.b.arithmetic;
+                        let exact = Money::cents(arith, *amount)
+                            .checked_mul(Num::of(arith, rate))
+                            .ok_or_else(ovf)?;
+                        let conv = exact.to_cents().ok_or_else(ovf)?;
                         notes.push(Step::note(
                             "Fee",
                             format!(
@@ -1343,8 +1369,9 @@ impl<'a> Explainer<'a> {
 
     fn credit_step(&self, i: usize) -> R<Step> {
         let c = self.applied_credit(i)?;
+        let arith = self.b.arithmetic;
         let mut notes = Vec::new();
-        let mut total = Exact::cents(0);
+        let mut total = Money::cents(arith, 0);
         for (k, cr) in c.rows.iter().enumerate() {
             let mut row_notes = Vec::new();
             let (gross, excluded) = match &cr.source {
@@ -1408,10 +1435,13 @@ impl<'a> Explainer<'a> {
                 format!("{} - {}", money(gross), money(excluded)),
                 net,
             ));
-            // The engine's own exact working, so the amounts agree.
-            let (credit, _) = credit_row(net, cr.percent, cr.cap).ok_or_else(ovf)?;
-            let pct = |v: Exact| v.checked_mul(cr.percent).map(Exact::percent);
-            let net_x = Exact::cents(net);
+            // The engine's own unrounded working, so the amounts agree.
+            let (credit, _) = credit_row(arith, net, cr.percent, cr.cap).ok_or_else(ovf)?;
+            let pct = |v: Money| {
+                v.checked_mul(Num::of(arith, cr.percent))
+                    .map(Money::percent)
+            };
+            let net_x = Money::cents(arith, net);
             match cr.cap {
                 CreditCap::None => {
                     row_notes.push(Step::note(
@@ -1425,7 +1455,9 @@ impl<'a> Explainer<'a> {
                     ));
                 }
                 CreditCap::QualifiedSpend(cap) => {
-                    let spend = net_x.checked_min(Exact::cents(cap)).ok_or_else(ovf)?;
+                    let spend = net_x
+                        .checked_min(Money::cents(arith, cap))
+                        .ok_or_else(ovf)?;
                     row_notes.push(Step::note(
                         "Cap on spend",
                         format!(
@@ -1472,15 +1504,15 @@ impl<'a> Explainer<'a> {
             notes.push(Step::note(label, dmoney(credit)).with(row_notes));
         }
         notes.push(Step::note("Rows added", dmoney(total)));
-        let capped = credit_cap(total, c.cap).ok_or_else(ovf)?;
+        let capped = credit_cap(arith, total, c.cap).ok_or_else(ovf)?;
         if let Some(cap) = c.cap {
             notes.push(Step::note(
                 "Credit cap",
                 format!("at most {}: {}", money(cap), dmoney(capped)),
             ));
         }
-        let keep = credit_keep(c.discount_percent).ok_or_else(ovf)?;
-        let exact = capped.checked_mul_exact(keep).ok_or_else(ovf)?;
+        let keep = credit_keep(arith, c.discount_percent).ok_or_else(ovf)?;
+        let exact = capped.checked_mul_money(keep).ok_or_else(ovf)?;
         if !c.discount_percent.is_zero() {
             notes.push(Step::note(
                 "Discount",
@@ -1559,14 +1591,39 @@ fn unit_words(b: &Budget, unit: &str, qty: Dec) -> String {
     }
 }
 
+/// A number as the working shows it: a decimal, or a double with the
+/// shortest digits that give it back (`0.3333333333333333`).
+fn nwords(n: Num) -> String {
+    match n {
+        Num::Dec(d) => num(d),
+        Num::F64(v) => {
+            // Grouped like a decimal.
+            let t = float_text(v);
+            let (sign, t) = match t.strip_prefix('-') {
+                Some(r) => ("-", r),
+                None => ("", t.as_str()),
+            };
+            match t.split_once('.') {
+                Some((i, f)) => format!("{sign}{}.{f}", group(i)),
+                None => format!("{sign}{}", group(t)),
+            }
+        }
+    }
+}
+
 /// A formula and its value: `40` or `SHOOT_DAYS + PREP_DAYS = 40
 /// (SHOOT_DAYS = 30, PREP_DAYS = 10)`.
-fn formula_words(ctx: &Ctx, f: &Formula, value: Dec) -> String {
+fn formula_words(ctx: &Ctx, f: &Formula, value: Num) -> String {
     let src = f.0.trim();
     if let Ok(v) = src.parse::<Dec>() {
-        if v == value {
-            return num(value);
+        if ctx.num(v) == value {
+            return nwords(value);
         }
+    }
+    // A number with more places than a decimal keeps (Movie Magic only).
+    let plain = !src.is_empty() && src.bytes().all(|c| c.is_ascii_digit() || c == b'.');
+    if plain && matches!(value, Num::F64(v) if src.parse::<f64>() == Ok(v)) {
+        return src.to_string();
     }
     let mut vars = BTreeSet::new();
     if let Ok(e) = Expr::parse(src) {
@@ -1574,14 +1631,14 @@ fn formula_words(ctx: &Ctx, f: &Formula, value: Dec) -> String {
     }
     let globals: Vec<String> = vars
         .iter()
-        .filter_map(|n| ctx.globals.get(n).map(|v| format!("{n} = {}", num(*v))))
+        .filter_map(|n| ctx.globals.get(n).map(|v| format!("{n} = {}", nwords(*v))))
         .collect();
     if globals.is_empty() {
-        format!("{src} = {}", num(value))
+        format!("{src} = {}", nwords(value))
     } else if globals.len() == 1 && vars.len() == 1 && vars.contains(src) {
         format!("global {}", globals[0])
     } else {
-        format!("{src} = {} ({})", num(value), globals.join(", "))
+        format!("{src} = {} ({})", nwords(value), globals.join(", "))
     }
 }
 
@@ -1616,14 +1673,14 @@ fn left_out(ctx: &Ctx, d: &Detail) -> String {
 fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail]) -> R<AccountCalc> {
     let base = &ctx.b.base_currency;
     let mut rows: Vec<RowCalc> = Vec::with_capacity(details.len());
-    let mut since_adjustment: Cents = 0;
+    let mut since_adjustment = Window::default();
     let mut adj_rows: Vec<usize> = Vec::new();
     let mut sub_rows: Vec<usize> = Vec::new();
     let zero = Factors {
-        amount: Dec::ZERO,
-        x: Dec::ONE,
-        x4: Dec::ONE,
-        quantity: Dec::ZERO,
+        amount: ctx.num(Dec::ZERO),
+        x: ctx.num(Dec::ONE),
+        x4: ctx.num(Dec::ONE),
+        quantity: ctx.num(Dec::ZERO),
     };
     let mut factors: Vec<Factors> = Vec::with_capacity(details.len());
     let blank_at = || String::new();
@@ -1663,10 +1720,8 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
         let amount = ctx.eval(&d.amount, Dec::ZERO, &blank_at)?;
         let x = ctx.eval(&d.x, Dec::ONE, &blank_at)?;
         let x4 = ctx.eval(&d.x4, Dec::ONE, &blank_at)?;
-        let quantity = amount
-            .checked_mul(x)
-            .and_then(|q| q.checked_mul(x4))
-            .ok_or_else(ovf)?;
+        let quantity = Factors::quantity(amount, x, x4).ok_or_else(ovf)?;
+        let shown = |n: Num| n.shown().ok_or_else(ovf);
         let included = ctx.includes(d, &blank_at)?;
         let mut notes = Vec::new();
 
@@ -1677,7 +1732,7 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
             format!(
                 "{}{}",
                 formula_words(ctx, &d.amount, amount),
-                unit_words(ctx.b, &d.unit, amount)
+                unit_words(ctx.b, &d.unit, shown(amount)?)
             )
         };
         notes.push(Step::note("Amount", amount_text));
@@ -1687,7 +1742,7 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
                 format!(
                     "{}{}",
                     formula_words(ctx, &d.x, x),
-                    unit_words(ctx.b, &d.unit2, x)
+                    unit_words(ctx.b, &d.unit2, shown(x)?)
                 ),
             ));
         }
@@ -1697,31 +1752,34 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
                 format!(
                     "{}{}",
                     formula_words(ctx, &d.x4, x4),
-                    unit_words(ctx.b, &d.unit4, x4)
+                    unit_words(ctx.b, &d.unit4, shown(x4)?)
                 ),
             ));
         }
         if !d.x.is_blank() || !d.x4.is_blank() {
-            let mut parts = vec![num(amount)];
+            let mut parts = vec![nwords(amount)];
             if !d.x.is_blank() {
-                parts.push(num(x));
+                parts.push(nwords(x));
             }
             if !d.x4.is_blank() {
-                parts.push(num(x4));
+                parts.push(nwords(x4));
             }
             notes.push(Step::note(
                 "Quantity",
-                format!("{} = {}", parts.join(" x "), num(quantity)),
+                format!("{} = {}", parts.join(" x "), nwords(quantity)),
             ));
         }
 
         let total = match d.kind {
             RowKind::Adjustment => {
-                let exact = Exact::cents(since_adjustment)
+                let exact = since_adjustment
+                    .money(ctx.arith)
                     .checked_mul(quantity)
                     .ok_or_else(ovf)?;
-                let t = mul_cents(since_adjustment, quantity).ok_or_else(ovf)?;
-                let pct = quantity.checked_mul(Dec::from_int(100)).ok_or_else(ovf)?;
+                let t = exact.to_cents().ok_or_else(ovf)?;
+                let pct = shown(quantity)?
+                    .checked_mul(Dec::from_int(100))
+                    .ok_or_else(ovf)?;
                 let window: Vec<Step> = adj_rows
                     .iter()
                     .map(|&k| {
@@ -1730,20 +1788,26 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
                             .with_link(Link::Row { ci, ai, row })
                     })
                     .collect();
+                let base_text = match ctx.arith {
+                    Arithmetic::Exact => {
+                        "the lines above, back to the previous adjustment (subtotal rows don't restart it)"
+                    }
+                    Arithmetic::Mmb => {
+                        "the lines above, back to the previous adjustment (subtotal rows don't restart it), added up in doubles"
+                    }
+                };
                 notes.push(
-                    Step::note_amount(
-                        "Base",
-                        "the lines above, back to the previous adjustment (subtotal rows don't restart it)",
-                        since_adjustment,
-                    )
-                    .with(window),
+                    Step::note_amount("Base", base_text, since_adjustment.cents).with(window),
                 );
+                let base_words = match ctx.arith {
+                    Arithmetic::Exact => money(since_adjustment.cents),
+                    Arithmetic::Mmb => dmoney(since_adjustment.money(ctx.arith)),
+                };
                 notes.push(Step::note(
                     "Adjustment",
                     format!(
-                        "{} x {} ({}%) = {}",
-                        money(since_adjustment),
-                        num(quantity),
+                        "{base_words} x {} ({}%) = {}",
+                        nwords(quantity),
                         num(pct),
                         dmoney(exact)
                     ),
@@ -1763,8 +1827,8 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
                     )
                 };
                 notes.push(Step::note("Rate", rate_text));
-                let exact = Exact::dec(quantity).checked_mul(rate).ok_or_else(ovf)?;
-                let local = exact.to_cents().ok_or_else(ovf)?;
+                let line = Money::num(quantity).checked_mul(rate).ok_or_else(ovf)?;
+                let local = line.to_cents().ok_or_else(ovf)?;
                 let cur_code = match &d.currency {
                     Some(c) if c != base => Some(c),
                     _ => None,
@@ -1774,12 +1838,17 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
                     "Line",
                     format!(
                         "{} x {} = {}{cur_words}",
-                        num(quantity),
-                        num(rate),
-                        dmoney(exact)
+                        nwords(quantity),
+                        nwords(rate),
+                        dmoney(line)
                     ),
                 ));
-                notes.extend(rounding(exact, local));
+                // Movie Magic converts the unrounded amount: the line rounds
+                // once, in the base currency.
+                let rounds_here = cur_code.is_none() || ctx.arith == Arithmetic::Exact;
+                if rounds_here {
+                    notes.extend(rounding(line, local));
+                }
                 match cur_code {
                     Some(c) => {
                         let cur = ctx
@@ -1787,13 +1856,17 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
                             .currencies
                             .get(c)
                             .ok_or_else(|| gone(&format!("currency {c}")))?;
-                        let exact = Exact::cents(local).checked_mul(cur.rate).ok_or_else(ovf)?;
-                        let t = mul_cents(local, cur.rate).ok_or_else(ovf)?;
+                        let exact = converted(ctx.arith, line, local, cur.rate).ok_or_else(ovf)?;
+                        let t = exact.to_cents().ok_or_else(ovf)?;
+                        let from = if rounds_here || line.is_cents(local) {
+                            format!("{} {c}", money(local))
+                        } else {
+                            format!("{} {c} (not rounded yet)", dmoney(line))
+                        };
                         notes.push(Step::note(
                             "Currency",
                             format!(
-                                "{} {c} x {} {base} per {c} = {} {base}",
-                                money(local),
+                                "{from} x {} {base} per {c} = {} {base}",
                                 num(cur.rate),
                                 dmoney(exact)
                             ),
@@ -1818,12 +1891,10 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
             ));
         }
         if d.kind == RowKind::Adjustment && included {
-            since_adjustment = 0;
+            since_adjustment.clear();
             adj_rows.clear();
         } else {
-            since_adjustment = since_adjustment
-                .checked_add(total_counted)
-                .ok_or_else(ovf)?;
+            since_adjustment.add(total_counted).ok_or_else(ovf)?;
             adj_rows.push(i);
         }
         sub_rows.push(i);
@@ -1881,7 +1952,7 @@ fn fringes_calc(
 ) -> R<()> {
     let blank_at = || String::new();
     // Rates, once per fringe the lines carry.
-    let mut rates: BTreeMap<&str, Dec> = BTreeMap::new();
+    let mut rates: BTreeMap<&str, Num> = BTreeMap::new();
     for d in details {
         if d.kind != RowKind::Line {
             continue;
@@ -1898,7 +1969,7 @@ fn fringes_calc(
             rates.insert(name.as_str(), ctx.eval(&f.rate, Dec::ZERO, &blank_at)?);
         }
     }
-    let rate_words = |name: &str, rate: Dec| -> String {
+    let rate_words = |name: &str, rate: Num| -> String {
         let f = &ctx.b.fringes[name];
         let src = f.rate.0.trim();
         if src.parse::<Dec>().is_ok() {
@@ -1962,11 +2033,8 @@ fn fringes_calc(
                 Some(c) => base.min(c),
                 None => base,
             };
-            let amount = percent_of(capped, rate).ok_or_else(ovf)?;
-            let exact = Exact::cents(capped)
-                .checked_mul(rate)
-                .map(Exact::percent)
-                .ok_or_else(ovf)?;
+            let exact = percent_of(ctx.arith, capped, rate).ok_or_else(ovf)?;
+            let amount = exact.to_cents().ok_or_else(ovf)?;
             let shares = allocate(amount, &weights).ok_or_else(ovf)?;
             let cutoff_use = allocate(capped, &weights).ok_or_else(ovf)?;
             let several = lines.len() > 1;
@@ -2015,7 +2083,7 @@ fn fringes_calc(
                     "Fringe",
                     format!(
                         "{}% of {} = {}{}",
-                        num(rate),
+                        nwords(rate),
                         money(capped),
                         dmoney(exact),
                         rate_words(name, rate)
@@ -2045,8 +2113,8 @@ fn fringes_calc(
                     notes.push(Step::note("This line's share", text));
                 }
                 let kind_text = match cutoff {
-                    Some(c) => format!("{}% with a {} cutoff", num(rate), money(c)),
-                    None => format!("{}%", num(rate)),
+                    Some(c) => format!("{}% with a {} cutoff", nwords(rate), money(c)),
+                    None => format!("{}%", nwords(rate)),
                 };
                 let s = Step::value(name, kind_text, shares[k])
                     .with(notes)
@@ -2072,9 +2140,9 @@ fn fringes_calc(
                 continue;
             };
             let rate = rates[name.as_str()];
-            // Counted as the engine counts, rounded once from the exact
-            // amount; a division that need not end shows to 9 places.
-            let c = flat_count(&ctx.b.units, &f.kind, d, factors[i]).ok_or_else(ovf)?;
+            // Counted as the engine counts, rounded once from the unrounded
+            // amount; an exact division that need not end shows to 9 places.
+            let c = flat_count(ctx.arith, &ctx.b.units, &f.kind, d, factors[i]).ok_or_else(ovf)?;
             let amount = c.amount(rate).ok_or_else(ovf)?;
             let exact = c.exact_amount(rate).ok_or_else(ovf)?;
             let (mut notes, text) = flat_words(ctx.b, name, d, unit.as_deref(), &c, rate, exact)?;
@@ -2130,8 +2198,8 @@ fn flat_words(
     d: &Detail,
     unit: Option<&str>,
     c: &FlatCount,
-    rate: Dec,
-    exact: Exact,
+    rate: Num,
+    exact: Money,
 ) -> R<(Vec<Step>, String)> {
     let fu = unit.map(str::trim).filter(|u| !u.is_empty());
     let fu_text = fu.unwrap_or("line");
@@ -2308,7 +2376,7 @@ fn flat_words(
         "Fringe",
         format!(
             "{name} {} per {fu_text} x {count_text} ({}) = {}",
-            dmoney(rate),
+            dmoney(Money::num(rate)),
             paren.join("; "),
             dmoney(exact)
         ),

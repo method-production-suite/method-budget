@@ -1,10 +1,12 @@
 //! Stage 3: fringe posting, production levels, ATL/BTL, charges and credits.
 
+use crate::calc::arith::{percent_of, Money, Num};
 use crate::calc::{err, overflow, sum, CalcError, Ctx, ErrorKind};
 use crate::coding::AccountCoding;
-use crate::decimal::{mul_cents, percent_of, Dec, Exact};
+use crate::decimal::Dec;
 use crate::model::{
-    Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource, Detail, FringePosting, TopsheetRow,
+    Arithmetic, Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource, Detail, FringePosting,
+    TopsheetRow,
 };
 use crate::report::{
     CategoryTotals, ChargeTotals, CreditRowTotals, CreditTotals, LevelTotals, Report, RowTotals,
@@ -234,11 +236,13 @@ fn charge(
         }
     }
 
+    let arith = b.arithmetic;
     let (base, amount) = match &c.kind {
         ChargeKind::Percent(p) => {
             let amount = atl_btl
                 .checked_sub(excluded)
-                .and_then(|n| percent_of(n, *p))
+                .and_then(|n| percent_of(arith, n, Num::of(arith, *p)))
+                .and_then(Money::to_cents)
                 .ok_or_else(ovf)?;
             (atl_btl, amount)
         }
@@ -250,7 +254,10 @@ fn charge(
                         .get(cur)
                         .ok_or_else(|| err(at(), ErrorKind::UnknownCurrency(cur.clone())))?
                         .rate;
-                    mul_cents(*amount, rate).ok_or_else(ovf)?
+                    Money::cents(arith, *amount)
+                        .checked_mul(Num::of(arith, rate))
+                        .and_then(Money::to_cents)
+                        .ok_or_else(ovf)?
                 }
                 _ => *amount,
             };
@@ -267,9 +274,10 @@ fn charge(
 
 fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals, CalcError> {
     let ovf = || overflow(format!("credit {}", c.name));
+    let arith = ctx.arith;
 
     let mut rows = Vec::with_capacity(c.rows.len());
-    let mut total = Exact::cents(0);
+    let mut total = Money::cents(arith, 0);
     for (i, cr) in c.rows.iter().enumerate() {
         let at = || format!("credit {} row {} ({})", c.name, i + 1, cr.description);
         let row_ovf = || overflow(at());
@@ -303,8 +311,10 @@ fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals
         };
         let net = gross.checked_sub(excluded_fringes).ok_or_else(row_ovf)?;
 
-        // Exact: rows are summed, capped and discounted before the one rounding.
-        let (credit, cap_variance) = credit_row(net, cr.percent, cr.cap).ok_or_else(row_ovf)?;
+        // Unrounded: rows are summed, capped and discounted before the one
+        // rounding.
+        let (credit, cap_variance) =
+            credit_row(arith, net, cr.percent, cr.cap).ok_or_else(row_ovf)?;
         total = total.checked_add(credit).ok_or_else(ovf)?;
         rows.push(CreditRowTotals {
             gross,
@@ -317,10 +327,10 @@ fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals
         });
     }
 
-    let capped = credit_cap(total, c.cap).ok_or_else(ovf)?;
+    let capped = credit_cap(arith, total, c.cap).ok_or_else(ovf)?;
     let amount = capped
-        .checked_mul_exact(credit_keep(c.discount_percent).ok_or_else(ovf)?)
-        .and_then(Exact::to_cents)
+        .checked_mul_money(credit_keep(arith, c.discount_percent).ok_or_else(ovf)?)
+        .and_then(Money::to_cents)
         .ok_or_else(ovf)?;
     Ok(CreditTotals {
         name: c.name.clone(),
@@ -330,44 +340,43 @@ fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals
     })
 }
 
-/// One credit row, exactly: `percent` of `net` (or of the capped spend, or
-/// capped itself), and how far it is under its cap. `None` on overflow.
+/// One credit row, unrounded: `percent` of `net` (or of the capped spend,
+/// or capped itself), and how far it is under its cap. `None` on overflow.
 pub(crate) fn credit_row(
+    arith: Arithmetic,
     net: Cents,
     percent: Dec,
     cap: CreditCap,
-) -> Option<(Exact, Option<Exact>)> {
-    let pct = |v: Exact| Some(v.checked_mul(percent)?.percent());
-    let net = Exact::cents(net);
+) -> Option<(Money, Option<Money>)> {
+    let pct = |v: Money| Some(v.checked_mul(Num::of(arith, percent))?.percent());
+    let net = Money::cents(arith, net);
     Some(match cap {
         CreditCap::None => (pct(net)?, None),
         CreditCap::QualifiedSpend(cap) => {
-            let cap = Exact::cents(cap);
+            let cap = Money::cents(arith, cap);
             (pct(net.checked_min(cap)?)?, Some(cap.checked_sub(net)?))
         }
         CreditCap::Credit(cap) => {
-            let cap = Exact::cents(cap);
+            let cap = Money::cents(arith, cap);
             let uncapped = pct(net)?;
             (uncapped.checked_min(cap)?, Some(cap.checked_sub(uncapped)?))
         }
     })
 }
 
-/// The rows' total under the credit's overall cap, exactly.
-pub(crate) fn credit_cap(total: Exact, cap: Option<Cents>) -> Option<Exact> {
+/// The rows' total under the credit's overall cap, unrounded.
+pub(crate) fn credit_cap(arith: Arithmetic, total: Money, cap: Option<Cents>) -> Option<Money> {
     match cap {
-        Some(cap) => total.checked_min(Exact::cents(cap)),
+        Some(cap) => total.checked_min(Money::cents(arith, cap)),
         None => Some(total),
     }
 }
 
-/// The share kept after a discount: `(100 - discount) / 100`, exactly.
-pub(crate) fn credit_keep(discount_percent: Dec) -> Option<Exact> {
-    Some(
-        Exact::dec(Dec::from_int(100))
-            .checked_sub(Exact::dec(discount_percent))?
-            .percent(),
-    )
+/// The share kept after a discount: `(100 - discount) / 100`, unrounded.
+pub(crate) fn credit_keep(arith: Arithmetic, discount_percent: Dec) -> Option<Money> {
+    let hundred = Money::num(Num::of(arith, Dec::from_int(100)));
+    let discount = Money::num(Num::of(arith, discount_percent));
+    Some(hundred.checked_sub(discount)?.percent())
 }
 
 #[cfg(test)]
@@ -509,6 +518,7 @@ mod tests {
     ) -> Result<Topsheet, CalcError> {
         let ctx = Ctx {
             b,
+            arith: b.arithmetic,
             globals: BTreeMap::new(),
             opts,
             unfiltered: false,
