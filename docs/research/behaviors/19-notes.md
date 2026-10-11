@@ -30,7 +30,7 @@ words; no copied text or images. The video stays outside the repo.
 
 ## Shortcuts seen
 
-- Add note: Ctrl+Shift+Space (Windows), Cmd+Shift+Space (Mac). Same as Sam's 2026
+- Add note: Ctrl+Shift+Space (Windows), Cmd+Shift+Space (Mac). Same as the 2026
   recording (note 01).
 - The Windows right-click menu in this era also showed: cut, copy and paste row, insert row
   Ctrl+I, delete row on Delete, insert subtotal adjustment, insert subtotal, include in an

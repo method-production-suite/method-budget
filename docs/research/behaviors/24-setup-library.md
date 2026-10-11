@@ -55,11 +55,11 @@ None.
 ## Era caution
 
 2020/2021 build, cloud storage tied to the vendor account. Method Budget is local-only
-(decision 14). Sam's 2026 recordings win any conflict.
+(decision 14). The 2026 recordings win any conflict.
 
 ## What this means for Method Budget
 
-Local-first equivalent: a **personal library file** (our own open format, e.g. a `.fwblib`
+Local-first equivalent: a **personal library file** (our own open format, e.g. a `.mthd`
 JSON next to the user's app data, or any folder the user picks, which they can put in a synced
 folder or git repo themselves). Same transfer model: explicit copy in, explicit copy out, no
 live link.
@@ -71,7 +71,7 @@ live link.
    brings the globals it references, a charge brings its excluded groups. Show what will come
    along and which same-named items will be replaced or kept (shares the conflict review with
    note 20).
-3. [missing] P2: **Import setup from another `.fwb` file** (pick items from a budget on disk),
+3. [missing] P2: **Import setup from another `.mthd` file** (pick items from a budget on disk),
    which covers most of the library's value with no new file type.
 4. [missing] P2: **In-use counts and totals in setup tables** (lines using each fringe, group,
    unit, global), with a click to find them. Helps deciding what is safe to delete.

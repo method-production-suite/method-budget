@@ -52,7 +52,7 @@ vendor data.
 
 ## Era caution
 
-2020/2021 build. Sam's 2026 recordings (notes 01 and 02) win any conflict. The two-budgets-in-
+2020/2021 build. The 2026 recordings (notes 01 and 02) win any conflict. The two-budgets-in-
 tabs layout and the marquee overlay may have changed; the target-wins conflict rule is the
 part most likely still current.
 
@@ -61,7 +61,7 @@ part most likely still current.
 1. [missing] P1: **Copy rows between budgets with their tools.** Our copy is tab-separated
    cell text (APP.md), which loses fringes, groups, set, location, currency, notes, styles
    and fringe ranges. Add a structured clipboard payload (our own JSON, also put on the
-   system clipboard as TSV for spreadsheets) so rows pasted into another open `.fwb` keep
+   system clipboard as TSV for spreadsheets) so rows pasted into another open `.mthd` keep
    everything. Same at the account and category level (copy whole accounts with their lines).
 2. [missing] P1: **Paste conflict review.** On paste, list referenced setup items: those that
    exist in the target with different values (target wins by default, offer "use source

@@ -4,7 +4,7 @@ Method Budget files are text files with stable identities inside (docs/FORMAT.md
 detail row has a row id that survives edits and moves, accounts and categories have
 numbers, and setup items have names. That makes two things possible that a budgeting tool
 usually can't do: say exactly **what changed** between two budgets, and **merge** two
-copies that changed apart. The engine does both (`fwb_core::diff`, `fwb_core::merge`); the
+copies that changed apart. The engine does both (`method_core::diff`, `method_core::merge`); the
 command line and the app use the same code. Decisions are in docs/decisions.md, entry 44.
 
 ## What changed (diff)
@@ -57,7 +57,7 @@ versions): display settings, report presets, tag presets, line blocks, overtime 
 setup order and folders, the provenance, and the compact-versions switch. Actuals are
 listed in a few words (`actuals none -> 12 transactions from 1 import`).
 
-Properties (crates/fwb-core/tests/merge.rs): a budget compared with itself has no changes
+Properties (crates/method-core/tests/merge.rs): a budget compared with itself has no changes
 and no money; a budget changed in any way has some.
 
 ## Three-way merge
@@ -106,7 +106,7 @@ conflicts, pick a side for each and the merge be worked out again with those pic
 (`merge_with(base, ours, theirs, default, picks)`). Money is never merged: the merged
 budget is recalculated like any other.
 
-Properties (crates/fwb-core/tests/merge.rs, random budgets and random edits):
+Properties (crates/method-core/tests/merge.rs, random budgets and random edits):
 `merge(base, x, base) == x`, `merge(base, base, x) == x` and `merge(base, x, x) == x` with
 no conflicts; edits that don't overlap merge with no conflict, give the same budget in
 either order (`merge(base, o, t) == merge(base, t, o)`), give exactly the budget that
@@ -121,7 +121,7 @@ and which version it was made from. When that version is still in the budget, it
 natural base. But the copy may have left things out (notes, budget info, the baseline,
 unused setup items), and a base that still has them would read their absence in the copy
 as the reviewer deleting them. So the base is first worked out *as it was sent*
-(`fwb_core::merge::base_as_shared`): what was left out isn't recorded, so it is read from
+(`method_core::merge::base_as_shared`): what was left out isn't recorded, so it is read from
 the copy (no note of the base's in the copy means notes were left out; no info field the
 same, info; a missing baseline, the baseline; every unused setup item missing, unused
 setup). The base's versions are those the copy and the original both still have, and its
@@ -152,7 +152,6 @@ Tell git which files use the driver, in the repository's `.gitattributes`:
 
 ```
 *.mthd merge=method-budget
-*.fwb merge=method-budget
 ```
 
 and what the driver is, once per repository (or with `--global`):
@@ -161,10 +160,6 @@ and what the driver is, once per repository (or with `--global`):
 git config merge.method-budget.name "Method Budget merge"
 git config merge.method-budget.driver "method merge-driver %O %A %B %P"
 ```
-
-Repositories set up before the rename (`*.fwb merge=fwb` and a driver line running
-`fwb merge-driver`) keep working: `fwb` is a deprecated alias of `method` (docs/CLI.md).
-Switch the driver line to `method` when convenient.
 
 `%O` is the common base, `%A` ours (which the result replaces), `%B` theirs and `%P` the
 file's path, for messages. A clean merge is committed as usual. When conflicts remain the

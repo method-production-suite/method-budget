@@ -6,7 +6,7 @@ on-screen action only. Clean-room: behavior in our own words, no frames kept, no
 data copied.
 
 "Shortcuts" here are not keyboard shortcuts. They are named presets saved from existing
-lines and replayed onto other lines. They live in a "shortcuts" tab of the tools pane (Sam's
+lines and replayed onto other lines. They live in a "shortcuts" tab of the tools pane (the 2026
 note 01 lists that tab in the bottom panel).
 
 ## Creating a shortcut

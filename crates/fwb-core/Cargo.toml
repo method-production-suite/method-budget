@@ -1,9 +1,0 @@
-[package]
-name = "fwb-core"
-description = "Method Budget engine: accounts, fringes, globals, topsheet"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-publish = false
-
-[dependencies]

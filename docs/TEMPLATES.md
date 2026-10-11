@@ -21,7 +21,7 @@ in front (adds what is missing, renames by number, never removes an account with
 | `templates/charts/SOURCES.md` | Where each chart came from, when, what was kept | yes |
 | `imports/coa-sources/` | Raw studio chart files used as sources | **never** (in .gitignore) |
 | `scripts/build-coa-templates.py` | Builds every template from its source and updates the list | yes |
-| `crates/fwb-format/src/charts_bundled.rs` | The list the app and the command line bundle, written by the script | yes |
+| `crates/method-format/src/charts_bundled.rs` | The list the app and the command line bundle, written by the script | yes |
 
 ## Adding a studio chart
 
@@ -157,7 +157,7 @@ as category `11`. Repeated account numbers are handled as above.
   against the CSV: the same categories and account numbers, written as in the CSV, and as
   many accounts as the CSV lists, less accounts named `.` and merged repeats. It stops on
   any difference.
-- `cargo test -p fwb-format charts` checks the bundled list agrees with `charts.json`,
+- `cargo test -p method-format charts` checks the bundled list agrees with `charts.json`,
   that every template opens, has no lines or setup, recalculates (categories with no
   accounts total 0), compares with itself and gives a cost report with no two accounts
   (or category fringe accounts) read as the same number, and is written as it reads, and

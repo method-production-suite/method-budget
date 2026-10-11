@@ -35,7 +35,7 @@ no frames kept, no budget data copied.
 
 None new. The tab menu has an entry for the keyboard shortcut sheet.
 
-Era caution: the 2021 build only. Not seen in Sam's 2026 recordings, so the split layout,
+Era caution: the 2021 build only. Not seen in the 2026 recordings, so the split layout,
 the tab menu items and the sub-budget and share-version entries may have changed.
 
 ## What this means for Method Budget

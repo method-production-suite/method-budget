@@ -1,6 +1,6 @@
 /* Method Budget brand tokens: the one place the site's colors and type are defined.
    docs/BRAND.md explains them and lists the contrast checks. The accent is the desktop
-   app's own teal (crates/fwb-app/ui/styles.css, --accent), so the site and the app read
+   app's own teal (crates/method-app/ui/styles.css, --accent), so the site and the app read
    as one product. Every text pairing below meets WCAG AA (4.5:1) in both schemes. */
 
 :root {

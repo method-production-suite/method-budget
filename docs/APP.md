@@ -1,9 +1,9 @@
-# The desktop app (`crates/fwb-app`)
+# The desktop app (`crates/method-app`)
 
 Method Budget's editor is a local desktop app built with [Tauri 2](https://tauri.app):
 the Rust engine runs natively inside the app, and the interface is plain HTML, CSS and
 JavaScript drawn in the operating system's own web view. Budgets are `.mthd` files on your
-disk ([FORMAT.md](FORMAT.md); older `.fwb` files open and save the same way). There is no server and no account, and the app
+disk ([FORMAT.md](FORMAT.md)). There is no server and no account, and the app
 goes online only to check for updates of itself, which can be turned off ("Updates" below).
 Why Tauri: [decisions.md](decisions.md), entry 14.
 
@@ -13,17 +13,17 @@ You need Rust (stable) and, for bundles, the Tauri CLI (`cargo install tauri-cli
 There is no JavaScript toolchain: no npm, no bundler, no packages.
 
 ```bash
-cargo run -p fwb-app                        # run a debug build
-cargo tauri build --debug --no-bundle       # debug binary in target/debug/fwb-app
+cargo run -p method-app                     # run a debug build
+cargo tauri build --debug --no-bundle       # debug binary in target/debug/method-budget
 cargo tauri build                           # release installers (.app/.dmg, .msi, .deb/.AppImage)
-cargo test -p fwb-app                       # command-layer tests, no window needed
-cargo build --release -p fwb-app --example perf && target/release/examples/perf
+cargo test -p method-app                    # command-layer tests, no window needed
+cargo build --release -p method-app --example perf && target/release/examples/perf
                                             # timings on a 5,000-row sample budget (no window)
 ```
 
-Run the `cargo tauri` commands from `crates/fwb-app` (or pass `--config crates/fwb-app/tauri.conf.json`).
-The UI files in `crates/fwb-app/ui/` are embedded into the binary at compile time, so after
-editing them, run `cargo run -p fwb-app` again to see the change.
+Run the `cargo tauri` commands from `crates/method-app` (or pass `--config crates/method-app/tauri.conf.json`).
+The UI files in `crates/method-app/ui/` are embedded into the binary at compile time, so after
+editing them, run `cargo run -p method-app` again to see the change.
 
 **Linux** needs the WebKitGTK development packages to build:
 
@@ -447,7 +447,7 @@ category or account on screen was renumbered, the grid goes back to the topsheet
 | `renumber_preview` | `category_width`, `account_width`, `sub_width`, `set_width`, `separator` (as `set_account_coding`) | `{categories, accounts, fringe_accounts, conflicts, warnings, changes}`: each change `{old, new}` (`new` empty when it doesn't fit), conflicts and warnings as sentences |
 | `renumber_accounts` | the same | View (refused, nothing changed, on any conflict) |
 
-The command is in `src/rename.rs`; the engine does the work (`fwb_core::rename`).
+The command is in `src/rename.rs`; the engine does the work (`method_core::rename`).
 
 **Globals and Units** are edited in place, as before: a global's formula (with its current
 value beside it), a unit's plural, hours and description; Enter or leaving the box saves,
@@ -606,7 +606,7 @@ selection with no row that takes the field is refused and nothing changes.
 
 `tools.js` draws the panel and mounts `apply.js`'s lists and header. `main.js` gives it the
 grid's selection (`selection()` in the panel context: level, row keys, current category,
-cursor row and account) and fires `fwb:selection` and `fwb:cursor` events on the document
+cursor row and account) and fires `method:selection` and `method:cursor` events on the document
 when the selection or the cursor changes; the lists ask for a fresh summary on those and on
 every new view, and the Notes tab redraws its line.
 
@@ -1572,7 +1572,7 @@ changes:
   differ, the two sums and their difference, and the first 50 differing rows. Differing
   rows are tinted in the preview table.
 
-How rows are read (`fwb_format::import::merge`): rows after the header row; rows empty in
+How rows are read (`method_format::import::merge`): rows after the header row; rows empty in
 every mapped column are passed over. Account numbers are read with the budget's account
 numbering (`1105`, `11-5` and `11.05` are all `11-05` under the default pattern) and
 matched anywhere in the budget; a number that doesn't fit the pattern (too long, too many
@@ -1594,7 +1594,7 @@ line, subtotal, adjustment and separator; subtotal and separator rows keep no am
 an adjustment keeps no rate (it is always the lines above it). A note becomes one note on
 the line.
 
-Reading the files (`fwb_format::import`, plain Rust, no crates): CSV per RFC 4180 with
+Reading the files (`method_format::import`, plain Rust, no crates): CSV per RFC 4180 with
 quoted fields, CRLF, LF or CR, a UTF-8 byte order mark dropped, UTF-16 with a byte order
 mark (Excel's Unicode Text), Windows-1252 when the bytes aren't UTF-8, and the delimiter
 (comma, tab or semicolon) taken from whichever splits the first lines most consistently;
@@ -1639,7 +1639,7 @@ step and one **import batch** the Actuals tab can take back out. Mappings are sa
 user like Import Spreadsheet's (by the header row's titles); the review is per budget and
 never saved.
 
-How rows are read (`fwb_format::import::actuals`): amounts exactly (no floats; currency
+How rows are read (`method_format::import::actuals`): amounts exactly (no floats; currency
 signs, thousands separators, `(5)` for -5), rounded once to the cent; dates from workbook
 serial numbers (the 1900 system), ISO `2026-09-30`, `2026/09/30`, `20260930`, `9/30/2026`
 or `30/9/2026` by the date order, `30.9.2026` (day first), and month names (`Sep 30,
@@ -1655,7 +1655,7 @@ account and the category total), before Total like Orig and Var; the lines get A
 transactions assigned to each line), and an account's total row its whole actual. They
 show by default once there are actuals and are hidden or shown one by one from the column
 menu. An over-budget row's EAC Var is in the warning color. The figures are the engine's
-(`fwb_core::actuals::cost_report`): an account's ETC is budget minus actual (never past
+(`method_core::actuals::cost_report`): an account's ETC is budget minus actual (never past
 zero) unless the Actuals tab sets a typed amount or a percent complete (EAC = actual /
 percent, rounded once to the cent); categories, levels and the totals add up their
 parts exactly; budget items outside the chart (fringes posted by budget or level, charges)
@@ -1726,10 +1726,8 @@ first Save asks where, as before. If an autosave into the file fails (the folder
 the disk is full), the app says so once and keeps a recovery copy.
 
 **File names.** New budgets, Save As, shared copies, templates and sub-budgets suggest
-`.mthd`, and a name typed without an extension gets `.mthd`. A budget opened from an older
-`.fwb` file keeps saving and autosaving to that same file; only Save As (or a copy) gives it
-a new name, and a `.fwb` name typed on purpose is kept. Every dialog that opens a budget
-accepts both.
+`.mthd`, and a name typed without an extension gets `.mthd`. Every dialog that opens a
+budget accepts `.mthd` files.
 
 **Changes made outside the app.** Because autosave writes the file often, the app never
 writes over a version it hasn't seen. When it opens or writes a budget file it notes the
@@ -1760,7 +1758,7 @@ unsaved changes on the same timing.
 
 **Recovery copies** are the safety net for a crash, a forced quit or a power cut. They live
 in the app's data folder (`Recovery/`, readable only by you: 0700 folder, 0600 files on
-macOS and Linux), one per open budget, each a budget file (named `.fwb`, an internal detail) with a small
+macOS and Linux), one per open budget, each a budget file (`.mthd`) with a small
 `.json` beside it (the
 original path, title and time). A copy is deleted when the budget is saved, when undo
 takes it back to the saved state, when you close its tab or the window (or quit) and choose
@@ -1778,8 +1776,7 @@ small file in `Recovery/`, so a second copy of the app never offers the first on
 copies as recovered.
 
 **Backups.** Before a save replaces a budget file, the version on disk is copied to the
-app's data folder: `Backups/<hash of the file's path>/<name> <date time> UTC.mthd` (backups
-taken before the rename end in `.fwb` and are listed too), with a
+app's data folder: `Backups/<hash of the file's path>/<name> <date time> UTC.mthd`, with a
 `source.json` naming the file. An explicit Save always makes one (unless the file is
 unchanged since the last backup); autosaves make one on the first write in a session and
 then at most every 10 minutes, so the backups span real time rather than the last few
@@ -1810,7 +1807,7 @@ two files with one name show their folder), kept in the data folder's `recent.js
 that no longer exist drop off when the menu is refreshed (every open and save). Clear Menu
 empties it. macOS's own system-wide recent documents list is not updated.
 
-**Opening from the system.** Double-clicking a `.mthd` (or older `.fwb`) file, Open With, or dropping one on
+**Opening from the system.** Double-clicking a `.mthd` file, Open With, or dropping one on
 the Dock icon opens it in a tab (its own tab, when it is open already): on macOS the app
 receives an open event, on Windows and Linux the path arrives on the command line. Nothing
 is asked: no budget is replaced. When several files arrive at once, the first one opens. On macOS a
@@ -1821,22 +1818,6 @@ that file (each copy has its own recovery copies and doesn't offer the other's).
 The app's data folder is the platform's local app data folder for
 `com.methodbudget.desktop`: `~/Library/Application Support/...` on macOS,
 `%LOCALAPPDATA%\...` on Windows, `~/.local/share/...` on Linux.
-
-**Moving over from the old identifier** (src/migrate.rs; decisions.md, entry 46). The data
-folder is named after the app's identifier, which changed with the rename from
-`io.github.ssandweiss.film-wizard-budgeting`. On every start, before the window opens,
-the app checks: when the new folder has none of its state (`settings.json`,
-`recent.json`, `tabs.json`, `library.json`, `Recovery/`, `Backups/` or the
-`migrated-from.json` marker) and the old folder exists, the old folder is **copied** (never
-moved, so an old copy of the app still works) into a temporary folder beside the new one,
-which is then renamed into place, so an interrupted copy leaves nothing half done. Lock
-files and web view caches stay behind; a file that can't be read is skipped and named on
-stderr. If the web view made the new folder first (Windows and Linux keep its storage
-there), the copied entries move in one by one, never over anything already there. On
-macOS the web view's storage (display choices and saved spreadsheet mappings) lives in
-`~/Library/WebKit/<identifier>` instead and is copied the same way when the new one doesn't
-exist yet. `migrated-from.json` records where the copy came from and when; the check runs
-again from Tauri's setup with the folder Tauri reports, which does nothing once copied.
 
 | Command | Arguments | Returns |
 |---|---|---|
@@ -1903,7 +1884,7 @@ shape. Check for Updates and the automatic switch are answered in Rust (src/upda
 ## Architecture
 
 ```
-crates/fwb-app/
+crates/method-app/
   src/session.rs     one open budget: Budget, file path, dirty flag, undo/redo patches
                      (each step labeled and timed), the account on screen, the recalc
                      cache, autosave and recovery state
@@ -1915,7 +1896,7 @@ crates/fwb-app/
   src/history.rs     the History tab: step labels, the list, jumps, a step as a version
   src/edit.rs        every edit as a function on &mut Budget (validates, then applies)
   src/diagnose.rs    lenient recalc: flags every bad cell instead of stopping at the first
-  src/report_dto.rs  serde shapes for fwb_core::Report (the engine stays serde-free)
+  src/report_dto.rs  serde shapes for method_core::Report (the engine stays serde-free)
   src/view.rs        what the UI draws after each command (lean), and the full view for printing
   src/batch.rs       multi-cell edits (paste, fill down) applied as one undo step
   src/apply.rs       the apply panel: tag the selected rows, fringe ranges, selection summary
@@ -1938,10 +1919,10 @@ crates/fwb-app/
   src/setup_sheets.rs  setup lists as spreadsheets: export by kind, import with a column
                      mapping per sheet, checked row by row, then Import Setup's review
   src/sheet_import.rs  Import Spreadsheet: the picked file kept by token, the mapping
-                     dialog's preview and the import (fwb_format::import does the work)
+                     dialog's preview and the import (method_format::import does the work)
   src/actuals.rs     Import Actuals, the Actuals tab's commands and the cost figures
-                     every view of a budget with actuals carries (fwb_core::actuals and
-                     fwb_format::import::actuals do the work); the rollup cache
+                     every view of a budget with actuals carries (method_core::actuals and
+                     method_format::import::actuals do the work); the rollup cache
   src/menu.rs        native menu bar, built from the same table as ui/js/shortcuts.js
   src/tools.rs       the tools panel's own window: opening, hiding and placing it, telling
                      the other window when the budget changed, the Notes tab's list
@@ -1953,9 +1934,9 @@ crates/fwb-app/
                      checked results as one undo step
   src/moverows.rs    moving lines, accounts and topsheet rows one place, keeping fringe
                      ranges whole; quick presses join one undo step
-  src/rename.rs      renaming a setup item everywhere (fwb_core::rename does the work)
+  src/rename.rs      renaming a setup item everywhere (method_core::rename does the work)
   src/renumber.rs    renumbering accounts to a new pattern: the preview and the one-step
-                     renumbering (fwb_core::renumber does the work)
+                     renumbering (method_core::renumber does the work)
   src/sharing.rs     copies for sharing (Save dialog, provenance, read-only, editable
                      copies, returned copies stored as versions) and sub-budgets
   src/versions.rs    the Versions dialog's commands: save, restore, rename, delete, each
@@ -1963,13 +1944,13 @@ crates/fwb-app/
   src/compare.rs     the compare screen's commands: budgets copied out of tabs, versions
                      and picked files, compared after the lock is released
   src/diffmerge.rs   What Changed and Merge Changes From: budgets copied out, totalled
-                     as their grids do, diffed or merged after the lock (fwb_core::diff
-                     and fwb_core::merge do the work); the merge is one undo step
+                     as their grids do, diffed or merged after the lock (method_core::diff
+                     and method_core::merge do the work); the merge is one undo step
   src/reports.rs     report presets saved in the budget (one undo step each), and
                      printing a report to the print sheet or a PDF file
   src/pdf_mac.rs     macOS: AppKit's print operation on the web view, into a PDF file
                      with no panel or through the print sheet (Objective-C runtime calls)
-  src/export.rs      File > Export: the budget's tables (fwb_format::export) as an Excel
+  src/export.rs      File > Export: the budget's tables (method_format::export) as an Excel
                      workbook, CSV files or tab-delimited detail, through a Save dialog
   src/safety.rs      saving safety as plain files: atomic writes, recovery copies,
                      backups, settings, the recent list (tested with temporary folders)
@@ -1981,7 +1962,7 @@ crates/fwb-app/
                      budget), What's New once after an update, Help > Release Notes
   src/app.rs         Tauri glue: commands, file dialogs, the close and quit guard (one
                      question about every unsaved tab), menu events
-  examples/perf.rs   timings on a large sample budget (fwb_core::sample), and canned
+  examples/perf.rs   timings on a large sample budget (method_core::sample), and canned
                      replies for a UI harness (perf dump DIR)
   ui/                index.html, styles.css, setup.css, js/*.js (ES modules, no build step)
   capabilities/      what each window's web view may call (main.json, tools.json,
@@ -2003,11 +1984,11 @@ account on screen, not on the budget: about 35 KB plus half a kilobyte per row o
 account.
 
 - `rev`: changes whenever the budget does (edit, undo, redo, a new or opened budget).
-- `budget`: the budget's outline as file-format JSON (via `fwb_format`, so the UI reads the
+- `budget`: the budget's outline as file-format JSON (via `method_format`, so the UI reads the
   documented format): setup tables, categories and accounts, charges, credits, info. Each
   account has `lines` (its row count) instead of `details`; the baseline has no `rows`;
   `versions` lists each version's `id`, `name`, `created` and `note`, not its content.
-- `report`: every total down to the account from `fwb_core::recalc`, with money as integer
+- `report`: every total down to the account from `method_core::recalc`, with money as integer
   cents and decimals as strings, never floats. Accounts have no `rows` here.
 - `account`: the account on screen in full, or `null`: `ti` and `ai` (its topsheet index and
   index in its category), `code`, `details` (its rows, file-format JSON), `rows` (their
@@ -2077,7 +2058,7 @@ categories or accounts were added, removed or moved. The dirty flag compares a r
 number with the one last saved, so undoing back to the saved state clears it.
 
 **Recalculation at scale.** Totals are worked out once per change and cached. The session
-keeps a `fwb_core::calc::cache::RecalcCache`: an account's rows depend only on the account
+keeps a `method_core::calc::cache::RecalcCache`: an account's rows depend only on the account
 and on the globals, fringes, currencies, units and groups, so after an edit only the
 accounts whose rows changed are evaluated again (every account when one of those tables
 changed); topsheet, charges, credits and breakdowns are always worked out in full. The
@@ -2092,7 +2073,7 @@ rules, flags each bad one (`issues`, by row id and field), and recalculates a co
 those cells blank. The UI shows the engine's message in a banner, outlines the bad cells,
 and shows totals marked as partial. The budget keeps what the user typed.
 
-**Selection totals** come from `fwb_core::selection_totals` through the
+**Selection totals** come from `method_core::selection_totals` through the
 `selection_totals` command.
 
 **The UI** is a handful of ES modules with no dependencies: `main.js` (state, navigation,

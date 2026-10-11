@@ -1,6 +1,6 @@
 # Behavior note 01: navigation, selection and the tools pane
 
-Source: a ~2 minute screen recording by Sam of normal use of a licensed copy of the reference
+Source: a ~2 minute screen recording of normal use of a licensed copy of the reference
 product (2026-10-09). Clean-room: this note describes behavior in our own words. It holds no
 budget data, labels copied verbatim beyond a few-word term, or images. The recording itself
 stays outside the repo.
@@ -13,7 +13,7 @@ stays outside the repo.
 - The breadcrumb shows every level. Each segment has a dropdown that jumps straight to a
   sibling (another category or another account) without going up first.
 - Next to the current breadcrumb segment are two small step buttons: previous and next
-  sibling account. Sam used them to walk through accounts in order.
+  sibling account. They were used to walk through accounts in order.
 - The account-list level shows the category's fringe account as its own bold row near the
   bottom (category code with a fixed suffix), followed by a total row.
 - On entering a level, the selection lands on the first row; at the detail level it lands on
@@ -57,7 +57,7 @@ stays outside the repo.
   amount, unit, X, currency, rate, subtotal. A corner menu toggles each optional column on or
   off (also aggregate sum, location, set, unit2, unit3, 4X, unit4).
 - The subtotal column can be pinned so it stays visible while the grid scrolls sideways.
-  With the tools pane open the grid was too narrow, and Sam scrolled horizontally back and
+  With the tools pane open the grid was too narrow, and the user scrolled horizontally back and
   forth to see amounts and totals: a pain point worth beating.
 - Row styling carries meaning: line text takes its group's color; suppressed lines are
   greyed; a bracket in the left gutter marks a fringe range; bold lines act as person
@@ -84,7 +84,7 @@ stays outside the repo.
 
 1. **Apply-to-selection panel**: tri-state checkboxes for fringes, groups, sets, locations
    and currency that reflect and edit the selected lines, with per-item selection totals.
-   Our setup panel edits tables; this is the missing "apply" half, and it's how Sam works.
+   Our setup panel edits tables; this is the missing "apply" half, and it is the core of the recorded workflow.
 2. **Sibling stepping and breadcrumb jumps**: previous/next account buttons beside the
    breadcrumb (we have Cmd+[ and Cmd+]; add visible buttons) and a dropdown per segment.
 3. **Context totals in the footer**: current account and parent totals when drilled down;
@@ -96,5 +96,5 @@ stays outside the repo.
    and indent formatting, separator rule lines, per-line notes.
 6. **Account list shows the fringe account row** (we already compute it).
 7. **Effective fringe percent column** per line.
-8. **Shortcut compatibility**: Sam's muscle memory is Cmd+I insert row, Cmd+D delete row,
+8. **Shortcut compatibility**: the recorded habits are Cmd+I insert row, Cmd+D delete row,
    Cmd+= insert subtotal. Ours currently use Cmd+D for fill down. Needs a decision.

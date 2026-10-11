@@ -176,7 +176,7 @@ Every tool that works on one budget takes `path`. Tools that read totals take
 
 ### Files and summaries
 
-**`list_budgets`** `{folder?, recursive?}`: the `.mthd` and `.fwb` files under the first root
+**`list_budgets`** `{folder?, recursive?}`: the `.mthd` files under the first root
 (or `folder`), with their sizes; hidden folders and symlinks are skipped (at most 2,000
 files, 8 folders deep).
 
@@ -422,7 +422,7 @@ The server treats the client as able to make mistakes and budget files as untrus
   so a link that leads out is refused; nothing is ever written through a symlink. Nothing
   below a root whose name starts with `.` (`.git`, `.ssh`, `.claude`, hidden files) is read
   or written.
-- **Extensions.** Budgets are read and written only as `.mthd` or `.fwb`; spreadsheets are
+- **Extensions.** Budgets are read and written only as `.mthd`; spreadsheets are
   read only as `.xlsx`, `.csv`, `.tsv` or `.txt`; an export's file must have its format's
   extension. The server can't be pointed at a script, a config file or a git hook.
 - **No replacing by accident.** A new file (`new_budget`, `save_as`, `export`,

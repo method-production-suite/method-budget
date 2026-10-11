@@ -23,7 +23,7 @@ not demonstrated.
 **Detail level**
 - When adding a detail line, copy from the line above: separate checkboxes for fringe,
   group, location, set and currency. Fringe was on by default, the rest off. This matches
-  Sam's 2026 recording (note 02): new lines inherit fringes, not groups.
+  the 2026 recording (note 02): new lines inherit fringes, not groups.
 
 **Rate column**
 - A display cutoff value (blank by default), then the number of decimal places for rates

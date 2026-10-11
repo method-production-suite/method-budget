@@ -50,7 +50,7 @@ copied help text or images. The video stays outside the repo.
   the status bar still matched the values from before those lines were suppressed. This
   is either an edited demo clip or a sign that detail-level subtotal and total rows keep
   showing suppressed amounts. Our engine counts suppressed lines as 0 in every subtotal
-  and total. Sam's 2026 note 02 says totals recalculated on the spot when a suppression
+  and total. The 2026 note 02 says totals recalculated on the spot when a suppression
   group was removed, which points to an artifact, but whether the detail total row itself
   excludes suppressed lines should be checked in a 2026 recording.
 - **Policies we hardcode**: unassigned lines always count; conflict always excludes;
@@ -67,7 +67,7 @@ copied help text or images. The video stays outside the repo.
 
 ## Era caution
 
-Sam's 2026 note 02 covers applying and removing the suppression group from the tools pane
+The 2026 note 02 covers applying and removing the suppression group from the tools pane
 with immediate recalculation, greyed lines, and a small rounding drift on toggling. The
 policy dropdowns and the "total" versus "active total" columns were not re-checked in 2026.
 

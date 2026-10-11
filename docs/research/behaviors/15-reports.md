@@ -81,14 +81,14 @@ The video stays outside the repo.
 ## Era caution
 
 - This is the 2020/2021 report window. The quick-reports list was empty in the video, so
-  what it holds now is unknown. Sam's 2026 notes have not covered reports yet; check the
+  what it holds now is unknown. The 2026 notes have not covered reports yet; check the
   current product before matching any specific option.
 
 ## What this means for Method Budget
 
 1. [partial] P1 **Report templates saved in the budget**: we print topsheet, detail or
    both with a fixed layout. Add named templates (columns, options, sections, header and
-   footer) stored in the `.fwb`, re-rendered from live data.
+   footer) stored in the `.mthd`, re-rendered from live data.
 2. [missing] P1 **Section picker**: choose categories and accounts to include, toggle
    suppressed lines, reorder sections, plus extra reports.
 3. [missing] P1 **Export to PDF** as a direct action (today we rely on the system print

@@ -39,13 +39,13 @@ All verified from numbers on screen:
   the rate for display only.
 - **Cutoff per range**: the range was made after the fringes were applied, and none of
   the fringes in view hit a cutoff, so the per-range cutoff could not be confirmed here.
-  Our rule (decision 3) remains an assumption to verify with Sam on a 2026 budget: make a
+  Our rule (decision 3) remains an assumption to verify on a 2026 budget: make a
   range whose combined pay crosses a cutoff and compare with each line alone.
 - No mismatch found.
 
 ## Era caution
 
-Sam's 2026 notes 01 and 02 show the same select-then-tick workflow, range buttons and
+The 2026 notes 01 and 02 show the same select-then-tick workflow, range buttons and
 selection dollars, plus the "copy fringes from the line above" preference on insert.
 This 2021 video agrees with them.
 

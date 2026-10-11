@@ -3,7 +3,7 @@
 How Method Budget looks and sounds, in the app, on methodbudget.com, in the README and
 anywhere else it shows up. The tokens live in [site/assets/tokens.css](../site/assets/tokens.css);
 the artwork is drawn by [scripts/make-brand.py](../scripts/make-brand.py) and, for the app
-icon, [crates/fwb-app/icons/source/make_icon.py](../crates/fwb-app/icons/source/make_icon.py).
+icon, [crates/method-app/icons/source/make_icon.py](../crates/method-app/icons/source/make_icon.py).
 
 ## The name
 
@@ -54,7 +54,7 @@ whole-unit rows) is used for favicons so it stays sharp at 16 and 32 pixels.
 | `site/favicon.svg` | The 16-unit mark; switches color with the browser's scheme |
 | `site/favicon.ico` | The 16-unit mark at 16 and 32 pixels |
 | `site/apple-touch-icon.png` | 180 pixels, white mark on a full-bleed teal square |
-| `crates/fwb-app/icons/` | The app icon set (below) |
+| `crates/method-app/icons/` | The app icon set (below) |
 
 Rules:
 
@@ -80,11 +80,11 @@ The mark in white on a teal rounded square, the figures showing the teal through
 bundle's sizes and formats come from it with the Tauri CLI:
 
 ```bash
-python3 crates/fwb-app/icons/source/make_icon.py crates/fwb-app/icons/source/icon-1024.png
-cd crates/fwb-app && cargo tauri icon icons/source/icon-1024.png -o <scratch dir>
+python3 crates/method-app/icons/source/make_icon.py crates/method-app/icons/source/icon-1024.png
+cd crates/method-app && cargo tauri icon icons/source/icon-1024.png -o <scratch dir>
 ```
 
-Copy back only the files already in `crates/fwb-app/icons/` (the PNG sizes,
+Copy back only the files already in `crates/method-app/icons/` (the PNG sizes,
 `icon.icns`, `icon.ico`); the CLI also writes Android and iOS sets the app doesn't use.
 
 Regenerate the SVGs, favicon and touch icon with `python3 scripts/make-brand.py`

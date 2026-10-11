@@ -7,7 +7,7 @@
 //! - every workspace member's Cargo.toml inherits it (`version.workspace =
 //!   true`, never a number of its own);
 //! - Cargo.lock records each member at that version (CI builds `--locked`);
-//! - `crates/fwb-app/tauri.conf.json` carries it as `version` (the bundle's
+//! - `crates/method-app/tauri.conf.json` carries it as `version` (the bundle's
 //!   version, the About box, and what the updater compares against).
 //!
 //! And the version has release notes, `docs/releases/<version>.md`: readable
@@ -632,22 +632,22 @@ mod tests {
         let r = TempRepo::new("versions");
         r.write(
             "Cargo.toml",
-            &format!("[workspace]\nresolver = \"2\"\nmembers = [\n    \"crates/a\",\n    \"crates/fwb-app\",\n]\n\n[workspace.package]\nedition = \"2021\"\n# The one place.\nversion = \"{version}\"\nlicense = \"MIT\"\n"),
+            &format!("[workspace]\nresolver = \"2\"\nmembers = [\n    \"crates/a\",\n    \"crates/method-app\",\n]\n\n[workspace.package]\nedition = \"2021\"\n# The one place.\nversion = \"{version}\"\nlicense = \"MIT\"\n"),
         );
         r.write(
             "crates/a/Cargo.toml",
             "[package]\nname = \"a\"\nversion.workspace = true\nedition.workspace = true\n\n[dependencies]\nserde = { version = \"=1.0.0\" }\n",
         );
         r.write(
-            "crates/fwb-app/Cargo.toml",
-            "[package]\nname = \"fwb-app\"\nversion.workspace = true\n",
+            "crates/method-app/Cargo.toml",
+            "[package]\nname = \"method-app\"\nversion.workspace = true\n",
         );
         r.write(
             "Cargo.lock",
-            &format!("version = 4\n\n[[package]]\nname = \"a\"\nversion = \"{version}\"\ndependencies = [\n \"serde\",\n]\n\n[[package]]\nname = \"fwb-app\"\nversion = \"{version}\"\n\n[[package]]\nname = \"serde\"\nversion = \"{version}\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"00\"\n"),
+            &format!("version = 4\n\n[[package]]\nname = \"a\"\nversion = \"{version}\"\ndependencies = [\n \"serde\",\n]\n\n[[package]]\nname = \"method-app\"\nversion = \"{version}\"\n\n[[package]]\nname = \"serde\"\nversion = \"{version}\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"00\"\n"),
         );
         r.write(
-            "crates/fwb-app/tauri.conf.json",
+            "crates/method-app/tauri.conf.json",
             &format!("{{\n  \"productName\": \"Method Budget\",\n  \"version\": \"{version}\",\n  \"plugins\": {{ \"x\": {{ \"version\": \"9\" }} }}\n}}\n"),
         );
         r.write("docs/release-notes-template.md", TEMPLATE);
@@ -674,20 +674,20 @@ mod tests {
             "[package]\nname = \"a\"\nversion = \"0.0.9\"\n",
         );
         let lock = r.read("Cargo.lock").replacen(
-            "name = \"fwb-app\"\nversion = \"0.1.0\"",
-            "name = \"fwb-app\"\nversion = \"0.0.9\"",
+            "name = \"method-app\"\nversion = \"0.1.0\"",
+            "name = \"method-app\"\nversion = \"0.0.9\"",
             1,
         );
         r.write("Cargo.lock", &lock);
         r.write(
-            "crates/fwb-app/tauri.conf.json",
+            "crates/method-app/tauri.conf.json",
             "{ \"version\": \"0.0.9\" }",
         );
         std::fs::remove_file(r.root().join("docs/releases/0.1.0.md")).unwrap();
         let e = check_command(r.root(), None).unwrap_err();
         for needle in [
             "crates/a/Cargo.toml sets its own version",
-            "Cargo.lock has fwb-app at 0.0.9",
+            "Cargo.lock has method-app at 0.0.9",
             "tauri.conf.json says 0.0.9",
             "docs/releases/0.1.0.md is missing",
         ] {
@@ -734,7 +734,7 @@ mod tests {
         let lock = r.read("Cargo.lock");
         assert!(lock.contains("name = \"a\"\nversion = \"0.2.0\""), "{lock}");
         assert!(
-            lock.contains("name = \"fwb-app\"\nversion = \"0.2.0\""),
+            lock.contains("name = \"method-app\"\nversion = \"0.2.0\""),
             "{lock}"
         );
         // The registry crate keeps its own version.
@@ -742,7 +742,7 @@ mod tests {
             lock.contains("name = \"serde\"\nversion = \"0.1.0\""),
             "{lock}"
         );
-        let conf = r.read("crates/fwb-app/tauri.conf.json");
+        let conf = r.read("crates/method-app/tauri.conf.json");
         assert!(conf.contains("\"version\": \"0.2.0\""), "{conf}");
         assert!(conf.contains("{ \"version\": \"9\" }"), "{conf}");
         let notes = r.read("docs/releases/0.2.0.md");
@@ -755,7 +755,7 @@ mod tests {
         assert!(check_command(r.root(), Some("v0.2.0")).is_err());
         // No temporary files are left behind.
         assert!(!r
-            .read_dir("crates/fwb-app")
+            .read_dir("crates/method-app")
             .iter()
             .any(|n| n.contains("xtask.tmp")));
     }
@@ -810,7 +810,7 @@ mod tests {
     fn bump_refuses_when_already_out_of_step() {
         let r = workspace("0.1.0");
         r.write(
-            "crates/fwb-app/tauri.conf.json",
+            "crates/method-app/tauri.conf.json",
             "{ \"version\": \"0.0.9\" }",
         );
         r.commit();

@@ -1,6 +1,6 @@
 # Behavior note 02: entering a line, autocomplete, applying tags to a selection
 
-Source: a ~2 minute screen recording by Sam of normal use of a licensed copy of the reference
+Source: a ~2 minute screen recording of normal use of a licensed copy of the reference
 product (2026-10-09). Clean-room: behavior in our own words, no budget data, no copied UI
 text beyond a few-word term. The recording stays outside the repo.
 

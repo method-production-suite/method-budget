@@ -3,7 +3,7 @@
 Source: official vendor tutorial video "Applied Tools" (published 2020-03-04); vendor
 tutorial, 2020/2021 era. Clean-room: behavior in our own words, no narration transcribed,
 no frames kept, no budget data copied. Complements note 01, which describes the same pane
-from Sam's 2026 recording; note 01 wins any conflict.
+from the 2026 recording; note 01 wins any conflict.
 
 ## What the video shows
 
@@ -37,7 +37,7 @@ from Sam's 2026 recording; note 01 wins any conflict.
 
 None.
 
-Era caution: early-2020 Windows build. Sam's 2026 recording shows the same two-panel pane
+Era caution: early-2020 Windows build. The 2026 recording shows the same two-panel pane
 on the right with a quick filter, setup and clear links, and an applied-only filter rather
 than a sort. Dock-to-bottom was not exercised in the 2026 recordings; assume it still
 exists but verify.

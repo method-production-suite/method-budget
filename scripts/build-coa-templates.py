@@ -24,7 +24,7 @@ templates/charts/SOURCES.md saying where it came from.
 A listed source that isn't on this machine (a studio export someone else has) is skipped
 and its committed template kept as it is.
 
-Last, crates/fwb-format/src/charts_bundled.rs (the list the app and `method new
+Last, crates/method-format/src/charts_bundled.rs (the list the app and `method new
 --template` bundle) is rewritten from the manifest.
 
 Each template built from a `kind,code,name,parent` CSV is checked against it: the same
@@ -48,8 +48,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHARTS = os.path.join(ROOT, "templates", "charts")
 MANIFEST = os.path.join(CHARTS, "charts.json")
 SOURCES = os.path.join(ROOT, "imports", "coa-sources")
-BUNDLED_RS = os.path.join(ROOT, "crates", "fwb-format", "src", "charts_bundled.rs")
-SOURCE_EXTENSIONS = (".csv", ".tsv", ".xlsx", ".mthd", ".fwb")
+BUNDLED_RS = os.path.join(ROOT, "crates", "method-format", "src", "charts_bundled.rs")
+SOURCE_EXTENSIONS = (".csv", ".tsv", ".xlsx", ".mthd")
 GROUPS = ("Feature", "Television", "Commercial", "Other")
 
 
@@ -131,7 +131,7 @@ def add_new_sources(m):
 def method_command(args):
     if args.method:
         return [os.path.abspath(args.method)]
-    return ["cargo", "run", "--quiet", "--locked", "-p", "fwb-cli", "--bin", "method", "--"]
+    return ["cargo", "run", "--quiet", "--locked", "-p", "method-cli", "--bin", "method", "--"]
 
 
 def build(entry, out, method):
@@ -297,7 +297,7 @@ def main():
 
     rs = bundled_rs(m)
     if rs != read(BUNDLED_RS):
-        stale.append("crates/fwb-format/src/charts_bundled.rs")
+        stale.append("crates/method-format/src/charts_bundled.rs")
     if args.check:
         if stale:
             print("out of date:\n  " + "\n  ".join(stale))

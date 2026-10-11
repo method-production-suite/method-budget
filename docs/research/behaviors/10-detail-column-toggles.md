@@ -41,7 +41,7 @@ or images. The video stays outside the repo.
 
 ## Era caution
 
-Sam's 2026 note 01 lists a longer column menu (aggregate sum, unit2, unit3, unit4,
+The 2026 note 01 lists a longer column menu (aggregate sum, unit2, unit3, unit4,
 location, set, 4X) and a pinnable subtotal column, so the current product has more toggles
 than this 2021 build. Note 01 wins.
 

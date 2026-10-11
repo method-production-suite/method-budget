@@ -69,7 +69,7 @@ each other; they're evaluated in dependency order and cycles are reported with t
 ## 6. No dependencies in the engine yet (2026-10-08)
 
 Property tests use a small seeded generator in `tests/properties.rs` instead of `proptest`.
-It keeps `fwb-core` dependency-free until we actually need something (serde, for the format).
+It keeps `method-core` dependency-free until we actually need something (serde, for the format).
 
 ## 7. Blank fields and row types (2026-10-08)
 
@@ -125,14 +125,14 @@ for comparison and import. Category fringe accounts are built through the patter
 
 JSON, not TOML: budgets are deeply nested (topsheet > categories > accounts > rows), which
 TOML handles poorly. Pretty-printed with fixed key order so files diff cleanly in git. It
-lives in its own crate (`fwb-format`) with separate file-side types, so the engine stays
+lives in its own crate (`method-format`) with separate file-side types, so the engine stays
 dependency-free and the file layout can stay stable while the model evolves. Money is
 integer cents, decimals are strings, never JSON floats. Extension `.mthd`. Spec:
 `docs/FORMAT.md`. First dependencies: serde and serde_json, pinned to releases well past
 the 14-day cooldown (checked by publish date; zmij is dtolnay's float formatter, pulled in
 by serde_json).
 
-## 14. UI approach: Tauri desktop app (2026-10-08, decided by Sam)
+## 14. UI approach: Tauri desktop app (2026-10-08, decided by the owner)
 
 Method Budget is a **local, open-source desktop app**, not a web app. Budgets live as
 `.mthd` files on the user's disk; no server, no account, works offline.
@@ -143,14 +143,14 @@ GUI (Slint, iced, egui) because spreadsheet-grade grid editing is the heart of b
 the web stack's grid tooling is far more mature. Small installers for macOS, Windows and
 Linux. The JS toolchain this adds is held to the same dependency cooldown and lockfile rules.
 
-## 15. Row shortcuts follow budgeting habits (2026-10-09, Sam)
+## 15. Row shortcuts follow budgeting habits (2026-10-09, the owner)
 
 Cmd/Ctrl+I inserts a line, Cmd/Ctrl+D deletes rows (undoable), Cmd/Ctrl+= inserts a
 subtotal: the keys people switching from other budgeting tools already have in their hands.
 Fill down moves to Shift+Cmd/Ctrl+D rather than the spreadsheet Cmd+D. Matching common
 shortcuts is about familiarity, not copying; labels and menus stay our own.
 
-Extended the same day (Sam): Cmd+minus inserts an adjustment (Option+Cmd+A still works),
+Extended the same day (the owner): Cmd+minus inserts an adjustment (Option+Cmd+A still works),
 Cmd+R and Shift+Cmd+R make and remove a fringe range, Shift+Cmd+Space edits a line's note,
 Cmd+Left and Cmd+Right step accounts (Cmd+[ and Cmd+] stay as aliases), and the setup
 tabs take the setup keys switchers know: Cmd+G globals, Cmd+3 fringes, Cmd+4 groups,
@@ -202,7 +202,7 @@ digits, stored lowercase) and limits enforced by the app's commands, not the fil
 Real budgets have thousands of lines (2,000+ across ~60 accounts is common). Every command
 used to send the whole budget and every row's totals (2 MB at 5,000 rows) and the UI redrew
 everything. Target: a one-cell edit in a 5,000-row budget under ~30 ms from key to screen,
-bulk edits under ~100 ms. Measured with `examples/perf.rs` on `fwb_core::sample` budgets.
+bulk edits under ~100 ms. Measured with `examples/perf.rs` on `method_core::sample` budgets.
 
 - **A lean view, not a diff.** Every command returns the budget's outline (no detail rows),
   totals down to the account, and the one account on screen in full; `focus_account`
@@ -231,7 +231,7 @@ bulk edits under ~100 ms. Measured with `examples/perf.rs` on `fwb_core::sample`
   (Chromium, fake bridge with the canned replies) 227 ms before, 13 ms after; opening the
   big account 192 ms before, 24 ms after.
 
-## 19. Four product calls from the roadmap (2026-10-09, Sam)
+## 19. Four product calls from the roadmap (2026-10-09, the owner)
 
 - **Autosave writes the file itself**, on by default with a visible toggle. Untitled budgets
   get a recovery copy until first saved, and every document keeps rolling backups so an
@@ -242,9 +242,9 @@ bulk edits under ~100 ms. Measured with `examples/perf.rs` on `fwb_core::sample`
 - **Compare shows both** each budget's difference from the base and optional
   Sum / Average / Variance columns in the reference's style.
 
-## 20. Autosave into the file, recovery copies, backups (2026-10-09, autosave default by Sam)
+## 20. Autosave into the file, recovery copies, backups (2026-10-09, autosave default by the owner)
 
-- **Autosave is on by default and writes the budget file itself** (Sam's call), 3 seconds
+- **Autosave is on by default and writes the budget file itself** (the owner's call), 3 seconds
   after the last change, at most 30 seconds after the first unsaved one, and at once when
   the window loses focus, on close or quit, and before another budget replaces it. It is
   an app-wide setting (toolbar switch and File > Autosave), not stored in budgets: one
@@ -278,7 +278,7 @@ bulk edits under ~100 ms. Measured with `examples/perf.rs` on `fwb_core::sample`
   single-instance plugin (it would add crates): a second launch on Windows or Linux is a
   second copy of the app.
 
-## 21. Tools panel layout (2026-10-09, Sam)
+## 21. Tools panel layout (2026-10-09, the owner)
 
 The side panel becomes two stacked tab panes, compact like the reference product's: top
 pane Fringes, Groups, Globals, Units; bottom pane Sets, Locations, Currency, Notes, Budget
@@ -337,7 +337,7 @@ remembered.
 - **A copy carries its setup**, transitively: fringes (and their flat units and the globals
   in their rates), groups, units, sets, locations, currencies and every global a formula
   names, however deep. Items the source doesn't define are left as names.
-- **Paste adds what is missing and keeps the target's version of what differs** (Sam's
+- **Paste adds what is missing and keeps the target's version of what differs** (roadmap
   decision 12), after a review that shows both definitions; per item the user can instead
   replace the target's version, or add the copied one under a new name (`Name (2)`, globals
   `NAME_2`), which the pasted rows and the copied items that refer to it then use (formulas
@@ -590,16 +590,16 @@ Roadmap 1.20 (behavior notes 07 and 24, decision 15), as built:
   Template… writes the budget in front, stripped the same way, to a new file named in Rust's
   Save dialog and titled after it; the budget and its own file don't change, and a file open
   in a tab is refused. No template format, folder or built-in templates: our own starter
-  budget (`fwb_core::starter`) remains what New opens.
+  budget (`method_core::starter`) remains what New opens.
 
 ## 30. Spreadsheet export as built (2026-10-09)
 
 Roadmap 2.1 (inventory section 21: what accounting and payroll tools take in):
 
-- **One set of tables, three writers.** `fwb_format::export` turns a budget and its report
+- **One set of tables, three writers.** `method_format::export` turns a budget and its report
   into plain tables (Topsheet, Accounts, Detail, Globals, Fringes, Groups, Units,
   Currencies, Sets, Locations); the Excel, CSV and tab-delimited writers only serialize
-  them, so every format carries the same figures. It lives in `fwb-format` so `fwb-core`
+  them, so every format carries the same figures. It lives in `method-format` so `method-core`
   stays dependency-free, and it is a one-way copy for other tools, not a second native
   format.
 - **No new crates.** An .xlsx is a ZIP of XML parts, so we write both ourselves: stored
@@ -698,7 +698,7 @@ Roadmap 1.10 and 1.18 (decision 7), with the calls they needed:
   Accounts and topsheet rows are named by place, so each press is built from the newest
   view; the reply gives the moved rows' new places (or ids) and the grid selects them.
 - **Renaming rewrites references and keeps names in the file** (decision 7). The engine
-  does it (`fwb_core::rename`): globals token by token the way the formula reader splits
+  does it (`method_core::rename`): globals token by token the way the formula reader splits
   them, with the rest of each formula kept byte for byte (not reprinted through the parse
   tree, which would respace formulas and break "rename and back gives the same file");
   fringes, groups, units, sets, locations and currencies everywhere they are named,
@@ -736,7 +736,7 @@ Roadmap 2.3 to 2.7, after an audit of what decisions 27 and 28 already built:
   ours keeps one field per slot (decision 28) and adds separate date and time fields and a
   global's value. Mixed text would need a small template language in the file; not worth
   it until someone asks.
-- **A global in a header follows a rename** of that global (`fwb_core::rename`, counted
+- **A global in a header follows a rename** of that global (`method_core::rename`, counted
   among its references), and a preset imported from another budget brings the globals its
   bands show along with it, renamed with them.
 - **The topsheet's Page column is filled after the pages are dealt.** Its cells have a
@@ -891,10 +891,10 @@ needed:
 ## 36. Spreadsheet import with a column mapping as built (2026-10-09)
 
 Roadmap 2.2 (inventory section 24), built ahead of 1.16 as the generic part that 1.16 will
-reuse: nothing here guesses the reference product's export layouts (that waits on Sam's
+reuse: nothing here guesses the reference product's export layouts (that waits on the
 export test).
 
-- **Our own readers, no crates.** An .xlsx is a ZIP of XML, so `fwb_format::import` reads
+- **Our own readers, no crates.** An .xlsx is a ZIP of XML, so `method_format::import` reads
   it by hand: a DEFLATE decoder (RFC 1951: stored, fixed and dynamic Huffman blocks, after
   the structure of Mark Adler's public-domain reference decoder), a ZIP reader working
   from the central directory, a small XML tokenizer, and the SpreadsheetML parts found
@@ -1026,7 +1026,7 @@ Roadmap 2.15 (behavior notes 09, 11 and 24; decision 15), as built:
   caller that doesn't know about them never turns them off.
 - **Live preview** is a read-only command (`preview_charge`) that checks the charge as
   `set_charge` would (`edit::build_charge`) and figures it on the cached report with the
-  engine's own charge code (`fwb_core::charge_preview`), without a recalc: one pass over the
+  engine's own charge code (`method_core::charge_preview`), without a recalc: one pass over the
   lines per keystroke batch (debounced 120 ms), exactly what saving gives, never a guess in
   JavaScript. A value that isn't a number yet keeps the old total, dimmed. Only an applied
   charge's heading total updates; an unapplied one still says "Not applied".
@@ -1051,7 +1051,7 @@ Roadmap 2.20, 2.21 and 2.22, with the calls they needed:
 
 - **Renumbering is offered when the pattern changes, never done silently.** Applying a
   new pattern in Settings > Account numbers first asks for a preview
-  (`fwb_core::renumber::plan`): every category, account and category fringe account
+  (`method_core::renumber::plan`): every category, account and category fringe account
   number now and after. When nothing would change the pattern is applied as before;
   otherwise the form offers "Renumber accounts to the new pattern", "Change the pattern
   only" (numbers keep their spelling, as before) or Cancel. Renumbering sets the pattern
@@ -1181,8 +1181,8 @@ Roadmap 3.12 and 3.4 (decision 17 left deltas for later):
 - **One module per subcommand.** `method` is a tiny dispatcher (`src/main.rs`, a table of
   name, usage and function) over `src/cmd/<name>.rs`, with shared flag parsing, exit
   codes and atomic writes in `src/cli.rs`, so new commands (diff, merge, explain,
-  actuals) are one file and one table entry each. It depends on `fwb-core` and
-  `fwb-format` only, never the app, and adds no crates (JSON output is written by hand).
+  actuals) are one file and one table entry each. It depends on `method-core` and
+  `method-format` only, never the app, and adds no crates (JSON output is written by hand).
 - **Exit codes are a contract** (docs/CLI.md): 0 ok, 1 failed, 2 usage, 3 edit refused
   with nothing written. Every file a command writes goes through a temporary file and a
   rename.
@@ -1232,9 +1232,9 @@ Roadmap 3.12 and 3.4 (decision 17 left deltas for later):
   fonts, shading and the topsheet page column; scripted adding and deleting of rows and
   accounts; a per-command JSON output for `set` and `apply`.
 
-## 42. The Budget Setup window and a compact tools panel (2026-10-09, Sam)
+## 42. The Budget Setup window and a compact tools panel (2026-10-09, the owner)
 
-Sam's live testing found the panel's Budget tab (charges, credits, info, settings,
+The owner's live testing found the panel's Budget tab (charges, credits, info, settings,
 baseline) too big for a pane, and asked to match the reference product's balance: one setup
 window with the full editor of every setup table, and tool tabs in the main window made
 small and quick for applying (behavior notes 07, 09, 12, 23, 24, and the 2026 notes 01 and
@@ -1297,7 +1297,7 @@ small and quick for applying (behavior notes 07, 09, 12, 23, 24, and the 2026 no
 
 Roadmap 3.5 and 3.10.
 
-- **Explain this number** (`fwb_core::explain`, src/explain.rs, ui/js/explain.js,
+- **Explain this number** (`method_core::explain`, src/explain.rs, ui/js/explain.js,
   `method explain`). Any total (a line, a subtotal row, a line's fringes or one fringe on it,
   an account's total, lines or fringes, a category and its fringes, a production level and
   its posted fringes, ATL, BTL, both, total fringes, each charge, the grand total, each
@@ -1343,7 +1343,7 @@ Roadmap 3.5 and 3.10.
   as `21-01`, `21-01/lines`, `21-01/fringes`, `21`, `21/fringes`, `21-01:3`, `#ID`,
   `level:`, `charge:`, `credit:`, `fringe:`, `atl`, `btl`, `atl+btl`, `fringes`, `credits`,
   `grand` (or `topsheet`), `net`; `--depth N` cuts the printout.
-- **Overtime helper** (`fwb_core::overtime`, src/overtime.rs, ui/js/overtime.js). User
+- **Overtime helper** (`method_core::overtime`, src/overtime.rs, ui/js/overtime.js). User
   driven, no union or guild rules shipped. A pattern is straight-time hours, then bands
   ("4 hours at 1.5x", the last band "the rest at 2x"; stored as hours per band, so there is
   nothing to keep in order), and optional sixth and seventh day multipliers. On a sixth or
@@ -1500,7 +1500,7 @@ reference), with the calls it needed:
   number the chart lacks (or have none) are the unassigned actuals, in the total actual with
   nothing to complete. Credits are left out: a cost report is gross spending.
 - **Importing reuses the spreadsheet readers**, with its own field list and mapping
-  (`fwb_format::import::actuals`): date, account, amount or debit and credit, vendor,
+  (`method_format::import::actuals`): date, account, amount or debit and credit, vendor,
   description, reference, tags. Dates take every shape accounting exports write (workbook
   serials in the 1900 system, ISO, compact, slashes, dots, month names); slash dates are
   read month first unless the column has a date only day-first can read (or the user says
@@ -1534,41 +1534,28 @@ reference), with the calls it needed:
   unmatched numbers were mapped differently the first time (the duplicate key compares the
   account the transaction ended up in).
 
-## 46. The product is Method Budget (2026-10-09, Sam)
+## 46. The product is Method Budget (2026-10-09, the owner)
 
-Formerly Film Wizard Budgeting. Sam renamed it; methodbudget.com is the site, and the repo is
-https://github.com/ssandweiss/method-budget. Never shorten the name to "MB" (that is how
-people shorten Movie Magic Budgeting), and no file extension of ours resembles `.mbd` or
-`.mmbx`. What changed and what didn't:
+methodbudget.com is the site, and the repo is https://github.com/ssandweiss/method-budget.
+Never shorten the name to "MB" (that is how people shorten Movie Magic Budgeting), and no
+file extension of ours resembles `.mbd` or `.mmbx`. What it covers:
 
 - **User-visible name everywhere**: window title, macOS app menu (About and Quit Method
   Budget), the About box (links methodbudget.com), dialogs, toasts, report and PDF metadata,
-  workbook metadata, CLI help. Crate and Rust module names (`fwb-core`, `fwb_app` and so
-  on), the UI's internal event names and its localStorage key prefix stay as they are for
-  now (internal; a later pass).
-- **Files are `.mthd`**, media type `application/vnd.method-budget+json`. New files, Save
-  As, shared copies, templates and sub-budgets suggest `.mthd`. Open (and every dialog that
-  picks a budget) accepts `.mthd` and `.fwb`. A budget opened from a `.fwb` keeps saving and
-  autosaving to that same file; only Save As (or Save a Copy) moves it to a new name, and a
-  `.fwb` name typed on purpose in a Save dialog is kept. Both extensions are registered,
-  `.mthd` first. Backups are written as `.mthd`; older `.fwb` backups are listed with them.
-  Recovery copies are internal and keep their old extension.
-- **The `"format"` field still says `"film-wizard-budget"`.** Builds from before the rename
-  refuse any other value, so writing a new one would lock them out of every file saved from
-  now on. This build also reads `"method-budget"`, reserved so a later build can switch to
-  writing it (one constant, `fwb_format::FORMAT_NAME`) once that no longer matters.
-- **The library**: a new one is `My Method Budget Library.mthd`; a folder that already has
-  the pre-rename library keeps using it.
-- **The command line is `method`.** `fwb` remains as a deprecated alias that runs the same
-  code (same output and exit codes), so scripts and git merge driver settings keep working.
+  workbook metadata, CLI help. Internal names follow it: the crates are `method-core`,
+  `method-format`, `method-cli` and `method-app` (the app's executable is
+  `method-budget`), the UI's document events are `method:*`, its localStorage keys start
+  with `method.`, and the report styles hang off `.method-report`.
+- **Files are `.mthd`**, media type `application/vnd.method-budget+json`, with
+  `"format": "method-budget"` (`method_format::FORMAT_NAME`). That is the only extension
+  and the only identifier read or written: there is no compatibility code for any earlier
+  working name, extension, identifier or data folder (removed 2026-10-10). New files, Save
+  As, shared copies, templates, sub-budgets, backups and recovery copies are all `.mthd`.
+- **The library**: a new one is `My Method Budget Library.mthd`.
+- **The command line is `method`.**
 - **App identity**: product name Method Budget, bundle identifier `com.methodbudget.desktop`
   (not `.app`: Tauri warns against identifiers ending in `.app` on macOS, where it is the
-  bundle extension). The local data folder follows the identifier, so on the first start
-  the old folder (`io.github.ssandweiss.film-wizard-budgeting`) is copied, never moved, to
-  the new one when the new one has no settings yet: settings, recent files, tabs, the
-  library choice, recovery copies and backups, and the web view's storage (display choices,
-  saved spreadsheet mappings). See src/migrate.rs and docs/APP.md ("Saving and recovery").
-- **Look unchanged**: same teal palette and icon artwork.
+  bundle extension). The local data folder follows the identifier.
 
 ## 47. One feature file for the README and the website; versioned skills (2026-10-09)
 
@@ -1694,11 +1681,11 @@ Sets of setup items to share and start from, built on Import Setup (entry 29), t
   between budgets (Import Setup, the library, packs) brings an item's source along and
   replacing an item replaces its source; importing a pack then stamps what came in with the
   pack's title, version and effective date (an item's own effective date wins).
-- **The import logic moved to fwb_format::setup** so the command line can share it: the
+- **The import logic moved to method_format::setup** so the command line can share it: the
   dependency walk, statuses, conflict choices and renaming (`setup::import`, from
   src/import_setup.rs) and the setup half of the row clipboard (`setup::copy`, from
   src/clipboard.rs) moved verbatim, and the app re-exports them, so the app's behavior and
-  tests are unchanged. fwb-format already held the spreadsheet import, so this added no
+  tests are unchanged. method-format already held the spreadsheet import, so this added no
   crate and no dependency. While there: overtime patterns became an importable kind
   (Import Setup, the library and packs), and a global's description, unit and display
   settings now come with it.
@@ -1736,12 +1723,12 @@ Sets of setup items to share and start from, built on Import Setup (entry 29), t
 
 Roadmap 3.16, under CLEAN-ROOM.md's exception for studio charts of accounts:
 
-- **A chart is numbers, names and levels.** `fwb_core::coa::Chart` holds categories,
+- **A chart is numbers, names and levels.** `method_core::coa::Chart` holds categories,
   accounts and production totals in topsheet order with the numbering pattern they are in,
   and nothing else. It becomes a budget with no lines or setup (`to_budget`, our default
   units only) or is applied to a budget (`apply`). Every other column of a source file is
   ignored, so no description, note, fringe, global or rate can come in by accident.
-- **One importer, many shapes** (`fwb_format::import::coa`, on the readers of decision 36):
+- **One importer, many shapes** (`method_format::import::coa`, on the readers of decision 36):
   a flat list, a one-column or indented outline, side-by-side category and account columns
   (blank category cells below the first, as merged cells read), number and name in one
   cell; numbers with or without separators; rows above the header, repeated headers, total
@@ -1809,7 +1796,7 @@ and help build budgets. `method mcp` is a Model Context Protocol server in the c
   respected) is designed in docs/MCP.md and left for later: it needs app UI that isn't
   designed yet.
 - **No new dependency.** JSON-RPC over stdio is written by hand on `serde_json`, which
-  `fwb-format` already uses and now re-exports, so Cargo.lock is unchanged. One message per
+  `method-format` already uses and now re-exports, so Cargo.lock is unchanged. One message per
   line, logs to stderr only.
 - **Both protocol eras.** The `initialize` handshake (revisions 2024-11-05 to 2025-11-25,
   answered with the client's revision or the newest we know) and revision 2026-07-28, where
@@ -1837,7 +1824,7 @@ and help build budgets. `method mcp` is a Model Context Protocol server in the c
   the app refuses them.
 - **Safety model.** Every path resolves inside a root (`--root`, default the current folder)
   with symlinks followed; nothing is written through a symlink; nothing below a root whose
-  name starts with `.` is touched; budgets are only `.mthd`/`.fwb`, sheets only spreadsheet
+  name starts with `.` is touched; budgets are only `.mthd`, sheets only spreadsheet
   extensions, exports only their format's extension, so the server can't write a script or a
   hook; existing files are replaced only with `overwrite`, and never a file that isn't a
   readable budget; `--read-only` removes the writing tools from the list; no program is run,

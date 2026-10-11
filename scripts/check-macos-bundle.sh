@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Inspects a built macOS bundle without opening it: architecture, minimum macOS,
-# the .mthd and .fwb document types, and the code signature.
+# the .mthd document type, and the code signature.
 # Usage: scripts/check-macos-bundle.sh [path/to/Method Budget.app]
 set -euo pipefail
 
 app="${1:-target/release/bundle/macos/Method Budget.app}"
 if [ ! -d "$app" ]; then
-  echo "No bundle at: $app (build it with: cd crates/fwb-app && cargo tauri build --bundles app)" >&2
+  echo "No bundle at: $app (build it with: cd crates/method-app && cargo tauri build --bundles app)" >&2
   exit 1
 fi
 
@@ -20,17 +20,14 @@ for key in CFBundleIdentifier CFBundleShortVersionString LSMinimumSystemVersion 
   printf '%s: %s\n' "$key" "$(/usr/libexec/PlistBuddy -c "Print :$key" "$plist")"
 done
 
-echo "== Document types (.mthd, and the older .fwb)"
-for i in 0 1; do
-  want=$([ "$i" = 0 ] && echo mthd || echo fwb)
-  if /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes:$i:CFBundleTypeExtensions" "$plist" | grep -qx "[[:space:]]*$want"; then
-    echo "CFBundleDocumentTypes declares .$want"
-  else
-    echo "MISSING: CFBundleDocumentTypes:$i does not declare .$want" >&2
-    exit 1
-  fi
-  /usr/libexec/PlistBuddy -c "Print :UTExportedTypeDeclarations:$i:UTTypeIdentifier" "$plist"
-done
+echo "== Document type (.mthd)"
+if /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes:0:CFBundleTypeExtensions" "$plist" | grep -qx "[[:space:]]*mthd"; then
+  echo "CFBundleDocumentTypes declares .mthd"
+else
+  echo "MISSING: CFBundleDocumentTypes:0 does not declare .mthd" >&2
+  exit 1
+fi
+/usr/libexec/PlistBuddy -c "Print :UTExportedTypeDeclarations:0:UTTypeIdentifier" "$plist"
 
 echo "== Signature"
 codesign -dv "$app" 2>&1

@@ -1,0 +1,15 @@
+[package]
+name = "method-cli"
+description = "Method Budget command line: check, show and tidy .mthd budgets"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "method"
+path = "src/main.rs"
+
+[dependencies]
+method-core = { path = "../method-core" }
+method-format = { path = "../method-format" }

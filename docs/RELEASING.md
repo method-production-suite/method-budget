@@ -19,7 +19,7 @@ The version lives in one place: `version` under `[workspace.package]` in the roo
 |---|---|
 | every crate's `Cargo.toml` (`version.workspace = true`) | `method --version`, the app's own `CARGO_PKG_VERSION` |
 | `Cargo.lock` (the workspace's own crates) | CI builds with `--locked` |
-| `crates/fwb-app/tauri.conf.json` (`version`) | the bundles' version, the About box, and what the updater compares |
+| `crates/method-app/tauri.conf.json` (`version`) | the bundles' version, the About box, and what the updater compares |
 | `docs/releases/<version>.md` | the release notes: What's New in the app, the GitHub release, the website |
 
 The commands (`cargo xtask` is an alias in `.cargo/config.toml` for the release tooling in
@@ -82,7 +82,7 @@ cargo xtask notes-check                     # ready?
 python3 scripts/site.py                     # the website's "What's new" box follows the notes
 cargo xtask check-version --tag v0.2.0      # what the release workflow checks first
 cargo test --workspace --locked
-git add Cargo.toml Cargo.lock crates/fwb-app/tauri.conf.json docs/releases/0.2.0.md README.md site/index.html
+git add Cargo.toml Cargo.lock crates/method-app/tauri.conf.json docs/releases/0.2.0.md README.md site/index.html
 git commit -m "0.2.0"
 git tag -a v0.2.0 -m "Method Budget 0.2.0"
 git push --atomic origin main v0.2.0
@@ -199,7 +199,7 @@ public key to the same name with `.pub`. Then:
 2. Set the two secrets from it:
    `gh secret set TAURI_SIGNING_PRIVATE_KEY -R ssandweiss/method-budget < "$HOME/.tauri/method-budget-updater.key"`
    and `gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD -R ssandweiss/method-budget`.
-3. Put the public key (the `.pub` file's single line) into `crates/fwb-app/tauri.conf.json`
+3. Put the public key (the `.pub` file's single line) into `crates/method-app/tauri.conf.json`
    as `plugins.updater.pubkey`, in place of the placeholder. `cargo xtask updater-key
    --require` should print `trusted <KEY ID>`. Commit that change.
 4. Delete the two local files once 1Password has them.
@@ -223,7 +223,7 @@ CLI does, so a manifest can't pair a new version number with an older signed arc
 ## Hosting
 
 Updates are served from GitHub Releases. The endpoint is written in one place,
-`plugins.updater.endpoints` in `crates/fwb-app/tauri.conf.json`:
+`plugins.updater.endpoints` in `crates/method-app/tauri.conf.json`:
 
 ```
 https://github.com/ssandweiss/method-budget/releases/latest/download/latest.json

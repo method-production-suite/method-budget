@@ -158,7 +158,7 @@ rustup picks it up on its own). There is no JavaScript toolchain: no npm, no bun
 
 ```bash
 cargo test --workspace            # the engine, the file format, the command line and the app
-cargo run -p fwb-app              # run the desktop app
+cargo run -p method-app           # run the desktop app
 ```
 
 On Linux, install the WebKitGTK build packages first (listed in [docs/APP.md](docs/APP.md)).
@@ -171,7 +171,7 @@ The `method` command reads and writes budgets without the app: same engine, no w
 network. Install it from a checkout:
 
 ```bash
-cargo install --path crates/fwb-cli --locked
+cargo install --path crates/method-cli --locked
 ```
 
 Then:
@@ -187,7 +187,7 @@ method export my-film.mthd --xlsx my-film.xlsx
 method diff old.mthd new.mthd                # what changed, in plain words
 ```
 
-Older `.fwb` budgets still open. Every command, flag and exit code is in
+Every command, flag and exit code is in
 [docs/CLI.md](docs/CLI.md).
 
 ### Budgets in git

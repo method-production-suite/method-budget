@@ -44,7 +44,7 @@ the repo.
 ## Era caution
 
 The "applied in budget" versus library split and account-based storage are 2020/2021
-cloud-era features. Sam's 2026 notes have not covered the credits or charges screens yet.
+cloud-era features. The 2026 notes have not covered the credits or charges screens yet.
 
 ## What this means for Method Budget
 

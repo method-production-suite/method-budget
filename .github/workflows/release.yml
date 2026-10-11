@@ -177,7 +177,7 @@ jobs:
 
       - name: Build bundles
         shell: bash
-        working-directory: crates/fwb-app
+        working-directory: crates/method-app
         env:
           BUNDLES: ${{ matrix.bundles }}
           TARGET: ${{ matrix.target }}

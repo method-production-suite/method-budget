@@ -30,13 +30,13 @@ cargo install tauri-cli --version 2.11.4 --locked
 Then, from the repository root:
 
 ```bash
-cd crates/fwb-app
+cd crates/method-app
 cargo tauri build --bundles app          # just the .app (quickest)
 cargo tauri build --bundles app,dmg      # the .app and a .dmg installer
 ```
 
 The app lands in `target/release/bundle/macos/Method Budget.app` (at the repository
-root, not inside `crates/fwb-app`), and the disk image in `target/release/bundle/dmg/`.
+root, not inside `crates/method-app`), and the disk image in `target/release/bundle/dmg/`.
 Making the `.dmg` briefly opens and arranges a Finder window; that is normal.
 
 That build runs on your Mac's own architecture. For one app that runs on both Apple silicon
@@ -48,8 +48,8 @@ cargo tauri build --bundles app --target universal-apple-darwin
 # lands in target/universal-apple-darwin/release/bundle/macos/
 ```
 
-To check a built bundle without opening it (architecture, minimum macOS, the `.mthd` and
-`.fwb` document types and the signature):
+To check a built bundle without opening it (architecture, minimum macOS, the `.mthd`
+document type and the signature):
 
 ```bash
 scripts/check-macos-bundle.sh
@@ -71,12 +71,7 @@ A copy built from source doesn't check; to update it, quit the app and replace i
 way. Your budgets are `.mthd` files wherever you saved them; installing, updating or
 removing the app never touches them.
 
-A copy installed before the product was renamed has a different name and identifier, so it
-installs next to the new one rather than being replaced. On its first start the new app
-copies the old one's settings, recent files, open tabs, library choice, recovery copies and
-backups (decisions.md, entry 46); once it has, delete the old app.
-
-The app registers the `.mthd` file type ("Method Budget"), and the older `.fwb` one, so
+The app registers the `.mthd` file type ("Method Budget"), so
 Finder shows those files as belonging to it and offers it under Open With; double-clicking one opens it in the
 app (asking first if the open budget has unsaved changes).
 
@@ -105,7 +100,7 @@ The same command builds the native installers on each platform; none of them has
 yet.
 
 ```bash
-cd crates/fwb-app
+cd crates/method-app
 cargo tauri build --bundles msi,nsis       # Windows: target/release/bundle/msi/ and nsis/
 cargo tauri build --bundles deb,appimage   # Linux:   target/release/bundle/deb/ and appimage/
 ```
@@ -118,7 +113,7 @@ show a SmartScreen warning: click **More info**, then **Run anyway**.
 
 Signing with a Developer ID and notarizing removes the Gatekeeper step. It needs an Apple
 Developer Program membership. Nothing below is stored in this repository: every secret
-lives in 1Password, in the **Darkwell** vault, per [BORN-SECURE.md](../BORN-SECURE.md)
+lives in 1Password, in the team 1Password vault, per [BORN-SECURE.md](../BORN-SECURE.md)
 (titled `Thing - What - Where`, tagged `app/method-budget`), and is read at build
 time with `op read` or `op run` and `op://` references.
 
@@ -139,12 +134,12 @@ staples the app. A local signed build looks like this (the `op://` paths are exa
 the real item names):
 
 ```bash
-cd crates/fwb-app
-export APPLE_SIGNING_IDENTITY="$(op read 'op://Darkwell/<item>/signing identity')"
-export APPLE_TEAM_ID="$(op read 'op://Darkwell/<item>/team id')"
-export APPLE_API_KEY="$(op read 'op://Darkwell/<item>/key id')"
-export APPLE_API_ISSUER="$(op read 'op://Darkwell/<item>/issuer id')"
-op read --out-file "$TMPDIR/AuthKey.p8" 'op://Darkwell/<item>/AuthKey.p8'
+cd crates/method-app
+export APPLE_SIGNING_IDENTITY="$(op read 'op://<team vault>/<item>/signing identity')"
+export APPLE_TEAM_ID="$(op read 'op://<team vault>/<item>/team id')"
+export APPLE_API_KEY="$(op read 'op://<team vault>/<item>/key id')"
+export APPLE_API_ISSUER="$(op read 'op://<team vault>/<item>/issuer id')"
+op read --out-file "$TMPDIR/AuthKey.p8" 'op://<team vault>/<item>/AuthKey.p8'
 export APPLE_API_KEY_PATH="$TMPDIR/AuthKey.p8"
 cargo tauri build --bundles app,dmg --target universal-apple-darwin
 rm -f "$TMPDIR/AuthKey.p8"

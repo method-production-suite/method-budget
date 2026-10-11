@@ -1,10 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/fwb-core",
-    "crates/fwb-format",
-    "crates/fwb-cli",
-    "crates/fwb-app",
+    "crates/method-core",
+    "crates/method-format",
+    "crates/method-cli",
+    "crates/method-app",
     "crates/method-release",
     "crates/xtask",
 ]

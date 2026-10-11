@@ -1,6 +1,6 @@
 # Export test plan: a made-up budget for MMB
 
-Hi Sam. This is a recipe. You type a tiny, fake budget into your copy of Movie Magic
+This is a recipe. You type a tiny, fake budget into your copy of Movie Magic
 Budgeting, export it in every open format, and drop the files in a folder. We then build our
 importers against those files, and the totals tell us how MMB does its math where the manual
 is unclear.
@@ -19,7 +19,7 @@ those in the export folder or send them to us.
 1. Make the folder `Screenshots/exports/` inside the project (and `Screenshots/exports/shots/`
    for screenshots). The whole `Screenshots/` folder is already gitignored, so nothing in it
    can get committed by accident. Please keep every file from this test in there.
-2. In MMB, start a **new blank budget** (not from a template). Call it `FWB Export Test 01`.
+2. In MMB, start a **new blank budget** (not from a template). Call it `ZTEST Export Test 01`.
 3. If the blank budget comes with some starter units, fringes or other setup items, leave them
    alone. Don't use them on any line.
 4. If a value won't fit or MMB refuses something, write down what happened and carry on.
@@ -105,7 +105,7 @@ Descriptions: anything starting with Z is fine, for example `ZPCT test fringe`.
 
 ### Step 8. Budget info (optional, 1 minute)
 
-If easy, fill the title with `FWB Export Test 01` and the production name with
+If easy, fill the title with `ZTEST Export Test 01` and the production name with
 `ZTEST PRODUCTION`. If you can add a custom text field, call it `ZINFO` with value `hello 5150`.
 That shows us where budget info lands in each export.
 
@@ -364,17 +364,17 @@ window (`shots/30-export-options-<format>.png`).
 
 | # | What | Save as (in `Screenshots/exports/`) |
 |---|---|---|
-| 1 | Tab delimited | `fwbtest-tab.txt` |
-| 2 | XML, basic | `fwbtest-xml-basic.xml` |
-| 3 | XML, advanced | `fwbtest-xml-advanced.xml` |
-| 4 | JSON | `fwbtest.json` |
-| 5 | Excel (with totals at 2 decimals) | `fwbtest.xlsx` |
-| 6 | Excel again with totals back to whole dollars (only if you changed that setting) | `fwbtest-wholedollars.xlsx` |
-| 7 | PDF: topsheet report | `fwbtest-topsheet.pdf` |
-| 8 | PDF: account details for all accounts, fringe breakdown shown, suppressed lines included | `fwbtest-details.pdf` |
-| 9 | PDF: setup reports (fringes, globals, groups, units, sets, locations, currencies, credits) | `fwbtest-setup.pdf` |
-| 10 | PDF: the credit print view from the credit setup screen | `fwbtest-credits.pdf` |
-| 11 | PDF: notes report, if offered | `fwbtest-notes.pdf` |
+| 1 | Tab delimited | `ztest-tab.txt` |
+| 2 | XML, basic | `ztest-xml-basic.xml` |
+| 3 | XML, advanced | `ztest-xml-advanced.xml` |
+| 4 | JSON | `ztest.json` |
+| 5 | Excel (with totals at 2 decimals) | `ztest.xlsx` |
+| 6 | Excel again with totals back to whole dollars (only if you changed that setting) | `ztest-wholedollars.xlsx` |
+| 7 | PDF: topsheet report | `ztest-topsheet.pdf` |
+| 8 | PDF: account details for all accounts, fringe breakdown shown, suppressed lines included | `ztest-details.pdf` |
+| 9 | PDF: setup reports (fringes, globals, groups, units, sets, locations, currencies, credits) | `ztest-setup.pdf` |
+| 10 | PDF: the credit print view from the credit setup screen | `ztest-credits.pdf` |
+| 11 | PDF: notes report, if offered | `ztest-notes.pdf` |
 
 Put the totals decimal setting back to 2 after export 6.
 
@@ -385,9 +385,9 @@ before the next one. Our predictions are in Part 2b below.
 
 | # | Change | Save as |
 |---|---|---|
-| V1 | Fringe posting: by budget | `fwbtest-v1-postbudget-topsheet.pdf` and `fwbtest-v1-postbudget.json` |
-| V2 | Percentage fringe cutoff factor: 2.0 | `fwbtest-v2-factor2-topsheet.pdf` and `fwbtest-v2-factor2-details.pdf` |
-| V3 | Totals (display) currency: EUR | `fwbtest-v3-eur-topsheet.pdf` and `fwbtest-v3-eur.json` |
+| V1 | Fringe posting: by budget | `ztest-v1-postbudget-topsheet.pdf` and `ztest-v1-postbudget.json` |
+| V2 | Percentage fringe cutoff factor: 2.0 | `ztest-v2-factor2-topsheet.pdf` and `ztest-v2-factor2-details.pdf` |
+| V3 | Totals (display) currency: EUR | `ztest-v3-eur-topsheet.pdf` and `ztest-v3-eur.json` |
 
 When all three are back, take one last topsheet screenshot and check it matches Part 2 again.
 
@@ -470,7 +470,7 @@ For the engineers. Question numbers are the open questions in
 
 | Question | Evidence |
 |---|---|
-| Q1 export schemas | All five exports of the same budget. Every value is distinctive (12345.67, 432.105, 312.34, 9999.99, Z names), so each field can be found by searching. Compare `fwbtest.xlsx` with `fwbtest-wholedollars.xlsx` to see whether Excel stores values or display-rounded text. |
+| Q1 export schemas | All five exports of the same budget. Every value is distinctive (12345.67, 432.105, 312.34, 9999.99, Z names), so each field can be found by searching. Compare `ztest.xlsx` with `ztest-wholedollars.xlsx` to see whether Excel stores values or display-rounded text. |
 | Q2 currency direction | Foreign lens line total (1,500.00 vs 166.67) in every export and the topsheet; V3 totals (divide vs multiply); how the EUR rate 3.00000 is written in XML/JSON. |
 | Q3 cutoff factor | V2 topsheet and details: grip range and driver ZPCT, using the V2 table. |
 | Q4 flat fringes and ranges | Grip ZFLAT per line (100, 425, 50) in the details PDF and any per-line fringe data in the advanced exports. |
@@ -493,5 +493,5 @@ For the engineers. Question numbers are the open questions in
 | Production totals, charges, credits | Whether each export includes topsheet rows beyond categories (ZTOTAL ATL/BTL, 7801, 7802, 7901). |
 | Notes | Search each export for `4242` and `4343`. The manual says notes don't export; this confirms it. |
 | Budget info | Search for `ZTEST PRODUCTION` and `hello 5150`. |
-| Fringe posting in exports | Main exports (by category) vs `fwbtest-v1-postbudget.json`: how fringe accounts or the fringe row are represented, and what number MMB gives the generated fringe accounts. |
+| Fringe posting in exports | Main exports (by category) vs `ztest-v1-postbudget.json`: how fringe accounts or the fringe row are represented, and what number MMB gives the generated fringe accounts. |
 | Account coding defaults | Screenshot 01. |

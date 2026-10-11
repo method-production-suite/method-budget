@@ -2,7 +2,7 @@
 
 This is the open, documented file format Method Budget uses to save budgets. It is
 plain JSON, designed to be read and written by other tools and to diff cleanly in version
-control. The reference implementation is `crates/fwb-format` (`to_string` and `from_str`).
+control. The reference implementation is `crates/method-format` (`to_string` and `from_str`).
 
 File extension: `.mthd`. Encoding: UTF-8. The registered MIME type is
 `application/vnd.method-budget+json`; since the content is plain JSON, tools may also
@@ -10,12 +10,8 @@ treat it as `application/json`.
 
 ## Identity
 
-- **Extension.** New files are `.mthd`. Files from before the product was renamed (to
-  Method Budget, decisions.md entry 46) end in `.fwb`; the content is the same format, and
-  readers should accept both. The app opens either, and a budget opened from a `.fwb`
-  keeps saving to that same file until it is saved under a new name.
-- **The `format` field.** Writers write `"method-budget"`. Readers also accept the legacy
-  value `"film-wizard-budget"`, which files written before the rename carry.
+- **Extension.** Files are `.mthd` (decisions.md, entry 46).
+- **The `format` field.** Always `"method-budget"`. Readers reject any other value.
 
 ## At a glance
 
@@ -46,7 +42,7 @@ treat it as `application/json`.
 
 | Field     | Type    | Notes |
 |-----------|---------|-------|
-| `format`  | string  | Written as `"method-budget"`; the legacy `"film-wizard-budget"` is read too (see [Identity](#identity)). Anything else is rejected as "not a budget file". |
+| `format`  | string  | Always `"method-budget"` (see [Identity](#identity)). Anything else is rejected as "not a budget file". |
 | `version` | integer | Format version, currently `1`. See [Versioning](#versioning). |
 | `budget`  | object  | The [budget](#budget). |
 
@@ -357,7 +353,7 @@ order:
 
 ```json
 "notes": [
-  { "id": 1, "created": "2026-10-09T14:30:00Z", "author": "Sam", "text": "Check the rate with the union" },
+  { "id": 1, "created": "2026-10-09T14:30:00Z", "author": "Alex", "text": "Check the rate with the union" },
   { "id": 2, "created": "2026-10-10T09:05:00Z", "edited": "2026-10-10T09:20:00Z", "done": true, "text": "Kit fee agreed" }
 ]
 ```
@@ -976,7 +972,7 @@ That is "8 hours straight time, then 1.5x after 8, 2x after 12; sixth day 1.5x".
 A reader that follows this document should:
 
 1. Parse the JSON. Reject trailing content after the top-level object.
-2. Check `format` is `"method-budget"` (or the legacy `"film-wizard-budget"`), then check `version`:
+2. Check `format` is `"method-budget"`, then check `version`:
    reject a missing or non-integer version, and reject a version newer than the reader
    supports, with a message saying the file needs a newer program. Do this before checking other fields,
    so a newer file gets the version message.
@@ -1071,7 +1067,7 @@ valid. Loading and saving it in Method Budget normalizes it.
 A small budget: two categories split by production totals, one global, a fringe with a
 cutoff, a group left out of the total, an adjustment row, and a contingency charge. It uses
 the default account coding and fringe posting, so neither is written. This exact text is
-checked by the test suite (`crates/fwb-format/tests/golden/small.json`).
+checked by the test suite (`crates/method-format/tests/golden/small.json`).
 
 ```json
 {

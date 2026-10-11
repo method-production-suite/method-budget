@@ -20,7 +20,7 @@ around the turned corner are cut out of the page, so the mark sits on any backgr
 The name is drawn from strokes on a 100-unit x-height (lowercase, geometric, one
 weight), not set in a font, so it looks the same everywhere and ships no font file.
 
-The app icon is drawn from the same geometry by crates/fwb-app/icons/source/make_icon.py;
+The app icon is drawn from the same geometry by crates/method-app/icons/source/make_icon.py;
 change both together. Colors are the brand tokens in site/assets/tokens.css; rules for
 using all of this are in docs/BRAND.md.
 """

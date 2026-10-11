@@ -41,7 +41,7 @@ video, no copied help text, no images. The video stays outside the repo.
 
 ## Era caution
 
-Sam's 2026 note 01 shows the fringe list in the tools pane with checkboxes, dollars and
+The 2026 note 01 shows the fringe list in the tools pane with checkboxes, dollars and
 range buttons; the setup screen's columns were not re-checked in 2026.
 
 ## What this means for Method Budget

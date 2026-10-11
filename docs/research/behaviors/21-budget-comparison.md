@@ -61,12 +61,12 @@ None.
 ## Era caution
 
 2020/2021 build, and cloud-only at the time (linked budgets had to be stored in the vendor's
-cloud). Sam's 2026 recordings win any conflict. Column names and the % definition could have
+cloud). The 2026 recordings win any conflict. Column names and the % definition could have
 changed; re-verify the percent rule against a current export before copying the semantics.
 
 ## What this means for Method Budget
 
-Local-first: "link a budget" becomes "add a `.fwb` file (or a saved version) to the
+Local-first: "link a budget" becomes "add a `.mthd` file (or a saved version) to the
 comparison"; recent files and versions inside the open budget are the picker's list.
 
 1. [partial] P1: **Comparison UI.** Engine done (decision 17, `comparison.rs`), no app

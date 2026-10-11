@@ -23,7 +23,6 @@ id_rsa*
 /docs/research/mmb-screens.md
 
 # Scratch budgets at the repo root (test files, personal budgets)
-/*.fwb
 /*.mthd
 /Test Library/
 

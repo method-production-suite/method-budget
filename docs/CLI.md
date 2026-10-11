@@ -1,15 +1,9 @@
 # The `method` command line
 
-`method` reads and writes Method Budget files (`.mthd`, and older `.fwb` ones:
-docs/FORMAT.md, "Identity") without the app: check a budget, print its totals, draw a report, export a spreadsheet, import one,
+`method` reads and writes Method Budget files (`.mthd`: docs/FORMAT.md) without the app: check a budget, print its totals, draw a report, export a spreadsheet, import one,
 and make scripted edits. It is plain Rust with no network and no GUI, so it runs the same
-on a laptop, a server or in CI. Build it with `cargo build --release -p fwb-cli`; the
+on a laptop, a server or in CI. Build it with `cargo build --release -p method-cli`; the
 binary is `target/release/method`.
-
-`fwb`, the command's name before the product was renamed, is still built
-(`target/release/fwb`) as a **deprecated alias**: it runs exactly the same code, with the
-same output, messages and exit codes, so existing scripts and git merge driver settings
-keep working. Switch to `method`; the alias will be removed in a later release.
 
 Every command takes the budget file first, then flags. Flags take their value as the next
 word or after `=` (`--out=x.pdf`); `-o` is short for `--out`; `--` ends the flags. A word
@@ -303,7 +297,7 @@ merged budget is written either way, never over one of the three budgets (that i
 
 `method merge` for git, writing the result over `<ours>`; exit 1 when conflicts remain, so
 git marks the file conflicted (it stays a valid budget, conflicts settled for ours). Set
-up with `*.mthd merge=method-budget` (and `*.fwb merge=method-budget`) in `.gitattributes`
+up with `*.mthd merge=method-budget` in `.gitattributes`
 and `git config merge.method-budget.driver "method merge-driver %O %A %B %P"` (docs/MERGE.md,
 "With git").
 

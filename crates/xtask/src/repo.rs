@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// The app's Tauri configuration, relative to the repository root.
-pub const TAURI_CONF: &str = "crates/fwb-app/tauri.conf.json";
+pub const TAURI_CONF: &str = "crates/method-app/tauri.conf.json";
 /// The notes guide, whose skeleton block starts each new notes file.
 pub const NOTES_TEMPLATE: &str = "docs/release-notes-template.md";
 /// Where each release's notes live.

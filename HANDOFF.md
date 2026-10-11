@@ -5,18 +5,19 @@ don't wait on follow-up questions for anything this file already answers.
 
 ## What this is
 An open-source, clean-room film and TV budgeting app in Rust: a free alternative to Movie Magic
-Budgeting (Entertainment Partners). A Darkwell project owned by Sam Sandweiss. The model is ArtCraft
-(github.com/storytold), who ship clean-room Rust rewrites of Photoshop, Premiere, etc.
+Budgeting (Entertainment Partners). "The owner" below is the person who makes the product calls.
+The model is ArtCraft (github.com/storytold), who ship clean-room Rust rewrites of Photoshop,
+Premiere, etc.
 
-- Local: `~/Documents/CODING_PROJECTS/Projects/02_Darkwell/film-wizard-budgeting`
-- Repo: https://github.com/ssandweiss/method-budget (**private** until Sam says go public).
-  The local folder keeps its old name for now. The older cwpsandywhois copy is retired.
+- Local: the owner's working copy on this Mac (its folder name is due to change; don't hard-code it).
+- Repo: https://github.com/ssandweiss/method-budget (**private** until the owner says go public).
+  An older copy under another account is retired.
 - GitHub: this Mac has several `gh` accounts. Pushes need `ssandweiss` active
   (`gh auth switch --user ssandweiss`). A push that 404s means the wrong account is active.
 - License: **MIT OR Apache-2.0** (same terms as ArtCraft). Decided, don't revisit.
 
 ## Decided scope (v1)
-1. **Engine** (`crates/fwb-core`): the budgeting math. Clean-room.
+1. **Engine** (`crates/method-core`): the budgeting math. Clean-room.
 2. **Import from exports**: read budgets other tools *export* (Excel/CSV). No proprietary parsing.
 3. **Our own open native format**: documented in-repo, diff-friendly (text, stable key order).
    Native `.mbd` (Movie Magic) support is **out**: it would need reverse engineering a
@@ -27,7 +28,7 @@ Budgeting (Entertainment Partners). A Darkwell project owned by Sam Sandweiss. T
   icons, or bundled data (rate books, fringe libraries).
 - Allowed: how film budgets work as a domain, public union/guild rate info, normal UI use of
   other tools, their open-format exports, and studio/network charts of accounts (studios share
-  them with production partners; Sam's call, 2026-10-10).
+  them with production partners; the owner's call, 2026-10-10).
 - Money is integer cents (`Cents = i64`). No floats for money, ever. Rates/percentages need an
   explicit decimal type and a documented rounding rule.
 - Born-secure: commit lockfiles, no secrets in git, CI stays `permissions: contents: read`,
@@ -35,28 +36,28 @@ Budgeting (Entertainment Partners). A Darkwell project owned by Sam Sandweiss. T
 - Stage explicit paths, never `git add -A` blindly.
 
 ## Current state (2026-10-09)
-A working local desktop app (Tauri v2, `crates/fwb-app`, zero-npm UI) on a tested engine.
-The product is **Method Budget** (methodbudget.com; decisions.md, entry 46). Crate and
-module names (`fwb-core` and so on) are internal and unchanged for now. Never shorten the
-name to "MB" (that is how people shorten Movie Magic Budgeting).
+A working local desktop app (Tauri v2, `crates/method-app`, zero-npm UI) on a tested engine.
+The product is **Method Budget** (methodbudget.com; decisions.md, entry 46). The crates are
+`method-core`, `method-format`, `method-cli` and `method-app`. Never shorten the name to "MB"
+(that is how people shorten Movie Magic Budgeting).
 Read docs/ROADMAP.md first (phases, decisions, engine checks), then docs/APP.md (how the app
 is built: lean views, multi-document tabs, security model, saving and recovery, printing),
 docs/decisions.md (every product and design call, numbered), docs/FORMAT.md (`.mthd` spec).
 
-- **Engine** (`fwb-core`, zero deps): topsheet levels, fringes (cutoffs per earner, ranges,
+- **Engine** (`method-core`, zero deps): topsheet levels, fringes (cutoffs per earner, ranges,
   unit-hour flats, four posting modes), groups, charges, credits, currencies, globals,
   account coding, baseline/variance, versions, multi-budget compare, report presets,
   incremental recalc. Checked against vendor tutorial figures to the cent.
-- **Format** (`fwb-format`): `.mthd` JSON (older `.fwb` files still open), documented,
+- **Format** (`method-format`): `.mthd` JSON, documented,
   version 1, additive changes only.
-- **CLI** (`fwb-cli`, binary `method`; `fwb` is a deprecated alias): show, check, fmt, new,
+- **CLI** (`method-cli`, binary `method`): show, check, fmt, new,
   sample (5,000-line test budget), and more (docs/CLI.md).
 - **App**: tabs, grid with keyboard flow, autocomplete and add-on-the-fly, right-click menus,
   formatting, notes, tools panel (two tab panes, dock right/bottom/pop-out window), apply to
   selection, row copy/paste with tags across budgets, find and replace, versions and compare,
   print setup with presets and PDF, autosave into the file with recovery and backups,
   outside-change guard, Movie Magic-style shortcuts. ~5 ms per edit at 5,000 lines.
-- **Research**: docs/research/behaviors/01-24 (Sam's recordings 01-02 outrank the 2020/2021
+- **Research**: docs/research/behaviors/01-24 (the 2026 recordings 01-02 outrank the 2020/2021
   vendor tutorials 03-24), feature inventory, export test plan.
 
 ## Studio chart templates (2026-10-10, uncommitted)
@@ -71,14 +72,14 @@ counts against its CSV. Groups for the 36 new charts follow their names (unclear
 Other). `imports/coa-sources/IMPORT-NOTES.md` has the per-chart detail.
 
 ## Next
-Phase 1 remaining (ROADMAP): import from MMB exports (1.16, blocked until Sam runs
-docs/research/export-test-plan.md; he tabled it for now), engine fixes from that test
-(1.17), signed Mac build (1.21, needs Sam's call on the signing team). Then Phase 2.
+Phase 1 remaining (ROADMAP): import from MMB exports (1.16, blocked until the owner runs
+docs/research/export-test-plan.md; tabled for now), engine fixes from that test
+(1.17), signed Mac build (1.21, needs the owner's call on the signing team). Then Phase 2.
 
 ## How to work here
-- Never launch the app or drive the GUI while Sam is at the computer unless he says so;
+- Never launch the app or drive the GUI while the owner is at the computer unless they say so;
   verify with tests, `node --check` and a browser-pane harness with a fake `__TAURI__`.
-  Launching only to take a window screenshot (no keystrokes) has been OK with Sam.
+  Launching only to take a window screenshot (no keystrokes) has been OK with the owner.
 - Parallel agents: each owns new files; shared files get small separated edits after a
   re-read. Report progress to the savvy-flow panel (`mcp__savvy-progress__*`).
 - Every locked crate must be at least 14 days old (`scripts/check-crate-ages.py`); Rust is
@@ -86,10 +87,10 @@ docs/research/export-test-plan.md; he tabled it for now), engine fixes from that
 - GitHub: push as `ssandweiss` (repo-local credential helper is set; don't flip the global
   gh account). Use `GH_TOKEN=$(gh auth token --user ssandweiss) gh ... -R
   ssandweiss/method-budget` for gh commands.
-- Clean room: never open Sam's `mmb-decomp` project from a Method Budget session (see
+- Clean room: never open the owner's `mmb-decomp` project from a Method Budget session (see
   CLEAN-ROOM.md and ROADMAP "Optional, outside this repo").
 
-## Working style for Sam
-- Casual and short. **No em dashes** in anything you write for him.
-- Keep moving on long builds: parallelize, batch updates, only stop him for real decisions.
+## Working style for the owner
+- Casual and short. **No em dashes** in anything you write for them.
+- Keep moving on long builds: parallelize, batch updates, only stop them for real decisions.
 - Flag anything that touches the legal line (file formats, bundled data) before doing it.

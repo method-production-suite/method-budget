@@ -59,7 +59,7 @@ The video stays outside the repo.
 
 ## Era caution
 
-The cloud library and the "new app" framing are from 2020. Sam's 2026 notes (01, 02) show
+The cloud library and the "new app" framing are from 2020. The 2026 notes (01, 02) show
 a tools pane with the same tables, but the setup window's current layout, the "D" and
 "Dec" columns, and the library workflow were not checked in 2026. Treat column details as
 indicative.
@@ -70,7 +70,7 @@ indicative.
    (lines and other globals) and allow a description. We show name, formula, value only.
 2. [missing] P2 **Global unit**: an optional unit on a global (days, weeks), offered from
    the units table with type-ahead. Decide whether it pre-fills a line's unit when the
-   global is typed into Amount (not shown in the video; needs Sam's 2026 check).
+   global is typed into Amount (not shown in the video; needs a 2026 check).
 3. [missing] P2 **Rename a global with formula rewrite**: the reference stores references
    by id, so renames are safe there. We reference by name; a rename should rewrite every
    formula that uses it (APP.md lists renaming under "Not yet").

@@ -3,7 +3,7 @@
 Sources: two official vendor tutorial videos, "Keyboard Navigation" (published 2021-04-13)
 and "Breadcrumb Navigation" (published 2020-03-04); vendor tutorial, 2020/2021 era.
 Clean-room: behavior described in our own words from the narration and on-screen action. No
-narration transcribed, no frames kept, no budget data copied. Sam's 2026 recordings (notes
+narration transcribed, no frames kept, no budget data copied. The 2026 recordings (notes
 01 and 02) win any conflict.
 
 ## Moving between levels with the keyboard
@@ -57,7 +57,7 @@ narration transcribed, no frames kept, no budget data copied. Sam's 2026 recordi
 | Next sibling (category in account list, account in detail) | Cmd+Right | Ctrl+Right |
 | Previous sibling | Cmd+Left | Ctrl+Left |
 
-Era caution: Sam's 2026 recording (note 01) shows the step buttons as previous/next buttons
+Era caution: the 2026 recording (note 01) shows the step buttons as previous/next buttons
 beside the current segment, which matches; whether stepping sideways still stops at the end
 of a category or wraps across categories was not shown in either video. The 2021 video was
 recorded on macOS, the 2020 one on Windows; keys matched apart from Cmd versus Ctrl.

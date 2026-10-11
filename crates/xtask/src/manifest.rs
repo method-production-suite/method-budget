@@ -606,7 +606,7 @@ mod tests {
             assert!(release_base(bad, "1.0.0").is_err(), "{bad}");
         }
         // The repository's own endpoint has the expected shape.
-        let conf = Path::new(env!("CARGO_MANIFEST_DIR")).join("../fwb-app/tauri.conf.json");
+        let conf = Path::new(env!("CARGO_MANIFEST_DIR")).join("../method-app/tauri.conf.json");
         let (_, endpoints) = updater_config(&conf).unwrap();
         assert_eq!(endpoints.len(), 1);
         assert!(release_base(&endpoints[0], "0.1.0").is_ok());

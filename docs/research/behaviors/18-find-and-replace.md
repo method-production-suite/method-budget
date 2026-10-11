@@ -42,7 +42,7 @@ words; no copied text or images. The video stays outside the repo.
 
 ## Era caution
 
-- Windows build, 2020. Sam's 2026 recording (note 01) still shows a Find tab in the tools
+- Windows build, 2020. The 2026 recording (note 01) still shows a Find tab in the tools
   pane and a Find item in the top navigation, so the feature lives on; the list of search
   types and the result layout may have changed.
 

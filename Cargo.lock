@@ -901,43 +901,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fwb-app"
-version = "0.1.0"
-dependencies = [
- "fwb-core",
- "fwb-format",
- "method-release",
- "reqwest",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-updater",
-]
-
-[[package]]
-name = "fwb-cli"
-version = "0.1.0"
-dependencies = [
- "fwb-core",
- "fwb-format",
-]
-
-[[package]]
-name = "fwb-core"
-version = "0.1.0"
-
-[[package]]
-name = "fwb-format"
-version = "0.1.0"
-dependencies = [
- "fwb-core",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "gdk"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1858,6 +1821,43 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "method-app"
+version = "0.1.0"
+dependencies = [
+ "method-core",
+ "method-format",
+ "method-release",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-updater",
+]
+
+[[package]]
+name = "method-cli"
+version = "0.1.0"
+dependencies = [
+ "method-core",
+ "method-format",
+]
+
+[[package]]
+name = "method-core"
+version = "0.1.0"
+
+[[package]]
+name = "method-format"
+version = "0.1.0"
+dependencies = [
+ "method-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

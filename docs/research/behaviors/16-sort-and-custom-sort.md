@@ -47,7 +47,7 @@ words; no copied text or images. The video stays outside the repo.
 
 ## Era caution
 
-- In Sam's 2026 recording (note 01) the apply lists have a filter box, setup/clear links and
+- In the 2026 recording (note 01) the apply lists have a filter box, setup/clear links and
   an applied-only toggle, consistent with this video. The Windows-era video in note 18
   shows a "sort by applied" checkbox instead of a filter, so the control has changed over
   time. Folder organization of setup tables may be tied to the vendor's cloud library.

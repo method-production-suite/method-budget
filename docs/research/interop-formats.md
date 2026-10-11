@@ -323,7 +323,7 @@ https://platform.softwareone.com/product/showbiz-budgeting/PCP-0606-8679
   any XML or JSON file and map its fields, like our spreadsheet mapping); our existing
   spreadsheet and tab-delimited importer, which already reads heading rows that name an
   account; an account-level budget import; reconciliation against any total column.
-- **With samples (optional, the owner's licensed copy, `docs/research/export-test-plan.md`):**
+- **With samples (optional, a licensed copy, `docs/research/export-test-plan.md`):**
   presets that recognize each MMB layout automatically, setup-table recovery (fringe rates,
   cutoffs, global formulas), and answers to the engine questions in inventory Q1 to Q15.
   Nothing in sections 10.1 and 10.3 depends on them.
@@ -801,8 +801,8 @@ Sizes follow the roadmap: **S** a day or two, **M** about a week, **L** more tha
 "Samples" says what test files each item needs. Synthetic means files we write ourselves
 from public documentation (committed as fixtures); real means exports from a person's
 own copy of another tool (kept out of the repository unless the owner decides otherwise).
-Anything that needs the owner's licensed copy of the reference product is marked
-**optional**: the owner has accepted that risk and decides if and when.
+Anything that needs a licensed copy of the reference product is marked
+**optional**: the owner decides if and when.
 
 The ordering principle: first the doors every downstream system already uses (account-level
 budgets, charts of accounts, plain spreadsheets, accounting exports), then the reference
@@ -863,7 +863,7 @@ reconciliation tells the user how close the import came.
 ## 11. Open questions for the owner
 
 1. **Reference samples.** Will you run the export test (`docs/research/export-test-plan.md`)
-   with your licensed copy, and if so, which formats first? Recommendation: JSON and Excel
+   with a licensed copy, and if so, which formats first? Recommendation: JSON and Excel
    first, then XML (Advanced), Tab Delimited, XML (Basic). Wave 1 and W2.1 don't wait on it.
 2. **Which downstream systems matter to you?** Which accounting, payroll or cost report
    platform do your productions actually hand budgets to? That decides which named presets

@@ -32,15 +32,15 @@ None.
 ## Era caution
 
 2020/2021 build. The share service depends on the vendor's accounts and cloud. Method Budget
-is local-only by Sam's decision (decision 14): no accounts, no server.
+is local-only by the owner's decision (decision 14): no accounts, no server.
 
 ## What this means for Method Budget
 
-Local-first equivalent: the `.fwb` file IS the shareable copy. People send it by email, chat
+Local-first equivalent: the `.mthd` file IS the shareable copy. People send it by email, chat
 or a shared drive they already use. What we can add is making that hand-off clean and making
 received copies easy to reconcile.
 
-1. [have] Budgets are plain `.fwb` files on disk, documented and diffable (decision 13);
+1. [have] Budgets are plain `.mthd` files on disk, documented and diffable (decision 13);
    sending one is sending a file.
 2. [missing] P2: **"Save a copy for sharing"**: write a snapshot file with a clear name
    (title, version name, date), optionally stripping notes or private budget info, and

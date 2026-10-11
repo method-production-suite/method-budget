@@ -69,7 +69,7 @@ None.
 ## Era caution
 
 2020/2021 build. The library lists (studio and vendor default charges) are vendor content and
-cloud features of that era. Sam's 2026 recordings win any conflict.
+cloud features of that era. The 2026 recordings win any conflict.
 
 ## What this means for Method Budget
 
