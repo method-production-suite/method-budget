@@ -11,8 +11,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use method_core::calc::cache::RecalcCache;
 use method_core::expr::Expr;
 use method_core::{
-    recalc, Budget, CalcError, ChargeKind, CreditSource, Dec, Formula, RecalcOptions, Report,
-    RowId, RowKind,
+    recalc, Arithmetic, Budget, CalcError, ChargeKind, CreditSource, Dec, Formula, RecalcOptions,
+    Report, RowId, RowKind,
 };
 use serde::Serialize;
 
@@ -118,6 +118,7 @@ fn settle_globals(clean: &mut Budget) -> (BTreeMap<String, Dec>, Vec<Issue>) {
     // Each round fixes at least one global, so this terminates.
     for _ in 0..=clean.globals.len() {
         let mut only = Budget::new("", clean.base_currency.clone());
+        only.arithmetic = clean.arithmetic;
         only.globals = clean.globals.clone();
         let e = match recalc(&only, &RecalcOptions::default()) {
             Ok(r) => return (r.globals, issues),
@@ -161,18 +162,34 @@ fn settle_globals(clean: &mut Budget) -> (BTreeMap<String, Dec>, Vec<Issue>) {
     (BTreeMap::new(), issues)
 }
 
-/// Why `f` can't be evaluated, if it can't. Blank is fine.
-fn check(f: &Formula, globals: &BTreeMap<String, Dec>) -> Option<String> {
+/// Why `f` can't be evaluated in `arith`, if it can't. Blank is fine.
+fn check(f: &Formula, globals: &BTreeMap<String, Dec>, arith: Arithmetic) -> Option<String> {
     if f.is_blank() {
         return None;
     }
-    let lookup = |n: &str| globals.get(n).copied();
-    if method_core::expr::quick_value(&f.0, &lookup).is_some() {
-        return None;
-    }
-    match Expr::parse(&f.0) {
-        Err(e) => Some(e.to_string()),
-        Ok(e) => e.eval(&lookup).err().map(|e| e.to_string()),
+    match arith {
+        Arithmetic::Exact => {
+            let lookup = |n: &str| globals.get(n).copied();
+            if method_core::expr::quick_value(&f.0, &lookup).is_some() {
+                return None;
+            }
+            match Expr::parse(&f.0) {
+                Err(e) => Some(e.to_string()),
+                Ok(e) => e.eval(&lookup).err().map(|e| e.to_string()),
+            }
+        }
+        // In doubles, as the engine works them out, so a number with more
+        // than nine places is fine.
+        Arithmetic::Mmb => {
+            let lookup = |n: &str| globals.get(n).map(|v| v.to_f64());
+            if method_core::expr::quick_value_f64(&f.0, &lookup).is_some() {
+                return None;
+            }
+            match Expr::parse(&f.0) {
+                Err(e) => Some(e.to_string()),
+                Ok(e) => e.eval_f64(&lookup).err().map(|e| e.to_string()),
+            }
+        }
     }
 }
 
@@ -180,6 +197,7 @@ fn check(f: &Formula, globals: &BTreeMap<String, Dec>) -> Option<String> {
 /// the list of those problems.
 pub fn sanitize(b: &Budget) -> (Budget, Vec<Issue>) {
     let mut clean = b.clone();
+    let arith = clean.arithmetic;
     let (globals, mut issues) = settle_globals(&mut clean);
 
     if let Some(c) = &clean.totals_currency {
@@ -195,7 +213,7 @@ pub fn sanitize(b: &Budget) -> (Budget, Vec<Issue>) {
     // Fringe rates that don't evaluate count as 0.
     let mut bad_fringes = Vec::new();
     for (name, f) in &clean.fringes {
-        if let Some(message) = check(&f.rate, &globals) {
+        if let Some(message) = check(&f.rate, &globals, arith) {
             issues.push(Issue {
                 target: Target::Fringe { name: name.clone() },
                 message,
@@ -236,7 +254,7 @@ pub fn sanitize(b: &Budget) -> (Budget, Vec<Issue>) {
                 formulas.insert(2, ("rate", &mut d.rate));
             }
             for (field, f) in formulas {
-                if let Some(message) = check(f, &globals) {
+                if let Some(message) = check(f, &globals, arith) {
                     flag(field, message);
                     *f = Formula::default();
                 }

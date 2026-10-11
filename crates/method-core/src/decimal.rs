@@ -79,6 +79,30 @@ impl Dec {
     pub fn to_cents(self) -> Option<Cents> {
         Cents::try_from(div_round(self.0, CENTS_SCALE)?).ok()
     }
+
+    /// The binary double nearest this value, for Movie Magic arithmetic
+    /// (decisions.md, entry 55).
+    pub fn to_f64(self) -> f64 {
+        // Below 2^53 the scaled value and 10^9 are both exact doubles, and
+        // one division rounds correctly; past that, parse the digits.
+        const EXACT: u128 = 1 << 53;
+        if self.0.unsigned_abs() <= EXACT {
+            self.0 as f64 / SCALE as f64
+        } else {
+            self.to_string().parse().unwrap_or(f64::NAN)
+        }
+    }
+
+    /// `v` to 9 places, for showing a double. `None` when it isn't a finite
+    /// number or doesn't fit.
+    pub fn from_f64(v: f64) -> Option<Dec> {
+        if !v.is_finite() {
+            return None;
+        }
+        // Formatting a double to fixed places rounds its exact value.
+        let d: Dec = format!("{v:.9}").parse().ok()?;
+        Some(if d.is_zero() { Dec::ZERO } else { d })
+    }
 }
 
 /// `c * f`, rounded once to cents.
@@ -958,5 +982,22 @@ mod tests {
         // Half a hundredth of a percent rounds away from zero.
         assert_eq!(percent_ratio(1, 80_000), Some(d("0")));
         assert_eq!(percent_ratio(1, 20_000), Some(d("0.01")));
+    }
+
+    #[test]
+    fn doubles_nearest_and_back() {
+        for s in ["0", "1.005", "-0.125", "0.145", "30000000.015", "1.234565"] {
+            assert_eq!(d(s).to_f64(), s.parse::<f64>().unwrap(), "{s}");
+        }
+        // Past 2^53 scaled, through the digits.
+        let big = d("3333333333333.335");
+        assert_eq!(big.to_f64(), 3333333333333.335_f64);
+        assert_eq!(Dec::from_f64(1.0 / 3.0), Some(d("0.333333333")));
+        assert_eq!(Dec::from_f64(17.0 / 3.0), Some(d("5.666666667")));
+        assert_eq!(Dec::from_f64(-0.0), Some(Dec::ZERO));
+        assert_eq!(Dec::from_f64(1.005), Some(d("1.005")));
+        assert_eq!(Dec::from_f64(f64::INFINITY), None);
+        assert_eq!(Dec::from_f64(f64::NAN), None);
+        assert_eq!(Dec::from_f64(1e30), None);
     }
 }

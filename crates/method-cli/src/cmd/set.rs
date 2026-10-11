@@ -5,7 +5,7 @@ use crate::script::{self, Op, RowRef, Word, LINE_FIELDS};
 
 pub const USAGE: &str = "  method set <file.mthd> <path> <value> [--dry-run]
       Change one value and save atomically. Paths: title, compact_versions,
-      global.NAME, fringe.NAME.rate, fringe.NAME.cutoff, fringe.NAME.basis
+      arithmetic (mmb or exact), global.NAME, fringe.NAME.rate, fringe.NAME.cutoff, fringe.NAME.basis
       (amount, amount_counts or quantity), fringe.NAME.max_hours_per_day,
       line.ROW.FIELD (ROW is #ID, ACCOUNT:N or ACCOUNT:*; FIELD as in `set
       line`), charge.NAME.applied.
@@ -31,6 +31,7 @@ pub fn op_for(path: &str, value: &str) -> Result<Op, CliError> {
         "compact_versions" if rest.is_empty() => {
             Op::CompactVersions(script::flag(&v).map_err(bad)?)
         }
+        "arithmetic" if rest.is_empty() => Op::Arithmetic(script::arithmetic(value).map_err(bad)?),
         "global" if !rest.is_empty() => Op::Global(rest.to_string(), value.to_string()),
         "fringe" => match middle(rest, path)? {
             (name, "rate") => Op::FringeRate(name.to_string(), value.to_string()),
@@ -150,6 +151,15 @@ mod tests {
             op_for("charge.Contingency.applied", "no").unwrap(),
             Op::Charge("Contingency".into(), false)
         );
+        assert_eq!(
+            op_for("arithmetic", "exact").unwrap(),
+            Op::Arithmetic(method_core::Arithmetic::Exact)
+        );
+        assert_eq!(
+            op_for("arithmetic", "mmb").unwrap(),
+            Op::Arithmetic(method_core::Arithmetic::Mmb)
+        );
+        assert!(op_for("arithmetic", "float").is_err());
         for bad in [
             "nope",
             "title.x",

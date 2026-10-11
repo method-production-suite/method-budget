@@ -12,10 +12,10 @@ use method_core::coding::AccountCoding;
 use method_core::order::SetupOrder;
 use method_core::pack::{ItemSource, PackInfo};
 use method_core::{
-    Account, Baseline, Budget, Category, Cents, Charge, ChargeKind, Credit, CreditCap, CreditRow,
-    CreditSource, Currency, Dec, Detail, DisplayPrefs, FlatBasis, Formula, Fringe, FringeKind,
-    FringePosting, GlobalInfo, Group, InfoValue, Location, NewLineDefaults, Note, ProductionTotal,
-    RowId, RowKind, SetDef, TopsheetRow, UnitDef, Version,
+    Account, Arithmetic, Baseline, Budget, Category, Cents, Charge, ChargeKind, Credit, CreditCap,
+    CreditRow, CreditSource, Currency, Dec, Detail, DisplayPrefs, FlatBasis, Formula, Fringe,
+    FringeKind, FringePosting, GlobalInfo, Group, InfoValue, Location, NewLineDefaults, Note,
+    ProductionTotal, RowId, RowKind, SetDef, TopsheetRow, UnitDef, Version,
 };
 use method_core::{
     Band, BandField, FontSize, ReportColumn, ReportPreset, ReportSection, ReportSpec,
@@ -186,6 +186,8 @@ pub(crate) struct FileBudget {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     fringe_posting: Option<FilePosting>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    arithmetic: Option<FileArithmetic>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     new_line_defaults: Option<FileNewLineDefaults>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     info: BTreeMap<String, FileInfo>,
@@ -250,6 +252,7 @@ impl From<&Budget> for FileBudget {
             units,
             fringes,
             fringe_posting,
+            arithmetic,
             account_coding,
             new_line_defaults,
             groups,
@@ -282,6 +285,10 @@ impl From<&Budget> for FileBudget {
                 .then(|| FileCoding::from(account_coding)),
             fringe_posting: (*fringe_posting != FringePosting::default())
                 .then(|| FilePosting::from(fringe_posting)),
+            // Movie Magic arithmetic is the default, also for files that
+            // don't say.
+            arithmetic: (*arithmetic != Arithmetic::default())
+                .then(|| FileArithmetic::from(*arithmetic)),
             new_line_defaults: (*new_line_defaults != NewLineDefaults::default())
                 .then(|| FileNewLineDefaults::from(new_line_defaults)),
             info: map(info, FileInfo::from),
@@ -350,6 +357,7 @@ impl From<FileBudget> for Budget {
                 .fringe_posting
                 .map(FringePosting::from)
                 .unwrap_or_default(),
+            arithmetic: f.arithmetic.map(Arithmetic::from).unwrap_or_default(),
             account_coding: f
                 .account_coding
                 .map(AccountCoding::from)
@@ -1067,6 +1075,33 @@ impl From<FileNewLineDefaults> for NewLineDefaults {
             set: f.set,
             location: f.location,
             currency: f.currency,
+        }
+    }
+}
+
+/// How a budget works out its totals: `"mmb"` (the default, left out) or
+/// `"exact"`.
+#[derive(Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FileArithmetic {
+    Mmb,
+    Exact,
+}
+
+impl From<Arithmetic> for FileArithmetic {
+    fn from(a: Arithmetic) -> FileArithmetic {
+        match a {
+            Arithmetic::Mmb => FileArithmetic::Mmb,
+            Arithmetic::Exact => FileArithmetic::Exact,
+        }
+    }
+}
+
+impl From<FileArithmetic> for Arithmetic {
+    fn from(a: FileArithmetic) -> Arithmetic {
+        match a {
+            FileArithmetic::Mmb => Arithmetic::Mmb,
+            FileArithmetic::Exact => Arithmetic::Exact,
         }
     }
 }

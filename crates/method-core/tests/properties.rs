@@ -207,6 +207,10 @@ fn gen_budget(rng: &mut Rng) -> Budget {
             cap: CreditCap::QualifiedSpend(rng.below(5_000_000) as i64),
         }],
     });
+    // Both arithmetics, so every property holds in each.
+    if rng.below(2) == 0 {
+        b.arithmetic = Arithmetic::Exact;
+    }
     b
 }
 

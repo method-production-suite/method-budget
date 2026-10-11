@@ -169,12 +169,23 @@ fn excluding_a_group_drops_its_lines() {
 fn changing_a_global_recalculates_dependents() {
     let mut b = sample();
     b.globals.insert("SHOOT_DAYS".into(), "35".into());
+    b.arithmetic = Arithmetic::Exact;
     let r = run(&b);
     let grip = &r.categories[1].accounts[0].rows[0];
     // 35 / 3 rounds to 11.666666667 at 9 places, so 3 x 46.666666667 = 140.000000001.
     assert_eq!(grip.quantity, d("140.000000001"));
     assert_eq!(grip.total, 6_300_000);
     // 50 per day x the Amount, 46.666666667 days: 2,333.33333335.
+    assert_eq!(grip.fringes["PH"], 233_333);
+
+    // Movie Magic keeps globals as doubles: 46.666666666666664 days, and
+    // 3 x that is 140 to 9 places.
+    b.arithmetic = Arithmetic::Mmb;
+    let r = run(&b);
+    let grip = &r.categories[1].accounts[0].rows[0];
+    assert_eq!(r.globals["PREP_DAYS"], d("11.666666667"));
+    assert_eq!(grip.quantity, d("140"));
+    assert_eq!(grip.total, 6_300_000);
     assert_eq!(grip.fringes["PH"], 233_333);
 }
 

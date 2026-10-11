@@ -10,9 +10,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::calc::arith::{mmb_cents, percent_of, Money, Num};
 use crate::calc::{err, overflow, row_at, sum, CalcError, Ctx, ErrorKind};
-use crate::decimal::{percent_of, Dec, Exact};
-use crate::model::{Account, Detail, FlatBasis, Fringe, FringeKind, RowKind, UnitDef};
+use crate::decimal::{Dec, Exact};
+use crate::model::{Account, Arithmetic, Detail, FlatBasis, Fringe, FringeKind, RowKind, UnitDef};
 use crate::report::RowTotals;
 use crate::Cents;
 
@@ -30,7 +31,7 @@ pub(crate) fn apply_fringes(
     }
 
     // Check every name (excluded lines too) and evaluate each rate once.
-    let mut rates: BTreeMap<&str, (&Fringe, Dec)> = BTreeMap::new();
+    let mut rates: BTreeMap<&str, (&Fringe, Num)> = BTreeMap::new();
     for (i, d) in details.iter().enumerate() {
         if d.kind != RowKind::Line {
             continue;
@@ -115,7 +116,9 @@ pub(crate) fn apply_fringes(
             if let Some(c) = cutoff {
                 base = base.min(c);
             }
-            let amount = percent_of(base, rate).ok_or_else(ovf)?;
+            let amount = percent_of(ctx.arith, base, rate)
+                .and_then(Money::to_cents)
+                .ok_or_else(ovf)?;
             let shares = allocate(amount, &weights).ok_or_else(ovf)?;
             for (&i, share) in lines.iter().zip(shares) {
                 rows[i].fringes.insert(name.to_string(), share);
@@ -138,7 +141,7 @@ pub(crate) fn apply_fringes(
             }
             let v = match factors {
                 Some(v) => v,
-                None => *factors.insert(Factors::of(ctx, &acct.code, i, d, rows[i].quantity)?),
+                None => *factors.insert(Factors::of(ctx, &acct.code, i, d)?),
             };
             let amount = flat_amount(ctx, &f.kind, d, v, rate)
                 .ok_or_else(|| overflow(row_at(&acct.code, i, d, &format!("fringe {name}"))))?;
@@ -232,47 +235,49 @@ pub(super) fn allocate(amount: Cents, weights: &[Cents]) -> Option<Vec<Cents>> {
     Some(out)
 }
 
-/// A line's evaluated Amount, X and 4X, and its quantity as the line shows
-/// it (`amount x X x 4X`, rounded to 9 places).
+/// A line's evaluated Amount, X and 4X, and its quantity (`amount x X x
+/// 4X`, as stage 1 works it out), in the budget's arithmetic.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Factors {
-    pub amount: Dec,
-    pub x: Dec,
-    pub x4: Dec,
-    pub quantity: Dec,
+    pub amount: Num,
+    pub x: Num,
+    pub x4: Num,
+    pub quantity: Num,
 }
 
 impl Factors {
     /// Evaluated again for the line at `i` of account `code`; stage 1 has
     /// already evaluated them, so this doesn't fail in practice.
-    pub(crate) fn of(
-        ctx: &Ctx,
-        code: &str,
-        i: usize,
-        d: &Detail,
-        quantity: Dec,
-    ) -> Result<Factors, CalcError> {
+    pub(crate) fn of(ctx: &Ctx, code: &str, i: usize, d: &Detail) -> Result<Factors, CalcError> {
         let at = |field: &'static str| move || row_at(code, i, d, field);
+        let amount = ctx.eval(&d.amount, Dec::ZERO, &at("amount"))?;
+        let x = ctx.eval(&d.x, Dec::ONE, &at("X"))?;
+        let x4 = ctx.eval(&d.x4, Dec::ONE, &at("4X"))?;
         Ok(Factors {
-            amount: ctx.eval(&d.amount, Dec::ZERO, &at("amount"))?,
-            x: ctx.eval(&d.x, Dec::ONE, &at("X"))?,
-            x4: ctx.eval(&d.x4, Dec::ONE, &at("4X"))?,
-            quantity,
+            amount,
+            x,
+            x4,
+            quantity: Factors::quantity(amount, x, x4).ok_or_else(|| overflow(at("total")()))?,
         })
+    }
+
+    /// `amount x X x 4X`, as stage 1 multiplies them. `None` on overflow.
+    pub(crate) fn quantity(amount: Num, x: Num, x4: Num) -> Option<Num> {
+        amount.checked_mul(x)?.checked_mul(x4)
     }
 }
 
 /// A flat fringe (`kind`) at `rate` on one line: `rate` times the line's
-/// count, the exact amount rounded to cents once. `None` on overflow, or
-/// when `kind` is not flat.
+/// count, rounded to cents once. `None` on overflow, or when `kind` is not
+/// flat.
 pub(crate) fn flat_amount(
     ctx: &Ctx,
     kind: &FringeKind,
     d: &Detail,
     v: Factors,
-    rate: Dec,
+    rate: Num,
 ) -> Option<Cents> {
-    flat_count(&ctx.b.units, kind, d, v)?.amount(rate)
+    flat_count(ctx.arith, &ctx.b.units, kind, d, v)?.amount(rate)
 }
 
 /// X or 4X.
@@ -313,62 +318,91 @@ pub(crate) enum CountFrom {
 }
 
 /// How many of its units a flat fringe counts on one line, and why. The
-/// count is the exact fraction (product of `num`) / (product of `den`); the
-/// fringe is `rate` times it, multiplied in that order and rounded to cents
-/// once (decisions.md, entries 2 and 54).
+/// count is (product of `num`) / (product of `den`). Exact arithmetic
+/// multiplies `rate` by it as an exact fraction, in that order, and rounds
+/// to cents once (decisions.md, entries 2 and 54); Movie Magic arithmetic
+/// works the count out in doubles, left to right, then multiplies it by
+/// `rate` and rounds (entry 55): `0.06` per 12-hour Day on 1 Hour is
+/// `0.06 x (1 x 1 / 12)`, 0.004999... and so 0.00.
 #[derive(Clone, Debug)]
 pub(crate) struct FlatCount {
+    pub arith: Arithmetic,
     pub basis: FlatBasis,
-    /// What the count starts from: the Amount, or under `Quantity` without
-    /// a cap the line's quantity.
+    /// What the count starts from, as shown: the Amount, or under
+    /// `Quantity` without a cap the line's quantity.
     pub base: Dec,
     pub from: CountFrom,
-    /// X or 4X multiplied in, with its value (blank ones, which are 1, are
-    /// left off).
+    /// X or 4X multiplied in, with its value as shown (blank ones, which
+    /// are 1, are left off).
     pub counted: Vec<(Factor, Dec)>,
     /// X or 4X filled in but not counted.
     pub ignored: Vec<(Factor, Dec)>,
-    pub num: Vec<Dec>,
-    pub den: Vec<Dec>,
+    pub num: Vec<Num>,
+    pub den: Vec<Num>,
 }
 
 impl FlatCount {
+    /// The decimals of `v` (exact arithmetic's values are all decimals).
+    fn decs(v: &[Num]) -> Option<Vec<Dec>> {
+        v.iter().map(|n| n.shown()).collect()
+    }
+
     /// `start` times every factor of `num`, exactly.
     fn times(&self, start: Dec) -> Option<Exact> {
-        self.num
-            .iter()
-            .try_fold(Exact::dec(start), |acc, &f| acc.checked_mul(f))
+        Self::decs(&self.num)?
+            .into_iter()
+            .try_fold(Exact::dec(start), |acc, f| acc.checked_mul(f))
+    }
+
+    /// The count in doubles, as Movie Magic works it out: the factors of
+    /// `num` multiplied, then divided by each of `den`, left to right.
+    fn float_count(&self) -> f64 {
+        let up = self.num.iter().fold(1.0, |acc, n| acc * n.f64());
+        self.den.iter().fold(up, |acc, d| acc / d.f64())
     }
 
     /// `rate x count`, rounded to cents once. `None` on overflow. With one
-    /// divisor this is the same arithmetic, step for step, as before
+    /// divisor, exact arithmetic is the same, step for step, as before
     /// decisions.md entry 54.
-    pub fn amount(&self, rate: Dec) -> Option<Cents> {
-        let e = self.times(rate)?;
-        match self.den[..] {
-            [] => e.to_cents(),
-            [d] => e.div_to_cents(d),
-            _ => e.div_exact_to_cents(product(&self.den)?),
+    pub fn amount(&self, rate: Num) -> Option<Cents> {
+        match self.arith {
+            Arithmetic::Mmb => mmb_cents(rate.f64() * self.float_count()),
+            Arithmetic::Exact => {
+                let e = self.times(rate.shown()?)?;
+                let den = Self::decs(&self.den)?;
+                match den[..] {
+                    [] => e.to_cents(),
+                    [d] => e.div_to_cents(d),
+                    _ => e.div_exact_to_cents(product(&den)?),
+                }
+            }
         }
     }
 
     /// `start x count` to 9 places, for showing. `None` on overflow.
-    pub fn shown(&self, start: Dec) -> Option<Dec> {
+    fn shown(&self, start: Dec) -> Option<Dec> {
+        if self.arith == Arithmetic::Mmb {
+            return Dec::from_f64(start.to_f64() * self.float_count());
+        }
         let e = self.times(start)?;
-        match self.den[..] {
+        let den = Self::decs(&self.den)?;
+        match den[..] {
             [] => e.to_dec(),
             [d] => e.div_to_dec(d),
-            _ => e.div_exact_to_dec(product(&self.den)?),
+            _ => e.div_exact_to_dec(product(&den)?),
         }
     }
 
-    /// `rate x count` before rounding, for showing (9 places when the
-    /// division need not end).
-    pub fn exact_amount(&self, rate: Dec) -> Option<Exact> {
-        if self.den.is_empty() {
-            self.times(rate)
-        } else {
-            self.shown(rate).map(Exact::dec)
+    /// `rate x count` before rounding, for showing (exactly, or to 9
+    /// places when the division need not end; a double as it is).
+    pub fn exact_amount(&self, rate: Num) -> Option<Money> {
+        match self.arith {
+            Arithmetic::Mmb => {
+                let v = rate.f64() * self.float_count();
+                v.is_finite().then_some(Money::F64(v))
+            }
+            Arithmetic::Exact if self.den.is_empty() => self.times(rate.shown()?).map(Money::Exact),
+            Arithmetic::Exact => self.shown(rate.shown()?).map(Money::from),
         }
     }
 
@@ -435,6 +469,7 @@ pub fn day_unit(units: &BTreeMap<String, UnitDef>) -> Option<(&str, Dec)> {
 ///   whose units are not time units, and `quantity` multiplies both (X not
 ///   again when it was read as the hours a day).
 pub(crate) fn flat_count(
+    arith: Arithmetic,
     units: &BTreeMap<String, UnitDef>,
     kind: &FringeKind,
     d: &Detail,
@@ -450,6 +485,7 @@ pub(crate) fn flat_count(
         return None;
     };
     let basis = *basis;
+    let n = |d: Dec| Num::of(arith, d);
     let fu = unit.as_deref();
     let fh = fu.and_then(|u| time_hours(units, u));
     let lh = time_hours(units, &d.unit);
@@ -475,14 +511,15 @@ pub(crate) fn flat_count(
                         fringe_hours: fh,
                     }
                 },
-                vec![q, lh],
-                vec![fh],
+                vec![q, n(lh)],
+                vec![n(fh)],
             ),
             _ => (once_from(fu, fh_old, &d.unit), Vec::new(), Vec::new()),
         };
         return Some(FlatCount {
+            arith,
             basis,
-            base: q,
+            base: q.shown()?,
             from,
             counted: Vec::new(),
             ignored: Vec::new(),
@@ -496,20 +533,20 @@ pub(crate) fn flat_count(
     let (from, mut num, den) = match (fu, fh, lh, cap) {
         (Some(_), Some(_), Some(_), Some((cap, fh, lh, day_unit, dh))) => {
             x_is_hours = !d.x.is_blank() && is_hour_unit(units, &d.unit2);
-            let per_day = if x_is_hours { v.x } else { dh };
-            let used = per_day.min(cap);
+            let per_day = if x_is_hours { v.x } else { n(dh) };
+            let used = per_day.min(n(cap));
             (
                 CountFrom::Capped {
                     line_hours: lh,
                     fringe_hours: fh,
                     day_unit,
                     day_hours: dh,
-                    per_day,
+                    per_day: per_day.shown()?,
                     cap,
                     from_x: x_is_hours,
                 },
-                vec![a, lh, used],
-                vec![dh, fh],
+                vec![a, n(lh), used],
+                vec![n(dh), n(fh)],
             )
         }
         (Some(u), Some(_), Some(_), None) if u == d.unit => {
@@ -520,8 +557,8 @@ pub(crate) fn flat_count(
                 line_hours: lh,
                 fringe_hours: fh,
             },
-            vec![a, lh],
-            vec![fh],
+            vec![a, n(lh)],
+            vec![n(fh)],
         ),
         _ => (once_from(fu, fh, &d.unit), Vec::new(), Vec::new()),
     };
@@ -544,16 +581,18 @@ pub(crate) fn flat_count(
             num.push(value);
         }
         if !blank {
+            let shown = value.shown()?;
             if counts {
-                counted.push((factor, value));
+                counted.push((factor, shown));
             } else {
-                ignored.push((factor, value));
+                ignored.push((factor, shown));
             }
         }
     }
     Some(FlatCount {
+        arith,
         basis,
-        base: a,
+        base: a.shown()?,
         from,
         counted,
         ignored,
@@ -577,7 +616,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::*;
-    use crate::calc::{eval_globals, lines, RecalcOptions};
+    use crate::calc::{lines, RecalcOptions};
     use crate::model::{Budget, Category, Formula, Group, TopsheetRow, UnitDef};
 
     fn budget(details: Vec<Detail>) -> Budget {
@@ -599,12 +638,7 @@ mod tests {
     /// Stage 1 on the first account, then stage 2 when `fringed`.
     fn rows_of(b: &Budget, fringed: bool) -> Result<Vec<RowTotals>, CalcError> {
         let opts = RecalcOptions::default();
-        let ctx = Ctx {
-            b,
-            globals: eval_globals(b)?,
-            opts: &opts,
-            unfiltered: false,
-        };
+        let ctx = Ctx::new(b, &opts)?;
         let acct = &b.categories().next().unwrap().accounts[0];
         let mut rows = lines::eval_rows(&ctx, acct)?;
         if fringed {
@@ -1060,8 +1094,14 @@ mod tests {
             line(2, "1", "Flat", "-33.35", &["P"], None),
         ]);
         b.fringes.insert("P".into(), pct("10", None));
+        b.arithmetic = Arithmetic::Exact;
         let rows = run(&b).unwrap();
         assert_eq!(amounts(&rows, "P"), [Some(334), Some(-334)]);
+        // Movie Magic rounds a half up, toward plus infinity: -3.335 is
+        // -3.33 (decisions.md, entry 55).
+        b.arithmetic = Arithmetic::Mmb;
+        let rows = run(&b).unwrap();
+        assert_eq!(amounts(&rows, "P"), [Some(334), Some(-333)]);
     }
 
     #[test]

@@ -2,8 +2,8 @@
 //!
 //! Stages 1 and 2 (evaluating rows and their fringes) are most of a recalc,
 //! and they work account by account: an account's rows depend only on the
-//! account itself and on the budget's globals, fringes, currencies, units and
-//! groups (and the recalc options). An edit usually changes one account, so
+//! account itself and on the budget's arithmetic, globals, fringes,
+//! currencies, units and groups (and the recalc options). An edit usually changes one account, so
 //! [`RecalcCache`] keeps every account's evaluated rows, and the next recalc
 //! evaluates again only the accounts whose rows changed (all of them when one
 //! of those tables changed). Stages 3 and 4 run in full every time. The
@@ -12,7 +12,7 @@
 use std::collections::BTreeMap;
 
 use crate::calc::{recalc_with, CalcError, RecalcOptions};
-use crate::model::{Account, Budget, Currency, Formula, Fringe, Group, UnitDef};
+use crate::model::{Account, Arithmetic, Budget, Currency, Formula, Fringe, Group, UnitDef};
 use crate::report::{Report, RowTotals};
 use crate::Cents;
 
@@ -28,6 +28,7 @@ pub struct RecalcCache {
 /// Everything besides an account that its rows depend on.
 #[derive(Clone, Debug)]
 struct Key {
+    arithmetic: Arithmetic,
     base_currency: String,
     currencies: BTreeMap<String, Currency>,
     globals: BTreeMap<String, Formula>,
@@ -40,6 +41,7 @@ struct Key {
 impl Key {
     fn of(b: &Budget, opts: &RecalcOptions) -> Key {
         Key {
+            arithmetic: b.arithmetic,
             base_currency: b.base_currency.clone(),
             currencies: b.currencies.clone(),
             globals: b.globals.clone(),
@@ -51,7 +53,8 @@ impl Key {
     }
 
     fn matches(&self, b: &Budget, opts: &RecalcOptions) -> bool {
-        self.base_currency == b.base_currency
+        self.arithmetic == b.arithmetic
+            && self.base_currency == b.base_currency
             && self.currencies == b.currencies
             && self.globals == b.globals
             && self.units == b.units

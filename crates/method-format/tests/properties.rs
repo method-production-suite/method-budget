@@ -333,6 +333,9 @@ fn gen_content(rng: &mut Rng) -> Budget {
             currency: rng.chance(50),
         };
     }
+    if rng.chance(30) {
+        b.arithmetic = Arithmetic::Exact;
+    }
     b.groups = rng.map(|r| Group {
         short_code: r.opt_text(),
         description: r.text(),
@@ -607,6 +610,7 @@ fn generator_covers_every_variant_and_field() {
         "totals_currency",
         "account_coding",
         "fringe_posting",
+        "arithmetic",
         "new_line_defaults",
         "info",
         "currencies",
