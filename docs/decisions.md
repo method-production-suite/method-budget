@@ -79,6 +79,10 @@ a full total (as if nothing were left out) and an active total.
 lines with no group can be left out (adjustment rows with them), a line in a counted and an
 uncounted group can be counted, and group totals can be shown without fringes.
 
+**Amended 2026-10-11 (entry 58):** a group's full total is now Movie Magic's "total":
+every tagged line at its base, suppressed ones included, plus only the fringes the lines
+actually earn (a suppressed line earns none). It still ignores the what-if filters.
+
 ## 5. Globals and formulas (2026-10-08)
 
 Amount, multiplier and rate are formula strings: numbers, global names, `+ - * /`, unary
@@ -2247,7 +2251,36 @@ we didn't. The owner's rule is to match it by default (entries 55 and 56).
   and the recalc cache handle the rules like the other budget settings.
 - **Still different** (not in scope here): Movie Magic's group "total" counts only the
   fringes a line actually earns (ZOFF total 5,000.00), while our full total gives a
-  suppressed line its fringes as if it counted (5,200.00).
+  suppressed line its fringes as if it counted (5,200.00). Matched since (entry 58).
 - Tests: crates/method-core/tests/mmb_parity.rs reproduces every figure above in both
   arithmetics (and V10-3 in every posting mode); the format, CLI, MCP and app tests cover
   writing, reading and setting them.
+
+## 58. A group's total counts only the fringes earned, as Movie Magic shows it (2026-10-11, the owner)
+
+The parity run of 2026-10-10 (imports/mmb-parity/2026-10-10, run-log.md, ZTEST07 and
+ZTEST10) read the "total" Movie Magic Budgeting 10 shows next to a group's active total.
+It is every tagged line at its base, suppressed lines included, plus only the fringes
+actually computed. A suppressed line earns no fringe, so it adds its base alone. Ours gave
+a suppressed line its fringes as if it counted. The owner's rule is to match it (entries 55
+to 57); this amends entries 4 and 57.
+
+- **The figures**: ZTEST07, ZOFF (in budget total off) holds Out 2,000.00 (10% fringe
+  ZP10N) and In and out 3,000.00 (no fringe): total 5,000.00, active 0.00 (ours was
+  5,200.00). With ZOFF turned on: 5,200.00 and 5,200.00. ZIN: 8,500.00 (1,000.00 + 100.00,
+  3,000.00 suppressed at its base, 4,000.00 + 400.00), active 5,500.00. ZIN2: 5,000.00 and
+  5,000.00. ZTEST10, ZCRED: 6,500.00 (4,000.00 with 500.00 of fringes, 2,000.00 suppressed
+  at its base), active 4,500.00; ZOFF 2,000.00 and 0.00.
+- **How**: the report's `groups[name].full` is worked out in one place
+  (`add_group_total` in crates/method-core/src/calc/breakdown.rs): each line's base from
+  the unfiltered pass, its fringes from a pass under the group rules alone. The recalc
+  options' what-if filters (`exclude_groups`, `only_groups`) still don't move it; that
+  extra pass runs only when a filter is set. `GroupTotals::shown` gives the total and the
+  active total as group lists, setup tables and reports show them, without fringes when
+  the group rule `fringes_in_totals` is Exclude (entry 57). Every place that shows a
+  group's total (the setup lists and their tooltips, the printed Groups section, the
+  Groups export sheet, `list_setup` over MCP, which now also gives `full_fringes_cents`)
+  reads that figure.
+- Tests: crates/method-core/tests/mmb_parity.rs reproduces every figure above in both
+  arithmetics (ZTEST10 in every posting mode), with filters set and with the fringes rule
+  set to Exclude.

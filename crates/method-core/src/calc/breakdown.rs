@@ -19,33 +19,67 @@ fn add(b: &mut Breakdown, r: &RowTotals) -> Option<()> {
     Some(())
 }
 
-/// Every detail with its row in `active` and unfiltered (`full`, where an
-/// account's rows differ; see `calc::eval_full`).
+/// One detail with its rows: counted (`active`), unfiltered (`full`) and
+/// under the group rules alone (`earned`).
+struct Rows<'a> {
+    d: &'a Detail,
+    active: &'a RowTotals,
+    full: &'a RowTotals,
+    earned: &'a RowTotals,
+}
+
+/// Every detail with its rows. `full` and `earned` hold an account's rows
+/// where they differ from the counted ones (see `calc::eval_full` and
+/// `calc::eval_earned`); `earned` is `None` when no account's do.
 fn rows<'a>(
     b: &'a Budget,
     active: &'a [CategoryTotals],
     full: &'a FullRows,
-) -> impl Iterator<Item = (&'a Detail, &'a RowTotals, &'a RowTotals)> {
+    earned: Option<&'a FullRows>,
+) -> impl Iterator<Item = Rows<'a>> {
     b.categories()
         .zip(active.iter().zip(full))
-        .flat_map(|(cat, (ac, fc))| {
+        .enumerate()
+        .flat_map(move |(ci, (cat, (ac, fc)))| {
             cat.accounts
                 .iter()
                 .zip(ac.accounts.iter().zip(fc))
-                .flat_map(|(acct, (aa, fa))| {
+                .enumerate()
+                .flat_map(move |(ai, (acct, (aa, fa)))| {
                     let fa = fa.as_deref().unwrap_or(&aa.rows);
+                    let ea = earned
+                        .and_then(|e| e[ci][ai].as_deref())
+                        .unwrap_or(&aa.rows);
                     acct.details
                         .iter()
-                        .zip(aa.rows.iter().zip(fa))
-                        .map(|(d, (a, f))| (d, a, f))
+                        .zip(aa.rows.iter().zip(fa.iter().zip(ea)))
+                        .map(|(d, (a, (f, e)))| Rows {
+                            d,
+                            active: a,
+                            full: f,
+                            earned: e,
+                        })
                 })
         })
+}
+
+/// A group's total, as Movie Magic shows it next to the active total
+/// (decisions.md, entry 58): every tagged line at its base, suppressed ones
+/// included, plus only the fringes the lines actually earn. A suppressed
+/// line earns none, so it adds its base alone. `full` is the line's
+/// unfiltered row (for the base), `earned` its row under the group rules
+/// alone (for the fringes), so the figure ignores the what-if filters.
+fn add_group_total(t: &mut Breakdown, full: &RowTotals, earned: &RowTotals) -> Option<()> {
+    t.details_total = t.details_total.checked_add(full.total)?;
+    t.fringe_total = t.fringe_total.checked_add(earned.fringe_total)?;
+    Some(())
 }
 
 pub(crate) fn breakdowns(
     ctx: &Ctx,
     active: &[CategoryTotals],
     full: &FullRows,
+    earned: Option<&FullRows>,
 ) -> Result<Breakdowns, CalcError> {
     let ovf = || overflow("breakdown totals");
     let mut fringes: BTreeMap<String, FringeSummary> = ctx
@@ -63,7 +97,8 @@ pub(crate) fn breakdowns(
     let mut sets: BTreeMap<String, Breakdown> = BTreeMap::new();
     let mut locations: BTreeMap<String, Breakdown> = BTreeMap::new();
 
-    for (d, a, f) in rows(ctx.b, active, full) {
+    for r in rows(ctx.b, active, full, earned) {
+        let (d, a) = (r.d, r.active);
         if !d.kind.is_costed() {
             continue;
         }
@@ -78,7 +113,7 @@ pub(crate) fn breakdowns(
         }
         for g in &d.groups {
             if let Some(t) = groups.get_mut(g) {
-                add(&mut t.full, f).ok_or_else(ovf)?;
+                add_group_total(&mut t.full, r.full, r.earned).ok_or_else(ovf)?;
                 add(&mut t.active, a).ok_or_else(ovf)?;
             }
         }

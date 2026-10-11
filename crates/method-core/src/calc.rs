@@ -423,6 +423,29 @@ fn eval_full(
     Ok(out)
 }
 
+/// The rows a group's total takes its fringes from (decisions.md, entry 58):
+/// the group rules apply but not the recalc options' what-if filters, so a
+/// suppressed line earns no fringes and the figure doesn't move with the
+/// filters. `None` when there are no filters: the counted rows are those
+/// rows. `ctx` is any context for the budget (its globals are reused).
+pub(crate) fn eval_earned(
+    ctx: &Ctx,
+    active: &[CategoryTotals],
+) -> Result<Option<FullRows>, CalcError> {
+    if ctx.opts.exclude_groups.is_empty() && ctx.opts.only_groups.is_none() {
+        return Ok(None);
+    }
+    let plain = RecalcOptions::default();
+    let earned_ctx = Ctx {
+        b: ctx.b,
+        arith: ctx.arith,
+        globals: ctx.globals.clone(),
+        opts: &plain,
+        unfiltered: false,
+    };
+    eval_full(&earned_ctx, active, None).map(Some)
+}
+
 /// What `b`'s totals (`r`, from recalculating it) leave out or count in a
 /// way worth a look, in plain words: fringes of categories after the last
 /// production total under production-level posting, which no level holds
@@ -468,7 +491,8 @@ fn recalc_with(
         ..ctx
     };
     let full = eval_full(&full_ctx, &ts.categories, cache)?;
-    let bd = breakdown::breakdowns(&full_ctx, &ts.categories, &full)?;
+    let earned = eval_earned(&full_ctx, &ts.categories)?;
+    let bd = breakdown::breakdowns(&full_ctx, &ts.categories, &full, earned.as_ref())?;
 
     Ok(Report {
         base_currency: b.base_currency.clone(),

@@ -67,9 +67,9 @@ recommendation stands as the default until the owner says otherwise.
    fringes (14, 24). We hardcode the reference's defaults. Options: keep hardcoded; add the
    three settings. **Recommend: keep hardcoded** until an imported budget turns up with a
    non-default setting; the format can take it later without breaking files.
-4. **Group "full" total.** Ours is "as if nothing were suppressed"; the reference's total
-   shrinks with suppressed lines' fringes (14). **Recommend: keep ours, label it "if
-   counted"**. Display only, no math change.
+4. **Group "full" total.** **Decided 2026-10-11 (D58)**: matched to the reference, every
+   tagged line at its base plus only the fringes earned (a suppressed line adds its base
+   alone).
 5. **Suppressed lines in detail subtotal rows.** Ours count them as 0 everywhere. One
    tutorial frame suggests the reference's detail subtotal and total rows still showed them
    (14, unverified). **Recommend: keep ours** unless the 2026 check (Engine check 2) shows
@@ -245,7 +245,7 @@ Semantic questions only a licensed copy can settle. Most are covered by the expo
 | 9 | Line with one "out" group and one "in" group | out | Export test Option B lens; or tag one line with both and read its total | yes |
 | 10 | Do suppressed lines inside a range still count toward the cutoff? | no | Bracket three lines that cross a cutoff, suppress the middle one, read the fringe on the other two | no |
 | 11 | Where does rounding happen? | once per line, half away from zero (D1, D2) | Export test Polish line (1,296.315): 1,296.32 or 1,296.31 | yes |
-| 12 | Group "total" column after suppression | ours is "as if counted" | Open the groups setup in 2026 and read total vs active total for a suppressed group | no |
+| 12 | Group "total" column after suppression | **Answered 2026-10-11 (D58)**: base of every tagged line plus only the fringes earned (ZOFF 5,000.00 total, 0.00 active). Built | Open the groups setup in 2026 and read total vs active total for a suppressed group | yes |
 | 13 | Does a global's unit do anything? | not modeled | Give a global the unit "week", type it into a line's Amt, see whether the line's unit fills in | no |
 | 14 | 2026 new-line and preference defaults | none yet | Screenshot budget preferences in a fresh blank budget (ETP step 1 does this) | yes |
 | 15 | Fringe percent shown on a suppressed line | the counted value | Turn on the Agg column, suppress a fringed line, read its Agg | no |

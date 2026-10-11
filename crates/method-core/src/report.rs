@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use crate::decimal::{Dec, Exact};
-use crate::model::{RowId, RowKind};
+use crate::model::{GroupRules, Inclusion, RowId, RowKind};
 use crate::Cents;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -167,8 +167,35 @@ pub struct Breakdown {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct GroupTotals {
-    /// Every tagged line, as if nothing were suppressed or filtered.
+    /// The group's total, as Movie Magic shows it (decisions.md, entry 58):
+    /// every tagged line at its base, suppressed ones included, and only the
+    /// fringes the lines earn (a suppressed line earns none). The what-if
+    /// filters don't change it.
     pub full: Breakdown,
     /// Only tagged lines that count toward the budget.
     pub active: Breakdown,
+}
+
+impl Breakdown {
+    /// Lines and fringes as a group's dollars show them: without the fringes
+    /// when the group rule `fringes_in_totals` is Exclude (display only;
+    /// decisions.md, entry 57). `None` on overflow.
+    pub fn group_shown(&self, rules: &GroupRules) -> Option<Cents> {
+        match rules.fringes_in_totals {
+            Inclusion::Include => self.details_total.checked_add(self.fringe_total),
+            Inclusion::Exclude => Some(self.details_total),
+        }
+    }
+}
+
+impl GroupTotals {
+    /// The group's total and active total as group lists, setup tables and
+    /// reports show them, by the group rules (see [`Breakdown::group_shown`]).
+    /// `None` on overflow.
+    pub fn shown(&self, rules: &GroupRules) -> Option<(Cents, Cents)> {
+        Some((
+            self.full.group_shown(rules)?,
+            self.active.group_shown(rules)?,
+        ))
+    }
 }

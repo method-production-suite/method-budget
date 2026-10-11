@@ -174,7 +174,27 @@ pub(crate) fn recalc(b: &Budget, opts: &RecalcOptions) -> Result<Report, CalcErr
         .into_iter()
         .map(|c| c.accounts.into_iter().map(|a| Some(a.rows)).collect())
         .collect();
-    let bd = breakdown::breakdowns(&full_ctx, &ts.categories, &full)?;
+    // Rows under the group rules alone, for the fringes in group totals.
+    let plain = RecalcOptions::default();
+    let earned_ctx = Ctx {
+        b: full_ctx.b,
+        arith: full_ctx.arith,
+        globals: full_ctx.globals.clone(),
+        opts: &plain,
+        unfiltered: false,
+    };
+    let earned: Option<Vec<Vec<Option<Vec<RowTotals>>>>> =
+        if opts.exclude_groups.is_empty() && opts.only_groups.is_none() {
+            None
+        } else {
+            Some(
+                eval_categories(&earned_ctx)?
+                    .into_iter()
+                    .map(|c| c.accounts.into_iter().map(|a| Some(a.rows)).collect())
+                    .collect(),
+            )
+        };
+    let bd = breakdown::breakdowns(&full_ctx, &ts.categories, &full, earned.as_ref())?;
     Ok(Report {
         base_currency: b.base_currency.clone(),
         totals_currency: b

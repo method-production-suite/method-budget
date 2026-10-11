@@ -65,13 +65,8 @@ fn dollars(b: &Budget, report: &Report, kind: SetupKind, name: &str) -> Option<C
         SetupKind::Group => {
             let g = report.groups.get(name)?;
             let counted = b.groups.get(name).is_none_or(|d| d.in_budget_total);
-            let bd = if counted { &g.active } else { &g.full };
-            // The group rule "fringes in group totals" (decisions.md,
-            // entry 57): display only.
-            match b.group_rules.fringes_in_totals {
-                method_core::Inclusion::Include => both(bd),
-                method_core::Inclusion::Exclude => Some(bd.details_total),
-            }
+            let (total, active) = g.shown(&b.group_rules)?;
+            Some(if counted { active } else { total })
         }
         SetupKind::Set => report.sets.get(name).map_or(Some(0), both),
         SetupKind::Location => report.locations.get(name).map_or(Some(0), both),

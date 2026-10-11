@@ -366,7 +366,8 @@ Currency, Globals and Units). Each item shows how many lines use it across the b
 a link: a click shows the Find tab searching for its uses (a global: its lines' formulas).
 The lists with dollars show the item's total across the budget beside it (a fringe: its
 fringe dollars; a group, set or location: its lines' totals with fringes, a group out of
-the total counted as if it were in; a currency: its lines' totals in the base currency);
+the total: its lines at their base, with only the fringes they earn, as Movie Magic
+shows it (decisions.md, entry 58); a currency: its lines' totals in the base currency);
 globals and units show the count only. The tooltip on a count also says when other setup
 uses the item (a global used by another global or a fringe rate, a unit by a flat fringe,
 a group by a credit or a charge). **Show** (All, Used or Unused) narrows the list; used

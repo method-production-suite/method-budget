@@ -776,6 +776,7 @@ fn list_setup(ctx: &mut Ctx, a: &Args) -> ToolResult {
                     "active_total_cents": t.map(|t| t.active.details_total),
                     "active_fringes_cents": t.map(|t| t.active.fringe_total),
                     "full_total_cents": t.map(|t| t.full.details_total),
+                    "full_fringes_cents": t.map(|t| t.full.fringe_total),
                 }));
             }
         }

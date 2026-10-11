@@ -1566,3 +1566,73 @@ fn group_rules_switch_cleanly() {
         assert_eq!(Inclusion::parse(i.name()), Some(i));
     }
 }
+
+/// A group's total and active total, lines plus fringes.
+fn group_figures(r: &Report, name: &str) -> (Cents, Cents) {
+    r.groups[name].shown(&GroupRules::default()).unwrap()
+}
+
+/// A group's total is Movie Magic's (decisions.md, entry 58): every tagged
+/// line at its base, suppressed ones included, plus only the fringes
+/// actually earned. ZTEST07: ZOFF 5,000.00 total (Out 2,000.00 earns no
+/// fringe while suppressed) and 0.00 active; ZIN 8,500.00 and 5,500.00;
+/// ZIN2 5,000.00 and 5,000.00. With ZOFF on: 5,200.00 and 5,200.00.
+#[test]
+fn ztest07_group_totals_count_only_earned_fringes() {
+    for arith in Arithmetic::ALL {
+        let mut b = ztest07(arith);
+        let (_, r) = totals(&b);
+        assert_eq!(group_figures(&r, "ZOFF"), (500_000, 0), "{arith:?}");
+        assert_eq!(group_figures(&r, "ZIN"), (850_000, 550_000), "{arith:?}");
+        assert_eq!(group_figures(&r, "ZIN2"), (500_000, 500_000), "{arith:?}");
+        assert_eq!(r.groups["ZOFF"].full.fringe_total, 0);
+
+        // The what-if filters don't move a group's total.
+        let filtered = recalc(
+            &b,
+            &RecalcOptions {
+                exclude_groups: set(&["ZIN2"]),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let only = recalc(
+            &b,
+            &RecalcOptions {
+                only_groups: Some(set(&["ZIN2"])),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        for g in ["ZIN", "ZIN2", "ZOFF"] {
+            assert_eq!(filtered.groups[g].full, r.groups[g].full, "{g} {arith:?}");
+            assert_eq!(only.groups[g].full, r.groups[g].full, "{g} {arith:?}");
+        }
+
+        // "Fringes in group totals" Exclude: lines alone.
+        let rules = GroupRules {
+            fringes_in_totals: Inclusion::Exclude,
+            ..GroupRules::default()
+        };
+        assert_eq!(r.groups["ZIN"].shown(&rules), Some((800_000, 500_000)));
+
+        b.groups.insert("ZOFF".into(), group(true));
+        let (_, on) = totals(&b);
+        assert_eq!(group_figures(&on, "ZOFF"), (520_000, 520_000), "{arith:?}");
+    }
+}
+
+/// ZTEST10: ZCRED's total is 6,500.00 (Grip days 4,000.00 with 500.00 of
+/// fringes, Suppressed grip 2,000.00 at its base alone), active 4,500.00;
+/// ZOFF 2,000.00 and 0.00, whatever the posting.
+#[test]
+fn ztest10_group_totals_count_only_earned_fringes() {
+    for arith in Arithmetic::ALL {
+        for posting in postings() {
+            let (_, r) = totals(&ztest10(arith, posting.clone()));
+            let at = format!("{arith:?} {posting:?}");
+            assert_eq!(group_figures(&r, "ZCRED"), (650_000, 450_000), "{at}");
+            assert_eq!(group_figures(&r, "ZOFF"), (200_000, 0), "{at}");
+        }
+    }
+}

@@ -220,7 +220,9 @@ using it), `other_uses`.
 
 **`list_setup`** `{path, type}`: one table (`fringe`, `group`, `set`, `location`, `unit`,
 `currency`) with every field and its use (`lines`, `other_uses`) and money where it means
-something (a fringe's `total_cents`, a group's active and full totals, a set's or location's
+something (a fringe's `total_cents`, a group's active and full totals: `active_total_cents`, `active_fringes_cents`,
+`full_total_cents` (lines, suppressed ones at their base) and `full_fringes_cents` (only the
+fringes earned; decisions.md, entry 58), a set's or location's
 totals). A percent fringe has `cutoff_cents`; a flat fringe has `unit`, `basis` and
 `max_hours_per_day` (a decimal string or null), and `unused_cutoff_cents` when it keeps a
 cutoff it never uses. The base currency is listed first with `base: true`.
