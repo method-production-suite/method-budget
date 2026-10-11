@@ -488,7 +488,10 @@ their fringes unless fringes post by budget), the typed amounts, categories and 
 and the total left out (each line once). While a percent, a flat amount or a left-out amount
 is being typed, the charge's total in its heading is figured from the typed text before
 Enter commits it (`preview_charge`, about a tenth of a second after the last key); a value
-that isn't a number yet dims the old total. **Credits**: each row shows its spend, the
+that isn't a number yet dims the old total. **Credits**: a row's **Spend** is an amount
+typed in, a group's lines or a topsheet category ("Category: 2100 Electric": the
+category's total with the fringes its lines earn, wherever fringes post; decisions.md,
+entry 57), and a group or category row can leave fringes out. Each row shows its spend, the
 fringes left out of it, the net spend the percent applies to, the credit (rounded for
 display; its tooltip has the exact figure, since rows add up before rounding), and with a
 cap, how far the row is under or over it (spend for a cap on the spend, credit for a cap on
@@ -572,7 +575,12 @@ currency's rate and symbol) with its line count (a click shows them in the tools
 Find tab) and its dollars across the budget; double-click, Enter or F2 edits an item in
 its form, Delete deletes it, the row at the bottom adds one, and the right-click menu
 renames it everywhere, sets a short code or saves it to the library. The fringe table ends
-with the budget's percent and flat fringe dollars. Globals and Units are their full tables
+with the budget's percent and flat fringe dollars. The group table ends with the **Group
+rules** (decisions.md, entry 57), each Include or Exclude for the whole budget: **Lines
+with no group** (Exclude leaves out every line and adjustment row that has no group),
+**Lines in a counted and an uncounted group** (Exclude, the default, leaves them out) and
+**Fringes in group totals** (display only: the group dollars in the tables and the
+printed Groups section with or without their fringes). Globals and Units are their full tables
 (a global's details included); Charges, Credits, Info, Settings (renumbering accounts
 included) and Baseline are the forms the tools panel's Budget tab used to hold. When the
 window is at least 860 pixels wide, the setup library sits beside each table, on that
@@ -648,6 +656,11 @@ The setup lists' counts, order and short codes, in `src/setup_lists.rs` (both wi
 | `set_setup_order` | `kind` (`fringe` or `fringes`, and so on), `names` (first to last; names the table doesn't have are skipped, the rest follow in name order) | View |
 | `move_setup_item` | `kind`, `name`, `by` (negative is up) | View (quick repeats on one item are one undo step) |
 | `set_short_code` | `kind` (`fringe` or `group`), `name`, `code` (blank clears) | View |
+
+The group rules are one command, `set_group_rule` (`rule`: `ungrouped_lines`, `conflict`
+or `fringes_in_totals`; `value`: `include` or `exclude`; returns the View), one undo
+step each. `set_credit`'s rows take a `source` of `{kind: "category", category,
+excluded_fringes}` besides `flat` and `group`.
 
 `delete_unit` and `delete_currency` take `clearLines` (default false): blank the unit on
 the lines that name it, or put the currency's lines back in the base currency, before

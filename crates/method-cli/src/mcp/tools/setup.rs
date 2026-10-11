@@ -174,18 +174,20 @@ pub fn tools() -> Vec<Tool> {
             name: "set_credit",
             title: "Add or change a credit",
             description: "Adds a credit (an incentive, by name) or changes the one with that name: \
-                rows that each take a percent of a flat amount or of a group's lines (less \
-                excluded fringes), with caps, an overall cap and a discount. rows replaces every \
+                rows that each take a percent of a flat amount, of a group's lines or of a \
+                topsheet category's total, with their fringes (less excluded fringes), with \
+                caps, an overall cap and a discount. rows replaces every \
                 row when given. New credits are applied unless applied is false.",
             mutating: true,
             destructive: false,
             schema: || {
                 let source = object(
                     vec![
-                        ("kind", s::one_of("flat or group.", &["flat", "group"])),
+                        ("kind", s::one_of("flat, group or category.", &["flat", "group", "category"])),
                         ("amount", money_schema("flat: the gross amount.")),
                         ("group", s::name("group: the group whose lines count.")),
-                        ("excluded_fringes", s::array("group: fringes not counted.", s::name("A fringe."), 100)),
+                        ("category", s::name("category: the topsheet category whose total counts, with its fringes.")),
+                        ("excluded_fringes", s::array("group and category: fringes not counted.", s::name("A fringe."), 100)),
                     ],
                     &["kind"],
                 );
@@ -1057,10 +1059,7 @@ fn delete_item(
             }
             for c in &mut b.credits {
                 for r in &mut c.rows {
-                    if let CreditSource::Group {
-                        excluded_fringes, ..
-                    } = &mut r.source
-                    {
+                    if let Some(excluded_fringes) = r.source.excluded_fringes_mut() {
                         excluded_fringes.remove(name);
                     }
                 }
@@ -1409,32 +1408,49 @@ fn set_credit(ctx: &mut Ctx, a: &Args) -> ToolResult {
             for (i, r) in a.list("rows").iter().enumerate() {
                 let n = i + 1;
                 let src = r.get("source").cloned().unwrap_or(Value::Null);
+                let excluded = || -> Result<BTreeSet<String>, ToolError> {
+                    let ex: Vec<String> = src
+                        .get("excluded_fringes")
+                        .and_then(Value::as_array)
+                        .map(|l| {
+                            l.iter()
+                                .filter_map(|x| x.as_str().map(str::to_string))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    let known: BTreeSet<String> = b.fringes.keys().cloned().collect();
+                    picked(&ex, &known, None, "fringe")
+                };
+                let text = |key: &str| {
+                    src.get(key)
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .trim()
+                        .to_string()
+                };
                 let source = match src.get("kind").and_then(Value::as_str) {
                     Some("group") => {
-                        let g = src
-                            .get("group")
-                            .and_then(Value::as_str)
-                            .unwrap_or("")
-                            .trim()
-                            .to_string();
+                        let g = text("group");
                         if !b.groups.contains_key(&g) {
                             return Err(ToolError::not_found(format!(
                                 "row {n}: there is no group `{g}`"
                             )));
                         }
-                        let ex: Vec<String> = src
-                            .get("excluded_fringes")
-                            .and_then(Value::as_array)
-                            .map(|l| {
-                                l.iter()
-                                    .filter_map(|x| x.as_str().map(str::to_string))
-                                    .collect()
-                            })
-                            .unwrap_or_default();
-                        let known: BTreeSet<String> = b.fringes.keys().cloned().collect();
                         CreditSource::Group {
                             group: g,
-                            excluded_fringes: picked(&ex, &known, None, "fringe")?,
+                            excluded_fringes: excluded()?,
+                        }
+                    }
+                    Some("category") => {
+                        let c = text("category");
+                        if !b.categories().any(|cat| cat.code == c) {
+                            return Err(ToolError::not_found(format!(
+                                "row {n}: there is no category `{c}`"
+                            )));
+                        }
+                        CreditSource::Category {
+                            category: c,
+                            excluded_fringes: excluded()?,
                         }
                     }
                     _ => {

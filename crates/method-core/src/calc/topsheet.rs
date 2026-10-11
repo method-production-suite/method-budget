@@ -185,6 +185,26 @@ pub(crate) fn trailing_fringes_warning(b: &Budget, r: &Report) -> Option<String>
     ))
 }
 
+/// Credit rows on a category the budget doesn't have, which count as 0
+/// (decisions.md, entry 57): one warning each.
+pub(crate) fn credit_category_warnings(b: &Budget) -> Vec<String> {
+    let mut out = Vec::new();
+    for c in &b.credits {
+        for (i, row) in c.rows.iter().enumerate() {
+            if let CreditSource::Category { category, .. } = &row.source {
+                if !b.categories().any(|cat| cat.code == *category) {
+                    out.push(format!(
+                        "credit {} row {} is on category {category}, which is not in the budget, so its spend is 0",
+                        c.name,
+                        i + 1
+                    ));
+                }
+            }
+        }
+    }
+    out
+}
+
 /// One level per production-total row, plus a trailing unnamed level when
 /// categories follow the last one. Also returns how many levels were closed by
 /// a real production total. `None` on overflow.
@@ -384,6 +404,30 @@ fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals
                         .and_then(|g| g.checked_add(l.row.fringe_total))
                         .ok_or_else(row_ovf)?;
                     for (name, amt) in &l.row.fringes {
+                        if excluded_fringes.contains(name) {
+                            ex = ex.checked_add(*amt).ok_or_else(row_ovf)?;
+                        }
+                    }
+                }
+                (gross, ex)
+            }
+            CreditSource::Category {
+                category,
+                excluded_fringes,
+            } => {
+                // The category's total with its own fringes, wherever
+                // fringes post, as Movie Magic counts a category row
+                // (decisions.md, entry 57). One that isn't in the budget
+                // is 0 (`warnings` says so).
+                let mut gross: Cents = 0;
+                let mut ex: Cents = 0;
+                if let Some(cat) = cats.iter().find(|c| c.code == *category) {
+                    gross = cat
+                        .details_total
+                        .checked_add(cat.fringe_total)
+                        .ok_or_else(row_ovf)?;
+                    let rows = cat.accounts.iter().flat_map(|a| &a.rows);
+                    for (name, amt) in rows.flat_map(|r| &r.fringes) {
                         if excluded_fringes.contains(name) {
                             ex = ex.checked_add(*amt).ok_or_else(row_ovf)?;
                         }

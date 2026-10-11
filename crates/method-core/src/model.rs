@@ -83,6 +83,9 @@ pub struct Budget {
     /// What a line inserted in the editor copies from its neighbor.
     pub new_line_defaults: NewLineDefaults,
     pub groups: BTreeMap<String, Group>,
+    /// Which lines groups leave in or out of the totals, budget-wide
+    /// (decisions.md, entry 57).
+    pub group_rules: GroupRules,
     pub sets: BTreeMap<String, SetDef>,
     pub locations: BTreeMap<String, Location>,
     /// Categories and production-total rows, in display order.
@@ -155,6 +158,7 @@ impl Budget {
             account_coding: AccountCoding::default(),
             new_line_defaults: NewLineDefaults::default(),
             groups: BTreeMap::new(),
+            group_rules: GroupRules::default(),
             sets: BTreeMap::new(),
             locations: BTreeMap::new(),
             topsheet: Vec::new(),
@@ -425,6 +429,89 @@ impl Arithmetic {
             }
         }
     }
+}
+
+/// Include or exclude: the two choices of each of Movie Magic's group rules
+/// ([`GroupRules`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Inclusion {
+    Include,
+    Exclude,
+}
+
+impl Inclusion {
+    pub const ALL: [Inclusion; 2] = [Inclusion::Include, Inclusion::Exclude];
+
+    /// The name files and commands use: `include` or `exclude`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Inclusion::Include => "include",
+            Inclusion::Exclude => "exclude",
+        }
+    }
+
+    /// The choice named `name` (as [`Inclusion::name`] writes it).
+    pub fn parse(name: &str) -> Option<Inclusion> {
+        Inclusion::ALL.into_iter().find(|i| i.name() == name.trim())
+    }
+}
+
+/// The budget-wide group rules, as Movie Magic Budgeting has them
+/// (decisions.md, entry 57). A budget setting, saved with the file; versions
+/// carry it. The defaults are Movie Magic's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct GroupRules {
+    /// Lines with no group: counted (the default) or left out. Left out
+    /// takes adjustment rows with no group along with them.
+    pub ungrouped_lines: Inclusion,
+    /// A line in a counted group and in a group whose "in budget total" is
+    /// off: left out (the default) or counted.
+    pub conflict: Inclusion,
+    /// Group totals shown with their lines' fringes (the default) or
+    /// without. Display only: never changes a budget total.
+    pub fringes_in_totals: Inclusion,
+}
+
+impl Default for GroupRules {
+    fn default() -> GroupRules {
+        GroupRules {
+            ungrouped_lines: Inclusion::Include,
+            conflict: Inclusion::Exclude,
+            fringes_in_totals: Inclusion::Include,
+        }
+    }
+}
+
+impl GroupRules {
+    /// Whether a line (or adjustment row) counts toward totals under these
+    /// rules, given whether each of its groups is in the budget total
+    /// (`counted`, one per group): `Err` says why it doesn't.
+    pub fn counts(&self, counted: impl IntoIterator<Item = bool>) -> Result<(), LeftOut> {
+        let (mut on, mut off) = (0usize, 0usize);
+        for c in counted {
+            if c {
+                on += 1;
+            } else {
+                off += 1;
+            }
+        }
+        match (on, off) {
+            (0, 0) if self.ungrouped_lines == Inclusion::Exclude => Err(LeftOut::Ungrouped),
+            (_, 0) => Ok(()),
+            (1.., _) if self.conflict == Inclusion::Include => Ok(()),
+            _ => Err(LeftOut::GroupOff),
+        }
+    }
+}
+
+/// Why the group rules leave a line out ([`GroupRules::counts`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LeftOut {
+    /// It has no group, and lines with no group are excluded.
+    Ungrouped,
+    /// A group of its has "in budget total" off (and conflicts are
+    /// excluded, when it also has a counted group).
+    GroupOff,
 }
 
 /// Which tags a new line copies from the nearest line above it (below it when
@@ -832,6 +919,42 @@ pub enum CreditSource {
         group: String,
         excluded_fringes: BTreeSet<String>,
     },
+    /// The total of topsheet category `category` (its counted lines and
+    /// adjustment rows), plus their fringes wherever fringes post, except
+    /// `excluded_fringes` (decisions.md, entry 57). A category that isn't
+    /// in the budget is 0.
+    Category {
+        category: String,
+        excluded_fringes: BTreeSet<String>,
+    },
+}
+
+impl CreditSource {
+    /// The fringes left out of the row's spend (none for a typed amount).
+    pub fn excluded_fringes(&self) -> Option<&BTreeSet<String>> {
+        match self {
+            CreditSource::Flat(_) => None,
+            CreditSource::Group {
+                excluded_fringes, ..
+            }
+            | CreditSource::Category {
+                excluded_fringes, ..
+            } => Some(excluded_fringes),
+        }
+    }
+
+    /// [`CreditSource::excluded_fringes`], to change.
+    pub fn excluded_fringes_mut(&mut self) -> Option<&mut BTreeSet<String>> {
+        match self {
+            CreditSource::Flat(_) => None,
+            CreditSource::Group {
+                excluded_fringes, ..
+            }
+            | CreditSource::Category {
+                excluded_fringes, ..
+            } => Some(excluded_fringes),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -951,6 +1074,7 @@ pub struct BudgetSnapshot {
     pub account_coding: AccountCoding,
     pub new_line_defaults: NewLineDefaults,
     pub groups: BTreeMap<String, Group>,
+    pub group_rules: GroupRules,
     pub sets: BTreeMap<String, SetDef>,
     pub locations: BTreeMap<String, Location>,
     pub topsheet: Vec<TopsheetRow>,
@@ -979,6 +1103,7 @@ impl Budget {
             account_coding,
             new_line_defaults,
             groups,
+            group_rules,
             sets,
             locations,
             topsheet,
@@ -1014,6 +1139,7 @@ impl Budget {
             account_coding: *account_coding,
             new_line_defaults: *new_line_defaults,
             groups: groups.clone(),
+            group_rules: *group_rules,
             sets: sets.clone(),
             locations: locations.clone(),
             topsheet: topsheet.clone(),
@@ -1042,6 +1168,7 @@ impl Budget {
             account_coding,
             new_line_defaults,
             groups,
+            group_rules,
             sets,
             locations,
             topsheet,
@@ -1077,6 +1204,7 @@ impl Budget {
             account_coding,
             new_line_defaults,
             groups,
+            group_rules,
             sets,
             locations,
             topsheet,
@@ -1150,6 +1278,7 @@ impl BudgetSnapshot {
             account_coding,
             new_line_defaults,
             groups,
+            group_rules,
             sets,
             locations,
             topsheet,
@@ -1173,6 +1302,7 @@ impl BudgetSnapshot {
             account_coding,
             new_line_defaults,
             groups,
+            group_rules,
             sets,
             locations,
             topsheet,

@@ -6,7 +6,8 @@
 //!   other setup that refers to it, and its dollars where that means
 //!   something (fringes: the fringe dollars; groups, sets and locations:
 //!   their lines' totals with fringes, a group out of the total counted as
-//!   if it were in; currencies: their lines' totals in the base currency).
+//!   if it were in, and a group without fringes when the group rule says
+//!   so; currencies: their lines' totals in the base currency).
 //!   Fetched by the panel when the budget changes, not sent with every view.
 //! - [`set_setup_order`] and [`move_setup_item`]: a table's order, saved in
 //!   the file (`method_core::order`). Moving by key joins quick repeats into
@@ -64,7 +65,13 @@ fn dollars(b: &Budget, report: &Report, kind: SetupKind, name: &str) -> Option<C
         SetupKind::Group => {
             let g = report.groups.get(name)?;
             let counted = b.groups.get(name).is_none_or(|d| d.in_budget_total);
-            both(if counted { &g.active } else { &g.full })
+            let bd = if counted { &g.active } else { &g.full };
+            // The group rule "fringes in group totals" (decisions.md,
+            // entry 57): display only.
+            match b.group_rules.fringes_in_totals {
+                method_core::Inclusion::Include => both(bd),
+                method_core::Inclusion::Exclude => Some(bd.details_total),
+            }
         }
         SetupKind::Set => report.sets.get(name).map_or(Some(0), both),
         SetupKind::Location => report.locations.get(name).map_or(Some(0), both),

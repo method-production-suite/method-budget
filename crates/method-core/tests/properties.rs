@@ -225,6 +225,13 @@ fn gen_budget(rng: &mut Rng) -> Budget {
     if rng.below(2) == 0 {
         b.arithmetic = Arithmetic::Exact;
     }
+    // Sometimes Movie Magic's other group rules (decisions.md, entry 57).
+    if rng.chance(20) {
+        b.group_rules.ungrouped_lines = Inclusion::Exclude;
+    }
+    if rng.chance(20) {
+        b.group_rules.conflict = Inclusion::Include;
+    }
     b
 }
 
@@ -399,6 +406,9 @@ fn excluding_a_group_equals_deleting_its_lines() {
 fn suppressed_group_equals_excluding_it() {
     for seed in 1..=CASES {
         let mut b = gen_budget(&mut Rng(seed));
+        // Excluding a group leaves out a line it shares with a counted one;
+        // suppressing it does only while conflicts are excluded.
+        b.group_rules.conflict = Inclusion::Exclude;
         b.groups.insert("OFF".into(), group(true));
         let opts = RecalcOptions {
             exclude_groups: set(&["OFF"]),
@@ -409,6 +419,57 @@ fn suppressed_group_equals_excluding_it() {
         let suppressed = recalc(&b, &RecalcOptions::default()).unwrap();
         assert_eq!(excluded.categories, suppressed.categories, "seed {seed}");
         assert_eq!(excluded.net_total, suppressed.net_total, "seed {seed}");
+    }
+}
+
+/// Leaving out lines with no group (decisions.md, entry 57) gives the same
+/// totals as deleting them and the adjustment rows with no group.
+#[test]
+fn excluding_lines_with_no_group_equals_deleting_them() {
+    for seed in 1..=CASES {
+        let mut b = gen_budget(&mut Rng(seed));
+        b.group_rules.ungrouped_lines = Inclusion::Exclude;
+        let ruled = recalc(&b, &RecalcOptions::default()).unwrap();
+        check_rollups(&b, &ruled, seed);
+
+        let mut pruned = b.clone();
+        pruned.group_rules.ungrouped_lines = Inclusion::Include;
+        for acct in pruned.categories_mut().flat_map(|c| &mut c.accounts) {
+            acct.details
+                .retain(|d| !d.kind.is_costed() || !d.groups.is_empty());
+        }
+        let direct = recalc(&pruned, &RecalcOptions::default()).unwrap();
+        assert_eq!(ruled.atl_btl, direct.atl_btl, "seed {seed}");
+        assert_eq!(ruled.grand_total, direct.grand_total, "seed {seed}");
+        assert_eq!(ruled.charges, direct.charges, "seed {seed}");
+        assert_eq!(ruled.net_total, direct.net_total, "seed {seed}");
+    }
+}
+
+/// Counting conflicts (decisions.md, entry 57) gives the same totals as
+/// taking the uncounted group off every line that also has a counted one.
+#[test]
+fn including_conflicts_equals_untagging_the_uncounted_group() {
+    for seed in 1..=CASES {
+        let mut b = gen_budget(&mut Rng(seed));
+        b.group_rules.conflict = Inclusion::Include;
+        let ruled = recalc(&b, &RecalcOptions::default()).unwrap();
+        check_rollups(&b, &ruled, seed);
+
+        let mut untagged = b.clone();
+        untagged.group_rules.conflict = Inclusion::Exclude;
+        for d in untagged
+            .categories_mut()
+            .flat_map(|c| &mut c.accounts)
+            .flat_map(|a| &mut a.details)
+        {
+            if d.groups.len() > 1 && d.groups.iter().any(|g| g != "OFF") {
+                d.groups.remove("OFF");
+            }
+        }
+        let direct = recalc(&untagged, &RecalcOptions::default()).unwrap();
+        assert_eq!(ruled.categories, direct.categories, "seed {seed}");
+        assert_eq!(ruled.net_total, direct.net_total, "seed {seed}");
     }
 }
 

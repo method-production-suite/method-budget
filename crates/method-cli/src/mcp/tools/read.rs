@@ -880,6 +880,9 @@ fn list_charges(ctx: &mut Ctx, a: &Args) -> ToolResult {
                         CreditSource::Group { group, excluded_fringes } => {
                             json!({"kind": "group", "group": group, "excluded_fringes": excluded_fringes})
                         }
+                        CreditSource::Category { category, excluded_fringes } => {
+                            json!({"kind": "category", "category": category, "excluded_fringes": excluded_fringes})
+                        }
                     };
                     let cap = match row.cap {
                         CreditCap::None => json!({"kind": "none"}),

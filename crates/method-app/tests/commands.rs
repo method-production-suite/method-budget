@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use method_app::edit::{self, CurrencyInput, FringeInput, GroupInput, UnitInput};
 use method_app::view::Focus;
 use method_app::Session;
-use method_core::{Budget, RowId};
+use method_core::{Budget, Inclusion, RowId};
 use serde_json::Value;
 
 /// Everything, every row (the full view the printed report uses).
@@ -910,6 +910,54 @@ fn credits_reduce_the_net_total() {
     assert_eq!(net(&view(&mut s)), grand(&v0));
 }
 
+/// A credit row on a topsheet category counts the category with its
+/// fringes (decisions.md, entry 57), and the group rules are one command
+/// each.
+#[test]
+fn category_credit_rows_and_group_rules() {
+    let mut s = Session::new();
+    let v0 = view(&mut s);
+    let code = s.budget().categories().next().unwrap().code.clone();
+    let cat = &v0["report"]["categories"][0];
+    let want = cat["details_total"].as_i64().unwrap() + cat["fringe_total"].as_i64().unwrap();
+    let credit: edit::CreditInput = input(serde_json::json!({
+        "name": "Category", "rows": [
+            {"description": "First category", "source": {"kind": "category", "category": code},
+             "percent": "10", "cap": {"kind": "none"}}
+        ]
+    }));
+    one_step(&mut s, |b| edit::set_credit(b, None, &credit));
+    let v = view(&mut s);
+    assert_eq!(
+        v["budget"]["credits"][0]["rows"][0]["source"]["kind"],
+        "category"
+    );
+    assert_eq!(v["report"]["credits"][0]["rows"][0]["gross"], want);
+    assert_eq!(v["report"]["credits"][0]["amount"], (want + 5) / 10);
+
+    assert!(
+        v["budget"].get("group_rules").is_none(),
+        "default is left out"
+    );
+    one_step(&mut s, |b| {
+        edit::set_group_rule(b, "ungrouped_lines", "exclude")
+    });
+    let v = view(&mut s);
+    assert_eq!(v["budget"]["group_rules"]["ungrouped_lines"], "exclude");
+    assert_ne!(grand(&v), grand(&v0), "the starter's lines have no group");
+    one_step(&mut s, |b| {
+        edit::set_group_rule(b, "fringes_in_totals", "exclude")
+    });
+    one_step(&mut s, |b| edit::set_group_rule(b, "conflict", "include"));
+    refused(&mut s, |b| edit::set_group_rule(b, "conflict", "maybe"));
+    refused(&mut s, |b| edit::set_group_rule(b, "nope", "include"));
+    let r = s.budget().group_rules;
+    assert_eq!(
+        (r.ungrouped_lines, r.conflict, r.fringes_in_totals),
+        (Inclusion::Exclude, Inclusion::Include, Inclusion::Exclude)
+    );
+}
+
 #[test]
 fn bad_credits_are_refused_and_change_nothing() {
     let mut s = Session::new();
@@ -940,6 +988,12 @@ fn bad_credits_are_refused_and_change_nothing() {
         ),
         credit(
             serde_json::json!({"rows": [row(serde_json::json!({"kind": "group", "group": ""}), "5", none.clone())]}),
+        ),
+        credit(
+            serde_json::json!({"rows": [row(serde_json::json!({"kind": "category", "category": "Nope"}), "5", none.clone())]}),
+        ),
+        credit(
+            serde_json::json!({"rows": [row(serde_json::json!({"kind": "category", "category": " "}), "5", none.clone())]}),
         ),
         credit(
             serde_json::json!({"rows": [row(flat.clone(), "5", serde_json::json!({"kind": "qualified_spend", "amount": "-1"}))]}),

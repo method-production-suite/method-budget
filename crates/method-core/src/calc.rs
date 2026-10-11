@@ -159,22 +159,24 @@ impl<'a> Ctx<'a> {
             .collect()
     }
 
-    /// Whether a line counts toward totals: not suppressed by a group with
-    /// "in budget total" off, and allowed by the options.
+    /// Whether a line counts toward totals: not left out by the group rules
+    /// (a group with "in budget total" off, or no group when lines with no
+    /// group are excluded; decisions.md, entry 57), and allowed by the
+    /// options.
     pub fn includes(&self, d: &Detail, at: &dyn Fn() -> String) -> Result<bool, CalcError> {
-        let mut suppressed = false;
+        let mut counted = Vec::with_capacity(d.groups.len());
         for g in &d.groups {
             let group = self
                 .b
                 .groups
                 .get(g)
                 .ok_or_else(|| err(at(), ErrorKind::UnknownGroup(g.clone())))?;
-            suppressed |= !group.in_budget_total;
+            counted.push(group.in_budget_total);
         }
         if self.unfiltered {
             return Ok(true);
         }
-        if suppressed
+        if self.b.group_rules.counts(counted).is_err()
             || d.groups
                 .iter()
                 .any(|g| self.opts.exclude_groups.contains(g))
@@ -422,13 +424,15 @@ fn eval_full(
 }
 
 /// What `b`'s totals (`r`, from recalculating it) leave out or count in a
-/// way worth a look, in plain words: for now, fringes of categories after
-/// the last production total under production-level posting, which no
-/// level holds (decisions.md, entry 56). `method check` and the MCP
-/// `validate` tool list them; they never stop a recalc.
+/// way worth a look, in plain words: fringes of categories after the last
+/// production total under production-level posting, which no level holds
+/// (decisions.md, entry 56), and credit rows on a category the budget
+/// doesn't have (entry 57). `method check` and the MCP `validate` tool list
+/// them; they never stop a recalc.
 pub fn warnings(b: &Budget, r: &Report) -> Vec<String> {
     topsheet::trailing_fringes_warning(b, r)
         .into_iter()
+        .chain(topsheet::credit_category_warnings(b))
         .collect()
 }
 

@@ -161,7 +161,7 @@ const CHARGE: [Column; 9] = [
         &["excludeaccounts"],
     ),
 ];
-const CREDIT: [Column; 12] = [
+const CREDIT: [Column; 13] = [
     col("name", "Credit", &["name", "incentive"]),
     col("account", "Account", &["acct"]),
     col("applied", "Applied", &["on", "active"]),
@@ -169,6 +169,7 @@ const CREDIT: [Column; 12] = [
     col("discount", "Discount %", &["discount"]),
     col("row", "Row", &["rowdescription", "description"]),
     col("group", "Group", &["sourcegroup"]),
+    col("category", "Category", &["sourcecategory"]),
     col("amount", "Flat Amount", &["flat", "grossamount"]),
     col("percent", "Percent", &["rate", "creditpercent"]),
     col("row_cap_on", "Row Cap On", &["capon", "capkind"]),
@@ -473,19 +474,31 @@ pub fn sheet(b: &Budget, w: What) -> Sheet {
                 if c.rows.is_empty() {
                     let mut cells = Vec::new();
                     head(&mut cells);
-                    cells.extend(std::iter::repeat_n(Cell::Empty, 7));
+                    cells.extend(std::iter::repeat_n(Cell::Empty, 8));
                     push(&c.name, cells);
                 }
                 for r in &c.rows {
                     let mut cells = Vec::new();
                     head(&mut cells);
-                    let (group, amount, excluded) = match &r.source {
-                        CreditSource::Flat(a) => (Cell::Empty, Cell::Money(*a), Cell::Empty),
+                    let (group, category, amount, excluded) = match &r.source {
+                        CreditSource::Flat(a) => {
+                            (Cell::Empty, Cell::Empty, Cell::Money(*a), Cell::Empty)
+                        }
                         CreditSource::Group {
                             group,
                             excluded_fringes,
                         } => (
                             Cell::text(group.clone()),
+                            Cell::Empty,
+                            Cell::Empty,
+                            list(excluded_fringes),
+                        ),
+                        CreditSource::Category {
+                            category,
+                            excluded_fringes,
+                        } => (
+                            Cell::Empty,
+                            Cell::text(category.clone()),
                             Cell::Empty,
                             list(excluded_fringes),
                         ),
@@ -498,6 +511,7 @@ pub fn sheet(b: &Budget, w: What) -> Sheet {
                     cells.extend([
                         Cell::text(r.description.clone()),
                         group,
+                        category,
                         amount,
                         Cell::Number(r.percent),
                         on,
@@ -1043,6 +1057,7 @@ pub fn read(
                     let has_row = [
                         "row",
                         "group",
+                        "category",
                         "amount",
                         "percent",
                         "row_cap",
@@ -1069,21 +1084,28 @@ pub fn read(
                     };
                     if has_row {
                         let group = row.opt("group");
+                        let category = row.opt("category");
                         let amount = row.money("amount", "the flat amount")?;
-                        let source = match (group, amount) {
-                            (Some(_), Some(_)) => {
-                                return Err(
-                                    "a credit row takes a group or a flat amount, not both".into()
-                                )
-                            }
-                            (Some(g), None) => CreditSource::Group {
+                        let source = match (group, category, amount) {
+                            (Some(g), None, None) => CreditSource::Group {
                                 group: g,
                                 excluded_fringes: row.names("excluded_fringes"),
                             },
-                            (None, Some(a)) => CreditSource::Flat(a),
-                            (None, None) => {
-                                return Err("a credit row needs a group or a flat amount".into())
+                            (None, Some(c), None) => CreditSource::Category {
+                                category: c,
+                                excluded_fringes: row.names("excluded_fringes"),
+                            },
+                            (None, None, Some(a)) => CreditSource::Flat(a),
+                            (None, None, None) => {
+                                return Err(
+                                    "a credit row needs a group, a category or a flat amount"
+                                        .into(),
+                                )
                             }
+                            _ => return Err(
+                                "a credit row takes one of a group, a category or a flat amount"
+                                    .into(),
+                            ),
                         };
                         let percent = row
                             .number("percent", "the percent")?
@@ -1326,6 +1348,15 @@ mod tests {
                     description: "Other".into(),
                     source: CreditSource::Flat(1_000_000),
                     percent: Dec::from_int(20),
+                    cap: CreditCap::None,
+                },
+                CreditRow {
+                    description: "Electric".into(),
+                    source: CreditSource::Category {
+                        category: "10".into(),
+                        excluded_fringes: ["KIT".to_string()].into(),
+                    },
+                    percent: Dec::from_int(10),
                     cap: CreditCap::None,
                 },
             ],

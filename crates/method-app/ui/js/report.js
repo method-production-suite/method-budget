@@ -1116,6 +1116,9 @@ function globalsSection(ctx) {
 function groupsSection(ctx) {
   const groups = ctx.b.groups && typeof ctx.b.groups === 'object' ? ctx.b.groups : {};
   const sums = (ctx.r && ctx.r.groups) || {};
+  // The group rule "fringes in group totals" (display only).
+  const rules = ctx.b.group_rules && typeof ctx.b.group_rules === 'object' ? ctx.b.group_rules : {};
+  const withFringes = rules.fringes_in_totals !== 'exclude';
   const lines = new Map();
   for (const it of ctx.items) {
     if (it.kind !== 'category') continue;
@@ -1146,10 +1149,10 @@ function groupsSection(ctx) {
         ctx.colors.add(c);
       }
     }
-    rows.push(row(el('tr', { class: cls }, td(name, 'name'), td(gr.description || '', 'txt'), td(gr.in_budget_total === false ? 'No' : 'Yes', 'txt'), td(String(lines.get(name) || 0), 'num'), td(s ? m(s.details_total) : '', 'num'), td(s ? m(s.fringe_total) : '', 'num'), td(s ? m(s.details_total + s.fringe_total) : '', 'num'))));
+    rows.push(row(el('tr', { class: cls }, td(name, 'name'), td(gr.description || '', 'txt'), td(gr.in_budget_total === false ? 'No' : 'Yes', 'txt'), td(String(lines.get(name) || 0), 'num'), td(s ? m(s.details_total) : '', 'num'), td(s ? m(s.fringe_total) : '', 'num'), td(s ? m(s.details_total + (withFringes ? s.fringe_total : 0)) : '', 'num'))));
   }
   if (!rows.length) rows.push(emptyRow('This budget has no groups.', spec.length));
-  else rows.push(row(el('tr', { class: 'rpt-note-row' }, td('Totals count every tagged line, in the budget total or not. A line in several groups counts in each.', 'note', spec.length))));
+  else rows.push(row(el('tr', { class: 'rpt-note-row' }, td(`Totals count every tagged line, in the budget total or not. A line in several groups counts in each.${withFringes ? '' : ' Totals leave out fringes (group rules).'}`, 'note', spec.length))));
   return [simpleTable('Groups', 'rpt-groups', spec, rows)];
 }
 

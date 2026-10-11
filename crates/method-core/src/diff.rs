@@ -31,9 +31,9 @@ use std::fmt::Write as _;
 use crate::coding::AccountCoding;
 use crate::model::{
     Account, Arithmetic, Baseline, Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource,
-    Currency, Detail, FlatBasis, Fringe, FringeKind, FringePosting, GlobalInfo, Group, InfoValue,
-    Location, NewLineDefaults, Note, RowId, RowKind, SetDef, TopsheetRow, TrailingFringes, UnitDef,
-    Version,
+    Currency, Detail, FlatBasis, Fringe, FringeKind, FringePosting, GlobalInfo, Group, GroupRules,
+    Inclusion, InfoValue, Location, NewLineDefaults, Note, RowId, RowKind, SetDef, TopsheetRow,
+    TrailingFringes, UnitDef, Version,
 };
 use crate::report::Report;
 use crate::{recalc, Cents, Dec, RecalcOptions};
@@ -845,6 +845,14 @@ pub(crate) fn credit_rows_text(c: &Credit) -> String {
                     group,
                     excluded_fringes,
                 } => format!("group {group} less {}", set_text(excluded_fringes)),
+                CreditSource::Category {
+                    category,
+                    excluded_fringes,
+                } if excluded_fringes.is_empty() => format!("category {category}"),
+                CreditSource::Category {
+                    category,
+                    excluded_fringes,
+                } => format!("category {category} less {}", set_text(excluded_fringes)),
             };
             let cap = match r.cap {
                 CreditCap::None => String::new(),
@@ -908,6 +916,19 @@ pub(crate) fn arithmetic_text(a: &Arithmetic) -> String {
         Arithmetic::Mmb => "Movie Magic (binary doubles)".into(),
         Arithmetic::Exact => "exact decimals".into(),
     }
+}
+
+pub(crate) fn group_rules_text(r: &GroupRules) -> String {
+    let word = |i: Inclusion| match i {
+        Inclusion::Include => "included",
+        Inclusion::Exclude => "excluded",
+    };
+    format!(
+        "lines with no group {}, conflicts {}, fringes in group totals {}",
+        word(r.ungrouped_lines),
+        word(r.conflict),
+        word(r.fringes_in_totals)
+    )
 }
 
 pub(crate) fn defaults_text(d: &NewLineDefaults) -> String {
@@ -974,6 +995,11 @@ pub(crate) fn setting_fields(b: &Budget) -> Vec<Field> {
             trailing_text(&b.trailing_level_fringes),
         ),
         text("arithmetic", "arithmetic", arithmetic_text(&b.arithmetic)),
+        text(
+            "group_rules",
+            "group rules",
+            group_rules_text(&b.group_rules),
+        ),
         text(
             "new_line_defaults",
             "new lines copy",

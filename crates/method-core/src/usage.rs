@@ -112,17 +112,13 @@ pub fn usage(b: &Budget, kind: SetupKind) -> BTreeMap<String, ItemUse> {
         }
         SetupKind::Fringe | SetupKind::Group => {
             for r in b.credits.iter().flat_map(|c| &c.rows) {
-                if let CreditSource::Group {
-                    group,
-                    excluded_fringes,
-                } = &r.source
-                {
-                    if kind == SetupKind::Group {
+                if kind == SetupKind::Group {
+                    if let CreditSource::Group { group, .. } = &r.source {
                         bump(group, false);
-                    } else {
-                        for f in excluded_fringes {
-                            bump(f, false);
-                        }
+                    }
+                } else {
+                    for f in r.source.excluded_fringes().into_iter().flatten() {
+                        bump(f, false);
                     }
                 }
             }

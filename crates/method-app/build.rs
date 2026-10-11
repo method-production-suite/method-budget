@@ -32,6 +32,7 @@ const COMMANDS: &[&str] = &[
     "set_fringe",
     "delete_fringe",
     "set_group",
+    "set_group_rule",
     "delete_group",
     "set_unit",
     "delete_unit",

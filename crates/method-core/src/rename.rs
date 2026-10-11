@@ -218,8 +218,9 @@ pub fn references(b: &Budget, kind: SetupKind, name: &str) -> usize {
             .iter()
             .flat_map(|c| &c.rows)
             .filter(|r| {
-                matches!(&r.source, CreditSource::Group { excluded_fringes, .. }
-                    if excluded_fringes.contains(name))
+                r.source
+                    .excluded_fringes()
+                    .is_some_and(|ex| ex.contains(name))
             })
             .count(),
         SetupKind::Group => {
@@ -519,10 +520,7 @@ fn rewrite(b: &mut Budget, kind: SetupKind, from: &str, to: &str) -> usize {
         SetupKind::Fringe => {
             rekey(&mut b.fringes, from, to);
             for r in b.credits.iter_mut().flat_map(|c| &mut c.rows) {
-                if let CreditSource::Group {
-                    excluded_fringes, ..
-                } = &mut r.source
-                {
+                if let Some(excluded_fringes) = r.source.excluded_fringes_mut() {
                     count(swap_in(excluded_fringes, from, to));
                 }
             }

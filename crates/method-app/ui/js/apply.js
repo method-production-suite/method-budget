@@ -759,7 +759,9 @@ function budgetWide(list, name, def) {
     const g = obj(obj(r.groups)[name]);
     const bd = def.in_budget_total === false ? g.full : g.active;
     if (!bd) return '';
-    const total = (Number(bd.details_total) || 0) + (Number(bd.fringe_total) || 0);
+    // Without fringes when the group rule says so (display only).
+    const fringes = groupRules().fringes_in_totals === 'exclude' ? 0 : Number(bd.fringe_total) || 0;
+    const total = (Number(bd.details_total) || 0) + fringes;
     return `Whole budget: ${money(total)}${def.in_budget_total === false ? ', not in the total' : ''}`;
   }
   if (list.id === 'sets' || list.id === 'locations') {
@@ -1068,6 +1070,7 @@ function drawSetupList(host, list) {
   else if (!shown.length) parts.push(el('p', { class: 'setup-empty', text: 'Nothing matches the filter.' }));
   parts.push(ul);
   if (list.id === 'fringes' && names.length) parts.push(setupFringeFoot(defs));
+  if (list.id === 'groups') parts.push(setupGroupRules());
   if (st.error) parts.push(el('p', { class: 'setup-error apply-error', text: st.error, attrs: { role: 'alert' } }));
   host.replaceChildren(...parts);
 }
@@ -1215,6 +1218,61 @@ function setupFringeFoot(defs) {
       stat('Flat', money(flat), 'Fringe dollars from flat fringes in the whole budget'),
       stat('Fringe total', money(percent + flat), 'Every fringe dollar in the budget'),
     ),
+  );
+}
+
+/**
+ * Movie Magic's budget-wide group rules (decisions.md, entry 57), each
+ * Include or Exclude: [rule, label, default, title]. The file leaves out a
+ * rule at its default.
+ */
+const GROUP_RULES = [
+  ['ungrouped_lines', 'Lines with no group', 'include', 'Exclude leaves out every line and adjustment row that has no group'],
+  ['conflict', 'Lines in a counted and an uncounted group', 'exclude', 'Include counts a line that is in a group in the total and a group that is not'],
+  ['fringes_in_totals', 'Fringes in group totals', 'include', 'Whether group totals show their lines’ fringes. Display only: budget totals never change'],
+];
+
+function groupRules() {
+  const r = obj(budget().group_rules);
+  const out = {};
+  for (const [rule, , def] of GROUP_RULES) out[rule] = r[rule] === 'include' || r[rule] === 'exclude' ? r[rule] : def;
+  return out;
+}
+
+/** Under the group table: the group rules, as Budget > Settings lays out its choices. */
+function setupGroupRules() {
+  const now = groupRules();
+  const fields = el('div', { class: 'setup-fields' });
+  for (const [rule, label, , title] of GROUP_RULES) {
+    const id = nextId();
+    const sel = el(
+      'select',
+      { class: 'setup-input setup-select', title, attrs: { id, disabled: st.busy }, data: { key: `apply:grouprule:${rule}` } },
+      el('option', { attrs: { value: 'include' }, text: 'Include' }),
+      el('option', { attrs: { value: 'exclude' }, text: 'Exclude' }),
+    );
+    sel.value = now[rule];
+    sel.addEventListener('change', () => {
+      if (st.busy) return;
+      st.busy = true;
+      st.error = '';
+      call('set_group_rule', { rule, value: sel.value })
+        .catch((e) => {
+          st.error = errText(e);
+        })
+        .finally(() => {
+          st.busy = false;
+          draw();
+        });
+    });
+    fields.append(el('div', { class: 'setup-field setup-field-wide' }, el('label', { class: 'setup-label', text: label, attrs: { for: id } }), sel));
+  }
+  return el(
+    'div',
+    { class: 'tss-group' },
+    el('h3', { class: 'tss-heading', text: 'Group rules' }),
+    fields,
+    el('p', { class: 'setup-hint tss-note', text: 'They apply to the whole budget. A line left out still shows, but counts as 0.' }),
   );
 }
 

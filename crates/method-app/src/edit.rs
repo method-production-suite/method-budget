@@ -748,10 +748,7 @@ pub fn delete_fringe(b: &mut Budget, name: &str) -> EditResult {
     }
     for credit in &mut b.credits {
         for row in &mut credit.rows {
-            if let CreditSource::Group {
-                excluded_fringes, ..
-            } = &mut row.source
-            {
+            if let Some(excluded_fringes) = row.source.excluded_fringes_mut() {
                 excluded_fringes.remove(name);
             }
         }
@@ -787,6 +784,21 @@ pub fn set_group(b: &mut Budget, name: &str, g: &GroupInput) -> EditResult {
             color,
         },
     );
+    Ok(())
+}
+
+/// Sets one group rule (decisions.md, entry 57): `ungrouped_lines`,
+/// `conflict` or `fringes_in_totals`, to `include` or `exclude`.
+pub fn set_group_rule(b: &mut Budget, rule: &str, value: &str) -> EditResult {
+    let v = method_core::Inclusion::parse(value)
+        .ok_or_else(|| format!("`{value}` is not include or exclude"))?;
+    let r = &mut b.group_rules;
+    match rule {
+        "ungrouped_lines" => r.ungrouped_lines = v,
+        "conflict" => r.conflict = v,
+        "fringes_in_totals" => r.fringes_in_totals = v,
+        _ => return Err(format!("`{rule}` is not a group rule")),
+    }
     Ok(())
 }
 
@@ -1213,6 +1225,12 @@ pub enum CreditSourceInput {
         #[serde(default)]
         excluded_fringes: Vec<String>,
     },
+    /// A topsheet category's total with its fringes (decisions.md, entry 57).
+    Category {
+        category: String,
+        #[serde(default)]
+        excluded_fringes: Vec<String>,
+    },
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -1286,18 +1304,22 @@ pub fn set_credit(b: &mut Budget, index: Option<usize>, c: &CreditInput) -> Edit
     };
     // Old rows' references stay valid while editing, like charge exclusions.
     let mut old_groups = BTreeSet::new();
+    let mut old_categories = BTreeSet::new();
     let mut old_fringes = BTreeSet::new();
     for r in old.iter().flat_map(|o| &o.rows) {
-        if let CreditSource::Group {
-            group,
-            excluded_fringes,
-        } = &r.source
-        {
-            old_groups.insert(group.clone());
-            old_fringes.extend(excluded_fringes.iter().cloned());
+        match &r.source {
+            CreditSource::Group { group, .. } => {
+                old_groups.insert(group.clone());
+            }
+            CreditSource::Category { category, .. } => {
+                old_categories.insert(category.clone());
+            }
+            CreditSource::Flat(_) => {}
         }
+        old_fringes.extend(r.source.excluded_fringes().into_iter().flatten().cloned());
     }
     let groups: BTreeSet<String> = b.groups.keys().cloned().collect();
+    let categories: BTreeSet<String> = b.categories().map(|c| c.code.clone()).collect();
     let fringes: BTreeSet<String> = b.fringes.keys().cloned().collect();
     let mut rows = Vec::with_capacity(c.rows.len());
     for (i, r) in c.rows.iter().enumerate() {
@@ -1319,6 +1341,27 @@ pub fn set_credit(b: &mut Budget, index: Option<usize>, c: &CreditInput) -> Edit
                 }
                 CreditSource::Group {
                     group: g.to_string(),
+                    excluded_fringes: picked_names(
+                        excluded_fringes,
+                        &fringes,
+                        Some(&old_fringes),
+                        "fringe",
+                    )?,
+                }
+            }
+            CreditSourceInput::Category {
+                category,
+                excluded_fringes,
+            } => {
+                let c = category.trim();
+                if c.is_empty() {
+                    return Err(format!("row {n} needs a category"));
+                }
+                if !categories.contains(c) && !old_categories.contains(c) {
+                    return Err(format!("there is no category `{c}`"));
+                }
+                CreditSource::Category {
+                    category: c.to_string(),
                     excluded_fringes: picked_names(
                         excluded_fringes,
                         &fringes,

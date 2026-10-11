@@ -33,7 +33,7 @@ use crate::decimal::{Dec, Exact};
 use crate::expr::Expr;
 use crate::model::{
     Arithmetic, Budget, ChargeKind, CreditCap, CreditSource, Detail, FlatBasis, Formula,
-    FringeKind, FringePosting, RowId, RowKind, TopsheetRow,
+    FringeKind, FringePosting, LeftOut, RowId, RowKind, TopsheetRow,
 };
 use crate::report::{Report, RowTotals};
 use crate::Cents;
@@ -1463,6 +1463,52 @@ impl<'a> Explainer<'a> {
                     }
                     (gross, ex)
                 }
+                CreditSource::Category {
+                    category,
+                    excluded_fringes,
+                } => {
+                    let mut gross: Cents = 0;
+                    let mut ex: Cents = 0;
+                    let mut found = None;
+                    for (ci, _, cat, _, _, r) in self.costed() {
+                        if cat != category {
+                            continue;
+                        }
+                        found = Some(ci);
+                        let v = r.total.checked_add(r.fringe_total).ok_or_else(ovf)?;
+                        gross = gross.checked_add(v).ok_or_else(ovf)?;
+                        for (name, s) in &r.fringes {
+                            if excluded_fringes.contains(name) {
+                                ex = ex.checked_add(s.amount.unwrap_or(0)).ok_or_else(ovf)?;
+                            }
+                        }
+                    }
+                    if found.is_none() {
+                        found = self.b.categories().position(|c| c.code == *category);
+                    }
+                    let gross_note = match found {
+                        Some(ci) => Step::note_amount(
+                            "Gross",
+                            format!(
+                                "category {} with its fringes, wherever fringes post",
+                                self.category_name(ci)
+                            ),
+                            gross,
+                        )
+                        .with_link(Link::Category { ci }),
+                        None => Step::note_amount(
+                            "Gross",
+                            format!("category {category} is not in the budget, so 0"),
+                            gross,
+                        ),
+                    };
+                    row_notes.push(gross_note);
+                    if !excluded_fringes.is_empty() {
+                        let names = excluded_fringes.iter().cloned().collect::<Vec<_>>();
+                        row_notes.push(Step::note_amount("Excluded fringes", names.join(", "), ex));
+                    }
+                    (gross, ex)
+                }
             };
             let net = gross.checked_sub(excluded).ok_or_else(ovf)?;
             row_notes.push(Step::note_amount(
@@ -1679,19 +1725,42 @@ fn formula_words(ctx: &Ctx, f: &Formula, value: Num) -> String {
 
 /// Why a line is left out, in words.
 fn left_out(ctx: &Ctx, d: &Detail) -> String {
-    let off: Vec<&str> = d
+    let rules = ctx.b.group_rules;
+    let counted = d
         .groups
         .iter()
-        .filter(|g| ctx.b.groups.get(*g).is_some_and(|x| !x.in_budget_total))
-        .map(String::as_str)
-        .collect();
-    if !off.is_empty() {
-        let s = if off.len() == 1 { "" } else { "s" };
-        return format!(
-            "group{s} {} {} In budget total off, so the line shows but counts as 0",
-            off.join(", "),
-            if off.len() == 1 { "has" } else { "have" }
-        );
+        .map(|g| ctx.b.groups.get(g).is_none_or(|x| x.in_budget_total));
+    match rules.counts(counted) {
+        Ok(()) => {}
+        Err(LeftOut::Ungrouped) => {
+            let what = if d.kind == RowKind::Adjustment {
+                "the adjustment row has no group"
+            } else {
+                "the line has no group"
+            };
+            return format!(
+                "{what} and the group rule leaves out lines with no group, so it shows but counts as 0"
+            );
+        }
+        Err(LeftOut::GroupOff) => {
+            let off: Vec<&str> = d
+                .groups
+                .iter()
+                .filter(|g| ctx.b.groups.get(*g).is_some_and(|x| !x.in_budget_total))
+                .map(String::as_str)
+                .collect();
+            let s = if off.len() == 1 { "" } else { "s" };
+            let conflict = if off.len() < d.groups.len() {
+                " (it is also in a counted group, and the group rule leaves out such conflicts)"
+            } else {
+                ""
+            };
+            return format!(
+                "group{s} {} {} In budget total off{conflict}, so the line shows but counts as 0",
+                off.join(", "),
+                if off.len() == 1 { "has" } else { "have" }
+            );
+        }
     }
     let ex: Vec<&str> = d
         .groups

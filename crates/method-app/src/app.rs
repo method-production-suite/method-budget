@@ -634,6 +634,22 @@ pub fn set_group<R: Runtime>(
     )
 }
 
+/// One of the budget's group rules (decisions.md, entry 57): `rule` is
+/// `ungrouped_lines`, `conflict` or `fringes_in_totals`, `value` is
+/// `include` or `exclude`.
+#[tauri::command]
+pub fn set_group_rule<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    rule: String,
+    value: String,
+) -> CmdResult {
+    edit_budget(&window, &state, doc, "Change a group rule", |b| {
+        edit::set_group_rule(b, &rule, &value)
+    })
+}
+
 #[tauri::command]
 pub fn delete_group<R: Runtime>(
     window: WebviewWindow<R>,
@@ -1313,6 +1329,7 @@ pub fn run() {
             set_fringe,
             delete_fringe,
             set_group,
+            set_group_rule,
             delete_group,
             set_unit,
             delete_unit,

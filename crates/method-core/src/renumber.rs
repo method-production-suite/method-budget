@@ -42,7 +42,8 @@
 //! # What is rewritten
 //!
 //! Category and account numbers; charges' excluded categories and accounts
-//! and the account they post to; credits' accounts; report presets' left-out
+//! and the account they post to; credits' accounts and the categories of
+//! their category rows; report presets' left-out
 //! categories and accounts; and the baseline's category and account keys, so
 //! the original and variance columns still line up. A reference to a number
 //! that is no longer in the chart is carried over by the same rule when it
@@ -68,7 +69,7 @@ use std::fmt;
 
 use crate::actuals::normalize_code;
 use crate::coding::{AccountCode, AccountCoding, CodingError, SEPARATORS};
-use crate::model::{Budget, FringePosting, TopsheetRow};
+use crate::model::{Budget, CreditSource, FringePosting, TopsheetRow};
 
 /// A category or account number before and after.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -555,6 +556,12 @@ pub fn renumber(b: &mut Budget, to: AccountCoding) -> Result<RenumberPlan, Renum
     }
     for cr in &mut b.credits {
         cr.account = carry_label(&cr.account, &accts, &acct_new, acct_conv);
+        for row in &mut cr.rows {
+            if let CreditSource::Category { category, .. } = &mut row.source {
+                let label = Some(std::mem::take(category));
+                *category = carry_label(&label, &cats, &cat_new, cat_conv).unwrap_or_default();
+            }
+        }
     }
     for p in &mut b.report_presets {
         let spec = &mut p.spec;

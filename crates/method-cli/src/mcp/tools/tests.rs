@@ -974,6 +974,37 @@ fn charges_credits_categories_accounts_and_title() {
         f.tool("set_credit", json!({"path": "film.mthd", "name": "Bad", "rows": [{"source": {"kind": "group", "group": "Nope"}, "percent": 1}]})),
         "no group",
     );
+    // A row on a topsheet category (decisions.md, entry 57).
+    f.tool(
+        "set_credit",
+        json!({"path": "film.mthd", "name": "Camera credit", "rows": [
+            {"source": {"kind": "category", "category": "21"}, "percent": 10}
+        ]}),
+    )
+    .unwrap();
+    let cr = f
+        .tool("list_charges", json!({"path": "film.mthd"}))
+        .unwrap();
+    let credit = cr["credits"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "Camera credit")
+        .unwrap();
+    assert_eq!(
+        credit["rows"][0]["source"],
+        json!({"kind": "category", "category": "21", "excluded_fringes": []})
+    );
+    assert!(credit["amount_cents"].as_i64().unwrap() > 0);
+    err_contains(
+        f.tool("set_credit", json!({"path": "film.mthd", "name": "Bad", "rows": [{"source": {"kind": "category", "category": "99"}, "percent": 1}]})),
+        "no category",
+    );
+    f.tool(
+        "delete_charge",
+        json!({"path": "film.mthd", "type": "credit", "name": "Camera credit"}),
+    )
+    .unwrap();
     f.tool(
         "delete_charge",
         json!({"path": "film.mthd", "type": "credit", "name": "State incentive"}),

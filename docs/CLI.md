@@ -41,9 +41,10 @@ Reads and recalculates the budget. Prints `<file>: ok, net total 1,234.56`, or f
 (exit 1) with the reader's or the engine's message, such as
 `line 40, column 21 (budget.topsheet[2].accounts[0].details[3].rate): ...`. A budget that
 adds up can still print warnings after the ok line, one per line as `<file>: warning:
-...`, without failing: for now, fringes posted by production level that belong to
-categories after the last production total, which no level holds (decisions.md, entry
-56; kept in the grand total unless `trailing_level_fringes` is `drop`).
+...`, without failing: fringes posted by production level that belong to categories
+after the last production total, which no level holds (decisions.md, entry 56; kept in
+the grand total unless `trailing_level_fringes` is `drop`), and credit rows on a
+category the budget doesn't have, which count 0 (entry 57).
 
 ### `method fmt <file.mthd>`
 
@@ -148,6 +149,9 @@ Changes one value and saves. Paths:
 | `compact_versions` | `true` or `false`: save versions as deltas (docs/FORMAT.md, "Version deltas"). |
 | `arithmetic` | `mmb` (the default: totals worked out as Movie Magic Budgeting works them, in binary doubles) or `exact` (exact decimals, half away from zero). See decisions.md, entry 55. |
 | `trailing_level_fringes` | `keep` (the default) or `drop`: under production-level posting, keep the fringes of categories after the last production total in the grand total, or drop them as Movie Magic Budgeting does. See decisions.md, entry 56. |
+| `group_rules.ungrouped_lines` | `include` (the default) or `exclude`: lines and adjustment rows with no group count, or are left out. See decisions.md, entry 57. |
+| `group_rules.conflict` | `exclude` (the default) or `include`: a line in a group that counts and a group that doesn't is left out, or counts. |
+| `group_rules.fringes_in_totals` | `include` (the default) or `exclude`: group totals shown with or without their fringes. Display only. |
 | `global.NAME` | A formula. Adds the global when it's new. |
 | `fringe.NAME.rate` | A formula. |
 | `fringe.NAME.cutoff` | An amount (`168,600.00`), or `none`. Percent fringes only (`none` also clears a cutoff a flat fringe kept, which it never uses). |
@@ -392,6 +396,7 @@ remove charge Insurance
 | `set compact_versions true\|false` | Save versions as deltas. |
 | `set arithmetic mmb\|exact` | How totals are worked out (see `arithmetic` above). |
 | `set trailing_level_fringes keep\|drop` | Fringes after the last production total (see `trailing_level_fringes` above). |
+| `set group_rules RULE include\|exclude` | One group rule: `ungrouped_lines`, `conflict` or `fringes_in_totals` (see `group_rules.RULE` above). |
 | `set global NAME FORMULA` | Sets a global's formula, adding the global when it's new. |
 | `set fringe NAME rate FORMULA` | A fringe's rate. |
 | `set fringe NAME cutoff AMOUNT\|none` | A percent fringe's cutoff per earner; whole cents only. A flat fringe has none to set (`none` clears one it kept). |

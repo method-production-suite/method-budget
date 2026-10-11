@@ -6,6 +6,8 @@ use crate::script::{self, Op, RowRef, Word, LINE_FIELDS};
 pub const USAGE: &str = "  method set <file.mthd> <path> <value> [--dry-run]
       Change one value and save atomically. Paths: title, compact_versions,
       arithmetic (mmb or exact), trailing_level_fringes (keep or drop),
+      group_rules.ungrouped_lines, group_rules.conflict and
+      group_rules.fringes_in_totals (include or exclude),
       global.NAME, fringe.NAME.rate, fringe.NAME.cutoff, fringe.NAME.basis
       (amount, amount_counts or quantity), fringe.NAME.max_hours_per_day,
       line.ROW.FIELD (ROW is #ID, ACCOUNT:N or ACCOUNT:*; FIELD as in `set
@@ -75,6 +77,7 @@ pub fn op_for(path: &str, value: &str) -> Result<Op, CliError> {
             (name, "applied") => Op::Charge(name.to_string(), script::flag(&v).map_err(bad)?),
             (_, other) => return Err(bad(format!("a charge has no field `{other}`"))),
         },
+        "group_rules" if !rest.is_empty() => script::group_rule(rest, value).map_err(bad)?,
         _ => return Err(bad(format!("`{path}` is not a path `method set` knows"))),
     })
 }
@@ -169,6 +172,17 @@ mod tests {
             Op::TrailingLevelFringes(method_core::TrailingFringes::Drop)
         );
         assert!(op_for("trailing_level_fringes", "lose").is_err());
+        assert_eq!(
+            op_for("group_rules.ungrouped_lines", "exclude").unwrap(),
+            Op::GroupRule("ungrouped_lines", method_core::Inclusion::Exclude)
+        );
+        assert_eq!(
+            op_for("group_rules.conflict", "include").unwrap(),
+            Op::GroupRule("conflict", method_core::Inclusion::Include)
+        );
+        assert!(op_for("group_rules.conflict", "maybe").is_err());
+        assert!(op_for("group_rules.nope", "include").is_err());
+        assert!(op_for("group_rules", "include").is_err());
         for bad in [
             "nope",
             "title.x",

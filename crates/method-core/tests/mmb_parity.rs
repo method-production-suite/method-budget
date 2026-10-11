@@ -1172,3 +1172,397 @@ fn a_global_name_may_start_with_a_digit() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// Decisions.md, entry 57: credit rows on a topsheet category, and the group
+// rules (lines with no group, conflicts, fringes in group totals).
+
+/// Every step's label and text in `s`, one per line.
+fn words(s: &method_core::explain::Step) -> String {
+    let mut out = format!("{}: {}\n", s.label, s.text);
+    for c in &s.children {
+        out.push_str(&words(c));
+    }
+    out
+}
+
+/// What Explain says about `t` in `b`.
+fn explained(b: &Budget, t: Target) -> String {
+    let ex = Explainer::new(b, &RecalcOptions::default()).unwrap();
+    words(&ex.explain(&t).unwrap().root)
+}
+
+/// A credit of `rows`, applied, with no cap or discount.
+fn credit(name: &str, rows: Vec<CreditRow>) -> Credit {
+    Credit {
+        name: name.into(),
+        account: None,
+        applied: true,
+        cap: None,
+        discount_percent: Dec::ZERO,
+        rows,
+    }
+}
+
+fn credit_row(source: CreditSource, percent: &str, cap: CreditCap) -> CreditRow {
+    CreditRow {
+        description: String::new(),
+        source,
+        percent: d(percent),
+        cap,
+    }
+}
+
+/// Credit row on topsheet category `code`, less `excluded` fringes.
+fn on_category(code: &str, excluded: &[&str]) -> CreditSource {
+    CreditSource::Category {
+        category: code.into(),
+        excluded_fringes: set(excluded),
+    }
+}
+
+/// ZTEST10 CREDITS' lines (parity plan 4.10, run log): 1100 4,000.00 with
+/// 500.00 of fringes (a suppressed line earns none), 2100 4,000.00 with
+/// 300.00, grand 8,800.00 whatever the posting.
+fn ztest10(arith: Arithmetic, posting: FringePosting) -> Budget {
+    let mut grip = Detail::line(399, "Grip days", "4", "Day", "1000");
+    grip.fringes = set(&["ZFDAY", "ZP10N"]);
+    grip.groups = set(&["ZCRED"]);
+    let mut off = Detail::line(400, "Suppressed grip", "1", "", "2000");
+    off.fringes = set(&["ZP10N"]);
+    off.groups = set(&["ZCRED", "ZOFF"]);
+    let mut electric = Detail::line(401, "Electric", "1", "", "3000");
+    electric.fringes = set(&["ZP10N"]);
+    electric.groups = set(&["ZCRED2"]);
+    let plain = Detail::line(402, "Plain", "1", "", "1000");
+    let mut b = budget(
+        arith,
+        vec![
+            category(
+                "1100",
+                "ZATL",
+                vec![account("1101", "Z crew credit", vec![grip, off])],
+            ),
+            level("ZTOTAL ATL"),
+            category(
+                "2100",
+                "ZBTL",
+                vec![account("2101", "Z crew two", vec![electric, plain])],
+            ),
+            level("ZTOTAL BTL"),
+        ],
+    );
+    b.fringe_posting = posting;
+    b.fringes.insert("ZP10N".into(), percent("10", None));
+    b.fringes.insert(
+        "ZFDAY".into(),
+        Fringe {
+            description: String::new(),
+            short_code: None,
+            rate: "25".into(),
+            kind: FringeKind::flat(Some("Day".into())),
+        },
+    );
+    b.groups.insert("ZCRED".into(), group(true));
+    b.groups.insert("ZCRED2".into(), group(true));
+    b.groups.insert("ZOFF".into(), group(false));
+    b
+}
+
+/// Every way fringes can post.
+fn postings() -> [FringePosting; 4] {
+    [
+        FringePosting::Budget,
+        FringePosting::ProductionLevel,
+        FringePosting::Account,
+        FringePosting::default(),
+    ]
+}
+
+/// A category row's spend is the category with its own fringes, even when
+/// fringes post by budget: 2100 is 4,000.00 + 300.00 = 4,300.00, and 10% of
+/// it is 430.00 (V10-3).
+#[test]
+fn v10_3_a_category_credit_row_counts_the_category_with_its_fringes() {
+    for arith in Arithmetic::ALL {
+        for posting in postings() {
+            let mut b = ztest10(arith, posting.clone());
+            b.credits.push(credit(
+                "ZCAT",
+                vec![credit_row(on_category("2100", &[]), "10", CreditCap::None)],
+            ));
+            let (_, r) = totals(&b);
+            assert_eq!(r.grand_total, 880_000, "{arith:?} {posting:?}");
+            let row = &r.credits[0].rows[0];
+            assert_eq!(
+                (row.gross, row.excluded_fringes, row.net),
+                (430_000, 0, 430_000),
+                "{arith:?} {posting:?}"
+            );
+            assert_eq!(r.credits[0].amount, 43_000, "{arith:?} {posting:?}");
+            assert_eq!(r.net_total, 880_000 - 43_000);
+            let text = explained(&b, Target::Credit(0));
+            assert!(
+                text.contains("category 2100 ZBTL with its fringes"),
+                "{text}"
+            );
+        }
+    }
+}
+
+/// Ticking ZCR3 on category 2100 adds a row at 0%: the credit's gross goes
+/// from 1,234.57 to 5,534.57 and the credit stays 411.52 (V10-3). At 10%
+/// the row adds 430.00, and the rows still round once together.
+#[test]
+fn v10_3_a_category_row_joins_a_credit_at_zero_percent() {
+    for arith in Arithmetic::ALL {
+        let mut b = ztest10(arith, FringePosting::Budget);
+        b.credits.push(credit(
+            "ZCR3",
+            vec![
+                credit_row(CreditSource::Flat(123_457), "33.333", CreditCap::None),
+                credit_row(on_category("2100", &[]), "0", CreditCap::None),
+            ],
+        ));
+        let (_, r) = totals(&b);
+        let c = &r.credits[0];
+        let gross: Cents = c.rows.iter().map(|row| row.gross).sum();
+        assert_eq!(gross, 553_457, "{arith:?}");
+        assert_eq!(c.amount, 41_152, "{arith:?}");
+
+        b.credits[0].rows[1].percent = d("10");
+        let (_, r) = totals(&b);
+        // 411.51849... + 430.00, rounded once.
+        assert_eq!(r.credits[0].amount, 84_152, "{arith:?}");
+    }
+}
+
+/// A category row leaves out the credit's excluded fringes like a group
+/// row (our reading, decisions.md, entry 57), and takes either cap.
+#[test]
+fn a_category_credit_row_leaves_out_fringes_and_takes_caps() {
+    for arith in Arithmetic::ALL {
+        let mut b = ztest10(arith, FringePosting::Budget);
+        b.credits.push(credit(
+            "ZCAT",
+            vec![
+                credit_row(on_category("2100", &["ZP10N"]), "10", CreditCap::None),
+                credit_row(
+                    on_category("2100", &[]),
+                    "10",
+                    CreditCap::QualifiedSpend(200_000),
+                ),
+                credit_row(on_category("1100", &[]), "10", CreditCap::Credit(5_000)),
+                credit_row(on_category("1100", &["ZFDAY"]), "10", CreditCap::None),
+            ],
+        ));
+        let (_, r) = totals(&b);
+        let rows = &r.credits[0].rows;
+        assert_eq!(
+            (rows[0].gross, rows[0].excluded_fringes, rows[0].net),
+            (430_000, 30_000, 400_000)
+        );
+        assert_eq!(rows[0].credit, d("400"));
+        assert_eq!(rows[1].credit, d("200"));
+        assert_eq!(rows[1].cap_variance, Some(d("-2300")));
+        // 1100 is 4,000.00 + 500.00 (the suppressed line earns nothing).
+        assert_eq!(rows[2].gross, 450_000);
+        assert_eq!(rows[2].credit, d("50"));
+        assert_eq!((rows[3].excluded_fringes, rows[3].net), (10_000, 440_000));
+        assert_eq!(r.credits[0].amount, 40_000 + 20_000 + 5_000 + 44_000);
+        let text = explained(&b, Target::Credit(0));
+        assert!(text.contains("Excluded fringes: ZP10N"), "{text}");
+    }
+}
+
+/// A row on a category the budget doesn't have counts 0, and `warnings`
+/// says so; renumbering carries the row's category along, and renaming a
+/// fringe renames it in the row's exclusions.
+#[test]
+fn a_category_credit_row_follows_the_chart() {
+    let mut b = ztest10(Arithmetic::Mmb, FringePosting::Budget);
+    b.credits.push(credit(
+        "ZCAT",
+        vec![
+            credit_row(on_category("9900", &[]), "10", CreditCap::None),
+            credit_row(on_category("2100", &["ZP10N"]), "10", CreditCap::None),
+        ],
+    ));
+    let (_, r) = totals(&b);
+    assert_eq!(r.credits[0].rows[0].gross, 0);
+    let w = warnings(&b, &r);
+    assert!(
+        w.iter()
+            .any(|w| w.contains("credit ZCAT row 1") && w.contains("9900")),
+        "{w:?}"
+    );
+    assert!(explained(&b, Target::Credit(0)).contains("category 9900 is not in the budget"));
+
+    rename(&mut b, SetupKind::Fringe, "ZP10N", "ZPCT").unwrap();
+    assert_eq!(b.credits[0].rows[1].source, on_category("2100", &["ZPCT"]));
+    let usage = method_core::usage::usage(&b, SetupKind::Fringe);
+    assert!(usage["ZPCT"].other >= 1);
+
+    let to = method_core::coding::AccountCoding {
+        separator: Some('-'),
+        ..b.account_coding
+    };
+    method_core::renumber::renumber(&mut b, to).unwrap();
+    let cat = b.categories().nth(1).unwrap().code.clone();
+    assert_ne!(cat, "2100");
+    assert_eq!(b.credits[0].rows[1].source, on_category(&cat, &["ZPCT"]));
+    let r2 = recalc(&b, &RecalcOptions::default()).unwrap();
+    assert_eq!(r2.credits[0].amount, r.credits[0].amount);
+}
+
+/// ZTEST07 GROUPS (parity plan 4.7, run log): ZIN and ZIN2 count, ZOFF
+/// doesn't; fringes post by budget.
+fn ztest07(arith: Arithmetic) -> Budget {
+    let tagged = |id: u64, desc: &str, rate: &str, groups: &[&str], fringes: &[&str]| Detail {
+        groups: set(groups),
+        fringes: set(fringes),
+        ..Detail::line(id, desc, "1", "", rate)
+    };
+    let mut b = budget(
+        arith,
+        vec![
+            category(
+                "1100",
+                "ZGROUPS A",
+                vec![account(
+                    "1101",
+                    "Z groups",
+                    vec![
+                        tagged(306, "In", "1000", &["ZIN"], &["ZP10N"]),
+                        tagged(307, "Out", "2000", &["ZOFF"], &["ZP10N"]),
+                        tagged(308, "In and out", "3000", &["ZIN", "ZOFF"], &[]),
+                        tagged(309, "In twice", "4000", &["ZIN", "ZIN2"], &["ZP10N"]),
+                        tagged(310, "No group", "500", &[], &[]),
+                        Detail::subtotal(311, "ZSUB G"),
+                        Detail::adjustment(312, "ZADJ G", "0.1"),
+                    ],
+                )],
+            ),
+            level("ZTOTAL ATL"),
+            category(
+                "1200",
+                "ZGROUPS B",
+                vec![account(
+                    "1201",
+                    "Z groups B",
+                    vec![tagged(313, "In two", "600", &["ZIN2"], &[])],
+                )],
+            ),
+            level("ZTOTAL BTL"),
+        ],
+    );
+    b.fringe_posting = FringePosting::Budget;
+    b.fringes.insert("ZP10N".into(), percent("10", None));
+    b.groups.insert("ZIN".into(), group(true));
+    b.groups.insert("ZIN2".into(), group(true));
+    b.groups.insert("ZOFF".into(), group(false));
+    b
+}
+
+/// The row with id `id`.
+fn row(r: &Report, id: u64) -> &RowTotals {
+    r.categories
+        .iter()
+        .flat_map(|c| &c.accounts)
+        .flat_map(|a| &a.rows)
+        .find(|row| row.id == id)
+        .unwrap()
+}
+
+/// Movie Magic's defaults: lines with no group count, a line in a counted
+/// and an uncounted group doesn't. Subtotal 5,500.00, adjustment 550.00,
+/// grand 7,150.00 (ZTEST07 main).
+#[test]
+fn ztest07_default_group_rules_match_movie_magic() {
+    for arith in Arithmetic::ALL {
+        let b = ztest07(arith);
+        assert_eq!(b.group_rules, GroupRules::default());
+        let (rows, r) = totals(&b);
+        assert!(!row(&r, 307).included && !row(&r, 308).included);
+        assert_eq!(row(&r, 311).subtotal, Some(550_000), "{arith:?}");
+        assert_eq!(rows[&312], 55_000, "{arith:?}");
+        assert_eq!(r.budget_fringes, 50_000);
+        assert_eq!(r.grand_total, 715_000, "{arith:?}");
+        let zin = &r.groups["ZIN"].active;
+        assert_eq!(zin.details_total + zin.fringe_total, 550_000);
+        let text = explained(&b, Target::Line(308));
+        assert!(text.contains("leaves out such conflicts"), "{text}");
+    }
+}
+
+/// Lines with no group excluded: No group and the adjustment row (it has
+/// no group) are left out, the subtotal shows 5,000.00 and the grand total
+/// is 6,100.00 (V07-3).
+#[test]
+fn ztest07_lines_with_no_group_excluded() {
+    for arith in Arithmetic::ALL {
+        let mut b = ztest07(arith);
+        b.group_rules.ungrouped_lines = Inclusion::Exclude;
+        let (rows, r) = totals(&b);
+        assert!(!row(&r, 310).included, "No group");
+        assert!(!row(&r, 312).included, "the adjustment row");
+        assert!(row(&r, 306).included && row(&r, 313).included);
+        assert_eq!(rows[&310], 0);
+        assert_eq!(rows[&312], 0);
+        assert_eq!(row(&r, 311).subtotal, Some(500_000), "{arith:?}");
+        assert_eq!(r.grand_total, 610_000, "{arith:?}");
+        assert!(explained(&b, Target::Line(310)).contains("the line has no group"));
+        assert!(explained(&b, Target::Line(312)).contains("the adjustment row has no group"));
+    }
+}
+
+/// Conflicts included: In and out counts, ZOFF's active total is
+/// 3,000.00 and the grand total is 10,450.00 (V07-4).
+#[test]
+fn ztest07_conflicts_included() {
+    for arith in Arithmetic::ALL {
+        let mut b = ztest07(arith);
+        b.group_rules.conflict = Inclusion::Include;
+        let (rows, r) = totals(&b);
+        assert!(row(&r, 308).included);
+        assert!(!row(&r, 307).included, "only uncounted groups: still out");
+        assert_eq!(row(&r, 311).subtotal, Some(850_000), "{arith:?}");
+        assert_eq!(rows[&312], 85_000, "{arith:?}");
+        assert_eq!(r.grand_total, 1_045_000, "{arith:?}");
+        assert_eq!(r.groups["ZOFF"].active.details_total, 300_000);
+    }
+}
+
+/// "Fringe amounts in group totals" is display only: no total changes.
+/// The rules round through a version, and the cache starts over when one
+/// changes.
+#[test]
+fn group_rules_switch_cleanly() {
+    let mut b = ztest07(Arithmetic::Mmb);
+    let opts = RecalcOptions::default();
+    let mut cache = RecalcCache::new();
+    let base = cache.recalc(&b, &opts).unwrap();
+    b.group_rules.fringes_in_totals = Inclusion::Exclude;
+    assert_eq!(cache.recalc(&b, &opts).unwrap(), base);
+    b.group_rules.ungrouped_lines = Inclusion::Exclude;
+    let ex = cache.recalc(&b, &opts).unwrap();
+    assert_eq!(ex, recalc(&b, &opts).unwrap());
+    assert_eq!(ex.grand_total, 610_000);
+    assert_eq!(b.snapshot().group_rules, b.group_rules);
+    assert_eq!(b.snapshot().to_budget().group_rules, b.group_rules);
+
+    let rules = GroupRules::default();
+    assert_eq!(rules.counts([]), Ok(()));
+    assert_eq!(rules.counts([true, false]), Err(LeftOut::GroupOff));
+    let open = GroupRules {
+        ungrouped_lines: Inclusion::Exclude,
+        conflict: Inclusion::Include,
+        ..rules
+    };
+    assert_eq!(open.counts([]), Err(LeftOut::Ungrouped));
+    assert_eq!(open.counts([true, false]), Ok(()));
+    assert_eq!(open.counts([false]), Err(LeftOut::GroupOff));
+    for i in Inclusion::ALL {
+        assert_eq!(Inclusion::parse(i.name()), Some(i));
+    }
+}

@@ -257,9 +257,10 @@ names, setup item names, charges and credits. 100 matches by default, 1,000 at m
 
 **`validate`** `{path}`: `ok`, `problem` (why it doesn't add up, if it doesn't),
 `net_total_cents` and `warnings`: lines naming units, sets or locations the budget doesn't
-have, account or category numbers used twice, and fringes of categories after the last
+have, account or category numbers used twice, fringes of categories after the last
 production total that no level holds (fringes posted by production level; decisions.md,
-entry 56).
+entry 56), and credit rows on a category the budget doesn't have, which count 0 (entry
+57).
 
 **`diff`** `{path, against?, since?}`: what changed, in plain words, with the money that
 moved per account, category and topsheet line (the engine's diff, as `method diff`).
@@ -361,9 +362,11 @@ below-the-line) or flat `amount`, and is applied unless `applied` is false.
 
 **`set_credit`** `{path, name, new_name?, account?, applied?, cap?, discount_percent?, rows?}`:
 adds a credit or changes it; `rows` replaces every row. Each row: `source` (`{"kind": "flat",
-"amount": "250000"}` or `{"kind": "group", "group": "Local hire", "excluded_fringes": [...]}`),
-`percent`, `cap` (`{"kind": "none" | "qualified_spend" | "credit", "amount"}`),
-`description`.
+"amount": "250000"}`, `{"kind": "group", "group": "Local hire", "excluded_fringes": [...]}`
+or `{"kind": "category", "category": "2100", "excluded_fringes": [...]}`: a topsheet
+category's total with the fringes its lines earn, wherever fringes post; decisions.md,
+entry 57), `percent`, `cap` (`{"kind": "none" | "qualified_spend" | "credit", "amount"}`),
+`description`. A group or category the budget doesn't have is refused.
 
 **`apply_charge`** `{path, type, name, applied}`: makes a charge or credit count or stop
 counting. **`delete_charge`** `{path, type, name}` removes it.

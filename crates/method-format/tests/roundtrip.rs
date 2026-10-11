@@ -750,3 +750,124 @@ fn flat_fringe_fields_are_checked() {
         assert!(method_format::from_str(&with(bad)).is_err(), "{bad}");
     }
 }
+
+/// `group_rules` (decisions.md, entry 57): Movie Magic's rules are the
+/// default, also for files that don't say, and are left out; only the rules
+/// that differ are written, right after the groups, and a version keeps its
+/// own.
+#[test]
+fn group_rules_round_trip_and_are_left_out_at_default() {
+    let mut b = rich();
+    assert_eq!(b.group_rules, GroupRules::default());
+    let text = round_trip(&b);
+    assert!(!text.contains("\"group_rules\""), "default is left out");
+
+    b.group_rules.ungrouped_lines = Inclusion::Exclude;
+    let text = round_trip(&b);
+    let v: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(
+        v["budget"]["group_rules"],
+        serde_json::json!({"ungrouped_lines": "exclude"})
+    );
+    let pos = |k: &str| text.find(&format!("\"{k}\":")).unwrap();
+    assert!(pos("groups") < pos("group_rules"));
+
+    b.group_rules = GroupRules {
+        ungrouped_lines: Inclusion::Include,
+        conflict: Inclusion::Include,
+        fringes_in_totals: Inclusion::Exclude,
+    };
+    let text = round_trip(&b);
+    let v: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(
+        v["budget"]["group_rules"],
+        serde_json::json!({"conflict": "include", "fringes_in_totals": "exclude"})
+    );
+
+    b.versions.push(Version {
+        id: 1,
+        name: "v1".into(),
+        created: "2026-10-10T00:00:00Z".into(),
+        note: None,
+        budget: std::sync::Arc::new(b.snapshot()),
+    });
+    b.group_rules = GroupRules::default();
+    let text = round_trip(&b);
+    assert_eq!(
+        text.matches("\"group_rules\"").count(),
+        1,
+        "only the version's"
+    );
+
+    let file = |body: &str| {
+        format!(
+            "{{\"format\": \"method-budget\", \"version\": 1, \"budget\": \
+             {{\"title\": \"T\", \"base_currency\": \"USD\"{body}}}}}"
+        )
+    };
+    let read = |body: &str| method_format::from_str(&file(body)).map(|b| b.group_rules);
+    assert_eq!(read("").unwrap(), GroupRules::default());
+    assert_eq!(
+        read(r#", "group_rules": {}"#).unwrap(),
+        GroupRules::default()
+    );
+    assert_eq!(
+        read(r#", "group_rules": {"conflict": "include"}"#)
+            .unwrap()
+            .conflict,
+        Inclusion::Include
+    );
+    for bad in [
+        r#", "group_rules": {"conflict": "maybe"}"#,
+        r#", "group_rules": {"ungrouped": "exclude"}"#,
+        r#", "group_rules": "exclude""#,
+    ] {
+        assert!(read(bad).is_err(), "{bad}");
+    }
+}
+
+/// A credit row on a topsheet category (decisions.md, entry 57) keeps its
+/// category and the fringes it leaves out.
+#[test]
+fn category_credit_rows_round_trip() {
+    let mut b = rich();
+    b.credits.push(Credit {
+        name: "Category credit".into(),
+        account: None,
+        applied: true,
+        cap: None,
+        discount_percent: Dec::ZERO,
+        rows: vec![
+            CreditRow {
+                description: "Electric".into(),
+                source: CreditSource::Category {
+                    category: "2100".into(),
+                    excluded_fringes: set(&[]),
+                },
+                percent: d("10"),
+                cap: CreditCap::QualifiedSpend(100_000),
+            },
+            CreditRow {
+                description: "Less pension".into(),
+                source: CreditSource::Category {
+                    category: "2100".into(),
+                    excluded_fringes: set(&["P"]),
+                },
+                percent: d("5"),
+                cap: CreditCap::None,
+            },
+        ],
+    });
+    let text = round_trip(&b);
+    let v: Value = serde_json::from_str(&text).unwrap();
+    let credits = v["budget"]["credits"].as_array().unwrap();
+    let rows = &credits.last().unwrap()["rows"];
+    assert_eq!(
+        rows[0]["source"],
+        serde_json::json!({"kind": "category", "category": "2100"})
+    );
+    assert_eq!(
+        rows[1]["source"],
+        serde_json::json!({"kind": "category", "category": "2100", "excluded_fringes": ["P"]})
+    );
+}

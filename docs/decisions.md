@@ -75,6 +75,10 @@ left-out adjustment row doesn't reset its window. Property-tested: excluding a g
 the same totals as deleting its lines, and suppressing equals excluding. Each group reports
 a full total (as if nothing were left out) and an active total.
 
+**Amended 2026-10-10 (entry 57):** the budget's group rules, as in the reference product:
+lines with no group can be left out (adjustment rows with them), a line in a counted and an
+uncounted group can be counted, and group totals can be shown without fringes.
+
 ## 5. Globals and formulas (2026-10-08)
 
 Amount, multiplier and rate are formula strings: numbers, global names, `+ - * /`, unary
@@ -120,6 +124,8 @@ from a time, for the bases that read them.)
   excluded line takes its fringes off with it in every posting mode; flat fees honor
   category and account exclusions too.)
 - Credit rows are summed **unrounded**, then capped and discounted, then rounded once.
+  (Amended by entry 57: a credit row can also be a topsheet category, its total with its
+  own fringes.)
 
 ## 10. Currency direction (2026-10-08)
 
@@ -2177,3 +2183,71 @@ is a setting.
   arithmetics where they could differ), the property tests generate fringed adjustment
   rows and the `drop` setting ("every fringe dollar posts exactly once, unless it is
   dropped"), and the reference engine works ranges out on its own.
+
+## 57. Category credit rows and the group rules, as Movie Magic has them (2026-10-10, the owner)
+
+The parity run of 2026-10-10 (imports/mmb-parity/2026-10-10, run-log.md, "ZTEST07
+GROUPS" and "V10-3 category credit") found two things Movie Magic Budgeting 10 does that
+we didn't. The owner's rule is to match it by default (entries 55 and 56).
+
+- **A credit row can be a topsheet category** (V10-3; amends entry 9). Besides a typed
+  amount and a group, a row's spend can be one category: `{"kind": "category",
+  "category": "2100"}` (FORMAT.md, "Credit row"). Its gross is the category's total (its
+  lines and adjustment rows that count) plus the fringes they earn, **wherever fringes
+  post**, as Movie Magic counts it: with fringes posted by budget, ticking ZCR3 on category
+  2100 (4,000.00 of lines, 300.00 of fringes) raised the credit's gross from 1,234.57 to
+  5,534.57 (+4,300.00), and the new row starts at 0%, so the credit stayed 411.52. At 10%
+  the row is 430.00 in every posting mode and both arithmetics. Like a group row, a
+  category row's fringes are those its lines earn, so a category after the last production
+  total keeps them when `trailing_level_fringes` is `drop` (entry 56), and a left-out line
+  earns none.
+- **Excluded fringes on a category row: our reading, not checked.** Movie Magic keeps one
+  excluded-fringe list per credit and applies it to group rows; the run did not try it on a
+  category row. We apply it the same way: the listed fringes come off the category row's
+  gross (2100 less ZP10N is 4,300.00 - 300.00 = 4,000.00, so 10% is 400.00). As for group
+  rows, our list is per row (entry 9's model), so a credit carried over from Movie Magic
+  would copy its list onto each of its group and category rows.
+- **A row's category follows the chart.** Renumbering carries it like a charge's excluded
+  categories; renaming a fringe renames it in the row's exclusions; a fringe's use count
+  includes them. A row on a category the budget doesn't have counts 0 (as a charge's
+  excluded category that matches nothing), and `method check` and the MCP `validate` tool
+  warn: "credit ZCAT row 1 is on category 9900, which is not in the budget, so its spend is
+  0". The app and the MCP `set_credit` refuse a category the budget doesn't have, as they
+  refuse an unknown group.
+- **The group rules** (ZTEST07; amends entry 4). Movie Magic's GROUPS setup carries three
+  budget-wide rules, each Include or Exclude; ours is the budget setting `group_rules`
+  (FORMAT.md, "Group rules"), each rule written only when it isn't Movie Magic's default,
+  and the object only when one isn't:
+  - `ungrouped_lines` (default `include`). `exclude` leaves out every line with no group
+    **and every adjustment row with no group** (an adjustment row has no group of its own
+    unless one is put on it), as Movie Magic does; subtotal rows then show only the lines
+    left. Checked (V07-3): lines In 1,000.00 (ZIN, ZP10N), Out 2,000.00 (ZOFF, off), In
+    and out 3,000.00 (ZIN and ZOFF), In twice 4,000.00 (ZIN and ZIN2, ZP10N), No group
+    500.00, a subtotal, a 10% adjustment, and In two 600.00 (ZIN2) in 1201, fringes posted
+    by budget: Include gives subtotal 5,500.00, adjustment 550.00, grand 7,150.00; Exclude
+    gives subtotal 5,000.00, the adjustment and No group left out, grand 6,100.00.
+  - `conflict` (default `exclude`). A line in a counted group and a group whose "in budget
+    total" is off: left out (what we always did), or counted with `include` (V07-4: In and
+    out counts, ZOFF's active total is 3,000.00, grand 10,450.00). A line whose groups are
+    all off is left out either way.
+  - `fringes_in_totals` (default `include`): whether group totals show their lines'
+    fringes. Display only, as in Movie Magic: the group dollars in the setup tables and the
+    printed Groups section's Total column leave fringes out with `exclude`; no budget total
+    changes, and the report still carries each group's fringes separately.
+  A line a rule leaves out behaves as a suppressed line always has (entry 4): it shows,
+  counts as 0, earns no fringes and doesn't reset an adjustment window. The recalc
+  options' what-if filters still apply on top. Explain says why: "the line has no group
+  and the group rule leaves out lines with no group", or for a conflict "(it is also in a
+  counted group, and the group rule leaves out such conflicts)".
+- **Where they are set**: `method set FILE group_rules.RULE include|exclude` and `set
+  group_rules RULE include|exclude` in scripts (CLI.md); in the app, a Group rules block at
+  the end of Budget Setup's Groups table (the `set_group_rule` command, APP.md); the credit
+  editor's Spend menu lists the categories after the groups ("Category: 2100 Electric").
+  Setup sheets carry a credit row's category in a Category column. Versions, diff, merge
+  and the recalc cache handle the rules like the other budget settings.
+- **Still different** (not in scope here): Movie Magic's group "total" counts only the
+  fringes a line actually earns (ZOFF total 5,000.00), while our full total gives a
+  suppressed line its fringes as if it counted (5,200.00).
+- Tests: crates/method-core/tests/mmb_parity.rs reproduces every figure above in both
+  arithmetics (and V10-3 in every posting mode); the format, CLI, MCP and app tests cover
+  writing, reading and setting them.

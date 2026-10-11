@@ -32,6 +32,7 @@
     "allow-set-fringe",
     "allow-delete-fringe",
     "allow-set-group",
+    "allow-set-group-rule",
     "allow-delete-group",
     "allow-set-unit",
     "allow-delete-unit",

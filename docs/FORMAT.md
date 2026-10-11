@@ -120,6 +120,7 @@ Fields in written order:
 | `global_info`     | map of [global info](#global-info) | Description, unit and display settings of globals, keyed by global name. Left out when no global has any. |
 | `fringes`         | map of [fringes](#fringe) | Keyed by the name detail rows use. |
 | `groups`          | map of [groups](#group) | Keyed by group name. |
+| `group_rules`     | [group rules](#group-rules) | Which lines the groups leave in or out, budget-wide. Left out when every rule is the default. |
 | `sets`            | map of [sets](#set) | Keyed by set name. |
 | `locations`       | map of [locations](#location) | Keyed by location name. |
 | `topsheet`        | list of [topsheet rows](#topsheet-row) | Categories and production totals, in display order. |
@@ -308,6 +309,19 @@ reader does not check.
 | `in_budget_total` | boolean, default `true` | When `false`, every line tagged with the group is shown but counts as zero. |
 | `color`           | optional text | Display color for the text of tagged lines, written `"#rrggbb"`. A line's own `color` wins. Never affects totals. |
 
+### Group rules
+
+Movie Magic Budgeting's three budget-wide group rules (`docs/decisions.md`, entry 57),
+each `"include"` or `"exclude"`. A budget setting; a [version](#version) keeps its own.
+Each rule is left out at its default, and the whole object is left out when every rule
+is; a missing rule means its default.
+
+| Field               | Default | Meaning |
+|---------------------|---------|---------|
+| `ungrouped_lines`   | `"include"` | Lines with no group. `"exclude"` leaves out every line and every adjustment row that has no group: shown, counted as zero, earning no fringes, so subtotal rows show only the lines left. |
+| `conflict`          | `"exclude"` | A line in a group whose `in_budget_total` is `false` and in a group whose is `true`. `"exclude"` leaves it out; `"include"` counts it. A line whose groups all have `in_budget_total` `false` is left out either way. |
+| `fringes_in_totals` | `"include"` | Whether group totals are shown with their lines' fringes. Display only: no total changes. |
+
 ### Set
 
 | Field         | Type | Notes |
@@ -466,6 +480,7 @@ catch it).
 |---------|--------|---------|
 | `flat`  | `amount` cents, **required** | A gross amount typed in directly. |
 | `group` | `group` text, **required**; `excluded_fringes` name set | Lines tagged with the group, plus their fringes except the excluded ones. |
+| `category` | `category` text, **required**; `excluded_fringes` name set | The topsheet category with that code: its total (lines and adjustment rows that count) plus the fringes they earn, wherever fringes post, except the excluded ones (`docs/decisions.md`, entry 57). A code that names no category counts 0, and `method check` warns. |
 
 `cap` kinds:
 
@@ -1141,6 +1156,10 @@ valid. Loading and saving it in Method Budget normalizes it.
   and accounts; above- and below-the-line count only levels a production total closes. So a
   range's per-line fringes, below-the-line, and some charges can differ from before; the
   file needs no change.
+- Version 1, additive (2026-10): budget [`group_rules`](#group-rules) (lines with no
+  group, conflicts, fringes in group totals), left out at Movie Magic's defaults, which
+  are what files without it already meant; credit row source kind `"category"`
+  (decisions.md, entry 57). Files that don't use them are unchanged.
 
 ## Complete example
 

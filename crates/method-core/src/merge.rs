@@ -834,6 +834,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         account_coding: _,
         new_line_defaults: _,
         groups: _,
+        group_rules: _,
         sets: _,
         locations: _,
         topsheet: _,
@@ -900,6 +901,12 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         &setting_at("arithmetic", "Arithmetic"),
         (&b.arithmetic, &o.arithmetic, &t.arithmetic),
         crate::diff::arithmetic_text,
+    );
+    let group_rules = merge_value(
+        cx,
+        &setting_at("group_rules", "Group rules"),
+        (&b.group_rules, &o.group_rules, &t.group_rules),
+        crate::diff::group_rules_text,
     );
     let new_line_defaults = merge_value(
         cx,
@@ -1288,6 +1295,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         account_coding,
         new_line_defaults,
         groups,
+        group_rules,
         sets,
         locations,
         topsheet,

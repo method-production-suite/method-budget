@@ -249,6 +249,15 @@ function categoryCodes() {
     .map((r) => k.str(r.code));
 }
 
+// Category codes with their names, in topsheet order.
+function categoryNames() {
+  const out = new Map();
+  for (const r of arr(k.budget().topsheet)) {
+    if (obj(r).kind === 'category') out.set(k.str(r.code), k.str(r.name));
+  }
+  return out;
+}
+
 function accountCodes() {
   const out = [];
   for (const r of arr(k.budget().topsheet)) {
@@ -680,7 +689,9 @@ function creditRowInput(r0) {
     source:
       src.kind === 'group'
         ? { kind: 'group', group: k.str(src.group), excluded_fringes: arr(src.excluded_fringes).map(k.str) }
-        : { kind: 'flat', amount: k.centsToText(isNone(src.amount) ? 0 : src.amount) },
+        : src.kind === 'category'
+          ? { kind: 'category', category: k.str(src.category), excluded_fringes: arr(src.excluded_fringes).map(k.str) }
+          : { kind: 'flat', amount: k.centsToText(isNone(src.amount) ? 0 : src.amount) },
     percent: k.str(r.percent) || '0',
     cap:
       cap.kind === 'qualified_spend' || cap.kind === 'credit'
@@ -866,8 +877,16 @@ function creditRow(i, n, row, raw, entry, ik) {
   );
 
   const groups = groupNames();
-  const current = row.source.kind === 'group' ? `group:${row.source.group}` : 'flat';
-  const srcOptions = [['flat', 'Amount typed in'], ...withKept(groups, row.source.kind === 'group' ? [row.source.group] : []).map((g) => [`group:${g}`, `Group: ${g}`])];
+  const cats = categoryNames();
+  const current =
+    row.source.kind === 'group' ? `group:${row.source.group}` : row.source.kind === 'category' ? `category:${row.source.category}` : 'flat';
+  const catLabel = (c) => (cats.get(c) ? `Category: ${c} ${cats.get(c)}` : `Category: ${c}`);
+  const srcOptions = [
+    ['flat', 'Amount typed in'],
+    ...withKept(groups, row.source.kind === 'group' ? [row.source.group] : []).map((g) => [`group:${g}`, `Group: ${g}`]),
+    // A topsheet category's total with its fringes (decisions.md, entry 57).
+    ...withKept([...cats.keys()], row.source.kind === 'category' ? [row.source.category] : []).map((c) => [`category:${c}`, catLabel(c)]),
+  ];
   grid.append(
     k.field(
       'Spend',
@@ -879,7 +898,9 @@ function creditRow(i, n, row, raw, entry, ik) {
           send(fk('source'), old)(
             v === 'flat'
               ? { source: { kind: 'flat', amount: '0' } }
-              : { source: { kind: 'group', group: v.slice(6), excluded_fringes: [] } },
+              : v.startsWith('category:')
+                ? { source: { kind: 'category', category: v.slice(9), excluded_fringes: [] } }
+                : { source: { kind: 'group', group: v.slice(6), excluded_fringes: [] } },
           ),
       }),
       { wide: true },
@@ -939,7 +960,7 @@ function creditRow(i, n, row, raw, entry, ik) {
       ),
     );
   }
-  if (row.source.kind === 'group') {
+  if (row.source.kind === 'group' || row.source.kind === 'category') {
     grid.append(
       chips({
         fieldKey: fk('fringes'),

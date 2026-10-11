@@ -14,8 +14,9 @@ use method_core::pack::{ItemSource, PackInfo};
 use method_core::{
     Account, Arithmetic, Baseline, Budget, Category, Cents, Charge, ChargeKind, Credit, CreditCap,
     CreditRow, CreditSource, Currency, Dec, Detail, DisplayPrefs, FlatBasis, Formula, Fringe,
-    FringeKind, FringePosting, GlobalInfo, Group, InfoValue, Location, NewLineDefaults, Note,
-    ProductionTotal, RowId, RowKind, SetDef, TopsheetRow, TrailingFringes, UnitDef, Version,
+    FringeKind, FringePosting, GlobalInfo, Group, GroupRules, Inclusion, InfoValue, Location,
+    NewLineDefaults, Note, ProductionTotal, RowId, RowKind, SetDef, TopsheetRow, TrailingFringes,
+    UnitDef, Version,
 };
 use method_core::{
     Band, BandField, FontSize, ReportColumn, ReportPreset, ReportSection, ReportSpec,
@@ -205,6 +206,8 @@ pub(crate) struct FileBudget {
     fringes: BTreeMap<String, FileFringe>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     groups: BTreeMap<String, FileGroup>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    group_rules: Option<FileGroupRules>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     sets: BTreeMap<String, FileSet>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -259,6 +262,7 @@ impl From<&Budget> for FileBudget {
             account_coding,
             new_line_defaults,
             groups,
+            group_rules,
             sets,
             locations,
             topsheet,
@@ -309,6 +313,10 @@ impl From<&Budget> for FileBudget {
                 .collect(),
             fringes: map(fringes, FileFringe::from),
             groups: map(groups, FileGroup::from),
+            // Movie Magic's rules are the default, also for files that
+            // don't say.
+            group_rules: (*group_rules != GroupRules::default())
+                .then(|| FileGroupRules::from(*group_rules)),
             sets: map(sets, FileSet::from),
             locations: map(locations, FileLocation::from),
             topsheet: topsheet.iter().map(FileTopsheetRow::from).collect(),
@@ -377,6 +385,7 @@ impl From<FileBudget> for Budget {
                 .map(NewLineDefaults::from)
                 .unwrap_or_default(),
             groups: unmap(f.groups, Group::from),
+            group_rules: f.group_rules.map(GroupRules::from).unwrap_or_default(),
             sets: unmap(f.sets, SetDef::from),
             locations: unmap(f.locations, Location::from),
             topsheet: f.topsheet.into_iter().map(TopsheetRow::from).collect(),
@@ -1140,6 +1149,70 @@ impl From<FileArithmetic> for Arithmetic {
         match a {
             FileArithmetic::Mmb => Arithmetic::Mmb,
             FileArithmetic::Exact => Arithmetic::Exact,
+        }
+    }
+}
+
+/// One of Movie Magic's group rules: `"include"` or `"exclude"`.
+#[derive(Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FileInclusion {
+    Include,
+    Exclude,
+}
+
+impl From<Inclusion> for FileInclusion {
+    fn from(i: Inclusion) -> FileInclusion {
+        match i {
+            Inclusion::Include => FileInclusion::Include,
+            Inclusion::Exclude => FileInclusion::Exclude,
+        }
+    }
+}
+
+impl From<FileInclusion> for Inclusion {
+    fn from(i: FileInclusion) -> Inclusion {
+        match i {
+            FileInclusion::Include => Inclusion::Include,
+            FileInclusion::Exclude => Inclusion::Exclude,
+        }
+    }
+}
+
+/// The budget-wide group rules (decisions.md, entry 57). The whole object
+/// is left out when every rule is Movie Magic's default, and so is each
+/// rule that is.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileGroupRules {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ungrouped_lines: Option<FileInclusion>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    conflict: Option<FileInclusion>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    fringes_in_totals: Option<FileInclusion>,
+}
+
+impl From<GroupRules> for FileGroupRules {
+    fn from(r: GroupRules) -> FileGroupRules {
+        let d = GroupRules::default();
+        let write = |v: Inclusion, def: Inclusion| (v != def).then(|| FileInclusion::from(v));
+        FileGroupRules {
+            ungrouped_lines: write(r.ungrouped_lines, d.ungrouped_lines),
+            conflict: write(r.conflict, d.conflict),
+            fringes_in_totals: write(r.fringes_in_totals, d.fringes_in_totals),
+        }
+    }
+}
+
+impl From<FileGroupRules> for GroupRules {
+    fn from(f: FileGroupRules) -> GroupRules {
+        let d = GroupRules::default();
+        let read = |v: Option<FileInclusion>, def: Inclusion| v.map_or(def, Inclusion::from);
+        GroupRules {
+            ungrouped_lines: read(f.ungrouped_lines, d.ungrouped_lines),
+            conflict: read(f.conflict, d.conflict),
+            fringes_in_totals: read(f.fringes_in_totals, d.fringes_in_totals),
         }
     }
 }
@@ -2116,6 +2189,11 @@ enum FileCreditSource {
         #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
         excluded_fringes: BTreeSet<String>,
     },
+    Category {
+        category: String,
+        #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+        excluded_fringes: BTreeSet<String>,
+    },
 }
 
 #[derive(Serialize, Deserialize)]
@@ -2144,6 +2222,13 @@ impl From<&CreditRow> for FileCreditRow {
                     group: group.clone(),
                     excluded_fringes: excluded_fringes.clone(),
                 },
+                CreditSource::Category {
+                    category,
+                    excluded_fringes,
+                } => FileCreditSource::Category {
+                    category: category.clone(),
+                    excluded_fringes: excluded_fringes.clone(),
+                },
             },
             percent: DecStr(*percent),
             cap: match *cap {
@@ -2166,6 +2251,13 @@ impl From<FileCreditRow> for CreditRow {
                     excluded_fringes,
                 } => CreditSource::Group {
                     group,
+                    excluded_fringes,
+                },
+                FileCreditSource::Category {
+                    category,
+                    excluded_fringes,
+                } => CreditSource::Category {
+                    category,
                     excluded_fringes,
                 },
             },

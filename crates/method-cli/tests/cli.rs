@@ -405,6 +405,47 @@ fn check_warns_about_trailing_level_fringes() {
     );
 }
 
+/// The group rules from the command line (decisions.md, entry 57): lines
+/// with no group left out, then conflicts counted; written only when not
+/// the default.
+#[test]
+fn set_group_rules() {
+    let d = Dir::new("group-rules");
+    let p = d.path("g.mthd");
+    let text = r#"{"format": "method-budget", "version": 1, "budget": {"title": "T", "base_currency": "USD",
+        "groups": {"IN": {}, "OFF": {"in_budget_total": false}},
+        "topsheet": [{"kind": "category", "code": "11", "name": "C", "accounts": [{"code": "11-01", "name": "A", "details": [
+            {"id": 1, "description": "In", "amount": "1", "rate": "1000", "groups": ["IN"]},
+            {"id": 2, "description": "Both", "amount": "1", "rate": "3000", "groups": ["IN", "OFF"]},
+            {"id": 3, "description": "None", "amount": "1", "rate": "500"}]}]}]}}"#;
+    std::fs::write(&p, text).unwrap();
+    let o = method(&["check", &p]);
+    assert!(out(&o).contains("ok, net total 1,500.00"), "{}", out(&o));
+
+    let o = method(&["set", &p, "group_rules.ungrouped_lines", "exclude"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(read(&p).contains("\"ungrouped_lines\": \"exclude\""));
+    let o = method(&["check", &p]);
+    assert!(out(&o).contains("ok, net total 1,000.00"), "{}", out(&o));
+
+    let o = method(&["set", &p, "group_rules.conflict", "include"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let o = method(&["check", &p]);
+    assert!(out(&o).contains("ok, net total 4,000.00"), "{}", out(&o));
+
+    method(&["set", &p, "group_rules.ungrouped_lines", "include"]);
+    method(&["set", &p, "group_rules.conflict", "exclude"]);
+    assert!(!read(&p).contains("group_rules"), "defaults are left out");
+    assert_eq!(
+        code(&method(&["set", &p, "group_rules.conflict", "maybe"])),
+        2
+    );
+    assert_eq!(
+        code(&method(&["set", &p, "group_rules.nope", "include"])),
+        2
+    );
+}
+
 /// A flat fringe's basis and most hours a day from the command line
 /// (decisions.md, entry 54).
 #[test]

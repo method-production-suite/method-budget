@@ -222,13 +222,16 @@ fn gen_credit(rng: &mut Rng) -> Credit {
         rows: (0..rng.below(4))
             .map(|_| CreditRow {
                 description: rng.text(),
-                source: if rng.chance(50) {
-                    CreditSource::Flat(rng.cents())
-                } else {
-                    CreditSource::Group {
+                source: match rng.below(3) {
+                    0 => CreditSource::Flat(rng.cents()),
+                    1 => CreditSource::Group {
                         group: rng.text(),
                         excluded_fringes: rng.texts(),
-                    }
+                    },
+                    _ => CreditSource::Category {
+                        category: rng.text(),
+                        excluded_fringes: rng.texts(),
+                    },
                 },
                 percent: rng.dec(),
                 cap: match rng.below(3) {
@@ -338,6 +341,20 @@ fn gen_content(rng: &mut Rng) -> Budget {
     }
     if rng.chance(30) {
         b.trailing_level_fringes = TrailingFringes::Drop;
+    }
+    if rng.chance(40) {
+        let pick = |r: &mut Rng| {
+            if r.chance(50) {
+                Inclusion::Include
+            } else {
+                Inclusion::Exclude
+            }
+        };
+        b.group_rules = GroupRules {
+            ungrouped_lines: pick(rng),
+            conflict: pick(rng),
+            fringes_in_totals: pick(rng),
+        };
     }
     b.groups = rng.map(|r| Group {
         short_code: r.opt_text(),
@@ -615,6 +632,10 @@ fn generator_covers_every_variant_and_field() {
         "fringe_posting",
         "trailing_level_fringes",
         "arithmetic",
+        "group_rules",
+        "ungrouped_lines",
+        "conflict",
+        "fringes_in_totals",
         "new_line_defaults",
         "info",
         "currencies",
@@ -637,6 +658,7 @@ fn generator_covers_every_variant_and_field() {
         "topsheet",
         "charges",
         "credits",
+        "category",
         "baseline",
         "tag_presets",
         "line_presets",

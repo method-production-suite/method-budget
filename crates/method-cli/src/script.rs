@@ -9,6 +9,7 @@
 //! set compact_versions true
 //! set arithmetic exact
 //! set trailing_level_fringes drop
+//! set group_rules ungrouped_lines exclude
 //! set global SHOOT_DAYS 32
 //! set fringe FICA rate 7.65
 //! set fringe FICA cutoff 168600.00
@@ -29,8 +30,8 @@ use std::str::FromStr;
 
 use method_core::rename::{rename, valid_name, SetupKind};
 use method_core::{
-    recalc, Arithmetic, Budget, Cents, Dec, Detail, FlatBasis, Formula, FringeKind, RecalcOptions,
-    Report, RowId, TrailingFringes,
+    recalc, Arithmetic, Budget, Cents, Dec, Detail, FlatBasis, Formula, FringeKind, Inclusion,
+    RecalcOptions, Report, RowId, TrailingFringes,
 };
 
 use crate::cli::{money, CliError, Outcome};
@@ -199,6 +200,37 @@ pub enum Op {
     /// Under production-level posting, keep or drop the fringes of
     /// categories after the last production total (docs/FORMAT.md, "Budget").
     TrailingLevelFringes(TrailingFringes),
+    /// One of the group rules ([`GROUP_RULES`]; docs/FORMAT.md, "Group
+    /// rules").
+    GroupRule(&'static str, Inclusion),
+}
+
+/// The group rules by the names files and commands use.
+pub const GROUP_RULES: [&str; 3] = ["ungrouped_lines", "conflict", "fringes_in_totals"];
+
+/// A group rule by name, with its value (`include` or `exclude`).
+pub fn group_rule(rule: &str, value: &str) -> Result<Op, String> {
+    let name = GROUP_RULES
+        .into_iter()
+        .find(|r| *r == rule.trim())
+        .ok_or_else(|| {
+            format!(
+                "`{rule}` is not a group rule: use {}",
+                GROUP_RULES.join(", ")
+            )
+        })?;
+    let v = Inclusion::parse(value)
+        .ok_or_else(|| format!("`{value}` is not a group rule value: use include or exclude"))?;
+    Ok(Op::GroupRule(name, v))
+}
+
+fn group_rule_slot<'a>(b: &'a mut Budget, rule: &str) -> &'a mut Inclusion {
+    let r = &mut b.group_rules;
+    match rule {
+        "ungrouped_lines" => &mut r.ungrouped_lines,
+        "conflict" => &mut r.conflict,
+        _ => &mut r.fringes_in_totals,
+    }
 }
 
 fn need<'a>(w: &'a [Word], n: usize, form: &str) -> Result<&'a [Word], String> {
@@ -254,6 +286,14 @@ pub fn parse(line: &str) -> Result<Option<Op>, String> {
         ["set", "trailing_level_fringes"] => {
             let w = need(&w, 3, "set trailing_level_fringes keep|drop")?;
             Op::TrailingLevelFringes(trailing(&w[2].text)?)
+        }
+        ["set", "group_rules"] => {
+            let w = need(
+                &w,
+                4,
+                "set group_rules ungrouped_lines|conflict|fringes_in_totals include|exclude",
+            )?;
+            group_rule(&w[2].text, &w[3].text)?
         }
         ["set", "global"] => {
             let w = need(&w, 4, "set global NAME FORMULA")?;
@@ -697,6 +737,15 @@ pub fn apply(b: &mut Budget, op: &Op) -> Result<Vec<String>, String> {
             ));
             b.trailing_level_fringes = *t;
         }
+        Op::GroupRule(rule, v) => {
+            let slot = group_rule_slot(b, rule);
+            log.push(format!(
+                "group_rules {rule} {} -> {}",
+                slot.name(),
+                v.name()
+            ));
+            *slot = *v;
+        }
         Op::Charge(name, applied) => {
             let c = b
                 .charges
@@ -851,6 +900,9 @@ mod tests {
             "set arithmetic mmb",
             "set trailing_level_fringes drop",
             "set trailing_level_fringes keep",
+            "set group_rules ungrouped_lines exclude",
+            "set group_rules conflict include",
+            "set group_rules fringes_in_totals exclude",
             "set global DAYS 30",
             "set fringe FICA rate 7.65",
             "set fringe FICA cutoff 168,600.00",
@@ -887,6 +939,9 @@ mod tests {
             ("add tag #1 set A", "not a tag kind"),
             ("rename account A B", "not something to rename"),
             ("delete everything", "unknown command"),
+            ("set group_rules ungrouped exclude", "not a group rule"),
+            ("set group_rules conflict maybe", "include or exclude"),
+            ("set group_rules conflict", "missing a value"),
         ];
         for (line, want) in bad {
             let e = parse(line).unwrap_err();

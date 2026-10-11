@@ -3,7 +3,7 @@
 //! Stages 1 and 2 (evaluating rows and their fringes) are most of a recalc,
 //! and they work account by account: an account's rows depend only on the
 //! account itself and on the budget's arithmetic, globals, fringes,
-//! currencies, units and groups (and the recalc options). An edit usually changes one account, so
+//! currencies, units, groups and group rules (and the recalc options). An edit usually changes one account, so
 //! [`RecalcCache`] keeps every account's evaluated rows, and the next recalc
 //! evaluates again only the accounts whose rows changed (all of them when one
 //! of those tables changed). Stages 3 and 4 run in full every time. The
@@ -12,7 +12,9 @@
 use std::collections::BTreeMap;
 
 use crate::calc::{recalc_with, CalcError, RecalcOptions};
-use crate::model::{Account, Arithmetic, Budget, Currency, Formula, Fringe, Group, UnitDef};
+use crate::model::{
+    Account, Arithmetic, Budget, Currency, Formula, Fringe, Group, GroupRules, UnitDef,
+};
 use crate::report::{Report, RowTotals};
 use crate::Cents;
 
@@ -35,6 +37,7 @@ struct Key {
     units: BTreeMap<String, UnitDef>,
     fringes: BTreeMap<String, Fringe>,
     groups: BTreeMap<String, Group>,
+    group_rules: GroupRules,
     opts: RecalcOptions,
 }
 
@@ -48,6 +51,7 @@ impl Key {
             units: b.units.clone(),
             fringes: b.fringes.clone(),
             groups: b.groups.clone(),
+            group_rules: b.group_rules,
             opts: opts.clone(),
         }
     }
@@ -60,6 +64,7 @@ impl Key {
             && self.units == b.units
             && self.fringes == b.fringes
             && self.groups == b.groups
+            && self.group_rules == b.group_rules
             && self.opts == *opts
     }
 }
@@ -174,7 +179,7 @@ mod tests {
 
     use super::*;
     use crate::calc::recalc;
-    use crate::model::{Detail, FringePosting, RowKind, TopsheetRow};
+    use crate::model::{Detail, FringePosting, Inclusion, RowKind, TopsheetRow};
     use crate::sample::{self, SampleSpec};
 
     struct Rng(u64);
@@ -185,6 +190,13 @@ mod tests {
             self.0 ^= self.0 << 25;
             self.0 ^= self.0 >> 27;
             self.0.wrapping_mul(0x2545_F491_4F6C_DD1D) % n.max(1)
+        }
+    }
+
+    fn flip(i: Inclusion) -> Inclusion {
+        match i {
+            Inclusion::Include => Inclusion::Exclude,
+            Inclusion::Exclude => Inclusion::Include,
         }
     }
 
@@ -202,7 +214,7 @@ mod tests {
         let k = rng.below(n) as usize;
         let fringes: Vec<String> = b.fringes.keys().cloned().collect();
         let groups: Vec<String> = b.groups.keys().cloned().collect();
-        match rng.below(14) {
+        match rng.below(15) {
             0..=3 => details_mut(b)[k].rate = format!("{}", rng.below(9_000)).into(),
             4 => details_mut(b)[k].amount = "SHOOT_DAYS / 2".into(),
             5 => details_mut(b)[k].amount = "NOPE".into(),
@@ -243,6 +255,15 @@ mod tests {
                 let g = groups[rng.below(groups.len() as u64) as usize].clone();
                 if let Some(g) = b.groups.get_mut(&g) {
                     g.in_budget_total = !g.in_budget_total;
+                }
+            }
+            13 => {
+                // Flip the group rules that change which lines count.
+                let r = &mut b.group_rules;
+                if rng.below(2) == 0 {
+                    r.ungrouped_lines = flip(r.ungrouped_lines);
+                } else {
+                    r.conflict = flip(r.conflict);
                 }
             }
             _ => {
