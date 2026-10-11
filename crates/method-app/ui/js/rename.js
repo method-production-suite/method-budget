@@ -13,7 +13,8 @@ import { anchoredForm } from './modal.js';
 import { openContextMenu } from './menu.js';
 import { saveItemToLibrary } from './library.js';
 
-const GLOBAL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+// Letters, digits and _, with at least one letter or _ (decisions.md, entry 56).
+const GLOBAL_NAME = /^(?=[A-Za-z0-9_]*[A-Za-z_])[A-Za-z0-9_]+$/;
 
 /** Each kind: what it is called, and its table in the view's budget. */
 export const RENAME_KINDS = {
@@ -37,7 +38,7 @@ export function renameProblem(kind, from, to, budget) {
   const b = budget && typeof budget === 'object' ? budget : {};
   if (to === '') return kind === 'currency' ? 'Enter a currency code.' : `Enter a ${info.what} name.`;
   if (kind === 'global') {
-    if (!GLOBAL_NAME.test(to)) return `“${to}” can’t be a global name: use letters, digits and _, starting with a letter.`;
+    if (!GLOBAL_NAME.test(to)) return `“${to}” can’t be a global name: use letters, digits and _, with at least one letter or _.`;
   } else if (to.includes(',')) {
     return kind === 'currency' ? 'Codes can’t contain commas.' : 'Names can’t contain commas.';
   }

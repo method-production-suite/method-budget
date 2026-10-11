@@ -1073,7 +1073,8 @@ function globalUses(ctx, names) {
   const counts = new Map(names.map((n) => [n, 0]));
   if (!names.length) return counts;
   const lower = new Map(names.map((n) => [n.toLowerCase(), n]));
-  const word = /[A-Za-z_][A-Za-z0-9_]*/g;
+  // Split as the formula reader splits it (1ZG is a name, 1.5 a number).
+  const word = /[\d.]*\.[\d.]*|[A-Za-z0-9_]+/g;
   for (const it of ctx.items) {
     if (it.kind !== 'category') continue;
     for (const a of Array.isArray(it.row.accounts) ? it.row.accounts : []) {

@@ -364,7 +364,7 @@ function suggestFor(field) {
   if (scope.kind === 'text') return [];
   const typed = (field === 'text' ? st.text : st.withText).trim();
   // A formula in the Replace box: only offer while it is one name.
-  if (scope.kind === 'global' && typed && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(typed)) return [];
+  if (scope.kind === 'global' && typed && !/^(?=[A-Za-z0-9_]*[A-Za-z_])[A-Za-z0-9_]+$/.test(typed)) return [];
   const pool = (field === 'text' ? names(scope) : withNames(scope)).map((name) => ({ name }));
   const ranked = rank(pool, typed);
   if (ranked.length === 1 && ranked[0].name === typed) return [];

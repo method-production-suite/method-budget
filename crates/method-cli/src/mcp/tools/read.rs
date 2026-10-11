@@ -229,7 +229,8 @@ pub fn tools() -> Vec<Tool> {
             title: "Check a budget",
             description: "Recalculates the budget and reports any problem (a formula that doesn't \
                 work, an unknown fringe or currency) and warnings: lines naming units, sets or \
-                locations the budget doesn't have, and repeated account or category numbers.",
+                locations the budget doesn't have, repeated account or category numbers, and \
+                fringes after the last production total that no level holds.",
             mutating: false,
             destructive: false,
             schema: || object(vec![path_prop()], &["path"]),
@@ -1153,6 +1154,12 @@ fn validate(ctx: &mut Ctx, a: &Args) -> ToolResult {
                     }
                 }
             }
+        }
+    }
+    // What the totals leave out (decisions.md, entry 56).
+    if let Ok(r) = &report {
+        for w in method_core::warnings(b, r) {
+            warn(w);
         }
     }
     let ok = report.is_ok();

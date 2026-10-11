@@ -109,8 +109,8 @@ pub fn tools() -> Vec<Tool> {
             name: "tag_lines",
             title: "Tag lines",
             description: "Puts fringes and groups on rows or takes them off: rows by id, or every \
-                line of an account. A fringe or group must exist to be added. Fringes go on lines \
-                only; groups on lines and adjustments.",
+                line of an account. A fringe or group must exist to be added. Fringes and groups \
+                go on lines and adjustments.",
             mutating: true,
             destructive: false,
             schema: || {
@@ -201,7 +201,7 @@ fn applies(kind: RowKind, field: &str) -> bool {
     match kind {
         RowKind::Line => true,
         RowKind::Subtotal => field == "description" || STYLE.contains(&field),
-        RowKind::Adjustment => !matches!(field, "rate" | "unit3" | "currency" | "fringes"),
+        RowKind::Adjustment => !matches!(field, "rate" | "unit3" | "currency"),
         RowKind::Separator => STYLE.contains(&field),
     }
 }
@@ -627,12 +627,8 @@ fn tag_lines(ctx: &mut Ctx, a: &Args) -> ToolResult {
                 if names.is_empty() {
                     continue;
                 }
-                let ok = if *group {
-                    d.kind.is_costed()
-                } else {
-                    d.kind == RowKind::Line
-                };
-                if !ok {
+                // Lines and adjustment rows take both (decisions.md, entry 56).
+                if !d.kind.is_costed() {
                     skipped.insert(*id);
                     continue;
                 }

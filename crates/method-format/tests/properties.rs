@@ -336,6 +336,9 @@ fn gen_content(rng: &mut Rng) -> Budget {
     if rng.chance(30) {
         b.arithmetic = Arithmetic::Exact;
     }
+    if rng.chance(30) {
+        b.trailing_level_fringes = TrailingFringes::Drop;
+    }
     b.groups = rng.map(|r| Group {
         short_code: r.opt_text(),
         description: r.text(),
@@ -610,6 +613,7 @@ fn generator_covers_every_variant_and_field() {
         "totals_currency",
         "account_coding",
         "fringe_posting",
+        "trailing_level_fringes",
         "arithmetic",
         "new_line_defaults",
         "info",

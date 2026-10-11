@@ -8,6 +8,7 @@
 //! set title "Feature, draft 3"
 //! set compact_versions true
 //! set arithmetic exact
+//! set trailing_level_fringes drop
 //! set global SHOOT_DAYS 32
 //! set fringe FICA rate 7.65
 //! set fringe FICA cutoff 168600.00
@@ -29,7 +30,7 @@ use std::str::FromStr;
 use method_core::rename::{rename, valid_name, SetupKind};
 use method_core::{
     recalc, Arithmetic, Budget, Cents, Dec, Detail, FlatBasis, Formula, FringeKind, RecalcOptions,
-    Report, RowId,
+    Report, RowId, TrailingFringes,
 };
 
 use crate::cli::{money, CliError, Outcome};
@@ -195,6 +196,9 @@ pub enum Op {
     CompactVersions(bool),
     /// How totals are worked out (docs/FORMAT.md, "Budget").
     Arithmetic(Arithmetic),
+    /// Under production-level posting, keep or drop the fringes of
+    /// categories after the last production total (docs/FORMAT.md, "Budget").
+    TrailingLevelFringes(TrailingFringes),
 }
 
 fn need<'a>(w: &'a [Word], n: usize, form: &str) -> Result<&'a [Word], String> {
@@ -213,6 +217,12 @@ fn parse_money(s: &str) -> Result<Cents, String> {
         return Err(format!("`{s}` has more than two decimal places"));
     }
     Ok(c)
+}
+
+/// A trailing level fringes setting by name (`keep` or `drop`).
+pub fn trailing(s: &str) -> Result<TrailingFringes, String> {
+    TrailingFringes::parse(s)
+        .ok_or_else(|| format!("`{s}` is not a trailing level fringes setting: use keep or drop"))
 }
 
 /// An arithmetic by name (`mmb` or `exact`).
@@ -240,6 +250,10 @@ pub fn parse(line: &str) -> Result<Option<Op>, String> {
         ["set", "arithmetic"] => {
             let w = need(&w, 3, "set arithmetic mmb|exact")?;
             Op::Arithmetic(arithmetic(&w[2].text)?)
+        }
+        ["set", "trailing_level_fringes"] => {
+            let w = need(&w, 3, "set trailing_level_fringes keep|drop")?;
+            Op::TrailingLevelFringes(trailing(&w[2].text)?)
         }
         ["set", "global"] => {
             let w = need(&w, 4, "set global NAME FORMULA")?;
@@ -531,7 +545,7 @@ pub fn apply(b: &mut Budget, op: &Op) -> Result<Vec<String>, String> {
         Op::Global(name, f) => {
             if !valid_name(SetupKind::Global, name) {
                 return Err(format!(
-                    "`{name}` can't be a global name: use letters, digits and _"
+                    "`{name}` can't be a global name: use letters, digits and _, with at least one letter or _"
                 ));
             }
             match b.globals.insert(name.clone(), Formula(f.clone())) {
@@ -674,6 +688,14 @@ pub fn apply(b: &mut Budget, op: &Op) -> Result<Vec<String>, String> {
                 a.name()
             ));
             b.arithmetic = *a;
+        }
+        Op::TrailingLevelFringes(t) => {
+            log.push(format!(
+                "trailing_level_fringes {} -> {}",
+                b.trailing_level_fringes.name(),
+                t.name()
+            ));
+            b.trailing_level_fringes = *t;
         }
         Op::Charge(name, applied) => {
             let c = b
@@ -827,6 +849,8 @@ mod tests {
             "set compact_versions true",
             "set arithmetic exact",
             "set arithmetic mmb",
+            "set trailing_level_fringes drop",
+            "set trailing_level_fringes keep",
             "set global DAYS 30",
             "set fringe FICA rate 7.65",
             "set fringe FICA cutoff 168,600.00",

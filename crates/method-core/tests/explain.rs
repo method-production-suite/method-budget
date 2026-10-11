@@ -264,7 +264,7 @@ fn a_line_shows_globals_quantity_and_rounding() {
     // The line's fringes are pointed to, not added in.
     let f = find(&e.root, "Fringes").unwrap();
     assert_eq!(f.role, Role::Note);
-    assert_eq!(f.amount, Some(273_768));
+    assert_eq!(f.amount, Some(276_500));
     assert_eq!(f.expand, Some(Target::LineFringes(2)));
     assert!(matches!(
         e.root.link,
@@ -322,7 +322,7 @@ fn currency_and_adjustment_rows_show_their_working() {
 }
 
 #[test]
-fn a_range_shares_its_cutoff_by_largest_remainder() {
+fn a_range_uses_its_cutoff_in_line_order() {
     let b = sample();
     let e = explain(
         &b,
@@ -330,22 +330,33 @@ fn a_range_shares_its_cutoff_by_largest_remainder() {
         &Target::LineFringe(2, "FICA".into()),
     )
     .unwrap();
-    assert_eq!(e.reported, 73_768);
+    // The grip's 54,000.00 uses the whole 10,000.00 cutoff (decisions.md,
+    // entry 56), so the overtime line after it earns nothing.
+    assert_eq!(e.reported, 76_500);
     let text = all_text(&e.root);
     assert!(
-        text.contains("range 1: lines 1, 2 earn as one person"),
+        text.contains("range 1: lines 1, 2 earn as one person, so they share one cutoff, used up in line order"),
         "{text}"
     );
-    assert!(text.contains("54,000.00 + 2,000.00"), "{text}");
+    assert!(text.contains("Earnings: this line's total"), "{text}");
     assert!(
-        text.contains("FICA stops at 10,000.00 per earner; this line uses 9,642.86 of it"),
+        text.contains("FICA stops at 10,000.00 per earner"),
         "{text}"
     );
     assert!(text.contains("7.65% of 10,000.00 = 765.00"), "{text}");
+    let ot = explain(
+        &b,
+        &RecalcOptions::default(),
+        &Target::LineFringe(3, "FICA".into()),
+    )
+    .unwrap();
+    assert_eq!(ot.reported, 0);
+    let text = all_text(&ot.root);
     assert!(
-        text.contains("which is 737.68 once the shares are split by largest remainder"),
+        text.contains("the lines above in the range used it all, so this line takes nothing"),
         "{text}"
     );
+    assert!(text.contains("7.65% of 0.00 = 0"), "{text}");
     let ph = explain(
         &b,
         &RecalcOptions::default(),

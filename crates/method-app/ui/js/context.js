@@ -248,7 +248,8 @@ function formatItems(s) {
 function tagItems(field, rows) {
   const b = (ctx.view() && ctx.view().budget) || {};
   const defs = b[field] && typeof b[field] === 'object' ? b[field] : {};
-  const takers = rows.filter((d) => (field === 'fringes' ? kindOf(d) === 'line' : kindOf(d) === 'line' || kindOf(d) === 'adjustment'));
+  // Lines and adjustment rows take fringes and groups (decisions.md, entry 56).
+  const takers = rows.filter((d) => kindOf(d) === 'line' || kindOf(d) === 'adjustment');
   const what = field === 'fringes' ? 'fringes' : 'groups';
   const out = Object.keys(defs)
     .sort(byteOrder)

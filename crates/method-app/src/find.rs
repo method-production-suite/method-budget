@@ -273,33 +273,15 @@ fn splice(hay: &str, ranges: &[(usize, usize)], with: &str) -> String {
 }
 
 /// Byte ranges of the global-name tokens equal to `name` in a formula, split
-/// the way the formula reader splits it: a run of digits and dots is a
-/// number, a letter or `_` starts a name that runs on through letters, digits
-/// and `_`. So `DAYS` matches in `DAYS * 2` but not in `SHOOT_DAYS` or
-/// `DAYS2`.
+/// the way the formula reader splits it (`method_core::expr::name_spans`): a
+/// run of digits and dots is a number unless its digits run on into a
+/// letter or `_`, and a name runs on through letters, digits and `_`. So
+/// `DAYS` matches in `DAYS * 2` but not in `SHOOT_DAYS`, `DAYS2` or `2DAYS`.
 pub fn global_tokens(src: &str, name: &str) -> Vec<(usize, usize)> {
-    let b = src.as_bytes();
-    let mut out = Vec::new();
-    let mut i = 0;
-    while i < b.len() {
-        let c = b[i];
-        if c.is_ascii_digit() || c == b'.' {
-            while i < b.len() && (b[i].is_ascii_digit() || b[i] == b'.') {
-                i += 1;
-            }
-        } else if c.is_ascii_alphabetic() || c == b'_' {
-            let start = i;
-            while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
-                i += 1;
-            }
-            if &src[start..i] == name {
-                out.push((start, i));
-            }
-        } else {
-            i += 1;
-        }
-    }
-    out
+    method_core::expr::name_spans(src)
+        .filter(|r| &src[r.clone()] == name)
+        .map(|r| (r.start, r.end))
+        .collect()
 }
 
 fn cut(s: &str) -> String {
@@ -411,7 +393,7 @@ impl Finder {
                 }
                 if !is_ident(name) {
                     return Err(format!(
-                        "`{name}` isn't a global's name: names are letters, digits and _"
+                        "`{name}` isn't a global's name: names are letters, digits and _, with at least one letter or _"
                     ));
                 }
                 Want::Token(name.to_string())
@@ -685,7 +667,7 @@ impl Finder {
                 match self.scope {
                     Scope::Fringe | Scope::Group => {
                         let (names, takes) = if self.scope == Scope::Fringe {
-                            (&mut d.fringes, d.kind == RowKind::Line)
+                            (&mut d.fringes, d.kind.is_costed())
                         } else {
                             (&mut d.groups, d.kind.is_costed())
                         };
@@ -1079,7 +1061,10 @@ mod tests {
         assert!(global_tokens("SHOOT_DAYS + DAYS2", "DAYS").is_empty());
         assert_eq!(global_tokens("(DAYS+1)/DAYS", "DAYS"), [(1, 5), (9, 13)]);
         // A number running into letters lexes as a number then a name.
-        assert_eq!(global_tokens("2DAYS", "DAYS"), [(1, 5)]);
+        // A digit-led name is a name of its own (decisions.md, entry 56).
+        assert!(global_tokens("2DAYS", "DAYS").is_empty());
+        assert_eq!(global_tokens("2DAYS", "2DAYS"), [(0, 5)]);
+        assert_eq!(global_tokens("1.5DAYS", "DAYS"), [(3, 7)]);
         assert!(global_tokens("1.5", "DAYS").is_empty());
 
         let b = budget();

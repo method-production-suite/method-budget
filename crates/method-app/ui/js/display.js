@@ -90,7 +90,9 @@ export function moneyAt(cents, places = 2) {
 export function globalsIn(formula, globals) {
   const out = [];
   const have = globals && typeof globals === 'object' ? globals : {};
-  for (const name of String(formula || '').match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
+  // Split as the formula reader splits it: a run with a point is a number,
+  // any other run of letters, digits and _ a name (1ZG is one).
+  for (const name of String(formula || '').match(/[\d.]*\.[\d.]*|[A-Za-z0-9_]+/g) || []) {
     if (Object.prototype.hasOwnProperty.call(have, name) && !out.includes(name)) out.push(name);
   }
   return out;

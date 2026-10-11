@@ -5,7 +5,8 @@ use crate::script::{self, Op, RowRef, Word, LINE_FIELDS};
 
 pub const USAGE: &str = "  method set <file.mthd> <path> <value> [--dry-run]
       Change one value and save atomically. Paths: title, compact_versions,
-      arithmetic (mmb or exact), global.NAME, fringe.NAME.rate, fringe.NAME.cutoff, fringe.NAME.basis
+      arithmetic (mmb or exact), trailing_level_fringes (keep or drop),
+      global.NAME, fringe.NAME.rate, fringe.NAME.cutoff, fringe.NAME.basis
       (amount, amount_counts or quantity), fringe.NAME.max_hours_per_day,
       line.ROW.FIELD (ROW is #ID, ACCOUNT:N or ACCOUNT:*; FIELD as in `set
       line`), charge.NAME.applied.
@@ -32,6 +33,9 @@ pub fn op_for(path: &str, value: &str) -> Result<Op, CliError> {
             Op::CompactVersions(script::flag(&v).map_err(bad)?)
         }
         "arithmetic" if rest.is_empty() => Op::Arithmetic(script::arithmetic(value).map_err(bad)?),
+        "trailing_level_fringes" if rest.is_empty() => {
+            Op::TrailingLevelFringes(script::trailing(value).map_err(bad)?)
+        }
         "global" if !rest.is_empty() => Op::Global(rest.to_string(), value.to_string()),
         "fringe" => match middle(rest, path)? {
             (name, "rate") => Op::FringeRate(name.to_string(), value.to_string()),
@@ -160,6 +164,11 @@ mod tests {
             Op::Arithmetic(method_core::Arithmetic::Mmb)
         );
         assert!(op_for("arithmetic", "float").is_err());
+        assert_eq!(
+            op_for("trailing_level_fringes", "drop").unwrap(),
+            Op::TrailingLevelFringes(method_core::TrailingFringes::Drop)
+        );
+        assert!(op_for("trailing_level_fringes", "lose").is_err());
         for bad in [
             "nope",
             "title.x",

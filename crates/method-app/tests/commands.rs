@@ -114,7 +114,7 @@ fn rejected_edits_change_nothing() {
     assert!(s.set_detail_field(999_999, "rate", "1").is_err());
     assert!(s.set_detail_field(1, "bogus", "1").is_err());
     assert!(s
-        .edit("Test edit", |b| edit::set_global(b, "9lives", "1"))
+        .edit("Test edit", |b| edit::set_global(b, "9.5lives", "1"))
         .is_err());
     assert!(s
         .edit("Test edit", |b| edit::add_account(
@@ -543,8 +543,10 @@ fn categories_accounts_and_production_totals() {
     s.set_detail_field(id, "amount", "1").unwrap();
     s.set_detail_field(id, "rate", "2500").unwrap();
     let v = view(&mut s);
-    // After the last production total, so it counts below the line.
+    // After the last production total, so it counts in neither ATL nor BTL
+    // (decisions.md, entry 56), only in the grand total.
     let atl_btl = v["report"]["atl_btl"].as_i64().unwrap();
+    let grand = v["report"]["grand_total"].as_i64().unwrap();
 
     s.edit("Test edit", |b| {
         edit::add_production_total(b, "Total publicity", None)
@@ -555,7 +557,9 @@ fn categories_accounts_and_production_totals() {
         v["report"]["levels"].as_array().unwrap().last().unwrap()["total"],
         250_000
     );
-    assert_eq!(v["report"]["atl_btl"].as_i64().unwrap(), atl_btl);
+    // A production total after it brings it below the line.
+    assert_eq!(v["report"]["atl_btl"].as_i64().unwrap(), atl_btl + 250_000);
+    assert_eq!(v["report"]["grand_total"].as_i64().unwrap(), grand);
 
     // Renumber and rename keep the accounts.
     let idx = v["budget"]["topsheet"].as_array().unwrap().len() - 2;

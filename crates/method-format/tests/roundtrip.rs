@@ -327,6 +327,95 @@ fn arithmetic_round_trips_and_is_left_out_at_default() {
     assert!(read(r#", "arithmetic": 1"#).is_err());
 }
 
+/// `trailing_level_fringes` (decisions.md, entry 56): keeping them is the
+/// default, also for files that don't say, and is left out; `"drop"` is
+/// written right after the fringe posting, and a version keeps its own.
+#[test]
+fn trailing_level_fringes_round_trip_and_are_left_out_at_default() {
+    let mut b = rich();
+    assert_eq!(b.trailing_level_fringes, TrailingFringes::Keep);
+    let text = round_trip(&b);
+    assert!(
+        !text.contains("\"trailing_level_fringes\""),
+        "default is left out"
+    );
+
+    b.trailing_level_fringes = TrailingFringes::Drop;
+    let text = round_trip(&b);
+    let v: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(v["budget"]["trailing_level_fringes"], "drop");
+    let pos = |k: &str| text.find(&format!("\"{k}\":")).unwrap();
+    assert!(pos("fringe_posting") < pos("trailing_level_fringes"));
+    assert!(pos("trailing_level_fringes") < pos("info"));
+
+    b.versions.push(Version {
+        id: 1,
+        name: "v1".into(),
+        created: "2026-10-10T00:00:00Z".into(),
+        note: None,
+        budget: std::sync::Arc::new(b.snapshot()),
+    });
+    b.trailing_level_fringes = TrailingFringes::Keep;
+    let text = round_trip(&b);
+    assert_eq!(
+        text.matches("\"trailing_level_fringes\"").count(),
+        1,
+        "only the version's"
+    );
+
+    let file = |body: &str| {
+        format!(
+            "{{\"format\": \"method-budget\", \"version\": 1, \"budget\": \
+             {{\"title\": \"T\", \"base_currency\": \"USD\"{body}}}}}"
+        )
+    };
+    let read = |body: &str| method_format::from_str(&file(body)).map(|b| b.trailing_level_fringes);
+    assert_eq!(read("").unwrap(), TrailingFringes::Keep);
+    assert_eq!(
+        read(r#", "trailing_level_fringes": "keep""#).unwrap(),
+        TrailingFringes::Keep
+    );
+    assert_eq!(
+        read(r#", "trailing_level_fringes": "drop""#).unwrap(),
+        TrailingFringes::Drop
+    );
+    assert!(read(r#", "trailing_level_fringes": "lose""#).is_err());
+}
+
+/// An adjustment row's fringes and a digit-led global name are kept.
+#[test]
+fn adjustment_fringes_and_digit_led_globals_round_trip() {
+    let mut b = Budget::new("T", "USD");
+    let mut adj = Detail::adjustment(2, "Ten percent", "0.1");
+    adj.fringes.insert("P".into());
+    adj.fringe_range = Some(1);
+    b.topsheet.push(category(
+        "1100",
+        "C",
+        vec![account(
+            "1101",
+            "A",
+            vec![Detail::line(1, "Pay", "1ZG", "", "500"), adj],
+        )],
+    ));
+    b.globals.insert("1ZG".into(), "7".into());
+    b.fringes.insert(
+        "P".into(),
+        Fringe {
+            short_code: None,
+            description: String::new(),
+            rate: "10".into(),
+            kind: FringeKind::Percent { cutoff: None },
+        },
+    );
+    let text = round_trip(&b);
+    let back = method_format::from_str(&text).unwrap();
+    assert_eq!(back, b);
+    let r = recalc(&back, &RecalcOptions::default()).unwrap();
+    // 7 x 500.00 = 3,500.00; the adjustment 350.00 earns 35.00.
+    assert_eq!(r.categories[0].accounts[0].rows[1].fringes["P"], 3_500);
+}
+
 /// A formula keeps more than nine decimal places as typed, and Movie
 /// Magic arithmetic uses them all.
 #[test]

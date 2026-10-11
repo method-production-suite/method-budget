@@ -26,7 +26,9 @@
 import { el } from './dom.js';
 import { setRules } from './sheet.js';
 
-const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
+// A global name: letters, digits and _, with at least one letter or _ (it
+// may start with digits, 1ZG; decisions.md, entry 56).
+const IDENT = /^(?=[A-Za-z0-9_]*[A-Za-z_])[A-Za-z0-9_]+$/;
 const IDENT_CHAR = /[A-Za-z0-9_]/;
 const MAX_ITEMS = 60;
 let listCount = 0;

@@ -352,8 +352,8 @@ lines from an edited file included. **Replace tags…** under the selection's to
 form like a tag preset's editor: a box per fringe and group and a pick for the set, location
 and currency, starting from what every selected line already shares; Replace makes the
 selected lines' tags exactly those (an empty part clears it), as a tag preset's replace does.
-Fringes and currencies go on lines; groups, sets and locations on lines and adjustments;
-other rows are skipped.
+Currencies go on lines; fringes, groups, sets and locations on lines and adjustments
+(decisions.md, entry 56); other rows are skipped.
 **Make range** turns the selected lines into one fringe range with a number new in that
 account; they must be next to each other in one account, with at least two lines
 (unselected subtotal rows in between are fine, since they never break a range). **Remove
@@ -527,8 +527,8 @@ a version keeps the current ones.
   next to the lines' own, and its set, location and currency only on lines that have none
   (a line in the base currency has none); it never takes anything off or changes a value a
   line already has. **Replace** makes the lines' fringes, groups, set, location and currency
-  exactly the preset's, so a part the preset leaves empty is cleared. Fringes and currencies
-  go on lines, groups, sets and locations on lines and adjustments, as with the lists. Each
+  exactly the preset's, so a part the preset leaves empty is cleared. Currencies go on
+  lines, fringes, groups, sets and locations on lines and adjustments, as with the lists. Each
   use is one undo step; a preset that names something the budget no longer has (a deleted
   fringe, say) is refused, naming it, and nothing changes. F2 or a double-click on the
   name edits a preset: its name, a box for every fringe and group, and the set, location
@@ -717,8 +717,8 @@ rounding, by the budget's arithmetic (decisions.md, entry 55: "1.005 is
 half up on the double)", or "6,125.819 rounds half away from zero to 6,125.82" for exact
 arithmetic); a line left out says which
 group or filter left it out and what it would be. Each fringe on a line shows percent or
-flat, the cutoff and how much of it each line of a range used, and its largest-remainder
-share; a flat fringe says what the line counts and why ("ZDAY 100.00 per Day x 25 Days
+flat, the cutoff and, for a range, how much of it the lines above had left (a range uses
+its cutoff up in line order, each line rounded on its own; decisions.md, entry 56); a flat fringe says what the line counts and why ("ZDAY 100.00 per Day x 25 Days
 (amount only; 14 Hours in X ignored) = 2,500.00", "x 1 (Allow has no hours: charged
 once)"), with a Count line for the hours conversion, the hours-a-day cap or the counts
 in X and 4X; a charge its base, each excluded account with the rule

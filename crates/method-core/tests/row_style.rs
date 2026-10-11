@@ -87,10 +87,10 @@ fn separators_do_not_break_a_fringe_range() {
     );
     let r = run(&b);
     let rows = rows(&r);
-    // One earner: 2,000.00 caps at 1,500.00, so 150.00 split evenly. As two
-    // earners it would be 100.00 each.
-    assert_eq!(rows[0].fringes["PEN"], 7_500);
-    assert_eq!(rows[3].fringes["PEN"], 7_500);
+    // One earner sharing the 1,500.00 cutoff, used up in line order: 100.00,
+    // then 50.00 on the 500.00 left. As two earners it would be 100.00 each.
+    assert_eq!(rows[0].fringes["PEN"], 10_000);
+    assert_eq!(rows[3].fringes["PEN"], 5_000);
     assert_eq!(rows[1].fringe_total + rows[2].fringe_total, 0);
 }
 
@@ -128,7 +128,10 @@ fn separators_are_never_counted_fringed_or_reported() {
     assert_eq!(r.groups["A"].full.details_total, 100_000);
     assert!(r.sets.is_empty());
     assert!(r.locations.is_empty());
-    assert_eq!(r.atl_btl, 110_000);
+    // No production totals: nothing is above or below the line, but the
+    // level and the grand total hold the line, its fringe and the charge.
+    assert_eq!(r.levels[0].total, 110_000);
+    assert_eq!(r.grand_total, 121_000);
 
     let base = Baseline::capture(&r).unwrap();
     assert!(base.rows.contains_key(&1));

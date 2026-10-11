@@ -6,7 +6,7 @@ use crate::coding::AccountCoding;
 use crate::decimal::Dec;
 use crate::model::{
     Arithmetic, Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource, Detail, FringePosting,
-    TopsheetRow,
+    TopsheetRow, TrailingFringes,
 };
 use crate::report::{
     CategoryTotals, ChargeTotals, CreditRowTotals, CreditTotals, LevelTotals, Report, RowTotals,
@@ -42,23 +42,28 @@ pub(crate) fn finish(
         post_fringes(posting, &ctx.b.account_coding, &mut categories).ok_or_else(ovf)?;
 
     let (levels, closed) = levels(ctx.b, posting, &categories).ok_or_else(ovf)?;
-    // The first level is above-the-line only when a real production total ends it.
+    // As Movie Magic counts them (decisions.md, entry 56): the first level
+    // is above-the-line when a production total closes it; every later
+    // level a production total closes is below-the-line; categories after
+    // the last production total (all of them when there is none) count in
+    // neither.
     let split = usize::from(closed > 0);
     let total_atl = sum(levels[..split].iter().map(|l| l.total)).ok_or_else(ovf)?;
-    let total_btl = sum(levels[split..].iter().map(|l| l.total)).ok_or_else(ovf)?;
+    let total_btl = sum(levels[split..closed].iter().map(|l| l.total)).ok_or_else(ovf)?;
     let atl_btl = total_atl.checked_add(total_btl).ok_or_else(ovf)?;
 
-    // Charges never stack: each one sees ATL + BTL only.
+    // Charges never stack: each one sees every level and the budget's
+    // fringe row, nothing else.
+    let base = before_charges(&levels, budget_fringes).ok_or_else(ovf)?;
     let charges = ctx
         .b
         .charges
         .iter()
         .filter(|c| c.applied)
-        .map(|c| charge(ctx.b, &categories, atl_btl, c))
+        .map(|c| charge(ctx.b, &categories, base, c))
         .collect::<Result<Vec<_>, _>>()?;
     let grand_total = sum(charges.iter().map(|c| c.amount))
-        .and_then(|c| c.checked_add(atl_btl))
-        .and_then(|t| t.checked_add(budget_fringes))
+        .and_then(|c| c.checked_add(base))
         .ok_or_else(ovf)?;
 
     let credits = ctx
@@ -117,6 +122,69 @@ fn post_fringes(
     Some(budget_fringes)
 }
 
+/// Every level (the categories with their fringes, wherever those post)
+/// plus the budget's one fringe row: what the grand total adds charges to,
+/// and what a percent charge is a percent of. `None` on overflow.
+fn before_charges(levels: &[LevelTotals], budget_fringes: Cents) -> Option<Cents> {
+    sum(levels.iter().map(|l| l.total))?.checked_add(budget_fringes)
+}
+
+/// Where the categories after the last production total start (every
+/// category when there is none), when their fringes are dropped: fringes
+/// post by production level and `trailing_level_fringes` is `drop`
+/// (decisions.md, entry 56). `None` when every fringe posts somewhere.
+pub(crate) fn dropped_from(b: &Budget) -> Option<usize> {
+    if b.fringe_posting != FringePosting::ProductionLevel
+        || b.trailing_level_fringes != TrailingFringes::Drop
+    {
+        return None;
+    }
+    Some(trailing_start(b))
+}
+
+/// How many categories come before the last production total: where the
+/// unnamed level after it starts.
+fn trailing_start(b: &Budget) -> usize {
+    let mut seen = 0;
+    let mut start = 0;
+    for row in &b.topsheet {
+        match row {
+            TopsheetRow::Category(_) => seen += 1,
+            TopsheetRow::ProductionTotal(_) => start = seen,
+        }
+    }
+    start
+}
+
+/// Why the fringes of categories after the last production total aren't in
+/// any level, when fringes post by production level and some are earned
+/// there (decisions.md, entry 56): `method check` and the MCP `validate`
+/// tool show it. `None` otherwise.
+pub(crate) fn trailing_fringes_warning(b: &Budget, r: &Report) -> Option<String> {
+    if b.fringe_posting != FringePosting::ProductionLevel {
+        return None;
+    }
+    let start = trailing_start(b).min(r.categories.len());
+    let earned: Vec<String> = r.categories[start..]
+        .iter()
+        .filter(|c| c.fringe_total != 0)
+        .map(|c| format!("{} {}", c.code, crate::calc::explain::money(c.fringe_total)))
+        .collect();
+    if earned.is_empty() {
+        return None;
+    }
+    let what = match b.trailing_level_fringes {
+        TrailingFringes::Keep => {
+            "kept in the grand total; Movie Magic leaves them out (trailing_level_fringes drop matches it)"
+        }
+        TrailingFringes::Drop => "left out of every total (trailing_level_fringes drop)",
+    };
+    Some(format!(
+        "fringes of categories after the last production total are not in any level ({}): {what}",
+        earned.join(", ")
+    ))
+}
+
 /// One level per production-total row, plus a trailing unnamed level when
 /// categories follow the last one. Also returns how many levels were closed by
 /// a real production total. `None` on overflow.
@@ -126,9 +194,12 @@ fn levels(
     cats: &[CategoryTotals],
 ) -> Option<(Vec<LevelTotals>, usize)> {
     let posted = *posting == FringePosting::ProductionLevel;
+    let dropped = dropped_from(b);
     let level = |name: &str, start: usize, end: usize| -> Option<LevelTotals> {
         let slice = &cats[start..end];
-        let posted_fringes = if posted {
+        // Fringes with no production total to post above are dropped
+        // (`trailing_level_fringes` drop).
+        let posted_fringes = if posted && dropped.is_none_or(|d| start < d) {
             sum(slice.iter().map(|c| c.fringe_total))?
         } else {
             0
@@ -165,6 +236,8 @@ fn levels(
 
 /// A costed row with where it lives. Subtotal and separator rows are skipped.
 struct Line<'a> {
+    /// The category's place among the categories.
+    ci: usize,
     category: &'a str,
     account: &'a str,
     detail: &'a Detail,
@@ -173,31 +246,37 @@ struct Line<'a> {
 
 /// Every costed detail (line or adjustment) of `b` with its evaluated row.
 fn lines<'a>(b: &'a Budget, cats: &'a [CategoryTotals]) -> impl Iterator<Item = Line<'a>> {
-    b.categories().zip(cats).flat_map(|(cat, ct)| {
-        cat.accounts
-            .iter()
-            .zip(&ct.accounts)
-            .flat_map(move |(acct, at)| {
-                acct.details
-                    .iter()
-                    .zip(&at.rows)
-                    .filter(|(d, _)| d.kind.is_costed())
-                    .map(move |(detail, row)| Line {
-                        category: &cat.code,
-                        account: &acct.code,
-                        detail,
-                        row,
-                    })
-            })
-    })
+    b.categories()
+        .zip(cats)
+        .enumerate()
+        .flat_map(|(ci, (cat, ct))| {
+            cat.accounts
+                .iter()
+                .zip(&ct.accounts)
+                .flat_map(move |(acct, at)| {
+                    acct.details
+                        .iter()
+                        .zip(&at.rows)
+                        .filter(|(d, _)| d.kind.is_costed())
+                        .map(move |(detail, row)| Line {
+                            ci,
+                            category: &cat.code,
+                            account: &acct.code,
+                            detail,
+                            row,
+                        })
+                })
+        })
 }
 
-/// What a line contributes to ATL + BTL: its total, plus its fringes unless
-/// they're posted budget-wide (outside ATL and BTL).
-fn counted(posting: &FringePosting, r: &RowTotals) -> Option<Cents> {
-    match posting {
-        FringePosting::Budget => Some(r.total),
-        _ => r.total.checked_add(r.fringe_total),
+/// What a row adds to the total before charges, wherever its fringes post:
+/// its total and its fringes, unless they are dropped (`dropped`, from
+/// [`dropped_from`]). `None` on overflow.
+fn counted(ci: usize, dropped: Option<usize>, r: &RowTotals) -> Option<Cents> {
+    if dropped.is_some_and(|d| ci >= d) {
+        Some(r.total)
+    } else {
+        r.total.checked_add(r.fringe_total)
     }
 }
 
@@ -206,20 +285,25 @@ fn counted(posting: &FringePosting, r: &RowTotals) -> Option<Cents> {
 /// recalculating anything else. For a live preview of a charge being edited.
 /// `report` must come from recalculating `b`.
 pub fn charge_preview(b: &Budget, report: &Report, c: &Charge) -> Result<ChargeTotals, CalcError> {
-    charge(b, &report.categories, report.atl_btl, c)
+    let base = before_charges(&report.levels, report.budget_fringes)
+        .ok_or_else(|| overflow(format!("charge {}", c.name)))?;
+    charge(b, &report.categories, base, c)
 }
 
+/// Charge `c` on `base`, the total before charges.
 fn charge(
     b: &Budget,
     cats: &[CategoryTotals],
-    atl_btl: Cents,
+    base: Cents,
     c: &Charge,
 ) -> Result<ChargeTotals, CalcError> {
     let at = || format!("charge {}", c.name);
     let ovf = || overflow(at());
 
-    // Flat fees exclude only groups (and manual amounts), per the reference.
-    let by_code = matches!(c.kind, ChargeKind::Percent(_));
+    // Percent charges and flat fees alike leave out typed amounts and the
+    // lines of excluded groups, accounts and categories, each line once,
+    // with its fringes (decisions.md, entry 56).
+    let dropped = dropped_from(b);
     let mut excluded = sum(c.excluded_amounts.iter().map(|(_, a)| *a)).ok_or_else(ovf)?;
     for l in lines(b, cats) {
         let hit = l
@@ -227,11 +311,10 @@ fn charge(
             .groups
             .iter()
             .any(|g| c.excluded_groups.contains(g))
-            || (by_code
-                && (c.excluded_accounts.contains(l.account)
-                    || c.excluded_categories.contains(l.category)));
+            || c.excluded_accounts.contains(l.account)
+            || c.excluded_categories.contains(l.category);
         if hit {
-            let v = counted(&b.fringe_posting, l.row).ok_or_else(ovf)?;
+            let v = counted(l.ci, dropped, l.row).ok_or_else(ovf)?;
             excluded = excluded.checked_add(v).ok_or_else(ovf)?;
         }
     }
@@ -239,12 +322,12 @@ fn charge(
     let arith = b.arithmetic;
     let (base, amount) = match &c.kind {
         ChargeKind::Percent(p) => {
-            let amount = atl_btl
+            let amount = base
                 .checked_sub(excluded)
                 .and_then(|n| percent_of(arith, n, Num::of(arith, *p)))
                 .and_then(Money::to_cents)
                 .ok_or_else(ovf)?;
-            (atl_btl, amount)
+            (base, amount)
         }
         ChargeKind::Flat { amount, currency } => {
             let base = match currency {
@@ -604,9 +687,10 @@ mod tests {
                 ("", 2, 3, 0, 55_000),
             ]
         );
+        // 5000 follows the last production total: in neither ATL nor BTL.
         assert_eq!(
             (ts.total_atl, ts.total_btl, ts.atl_btl),
-            (1_600_000, 715_600, 2_315_600)
+            (1_600_000, 660_600, 2_260_600)
         );
         assert_eq!(ts.budget_fringes, 0);
         assert_eq!(ts.grand_total, 2_315_600);
@@ -635,9 +719,10 @@ mod tests {
                 (55_000, Some(("50-99".to_string(), 5_000))),
             ]
         );
+        // 5000 follows the last production total: in neither ATL nor BTL.
         assert_eq!(
             (ts.total_atl, ts.total_btl, ts.atl_btl),
-            (1_600_000, 715_600, 2_315_600)
+            (1_600_000, 660_600, 2_260_600)
         );
         assert_eq!((ts.budget_fringes, ts.grand_total), (0, 2_315_600));
     }
@@ -680,9 +765,10 @@ mod tests {
                 ("", 2, 3, 5_000, 55_000),
             ]
         );
+        // 5000 follows the last production total: in neither ATL nor BTL.
         assert_eq!(
             (ts.total_atl, ts.total_btl, ts.atl_btl),
-            (1_600_000, 715_600, 2_315_600)
+            (1_600_000, 660_600, 2_260_600)
         );
         assert_eq!((ts.budget_fringes, ts.grand_total), (0, 2_315_600));
     }
@@ -706,22 +792,21 @@ mod tests {
         assert!(ts.levels.iter().all(|l| l.posted_fringes == 0));
         assert_eq!(
             (ts.total_atl, ts.total_btl, ts.atl_btl),
-            (1_500_000, 650_000, 2_150_000)
+            (1_500_000, 600_000, 2_100_000)
         );
         assert_eq!(ts.budget_fringes, 165_600);
         assert_eq!(ts.grand_total, 2_315_600);
     }
 
     #[test]
-    fn no_production_totals_is_all_btl() {
+    fn no_production_totals_is_neither_atl_nor_btl() {
         let mut b = fixture(FringePosting::Account);
         b.topsheet.retain(|r| matches!(r, TopsheetRow::Category(_)));
         let ts = run(&b);
         assert_eq!(level_totals(&ts), vec![("", 0, 3, 0, 2_315_600)]);
-        assert_eq!(
-            (ts.total_atl, ts.total_btl, ts.atl_btl),
-            (0, 2_315_600, 2_315_600)
-        );
+        // As Movie Magic shows it (ZTEST11 T-01): 0 / 0, grand total intact.
+        assert_eq!((ts.total_atl, ts.total_btl, ts.atl_btl), (0, 0, 0));
+        assert_eq!(ts.grand_total, 2_315_600);
     }
 
     #[test]
@@ -756,11 +841,13 @@ mod tests {
                 ("", 2, 3, 0, 55_000),
             ]
         );
-        // The empty first level is ATL; everything else is BTL.
+        // The empty first level is ATL; every later closed level is BTL;
+        // 5000, after the last production total, is in neither.
         assert_eq!(
             (ts.total_atl, ts.total_btl, ts.atl_btl),
-            (0, 2_315_600, 2_315_600)
+            (0, 2_260_600, 2_260_600)
         );
+        assert_eq!(ts.grand_total, 2_315_600);
     }
 
     #[test]
@@ -803,35 +890,62 @@ mod tests {
     }
 
     #[test]
-    fn percent_charge_counts_fringes_only_inside_atl_btl() {
+    fn percent_charge_is_the_same_in_every_posting_mode() {
+        // Fringes posted by budget are in the base too, and an excluded
+        // line takes its fringes with it (decisions.md, entry 56).
         for posting in [
             FringePosting::Category {
                 suffix: "99".into(),
             },
             FringePosting::ProductionLevel,
+            FringePosting::Budget,
         ] {
             let mut b = fixture(posting);
             b.charges = vec![percent_charge()];
             let ts = run(&b);
             assert_eq!(
-                (ts.charges[0].excluded, ts.charges[0].amount),
-                (678_250, 163_735)
+                ts.charges,
+                vec![ChargeTotals {
+                    name: "Contingency".into(),
+                    base: 2_315_600,
+                    excluded: 678_250,
+                    amount: 163_735
+                }]
             );
+            assert_eq!(ts.grand_total, 2_315_600 + 163_735);
         }
-        let mut b = fixture(FringePosting::Budget);
+    }
+
+    #[test]
+    fn dropped_trailing_fringes_leave_every_total() {
+        let mut b = fixture(FringePosting::ProductionLevel);
+        b.trailing_level_fringes = crate::model::TrailingFringes::Drop;
         b.charges = vec![percent_charge()];
         let ts = run(&b);
-        // Fringes sit outside ATL + BTL, so excluded lines count without them.
+        // 5000's 50.00 of fringes have no production total to post above.
         assert_eq!(
-            ts.charges,
-            vec![ChargeTotals {
-                name: "Contingency".into(),
-                base: 2_150_000,
-                excluded: 665_600,
-                amount: 148_440
-            }]
+            level_totals(&ts),
+            vec![
+                ("Total Above-the-Line", 0, 1, 100_000, 1_600_000),
+                ("Total Production", 1, 2, 60_600, 660_600),
+                ("", 2, 3, 0, 50_000),
+            ]
         );
-        assert_eq!(ts.grand_total, 2_150_000 + 165_600 + 148_440);
+        // Excluding row 6 (category 5000) takes its line only.
+        assert_eq!(
+            ts.charges[0],
+            ChargeTotals {
+                name: "Contingency".into(),
+                base: 2_310_600,
+                excluded: 673_250,
+                amount: 163_735
+            }
+        );
+        assert_eq!(ts.grand_total, 2_310_600 + 163_735);
+        // Under any other posting the setting changes nothing.
+        let mut a = fixture(FringePosting::Account);
+        a.trailing_level_fringes = crate::model::TrailingFringes::Drop;
+        assert_eq!(run(&a).grand_total, 2_315_600);
     }
 
     #[test]
@@ -860,7 +974,7 @@ mod tests {
     }
 
     #[test]
-    fn flat_charge_in_foreign_currency_excludes_amounts_and_groups_only() {
+    fn flat_charge_in_foreign_currency_excludes_like_a_percent_charge() {
         let mut b = fixture(FringePosting::Account);
         let mut c = charge(
             "Completion bond",
@@ -871,22 +985,23 @@ mod tests {
         );
         c.excluded_amounts = vec![("Waived".into(), 1_000)];
         c.excluded_groups = set(["VFX"]);
-        // Ignored for flat fees.
-        c.excluded_accounts = set(["1100"]);
-        c.excluded_categories = set(["2000"]);
+        // Honored for flat fees too (decisions.md, entry 56).
+        c.excluded_accounts = set(["1200"]);
+        c.excluded_categories = set(["5000"]);
         b.charges = vec![c];
         let ts = run(&b);
-        // 1,000,000 EUR cents x 1.1; excluded 1,000 + row 4 107,650 + row 6 55,000
+        // 1,000,000 EUR cents x 1.1; excluded 1,000 + row 2 500,000 + row 4
+        // 107,650 + row 6 55,000 (VFX and category 5000, counted once).
         assert_eq!(
             ts.charges,
             vec![ChargeTotals {
                 name: "Completion bond".into(),
                 base: 1_100_000,
-                excluded: 163_650,
-                amount: 936_350
+                excluded: 663_650,
+                amount: 436_350
             }]
         );
-        assert_eq!(ts.grand_total, 2_315_600 + 936_350);
+        assert_eq!(ts.grand_total, 2_315_600 + 436_350);
     }
 
     #[test]

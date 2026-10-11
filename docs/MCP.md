@@ -257,7 +257,9 @@ names, setup item names, charges and credits. 100 matches by default, 1,000 at m
 
 **`validate`** `{path}`: `ok`, `problem` (why it doesn't add up, if it doesn't),
 `net_total_cents` and `warnings`: lines naming units, sets or locations the budget doesn't
-have, and account or category numbers used twice.
+have, account or category numbers used twice, and fringes of categories after the last
+production total that no level holds (fringes posted by production level; decisions.md,
+entry 56).
 
 **`diff`** `{path, against?, since?}`: what changed, in plain words, with the money that
 moved per account, category and topsheet line (the engine's diff, as `method diff`).
@@ -290,7 +292,8 @@ Fields: `description`; the formulas `amount`, `x`, `rate`, `x4` (text or a numbe
 the budget, or null for the base), `set`, `location` (each must exist, or null);
 `fringe_range` (a number or null); `bold`, `italic`; `indent` (0 to 4); `color` (`#rrggbb`
 or null); `fringes` and `groups` (each replaces the row's whole list). A subtotal row takes
-only the description and style; an adjustment takes no rate, rate unit, currency or fringes;
+only the description and style; an adjustment takes no rate, rate unit or currency (it does
+take fringes, decisions.md, entry 56);
 a separator only style. Every row in the call must work or nothing is written.
 
 **`delete_lines`** `{path, rows: [ids]}`: all of them, or none when one is missing.
@@ -300,8 +303,8 @@ order given, keeping their ids.
 
 **`tag_lines`** `{path, rows?, account?, add_fringes?, remove_fringes?, add_groups?,
 remove_groups?}`: puts fringes and groups on rows (by id, or every line and adjustment of an
-account) or takes them off. A fringe or group must exist to be added. Fringes go on lines
-only, groups on lines and adjustments; other rows are counted in `rows_skipped`.
+account) or takes them off. A fringe or group must exist to be added. Fringes and groups go
+on lines and adjustments; other rows are counted in `rows_skipped`.
 
 Every change returns `changed`, `revision`, and `totals`: the headline totals `before` and
 `after` and `categories_moved` (each category whose total moved), so a model can check the

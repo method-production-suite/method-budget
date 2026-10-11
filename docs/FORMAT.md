@@ -110,12 +110,13 @@ Fields in written order:
 | `provenance`      | [provenance](#provenance) | Where this budget came from, when it is a copy saved for sharing, a sub-budget or a [setup pack](#setup-packs). Left out otherwise. |
 | `account_coding`  | [account coding](#account-coding) | Left out when it is the default pattern. |
 | `fringe_posting`  | [fringe posting](#fringe-posting) | Left out when it is the default (by category, suffix `"99"`). |
+| `trailing_level_fringes` | `"keep"` or `"drop"` | Under production-level posting, what happens to the fringes of categories after the last production total (see [trailing level fringes](#trailing-level-fringes)). Left out when `"keep"`, which is also what a missing field means. |
 | `arithmetic`      | `"mmb"` or `"exact"` | How totals are worked out (see [arithmetic](#arithmetic)). Left out when `"mmb"`, which is also what a missing `arithmetic` means. |
 | `new_line_defaults` | [new-line defaults](#new-line-defaults) | Left out when it is the default (copy fringes only). |
 | `info`            | map of [info values](#info-value) | Budget information fields, keyed by label. |
 | `currencies`      | map of [currencies](#currency) | Foreign currencies, keyed by code. |
 | `units`           | map of [units](#unit) | Keyed by singular name. Omitted means **no units**. |
-| `globals`         | map of formula | Named values usable in formulas, keyed by name. |
+| `globals`         | map of formula | Named values usable in formulas, keyed by name. A name is letters, digits and `_` with at least one letter or `_`; it may start with digits (`"1ZG"`), and all digits (`"12"`) is a number, not a name. |
 | `global_info`     | map of [global info](#global-info) | Description, unit and display settings of globals, keyed by global name. Left out when no global has any. |
 | `fringes`         | map of [fringes](#fringe) | Keyed by the name detail rows use. |
 | `groups`          | map of [groups](#group) | Keyed by group name. |
@@ -168,6 +169,21 @@ Where fringe totals appear. A tagged object:
 | `production_level` | none | One fringe row above each production total. |
 | `category`         | `suffix`: text, **required** | A fringe account at the end of each category, numbered from the category code and the suffix. |
 | `account`          | none | A fringe line at the end of each account. |
+
+Wherever fringes post, a percent [charge](#charge) applies to them, budget-wide ones too.
+
+### Trailing level fringes
+
+Under `production_level` [posting](#fringe-posting), each level's fringes post in a row
+above the production total that closes it, so the fringes of categories after the last
+production total (every category, when there is none) have no production total to post
+above (`docs/decisions.md`, entry 56). A budget setting; a [version](#version) keeps its
+own. It changes nothing under the other posting modes.
+
+| Value    | Meaning |
+|----------|---------|
+| `"keep"` | The default, also for files without the field. They post in a fringe row of the unnamed level after the last production total, so they are in the grand total and in a percent charge's base, though in neither above- nor below-the-line. `method check` warns about them. |
+| `"drop"` | As Movie Magic Budgeting does: they post nowhere, so they are in no total (lines still earn them, and fringe, group, set and location totals and credits still count them). |
 
 ### Arithmetic
 
@@ -316,7 +332,7 @@ A tagged object:
 | `kind`             | Fields | Meaning |
 |--------------------|--------|---------|
 | `category`         | `code` text, **required**; `name` text, **required**; `notes` list of [notes](#note); `accounts` list of [accounts](#account) | A budget category. |
-| `production_total` | `name` text, **required** | Subtotals every category since the previous production total. The first one ends above-the-line. A production total has no `code`, `notes` or `accounts`. |
+| `production_total` | `name` text, **required** | Subtotals every category since the previous production total. The first one ends above-the-line; every later one ends a level of below-the-line. Categories after the last production total (all of them when there is none) are in neither above- nor below-the-line, only in the grand total. A production total has no `code`, `notes` or `accounts`. |
 
 ### Account
 
@@ -345,8 +361,8 @@ Fields in written order:
 | `x4`           | formula | Fourth factor. Blank counts as 1. |
 | `unit4`        | text | Unit shown next to the fourth factor. Read by flat fringes as `unit2` is. |
 | `currency`     | optional text | Currency code; not set means the base currency. |
-| `fringe_range` | optional integer 0 to 4294967295 | Consecutive lines with the same number share percent-fringe cutoffs as one earner. |
-| `fringes`      | name set | Fringes applied to this line. |
+| `fringe_range` | optional integer 0 to 4294967295 | Consecutive lines and adjustment rows with the same number share each percent fringe's cutoff as one earner, used up in row order: each row takes the percent of its total, or of what is left of the cutoff when that is less (nothing once it is used), rounded on its own. |
+| `fringes`      | name set | Fringes applied to this line or adjustment row. |
 | `groups`       | name set | Groups this line belongs to. |
 | `set`          | optional text | Set name. |
 | `location`     | optional text | Location name. |
@@ -359,7 +375,8 @@ Fields in written order:
 A line costs `amount x X x rate x 4X`, worked out and rounded by the budget's
 [arithmetic](#arithmetic). A subtotal row shows a running total and adds
 nothing. An adjustment row's rate is the sum of the lines above it (back to the previous
-adjustment row). A separator row is a drawn rule line: it has no cost and is ignored by
+adjustment row); it takes no `rate`, `unit3` or `currency`, but it can carry fringes,
+charged on its total as on a line's. A separator row is a drawn rule line: it has no cost and is ignored by
 all math. It is never counted or fringed, it doesn't break a fringe range, and it doesn't
 reset a subtotal or adjustment window. Other fields on a separator row are kept but have
 no effect.
@@ -416,8 +433,12 @@ Kind-specific fields (written right after `applied`):
 
 | `kind`    | Fields | Meaning |
 |-----------|--------|---------|
-| `percent` | `percent` decimal, **required** | Percent of above- plus below-the-line, less exclusions (`"10"` is 10%). |
-| `flat`    | `amount` cents, **required**; `currency` optional text | A fixed fee, less excluded amounts and excluded group totals. |
+| `percent` | `percent` decimal, **required** | Percent of the grand total before charges (every level, with its fringes wherever they post, plus fringes posted by budget), less exclusions (`"10"` is 10%). |
+| `flat`    | `amount` cents, **required**; `currency` optional text | A fixed fee, less exclusions. |
+
+Exclusions, for both kinds: the excluded amounts, and every line or adjustment row in an
+excluded group, category or account, with its fringes (each row once, however many rules
+catch it).
 
 ### Credit
 
@@ -1111,6 +1132,15 @@ valid. Loading and saving it in Method Budget normalizes it.
   before, so a figure that lands on or near a half cent can move by a cent (`1 x 1.005`
   is 1.00, not 1.01); give it `"arithmetic": "exact"` to keep the old figures. Formulas
   may now hold numbers with more than 9 decimal places.
+- Version 1, additive (2026-10): budget
+  [`trailing_level_fringes`](#trailing-level-fringes) (`"keep"` or `"drop"`), left out at
+  `"keep"`; fringes on adjustment rows; global names that start with digits. The engine
+  changed with them (decisions.md, entry 56): a fringe range uses its cutoff up in row
+  order (each row rounded on its own) instead of splitting it pro rata; a percent charge
+  applies to fringes posted by budget too, and a flat fee leaves out excluded categories
+  and accounts; above- and below-the-line count only levels a production total closes. So a
+  range's per-line fringes, below-the-line, and some charges can differ from before; the
+  file needs no change.
 
 ## Complete example
 

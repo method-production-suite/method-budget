@@ -47,10 +47,11 @@ fn sample_fringes() {
     assert_eq!(atl.fringe_total, 76_500, "FICA stops at the $10,000 cutoff");
 
     let rows = &r.categories[1].accounts[0].rows;
-    // Grip and overtime are one earner: 5,600,000 caps to 1,000,000, so one
-    // 76,500 FICA split 54:2 between them.
-    assert_eq!(rows[0].fringes["FICA"], 73_768);
-    assert_eq!(rows[1].fringes["FICA"], 2_732);
+    // Grip and overtime are one earner sharing the $10,000 cutoff, used up
+    // in line order (decisions.md, entry 56): the grip's $54,000 takes all
+    // of it, 765.00, and the overtime line after it earns nothing.
+    assert_eq!(rows[0].fringes["FICA"], 76_500);
+    assert_eq!(rows[1].fringes["FICA"], 0);
     // $50 per day x 40 days: a flat fringe counts the Amount only, so the
     // 3 in X doesn't multiply it (decisions.md 54; it was 120 person-days,
     // 6,000.00, before).
@@ -148,6 +149,12 @@ fn budget_posting_keeps_fringes_out_of_levels() {
     assert_eq!(r.budget_fringes, 353_000);
     let charges: i64 = r.charges.iter().map(|c| c.amount).sum();
     assert_eq!(r.grand_total, r.atl_btl + r.budget_fringes + charges);
+    // Charges count fringes posted by budget, and an excluded line takes its
+    // fringes with it (decisions.md, entry 56), so every charge and the
+    // grand total are the same as posting by category.
+    let by_category = run(&sample());
+    assert_eq!(r.charges, by_category.charges);
+    assert_eq!(r.grand_total, by_category.grand_total);
 }
 
 #[test]

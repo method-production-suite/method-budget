@@ -2,6 +2,14 @@
 //!
 //! Grammar: numbers, global names, `+ - * /`, unary minus and parentheses.
 //! Parsed into an AST and walked; nothing is ever `eval`ed as code.
+//!
+//! A global name is letters, digits and `_` with at least one letter or `_`,
+//! and may start with digits, as Movie Magic allows (`1ZG`; decisions.md,
+//! entry 56). The lexer reads a run of digits that runs on into a letter or
+//! `_` as a name, and a run of digits and dots otherwise as a number. A
+//! number is never directly followed by a name in a formula that parses
+//! (there is no implied multiplication or exponent), so no formula that
+//! parsed before reads differently.
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -154,11 +162,43 @@ enum Tok {
     RParen,
 }
 
-/// True for names usable as globals: `[A-Za-z_][A-Za-z0-9_]*`.
+/// True for names usable as globals: letters, digits and `_`, with at least
+/// one letter or `_` (so it may start with digits, `1ZG`, but `12` is a
+/// number).
 pub fn is_ident(s: &str) -> bool {
-    let mut b = s.bytes();
-    matches!(b.next(), Some(c) if c.is_ascii_alphabetic() || c == b'_')
-        && b.all(|c| c.is_ascii_alphanumeric() || c == b'_')
+    !s.is_empty()
+        && s.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_')
+        && s.bytes().any(|c| c.is_ascii_alphabetic() || c == b'_')
+}
+
+/// Where the token starting at `i` (a digit, a dot, a letter or `_`) ends,
+/// and whether it is a name, as the lexer splits it: digits running on into
+/// a letter or `_` start a name, which runs on through letters, digits and
+/// `_`; otherwise a run of digits and dots is a number.
+fn token_end(bytes: &[u8], mut i: usize) -> (usize, bool) {
+    let word = |c: u8| c.is_ascii_alphanumeric() || c == b'_';
+    if bytes[i].is_ascii_digit() {
+        let mut j = i;
+        while j < bytes.len() && bytes[j].is_ascii_digit() {
+            j += 1;
+        }
+        if j < bytes.len() && (bytes[j].is_ascii_alphabetic() || bytes[j] == b'_') {
+            while j < bytes.len() && word(bytes[j]) {
+                j += 1;
+            }
+            return (j, true);
+        }
+    }
+    if bytes[i].is_ascii_digit() || bytes[i] == b'.' {
+        while i < bytes.len() && (bytes[i].is_ascii_digit() || bytes[i] == b'.') {
+            i += 1;
+        }
+        return (i, false);
+    }
+    while i < bytes.len() && word(bytes[i]) {
+        i += 1;
+    }
+    (i, true)
 }
 
 fn lex(src: &str) -> Result<Vec<(usize, Tok)>, ParseError> {
@@ -179,9 +219,12 @@ fn lex(src: &str) -> Result<Vec<(usize, Tok)>, ParseError> {
             b'/' => Tok::Op(Op::Div),
             b'(' => Tok::LParen,
             b')' => Tok::RParen,
-            b'0'..=b'9' | b'.' => {
-                while i < bytes.len() && (bytes[i].is_ascii_digit() || bytes[i] == b'.') {
-                    i += 1;
+            c if c.is_ascii_alphanumeric() || c == b'_' || c == b'.' => {
+                let (end, name) = token_end(bytes, i);
+                i = end;
+                if name {
+                    out.push((start, Tok::Ident(src[start..i].to_string())));
+                    continue;
                 }
                 let n = Literal::parse(&src[start..i]).map_err(|e| ParseError {
                     pos: start,
@@ -191,13 +234,6 @@ fn lex(src: &str) -> Result<Vec<(usize, Tok)>, ParseError> {
                     },
                 })?;
                 out.push((start, Tok::Num(n)));
-                continue;
-            }
-            c if c.is_ascii_alphabetic() || c == b'_' => {
-                while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
-                    i += 1;
-                }
-                out.push((start, Tok::Ident(src[start..i].to_string())));
                 continue;
             }
             _ => {
@@ -216,9 +252,10 @@ fn lex(src: &str) -> Result<Vec<(usize, Tok)>, ParseError> {
 
 /// `src` with every global-name token equal to `from` replaced by `to`, and
 /// how many were replaced. Tokens are split as the lexer splits them (a run
-/// of digits and dots is a number; a letter or `_` starts a name that runs on
-/// through letters, digits and `_`), so `DAYS` is never touched inside
-/// `SHOOT_DAYS` or `DAYS2`. Everything else is kept byte for byte, spacing
+/// of digits and dots is a number, unless its digits run on into a letter or
+/// `_`; a letter or `_` starts a name that runs on through letters, digits
+/// and `_`), so `DAYS` is never touched inside `SHOOT_DAYS`, `DAYS2` or
+/// `2DAYS`. Everything else is kept byte for byte, spacing
 /// included, and formulas that don't parse are rewritten the same way: what
 /// they name is still a reference. Parsing the result gives what
 /// [`Expr::rename`] gives on the parsed original.
@@ -240,22 +277,19 @@ pub fn rename_var(src: &str, from: &str, to: &str) -> (String, usize) {
 /// (see [`rename_var`]). Anything that is neither a number nor a name is
 /// stepped over a character at a time, so a formula that doesn't parse
 /// still gives every name in it.
-pub(crate) fn name_spans(src: &str) -> impl Iterator<Item = std::ops::Range<usize>> + '_ {
+pub fn name_spans(src: &str) -> impl Iterator<Item = std::ops::Range<usize>> + '_ {
     let bytes = src.as_bytes();
     let mut i = 0;
     std::iter::from_fn(move || {
         while i < bytes.len() {
             let c = bytes[i];
             let start = i;
-            if c.is_ascii_digit() || c == b'.' {
-                while i < bytes.len() && (bytes[i].is_ascii_digit() || bytes[i] == b'.') {
-                    i += 1;
+            if c.is_ascii_alphanumeric() || c == b'_' || c == b'.' {
+                let (end, name) = token_end(bytes, i);
+                i = end;
+                if name {
+                    return Some(start..i);
                 }
-            } else if c.is_ascii_alphabetic() || c == b'_' {
-                while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
-                    i += 1;
-                }
-                return Some(start..i);
             } else {
                 i += src[i..].chars().next().map_or(1, char::len_utf8);
             }
@@ -398,13 +432,10 @@ fn quick_token(src: &str) -> Option<Quick<'_>> {
     if t.is_empty() || t.len() > 64 {
         return None;
     }
-    let first = t.as_bytes()[0];
     if t.bytes().all(|c| c.is_ascii_digit() || c == b'.') {
         return Some(Quick::Num(t));
     }
-    if (first.is_ascii_alphabetic() || first == b'_')
-        && t.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_')
-    {
+    if is_ident(t) {
         return Some(Quick::Name(t));
     }
     None
@@ -710,7 +741,14 @@ mod tests {
             rename_var("SHOOT_DAYS + DAYS2 + 1.5", "DAYS", "X"),
             ("SHOOT_DAYS + DAYS2 + 1.5".into(), 0)
         );
-        assert_eq!(rename_var("2DAYS", "DAYS", "X"), ("2X".into(), 1));
+        // A digit-led name is a name of its own; digits after a point are
+        // a number, so the name after them stands alone.
+        assert_eq!(rename_var("2DAYS", "DAYS", "X"), ("2DAYS".into(), 0));
+        assert_eq!(
+            rename_var("2DAYS * 1.5DAYS", "DAYS", "X"),
+            ("2DAYS * 1.5X".into(), 1)
+        );
+        assert_eq!(rename_var("1ZG*1", "1ZG", "ONE"), ("ONE*1".into(), 1));
         // Formulas that don't parse are still rewritten; other text is kept.
         assert_eq!(rename_var("DAYS * é", "DAYS", "X"), ("X * é".into(), 1));
         for (src, from, to) in [
@@ -742,7 +780,12 @@ mod tests {
     fn ident_rule() {
         assert!(is_ident("SHOOT_DAYS"));
         assert!(is_ident("_x1"));
-        assert!(!is_ident("1x"));
+        // Digit-led names, as Movie Magic allows (decisions.md, entry 56).
+        assert!(is_ident("1x"));
+        assert!(is_ident("1ZG"));
+        assert!(is_ident("12_"));
+        assert!(!is_ident("12"));
+        assert!(!is_ident("1.5x"));
         assert!(!is_ident(""));
         assert!(!is_ident("a-b"));
     }

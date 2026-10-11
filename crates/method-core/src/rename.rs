@@ -119,7 +119,7 @@ impl fmt::Display for RenameError {
             RenameError::BadName { kind, name } => match kind {
                 SetupKind::Global => write!(
                     f,
-                    "`{name}` can't be a global name: use letters, digits and _, starting with a letter"
+                    "`{name}` can't be a global name: use letters, digits and _, with at least one letter or _"
                 ),
                 _ if name.is_empty() => write!(f, "the new {} name is empty", kind.name()),
                 _ => write!(f, "{} names can't contain commas", kind.name()),
@@ -147,7 +147,8 @@ impl fmt::Display for RenameError {
 impl std::error::Error for RenameError {}
 
 /// Whether `name` (already trimmed) can be a name of this kind: a global's
-/// name is letters, digits and `_`, not starting with a digit; other names
+/// name is letters, digits and `_` with at least one letter or `_` (it may
+/// start with digits, `1ZG`; decisions.md, entry 56); other names
 /// are any text without commas (lines list several fringes or groups
 /// separated by commas).
 pub fn valid_name(kind: SetupKind, name: &str) -> bool {
@@ -823,7 +824,11 @@ mod tests {
             RenameError::Same
         );
         assert!(matches!(
-            refuse(SetupKind::Global, "DAYS", "2DAYS"),
+            refuse(SetupKind::Global, "DAYS", "2.5DAYS"),
+            RenameError::BadName { .. }
+        ));
+        assert!(matches!(
+            refuse(SetupKind::Global, "DAYS", "12"),
             RenameError::BadName { .. }
         ));
         assert!(matches!(

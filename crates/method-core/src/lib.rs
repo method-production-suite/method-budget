@@ -33,7 +33,7 @@ pub mod versions;
 
 pub use calc::breakdown::{selection_totals, SelectionTotals};
 pub use calc::explain;
-pub use calc::{charge_preview, recalc, CalcError, ErrorKind, RecalcOptions};
+pub use calc::{charge_preview, recalc, warnings, CalcError, ErrorKind, RecalcOptions};
 pub use compare::{variance, Change, Variance};
 pub use comparison::{
     compare, compare_account, AccountComparison, Aggregate, CompareAccount, CompareCategory,

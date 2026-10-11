@@ -64,10 +64,9 @@ impl Field {
         match kind {
             RowKind::Line => true,
             RowKind::Subtotal => self == Field::Description,
-            RowKind::Adjustment => !matches!(
-                self,
-                Field::Rate | Field::Unit3 | Field::Currency | Field::Fringes
-            ),
+            // An adjustment row can carry fringes, as in Movie Magic
+            // (decisions.md, entry 56).
+            RowKind::Adjustment => !matches!(self, Field::Rate | Field::Unit3 | Field::Currency),
             // A drawn rule line shows nothing (style and notes have their own commands).
             RowKind::Separator => false,
         }
@@ -553,7 +552,7 @@ pub fn set_global(b: &mut Budget, name: &str, formula: &str) -> EditResult {
     let name = name.trim();
     if !is_ident(name) {
         return Err(format!(
-            "`{name}` can't be a global name: use letters, digits and _, starting with a letter"
+            "`{name}` can't be a global name: use letters, digits and _, with at least one letter or _"
         ));
     }
     let formula = formula.trim();

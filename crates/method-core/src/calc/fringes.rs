@@ -1,19 +1,21 @@
 //! Stage 2: fringe dollars per row.
 //!
-//! Only included `Line` rows earn fringes. A percent fringe is charged per
-//! earner: a single line, or a fringe range (consecutive rows sharing
-//! `fringe_range: Some(n)`; subtotal, separator and uncounted rows don't
-//! break a run).
-//! The earner's amount is rounded once, then split back over its lines so the
-//! shares sum exactly. A flat fringe is charged per line: its rate times the
-//! line's count, which [`flat_count`] works out (decisions.md, entry 54).
+//! Included lines and adjustment rows earn fringes (decisions.md, entry 56).
+//! A percent fringe's cutoff applies per earner: a single row, or a fringe
+//! range (consecutive rows sharing `fringe_range: Some(n)`; subtotal,
+//! separator and uncounted rows don't break a run). Within an earner the
+//! cutoff is used up in row order, as Movie Magic does: each row carrying
+//! the fringe takes the percent of its total, or of the cutoff still left
+//! when that is less, rounded on its own ([`percent_step`]). A flat fringe
+//! is charged per row: its rate times the row's count, which [`flat_count`]
+//! works out (decisions.md, entry 54).
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::calc::arith::{mmb_cents, percent_of, Money, Num};
 use crate::calc::{err, overflow, row_at, sum, CalcError, Ctx, ErrorKind};
 use crate::decimal::{Dec, Exact};
-use crate::model::{Account, Arithmetic, Detail, FlatBasis, Fringe, FringeKind, RowKind, UnitDef};
+use crate::model::{Account, Arithmetic, Detail, FlatBasis, Fringe, FringeKind, UnitDef};
 use crate::report::RowTotals;
 use crate::Cents;
 
@@ -30,10 +32,10 @@ pub(crate) fn apply_fringes(
         r.fringe_total = 0;
     }
 
-    // Check every name (excluded lines too) and evaluate each rate once.
+    // Check every name (excluded rows too) and evaluate each rate once.
     let mut rates: BTreeMap<&str, (&Fringe, Num)> = BTreeMap::new();
     for (i, d) in details.iter().enumerate() {
-        if d.kind != RowKind::Line {
+        if !d.kind.is_costed() {
             continue;
         }
         for name in &d.fringes {
@@ -53,7 +55,7 @@ pub(crate) fn apply_fringes(
     let earns: Vec<bool> = details
         .iter()
         .zip(rows.iter())
-        .map(|(d, r)| d.kind == RowKind::Line && r.included)
+        .map(|(d, r)| d.kind.is_costed() && r.included)
         .collect();
 
     // Percent fringes, per earner. Only the fringes the earner's lines carry
@@ -62,7 +64,6 @@ pub(crate) fn apply_fringes(
     let mut carried: BTreeSet<&str> = BTreeSet::new();
     let mut names: Vec<&str> = Vec::new();
     let mut lines: Vec<usize> = Vec::new();
-    let mut weights: Vec<Cents> = Vec::new();
     for earner in earners(details, rows) {
         // A lone line (the usual earner) carries its own, already sorted, set.
         let single = match earner[..] {
@@ -99,34 +100,25 @@ pub(crate) fn apply_fringes(
                         .filter(|&i| earns[i] && details[i].fringes.contains(name)),
                 ),
             }
-            let Some(&first) = lines.first() else {
-                continue;
-            };
-            let ovf = || {
-                overflow(row_at(
-                    &acct.code,
-                    first,
-                    &details[first],
-                    &format!("fringe {name}"),
-                ))
-            };
-            weights.clear();
-            weights.extend(lines.iter().map(|&i| rows[i].total));
-            let mut base = sum(weights.iter().copied()).ok_or_else(ovf)?;
-            if let Some(c) = cutoff {
-                base = base.min(c);
-            }
-            let amount = percent_of(ctx.arith, base, rate)
-                .and_then(Money::to_cents)
-                .ok_or_else(ovf)?;
-            let shares = allocate(amount, &weights).ok_or_else(ovf)?;
-            for (&i, share) in lines.iter().zip(shares) {
-                rows[i].fringes.insert(name.to_string(), share);
+            // The cutoff is used up in row order; each row rounds on its own.
+            let mut left = cutoff;
+            for &i in &lines {
+                let amount = percent_step(ctx.arith, rate, &mut left, rows[i].total)
+                    .and_then(|(_, m)| m.to_cents())
+                    .ok_or_else(|| {
+                        overflow(row_at(
+                            &acct.code,
+                            i,
+                            &details[i],
+                            &format!("fringe {name}"),
+                        ))
+                    })?;
+                rows[i].fringes.insert(name.to_string(), amount);
             }
         }
     }
 
-    // Flat fringes, per line.
+    // Flat fringes, per row.
     for (i, d) in details.iter().enumerate() {
         if !earns[i] {
             continue;
@@ -157,12 +149,13 @@ pub(crate) fn apply_fringes(
     Ok(())
 }
 
-/// Percent-fringe earners as lists of `Line` row indexes, in row order. Lines
-/// outside a range are their own earner. A range is a maximal run of rows with
-/// the same `fringe_range: Some(n)`. Subtotal and separator rows, and rows
-/// that don't count (suppressed or filtered out), are skipped, so they never
-/// break a run; any other row with a different value does. Skipping uncounted rows keeps
-/// "excluding a group equals deleting its lines" true (decisions.md 4).
+/// Percent-fringe earners as lists of row indexes (lines and adjustment
+/// rows), in row order. Rows outside a range are their own earner. A range
+/// is a maximal run of rows with the same `fringe_range: Some(n)`. Subtotal
+/// and separator rows, and rows that don't count (suppressed or filtered
+/// out), are skipped, so they never break a run; any other row with a
+/// different value does. Skipping uncounted rows keeps "excluding a group
+/// equals deleting its lines" true (decisions.md 4).
 pub(super) fn earners(details: &[Detail], rows: &[RowTotals]) -> Vec<Vec<usize>> {
     let mut out = Vec::new();
     let mut run: Option<(u32, Vec<usize>)> = None;
@@ -170,69 +163,47 @@ pub(super) fn earners(details: &[Detail], rows: &[RowTotals]) -> Vec<Vec<usize>>
         if !d.kind.is_costed() || !rows[i].included {
             continue;
         }
-        let is_line = d.kind == RowKind::Line;
-        if let (Some((m, lines)), Some(n)) = (&mut run, d.fringe_range) {
+        if let (Some((m, members)), Some(n)) = (&mut run, d.fringe_range) {
             if *m == n {
-                if is_line {
-                    lines.push(i);
-                }
+                members.push(i);
                 continue;
             }
         }
-        out.extend(run.take().map(|(_, lines)| lines));
+        out.extend(run.take().map(|(_, members)| members));
         match d.fringe_range {
-            Some(n) => run = Some((n, if is_line { vec![i] } else { Vec::new() })),
-            None if is_line => out.push(vec![i]),
-            None => {}
+            Some(n) => run = Some((n, vec![i])),
+            None => out.push(vec![i]),
         }
     }
-    out.extend(run.map(|(_, lines)| lines));
-    out.retain(|e| !e.is_empty());
+    out.extend(run.map(|(_, members)| members));
     out
 }
 
-/// Splits `amount` over `weights` pro rata by largest remainder, so the shares
-/// sum to exactly `amount`. Ties go to the earlier weight. The magnitude is
-/// split and the sign restored, so a credit mirrors the matching debit. When
-/// the weights sum to 0 the first one takes everything. `None` on overflow.
-pub(super) fn allocate(amount: Cents, weights: &[Cents]) -> Option<Vec<Cents>> {
-    let mut out = vec![0; weights.len()];
-    let Some(first) = out.first_mut() else {
-        return Some(out);
+/// One row of a percent fringe's earner, taken in row order (decisions.md,
+/// entry 56, as Movie Magic works a range): the part of the row's `total`
+/// the fringe applies to, and the fringe on it before rounding. `left` is
+/// the earner's cutoff not used yet (`None`: no cutoff); this row uses its
+/// whole total of it. Once nothing is left a row takes nothing, so a credit
+/// after the cutoff is used earns 0, while a credit on its own (with the
+/// cutoff all there) earns its percent. `None` on overflow.
+pub(crate) fn percent_step(
+    arith: Arithmetic,
+    rate: Num,
+    left: &mut Option<Cents>,
+    total: Cents,
+) -> Option<(Cents, Money)> {
+    let taken = match *left {
+        None => total,
+        Some(l) => {
+            *left = Some(l.saturating_sub(total));
+            if l <= 0 {
+                0
+            } else {
+                total.min(l)
+            }
+        }
     };
-    let total = weights
-        .iter()
-        .try_fold(0i128, |acc, &w| acc.checked_add(i128::from(w)))?;
-    if total == 0 {
-        *first = amount;
-        return Some(out);
-    }
-    // Make the divisor positive; the ratios are unchanged.
-    let (total, flip) = if total < 0 { (-total, -1) } else { (total, 1) };
-    let mag = i128::from(amount).abs();
-
-    let mut shares = Vec::with_capacity(weights.len());
-    let mut rems = Vec::with_capacity(weights.len());
-    let mut given = 0i128;
-    for (k, &w) in weights.iter().enumerate() {
-        let n = mag.checked_mul(i128::from(w).checked_mul(flip)?)?;
-        let q = n.div_euclid(total);
-        given = given.checked_add(q)?;
-        shares.push(q);
-        rems.push((n.rem_euclid(total), k));
-    }
-    // Each remainder is below `total` and they sum to `left * total`, so
-    // `0 <= left < weights.len()`.
-    let left = usize::try_from(mag.checked_sub(given)?).ok()?;
-    rems.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
-    for &(_, k) in rems.iter().take(left) {
-        shares[k] = shares[k].checked_add(1)?;
-    }
-    let sign = if amount < 0 { -1 } else { 1 };
-    for (slot, q) in out.iter_mut().zip(shares) {
-        *slot = Cents::try_from(q.checked_mul(sign)?).ok()?;
-    }
-    Some(out)
+    Some((taken, percent_of(arith, taken, rate)?))
 }
 
 /// A line's evaluated Amount, X and 4X, and its quantity (`amount x X x
@@ -1117,39 +1088,53 @@ mod tests {
     }
 
     #[test]
-    fn range_shares_one_cutoff_and_allocates_exactly() {
+    fn range_uses_its_cutoff_in_row_order() {
         let mut b = budget(vec![
             line(1, "1", "Flat", "1000", &["PEN"], Some(1)),
             line(2, "1", "Flat", "1000", &["PEN"], Some(1)),
             line(3, "1", "Flat", "1000", &["PEN"], Some(1)),
-            // In the range but without the fringe: adds nothing to its base.
+            // In the range but without the fringe: uses none of the cutoff.
             line(4, "1", "Flat", "5000", &[], Some(1)),
         ]);
         b.fringes.insert("PEN".into(), pct("10", Some(200_000)));
         let rows = run(&b).unwrap();
-        // 10% of min(3000, 2000) = 200.00, split 66.666... each, ties by row order.
+        // The first two lines use the 2,000.00 cutoff up; the third earns 0.
         assert_eq!(
             amounts(&rows, "PEN"),
-            [Some(6_667), Some(6_667), Some(6_666), None]
+            [Some(10_000), Some(10_000), Some(0), None]
         );
         assert_eq!(rows.iter().map(|r| r.fringe_total).sum::<Cents>(), 20_000);
         assert_totals_match(&rows);
     }
 
     #[test]
-    fn range_allocation_by_largest_remainder() {
+    fn each_row_of_a_range_rounds_on_its_own() {
         let mut b = budget(vec![
             line(1, "1", "Flat", "1000", &["FICA"], Some(7)),
-            line(2, "1", "Flat", "500", &["FICA"], Some(7)),
-            line(3, "1", "Flat", "250", &["FICA"], Some(7)),
+            line(2, "1", "Flat", "0.04", &["FICA"], Some(7)),
+            line(3, "1", "Flat", "0.04", &["FICA"], Some(7)),
+            line(4, "1", "Flat", "0.04", &["FICA"], Some(7)),
         ]);
-        b.fringes.insert("FICA".into(), pct("7.65", Some(100_000)));
+        b.fringes.insert("FICA".into(), pct("12.5", Some(222_222)));
         let rows = run(&b).unwrap();
-        // 76.50 over 4371.43 / 2185.71 / 1092.86: the two larger remainders win.
+        // 0.005 each, a cent each (0.03), not 0.015 rounded once.
         assert_eq!(
             amounts(&rows, "FICA"),
-            [Some(4_371), Some(2_186), Some(1_093)]
+            [Some(12_500), Some(1), Some(1), Some(1)]
         );
+    }
+
+    #[test]
+    fn a_credit_after_the_cutoff_is_used_earns_nothing() {
+        let mut b = budget(vec![
+            line(1, "1", "Flat", "3000", &["P"], Some(1)),
+            line(2, "1", "Flat", "-500", &["P"], Some(1)),
+            line(3, "1", "Flat", "-500", &["P"], None),
+        ]);
+        b.fringes.insert("P".into(), pct("10", Some(100_000)));
+        let rows = run(&b).unwrap();
+        // In the range: 100.00 then 0.00; on its own the credit earns -50.00.
+        assert_eq!(amounts(&rows, "P"), [Some(10_000), Some(0), Some(-5_000)]);
     }
 
     #[test]
@@ -1176,12 +1161,13 @@ mod tests {
         ]);
         b.fringes.insert("PEN".into(), pct("10", Some(150_000)));
         let rows = run(&b).unwrap();
-        assert_eq!(amounts(&rows, "PEN"), [Some(7_500), None, Some(7_500)]);
+        // 1,000.00 of the cutoff, then the 500.00 left.
+        assert_eq!(amounts(&rows, "PEN"), [Some(10_000), None, Some(5_000)]);
         assert_eq!(rows[1].fringe_total, 0);
     }
 
     #[test]
-    fn adjustment_row_breaks_range_and_earns_nothing() {
+    fn adjustment_row_breaks_range_and_earns_its_own_fringes() {
         let mut adj = Detail::adjustment(2, "Kit", "0.1");
         adj.fringes.insert("PEN".into());
         let mut b = budget(vec![
@@ -1192,8 +1178,28 @@ mod tests {
         b.fringes.insert("PEN".into(), pct("10", Some(150_000)));
         let rows = run(&b).unwrap();
         assert_eq!(rows[1].total, 10_000);
-        assert_eq!(amounts(&rows, "PEN"), [Some(10_000), None, Some(10_000)]);
-        assert_eq!(rows[1].fringe_total, 0);
+        // 10% of the 100.00 adjustment, as Movie Magic charges it.
+        assert_eq!(
+            amounts(&rows, "PEN"),
+            [Some(10_000), Some(1_000), Some(10_000)]
+        );
+        assert_eq!(rows[1].fringe_total, 1_000);
+    }
+
+    #[test]
+    fn adjustment_rows_take_part_in_a_range() {
+        let mut adj = Detail::adjustment(2, "Kit", "0.5");
+        adj.fringes.insert("PEN".into());
+        adj.fringe_range = Some(1);
+        let mut b = budget(vec![
+            line(1, "1", "Flat", "1000", &["PEN"], Some(1)),
+            adj,
+            line(3, "1", "Flat", "1000", &["PEN"], Some(1)),
+        ]);
+        b.fringes.insert("PEN".into(), pct("10", Some(150_000)));
+        let rows = run(&b).unwrap();
+        // 1,000.00, then the 500.00 adjustment uses the rest.
+        assert_eq!(amounts(&rows, "PEN"), [Some(10_000), Some(5_000), Some(0)]);
     }
 
     #[test]
@@ -1220,12 +1226,12 @@ mod tests {
         b.fringes.insert("MEAL".into(), flat("12", None));
         let rows = run(&b).unwrap();
         assert!(!rows[1].included);
-        // Base is 2000 (not 3000), capped to 1500.
-        assert_eq!(amounts(&rows, "PEN"), [Some(7_500), None, Some(7_500)]);
+        // The left-out line uses none of the cutoff: 1,000.00, then 500.00.
+        assert_eq!(amounts(&rows, "PEN"), [Some(10_000), None, Some(5_000)]);
         assert_eq!(amounts(&rows, "MEAL"), [Some(1_200), None, Some(1_200)]);
         assert!(rows[1].fringes.is_empty());
         assert_eq!(rows[1].fringe_total, 0);
-        assert_eq!(rows[0].fringe_total, 8_700);
+        assert_eq!(rows[0].fringe_total, 11_200);
     }
 
     #[test]
@@ -1383,7 +1389,8 @@ mod tests {
         ]);
         b.fringes.insert("PEN".into(), pct("10", Some(50_000)));
         let rows = run(&b).unwrap();
-        // min(-1000, 500) keeps the credit; the range splits -300.00 evenly.
+        // min(-1000, 500) keeps the credit; in the range each credit adds
+        // to the cutoff left, so each earns its own -100.00.
         assert_eq!(
             amounts(&rows, "PEN"),
             [Some(-10_000), Some(-10_000), Some(-10_000), Some(-10_000)]
@@ -1391,14 +1398,14 @@ mod tests {
     }
 
     #[test]
-    fn range_netting_to_zero_earns_zero() {
+    fn without_a_cutoff_each_row_earns_its_own_percent() {
         let mut b = budget(vec![
             line(1, "1", "Flat", "1000", &["PEN"], Some(1)),
             line(2, "1", "Flat", "-1000", &["PEN"], Some(1)),
         ]);
         b.fringes.insert("PEN".into(), pct("10", None));
         let rows = run(&b).unwrap();
-        assert_eq!(amounts(&rows, "PEN"), [Some(0), Some(0)]);
+        assert_eq!(amounts(&rows, "PEN"), [Some(10_000), Some(-10_000)]);
     }
 
     #[test]
@@ -1441,7 +1448,7 @@ mod tests {
         let rows = rows_of(&b, false).unwrap();
         assert_eq!(
             earners(&ds, &rows),
-            vec![vec![0], vec![1, 3], vec![4, 6], vec![7]]
+            vec![vec![0], vec![1, 3], vec![4, 5, 6], vec![7]]
         );
         ds.clear();
         assert!(earners(&ds, &[]).is_empty());
@@ -1464,28 +1471,10 @@ mod tests {
         b.groups.insert("Hold".into(), group);
         b.fringes.insert("PEN".into(), pct("10", Some(150_000)));
         let rows = run(&b).unwrap();
-        // Same as if rows 2 and 3 were deleted: one earner capped at 1500.
+        // Same as if rows 2 and 3 were deleted: one earner, 1,500.00 cutoff.
         assert_eq!(
             amounts(&rows, "PEN"),
-            [Some(7_500), None, None, Some(7_500)]
+            [Some(10_000), None, None, Some(5_000)]
         );
-    }
-
-    #[test]
-    fn allocate_cases() {
-        assert_eq!(allocate(10, &[1, 1, 1]), Some(vec![4, 3, 3]));
-        assert_eq!(allocate(-10, &[1, 1, 1]), Some(vec![-4, -3, -3]));
-        assert_eq!(allocate(10, &[-1, -1, -1]), Some(vec![4, 3, 3]));
-        assert_eq!(allocate(100, &[300, -100]), Some(vec![150, -50]));
-        assert_eq!(allocate(7, &[5, -5]), Some(vec![7, 0]));
-        assert_eq!(allocate(0, &[5, 5]), Some(vec![0, 0]));
-        assert_eq!(allocate(5, &[0, 3, 0]), Some(vec![0, 5, 0]));
-        assert_eq!(allocate(5, &[]), Some(vec![]));
-        assert_eq!(allocate(i64::MAX, &[i64::MAX, -1]), None);
-        let w = [123_457, 98_765, 1, 55_555, 77_777];
-        for amount in [-9_999, -1, 0, 1, 2, 3, 12_345, 1_000_001] {
-            let shares = allocate(amount, &w).unwrap();
-            assert_eq!(shares.iter().sum::<Cents>(), amount);
-        }
     }
 }

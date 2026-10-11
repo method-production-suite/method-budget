@@ -969,17 +969,18 @@ pub fn cost_report(b: &Budget, r: &Report, roll: &Rollup) -> Option<CostReport> 
             figures,
         });
     }
-    let has_levels = b
+    // ATL and BTL as the report counts them (decisions.md, entry 56): the
+    // first level when a production total closes it, then every later level
+    // one closes; the trailing unnamed level is in neither.
+    let closed = b
         .topsheet
         .iter()
-        .any(|row| matches!(row, TopsheetRow::ProductionTotal(_)));
-    let (atl_levels, btl_levels) = if has_levels && !levels.is_empty() {
-        levels.split_at(1)
-    } else {
-        levels.split_at(0)
-    };
-    let total_atl = CostFigures::sum(atl_levels.iter().map(|l| &l.figures), None)?;
-    let total_btl = CostFigures::sum(btl_levels.iter().map(|l| &l.figures), None)?;
+        .filter(|row| matches!(row, TopsheetRow::ProductionTotal(_)))
+        .count()
+        .min(levels.len());
+    let split = usize::from(closed > 0);
+    let total_atl = CostFigures::sum(levels[..split].iter().map(|l| &l.figures), None)?;
+    let total_btl = CostFigures::sum(levels[split..closed].iter().map(|l| &l.figures), None)?;
     let atl_btl = CostFigures::sum([&total_atl, &total_btl], None)?;
     let budget_fringes = if r.budget_fringes != 0 {
         Some(CostItem {
@@ -1010,6 +1011,7 @@ pub fn cost_report(b: &Budget, r: &Report, roll: &Rollup) -> Option<CostReport> 
     let total = CostFigures::sum(
         [&atl_btl]
             .into_iter()
+            .chain(levels[closed..].iter().map(|l| &l.figures))
             .chain(budget_fringes.iter().map(|f| &f.figures))
             .chain(charges.iter().map(|c| &c.figures))
             .chain([&unassigned]),
@@ -1261,11 +1263,13 @@ mod tests {
             (150_000, 120_000, 50_000, 170_000, -20_000)
         );
         assert_eq!(cat.percent_spent, Some(d("80")));
-        // Levels: 10 above the line, 20 below.
+        // Levels: 10 above the line; 20 comes after the last production
+        // total, so it is in neither (decisions.md, entry 56).
         assert_eq!(c.levels.len(), 2);
         assert_eq!(c.total_atl.budget, 150_000);
-        assert_eq!(c.total_btl.budget, 200_000);
-        assert_eq!(c.atl_btl.actual, 170_000);
+        assert_eq!(c.total_btl.budget, 0);
+        assert_eq!(c.atl_btl.actual, 120_000);
+        assert_eq!(c.levels[1].figures.budget, 200_000);
         // The charge keeps its whole budget to complete.
         assert_eq!(c.charges[0].figures.budget, 35_000);
         assert_eq!(c.charges[0].figures.etc, 35_000);

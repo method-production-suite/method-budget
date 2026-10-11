@@ -37,8 +37,8 @@ pub fn tools() -> Vec<Tool> {
             name: "set_global",
             title: "Set a global",
             description: "Sets a global's formula (adding the global when it is new), and \
-                optionally its description and unit. Names are letters, digits and _, starting \
-                with a letter. Lines use globals by name in their formulas (SHOOT_DAYS * 2).",
+                optionally its description and unit. Names are letters, digits and _, with at \
+                least one letter or _ (1ZG is a name). Lines use globals by name in their formulas (SHOOT_DAYS * 2).",
             mutating: true,
             destructive: false,
             schema: || {

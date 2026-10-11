@@ -43,12 +43,13 @@ use crate::clipboard::{self, Clip, Content, Pasted, Preview, Setup, Target};
 use crate::edit::{details, EditResult};
 use crate::view::View;
 
-/// Lines take fringes and a currency.
+/// Lines take a currency.
 fn is_line(d: &Detail) -> bool {
     d.kind == RowKind::Line
 }
 
-/// Lines and adjustments take groups, a set and a location.
+/// Lines and adjustments take fringes (decisions.md, entry 56), groups, a
+/// set and a location.
 fn is_costed(d: &Detail) -> bool {
     matches!(d.kind, RowKind::Line | RowKind::Adjustment)
 }
@@ -436,9 +437,7 @@ fn put_tags(b: &mut Budget, p: &TagPreset, mode: Mode, ids: &[RowId]) -> EditRes
         }
         match mode {
             Mode::Add => {
-                if line {
-                    d.fringes.extend(p.fringes.iter().cloned());
-                }
+                d.fringes.extend(p.fringes.iter().cloned());
                 d.groups.extend(p.groups.iter().cloned());
                 if d.set.is_none() {
                     d.set.clone_from(&p.set);
@@ -452,8 +451,8 @@ fn put_tags(b: &mut Budget, p: &TagPreset, mode: Mode, ids: &[RowId]) -> EditRes
                 }
             }
             Mode::Replace => {
+                d.fringes.clone_from(&p.fringes);
                 if line {
-                    d.fringes.clone_from(&p.fringes);
                     d.currency.clone_from(&currency);
                 }
                 d.groups.clone_from(&p.groups);
@@ -1089,10 +1088,11 @@ mod tests {
         assert_eq!(tagged.groups, names(&["Crew", "Union"]));
         assert_eq!(tagged.set.as_deref(), Some("Stage B"));
         assert_eq!(tagged.location.as_deref(), Some("Toronto"));
-        // The adjustment takes groups, set and location; never fringes or a
-        // currency. The subtotal takes nothing.
+        // The adjustment takes fringes (decisions.md, entry 56), groups, set
+        // and location; never a currency. The subtotal takes nothing.
         let adj = row(&b, rows[3]);
-        assert!(adj.fringes.is_empty() && adj.currency.is_none());
+        assert_eq!(adj.fringes, names(&["PENSION"]));
+        assert!(adj.currency.is_none());
         assert_eq!(adj.groups, names(&["Union"]));
         assert_eq!(adj.set.as_deref(), Some("Stage A"));
         assert_eq!(row(&b, rows[1]), row(&before, rows[1]));

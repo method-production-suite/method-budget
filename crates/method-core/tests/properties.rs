@@ -37,7 +37,18 @@ impl Rng {
 fn gen_detail(rng: &mut Rng, id: RowId, range: Option<u32>) -> Detail {
     let mut det = match rng.below(11) {
         0 => return Detail::subtotal(id, "sub"),
-        1 => Detail::adjustment(id, "adj", format!("0.{}", rng.below(30)).as_str()),
+        // Adjustment rows can carry fringes and sit in a range, as lines
+        // can (decisions.md, entry 56).
+        1 => {
+            let mut adj = Detail::adjustment(id, "adj", format!("0.{}", rng.below(30)).as_str());
+            for f in ["PCT", "CAPPED", "FLAT"] {
+                if rng.chance(20) {
+                    adj.fringes.insert(f.into());
+                }
+            }
+            adj.fringe_range = range;
+            adj
+        }
         // Separators sometimes sit inside a fringe range, sometimes carry a
         // different range or stray tags: none of it may matter.
         2 => {
@@ -148,6 +159,9 @@ fn gen_budget(rng: &mut Rng) -> Budget {
             suffix: "99".into(),
         },
     };
+    if rng.chance(30) {
+        b.trailing_level_fringes = TrailingFringes::Drop;
+    }
     b.groups.insert("A".into(), group(true));
     b.groups.insert("B".into(), group(true));
     b.groups.insert("OFF".into(), group(false));
@@ -223,7 +237,7 @@ fn check_rollups(b: &Budget, r: &Report, seed: u64) {
         for acct in &cat.accounts {
             for row in &acct.rows {
                 assert_eq!(row.fringe_total, row.fringes.values().sum::<i64>(), "{msg}");
-                if !row.included || row.kind != RowKind::Line {
+                if !row.included || !row.kind.is_costed() {
                     assert_eq!(row.fringe_total, 0, "{msg}");
                 }
                 if row.kind == RowKind::Separator {
@@ -267,32 +281,50 @@ fn check_rollups(b: &Budget, r: &Report, seed: u64) {
             "{msg}"
         );
     }
+    // Where the unnamed level after the last production total starts, and
+    // how many levels a production total closes.
+    let closed = b
+        .topsheet
+        .iter()
+        .filter(|row| matches!(row, TopsheetRow::ProductionTotal(_)))
+        .count();
+    let trailing = r.levels.get(closed).map_or(r.categories.len(), |l| l.start);
+    let dropping = *posting == FringePosting::ProductionLevel
+        && b.trailing_level_fringes == TrailingFringes::Drop;
+    let dropped: i64 = if dropping {
+        r.categories[trailing..]
+            .iter()
+            .map(|c| c.fringe_total)
+            .sum()
+    } else {
+        0
+    };
     for l in &r.levels {
         posted += l.posted_fringes;
         let cats: i64 = r.categories[l.start..l.end].iter().map(|c| c.total).sum();
         assert_eq!(l.total, cats + l.posted_fringes, "{msg}");
     }
     assert_eq!(
-        posted, all_fringes,
-        "every fringe dollar posts exactly once, {msg}"
+        posted + dropped,
+        all_fringes,
+        "every fringe dollar posts exactly once, unless it is dropped, {msg}"
     );
     assert_eq!(
         r.fringes.values().map(|f| f.total).sum::<i64>(),
         all_fringes,
         "{msg}"
     );
+    // ATL and BTL are the levels a production total closes; the trailing
+    // level is in neither, but in the grand total (decisions.md, entry 56).
     assert_eq!(
         r.total_atl + r.total_btl,
-        r.levels.iter().map(|l| l.total).sum::<i64>(),
+        r.levels[..closed].iter().map(|l| l.total).sum::<i64>(),
         "{msg}"
     );
     assert_eq!(r.atl_btl, r.total_atl + r.total_btl, "{msg}");
     let charges: i64 = r.charges.iter().map(|c| c.amount).sum();
-    assert_eq!(
-        r.grand_total,
-        r.atl_btl + r.budget_fringes + charges,
-        "{msg}"
-    );
+    let levels: i64 = r.levels.iter().map(|l| l.total).sum();
+    assert_eq!(r.grand_total, levels + r.budget_fringes + charges, "{msg}");
     assert_eq!(
         r.credits_total,
         r.credits.iter().map(|c| c.amount).sum::<i64>(),

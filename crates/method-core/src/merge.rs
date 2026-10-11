@@ -829,6 +829,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         units: _,
         fringes: _,
         fringe_posting: _,
+        trailing_level_fringes: _,
         arithmetic: _,
         account_coding: _,
         new_line_defaults: _,
@@ -883,6 +884,16 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         &setting_at("fringe_posting", "Fringe posting"),
         (&b.fringe_posting, &o.fringe_posting, &t.fringe_posting),
         crate::diff::posting_text,
+    );
+    let trailing_level_fringes = merge_value(
+        cx,
+        &setting_at("trailing_level_fringes", "Trailing level fringes"),
+        (
+            &b.trailing_level_fringes,
+            &o.trailing_level_fringes,
+            &t.trailing_level_fringes,
+        ),
+        crate::diff::trailing_text,
     );
     let arithmetic = merge_value(
         cx,
@@ -1272,6 +1283,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         units,
         fringes,
         fringe_posting,
+        trailing_level_fringes,
         arithmetic,
         account_coding,
         new_line_defaults,

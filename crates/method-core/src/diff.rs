@@ -32,7 +32,8 @@ use crate::coding::AccountCoding;
 use crate::model::{
     Account, Arithmetic, Baseline, Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource,
     Currency, Detail, FlatBasis, Fringe, FringeKind, FringePosting, GlobalInfo, Group, InfoValue,
-    Location, NewLineDefaults, Note, RowId, RowKind, SetDef, TopsheetRow, UnitDef, Version,
+    Location, NewLineDefaults, Note, RowId, RowKind, SetDef, TopsheetRow, TrailingFringes, UnitDef,
+    Version,
 };
 use crate::report::Report;
 use crate::{recalc, Cents, Dec, RecalcOptions};
@@ -895,6 +896,13 @@ pub(crate) fn posting_text(p: &FringePosting) -> String {
     }
 }
 
+pub(crate) fn trailing_text(t: &TrailingFringes) -> String {
+    match t {
+        TrailingFringes::Keep => "kept after the last production total".into(),
+        TrailingFringes::Drop => "dropped after the last production total".into(),
+    }
+}
+
 pub(crate) fn arithmetic_text(a: &Arithmetic) -> String {
     match a {
         Arithmetic::Mmb => "Movie Magic (binary doubles)".into(),
@@ -959,6 +967,11 @@ pub(crate) fn setting_fields(b: &Budget) -> Vec<Field> {
             "fringe_posting",
             "fringe posting",
             posting_text(&b.fringe_posting),
+        ),
+        text(
+            "trailing_level_fringes",
+            "trailing level fringes",
+            trailing_text(&b.trailing_level_fringes),
         ),
         text("arithmetic", "arithmetic", arithmetic_text(&b.arithmetic)),
         text(

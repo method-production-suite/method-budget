@@ -421,6 +421,17 @@ fn eval_full(
     Ok(out)
 }
 
+/// What `b`'s totals (`r`, from recalculating it) leave out or count in a
+/// way worth a look, in plain words: for now, fringes of categories after
+/// the last production total under production-level posting, which no
+/// level holds (decisions.md, entry 56). `method check` and the MCP
+/// `validate` tool list them; they never stop a recalc.
+pub fn warnings(b: &Budget, r: &Report) -> Vec<String> {
+    topsheet::trailing_fringes_warning(b, r)
+        .into_iter()
+        .collect()
+}
+
 /// Recalculates every total in `b`.
 pub fn recalc(b: &Budget, opts: &RecalcOptions) -> Result<Report, CalcError> {
     recalc_with(b, opts, None)

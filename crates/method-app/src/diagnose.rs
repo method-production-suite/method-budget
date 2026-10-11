@@ -266,12 +266,14 @@ pub fn sanitize(b: &Budget) -> (Budget, Vec<Issue>) {
                         d.currency = None;
                     }
                 }
-                let unknown: Vec<String> = d.fringes.difference(&fringes).cloned().collect();
-                if !unknown.is_empty() {
-                    let list = unknown.join("`, `");
-                    flag("fringes", format!("unknown fringe `{list}`"));
-                    d.fringes.retain(|n| fringes.contains(n));
-                }
+            }
+            // Lines and adjustment rows both earn fringes (decisions.md,
+            // entry 56).
+            let unknown: Vec<String> = d.fringes.difference(&fringes).cloned().collect();
+            if !unknown.is_empty() {
+                let list = unknown.join("`, `");
+                flag("fringes", format!("unknown fringe `{list}`"));
+                d.fringes.retain(|n| fringes.contains(n));
             }
             let unknown: Vec<String> = d.groups.difference(&groups).cloned().collect();
             if !unknown.is_empty() {
@@ -426,6 +428,29 @@ mod tests {
                 field: "currency"
             }));
         assert_eq!(o.report.unwrap().categories[0].fringe_total, 0);
+    }
+
+    /// An adjustment row earns fringes (decisions.md, entry 56), so an
+    /// unknown one on it is flagged on its cell like a line's.
+    #[test]
+    fn an_unknown_fringe_on_an_adjustment_row_is_flagged() {
+        let mut b = starter::budget();
+        let id = 900;
+        let acct = b
+            .categories_mut()
+            .flat_map(|c| &mut c.accounts)
+            .find(|a| a.code == "41-01")
+            .unwrap();
+        let mut adj = method_core::Detail::adjustment(id, "Kit", "0.1");
+        adj.fringes.insert("NOPE".into());
+        acct.details.push(adj);
+        let o = lenient_recalc(&b);
+        assert!(o.partial());
+        assert!(o.issues.iter().any(|i| i.target
+            == Target::Cell {
+                row_id: id,
+                field: "fringes"
+            }));
     }
 
     #[test]

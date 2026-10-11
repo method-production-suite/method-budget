@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use method_core::coding::AccountCoding;
 use method_core::{
     Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource, FringeKind, FringePosting,
-    NewLineDefaults, ReportPreset, MAX_PRESETS, MAX_PRESET_NAME_CHARS,
+    NewLineDefaults, ReportPreset, TrailingFringes, MAX_PRESETS, MAX_PRESET_NAME_CHARS,
 };
 use serde::{Deserialize, Serialize};
 
@@ -407,9 +407,12 @@ fn status_of(src: &Budget, here: &Budget, w: What, name: &str) -> Status {
         What::AccountCoding => {
             clipboard::status(Some(&src.account_coding), Some(&here.account_coding))
         }
-        What::FringePosting => {
-            clipboard::status(Some(&src.fringe_posting), Some(&here.fringe_posting))
-        }
+        // The posting mode and what it does with fringes after the last
+        // production total (decisions.md, entry 56) go together.
+        What::FringePosting => clipboard::status(
+            Some(&(&src.fringe_posting, src.trailing_level_fringes)),
+            Some(&(&here.fringe_posting, here.trailing_level_fringes)),
+        ),
         What::NewLineDefaults => {
             clipboard::status(Some(&src.new_line_defaults), Some(&here.new_line_defaults))
         }
@@ -450,7 +453,10 @@ pub fn describe(b: &Budget, w: What, name: &str) -> String {
             .find(|p| p.name == name)
             .map(describe_ot),
         What::AccountCoding => Some(describe_coding(&b.account_coding)),
-        What::FringePosting => Some(describe_posting(&b.fringe_posting)),
+        What::FringePosting => Some(describe_posting(
+            &b.fringe_posting,
+            b.trailing_level_fringes,
+        )),
         What::NewLineDefaults => Some(describe_line_defaults(&b.new_line_defaults)),
     }
     .unwrap_or_default()
@@ -588,9 +594,12 @@ fn describe_coding(c: &AccountCoding) -> String {
     )
 }
 
-fn describe_posting(p: &FringePosting) -> String {
+fn describe_posting(p: &FringePosting, trailing: TrailingFringes) -> String {
     match p {
         FringePosting::Budget => "one Total Fringes row for the budget".to_string(),
+        FringePosting::ProductionLevel if trailing == TrailingFringes::Drop => {
+            "a fringe row above each production total (none after the last one)".to_string()
+        }
         FringePosting::ProductionLevel => "a fringe row above each production total".to_string(),
         FringePosting::Category { suffix } => {
             format!("a fringe account in each category, numbered {suffix}")
@@ -1138,7 +1147,10 @@ pub fn import(
                 }
             }
             What::AccountCoding => b.account_coding = src.account_coding,
-            What::FringePosting => b.fringe_posting = src.fringe_posting.clone(),
+            What::FringePosting => {
+                b.fringe_posting = src.fringe_posting.clone();
+                b.trailing_level_fringes = src.trailing_level_fringes;
+            }
             What::NewLineDefaults => b.new_line_defaults = src.new_line_defaults,
             _ => {}
         }

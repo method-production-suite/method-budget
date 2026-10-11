@@ -62,6 +62,10 @@ remainder, so the pieces sum exactly. Subtotal rows and left-out rows don't brea
 (so excluding a line still equals deleting it). There is no cross-account "person"; that matches how
 budgeting tools work in practice (see docs/research/mmb-feature-inventory.md).
 
+**Amended 2026-10-10 (entry 56):** the range's cutoff is now used up in line order, each
+line's fringe rounded on its own, as the reference product works it; nothing is split pro
+rata. Adjustment rows can be earners too.
+
 ## 4. Groups (2026-10-08, revised)
 
 Groups are budget data with an "in budget total" switch: turning it off suppresses every
@@ -77,6 +81,9 @@ Amount, multiplier and rate are formula strings: numbers, global names, `+ - * /
 minus, parentheses. Hand-written parser plus AST walker, no `eval`. Globals can reference
 each other; they're evaluated in dependency order and cycles are reported with their path.
 
+**Amended 2026-10-10 (entry 56):** a global's name may start with digits (`1ZG`), as in
+the reference product: letters, digits and `_` with at least one letter or `_`.
+
 ## 6. No dependencies in the engine yet (2026-10-08)
 
 Property tests use a small seeded generator in `tests/properties.rs` instead of `proptest`.
@@ -87,7 +94,8 @@ It keeps `method-core` dependency-free until we actually need something (serde, 
 Blank Amt and Rate count as 0, blank X and 4X as 1, so a title line is just a line with no
 numbers. Subtotal rows show a running total and add nothing. Adjustment rows are real costs
 whose rate is locked to the lines above them (back to the previous adjustment); Amt sets
-the percentage, e.g. `0.1` for 10%.
+the percentage, e.g. `0.1` for 10%. (Amended by entry 56: an adjustment row can carry
+fringes, charged as on a line.)
 
 ## 8. Units (2026-10-08)
 
@@ -100,12 +108,17 @@ from a time, for the bases that read them.)
 ## 9. Topsheet, charges and credits (2026-10-08)
 
 - Production-total rows split the topsheet into levels; the first level is above-the-line.
-  With no production totals, everything is below-the-line.
+  With no production totals, everything is below-the-line. (Amended by entry 56: BTL is
+  only the levels a production total closes; categories after the last one, and
+  everything when there is none, count in neither, as in the reference product.)
 - Fringe posting is a budget setting: by budget, production level, category (fringe account
   numbered category code + suffix, default `99`) or account. Every fringe dollar posts
   exactly once (property-tested).
 - Charges apply to ATL + BTL in order and never to each other. Exclusions count each line
-  once even if it matches several rules.
+  once even if it matches several rules. (Amended by entry 56: a percent charge applies to
+  every level plus fringes posted by budget, the grand total before charges, and an
+  excluded line takes its fringes off with it in every posting mode; flat fees honor
+  category and account exclusions too.)
 - Credit rows are summed **unrounded**, then capped and discounted, then rounded once.
 
 ## 10. Currency direction (2026-10-08)
@@ -1332,7 +1345,8 @@ Roadmap 3.5 and 3.10.
   be; each percent fringe with the earner's earnings, the cutoff, for a range the lines that
   share it and **how much of the cutoff each line used** (the capped base split pro rata by
   largest remainder, the same split the engine gives the fringe), the exact share and the
-  allocated cents; each flat fringe once per line or per unit with the hours conversion,
+  allocated cents (amended by entry 56: the cutoff left after the lines above, used up in
+  line order, each line rounded on its own); each flat fringe once per line or per unit with the hours conversion,
   and why it fell back to once; where fringes post, wherever that decides what a total
   holds; a charge's base, each excluded account with the rules that caught it (each line
   counted once) and typed amounts; a credit's rows (gross with the accounts it came from,
@@ -2063,3 +2077,103 @@ default, and keep our exact decimals (entries 1 and 2) as a setting per budget.*
   and the spreadsheet importers still round numbers to 9 places. The editor's lenient
   recalc checks formulas in the budget's arithmetic.
 
+## 56. Ranges, charges, levels and posting as Movie Magic works them (2026-10-10, the owner)
+
+The parity run of 2026-10-10 (imports/mmb-parity/2026-10-10, run-log.md and
+parity-report.md, section A items 2 to 6, 10 and 11) found six more places where Movie
+Magic Budgeting 10 works a total out differently. The owner's rule is to match it by
+default; where matching drops money, our behavior stays as the default and Movie Magic's
+is a setting.
+
+- **A range uses its cutoff up in line order** (A2; replaces the pro rata split of entry
+  3). Within an earner (a fringe range, or one row), the rows carrying a percent fringe are
+  taken in order: each takes the percent of its total, or of the cutoff still left when
+  that is less, rounded to cents on its own; the cutoff left goes down by the row's whole
+  total. Once nothing is left a row takes nothing. Rows without the fringe, subtotal and
+  separator rows and rows that don't count (suppressed or filtered out) are skipped and use
+  none of it. A row on its own is the same rule with the whole cutoff, so a credit on its
+  own still earns its (negative) percent, while a credit after the cutoff is used earns 0.
+  Without a cutoff each row is simply its own percent, rounded alone. Checked (ZTEST04):
+  ZP125 12.5% with a 2,222.22 cutoff on Prep 1,249.36 / Shoot 5,309.78 / Wrap 624.68 is
+  156.17 / 121.61 / 0.00; two 1,500.00 lines with ZP125 and ZP321 (3.21%, no cutoff) give
+  ZP125 187.50 then 90.28 and ZP321 48.15; ZP10 (10%, cutoff 1,000.00) on First 1,500.00 /
+  a suppressed Middle / Last 1,500.00 is 100.00 / none / 0.00, across a subtotal row 100.00
+  / 0.00, in two ranges of 1,500.00 + 1,500.00 100.00 / 0.00 each, on Fringed 600.00 / Not
+  fringed 600.00 / Fringed again 600.00 60.00 / none / 40.00, on Pay 3,000.00 / Refund
+  -500.00 100.00 / 0.00 (on its own the refund earns -50.00); three 0.04 lines with ZP125
+  are 0.01 each (0.03), not 0.015 rounded once. No setting: the proration is gone.
+- **A percent charge's base is everything before charges** (A3; replaces entry 9's "ATL +
+  BTL", which left fringes posted by budget out). It is every level (every category with
+  its fringes, wherever they post, and the categories after the last production total)
+  plus the budget's Total Fringes row: the grand total before charges. Excluding a line,
+  account or category takes the line's fringes off with it whatever the posting mode, so a
+  charge comes to the same in every posting mode. Checked: ZTEST06 posting by budget, ZP10N
+  fringes 3,100.00 on 29,400.00 of lines, ZPCT5 5% = 1,625.00, grand 34,125.00; ZTEST09
+  posting by budget changes no charge (ZPCTCAT 2% excluding category 2100 with its 800.00
+  of fringes is still 270.00).
+- **A flat fee honors category and account exclusions** (A4): typed amounts and the lines
+  of excluded groups, accounts and categories (each line once, with its fringes) come off
+  the fee, as for a percent charge. Checked (ZTEST09): ZFLATCAT 10,000.00 excluding
+  category 3100 (2,000.00) is 8,000.00; ZFLAT 2,500.00 less 222.00 typed and group ZNOCHG
+  (800.00) is still 1,478.00, and 2,278.00 with ZNOCHG out of the budget total. A fee
+  smaller than its exclusions goes below zero (not checked; no figure decided it).
+- **ATL and BTL follow the production totals** (A5; amends entry 9). Above-the-line is the
+  first level (the rows up to the first production total) when a production total closes
+  it; below-the-line is every later level a production total closes; categories after the
+  last production total count in neither, and with no production total nothing is above or
+  below the line (ATL = BTL = 0). An empty first level (a production total at the very
+  top) is ATL 0, not skipped. The grand total is unchanged: every level, the trailing one
+  too, plus budget fringes and charges. Checked (ZTEST11, four categories of 1,000.00 to
+  4,000.00): no production totals 0 / 0; a total after 1100 1,000.00 / 0; a total above
+  1100 as well 0 / 1,000.00; and a closing total after 4100 0 / 10,000.00. ZTEST06 (totals
+  ATL, PROD and POST, 4100 trailing with 1,100.00) is ATL 16,500.00, BTL 14,900.00.
+- **Fringes after the last production total** (A6). Posting by production level, Movie
+  Magic puts each level's fringes in a row above its production total, and a category after
+  the last one loses its fringes: not a setting, and adding a closing production total
+  brings them back (V06-2: ZPCT5 1,620.00, grand 34,020.00 instead of 34,125.00). That
+  drops money, so **we keep them by default**, in a fringe row of the unnamed last level,
+  and `method check` and the MCP `validate` tool warn: "fringes of categories after the
+  last production total are not in any level (4100 100.00): kept in the grand total; Movie
+  Magic leaves them out (trailing_level_fringes drop matches it)". The budget setting
+  **`trailing_level_fringes`** (`keep`, the default, or `drop`; FORMAT.md) drops them as
+  Movie Magic does: the trailing level posts no fringes, they count in no total and no
+  charge base, and an excluded line there comes off a charge without them. It changes
+  nothing under the other posting modes. With no production total at all every category
+  is trailing, so `drop` drops every fringe (not checked; it follows from the rule).
+  Breakdowns (fringe, group, set and location totals) and credits still count fringes as
+  earned.
+- **Adjustment rows can carry fringes** (A10). A fringe on an adjustment row is charged
+  as on a line: ZP10N on the 350.00 adjustment is 35.00 (ZTEST03, account 1101 fringes
+  335.00). An adjustment row is an earner of its own, or part of a fringe range when it
+  carries the range's number (it already broke a range otherwise, and still does). Not
+  checked, chosen: a flat fringe on an adjustment row counts its Amount the way it would on
+  a line (entry 54; the Amount is the percentage, so a per-line fringe is the usual one).
+  The grid shows the Fringes cell, fringe dollars and fringe percent on adjustment rows;
+  the apply panel, tag presets, right-click Apply Fringe, `set line` and the MCP tools put
+  fringes on them.
+- **Global names may start with digits** (A11; amends entry 5). Movie Magic accepts a
+  global named `1ZG` and `1ZG*1` in Amt is 7.00 (V02-3). Our grammar can read that
+  unambiguously, so it does: a name is letters, digits and `_` with at least one letter or
+  `_`; the reader takes a run of digits that runs on into a letter or `_` as a name, and a
+  run of digits and dots otherwise as a number (`1.5ZG` is still a number then a name, so
+  an error). No formula that parsed before reads differently: a number was never directly
+  followed by a name in a valid formula (there is no implied multiplication or exponent),
+  so only some error messages change (`2SHOOT` was "unexpected token", now "unknown global
+  `2SHOOT`"). Renaming follows the same split, so `DAYS` is not touched inside `2DAYS`.
+  Importers need not rename such globals. All digits (`12`) is a number, never a name.
+- **Explain says it**: a range line reads "range 1: lines 1, 2 earn as one person, so they
+  share one cutoff, used up in line order", then the line's earnings and the cutoff left
+  after the lines above ("Cutoff used up: ... so this line takes nothing" when none is);
+  ATL and BTL list the levels they hold, BTL notes that the categories after the last
+  production total are in neither, the grand total adds that trailing level, and a charge's
+  base is "every category with its fringes, wherever they post, plus the budget's fringe
+  row". Its leaves still add up to every total (the explain tests cover every new case).
+- **Figures that changed**: in the hand-checked sample (tests/common) the grip's range
+  splits its 765.00 of FICA 765.00 / 0.00 (was 737.68 / 27.32); every account, category
+  and grand total is unchanged. A budget with categories after its last production total
+  shows a smaller BTL (and with none, ATL and BTL of 0); a budget posting fringes by budget
+  gets larger percent charges; flat fees with category or account exclusions get smaller.
+- Tests: crates/method-core/tests/mmb_parity.rs reproduces every figure above (both
+  arithmetics where they could differ), the property tests generate fringed adjustment
+  rows and the `drop` setting ("every fringe dollar posts exactly once, unless it is
+  dropped"), and the reference engine works ranges out on its own.

@@ -11,7 +11,7 @@ use crate::calc::{
     RecalcOptions,
 };
 use crate::decimal::Dec;
-use crate::model::{Account, Budget, Detail, Fringe, FringeKind, RowKind};
+use crate::model::{Account, Budget, Detail, Fringe, FringeKind};
 use crate::report::{AccountTotals, CategoryTotals, Report, RowTotals};
 use crate::Cents;
 
@@ -24,7 +24,7 @@ fn apply_fringes(ctx: &Ctx, acct: &Account, rows: &mut [RowTotals]) -> Result<()
     }
     let mut rates: BTreeMap<&str, (&Fringe, Num)> = BTreeMap::new();
     for (i, d) in details.iter().enumerate() {
-        if d.kind != RowKind::Line {
+        if !d.kind.is_costed() {
             continue;
         }
         for name in &d.fringes {
@@ -43,7 +43,7 @@ fn apply_fringes(ctx: &Ctx, acct: &Account, rows: &mut [RowTotals]) -> Result<()
     let earns: Vec<bool> = details
         .iter()
         .zip(rows.iter())
-        .map(|(d, r)| d.kind == RowKind::Line && r.included)
+        .map(|(d, r)| d.kind.is_costed() && r.included)
         .collect();
     for earner in earners(details, rows) {
         for (&name, &(f, rate)) in &rates {
@@ -55,28 +55,34 @@ fn apply_fringes(ctx: &Ctx, acct: &Account, rows: &mut [RowTotals]) -> Result<()
                 .copied()
                 .filter(|&i| earns[i] && details[i].fringes.contains(name))
                 .collect();
-            let Some(&first) = lines.first() else {
-                continue;
-            };
-            let ovf = || {
-                overflow(row_at(
-                    &acct.code,
-                    first,
-                    &details[first],
-                    &format!("fringe {name}"),
-                ))
-            };
-            let weights: Vec<Cents> = lines.iter().map(|&i| rows[i].total).collect();
-            let mut base = sum(weights.iter().copied()).ok_or_else(ovf)?;
-            if let Some(c) = cutoff {
-                base = base.min(c);
-            }
-            let amount = percent_of(ctx.arith, base, rate)
-                .and_then(Money::to_cents)
-                .ok_or_else(ovf)?;
-            let shares = super::fringes::allocate(amount, &weights).ok_or_else(ovf)?;
-            for (&i, share) in lines.iter().zip(shares) {
-                rows[i].fringes.insert(name.to_string(), share);
+            // The cutoff, used up in row order: each row takes the percent
+            // of its total, or of what is left of the cutoff when that is
+            // less (nothing once it is used), rounded on its own.
+            let mut left: Option<Cents> = cutoff;
+            for &i in &lines {
+                let total = rows[i].total;
+                let taken = match left {
+                    None => total,
+                    Some(l) => {
+                        left = Some(l.saturating_sub(total));
+                        if l > 0 {
+                            total.min(l)
+                        } else {
+                            0
+                        }
+                    }
+                };
+                let amount = percent_of(ctx.arith, taken, rate)
+                    .and_then(Money::to_cents)
+                    .ok_or_else(|| {
+                        overflow(row_at(
+                            &acct.code,
+                            i,
+                            &details[i],
+                            &format!("fringe {name}"),
+                        ))
+                    })?;
+                rows[i].fringes.insert(name.to_string(), amount);
             }
         }
     }

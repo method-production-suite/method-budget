@@ -8,8 +8,8 @@
 //! (unrounded to rounded, by the budget's arithmetic: half away from zero,
 //! or half up on the binary double as Movie Magic rounds, saying what the
 //! double holds; decisions.md, entry 55), each fringe on each line
-//! (percent or flat, the cutoff and how much of it each line of a range used,
-//! the largest-remainder share), where fringes post, what a group or a
+//! (percent or flat, the cutoff and how much of it the lines above in a
+//! range left, decisions.md, entry 56), where fringes post, what a group or a
 //! report filter left out and why, a charge's base and exclusions, a credit's
 //! gross, excluded, net and caps.
 //!
@@ -26,8 +26,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use super::arith::{converted, float_digits, float_text, percent_of, Money, Num, Window};
-use super::fringes::{allocate, earners, flat_count, CountFrom, Factor, Factors, FlatCount};
-use super::topsheet::{credit_cap, credit_keep, credit_row};
+use super::fringes::{earners, flat_count, percent_step, CountFrom, Factor, Factors, FlatCount};
+use super::topsheet::{credit_cap, credit_keep, credit_row, dropped_from};
 use super::{recalc, CalcError, Ctx, RecalcOptions};
 use crate::decimal::{Dec, Exact};
 use crate::expr::Expr;
@@ -471,7 +471,7 @@ impl<'a> Explainer<'a> {
                         continue;
                     }
                     out.push(Target::Line(d.id));
-                    if d.kind == RowKind::Line {
+                    if d.kind.is_costed() {
                         out.push(Target::LineFringes(d.id));
                         for (name, _) in &r.fringes {
                             out.push(Target::LineFringe(d.id, name.clone()));
@@ -650,7 +650,7 @@ impl<'a> Explainer<'a> {
             }
             RowKind::Line | RowKind::Adjustment => {
                 let mut s = r.value.clone().ok_or_else(|| gone("that line"))?;
-                if d.kind == RowKind::Line && r.included && r.fringe_total != 0 {
+                if r.included && r.fringe_total != 0 {
                     s.children.push(
                         Step::note_amount(
                             "Fringes",
@@ -763,7 +763,7 @@ impl<'a> Explainer<'a> {
         let acct = self.acct(ci, ai);
         let mut children = Vec::new();
         for (i, d) in acct.details.iter().enumerate() {
-            if d.kind == RowKind::Line && !self.accounts[ci][ai].rows[i].fringes.is_empty() {
+            if d.kind.is_costed() && !self.accounts[ci][ai].rows[i].fringes.is_empty() {
                 children.push(self.row_fringes_step(ci, ai, i)?);
             }
         }
@@ -946,7 +946,14 @@ impl<'a> Explainer<'a> {
             .levels
             .get(li)
             .ok_or_else(|| gone("that production level"))?;
-        let children = if self.b.fringe_posting == FringePosting::ProductionLevel {
+        let dropped = dropped_from(self.b).is_some_and(|d| lv.start >= d);
+        let children = if dropped {
+            vec![Step::note(
+                "Left out",
+                "no production total follows these categories, so their fringes post nowhere \
+                 and count in no total (trailing level fringes: drop, as Movie Magic does)",
+            )]
+        } else if self.b.fringe_posting == FringePosting::ProductionLevel {
             (lv.start..lv.end)
                 .map(|ci| self.category_fringes_step(ci))
                 .collect::<R<Vec<_>>>()?
@@ -1011,36 +1018,58 @@ impl<'a> Explainer<'a> {
             .count()
     }
 
+    /// The levels a production total closes, as indexes into the report's
+    /// levels (the trailing unnamed level is left out).
+    fn closed_range(&self) -> std::ops::Range<usize> {
+        0..self.closed_levels().min(self.report.levels.len())
+    }
+
     fn atl_step(&self) -> R<Step> {
-        let split = usize::from(self.closed_levels() > 0).min(self.report.levels.len());
+        let closed = self.closed_range().end;
+        let split = usize::from(closed > 0);
         let mut children = (0..split)
             .map(|li| self.level_step(li))
             .collect::<R<Vec<_>>>()?;
         if split == 0 {
             children.push(Step::note(
                 "No production totals",
-                "everything is below the line until a production total ends the above-the-line part",
+                "nothing is above or below the line until a production total closes the first level",
             ));
         }
         Ok(Step::sum(
             "Total above-the-line",
-            "the first production level",
+            "the first production level, when a production total closes it",
             children,
         )?
         .with_expand(Target::Atl))
     }
 
     fn btl_step(&self) -> R<Step> {
-        let split = usize::from(self.closed_levels() > 0).min(self.report.levels.len());
-        let children = (split..self.report.levels.len())
+        let closed = self.closed_range().end;
+        let split = usize::from(closed > 0);
+        let mut children = (split..closed)
             .map(|li| self.level_step(li))
             .collect::<R<Vec<_>>>()?;
+        if closed < self.report.levels.len() {
+            children.push(Step::note(
+                "Not counted here",
+                "categories after the last production total are neither above nor below the line",
+            ));
+        }
         Ok(Step::sum(
             "Total below-the-line",
-            "every production level after the first",
+            "every later production level a production total closes",
             children,
         )?
         .with_expand(Target::Btl))
+    }
+
+    /// The trailing unnamed level, when categories follow the last
+    /// production total (every category when there is none).
+    fn trailing_steps(&self) -> R<Vec<Step>> {
+        (self.closed_range().end..self.report.levels.len())
+            .map(|li| self.level_step(li))
+            .collect()
     }
 
     fn atl_btl_step(&self) -> R<Step> {
@@ -1093,17 +1122,25 @@ impl<'a> Explainer<'a> {
         Ok(("Total fringes".into(), s))
     }
 
-    fn grand_total(&self) -> R<(String, Step)> {
+    /// Everything before charges: above and below-the-line, the categories
+    /// after the last production total, and the budget's fringe row.
+    fn before_charges_steps(&self) -> R<Vec<Step>> {
         let mut children = vec![self.atl_btl_step()?];
+        children.extend(self.trailing_steps()?);
         if self.b.fringe_posting == FringePosting::Budget {
             children.push(self.budget_fringes_step()?);
         }
+        Ok(children)
+    }
+
+    fn grand_total(&self) -> R<(String, Step)> {
+        let mut children = self.before_charges_steps()?;
         for i in 0..self.report.charges.len() {
             children.push(self.charge_step(i)?);
         }
         let s = Step::sum(
             "Grand total",
-            "above and below-the-line, plus budget fringes and charges",
+            "above and below-the-line, the categories after the last production total, budget fringes and charges",
             children,
         )?;
         Ok(("Grand total".into(), s))
@@ -1192,8 +1229,11 @@ impl<'a> Explainer<'a> {
         })
     }
 
-    fn atl_btl_total(&self) -> R<Cents> {
-        self.atl_btl_step()?.amount.ok_or_else(ovf)
+    /// What a percent charge is a percent of: the grand total before
+    /// charges.
+    fn before_charges_total(&self) -> R<Cents> {
+        let s = Step::sum("Before charges", "", self.before_charges_steps()?)?;
+        s.amount.ok_or_else(ovf)
     }
 
     fn applied_charge(&self, i: usize) -> R<&crate::model::Charge> {
@@ -1207,8 +1247,7 @@ impl<'a> Explainer<'a> {
 
     fn charge_step(&self, i: usize) -> R<Step> {
         let c = self.applied_charge(i)?;
-        let by_code = matches!(c.kind, ChargeKind::Percent(_));
-        let budget_posting = self.b.fringe_posting == FringePosting::Budget;
+        let dropped = dropped_from(self.b);
         let mut excluded: Cents = 0;
         let mut notes = Vec::new();
         // Excluded lines, gathered per account with the rule that caught them.
@@ -1220,18 +1259,16 @@ impl<'a> Explainer<'a> {
                     why.insert(format!("group {g}"));
                 }
             }
-            if by_code {
-                if c.excluded_accounts.contains(acct) {
-                    why.insert(format!("account {acct}"));
-                }
-                if c.excluded_categories.contains(cat) {
-                    why.insert(format!("category {cat}"));
-                }
+            if c.excluded_accounts.contains(acct) {
+                why.insert(format!("account {acct}"));
+            }
+            if c.excluded_categories.contains(cat) {
+                why.insert(format!("category {cat}"));
             }
             if why.is_empty() {
                 continue;
             }
-            let v = if budget_posting {
+            let v = if dropped.is_some_and(|d| ci >= d) {
                 r.total
             } else {
                 r.total.checked_add(r.fringe_total).ok_or_else(ovf)?
@@ -1255,8 +1292,8 @@ impl<'a> Explainer<'a> {
         }
         for ((ci, ai), (amt, why)) in &per_account {
             excluded = excluded.checked_add(*amt).ok_or_else(ovf)?;
-            let what = if budget_posting {
-                "its lines"
+            let what = if dropped.is_some_and(|d| *ci >= d) {
+                "its lines (their fringes are left out of every total)"
             } else {
                 "its lines and their fringes"
             };
@@ -1274,15 +1311,13 @@ impl<'a> Explainer<'a> {
         }
         let (amount, label_text) = match &c.kind {
             ChargeKind::Percent(p) => {
-                let base = self.atl_btl_total()?;
-                notes.push(
-                    Step::note_amount(
-                        "Base",
-                        "total above and below-the-line (charges never apply to each other)",
-                        base,
-                    )
-                    .with_expand(Target::AtlBtl),
-                );
+                let base = self.before_charges_total()?;
+                notes.push(Step::note_amount(
+                    "Base",
+                    "every category with its fringes, wherever they post, plus the budget's \
+                     fringe row: the grand total before charges (charges never apply to each other)",
+                    base,
+                ));
                 notes.push(
                     Step::note_amount("Excluded", "taken off the base", excluded).with(ex_children),
                 );
@@ -1335,8 +1370,8 @@ impl<'a> Explainer<'a> {
                         *amount
                     }
                 };
-                let ex_text =
-                    "taken off the fee (flat fees leave out groups and typed amounts only)";
+                let ex_text = "taken off the fee (typed amounts, and the lines of excluded \
+                     groups, accounts and categories with their fringes)";
                 notes.push(Step::note_amount("Excluded", ex_text, excluded).with(ex_children));
                 let amount = base.checked_sub(excluded).ok_or_else(ovf)?;
                 notes.push(Step::note(
@@ -1954,7 +1989,7 @@ fn fringes_calc(
     // Rates, once per fringe the lines carry.
     let mut rates: BTreeMap<&str, Num> = BTreeMap::new();
     for d in details {
-        if d.kind != RowKind::Line {
+        if !d.kind.is_costed() {
             continue;
         }
         for name in &d.fringes {
@@ -1981,7 +2016,7 @@ fn fringes_calc(
     let earns: Vec<bool> = details
         .iter()
         .zip(rows.iter())
-        .map(|(d, r)| d.kind == RowKind::Line && r.included)
+        .map(|(d, r)| d.kind.is_costed() && r.included)
         .collect();
     // The engine's earners, from a row list that has what it reads.
     let shadow: Vec<RowTotals> = rows
@@ -2008,7 +2043,7 @@ fn fringes_calc(
                 names.extend(details[i].fringes.iter().map(String::as_str));
             }
         }
-        // Every line of an earner from a range shares its number.
+        // Every row of an earner from a range shares its number.
         let range = details[earner[0]].fringe_range;
         for name in names {
             let f = &ctx.b.fringes[name];
@@ -2021,102 +2056,73 @@ fn fringes_calc(
                 .copied()
                 .filter(|&i| earns[i] && details[i].fringes.contains(name))
                 .collect();
-            if lines.is_empty() {
-                continue;
-            }
-            let weights: Vec<Cents> = lines.iter().map(|&i| rows[i].total).collect();
-            let base = weights
-                .iter()
-                .try_fold(0, |a: Cents, w| a.checked_add(*w))
-                .ok_or_else(ovf)?;
-            let capped = match cutoff {
-                Some(c) => base.min(c),
-                None => base,
-            };
-            let exact = percent_of(ctx.arith, capped, rate).ok_or_else(ovf)?;
-            let amount = exact.to_cents().ok_or_else(ovf)?;
-            let shares = allocate(amount, &weights).ok_or_else(ovf)?;
-            let cutoff_use = allocate(capped, &weights).ok_or_else(ovf)?;
-            let several = lines.len() > 1;
+            // The cutoff, used up in row order, as the engine uses it.
+            let mut left = cutoff;
             for (k, &i) in lines.iter().enumerate() {
+                let total = rows[i].total;
+                let before = left;
+                let (taken, exact) =
+                    percent_step(ctx.arith, rate, &mut left, total).ok_or_else(ovf)?;
+                let amount = exact.to_cents().ok_or_else(ovf)?;
                 let mut notes = Vec::new();
                 if let Some(n) = range {
                     let others: Vec<String> = lines.iter().map(|&j| (j + 1).to_string()).collect();
                     notes.push(Step::note(
                         "Fringe range",
                         format!(
-                            "range {n}: lines {} earn as one person, so they share one cutoff",
+                            "range {n}: lines {} earn as one person, so they share one cutoff, used up in line order",
                             others.join(", ")
                         ),
                     ));
                 }
-                if several {
-                    let parts: Vec<String> = weights.iter().map(|w| money(*w)).collect();
-                    notes.push(Step::note_amount(
-                        "Earnings",
-                        format!("lines in the range carrying {name}: {}", parts.join(" + ")),
-                        base,
-                    ));
-                } else {
-                    notes.push(Step::note_amount("Earnings", "this line's total", base));
-                }
-                match cutoff {
-                    Some(c) if base > c => {
-                        let mut t = format!("{name} stops at {} per earner", money(c));
-                        if several {
-                            t.push_str(&format!(
-                                "; this line uses {} of it (pro rata, largest remainder)",
-                                money(cutoff_use[k])
-                            ));
-                        }
-                        notes.push(Step::note_amount("Cutoff reached", t, capped));
-                    }
-                    Some(c) => {
+                notes.push(Step::note_amount("Earnings", "this line's total", total));
+                if let (Some(c), Some(l)) = (cutoff, before) {
+                    let above = if k == 0 {
+                        String::new()
+                    } else {
+                        format!(
+                            "; {} of it left after the lines above in the range",
+                            money(l.max(0))
+                        )
+                    };
+                    if l <= 0 && k > 0 {
+                        notes.push(Step::note_amount(
+                            "Cutoff used up",
+                            format!(
+                                "{name} stops at {} per earner, and the lines above in the range used it all, so this line takes nothing",
+                                money(c)
+                            ),
+                            0,
+                        ));
+                    } else if total > l || l <= 0 {
+                        notes.push(Step::note_amount(
+                            "Cutoff reached",
+                            format!("{name} stops at {} per earner{above}", money(c)),
+                            taken,
+                        ));
+                    } else {
                         notes.push(Step::note(
                             "Cutoff",
-                            format!("{} per earner, not reached", money(c)),
+                            format!("{} per earner{above}, not reached", money(c)),
                         ));
                     }
-                    None => {}
                 }
                 notes.push(Step::note(
                     "Fringe",
                     format!(
                         "{}% of {} = {}{}",
                         nwords(rate),
-                        money(capped),
+                        money(taken),
                         dmoney(exact),
                         rate_words(name, rate)
                     ),
                 ));
                 notes.extend(rounding(exact, amount));
-                if several {
-                    let exact_share = Dec::from_cents(amount)
-                        .checked_mul(Dec::from_cents(weights[k]))
-                        .and_then(|v| v.checked_div(Dec::from_cents(base)));
-                    let text = match exact_share {
-                        Some(s) if base != 0 => format!(
-                            "{} x {} / {} = {}, which is {} once the shares are split by largest remainder (they add up to exactly {})",
-                            money(amount),
-                            money(weights[k]),
-                            money(base),
-                            dmoney(s),
-                            money(shares[k]),
-                            money(amount)
-                        ),
-                        _ => format!(
-                            "{} of the range's {} (the earnings net to zero, so the first line takes it)",
-                            money(shares[k]),
-                            money(amount)
-                        ),
-                    };
-                    notes.push(Step::note("This line's share", text));
-                }
                 let kind_text = match cutoff {
                     Some(c) => format!("{}% with a {} cutoff", nwords(rate), money(c)),
                     None => format!("{}%", nwords(rate)),
                 };
-                let s = Step::value(name, kind_text, shares[k])
+                let s = Step::value(name, kind_text, amount)
                     .with(notes)
                     .with_link(Link::Row {
                         ci,
@@ -2129,7 +2135,7 @@ fn fringes_calc(
         }
     }
 
-    // Flat fringes, per line.
+    // Flat fringes, per row.
     for (i, d) in details.iter().enumerate() {
         if !earns[i] {
             continue;

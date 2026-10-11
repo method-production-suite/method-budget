@@ -73,8 +73,9 @@ const LISTS = [
     field: 'fringes',
     multi: true,
     defs: (b) => b.fringes,
-    eligible: (s) => s.lines,
-    noTakers: 'Fringes go on lines, and the selection has none.',
+    // Lines and adjustment rows take fringes (decisions.md, entry 56).
+    eligible: (s) => s.costed,
+    noTakers: 'Subtotal rows take no fringes.',
     none: 'No fringes yet.',
   },
   {
@@ -463,7 +464,7 @@ async function replaceTags(anchor) {
       fields.push({ key: `${kind}:${n}`, label: `${label} ${n}`, type: 'check', value: on.includes(n) });
     }
   };
-  checks('f', 'Fringe', b.fringes, shared('fringes', s.lines));
+  checks('f', 'Fringe', b.fringes, shared('fringes', s.costed));
   checks('g', 'Group', b.groups, shared('groups', s.costed));
   const pick = (key, label, listId, defs, eligible, noneLabel) => {
     const names = orderedNames(b, listId).filter((n) => Object.prototype.hasOwnProperty.call(obj(defs), n));

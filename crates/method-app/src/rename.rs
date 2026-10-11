@@ -145,7 +145,7 @@ mod tests {
             .unwrap();
         let before = s.budget().clone();
         let e = s
-            .edit("Test edit", |b| rename_item(b, "global", "DAYS", "2x"))
+            .edit("Test edit", |b| rename_item(b, "global", "DAYS", "1.5x"))
             .unwrap_err();
         assert!(e.contains("can't be a global name"), "{e}");
         let e = s

@@ -15,7 +15,7 @@ use method_core::{
     Account, Arithmetic, Baseline, Budget, Category, Cents, Charge, ChargeKind, Credit, CreditCap,
     CreditRow, CreditSource, Currency, Dec, Detail, DisplayPrefs, FlatBasis, Formula, Fringe,
     FringeKind, FringePosting, GlobalInfo, Group, InfoValue, Location, NewLineDefaults, Note,
-    ProductionTotal, RowId, RowKind, SetDef, TopsheetRow, UnitDef, Version,
+    ProductionTotal, RowId, RowKind, SetDef, TopsheetRow, TrailingFringes, UnitDef, Version,
 };
 use method_core::{
     Band, BandField, FontSize, ReportColumn, ReportPreset, ReportSection, ReportSpec,
@@ -186,6 +186,8 @@ pub(crate) struct FileBudget {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     fringe_posting: Option<FilePosting>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    trailing_level_fringes: Option<FileTrailingFringes>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     arithmetic: Option<FileArithmetic>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     new_line_defaults: Option<FileNewLineDefaults>,
@@ -252,6 +254,7 @@ impl From<&Budget> for FileBudget {
             units,
             fringes,
             fringe_posting,
+            trailing_level_fringes,
             arithmetic,
             account_coding,
             new_line_defaults,
@@ -285,6 +288,9 @@ impl From<&Budget> for FileBudget {
                 .then(|| FileCoding::from(account_coding)),
             fringe_posting: (*fringe_posting != FringePosting::default())
                 .then(|| FilePosting::from(fringe_posting)),
+            // Keeping them is the default, also for files that don't say.
+            trailing_level_fringes: (*trailing_level_fringes != TrailingFringes::default())
+                .then(|| FileTrailingFringes::from(*trailing_level_fringes)),
             // Movie Magic arithmetic is the default, also for files that
             // don't say.
             arithmetic: (*arithmetic != Arithmetic::default())
@@ -356,6 +362,10 @@ impl From<FileBudget> for Budget {
             fringe_posting: f
                 .fringe_posting
                 .map(FringePosting::from)
+                .unwrap_or_default(),
+            trailing_level_fringes: f
+                .trailing_level_fringes
+                .map(TrailingFringes::from)
                 .unwrap_or_default(),
             arithmetic: f.arithmetic.map(Arithmetic::from).unwrap_or_default(),
             account_coding: f
@@ -1075,6 +1085,34 @@ impl From<FileNewLineDefaults> for NewLineDefaults {
             set: f.set,
             location: f.location,
             currency: f.currency,
+        }
+    }
+}
+
+/// Under production-level posting, what happens to the fringes of
+/// categories after the last production total: `"keep"` (the default, left
+/// out) or `"drop"`.
+#[derive(Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FileTrailingFringes {
+    Keep,
+    Drop,
+}
+
+impl From<TrailingFringes> for FileTrailingFringes {
+    fn from(t: TrailingFringes) -> FileTrailingFringes {
+        match t {
+            TrailingFringes::Keep => FileTrailingFringes::Keep,
+            TrailingFringes::Drop => FileTrailingFringes::Drop,
+        }
+    }
+}
+
+impl From<FileTrailingFringes> for TrailingFringes {
+    fn from(t: FileTrailingFringes) -> TrailingFringes {
+        match t {
+            FileTrailingFringes::Keep => TrailingFringes::Keep,
+            FileTrailingFringes::Drop => TrailingFringes::Drop,
         }
     }
 }

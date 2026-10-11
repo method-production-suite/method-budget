@@ -9,9 +9,10 @@
 //! the budget, so a rejected edit leaves it alone; run through
 //! `Session::edit` (as the commands do), each one is a single undo step.
 //!
-//! Which rows take what follows the grid's cells (`edit::Field`): fringes and
-//! a currency go on lines; groups, a set and a location go on lines and
-//! adjustments. Other rows in a selection are skipped.
+//! Which rows take what follows the grid's cells (`edit::Field`): a currency
+//! goes on lines; fringes, groups, a set and a location go on lines and
+//! adjustments (decisions.md, entry 56). Other rows in a selection are
+//! skipped.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -27,12 +28,13 @@ use crate::view::View;
 
 type Cents = i64;
 
-/// Lines take fringes and a currency.
+/// Lines take a currency.
 fn is_line(d: &Detail) -> bool {
     d.kind == RowKind::Line
 }
 
-/// Lines and adjustments take groups, a set and a location.
+/// Lines and adjustments take fringes (decisions.md, entry 56), groups, a
+/// set and a location.
 fn is_costed(d: &Detail) -> bool {
     matches!(d.kind, RowKind::Line | RowKind::Adjustment)
 }
@@ -64,8 +66,7 @@ impl Tag {
 
     fn takes(self, d: &Detail) -> bool {
         match self {
-            Tag::Fringes => is_line(d),
-            Tag::Groups => is_costed(d),
+            Tag::Fringes | Tag::Groups => is_costed(d),
         }
     }
 
@@ -92,7 +93,9 @@ impl Tag {
 
     fn none_take(self) -> &'static str {
         match self {
-            Tag::Fringes => "fringes only go on lines, and none of the selected rows is a line",
+            Tag::Fringes => {
+                "fringes only go on lines and adjustment rows, and none of the selected rows is one"
+            }
             Tag::Groups => "none of the selected rows can be in a group",
         }
     }
@@ -282,8 +285,8 @@ pub struct TagsInput {
     pub currency: Option<String>,
 }
 
-/// Makes the selected rows' tags exactly `tags` (fringes and the currency on
-/// lines; groups, a set and a location on lines and adjustments), as a tag
+/// Makes the selected rows' tags exactly `tags` (the currency on lines;
+/// fringes, groups, a set and a location on lines and adjustments), as a tag
 /// preset's replace does. Every name must be defined. One undo step.
 pub fn replace_row_tags(b: &mut Budget, ids: &[RowId], tags: &TagsInput) -> EditResult<usize> {
     let preset = TagPreset {
@@ -551,14 +554,12 @@ pub fn summary(
     let mut fringes = blank(b.fringes.keys().collect());
     let mut groups = blank(b.groups.keys().collect());
     for d in &chosen {
-        if is_line(d) {
+        if is_costed(d) {
             for f in &d.fringes {
                 if let Some(t) = fringes.get_mut(f) {
                     t.count += 1;
                 }
             }
-        }
-        if is_costed(d) {
             for g in &d.groups {
                 if let Some(t) = groups.get_mut(g) {
                     t.count += 1;
@@ -909,7 +910,7 @@ mod tests {
     }
 
     #[test]
-    fn fringes_go_on_the_lines_and_come_off_as_one_undo_step_each() {
+    fn fringes_go_on_lines_and_adjustments_and_come_off_as_one_undo_step_each() {
         let mut s = session();
         let rows = mixed(&mut s);
         let before = s.budget().clone();
@@ -919,11 +920,13 @@ mod tests {
                 apply_tag(b, &rows, "fringes", "PENSION", true)
             })
             .unwrap();
-        assert_eq!(n, 2, "only the two lines take a fringe");
+        // The two lines and the adjustment row (decisions.md, entry 56); not
+        // the subtotal.
+        assert_eq!(n, 3);
         assert!(row(s.budget(), rows[0]).fringes.contains("PENSION"));
         assert!(row(s.budget(), rows[2]).fringes.contains("PENSION"));
         assert!(row(s.budget(), rows[1]).fringes.is_empty());
-        assert!(row(s.budget(), rows[3]).fringes.is_empty());
+        assert!(row(s.budget(), rows[3]).fringes.contains("PENSION"));
         // The lines keep the fringe they had.
         assert!(row(s.budget(), rows[0]).fringes.contains("PAYROLL"));
 
@@ -989,8 +992,8 @@ mod tests {
         // A row that's gone sinks the whole request, even after good rows.
         let gone = [rows[0], rows[2], 999_999];
         assert!(refused(&mut s, &gone, "fringes", "PENSION", true).contains("999999"));
-        // Only a subtotal and an adjustment: no line to take a fringe.
-        assert!(refused(&mut s, &[rows[1], rows[3]], "fringes", "PAYROLL", true).contains("lines"));
+        // Only a subtotal: no row to take a fringe.
+        assert!(refused(&mut s, &[rows[1]], "fringes", "PAYROLL", true).contains("lines"));
         assert!(refused(&mut s, &[rows[1]], "groups", "Crew", true).contains("group"));
     }
 
@@ -1488,9 +1491,11 @@ mod tests {
             assert_eq!(d.set.as_deref(), Some("Stage A"));
             assert_eq!(d.currency.as_deref(), Some("CAD"));
         }
-        // The adjustment takes the set but no fringes or currency.
+        // The adjustment takes the set and the fringes (decisions.md, entry
+        // 56), but no currency.
         let adj = row(&b, rows[3]);
-        assert!(adj.fringes.is_empty() && adj.currency.is_none());
+        assert_eq!(adj.fringes, ["PENSION".to_string()].into());
+        assert!(adj.currency.is_none());
         assert_eq!(adj.set.as_deref(), Some("Stage A"));
         // The base currency is stored as none; empty tags clear everything.
         let none = TagsInput {

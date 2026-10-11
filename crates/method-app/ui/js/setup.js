@@ -44,7 +44,8 @@ import { globalValueText } from './display.js';
 import { globalInfoBlock } from './display-settings.js';
 import { str, plural, errText, sourceText } from './util.js';
 
-const GLOBAL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+// Letters, digits and _, with at least one letter or _ (decisions.md, entry 56).
+const GLOBAL_NAME = /^(?=[A-Za-z0-9_]*[A-Za-z_])[A-Za-z0-9_]+$/;
 const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)$/;
 
 // State that has to survive re-renders.
@@ -749,7 +750,7 @@ function renderGlobals(panel) {
 
   panel.append(
     addRow('globals', 'global', [
-      { key: 'name', label: 'Name (letters, digits and _, not starting with a digit)', value: '', placeholder: 'SHOOT_DAYS' },
+      { key: 'name', label: 'Name (letters, digits and _, with at least one letter or _)', value: '', placeholder: 'SHOOT_DAYS' },
       { key: 'formula', label: 'Formula', value: '', placeholder: '30' },
     ], (v) => {
       const name = v.name.trim();

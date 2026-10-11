@@ -358,6 +358,53 @@ fn set_changes_one_value() {
     assert_eq!(read(&p), now);
 }
 
+/// Posting by production level, `method check` warns about fringes after
+/// the last production total, and `method set trailing_level_fringes drop`
+/// leaves them out as Movie Magic does (decisions.md, entry 56).
+#[test]
+fn check_warns_about_trailing_level_fringes() {
+    let d = Dir::new("trailing");
+    let p = d.path("t.mthd");
+    let line = |id: u32| {
+        format!(
+            r#"{{"id": {id}, "description": "Pay", "amount": "1", "rate": "1000", "fringes": ["P"]}}"#
+        )
+    };
+    let cat = |code: &str, id: u32| {
+        format!(
+            r#"{{"kind": "category", "code": "{code}", "name": "C", "accounts": [{{"code": "{code}-01", "name": "A", "details": [{}]}}]}}"#,
+            line(id)
+        )
+    };
+    let text = format!(
+        r#"{{"format": "method-budget", "version": 1, "budget": {{"title": "T", "base_currency": "USD", "fringe_posting": {{"kind": "production_level"}}, "fringes": {{"P": {{"kind": "percent", "rate": "10"}}}}, "topsheet": [{}, {{"kind": "production_total", "name": "Total"}}, {}]}}}}"#,
+        cat("11", 1),
+        cat("41", 2)
+    );
+    std::fs::write(&p, text).unwrap();
+    let o = method(&["check", &p]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(out(&o).contains("ok, net total 2,200.00"), "{}", out(&o));
+    assert!(
+        out(&o).contains(
+            "warning: fringes of categories after the last production total are not in any level (41 100.00)"
+        ),
+        "{}",
+        out(&o)
+    );
+
+    let o = method(&["set", &p, "trailing_level_fringes", "drop"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(read(&p).contains("\"trailing_level_fringes\": \"drop\""));
+    let o = method(&["check", &p]);
+    assert!(out(&o).contains("ok, net total 2,100.00"), "{}", out(&o));
+    assert!(out(&o).contains("left out of every total"), "{}", out(&o));
+    assert_eq!(
+        code(&method(&["set", &p, "trailing_level_fringes", "lose"])),
+        2
+    );
+}
+
 /// A flat fringe's basis and most hours a day from the command line
 /// (decisions.md, entry 54).
 #[test]

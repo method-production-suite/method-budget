@@ -21,13 +21,15 @@ pub struct Report {
     pub levels: Vec<LevelTotals>,
     /// Fringes posted as one budget-wide row (`FringePosting::Budget`), else 0.
     pub budget_fringes: Cents,
-    /// The first level's total, or 0 when there are no production totals.
+    /// The first level's total when a production total closes it, else 0
+    /// (decisions.md, entry 56).
     pub total_atl: Cents,
-    /// Every other level's total.
+    /// The total of every later level a production total closes. The
+    /// trailing unnamed level is in neither ATL nor BTL.
     pub total_btl: Cents,
     pub atl_btl: Cents,
     pub charges: Vec<ChargeTotals>,
-    /// ATL + BTL + budget fringes + charges.
+    /// Every level (the trailing one too) + budget fringes + charges.
     pub grand_total: Cents,
     pub credits: Vec<CreditTotals>,
     pub credits_total: Cents,
@@ -55,7 +57,9 @@ pub struct LevelTotals {
     /// Indexes into `Report::categories`: `start..end`.
     pub start: usize,
     pub end: usize,
-    /// Fringes posted at this level (`FringePosting::ProductionLevel`), else 0.
+    /// Fringes posted at this level (`FringePosting::ProductionLevel`), else 0
+    /// (also 0 for the trailing level when `trailing_level_fringes` is
+    /// `drop`).
     pub posted_fringes: Cents,
     /// Sum of its categories' totals plus `posted_fringes`.
     pub total: Cents,
@@ -106,7 +110,8 @@ pub struct RowTotals {
     pub total: Cents,
     /// Subtotal rows only: the running total they display.
     pub subtotal: Option<Cents>,
-    /// Fringe dollars this row earned, by fringe name (range fringes allocated).
+    /// Fringe dollars this row earned, by fringe name (lines and adjustment
+    /// rows; a range uses its cutoff up in row order).
     pub fringes: BTreeMap<String, Cents>,
     pub fringe_total: Cents,
 }
@@ -114,7 +119,9 @@ pub struct RowTotals {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChargeTotals {
     pub name: String,
-    /// What the percentage was applied to (for flat fees, the fee before exclusions).
+    /// What the percentage was applied to: every level plus budget fringes,
+    /// the grand total before charges (for flat fees, the fee before
+    /// exclusions).
     pub base: Cents,
     pub excluded: Cents,
     pub amount: Cents,

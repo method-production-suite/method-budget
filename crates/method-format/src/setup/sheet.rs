@@ -867,7 +867,7 @@ pub fn read(
                 What::Global => {
                     if !is_ident(&name) {
                         return Err(format!(
-                            "\u{201c}{name}\u{201d} can't be a global name: use letters, digits and _, starting with a letter"
+                            "\u{201c}{name}\u{201d} can't be a global name: use letters, digits and _, with at least one letter or _"
                         ));
                     }
                     let f = row.get("formula");
@@ -1491,7 +1491,7 @@ mod tests {
         .is_empty());
 
         // Globals: names must be names, formulas must parse.
-        let t = csv_table("Name,Formula,Effective,Source Links\nGOOD,1,,\n2BAD,1,,\nX,1,someday,\nY,1,,ftp://nope\nZ,,,\n");
+        let t = csv_table("Name,Formula,Effective,Source Links\nGOOD,1,,\n2.5BAD,1,,\nX,1,someday,\nY,1,,ftp://nope\nZ,,,\n");
         let mut into = empty_source("x", "USD");
         let errs = read(
             &t,

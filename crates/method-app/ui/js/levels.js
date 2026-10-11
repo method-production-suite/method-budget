@@ -691,6 +691,8 @@ export function detailRows(ix, entry, ai, full, shown = null) {
       cells.rate = adjBase.has(d.id)
         ? { text: money(adjBase.get(d.id)), cls: 'auto', title: 'Sum of the lines above, back to the previous adjustment' }
         : {};
+      // An adjustment row can carry fringes too (decisions.md, entry 56).
+      cells.fringes = tagCell(ix.b, 'fringes', d.fringes, issues.fringes);
     }
 
     if (!rr) {
@@ -703,7 +705,7 @@ export function detailRows(ix, entry, ai, full, shown = null) {
       const foreign = rr.currency && rr.currency !== base;
       cells.total = moneyCell(rr.total, foreign ? { title: `${money(rr.local_total)} ${rr.currency}` } : {});
     }
-    if (rr && line && rr.fringe_total) {
+    if (rr && (line || kind === 'adjustment') && rr.fringe_total) {
       const parts = Object.entries(rr.fringes).map(([n, c]) => `${n}: ${money(c)}`);
       cells.fringe_total = { text: money(rr.fringe_total), cls: 'muted', title: parts.join('\n') };
     }
@@ -714,7 +716,7 @@ export function detailRows(ix, entry, ai, full, shown = null) {
       const got = ix.cost.lines ? ix.cost.lines[d.id] : null;
       if (got) cells.act = { text: money(got.amount), title: `${got.count} ${got.count === 1 ? 'transaction' : 'transactions'} assigned to this line` };
     }
-    if (rr && line && rr.included && rr.total && (rr.fringe_total || (d.fringes || []).length)) {
+    if (rr && (line || kind === 'adjustment') && rr.included && rr.total && (rr.fringe_total || (d.fringes || []).length)) {
       const parts = Object.entries(rr.fringes).map(([n, c]) => `${n}: ${fringePercent(c, rr.total)}`);
       cells.fringe_pct = { text: fringePercent(rr.fringe_total, rr.total), cls: 'muted', title: parts.join('\n') };
     }

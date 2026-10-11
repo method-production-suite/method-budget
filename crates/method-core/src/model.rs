@@ -71,6 +71,10 @@ pub struct Budget {
     /// Fringe definitions, keyed by the name details use to apply them.
     pub fringes: BTreeMap<String, Fringe>,
     pub fringe_posting: FringePosting,
+    /// Under production-level posting, what happens to the fringes of
+    /// categories after the last production total: kept (the default) or
+    /// dropped, as Movie Magic Budgeting does (decisions.md, entry 56).
+    pub trailing_level_fringes: TrailingFringes,
     /// How totals are worked out: as Movie Magic Budgeting does (binary
     /// doubles, the default) or in exact decimals (decisions.md, entry 55).
     pub arithmetic: Arithmetic,
@@ -146,6 +150,7 @@ impl Budget {
             units: default_units(),
             fringes: BTreeMap::new(),
             fringe_posting: FringePosting::default(),
+            trailing_level_fringes: TrailingFringes::default(),
             arithmetic: Arithmetic::default(),
             account_coding: AccountCoding::default(),
             new_line_defaults: NewLineDefaults::default(),
@@ -338,6 +343,41 @@ impl Default for FringePosting {
         FringePosting::Category {
             suffix: "99".into(),
         }
+    }
+}
+
+/// Under [`FringePosting::ProductionLevel`], what happens to the fringes of
+/// categories after the last production total, which no production total
+/// closes (decisions.md, entry 56). A budget setting, saved with the file;
+/// versions carry it. It changes nothing under the other posting modes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TrailingFringes {
+    /// Posted in a fringe row of their own, in the unnamed level after the
+    /// last production total, so they stay in the grand total (`method
+    /// check` warns that they are in no level). The default.
+    #[default]
+    Keep,
+    /// Left out of every total, as Movie Magic Budgeting does: they have no
+    /// production total to post above.
+    Drop,
+}
+
+impl TrailingFringes {
+    pub const ALL: [TrailingFringes; 2] = [TrailingFringes::Keep, TrailingFringes::Drop];
+
+    /// The name files and commands use: `keep` or `drop`.
+    pub fn name(self) -> &'static str {
+        match self {
+            TrailingFringes::Keep => "keep",
+            TrailingFringes::Drop => "drop",
+        }
+    }
+
+    /// The setting named `name` (as [`TrailingFringes::name`] writes it).
+    pub fn parse(name: &str) -> Option<TrailingFringes> {
+        TrailingFringes::ALL
+            .into_iter()
+            .find(|t| t.name() == name.trim())
     }
 }
 
@@ -906,6 +946,7 @@ pub struct BudgetSnapshot {
     pub units: BTreeMap<String, UnitDef>,
     pub fringes: BTreeMap<String, Fringe>,
     pub fringe_posting: FringePosting,
+    pub trailing_level_fringes: TrailingFringes,
     pub arithmetic: Arithmetic,
     pub account_coding: AccountCoding,
     pub new_line_defaults: NewLineDefaults,
@@ -933,6 +974,7 @@ impl Budget {
             units,
             fringes,
             fringe_posting,
+            trailing_level_fringes,
             arithmetic,
             account_coding,
             new_line_defaults,
@@ -967,6 +1009,7 @@ impl Budget {
             units: units.clone(),
             fringes: fringes.clone(),
             fringe_posting: fringe_posting.clone(),
+            trailing_level_fringes: *trailing_level_fringes,
             arithmetic: *arithmetic,
             account_coding: *account_coding,
             new_line_defaults: *new_line_defaults,
@@ -994,6 +1037,7 @@ impl Budget {
             units,
             fringes,
             fringe_posting,
+            trailing_level_fringes,
             arithmetic,
             account_coding,
             new_line_defaults,
@@ -1028,6 +1072,7 @@ impl Budget {
             units,
             fringes,
             fringe_posting,
+            trailing_level_fringes,
             arithmetic,
             account_coding,
             new_line_defaults,
@@ -1100,6 +1145,7 @@ impl BudgetSnapshot {
             units,
             fringes,
             fringe_posting,
+            trailing_level_fringes,
             arithmetic,
             account_coding,
             new_line_defaults,
@@ -1122,6 +1168,7 @@ impl BudgetSnapshot {
             units,
             fringes,
             fringe_posting,
+            trailing_level_fringes,
             arithmetic,
             account_coding,
             new_line_defaults,
