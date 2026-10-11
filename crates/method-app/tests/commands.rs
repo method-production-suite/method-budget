@@ -348,6 +348,8 @@ fn fringes_units_and_currencies() {
         rate: "6".into(),
         cutoff: Some("100,000".into()),
         unit: None,
+        basis: None,
+        max_hours_per_day: None,
     };
     s.edit("Test edit", |b| edit::set_fringe(b, "PENSION", &pension))
         .unwrap();
@@ -369,6 +371,8 @@ fn fringes_units_and_currencies() {
         rate: "50".into(),
         cutoff: None,
         unit: Some("Day".into()),
+        basis: None,
+        max_hours_per_day: None,
     };
     s.edit("Test edit", |b| edit::set_fringe(b, "MEAL", &meal))
         .unwrap();
@@ -386,6 +390,58 @@ fn fringes_units_and_currencies() {
             }
         ))
         .is_err());
+
+    // How a flat fringe counts: its basis and most hours a day, written to
+    // the file JSON the views read.
+    let pen_hr = FringeInput {
+        unit: Some("Hour".into()),
+        basis: Some("amount_counts".into()),
+        max_hours_per_day: Some("12".into()),
+        ..meal.clone()
+    };
+    s.edit("Test edit", |b| edit::set_fringe(b, "PENHR", &pen_hr))
+        .unwrap();
+    let f = &view(&mut s)["budget"]["fringes"]["PENHR"];
+    assert_eq!(
+        (f["basis"].clone(), f["max_hours_per_day"].clone()),
+        (serde_json::json!("amount_counts"), serde_json::json!("12"))
+    );
+    for (field, bad, why) in [
+        ("basis", "hours", "unknown flat fringe basis"),
+        ("max", "0", "more than 0"),
+        ("max", "lots", "max hours per day"),
+    ] {
+        let mut input = pen_hr.clone();
+        if field == "basis" {
+            input.basis = Some(bad.into());
+        } else {
+            input.max_hours_per_day = Some(bad.into());
+        }
+        let e = s
+            .edit("Test edit", |b| edit::set_fringe(b, "PENHR", &input))
+            .unwrap_err();
+        assert!(e.contains(why), "{e}");
+    }
+    // A percent fringe's cutoff is kept when it turns flat (never used),
+    // and is back when it turns percent again.
+    let kept = FringeInput {
+        kind: "flat".into(),
+        ..pension.clone()
+    };
+    s.edit("Test edit", |b| edit::set_fringe(b, "PENSION", &kept))
+        .unwrap();
+    assert_eq!(
+        view(&mut s)["budget"]["fringes"]["PENSION"]["cutoff"],
+        10_000_000
+    );
+    s.edit("Test edit", |b| edit::set_fringe(b, "PENSION", &pension))
+        .unwrap();
+    assert_eq!(
+        view(&mut s)["budget"]["fringes"]["PENSION"]["kind"],
+        "percent"
+    );
+    s.edit("Test edit", |b| edit::delete_fringe(b, "PENHR"))
+        .unwrap();
 
     // Deleting a fringe takes it off every row.
     s.edit("Test edit", |b| edit::delete_fringe(b, "PENSION"))

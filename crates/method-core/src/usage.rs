@@ -100,7 +100,7 @@ pub fn usage(b: &Budget, kind: SetupKind) -> BTreeMap<String, ItemUse> {
         }
         SetupKind::Unit => {
             for fr in b.fringes.values() {
-                if let FringeKind::Flat { unit: Some(u) } = &fr.kind {
+                if let FringeKind::Flat { unit: Some(u), .. } = &fr.kind {
                     bump(u, false);
                 }
             }

@@ -1130,9 +1130,7 @@ mod tests {
                 short_code: None,
                 description: String::new(),
                 rate: "50".into(),
-                kind: FringeKind::Flat {
-                    unit: Some("Shift".into()),
-                },
+                kind: FringeKind::flat(Some("Shift".into())),
             },
         );
         b.units.insert(

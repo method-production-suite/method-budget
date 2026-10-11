@@ -10,6 +10,8 @@
 //! set global SHOOT_DAYS 32
 //! set fringe FICA rate 7.65
 //! set fringe FICA cutoff 168600.00
+//! set fringe MEALS basis amount_counts
+//! set fringe PENSION max_hours_per_day 12
 //! set line 21-01:2 rate 900
 //! set line #17 description "Director of photography"
 //! add tag 21-01:* fringe FICA
@@ -25,7 +27,8 @@ use std::str::FromStr;
 
 use method_core::rename::{rename, valid_name, SetupKind};
 use method_core::{
-    recalc, Budget, Cents, Dec, Detail, Formula, FringeKind, RecalcOptions, Report, RowId,
+    recalc, Budget, Cents, Dec, Detail, FlatBasis, Formula, FringeKind, RecalcOptions, Report,
+    RowId,
 };
 
 use crate::cli::{money, CliError, Outcome};
@@ -174,6 +177,10 @@ pub enum Op {
     Global(String, String),
     FringeRate(String, String),
     FringeCutoff(String, Option<Cents>),
+    /// What a flat fringe counts on a line (decisions.md, entry 54).
+    FringeBasis(String, FlatBasis),
+    /// A flat fringe's most hours a day; `None` for no cap.
+    FringeMaxHours(String, Option<Dec>),
     Line(RowRef, String, Word),
     Tag {
         add: bool,
@@ -227,7 +234,9 @@ pub fn parse(line: &str) -> Result<Option<Op>, String> {
             Op::Global(w[2].text.clone(), w[3].text.clone())
         }
         ["set", "fringe"] => {
-            let form = "set fringe NAME rate FORMULA | set fringe NAME cutoff AMOUNT|none";
+            let form = "set fringe NAME rate FORMULA | set fringe NAME cutoff AMOUNT|none | \
+                        set fringe NAME basis amount|amount_counts|quantity | \
+                        set fringe NAME max_hours_per_day HOURS|none";
             let w = need(&w, 5, form)?;
             match w[3].text.as_str() {
                 "rate" => Op::FringeRate(w[2].text.clone(), w[4].text.clone()),
@@ -238,6 +247,28 @@ pub fn parse(line: &str) -> Result<Option<Op>, String> {
                         Some(parse_money(&w[4].text)?)
                     };
                     Op::FringeCutoff(w[2].text.clone(), cutoff)
+                }
+                "basis" => Op::FringeBasis(
+                    w[2].text.clone(),
+                    FlatBasis::parse(&w[4].text).ok_or_else(|| {
+                        format!(
+                            "`{}` is not a basis: use amount, amount_counts or quantity",
+                            w[4].text
+                        )
+                    })?,
+                ),
+                "max_hours_per_day" => {
+                    let hours = if w[4].is_none() {
+                        None
+                    } else {
+                        let h = Dec::from_str(w[4].text.trim())
+                            .map_err(|_| format!("`{}` is not a number of hours", w[4].text))?;
+                        if h <= Dec::ZERO {
+                            return Err("max_hours_per_day must be more than 0".into());
+                        }
+                        Some(h)
+                    };
+                    Op::FringeMaxHours(w[2].text.clone(), hours)
                 }
                 other => return Err(format!("a fringe has no field `{other}`: {form}")),
             }
@@ -508,21 +539,63 @@ pub fn apply(b: &mut Budget, op: &Op) -> Result<Vec<String>, String> {
             ));
             fr.rate = Formula(f.clone());
         }
-        Op::FringeCutoff(name, cutoff) => {
+        Op::FringeCutoff(name, new) => {
             let fr = b
                 .fringes
                 .get_mut(name)
                 .ok_or_else(|| format!("there is no fringe {name}"))?;
-            let FringeKind::Percent { cutoff: c } = &mut fr.kind else {
-                return Err(format!("fringe {name} is flat and has no cutoff"));
+            let c = match &mut fr.kind {
+                FringeKind::Percent { cutoff } => cutoff,
+                // A flat fringe may keep one from before (never used): it
+                // can be cleared, not set.
+                FringeKind::Flat { cutoff, .. } if new.is_none() => cutoff,
+                FringeKind::Flat { .. } => {
+                    return Err(format!(
+                        "fringe {name} is flat and has no cutoff: cutoffs apply to percent fringes only"
+                    ))
+                }
             };
             let show = |c: &Option<Cents>| c.map_or("none".into(), money);
+            log.push(format!("fringe {name} cutoff {} -> {}", show(c), show(new)));
+            *c = *new;
+        }
+        Op::FringeBasis(name, new) => {
+            let fr = b
+                .fringes
+                .get_mut(name)
+                .ok_or_else(|| format!("there is no fringe {name}"))?;
+            let FringeKind::Flat { basis, .. } = &mut fr.kind else {
+                return Err(format!(
+                    "fringe {name} is a percent fringe: only a flat fringe has a basis"
+                ));
+            };
             log.push(format!(
-                "fringe {name} cutoff {} -> {}",
-                show(c),
-                show(cutoff)
+                "fringe {name} basis {} -> {}",
+                basis.name(),
+                new.name()
             ));
-            *c = *cutoff;
+            *basis = *new;
+        }
+        Op::FringeMaxHours(name, new) => {
+            let fr = b
+                .fringes
+                .get_mut(name)
+                .ok_or_else(|| format!("there is no fringe {name}"))?;
+            let FringeKind::Flat {
+                max_hours_per_day, ..
+            } = &mut fr.kind
+            else {
+                return Err(format!(
+                    "fringe {name} is a percent fringe: only a flat fringe has max hours per day"
+                ));
+            };
+            let show = |h: &Option<Dec>| h.map_or("none".into(), |h| h.to_string());
+            log.push(format!(
+                "fringe {name} max_hours_per_day {} -> {}",
+                show(max_hours_per_day),
+                show(new)
+            ));
+            *max_hours_per_day = *new;
         }
         Op::Line(rows, field, value) => {
             let setup = b.clone();
@@ -736,6 +809,10 @@ mod tests {
             "set fringe FICA rate 7.65",
             "set fringe FICA cutoff 168,600.00",
             "set fringe FICA cutoff none",
+            "set fringe MEALS basis amount_counts",
+            "set fringe MEALS basis quantity",
+            "set fringe PEN max_hours_per_day 12",
+            "set fringe PEN max_hours_per_day none",
             "set line #1 rate \"WEEKS * 5\"",
             "add tag 10-01:* fringe FICA",
             "remove tag #1 group Night",
@@ -754,6 +831,12 @@ mod tests {
             ("set global DAYS 3 0", "too many words"),
             ("set fringe FICA kind flat", "no field `kind`"),
             ("set fringe FICA cutoff 1.005", "two decimal places"),
+            ("set fringe MEALS basis hours", "not a basis"),
+            ("set fringe PEN max_hours_per_day 0", "more than 0"),
+            (
+                "set fringe PEN max_hours_per_day lots",
+                "not a number of hours",
+            ),
             ("set line #1 colour red", "no field `colour`"),
             ("add tag #1 set A", "not a tag kind"),
             ("rename account A B", "not something to rename"),

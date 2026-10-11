@@ -41,3 +41,33 @@ export function sourceText(view, kind, name) {
   for (const u of Array.isArray(s.urls) ? s.urls : []) if (str(u)) parts.push(str(u));
   return parts.join('. ');
 }
+
+/** The ways a flat fringe can count a line, as [value, label] (decisions.md, entry 54). */
+export const FLAT_BASES = [
+  ['amount', 'Amount only (standard)'],
+  ['amount_counts', 'Amount, plus counts in X and 4X'],
+  ['quantity', 'Full quantity'],
+];
+
+/** Whether `unit` is an hour among the budget's `units`: one hour long, or named Hour (any case). */
+export function isHourUnit(units, unit) {
+  const name = str(unit).trim();
+  if (!name) return false;
+  if (/^hours?$/i.test(name)) return true;
+  const u = obj(obj(units)[name]);
+  return str(u.hours) !== '' && Number(u.hours) === 1;
+}
+
+/**
+ * How flat fringe `def` counts beyond its unit, as words to add after it:
+ * ", plus counts in X and 4X", ", full quantity", ", up to 12 hours a day"
+ * (for a fringe charged per hour only). '' for the standard count.
+ */
+export function flatCountWords(def, units) {
+  const d = obj(def);
+  let out = '';
+  if (d.basis === 'amount_counts') out += ', plus counts in X and 4X';
+  else if (d.basis === 'quantity') out += ', full quantity';
+  if (str(d.max_hours_per_day) !== '' && isHourUnit(units, d.unit)) out += `, up to ${d.max_hours_per_day} hours a day`;
+  return out;
+}

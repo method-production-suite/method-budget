@@ -188,8 +188,10 @@ export function anchoredDialog({ anchor, title, message = '', label, value = '',
  * fields: the editor for one setup item (apply.js). Each field is
  *   { key, label, type, value, options, suffix, placeholder, showIf }
  * where type is 'text' (the default), 'select' (options: [[value, label]]),
- * 'check' (value true or false) or 'swatches' (options: [{ id, label, cls }],
- * value an id: a row of color chips, one picked). `suffix` is text after a
+ * 'check' (value true or false), 'swatches' (options: [{ id, label, cls }],
+ * value an id: a row of color chips, one picked) or 'note' (a quiet line of
+ * `text`, a string or a function of the current values; no value of its
+ * own). `suffix` is text after a
  * text box, or a function of the current values; `showIf(values)` hides the
  * field while it returns false. Enter saves from any field, Escape cancels.
  * `onSubmit(values)` returns a promise; if it rejects, the message shows and
@@ -274,7 +276,7 @@ export function anchoredForm({ anchor, title, message = '', fields = [], submitT
     root.replaceChildren(backdrop);
     refresh();
     placePopover(form, anchor);
-    const first = parts.find((p) => !p.wrap.hidden);
+    const first = parts.find((p) => !p.wrap.hidden && !p.note);
     if (first) first.focus();
     else ok.focus();
     shutBehind();
@@ -288,6 +290,20 @@ function formField(f, id) {
   let get;
   let wrap;
   let adorn = null;
+  if (type === 'note') {
+    const line = el('p', { class: 'popover-note', attrs: { id } });
+    return {
+      key: f.key,
+      note: true,
+      wrap: line,
+      get: () => '',
+      refresh: (v) => {
+        line.hidden = typeof f.showIf === 'function' && !f.showIf(v);
+        line.textContent = typeof f.text === 'function' ? f.text(v) : String(f.text || '');
+      },
+      focus: () => {},
+    };
+  }
   if (type === 'check') {
     control = el('input', { attrs: { id, type: 'checkbox' } });
     control.checked = Boolean(f.value);

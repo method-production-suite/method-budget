@@ -184,10 +184,8 @@ pub fn budget(spec: &SampleSpec) -> Budget {
             0..=2 => FringeKind::Percent {
                 cutoff: (i % 3 == 0).then(|| (rng.below(150_000) as i64 + 20_000) * 100),
             },
-            3 => FringeKind::Flat {
-                unit: Some("Day".into()),
-            },
-            _ => FringeKind::Flat { unit: None },
+            3 => FringeKind::flat(Some("Day".into())),
+            _ => FringeKind::flat(None),
         };
         let rate = match kind {
             FringeKind::Percent { .. } => format!("{}.{:02}", rng.below(12) + 1, rng.below(100)),
@@ -544,6 +542,62 @@ pub fn fine_decimals(b: &mut Budget, seed: u64) {
             row.percent = (*rng.pick(&["25.000000005", "12.5", "33.333333333"]))
                 .parse()
                 .unwrap_or(Dec::ONE);
+        }
+    }
+}
+
+/// Gives the flat fringes of `b` (from [`budget`]) every basis, some a
+/// most-hours-a-day cap (with some charged per Hour so it applies) and a
+/// stored cutoff (which must change nothing), and gives lines X and 4X in
+/// every kind of unit: hours, days, weeks, a non-time Episode, none. For
+/// tests that the engine, the cache, the reference and Explain agree on
+/// every way flat fringes count (decisions.md, entry 54).
+pub fn flat_bases(b: &mut Budget, seed: u64) {
+    let mut rng = Rng::new(seed ^ 0x5EED_F1A7);
+    b.units.insert(
+        "Episode".into(),
+        UnitDef {
+            plural: "Episodes".into(),
+            description: String::new(),
+            hours: None,
+        },
+    );
+    let caps: [Option<&str>; 5] = [None, Some("8"), Some("10"), Some("12"), Some("14.5")];
+    for f in b.fringes.values_mut() {
+        if let FringeKind::Flat {
+            unit,
+            basis,
+            max_hours_per_day,
+            cutoff,
+        } = &mut f.kind
+        {
+            *basis = *rng.pick(&crate::model::FlatBasis::ALL);
+            *max_hours_per_day = rng.pick(&caps).map(dec);
+            if unit.is_some() && rng.chance(50) {
+                *unit = Some("Hour".into());
+            }
+            if rng.chance(20) {
+                *cutoff = Some(rng.below(100_000) as i64 * 100);
+            }
+        }
+    }
+    const SECOND: [&str; 6] = ["", "Hour", "Day", "Week", "Episode", "Allow"];
+    const FOURTH: [&str; 4] = ["", "Episode", "Week", "Hour"];
+    for c in b.categories_mut() {
+        for a in &mut c.accounts {
+            for d in &mut a.details {
+                if d.kind != crate::model::RowKind::Line {
+                    continue;
+                }
+                if rng.chance(40) {
+                    d.x = (*rng.pick(&["2", "3", "8", "14", "0.5"])).into();
+                    d.unit2 = (*rng.pick(&SECOND)).into();
+                }
+                if rng.chance(30) {
+                    d.x4 = (*rng.pick(&["2", "3", "1.5"])).into();
+                    d.unit4 = (*rng.pick(&FOURTH)).into();
+                }
+            }
         }
     }
 }

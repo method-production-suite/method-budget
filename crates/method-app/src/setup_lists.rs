@@ -388,6 +388,8 @@ mod tests {
             rate: "7.65".into(),
             cutoff: None,
             unit: None,
+            basis: None,
+            max_hours_per_day: None,
             short_code: code.map(String::from),
         };
         s.edit("Test edit", |b| {

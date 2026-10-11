@@ -11,9 +11,9 @@ use method_core::coding::AccountCoding;
 use method_core::expr::is_ident;
 use method_core::{
     recalc, Account, Baseline, Budget, Category, Charge, ChargeKind, Credit, CreditCap, CreditRow,
-    CreditSource, Currency, Dec, Detail, Formula, Fringe, FringeKind, FringePosting, Group,
-    InfoValue, Location, NewLineDefaults, ProductionTotal, RecalcOptions, RowId, RowKind, SetDef,
-    TopsheetRow, UnitDef,
+    CreditSource, Currency, Dec, Detail, FlatBasis, Formula, Fringe, FringeKind, FringePosting,
+    Group, InfoValue, Location, NewLineDefaults, ProductionTotal, RecalcOptions, RowId, RowKind,
+    SetDef, TopsheetRow, UnitDef,
 };
 use serde::Deserialize;
 
@@ -587,12 +587,20 @@ pub struct FringeInput {
     #[serde(default)]
     pub description: String,
     pub rate: String,
-    /// Percent fringes: cutoff as money text, blank for none.
+    /// Cutoff as money text, blank for none. Used by percent fringes; a flat
+    /// fringe keeps it but never uses it.
     #[serde(default)]
     pub cutoff: Option<String>,
     /// Flat fringes: unit name, blank for none.
     #[serde(default)]
     pub unit: Option<String>,
+    /// Flat fringes: what a line counts, `amount` (blank), `amount_counts`
+    /// or `quantity` (decisions.md, entry 54).
+    #[serde(default)]
+    pub basis: Option<String>,
+    /// Flat fringes charged per hour: most hours a day, blank for no cap.
+    #[serde(default)]
+    pub max_hours_per_day: Option<String>,
     /// Short code: missing keeps the fringe's own, `""` clears it.
     #[serde(default)]
     pub short_code: Option<String>,
@@ -674,23 +682,43 @@ pub fn set_short_code(
 
 pub fn set_fringe(b: &mut Budget, name: &str, f: &FringeInput) -> EditResult {
     let name = check_name(name, "fringe")?;
+    let cutoff = match f.cutoff.as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some(text) => {
+            let c = parse_money(text)?;
+            if c < 0 {
+                return Err("a cutoff can't be negative".into());
+            }
+            Some(c)
+        }
+    };
     let kind = match f.kind.as_str() {
-        "percent" => {
-            let cutoff = match f.cutoff.as_deref().map(str::trim) {
+        "percent" => FringeKind::Percent { cutoff },
+        "flat" => {
+            let basis = match f.basis.as_deref().map(str::trim) {
+                None | Some("") => FlatBasis::Amount,
+                Some(text) => FlatBasis::parse(text)
+                    .ok_or_else(|| format!("unknown flat fringe basis `{text}`"))?,
+            };
+            let max_hours_per_day = match f.max_hours_per_day.as_deref().map(str::trim) {
                 None | Some("") => None,
                 Some(text) => {
-                    let c = parse_money(text)?;
-                    if c < 0 {
-                        return Err("a cutoff can't be negative".into());
+                    let h = parse_dec(text, "max hours per day")?;
+                    if h <= Dec::ZERO {
+                        return Err("max hours per day must be more than 0".into());
                     }
-                    Some(c)
+                    Some(h)
                 }
             };
-            FringeKind::Percent { cutoff }
+            // The cutoff is kept as it is, never used: cutoffs apply to
+            // percent fringes only.
+            FringeKind::Flat {
+                unit: f.unit.as_deref().and_then(optional),
+                basis,
+                max_hours_per_day,
+                cutoff,
+            }
         }
-        "flat" => FringeKind::Flat {
-            unit: f.unit.as_deref().and_then(optional),
-        },
         other => return Err(format!("unknown fringe kind `{other}`")),
     };
     let short_code = match f.short_code.as_deref() {

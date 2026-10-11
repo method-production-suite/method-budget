@@ -40,16 +40,16 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::Hash;
 
 use crate::diff::{
-    account_list, charge_fields, credit_fields, currency_fields, field_changes, formula_text,
-    fringe_fields, global_fields, group_fields, info_fields, kind_name, location_fields,
-    match_topsheets, on_off, opt_text, pair_by_key, quoted, row_changes, row_name, set_fields,
-    summary, top_key, unit_fields, Field, Place, Table,
+    account_list, basis_text, charge_fields, credit_fields, currency_fields, field_changes,
+    formula_text, fringe_fields, global_fields, group_fields, info_fields, kind_name,
+    location_fields, match_topsheets, max_hours_text, money, on_off, opt_text, pair_by_key, quoted,
+    row_changes, row_name, set_fields, summary, top_key, unit_fields, Field, Place, Table,
 };
 use crate::model::{
-    Account, Budget, Category, Charge, Credit, Detail, Note, ProductionTotal, RowId, TopsheetRow,
-    Version, VersionId,
+    Account, Budget, Category, Charge, Credit, Detail, FlatBasis, FringeKind, Note,
+    ProductionTotal, RowId, TopsheetRow, Version, VersionId,
 };
-use crate::{recalc, RecalcOptions};
+use crate::{recalc, Dec, RecalcOptions};
 
 // ---------------------------------------------------------------------------
 // What a merge gives back
@@ -473,6 +473,77 @@ type Maps<'a, V> = (
 );
 
 /// A map of named items merged item by item.
+/// A fringe's kind merged field by field: percent or flat, then the
+/// cutoff (both kinds keep one) and a flat fringe's unit, basis and most
+/// hours a day, each from the side that changed it.
+fn merge_fringe_kind(cx: &mut Cx, at: &At, th: &Three<crate::model::Fringe>) -> FringeKind {
+    static NO_UNIT: Option<String> = None;
+    static NO_HOURS: Option<Dec> = None;
+    static STANDARD: FlatBasis = FlatBasis::Amount;
+    let flat = th.field(
+        cx,
+        at,
+        "kind",
+        "kind",
+        |f| match f.kind {
+            FringeKind::Percent { .. } => &false,
+            FringeKind::Flat { .. } => &true,
+        },
+        |v| if *v { "flat" } else { "percent" }.into(),
+    );
+    let cutoff = th.field(
+        cx,
+        at,
+        "cutoff",
+        "cutoff",
+        |f| match &f.kind {
+            FringeKind::Percent { cutoff } | FringeKind::Flat { cutoff, .. } => cutoff,
+        },
+        |v| v.map_or("none".into(), money),
+    );
+    if !flat {
+        return FringeKind::Percent { cutoff };
+    }
+    FringeKind::Flat {
+        unit: th.field(
+            cx,
+            at,
+            "unit",
+            "flat unit",
+            |f| match &f.kind {
+                FringeKind::Flat { unit, .. } => unit,
+                FringeKind::Percent { .. } => &NO_UNIT,
+            },
+            opt_text,
+        ),
+        basis: th.field(
+            cx,
+            at,
+            "basis",
+            "basis",
+            |f| match &f.kind {
+                FringeKind::Flat { basis, .. } => basis,
+                FringeKind::Percent { .. } => &STANDARD,
+            },
+            |v| basis_text(*v),
+        ),
+        max_hours_per_day: th.field(
+            cx,
+            at,
+            "max_hours_per_day",
+            "max hours a day",
+            |f| match &f.kind {
+                FringeKind::Flat {
+                    max_hours_per_day, ..
+                } => max_hours_per_day,
+                FringeKind::Percent { .. } => &NO_HOURS,
+            },
+            max_hours_text,
+        ),
+        cutoff,
+    }
+}
+
 fn merge_map<V: PartialEq + Clone>(
     cx: &mut Cx,
     kind: Kind,
@@ -930,22 +1001,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
                 |f| &f.rate,
                 |v| formula_text(&v.0, false),
             ),
-            kind: th.field(
-                cx,
-                at,
-                "kind",
-                "kind",
-                |f| &f.kind,
-                |k| {
-                    let probe = crate::model::Fringe {
-                        description: String::new(),
-                        short_code: None,
-                        rate: Default::default(),
-                        kind: k.clone(),
-                    };
-                    summary(&fringe_fields(&probe)[2..])
-                },
-            ),
+            kind: merge_fringe_kind(cx, at, &th),
         },
     );
     let groups = merge_map(

@@ -13,9 +13,9 @@ use method_core::order::SetupOrder;
 use method_core::pack::{ItemSource, PackInfo};
 use method_core::{
     Account, Baseline, Budget, Category, Cents, Charge, ChargeKind, Credit, CreditCap, CreditRow,
-    CreditSource, Currency, Dec, Detail, DisplayPrefs, Formula, Fringe, FringeKind, FringePosting,
-    GlobalInfo, Group, InfoValue, Location, NewLineDefaults, Note, ProductionTotal, RowId, RowKind,
-    SetDef, TopsheetRow, UnitDef, Version,
+    CreditSource, Currency, Dec, Detail, DisplayPrefs, FlatBasis, Formula, Fringe, FringeKind,
+    FringePosting, GlobalInfo, Group, InfoValue, Location, NewLineDefaults, Note, ProductionTotal,
+    RowId, RowKind, SetDef, TopsheetRow, UnitDef, Version,
 };
 use method_core::{
     Band, BandField, FontSize, ReportColumn, ReportPreset, ReportSection, ReportSpec,
@@ -1223,7 +1223,50 @@ enum FileFringe {
         rate: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         unit: Option<String>,
+        #[serde(default, skip_serializing_if = "FileBasis::is_amount")]
+        basis: FileBasis,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        max_hours_per_day: Option<DecStr>,
+        /// Kept, never used: cutoffs apply to percent fringes only.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cutoff: Option<Cents>,
     },
+}
+
+/// What a flat fringe counts on a line (docs/FORMAT.md, fringe).
+#[derive(Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum FileBasis {
+    #[default]
+    Amount,
+    AmountCounts,
+    Quantity,
+}
+
+impl FileBasis {
+    fn is_amount(&self) -> bool {
+        *self == FileBasis::Amount
+    }
+}
+
+impl From<FlatBasis> for FileBasis {
+    fn from(b: FlatBasis) -> FileBasis {
+        match b {
+            FlatBasis::Amount => FileBasis::Amount,
+            FlatBasis::AmountCounts => FileBasis::AmountCounts,
+            FlatBasis::Quantity => FileBasis::Quantity,
+        }
+    }
+}
+
+impl From<FileBasis> for FlatBasis {
+    fn from(b: FileBasis) -> FlatBasis {
+        match b {
+            FileBasis::Amount => FlatBasis::Amount,
+            FileBasis::AmountCounts => FlatBasis::AmountCounts,
+            FileBasis::Quantity => FlatBasis::Quantity,
+        }
+    }
 }
 
 impl From<&Fringe> for FileFringe {
@@ -1243,11 +1286,19 @@ impl From<&Fringe> for FileFringe {
                 rate,
                 cutoff: *cutoff,
             },
-            FringeKind::Flat { unit } => FileFringe::Flat {
+            FringeKind::Flat {
+                unit,
+                basis,
+                max_hours_per_day,
+                cutoff,
+            } => FileFringe::Flat {
                 description,
                 short_code,
                 rate,
                 unit: unit.clone(),
+                basis: (*basis).into(),
+                max_hours_per_day: max_hours_per_day.map(DecStr),
+                cutoff: *cutoff,
             },
         }
     }
@@ -1272,11 +1323,19 @@ impl From<FileFringe> for Fringe {
                 short_code,
                 rate,
                 unit,
+                basis,
+                max_hours_per_day,
+                cutoff,
             } => Fringe {
                 description,
                 short_code,
                 rate: Formula(rate),
-                kind: FringeKind::Flat { unit },
+                kind: FringeKind::Flat {
+                    unit,
+                    basis: basis.into(),
+                    max_hours_per_day: max_hours_per_day.map(|h| h.0),
+                    cutoff,
+                },
             },
         }
     }

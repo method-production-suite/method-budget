@@ -221,7 +221,9 @@ using it), `other_uses`.
 **`list_setup`** `{path, type}`: one table (`fringe`, `group`, `set`, `location`, `unit`,
 `currency`) with every field and its use (`lines`, `other_uses`) and money where it means
 something (a fringe's `total_cents`, a group's active and full totals, a set's or location's
-totals). The base currency is listed first with `base: true`.
+totals). A percent fringe has `cutoff_cents`; a flat fringe has `unit`, `basis` and
+`max_hours_per_day` (a decimal string or null), and `unused_cutoff_cents` when it keeps a
+cutoff it never uses. The base currency is listed first with `base: true`.
 
 **`list_charges`** `{path}`: charges (`charge_kind`, `percent` or `flat_amount_cents` and
 `currency`, `applied`, `account`, the exclusions, and `base_cents`, `excluded_cents`,
@@ -316,7 +318,7 @@ optional one). Fields by type:
 
 | Type | Fields |
 |---|---|
-| fringe | `fringe_kind` (`percent`, the default, or `flat`), `rate` (a formula: `7.65` is 7.65%, or a flat amount), `cutoff` (percent: pay per earner it stops at, `"168,600.00"`, or null), `unit` (flat: charged per this unit, scaled by hours), `description`, `short_code` |
+| fringe | `fringe_kind` (`percent`, the default, or `flat`), `rate` (a formula: `7.65` is 7.65%, or a flat amount), `cutoff` (percent: pay per earner it stops at, `"168,600.00"`, or null; a flat fringe keeps one it had, from turning flat, but never uses it, and takes only null), `unit` (flat: charged per this unit; the line's Amount converts into it through unit hours, and a line or fringe whose unit has no hours is charged once), `basis` (flat: `amount`, the standard and what null means: the Amount column only, X and 4X never count; `amount_counts`: also times X and 4X when their units aren't time units, a blank unit being a count; `quantity`: Amount x X x 4X), `max_hours_per_day` (flat, charged per hour: most hours a day counted, `12`, or null; days are the Amount converted through the Day unit, hours a day are X when X is in hours, else the Day unit's hours), `description`, `short_code`. Fields left out keep their value; the cutoff stays when the kind changes, a flat fringe's unit, basis and cap go when it turns percent (decisions.md, entry 54) |
 | group | `in_budget_total` (false: its lines are shown but count as 0), `description`, `short_code`, `color` |
 | set | `description` |
 | location | `description`, `city`, `region`, `country` |
@@ -326,6 +328,8 @@ optional one). Fields by type:
 ```json
 {"name": "add_setup", "arguments": {"path": "film.mthd", "type": "fringe", "name": "FICA",
   "fields": {"rate": "7.65", "cutoff": "168,600.00"}}}
+{"name": "add_setup", "arguments": {"path": "film.mthd", "type": "fringe", "name": "PENSION_HR",
+  "fields": {"fringe_kind": "flat", "rate": "1.25", "unit": "Hour", "max_hours_per_day": "12"}}}
 ```
 
 **`rename_setup`** `{path, type, from, to}`: renames a global, fringe, group, set, location,

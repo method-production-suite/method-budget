@@ -5,14 +5,14 @@
 //! `fringe_range: Some(n)`; subtotal, separator and uncounted rows don't
 //! break a run).
 //! The earner's amount is rounded once, then split back over its lines so the
-//! shares sum exactly. A flat fringe is charged per line, converted by unit
-//! hours when both units have them.
+//! shares sum exactly. A flat fringe is charged per line: its rate times the
+//! line's count, which [`flat_count`] works out (decisions.md, entry 54).
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::calc::{err, overflow, row_at, sum, CalcError, Ctx, ErrorKind};
 use crate::decimal::{percent_of, Dec, Exact};
-use crate::model::{Account, Detail, Fringe, FringeKind, RowKind};
+use crate::model::{Account, Detail, FlatBasis, Fringe, FringeKind, RowKind, UnitDef};
 use crate::report::RowTotals;
 use crate::Cents;
 
@@ -128,14 +128,19 @@ pub(crate) fn apply_fringes(
         if !earns[i] {
             continue;
         }
+        let mut factors: Option<Factors> = None;
         for name in &d.fringes {
             let Some(&(f, rate)) = rates.get(name.as_str()) else {
                 continue;
             };
-            let FringeKind::Flat { unit } = &f.kind else {
+            if !matches!(f.kind, FringeKind::Flat { .. }) {
                 continue;
+            }
+            let v = match factors {
+                Some(v) => v,
+                None => *factors.insert(Factors::of(ctx, &acct.code, i, d, rows[i].quantity)?),
             };
-            let amount = flat_amount(ctx, unit.as_deref(), &d.unit, rate, rows[i].quantity)
+            let amount = flat_amount(ctx, &f.kind, d, v, rate)
                 .ok_or_else(|| overflow(row_at(&acct.code, i, d, &format!("fringe {name}"))))?;
             rows[i].fringes.insert(name.clone(), amount);
         }
@@ -227,24 +232,343 @@ pub(super) fn allocate(amount: Cents, weights: &[Cents]) -> Option<Vec<Cents>> {
     Some(out)
 }
 
-/// A flat fringe on one line. Per unit, scaled by the hours ratio, when the
-/// fringe's unit and the line's primary unit both have hours (and the
-/// fringe's are not zero); otherwise `rate` once. The exact amount is
-/// rounded to cents once.
-pub(super) fn flat_amount(
+/// A line's evaluated Amount, X and 4X, and its quantity as the line shows
+/// it (`amount x X x 4X`, rounded to 9 places).
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Factors {
+    pub amount: Dec,
+    pub x: Dec,
+    pub x4: Dec,
+    pub quantity: Dec,
+}
+
+impl Factors {
+    /// Evaluated again for the line at `i` of account `code`; stage 1 has
+    /// already evaluated them, so this doesn't fail in practice.
+    pub(crate) fn of(
+        ctx: &Ctx,
+        code: &str,
+        i: usize,
+        d: &Detail,
+        quantity: Dec,
+    ) -> Result<Factors, CalcError> {
+        let at = |field: &'static str| move || row_at(code, i, d, field);
+        Ok(Factors {
+            amount: ctx.eval(&d.amount, Dec::ZERO, &at("amount"))?,
+            x: ctx.eval(&d.x, Dec::ONE, &at("X"))?,
+            x4: ctx.eval(&d.x4, Dec::ONE, &at("4X"))?,
+            quantity,
+        })
+    }
+}
+
+/// A flat fringe (`kind`) at `rate` on one line: `rate` times the line's
+/// count, the exact amount rounded to cents once. `None` on overflow, or
+/// when `kind` is not flat.
+pub(crate) fn flat_amount(
     ctx: &Ctx,
-    fringe_unit: Option<&str>,
-    line_unit: &str,
+    kind: &FringeKind,
+    d: &Detail,
+    v: Factors,
     rate: Dec,
-    quantity: Dec,
 ) -> Option<Cents> {
-    let hours = |u: &str| ctx.b.units.get(u).and_then(|def| def.hours);
-    match (fringe_unit.and_then(hours), hours(line_unit)) {
-        (Some(fh), Some(lh)) if !fh.is_zero() => Exact::dec(rate)
-            .checked_mul(quantity)?
-            .checked_mul(lh)?
-            .div_to_cents(fh),
-        _ => rate.to_cents(),
+    flat_count(&ctx.b.units, kind, d, v)?.amount(rate)
+}
+
+/// X or 4X.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Factor {
+    X,
+    X4,
+}
+
+/// Why a flat fringe's count starts where it does.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum CountFrom {
+    /// The fringe has no unit: once per line.
+    PerLine,
+    /// The fringe's unit has no hours (or 0): charged once.
+    FringeNoHours(String),
+    /// The line's unit (blank for none) has no hours (or 0): charged once.
+    LineNoHours(String),
+    /// The line is in the fringe's own unit: the count is the Amount
+    /// (`base`).
+    SameUnit,
+    /// `base` in the line's unit, converted: `base x line_hours /
+    /// fringe_hours`.
+    Hours { line_hours: Dec, fringe_hours: Dec },
+    /// A per-hour fringe with a most-hours-a-day cap: `days x min(per_day,
+    /// cap)` hours, where `days` is the Amount converted to days through
+    /// the Day unit (`day_unit`, `day_hours` hours) and `per_day` is X when
+    /// X is filled in and in hours (`from_x`), else the Day unit's hours.
+    Capped {
+        line_hours: Dec,
+        fringe_hours: Dec,
+        day_unit: String,
+        day_hours: Dec,
+        per_day: Dec,
+        cap: Dec,
+        from_x: bool,
+    },
+}
+
+/// How many of its units a flat fringe counts on one line, and why. The
+/// count is the exact fraction (product of `num`) / (product of `den`); the
+/// fringe is `rate` times it, multiplied in that order and rounded to cents
+/// once (decisions.md, entries 2 and 54).
+#[derive(Clone, Debug)]
+pub(crate) struct FlatCount {
+    pub basis: FlatBasis,
+    /// What the count starts from: the Amount, or under `Quantity` without
+    /// a cap the line's quantity.
+    pub base: Dec,
+    pub from: CountFrom,
+    /// X or 4X multiplied in, with its value (blank ones, which are 1, are
+    /// left off).
+    pub counted: Vec<(Factor, Dec)>,
+    /// X or 4X filled in but not counted.
+    pub ignored: Vec<(Factor, Dec)>,
+    pub num: Vec<Dec>,
+    pub den: Vec<Dec>,
+}
+
+impl FlatCount {
+    /// `start` times every factor of `num`, exactly.
+    fn times(&self, start: Dec) -> Option<Exact> {
+        self.num
+            .iter()
+            .try_fold(Exact::dec(start), |acc, &f| acc.checked_mul(f))
+    }
+
+    /// `rate x count`, rounded to cents once. `None` on overflow. With one
+    /// divisor this is the same arithmetic, step for step, as before
+    /// decisions.md entry 54.
+    pub fn amount(&self, rate: Dec) -> Option<Cents> {
+        let e = self.times(rate)?;
+        match self.den[..] {
+            [] => e.to_cents(),
+            [d] => e.div_to_cents(d),
+            _ => e.div_exact_to_cents(product(&self.den)?),
+        }
+    }
+
+    /// `start x count` to 9 places, for showing. `None` on overflow.
+    pub fn shown(&self, start: Dec) -> Option<Dec> {
+        let e = self.times(start)?;
+        match self.den[..] {
+            [] => e.to_dec(),
+            [d] => e.div_to_dec(d),
+            _ => e.div_exact_to_dec(product(&self.den)?),
+        }
+    }
+
+    /// `rate x count` before rounding, for showing (9 places when the
+    /// division need not end).
+    pub fn exact_amount(&self, rate: Dec) -> Option<Exact> {
+        if self.den.is_empty() {
+            self.times(rate)
+        } else {
+            self.shown(rate).map(Exact::dec)
+        }
+    }
+
+    /// The count to 9 places, for showing. `None` on overflow.
+    pub fn count(&self) -> Option<Dec> {
+        self.shown(Dec::ONE)
+    }
+}
+
+/// The exact product of `factors` (at least one).
+fn product(factors: &[Dec]) -> Option<Exact> {
+    let (&first, rest) = factors.split_first()?;
+    rest.iter()
+        .try_fold(Exact::dec(first), |acc, &f| acc.checked_mul(f))
+}
+
+/// Hours in one `unit`, when the budget defines it with hours.
+fn unit_hours(units: &BTreeMap<String, UnitDef>, unit: &str) -> Option<Dec> {
+    units.get(unit).and_then(|u| u.hours)
+}
+
+/// Hours in one `unit` when it is a time unit: defined, with hours that
+/// aren't 0.
+pub(crate) fn time_hours(units: &BTreeMap<String, UnitDef>, unit: &str) -> Option<Dec> {
+    unit_hours(units, unit).filter(|h| !h.is_zero())
+}
+
+/// Whether `unit` is an hour: one hour long, or named Hour (any case).
+pub(crate) fn is_hour_unit(units: &BTreeMap<String, UnitDef>, unit: &str) -> bool {
+    unit_hours(units, unit) == Some(Dec::ONE)
+        || ["hour", "hours"]
+            .iter()
+            .any(|h| unit.trim().eq_ignore_ascii_case(h))
+}
+
+/// The budget's Day unit (named Day or Days, any case; `Day` first) and its
+/// hours, when it is a time unit: what a flat fringe's most hours a day
+/// count days by.
+pub fn day_unit(units: &BTreeMap<String, UnitDef>) -> Option<(&str, Dec)> {
+    let named = |n: &str| {
+        ["day", "days"]
+            .iter()
+            .any(|d| n.trim().eq_ignore_ascii_case(d))
+    };
+    units
+        .get_key_value("Day")
+        .into_iter()
+        .chain(units.iter().filter(|(n, _)| named(n)))
+        .find_map(|(n, u)| Some((n.as_str(), u.hours.filter(|h| !h.is_zero())?)))
+}
+
+/// How many units flat fringe `kind` counts on line `d` (with evaluated
+/// factors `v`). `None` when `kind` is not flat, or on overflow.
+///
+/// - `quantity` with no cap that applies: the rule before decisions.md entry
+///   54, unchanged: the line's quantity converted through hours when the
+///   fringe's unit has hours (not 0) and the line's unit has hours, else 1.
+/// - Otherwise the Amount converted into the fringe's unit through hours
+///   (the Amount itself when the line is in the fringe's unit), or 1 when
+///   the fringe has no unit or either unit has no hours (or 0). For a
+///   fringe charged per hour with `max_hours_per_day`, and a Day unit with
+///   hours, the converted hours are `days x min(per_day, cap)`
+///   ([`CountFrom::Capped`]). Then `amount_counts` multiplies X and 4X
+///   whose units are not time units, and `quantity` multiplies both (X not
+///   again when it was read as the hours a day).
+pub(crate) fn flat_count(
+    units: &BTreeMap<String, UnitDef>,
+    kind: &FringeKind,
+    d: &Detail,
+    v: Factors,
+) -> Option<FlatCount> {
+    let FringeKind::Flat {
+        unit,
+        basis,
+        max_hours_per_day,
+        ..
+    } = kind
+    else {
+        return None;
+    };
+    let basis = *basis;
+    let fu = unit.as_deref();
+    let fh = fu.and_then(|u| time_hours(units, u));
+    let lh = time_hours(units, &d.unit);
+    // The cap: a fringe per hour, both units with hours, and a Day unit.
+    let cap = match (max_hours_per_day, fu, fh, lh) {
+        (Some(cap), Some(u), Some(fh), Some(lh)) if is_hour_unit(units, u) => {
+            day_unit(units).map(|(day, dh)| (*cap, fh, lh, day.to_string(), dh))
+        }
+        _ => None,
+    };
+
+    if basis == FlatBasis::Quantity && cap.is_none() {
+        // The old rule, exactly: zero hours on the line's unit count 0.
+        let q = v.quantity;
+        let fh_old = fu.and_then(|u| unit_hours(units, u));
+        let (from, num, den) = match (fh_old, unit_hours(units, &d.unit)) {
+            (Some(fh), Some(lh)) if !fh.is_zero() => (
+                if fu == Some(d.unit.as_str()) {
+                    CountFrom::SameUnit
+                } else {
+                    CountFrom::Hours {
+                        line_hours: lh,
+                        fringe_hours: fh,
+                    }
+                },
+                vec![q, lh],
+                vec![fh],
+            ),
+            _ => (once_from(fu, fh_old, &d.unit), Vec::new(), Vec::new()),
+        };
+        return Some(FlatCount {
+            basis,
+            base: q,
+            from,
+            counted: Vec::new(),
+            ignored: Vec::new(),
+            num,
+            den,
+        });
+    }
+
+    let a = v.amount;
+    let mut x_is_hours = false;
+    let (from, mut num, den) = match (fu, fh, lh, cap) {
+        (Some(_), Some(_), Some(_), Some((cap, fh, lh, day_unit, dh))) => {
+            x_is_hours = !d.x.is_blank() && is_hour_unit(units, &d.unit2);
+            let per_day = if x_is_hours { v.x } else { dh };
+            let used = per_day.min(cap);
+            (
+                CountFrom::Capped {
+                    line_hours: lh,
+                    fringe_hours: fh,
+                    day_unit,
+                    day_hours: dh,
+                    per_day,
+                    cap,
+                    from_x: x_is_hours,
+                },
+                vec![a, lh, used],
+                vec![dh, fh],
+            )
+        }
+        (Some(u), Some(_), Some(_), None) if u == d.unit => {
+            (CountFrom::SameUnit, vec![a], Vec::new())
+        }
+        (Some(_), Some(fh), Some(lh), None) => (
+            CountFrom::Hours {
+                line_hours: lh,
+                fringe_hours: fh,
+            },
+            vec![a, lh],
+            vec![fh],
+        ),
+        _ => (once_from(fu, fh, &d.unit), Vec::new(), Vec::new()),
+    };
+
+    let mut counted = Vec::new();
+    let mut ignored = Vec::new();
+    for (factor, value, unit, blank) in [
+        (Factor::X, v.x, &d.unit2, d.x.is_blank()),
+        (Factor::X4, v.x4, &d.unit4, d.x4.is_blank()),
+    ] {
+        if factor == Factor::X && x_is_hours {
+            continue;
+        }
+        let counts = match basis {
+            FlatBasis::Amount => false,
+            FlatBasis::AmountCounts => time_hours(units, unit).is_none(),
+            FlatBasis::Quantity => true,
+        };
+        if counts {
+            num.push(value);
+        }
+        if !blank {
+            if counts {
+                counted.push((factor, value));
+            } else {
+                ignored.push((factor, value));
+            }
+        }
+    }
+    Some(FlatCount {
+        basis,
+        base: a,
+        from,
+        counted,
+        ignored,
+        num,
+        den,
+    })
+}
+
+/// Why a flat fringe counts once on a line: it has no unit, its unit has no
+/// hours (`fringe_hours`), or the line's unit has none.
+fn once_from(fringe_unit: Option<&str>, fringe_hours: Option<Dec>, line_unit: &str) -> CountFrom {
+    match fringe_unit {
+        None => CountFrom::PerLine,
+        Some(u) if fringe_hours.is_none_or(Dec::is_zero) => CountFrom::FringeNoHours(u.to_string()),
+        Some(_) => CountFrom::LineNoHours(line_unit.to_string()),
     }
 }
 
@@ -317,10 +641,380 @@ mod tests {
             short_code: None,
             description: String::new(),
             rate: rate.into(),
+            kind: FringeKind::flat(unit.map(String::from)),
+        }
+    }
+
+    fn flat_with(rate: &str, unit: Option<&str>, basis: FlatBasis, cap: Option<&str>) -> Fringe {
+        Fringe {
             kind: FringeKind::Flat {
                 unit: unit.map(String::from),
+                basis,
+                max_hours_per_day: cap.map(|c| c.parse().unwrap()),
+                cutoff: None,
             },
+            ..flat(rate, unit)
         }
+    }
+
+    fn unit(hours: Option<&str>) -> UnitDef {
+        UnitDef {
+            plural: String::new(),
+            description: String::new(),
+            hours: hours.map(|h| h.parse().unwrap()),
+        }
+    }
+
+    /// The units the reference product was checked with (2026-10-11): Day
+    /// 12 hours, Week 60, Hour 1, Allow none, plus a non-time Episode.
+    fn checked_units(b: &mut Budget) {
+        b.units.clear();
+        b.units.insert("Day".into(), unit(Some("12")));
+        b.units.insert("Week".into(), unit(Some("60")));
+        b.units.insert("Hour".into(), unit(Some("1")));
+        b.units.insert("Allow".into(), unit(None));
+        b.units.insert("Episode".into(), unit(None));
+    }
+
+    /// `amount unit [x X unit2] [4X x4 unit4]` at `rate`.
+    fn shaped(
+        id: u64,
+        amount: &str,
+        unit: &str,
+        x: Option<(&str, &str)>,
+        x4: Option<(&str, &str)>,
+        rate: &str,
+        fringes: &[&str],
+    ) -> Detail {
+        let mut d = line(id, amount, unit, rate, fringes, None);
+        if let Some((v, u)) = x {
+            d.x = v.into();
+            d.unit2 = u.into();
+        }
+        if let Some((v, u)) = x4 {
+            d.x4 = v.into();
+            d.unit4 = u.into();
+        }
+        d
+    }
+
+    /// Lines in the shapes checked in the reference product, each with
+    /// `fringes`.
+    fn checked_lines(fringes: &[&str]) -> Vec<Detail> {
+        vec![
+            shaped(1, "25", "Day", None, None, "100", fringes),
+            shaped(2, "25", "Day", Some(("3", "")), None, "100", fringes),
+            shaped(3, "25", "Day", Some(("14", "Hour")), None, "100", fringes),
+            shaped(
+                4,
+                "25",
+                "Day",
+                Some(("14", "Hour")),
+                Some(("2", "")),
+                "10",
+                fringes,
+            ),
+            shaped(5, "2", "Week", None, None, "100", fringes),
+            shaped(6, "300", "Hour", None, None, "100", fringes),
+            shaped(7, "2", "Allow", None, None, "100", fringes),
+        ]
+    }
+
+    /// The figures read off the reference product on 2026-10-11 (units Day
+    /// 12h, Week 60h, Hour 1h, Allow none; ZDAY 100.00 per Day, ZHR 1.00
+    /// per Hour), by the standard basis.
+    #[test]
+    fn flat_fringes_count_the_amount_as_checked_in_the_reference() {
+        let mut b = budget(checked_lines(&["ZDAY", "ZHR"]));
+        checked_units(&mut b);
+        b.fringes.insert("ZDAY".into(), flat("100", Some("Day")));
+        b.fringes.insert("ZHR".into(), flat("1", Some("Hour")));
+        let rows = run(&b).unwrap();
+        // 25 Days; x 3; x 14 Hours; x 14 Hours x 4X 2; 2 Weeks; 300 Hours; 2 Allow.
+        assert_eq!(
+            amounts(&rows, "ZDAY"),
+            [
+                Some(250_000),
+                Some(250_000),
+                Some(250_000),
+                Some(250_000),
+                Some(100_000),
+                Some(250_000),
+                Some(10_000),
+            ]
+        );
+        assert_eq!(
+            amounts(&rows, "ZHR"),
+            [
+                Some(30_000),
+                Some(30_000),
+                Some(30_000),
+                Some(30_000),
+                Some(12_000),
+                Some(30_000),
+                Some(100),
+            ]
+        );
+        assert_eq!(rows[3].total, 700_000, "25 x 14 x 2 x 10.00");
+        assert_totals_match(&rows);
+    }
+
+    #[test]
+    fn amount_counts_multiplies_counts_not_time() {
+        let mut b = budget(vec![
+            // 3 crew x 25 days: 75 days.
+            shaped(1, "25", "Day", Some(("3", "")), None, "100", &["ZDAY"]),
+            // 14 Hours in X is time: ignored.
+            shaped(2, "25", "Day", Some(("14", "Hour")), None, "100", &["ZDAY"]),
+            // 2 Episodes in 4X (no hours) count; 14 Hours don't.
+            shaped(
+                3,
+                "25",
+                "Day",
+                Some(("14", "Hour")),
+                Some(("2", "Episode")),
+                "1",
+                &["ZDAY"],
+            ),
+            // A 4X in Weeks is time: ignored; a blank-unit X counts.
+            shaped(
+                4,
+                "25",
+                "Day",
+                Some(("2", "")),
+                Some(("3", "Week")),
+                "1",
+                &["ZDAY"],
+            ),
+            // No hours on the line: once, times the counts.
+            shaped(5, "2", "Allow", Some(("3", "")), None, "1", &["ZDAY"]),
+        ]);
+        checked_units(&mut b);
+        b.fringes.insert(
+            "ZDAY".into(),
+            flat_with("100", Some("Day"), FlatBasis::AmountCounts, None),
+        );
+        let rows = run(&b).unwrap();
+        assert_eq!(
+            amounts(&rows, "ZDAY"),
+            [
+                Some(750_000),
+                Some(250_000),
+                Some(500_000),
+                Some(500_000),
+                Some(30_000)
+            ]
+        );
+    }
+
+    /// The full quantity is the rule from before decisions.md 54: worked out
+    /// here the old way, independently, for every checked shape.
+    #[test]
+    fn quantity_reproduces_the_old_figures() {
+        let mut b = budget(checked_lines(&["ZDAY", "ZHR"]));
+        checked_units(&mut b);
+        b.fringes.insert(
+            "ZDAY".into(),
+            flat_with("100", Some("Day"), FlatBasis::Quantity, None),
+        );
+        b.fringes.insert(
+            "ZHR".into(),
+            flat_with("1", Some("Hour"), FlatBasis::Quantity, None),
+        );
+        let rows = run(&b).unwrap();
+        let old = |rate: &str, fh: Option<&str>, r: &RowTotals, unit: &str| -> Cents {
+            let hours = |u: &str| b.units.get(u).and_then(|d| d.hours);
+            let rate: Dec = rate.parse().unwrap();
+            match (fh.and_then(hours), hours(unit)) {
+                (Some(fh), Some(lh)) if !fh.is_zero() => Exact::dec(rate)
+                    .checked_mul(r.quantity)
+                    .unwrap()
+                    .checked_mul(lh)
+                    .unwrap()
+                    .div_to_cents(fh)
+                    .unwrap(),
+                _ => rate.to_cents().unwrap(),
+            }
+        };
+        let units = ["Day", "Day", "Day", "Day", "Week", "Hour", "Allow"];
+        for (k, r) in rows.iter().enumerate() {
+            assert_eq!(
+                r.fringes["ZDAY"],
+                old("100", Some("Day"), r, units[k]),
+                "line {k}"
+            );
+            assert_eq!(
+                r.fringes["ZHR"],
+                old("1", Some("Hour"), r, units[k]),
+                "line {k}"
+            );
+        }
+        // 25 Days x 3 counts 75 days; 25 x 14 Hours x 2 counts 700 "days".
+        assert_eq!(rows[1].fringes["ZDAY"], 750_000);
+        assert_eq!(rows[3].fringes["ZDAY"], 7_000_000);
+        assert_eq!(rows[6].fringes["ZDAY"], 10_000, "still once on Allow");
+    }
+
+    #[test]
+    fn max_hours_per_day_caps_hours_in_both_shapes() {
+        let lines = vec![
+            // Shape B: hours a day from the Day unit (12).
+            shaped(1, "25", "Day", None, None, "100", &["ZHR"]),
+            shaped(2, "2", "Week", None, None, "100", &["ZHR"]),
+            shaped(3, "300", "Hour", None, None, "100", &["ZHR"]),
+            // Shape A: "N Days x H Hours", hours a day from X.
+            shaped(4, "25", "Day", Some(("14", "Hour")), None, "100", &["ZHR"]),
+            shaped(
+                5,
+                "25",
+                "Day",
+                Some(("8", "Hour")),
+                Some(("2", "")),
+                "100",
+                &["ZHR"],
+            ),
+            // No hours on the line: still once.
+            shaped(6, "2", "Allow", Some(("14", "Hour")), None, "100", &["ZHR"]),
+        ];
+        let mut b = budget(lines);
+        checked_units(&mut b);
+        let with_cap = |b: &mut Budget, basis: FlatBasis, cap: Option<&str>| {
+            b.fringes
+                .insert("ZHR".into(), flat_with("1", Some("Hour"), basis, cap));
+            amounts(&run(b).unwrap(), "ZHR")
+        };
+        // Cap 12 with a 12-hour Day: 25 x 12 = 300; X's 14 hours capped to 12.
+        assert_eq!(
+            with_cap(&mut b, FlatBasis::Amount, Some("12")),
+            [
+                Some(30_000),
+                Some(12_000),
+                Some(30_000),
+                Some(30_000),
+                Some(20_000),
+                Some(100)
+            ]
+        );
+        // Cap 10: 25 x 10 = 250; 2 Weeks = 10 days x 10 = 100; 300 Hours =
+        // 25 days x 10; 25 x min(14, 10); 25 x min(8, 10) = 200.
+        assert_eq!(
+            with_cap(&mut b, FlatBasis::Amount, Some("10")),
+            [
+                Some(25_000),
+                Some(10_000),
+                Some(25_000),
+                Some(25_000),
+                Some(20_000),
+                Some(100)
+            ]
+        );
+        // A cap above the Day's hours: the Day lines as without a cap, but
+        // X's hours a day are counted (25 x 14).
+        assert_eq!(
+            with_cap(&mut b, FlatBasis::Amount, Some("16")),
+            [
+                Some(30_000),
+                Some(12_000),
+                Some(30_000),
+                Some(35_000),
+                Some(20_000),
+                Some(100)
+            ]
+        );
+        // Counts in X and 4X multiply on top: the 2 in 4X on line 5.
+        assert_eq!(
+            with_cap(&mut b, FlatBasis::AmountCounts, Some("10"))[4],
+            Some(40_000)
+        );
+        // Under the full quantity the cap reads X as hours a day, 4X counts.
+        assert_eq!(
+            with_cap(&mut b, FlatBasis::Quantity, Some("10"))[3..5],
+            [Some(25_000), Some(40_000)]
+        );
+        // Hours in X's unit but no X typed: hours a day are the Day's.
+        let mut blank_x = budget(vec![shaped(
+            1,
+            "25",
+            "Day",
+            Some(("", "Hour")),
+            None,
+            "100",
+            &["ZHR"],
+        )]);
+        checked_units(&mut blank_x);
+        assert_eq!(
+            with_cap(&mut blank_x, FlatBasis::Amount, Some("10")),
+            [Some(25_000)]
+        );
+        // A cap on a fringe charged per Day is ignored.
+        b.fringes.insert(
+            "ZHR".into(),
+            flat_with("100", Some("Day"), FlatBasis::Amount, Some("10")),
+        );
+        assert_eq!(amounts(&run(&b).unwrap(), "ZHR")[0], Some(250_000));
+        // With no Day unit the cap can't apply.
+        b.units.remove("Day");
+        b.units.insert("Shift".into(), unit(Some("12")));
+        for d in all_lines(&mut b) {
+            if d.unit == "Day" {
+                d.unit = "Shift".into();
+            }
+        }
+        assert_eq!(
+            with_cap(&mut b, FlatBasis::Amount, Some("10"))[0],
+            Some(30_000)
+        );
+    }
+
+    fn all_lines(b: &mut Budget) -> Vec<&mut Detail> {
+        b.categories_mut()
+            .flat_map(|c| &mut c.accounts)
+            .flat_map(|a| &mut a.details)
+            .collect()
+    }
+
+    #[test]
+    fn a_cutoff_kept_on_a_flat_fringe_is_ignored() {
+        let mut b = budget(vec![
+            line(1, "25", "Day", "1000", &["ZDAY"], Some(1)),
+            line(2, "25", "Day", "1000", &["ZDAY"], Some(1)),
+        ]);
+        b.fringes.insert(
+            "ZDAY".into(),
+            Fringe {
+                kind: FringeKind::Flat {
+                    unit: Some("Day".into()),
+                    basis: FlatBasis::Amount,
+                    max_hours_per_day: None,
+                    cutoff: Some(100),
+                },
+                ..flat("100", Some("Day"))
+            },
+        );
+        // Per line, whole: the range and the 1.00 cutoff change nothing.
+        let rows = run(&b).unwrap();
+        assert_eq!(amounts(&rows, "ZDAY"), [Some(250_000), Some(250_000)]);
+        assert_eq!(b.fringes["ZDAY"].kind.cutoff(), Some(100));
+    }
+
+    #[test]
+    fn hour_and_day_units_are_found_by_hours_or_name() {
+        let mut b = budget(Vec::new());
+        checked_units(&mut b);
+        b.units.insert("Hr".into(), unit(Some("1")));
+        b.units.insert("HOURS".into(), unit(Some("2")));
+        assert!(is_hour_unit(&b.units, "Hr"));
+        assert!(is_hour_unit(&b.units, "HOURS"));
+        assert!(is_hour_unit(&b.units, "hour"));
+        assert!(!is_hour_unit(&b.units, "Day"));
+        assert_eq!(day_unit(&b.units), Some(("Day", "12".parse().unwrap())));
+        b.units.remove("Day");
+        b.units.insert("days".into(), unit(Some("8")));
+        assert_eq!(day_unit(&b.units), Some(("days", "8".parse().unwrap())));
+        b.units.insert("days".into(), unit(Some("0")));
+        assert_eq!(day_unit(&b.units), None);
+        assert_eq!(time_hours(&b.units, "Allow"), None);
+        assert_eq!(time_hours(&b.units, "days"), None, "0 hours is no hours");
     }
 
     /// `amount` `unit` at `rate`, carrying `fringes`, in `range`.
@@ -518,7 +1212,17 @@ mod tests {
         ]);
         b.fringes.insert("HW".into(), flat("20", Some("Day")));
         let rows = run(&b).unwrap();
-        // 20/day x quantity x line hours / 10.
+        // 20/day x Amount x line hours / 10; the 3 in X doesn't count.
+        assert_eq!(
+            amounts(&rows, "HW"),
+            [Some(20_000), Some(20_000), Some(2_400), Some(2_000)]
+        );
+        // Under the full quantity it does, as before decisions.md 54.
+        b.fringes.insert(
+            "HW".into(),
+            flat_with("20", Some("Day"), FlatBasis::Quantity, None),
+        );
+        let rows = run(&b).unwrap();
         assert_eq!(
             amounts(&rows, "HW"),
             [Some(20_000), Some(60_000), Some(2_400), Some(2_000)]

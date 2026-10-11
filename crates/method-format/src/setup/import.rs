@@ -236,8 +236,21 @@ fn needs(b: &Budget, w: What, name: &str) -> BTreeSet<Key> {
                 for g in global_names(&f.rate.0) {
                     add(What::Global, &g);
                 }
-                if let FringeKind::Flat { unit: Some(u) } = &f.kind {
-                    add(What::Unit, u);
+                if let FringeKind::Flat {
+                    unit,
+                    max_hours_per_day,
+                    ..
+                } = &f.kind
+                {
+                    if let Some(u) = unit {
+                        add(What::Unit, u);
+                    }
+                    // Most hours a day count days by the Day unit.
+                    if max_hours_per_day.is_some() {
+                        if let Some((day, _)) = method_core::calc::day_unit(&b.units) {
+                            add(What::Unit, day);
+                        }
+                    }
                 }
             }
         }
@@ -1178,7 +1191,7 @@ fn rename_setup_items(s: &mut method_core::SetupItems, r: &Renames) {
     keys(&mut s.locations, &r.locations);
     for f in s.fringes.values_mut() {
         f.rate.0 = clipboard::rename_globals(&f.rate.0, &r.globals);
-        if let FringeKind::Flat { unit: Some(u) } = &mut f.kind {
+        if let FringeKind::Flat { unit: Some(u), .. } = &mut f.kind {
             *u = clipboard::renamed(&r.units, u);
         }
     }

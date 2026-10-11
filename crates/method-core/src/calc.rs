@@ -29,6 +29,7 @@ pub(crate) mod lines;
 mod reference;
 pub(crate) mod topsheet;
 
+pub use fringes::day_unit;
 pub use topsheet::charge_preview;
 
 /// Which details count toward totals, on top of group suppression.

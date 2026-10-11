@@ -340,9 +340,7 @@ mod tests {
                 short_code: None,
                 description: "Kit".into(),
                 rate: "WEEKS * 10".into(),
-                kind: FringeKind::Flat {
-                    unit: Some("Shift".into()),
-                },
+                kind: FringeKind::flat(Some("Shift".into())),
             },
         );
         b.groups.insert(

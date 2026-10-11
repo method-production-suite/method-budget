@@ -85,12 +85,12 @@ fn apply_fringes(ctx: &Ctx, acct: &Account, rows: &mut [RowTotals]) -> Result<()
             let Some(&(f, rate)) = rates.get(name.as_str()) else {
                 continue;
             };
-            let FringeKind::Flat { unit } = &f.kind else {
+            if !matches!(f.kind, FringeKind::Flat { .. }) {
                 continue;
-            };
-            let amount =
-                super::fringes::flat_amount(ctx, unit.as_deref(), &d.unit, rate, rows[i].quantity)
-                    .ok_or_else(|| overflow(row_at(&acct.code, i, d, &format!("fringe {name}"))))?;
+            }
+            let v = super::fringes::Factors::of(ctx, &acct.code, i, d, rows[i].quantity)?;
+            let amount = super::fringes::flat_amount(ctx, &f.kind, d, v, rate)
+                .ok_or_else(|| overflow(row_at(&acct.code, i, d, &format!("fringe {name}"))))?;
             rows[i].fringes.insert(name.clone(), amount);
         }
     }
@@ -377,6 +377,42 @@ mod tests {
         let r = recalc(&b, &RecalcOptions::default()).unwrap();
         let row = &r.categories[0].accounts[0].rows[0];
         assert_eq!((row.local_total, row.total), (0, 0));
+    }
+
+    /// Flat fringes counted every way (each basis, caps, X and 4X in every
+    /// kind of unit, stored cutoffs), under every posting mode: the
+    /// optimized engine matches the old one to the cent.
+    #[test]
+    fn every_flat_basis_matches_the_old_engine() {
+        for seed in 1..=8u64 {
+            let mut b = sample::budget(&SampleSpec {
+                seed,
+                rows: 250 + (seed as usize) * 37,
+                accounts: 9 + seed as usize,
+                fringes: 15,
+                groups: 4,
+                ..SampleSpec::default()
+            });
+            sample::flat_bases(&mut b, seed);
+            if seed % 3 == 0 {
+                sample::fine_decimals(&mut b, seed);
+            }
+            b.fringe_posting = match seed % 4 {
+                0 => FringePosting::Budget,
+                1 => FringePosting::ProductionLevel,
+                2 => FringePosting::Account,
+                _ => FringePosting::Category {
+                    suffix: "99".into(),
+                },
+            };
+            same(&b, &RecalcOptions::default(), &format!("seed {seed}"));
+            let groups: Vec<String> = b.groups.keys().cloned().collect();
+            let exclude = RecalcOptions {
+                exclude_groups: groups.iter().take(1).cloned().collect(),
+                only_groups: None,
+            };
+            same(&b, &exclude, &format!("seed {seed} exclude"));
+        }
     }
 
     /// The shortcut for plain numbers and bare globals agrees with parsing

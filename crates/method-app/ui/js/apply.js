@@ -63,7 +63,7 @@ import {
   MOVE_KEYS,
   inUse,
 } from './setuplist.js';
-import { obj, str, plural, errText, sourceText } from './util.js';
+import { obj, str, plural, errText, sourceText, FLAT_BASES, isHourUnit, flatCountWords } from './util.js';
 
 const LISTS = [
   {
@@ -224,7 +224,7 @@ function fringeRate(def) {
   if (def.kind !== 'flat') return `${rateText(def.rate)}%`;
   const base = str(budget().base_currency);
   const unit = str(def.unit);
-  return `${rateText(def.rate)}${base ? ` ${base}` : ''} per ${unit || 'line'}`;
+  return `${rateText(def.rate)}${base ? ` ${base}` : ''} per ${unit || 'line'}${flatCountWords(def, budget().units)}`;
 }
 
 function visible() {
@@ -1246,6 +1246,8 @@ const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)$/;
 function fringeFields(def) {
   const base = str(budget().base_currency);
   const unit = def.unit === undefined || def.unit === null ? '' : String(def.unit);
+  const units = budget().units;
+  const basis = FLAT_BASES.some(([b]) => b === def.basis) ? def.basis : 'amount';
   return [
     { key: 'kind', label: 'Kind', type: 'select', options: [['percent', 'Percent of pay'], ['flat', 'Flat amount']], value: def.kind === 'flat' ? 'flat' : 'percent' },
     { key: 'rate', label: 'Rate', value: str(def.rate), placeholder: '18.5', suffix: (v) => (v.kind === 'flat' ? base : '%') },
@@ -1257,6 +1259,14 @@ function fringeFields(def) {
       showIf: (v) => v.kind !== 'flat',
     },
     {
+      // A flat fringe keeps a cutoff it had (from a percent fringe, a file
+      // or an import) but never uses it.
+      key: 'cutoff_note',
+      type: 'note',
+      text: (v) => `Its cutoff of ${str(v.cutoff).trim()} is kept but not used: cutoffs apply to percent fringes only.`,
+      showIf: (v) => v.kind === 'flat' && str(v.cutoff).trim() !== '',
+    },
+    {
       key: 'unit',
       label: 'Charged per',
       type: 'select',
@@ -1264,18 +1274,33 @@ function fringeFields(def) {
       value: unit,
       showIf: (v) => v.kind === 'flat',
     },
+    { key: 'basis', label: 'Basis', type: 'select', options: FLAT_BASES, value: basis, showIf: (v) => v.kind === 'flat' },
+    {
+      key: 'max_hours_per_day',
+      label: 'Max hours per day',
+      value: str(def.max_hours_per_day),
+      placeholder: 'None',
+      showIf: (v) => v.kind === 'flat' && isHourUnit(units, v.unit),
+    },
     { key: 'description', label: 'Description', value: str(def.description) },
     { key: 'short_code', label: 'Short code (shown in the grid)', value: str(def.short_code), placeholder: 'None' },
   ];
 }
 
 function fringeInput(v) {
+  const flat = v.kind === 'flat';
+  const hours = str(v.max_hours_per_day).trim();
   return {
-    kind: v.kind === 'flat' ? 'flat' : 'percent',
+    kind: flat ? 'flat' : 'percent',
     description: v.description,
     rate: v.rate.trim(),
-    cutoff: v.kind === 'flat' ? null : moneyText(v.cutoff),
-    unit: v.kind === 'flat' && v.unit ? v.unit : null,
+    // Kept on a flat fringe too (never used there), so it comes back if the
+    // fringe turns percent again.
+    cutoff: moneyText(v.cutoff),
+    unit: flat && v.unit ? v.unit : null,
+    basis: flat ? v.basis || 'amount' : null,
+    // Only a fringe charged per hour has a cap; it goes with the field.
+    max_hours_per_day: flat && hours && isHourUnit(budget().units, v.unit) ? hours : null,
     short_code: str(v.short_code).trim(),
   };
 }

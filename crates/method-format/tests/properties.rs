@@ -289,7 +289,12 @@ fn gen_content(rng: &mut Rng) -> Budget {
                 cutoff: r.chance(50).then(|| r.cents()),
             }
         } else {
-            FringeKind::Flat { unit: r.opt_text() }
+            FringeKind::Flat {
+                unit: r.opt_text(),
+                basis: FlatBasis::ALL[r.below(3) as usize],
+                max_hours_per_day: r.chance(40).then(|| r.dec()),
+                cutoff: r.chance(20).then(|| r.cents()),
+            }
         },
     });
     b.fringe_posting = match rng.below(5) {

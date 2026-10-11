@@ -93,9 +93,7 @@ pub fn sample() -> Budget {
             short_code: None,
             description: String::new(),
             rate: "50".into(),
-            kind: FringeKind::Flat {
-                unit: Some("Day".into()),
-            },
+            kind: FringeKind::flat(Some("Day".into())),
         },
     );
     b.groups.insert("OptionA".into(), group(true));
@@ -254,7 +252,7 @@ pub fn rich() -> Budget {
             short_code: None,
             description: "Per line".into(),
             rate: "".into(),
-            kind: FringeKind::Flat { unit: None },
+            kind: FringeKind::flat(None),
         },
     );
     b.groups.get_mut("OptionA").unwrap().description = "Option A \"deluxe\"".into();

@@ -5,8 +5,10 @@ use crate::script::{self, Op, RowRef, Word, LINE_FIELDS};
 
 pub const USAGE: &str = "  method set <file.mthd> <path> <value> [--dry-run]
       Change one value and save atomically. Paths: title, compact_versions,
-      global.NAME, fringe.NAME.rate, fringe.NAME.cutoff, line.ROW.FIELD (ROW is
-      #ID, ACCOUNT:N or ACCOUNT:*; FIELD as in `set line`), charge.NAME.applied.
+      global.NAME, fringe.NAME.rate, fringe.NAME.cutoff, fringe.NAME.basis
+      (amount, amount_counts or quantity), fringe.NAME.max_hours_per_day,
+      line.ROW.FIELD (ROW is #ID, ACCOUNT:N or ACCOUNT:*; FIELD as in `set
+      line`), charge.NAME.applied.
       `none` or \"\" clears an optional value. --dry-run prints what would
       change and writes nothing. Exit 3 when the edit is refused.
 ";
@@ -32,10 +34,11 @@ pub fn op_for(path: &str, value: &str) -> Result<Op, CliError> {
         "global" if !rest.is_empty() => Op::Global(rest.to_string(), value.to_string()),
         "fringe" => match middle(rest, path)? {
             (name, "rate") => Op::FringeRate(name.to_string(), value.to_string()),
-            (name, "cutoff") => {
-                // The script parser handles amounts and `none` (or "").
+            (name, field @ ("cutoff" | "basis" | "max_hours_per_day")) => {
+                // The script parser handles amounts, hours, bases and
+                // `none` (or "").
                 let line = format!(
-                    "set fringe {} cutoff {}",
+                    "set fringe {} {field} {}",
                     quote(name),
                     if v.is_none() {
                         "none".into()
@@ -44,7 +47,9 @@ pub fn op_for(path: &str, value: &str) -> Result<Op, CliError> {
                     }
                 );
                 match script::parse(&line).map_err(CliError::rejected)? {
-                    Some(op @ Op::FringeCutoff(..)) => op,
+                    Some(
+                        op @ (Op::FringeCutoff(..) | Op::FringeBasis(..) | Op::FringeMaxHours(..)),
+                    ) => op,
                     _ => return Err(bad(format!("`{path}` is not a fringe field"))),
                 }
             }
@@ -106,6 +111,22 @@ mod tests {
                 Op::FringeCutoff("FICA".into(), None)
             );
         }
+        assert_eq!(
+            op_for("fringe.MEALS.basis", "amount_counts").unwrap(),
+            Op::FringeBasis("MEALS".into(), method_core::FlatBasis::AmountCounts)
+        );
+        assert_eq!(
+            op_for("fringe.PEN.max_hours_per_day", "12.5").unwrap(),
+            Op::FringeMaxHours("PEN".into(), Some("12.5".parse().unwrap()))
+        );
+        for clear in ["", "none"] {
+            assert_eq!(
+                op_for("fringe.PEN.max_hours_per_day", clear).unwrap(),
+                Op::FringeMaxHours("PEN".into(), None)
+            );
+        }
+        assert!(op_for("fringe.MEALS.basis", "none").is_err());
+        assert!(op_for("fringe.MEALS.basis", "hours").is_err());
         assert_eq!(
             op_for("compact_versions", "on").unwrap(),
             Op::CompactVersions(true)

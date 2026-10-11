@@ -35,7 +35,7 @@ Premiere, etc.
   SHA-pin any third-party Action. Machine-wide dependency cooldowns exist; don't bypass them.
 - Stage explicit paths, never `git add -A` blindly.
 
-## Current state (2026-10-09)
+## Current state (2026-10-11)
 A working local desktop app (Tauri v2, `crates/method-app`, zero-npm UI) on a tested engine.
 The product is **Method Budget** (methodbudget.com; decisions.md, entry 46). The crates are
 `method-core`, `method-format`, `method-cli` and `method-app`. Never shorten the name to "MB"
@@ -58,9 +58,20 @@ docs/decisions.md (every product and design call, numbered), docs/FORMAT.md (`.m
   print setup with presets and PDF, autosave into the file with recovery and backups,
   outside-change guard, Movie Magic-style shortcuts. ~5 ms per edit at 5,000 lines.
 - **Research**: docs/research/behaviors/01-24 (the 2026 recordings 01-02 outrank the 2020/2021
-  vendor tutorials 03-24), feature inventory, export test plan.
+  vendor tutorials 03-24), feature inventory, interop formats, the overnight parity test plan.
+- **Also built**: diff and three-way merge with a git driver, Explain This Number, overtime
+  helper, actuals and cost report, setup packs and library, chart of accounts import with 91
+  bundled templates, the `method mcp` server for coding agents, updater and release tooling,
+  website and brand. Flat fringes count the way Movie Magic does (decision 54, verified in the
+  real app): Amount only by default, with `amount_counts` and `quantity` as options and an
+  optional max hours per day.
+- **Master rule**: match Movie Magic Budgeting as closely as possible. When unsure, check it in
+  the real app (an agent may drive MMB 10 on this Mac with the owner's permission, using
+  throwaway "ZTEST" budgets only and full-screen control for the grid).
+- **Rate data** lives in a separate private repo, methodbudget/method-budget-data (local
+  folder next to this one), bundled into releases as setup packs later.
 
-## Studio chart templates (2026-10-10, uncommitted)
+## Studio chart templates (2026-10-10)
 All 84 studio/network charts in `imports/coa-sources/` (gitignored) are bundled templates
 now, next to our own 7 (91 in `templates/charts/charts.json`); `needs-review/` is empty.
 The importer fix is done (decision 53, docs/TEMPLATES.md): a `kind,code,name,parent` sheet
@@ -72,9 +83,24 @@ counts against its CSV. Groups for the 36 new charts follow their names (unclear
 Other). `imports/coa-sources/IMPORT-NOTES.md` has the per-chart detail.
 
 ## Next
-Phase 1 remaining (ROADMAP): import from MMB exports (1.16, blocked until the owner runs
-docs/research/export-test-plan.md; tabled for now), engine fixes from that test
-(1.17), signed Mac build (1.21, needs the owner's call on the signing team). Then Phase 2.
+1. **First, after the project folder rename** (film-wizard-budgeting to method-budget): the
+   app's saved library path in `~/Library/Application Support/com.methodbudget.desktop/
+   library.json` still points into the old folder; repoint it to
+   `<new folder>/Test Library/My Method Budget Library.mthd` (and `recent.json`).
+2. **Overnight parity run**: execute docs/research/parity-test-plan.md against the real MMB.
+   The owner still has to answer its section 7 questions; proposed defaults: allow the
+   decimals-on-totals setting for the night and restore it, stop at 06:30, MMB files in
+   `~/ZTEST-mmb-parity/<date>/` and trashed after comparison, start comparing if P0 finishes
+   early, commit the generator under `scripts/parity/`, skip cloud-only compare cases.
+3. **Known issue**: splitting a line with the overtime helper copies its flat fringes onto
+   every part, so a per-day fringe is charged once per part. Fix so only one part carries it.
+4. Flight Deck (a line producer's separate app) exports `.mthd` and will write
+   `basis: "amount_counts"` and `max_hours_per_day: "12"`; keep the format stable for it.
+5. Remaining roadmap: import from MMB's open exports (1.16/1.17, now unblocked: drive MMB to
+   make sample exports), episode-level budgeting (the owner confirmed it's wanted), the
+   import/export waves in docs/research/interop-formats.md, Phase 3 wave B. Flip the
+   "Signed and notarized Mac app" feature to have when a signed release ships.
+6. Sister project: `../method-scheduling` (kickoff in its docs/KICKOFF.md).
 
 ## How to work here
 - Never launch the app or drive the GUI while the owner is at the computer unless they say so;

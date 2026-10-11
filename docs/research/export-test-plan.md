@@ -1,5 +1,9 @@
 # Export test plan: a made-up budget for MMB
 
+Status: superseded by `docs/research/parity-test-plan.md`, which covers every
+question below in themed budgets for an unattended run. Kept for history and for anyone
+running this one budget by hand; its predictions predate decisions entry 54 (flat fringes).
+
 This is a recipe. You type a tiny, fake budget into your copy of Movie Magic
 Budgeting, export it in every open format, and drop the files in a folder. We then build our
 importers against those files, and the totals tell us how MMB does its math where the manual

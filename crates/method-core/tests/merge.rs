@@ -84,15 +84,10 @@ fn gen_budget(rng: &mut Rng) -> Budget {
         ),
     );
     b.fringes
-        .insert("FLAT".into(), fringe("25", FringeKind::Flat { unit: None }));
+        .insert("FLAT".into(), fringe("25", FringeKind::flat(None)));
     b.fringes.insert(
         "DAILY".into(),
-        fringe(
-            "12.5",
-            FringeKind::Flat {
-                unit: Some("Day".into()),
-            },
-        ),
+        fringe("12.5", FringeKind::flat(Some("Day".into()))),
     );
     b.groups.insert("A".into(), group(true));
     b.groups.insert("B".into(), group(true));
@@ -883,6 +878,103 @@ fn setup_items_merge_field_by_field() {
     let m = merge(&base, &ours, &theirs);
     assert_eq!(m.conflicts.len(), 1);
     assert_eq!(m.conflicts[0].key, "fringe:FLAT");
+}
+
+/// A flat fringe's unit, basis, most hours a day and kept cutoff merge one
+/// by one, and the diff names each.
+#[test]
+fn flat_fringe_fields_diff_and_merge_one_by_one() {
+    let base = sample_base();
+    let set_flat = |b: &mut Budget, name: &str, f: &dyn Fn(&mut FringeKind)| {
+        f(&mut b.fringes.get_mut(name).unwrap().kind);
+    };
+    let mut ours = base.clone();
+    set_flat(&mut ours, "DAILY", &|k| {
+        if let FringeKind::Flat { basis, .. } = k {
+            *basis = FlatBasis::AmountCounts;
+        }
+    });
+    let mut theirs = base.clone();
+    set_flat(&mut theirs, "DAILY", &|k| {
+        if let FringeKind::Flat {
+            unit,
+            max_hours_per_day,
+            ..
+        } = k
+        {
+            *unit = Some("Hour".into());
+            *max_hours_per_day = Some(d("10"));
+        }
+    });
+    let m = merge(&base, &ours, &theirs);
+    assert!(m.conflicts.is_empty(), "{:?}", m.conflicts);
+    assert_eq!(
+        m.budget.fringes["DAILY"].kind,
+        FringeKind::Flat {
+            unit: Some("Hour".into()),
+            basis: FlatBasis::AmountCounts,
+            max_hours_per_day: Some(d("10")),
+            cutoff: None,
+        }
+    );
+    let words: Vec<String> = diff(&base, &ours)
+        .items
+        .iter()
+        .map(|i| i.text.clone())
+        .collect();
+    assert!(
+        words
+            .iter()
+            .any(|t| t.contains("basis amount only -> amount plus counts in X and 4X")),
+        "{words:?}"
+    );
+    let words: Vec<String> = diff(&base, &theirs)
+        .items
+        .iter()
+        .map(|i| i.text.clone())
+        .collect();
+    assert!(
+        words
+            .iter()
+            .any(|t| t.contains("max hours a day none -> 10")),
+        "{words:?}"
+    );
+
+    // The same field both ways is a conflict on that field alone.
+    let mut theirs = base.clone();
+    set_flat(&mut theirs, "DAILY", &|k| {
+        if let FringeKind::Flat { basis, .. } = k {
+            *basis = FlatBasis::Quantity;
+        }
+    });
+    let m = merge(&base, &ours, &theirs);
+    let keys: Vec<&str> = m.conflicts.iter().map(|c| c.key.as_str()).collect();
+    assert_eq!(keys, ["fringe:DAILY:basis"]);
+
+    // A percent fringe turned flat on one side (keeping its cutoff) and its
+    // cutoff changed on the other: flat, with the new cutoff kept.
+    let mut ours = base.clone();
+    set_flat(&mut ours, "CAPPED", &|k| {
+        *k = FringeKind::Flat {
+            unit: None,
+            basis: FlatBasis::Amount,
+            max_hours_per_day: None,
+            cutoff: Some(2_000_000),
+        }
+    });
+    let mut theirs = base.clone();
+    set_flat(&mut theirs, "CAPPED", &|k| {
+        *k = FringeKind::Percent {
+            cutoff: Some(3_000_000),
+        }
+    });
+    let m = merge(&base, &ours, &theirs);
+    assert!(m.conflicts.is_empty(), "{:?}", m.conflicts);
+    assert_eq!(m.budget.fringes["CAPPED"].kind.cutoff(), Some(3_000_000));
+    assert!(matches!(
+        m.budget.fringes["CAPPED"].kind,
+        FringeKind::Flat { .. }
+    ));
 }
 
 #[test]

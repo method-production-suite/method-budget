@@ -23,14 +23,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use super::fringes::{allocate, earners};
+use super::fringes::{allocate, earners, flat_count, CountFrom, Factor, Factors, FlatCount};
 use super::topsheet::{credit_cap, credit_keep, credit_row};
 use super::{recalc, CalcError, Ctx, RecalcOptions};
 use crate::decimal::{mul_cents, percent_of, Dec, Exact};
 use crate::expr::Expr;
 use crate::model::{
-    Budget, ChargeKind, CreditCap, CreditSource, Detail, Formula, FringeKind, FringePosting, RowId,
-    RowKind, TopsheetRow,
+    Budget, ChargeKind, CreditCap, CreditSource, Detail, FlatBasis, Formula, FringeKind,
+    FringePosting, RowId, RowKind, TopsheetRow,
 };
 use crate::report::{Report, RowTotals};
 use crate::Cents;
@@ -1619,7 +1619,13 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
     let mut since_adjustment: Cents = 0;
     let mut adj_rows: Vec<usize> = Vec::new();
     let mut sub_rows: Vec<usize> = Vec::new();
-    let mut quantities: Vec<Dec> = Vec::with_capacity(details.len());
+    let zero = Factors {
+        amount: Dec::ZERO,
+        x: Dec::ONE,
+        x4: Dec::ONE,
+        quantity: Dec::ZERO,
+    };
+    let mut factors: Vec<Factors> = Vec::with_capacity(details.len());
     let blank_at = || String::new();
 
     for (i, d) in details.iter().enumerate() {
@@ -1635,7 +1641,7 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
                     fringes: Vec::new(),
                     fringe_total: 0,
                 });
-                quantities.push(Dec::ZERO);
+                factors.push(zero);
                 continue;
             }
             RowKind::Separator => {
@@ -1648,7 +1654,7 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
                     fringes: Vec::new(),
                     fringe_total: 0,
                 });
-                quantities.push(Dec::ZERO);
+                factors.push(zero);
                 continue;
             }
             RowKind::Line | RowKind::Adjustment => {}
@@ -1837,7 +1843,12 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
         .with(notes)
         .with_link(link)
         .with_expand(Target::Line(d.id));
-        quantities.push(quantity);
+        factors.push(Factors {
+            amount,
+            x,
+            x4,
+            quantity,
+        });
         rows.push(RowCalc {
             kind: d.kind,
             included,
@@ -1849,7 +1860,7 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
         });
     }
 
-    fringes_calc(ctx, ci, ai, details, &mut rows, &quantities)?;
+    fringes_calc(ctx, ci, ai, details, &mut rows, &factors)?;
 
     let fringe_total = rows
         .iter()
@@ -1866,7 +1877,7 @@ fn fringes_calc(
     ai: usize,
     details: &[Detail],
     rows: &mut [RowCalc],
-    quantities: &[Dec],
+    factors: &[Factors],
 ) -> R<()> {
     let blank_at = || String::new();
     // Rates, once per fringe the lines carry.
@@ -2051,71 +2062,26 @@ fn fringes_calc(
     }
 
     // Flat fringes, per line.
-    let hours = |u: &str| ctx.b.units.get(u).and_then(|def| def.hours);
     for (i, d) in details.iter().enumerate() {
         if !earns[i] {
             continue;
         }
         for name in &d.fringes {
             let f = &ctx.b.fringes[name];
-            let FringeKind::Flat { unit } = &f.kind else {
+            let FringeKind::Flat { unit, .. } = &f.kind else {
                 continue;
             };
             let rate = rates[name.as_str()];
-            let q = quantities[i];
-            let mut notes = Vec::new();
-            let fh = unit.as_deref().and_then(hours);
-            let lh = hours(&d.unit);
-            let (amount, text) = match (fh, lh) {
-                (Some(fh), Some(lh)) if !fh.is_zero() => {
-                    // Rounded once from the exact amount, as the engine does.
-                    // The division need not end, so the working shows it
-                    // to 9 places.
-                    let product = Exact::dec(rate)
-                        .checked_mul(q)
-                        .and_then(|v| v.checked_mul(lh))
-                        .ok_or_else(ovf)?;
-                    let amount = product.div_to_cents(fh).ok_or_else(ovf)?;
-                    let exact = product.div_to_dec(fh).ok_or_else(ovf)?;
-                    let fu = unit.as_deref().unwrap_or_default();
-                    notes.push(Step::note(
-                        "Fringe",
-                        format!(
-                            "{} per {fu} x {} (quantity) x {} hours per {} / {} hours per {fu} = {}{}",
-                            dmoney(rate),
-                            num(q),
-                            num(lh),
-                            d.unit.trim(),
-                            num(fh),
-                            dmoney(exact),
-                            rate_words(name, rate)
-                        ),
-                    ));
-                    notes.extend(rounding(exact, amount));
-                    (amount, format!("flat, per {fu}"))
-                }
-                _ => {
-                    let amount = rate.to_cents().ok_or_else(ovf)?;
-                    let why = match unit.as_deref() {
-                        Some(u) if !u.trim().is_empty() => format!(
-                            "{} once on this line: it is per {u}, but {} hours to convert by",
-                            dmoney(rate),
-                            if fh.is_none() || fh.is_some_and(Dec::is_zero) {
-                                format!("{u} has no")
-                            } else {
-                                format!("the line's unit `{}` has no", d.unit.trim())
-                            }
-                        ),
-                        _ => format!("{} once on this line", dmoney(rate)),
-                    };
-                    notes.push(Step::note(
-                        "Fringe",
-                        format!("{why}{}", rate_words(name, rate)),
-                    ));
-                    notes.extend(rounding(rate, amount));
-                    (amount, "flat, once per line".to_string())
-                }
-            };
+            // Counted as the engine counts, rounded once from the exact
+            // amount; a division that need not end shows to 9 places.
+            let c = flat_count(&ctx.b.units, &f.kind, d, factors[i]).ok_or_else(ovf)?;
+            let amount = c.amount(rate).ok_or_else(ovf)?;
+            let exact = c.exact_amount(rate).ok_or_else(ovf)?;
+            let (mut notes, text) = flat_words(ctx.b, name, d, unit.as_deref(), &c, rate, exact)?;
+            if let Some(n) = notes.last_mut() {
+                n.text.push_str(&rate_words(name, rate));
+            }
+            notes.extend(rounding(exact, amount));
             let s = Step::value(name.as_str(), text, amount)
                 .with(notes)
                 .with_link(Link::Row { ci, ai, row: d.id })
@@ -2133,6 +2099,225 @@ fn fringes_calc(
         rows[i].fringes = map.into_iter().collect();
     }
     Ok(())
+}
+
+/// `1 hour`, `12 hours`.
+fn hours_words(h: Dec) -> String {
+    if h == Dec::ONE {
+        "1 hour".into()
+    } else {
+        format!("{} hours", num(h))
+    }
+}
+
+/// How a flat fringe's basis reads in the working.
+fn basis_words(b: FlatBasis) -> &'static str {
+    match b {
+        FlatBasis::Amount => "amount only",
+        FlatBasis::AmountCounts => "amount plus counts in X and 4X",
+        FlatBasis::Quantity => "full quantity",
+    }
+}
+
+/// The notes for flat fringe `name` on line `d` (its count `c`, `rate` per
+/// `unit`, `exact` before rounding) and its value step's text: how many
+/// units the line counts and why, then the fringe itself, e.g. "ZDAY
+/// 100.00 per Day x 25 Days (amount only; 14 Hours in X ignored) =
+/// 2,500.00".
+fn flat_words(
+    b: &Budget,
+    name: &str,
+    d: &Detail,
+    unit: Option<&str>,
+    c: &FlatCount,
+    rate: Dec,
+    exact: Exact,
+) -> R<(Vec<Step>, String)> {
+    let fu = unit.map(str::trim).filter(|u| !u.is_empty());
+    let fu_text = fu.unwrap_or("line");
+    let count = c.count().ok_or_else(ovf)?;
+    let lu = d.unit.trim();
+    let qty = |v: Dec, u: &str| format!("{}{}", num(v), unit_words(b, u, v));
+    let factor_words = |f: Factor, v: Dec| match f {
+        Factor::X => format!("{} in X", qty(v, &d.unit2)),
+        Factor::X4 => format!("{} in 4X", qty(v, &d.unit4)),
+    };
+    let old_quantity =
+        c.basis == FlatBasis::Quantity && !matches!(c.from, CountFrom::Capped { .. });
+    let mut paren: Vec<String> = Vec::new();
+    let mut clauses: Vec<String> = Vec::new();
+    // The count before X and 4X, and whether it is a "once".
+    let (start, once) = match &c.from {
+        CountFrom::PerLine => {
+            paren.push("once per line".into());
+            (Dec::ONE, true)
+        }
+        CountFrom::FringeNoHours(u) => {
+            paren.push(format!("{} has no hours: charged once", u.trim()));
+            (Dec::ONE, true)
+        }
+        CountFrom::LineNoHours(u) if u.trim().is_empty() => {
+            paren.push("the line has no unit: charged once".into());
+            (Dec::ONE, true)
+        }
+        CountFrom::LineNoHours(u) => {
+            paren.push(format!("{} has no hours: charged once", u.trim()));
+            (Dec::ONE, true)
+        }
+        CountFrom::SameUnit => {
+            paren.push(basis_words(c.basis).into());
+            if old_quantity && (!d.x.is_blank() || !d.x4.is_blank()) {
+                clauses.push(format!(
+                    "the line's quantity (amount x X x 4X) is {}",
+                    qty(c.base, lu)
+                ));
+            }
+            (c.base, false)
+        }
+        CountFrom::Hours {
+            line_hours,
+            fringe_hours,
+        } => {
+            paren.push(basis_words(c.basis).into());
+            let converted = Exact::dec(c.base)
+                .checked_mul(*line_hours)
+                .and_then(|e| e.div_to_dec(*fringe_hours))
+                .ok_or_else(ovf)?;
+            clauses.push(format!(
+                "{}{} x {} per {lu} / {} per {fu_text} = {}",
+                if old_quantity { "quantity " } else { "" },
+                qty(c.base, lu),
+                hours_words(*line_hours),
+                hours_words(*fringe_hours),
+                qty(converted, fu_text)
+            ));
+            (converted, false)
+        }
+        CountFrom::Capped {
+            line_hours,
+            fringe_hours,
+            day_unit,
+            day_hours,
+            per_day,
+            cap,
+            from_x,
+        } => {
+            paren.push(basis_words(c.basis).into());
+            let days = Exact::dec(c.base)
+                .checked_mul(*line_hours)
+                .and_then(|e| e.div_to_dec(*day_hours))
+                .ok_or_else(ovf)?;
+            let used = (*per_day).min(*cap);
+            let days_text = if lu == day_unit {
+                format!("{} days", num(days))
+            } else {
+                format!(
+                    "{} x {} per {lu} / {} per {day_unit} = {} days",
+                    qty(c.base, lu),
+                    hours_words(*line_hours),
+                    hours_words(*day_hours),
+                    num(days)
+                )
+            };
+            let per_day_text = if *from_x {
+                format!("{} a day from X", hours_words(*per_day))
+            } else {
+                format!("{} a day (one {day_unit})", hours_words(*per_day))
+            };
+            let cap_text = if *per_day > *cap {
+                paren.push(format!("capped at {} a day", hours_words(*cap)));
+                format!("capped at {} a day", hours_words(*cap))
+            } else {
+                format!("within the cap of {} a day", hours_words(*cap))
+            };
+            let hours = days.checked_mul(used).ok_or_else(ovf)?;
+            let converted = if *fringe_hours == Dec::ONE {
+                hours
+            } else {
+                Exact::dec(hours)
+                    .div_to_dec(*fringe_hours)
+                    .ok_or_else(ovf)?
+            };
+            let per_unit = if *fringe_hours == Dec::ONE {
+                String::new()
+            } else {
+                format!(" / {} per {fu_text}", hours_words(*fringe_hours))
+            };
+            clauses.push(format!(
+                "{days_text}; {per_day_text}, {cap_text}: {} days x {}{per_unit} = {}",
+                num(days),
+                hours_words(used),
+                qty(converted, fu_text)
+            ));
+            (converted, false)
+        }
+    };
+    if !c.counted.is_empty() {
+        if once {
+            paren.push(basis_words(c.basis).into());
+        }
+        let parts: Vec<String> = c
+            .counted
+            .iter()
+            .map(|&(f, v)| match f {
+                Factor::X => format!("{} (X)", qty(v, &d.unit2)),
+                Factor::X4 => format!("{} (4X)", qty(v, &d.unit4)),
+            })
+            .collect();
+        let from = if once {
+            "1 (once)".to_string()
+        } else {
+            qty(start, fu_text)
+        };
+        clauses.push(format!(
+            "{from} x {} = {}",
+            parts.join(" x "),
+            if once {
+                num(count)
+            } else {
+                qty(count, fu_text)
+            }
+        ));
+    }
+    if !c.ignored.is_empty() {
+        let parts: Vec<String> = c.ignored.iter().map(|&(f, v)| factor_words(f, v)).collect();
+        paren.push(format!("{} ignored", parts.join(" and ")));
+    }
+    let count_text = if once {
+        num(count)
+    } else {
+        qty(count, fu_text)
+    };
+    let mut notes = Vec::new();
+    if !clauses.is_empty() {
+        notes.push(Step::note("Count", clauses.join("; ")));
+    }
+    if let FringeKind::Flat {
+        cutoff: Some(cut), ..
+    } = &b.fringes[name].kind
+    {
+        notes.push(Step::note(
+            "Cutoff",
+            format!(
+                "{} is kept on {name} but not used: cutoffs apply to percent fringes only",
+                money(*cut)
+            ),
+        ));
+    }
+    notes.push(Step::note(
+        "Fringe",
+        format!(
+            "{name} {} per {fu_text} x {count_text} ({}) = {}",
+            dmoney(rate),
+            paren.join("; "),
+            dmoney(exact)
+        ),
+    ));
+    let text = match (&c.from, fu) {
+        (CountFrom::PerLine, _) | (_, None) => "flat, once per line".to_string(),
+        (_, Some(u)) => format!("flat, per {u}, {}", basis_words(c.basis)),
+    };
+    Ok((notes, text))
 }
 
 // ---------------------------------------------------------------------------

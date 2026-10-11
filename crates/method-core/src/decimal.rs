@@ -439,6 +439,42 @@ impl Exact {
         Some((self.neg != (d.0 < 0) && !mag.is_zero(), mag))
     }
 
+    /// `self / d` for an exact divisor (a product of decimals), rounded once
+    /// to cents, half away from zero. `None` when `d` is zero, its mantissa
+    /// is wider than 128 bits, or the result doesn't fit.
+    pub fn div_exact_to_cents(self, d: Exact) -> Option<Cents> {
+        let (neg, mag) = self.div_round_exact(d, 2)?;
+        signed_cents(neg, mag)
+    }
+
+    /// `self / d` for an exact divisor, rounded once to [`DEC_PLACES`], half
+    /// away from zero, for showing. `None` as for
+    /// [`Exact::div_exact_to_cents`].
+    pub fn div_exact_to_dec(self, d: Exact) -> Option<Dec> {
+        let (neg, mag) = self.div_round_exact(d, DEC_PLACES as u32)?;
+        let m = i128::try_from(mag.to_u128()?).ok()?;
+        Some(Dec(if neg { -m } else { m }))
+    }
+
+    /// The sign and magnitude of `self / d` rounded to `places`: the same
+    /// nested floors as [`Exact::div_round`], so dividing by `Exact::dec(x)`
+    /// gives exactly what dividing by `x` does.
+    fn div_round_exact(self, d: Exact, places: u32) -> Option<(bool, Wide)> {
+        let dm = d.mag.to_u128()?;
+        if dm == 0 {
+            return None;
+        }
+        // self / d = (mag / 10^self.places) / (dm / 10^d.places), so
+        // round(mag * 10^(d.places + places) / (10^self.places * dm)).
+        let n = self
+            .mag
+            .mul_pow10(d.places.checked_add(places)?)?
+            .mul_u64(2)?;
+        let twice = n.div_pow10(self.places).div_u128(dm);
+        let mag = twice.add(Wide::from_u128(1))?.div_u64(2).0;
+        Some((self.neg != d.neg && !mag.is_zero(), mag))
+    }
+
     /// Rounded to [`DEC_PLACES`], half away from zero, for showing. `None`
     /// when it doesn't fit.
     pub fn to_dec(self) -> Option<Dec> {
@@ -850,7 +886,50 @@ mod tests {
                 want,
                 "case {case}: {raws:?} / {div}"
             );
+            // An exact divisor gives the same: as a Dec, and at 18 places
+            // (the scale of a product of two decimals).
+            assert_eq!(
+                e.div_exact_to_cents(Exact::dec(divisor)),
+                want,
+                "case {case}"
+            );
+            if let Some(wide) = divisor.0.checked_mul(SCALE) {
+                assert_eq!(
+                    e.div_exact_to_cents(Exact::new(wide, 18)),
+                    want,
+                    "case {case}"
+                );
+            }
         }
+    }
+
+    #[test]
+    fn exact_divisors() {
+        let third = Exact::dec(Dec::ONE).div_exact_to_dec(Exact::dec(d("3")));
+        assert_eq!(third, Some(d("0.333333333")));
+        // 100 x 25 x 12 x 10 / (12 x 1): a capped count through two divisors.
+        let n = Exact::dec(d("100"))
+            .checked_mul(d("25"))
+            .and_then(|v| v.checked_mul(d("12")))
+            .and_then(|v| v.checked_mul(d("10")))
+            .unwrap();
+        let den = Exact::dec(d("12")).checked_mul(Dec::ONE).unwrap();
+        assert_eq!(n.div_exact_to_cents(den), Some(2_500_000));
+        // 10.01 / (1.5 x 2): 3.336666... rounds to 3.34; negatives mirror.
+        let den = Exact::dec(d("1.5")).checked_mul(d("2")).unwrap();
+        assert_eq!(Exact::dec(d("10.01")).div_exact_to_cents(den), Some(334));
+        assert_eq!(Exact::dec(d("-10.01")).div_exact_to_cents(den), Some(-334));
+        let neg = Exact::dec(d("-3"));
+        assert_eq!(Exact::dec(d("10.01")).div_exact_to_cents(neg), Some(-334));
+        assert_eq!(
+            Exact::cents(5).div_exact_to_cents(Exact::dec(Dec::ZERO)),
+            None
+        );
+        // A divisor past 128 bits is refused, not a panic.
+        let huge = Exact::dec(Dec(i128::MAX))
+            .checked_mul(Dec(i128::MAX))
+            .unwrap();
+        assert_eq!(Exact::cents(5).div_exact_to_cents(huge), None);
     }
 
     #[test]

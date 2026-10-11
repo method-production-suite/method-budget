@@ -394,7 +394,14 @@ item in the type-ahead (choosing it puts the name in). Lines always refer to ite
 name, so renaming an item keeps its code and nothing else changes.
 
 **Editing an item where it is listed.** The editor holds a fringe's kind, rate, cutoff
-(percent) or what it is charged per (flat), description and short code; a group's
+(percent) or, for a flat fringe, what it is charged per, its **Basis** ("Amount only
+(standard)", "Amount, plus counts in X and 4X" or "Full quantity": what a line counts,
+decisions.md entry 54) and, when it is charged per hour, **Max hours per day** (blank for
+no cap), then the description and short code. A flat fringe that keeps a cutoff (switched
+from percent, or from a file) says so in a quiet line under the rate: it is kept but not
+used, since cutoffs apply to percent fringes only, and comes back if the fringe turns
+percent again. The lists' rate text adds what a flat fringe counts beyond its unit ("1.00
+USD per Hour, plus counts in X and 4X, up to 12 hours a day"); a group's
 description, short code, "counts in total" switch and line color (No color or one of the eight colors; a color set some
 other way is kept unless another is picked); a set's description; a location's
 description, city, region and country; a currency's rate, symbol and description. Enter
@@ -645,7 +652,11 @@ The setup lists' counts, order and short codes, in `src/setup_lists.rs` (both wi
 `delete_unit` and `delete_currency` take `clearLines` (default false): blank the unit on
 the lines that name it, or put the currency's lines back in the base currency, before
 deleting, as one step. `set_fringe`'s `fringe` and `set_group`'s and `update_group`'s
-`group` take `short_code` (left out keeps the item's own; `""` clears it).
+`group` take `short_code` (left out keeps the item's own; `""` clears it). `set_fringe`'s
+`fringe` is `{kind, rate, description, cutoff, unit, basis, max_hours_per_day, short_code}`:
+`cutoff` is kept on a flat fringe too (never used there); `basis` is `amount` (blank),
+`amount_counts` or `quantity`, and `max_hours_per_day` a number above 0 or blank, both
+for flat fringes only (a percent fringe ignores them).
 
 The Presets tab and the right-click submenus (`ui/js/presets.js`) use these, in
 `src/presets.rs`; the main window and the tools window may both call them. Every one
@@ -703,8 +714,11 @@ and notes only explain. A line reads "Amount: SHOOT_DAYS + PREP_DAYS = 40 (PREP_
 SHOOT_DAYS = 30) Days", "Line: 120 x 450 = 54,000.00", the currency conversion and every
 rounding ("6,125.819 rounds half away from zero to 6,125.82"); a line left out says which
 group or filter left it out and what it would be. Each fringe on a line shows percent or
-flat (with the hours conversion), the cutoff and how much of it each line of a range used,
-and its largest-remainder share; a charge its base, each excluded account with the rule
+flat, the cutoff and how much of it each line of a range used, and its largest-remainder
+share; a flat fringe says what the line counts and why ("ZDAY 100.00 per Day x 25 Days
+(amount only; 14 Hours in X ignored) = 2,500.00", "x 1 (Allow has no hours: charged
+once)"), with a Count line for the hours conversion, the hours-a-day cap or the counts
+in X and 4X; a charge its base, each excluded account with the rule
 that caught it and the typed amounts; a credit each row's gross, excluded fringes, net,
 percent and caps, the overall cap, the discount and the one rounding. Where fringes post
 (the budget setting) is said wherever it decides what a total holds. "less" marks a step
@@ -1263,7 +1277,10 @@ Library tab is in each; the dialogs are Rust's and the page never names a path.
 currencies, charges, credits, tag presets and overtime patterns, whichever are ticked, as an
 Excel workbook (a sheet per kind) or CSV files (one per kind, named `<file> - Fringes.csv`
 and so on). Lists (a charge's excluded groups, a tag preset's fringes) are names joined with
-commas; an overtime pattern's bands read `2 @ 1.5; rest @ 2`. A charge's excluded amounts
+commas; an overtime pattern's bands read `2 @ 1.5; rest @ 2`; a flat fringe's Basis is the
+editor's label (reading also takes `amount`, `amount_counts`, `quantity` or `Full quantity`)
+and its Max Hours Per Day a number, and a cutoff a flat fringe keeps is written and read
+back as it is. A charge's excluded amounts
 belong to one budget's lines and stay out (the message says how many charges have them);
 line blocks, report presets and the budget settings are not lists.
 
@@ -1273,8 +1290,9 @@ file's) and a column per field, guessed from the titles (our own export maps its
 department sheet's `Fringe Name`, `Percentage`, `Wage Cap` and `Notes` come out right) and
 changeable. **Check and Review…** reads every chosen sheet and lists every problem with its
 sheet and row number (names missing or listed twice, numbers that aren't numbers, formulas
-that don't parse or name a global neither the sheet nor the budget has, a cutoff on a flat
-fringe, dates that aren't `YYYY-MM-DD`, links that aren't web links); nothing is imported
+that don't parse or name a global neither the sheet nor the budget has, a basis or max
+hours per day on a percent fringe, a basis it doesn't know, dates that aren't `YYYY-MM-DD`,
+links that aren't web links); nothing is imported
 while any is left. A clean read goes to Import Setup's review (keep, take or add under a
 new name; one undo step). To fill a pack from a spreadsheet, open the pack as a tab and
 import there.
@@ -1399,7 +1417,8 @@ still prints the topsheet straight away, with the standard layout.
 
 - **Sections, in print order**: topsheet, account level (each category's accounts with
   fringes and totals), detail level (each category starts a page), fringes (type, rate,
-  cutoff or unit, how many lines use it, what it adds up to), globals (formula, value, how
+  cutoff or unit with what a flat fringe counts beyond it, how many lines use it, what it
+  adds up to), globals (formula, value, how
   many lines use it), groups with totals (in the budget total or not, lines, lines total,
   fringes, total), notes list, budget information, chart of accounts (every category and
   account code with its name, account and row counts, production totals where they fall),
@@ -1506,7 +1525,8 @@ What the tables hold:
   last so positional importers keep their columns). An adjustment's rate is the amount it
   is a percentage of.
 - **Setup tables**: globals with their formulas and values; fringes with type, rate (as
-  typed and its value), cutoff or unit, lines and total; groups with their switch and
+  typed and its value), cutoff or unit, lines and total, then a flat fringe's basis and max
+  hours per day (added last); groups with their switch and
   totals (every tagged line, and what counts toward the budget); units with hours;
   currencies with their rate in the base currency; sets and locations with their totals.
 

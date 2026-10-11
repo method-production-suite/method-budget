@@ -360,9 +360,21 @@ fn fringes(b: &Budget, r: &Report) -> Sheet {
         .fringes
         .iter()
         .map(|(name, f)| {
-            let (kind, cutoff, unit) = match &f.kind {
-                FringeKind::Percent { cutoff } => ("Percent", *cutoff, None),
-                FringeKind::Flat { unit } => ("Flat", None, unit.as_deref()),
+            // A flat fringe's kept cutoff is never used, so it isn't shown.
+            let (kind, cutoff, unit, basis, max_hours) = match &f.kind {
+                FringeKind::Percent { cutoff } => ("Percent", *cutoff, None, "", None),
+                FringeKind::Flat {
+                    unit,
+                    basis,
+                    max_hours_per_day,
+                    ..
+                } => (
+                    "Flat",
+                    None,
+                    unit.as_deref(),
+                    basis.label(),
+                    *max_hours_per_day,
+                ),
             };
             let summary = r.fringes.get(name).cloned().unwrap_or_default();
             vec![
@@ -375,6 +387,8 @@ fn fringes(b: &Budget, r: &Report) -> Sheet {
                 Cell::text(unit.unwrap_or("")),
                 Cell::Int(u64::from(summary.uses)),
                 Cell::Money(summary.total),
+                Cell::text(basis),
+                max_hours.map_or(Cell::Empty, Cell::Number),
             ]
         })
         .collect();
@@ -390,6 +404,8 @@ fn fringes(b: &Budget, r: &Report) -> Sheet {
             "Unit",
             "Lines",
             "Total",
+            "Basis",
+            "Max Hours Per Day",
         ]),
         rows,
     }

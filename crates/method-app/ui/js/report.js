@@ -30,6 +30,7 @@ import { rowColor, fringePercent, chargeLabel } from './levels.js';
 import { setRules } from './sheet.js';
 import { orderedNames } from './order.js';
 import { invoke, connected } from './api.js';
+import { flatCountWords } from './util.js';
 
 // ---------------------------------------------------------------------------
 // The spec
@@ -1058,7 +1059,7 @@ function fringesSection(ctx) {
     const sum = sums[name] || null;
     const pct = f.kind !== 'flat';
     const rate = formula(f.rate);
-    const limit = pct ? (typeof f.cutoff === 'number' ? `Up to ${money(f.cutoff)}` : '') : f.unit ? `Per ${f.unit}` : 'Per line';
+    const limit = pct ? (typeof f.cutoff === 'number' ? `Up to ${money(f.cutoff)}` : '') : `${f.unit ? `Per ${f.unit}` : 'Per line'}${flatCountWords(f, ctx.b.units)}`;
     rows.push(row(el('tr', { class: 'rpt-row' }, td(name, 'name'), td(f.description || '', 'txt'), td(pct ? 'Percent' : 'Flat', 'txt'), td(rate.text ? (pct ? `${rate.text}%` : rate.text) : '', `num${rate.formula ? ' formula' : ''}`), td(limit, 'txt'), td(sum ? String(sum.uses) : '', 'num'), td(sum ? m(sum.total) : '', 'num'))));
     if (sum) total += sum.total;
   }

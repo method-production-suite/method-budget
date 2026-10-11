@@ -11,8 +11,8 @@ use std::str::FromStr;
 use method_core::rename::{rename, valid_name, SetupKind};
 use method_core::{
     Account, Budget, Category, Cents, Charge, ChargeKind, Credit, CreditCap, CreditRow,
-    CreditSource, Currency, Dec, Formula, Fringe, FringeKind, Group, Location, SetDef, TopsheetRow,
-    UnitDef,
+    CreditSource, Currency, Dec, FlatBasis, Formula, Fringe, FringeKind, Group, Location, SetDef,
+    TopsheetRow, UnitDef,
 };
 use method_format::serde_json::{json, Map, Value};
 
@@ -59,8 +59,9 @@ pub fn tools() -> Vec<Tool> {
             name: "add_setup",
             title: "Add a setup item",
             description: "Adds a fringe, group, set, location, unit or currency. fields by type: \
-                fringe {fringe_kind percent|flat, rate, cutoff (percent), unit (flat), \
-                description, short_code}; group {in_budget_total, description, short_code, \
+                fringe {fringe_kind percent|flat, rate, cutoff (percent), unit (flat), basis \
+                (flat), max_hours_per_day (flat), description, short_code}; group \
+                {in_budget_total, description, short_code, \
                 color}; set {description}; location {description, city, region, country}; unit \
                 {plural, description, hours}; currency {rate (base units per one of it), \
                 description, symbol}.",
@@ -432,8 +433,10 @@ fn setup_schema(update: bool) -> Value {
             ("short_code", s::nullable(s::name("fringe, group: short code shown in the grid."))),
             ("fringe_kind", s::one_of("fringe: percent (of each earner's pay) or flat (per line).", &["percent", "flat"])),
             ("rate", s::formula("fringe: percent (7.65) or flat amount, may use globals; currency: base units per one unit.")),
-            ("cutoff", s::nullable(money_schema("fringe (percent): pay per earner it stops at (168600.00), or null."))),
-            ("unit", s::nullable(s::name("fringe (flat): charge per this unit (scaled by hours), or null."))),
+            ("cutoff", s::nullable(money_schema("fringe (percent): pay per earner it stops at (168600.00), or null. A flat fringe keeps one it had but never uses it; only null is taken for a flat fringe."))),
+            ("unit", s::nullable(s::name("fringe (flat): charge per this unit (the line's Amount converted through unit hours; once per line when null or when either unit has no hours), or null."))),
+            ("basis", s::nullable(s::one_of("fringe (flat): what a line counts. amount (the standard): the Amount column only, X and 4X never count; amount_counts: also times X and 4X when their units aren't time units (a blank unit is a count); quantity: Amount x X x 4X. null is amount.", &["amount", "amount_counts", "quantity"]))),
+            ("max_hours_per_day", s::nullable(json!({"type": ["string", "number"], "description": "fringe (flat, charged per hour): most hours a day counted (12), or null for no cap. Days come from the line's Amount through the Day unit; hours a day are X when X is in hours, else the Day unit's hours.", "maxLength": 40}))),
             ("in_budget_total", s::boolean("group: whether its lines count (false suppresses them).")),
             ("color", s::nullable(s::name("group: text color #rrggbb, or null."))),
             ("city", s::text("location: city.")),
@@ -585,6 +588,8 @@ fn check_fields(kind: SetupKind, f: &Map<String, Value>) -> Result<(), ToolError
             "rate",
             "cutoff",
             "unit",
+            "basis",
+            "max_hours_per_day",
         ],
         SetupKind::Group => &["description", "short_code", "in_budget_total", "color"],
         SetupKind::Set => &["description"],
@@ -651,36 +656,75 @@ fn put_item(
                 .as_ref()
                 .is_none_or(|o| matches!(o.kind, FringeKind::Percent { .. }));
             let percent = want.map_or(was_percent, |k| k == "percent");
+            // The cutoff kept either way: a flat fringe keeps one it had
+            // (never used), so switching back to percent brings it back.
+            let old_cutoff = old.as_ref().and_then(|o| o.kind.cutoff());
             let fk = if percent {
-                if f.contains_key("unit") && f.get("unit").is_some_and(|v| !v.is_null()) {
-                    return Err(ToolError::invalid("a percent fringe has no unit"));
+                for k in ["unit", "basis", "max_hours_per_day"] {
+                    if f.get(k).is_some_and(|v| !v.is_null()) {
+                        return Err(ToolError::invalid(format!(
+                            "a percent fringe has no {}",
+                            k.replace('_', " ")
+                        )));
+                    }
                 }
                 let cutoff = match f.get("cutoff") {
                     Some(Value::Null) => None,
                     Some(v) => Some(cents(v, "cutoff")?),
-                    None => match old.as_ref().map(|o| &o.kind) {
-                        Some(FringeKind::Percent { cutoff }) => *cutoff,
-                        _ => None,
-                    },
+                    None => old_cutoff,
                 };
                 FringeKind::Percent { cutoff }
             } else {
-                if f.get("cutoff").is_some_and(|v| !v.is_null()) {
-                    return Err(ToolError::invalid("a flat fringe has no cutoff"));
-                }
-                let unit = match opt_text(f, "unit") {
-                    Some(u) => u,
-                    None => match old.as_ref().map(|o| &o.kind) {
-                        Some(FringeKind::Flat { unit }) => unit.clone(),
-                        _ => None,
-                    },
+                let cutoff =
+                    match f.get("cutoff") {
+                        None => old_cutoff,
+                        Some(Value::Null) => None,
+                        Some(_) => return Err(ToolError::invalid(
+                            "a flat fringe has no cutoff: cutoffs apply to percent fringes only",
+                        )),
+                    };
+                let (old_unit, old_basis, old_max) = match old.as_ref().map(|o| &o.kind) {
+                    Some(FringeKind::Flat {
+                        unit,
+                        basis,
+                        max_hours_per_day,
+                        ..
+                    }) => (unit.clone(), *basis, *max_hours_per_day),
+                    _ => (None, FlatBasis::Amount, None),
                 };
+                let unit = opt_text(f, "unit").unwrap_or(old_unit);
                 if let Some(u) = &unit {
                     if !b.units.contains_key(u) {
                         return Err(ToolError::not_found(format!("there is no unit {u}")));
                     }
                 }
-                FringeKind::Flat { unit }
+                let basis = match f.get("basis") {
+                    None => old_basis,
+                    Some(Value::Null) => FlatBasis::Amount,
+                    Some(v) => v.as_str().and_then(FlatBasis::parse).ok_or_else(|| {
+                        ToolError::invalid("basis: use amount, amount_counts or quantity")
+                    })?,
+                };
+                let max_hours_per_day = match f.get("max_hours_per_day") {
+                    None => old_max,
+                    Some(Value::Null) => None,
+                    Some(v) if formula_text(v).trim().is_empty() => None,
+                    Some(v) => {
+                        let h = dec(v, "max_hours_per_day")?;
+                        if h <= Dec::ZERO {
+                            return Err(ToolError::invalid(
+                                "max_hours_per_day must be more than 0",
+                            ));
+                        }
+                        Some(h)
+                    }
+                };
+                FringeKind::Flat {
+                    unit,
+                    basis,
+                    max_hours_per_day,
+                    cutoff,
+                }
             };
             let code = match opt_text(f, "short_code") {
                 Some(c) => short_code(b, kind, name, c)?,
@@ -1057,7 +1101,7 @@ fn delete_item(
                 }
             }
             for f in b.fringes.values_mut() {
-                if let FringeKind::Flat { unit } = &mut f.kind {
+                if let FringeKind::Flat { unit, .. } = &mut f.kind {
                     if unit.as_deref() == Some(name) {
                         *unit = None;
                     }

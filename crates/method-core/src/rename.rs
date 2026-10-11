@@ -241,7 +241,7 @@ pub fn references(b: &Budget, kind: SetupKind, name: &str) -> usize {
         SetupKind::Unit => {
             b.fringes
                 .values()
-                .filter(|f| matches!(&f.kind, FringeKind::Flat { unit } if has(unit)))
+                .filter(|f| matches!(&f.kind, FringeKind::Flat { unit, .. } if has(unit)))
                 .count()
                 + b.global_info.values().filter(|g| g.unit == name).count()
         }
@@ -296,7 +296,7 @@ fn setup_refs(s: &SetupItems, kind: SetupKind, name: &str) -> usize {
             usize::from(s.units.contains_key(name))
                 + s.fringes
                     .values()
-                    .filter(|f| matches!(&f.kind, FringeKind::Flat { unit } if unit.as_deref() == Some(name)))
+                    .filter(|f| matches!(&f.kind, FringeKind::Flat { unit, .. } if unit.as_deref() == Some(name)))
                     .count()
         }
         SetupKind::Set => usize::from(s.sets.contains_key(name)),
@@ -443,7 +443,7 @@ fn setup_rewrite(s: &mut SetupItems, kind: SetupKind, from: &str, to: &str) -> u
         SetupKind::Unit => {
             n += usize::from(rekey_hit(&mut s.units, from, to));
             for fr in s.fringes.values_mut() {
-                if let FringeKind::Flat { unit } = &mut fr.kind {
+                if let FringeKind::Flat { unit, .. } = &mut fr.kind {
                     n += usize::from(swap_opt(unit, from, to));
                 }
             }
@@ -546,7 +546,7 @@ fn rewrite(b: &mut Budget, kind: SetupKind, from: &str, to: &str) -> usize {
         SetupKind::Unit => {
             rekey(&mut b.units, from, to);
             for fr in b.fringes.values_mut() {
-                if let FringeKind::Flat { unit } = &mut fr.kind {
+                if let FringeKind::Flat { unit, .. } = &mut fr.kind {
                     count(swap_opt(unit, from, to));
                 }
             }
@@ -617,9 +617,7 @@ mod tests {
                 short_code: None,
                 description: String::new(),
                 rate: "12".into(),
-                kind: FringeKind::Flat {
-                    unit: Some("Day".into()),
-                },
+                kind: FringeKind::flat(Some("Day".into())),
             },
         );
         b.groups.insert(

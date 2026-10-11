@@ -40,7 +40,9 @@ the report (`credit`, `cap_variance`, `capped`) are the exact values rounded to 
 showing; the amount is rounded from the exact values, not from those. Explain shows the
 exact product in full (`0.5 x 0.009999999 = 0.0049999995`, rounding to `0.00`); for a flat
 fringe per unit, whose division need not end, it shows the quotient to 9 places. The
-hand-checked tutorial figures are unchanged.
+hand-checked tutorial figures are unchanged. (What a flat fringe counts changed in entry
+54: the Amount, not the quantity, and the count is an exact fraction rounded once with the
+fringe, the same rule.)
 
 ## 3. Fringe cutoffs are per earner (2026-10-08, revised)
 
@@ -82,7 +84,9 @@ the percentage, e.g. `0.1` for 10%.
 
 Units are a per-budget table with an optional hours equivalence. Our defaults are our own
 (Hour 1, Day 10, Week 50, Month 200, plus Allow and Flat) and fully editable. Flat fringes
-convert between time units through hours, using the line's primary unit only.
+convert between time units through hours, using the line's primary unit only. (Amended by
+entry 54: the Amount converts through the primary unit; X's and 4X's units tell a count
+from a time, for the bases that read them.)
 
 ## 9. Topsheet, charges and credits (2026-10-08)
 
@@ -1896,3 +1900,81 @@ category, `3100` stored as `31`, a chart refused outright):
   accounts or category fringe accounts read as one number.
 - **Not yet**: a typed new number still follows the pattern's parsing rules (a part too
   long is cut); the guessed shapes don't drop `.` placeholders (they come in unnamed).
+
+## 54. Flat fringes count the Amount, as the reference product does (2026-10-11)
+
+Checked in the reference product on 2026-10-11 (roadmap engine check 6), with units Day =
+12 hours, Week = 60, Hour = 1 and Allow with no hours, a 100.00 per Day fringe ZDAY and a
+1.00 per Hour fringe ZHR:
+
+| Line | ZDAY | ZHR |
+|---|---|---|
+| 25 Days | 2,500.00 | |
+| 25 Days x 3 in X (no unit) | 2,500.00 | |
+| 25 Days x 14 Hours (X with Unit2 Hour) | 2,500.00 | |
+| 25 Days x 14 Hours x 4X 2 (line 7,000.00) | 2,500.00 | 300.00 (25 x 12) |
+| 2 Weeks | 1,000.00 (10 days) | 120.00 |
+| 300 Hours | 2,500.00 (25 days) | 300.00 |
+| 2 Allow | 100.00 | 1.00 |
+
+So a flat fringe counts the **Amount column only**, converted from the line's unit into the
+fringe's unit through unit hours; X and 4X never count; and a line whose unit has no hours
+(or a fringe whose unit has none) is charged **once**, not times the Amount. We counted
+Amount x X x 4X before (entry 8). The blank cells were not read; the tests hold our rule's
+figures for them (300.00 each).
+
+- **Three bases, stored on the fringe** (`basis`, FORMAT.md): `amount`, the default and
+  what a missing `basis` means, is the checked rule. `amount_counts` also multiplies X when
+  Unit2 is not a time unit (a blank unit counts as a count) and 4X when Unit4 is not: 3
+  crew x 25 days counts 75 days, 14 Hours in X are ignored, 2 Episodes in 4X count. For
+  fringes that really are per person or per episode. `quantity` is the old rule, step for
+  step (Amount x X x 4X as the line shows it, converted through hours, 0 hours on the line's
+  unit counting 0), so a budget built on it can keep its figures. A time unit is one whose
+  hours are set and not 0; a unit with 0 hours counts as having none.
+- **The count is exact**: the product of the Amount, the line unit's hours and any counts
+  over the fringe unit's hours (and, with a cap, the Day's), rounded to cents once with the
+  rate, half away from zero (entry 2). With one divisor it is the same arithmetic as before,
+  so `quantity` is bit-identical to the old engine.
+- **Most hours a day** (`max_hours_per_day`, optional): for a fringe charged per hour (its
+  unit is 1 hour long, or named Hour), the count is days x min(hours a day, cap). Days are
+  the Amount converted to days through the budget's Day unit (named Day or Days, Day first,
+  with hours set and not 0). Hours a day are X when X is filled in and its unit is an hour
+  unit (the line reads "N Days x H Hours"), else the Day unit's hours. With a 12-hour Day:
+  25 Days at cap 12 counts 300 hours, at cap 10 250; 25 Days x 14 Hours at cap 12 counts
+  300, at cap 16 350 (below the cap X's hours all count); 2 Weeks at cap 10 is 10 days x 10
+  = 100; 300 Hours at cap 10 is 25 days x 10 = 250. X read as hours a day is never
+  multiplied again; under
+  `amount_counts` a counted 4X still multiplies, under `quantity` 4X does. Ignored for a
+  fringe not charged per hour, when either unit has no hours, and when there is no Day unit
+  with hours. Hour and Day are found by name as well as hours, so renaming the Day unit
+  changes where a cap applies.
+- **Cutoffs are for percent fringes only.** A flat fringe keeps a cutoff it has (switched
+  from percent, from a file or a spreadsheet) but never uses it; the editor says so in a
+  quiet line, Explain notes it, and switching back to percent brings it back. The command
+  line and the MCP tools clear one but refuse to set one; a setup spreadsheet's cutoff on a
+  flat fringe is kept, where it was refused before.
+- **Still per line**: fringe ranges only matter for percent cutoffs; a flat fringe is
+  charged on each line on its own.
+- **Explain says the rule and the count**: "ZDAY 100.00 per Day x 25 Days (amount only; 14
+  Hours in X ignored) = 2,500.00", "x 1 (Allow has no hours: charged once)", a Count note
+  with the conversion ("2 Weeks x 60 hours per Week / 12 hours per Day = 10 Days"), the cap
+  ("14 hours a day from X, capped at 12 hours a day: 25 days x 12 hours = 300 Hours") or the
+  counts ("25 Days x 3 (X) = 75 Days"). Engine, reference engine and Explain share one
+  count (`calc::fringes::flat_count`); the leaves still add up to every total.
+- **Everywhere a fringe is edited or shown**: the Budget Setup editor and the tools panel
+  (a Basis list: "Amount only (standard)", "Amount, plus counts in X and 4X", "Full
+  quantity"; a Max hours per day box for a fringe charged per hour, sent only while it
+  shows), the lists' rate text and the printed fringe list ("1.00 USD per Hour, plus counts
+  in X and 4X, up to 12 hours a day"), setup sheets (Basis and Max Hours Per Day columns,
+  reading the labels or the file's names), the budget export's Fringes sheet (two columns
+  added last), diff and merge (each field on its own, the kind's cutoff, unit, basis and cap
+  merged one by one), `method set fringe.NAME.basis` and `.max_hours_per_day` and the
+  same script commands, the MCP setup tools. Copies, packs, the library and import setup
+  carry the fields, and bring the Day unit along with a capped fringe.
+- **Figures that changed**: in the hand-checked sample (tests/common), the Key grip's 50.00
+  per Day fringe on 40 Days x 3 is 2,000.00, not 6,000.00, so the Production category is
+  70,149.01 (was 74,149.01), the grand total 282,134.14 (was 286,634.14, with contingency
+  and insurance on the smaller base) and the net 272,234.14 (was 276,734.14). The export
+  test plan's predictions are unchanged: none of its flat-fringed lines has X or 4X (Driver
+  ZFLAT on 3 Zweeks is still 15 Zdays, 375.00; Driver kit on 2 Zallow still 25.00 once).
+

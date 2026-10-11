@@ -25,7 +25,8 @@ use method_core::overtime::{OtBand, OtPattern};
 use method_core::pack::{self as core_pack, ItemSource};
 use method_core::{
     Budget, Cents, Charge, ChargeKind, Credit, CreditCap, CreditRow, CreditSource, Currency, Dec,
-    Formula, Fringe, FringeKind, GlobalInfo, Group, Location, SetDef, TagPreset, UnitDef,
+    FlatBasis, Formula, Fringe, FringeKind, GlobalInfo, Group, Location, SetDef, TagPreset,
+    UnitDef,
 };
 use serde::{Deserialize, Serialize};
 
@@ -88,7 +89,7 @@ const GLOBAL: [Column; 4] = [
     col("description", "Description", &["desc"]),
     col("unit", "Unit", &["units"]),
 ];
-const FRINGE: [Column; 7] = [
+const FRINGE: [Column; 9] = [
     col("name", "Name", &["fringe"]),
     col("description", "Description", &["desc"]),
     col("short_code", "Short Code", &["code", "short"]),
@@ -100,6 +101,12 @@ const FRINGE: [Column; 7] = [
     ),
     col("cutoff", "Cutoff", &["cap", "ceiling", "limit", "wagecap"]),
     col("unit", "Unit", &["per", "perunit"]),
+    col("basis", "Basis", &["counts", "counting", "countedon"]),
+    col(
+        "max_hours_per_day",
+        "Max Hours Per Day",
+        &["maxhours", "hourcap", "maxhoursaday", "dailyhourcap"],
+    ),
 ];
 const GROUP: [Column; 5] = [
     col("name", "Name", &["group"]),
@@ -243,6 +250,25 @@ fn list<'a>(names: impl IntoIterator<Item = &'a String>) -> Cell {
     Cell::text(names.into_iter().cloned().collect::<Vec<_>>().join(", "))
 }
 
+/// A flat fringe's basis as a sheet may write it: the application's labels
+/// (`Amount only (standard)`), the file's names (`amount_counts`) or short
+/// forms (`Full quantity`, `quantity`), ignoring case, spaces and marks.
+pub fn basis_named(text: &str) -> Option<FlatBasis> {
+    let key: String = text
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .collect::<String>()
+        .to_ascii_lowercase();
+    match key.as_str() {
+        "amount" | "amountonly" | "amountonlystandard" | "standard" => Some(FlatBasis::Amount),
+        "amountcounts" | "amountpluscounts" | "amountpluscountsinxand4x" | "counts" => {
+            Some(FlatBasis::AmountCounts)
+        }
+        "quantity" | "fullquantity" => Some(FlatBasis::Quantity),
+        _ => None,
+    }
+}
+
 fn opt(s: &Option<String>) -> Cell {
     Cell::text(s.clone().unwrap_or_default())
 }
@@ -300,14 +326,24 @@ pub fn sheet(b: &Budget, w: What) -> Sheet {
         What::Fringe => {
             for n in ordered(method_core::SetupKind::Fringe) {
                 let Some(f) = b.fringes.get(&n) else { continue };
-                let (kind, cutoff, unit) = match &f.kind {
-                    FringeKind::Percent { cutoff } => (
-                        "Percent",
-                        cutoff.map_or(Cell::Empty, Cell::Money),
-                        Cell::Empty,
+                let (kind, unit, basis, max_hours) = match &f.kind {
+                    FringeKind::Percent { .. } => {
+                        ("Percent", Cell::Empty, Cell::Empty, Cell::Empty)
+                    }
+                    FringeKind::Flat {
+                        unit,
+                        basis,
+                        max_hours_per_day,
+                        ..
+                    } => (
+                        "Flat",
+                        opt(unit),
+                        Cell::text(basis.label()),
+                        max_hours_per_day.map_or(Cell::Empty, Cell::Number),
                     ),
-                    FringeKind::Flat { unit } => ("Flat", Cell::Empty, opt(unit)),
                 };
+                // A flat fringe's cutoff is kept (never used), so it is written too.
+                let cutoff = f.kind.cutoff().map_or(Cell::Empty, Cell::Money);
                 push(
                     &n,
                     vec![
@@ -318,6 +354,8 @@ pub fn sheet(b: &Budget, w: What) -> Sheet {
                         Cell::text(f.rate.0.clone()),
                         cutoff,
                         unit,
+                        basis,
+                        max_hours,
                     ],
                 );
             }
@@ -857,18 +895,39 @@ pub fn read(
                     check_formula(&rate, &format!("fringe {name}'s rate"), at, &mut uses)?;
                     let cutoff = row.money("cutoff", "the cutoff")?;
                     let unit = row.opt("unit");
+                    let basis = row.opt("basis");
+                    let max_hours = row.number("max_hours_per_day", "the max hours per day")?;
                     let kind = match kind.as_str() {
                         "" | "percent" | "%" | "pct" | "percentage" => {
-                            if unit.is_some() {
-                                return Err(format!("fringe {name}: only a flat fringe has a unit"));
+                            for (set, what) in [
+                                (unit.is_some(), "a unit"),
+                                (basis.is_some(), "a basis"),
+                                (max_hours.is_some(), "max hours per day"),
+                            ] {
+                                if set {
+                                    return Err(format!("fringe {name}: only a flat fringe has {what}"));
+                                }
                             }
                             FringeKind::Percent { cutoff }
                         }
                         "flat" | "amount" | "fixed" => {
-                            if cutoff.is_some() {
-                                return Err(format!("fringe {name}: only a percent fringe has a cutoff"));
+                            let basis = match basis.as_deref() {
+                                None => FlatBasis::Amount,
+                                Some(text) => basis_named(text).ok_or_else(|| format!(
+                                    "fringe {name}: the basis should be Amount only, Amount plus counts or Full quantity, not \u{201c}{text}\u{201d}"
+                                ))?,
+                            };
+                            if max_hours.is_some_and(|h| h <= Dec::ZERO) {
+                                return Err(format!("fringe {name}: max hours per day should be more than 0"));
                             }
-                            FringeKind::Flat { unit }
+                            // A cutoff is kept as it is, but never used:
+                            // cutoffs apply to percent fringes only.
+                            FringeKind::Flat {
+                                unit,
+                                basis,
+                                max_hours_per_day: max_hours,
+                                cutoff,
+                            }
                         }
                         other => return Err(format!("fringe {name}: the kind should be Percent or Flat, not \u{201c}{other}\u{201d}")),
                     };
@@ -1169,8 +1228,34 @@ mod tests {
                 description: String::new(),
                 short_code: None,
                 rate: "WEEKS * 10".into(),
+                kind: FringeKind::flat(Some("Week".into())),
+            },
+        );
+        b.fringes.insert(
+            "PENHR".into(),
+            Fringe {
+                description: "Pension per hour".into(),
+                short_code: None,
+                rate: "1.25".into(),
                 kind: FringeKind::Flat {
-                    unit: Some("Week".into()),
+                    unit: Some("Hour".into()),
+                    basis: FlatBasis::AmountCounts,
+                    max_hours_per_day: Some("12.5".parse().unwrap()),
+                    cutoff: Some(5_000_000),
+                },
+            },
+        );
+        b.fringes.insert(
+            "OLD".into(),
+            Fringe {
+                description: String::new(),
+                short_code: None,
+                rate: "3".into(),
+                kind: FringeKind::Flat {
+                    unit: None,
+                    basis: FlatBasis::Quantity,
+                    max_hours_per_day: None,
+                    cutoff: None,
                 },
             },
         );
@@ -1379,7 +1464,7 @@ mod tests {
         assert_eq!(m.header_row, Some(0));
         let errs = read(&t, What::Fringe, &m, &BTreeSet::new(), &mut into);
         let rows: Vec<usize> = errs.iter().map(|e| e.row).collect();
-        assert_eq!(rows, [3, 4, 5, 6, 7, 8, 9, 11], "{errs:?}");
+        assert_eq!(rows, [3, 4, 5, 6, 8, 9, 11], "{errs:?}");
         assert!(errs[0].message.contains("no name"));
         assert!(
             errs[1].message.contains("listed twice (first on row 2)"),
@@ -1388,12 +1473,10 @@ mod tests {
         );
         assert!(errs[2].message.contains("isn't a formula"));
         assert!(errs[3].message.contains("NOPE"), "{}", errs[3].message);
-        assert!(errs[4]
-            .message
-            .contains("only a percent fringe has a cutoff"));
-        assert!(errs[5].message.contains("abc"), "{}", errs[5].message);
-        assert!(errs[6].message.contains("Percent or Flat"));
-        assert!(errs[7].message.contains("isn't a number"));
+        // A cutoff on a flat fringe is kept (and never used), not refused.
+        assert!(errs[4].message.contains("abc"), "{}", errs[4].message);
+        assert!(errs[5].message.contains("Percent or Flat"));
+        assert!(errs[6].message.contains("isn't a number"));
         // A global the budget has is fine.
         let mut into = empty_source("x", "USD");
         let t = csv_table("Name,Rate\nX,NOPE * 2\n");
@@ -1434,6 +1517,73 @@ mod tests {
             &mut empty_source("x", "USD"),
         );
         assert_eq!(errs.len(), 1);
+    }
+
+    #[test]
+    fn flat_fringe_basis_and_max_hours_columns() {
+        let t = csv_table(
+            "Name,Kind,Rate,Unit,Basis,Max Hours Per Day,Cutoff\n\
+             STD,Flat,100,Day,,,\n\
+             LABEL,Flat,100,Day,\"Amount, plus counts in X and 4X\",,\n\
+             FULL,Flat,1,Hour,Full quantity,12,\n\
+             CUT,Flat,1,Hour,amount_counts,10.5,1000\n\
+             BADB,Flat,1,Hour,sometimes,,\n\
+             ZERO,Flat,1,Hour,,0,\n\
+             PCTB,Percent,7,,Full quantity,,\n\
+             PCTH,Percent,7,,,12,\n",
+        );
+        let mut into = empty_source("x", "USD");
+        let errs = read(
+            &t,
+            What::Fringe,
+            &guess(&t, What::Fringe),
+            &BTreeSet::new(),
+            &mut into,
+        );
+        let rows: Vec<usize> = errs.iter().map(|e| e.row).collect();
+        assert_eq!(rows, [6, 7, 8, 9], "{errs:?}");
+        assert!(errs[0].message.contains("the basis should be"), "{errs:?}");
+        assert!(errs[1].message.contains("more than 0"), "{errs:?}");
+        assert!(
+            errs[2].message.contains("only a flat fringe has a basis"),
+            "{errs:?}"
+        );
+        assert!(
+            errs[3].message.contains("only a flat fringe has max hours"),
+            "{errs:?}"
+        );
+        let kind = |n: &str| into.fringes[n].kind.clone();
+        assert_eq!(kind("STD"), FringeKind::flat(Some("Day".into())));
+        assert!(matches!(
+            kind("LABEL"),
+            FringeKind::Flat {
+                basis: FlatBasis::AmountCounts,
+                ..
+            }
+        ));
+        assert_eq!(
+            kind("FULL"),
+            FringeKind::Flat {
+                unit: Some("Hour".into()),
+                basis: FlatBasis::Quantity,
+                max_hours_per_day: Some(Dec::from_int(12)),
+                cutoff: None,
+            }
+        );
+        assert_eq!(
+            kind("CUT"),
+            FringeKind::Flat {
+                unit: Some("Hour".into()),
+                basis: FlatBasis::AmountCounts,
+                max_hours_per_day: Some("10.5".parse().unwrap()),
+                cutoff: Some(100_000),
+            }
+        );
+        // Every label the application shows reads back as its basis.
+        for b in FlatBasis::ALL {
+            assert_eq!(basis_named(b.label()), Some(b));
+            assert_eq!(basis_named(b.name()), Some(b));
+        }
     }
 
     #[test]

@@ -232,10 +232,87 @@ pub enum FringeKind {
     /// `rate`% of the earner's subtotal, capped at `cutoff` when set. The earner
     /// is a single line, or a whole fringe range (see [`Detail::fringe_range`]).
     Percent { cutoff: Option<Cents> },
-    /// `rate` once per line. When `unit` and the line's primary unit both have
-    /// hours, it's charged per unit instead, scaled by the hours ratio and
-    /// multiplied by the line's quantity (amount x X x 4X).
-    Flat { unit: Option<String> },
+    /// `rate` per unit, per line (never per range). How many units a line
+    /// counts is set by `basis` (decisions.md, entry 54): by default the
+    /// line's Amount converted into `unit` through unit hours, X and 4X left
+    /// out. With no `unit`, or when it or the line's unit has no hours, the
+    /// line counts once.
+    Flat {
+        unit: Option<String>,
+        basis: FlatBasis,
+        /// Most hours a day counted, for a fringe charged per hour; `None`
+        /// for no cap. Ignored for other units.
+        max_hours_per_day: Option<Dec>,
+        /// Kept as stored but never used: cutoffs apply to percent fringes
+        /// only.
+        cutoff: Option<Cents>,
+    },
+}
+
+impl FringeKind {
+    /// A flat fringe charged per `unit` (once per line when `None`), counted
+    /// the standard way, with no hours cap and no stored cutoff.
+    pub fn flat(unit: Option<String>) -> FringeKind {
+        FringeKind::Flat {
+            unit,
+            basis: FlatBasis::Amount,
+            max_hours_per_day: None,
+            cutoff: None,
+        }
+    }
+
+    /// The stored cutoff, of either kind (only a percent fringe's counts).
+    pub fn cutoff(&self) -> Option<Cents> {
+        match self {
+            FringeKind::Percent { cutoff } | FringeKind::Flat { cutoff, .. } => *cutoff,
+        }
+    }
+}
+
+/// What a flat fringe counts on a line (decisions.md, entry 54).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum FlatBasis {
+    /// The Amount column only, converted from the line's unit into the
+    /// fringe's unit through unit hours; X and 4X never count. The standard.
+    #[default]
+    Amount,
+    /// As `Amount`, then times X when X's unit is not a time unit (a blank
+    /// unit is a count), and times 4X when 4X's unit is not.
+    AmountCounts,
+    /// The line's whole quantity (Amount x X x 4X), converted through unit
+    /// hours: how flat fringes counted before entry 54.
+    Quantity,
+}
+
+impl FlatBasis {
+    pub const ALL: [FlatBasis; 3] = [
+        FlatBasis::Amount,
+        FlatBasis::AmountCounts,
+        FlatBasis::Quantity,
+    ];
+
+    /// The name files and commands use: `amount`, `amount_counts`, `quantity`.
+    pub fn name(self) -> &'static str {
+        match self {
+            FlatBasis::Amount => "amount",
+            FlatBasis::AmountCounts => "amount_counts",
+            FlatBasis::Quantity => "quantity",
+        }
+    }
+
+    /// The basis named `name` (as [`FlatBasis::name`] writes it).
+    pub fn parse(name: &str) -> Option<FlatBasis> {
+        FlatBasis::ALL.into_iter().find(|b| b.name() == name.trim())
+    }
+
+    /// How the application labels it.
+    pub fn label(self) -> &'static str {
+        match self {
+            FlatBasis::Amount => "Amount only (standard)",
+            FlatBasis::AmountCounts => "Amount, plus counts in X and 4X",
+            FlatBasis::Quantity => "Full quantity",
+        }
+    }
 }
 
 /// Where fringe dollars show up. They never show on the line itself.
@@ -507,7 +584,8 @@ pub struct Detail {
     pub kind: RowKind,
     pub description: String,
     pub amount: Formula,
-    /// Primary unit name. The only unit used for flat-fringe hour conversion.
+    /// Primary unit name. Flat fringes convert the Amount from it through
+    /// unit hours.
     pub unit: String,
     pub x: Formula,
     pub unit2: String,

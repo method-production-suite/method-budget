@@ -135,15 +135,10 @@ fn gen_budget(rng: &mut Rng) -> Budget {
         ),
     );
     b.fringes
-        .insert("FLAT".into(), fringe("25", FringeKind::Flat { unit: None }));
+        .insert("FLAT".into(), fringe("25", FringeKind::flat(None)));
     b.fringes.insert(
         "DAILY".into(),
-        fringe(
-            "12.5",
-            FringeKind::Flat {
-                unit: Some("Day".into()),
-            },
-        ),
+        fringe("12.5", FringeKind::flat(Some("Day".into()))),
     );
     b.fringe_posting = match rng.below(4) {
         0 => FringePosting::Budget,

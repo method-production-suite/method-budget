@@ -8,7 +8,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use method_core::{
-    Budget, Cents, Currency, Detail, Formula, Fringe, FringeKind, Group, Location, SetDef, UnitDef,
+    Budget, Cents, Currency, Detail, FlatBasis, Formula, Fringe, FringeKind, Group, Location,
+    SetDef, UnitDef,
 };
 
 /// A result whose error is a sentence for the user.
@@ -119,8 +120,19 @@ impl Setup {
         }
         for f in s.fringes.values() {
             globals.extend(global_names(&f.rate.0));
-            if let FringeKind::Flat { unit: Some(u) } = &f.kind {
-                units.insert(u.clone());
+            if let FringeKind::Flat {
+                unit,
+                max_hours_per_day,
+                ..
+            } = &f.kind
+            {
+                units.extend(unit.iter().cloned());
+                // Most hours a day count days by the Day unit.
+                if max_hours_per_day.is_some() {
+                    if let Some((day, _)) = method_core::calc::day_unit(&b.units) {
+                        units.insert(day.to_string());
+                    }
+                }
             }
         }
         for u in units {
@@ -254,8 +266,26 @@ pub fn describe_fringe(f: &Fringe) -> String {
     let how = match &f.kind {
         FringeKind::Percent { cutoff: None } => format!("{rate}% with no cutoff"),
         FringeKind::Percent { cutoff: Some(c) } => format!("{rate}% up to {}", money(*c)),
-        FringeKind::Flat { unit: None } => format!("{rate} flat per line"),
-        FringeKind::Flat { unit: Some(u) } => format!("{rate} flat per {u}"),
+        FringeKind::Flat {
+            unit,
+            basis,
+            max_hours_per_day,
+            cutoff,
+        } => {
+            let mut how = format!("{rate} flat per {}", unit.as_deref().unwrap_or("line"));
+            match basis {
+                FlatBasis::Amount => {}
+                FlatBasis::AmountCounts => how.push_str(", counting counts in X and 4X too"),
+                FlatBasis::Quantity => how.push_str(", counting the full quantity"),
+            }
+            if let Some(h) = max_hours_per_day {
+                how.push_str(&format!(", up to {h} hours a day"));
+            }
+            if let Some(c) = cutoff {
+                how.push_str(&format!(", cutoff {} kept but not used", money(*c)));
+            }
+            how
+        }
     };
     words(&[how.as_str(), f.description.as_str()], "")
 }
@@ -391,7 +421,7 @@ pub fn write(b: &mut Budget, s: &Setup, kind: Kind, from: &str, to: &str, r: &Re
             if let Some(f) = s.fringes.get(from) {
                 let mut f = f.clone();
                 f.rate.0 = rename_globals(&f.rate.0, &r.globals);
-                if let FringeKind::Flat { unit: Some(u) } = &mut f.kind {
+                if let FringeKind::Flat { unit: Some(u), .. } = &mut f.kind {
                     *u = renamed(&r.units, u);
                 }
                 b.fringes.insert(to, f);

@@ -92,9 +92,7 @@ pub fn sample() -> Budget {
             short_code: None,
             description: String::new(),
             rate: "50".into(),
-            kind: FringeKind::Flat {
-                unit: Some("Day".into()),
-            },
+            kind: FringeKind::flat(Some("Day".into())),
         },
     );
     b.groups.insert("OptionA".into(), group(true));

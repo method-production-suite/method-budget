@@ -358,6 +358,58 @@ fn set_changes_one_value() {
     assert_eq!(read(&p), now);
 }
 
+/// A flat fringe's basis and most hours a day from the command line
+/// (decisions.md, entry 54).
+#[test]
+fn set_a_flat_fringes_basis_and_max_hours() {
+    let d = Dir::new("set-flat");
+    let p = d.starter("a.mthd");
+    let text = read(&p).replacen(
+        "\"fringes\": {",
+        "\"fringes\": { \"MEALS\": { \"kind\": \"flat\", \"rate\": \"25\", \"unit\": \"Day\" },",
+        1,
+    );
+    std::fs::write(&p, text).unwrap();
+    let o = method(&["set", &p, "fringe.MEALS.basis", "amount_counts"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(
+        out(&o).contains("basis amount -> amount_counts"),
+        "{}",
+        out(&o)
+    );
+    assert!(read(&p).contains("\"basis\": \"amount_counts\""));
+    let o = method(&["set", &p, "fringe.MEALS.max_hours_per_day", "12"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(read(&p).contains("\"max_hours_per_day\": \"12\""));
+    let o = method(&["set", &p, "fringe.MEALS.max_hours_per_day", "none"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(!read(&p).contains("max_hours_per_day"));
+    let o = method(&["set", &p, "fringe.MEALS.basis", "amount"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(!read(&p).contains("\"basis\""), "the default is left out");
+
+    let now = read(&p);
+    let o = method(&["set", &p, "fringe.PAYROLL.basis", "quantity"]);
+    assert_eq!(code(&o), 3);
+    assert!(
+        err(&o).contains("only a flat fringe has a basis"),
+        "{}",
+        err(&o)
+    );
+    let o = method(&["set", &p, "fringe.MEALS.cutoff", "100"]);
+    assert_eq!(code(&o), 3);
+    assert!(
+        err(&o).contains("cutoffs apply to percent fringes only"),
+        "{}",
+        err(&o)
+    );
+    assert_eq!(
+        code(&method(&["set", &p, "fringe.MEALS.basis", "hours"])),
+        3
+    );
+    assert_eq!(read(&p), now);
+}
+
 #[test]
 fn apply_runs_a_script_all_or_nothing() {
     let d = Dir::new("apply");

@@ -482,3 +482,101 @@ fn charge_label_switches_round_trip_and_are_left_out_when_off() {
     let bad = text.replacen("\"label_percent\": true", "\"label_percent\": \"yes\"", 1);
     assert!(method_format::from_str(&bad).is_err());
 }
+
+/// A flat fringe's basis, most hours a day and kept cutoff: written after
+/// its unit, in that order, each left out at its default; a file without
+/// them reads as the standard basis (the Amount only), no cap, no cutoff.
+#[test]
+fn flat_fringe_basis_max_hours_and_kept_cutoff() {
+    let mut b = Budget::new("Flat", "USD");
+    b.fringes.insert(
+        "PEN".into(),
+        Fringe {
+            description: String::new(),
+            short_code: None,
+            rate: "1.25".into(),
+            kind: FringeKind::Flat {
+                unit: Some("Hour".into()),
+                basis: FlatBasis::AmountCounts,
+                max_hours_per_day: Some("12.5".parse().unwrap()),
+                cutoff: Some(5_000_000),
+            },
+        },
+    );
+    b.fringes.insert(
+        "STD".into(),
+        Fringe {
+            description: String::new(),
+            short_code: None,
+            rate: "100".into(),
+            kind: FringeKind::flat(Some("Day".into())),
+        },
+    );
+    let text = round_trip(&b);
+    assert!(
+        text.contains(
+            "\"PEN\": {\n        \"kind\": \"flat\",\n        \"rate\": \"1.25\",\n        \"unit\": \"Hour\",\n        \"basis\": \"amount_counts\",\n        \"max_hours_per_day\": \"12.5\",\n        \"cutoff\": 5000000\n      }"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.contains("\"STD\": {\n        \"kind\": \"flat\",\n        \"rate\": \"100\",\n        \"unit\": \"Day\"\n      }"),
+        "the defaults are left out: {text}"
+    );
+    for basis in FlatBasis::ALL {
+        if let FringeKind::Flat { basis: slot, .. } = &mut b.fringes.get_mut("PEN").unwrap().kind {
+            *slot = basis;
+        }
+        let text = round_trip(&b);
+        assert_eq!(
+            text.contains(&format!("\"basis\": \"{}\"", basis.name())),
+            basis != FlatBasis::Amount,
+            "{text}"
+        );
+    }
+    // Written by hand: "amount" is accepted and means the default.
+    let typed = text.replace("\"basis\": \"amount_counts\"", "\"basis\": \"amount\"");
+    assert_ne!(typed, text);
+    let read = method_format::from_str(&typed).unwrap();
+    assert!(matches!(
+        read.fringes["PEN"].kind,
+        FringeKind::Flat {
+            basis: FlatBasis::Amount,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn flat_fringe_fields_are_checked() {
+    let b = Budget::new("Flat", "USD");
+    let base = method_format::to_string(&b);
+    let with = |fringe: &str| {
+        base.replacen(
+            "\"base_currency\": \"USD\"",
+            &format!("\"base_currency\": \"USD\",\n    \"fringes\": {{ \"F\": {fringe} }}"),
+            1,
+        )
+    };
+    let ok = with(
+        r#"{"kind": "flat", "rate": "1", "unit": "Hour", "basis": "quantity", "max_hours_per_day": "10", "cutoff": 100}"#,
+    );
+    let read = method_format::from_str(&ok).unwrap();
+    assert_eq!(
+        read.fringes["F"].kind,
+        FringeKind::Flat {
+            unit: Some("Hour".into()),
+            basis: FlatBasis::Quantity,
+            max_hours_per_day: Some(Dec::from_int(10)),
+            cutoff: Some(100),
+        }
+    );
+    for bad in [
+        r#"{"kind": "flat", "rate": "1", "basis": "hours"}"#,
+        r#"{"kind": "flat", "rate": "1", "max_hours_per_day": 10}"#,
+        r#"{"kind": "percent", "rate": "1", "basis": "amount"}"#,
+        r#"{"kind": "percent", "rate": "1", "max_hours_per_day": "10"}"#,
+    ] {
+        assert!(method_format::from_str(&with(bad)).is_err(), "{bad}");
+    }
+}

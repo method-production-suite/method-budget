@@ -338,6 +338,97 @@ mod tests {
         }
     }
 
+    /// One random edit to how flat fringes count: a fringe's basis, cap or
+    /// unit, a unit's hours, or a line's X, 4X and their units.
+    fn flat_edit(rng: &mut Rng, b: &mut Budget) {
+        use crate::model::{FlatBasis, FringeKind};
+        let n = details_mut(b).len() as u64;
+        let k = rng.below(n) as usize;
+        let flats: Vec<String> = b
+            .fringes
+            .iter()
+            .filter(|(_, f)| matches!(f.kind, FringeKind::Flat { .. }))
+            .map(|(n, _)| n.clone())
+            .collect();
+        let pick = flats.get(rng.below(flats.len() as u64) as usize).cloned();
+        let flat = pick.and_then(|n| b.fringes.get_mut(&n));
+        match (rng.below(6), flat) {
+            (0, Some(f)) => {
+                if let FringeKind::Flat { basis, .. } = &mut f.kind {
+                    *basis = FlatBasis::ALL[rng.below(3) as usize];
+                }
+            }
+            (1, Some(f)) => {
+                if let FringeKind::Flat {
+                    max_hours_per_day, ..
+                } = &mut f.kind
+                {
+                    *max_hours_per_day =
+                        (rng.below(3) > 0).then(|| crate::Dec::from_int(rng.below(16) as i64 + 1));
+                }
+            }
+            (2, Some(f)) => {
+                if let FringeKind::Flat { unit, .. } = &mut f.kind {
+                    *unit = ["Hour", "Day", "Week", "Episode"]
+                        .get(rng.below(5) as usize)
+                        .map(|u| u.to_string());
+                }
+            }
+            (3, _) => {
+                if let Some(u) = b.units.get_mut("Day") {
+                    u.hours = Some(crate::Dec::from_int(rng.below(14) as i64));
+                }
+            }
+            (4, _) => {
+                let d = &mut details_mut(b)[k];
+                d.x = format!("{}", rng.below(16)).into();
+                d.unit2 = ["", "Hour", "Episode", "Week"][rng.below(4) as usize].into();
+            }
+            _ => {
+                let d = &mut details_mut(b)[k];
+                d.x4 = format!("{}", rng.below(4) + 1).into();
+                d.unit4 = ["", "Episode", "Day"][rng.below(3) as usize].into();
+            }
+        }
+    }
+
+    /// With flat fringes counted every way (each basis, caps, hours a day
+    /// from X, counts in X and 4X), the cache gives exactly what the full
+    /// recalc and the frozen reference engine give, edit after edit.
+    #[test]
+    fn cached_recalc_equals_reference_with_every_flat_basis() {
+        for seed in 1..=4u64 {
+            let mut b = sample::budget(&SampleSpec {
+                seed,
+                rows: 300,
+                accounts: 10,
+                categories: 3,
+                fringes: 15,
+                groups: 4,
+                baseline: false,
+            });
+            sample::flat_bases(&mut b, seed);
+            if seed % 2 == 0 {
+                sample::fine_decimals(&mut b, seed);
+            }
+            let opts = RecalcOptions::default();
+            let mut cache = RecalcCache::new();
+            let mut rng = Rng(seed * 6_247 + 11);
+            for step in 0..60 {
+                if step > 0 {
+                    if step % 3 == 0 {
+                        edit(&mut rng, &mut b);
+                    } else {
+                        flat_edit(&mut rng, &mut b);
+                    }
+                }
+                let want = super::super::reference::recalc(&b, &opts);
+                assert_eq!(cache.recalc(&b, &opts), want, "seed {seed} step {step}");
+                assert_eq!(recalc(&b, &opts), want, "seed {seed} step {step}");
+            }
+        }
+    }
+
     #[test]
     fn unchanged_accounts_are_not_evaluated_again() {
         let mut b = sample::budget(&SampleSpec {

@@ -31,11 +31,11 @@ use std::fmt::Write as _;
 use crate::coding::AccountCoding;
 use crate::model::{
     Account, Baseline, Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource, Currency,
-    Detail, Fringe, FringeKind, FringePosting, GlobalInfo, Group, InfoValue, Location,
+    Detail, FlatBasis, Fringe, FringeKind, FringePosting, GlobalInfo, Group, InfoValue, Location,
     NewLineDefaults, Note, RowId, RowKind, SetDef, TopsheetRow, UnitDef, Version,
 };
 use crate::report::Report;
-use crate::{recalc, Cents, RecalcOptions};
+use crate::{recalc, Cents, Dec, RecalcOptions};
 
 // ---------------------------------------------------------------------------
 // What a diff is
@@ -646,15 +646,39 @@ pub(crate) fn row_name(d: &Detail) -> String {
     }
 }
 
+/// A flat fringe's basis as the diff says it.
+pub(crate) fn basis_text(b: FlatBasis) -> String {
+    match b {
+        FlatBasis::Amount => "amount only",
+        FlatBasis::AmountCounts => "amount plus counts in X and 4X",
+        FlatBasis::Quantity => "full quantity",
+    }
+    .into()
+}
+
+/// Most hours a day, or none.
+pub(crate) fn max_hours_text(h: &Option<Dec>) -> String {
+    h.map_or("none".into(), |h| h.to_string())
+}
+
 pub(crate) fn fringe_fields(f: &Fringe) -> Vec<Field> {
-    let (kind, cutoff, unit) = match &f.kind {
-        FringeKind::Percent { cutoff } => (
-            "percent",
-            cutoff.map_or("none".into(), money),
-            "none".to_string(),
+    let none = || "none".to_string();
+    let (kind, unit, basis, max_hours) = match &f.kind {
+        FringeKind::Percent { .. } => ("percent", none(), none(), none()),
+        FringeKind::Flat {
+            unit,
+            basis,
+            max_hours_per_day,
+            ..
+        } => (
+            "flat",
+            opt_text(unit),
+            basis_text(*basis),
+            max_hours_text(max_hours_per_day),
         ),
-        FringeKind::Flat { unit } => ("flat", "none".to_string(), opt_text(unit)),
     };
+    // A flat fringe's cutoff is kept but never used; it still shows here.
+    let cutoff = f.kind.cutoff().map_or_else(none, money);
     vec![
         text("description", "description", quoted(&f.description)),
         text("short_code", "short code", opt_text(&f.short_code)),
@@ -662,6 +686,8 @@ pub(crate) fn fringe_fields(f: &Fringe) -> Vec<Field> {
         text("rate", "rate", formula_text(&f.rate.0, false)),
         text("cutoff", "cutoff", cutoff),
         text("unit", "flat unit", unit),
+        text("basis", "basis", basis),
+        text("max_hours_per_day", "max hours a day", max_hours),
     ]
 }
 
@@ -2314,7 +2340,7 @@ fn money_lines(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{starter, Dec};
+    use crate::starter;
 
     fn first_line(b: &mut Budget) -> &mut Detail {
         b.categories_mut()

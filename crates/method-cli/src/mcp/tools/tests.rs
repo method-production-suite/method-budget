@@ -609,6 +609,87 @@ fn globals_and_setup_tables() {
         (json!("6.2"), Value::Null)
     );
     f.tool("update_setup", json!({"path": "film.mthd", "type": "fringe", "name": "FICA", "fields": {"fringe_kind": "flat", "unit": "Day"}})).unwrap();
+    // How a flat fringe counts: its basis and most hours a day.
+    f.tool("add_setup", json!({"path": "film.mthd", "type": "fringe", "name": "PENHR", "fields": {"fringe_kind": "flat", "rate": "1.5", "unit": "Hour", "basis": "amount_counts", "max_hours_per_day": "12"}})).unwrap();
+    let pen = |f: &mut Fixture| {
+        f.tool("list_setup", json!({"path": "film.mthd", "type": "fringe"}))
+            .unwrap()["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|x| x["name"] == "PENHR")
+            .unwrap()
+            .clone()
+    };
+    let p = pen(&mut f);
+    assert_eq!(
+        (
+            p["basis"].clone(),
+            p["max_hours_per_day"].clone(),
+            p["unit"].clone()
+        ),
+        (json!("amount_counts"), json!("12"), json!("Hour"))
+    );
+    // Other fields leave them alone; null puts each back to its default.
+    f.tool(
+        "update_setup",
+        json!({"path": "film.mthd", "type": "fringe", "name": "PENHR", "fields": {"rate": 2}}),
+    )
+    .unwrap();
+    assert_eq!(pen(&mut f)["basis"], json!("amount_counts"));
+    f.tool("update_setup", json!({"path": "film.mthd", "type": "fringe", "name": "PENHR", "fields": {"basis": null, "max_hours_per_day": null}})).unwrap();
+    let p = pen(&mut f);
+    assert_eq!(
+        (p["basis"].clone(), p["max_hours_per_day"].clone()),
+        (json!("amount"), Value::Null)
+    );
+    let fields =
+        |v: Value| json!({"path": "film.mthd", "type": "fringe", "name": "PENHR", "fields": v});
+    err_contains(
+        f.tool("update_setup", fields(json!({"basis": "hours"}))),
+        "must be one of",
+    );
+    err_contains(
+        f.tool("update_setup", fields(json!({"max_hours_per_day": 0}))),
+        "more than 0",
+    );
+    err_contains(
+        f.tool("update_setup", fields(json!({"cutoff": "100"}))),
+        "cutoffs apply to percent fringes only",
+    );
+    err_contains(
+        f.tool(
+            "update_setup",
+            fields(json!({"fringe_kind": "percent", "basis": "quantity"})),
+        ),
+        "a percent fringe has no basis",
+    );
+    // A percent fringe's cutoff is kept when it turns flat, and back.
+    f.tool("add_setup", json!({"path": "film.mthd", "type": "fringe", "name": "CAPPED", "fields": {"rate": "5", "cutoff": "1000"}})).unwrap();
+    f.tool("update_setup", json!({"path": "film.mthd", "type": "fringe", "name": "CAPPED", "fields": {"fringe_kind": "flat"}})).unwrap();
+    let list = f
+        .tool("list_setup", json!({"path": "film.mthd", "type": "fringe"}))
+        .unwrap();
+    let capped = list["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["name"] == "CAPPED")
+        .unwrap()
+        .clone();
+    assert_eq!(capped["unused_cutoff_cents"], json!(100_000));
+    f.tool("update_setup", json!({"path": "film.mthd", "type": "fringe", "name": "CAPPED", "fields": {"fringe_kind": "percent"}})).unwrap();
+    let list = f
+        .tool("list_setup", json!({"path": "film.mthd", "type": "fringe"}))
+        .unwrap();
+    let capped = list["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["name"] == "CAPPED")
+        .unwrap()
+        .clone();
+    assert_eq!(capped["cutoff_cents"], json!(100_000));
     err_contains(
         f.tool(
             "add_setup",

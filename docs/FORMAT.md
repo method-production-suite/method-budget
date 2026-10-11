@@ -237,7 +237,27 @@ A tagged object:
 | `kind`    | Fields | Meaning |
 |-----------|--------|---------|
 | `percent` | `description` text; `short_code` optional text; `rate` formula, **required**; `cutoff` optional cents | `rate` percent of each earner's pay (`"7.65"` is 7.65%), up to `cutoff` of pay when set. |
-| `flat`    | `description` text; `short_code` optional text; `rate` formula, **required**; `unit` optional text | `rate` (in base currency) once per line, or per unit when `unit` and the line's unit both have hours. |
+| `flat`    | `description` text; `short_code` optional text; `rate` formula, **required**; `unit` optional text; `basis` text; `max_hours_per_day` optional decimal; `cutoff` optional cents | `rate` (in base currency) per `unit`, per line: times the number of `unit`s the line counts, as `basis` says (below). With no `unit`, or when it or the line's unit has no hours, once per line. |
+
+Fields of a flat fringe, in written order after `rate`:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `unit` | optional text | The unit it is charged per. Not set: once per line. |
+| `basis` | `"amount"`, `"amount_counts"` or `"quantity"` | What a line counts. Left out when `"amount"`, which is also what a missing `basis` means. `"amount"`: the line's Amount only, converted from the line's unit into `unit` through unit hours (Amount x line unit hours / fringe unit hours; the Amount itself when the line is in `unit`); X and 4X never count. `"amount_counts"`: the same, then times X when X's unit (`unit2`) is not a time unit (a blank unit counts as a count), and times 4X when `unit4` is not. `"quantity"`: Amount x X x 4X converted through hours (how flat fringes counted before this field, kept for budgets built that way). A unit "has hours" when its `hours` are set and not 0 (under `"quantity"` without a cap, 0 hours on the line's unit count 0, as before). |
+| `max_hours_per_day` | optional decimal | Most hours a day counted, for a fringe charged per hour (its unit is 1 hour long, or named Hour). Not set: no cap. The line's days are its Amount converted to days through the budget's Day unit (named Day or Days, with hours); its hours a day are X when X is filled in and its unit is an hour unit ("25 Days x 14 Hours"), else the Day unit's hours; the count is days x the smaller of hours a day and the cap. Ignored for other units, when either unit has no hours, or when there is no Day unit with hours. |
+| `cutoff` | optional cents | Kept, never used: cutoffs apply to percent fringes only. A fringe switched from percent to flat keeps its cutoff here, so it comes back if the fringe is switched back. |
+
+A flat fringe is always charged per line, never per [fringe range](#detail-row); its dollars
+are rounded to cents once per line, half away from zero, from the exact count (see
+`docs/decisions.md`, entries 2 and 54).
+
+```json
+"fringes": {
+  "MEALS": { "kind": "flat", "rate": "25", "unit": "Day" },
+  "PENSION_HR": { "kind": "flat", "rate": "1.25", "unit": "Hour", "basis": "amount_counts", "max_hours_per_day": "12" }
+}
+```
 
 `short_code` (both kinds, and groups) is a short label such as `"FICA"` that the
 application shows in the grid's fringes column instead of the name. Display only: lines
@@ -300,13 +320,13 @@ Fields in written order:
 | `kind`         | `"line"`, `"subtotal"`, `"adjustment"` or `"separator"` | Default `"line"`. |
 | `description`  | text, **required** | Always written, even when empty. |
 | `amount`       | formula | Blank counts as 0. On an adjustment row, the percentage as a fraction (`"0.1"` is 10%). |
-| `unit`         | text | Primary unit name. |
+| `unit`         | text | Primary unit name. Flat fringes convert the Amount from it through unit hours. |
 | `x`            | formula | Multiplier. Blank counts as 1. |
-| `unit2`        | text | Unit shown next to X. |
+| `unit2`        | text | Unit shown next to X. Flat fringes read it to tell a count from a time (see [fringe](#fringe)). |
 | `rate`         | formula | Blank counts as 0. |
 | `unit3`        | text | Unit shown next to the rate. |
 | `x4`           | formula | Fourth factor. Blank counts as 1. |
-| `unit4`        | text | Unit shown next to the fourth factor. |
+| `unit4`        | text | Unit shown next to the fourth factor. Read by flat fringes as `unit2` is. |
 | `currency`     | optional text | Currency code; not set means the base currency. |
 | `fringe_range` | optional integer 0 to 4294967295 | Consecutive lines with the same number share percent-fringe cutoffs as one earner. |
 | `fringes`      | name set | Fringes applied to this line. |
@@ -1061,6 +1081,12 @@ valid. Loading and saving it in Method Budget normalizes it.
   `"setup_pack"` and provenance `pack` (a pack's details), budget
   [`setup_sources`](#setup-sources) (where setup items came from), and setup folders for
   `ot_pattern`. Each is left out when empty, so files that don't use them are unchanged.
+- Version 1, additive (2026-10): flat fringe `basis`, `max_hours_per_day` and `cutoff`
+  (kept, never used). Each is left out at its default, so files that don't use them are
+  unchanged. The engine's count changed with them (decisions.md, entry 54): a flat
+  fringe without a `basis` now counts the Amount only, where it counted Amount x X x 4X
+  before, so a flat fringe on a line with X or 4X filled in totals differently; give it
+  `"basis": "quantity"` to keep the old figure.
 
 ## Complete example
 

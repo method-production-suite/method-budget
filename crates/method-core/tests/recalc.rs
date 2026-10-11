@@ -51,9 +51,11 @@ fn sample_fringes() {
     // 76,500 FICA split 54:2 between them.
     assert_eq!(rows[0].fringes["FICA"], 73_768);
     assert_eq!(rows[1].fringes["FICA"], 2_732);
-    // $50 per day x 120 person-days.
-    assert_eq!(rows[0].fringes["PH"], 600_000);
-    assert_eq!(r.categories[1].fringe_total, 676_500);
+    // $50 per day x 40 days: a flat fringe counts the Amount only, so the
+    // 3 in X doesn't multiply it (decisions.md 54; it was 120 person-days,
+    // 6,000.00, before).
+    assert_eq!(rows[0].fringes["PH"], 200_000);
+    assert_eq!(r.categories[1].fringe_total, 276_500);
 
     assert_eq!(
         r.fringes["FICA"],
@@ -66,7 +68,7 @@ fn sample_fringes() {
         r.fringes["PH"],
         FringeSummary {
             uses: 1,
-            total: 600_000
+            total: 200_000
         }
     );
 }
@@ -81,13 +83,13 @@ fn sample_topsheet() {
         Some(("10-99".into(), 76_500))
     );
     assert_eq!(r.categories[0].total, 15_076_500);
-    assert_eq!(r.categories[1].total, 7_414_901);
+    assert_eq!(r.categories[1].total, 7_014_901);
     assert_eq!(r.categories[2].total, 3_000_000);
 
     assert_eq!(r.levels.len(), 3);
     assert_eq!(r.total_atl, 15_076_500);
-    assert_eq!(r.total_btl, 10_414_901);
-    assert_eq!(r.atl_btl, 25_491_401);
+    assert_eq!(r.total_btl, 10_014_901);
+    assert_eq!(r.atl_btl, 25_091_401);
 
     let c: Vec<_> = r
         .charges
@@ -97,19 +99,19 @@ fn sample_topsheet() {
     assert_eq!(
         c,
         [
-            ("Contingency", 2_549_140),
-            // (25,491,401 - 15,076,500 writer and fringes - 100,000 deposit) x 2.5%
-            ("Insurance", 257_873),
+            ("Contingency", 2_509_140),
+            // (25,091,401 - 15,076,500 writer and fringes - 100,000 deposit) x 2.5%
+            ("Insurance", 247_873),
             // 500,000 CAD cents x 0.73
             ("Bond fee", 365_000),
         ]
     );
-    assert_eq!(r.grand_total, 28_663_414);
+    assert_eq!(r.grand_total, 28_213_414);
 
     // (3,000,000 x 30% + min(250,000, 200,000)) less 10% discount.
     assert_eq!(r.credits[0].amount, 990_000);
     assert_eq!(r.credits_total, 990_000);
-    assert_eq!(r.net_total, 27_673_414);
+    assert_eq!(r.net_total, 27_223_414);
 }
 
 #[test]
@@ -129,7 +131,7 @@ fn sample_breakdowns() {
         sel.lines,
         Breakdown {
             details_total: 5_600_000,
-            fringe_total: 676_500
+            fringe_total: 276_500
         }
     );
     assert_eq!(sel.fringes["FICA"], 76_500);
@@ -143,7 +145,7 @@ fn budget_posting_keeps_fringes_out_of_levels() {
     assert_eq!(r.categories[0].fringe_account, None);
     assert_eq!(r.total_atl, 15_000_000);
     assert_eq!(r.total_btl, 9_738_401);
-    assert_eq!(r.budget_fringes, 753_000);
+    assert_eq!(r.budget_fringes, 353_000);
     let charges: i64 = r.charges.iter().map(|c| c.amount).sum();
     assert_eq!(r.grand_total, r.atl_btl + r.budget_fringes + charges);
 }
@@ -172,7 +174,8 @@ fn changing_a_global_recalculates_dependents() {
     // 35 / 3 rounds to 11.666666667 at 9 places, so 3 x 46.666666667 = 140.000000001.
     assert_eq!(grip.quantity, d("140.000000001"));
     assert_eq!(grip.total, 6_300_000);
-    assert_eq!(grip.fringes["PH"], 700_000);
+    // 50 per day x the Amount, 46.666666667 days: 2,333.33333335.
+    assert_eq!(grip.fringes["PH"], 233_333);
 }
 
 #[test]

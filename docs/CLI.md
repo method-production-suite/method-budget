@@ -144,7 +144,9 @@ Changes one value and saves. Paths:
 | `compact_versions` | `true` or `false`: save versions as deltas (docs/FORMAT.md, "Version deltas"). |
 | `global.NAME` | A formula. Adds the global when it's new. |
 | `fringe.NAME.rate` | A formula. |
-| `fringe.NAME.cutoff` | An amount (`168,600.00`), or `none`. Percent fringes only. |
+| `fringe.NAME.cutoff` | An amount (`168,600.00`), or `none`. Percent fringes only (`none` also clears a cutoff a flat fringe kept, which it never uses). |
+| `fringe.NAME.basis` | What a flat fringe counts on a line: `amount` (the standard: the Amount only, converted through unit hours), `amount_counts` (also X and 4X when their units aren't time units) or `quantity` (Amount x X x 4X). Flat fringes only (decisions.md, entry 54). |
+| `fringe.NAME.max_hours_per_day` | Most hours a day a flat fringe charged per hour counts (`12`), or `none`. |
 | `line.ROW.FIELD` | See `set line` below for rows and fields. |
 | `charge.NAME.applied` | `true` or `false`. |
 
@@ -362,6 +364,8 @@ set global SHOOT_DAYS 32
 set global WEEKS "SHOOT_DAYS / 5"
 set fringe FICA rate 7.65
 set fringe FICA cutoff 168,600.00
+set fringe MEALS basis amount_counts
+set fringe PENSION_HR max_hours_per_day 12
 set line 21-01:2 rate 900
 set line #17 description "Director of photography"
 set line 21-01:* location "Stage 4"
@@ -378,7 +382,9 @@ remove charge Insurance
 | `set compact_versions true\|false` | Save versions as deltas. |
 | `set global NAME FORMULA` | Sets a global's formula, adding the global when it's new. |
 | `set fringe NAME rate FORMULA` | A fringe's rate. |
-| `set fringe NAME cutoff AMOUNT\|none` | A percent fringe's cutoff per earner; whole cents only. |
+| `set fringe NAME cutoff AMOUNT\|none` | A percent fringe's cutoff per earner; whole cents only. A flat fringe has none to set (`none` clears one it kept). |
+| `set fringe NAME basis amount\|amount_counts\|quantity` | What a flat fringe counts on a line (see `fringe.NAME.basis` above). |
+| `set fringe NAME max_hours_per_day HOURS\|none` | A flat fringe's most hours a day (above 0), for one charged per hour. |
 | `set line ROW FIELD VALUE` | A field of one or more rows. |
 | `add tag ROW fringe\|group NAME` | Puts a fringe or group on rows. The fringe or group must exist. |
 | `remove tag ROW fringe\|group NAME` | Takes it off. |

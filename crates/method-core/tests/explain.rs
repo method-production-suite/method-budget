@@ -128,6 +128,33 @@ fn every_total_adds_up_on_rounding_edges() {
     check_all(&b, &RecalcOptions::default());
 }
 
+/// Flat fringes counted every way (each basis, caps, X and 4X in every kind
+/// of unit): every explanation adds up to the reported total.
+#[test]
+fn every_total_adds_up_with_every_flat_basis() {
+    for seed in 1..=4 {
+        let spec = SampleSpec {
+            seed,
+            categories: 4,
+            accounts: 12,
+            rows: 300,
+            fringes: 15,
+            groups: 4,
+            baseline: false,
+        };
+        let mut base = sample::budget(&spec);
+        sample::flat_bases(&mut base, seed);
+        if seed % 2 == 0 {
+            sample::fine_decimals(&mut base, seed);
+        }
+        for posting in postings() {
+            let mut b = base.clone();
+            b.fringe_posting = posting;
+            check_all(&b, &RecalcOptions::default());
+        }
+    }
+}
+
 /// 0.5 x 0.009999999 is 0.0049999995: shown in full, and rounded once to 0.00.
 #[test]
 fn an_edge_line_shows_its_exact_product_and_one_rounding() {
@@ -188,7 +215,7 @@ fn a_line_shows_globals_quantity_and_rounding() {
     // The line's fringes are pointed to, not added in.
     let f = find(&e.root, "Fringes").unwrap();
     assert_eq!(f.role, Role::Note);
-    assert_eq!(f.amount, Some(673_768));
+    assert_eq!(f.amount, Some(273_768));
     assert_eq!(f.expand, Some(Target::LineFringes(2)));
     assert!(matches!(
         e.root.link,
@@ -256,10 +283,11 @@ fn a_range_shares_its_cutoff_by_largest_remainder() {
         &Target::LineFringe(2, "PH".into()),
     )
     .unwrap();
+    // A flat fringe counts the Amount only: the 3 in X doesn't multiply it.
+    assert_eq!(ph.reported, 200_000);
     assert!(
-        all_text(&ph.root).contains(
-            "50.00 per Day x 120 (quantity) x 10 hours per Day / 10 hours per Day = 6,000.00"
-        ),
+        all_text(&ph.root)
+            .contains("PH 50.00 per Day x 40 Days (amount only; 3 in X ignored) = 2,000.00"),
         "{}",
         all_text(&ph.root)
     );
@@ -293,7 +321,7 @@ fn charges_list_their_exclusions_and_credits_their_caps() {
     let b = sample();
     let opts = RecalcOptions::default();
     let ins = explain(&b, &opts, &Target::Charge(1)).unwrap();
-    assert_eq!(ins.reported, 257_873);
+    assert_eq!(ins.reported, 247_873);
     let ex = find(&ins.root, "Excluded").unwrap();
     assert_eq!(ex.amount, Some(15_176_500));
     assert_eq!(ex.children.len(), 2, "the deposit and account 1100");
@@ -301,7 +329,7 @@ fn charges_list_their_exclusions_and_credits_their_caps() {
     assert!(text.contains("left out by account 1100"), "{text}");
     assert!(text.contains("Deposit"), "{text}");
     assert!(
-        text.contains("2.5% of (254,914.01 - 151,765.00) = 2,578.72525"),
+        text.contains("2.5% of (250,914.01 - 151,765.00) = 2,478.72525"),
         "{text}"
     );
     let bond = explain(&b, &opts, &Target::Charge(2)).unwrap();
@@ -321,7 +349,7 @@ fn charges_list_their_exclusions_and_credits_their_caps() {
     );
 
     let net = explain(&b, &opts, &Target::NetTotal).unwrap();
-    assert_eq!(net.reported, 27_673_414);
+    assert_eq!(net.reported, 27_223_414);
     let less = find(&net.root, "Less credits").unwrap();
     assert!(less.minus);
 }
@@ -346,7 +374,7 @@ fn posting_mode_decides_where_fringes_count() {
     let e = explain(&b, &opts, &acct).unwrap();
     let f = find(&e.root, "Fringes").unwrap();
     assert_eq!(f.role, Role::Sum);
-    assert_eq!(f.amount, Some(676_500));
+    assert_eq!(f.amount, Some(276_500));
 }
 
 #[test]

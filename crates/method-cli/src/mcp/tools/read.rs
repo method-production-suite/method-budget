@@ -731,19 +731,38 @@ fn list_setup(ctx: &mut Ctx, a: &Args) -> ToolResult {
     match kind {
         SetupKind::Fringe => {
             for (name, f) in &b.fringes {
-                let (fk, cutoff, unit) = match &f.kind {
-                    FringeKind::Percent { cutoff } => ("percent", *cutoff, None),
-                    FringeKind::Flat { unit } => ("flat", None, unit.clone()),
-                };
                 let total = report
                     .as_ref()
                     .and_then(|r| r.fringes.get(name))
                     .map(|s| s.total);
-                items.push(json!({
+                let mut item = json!({
                     "name": name, "description": f.description, "short_code": f.short_code,
-                    "fringe_kind": fk, "rate": f.rate.0, "cutoff_cents": cutoff, "unit": unit,
+                    "rate": f.rate.0,
                     "lines": used(name).lines, "other_uses": used(name).other, "total_cents": total,
-                }));
+                });
+                match &f.kind {
+                    FringeKind::Percent { cutoff } => {
+                        item["fringe_kind"] = json!("percent");
+                        item["cutoff_cents"] = json!(cutoff);
+                    }
+                    FringeKind::Flat {
+                        unit,
+                        basis,
+                        max_hours_per_day,
+                        cutoff,
+                    } => {
+                        item["fringe_kind"] = json!("flat");
+                        item["unit"] = json!(unit);
+                        item["basis"] = json!(basis.name());
+                        item["max_hours_per_day"] = json!(max_hours_per_day.map(|h| h.to_string()));
+                        // Kept from before, never used: cutoffs apply to
+                        // percent fringes only.
+                        if let Some(c) = cutoff {
+                            item["unused_cutoff_cents"] = json!(c);
+                        }
+                    }
+                }
+                items.push(item);
             }
         }
         SetupKind::Group => {
