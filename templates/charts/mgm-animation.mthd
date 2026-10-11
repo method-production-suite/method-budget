@@ -5,8 +5,8 @@
     "title": "MGM ANIMATION",
     "base_currency": "USD",
     "account_coding": {
-      "category_width": 3,
-      "account_width": 1,
+      "category_width": 2,
+      "account_width": 2,
       "sub_width": 0,
       "set_width": 0,
       "separator": ""
@@ -38,7 +38,7 @@
     "topsheet": [
       {
         "kind": "category",
-        "code": "110",
+        "code": "1100",
         "name": "STORY AND RIGHTS",
         "accounts": [
           {
@@ -81,7 +81,7 @@
       },
       {
         "kind": "category",
-        "code": "120",
+        "code": "1200",
         "name": "PRODUCER'S UNIT",
         "accounts": [
           {
@@ -120,7 +120,7 @@
       },
       {
         "kind": "category",
-        "code": "130",
+        "code": "1300",
         "name": "DIRECTION",
         "accounts": [
           {
@@ -159,7 +159,7 @@
       },
       {
         "kind": "category",
-        "code": "140",
+        "code": "1400",
         "name": "CAST",
         "accounts": [
           {
@@ -214,7 +214,7 @@
       },
       {
         "kind": "category",
-        "code": "150",
+        "code": "1500",
         "name": "ATL TRAVEL/LIVING EXPENSE",
         "accounts": [
           {
@@ -269,7 +269,7 @@
       },
       {
         "kind": "category",
-        "code": "440",
+        "code": "4400",
         "name": "PHOTOGRAPHIC EFX & INSERTS",
         "accounts": [
           {
@@ -312,7 +312,7 @@
       },
       {
         "kind": "category",
-        "code": "450",
+        "code": "4500",
         "name": "EDITORIAL & PROJECTION",
         "accounts": [
           {
@@ -407,7 +407,7 @@
       },
       {
         "kind": "category",
-        "code": "460",
+        "code": "4600",
         "name": "MUSIC",
         "accounts": [
           {
@@ -478,7 +478,7 @@
       },
       {
         "kind": "category",
-        "code": "470",
+        "code": "4700",
         "name": "POST PRODUCTION SOUND",
         "accounts": [
           {
@@ -545,7 +545,7 @@
       },
       {
         "kind": "category",
-        "code": "480",
+        "code": "4800",
         "name": "FILM & LAB - POST PRODUCTION",
         "accounts": [
           {
@@ -604,7 +604,7 @@
       },
       {
         "kind": "category",
-        "code": "490",
+        "code": "4900",
         "name": "TITLES",
         "accounts": [
           {
@@ -639,7 +639,7 @@
       },
       {
         "kind": "category",
-        "code": "500",
+        "code": "5000",
         "name": "VIDEO POST PRODUCTION",
         "accounts": [
           {
@@ -686,7 +686,7 @@
       },
       {
         "kind": "category",
-        "code": "510",
+        "code": "5100",
         "name": "STOCK FOOTAGE",
         "accounts": [
           {
@@ -729,7 +729,7 @@
       },
       {
         "kind": "category",
-        "code": "530",
+        "code": "5300",
         "name": "ANIMATION PRODUCTION STAFF",
         "accounts": [
           {
@@ -772,7 +772,7 @@
       },
       {
         "kind": "category",
-        "code": "535",
+        "code": "5350",
         "name": "PRE PRODUCTION STORYBOARD/TIMING",
         "accounts": [
           {
@@ -827,7 +827,7 @@
       },
       {
         "kind": "category",
-        "code": "540",
+        "code": "5400",
         "name": "CONCEPTUAL ART",
         "accounts": [
           {
@@ -898,7 +898,7 @@
       },
       {
         "kind": "category",
-        "code": "550",
+        "code": "5500",
         "name": "CHARACTER / MODEL DESIGN",
         "accounts": [
           {
@@ -929,7 +929,7 @@
       },
       {
         "kind": "category",
-        "code": "555",
+        "code": "5550",
         "name": "ART DIRECTION",
         "accounts": [
           {
@@ -964,7 +964,7 @@
       },
       {
         "kind": "category",
-        "code": "560",
+        "code": "5600",
         "name": "LAYOUTS",
         "accounts": [
           {
@@ -995,7 +995,7 @@
       },
       {
         "kind": "category",
-        "code": "570",
+        "code": "5700",
         "name": "BACKGROUNDS",
         "accounts": [
           {
@@ -1022,7 +1022,7 @@
       },
       {
         "kind": "category",
-        "code": "575",
+        "code": "5750",
         "name": "PRODUCTION BACKGROUNDS",
         "accounts": [
           {
@@ -1049,7 +1049,7 @@
       },
       {
         "kind": "category",
-        "code": "580",
+        "code": "5800",
         "name": "CHARACTER ANIMATION",
         "accounts": [
           {
@@ -1076,7 +1076,7 @@
       },
       {
         "kind": "category",
-        "code": "585",
+        "code": "5850",
         "name": "CLEANUP",
         "accounts": [
           {
@@ -1103,7 +1103,7 @@
       },
       {
         "kind": "category",
-        "code": "590",
+        "code": "5900",
         "name": "EFFECTS + COMPUTER ANIMATION",
         "accounts": [
           {
@@ -1142,7 +1142,7 @@
       },
       {
         "kind": "category",
-        "code": "595",
+        "code": "5950",
         "name": "PRE-PROD COMPUTER COLOR",
         "accounts": [
           {
@@ -1177,7 +1177,7 @@
       },
       {
         "kind": "category",
-        "code": "600",
+        "code": "6000",
         "name": "LIVE ACTION REFERENCE",
         "accounts": [
           {
@@ -1196,7 +1196,7 @@
       },
       {
         "kind": "category",
-        "code": "605",
+        "code": "6050",
         "name": "XEROX / INK / PAINT",
         "accounts": [
           {
@@ -1235,7 +1235,7 @@
       },
       {
         "kind": "category",
-        "code": "610",
+        "code": "6100",
         "name": "ANIMATION CAMERA",
         "accounts": [
           {
@@ -1278,7 +1278,7 @@
       },
       {
         "kind": "category",
-        "code": "615",
+        "code": "6150",
         "name": "ANIMATION CHECKING",
         "accounts": [
           {
@@ -1317,7 +1317,7 @@
       },
       {
         "kind": "category",
-        "code": "620",
+        "code": "6200",
         "name": "OVERSEAS PRODUCTION SUPERVISOR",
         "accounts": [
           {
@@ -1364,7 +1364,7 @@
       },
       {
         "kind": "category",
-        "code": "625",
+        "code": "6250",
         "name": "VIDEO GAMES",
         "accounts": [
           {
@@ -1375,7 +1375,7 @@
       },
       {
         "kind": "category",
-        "code": "630",
+        "code": "6300",
         "name": "ANIMATION FILM/LAB PRODUCTION",
         "accounts": [
           {
@@ -1406,7 +1406,7 @@
       },
       {
         "kind": "category",
-        "code": "635",
+        "code": "6350",
         "name": "VIDEO PRODUCTION",
         "accounts": [
           {
@@ -1449,7 +1449,7 @@
       },
       {
         "kind": "category",
-        "code": "650",
+        "code": "6500",
         "name": "PUBLICITY",
         "accounts": [
           {
@@ -1480,7 +1480,7 @@
       },
       {
         "kind": "category",
-        "code": "670",
+        "code": "6700",
         "name": "INSURANCE",
         "accounts": [
           {
@@ -1507,7 +1507,7 @@
       },
       {
         "kind": "category",
-        "code": "680",
+        "code": "6800",
         "name": "GENERAL EXPENSE",
         "accounts": [
           {

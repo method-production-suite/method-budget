@@ -1089,10 +1089,19 @@ fn details_mut(b: &mut Budget) -> impl Iterator<Item = &mut fwb_core::Detail> {
         .flat_map(|a| &mut a.details)
 }
 
+/// An account number as the budget writes it: one already in the budget
+/// exactly as typed (a chart's own numbers may not follow the pattern),
+/// else the typed number in the budget's pattern.
 fn account_number(b: &Budget, typed: &str) -> Result<String, ToolError> {
     let t = typed.trim();
     if t.is_empty() {
         return Err(ToolError::invalid("the account number is empty"));
+    }
+    if b.categories()
+        .flat_map(|c| &c.accounts)
+        .any(|a| a.code == t)
+    {
+        return Ok(t.to_string());
     }
     if b.account_coding.validate().is_err() {
         return Ok(t.to_string());
@@ -1102,10 +1111,15 @@ fn account_number(b: &Budget, typed: &str) -> Result<String, ToolError> {
         .map_err(|e| ToolError::invalid(format!("{t}: {e}")))
 }
 
+/// A category number as the budget writes it: one already in the budget
+/// exactly as typed, else the typed number's category part.
 fn category_number(b: &Budget, typed: &str) -> Result<String, ToolError> {
     let t = typed.trim();
     if t.is_empty() {
         return Err(ToolError::invalid("the category number is empty"));
+    }
+    if b.categories().any(|c| c.code == t) {
+        return Ok(t.to_string());
     }
     if b.account_coding.validate().is_err() {
         return Ok(t.to_string());

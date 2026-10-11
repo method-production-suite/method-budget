@@ -38,7 +38,7 @@
     "topsheet": [
       {
         "kind": "category",
-        "code": "5500",
+        "code": "5500-000",
         "name": "DEVELOPMENT",
         "accounts": [
           {
@@ -77,7 +77,7 @@
       },
       {
         "kind": "category",
-        "code": "5600",
+        "code": "5600-100",
         "name": "CREATIVE SUPV/EXEC PROD",
         "accounts": [
           {
@@ -108,7 +108,7 @@
       },
       {
         "kind": "category",
-        "code": "5601",
+        "code": "5601-000",
         "name": "EXECUTIVE IN CHARGE",
         "accounts": [
           {
@@ -127,7 +127,7 @@
       },
       {
         "kind": "category",
-        "code": "5602",
+        "code": "5602-000",
         "name": "RIGHTS",
         "accounts": [
           {
@@ -182,7 +182,7 @@
       },
       {
         "kind": "category",
-        "code": "5603",
+        "code": "5603-000",
         "name": "STORY/WRITING",
         "accounts": [
           {
@@ -289,7 +289,7 @@
       },
       {
         "kind": "category",
-        "code": "5604",
+        "code": "5604-000",
         "name": "PRODUCER UNIT",
         "accounts": [
           {
@@ -364,7 +364,7 @@
       },
       {
         "kind": "category",
-        "code": "5605",
+        "code": "5605-000",
         "name": "DIRECTOR'S UNIT",
         "accounts": [
           {
@@ -403,7 +403,7 @@
       },
       {
         "kind": "category",
-        "code": "5606",
+        "code": "5606-000",
         "name": "CAST/TALENT/VOCAL",
         "accounts": [
           {
@@ -566,7 +566,7 @@
       },
       {
         "kind": "category",
-        "code": "5700",
+        "code": "5700-000",
         "name": "EXTRAS/AUDIENCE",
         "accounts": [
           {
@@ -633,7 +633,7 @@
       },
       {
         "kind": "category",
-        "code": "5701",
+        "code": "5701-000",
         "name": "PRODUCTION STAFF",
         "accounts": [
           {
@@ -760,7 +760,7 @@
       },
       {
         "kind": "category",
-        "code": "5702",
+        "code": "5702-000",
         "name": "ART DEPARTMENT",
         "accounts": [
           {
@@ -827,7 +827,7 @@
       },
       {
         "kind": "category",
-        "code": "5703",
+        "code": "5703-000",
         "name": "SET CONSTRUCTION",
         "accounts": [
           {
@@ -914,7 +914,7 @@
       },
       {
         "kind": "category",
-        "code": "5704",
+        "code": "5704-000",
         "name": "MULTI-CAMERA STAGING",
         "accounts": [
           {
@@ -1041,7 +1041,7 @@
       },
       {
         "kind": "category",
-        "code": "5705",
+        "code": "5705-000",
         "name": "GRIP OPERATORS",
         "accounts": [
           {
@@ -1112,7 +1112,7 @@
       },
       {
         "kind": "category",
-        "code": "5706",
+        "code": "5706-000",
         "name": "SPECIAL EFFECTS",
         "accounts": [
           {
@@ -1171,7 +1171,7 @@
       },
       {
         "kind": "category",
-        "code": "5707",
+        "code": "5707-000",
         "name": "WARDROBE",
         "accounts": [
           {
@@ -1242,7 +1242,7 @@
       },
       {
         "kind": "category",
-        "code": "5708",
+        "code": "5708-000",
         "name": "SET DRESSING",
         "accounts": [
           {
@@ -1301,7 +1301,7 @@
       },
       {
         "kind": "category",
-        "code": "5709",
+        "code": "5709-000",
         "name": "PROPERTY",
         "accounts": [
           {
@@ -1364,7 +1364,7 @@
       },
       {
         "kind": "category",
-        "code": "5710",
+        "code": "5710-000",
         "name": "ANIMALS & PICTURE VEHICLES",
         "accounts": [
           {
@@ -1407,7 +1407,7 @@
       },
       {
         "kind": "category",
-        "code": "5711",
+        "code": "5711-000",
         "name": "LIGHTING",
         "accounts": [
           {
@@ -1490,7 +1490,7 @@
       },
       {
         "kind": "category",
-        "code": "5712",
+        "code": "5712-000",
         "name": "MULTI-CAMERA TECH CREW",
         "accounts": [
           {
@@ -1613,7 +1613,7 @@
       },
       {
         "kind": "category",
-        "code": "5713",
+        "code": "5713-000",
         "name": "MULTI-CAMERA EQUIPMENT",
         "accounts": [
           {
@@ -1776,7 +1776,7 @@
       },
       {
         "kind": "category",
-        "code": "5714",
+        "code": "5714-000",
         "name": "FILM",
         "accounts": [
           {
@@ -1859,7 +1859,7 @@
       },
       {
         "kind": "category",
-        "code": "5715",
+        "code": "5715-000",
         "name": "PRODUCTION SOUND",
         "accounts": [
           {
@@ -1906,7 +1906,7 @@
       },
       {
         "kind": "category",
-        "code": "5716",
+        "code": "5716-000",
         "name": "TESTS",
         "accounts": [
           {
@@ -1929,7 +1929,7 @@
       },
       {
         "kind": "category",
-        "code": "5717",
+        "code": "5717-000",
         "name": "SECOND UNIT",
         "accounts": [
           {
@@ -1956,7 +1956,7 @@
       },
       {
         "kind": "category",
-        "code": "5718",
+        "code": "5718-000",
         "name": "STAGE/FACILITIES",
         "accounts": [
           {
@@ -2079,7 +2079,7 @@
       },
       {
         "kind": "category",
-        "code": "5719",
+        "code": "5719-000",
         "name": "WARDROBE",
         "accounts": [
           {
@@ -2150,7 +2150,7 @@
       },
       {
         "kind": "category",
-        "code": "5720",
+        "code": "5720-000",
         "name": "MAKEUP & HAIR",
         "accounts": [
           {
@@ -2209,7 +2209,7 @@
       },
       {
         "kind": "category",
-        "code": "5721",
+        "code": "5721-000",
         "name": "TRAVEL/TRANSPORTATION",
         "accounts": [
           {
@@ -2348,7 +2348,7 @@
       },
       {
         "kind": "category",
-        "code": "5722",
+        "code": "5722-000",
         "name": "LOCATION",
         "accounts": [
           {
@@ -2515,7 +2515,7 @@
       },
       {
         "kind": "category",
-        "code": "5723",
+        "code": "5723-000",
         "name": "PRODUCTION FILM & TAPE",
         "accounts": [
           {
@@ -2550,7 +2550,7 @@
       },
       {
         "kind": "category",
-        "code": "5724",
+        "code": "5724-000",
         "name": "PRODUCTION OFFICE",
         "accounts": [
           {
@@ -2637,7 +2637,7 @@
       },
       {
         "kind": "category",
-        "code": "5800",
+        "code": "5800-000",
         "name": "EDITORIAL/VIDEO POST PROD",
         "accounts": [
           {
@@ -2788,7 +2788,7 @@
       },
       {
         "kind": "category",
-        "code": "5801",
+        "code": "5801-000",
         "name": "MUSIC",
         "accounts": [
           {
@@ -2863,7 +2863,7 @@
       },
       {
         "kind": "category",
-        "code": "5802",
+        "code": "5802-000",
         "name": "POST PRODUCTION SOUND",
         "accounts": [
           {
@@ -2966,7 +2966,7 @@
       },
       {
         "kind": "category",
-        "code": "5803",
+        "code": "5803-000",
         "name": "TITLES & GRAPHICS",
         "accounts": [
           {
@@ -3029,7 +3029,7 @@
       },
       {
         "kind": "category",
-        "code": "5804",
+        "code": "5804-000",
         "name": "FOOTAGE",
         "accounts": [
           {
@@ -3064,7 +3064,7 @@
       },
       {
         "kind": "category",
-        "code": "5805",
+        "code": "5805-000",
         "name": "POST PROD TAPE STOCK/DUBS",
         "accounts": [
           {
@@ -3119,7 +3119,7 @@
       },
       {
         "kind": "category",
-        "code": "5900",
+        "code": "5900-000",
         "name": "OTHER EXPENSES",
         "accounts": [
           {
@@ -3194,7 +3194,7 @@
       },
       {
         "kind": "category",
-        "code": "5998",
+        "code": "5998-000",
         "name": "AMORTIZED COSTS - ACQUIRED FILMS",
         "accounts": [
           {
@@ -3205,7 +3205,7 @@
       },
       {
         "kind": "category",
-        "code": "5999",
+        "code": "5999-000",
         "name": "AMORTIZED COSTS IN-HOUSE SHOWS",
         "accounts": [
           {

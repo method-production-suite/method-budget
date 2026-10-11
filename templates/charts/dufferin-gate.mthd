@@ -38,7 +38,7 @@
     "topsheet": [
       {
         "kind": "category",
-        "code": "11",
+        "code": "1100",
         "name": "STORY RIGHTS/WRITER",
         "accounts": [
           {
@@ -81,7 +81,7 @@
       },
       {
         "kind": "category",
-        "code": "12",
+        "code": "1200",
         "name": "PRODUCER",
         "accounts": [
           {
@@ -112,7 +112,7 @@
       },
       {
         "kind": "category",
-        "code": "13",
+        "code": "1300",
         "name": "DIRECTOR",
         "accounts": [
           {
@@ -143,7 +143,7 @@
       },
       {
         "kind": "category",
-        "code": "14",
+        "code": "1400",
         "name": "CAST",
         "accounts": [
           {
@@ -203,10 +203,6 @@
             "name": "STUNT PLAYERS"
           },
           {
-            "code": "1452",
-            "name": ""
-          },
-          {
             "code": "1455",
             "name": "STUNT PURCHASES/RENTALS"
           },
@@ -246,7 +242,7 @@
       },
       {
         "kind": "category",
-        "code": "16",
+        "code": "1600",
         "name": "A-T-L TRAVEL/LIVING",
         "accounts": [
           {
@@ -313,7 +309,7 @@
       },
       {
         "kind": "category",
-        "code": "17",
+        "code": "1700",
         "name": "BUYOUTS",
         "accounts": [
           {
@@ -332,7 +328,7 @@
       },
       {
         "kind": "category",
-        "code": "20",
+        "code": "2000",
         "name": "PRODUCTION STAFF",
         "accounts": [
           {
@@ -435,7 +431,7 @@
       },
       {
         "kind": "category",
-        "code": "21",
+        "code": "2100",
         "name": "EXTRA TALENT",
         "accounts": [
           {
@@ -462,7 +458,7 @@
       },
       {
         "kind": "category",
-        "code": "22",
+        "code": "2200",
         "name": "ART DEPARTMENT",
         "accounts": [
           {
@@ -509,7 +505,7 @@
       },
       {
         "kind": "category",
-        "code": "23",
+        "code": "2300",
         "name": "CONSTRUCTION",
         "accounts": [
           {
@@ -552,7 +548,7 @@
       },
       {
         "kind": "category",
-        "code": "25",
+        "code": "2500",
         "name": "GRIP/SET OPERATIONS",
         "accounts": [
           {
@@ -631,7 +627,7 @@
       },
       {
         "kind": "category",
-        "code": "26",
+        "code": "2600",
         "name": "CAMERA",
         "accounts": [
           {
@@ -710,7 +706,7 @@
       },
       {
         "kind": "category",
-        "code": "27",
+        "code": "2700",
         "name": "SOUND",
         "accounts": [
           {
@@ -753,7 +749,7 @@
       },
       {
         "kind": "category",
-        "code": "28",
+        "code": "2800",
         "name": "ELECTRIC/SET LIGHTING",
         "accounts": [
           {
@@ -820,7 +816,7 @@
       },
       {
         "kind": "category",
-        "code": "29",
+        "code": "2900",
         "name": "SPECIAL EFFECTS",
         "accounts": [
           {
@@ -847,7 +843,7 @@
       },
       {
         "kind": "category",
-        "code": "30",
+        "code": "3000",
         "name": "SET DRESSING",
         "accounts": [
           {
@@ -902,7 +898,7 @@
       },
       {
         "kind": "category",
-        "code": "31",
+        "code": "3100",
         "name": "PROPERTY",
         "accounts": [
           {
@@ -945,7 +941,7 @@
       },
       {
         "kind": "category",
-        "code": "32",
+        "code": "3200",
         "name": "PICTURE VEHICLES/ANIMALS",
         "accounts": [
           {
@@ -964,7 +960,7 @@
       },
       {
         "kind": "category",
-        "code": "33",
+        "code": "3300",
         "name": "WARDROBE",
         "accounts": [
           {
@@ -1011,7 +1007,7 @@
       },
       {
         "kind": "category",
-        "code": "34",
+        "code": "3400",
         "name": "MAKEUP/HAIR",
         "accounts": [
           {
@@ -1058,7 +1054,7 @@
       },
       {
         "kind": "category",
-        "code": "35",
+        "code": "3500",
         "name": "PRODUCTION FILM/LAB",
         "accounts": [
           {
@@ -1089,7 +1085,7 @@
       },
       {
         "kind": "category",
-        "code": "36",
+        "code": "3600",
         "name": "TRANSPORTATION",
         "accounts": [
           {
@@ -1284,7 +1280,7 @@
       },
       {
         "kind": "category",
-        "code": "37",
+        "code": "3700",
         "name": "LOCATION/OFFICE EXPENSE",
         "accounts": [
           {
@@ -1342,10 +1338,6 @@
           {
             "code": "3772",
             "name": "OFFICE EQUIPMENT RENTAL"
-          },
-          {
-            "code": "3774",
-            "name": ""
           },
           {
             "code": "3776",
@@ -1415,7 +1407,7 @@
       },
       {
         "kind": "category",
-        "code": "38",
+        "code": "3800",
         "name": "B-T-L TRAVEL AND LIVING",
         "accounts": [
           {
@@ -1438,7 +1430,7 @@
       },
       {
         "kind": "category",
-        "code": "39",
+        "code": "3900",
         "name": "STAGE/BACKLOT CHARGES",
         "accounts": [
           {
@@ -1465,7 +1457,7 @@
       },
       {
         "kind": "category",
-        "code": "41",
+        "code": "4100",
         "name": "TESTS",
         "accounts": [
           {
@@ -1480,7 +1472,7 @@
       },
       {
         "kind": "category",
-        "code": "42",
+        "code": "4200",
         "name": "2ND UNIT",
         "accounts": [
           {
@@ -1535,7 +1527,7 @@
       },
       {
         "kind": "category",
-        "code": "50",
+        "code": "5000",
         "name": "EDITORIAL",
         "accounts": [
           {
@@ -1598,7 +1590,7 @@
       },
       {
         "kind": "category",
-        "code": "51",
+        "code": "5100",
         "name": "POST PRODUCTION SOUND",
         "accounts": [
           {
@@ -1617,7 +1609,7 @@
       },
       {
         "kind": "category",
-        "code": "52",
+        "code": "5200",
         "name": "POST PROD FILM/LAB",
         "accounts": [
           {
@@ -1660,7 +1652,7 @@
       },
       {
         "kind": "category",
-        "code": "53",
+        "code": "5300",
         "name": "STOCK PICTURE FOOTAGE",
         "accounts": [
           {
@@ -1679,7 +1671,7 @@
       },
       {
         "kind": "category",
-        "code": "54",
+        "code": "5400",
         "name": "MUSIC",
         "accounts": [
           {
@@ -1722,7 +1714,7 @@
       },
       {
         "kind": "category",
-        "code": "56",
+        "code": "5600",
         "name": "TITLES/OPTICALS",
         "accounts": [
           {
@@ -1737,7 +1729,7 @@
       },
       {
         "kind": "category",
-        "code": "58",
+        "code": "5800",
         "name": "POST PRODUCTION VIDEO",
         "accounts": [
           {
@@ -1768,7 +1760,7 @@
       },
       {
         "kind": "category",
-        "code": "65",
+        "code": "6500",
         "name": "PUBLICITY",
         "accounts": [
           {
@@ -1787,7 +1779,7 @@
       },
       {
         "kind": "category",
-        "code": "67",
+        "code": "6700",
         "name": "INSURANCE",
         "accounts": [
           {
@@ -1802,7 +1794,7 @@
       },
       {
         "kind": "category",
-        "code": "68",
+        "code": "6800",
         "name": "G/A",
         "accounts": [
           {

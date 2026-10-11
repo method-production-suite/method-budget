@@ -432,6 +432,9 @@ pub fn update_topsheet_row(
 ) -> EditResult {
     let new_code = match (b.topsheet.get(index), code) {
         (None, _) => return Err("that topsheet row no longer exists".into()),
+        // The number as it is stays as it is, even one the pattern can't
+        // read (a chart's own numbers may not follow it).
+        (Some(TopsheetRow::Category(c)), Some(typed)) if typed.trim() == c.code => None,
         (Some(TopsheetRow::Category(_)), Some(typed)) => {
             let code = category_code(&b.account_coding, typed)?;
             if category_exists(b, &code, Some(index)) {
@@ -512,7 +515,13 @@ pub fn update_account(
     new_code: &str,
     name: &str,
 ) -> EditResult<String> {
-    let new_code = account_code(&b.account_coding, new_code)?;
+    // The number as it is stays as it is, even one the pattern can't read
+    // (a chart's own numbers may not follow it).
+    let new_code = if new_code.trim() == code {
+        code.to_string()
+    } else {
+        account_code(&b.account_coding, new_code)?
+    };
     if new_code != code && account_exists(b, &new_code, Some(code)) {
         return Err(format!("account {new_code} already exists"));
     }
@@ -971,10 +980,12 @@ fn picked_names(
     Ok(out)
 }
 
-/// An optional account number, normalized by the budget's coding.
+/// An optional account number: one already in the budget exactly as typed,
+/// else normalized by the budget's coding.
 fn optional_account(b: &Budget, typed: Option<&str>) -> EditResult<Option<String>> {
     match typed.map(str::trim) {
         None | Some("") => Ok(None),
+        Some(t) if account_exists(b, t, None) => Ok(Some(t.to_string())),
         Some(t) => account_code(&b.account_coding, t).map(Some),
     }
 }

@@ -27,8 +27,14 @@ and its committed template kept as it is.
 Last, crates/fwb-format/src/charts_bundled.rs (the list the app and `method new
 --template` bundle) is rewritten from the manifest.
 
+Each template built from a `kind,code,name,parent` CSV is checked against it: the same
+categories and account numbers, written as in the CSV, and as many accounts as the CSV
+lists, less accounts named "." (unused slots) and repeats merged into the first (an
+account number listed again with the same name).
+
 Exit codes: 0 done (or up to date), 1 out of date (--check only), 2 a source failed to
-import or the manifest is wrong; the failing step says why.
+import, a template doesn't match its source, or the manifest is wrong; the failing step
+says why.
 """
 
 import json
@@ -141,6 +147,75 @@ def build(entry, out, method):
     return r.stdout
 
 
+def same_name(a, b):
+    tidy = lambda s: " ".join(s.split()).lower()
+    return tidy(a) == tidy(b)
+
+
+def kinded_counts(path):
+    """What a `kind,code,name,parent` CSV should import as: its category numbers and its
+    account numbers, both as written, and the account count. Accounts named "." are unused
+    slots (left out); an account number listed again with the same name is merged into the
+    first (docs/TEMPLATES.md). `None` for any other layout."""
+    import csv
+
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        rows = list(csv.reader(f))
+    if not rows:
+        return None
+    head = [h.strip().lower() for h in rows[0]]
+    if not {"kind", "code", "name"} <= set(head):
+        return None
+    k, c, n = head.index("kind"), head.index("code"), head.index("name")
+    cell = lambda r, i: r[i].strip() if i < len(r) else ""
+    cats, codes, seen, accounts = [], set(), {}, 0
+    for r in rows[1:]:
+        kind = cell(r, k).lower().replace("-", "").replace(" ", "")
+        code, name = cell(r, c), cell(r, n)
+        if kind == "category" and code and code not in cats:
+            cats.append(code)
+        elif kind in ("account", "subaccount") and code and name != ".":
+            if any(same_name(x, name) for x in seen.get(code, [])):
+                continue
+            seen.setdefault(code, []).append(name)
+            codes.add(code)
+            accounts += 1
+    return {"categories": cats, "account_codes": codes, "accounts": accounts}
+
+
+def built_counts(text):
+    import json as _json
+
+    rows = _json.loads(text)["budget"].get("topsheet", [])
+    cats = [r for r in rows if r.get("kind") == "category"]
+    return {
+        "categories": [r["code"] for r in cats],
+        "account_codes": {a["code"] for r in cats for a in r.get("accounts", [])},
+        "accounts": sum(len(r.get("accounts", [])) for r in cats),
+    }
+
+
+def verify_counts(entry, text):
+    """For a `kind,code,name,parent` source: the template has every category and account
+    of the source, numbers as written. Returns what doesn't match (empty when all do)."""
+    want = kinded_counts(os.path.join(ROOT, entry["source"]))
+    if want is None:
+        return []
+    got = built_counts(text)
+    problems = []
+    if got["categories"] != want["categories"]:
+        missing = [c for c in want["categories"] if c not in got["categories"]]
+        problems.append(f"{len(got['categories'])} categories, the source has "
+                        f"{len(want['categories'])} (missing: {', '.join(missing[:5]) or 'none'})")
+    if got["accounts"] != want["accounts"]:
+        problems.append(f"{got['accounts']} accounts, the source has {want['accounts']} "
+                        "(after merging repeats and leaving out \".\" slots)")
+    missing = sorted(want["account_codes"] - got["account_codes"])
+    if missing:
+        problems.append(f"account numbers not kept as written: {', '.join(missing[:5])}")
+    return problems
+
+
 def rust_str(s):
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
@@ -206,6 +281,9 @@ def main():
             out = os.path.join(tmp, f"{e['id']}.mthd")
             report = build(e, out, method)
             new = read(out)
+            problems = verify_counts(e, new)
+            if problems:
+                fail(f"{e['source']}: the template doesn't match its source: " + "; ".join(problems))
             if new != read(target):
                 stale.append(f"templates/charts/{e['id']}.mthd")
                 if not args.check:

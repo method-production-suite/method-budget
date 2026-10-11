@@ -38,7 +38,7 @@
     "topsheet": [
       {
         "kind": "category",
-        "code": "11",
+        "code": "1100",
         "name": "STORY & RIGHTS",
         "accounts": [
           {
@@ -61,7 +61,7 @@
       },
       {
         "kind": "category",
-        "code": "12",
+        "code": "1200",
         "name": "PRODUCERS",
         "accounts": [
           {
@@ -96,7 +96,7 @@
       },
       {
         "kind": "category",
-        "code": "14",
+        "code": "1400",
         "name": "TALENT",
         "accounts": [
           {
@@ -119,7 +119,7 @@
       },
       {
         "kind": "category",
-        "code": "15",
+        "code": "1500",
         "name": "TRAVEL & LIVING",
         "accounts": [
           {
@@ -138,7 +138,7 @@
       },
       {
         "kind": "category",
-        "code": "20",
+        "code": "2000",
         "name": "PRODUCTION STAFF",
         "accounts": [
           {
@@ -157,7 +157,7 @@
       },
       {
         "kind": "category",
-        "code": "35",
+        "code": "3500",
         "name": "TRANSPORTATION",
         "accounts": [
           {
@@ -168,7 +168,7 @@
       },
       {
         "kind": "category",
-        "code": "36",
+        "code": "3600",
         "name": "LOCATION",
         "accounts": [
           {
@@ -235,7 +235,7 @@
       },
       {
         "kind": "category",
-        "code": "37",
+        "code": "3700",
         "name": "FILM & LABORATORY",
         "accounts": [
           {
@@ -246,7 +246,7 @@
       },
       {
         "kind": "category",
-        "code": "40",
+        "code": "4000",
         "name": "REMOTES",
         "accounts": [
           {
@@ -261,7 +261,7 @@
       },
       {
         "kind": "category",
-        "code": "43",
+        "code": "4300",
         "name": "STOCK FOOTAGE",
         "accounts": [
           {
@@ -288,7 +288,7 @@
       },
       {
         "kind": "category",
-        "code": "44",
+        "code": "4400",
         "name": "FRINGES",
         "accounts": [
           {
@@ -303,7 +303,7 @@
       },
       {
         "kind": "category",
-        "code": "45",
+        "code": "4500",
         "name": "EDITORIAL",
         "accounts": [
           {
@@ -394,7 +394,7 @@
       },
       {
         "kind": "category",
-        "code": "46",
+        "code": "4600",
         "name": "MUSIC",
         "accounts": [
           {
@@ -413,7 +413,7 @@
       },
       {
         "kind": "category",
-        "code": "47",
+        "code": "4700",
         "name": "POST PRODUCTION SOUND",
         "accounts": [
           {
@@ -428,7 +428,7 @@
       },
       {
         "kind": "category",
-        "code": "49",
+        "code": "4900",
         "name": "TITLES, OPTICALS & INSERTS",
         "accounts": [
           {
@@ -443,7 +443,7 @@
       },
       {
         "kind": "category",
-        "code": "65",
+        "code": "6500",
         "name": "PUBLICITY",
         "accounts": [
           {
@@ -454,7 +454,7 @@
       },
       {
         "kind": "category",
-        "code": "67",
+        "code": "6700",
         "name": "INSURANCE",
         "accounts": [
           {
@@ -489,7 +489,7 @@
       },
       {
         "kind": "category",
-        "code": "68",
+        "code": "6800",
         "name": "GENERAL EXPENSES",
         "accounts": [
           {

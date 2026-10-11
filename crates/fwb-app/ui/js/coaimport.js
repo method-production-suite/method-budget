@@ -375,6 +375,9 @@ export function showChartDialog(ctx, picked) {
     if (p.totals_skipped) line += ` ${plural(p.totals_skipped, 'total row', 'total rows')} left out.`;
     const summary = [el('p', { class: 'si-summary-main', text: line })];
     if (p.default_levels_added) summary.push(el('p', { class: 'si-note', text: 'Our production totals were added: change them on the topsheet if the chart groups its categories differently.' }));
+    if (p.renumbered_count) summary.push(el('p', { class: 'si-note', text: `${plural(p.renumbered_count, 'account shares its number', 'accounts share their numbers')} with an account of another name in the chart, so ${p.renumbered_count === 1 ? 'it comes' : 'they come'} in under a new number: see Renumbered below.` }));
+    if (p.merged_repeats) summary.push(el('p', { class: 'si-note', text: `${plural(p.merged_repeats, 'account is', 'accounts are')} listed twice with the same number and name: each comes in once.` }));
+    if (p.placeholders) summary.push(el('p', { class: 'si-note', text: `${plural(p.placeholders, 'account', 'accounts')} named “.” (unused slots in the chart) left out.` }));
     if (p.truncated) summary.push(el('p', { class: 'si-note', text: 'This sheet is larger than the import reads: only what was read is shown and imported.' }));
     ui.summary.replaceChildren(...summary);
 
@@ -391,7 +394,11 @@ export function showChartDialog(ctx, picked) {
     const more = total > p.rows.length ? el('p', { class: 'si-more', text: `The first ${p.rows.length} of ${total} rows.` }) : null;
     ui.rows.replaceChildren(...[el('div', { class: 'si-table-wrap' }, table), more].filter(Boolean));
 
-    const parts = [noteList(p.warnings, p.warning_count, 'To check', true), noteList(p.skipped, p.skipped_count, 'Skipped rows')];
+    const parts = [
+      textList(p.renumbered, p.renumbered_count, 'Renumbered (repeated numbers)', true),
+      noteList(p.warnings, p.warning_count, 'To check', true),
+      noteList(p.skipped, p.skipped_count, 'Skipped rows'),
+    ];
     const a = p.apply;
     if (a) {
       parts.push(

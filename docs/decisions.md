@@ -1853,3 +1853,59 @@ and help build budgets. `method mcp` is a Model Context Protocol server in the c
 - **Not yet**: resources and prompts, output schemas, versions and the baseline, budget info
   fields, report presets, notes on accounts and categories, renumbering, sub-budgets and
   actuals as tools, and the live app bridge.
+
+## 53. Charts keep their numbers as written; repeated numbers get new ones (2026-10-10)
+
+Follows decision 51, after the studio charts showed what reading structure from numbers
+loses (accounts as wide as their categories dropped, `1A00` and `1B00` read as one
+category, `3100` stored as `31`, a chart refused outright):
+
+- **A sheet that names its rows is read as named.** In the `kind,code,name,parent` layout
+  each account goes in the category its `parent` names (else the category above it, when
+  there is no `parent` column), and every category and account number is kept exactly as
+  written: mixed widths, letters (`1A00`, `39AA`), trailing dots (`4AA.`), separators
+  (`5600-100`), spaces. Sub-accounts keep their numbers too, right after their account.
+  Structure is guessed from number widths only for the other shapes, which have no other
+  way to tell a category from an account; they still store a category as its part.
+- **The pattern is for typing, not for reading.** It is still worked out (the one that
+  writes the most account numbers exactly as they are, with the category part their
+  category names; `infer_coding_lenient`), shown in the import and used for new numbers.
+  It never reshapes or refuses a number already in a budget.
+- **Matching never cuts a number short.** Everything that finds an account by number
+  reads it through the pattern only when nothing would be cut off
+  (`AccountCoding::read`, `key`, `category_key`), else as written, so `050101` is never
+  `05-01` and `0501` is never `050101`. Checked one by one: actuals (assignment, the cost
+  report, filters, duplicates detection, estimate overrides) and comparison by number
+  (categories by the category they name, so `1100` and `11` line up); explain and the
+  command line's targets (as written first, then as the pattern reads it); the MCP tools
+  and the app's references to accounts (charges, credits) take a number already in the
+  budget as written; editing a name leaves the number alone even when the pattern can't
+  read it; sheet imports find existing accounts as written before checking a new number
+  fits; applying a chart matches categories by the category they name; pasting keeps a
+  category's full-width number. Diff and merge already matched numbers as written.
+  Renumbering keeps a category written `1100` in that form (`011000` at 3 + 3) and refuses,
+  listing each one, numbers it can't carry (`050101` under 2 + 2). A category's fringe
+  account (fringes posted by category) is its number as written plus the suffix when the
+  number isn't a plain category under the pattern (`0501` gives `050199`), so two
+  categories never share one because the pattern cut them to the same part.
+- **Empty categories are allowed.** Section headers and departments with no default
+  accounts are part of the charts; they total 0 everywhere.
+- **Repeated account numbers.** One listed again with the same name (ignoring case and
+  spacing) is the same account: merged, and said so. One listed again with another name
+  is another account, and it gets a new number: the chart's number, its separator (`-`
+  when it has none, or a space), and a count (`10950`, `10950-2`, `10950-3`), the first not
+  used anywhere in the chart. Keeping both under one number was ruled out because
+  matching by number can't tell them apart and would misattribute money without a word:
+  every transaction coded `10950` goes to the first account, comparison adds the two
+  together, imports and lookups land on the first. The new numbers are listed in the
+  import (a "Renumbered" list and a sentence in the preview, `check:` lines from the
+  command line). They don't follow the pattern, so renumbering refuses them until renamed.
+- **Placeholders.** An account named `.` is an unused slot in a chart: left out and
+  counted. An account with no name comes in with no name.
+- **Checked against the source.** The build script compares each template built from a
+  `kind,code,name,parent` CSV with the CSV (categories and account numbers as written,
+  account count less placeholders and merged repeats) and fails on any difference; a test
+  checks every bundled template recalculates, compares and gives a cost report with no two
+  accounts or category fringe accounts read as one number.
+- **Not yet**: a typed new number still follows the pattern's parsing rules (a part too
+  long is cut); the guessed shapes don't drop `.` placeholders (they come in unnamed).

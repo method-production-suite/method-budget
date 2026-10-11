@@ -1,0 +1,813 @@
+{
+  "format": "method-budget",
+  "version": 1,
+  "budget": {
+    "title": "FOX VAN NESS FILMS",
+    "base_currency": "USD",
+    "account_coding": {
+      "category_width": 3,
+      "account_width": 2,
+      "sub_width": 0,
+      "set_width": 0,
+      "separator": ""
+    },
+    "units": {
+      "Allow": {
+        "plural": "Allow"
+      },
+      "Day": {
+        "plural": "Days",
+        "hours": "10"
+      },
+      "Flat": {
+        "plural": "Flat"
+      },
+      "Hour": {
+        "plural": "Hours",
+        "hours": "1"
+      },
+      "Month": {
+        "plural": "Months",
+        "hours": "200"
+      },
+      "Week": {
+        "plural": "Weeks",
+        "hours": "50"
+      }
+    },
+    "topsheet": [
+      {
+        "kind": "category",
+        "code": "10000",
+        "name": "PRODUCTION"
+      },
+      {
+        "kind": "category",
+        "code": "10100",
+        "name": "STORY RIGHTS"
+      },
+      {
+        "kind": "category",
+        "code": "10200",
+        "name": "WRITERS",
+        "accounts": [
+          {
+            "code": "10201",
+            "name": "WRITERS"
+          },
+          {
+            "code": "10203",
+            "name": "STORY EDITOR"
+          },
+          {
+            "code": "10205",
+            "name": "RESEARCHERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "10400",
+        "name": "PRODUCER",
+        "accounts": [
+          {
+            "code": "10401",
+            "name": "EXECUTIVE PRODUCER"
+          },
+          {
+            "code": "10402",
+            "name": "SUPERVISING PRODUCER"
+          },
+          {
+            "code": "10403",
+            "name": "COORDINATING PRODUCER"
+          },
+          {
+            "code": "10404",
+            "name": "PRODUCERS"
+          },
+          {
+            "code": "1040401",
+            "name": "PRODUCER #1"
+          },
+          {
+            "code": "1040402",
+            "name": "PRODUCER #2"
+          },
+          {
+            "code": "1040403",
+            "name": "PRODUCER #3"
+          },
+          {
+            "code": "10405",
+            "name": "CONSULTING PRODUCERS"
+          },
+          {
+            "code": "10407",
+            "name": "TRANSCRIBERS"
+          },
+          {
+            "code": "10408",
+            "name": "ASSOCIATE PRODUCERS"
+          },
+          {
+            "code": "1040801",
+            "name": "ASSOC PROD #1"
+          },
+          {
+            "code": "1040802",
+            "name": "ASSOC PROD #2"
+          },
+          {
+            "code": "1040803",
+            "name": "ASSOC PRODUCER #3"
+          },
+          {
+            "code": "10480",
+            "name": "PRODUCER ENT. & MEALS"
+          },
+          {
+            "code": "10490",
+            "name": "PRODUCER OVERHEAD CHARGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "10500",
+        "name": "DIRECTOR"
+      },
+      {
+        "kind": "category",
+        "code": "10600",
+        "name": "TALENT",
+        "accounts": [
+          {
+            "code": "10601",
+            "name": "VOICE OVER NARRATION"
+          },
+          {
+            "code": "10605",
+            "name": "CAST: TEST OPTIONS"
+          },
+          {
+            "code": "10609",
+            "name": "PRINCIPAL CAST OVERTIME"
+          },
+          {
+            "code": "10611",
+            "name": "INTERVIEW FEES"
+          },
+          {
+            "code": "10615",
+            "name": "TEACHER/WELFARE WORKER"
+          },
+          {
+            "code": "10620",
+            "name": "CASTING DIRECTOR"
+          },
+          {
+            "code": "10621",
+            "name": "TALENT COORDINATOR"
+          },
+          {
+            "code": "10680",
+            "name": "CAST ENT. & MEALS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "10700",
+        "name": "SUPPORTING CAST"
+      },
+      {
+        "kind": "category",
+        "code": "10800",
+        "name": "STUNTS"
+      },
+      {
+        "kind": "category",
+        "code": "10900",
+        "name": "REHEARSALS"
+      },
+      {
+        "kind": "category",
+        "code": "11000",
+        "name": "ATL TRAVEL AND LIVING",
+        "accounts": [
+          {
+            "code": "11002",
+            "name": "WRITER & STAFF TRAVEL & LIVING"
+          },
+          {
+            "code": "11004",
+            "name": "PROD & STAFF TRAVEL & LIVING"
+          },
+          {
+            "code": "11005",
+            "name": "DIRECTOR/STAFF TRAVEL & LIVING"
+          },
+          {
+            "code": "11006",
+            "name": "PRINCIPAL CAST TRAVEL & LIVING"
+          },
+          {
+            "code": "11007",
+            "name": "SUPP. CAST TRAVEL & LIVING"
+          },
+          {
+            "code": "11008",
+            "name": "STUNTS TRAVEL & LIVING"
+          },
+          {
+            "code": "11009",
+            "name": "REHEARSAL TRAVEL & LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "11100",
+        "name": "EXTRAS"
+      },
+      {
+        "kind": "production_total",
+        "name": "Total above-the-line"
+      },
+      {
+        "kind": "category",
+        "code": "11200",
+        "name": "PRODUCTION STAFF",
+        "accounts": [
+          {
+            "code": "11201",
+            "name": "PRODUCTION MANAGER"
+          },
+          {
+            "code": "11202",
+            "name": "ASST. DIRECTOR"
+          },
+          {
+            "code": "11203",
+            "name": "SECOND ASST. DIRECTOR"
+          },
+          {
+            "code": "11204",
+            "name": "EXEC ADMIN ASST"
+          },
+          {
+            "code": "11205",
+            "name": "PRODUCTION ASSISTANTS"
+          },
+          {
+            "code": "11206",
+            "name": "SUPERVISION"
+          },
+          {
+            "code": "11207",
+            "name": "PRODUCTION COORDINATOR"
+          },
+          {
+            "code": "11223",
+            "name": "TRANSCRIBERS"
+          },
+          {
+            "code": "11247",
+            "name": "STAFF MILEAGE"
+          },
+          {
+            "code": "11250",
+            "name": "RENTALS"
+          },
+          {
+            "code": "11251",
+            "name": "FOX (STUDIO) RENTALS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "11400",
+        "name": "ART DEOARTMENT"
+      },
+      {
+        "kind": "category",
+        "code": "11500",
+        "name": "SET CONSTRUCTION"
+      },
+      {
+        "kind": "category",
+        "code": "11600",
+        "name": "GRIP/SET OPERATIONS"
+      },
+      {
+        "kind": "category",
+        "code": "11800",
+        "name": "CAMERA"
+      },
+      {
+        "kind": "category",
+        "code": "11900",
+        "name": "PRODUCTION SOUND"
+      },
+      {
+        "kind": "category",
+        "code": "12000",
+        "name": "ELECTRICAL/SET LIGHTING"
+      },
+      {
+        "kind": "category",
+        "code": "12100",
+        "name": "SPECIAL EFFECTS"
+      },
+      {
+        "kind": "category",
+        "code": "12200",
+        "name": "CREATURE/MECHANICAL EFX"
+      },
+      {
+        "kind": "category",
+        "code": "12300",
+        "name": "SET DRESSING"
+      },
+      {
+        "kind": "category",
+        "code": "12400",
+        "name": "ANIMALS/HANDLERS"
+      },
+      {
+        "kind": "category",
+        "code": "12500",
+        "name": "WARDROBE"
+      },
+      {
+        "kind": "category",
+        "code": "12700",
+        "name": "MAKEUP/HAIR"
+      },
+      {
+        "kind": "category",
+        "code": "12800",
+        "name": "VIDEO PLAYBACK & ASSIST"
+      },
+      {
+        "kind": "category",
+        "code": "13100",
+        "name": "PROPS"
+      },
+      {
+        "kind": "category",
+        "code": "13500",
+        "name": "ACTION PROPS/PICT. VEHICLES"
+      },
+      {
+        "kind": "category",
+        "code": "14000",
+        "name": "STOCK/TELECINE/MOTION CONTROL",
+        "accounts": [
+          {
+            "code": "14017",
+            "name": "BETA STOCK"
+          },
+          {
+            "code": "14018",
+            "name": "TELECINE"
+          },
+          {
+            "code": "14019",
+            "name": "PRINTING"
+          },
+          {
+            "code": "14020",
+            "name": "DUBS/STOCK"
+          },
+          {
+            "code": "14024",
+            "name": "MOTION CONTROL"
+          },
+          {
+            "code": "14025",
+            "name": "VIDEO TAPE (3/4\" & 1/2\")"
+          },
+          {
+            "code": "14063",
+            "name": "DAILY SOUND TRANSFER"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "14100",
+        "name": "INTERVIEW SHOOTS",
+        "accounts": [
+          {
+            "code": "14107",
+            "name": "SUPPORTING CAST"
+          },
+          {
+            "code": "14108",
+            "name": "STUNT PLAYERS"
+          },
+          {
+            "code": "14111",
+            "name": "EXTRAS"
+          },
+          {
+            "code": "14112",
+            "name": "2ND UNIT-PRODUCTION STAFF"
+          },
+          {
+            "code": "14114",
+            "name": "ART DEPARTMENT"
+          },
+          {
+            "code": "14115",
+            "name": "SET CONSTRUCTION"
+          },
+          {
+            "code": "14116",
+            "name": "SET OPERATIONS/CRAFT SERVICE"
+          },
+          {
+            "code": "14118",
+            "name": "CAMERA"
+          },
+          {
+            "code": "14119",
+            "name": "SOUND"
+          },
+          {
+            "code": "14120",
+            "name": "EQUIP RNTLS:CAM/S/G/L"
+          },
+          {
+            "code": "14121",
+            "name": "SPECIAL EFFECTS"
+          },
+          {
+            "code": "14122",
+            "name": "CREATURE/MECHANICAL EFX"
+          },
+          {
+            "code": "14123",
+            "name": "SET DRESSING"
+          },
+          {
+            "code": "14124",
+            "name": "ANIMALS/HANDLERS"
+          },
+          {
+            "code": "14125",
+            "name": "WARDROBE"
+          },
+          {
+            "code": "14127",
+            "name": "MAKEUP/HAIR"
+          },
+          {
+            "code": "14128",
+            "name": "VIDEO PLAYBACK & ASSIST"
+          },
+          {
+            "code": "14131",
+            "name": "PROPERTY"
+          },
+          {
+            "code": "14135",
+            "name": "ACTION PROPS"
+          },
+          {
+            "code": "14140",
+            "name": "BETA STOCK /SHOOT ONLY"
+          },
+          {
+            "code": "14147",
+            "name": "CREW MILEAGE"
+          },
+          {
+            "code": "14150",
+            "name": "LOCATION & OFFICE EXPENSES"
+          },
+          {
+            "code": "14155",
+            "name": "BTL TRAVEL & LIVING"
+          },
+          {
+            "code": "14159",
+            "name": "STUDIO/BACKLOT CHARGES"
+          },
+          {
+            "code": "14175",
+            "name": "MISCELLANEOUS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "14200",
+        "name": "ADDITIONAL UNIT"
+      },
+      {
+        "kind": "category",
+        "code": "14300",
+        "name": "CLIPS/STILLS",
+        "accounts": [
+          {
+            "code": "14302",
+            "name": "CLIP CLEARANCE"
+          },
+          {
+            "code": "1430201",
+            "name": "CLIP CLEARANCE #1"
+          },
+          {
+            "code": "1430202",
+            "name": "CLIP CLEARANCE #2"
+          },
+          {
+            "code": "14310",
+            "name": "CLIP PURCHASES"
+          },
+          {
+            "code": "14311",
+            "name": "SCREENERS"
+          },
+          {
+            "code": "14312",
+            "name": "B-ROLL"
+          },
+          {
+            "code": "14320",
+            "name": "GUILD PAYMENTS"
+          },
+          {
+            "code": "14330",
+            "name": "STILLS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "14400",
+        "name": "TESTS"
+      },
+      {
+        "kind": "category",
+        "code": "14500",
+        "name": "ADDITIONAL UNIT #2"
+      },
+      {
+        "kind": "category",
+        "code": "14600",
+        "name": "ADDITIONAL UNIT #3"
+      },
+      {
+        "kind": "category",
+        "code": "14700",
+        "name": "TRANSPORTATION"
+      },
+      {
+        "kind": "category",
+        "code": "15000",
+        "name": "LOCATION & OFFICE EXPENSES",
+        "accounts": [
+          {
+            "code": "15033",
+            "name": "LOC OFC PHONE/COMM. EQUIP"
+          },
+          {
+            "code": "15040",
+            "name": "PRODN OFFICE SUPPLIES"
+          },
+          {
+            "code": "15041",
+            "name": "SHIPPING & POSTAGE"
+          },
+          {
+            "code": "15042",
+            "name": "RESEARCH/SUBSCRIPTIONS"
+          },
+          {
+            "code": "15049",
+            "name": "WRAP PARTY EXPENSES"
+          },
+          {
+            "code": "15051",
+            "name": "STAFF MILEAGE"
+          },
+          {
+            "code": "15080",
+            "name": "MISCELLANEOUS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "15500",
+        "name": "BTL TRAVEL & LIVING"
+      },
+      {
+        "kind": "category",
+        "code": "15900",
+        "name": "STAGE AND BACKLOT CHARGES"
+      },
+      {
+        "kind": "category",
+        "code": "17800",
+        "name": "AMORTIZED COSTS(TV)"
+      },
+      {
+        "kind": "category",
+        "code": "18100",
+        "name": "INSURANCE CLAIM #1"
+      },
+      {
+        "kind": "category",
+        "code": "18200",
+        "name": "INSURANCE CLAIM #2"
+      },
+      {
+        "kind": "production_total",
+        "name": "Total production"
+      },
+      {
+        "kind": "category",
+        "code": "36100",
+        "name": "EDITING",
+        "accounts": [
+          {
+            "code": "36101",
+            "name": "OFFLINE EDITOR"
+          },
+          {
+            "code": "3610101",
+            "name": "EDITOR #1"
+          },
+          {
+            "code": "3610102",
+            "name": "EDITOR #2"
+          },
+          {
+            "code": "3610103",
+            "name": "EDITOR #3"
+          },
+          {
+            "code": "36102",
+            "name": "ASSISTANT EDITOR"
+          },
+          {
+            "code": "36150",
+            "name": "RENTALS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "36200",
+        "name": "SOUND EDITORIAL"
+      },
+      {
+        "kind": "category",
+        "code": "36300",
+        "name": "POST PRODUCTION SOUND",
+        "accounts": [
+          {
+            "code": "36305",
+            "name": "LAYBACK/PRELAY/MIX"
+          },
+          {
+            "code": "36308",
+            "name": "VOICEOVER/RECORDING SESSIONS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "36400",
+        "name": "POST PROD VIDEO",
+        "accounts": [
+          {
+            "code": "36410",
+            "name": "TELECINE"
+          },
+          {
+            "code": "36420",
+            "name": "MOTION CONTROL"
+          },
+          {
+            "code": "36422",
+            "name": "ON LINE EDIT"
+          },
+          {
+            "code": "36431",
+            "name": "PAINTBOX"
+          },
+          {
+            "code": "36440",
+            "name": "DUBS/STOCK"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "36500",
+        "name": "MUSIC"
+      },
+      {
+        "kind": "category",
+        "code": "36600",
+        "name": "MUSIC",
+        "accounts": [
+          {
+            "code": "36602",
+            "name": "COMPOSER/SOURCE"
+          },
+          {
+            "code": "36613",
+            "name": "SYNCH LICENSES"
+          },
+          {
+            "code": "36614",
+            "name": "AF OF M"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "36700",
+        "name": "VISUAL EFFECTS-POST PRODN"
+      },
+      {
+        "kind": "category",
+        "code": "36800",
+        "name": "TITLES/DISSOLVES/WIPES"
+      },
+      {
+        "kind": "category",
+        "code": "36900",
+        "name": "PROJECTION"
+      },
+      {
+        "kind": "production_total",
+        "name": "Total post"
+      },
+      {
+        "kind": "category",
+        "code": "40000",
+        "name": "OTHER CHARGES"
+      },
+      {
+        "kind": "category",
+        "code": "47000",
+        "name": "MISCELLANEOUS CHARGES"
+      },
+      {
+        "kind": "category",
+        "code": "47100",
+        "name": "INSURANCE",
+        "accounts": [
+          {
+            "code": "47135",
+            "name": "EMPLOYEE BENEFITS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "47500",
+        "name": "PUBLICITY/STILLS"
+      },
+      {
+        "kind": "category",
+        "code": "48000",
+        "name": "CONTINGENCIES",
+        "accounts": [
+          {
+            "code": "48001",
+            "name": "CONTINGENCY"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "48500",
+        "name": "FEES/OVERHEAD",
+        "accounts": [
+          {
+            "code": "48510",
+            "name": "EXEC ADMIN FEE"
+          },
+          {
+            "code": "48511",
+            "name": "SHARED OPERATIONAL COST"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total other"
+      }
+    ]
+  }
+}

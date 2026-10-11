@@ -665,9 +665,7 @@ fn chart_list(b: &Budget) -> Vec<ChartDto> {
                 push(&a.code, &mut out);
             }
             if let fwb_core::FringePosting::Category { suffix } = &b.fringe_posting {
-                let number = coding
-                    .fringe_account(&c.code, suffix)
-                    .unwrap_or_else(|_| format!("{}{suffix}", c.code));
+                let number = coding.category_fringe_account(&c.code, suffix);
                 push(&number, &mut out);
             }
         }

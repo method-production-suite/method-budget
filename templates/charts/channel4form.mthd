@@ -1,0 +1,1334 @@
+{
+  "format": "method-budget",
+  "version": 1,
+  "budget": {
+    "title": "CHANNEL4FORM",
+    "base_currency": "USD",
+    "account_coding": {
+      "category_width": 3,
+      "account_width": 2,
+      "sub_width": 0,
+      "set_width": 0,
+      "separator": "-"
+    },
+    "units": {
+      "Allow": {
+        "plural": "Allow"
+      },
+      "Day": {
+        "plural": "Days",
+        "hours": "10"
+      },
+      "Flat": {
+        "plural": "Flat"
+      },
+      "Hour": {
+        "plural": "Hours",
+        "hours": "1"
+      },
+      "Month": {
+        "plural": "Months",
+        "hours": "200"
+      },
+      "Week": {
+        "plural": "Weeks",
+        "hours": "50"
+      }
+    },
+    "topsheet": [
+      {
+        "kind": "category",
+        "code": "005-00",
+        "name": "Story/Scripts/Development",
+        "accounts": [
+          {
+            "code": "005-01",
+            "name": "Agreed Development Cost"
+          },
+          {
+            "code": "005-02",
+            "name": "Rights/Option Payments"
+          },
+          {
+            "code": "005-03",
+            "name": "Writer's Fee"
+          },
+          {
+            "code": "005-04",
+            "name": "Preparation Costs"
+          },
+          {
+            "code": "005-05",
+            "name": "Typing"
+          },
+          {
+            "code": "005-06",
+            "name": "Duplicating"
+          },
+          {
+            "code": "005-07",
+            "name": "Budgeting"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "006-00",
+        "name": "Producer/Director",
+        "accounts": [
+          {
+            "code": "006-01",
+            "name": "Executive Producer"
+          },
+          {
+            "code": "006-02",
+            "name": "Producer"
+          },
+          {
+            "code": "006-03",
+            "name": "Associate Producer"
+          },
+          {
+            "code": "006-04",
+            "name": "Director"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "007-00",
+        "name": "Artists",
+        "accounts": [
+          {
+            "code": "007-01",
+            "name": "Artists"
+          },
+          {
+            "code": "007-02",
+            "name": "Extras, Crowd etc"
+          },
+          {
+            "code": "007-03",
+            "name": "Stand-ins/Doubles/Stunts"
+          },
+          {
+            "code": "007-04",
+            "name": "Foorsteps and Effects"
+          },
+          {
+            "code": "007-05",
+            "name": "Chaperones"
+          },
+          {
+            "code": "007-06",
+            "name": "CCA Fee"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "008-00",
+        "name": "Presenters/Interviewees",
+        "accounts": [
+          {
+            "code": "008-01",
+            "name": "Presenters"
+          },
+          {
+            "code": "008-02",
+            "name": "Interviewees"
+          },
+          {
+            "code": "008-03",
+            "name": "Consultants"
+          },
+          {
+            "code": "008-04",
+            "name": "Voice Over Artists"
+          },
+          {
+            "code": "008-05",
+            "name": "Other"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total above-the-line"
+      },
+      {
+        "kind": "category",
+        "code": "009-00",
+        "name": "Production Unit Salaries",
+        "accounts": [
+          {
+            "code": "009-01",
+            "name": "Production Manager"
+          },
+          {
+            "code": "009-02",
+            "name": "Location Manager"
+          },
+          {
+            "code": "009-03",
+            "name": "Production Co-ordinator"
+          },
+          {
+            "code": "009-04",
+            "name": "Production Assistant"
+          },
+          {
+            "code": "009-05",
+            "name": "Production Secretary"
+          },
+          {
+            "code": "009-06",
+            "name": "Unit Runner"
+          },
+          {
+            "code": "009-07",
+            "name": "Production Accountant"
+          },
+          {
+            "code": "009-08",
+            "name": "Accounts Assistant"
+          },
+          {
+            "code": "009-09",
+            "name": "Researchers"
+          },
+          {
+            "code": "009-10",
+            "name": "Casting Director"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "010-00",
+        "name": "Asst Directors/Continuity",
+        "accounts": [
+          {
+            "code": "010-01",
+            "name": "First Assistant Director"
+          },
+          {
+            "code": "010-02",
+            "name": "Second Assistant Director"
+          },
+          {
+            "code": "010-03",
+            "name": "Third Assistant Director"
+          },
+          {
+            "code": "010-04",
+            "name": "Script Supervisor"
+          },
+          {
+            "code": "010-05",
+            "name": "Floor Runner"
+          },
+          {
+            "code": "010-06",
+            "name": "Other"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "011-00",
+        "name": "Crew - Camera",
+        "accounts": [
+          {
+            "code": "011-01",
+            "name": "Director of Photography"
+          },
+          {
+            "code": "011-02",
+            "name": "Camera Operator"
+          },
+          {
+            "code": "011-03",
+            "name": "Assistant Camera-Video"
+          },
+          {
+            "code": "011-04",
+            "name": "Focus Puller"
+          },
+          {
+            "code": "011-05",
+            "name": "Clapper Loader"
+          },
+          {
+            "code": "011-06",
+            "name": "Key Grip"
+          },
+          {
+            "code": "011-07",
+            "name": "Asst Grip/Crane Operator"
+          },
+          {
+            "code": "011-08",
+            "name": "Other"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "012-00",
+        "name": "Crew - Sound",
+        "accounts": [
+          {
+            "code": "012-01",
+            "name": "Sound Recordist"
+          },
+          {
+            "code": "012-02",
+            "name": "Boom Operator"
+          },
+          {
+            "code": "012-03",
+            "name": "Other"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "013-00",
+        "name": "Crew - Lighting",
+        "accounts": [
+          {
+            "code": "013-01",
+            "name": "Gaffer"
+          },
+          {
+            "code": "013-02",
+            "name": "Electrician 1"
+          },
+          {
+            "code": "013-03",
+            "name": "Electrician 2"
+          },
+          {
+            "code": "013-04",
+            "name": "Generator Operator"
+          },
+          {
+            "code": "013-05",
+            "name": "Other"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "014-00",
+        "name": "Crew - Art Deparment",
+        "accounts": [
+          {
+            "code": "014-01",
+            "name": "Designer"
+          },
+          {
+            "code": "014-02",
+            "name": "Art Director"
+          },
+          {
+            "code": "014-03",
+            "name": "Assistant Art Director"
+          },
+          {
+            "code": "014-04",
+            "name": "Graphic Designer"
+          },
+          {
+            "code": "014-05",
+            "name": "Props Master"
+          },
+          {
+            "code": "014-06",
+            "name": "Props Buyer"
+          },
+          {
+            "code": "014-07",
+            "name": "Stand-By Props"
+          },
+          {
+            "code": "014-08",
+            "name": "Dressing Props"
+          },
+          {
+            "code": "014-09",
+            "name": "Construction Manager"
+          },
+          {
+            "code": "014-10",
+            "name": "Carpenters"
+          },
+          {
+            "code": "014-11",
+            "name": "Painters"
+          },
+          {
+            "code": "014-12",
+            "name": "Plasterers"
+          },
+          {
+            "code": "014-13",
+            "name": "Stand-By Carpenter"
+          },
+          {
+            "code": "014-14",
+            "name": "Stand-By Painter"
+          },
+          {
+            "code": "014-15",
+            "name": "Riggers"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "015-00",
+        "name": "Crew - Ward/Make-up/Hair",
+        "accounts": [
+          {
+            "code": "015-01",
+            "name": "Costume Designer"
+          },
+          {
+            "code": "015-02",
+            "name": "Wordrobe Mistress/Master"
+          },
+          {
+            "code": "015-03",
+            "name": "Wardrobe Assistant 1"
+          },
+          {
+            "code": "015-04",
+            "name": "Wardrobe Assistant 2"
+          },
+          {
+            "code": "015-05",
+            "name": "Daily Staff"
+          },
+          {
+            "code": "015-06",
+            "name": "Make-up Supervisor"
+          },
+          {
+            "code": "015-07",
+            "name": "Make-up Artist"
+          },
+          {
+            "code": "015-08",
+            "name": "Make-up Assistant"
+          },
+          {
+            "code": "015-09",
+            "name": "Daily Staff"
+          },
+          {
+            "code": "015-10",
+            "name": "Hairdresser"
+          },
+          {
+            "code": "015-11",
+            "name": "Assistant Hairdresser"
+          },
+          {
+            "code": "015-12",
+            "name": "Daily Staff"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "016-00",
+        "name": "Crew - Editing",
+        "accounts": [
+          {
+            "code": "016-01",
+            "name": "Editor"
+          },
+          {
+            "code": "016-02",
+            "name": "First Assistant Editor"
+          },
+          {
+            "code": "016-03",
+            "name": "Second Assistant Editor"
+          },
+          {
+            "code": "016-04",
+            "name": "Dubbing Editor"
+          },
+          {
+            "code": "016-05",
+            "name": "Other"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "017-00",
+        "name": "Crew - Second Unit",
+        "accounts": [
+          {
+            "code": "017-01",
+            "name": "2nd Unit"
+          },
+          {
+            "code": "017-02",
+            "name": "2nd Unit"
+          },
+          {
+            "code": "017-03",
+            "name": "2nd Unit"
+          },
+          {
+            "code": "017-04",
+            "name": "2nd Unit"
+          },
+          {
+            "code": "017-05",
+            "name": "2nd Unit"
+          },
+          {
+            "code": "017-06",
+            "name": "2nd Unit"
+          },
+          {
+            "code": "017-07",
+            "name": "2nd Unit"
+          },
+          {
+            "code": "017-08",
+            "name": "2nd Unit"
+          },
+          {
+            "code": "017-09",
+            "name": "2nd Unit"
+          },
+          {
+            "code": "017-10",
+            "name": "2nd Unit"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "018-00",
+        "name": "Wage Related Overheads",
+        "accounts": [
+          {
+            "code": "018-01",
+            "name": "Holiday Credits"
+          },
+          {
+            "code": "018-02",
+            "name": "NIC Crew"
+          },
+          {
+            "code": "018-03",
+            "name": "NIC on Holiday Credits"
+          },
+          {
+            "code": "018-04",
+            "name": "NIC Artists"
+          },
+          {
+            "code": "018-05",
+            "name": "NIC Crowd/Others"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "019-00",
+        "name": "Materials - Art Dept",
+        "accounts": [
+          {
+            "code": "019-01",
+            "name": "Sets"
+          },
+          {
+            "code": "019-02",
+            "name": "Construction Materials"
+          },
+          {
+            "code": "019-03",
+            "name": "Props Hired"
+          },
+          {
+            "code": "019-04",
+            "name": "Props Purchased"
+          },
+          {
+            "code": "019-05",
+            "name": "Action Props"
+          },
+          {
+            "code": "019-06",
+            "name": "Drapes"
+          },
+          {
+            "code": "019-07",
+            "name": "Other"
+          },
+          {
+            "code": "019-08",
+            "name": "Consumables"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "020-00",
+        "name": "Materials - Ward/Up/Hair",
+        "accounts": [
+          {
+            "code": "020-01",
+            "name": "Costumes Hired"
+          },
+          {
+            "code": "020-02",
+            "name": "Costumes Purchased"
+          },
+          {
+            "code": "020-03",
+            "name": "Repairs & Cleaning Costs"
+          },
+          {
+            "code": "020-04",
+            "name": "Make-up Materials"
+          },
+          {
+            "code": "020-05",
+            "name": "Wigs Bought"
+          },
+          {
+            "code": "020-06",
+            "name": "Consumables"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "021-00",
+        "name": "Production Equipment",
+        "accounts": [
+          {
+            "code": "021-01",
+            "name": "Camera Equipment"
+          },
+          {
+            "code": "021-02",
+            "name": "Camera Consumables"
+          },
+          {
+            "code": "021-03",
+            "name": "Grip Equipment"
+          },
+          {
+            "code": "021-04",
+            "name": "Sound Equipment"
+          },
+          {
+            "code": "021-05",
+            "name": "Portable Telephone"
+          },
+          {
+            "code": "021-06",
+            "name": "Sound Consumables"
+          },
+          {
+            "code": "021-08",
+            "name": "Lighting Equipment"
+          },
+          {
+            "code": "021-09",
+            "name": "Generator"
+          },
+          {
+            "code": "021-10",
+            "name": "Lighting Consumables"
+          },
+          {
+            "code": "021-11",
+            "name": "Editing Equipment"
+          },
+          {
+            "code": "021-12",
+            "name": "Cutting Room Supplies"
+          },
+          {
+            "code": "021-13",
+            "name": "Other"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "022-00",
+        "name": "Facility Packages",
+        "accounts": [
+          {
+            "code": "022-01",
+            "name": "Camera Crew/Equipment"
+          },
+          {
+            "code": "022-02",
+            "name": "Sound Crew/Equipment"
+          },
+          {
+            "code": "022-03",
+            "name": "Lighting Crew/Equipment"
+          },
+          {
+            "code": "022-04",
+            "name": "Editing Facilities"
+          },
+          {
+            "code": "022-05",
+            "name": "Design Package"
+          },
+          {
+            "code": "022-06",
+            "name": "Other"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "023-00",
+        "name": "Studios/Outside Broadcast",
+        "accounts": [
+          {
+            "code": "023-01",
+            "name": "Studios"
+          },
+          {
+            "code": "023-02",
+            "name": "Recording Studios"
+          },
+          {
+            "code": "023-03",
+            "name": "O.B. Unit"
+          },
+          {
+            "code": "023-04",
+            "name": "Sound Mobile"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "024-00",
+        "name": "Other Prod Facilities",
+        "accounts": [
+          {
+            "code": "024-01",
+            "name": "Rehearsal Rooms"
+          },
+          {
+            "code": "024-02",
+            "name": "Location Office"
+          },
+          {
+            "code": "024-03",
+            "name": "Location Fees"
+          },
+          {
+            "code": "024-04",
+            "name": "Gratuities"
+          },
+          {
+            "code": "024-05",
+            "name": "Security"
+          },
+          {
+            "code": "024-06",
+            "name": "Police"
+          },
+          {
+            "code": "024-07",
+            "name": "Location Equipment"
+          },
+          {
+            "code": "024-08",
+            "name": "Other"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "025-00",
+        "name": "Film/Tape Stock",
+        "accounts": [
+          {
+            "code": "025-01",
+            "name": "Shooting Film Stock"
+          },
+          {
+            "code": "025-02",
+            "name": "Other Film Stock"
+          },
+          {
+            "code": "025-03",
+            "name": "Stills stock"
+          },
+          {
+            "code": "025-04",
+            "name": "Shooting tapes"
+          },
+          {
+            "code": "025-05",
+            "name": "Sound Stock"
+          },
+          {
+            "code": "025-06",
+            "name": "Effects Stock"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "026-00",
+        "name": "Pic/Sound Post-Prod Film",
+        "accounts": [
+          {
+            "code": "026-01",
+            "name": "Negative Developing"
+          },
+          {
+            "code": "026-02",
+            "name": "Printing"
+          },
+          {
+            "code": "026-03",
+            "name": "Spacing"
+          },
+          {
+            "code": "026-04",
+            "name": "Numbering"
+          },
+          {
+            "code": "026-05",
+            "name": "Reprints - Picture/Sound"
+          },
+          {
+            "code": "026-06",
+            "name": "Opticals"
+          },
+          {
+            "code": "026-07",
+            "name": "Special Effects"
+          },
+          {
+            "code": "026-08",
+            "name": "Dupe Prints"
+          },
+          {
+            "code": "026-09",
+            "name": "Negative Cutting"
+          },
+          {
+            "code": "026-10",
+            "name": "Additional Rolls"
+          },
+          {
+            "code": "026-11",
+            "name": "Answer Prints"
+          },
+          {
+            "code": "026-12",
+            "name": "CRI"
+          },
+          {
+            "code": "026-13",
+            "name": "Transmission Print"
+          },
+          {
+            "code": "026-14",
+            "name": "M & E Tracks"
+          },
+          {
+            "code": "026-15",
+            "name": "Miscellaneous Lab Costs"
+          },
+          {
+            "code": "026-16",
+            "name": "Cutting Room Hire"
+          },
+          {
+            "code": "026-17",
+            "name": "Viewing Theatre"
+          },
+          {
+            "code": "026-18",
+            "name": "Sound Transfer"
+          },
+          {
+            "code": "026-19",
+            "name": "Footsteps/Effects Theatre"
+          },
+          {
+            "code": "026-20",
+            "name": "Post-sync. Theatre"
+          },
+          {
+            "code": "026-21",
+            "name": "Dubbing Theatre"
+          },
+          {
+            "code": "026-22",
+            "name": "Music Recording Theatre"
+          },
+          {
+            "code": "026-23",
+            "name": "Miscellaneous"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "027-00",
+        "name": "Pic/Sound Post-Prod Tape",
+        "accounts": [
+          {
+            "code": "027-01",
+            "name": "Tape Transfers"
+          },
+          {
+            "code": "027-02",
+            "name": "Standard Conversion"
+          },
+          {
+            "code": "027-03",
+            "name": "Off-Line Editing"
+          },
+          {
+            "code": "027-04",
+            "name": "On-Line Editing"
+          },
+          {
+            "code": "027-05",
+            "name": "Caption Generator"
+          },
+          {
+            "code": "027-06",
+            "name": "Special Effects"
+          },
+          {
+            "code": "027-07",
+            "name": "Lay Off"
+          },
+          {
+            "code": "027-08",
+            "name": "Audio Dubbing"
+          },
+          {
+            "code": "027-09",
+            "name": "Lay Back"
+          },
+          {
+            "code": "027-10",
+            "name": "Film/tape Transfers"
+          },
+          {
+            "code": "027-11",
+            "name": "Other"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "028-00",
+        "name": "Archive Material",
+        "accounts": [
+          {
+            "code": "028-01",
+            "name": "Viewing Costs"
+          },
+          {
+            "code": "028-02",
+            "name": "Search Fees"
+          },
+          {
+            "code": "028-03",
+            "name": "Processing/Transfer Costs"
+          },
+          {
+            "code": "028-04",
+            "name": "Royalties Film/Tape Arch"
+          },
+          {
+            "code": "028-05",
+            "name": "Stills Archive"
+          },
+          {
+            "code": "028-06",
+            "name": "Sound Archive"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "029-00",
+        "name": "Rostrum/Graphics",
+        "accounts": [
+          {
+            "code": "029-01",
+            "name": "Rostrum"
+          },
+          {
+            "code": "029-02",
+            "name": "Graphics"
+          },
+          {
+            "code": "029-03",
+            "name": "Titles"
+          },
+          {
+            "code": "029-04",
+            "name": "Credits"
+          },
+          {
+            "code": "029-05",
+            "name": "Other"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "030-00",
+        "name": "Music",
+        "accounts": [
+          {
+            "code": "030-01",
+            "name": "Composer"
+          },
+          {
+            "code": "030-02",
+            "name": "Synchronization Rights"
+          },
+          {
+            "code": "030-03",
+            "name": "Orchestration and Copying"
+          },
+          {
+            "code": "030-04",
+            "name": "Gramophone Records"
+          },
+          {
+            "code": "030-05",
+            "name": "Musical Director"
+          },
+          {
+            "code": "030-06",
+            "name": "Musicians"
+          },
+          {
+            "code": "030-07",
+            "name": "Doubling"
+          },
+          {
+            "code": "030-08",
+            "name": "Fixer"
+          },
+          {
+            "code": "030-09",
+            "name": "Special Instruments Hire"
+          },
+          {
+            "code": "030-10",
+            "name": "Porterage"
+          },
+          {
+            "code": "030-11",
+            "name": "Hire of Music"
+          },
+          {
+            "code": "030-12",
+            "name": "Other"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "031-00",
+        "name": "Travel/Transport",
+        "accounts": [
+          {
+            "code": "031-01",
+            "name": "Recce/Pre-Prod Costs"
+          },
+          {
+            "code": "031-02",
+            "name": "Production Costs - Crew"
+          },
+          {
+            "code": "031-03",
+            "name": "Production Costs -Artists"
+          },
+          {
+            "code": "031-04",
+            "name": "Equipment"
+          },
+          {
+            "code": "031-05",
+            "name": "Freight"
+          },
+          {
+            "code": "031-06",
+            "name": "Carnets & Agents Fees"
+          },
+          {
+            "code": "031-07",
+            "name": "Excess Baggage"
+          },
+          {
+            "code": "031-08",
+            "name": "Visas"
+          },
+          {
+            "code": "031-09",
+            "name": "Innoculations"
+          },
+          {
+            "code": "031-10",
+            "name": "Parking"
+          },
+          {
+            "code": "031-11",
+            "name": "Bikes and Taxis"
+          },
+          {
+            "code": "031-12",
+            "name": "Set Storage"
+          },
+          {
+            "code": "031-13",
+            "name": "Set Transport"
+          },
+          {
+            "code": "031-14",
+            "name": "Other"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "032-00",
+        "name": "Hotel/Living",
+        "accounts": [
+          {
+            "code": "032-01",
+            "name": "Recce/Pre-Prod Costs"
+          },
+          {
+            "code": "032-02",
+            "name": "Crew Accomodation"
+          },
+          {
+            "code": "032-03",
+            "name": "Artists Accomodation"
+          },
+          {
+            "code": "032-04",
+            "name": "Location Caterers"
+          },
+          {
+            "code": "032-05",
+            "name": "Living Allowances"
+          },
+          {
+            "code": "032-06",
+            "name": "Meal Allowances - Crew"
+          },
+          {
+            "code": "032-07",
+            "name": "Meal Allowances - Artists"
+          },
+          {
+            "code": "032-08",
+            "name": "Gratuities"
+          },
+          {
+            "code": "032-09",
+            "name": "Hospitality"
+          },
+          {
+            "code": "032-10",
+            "name": "Laundry"
+          },
+          {
+            "code": "032-11",
+            "name": "Miscellaneous"
+          },
+          {
+            "code": "032-12",
+            "name": "Other"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "033-00",
+        "name": "Other Production Costs",
+        "accounts": [
+          {
+            "code": "033-01",
+            "name": "Fees/Levies/Subscriptions"
+          },
+          {
+            "code": "033-02",
+            "name": "Transcription Costs"
+          },
+          {
+            "code": "033-03",
+            "name": "Post Production Scripts"
+          },
+          {
+            "code": "033-04",
+            "name": "Script copying"
+          },
+          {
+            "code": "033-05",
+            "name": "Publicity Stills"
+          },
+          {
+            "code": "033-06",
+            "name": "Other Publicity Costs"
+          },
+          {
+            "code": "033-07",
+            "name": "Other"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "034-00",
+        "name": "Insurance/Finance/Legal",
+        "accounts": [
+          {
+            "code": "034-01",
+            "name": "Insurance"
+          },
+          {
+            "code": "034-02",
+            "name": "Finance - Bank Charges"
+          },
+          {
+            "code": "034-03",
+            "name": "Legal Fees"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "035-00",
+        "name": "Production Overheads",
+        "accounts": [
+          {
+            "code": "035-01",
+            "name": "Office Rent"
+          },
+          {
+            "code": "035-02",
+            "name": "Rates"
+          },
+          {
+            "code": "035-03",
+            "name": "Power/Lighting/Heating"
+          },
+          {
+            "code": "035-04",
+            "name": "Telephone/Telex/Fax"
+          },
+          {
+            "code": "035-05",
+            "name": "Postage & Stationery"
+          },
+          {
+            "code": "035-06",
+            "name": "Photocopying"
+          },
+          {
+            "code": "035-07",
+            "name": "Office Equipment Hire"
+          },
+          {
+            "code": "035-08",
+            "name": "Other"
+          },
+          {
+            "code": "035-09",
+            "name": "Indirect Overheads"
+          },
+          {
+            "code": "035-10",
+            "name": "Other Admin Charges"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "036-00",
+        "name": "Theatrical Performances",
+        "accounts": [
+          {
+            "code": "036-01",
+            "name": "Staff Costs"
+          },
+          {
+            "code": "036-02",
+            "name": "Theatre Technical Crew"
+          },
+          {
+            "code": "036-03",
+            "name": "Front of House Staff"
+          },
+          {
+            "code": "036-04",
+            "name": "Other"
+          },
+          {
+            "code": "036-05",
+            "name": "Theatre Facility Fees"
+          },
+          {
+            "code": "036-06",
+            "name": "'Lost' Performance Costs"
+          },
+          {
+            "code": "036-07",
+            "name": "'Lost' Seating"
+          },
+          {
+            "code": "036-08",
+            "name": "Reduction Ticket Revenue"
+          },
+          {
+            "code": "036-09",
+            "name": "Management Fees"
+          },
+          {
+            "code": "036-10",
+            "name": "Other"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "037-00",
+        "name": "Continuation Sheets"
+      },
+      {
+        "kind": "production_total",
+        "name": "Total production"
+      }
+    ]
+  }
+}

@@ -88,24 +88,51 @@ total,,TOTAL PRODUCTION,
 
 How it is read:
 
-- **The numbering pattern is worked out from the numbers.** Category `1100` over accounts
-  `1101`, `1102` is a two-character category and a two-character account with no
-  separator; `11` over `11-01` is the same with a hyphen. A category's own number is its
-  category part (`1100` is stored as category `11`, as Method Budget numbers categories).
+- **Every number is kept exactly as written**, categories and accounts alike: mixed
+  widths (`0501` with `050101` and `1101`), letters (`1A00`, `39AA`), trailing dots
+  (`4AA.`), separators and spaces (`5600-100`). Nothing is guessed from the numbers.
+- **Each account goes in the category its `parent` names.** Without a `parent` column,
+  an account goes in the category above it. An account naming a category that isn't in
+  the chart, or with no category above it, is skipped and listed.
+- **The numbering pattern is worked out for typing new numbers**: the one that writes the
+  most account numbers exactly as they are, with the category part their category names
+  (`1101` under `1100` is 2 + 2). It is shown in the import and used when you type a new
+  number; it never changes or refuses a number the chart has, and anything that matches
+  numbers (actuals, comparison, imports) reads a number through it only when nothing
+  would be cut off.
 - **Sub-accounts become accounts.** A budget has categories and accounts, no third level,
-  so a sub-account is kept as an account of its own right after its account, numbered with
-  its part after the account's (`1102.01` under `1102` becomes `110201`, with a two-character
-  sub-account part in the pattern). The import says how many it folded in.
+  so a sub-account is kept as an account of its own right after its account, its number
+  as written (`1102.01`). The import says how many it folded in.
 - **Totals.** Each total becomes a production total, its name tidied (`TOTAL
   ABOVE-THE-LINE` as `Total above-the-line`). The first production total marks the end of
   above-the-line. A total that comes straight after another total (`TOTAL BELOW-THE-LINE`
   after `TOTAL OTHER`) adds up totals rather than categories; the topsheet works out above-
   and below-the-line itself, so it is left out and said so.
-- **Duplicates** (an account number listed twice) keep the first and are listed;
-  accounts naming a category that isn't listed above them are skipped and listed; a
-  category with no accounts is listed.
+- **Categories with no accounts** (section headers, departments with no default accounts)
+  are kept, and listed to check. They total 0.
+- **Accounts named `.`** are unused slots in the chart: left out and counted. An account
+  with no name comes in with no name, listed to check.
+- **Repeated account numbers** (see below): the same number with the same name is merged
+  into one; the same number with another name comes in under a new number.
 - A chart that names no totals gets our default production totals by category number
   (`1` above the line, `2` and `3` production, `4` post, the rest other).
+
+## Repeated account numbers
+
+Some charts list an account number twice. With the same name (ignoring capitals and
+spacing) it is the same account, so the two are merged into one and the import says so.
+With another name (`10950 RENTALS`, `10950 REHEARSAL HALL RENTALS`) it is another account,
+and it comes in under a new number: the chart's number, the chart's separator (`-` when
+it has none or uses a space) and a count, the first one not used anywhere in the chart
+(`10950-2`, `10950-3`; `11-01` gives `11-01-2`).
+
+Both can't keep the same number because everything that matches accounts by number would
+treat them as one: transactions coded `10950` would all land on the first, a comparison
+would add the two together, and imports and lookups by number would find only the first.
+The new numbers are listed in the import: under **Renumbered** (and in a sentence at the
+top) in the app's preview, and as `check:` lines from `method coa import`. Rename them to
+whatever the production uses; renumbering to another pattern refuses them until then,
+since they don't follow the pattern. Decision 53 in docs/decisions.md has the reasoning.
 
 ## Other spreadsheet shapes
 
@@ -118,11 +145,20 @@ without separators, numbers that lost their leading zeros in a spreadsheet (`101
 `0101`), rows above the header, repeated header rows, total rows and level headings
 (`ABOVE THE LINE`, `POST PRODUCTION`) are handled. The dialog shows the guessed columns and
 pattern and lets you change them; `--mapping` does the same on the command line.
+In these shapes the numbers are what tell categories from accounts, so the pattern is
+worked out from them first and a category written `1100` over accounts `1101` is stored
+as category `11`. Repeated account numbers are handled as above.
 
 ## Checks
 
 - `python3 scripts/build-coa-templates.py --check` changes nothing and fails if a template
   or the bundled list is out of date (a source on this machine whose template differs).
+- The build script also checks each template built from a `kind,code,name,parent` CSV
+  against the CSV: the same categories and account numbers, written as in the CSV, and as
+  many accounts as the CSV lists, less accounts named `.` and merged repeats. It stops on
+  any difference.
 - `cargo test -p fwb-format charts` checks the bundled list agrees with `charts.json`,
-  that every template opens, has no lines or setup, recalculates and is written as it
-  reads, and that every template whose source is in the repository rebuilds byte for byte.
+  that every template opens, has no lines or setup, recalculates (categories with no
+  accounts total 0), compares with itself and gives a cost report with no two accounts
+  (or category fringe accounts) read as the same number, and is written as it reads, and
+  that every template whose source is in the repository rebuilds byte for byte.

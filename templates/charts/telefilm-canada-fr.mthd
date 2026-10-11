@@ -1,0 +1,3852 @@
+{
+  "format": "method-budget",
+  "version": 1,
+  "budget": {
+    "title": "Telefilm Canada FR",
+    "base_currency": "USD",
+    "account_coding": {
+      "category_width": 2,
+      "account_width": 2,
+      "sub_width": 0,
+      "set_width": 0,
+      "separator": ""
+    },
+    "units": {
+      "Allow": {
+        "plural": "Allow"
+      },
+      "Day": {
+        "plural": "Days",
+        "hours": "10"
+      },
+      "Flat": {
+        "plural": "Flat"
+      },
+      "Hour": {
+        "plural": "Hours",
+        "hours": "1"
+      },
+      "Month": {
+        "plural": "Months",
+        "hours": "200"
+      },
+      "Week": {
+        "plural": "Weeks",
+        "hours": "50"
+      }
+    },
+    "topsheet": [
+      {
+        "kind": "category",
+        "code": "0100",
+        "name": "DROITS D'AUTEUR/ACQUISITIONS",
+        "accounts": [
+          {
+            "code": "0101",
+            "name": "DROITS D'AUTEUR/ACQUISITIONS"
+          },
+          {
+            "code": "0195",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "0200",
+        "name": "SCÉNARIO",
+        "accounts": [
+          {
+            "code": "0201",
+            "name": "SCÉNARISTE(S)"
+          },
+          {
+            "code": "0204",
+            "name": "ATELIERS DE SCÉNARISATION"
+          },
+          {
+            "code": "0205",
+            "name": "CONSEILLER(S)/SCÉNARISATION/ÉCRITURE SENSIBLE, EDI"
+          },
+          {
+            "code": "0215",
+            "name": "DÉCOUPAGE"
+          },
+          {
+            "code": "0220",
+            "name": "SCRIPT-ÉDITEUR(S)"
+          },
+          {
+            "code": "0221",
+            "name": "ÉCRITURE BIBLE"
+          },
+          {
+            "code": "0225",
+            "name": "RECHERCHE"
+          },
+          {
+            "code": "0227",
+            "name": "RECHERCHE/ACQUISITIONS DE DROITS"
+          },
+          {
+            "code": "0228",
+            "name": "TRADUCTION/INTERPRÈTE"
+          },
+          {
+            "code": "0230",
+            "name": "SECRÉTARIAT"
+          },
+          {
+            "code": "0235",
+            "name": "IMPRESSION/DISTRIBUTION NUMÉRIQUE"
+          },
+          {
+            "code": "0260",
+            "name": "VOYAGE"
+          },
+          {
+            "code": "0265",
+            "name": "SÉJOUR"
+          },
+          {
+            "code": "0290",
+            "name": "AVANTAGE SOCIAUX"
+          },
+          {
+            "code": "0293",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "0295",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "0300",
+        "name": "FRAIS DE DÉVELOPPEMENT",
+        "accounts": [
+          {
+            "code": "0301",
+            "name": "DÉPOUILLEMENT PRÉLIMINAIRE/BUDGET/MINUTAGE"
+          },
+          {
+            "code": "0302",
+            "name": "BIBLE DE PRÉSENTATION - DÉVELOPPEMENT"
+          },
+          {
+            "code": "0303",
+            "name": "DÉMO"
+          },
+          {
+            "code": "0305",
+            "name": "&nbsp;"
+          },
+          {
+            "code": "0306",
+            "name": "PRÉ-CASTING"
+          },
+          {
+            "code": "0307",
+            "name": "PRÉ-DESIGN"
+          },
+          {
+            "code": "0308",
+            "name": "RECHERCHE TECHNOLOGIQUE"
+          },
+          {
+            "code": "0325",
+            "name": "FRAIS DE BUREAU"
+          },
+          {
+            "code": "0350",
+            "name": "REPÉRAGE PRÉLIMINAIRE"
+          },
+          {
+            "code": "0360",
+            "name": "VOYAGE"
+          },
+          {
+            "code": "0365",
+            "name": "SÉJOUR"
+          },
+          {
+            "code": "0370",
+            "name": "PROMOTION"
+          },
+          {
+            "code": "0390",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "0395",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "0400",
+        "name": "PRODUCTEUR(S)",
+        "accounts": [
+          {
+            "code": "0401",
+            "name": "PRODUCTEUR(S) EXÉCUTIF(S)"
+          },
+          {
+            "code": "0405",
+            "name": "PRODUCTEUR(S)"
+          },
+          {
+            "code": "0407",
+            "name": "PRODUCTEUR(S) DÉLÉGUÉ(S)"
+          },
+          {
+            "code": "0408",
+            "name": "PRODUCTEUR(S) SUPERVISEUR(S)"
+          },
+          {
+            "code": "0410",
+            "name": "COPRODUCTEUR(S)"
+          },
+          {
+            "code": "0415",
+            "name": "PRODUCTEUR(S) ASSOCIÉ(S)"
+          },
+          {
+            "code": "0416",
+            "name": "PRODUCTEUR DE REPORTAGE"
+          },
+          {
+            "code": "0425",
+            "name": "ASSISTANT DU PRODUCTEUR"
+          },
+          {
+            "code": "0460",
+            "name": "VOYAGE"
+          },
+          {
+            "code": "0465",
+            "name": "SÉJOUR"
+          },
+          {
+            "code": "0470",
+            "name": "RELATIONS PUBLIQUES"
+          },
+          {
+            "code": "0490",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "0493",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "0495",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "0500",
+        "name": "RÉALISATEUR(S)",
+        "accounts": [
+          {
+            "code": "0501",
+            "name": "RÉALISATEUR"
+          },
+          {
+            "code": "0502",
+            "name": "RÉALISATEUR ANIMATION"
+          },
+          {
+            "code": "0505",
+            "name": "RÉALISATEUR DEUXIÈME ÉQUIPE"
+          },
+          {
+            "code": "0507",
+            "name": "SUPERVISEUR DES DIALOGUES"
+          },
+          {
+            "code": "0530",
+            "name": "ASSISTANT AU RÉALISATEUR"
+          },
+          {
+            "code": "0560",
+            "name": "VOYAGE"
+          },
+          {
+            "code": "0565",
+            "name": "SÉJOUR"
+          },
+          {
+            "code": "0590",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "0592",
+            "name": "PERMIS"
+          },
+          {
+            "code": "0593",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "0595",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "0600",
+        "name": "VEDETTES",
+        "accounts": [
+          {
+            "code": "0601",
+            "name": "VEDETTES FORFAITAIRES"
+          },
+          {
+            "code": "0604",
+            "name": "DROITS (_______%)"
+          },
+          {
+            "code": "0640",
+            "name": "POSTSYNCHRONISATION"
+          },
+          {
+            "code": "0644",
+            "name": "DROITS (_______%)"
+          },
+          {
+            "code": "0650",
+            "name": "RÉPÉTITION(S)/ESSAYAGE(S)"
+          },
+          {
+            "code": "0660",
+            "name": "FRAIS DE DÉPLACEMENT"
+          },
+          {
+            "code": "0665",
+            "name": "SÉJOUR"
+          },
+          {
+            "code": "0670",
+            "name": "DÉPENSES AFFÉRENTES"
+          },
+          {
+            "code": "0672",
+            "name": "DÉPENSES POSTPRODUCTION"
+          },
+          {
+            "code": "0690",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "0692",
+            "name": "PERMIS"
+          },
+          {
+            "code": "0695",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total above-the-line"
+      },
+      {
+        "kind": "category",
+        "code": "1000",
+        "name": "COMÉDIENS",
+        "accounts": [
+          {
+            "code": "1001",
+            "name": "PREMIERS RÔLES"
+          },
+          {
+            "code": "1004",
+            "name": "DROITS (_______%)"
+          },
+          {
+            "code": "1010",
+            "name": "DEUXIÈMES RÔLES"
+          },
+          {
+            "code": "1018",
+            "name": "DROITS (_______%)"
+          },
+          {
+            "code": "1020",
+            "name": "TROISIÈME RÔLES/TROISIÈME RÔLES MUET"
+          },
+          {
+            "code": "1021",
+            "name": "DROITS (_______%)"
+          },
+          {
+            "code": "1025",
+            "name": "VOIX HORS CHAMP/NARRATION"
+          },
+          {
+            "code": "1028",
+            "name": "DROITS (_______%)"
+          },
+          {
+            "code": "1030",
+            "name": "CHEF DE TROUPE (COACH)"
+          },
+          {
+            "code": "1040",
+            "name": "POSTSYNCHRONISATION"
+          },
+          {
+            "code": "1043",
+            "name": "DROITS (_______%)"
+          },
+          {
+            "code": "1050",
+            "name": "COORDONNATEUR(S) DES CASCADES"
+          },
+          {
+            "code": "1052",
+            "name": "CASCADEURS/AJUSTEMENTS CASCADES"
+          },
+          {
+            "code": "1055",
+            "name": "DROITS (_______%)"
+          },
+          {
+            "code": "1060",
+            "name": "CHORÉGRAPHE"
+          },
+          {
+            "code": "1062",
+            "name": "COORDONNATEUR(S) D'INTIMITÉ"
+          },
+          {
+            "code": "1065",
+            "name": "SURCLASSEMENT RÔLES"
+          },
+          {
+            "code": "1067",
+            "name": "DROITS (_______%)"
+          },
+          {
+            "code": "1069",
+            "name": "RÉPÉTITIONS/ESSAYAGES"
+          },
+          {
+            "code": "1070",
+            "name": "RESPONSABLE DE LA DISTRIBUTION - RÔLES"
+          },
+          {
+            "code": "1075",
+            "name": "FRAIS DE DISTRIBUTION - RÔLES"
+          },
+          {
+            "code": "1076",
+            "name": "SALLES DE RÉPÉTITION"
+          },
+          {
+            "code": "1077",
+            "name": "FRAIS DE VIDÉO/ TEST DE CASTING"
+          },
+          {
+            "code": "1090",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "1092",
+            "name": "PERMIS"
+          },
+          {
+            "code": "1095",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "1100",
+        "name": "FIGURATION",
+        "accounts": [
+          {
+            "code": "1101",
+            "name": "FIGURANT(S) SPÉCIALISÉ(S)/D'AMBIANCE (DÉTAILS)"
+          },
+          {
+            "code": "1110",
+            "name": "FIGURANT (S) (DÉTAILS)"
+          },
+          {
+            "code": "1120",
+            "name": "DOUBLURES"
+          },
+          {
+            "code": "1170",
+            "name": "RESPONSABLE DE LA DISTRIBUTION - FIGURATION"
+          },
+          {
+            "code": "1172",
+            "name": "FRAIS DE DISTRIBUTION - FIGURATION"
+          },
+          {
+            "code": "1174",
+            "name": "ASSISTANT À LA DISTRIBUTION - FIGURATION"
+          },
+          {
+            "code": "1175",
+            "name": "DÉPENSES DE DISTRIBUTION - FIGURATION"
+          },
+          {
+            "code": "1180",
+            "name": "PRÉCEPTEUR(S)"
+          },
+          {
+            "code": "1181",
+            "name": "RESPONSABLE DES ENFANTS"
+          },
+          {
+            "code": "1182",
+            "name": "CHAPERONS (EX. TUTEUR, PARENT)"
+          },
+          {
+            "code": "1190",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "1192",
+            "name": "PERMIS"
+          },
+          {
+            "code": "1195",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "1200",
+        "name": "ÉQUIPE DE PRODUCTION",
+        "accounts": [
+          {
+            "code": "1201",
+            "name": "SUPERVISEUR DE PRODUCTION"
+          },
+          {
+            "code": "1205",
+            "name": "DIRECTEUR DE PRODUCTION"
+          },
+          {
+            "code": "1208",
+            "name": "ASSISTANT DIRECTEUR DE PRODUCTION"
+          },
+          {
+            "code": "1210",
+            "name": "RÉGISSEUR DE PLATEAU"
+          },
+          {
+            "code": "1215",
+            "name": "DIRECTEUR DES LIEUX DE TOURNAGE"
+          },
+          {
+            "code": "1216",
+            "name": "ASSISTANT(S) DIRECTEUR DES LIEUX DE TOURNAGE"
+          },
+          {
+            "code": "1220",
+            "name": "PREMIER ASSISTANT(S) RÉALISATEUR(S)"
+          },
+          {
+            "code": "1223",
+            "name": "DEUXIÈME ASSISTANT(S) RÉALISATEUR(S)"
+          },
+          {
+            "code": "1228",
+            "name": "TROISIÈME ASSISTANT(S) RÉALISATEUR(S)"
+          },
+          {
+            "code": "1235",
+            "name": "ASSISTANT(S) DE PRODUCTION"
+          },
+          {
+            "code": "1240",
+            "name": "COORDONNATEUR DE PRODUCTION"
+          },
+          {
+            "code": "1243",
+            "name": "ASSISTANT COORDONNATEUR DE PRODUCTION"
+          },
+          {
+            "code": "1245",
+            "name": "SECRÉTAIRE DE PRODUCTION"
+          },
+          {
+            "code": "1248",
+            "name": "ASSISTANT(S) DE PRODUCTION - BUREAU"
+          },
+          {
+            "code": "1250",
+            "name": "COMPTABLE DE PRODUCTION"
+          },
+          {
+            "code": "1252",
+            "name": "ASSISTANT COMPTABLE DE PRODUCTION"
+          },
+          {
+            "code": "1254",
+            "name": "COMMIS COMPTABLE"
+          },
+          {
+            "code": "1260",
+            "name": "PERSONNE(S) RESSOURCE LOCALE"
+          },
+          {
+            "code": "1261",
+            "name": "RESPONSABLE(S) - ÉCORESPONSABILITÉ"
+          },
+          {
+            "code": "1262",
+            "name": "RESPONSABLE(S) - TECHNIQUE, EDI, ACCESSIBILITÉ, COMMUNAUTAIRE"
+          },
+          {
+            "code": "1264",
+            "name": "INTERPRÈTE - LSQ OU LANGUE ÉTRANGÈRE"
+          },
+          {
+            "code": "1270",
+            "name": "CANTINIER"
+          },
+          {
+            "code": "1275",
+            "name": "COORDONNATEUR - LIBÉRATION DES DROITS"
+          },
+          {
+            "code": "1276",
+            "name": "RECHERCHE VISUELLE"
+          },
+          {
+            "code": "1280",
+            "name": "SCRIPTE"
+          },
+          {
+            "code": "1285",
+            "name": "COORDONNATEUR SANITAIRE"
+          },
+          {
+            "code": "1290",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "1293",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "1295",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "1300",
+        "name": "ÉQUIPE CONCEPTION ARTISTIQUE",
+        "accounts": [
+          {
+            "code": "1301",
+            "name": "CONCEPTEUR VISUEL"
+          },
+          {
+            "code": "1310",
+            "name": "DIRECTEUR ARTISTIQUE"
+          },
+          {
+            "code": "1312",
+            "name": "PREMIER ASSISTANT DIRECTEUR ARTISTIQUE"
+          },
+          {
+            "code": "1314",
+            "name": "DEUXIÈME ASSISTANT DIRECTEUR ARTISTIQUE"
+          },
+          {
+            "code": "1320",
+            "name": "ASSISTANT(S) AU DÉPARTEMENT ARTISTIQUE"
+          },
+          {
+            "code": "1330",
+            "name": "DESSINATEUR(S)"
+          },
+          {
+            "code": "1335",
+            "name": "GRAPHISTE(S)"
+          },
+          {
+            "code": "1350",
+            "name": "COORDONNATEUR AU DÉPARTEMENT ARTISTIQUE"
+          },
+          {
+            "code": "1389",
+            "name": "ASSISTANT(S) AU DÉPARTEMENT ARTISTIQUE - ÉCORESPONSABILITÉ"
+          },
+          {
+            "code": "1390",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "1393",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "1395",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "1400",
+        "name": "ÉQUIPE CONSTRUCTION",
+        "accounts": [
+          {
+            "code": "1401",
+            "name": "COORDONNATEUR DE CONSTRUCTION"
+          },
+          {
+            "code": "1420",
+            "name": "CHEF MENUISIER"
+          },
+          {
+            "code": "1425",
+            "name": "MENUISIER(S)"
+          },
+          {
+            "code": "1440",
+            "name": "CHEF PEINTRE SCÉNIQUE"
+          },
+          {
+            "code": "1445",
+            "name": "CHEF PEINTRE"
+          },
+          {
+            "code": "1450",
+            "name": "PEINTRE(S)"
+          },
+          {
+            "code": "1460",
+            "name": "MENUISIER(S) SUPPLÉMENTAIRE(S)"
+          },
+          {
+            "code": "1465",
+            "name": "PEINTRE(S) SUPPLÉMENTAIRE(S)"
+          },
+          {
+            "code": "1470",
+            "name": "ÉQUIPE DÉMONTAGE"
+          },
+          {
+            "code": "1475",
+            "name": "JOURNALIER(S)"
+          },
+          {
+            "code": "1480",
+            "name": "PAYSAGISTE(S)"
+          },
+          {
+            "code": "1490",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "1493",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "1495",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "1500",
+        "name": "ÉQUIPE DÉCORS",
+        "accounts": [
+          {
+            "code": "1501",
+            "name": "CHEF DÉCORATEUR"
+          },
+          {
+            "code": "1505",
+            "name": "DÉCORATEUR(S)"
+          },
+          {
+            "code": "1510",
+            "name": "ASSISTANT(S) DÉCORATEUR(S)"
+          },
+          {
+            "code": "1515",
+            "name": "DÉCORATEUR(S) PLATEAU"
+          },
+          {
+            "code": "1516",
+            "name": "ACHETEUR(S) DÉCOR"
+          },
+          {
+            "code": "1520",
+            "name": "TECHNICIEN(S) AUX DÉCORS"
+          },
+          {
+            "code": "1530",
+            "name": "JOURNALIER(S)"
+          },
+          {
+            "code": "1590",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "1593",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "1595",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "1600",
+        "name": "ÉQUIPE ACCESSOIRES",
+        "accounts": [
+          {
+            "code": "1601",
+            "name": "CHEF ACCESSOIRISTE"
+          },
+          {
+            "code": "1610",
+            "name": "ASSISTANT ACCESSOIRISTE"
+          },
+          {
+            "code": "1615",
+            "name": "ACCESSOIRISTE DE PLATEAU"
+          },
+          {
+            "code": "1616",
+            "name": "ACHETEUR(S) ACCESSOIRES"
+          },
+          {
+            "code": "1690",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "1693",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "1695",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "1700",
+        "name": "ÉQUIPE EFFETS SPÉCIAUX",
+        "accounts": [
+          {
+            "code": "1701",
+            "name": "COORDONNATEUR D'EFFETS SPÉCIAUX"
+          },
+          {
+            "code": "1705",
+            "name": "TECHNICIEN(S) D'EFFETS SPÉCIAUX"
+          },
+          {
+            "code": "1710",
+            "name": "ASSISTANT(S) AUX EFFETS SPÉCIAUX"
+          },
+          {
+            "code": "1790",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "1793",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "1795",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "1800",
+        "name": "ÉQUIPE RESPONSABLE DES ANIMAUX",
+        "accounts": [
+          {
+            "code": "1801",
+            "name": "RESPONSABLE DES ANIMAUX"
+          },
+          {
+            "code": "1810",
+            "name": "DRESSEURS OU AUTRES RESPONSABLES DES ANIMAUX"
+          },
+          {
+            "code": "1890",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "1893",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "1895",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "1900",
+        "name": "ÉQUIPE COSTUMES",
+        "accounts": [
+          {
+            "code": "1901",
+            "name": "CRÉATEUR DE COSTUMES"
+          },
+          {
+            "code": "1903",
+            "name": "ASSISTANT CRÉATEUR DE COSTUMES"
+          },
+          {
+            "code": "1904",
+            "name": "COORDONNATEUR DE COSTUMES"
+          },
+          {
+            "code": "1905",
+            "name": "CHEF COSTUMIER"
+          },
+          {
+            "code": "1910",
+            "name": "ASSISTANT COSTUMIER"
+          },
+          {
+            "code": "1920",
+            "name": "COUTURIÈRE/TAILLEUR"
+          },
+          {
+            "code": "1950",
+            "name": "CHEF HABILLEUR"
+          },
+          {
+            "code": "1951",
+            "name": "HABILLEUR"
+          },
+          {
+            "code": "1990",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "1993",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "1995",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2000",
+        "name": "ÉQUIPE MAQUILLAGE/COIFFURE",
+        "accounts": [
+          {
+            "code": "2001",
+            "name": "CHEF MAQUILLEUR"
+          },
+          {
+            "code": "2005",
+            "name": "MAQUILLEUR(S)"
+          },
+          {
+            "code": "2010",
+            "name": "ASSISTANT(S) MAQUILLEUR"
+          },
+          {
+            "code": "2020",
+            "name": "MAQUILLEUR(S) SUPPLÉMENTAIRE(S)"
+          },
+          {
+            "code": "2040",
+            "name": "CHEF COIFFEUR"
+          },
+          {
+            "code": "2050",
+            "name": "COIFFEUR(S)"
+          },
+          {
+            "code": "2060",
+            "name": "ASSISTANT(S) COIFFEUR"
+          },
+          {
+            "code": "2065",
+            "name": "COIFFEUR(S) SUPPLÉMENTAIRE(S)"
+          },
+          {
+            "code": "2070",
+            "name": "MAQUILLAGE/COIFFURE-EFFETS SPÉCIAUX"
+          },
+          {
+            "code": "2075",
+            "name": "CONFECTION DE PERRUQUES/POSTICHES"
+          },
+          {
+            "code": "2090",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "2093",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "2095",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2100",
+        "name": "ÉQUIPE TECHNIQUE VIDÉO",
+        "accounts": [
+          {
+            "code": "2101",
+            "name": "SUPERVISEUR TECHNIQUE"
+          },
+          {
+            "code": "2103",
+            "name": "DIRECTEUR TECHNIQUE"
+          },
+          {
+            "code": "2105",
+            "name": "RÉGISSEUR DE PLATEAU"
+          },
+          {
+            "code": "2108",
+            "name": "CONSULTANT ÉCLAIRAGE"
+          },
+          {
+            "code": "2110",
+            "name": "DIRECTEUR ÉCLAIRAGE"
+          },
+          {
+            "code": "2112",
+            "name": "AIGUILLEUR"
+          },
+          {
+            "code": "2115",
+            "name": "ÉLECTRICIEN(S)"
+          },
+          {
+            "code": "2120",
+            "name": "PRENEUR DE SON"
+          },
+          {
+            "code": "2125",
+            "name": "PERCHISTE"
+          },
+          {
+            "code": "2130",
+            "name": "CAMÉRAMAN(S)"
+          },
+          {
+            "code": "2135",
+            "name": "OPÉRATEUR DE GRUE"
+          },
+          {
+            "code": "2140",
+            "name": "CHAUFFEUR(S)"
+          },
+          {
+            "code": "2145",
+            "name": "OPÉRATEUR(S) VIDÉO"
+          },
+          {
+            "code": "2150",
+            "name": "OPÉRATEUR(S) MAGNÉTOSCOPIQUE"
+          },
+          {
+            "code": "2155",
+            "name": "ENTRETIEN"
+          },
+          {
+            "code": "2160",
+            "name": "MACHINISTE(S)"
+          },
+          {
+            "code": "2165",
+            "name": "ASSISTANT(S) MACHINISTE(S)"
+          },
+          {
+            "code": "2170",
+            "name": "OPÉRATEUR DE TÉLÉSOUFFLEUR"
+          },
+          {
+            "code": "2175",
+            "name": "PERSONNEL DE SERVICE"
+          },
+          {
+            "code": "2185",
+            "name": "ASSISTANT(S) TÉLÉVISION"
+          },
+          {
+            "code": "2190",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "2193",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "2195",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2200",
+        "name": "ÉQUIPE CAMÉRA",
+        "accounts": [
+          {
+            "code": "2201",
+            "name": "DIRECTEUR DE LA PHOTOGRAPHIE"
+          },
+          {
+            "code": "2205",
+            "name": "CADREUR"
+          },
+          {
+            "code": "2210",
+            "name": "PREMIER ASSISTANT À LA CAMÉRA"
+          },
+          {
+            "code": "2211",
+            "name": "TECHNICIEN(S) IMAGERIE NUMÉRIQUE / RETOUR VIDÉO"
+          },
+          {
+            "code": "2212",
+            "name": "DEUXIÈME ASSISTANT À LA CAMÉRA"
+          },
+          {
+            "code": "2220",
+            "name": "STAGIAIRE(S)"
+          },
+          {
+            "code": "2245",
+            "name": "OPÉRATEUR STEADICAM"
+          },
+          {
+            "code": "2250",
+            "name": "OPÉRATEUR(S) ÉQUIPEMENT SPÉCIAL"
+          },
+          {
+            "code": "2260",
+            "name": "CADREUR(S) CAMÉRA SUPPLÉMENTAIRE"
+          },
+          {
+            "code": "2263",
+            "name": "PREMIER ASSISTANT CAMÉRA SUPPL."
+          },
+          {
+            "code": "2266",
+            "name": "DEUXIÈME ASSISTANT CAMÉRA SUPPL."
+          },
+          {
+            "code": "2270",
+            "name": "PHOTOGRAPHE DE PLATEAU"
+          },
+          {
+            "code": "2290",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "2293",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "2295",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2300",
+        "name": "ÉQUIPE ÉLECTRIQUE",
+        "accounts": [
+          {
+            "code": "2301",
+            "name": "CHEF ÉCLAIRAGISTE (GAFFER)"
+          },
+          {
+            "code": "2310",
+            "name": "ASSISTANT CHEF ÉCLAIRAGISTE (ANCIENNEMENT BEST BOY)"
+          },
+          {
+            "code": "2320",
+            "name": "ÉCLAIRAGISTE(S)"
+          },
+          {
+            "code": "2330",
+            "name": "ÉCLAIRAGISTE(S) SUPPLÉMENTAIRE(S)"
+          },
+          {
+            "code": "2340",
+            "name": "PRÉ-ÉCLAIRAGE/DÉMONTAGE"
+          },
+          {
+            "code": "2350",
+            "name": "OPÉRATEUR DE GÉNÉRATRICE"
+          },
+          {
+            "code": "2390",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "2393",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "2395",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2400",
+        "name": "ÉQUIPE MACHINISTE",
+        "accounts": [
+          {
+            "code": "2401",
+            "name": "CHEF MACHINISTE"
+          },
+          {
+            "code": "2410",
+            "name": "ASSISTANT CHEF MACHINISTE (ANCIENNEMENT BEST BOY)"
+          },
+          {
+            "code": "2415",
+            "name": "OPÉRATEUR DE CHARIOT CAMÉRA (DOLLY)"
+          },
+          {
+            "code": "2420",
+            "name": "MACHINISTE(S)"
+          },
+          {
+            "code": "2430",
+            "name": "MACHINISTE(S) SUPPLÉMENTAIRE(S)"
+          },
+          {
+            "code": "2440",
+            "name": "PRÉ-INSTALLATION/DÉMONTAGE"
+          },
+          {
+            "code": "2450",
+            "name": "JOURNALIER(S)"
+          },
+          {
+            "code": "2460",
+            "name": "OPÉRATEUR(S) ÉQUIPEMENT SPÉCIAL"
+          },
+          {
+            "code": "2490",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "2493",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "2495",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2500",
+        "name": "ÉQUIPE SON",
+        "accounts": [
+          {
+            "code": "2501",
+            "name": "PRENEUR DE SON"
+          },
+          {
+            "code": "2510",
+            "name": "PERCHISTE"
+          },
+          {
+            "code": "2515",
+            "name": "PRÉPOSÉ(S) AUX CÂBLES"
+          },
+          {
+            "code": "2520",
+            "name": "OPÉRATEUR RETOUR SONORE"
+          },
+          {
+            "code": "2525",
+            "name": "ASSISTANT(S) AU SON"
+          },
+          {
+            "code": "2590",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "2593",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "2595",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2600",
+        "name": "ÉQUIPE TRANSPORT",
+        "accounts": [
+          {
+            "code": "2601",
+            "name": "COORDONNATEUR DE TRANSPORT"
+          },
+          {
+            "code": "2610",
+            "name": "CAPITAINE DU TRANSPORT"
+          },
+          {
+            "code": "2612",
+            "name": "CO-CAPITAINE/CHAUFFEUR EN CHEF"
+          },
+          {
+            "code": "2620",
+            "name": "CHAUFFEURS (DÉTAILS)"
+          },
+          {
+            "code": "2625",
+            "name": "CHAUFFEURS SPÉCIALISÉS (DÉTAILS)"
+          },
+          {
+            "code": "2690",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "2693",
+            "name": "ALLOCATIONS"
+          },
+          {
+            "code": "2695",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2700",
+        "name": "AVANTAGES SOCIAUX",
+        "accounts": [
+          {
+            "code": "2701",
+            "name": "AVANTAGES GOUVERNEMENTAUX :"
+          },
+          {
+            "code": "2702",
+            "name": "AVANTAGES DES SYNDICATS / ASSOCIATIONS :"
+          },
+          {
+            "code": "2795",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2800",
+        "name": "FRAIS DE BUREAU DE PRODUCTION",
+        "accounts": [
+          {
+            "code": "2801",
+            "name": "LOCATION DE BUREAUX"
+          },
+          {
+            "code": "2803",
+            "name": "CHAUFFAGE/ÉLECTRICITÉ"
+          },
+          {
+            "code": "2805",
+            "name": "MOBILIER DE BUREAU - LOCATIONS/ACHATS"
+          },
+          {
+            "code": "2807",
+            "name": "ÉQUIPEMENT DE BUREAU - LOCATIONS/ACHATS"
+          },
+          {
+            "code": "2810",
+            "name": "DISTRIBUTION NUMÉRIQUE/PHOTOCOPIES"
+          },
+          {
+            "code": "2815",
+            "name": "PAPETERIE/MATÉRIEL DE BUREAU"
+          },
+          {
+            "code": "2820",
+            "name": "TÉLÉPHONE/CELLULAIRE"
+          },
+          {
+            "code": "2821",
+            "name": "INTERNET"
+          },
+          {
+            "code": "2830",
+            "name": "MESSAGERIES/POSTES"
+          },
+          {
+            "code": "2835",
+            "name": "SERVICES INFORMATIQUES, LOGICIELS, SYSTÈME COMPTABLE, ETC."
+          },
+          {
+            "code": "2840",
+            "name": "COLLATIONS (BUREAU)"
+          },
+          {
+            "code": "2841",
+            "name": "SERVICE DE TRAITEUR (BUREAU)"
+          },
+          {
+            "code": "2845",
+            "name": "MÉNAGE"
+          },
+          {
+            "code": "2850",
+            "name": "SÉCURITÉ AU BUREAU, SYSTÈME D'ALARME, GARDIENS, ETC."
+          },
+          {
+            "code": "2889",
+            "name": "ÉCORESPONSABILITÉ/GESTION DES MATIÈRES RÉSIDUELLES"
+          },
+          {
+            "code": "2895",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2900",
+        "name": "FRAIS DE STUDIO",
+        "accounts": [
+          {
+            "code": "2901",
+            "name": "LOCATION STUDIO :"
+          },
+          {
+            "code": "2905",
+            "name": "ÉLECTRICITÉ"
+          },
+          {
+            "code": "2910",
+            "name": "LOCATION D'ATELIER DE MENUISERIE"
+          },
+          {
+            "code": "2915",
+            "name": "LOCATION DE BUREAUX"
+          },
+          {
+            "code": "2920",
+            "name": "TÉLÉPHONE"
+          },
+          {
+            "code": "2921",
+            "name": "INTERNET"
+          },
+          {
+            "code": "2927",
+            "name": "SALLES D'APPUI"
+          },
+          {
+            "code": "2930",
+            "name": "ÉQUIPEMENT DE STUDIO POUR EFFETS SPÉCIAUX"
+          },
+          {
+            "code": "2945",
+            "name": "NETTOYAGE"
+          },
+          {
+            "code": "2950",
+            "name": "SÉCURITÉ, GARDIENNAGE DES LIEUX"
+          },
+          {
+            "code": "2989",
+            "name": "ÉCORESPONSABILITÉ/GESTION DES MATIÈRES RÉSIDUELLES"
+          },
+          {
+            "code": "2995",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "3000",
+        "name": "FRAIS DE BUREAU - LIEUX DE TOURNAGE",
+        "accounts": [
+          {
+            "code": "3001",
+            "name": "LOCATION DE BUREAU"
+          },
+          {
+            "code": "3005",
+            "name": "MOBILIER DE BUREAU - LOCATIONS/ACHATS"
+          },
+          {
+            "code": "3007",
+            "name": "ÉQUIPEMENT DE BUREAU - LOCATIONS/ACHATS"
+          },
+          {
+            "code": "3010",
+            "name": "DISTRIBUTION NUMÉRIQUE/PHOTOCOPIES"
+          },
+          {
+            "code": "3020",
+            "name": "TÉLÉPHONE/CELLULAIRE"
+          },
+          {
+            "code": "3021",
+            "name": "INTERNET"
+          },
+          {
+            "code": "3030",
+            "name": "MESSAGERIE/POSTES"
+          },
+          {
+            "code": "3045",
+            "name": "NETTOYAGE"
+          },
+          {
+            "code": "3089",
+            "name": "ÉCORESPONSABILITÉ/GESTION DES MATIÈRES RÉSIDUELLES"
+          },
+          {
+            "code": "3095",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "3100",
+        "name": "FRAIS LIEUX DE TOURNAGE",
+        "accounts": [
+          {
+            "code": "3101",
+            "name": "FRAIS DE REPÉRAGE/FRAIS STOCKAGE NUMÉRIQUE"
+          },
+          {
+            "code": "3105",
+            "name": "LOCATION/LIEUX DE TOURNAGE"
+          },
+          {
+            "code": "3106",
+            "name": "RELOCALISATION"
+          },
+          {
+            "code": "3107",
+            "name": "ÉLECTRICITÉ/LIEUX DE TOURNAGE"
+          },
+          {
+            "code": "3110",
+            "name": "ACCÈS/LIEUX DE TOURNAGE :"
+          },
+          {
+            "code": "3112",
+            "name": "STATIONNEMENT - ÉQUIPE/CAMP DE BASE"
+          },
+          {
+            "code": "3115",
+            "name": "ASSURANCE SUPPLÉMENTAIRE"
+          },
+          {
+            "code": "3120",
+            "name": "RÉPARATION/REMISE EN ÉTAT"
+          },
+          {
+            "code": "3145",
+            "name": "NETTOYAGE"
+          },
+          {
+            "code": "3150",
+            "name": "SÉCURITÉ, GARDIENNAGE DES LIEUX"
+          },
+          {
+            "code": "3152",
+            "name": "SERVICES POLICIERS, POMPIERS"
+          },
+          {
+            "code": "3160",
+            "name": "RELATIONS PUBLIQUES"
+          },
+          {
+            "code": "3189",
+            "name": "ÉCORESPONSABILITÉ/GESTION DES MATIÈRES RÉSIDUELLES"
+          },
+          {
+            "code": "3195",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "3200",
+        "name": "FRAIS DE RÉGIE",
+        "accounts": [
+          {
+            "code": "3201",
+            "name": "REPAS"
+          },
+          {
+            "code": "3210",
+            "name": "SERVICE DE TRAITEUR"
+          },
+          {
+            "code": "3215",
+            "name": "COLLATIONS AU PLATEAU :"
+          },
+          {
+            "code": "3218",
+            "name": "ÉQUIPEMENT RÉGIE (TABLES/CHAISES, MATÉRIEL)"
+          },
+          {
+            "code": "3219",
+            "name": "TOILETTES"
+          },
+          {
+            "code": "3220",
+            "name": "SALLES D'APPUI"
+          },
+          {
+            "code": "3225",
+            "name": "PREMIERS SOINS/MATÉRIEL SANTÉ ET SÉCURITÉ"
+          },
+          {
+            "code": "3226",
+            "name": "PERSONNEL PARAMÉDICAL"
+          },
+          {
+            "code": "3228",
+            "name": "OFFICIERS DE POLICE/CONTRÔLEURS DE CIRCULATION"
+          },
+          {
+            "code": "3240",
+            "name": "ÉQUIPEMENTS SPÉCIAUX: MANTEAU D'HIVER, COMBINAISON DE PLONGÉE, ETC."
+          },
+          {
+            "code": "3245",
+            "name": "FRAIS MÉDICAUX/ASSURANCES/VISAS"
+          },
+          {
+            "code": "3260",
+            "name": "RELATIONS PUBLIQUES/COMMUNAUTAIRES"
+          },
+          {
+            "code": "3270",
+            "name": "LOCATIONS/FOURNITURE DE RÉGIE"
+          },
+          {
+            "code": "3271",
+            "name": "ACHATS/FOURNITURE DE RÉGIE"
+          },
+          {
+            "code": "3289",
+            "name": "ÉCORESPONSABILITÉ/GESTION DES MATIÈRES RÉSIDUELLES"
+          },
+          {
+            "code": "3295",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "3300",
+        "name": "VOYAGES/SÉJOUR",
+        "accounts": [
+          {
+            "code": "3301",
+            "name": "BILLETS"
+          },
+          {
+            "code": "3310",
+            "name": "HÉBERGEMENT"
+          },
+          {
+            "code": "3320",
+            "name": "PER DIEM"
+          },
+          {
+            "code": "3330",
+            "name": "TRANSFERTS (TAXIS/LIMOUSINES)"
+          },
+          {
+            "code": "3335",
+            "name": "EXCÈS DE BAGAGE"
+          },
+          {
+            "code": "3340",
+            "name": "EXPÉDITION"
+          },
+          {
+            "code": "3350",
+            "name": "DOUANES/COURTAGES"
+          },
+          {
+            "code": "3395",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "3400",
+        "name": "TRANSPORT",
+        "accounts": [
+          {
+            "code": "3401",
+            "name": "AUTOMOBILES DE PRODUCTION - ÉQUIPE :"
+          },
+          {
+            "code": "3405",
+            "name": "CAMIONS/FOURGONNETTES:"
+          },
+          {
+            "code": "3410",
+            "name": "AUTOBUS:"
+          },
+          {
+            "code": "3412",
+            "name": "UNITÉS MOBILES (LOGES, BUREAUX, CCM, ETC):"
+          },
+          {
+            "code": "3415",
+            "name": "AUTOMOBILES DE PRODUCTION - COMÉDIEN:"
+          },
+          {
+            "code": "3420",
+            "name": "VÉHICULES SPÉCIAUX D'APPUI (BATEAUX,MOTONEIGE, LOGIS, ETC.):"
+          },
+          {
+            "code": "3430",
+            "name": "RECHARGE ÉLECTRIQUE/ESSENCE:"
+          },
+          {
+            "code": "3432",
+            "name": "ENTRETIEN"
+          },
+          {
+            "code": "3435",
+            "name": "RÉPARATIONS"
+          },
+          {
+            "code": "3440",
+            "name": "TAXIS/CO-VOITURAGE/NAVETTE"
+          },
+          {
+            "code": "3445",
+            "name": "STATIONNEMENT"
+          },
+          {
+            "code": "3447",
+            "name": "KILOMÉTRAGE"
+          },
+          {
+            "code": "3450",
+            "name": "PERMIS/PLAQUES SPÉCIALES"
+          },
+          {
+            "code": "3455",
+            "name": "DOUANE/COURTAGE"
+          },
+          {
+            "code": "3495",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "3500",
+        "name": "MATÉRIEL DE CONSTRUCTION",
+        "accounts": [
+          {
+            "code": "3510",
+            "name": "LOCATION/MENUISERIE"
+          },
+          {
+            "code": "3515",
+            "name": "ACHATS/MENUISERIE"
+          },
+          {
+            "code": "3520",
+            "name": "LOCATION/PEINTURE"
+          },
+          {
+            "code": "3525",
+            "name": "ACHATS/PEINTURE"
+          },
+          {
+            "code": "3545",
+            "name": "ÉCRAN CHROMATIQUE/TOILE DE FOND/CYCLORAMA"
+          },
+          {
+            "code": "3580",
+            "name": "PAYSAGEMENT"
+          },
+          {
+            "code": "3589",
+            "name": "ÉCORESPONABILITÉ/GESTION DES MATIÈRES RÉSIDUELLES/ENTREPOSAGE"
+          },
+          {
+            "code": "3595",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "3600",
+        "name": "MATÉRIEL D'ARTISTE",
+        "accounts": [
+          {
+            "code": "3610",
+            "name": "FOURNITURES/DESSINS"
+          },
+          {
+            "code": "3612",
+            "name": "ÉQUIPEMENT/DESSIN"
+          },
+          {
+            "code": "3615",
+            "name": "FRAIS DE RECHERCHE"
+          },
+          {
+            "code": "3620",
+            "name": "IMPRESSION/STOCKAGE NUMÉRIQUE"
+          },
+          {
+            "code": "3622",
+            "name": "REPRODUCTIONS"
+          },
+          {
+            "code": "3695",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "3700",
+        "name": "DÉCORS",
+        "accounts": [
+          {
+            "code": "3710",
+            "name": "LOCATIONS"
+          },
+          {
+            "code": "3730",
+            "name": "ACHATS"
+          },
+          {
+            "code": "3740",
+            "name": "FABRICATION"
+          },
+          {
+            "code": "3748",
+            "name": "RÉPARATION/REMPLACEMENT"
+          },
+          {
+            "code": "3789",
+            "name": "ÉCORESPONABILITÉ/GESTION DES MATIÈRES RÉSIDUELLES/ENTREPOSAGE"
+          },
+          {
+            "code": "3795",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "3800",
+        "name": "ACCESSOIRES",
+        "accounts": [
+          {
+            "code": "3810",
+            "name": "LOCATIONS"
+          },
+          {
+            "code": "3830",
+            "name": "ACHATS"
+          },
+          {
+            "code": "3840",
+            "name": "FABRICATION"
+          },
+          {
+            "code": "3845",
+            "name": "GRAPHISME/ENSEIGNE"
+          },
+          {
+            "code": "3848",
+            "name": "RÉPARATION/REMPLACEMENT"
+          },
+          {
+            "code": "3850",
+            "name": "VÉHICULES CINÉMATOGRAPHIQUES - LOCATIONS"
+          },
+          {
+            "code": "3855",
+            "name": "VÉHICULES CINÉMATOGRAPHIQUES - ACHATS"
+          },
+          {
+            "code": "3857",
+            "name": "VÉHICULES CINÉMATOGRAPHIQUES - MODIFICATIONS"
+          },
+          {
+            "code": "3859",
+            "name": "ASSURANCES SUPPLÉMENTAIRES"
+          },
+          {
+            "code": "3889",
+            "name": "ÉCORESPONABILITÉ/GESTION DES MATIÈRES RÉSIDUELLES/ENTREPOSAGE"
+          },
+          {
+            "code": "3895",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "3900",
+        "name": "EFFETS SPÉCIAUX",
+        "accounts": [
+          {
+            "code": "3910",
+            "name": "LOCATIONS"
+          },
+          {
+            "code": "3930",
+            "name": "ACHATS"
+          },
+          {
+            "code": "3940",
+            "name": "CASCADES/LOCATIONS ET ACHATS"
+          },
+          {
+            "code": "3945",
+            "name": "ARMES/FRAIS DE PERMIS"
+          },
+          {
+            "code": "3989",
+            "name": "ÉCORESPONSABILITÉ/GESTION DES MATIÈRES RÉSIDUELLES"
+          },
+          {
+            "code": "3995",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4000",
+        "name": "ANIMAUX",
+        "accounts": [
+          {
+            "code": "4010",
+            "name": "LOCATIONS"
+          },
+          {
+            "code": "4030",
+            "name": "ACHATS"
+          },
+          {
+            "code": "4040",
+            "name": "ALIMENTATION/HÉBERGEMENT"
+          },
+          {
+            "code": "4045",
+            "name": "TRANSPORT"
+          },
+          {
+            "code": "4047",
+            "name": "FRAIS VÉTÉRINAIRES"
+          },
+          {
+            "code": "4055",
+            "name": "DOUANE/COURTAGE"
+          },
+          {
+            "code": "4095",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4100",
+        "name": "COSTUMES",
+        "accounts": [
+          {
+            "code": "4110",
+            "name": "LOCATIONS"
+          },
+          {
+            "code": "4130",
+            "name": "ACHATS"
+          },
+          {
+            "code": "4140",
+            "name": "FABRICATION"
+          },
+          {
+            "code": "4143",
+            "name": "EXPÉDITION/DOUANE/COURTAGE"
+          },
+          {
+            "code": "4148",
+            "name": "RÉPARATION/NETTOYAGE"
+          },
+          {
+            "code": "4189",
+            "name": "ÉCORESPONABILITÉ/GESTION DES MATIÈRES RÉSIDUELLES/ENTREPOSAGE"
+          },
+          {
+            "code": "4195",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4200",
+        "name": "MAQUILLAGE/COIFFURE",
+        "accounts": [
+          {
+            "code": "4210",
+            "name": "LOCATIONS/MAQUILLAGE"
+          },
+          {
+            "code": "4212",
+            "name": "ACHATS/MAQUILLAGE"
+          },
+          {
+            "code": "4220",
+            "name": "LOCATIONS/COIFFURE"
+          },
+          {
+            "code": "4222",
+            "name": "ACHATS/COIFFURE"
+          },
+          {
+            "code": "4226",
+            "name": "LOCATIONS ET ACHATS/PERRUQUES, POSTICHES"
+          },
+          {
+            "code": "4240",
+            "name": "EFFETS SPÉCIAUX"
+          },
+          {
+            "code": "4243",
+            "name": "EXPÉDITION/DOUANE/COURTAGE"
+          },
+          {
+            "code": "4295",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4300",
+        "name": "STUDIO VIDÉO",
+        "accounts": [
+          {
+            "code": "4301",
+            "name": "STUDIO"
+          },
+          {
+            "code": "4305",
+            "name": "SALLE DE CONTRÔLE"
+          },
+          {
+            "code": "4310",
+            "name": "TRAITEMENT DE L'IMAGE"
+          },
+          {
+            "code": "4315",
+            "name": "CAMÉRA(S)"
+          },
+          {
+            "code": "4320",
+            "name": "MAGNÉTOSCOPE(S)"
+          },
+          {
+            "code": "4325",
+            "name": "AUDIO"
+          },
+          {
+            "code": "4330",
+            "name": "QUANTEL/ULTRAMATTE"
+          },
+          {
+            "code": "4333",
+            "name": "TÉLÉCINÉMA"
+          },
+          {
+            "code": "4340",
+            "name": "AIGUILLEUR"
+          },
+          {
+            "code": "4342",
+            "name": "INTERPHONE"
+          },
+          {
+            "code": "4344",
+            "name": "GÉNÉRATEUR DE CARACTÈRES"
+          },
+          {
+            "code": "4346",
+            "name": "ÉCRAN(S) TÉMOIN"
+          },
+          {
+            "code": "4350",
+            "name": "SALLES COSTUMES/MAQUILLAGE"
+          },
+          {
+            "code": "4360",
+            "name": "ATELIER DE MENUISERIE"
+          },
+          {
+            "code": "4395",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4400",
+        "name": "UNITÉ MOBILE VIDÉO",
+        "accounts": [
+          {
+            "code": "4401",
+            "name": "UNITÉ(S) MOBILE(S) :"
+          },
+          {
+            "code": "4405",
+            "name": "TRAITEMENT DE L'IMAGE"
+          },
+          {
+            "code": "4410",
+            "name": "CAMÉRA(S)"
+          },
+          {
+            "code": "4415",
+            "name": "ÉQUIPEMENT AUDIO"
+          },
+          {
+            "code": "4420",
+            "name": "MAGNÉTOSCOPE(S)"
+          },
+          {
+            "code": "4425",
+            "name": "MAGNÉTOSCOPE(S) À RALENTI"
+          },
+          {
+            "code": "4430",
+            "name": "ÉQUIPEMENT SPÉCIAL"
+          },
+          {
+            "code": "4435",
+            "name": "GÉNÉRATEUR DE CARACTÈRES"
+          },
+          {
+            "code": "4495",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4500",
+        "name": "ÉQUIPEMENT CAMÉRA",
+        "accounts": [
+          {
+            "code": "4510",
+            "name": "LOCATION DE BASE"
+          },
+          {
+            "code": "4512",
+            "name": "LOCATIONS QUOTIDIENNES"
+          },
+          {
+            "code": "4515",
+            "name": "LOCATION SPÉCIALES"
+          },
+          {
+            "code": "4525",
+            "name": "ÉQUIPEMENT V.A./D.I.T."
+          },
+          {
+            "code": "4527",
+            "name": "DISQUES DURS/CARTES"
+          },
+          {
+            "code": "4530",
+            "name": "ACHATS"
+          },
+          {
+            "code": "4535",
+            "name": "STEADICAM"
+          },
+          {
+            "code": "4543",
+            "name": "EXPÉDITION/COURTAGE"
+          },
+          {
+            "code": "4585",
+            "name": "PERTES ET DOMMAGES"
+          },
+          {
+            "code": "4595",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4600",
+        "name": "ÉQUIPEMENT ÉLECTRIQUE",
+        "accounts": [
+          {
+            "code": "4610",
+            "name": "LOCATION DE BASE"
+          },
+          {
+            "code": "4612",
+            "name": "LOCATIONS QUOTIDIENNES"
+          },
+          {
+            "code": "4615",
+            "name": "LOCATION SPÉCIALES"
+          },
+          {
+            "code": "4626",
+            "name": "GÉNÉRATRICE(S):"
+          },
+          {
+            "code": "4627",
+            "name": "RECHARGE ÉLECTRIQUE/ESSENCE:"
+          },
+          {
+            "code": "4630",
+            "name": "ACHATS"
+          },
+          {
+            "code": "4685",
+            "name": "PERTES ET DOMMAGES"
+          },
+          {
+            "code": "4695",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4700",
+        "name": "ÉQUIPEMENT MACHINISTES",
+        "accounts": [
+          {
+            "code": "4710",
+            "name": "LOCATION DE BASE"
+          },
+          {
+            "code": "4712",
+            "name": "LOCATIONS QUOTIDIENNES"
+          },
+          {
+            "code": "4715",
+            "name": "LOCATION SPÉCIALES"
+          },
+          {
+            "code": "4720",
+            "name": "LOCATION DE GRUE"
+          },
+          {
+            "code": "4725",
+            "name": "ÉCHAFAUDAGE"
+          },
+          {
+            "code": "4730",
+            "name": "ACHATS"
+          },
+          {
+            "code": "4785",
+            "name": "PERTES ET DOMMAGES"
+          },
+          {
+            "code": "4795",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4800",
+        "name": "ÉQUIPEMENT SON",
+        "accounts": [
+          {
+            "code": "4810",
+            "name": "LOCATION DE BASE"
+          },
+          {
+            "code": "4812",
+            "name": "LOCATIONS QUOTIDIENNES"
+          },
+          {
+            "code": "4816",
+            "name": "MICROS PORTATIFS"
+          },
+          {
+            "code": "4828",
+            "name": "ÉMETTEURS-RÉCEPTEURS PORTATIFS"
+          },
+          {
+            "code": "4830",
+            "name": "ACHATS"
+          },
+          {
+            "code": "4895",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4900",
+        "name": "DEUXIÈME ÉQUIPE",
+        "accounts": [
+          {
+            "code": "4901",
+            "name": "ÉQUIPE:"
+          },
+          {
+            "code": "4915",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "4920",
+            "name": "VOYAGES/SÉJOURS"
+          },
+          {
+            "code": "4925",
+            "name": "TRANSPORT"
+          },
+          {
+            "code": "4930",
+            "name": "ÉQUIPEMENT"
+          },
+          {
+            "code": "4940",
+            "name": "PELLICULE/DISQUES DURS"
+          },
+          {
+            "code": "4942",
+            "name": "DÉVELOPPEMENT"
+          },
+          {
+            "code": "4944",
+            "name": "TRANSFERTS/COPIE DE TRAVAIL"
+          },
+          {
+            "code": "4989",
+            "name": "ÉCORESPONSABILITÉ/GESTION DES MATIÈRES RÉSIDUELLES"
+          },
+          {
+            "code": "4995",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5000",
+        "name": "RUBANS MAGNÉTOSCOPIQUES",
+        "accounts": [
+          {
+            "code": "5001",
+            "name": "TOURNAGE ORIGINAL :"
+          },
+          {
+            "code": "5010",
+            "name": "RUBANS/TRANSFERT FILM À VIDÉO :"
+          },
+          {
+            "code": "5020",
+            "name": "COPIE AVEC CODE TEMPOREL"
+          },
+          {
+            "code": "5050",
+            "name": "COPIES DE VISIONNEMENT/PLATEFORME - VISIONNEMENT DES RUSHES"
+          },
+          {
+            "code": "5095",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5100",
+        "name": "LABORATOIRE DE PRODUCTION",
+        "accounts": [
+          {
+            "code": "5101",
+            "name": "PELLICULE VIERGE"
+          },
+          {
+            "code": "5110",
+            "name": "DÉVELOPPEMENT"
+          },
+          {
+            "code": "5115",
+            "name": "DÉVELOPPEMENT SPÉCIAL"
+          },
+          {
+            "code": "5117",
+            "name": "VACUUM"
+          },
+          {
+            "code": "5120",
+            "name": "COPIE DE TRAVAIL"
+          },
+          {
+            "code": "5124",
+            "name": "SÉLECTION DE PRISES"
+          },
+          {
+            "code": "5126",
+            "name": "TIRAGE SPÉCIAL"
+          },
+          {
+            "code": "5130",
+            "name": "RUBANS MAGNÉTIQUES MAÎTRESSE"
+          },
+          {
+            "code": "5135",
+            "name": "REPIQUAGE MAGNÉTIQUE :"
+          },
+          {
+            "code": "5140",
+            "name": "SYNCHRONISATION"
+          },
+          {
+            "code": "5150",
+            "name": "NUMÉROTAGE DE BORD"
+          },
+          {
+            "code": "5160",
+            "name": "PROJECTIONS (RUSHES)"
+          },
+          {
+            "code": "5161",
+            "name": "RUSHES/DAILIES - COPIES DE VISIONNEMENT"
+          },
+          {
+            "code": "5162",
+            "name": "DIFFUSION EN CONTINU (\"TELESTREAMING\")"
+          },
+          {
+            "code": "5170",
+            "name": "PHOTOS DE CONTINUITÉ/PRODUCTION"
+          },
+          {
+            "code": "5195",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5200",
+        "name": "ENREGISTREMENT DES VOIX - ANIMATION",
+        "accounts": [
+          {
+            "code": "5205",
+            "name": "DIRECTEUR DE PLATEAU"
+          },
+          {
+            "code": "5210",
+            "name": "PRENEUR DE SON"
+          },
+          {
+            "code": "5220",
+            "name": "MONTEUR DES VOIX"
+          },
+          {
+            "code": "5230",
+            "name": "PISTE GUIDE"
+          },
+          {
+            "code": "5240",
+            "name": "LOCATION DE STUDIO DE SON"
+          },
+          {
+            "code": "5290",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "5295",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5300",
+        "name": "ÉQUIPE DE PRODUCTION - ANIMATION",
+        "accounts": [
+          {
+            "code": "5301",
+            "name": "PRODUCTEUR DÉLÉGUÉ - ANIMATION"
+          },
+          {
+            "code": "5302",
+            "name": "CHEF D'ÉQUIPE / SUPERVISEUR DE PROD. - ANIM."
+          },
+          {
+            "code": "5305",
+            "name": "DIRECTEUR DE PRODUCTION - ANIMATION"
+          },
+          {
+            "code": "5306",
+            "name": "ASSISTANT DIRECTEUR DE PRODUCTION - ANIMATION"
+          },
+          {
+            "code": "5308",
+            "name": "DIRECTEUR TECHNIQUE - ANIMATION"
+          },
+          {
+            "code": "5309",
+            "name": "CHEF COORDONNATEUR - ANIMATION"
+          },
+          {
+            "code": "5310",
+            "name": "COORDONNATEUR - ANIMATION"
+          },
+          {
+            "code": "5320",
+            "name": "ASSISTANT RÉALISATEUR - ANIMATION"
+          },
+          {
+            "code": "5325",
+            "name": "SECRÉTAIRE DU RÉALISATEUR - ANIMATION"
+          },
+          {
+            "code": "5330",
+            "name": "COORDONNATEUR DU DESIGN - ANIMATION"
+          },
+          {
+            "code": "5335",
+            "name": "ASSITANT DE PRODUCTION - ANIMATION"
+          },
+          {
+            "code": "5345",
+            "name": "SECRÉTAIRE DE PRODUCTION - ANIMATION"
+          },
+          {
+            "code": "5350",
+            "name": "COMPTABLE DE PRODUCTION - ANIMATION"
+          },
+          {
+            "code": "5354",
+            "name": "ASSISTANT COMPTABLE DE PRODUCTION - ANIMATION"
+          },
+          {
+            "code": "5390",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "5395",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5400",
+        "name": "ÉQUIPE DE CONCEPTION ARTISTIQUE - ANIMATION",
+        "accounts": [
+          {
+            "code": "5401",
+            "name": "DIRECTEUR ARTISTIQUE - ANIMATION"
+          },
+          {
+            "code": "5402",
+            "name": "CHEF DU DESIGN - ANIMATION"
+          },
+          {
+            "code": "5405",
+            "name": "DESIGNER DE CONCEPTION DES PERSONNAGES"
+          },
+          {
+            "code": "5409",
+            "name": "DESIGNER CONCEPTION DÉCOR"
+          },
+          {
+            "code": "5420",
+            "name": "DESIGNER DES ACCESSOIRES"
+          },
+          {
+            "code": "5425",
+            "name": "DIRECTEUR DES EFFETS SPÉCIAUX"
+          },
+          {
+            "code": "5435",
+            "name": "DESIGNER DES EFFETS SPÉCIAUX"
+          },
+          {
+            "code": "5450",
+            "name": "DESIGNER DES COULEURS (BG)"
+          },
+          {
+            "code": "5455",
+            "name": "DESIGNER DES COULEURS (PERSONNAGES)"
+          },
+          {
+            "code": "5460",
+            "name": "SUPERVISEUR DE SCÉNARIO MAQUETTE - ANIM."
+          },
+          {
+            "code": "5461",
+            "name": "COORDONNATEUR STORYBOARD"
+          },
+          {
+            "code": "5462",
+            "name": "ARTISTE STORYBOARD"
+          },
+          {
+            "code": "5464",
+            "name": "RÉVISEUR FINAL DE STORYBOARD"
+          },
+          {
+            "code": "5470",
+            "name": "TECHNICIEN ANIMATIQUE"
+          },
+          {
+            "code": "5480",
+            "name": "DIRECTEUR FEUILLES DE DIRECTION"
+          },
+          {
+            "code": "5482",
+            "name": "MINUTAGE ET DÉCODAGE DES DIALOGUES"
+          },
+          {
+            "code": "5490",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "5495",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5500",
+        "name": "ÉQUIPE ANIMATION 2D",
+        "accounts": [
+          {
+            "code": "5501",
+            "name": "DIRECTEUR DES DÉCORS"
+          },
+          {
+            "code": "5502",
+            "name": "ASSISTANT DIRECTEUR DES DÉCORS"
+          },
+          {
+            "code": "5505",
+            "name": "ARITSTE DÉCORS"
+          },
+          {
+            "code": "5506",
+            "name": "SUPERVISEUR LAYOUT"
+          },
+          {
+            "code": "5507",
+            "name": "ARTISTE KEY LAYOUT"
+          },
+          {
+            "code": "5508",
+            "name": "ARTISTE MISE AU PROPRE"
+          },
+          {
+            "code": "5510",
+            "name": "ANIMATEUR CLÉ / ASTISTE DE KEY POSING"
+          },
+          {
+            "code": "5520",
+            "name": "DIRECTEUR DE L'ANIMATION 2D"
+          },
+          {
+            "code": "5525",
+            "name": "SUPERVISEUR DE L'ANIMATION"
+          },
+          {
+            "code": "5545",
+            "name": "COORDONNATEUR DE L'ANIMATION"
+          },
+          {
+            "code": "5550",
+            "name": "ANIMATEUR"
+          },
+          {
+            "code": "5554",
+            "name": "ANIMATEUR DE LA CAMÉRA"
+          },
+          {
+            "code": "5555",
+            "name": "VÉRIFICATEUR D'ANIMATION"
+          },
+          {
+            "code": "5560",
+            "name": "DIRECTEUR DÉCOR COULEUR"
+          },
+          {
+            "code": "5561",
+            "name": "COORDONNATEUR DÉCOR COULEUR"
+          },
+          {
+            "code": "5562",
+            "name": "ARTISTE DÉCORS CLÉS"
+          },
+          {
+            "code": "5563",
+            "name": "ARTISTE DÉCOR COULEUR"
+          },
+          {
+            "code": "5564",
+            "name": "ARTISTE PERSONNAGES COULEUR"
+          },
+          {
+            "code": "5565",
+            "name": "ARTISTE ACCESSOIRES"
+          },
+          {
+            "code": "5566",
+            "name": "ARTISTE EFFETS SPÉCIAUX"
+          },
+          {
+            "code": "5567",
+            "name": "COLORISTE"
+          },
+          {
+            "code": "5568",
+            "name": "ASSEMBLEUR DE NIVEAU (COMPOSITEUR)"
+          },
+          {
+            "code": "5580",
+            "name": "STAGIAIRES ANIMATION 2D"
+          },
+          {
+            "code": "5590",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "5595",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5600",
+        "name": "ÉQUIPE ANIMATION 3D",
+        "accounts": [
+          {
+            "code": "5601",
+            "name": "DIRECTEUR DE L'ANIMATION 3D"
+          },
+          {
+            "code": "5602",
+            "name": "DIRECTEUR MODELISATION"
+          },
+          {
+            "code": "5605",
+            "name": "SCULPTEUR PERSONNAGES"
+          },
+          {
+            "code": "5606",
+            "name": "MODELEUR PERSONNAGES"
+          },
+          {
+            "code": "5608",
+            "name": "MODELEUR DÉCORS"
+          },
+          {
+            "code": "5609",
+            "name": "MODELEUR ACCESSOIRES"
+          },
+          {
+            "code": "5610",
+            "name": "DIRECTEUR SET-UP PERSONNAGES"
+          },
+          {
+            "code": "5611",
+            "name": "SET-UP PERSONNAGES"
+          },
+          {
+            "code": "5620",
+            "name": "DIRECTEUR TEXTURES ET MAPPING"
+          },
+          {
+            "code": "5621",
+            "name": "ARTISTE(S) TEXTURES ET MAPPING"
+          },
+          {
+            "code": "5630",
+            "name": "DIRECTEUR LAYOUT 3D"
+          },
+          {
+            "code": "5631",
+            "name": "INFOGRAPHISTES LAYOUT 3D"
+          },
+          {
+            "code": "5640",
+            "name": "DIRECTEUR TECHNIQUE"
+          },
+          {
+            "code": "5641",
+            "name": "DIRECTEUR TECHNIQUE ADJOINT"
+          },
+          {
+            "code": "5642",
+            "name": "ADMINISTRATEUR SYSTÈME"
+          },
+          {
+            "code": "5643",
+            "name": "DÉVELOPPEUR / INGÉNIEUR"
+          },
+          {
+            "code": "5650",
+            "name": "DIRECTEUR DE L'ANIMATION KEYFRAME"
+          },
+          {
+            "code": "5651",
+            "name": "CHEF D'ÉQUIPE DE L'ANIMATION KEYFRAME"
+          },
+          {
+            "code": "5652",
+            "name": "ANIMATEURS"
+          },
+          {
+            "code": "5659",
+            "name": "ANIMATEUR DE LA CAMÉRA"
+          },
+          {
+            "code": "5660",
+            "name": "DIRECTEUR ÉCLAIRAGE"
+          },
+          {
+            "code": "5661",
+            "name": "ARTISTES ÉCLAIRAGES"
+          },
+          {
+            "code": "5670",
+            "name": "DIRECTEUR ANIMATEUR EFFETS SPÉCIAUX"
+          },
+          {
+            "code": "5671",
+            "name": "ANIMATEURS FX"
+          },
+          {
+            "code": "5672",
+            "name": "DIRECTEUR ANIMATEUR RENDU"
+          },
+          {
+            "code": "5673",
+            "name": "ANIMATEUR RENDU"
+          },
+          {
+            "code": "5674",
+            "name": "DIRECTEUR ANIMATEUR COMPOSITING"
+          },
+          {
+            "code": "5675",
+            "name": "ANIMATEUR COMPOSITING"
+          },
+          {
+            "code": "5679",
+            "name": "TECHNICIEN EN CONTRÔLE DE QUALITÉ"
+          },
+          {
+            "code": "5680",
+            "name": "STAGIAIRES ANIMATION 3D"
+          },
+          {
+            "code": "5690",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "5695",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5700",
+        "name": "ÉQUIPE MOCAP",
+        "accounts": [
+          {
+            "code": "5701",
+            "name": "OPÉRATEUR TEMPS RÉEL"
+          },
+          {
+            "code": "5705",
+            "name": "DIRECTEUR ANIMATEUR TEMPS RÉEL"
+          },
+          {
+            "code": "5710",
+            "name": "ANIMATEUR TEMPS RÉEL"
+          },
+          {
+            "code": "5715",
+            "name": "SUPERVISEUR DE CAPTURE DE MOUVEMENT"
+          },
+          {
+            "code": "5720",
+            "name": "OPÉRATEUR DE TOURNAGE"
+          },
+          {
+            "code": "5725",
+            "name": "ANIMATEUR POUR TRAITEMENT DE DONNÉES"
+          },
+          {
+            "code": "5730",
+            "name": "BRICOLEUR DE SERVICE POUR ACCESSOIRES"
+          },
+          {
+            "code": "5780",
+            "name": "STAGIAIRES MOCAP"
+          },
+          {
+            "code": "5785",
+            "name": "FORFAIT MOCAP"
+          },
+          {
+            "code": "5790",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "5795",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5800",
+        "name": "AVANTAGES SOCIAUX - ANIMATION",
+        "accounts": [
+          {
+            "code": "5801",
+            "name": "AVANTAGES SOCIAUX - ANIMATION"
+          },
+          {
+            "code": "5895",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5900",
+        "name": "MATÉRIEL ET FOURNITURES - ANIMATION",
+        "accounts": [
+          {
+            "code": "5901",
+            "name": "STATIONS DE TRAVAIL"
+          },
+          {
+            "code": "5902",
+            "name": "STATION SERVEUR FICHIER"
+          },
+          {
+            "code": "5905",
+            "name": "MÉMOIRE SUPPLÉMENTAIRE"
+          },
+          {
+            "code": "5906",
+            "name": "UPS POUR PROTECTION CONTRE PANNE ET FLUCTUATION DE COURANT"
+          },
+          {
+            "code": "5908",
+            "name": "STATION MAINTENANCE SERVEUR FICHIER"
+          },
+          {
+            "code": "5909",
+            "name": "PARC DE CALCULS"
+          },
+          {
+            "code": "5910",
+            "name": "MÉMOIRE ET PUISSANCE (CPU) SUPPLÉMENTAIRES"
+          },
+          {
+            "code": "5920",
+            "name": "NETWORK - NFS (NETWORK FILE SYSTEM)"
+          },
+          {
+            "code": "5925",
+            "name": "INSTALLATION RÉSEAU ET ÉQUIPEMENT RÉSEAU"
+          },
+          {
+            "code": "5935",
+            "name": "LOGICIELS"
+          },
+          {
+            "code": "5945",
+            "name": "LICENCES"
+          },
+          {
+            "code": "5950",
+            "name": "PÉRIPHÉRIQUES"
+          },
+          {
+            "code": "5954",
+            "name": "SUPPORT TECHNIQUE ET MAINTENANCE"
+          },
+          {
+            "code": "5955",
+            "name": "PALETTRES GRAPHIQUES"
+          },
+          {
+            "code": "5960",
+            "name": "SYSTÈME BACK-UP"
+          },
+          {
+            "code": "5965",
+            "name": "MATÉRIEAUX D'ENREGISTREMENT"
+          },
+          {
+            "code": "5970",
+            "name": "BANQUE D'ÉLÉMENTS 3D/FRAIS STOCKAGE NUMÉRIQUE"
+          },
+          {
+            "code": "5975",
+            "name": "FOURNITURES"
+          },
+          {
+            "code": "5980",
+            "name": "RENDERING"
+          },
+          {
+            "code": "5889",
+            "name": "ÉCORESPONSABILITÉ/GESTION DES MATIÈRES RÉSIDUELLES"
+          },
+          {
+            "code": "5995",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total production"
+      },
+      {
+        "kind": "category",
+        "code": "6000",
+        "name": "ÉQUIPE MONTAGE",
+        "accounts": [
+          {
+            "code": "6001",
+            "name": "SUPERVISEUR DE POSTPRODUCTION"
+          },
+          {
+            "code": "6002",
+            "name": "COORDONNATEUR DE POSTPRODUCTION"
+          },
+          {
+            "code": "6010",
+            "name": "MONTEUR"
+          },
+          {
+            "code": "6012",
+            "name": "ASSISTANT MONTEUR"
+          },
+          {
+            "code": "6018",
+            "name": "APPRENTI MONTEUR"
+          },
+          {
+            "code": "6020",
+            "name": "CONCEPTEUR SONORE"
+          },
+          {
+            "code": "6021",
+            "name": "SUPERVISEUR MONTAGE SONORE"
+          },
+          {
+            "code": "6022",
+            "name": "MONTEUR DIALOGUES"
+          },
+          {
+            "code": "6024",
+            "name": "MONTEUR EFFETS SONORES"
+          },
+          {
+            "code": "6030",
+            "name": "MONTEUR MUSIQUE"
+          },
+          {
+            "code": "6035",
+            "name": "ASSISTANT MONTEUR SONORE"
+          },
+          {
+            "code": "6040",
+            "name": "SUPERVISEUR DE POSTSYNCHRONISATION (ADR)"
+          },
+          {
+            "code": "6041",
+            "name": "MAIN-D'ŒUVRE BRUITAGE"
+          },
+          {
+            "code": "6042",
+            "name": "AUTRE MAIN-D'ŒUVRE"
+          },
+          {
+            "code": "6060",
+            "name": "VOYAGE"
+          },
+          {
+            "code": "6065",
+            "name": "SÉJOUR"
+          },
+          {
+            "code": "6070",
+            "name": "TRANSCRIPTION DES DIALOGUES"
+          },
+          {
+            "code": "6090",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "6092",
+            "name": "ALLOCATIONS (CELLULAIRE, ORDINATEUR, PETIT MATÉRIEL, ETC.)"
+          },
+          {
+            "code": "6095",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6100",
+        "name": "ÉQUIPEMENT DE MONTAGE",
+        "accounts": [
+          {
+            "code": "6101",
+            "name": "SALLES DE MONTAGE"
+          },
+          {
+            "code": "6110",
+            "name": "ÉQUIPEMENT DE MONTAGE (LINÉAIRE/NON LINÉAIRE)"
+          },
+          {
+            "code": "6130",
+            "name": "ACHATS MONTAGE IMAGE"
+          },
+          {
+            "code": "6135",
+            "name": "ACHATS MONTAGE SONORE"
+          },
+          {
+            "code": "6140",
+            "name": "PETITE CAISSE POSTPRODUCTION"
+          },
+          {
+            "code": "6150",
+            "name": "MESSAGERIE"
+          },
+          {
+            "code": "6189",
+            "name": "ÉCORESPONSABILITÉ/GESTION DES MATIÈRES RÉSIDUELLES"
+          },
+          {
+            "code": "6195",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6200",
+        "name": "POSTPRODUCTION VIDÉO (IMAGE)",
+        "accounts": [
+          {
+            "code": "6201",
+            "name": "MONTAGE :"
+          },
+          {
+            "code": "6205",
+            "name": "MONTAGE EN LATÉRAL (OFF LINE) :"
+          },
+          {
+            "code": "6210",
+            "name": "PROGRAMME DE MONTAGE : CLEAN LIST"
+          },
+          {
+            "code": "6215",
+            "name": "EN LIGNE :"
+          },
+          {
+            "code": "6221",
+            "name": "CORRECTION DE LA COULEUR"
+          },
+          {
+            "code": "6225",
+            "name": "GÉNÉRATEUR DE CARACTÈRES"
+          },
+          {
+            "code": "6230",
+            "name": "\"COMPUTER CLEAN\" (DVNR)"
+          },
+          {
+            "code": "6232",
+            "name": "DIRT-FIX"
+          },
+          {
+            "code": "6240",
+            "name": "GRAPHIQUES"
+          },
+          {
+            "code": "6245",
+            "name": "CAMÉRA(S) GRAPHIQUE(S)"
+          },
+          {
+            "code": "6250",
+            "name": "INSERTION EN STUDIO"
+          },
+          {
+            "code": "6255",
+            "name": "\"LAYBACK\""
+          },
+          {
+            "code": "6257",
+            "name": "COPIES DE TRAVAIL/MONTAGE"
+          },
+          {
+            "code": "6260",
+            "name": "COPIES DE SÉCURITÉ"
+          },
+          {
+            "code": "6262",
+            "name": "INTERMÉDIAIRE NUMÉRIQUE"
+          },
+          {
+            "code": "6264",
+            "name": "COPIES DE DISTRIBUTION:"
+          },
+          {
+            "code": "6265",
+            "name": "LIVRABLES VIDÉO - BIBLIOTHÈQUE ET ARCHIVES (BAC)"
+          },
+          {
+            "code": "6266",
+            "name": "COPIES VARIÉES/CONVERSIONS"
+          },
+          {
+            "code": "6268",
+            "name": "COPIES DE VISIONNEMENT"
+          },
+          {
+            "code": "6295",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6300",
+        "name": "POSTPRODUCTION VIDÉO (SON)",
+        "accounts": [
+          {
+            "code": "6301",
+            "name": "BANDE MAÎTRESSE AUDIO :"
+          },
+          {
+            "code": "6305",
+            "name": "BANDE MAÎTRESSE MONTÉE :"
+          },
+          {
+            "code": "6310",
+            "name": "ENREGISTREMENT VOIX HORS CHAMP :"
+          },
+          {
+            "code": "6315",
+            "name": "PRÉ-MIXAGE :"
+          },
+          {
+            "code": "6320",
+            "name": "SWEETENING"
+          },
+          {
+            "code": "6325",
+            "name": "MIXAGE :"
+          },
+          {
+            "code": "6330",
+            "name": "\"RE-STRIPE\" :"
+          },
+          {
+            "code": "6335",
+            "name": "BRUITAGE :"
+          },
+          {
+            "code": "6340",
+            "name": "BANDE INTERNATIONALE (M&E)"
+          },
+          {
+            "code": "6395",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6400",
+        "name": "POSTPRODUCTION FILM (IMAGE)",
+        "accounts": [
+          {
+            "code": "6401",
+            "name": "COPIE DIRECTE (SLASH)"
+          },
+          {
+            "code": "6405",
+            "name": "MONTAGE NÉGATIF"
+          },
+          {
+            "code": "6410",
+            "name": "COPIE ZÉRO"
+          },
+          {
+            "code": "6415",
+            "name": "FONDUS/FONDUS ENCHAÎNÉS"
+          },
+          {
+            "code": "6420",
+            "name": "INTERPOSITIF"
+          },
+          {
+            "code": "6425",
+            "name": "INTERNÉGATIF"
+          },
+          {
+            "code": "6430",
+            "name": "CONTRETYPE (C.R.I.)"
+          },
+          {
+            "code": "6435",
+            "name": "COPIE(S) D'ESSAI"
+          },
+          {
+            "code": "6440",
+            "name": "FENÊTRE DE TREMPAGE"
+          },
+          {
+            "code": "6445",
+            "name": "CIRAGE/POLISSAGE"
+          },
+          {
+            "code": "6450",
+            "name": "COPIES D'EXPLOIT./DISTRIBUTION"
+          },
+          {
+            "code": "6452",
+            "name": "COPIE(S) À FAIBLE CONTRASTE"
+          },
+          {
+            "code": "6455",
+            "name": "TAXES GOUVERNEMENTALES"
+          },
+          {
+            "code": "6460",
+            "name": "RÉDUCTION/GONFLAGE"
+          },
+          {
+            "code": "6465",
+            "name": "PRODUITS ET ARCHIVES VIDÉO"
+          },
+          {
+            "code": "6470",
+            "name": "BLU-RAYS/DVDS"
+          },
+          {
+            "code": "6480",
+            "name": "VOÛTES/ENTREPOSAGE"
+          },
+          {
+            "code": "6495",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6500",
+        "name": "POSTPRODUCTION FILM (SON)",
+        "accounts": [
+          {
+            "code": "6501",
+            "name": "ENREGISTREMENT EFFETS ORIGINAUX"
+          },
+          {
+            "code": "6504",
+            "name": "ACHATS D'EFFETS/SONOTHÈQUE"
+          },
+          {
+            "code": "6508",
+            "name": "TRAITEMENT SONORE"
+          },
+          {
+            "code": "6510",
+            "name": "NARRATION/VOIX SUR DIALOGUE"
+          },
+          {
+            "code": "6515",
+            "name": "REPIQUAGE SONORE :"
+          },
+          {
+            "code": "6520",
+            "name": "COPIE DIRECTE SON (SLASH)"
+          },
+          {
+            "code": "6522",
+            "name": "BANDE RYTHMO"
+          },
+          {
+            "code": "6525",
+            "name": "ENREG. POSTSYNCH (A.D.R)"
+          },
+          {
+            "code": "6530",
+            "name": "BRUITAGE :"
+          },
+          {
+            "code": "6535",
+            "name": "PROJECTIONS D'ÉVALUATIONS"
+          },
+          {
+            "code": "6537",
+            "name": "PROJECTIONS INTERLOCK"
+          },
+          {
+            "code": "6540",
+            "name": "PRÉ-MIXAGE"
+          },
+          {
+            "code": "6545",
+            "name": "MIXAGE :"
+          },
+          {
+            "code": "6548",
+            "name": "COPIE MAÎTRESSE"
+          },
+          {
+            "code": "6550",
+            "name": "COPIE DE PROTECTION"
+          },
+          {
+            "code": "6552",
+            "name": "BANDE INTERNATIONALE (M&E)"
+          },
+          {
+            "code": "6555",
+            "name": "PISTE OPTIQUE :"
+          },
+          {
+            "code": "6560",
+            "name": "RÉDUCTION/GONFLAGE-PISTE OPTIQUE :"
+          },
+          {
+            "code": "6570",
+            "name": "SYSTÈME DOLBY :"
+          },
+          {
+            "code": "6595",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6600",
+        "name": "MUSIQUE",
+        "accounts": [
+          {
+            "code": "6601",
+            "name": "SUPERVISEUR DE MUSIQUE"
+          },
+          {
+            "code": "6602",
+            "name": "BANDE-TÉMOIN PRÉENREGISTRÉE :"
+          },
+          {
+            "code": "6610",
+            "name": "COMPOSITEUR(S)"
+          },
+          {
+            "code": "6615",
+            "name": "ADAPTATEURS/ORCHESTRATION/COPISTES"
+          },
+          {
+            "code": "6620",
+            "name": "CHEF D'ORCHESTRE"
+          },
+          {
+            "code": "6625",
+            "name": "MUSICIENS"
+          },
+          {
+            "code": "6630",
+            "name": "SESSION(S) DE POINTAGE"
+          },
+          {
+            "code": "6640",
+            "name": "STUDIO"
+          },
+          {
+            "code": "6650",
+            "name": "VOYAGE"
+          },
+          {
+            "code": "6655",
+            "name": "SÉJOUR"
+          },
+          {
+            "code": "6660",
+            "name": "MIXAGE"
+          },
+          {
+            "code": "6665",
+            "name": "MATÉRIEL"
+          },
+          {
+            "code": "6670",
+            "name": "DROITS DE MUSIQUE :"
+          },
+          {
+            "code": "6671",
+            "name": "COORDONNATEUR - LIBÉRATION DE DROITS MUSICAUX"
+          },
+          {
+            "code": "6690",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "6695",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6700",
+        "name": "TITRES/OPTIQUES/ARCHIVES/EFFETS VISUELS",
+        "accounts": [
+          {
+            "code": "6701",
+            "name": "TITRES :"
+          },
+          {
+            "code": "6720",
+            "name": "EFFETS NUMÉRIQUES/OPTIQUES"
+          },
+          {
+            "code": "6730",
+            "name": "ARCHIVE :"
+          },
+          {
+            "code": "6750",
+            "name": "EFFETS VISUELS (VFX) / IMAGES CONÇUES PAR ORD. :"
+          },
+          {
+            "code": "6790",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "6795",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6800",
+        "name": "VERSION",
+        "accounts": [
+          {
+            "code": "6801",
+            "name": "PRÉPARATION"
+          },
+          {
+            "code": "6802",
+            "name": "DOUBLAGE :"
+          },
+          {
+            "code": "6805",
+            "name": "REPIQUAGE OPTIQUE"
+          },
+          {
+            "code": "6808",
+            "name": "TITRES ET GRAPHISME"
+          },
+          {
+            "code": "6810",
+            "name": "COPIE ZÉRO"
+          },
+          {
+            "code": "6820",
+            "name": "INTERPOSITIF"
+          },
+          {
+            "code": "6825",
+            "name": "INTERNÉGATIF"
+          },
+          {
+            "code": "6835",
+            "name": "COPIE D'ESSAI"
+          },
+          {
+            "code": "6850",
+            "name": "COPIE DISTRIBUTION"
+          },
+          {
+            "code": "6852",
+            "name": "DCP/BANDE VIDÉO MAÎTRESSE"
+          },
+          {
+            "code": "6890",
+            "name": "SOUS-TITRAGE CODÉ"
+          },
+          {
+            "code": "6892",
+            "name": "DESCRIPTION VIDÉO"
+          },
+          {
+            "code": "6895",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6900",
+        "name": "AMORTISSEMENT (SÉRIE)"
+      },
+      {
+        "kind": "production_total",
+        "name": "Total post"
+      },
+      {
+        "kind": "category",
+        "code": "7000",
+        "name": "PUBLICITÉ",
+        "accounts": [
+          {
+            "code": "7001",
+            "name": "PUBLICITÉ EN COURS DE PRODUCTION"
+          },
+          {
+            "code": "7002",
+            "name": "COORDONATEUR DE LA PUBLICITÉ"
+          },
+          {
+            "code": "7005",
+            "name": "FRAIS DE PUBLICITÉ/PRESSE"
+          },
+          {
+            "code": "7010",
+            "name": "SITE WEB DE PRODUCTION"
+          },
+          {
+            "code": "7012",
+            "name": "MÉDIAS SOCIAUX DE PRODUCTION / RÉFÉRENCEMENT (SEO)"
+          },
+          {
+            "code": "7020",
+            "name": "PHOTOGRAPHE DE PLATEAU"
+          },
+          {
+            "code": "7021",
+            "name": "ÉQUIPEMENT PHOTO"
+          },
+          {
+            "code": "7022",
+            "name": "SÉANCE PHOTOS"
+          },
+          {
+            "code": "7025",
+            "name": "PHOTOS/DÉVELOPPEMENT/IMPRESSION"
+          },
+          {
+            "code": "7040",
+            "name": "PROMOTION"
+          },
+          {
+            "code": "7045",
+            "name": "DISTRIBUTION NUMÉRIQUE/DVD/BLU-RAYS"
+          },
+          {
+            "code": "7050",
+            "name": "RELATIONS PUBLIQUES"
+          },
+          {
+            "code": "7065",
+            "name": "DOSSIER DE PRESSE ÉLECTRONIQUE"
+          },
+          {
+            "code": "7090",
+            "name": "AVANTAGES SOCIAUX"
+          },
+          {
+            "code": "7095",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "7100",
+        "name": "FRAIS GÉNÉRAUX/DIVERS",
+        "accounts": [
+          {
+            "code": "7101",
+            "name": "ASSURANCES"
+          },
+          {
+            "code": "7105",
+            "name": "FRAIS MÉDICAUX"
+          },
+          {
+            "code": "7110",
+            "name": "FRAIS LÉGAUX"
+          },
+          {
+            "code": "7120",
+            "name": "COMPTABLE POSTPRODUCTION"
+          },
+          {
+            "code": "7125",
+            "name": "FRAIS DE VÉRIFICATION"
+          },
+          {
+            "code": "7130",
+            "name": "FRAIS DE BANQUE"
+          },
+          {
+            "code": "7195",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "7200",
+        "name": "COÛTS INDIRECTS",
+        "accounts": [
+          {
+            "code": "7201",
+            "name": "FRAIS D'ADMINISTRATION"
+          },
+          {
+            "code": "7210",
+            "name": "ADMINISTRATION DES CRÉDITS D'IMPÔT"
+          },
+          {
+            "code": "7220",
+            "name": "FINANCEMENT INTÉRIMAIRE"
+          },
+          {
+            "code": "7230",
+            "name": "AUTRE FINANCEMENT"
+          },
+          {
+            "code": "7250",
+            "name": "ENREGISTREMENT ISAN"
+          },
+          {
+            "code": "7289",
+            "name": "ACCRÉDITATION/CERTIFICATION ÉCORESPONSABLE"
+          },
+          {
+            "code": "7295",
+            "name": "DIVERS"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total autres"
+      },
+      {
+        "kind": "category",
+        "code": "8000",
+        "name": "IMPRÉVUS",
+        "accounts": [
+          {
+            "code": "8001",
+            "name": "IMPRÉVUS"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total imprevus"
+      },
+      {
+        "kind": "category",
+        "code": "8100",
+        "name": "GARANTIE DE BONNE FIN",
+        "accounts": [
+          {
+            "code": "8101",
+            "name": "GARANTIE DE BONNE FIN"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total garantie de bonne fin"
+      }
+    ]
+  }
+}

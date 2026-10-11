@@ -1,0 +1,3477 @@
+{
+  "format": "method-budget",
+  "version": 1,
+  "budget": {
+    "title": "DISNEY ANIMATION",
+    "base_currency": "USD",
+    "account_coding": {
+      "category_width": 2,
+      "account_width": 2,
+      "sub_width": 0,
+      "set_width": 0,
+      "separator": ""
+    },
+    "units": {
+      "Allow": {
+        "plural": "Allow"
+      },
+      "Day": {
+        "plural": "Days",
+        "hours": "10"
+      },
+      "Flat": {
+        "plural": "Flat"
+      },
+      "Hour": {
+        "plural": "Hours",
+        "hours": "1"
+      },
+      "Month": {
+        "plural": "Months",
+        "hours": "200"
+      },
+      "Week": {
+        "plural": "Weeks",
+        "hours": "50"
+      }
+    },
+    "topsheet": [
+      {
+        "kind": "category",
+        "code": "0501",
+        "name": "BONUSES",
+        "accounts": [
+          {
+            "code": "050199",
+            "name": "SIGNING BONUS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "0502",
+        "name": "RELOCATION ALLOW"
+      },
+      {
+        "kind": "category",
+        "code": "0503",
+        "name": "PRODUCERS"
+      },
+      {
+        "kind": "category",
+        "code": "0504",
+        "name": "EARLY HIRES"
+      },
+      {
+        "kind": "category",
+        "code": "0505",
+        "name": "ARTISTIC LIAISON"
+      },
+      {
+        "kind": "category",
+        "code": "0506",
+        "name": "PAYOFFS/SETTLEMENTS"
+      },
+      {
+        "kind": "category",
+        "code": "0507",
+        "name": "CONTRACTUAL PERKS"
+      },
+      {
+        "kind": "category",
+        "code": "0590",
+        "name": "FRINGES",
+        "accounts": [
+          {
+            "code": "0599",
+            "name": "FRINGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "1000",
+        "name": "STORY RIGHTS",
+        "accounts": [
+          {
+            "code": "1001",
+            "name": "OPTION RIGHTS PURCHASED"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "1100",
+        "name": "WRITING",
+        "accounts": [
+          {
+            "code": "1101",
+            "name": "STUDIO WRITER ALLOCATION"
+          },
+          {
+            "code": "1102",
+            "name": "FREELANCE WRITERS"
+          },
+          {
+            "code": "1105",
+            "name": "STORY CONSULTANT"
+          },
+          {
+            "code": "1107",
+            "name": "WRITERS ASSISTANT"
+          },
+          {
+            "code": "1108",
+            "name": "SCRIPT PRINTING"
+          },
+          {
+            "code": "1110",
+            "name": "STORY DEVELOPMENT"
+          },
+          {
+            "code": "1115",
+            "name": "RESEARCH"
+          },
+          {
+            "code": "1135",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "1140",
+            "name": "RENTALS"
+          },
+          {
+            "code": "1170",
+            "name": "TRAVEL & LIVING"
+          },
+          {
+            "code": "1180",
+            "name": "TRAINEES"
+          },
+          {
+            "code": "1190",
+            "name": "MISC."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "1200",
+        "name": "PRODUCER & STAFF",
+        "accounts": [
+          {
+            "code": "1201",
+            "name": "EXEC.PRODUCER"
+          },
+          {
+            "code": "1202",
+            "name": "SUPERV. PRODUCER"
+          },
+          {
+            "code": "1203",
+            "name": "ASSOC.PRODUCER"
+          },
+          {
+            "code": "1204",
+            "name": "PRODUCERS"
+          },
+          {
+            "code": "1205",
+            "name": "ASSOCIATE PRODUCERS"
+          },
+          {
+            "code": "1207",
+            "name": "ASST TO PRODUCERS"
+          },
+          {
+            "code": "1208",
+            "name": "ASST TO PRODUCERS OT"
+          },
+          {
+            "code": "1210",
+            "name": "PRODUCER PA"
+          },
+          {
+            "code": "1211",
+            "name": "PRODUCER PA OT"
+          },
+          {
+            "code": "1230",
+            "name": "ENTERTAINMENT"
+          },
+          {
+            "code": "1235",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "1240",
+            "name": "RENTALS"
+          },
+          {
+            "code": "1250",
+            "name": "AUDIO/VIDEO EQUIPMENT"
+          },
+          {
+            "code": "1270",
+            "name": "TRAVEL & LIVING"
+          },
+          {
+            "code": "1280",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "1290",
+            "name": "MISC."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "1300",
+        "name": "DIRECTOR & STAFF",
+        "accounts": [
+          {
+            "code": "1301",
+            "name": "DIRECTORS"
+          },
+          {
+            "code": "1307",
+            "name": "ASST TO DIRECTORS"
+          },
+          {
+            "code": "1308",
+            "name": "ASST.TO DIRECTORS OT"
+          },
+          {
+            "code": "1310",
+            "name": "CONSULTANT"
+          },
+          {
+            "code": "1330",
+            "name": "ENTERTAINMENT"
+          },
+          {
+            "code": "1335",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "1340",
+            "name": "RENTALS"
+          },
+          {
+            "code": "1350",
+            "name": "AUDIO/VISUAL EQUIPMENT"
+          },
+          {
+            "code": "1370",
+            "name": "TRAVEL & LIVING"
+          },
+          {
+            "code": "1380",
+            "name": "TRAINEES"
+          },
+          {
+            "code": "1390",
+            "name": "MISC."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "1400",
+        "name": "TALENT",
+        "accounts": [
+          {
+            "code": "1401",
+            "name": "PRINCIPAL CAST"
+          },
+          {
+            "code": "1402",
+            "name": "SUPPORTING CAST"
+          },
+          {
+            "code": "140299",
+            "name": "MISC SUPPORT CAST/HUMAN VOICES"
+          },
+          {
+            "code": "1403",
+            "name": "SOUND ALIKE VOCALS"
+          },
+          {
+            "code": "1404",
+            "name": "SONG FEES-PRINCIPAL"
+          },
+          {
+            "code": "1408",
+            "name": "SCRATCH VOICES"
+          },
+          {
+            "code": "1414",
+            "name": "TEACHER/WELFARE WORKER"
+          },
+          {
+            "code": "1420",
+            "name": "LOOPING/PICKUPS/EXP"
+          },
+          {
+            "code": "1425",
+            "name": "DIALOGUE COACH"
+          },
+          {
+            "code": "1429",
+            "name": "OUTSIDE CASTING SERVICES"
+          },
+          {
+            "code": "1430",
+            "name": "STUDIO CASTING DIRECTOR"
+          },
+          {
+            "code": "1431",
+            "name": "CASTING REFERENCE"
+          },
+          {
+            "code": "1432",
+            "name": "CASTING SUPPLIES"
+          },
+          {
+            "code": "1434",
+            "name": "CAST CONTRACTUAL PERKS"
+          },
+          {
+            "code": "1470",
+            "name": "TRAVEL & LIVING"
+          },
+          {
+            "code": "1480",
+            "name": "TRAINEES"
+          },
+          {
+            "code": "1490",
+            "name": "MISC."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "1900",
+        "name": "ATL FRINGE",
+        "accounts": [
+          {
+            "code": "1999",
+            "name": "FRINGES"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total above-the-line"
+      },
+      {
+        "kind": "category",
+        "code": "2000",
+        "name": "PRODUCTION STAFF",
+        "accounts": [
+          {
+            "code": "2001",
+            "name": "PRODUCTION MANAGERS"
+          },
+          {
+            "code": "2005",
+            "name": "PRODUCTION SUPERVISORS"
+          },
+          {
+            "code": "2006",
+            "name": "PROD SUPERVISOR OT"
+          },
+          {
+            "code": "2007",
+            "name": "PROD COORDINATORS"
+          },
+          {
+            "code": "200799",
+            "name": "TEMP. HIRES"
+          },
+          {
+            "code": "2008",
+            "name": "PROD. COORD OT"
+          },
+          {
+            "code": "2009",
+            "name": "PROD. ACCT."
+          },
+          {
+            "code": "2010",
+            "name": "ASST PROD ACCOUNTANTS"
+          },
+          {
+            "code": "2011",
+            "name": "PROD ACCT OT"
+          },
+          {
+            "code": "2012",
+            "name": "ADMIN ASSISTANTS"
+          },
+          {
+            "code": "2013",
+            "name": "ADMIN ASST OT"
+          },
+          {
+            "code": "2016",
+            "name": "TECHNICAL LIASON"
+          },
+          {
+            "code": "2018",
+            "name": "PRODUCTION ASSISTANTS"
+          },
+          {
+            "code": "201899",
+            "name": "MISC PROD ASST"
+          },
+          {
+            "code": "2019",
+            "name": "PROD.ASST OT"
+          },
+          {
+            "code": "2020",
+            "name": "DIGITAL OPERATIONS MGR"
+          },
+          {
+            "code": "2022",
+            "name": "LINE TESTERS"
+          },
+          {
+            "code": "2023",
+            "name": "LINE TESTERS OT"
+          },
+          {
+            "code": "2030",
+            "name": "PRODUCTION ENTERTAINMENT"
+          },
+          {
+            "code": "2050",
+            "name": "EQUIPMENT"
+          },
+          {
+            "code": "2070",
+            "name": "TRAVEL & LIVING"
+          },
+          {
+            "code": "2080",
+            "name": "TRAINEES"
+          },
+          {
+            "code": "2090",
+            "name": "MISC."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2100",
+        "name": "STORY",
+        "accounts": [
+          {
+            "code": "2102",
+            "name": "STORYBOARD SUPERVISORS"
+          },
+          {
+            "code": "2103",
+            "name": "STORY SUPERVISOR OT"
+          },
+          {
+            "code": "2104",
+            "name": "STORYBOARD ARTISTS"
+          },
+          {
+            "code": "210499",
+            "name": "MISC STORY ARTISTS"
+          },
+          {
+            "code": "2105",
+            "name": "STORY ARTIST OT"
+          },
+          {
+            "code": "2120",
+            "name": "STORY BLITZ"
+          },
+          {
+            "code": "2144",
+            "name": "STORY SUPPLIES"
+          },
+          {
+            "code": "2146",
+            "name": "REF & RESEARCH"
+          },
+          {
+            "code": "2150",
+            "name": "EQUIPMENT"
+          },
+          {
+            "code": "2180",
+            "name": "TRAINEES"
+          },
+          {
+            "code": "2181",
+            "name": "TRAINEE OT"
+          },
+          {
+            "code": "2190",
+            "name": "MISC."
+          },
+          {
+            "code": "2199",
+            "name": "SCREENING/REDO OVERAGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2200",
+        "name": "VIS DEV/ART DEPARTMENT",
+        "accounts": [
+          {
+            "code": "2202",
+            "name": "PRODUCTION DESIGNER"
+          },
+          {
+            "code": "2203",
+            "name": "PROD DESIGNER OT"
+          },
+          {
+            "code": "2204",
+            "name": "ART DIRECTOR/ASST"
+          },
+          {
+            "code": "2205",
+            "name": "ART DIRECTOR OT"
+          },
+          {
+            "code": "2206",
+            "name": "SET DESIGNERS"
+          },
+          {
+            "code": "220699",
+            "name": "SET/SEQ DESIGNERS-MISC."
+          },
+          {
+            "code": "2207",
+            "name": "SET/SEQ DESIGN O.T."
+          },
+          {
+            "code": "2208",
+            "name": "CHARACTER DESIGNER"
+          },
+          {
+            "code": "220899",
+            "name": "MISC CHARACTER DESIGNERS"
+          },
+          {
+            "code": "2209",
+            "name": "CHARACTER DESIGN OT"
+          },
+          {
+            "code": "2210",
+            "name": "VIS DEV ARTIST"
+          },
+          {
+            "code": "221099",
+            "name": "VIS DEV ARTISTS MISC"
+          },
+          {
+            "code": "2211",
+            "name": "VIS DEV ARTIST OT"
+          },
+          {
+            "code": "2212",
+            "name": "VIS DEV CONSULTANT"
+          },
+          {
+            "code": "221299",
+            "name": "MISC VIS DEV CONSULTANTS"
+          },
+          {
+            "code": "2214",
+            "name": "PROP/COSTUME DESIGN"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2215",
+        "name": "TBD",
+        "accounts": [
+          {
+            "code": "2216",
+            "name": "MATTE PAINTERS"
+          },
+          {
+            "code": "2217",
+            "name": "MATTE PAINTERS OT"
+          },
+          {
+            "code": "2218",
+            "name": "SCULPTURE MODEL LABOR"
+          },
+          {
+            "code": "221899",
+            "name": "MISC"
+          },
+          {
+            "code": "2219",
+            "name": "SCULPT/MODEL OT"
+          },
+          {
+            "code": "2220",
+            "name": "VIS DEV BLITZ"
+          },
+          {
+            "code": "2242",
+            "name": "MOLDS"
+          },
+          {
+            "code": "2244",
+            "name": "ART SUPPLIES"
+          },
+          {
+            "code": "2246",
+            "name": "RESEARCH REFERENCE"
+          },
+          {
+            "code": "2248",
+            "name": "LOOK OF THE PICTURE EXPS"
+          },
+          {
+            "code": "2250",
+            "name": "EQUIPMENT"
+          },
+          {
+            "code": "2252",
+            "name": "ARTIST PRESENTATION SPLYS"
+          },
+          {
+            "code": "2254",
+            "name": "COLOR XEROX (PDI)"
+          },
+          {
+            "code": "2260",
+            "name": "SUB-CONTRACT"
+          },
+          {
+            "code": "2270",
+            "name": "TRAVEL-PRE VIS RESEARCH"
+          },
+          {
+            "code": "2290",
+            "name": "MISC."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2300",
+        "name": "LAYOUT",
+        "accounts": [
+          {
+            "code": "2302",
+            "name": "HEAD OF LAYOUT"
+          },
+          {
+            "code": "2303",
+            "name": "HEAD OF LAYOUT OT"
+          },
+          {
+            "code": "2304",
+            "name": "LAYOUT PIC SUPERVISOR"
+          },
+          {
+            "code": "2305",
+            "name": "LAYOUT PIC SUPERVISOR OT"
+          },
+          {
+            "code": "2306",
+            "name": "WORKBOOK ARTISTS"
+          },
+          {
+            "code": "230699",
+            "name": "MISC / TRAINING"
+          },
+          {
+            "code": "2307",
+            "name": "WORKBOOK ARTIST OT"
+          },
+          {
+            "code": "2308",
+            "name": "ROUGH LAYOUT ARTISTS"
+          },
+          {
+            "code": "230899",
+            "name": "MISC"
+          },
+          {
+            "code": "2309",
+            "name": "ROUGH LAYOUT ARTISTS OT"
+          },
+          {
+            "code": "2310",
+            "name": "CLEAN UP LAYOUT ARTISTS"
+          },
+          {
+            "code": "2311",
+            "name": "CLEAN UP LAYOUT ART. OT"
+          },
+          {
+            "code": "2312",
+            "name": "CG LAYOUT ARTISTS"
+          },
+          {
+            "code": "231299",
+            "name": "MISC./ TRAINING"
+          },
+          {
+            "code": "2313",
+            "name": "CG LAYOUT ARTISTS OT"
+          },
+          {
+            "code": "2314",
+            "name": "BLUE SKETCH ARTIST"
+          },
+          {
+            "code": "2315",
+            "name": "BLUE SKETCH ARTIST OT"
+          },
+          {
+            "code": "2330",
+            "name": "LAYOUT T.D."
+          },
+          {
+            "code": "2331",
+            "name": "LAYOUT TD OT"
+          },
+          {
+            "code": "2346",
+            "name": "LAYOUT REFERENCE/RESEARCH"
+          },
+          {
+            "code": "2360",
+            "name": "SUB-CONTRACTORS"
+          },
+          {
+            "code": "2380",
+            "name": "TRAINEES"
+          },
+          {
+            "code": "2381",
+            "name": "TRAINEES OT"
+          },
+          {
+            "code": "2390",
+            "name": "CINEMATIC COMPLEXITY FUND"
+          },
+          {
+            "code": "2399",
+            "name": "SCREENING/REDO OVERAGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2400",
+        "name": "ANIMATION"
+      },
+      {
+        "kind": "category",
+        "code": "2401",
+        "name": "ANIMATION DEPT. HEAD",
+        "accounts": [
+          {
+            "code": "2402",
+            "name": "SUPERVISING ANIMATORS"
+          },
+          {
+            "code": "240201",
+            "name": "#1"
+          },
+          {
+            "code": "240202",
+            "name": "#2"
+          },
+          {
+            "code": "240299",
+            "name": "MISC./TRAINING"
+          },
+          {
+            "code": "2403",
+            "name": "SUPERVISING ANIMATOR OT"
+          },
+          {
+            "code": "2404",
+            "name": "ANIMATORS"
+          },
+          {
+            "code": "240401",
+            "name": "#1"
+          },
+          {
+            "code": "240402",
+            "name": "#2"
+          },
+          {
+            "code": "240499",
+            "name": "MISC./TRAINING"
+          },
+          {
+            "code": "2405",
+            "name": "ANIMATOR OT"
+          },
+          {
+            "code": "2406",
+            "name": "ANIMATING ASSISTANTS"
+          },
+          {
+            "code": "2407",
+            "name": "ANIM ASST OT"
+          },
+          {
+            "code": "2408",
+            "name": "ROUGH INBETWEENERS"
+          },
+          {
+            "code": "240801",
+            "name": "#1"
+          },
+          {
+            "code": "240802",
+            "name": "#2"
+          },
+          {
+            "code": "240899",
+            "name": "MISC./TRAINING"
+          },
+          {
+            "code": "2409",
+            "name": "ROUGH INBETWEENERS OT"
+          },
+          {
+            "code": "2410",
+            "name": "SPRITE ANIMATORS - MANES & TAILS"
+          },
+          {
+            "code": "241099",
+            "name": "MISC"
+          },
+          {
+            "code": "2411",
+            "name": "MANES & TAILS O.T."
+          },
+          {
+            "code": "2430",
+            "name": "ANIMATION TECH DIR"
+          },
+          {
+            "code": "2431",
+            "name": "ANIM TD OT"
+          },
+          {
+            "code": "2460",
+            "name": "SUB-CONTRACTORS"
+          },
+          {
+            "code": "246099",
+            "name": "TRAINING - OUTSOURCE"
+          },
+          {
+            "code": "2480",
+            "name": "TRAINEES"
+          },
+          {
+            "code": "2481",
+            "name": "TRAINEES OT"
+          },
+          {
+            "code": "2490",
+            "name": "MISC."
+          },
+          {
+            "code": "249099",
+            "name": "MISC."
+          },
+          {
+            "code": "2499",
+            "name": "SCREENING/REDO OVERAGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2500",
+        "name": "FINAL LINE",
+        "accounts": [
+          {
+            "code": "2501",
+            "name": "FINAL LINE PRE-VIS/R&D EXP"
+          },
+          {
+            "code": "2502",
+            "name": "FINAL LINE DEPT HEAD"
+          },
+          {
+            "code": "2503",
+            "name": "FINAL LINE DEPT HEAD OT"
+          },
+          {
+            "code": "2504",
+            "name": "CHARACTER LEADS"
+          },
+          {
+            "code": "250401",
+            "name": "#1"
+          },
+          {
+            "code": "250402",
+            "name": "#2"
+          },
+          {
+            "code": "2505",
+            "name": "CHARACTER LEAD OT"
+          },
+          {
+            "code": "2506",
+            "name": "KEY ASSISTANTS"
+          },
+          {
+            "code": "250601",
+            "name": "#1"
+          },
+          {
+            "code": "250602",
+            "name": "#2"
+          },
+          {
+            "code": "250699",
+            "name": "MISC. LABOR"
+          },
+          {
+            "code": "2507",
+            "name": "KEY ASSTS OT"
+          },
+          {
+            "code": "2508",
+            "name": "ASSISTANTS"
+          },
+          {
+            "code": "250801",
+            "name": "#1"
+          },
+          {
+            "code": "250802",
+            "name": "#2"
+          },
+          {
+            "code": "250899",
+            "name": "MISC / TRAINING"
+          },
+          {
+            "code": "2509",
+            "name": "ASSISTANTS OT"
+          },
+          {
+            "code": "2510",
+            "name": "BREAKDOWN"
+          },
+          {
+            "code": "251005",
+            "name": ""
+          },
+          {
+            "code": "251007",
+            "name": ""
+          },
+          {
+            "code": "251099",
+            "name": "MISC"
+          },
+          {
+            "code": "2511",
+            "name": "BREAKDOWN OT"
+          },
+          {
+            "code": "2512",
+            "name": "INBETWEENERS"
+          },
+          {
+            "code": "251201",
+            "name": "#1"
+          },
+          {
+            "code": "251202",
+            "name": "#2"
+          },
+          {
+            "code": "251299",
+            "name": "MISC"
+          },
+          {
+            "code": "2513",
+            "name": "INBETWEENERS OT"
+          },
+          {
+            "code": "2530",
+            "name": "FINAL LINE TD"
+          },
+          {
+            "code": "2531",
+            "name": "FINAL LINE TD OT"
+          },
+          {
+            "code": "2560",
+            "name": "OUTSIDE SERVICE"
+          },
+          {
+            "code": "256099",
+            "name": "TRAINING"
+          },
+          {
+            "code": "2580",
+            "name": "TRAINEES"
+          },
+          {
+            "code": "2581",
+            "name": "TRAINEES OT"
+          },
+          {
+            "code": "2590",
+            "name": "MISC/ANIM. & CU"
+          },
+          {
+            "code": "259099",
+            "name": "ANIM./CLEAN-UP O.T."
+          },
+          {
+            "code": "2599",
+            "name": "ANIM. TO C/U OVERTIME"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2600",
+        "name": "2D EFFECTS",
+        "accounts": [
+          {
+            "code": "2601",
+            "name": "EFX PRE-VISUALIZATION/R&D"
+          },
+          {
+            "code": "2602",
+            "name": "EFX DEPT HEAD"
+          },
+          {
+            "code": "2603",
+            "name": "EFX DEPT HEAD OT"
+          },
+          {
+            "code": "2604",
+            "name": "EFX PIC SUPERVISOR"
+          },
+          {
+            "code": "2605",
+            "name": "EFX PIC SUPERVISOR OT"
+          },
+          {
+            "code": "2606",
+            "name": "EFX ANIMATORS"
+          },
+          {
+            "code": "260601",
+            "name": "#1"
+          },
+          {
+            "code": "260602",
+            "name": "#2"
+          },
+          {
+            "code": "260699",
+            "name": "MISC"
+          },
+          {
+            "code": "2607",
+            "name": "EFX ANIMATORS OT"
+          },
+          {
+            "code": "2608",
+            "name": "EFX ANIM ASST"
+          },
+          {
+            "code": "260801",
+            "name": "#1"
+          },
+          {
+            "code": "260802",
+            "name": "#2"
+          },
+          {
+            "code": "260899",
+            "name": "MISC"
+          },
+          {
+            "code": "2609",
+            "name": "EFX ANIM ASST OT"
+          },
+          {
+            "code": "2610",
+            "name": "EFX BREAKDOWN/INB"
+          },
+          {
+            "code": "261001",
+            "name": "#1"
+          },
+          {
+            "code": "261002",
+            "name": "#2"
+          },
+          {
+            "code": "261099",
+            "name": "MISC"
+          },
+          {
+            "code": "2611",
+            "name": "EFX BREAKDOWN/INB OT"
+          },
+          {
+            "code": "2612",
+            "name": "TONES/RIMS ANIMATORS"
+          },
+          {
+            "code": "2613",
+            "name": "TONES/RIMS OT"
+          },
+          {
+            "code": "2614",
+            "name": "TONES/RIMS ASSST ANIMATORS"
+          },
+          {
+            "code": "2615",
+            "name": "TONES/RIMS ASST ANIM OT"
+          },
+          {
+            "code": "2620",
+            "name": "2-D EFX BLITZ"
+          },
+          {
+            "code": "2660",
+            "name": "OUTSIDE SERVICE"
+          },
+          {
+            "code": "266001",
+            "name": "2D EFX"
+          },
+          {
+            "code": "266002",
+            "name": "OUTSOURCE"
+          },
+          {
+            "code": "2680",
+            "name": "TRAINEES"
+          },
+          {
+            "code": "2681",
+            "name": "TRAINEES OT"
+          },
+          {
+            "code": "2690",
+            "name": "MISC"
+          },
+          {
+            "code": "2699",
+            "name": "SCREENING/REDO OVERAGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2700",
+        "name": "SOFTWARE DEVELOPING",
+        "accounts": [
+          {
+            "code": "2702",
+            "name": "LEAD SOFTWARE DEVELOPERS"
+          },
+          {
+            "code": "270201",
+            "name": "TBA LEAD #1"
+          },
+          {
+            "code": "2703",
+            "name": "LEAD SFTWRE DEVELOPER OT"
+          },
+          {
+            "code": "2704",
+            "name": "SOFTWARE DEVELOPER"
+          },
+          {
+            "code": "2705",
+            "name": "SOFTWARE DEV OT"
+          },
+          {
+            "code": "2710",
+            "name": "2D/3D ENVIRONMENTS PHS I & II"
+          },
+          {
+            "code": "271001",
+            "name": "2D/3D ENVIRONMENTS PHASE I"
+          },
+          {
+            "code": "271002",
+            "name": "2D/3D ENVIRONMENTS PHASE II"
+          },
+          {
+            "code": "271003",
+            "name": "DIGITIAL HORSE DETAIL"
+          },
+          {
+            "code": "2711",
+            "name": "MOTION PAINT"
+          },
+          {
+            "code": "271101",
+            "name": "MOTION PAINTING"
+          },
+          {
+            "code": "271102",
+            "name": "MOTION PAINTING"
+          },
+          {
+            "code": "271103",
+            "name": "PARTNERSHIP COSTS"
+          },
+          {
+            "code": "271104",
+            "name": "PARTNERSHIP COSTS"
+          },
+          {
+            "code": "271105",
+            "name": "MOTION PAINT STUDIO COST"
+          },
+          {
+            "code": "2712",
+            "name": "HERD DEVELOPMENT"
+          },
+          {
+            "code": "271201",
+            "name": "ARTIST #1"
+          },
+          {
+            "code": "2727",
+            "name": "PROD DEDICATED SUPPORT OT"
+          },
+          {
+            "code": "2735",
+            "name": "SOFTWARE PURCHASES"
+          },
+          {
+            "code": "2750",
+            "name": "HARDWARE PURCHASES"
+          },
+          {
+            "code": "2799",
+            "name": "SCREENING/REDO OVERAGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2800",
+        "name": "3D EFX/DIGITAL TECHNICIANS",
+        "accounts": [
+          {
+            "code": "2801",
+            "name": "CG PRE-VISUALIZATION/R&D"
+          },
+          {
+            "code": "280101",
+            "name": "TBA PRE VIS TECHNICAL DIRECTOR"
+          },
+          {
+            "code": "280102",
+            "name": "TBA PRE VIS TECHNICAL DIRECTOR"
+          },
+          {
+            "code": "280103",
+            "name": "HORSE MODELING CG PRE VIS"
+          },
+          {
+            "code": "280104",
+            "name": "TBA PRE VIS FIRE/WATER SPRITES"
+          },
+          {
+            "code": "2802",
+            "name": "CG DEPT HEAD"
+          },
+          {
+            "code": "2803",
+            "name": "CG DEPT HEAD OT"
+          },
+          {
+            "code": "2804",
+            "name": "DIGITAL EFX SUPERVISOR"
+          },
+          {
+            "code": "2805",
+            "name": "DIGITAL EFX O.T."
+          },
+          {
+            "code": "2806",
+            "name": "CG ANIMATORS"
+          },
+          {
+            "code": "280601",
+            "name": "#1"
+          },
+          {
+            "code": "280602",
+            "name": "#2"
+          },
+          {
+            "code": "280699",
+            "name": "MISC. ANIMATORS"
+          },
+          {
+            "code": "2807",
+            "name": "CG ANIMATORS OT"
+          },
+          {
+            "code": "2808",
+            "name": "TECHNICAL DIRECTORS"
+          },
+          {
+            "code": "280801",
+            "name": "TBA TD"
+          },
+          {
+            "code": "280802",
+            "name": "TBA TD"
+          },
+          {
+            "code": "280803",
+            "name": "TBA TD"
+          },
+          {
+            "code": "2809",
+            "name": "TECHNICAL DIRECTORS OT"
+          },
+          {
+            "code": "2810",
+            "name": "SPRITE ANIM/CG MODELERS"
+          },
+          {
+            "code": "281001",
+            "name": "#1"
+          },
+          {
+            "code": "281002",
+            "name": "#2"
+          },
+          {
+            "code": "281099",
+            "name": "MISC. CG MODELERS"
+          },
+          {
+            "code": "2811",
+            "name": "SPRITE ANIM/CG MODEL OT"
+          },
+          {
+            "code": "2818",
+            "name": "2D CGI"
+          },
+          {
+            "code": "281801",
+            "name": "#1"
+          },
+          {
+            "code": "281802",
+            "name": "#2"
+          },
+          {
+            "code": "2819",
+            "name": "2D CGI OT"
+          },
+          {
+            "code": "2820",
+            "name": "CG CHARACTER T.D.'S"
+          },
+          {
+            "code": "282001",
+            "name": "#1"
+          },
+          {
+            "code": "282002",
+            "name": "#2"
+          },
+          {
+            "code": "282099",
+            "name": "MISC / TRAINING"
+          },
+          {
+            "code": "2821",
+            "name": "CG CHARACTER T.D. OT"
+          },
+          {
+            "code": "2822",
+            "name": "LIGHTERS/RENDERERS"
+          },
+          {
+            "code": "2823",
+            "name": "LIGHTERS/RENDERERS OT"
+          },
+          {
+            "code": "2824",
+            "name": "PLOTTER"
+          },
+          {
+            "code": "2825",
+            "name": "PLOTTER OT"
+          },
+          {
+            "code": "2826",
+            "name": "3D EFX JR. TECH. DIR"
+          },
+          {
+            "code": "2827",
+            "name": "PROD.SUPP./3D EFX JR TD O.T."
+          },
+          {
+            "code": "2860",
+            "name": "SUBCONTRACTING"
+          },
+          {
+            "code": "2890",
+            "name": "MISC"
+          },
+          {
+            "code": "2899",
+            "name": "SCREENING/REDO OVERAGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "2900",
+        "name": "BACKGROUNDS",
+        "accounts": [
+          {
+            "code": "2901",
+            "name": "BG PRE-VISUALIZATION/R&D"
+          },
+          {
+            "code": "2902",
+            "name": "BACKGROUND SUPERVISOR"
+          },
+          {
+            "code": "2903",
+            "name": "BACKGROUND SUPERVISOR OT"
+          },
+          {
+            "code": "2904",
+            "name": "BACKGROUND PAINTERS"
+          },
+          {
+            "code": "290401",
+            "name": "#1"
+          },
+          {
+            "code": "290402",
+            "name": "#2"
+          },
+          {
+            "code": "290499",
+            "name": "MISC. BG PAINTERS"
+          },
+          {
+            "code": "2905",
+            "name": "BACKGROUND PAINTERS OT"
+          },
+          {
+            "code": "2906",
+            "name": "DIGITAL BG PAINTER/CORRECTOR"
+          },
+          {
+            "code": "2907",
+            "name": "DIG BG PAINTER/CRRCTR OT"
+          },
+          {
+            "code": "2930",
+            "name": "BG TECHNICAL DIRECTOR"
+          },
+          {
+            "code": "2931",
+            "name": "BG TECHNICAL DIRECTOR OT"
+          },
+          {
+            "code": "2990",
+            "name": "MISC"
+          },
+          {
+            "code": "2999",
+            "name": "SCREENING/REDO OVERAGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "3000",
+        "name": "SCENE PLANNING",
+        "accounts": [
+          {
+            "code": "3001",
+            "name": "SC. PLAN PRE-VIS/R&D EXP"
+          },
+          {
+            "code": "3002",
+            "name": "SCENE PLANNING DEPT HEAD"
+          },
+          {
+            "code": "3003",
+            "name": "SCENE PLANNING DEPT HEAD OT"
+          },
+          {
+            "code": "3004",
+            "name": "SCENE PLANNERS"
+          },
+          {
+            "code": "300401",
+            "name": "#1"
+          },
+          {
+            "code": "300402",
+            "name": "#2"
+          },
+          {
+            "code": "300499",
+            "name": "MISC. SCENE PLANNER"
+          },
+          {
+            "code": "3005",
+            "name": "SCENE PLANNERS OT"
+          },
+          {
+            "code": "3006",
+            "name": "RE-USE WRANGLER"
+          },
+          {
+            "code": "3007",
+            "name": "RE-USE WRANGLER OT"
+          },
+          {
+            "code": "3030",
+            "name": "SCENE PLANING TD"
+          },
+          {
+            "code": "3031",
+            "name": "SC. PLAN TD OT"
+          },
+          {
+            "code": "3060",
+            "name": "SUB CONTRACTORS"
+          },
+          {
+            "code": "3080",
+            "name": "TRAINEES"
+          },
+          {
+            "code": "3081",
+            "name": "TRAINEES OT"
+          },
+          {
+            "code": "3090",
+            "name": "MISC"
+          },
+          {
+            "code": "3099",
+            "name": "SCREENING/REDO OVERAGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "3100",
+        "name": "DIGITAL SCANNING",
+        "accounts": [
+          {
+            "code": "3102",
+            "name": "SCAN SUPERVISOR"
+          },
+          {
+            "code": "3103",
+            "name": "SCAN SUPERVISOR OT"
+          },
+          {
+            "code": "3104",
+            "name": "SCAN OPERATORS"
+          },
+          {
+            "code": "310401",
+            "name": "#1"
+          },
+          {
+            "code": "310402",
+            "name": "#2"
+          },
+          {
+            "code": "310499",
+            "name": "WIDESCREEN/OVERSIZE ART:DOWNSHOOTER"
+          },
+          {
+            "code": "3105",
+            "name": "SCAN OPERATORS OT"
+          },
+          {
+            "code": "3106",
+            "name": "BG SCANNERS"
+          },
+          {
+            "code": "310601",
+            "name": "#1"
+          },
+          {
+            "code": "310699",
+            "name": "WIDESCREEN/OVERSIZE: PLOTTER"
+          },
+          {
+            "code": "3107",
+            "name": "BG SCANNERS O.T."
+          },
+          {
+            "code": "3108",
+            "name": "PLOTTER"
+          },
+          {
+            "code": "3109",
+            "name": "PLOTTER O.T."
+          },
+          {
+            "code": "3160",
+            "name": "OUTSIDE SERVICE"
+          },
+          {
+            "code": "3180",
+            "name": "TRAINEES"
+          },
+          {
+            "code": "3181",
+            "name": "TRAINEES OT"
+          },
+          {
+            "code": "3190",
+            "name": "MISC"
+          },
+          {
+            "code": "3199",
+            "name": "SCREENING/REDO OVERAGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "3200",
+        "name": "ANIMATION CHECKING",
+        "accounts": [
+          {
+            "code": "3202",
+            "name": "CHECKING SUPERVISORS"
+          },
+          {
+            "code": "320201",
+            "name": "#1"
+          },
+          {
+            "code": "320202",
+            "name": "#2"
+          },
+          {
+            "code": "3203",
+            "name": "CHECKING SUPERVISORS OT"
+          },
+          {
+            "code": "3204",
+            "name": "ANIMATION CHECKERS"
+          },
+          {
+            "code": "320401",
+            "name": "#1"
+          },
+          {
+            "code": "320402",
+            "name": "#2"
+          },
+          {
+            "code": "3205",
+            "name": "ANIMATION CHECKERS OT"
+          },
+          {
+            "code": "3206",
+            "name": "SCAN CHECKER"
+          },
+          {
+            "code": "3207",
+            "name": "SCAN CHECKER OT"
+          },
+          {
+            "code": "3260",
+            "name": "SUB CONTRACTORS"
+          },
+          {
+            "code": "3280",
+            "name": "TRAINEES"
+          },
+          {
+            "code": "3281",
+            "name": "TRAINEES OT"
+          },
+          {
+            "code": "3290",
+            "name": "MISC"
+          },
+          {
+            "code": "3299",
+            "name": "SCREENING/REDO OVERAGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "3300",
+        "name": "DIGITAL COLOR MODEL",
+        "accounts": [
+          {
+            "code": "3301",
+            "name": "COLOR PRE-VIS/DEV"
+          },
+          {
+            "code": "3302",
+            "name": "COLOR MODEL SUPERVISOR"
+          },
+          {
+            "code": "3303",
+            "name": "COLOR MODEL SUPERVISOR OT"
+          },
+          {
+            "code": "3304",
+            "name": "COLOR MODELISTS"
+          },
+          {
+            "code": "330401",
+            "name": "#1"
+          },
+          {
+            "code": "330402",
+            "name": "#2"
+          },
+          {
+            "code": "3305",
+            "name": "COLOR MODELISTS OT"
+          },
+          {
+            "code": "3306",
+            "name": "COLOR MDL ASST/MARK UP"
+          },
+          {
+            "code": "3307",
+            "name": "COLOR MDL ASST/MARK UP OT"
+          },
+          {
+            "code": "3380",
+            "name": "TRAINEES"
+          },
+          {
+            "code": "3381",
+            "name": "TRAINEES OT"
+          },
+          {
+            "code": "3390",
+            "name": "MISC"
+          },
+          {
+            "code": "3399",
+            "name": "SCREENING/REDO OVERAGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "3400",
+        "name": "DIGITAL PAINTING",
+        "accounts": [
+          {
+            "code": "3402",
+            "name": "PAINT SUPERVISOR"
+          },
+          {
+            "code": "3403",
+            "name": "PAINT SPRVSR OT"
+          },
+          {
+            "code": "3404",
+            "name": "PAINTERS"
+          },
+          {
+            "code": "340401",
+            "name": "#1"
+          },
+          {
+            "code": "340402",
+            "name": "#2"
+          },
+          {
+            "code": "3405",
+            "name": "PAINTERS OT"
+          },
+          {
+            "code": "3406",
+            "name": "PAINT CHECKER"
+          },
+          {
+            "code": "340601",
+            "name": "#1"
+          },
+          {
+            "code": "340602",
+            "name": "#2"
+          },
+          {
+            "code": "3407",
+            "name": "PAINT CHECKER OT"
+          },
+          {
+            "code": "3408",
+            "name": "PAINT MARK UP"
+          },
+          {
+            "code": "340801",
+            "name": "#1"
+          },
+          {
+            "code": "340802",
+            "name": "#2"
+          },
+          {
+            "code": "3409",
+            "name": "PAINT MARK UP OT"
+          },
+          {
+            "code": "3460",
+            "name": "SUB-CONTRACT"
+          },
+          {
+            "code": "3480",
+            "name": "TRAINEES"
+          },
+          {
+            "code": "3481",
+            "name": "TRAINEES OT"
+          },
+          {
+            "code": "3490",
+            "name": "MISC."
+          },
+          {
+            "code": "3499",
+            "name": "SCREENING/REDO OVERAGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "3900",
+        "name": "VOICE RECORDING",
+        "accounts": [
+          {
+            "code": "3904",
+            "name": "DIALOGUE TRANSCRIPTION"
+          },
+          {
+            "code": "3906",
+            "name": "XFERS-LABOR"
+          },
+          {
+            "code": "3908",
+            "name": "XFERS-STOCK"
+          },
+          {
+            "code": "3909",
+            "name": "RECORDING STUDIOS RNTL"
+          },
+          {
+            "code": "3910",
+            "name": "SESSION FOOD"
+          },
+          {
+            "code": "3940",
+            "name": "EQUIPMENT RENTALS"
+          },
+          {
+            "code": "3990",
+            "name": "MISC."
+          },
+          {
+            "code": "3999",
+            "name": "SCREENING/REDO OVERAGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4000",
+        "name": "FILM RECORDING",
+        "accounts": [
+          {
+            "code": "4001",
+            "name": "DEPT HEAD"
+          },
+          {
+            "code": "4002",
+            "name": "RECORDISTS"
+          },
+          {
+            "code": "4006",
+            "name": "TRANSFERS-MACHINE TIME"
+          },
+          {
+            "code": "4008",
+            "name": "TRANSFERS-STOCK"
+          },
+          {
+            "code": "4030",
+            "name": "CORRECTIONS"
+          },
+          {
+            "code": "4035",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "4040",
+            "name": "RENTALS"
+          },
+          {
+            "code": "4050",
+            "name": "EQUIPMENT"
+          },
+          {
+            "code": "4060",
+            "name": "OUTSIDE CONTRACTING"
+          },
+          {
+            "code": "4070",
+            "name": "VOICE OVER SESSIONS"
+          },
+          {
+            "code": "4090",
+            "name": "MISC"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4100",
+        "name": "FILM STOCK/TRANSFERS",
+        "accounts": [
+          {
+            "code": "4102",
+            "name": "NEGATIVE RAW STOCK"
+          },
+          {
+            "code": "4103",
+            "name": "OUTSIDE CAMERA SERVICE"
+          },
+          {
+            "code": "410301",
+            "name": "FILM-STORY REELS"
+          },
+          {
+            "code": "410302",
+            "name": "WORKBOOK TURNOVER"
+          },
+          {
+            "code": "4104",
+            "name": "DEVELOP NEGATIVE"
+          },
+          {
+            "code": "4106",
+            "name": "PRINT DAILIES"
+          },
+          {
+            "code": "4108",
+            "name": "MAG TRANSFERS LABOR"
+          },
+          {
+            "code": "4110",
+            "name": "MAG TRANSFERS STOCK"
+          },
+          {
+            "code": "4111",
+            "name": "SE FINAL COLOR"
+          },
+          {
+            "code": "4112",
+            "name": "SCANNING"
+          },
+          {
+            "code": "4113",
+            "name": "VIDEO TAPE/PRODUCTION USE"
+          },
+          {
+            "code": "4115",
+            "name": "AUDIO TAPE/PRODUCTION USE"
+          },
+          {
+            "code": "4116",
+            "name": "STANDARD CONVERSION"
+          },
+          {
+            "code": "4160",
+            "name": "OUTSIDE CONTRACTING"
+          },
+          {
+            "code": "4190",
+            "name": "MISC."
+          },
+          {
+            "code": "4199",
+            "name": "SCREENING/REDO OVERAGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4200",
+        "name": "AVAILABLE"
+      },
+      {
+        "kind": "category",
+        "code": "4300",
+        "name": "CG MODELING",
+        "accounts": [
+          {
+            "code": "4301",
+            "name": "CG MODELING PRE VIS/DEVEL"
+          },
+          {
+            "code": "4302",
+            "name": "CG MODELING DEPT HEAD/SPVSR"
+          },
+          {
+            "code": "4303",
+            "name": "CG MODELING DEPT HEAD OT"
+          },
+          {
+            "code": "4304",
+            "name": "CG MODELING LEAD"
+          },
+          {
+            "code": "4305",
+            "name": "CG MODELING LEAD OT"
+          },
+          {
+            "code": "4306",
+            "name": "CG MODELING ANIMATORS"
+          },
+          {
+            "code": "4307",
+            "name": "CG MODELING ANIM OT"
+          },
+          {
+            "code": "4308",
+            "name": "CG PROCEDURAL MODELING"
+          },
+          {
+            "code": "4340",
+            "name": "CG MODELING CORRECTIONS"
+          },
+          {
+            "code": "4350",
+            "name": "CG MODELING EQUIPMENT"
+          },
+          {
+            "code": "4360",
+            "name": "CG MODELING SUB CONTRACTORS"
+          },
+          {
+            "code": "4375",
+            "name": "CG MODELING CREW CONTRACTORS"
+          },
+          {
+            "code": "4380",
+            "name": "CG MODELING TRAINEES"
+          },
+          {
+            "code": "4390",
+            "name": "CG MODELING MISC"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4400",
+        "name": "CG CHARACTER TD'S",
+        "accounts": [
+          {
+            "code": "4401",
+            "name": "CG CHAR TD'S DEVEL/PRE VIS"
+          },
+          {
+            "code": "4402",
+            "name": "CG CHAR TD'S DEPT HEAD/SPVSR"
+          },
+          {
+            "code": "4403",
+            "name": "CG CHAR TD'S DEPT HEAD/SPVSR OT"
+          },
+          {
+            "code": "4404",
+            "name": "CG CHAR TD LEADS"
+          },
+          {
+            "code": "4405",
+            "name": "CG CHAR TD LEADS OT"
+          },
+          {
+            "code": "4406",
+            "name": "CG CHAR TD'S"
+          },
+          {
+            "code": "4407",
+            "name": "CG CHAR TD'S OT"
+          },
+          {
+            "code": "4440",
+            "name": "CG CHAR TD'S CORRECTIONS"
+          },
+          {
+            "code": "4450",
+            "name": "CG CHAR TD'S EQUIPMENT"
+          },
+          {
+            "code": "4460",
+            "name": "CG CHAR TD'S SUB CONTRACTORS"
+          },
+          {
+            "code": "4475",
+            "name": "CG CHAR TD'S CREW CONTRACTORS"
+          },
+          {
+            "code": "4480",
+            "name": "CG CHAR TD'S TRAINEES"
+          },
+          {
+            "code": "4490",
+            "name": "CG CHAR TD'S MISC"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4500",
+        "name": "CG SEQUENCE TD'S",
+        "accounts": [
+          {
+            "code": "4501",
+            "name": "CG SEQ TD'S DEV/PRE VIS"
+          },
+          {
+            "code": "4502",
+            "name": "CG SEQ TD DEPT HEAD/SPVSR"
+          },
+          {
+            "code": "4503",
+            "name": "CG SEQ TD DEPT HEAD/SPVSR OT"
+          },
+          {
+            "code": "4504",
+            "name": "CG SEQ TD LEAD"
+          },
+          {
+            "code": "4505",
+            "name": "CG SEQ TD LEAD OT"
+          },
+          {
+            "code": "4506",
+            "name": "CG SEQ TD"
+          },
+          {
+            "code": "4507",
+            "name": "CG SEQ TD OT"
+          },
+          {
+            "code": "4540",
+            "name": "CG SEQ TD CORRECTIONS"
+          },
+          {
+            "code": "4550",
+            "name": "CG SEQ TD EQUIPMENT"
+          },
+          {
+            "code": "4575",
+            "name": "CG SEQ TD CONTRACTUAL CREW"
+          },
+          {
+            "code": "4580",
+            "name": "CG SEQ TD TRAINEES"
+          },
+          {
+            "code": "4590",
+            "name": "CG SEQ TD MISC"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4600",
+        "name": "CG LAYOUT",
+        "accounts": [
+          {
+            "code": "4601",
+            "name": "CG LAYOUT DEVEL/PRE VIS"
+          },
+          {
+            "code": "4602",
+            "name": "CG HEAD OF LAYOUT"
+          },
+          {
+            "code": "4603",
+            "name": "CG HEAD OF LAYOUT OT"
+          },
+          {
+            "code": "4604",
+            "name": "CG LAYOUT PIX SUPERVISOR"
+          },
+          {
+            "code": "4605",
+            "name": "CG LAYOUT PIX SUPERVISOR OT"
+          },
+          {
+            "code": "4606",
+            "name": "CG WORKBOOK ARTISTS"
+          },
+          {
+            "code": "4607",
+            "name": "CG WORKBOOK ARTISTS OT"
+          },
+          {
+            "code": "4608",
+            "name": "CG ROUGH LAYOUT ARTISTS"
+          },
+          {
+            "code": "4609",
+            "name": "CG ROUGH LAYOUT ARTISTS OT"
+          },
+          {
+            "code": "4612",
+            "name": "CG LAYOUT ARTIST"
+          },
+          {
+            "code": "4613",
+            "name": "CG LAYOUT ARTISTS OT"
+          },
+          {
+            "code": "4616",
+            "name": "CG SET BUILDER"
+          },
+          {
+            "code": "4617",
+            "name": "CG SET BUILDER OT"
+          },
+          {
+            "code": "4630",
+            "name": "CG LAYOUT TD"
+          },
+          {
+            "code": "4631",
+            "name": "CG LAYOUT TD OT"
+          },
+          {
+            "code": "4650",
+            "name": "CG LAYOUT EQUIPMENT"
+          },
+          {
+            "code": "4660",
+            "name": "CG LAYOUT SUBCONTRACTING"
+          },
+          {
+            "code": "4675",
+            "name": "CG LAYOUT CREW CONTRACT..."
+          },
+          {
+            "code": "4680",
+            "name": "CG LAYOUT TRAINEES"
+          },
+          {
+            "code": "4690",
+            "name": "CG LAYOUT MISC"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4700",
+        "name": "CG ANIMATION",
+        "accounts": [
+          {
+            "code": "4701",
+            "name": "CG MOTION DEVEL/PRE VIS"
+          },
+          {
+            "code": "4702",
+            "name": "CG MOTION DEPT HEAD"
+          },
+          {
+            "code": "4703",
+            "name": "CG MOTION DEPT HEAD OT"
+          },
+          {
+            "code": "4704",
+            "name": "CG MOTION DIRECTING ANIMATORS"
+          },
+          {
+            "code": "4705",
+            "name": "CG MOTION DIRECTING ANIM OT"
+          },
+          {
+            "code": "4706",
+            "name": "CG MOTION ANIMATORS"
+          },
+          {
+            "code": "4707",
+            "name": "CG MOTION ANIMATORS OT"
+          },
+          {
+            "code": "4708",
+            "name": "CG MOTION CONSULTANT"
+          },
+          {
+            "code": "4735",
+            "name": "CG MOTION PURCHASES"
+          },
+          {
+            "code": "4740",
+            "name": "CG MOTION RENTALS"
+          },
+          {
+            "code": "4750",
+            "name": "CG MOTION EQUIPMENT"
+          },
+          {
+            "code": "4760",
+            "name": "CG MOTION SUB CONTRACTORS"
+          },
+          {
+            "code": "4775",
+            "name": "CG MOTION CREW CONTRACTORS"
+          },
+          {
+            "code": "4780",
+            "name": "CG MOTION INTERNS"
+          },
+          {
+            "code": "4790",
+            "name": "CG MOTION MISC"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4800",
+        "name": "CG ANIMATION - LIGHTING",
+        "accounts": [
+          {
+            "code": "4801",
+            "name": "CG LIGHTING DEVEL/PRE VIS"
+          },
+          {
+            "code": "4802",
+            "name": "CG LIGHTING SEQ SPVSR"
+          },
+          {
+            "code": "4803",
+            "name": "CG LIGHTING SEQ SPVSR OT"
+          },
+          {
+            "code": "4804",
+            "name": "CG LIGHTING LEAD ANIMATORS"
+          },
+          {
+            "code": "4805",
+            "name": "CG LIGHTING LEAD ANIMATORS OT"
+          },
+          {
+            "code": "4806",
+            "name": "CG LIGHTING ANIMATORS"
+          },
+          {
+            "code": "4807",
+            "name": "CG LIGHTING ANIMATORS OT"
+          },
+          {
+            "code": "4820",
+            "name": "CG LIGHTING SHADER WRITER"
+          },
+          {
+            "code": "4821",
+            "name": "CG LIGHTING SHADER WRITER OT"
+          },
+          {
+            "code": "4830",
+            "name": "CG LIGHTING CORRECTIONS"
+          },
+          {
+            "code": "4835",
+            "name": "CG LIGHTING PURCHASES"
+          },
+          {
+            "code": "4840",
+            "name": "CG LIGHTING RENTALS"
+          },
+          {
+            "code": "4850",
+            "name": "CG LIGHTING EQUIPMENT"
+          },
+          {
+            "code": "4860",
+            "name": "CG LIGHTING SUB CONTRACTORS"
+          },
+          {
+            "code": "4875",
+            "name": "CG LIGHTING CREW CONTRACTORS"
+          },
+          {
+            "code": "4880",
+            "name": "CG LIGHTING INTERNS"
+          },
+          {
+            "code": "4890",
+            "name": "CG LIGHTING MISC"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4900",
+        "name": "CG ANIMATION - EFFECTS",
+        "accounts": [
+          {
+            "code": "4901",
+            "name": "CG EFFECTS DEVEL/PRE VIS"
+          },
+          {
+            "code": "4902",
+            "name": "CG EFFECTS DEPT HEAD"
+          },
+          {
+            "code": "4903",
+            "name": "CG EFFECTS DEPT HEAD OT"
+          },
+          {
+            "code": "4904",
+            "name": "CG EFFECTS DEPT LEAD ANIMATOR"
+          },
+          {
+            "code": "4905",
+            "name": "CG EFFECTS DEPT LEAD ANIM OT"
+          },
+          {
+            "code": "4906",
+            "name": "CG EFFECTS ANINMATORS"
+          },
+          {
+            "code": "4907",
+            "name": "CG EFFECTS ANINMATORS OT"
+          },
+          {
+            "code": "4920",
+            "name": "CG VISUAL EFFECTS SPVSR"
+          },
+          {
+            "code": "4930",
+            "name": "CG EFFECTS CORRECTIONS"
+          },
+          {
+            "code": "4935",
+            "name": "CG EFFECTS PURCHASES"
+          },
+          {
+            "code": "4940",
+            "name": "CG EFFECTS RENTALS"
+          },
+          {
+            "code": "4950",
+            "name": "CG EFFECTS EQUIPMENT"
+          },
+          {
+            "code": "4960",
+            "name": "CG EFFECTS SUB CONTRACTORS"
+          },
+          {
+            "code": "4975",
+            "name": "CG EFFECTS CREW CONTRACTORS"
+          },
+          {
+            "code": "4980",
+            "name": "CG EFFECTS TRAINEES"
+          },
+          {
+            "code": "4990",
+            "name": "CG EFFECTS MISC"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5000",
+        "name": "CG SURFACES",
+        "accounts": [
+          {
+            "code": "5001",
+            "name": "CG SURFACES DEVEL/PRE VIS"
+          },
+          {
+            "code": "5002",
+            "name": "CG SURFACES 3D PAINT SPVSR"
+          },
+          {
+            "code": "5003",
+            "name": "CG SURFACES 3D PAINT SPVSR OT"
+          },
+          {
+            "code": "5006",
+            "name": "CG SURFACES 3D PAINTER"
+          },
+          {
+            "code": "5007",
+            "name": "CG SURFACES 3D PAINTER OT"
+          },
+          {
+            "code": "5008",
+            "name": "CG SURFACES 3D PAINT FIX ARTIST"
+          },
+          {
+            "code": "5009",
+            "name": "CG SURFACES 3D PAINT FIX ARTIST OT"
+          },
+          {
+            "code": "5035",
+            "name": "CG SURFACES PURCHASES"
+          },
+          {
+            "code": "5040",
+            "name": "CG SURFACES RENTALS"
+          },
+          {
+            "code": "5050",
+            "name": "CG SURFACES EQUIPMENT"
+          },
+          {
+            "code": "5075",
+            "name": "CG SURFACES CREW CONTRACTORS"
+          },
+          {
+            "code": "5090",
+            "name": "CG SURFACES MISC"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5100",
+        "name": "ART SUPPLIES",
+        "accounts": [
+          {
+            "code": "5102",
+            "name": "ANIMATION SUPPLIES"
+          },
+          {
+            "code": "5104",
+            "name": "ANIMATION PAPER"
+          },
+          {
+            "code": "5106",
+            "name": "BACKGND SUPP/PAINT"
+          },
+          {
+            "code": "5110",
+            "name": "X-SHEETS"
+          },
+          {
+            "code": "5190",
+            "name": "MISC."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5200",
+        "name": "RENDERING",
+        "accounts": [
+          {
+            "code": "5201",
+            "name": "CG RENDERING DEVEL/PRE VIS"
+          },
+          {
+            "code": "5202",
+            "name": "CG RENDERING DEPT HEAD"
+          },
+          {
+            "code": "5203",
+            "name": "CG RENDERING DEPT HEAD OT"
+          },
+          {
+            "code": "5206",
+            "name": "CG RENDERING ASSISTANTS"
+          },
+          {
+            "code": "5207",
+            "name": "CG RENDERING ASSTS OT"
+          },
+          {
+            "code": "5230",
+            "name": "CG RENDERING CORRECTIONS"
+          },
+          {
+            "code": "5235",
+            "name": "CG RENDERING PURCHASES"
+          },
+          {
+            "code": "5240",
+            "name": "CG RENDERING RENTALS"
+          },
+          {
+            "code": "5260",
+            "name": "CG RENDERING SUB CONTRACTORS"
+          },
+          {
+            "code": "5275",
+            "name": "CG RENDERING CREW CONTRACTORS"
+          },
+          {
+            "code": "5280",
+            "name": "CG RENDERING TRAINEES"
+          },
+          {
+            "code": "5290",
+            "name": "CG RENDERING MISC"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5300",
+        "name": "LOCATIONS",
+        "accounts": [
+          {
+            "code": "5302",
+            "name": "SATELLITE LINK"
+          },
+          {
+            "code": "5304",
+            "name": "SHIPPING & CUSTOMS"
+          },
+          {
+            "code": "5370",
+            "name": "TRAVEL & LIVING"
+          },
+          {
+            "code": "5390",
+            "name": "MISC."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5400",
+        "name": "TRANSPORTATION",
+        "accounts": [
+          {
+            "code": "5402",
+            "name": "GAS & OIL/MILEAGE/PARKING"
+          },
+          {
+            "code": "5404",
+            "name": "TRANS/MESSENGERS"
+          },
+          {
+            "code": "5406",
+            "name": "DRIVERS/RUNNERS"
+          },
+          {
+            "code": "5408",
+            "name": "RENTED VEHICLES"
+          },
+          {
+            "code": "5490",
+            "name": "MISC."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5500",
+        "name": "AVAILABLE"
+      },
+      {
+        "kind": "category",
+        "code": "5600",
+        "name": "AVAILABLE"
+      },
+      {
+        "kind": "category",
+        "code": "5700",
+        "name": "ANIMATION SUPPLIES",
+        "accounts": [
+          {
+            "code": "5702",
+            "name": "ANIMATION SUPPLIES"
+          },
+          {
+            "code": "5704",
+            "name": "ANIMATION PAPER"
+          },
+          {
+            "code": "5706",
+            "name": "BACKGROUND SUPPLIES/PAINT"
+          },
+          {
+            "code": "5710",
+            "name": "X-SHEETS"
+          },
+          {
+            "code": "5790",
+            "name": "MISC"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5800",
+        "name": "LIVE ACTION REFERENCE",
+        "accounts": [
+          {
+            "code": "5802",
+            "name": "ACTORS"
+          },
+          {
+            "code": "5803",
+            "name": "CAMERA LABOR & EQUIP RENTAL"
+          },
+          {
+            "code": "5804",
+            "name": "EFFECTS"
+          },
+          {
+            "code": "5805",
+            "name": "TESTS"
+          },
+          {
+            "code": "580599",
+            "name": "MISC. WIDESCREEN TESTS"
+          },
+          {
+            "code": "5890",
+            "name": "MISC"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5900",
+        "name": "BTL FRINGE",
+        "accounts": [
+          {
+            "code": "5999",
+            "name": "FRINGES"
+          },
+          {
+            "code": "599901",
+            "name": "DISMISSAL PAY"
+          },
+          {
+            "code": "599902",
+            "name": "NEW SHOTS OVERTIME ALLOW"
+          },
+          {
+            "code": "599999",
+            "name": "FRINGES"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total production"
+      },
+      {
+        "kind": "category",
+        "code": "6100",
+        "name": "EDITORIAL",
+        "accounts": [
+          {
+            "code": "6101",
+            "name": "EDITORIAL SUPERVISOR"
+          },
+          {
+            "code": "610199",
+            "name": "MISC. EDITORS"
+          },
+          {
+            "code": "6102",
+            "name": "EDITORIAL SPRVSR OT"
+          },
+          {
+            "code": "6104",
+            "name": "ASSOC EDITORS OT"
+          },
+          {
+            "code": "6105",
+            "name": "ASST EDITORS"
+          },
+          {
+            "code": "610599",
+            "name": "MISC."
+          },
+          {
+            "code": "6106",
+            "name": "ASST EDITOR OT"
+          },
+          {
+            "code": "6107",
+            "name": "TRACK READERS"
+          },
+          {
+            "code": "610799",
+            "name": "MISC."
+          },
+          {
+            "code": "6108",
+            "name": "TRACK READER OT"
+          },
+          {
+            "code": "6109",
+            "name": "PROJECTION"
+          },
+          {
+            "code": "6111",
+            "name": "PRE-PRODUCTION SOUND"
+          },
+          {
+            "code": "6112",
+            "name": "SOUND PACKAGE"
+          },
+          {
+            "code": "6113",
+            "name": "ADR EDITOR"
+          },
+          {
+            "code": "6114",
+            "name": "FOLEY EDITOR"
+          },
+          {
+            "code": "6115",
+            "name": "SOUND EDIT ASST/APPRN"
+          },
+          {
+            "code": "6116",
+            "name": "OUTSIDE EDITING"
+          },
+          {
+            "code": "6117",
+            "name": "DIALOG TRX EDITING"
+          },
+          {
+            "code": "6120",
+            "name": "MUSIC EDITOR"
+          },
+          {
+            "code": "612099",
+            "name": "MUSIC EDIT O.T."
+          },
+          {
+            "code": "6121",
+            "name": "MUSIC EDIT ASST"
+          },
+          {
+            "code": "6122",
+            "name": "MUSIC EDIT RENTALS"
+          },
+          {
+            "code": "6125",
+            "name": "TRAILER EDITOR"
+          },
+          {
+            "code": "6132",
+            "name": "POST SHIP/MESSENGER"
+          },
+          {
+            "code": "6134",
+            "name": "CONTINUITY"
+          },
+          {
+            "code": "6135",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "6138",
+            "name": "CUTTING ROOM RENTAL"
+          },
+          {
+            "code": "613801",
+            "name": "EDITORIAL"
+          },
+          {
+            "code": "613802",
+            "name": "MUSIC EDITOR"
+          },
+          {
+            "code": "613803",
+            "name": "MUSIC ASST EDITOR"
+          },
+          {
+            "code": "6140",
+            "name": "EQUIP.RENTALS"
+          },
+          {
+            "code": "6142",
+            "name": "EQUIP REPAIR/MAINT"
+          },
+          {
+            "code": "6170",
+            "name": "TRAVEL & LIVING"
+          },
+          {
+            "code": "6180",
+            "name": "TRAINEES"
+          },
+          {
+            "code": "6190",
+            "name": "MISC."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6200",
+        "name": "POST VIDEO TAPE",
+        "accounts": [
+          {
+            "code": "6203",
+            "name": "TELECINE/KINESCOPE"
+          },
+          {
+            "code": "6204",
+            "name": "TAPE TO TAPE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6300",
+        "name": "MUSIC",
+        "accounts": [
+          {
+            "code": "6301",
+            "name": "MUSIC RIGHTS"
+          },
+          {
+            "code": "630101",
+            "name": "SYNC LICENSE"
+          },
+          {
+            "code": "6302",
+            "name": "MUSIC SUPERVISOR"
+          },
+          {
+            "code": "6303",
+            "name": "COMPOSER"
+          },
+          {
+            "code": "6304",
+            "name": "ORCHESTRATION"
+          },
+          {
+            "code": "6305",
+            "name": "COPYISTS"
+          },
+          {
+            "code": "6306",
+            "name": "PRE-PROD MUSIC"
+          },
+          {
+            "code": "630610",
+            "name": "DEMOS"
+          },
+          {
+            "code": "630620",
+            "name": "VOCAL COACHING"
+          },
+          {
+            "code": "630630",
+            "name": "AUDITIONS"
+          },
+          {
+            "code": "6307",
+            "name": "PRE-RECORDS"
+          },
+          {
+            "code": "6308",
+            "name": "UNDERSCORE MUSICIANS"
+          },
+          {
+            "code": "630899",
+            "name": "MISC."
+          },
+          {
+            "code": "6309",
+            "name": "UNDERSCORE VOCALS"
+          },
+          {
+            "code": "630901",
+            "name": "GROUP SINGERS"
+          },
+          {
+            "code": "630999",
+            "name": "DEMO SINGERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6310",
+        "name": "TALENT/PRODUCER",
+        "accounts": [
+          {
+            "code": "6311",
+            "name": "SONG WRITERS"
+          },
+          {
+            "code": "6312",
+            "name": "STAR VOCALISTS"
+          },
+          {
+            "code": "631299",
+            "name": "SINGERS"
+          },
+          {
+            "code": "6313",
+            "name": "SONG REC/PRODUCERS"
+          },
+          {
+            "code": "6330",
+            "name": "MUSIC CONSULTING"
+          },
+          {
+            "code": "6335",
+            "name": "PURCHASES/SUPPLIES"
+          },
+          {
+            "code": "6340",
+            "name": "INSTRUMENT RNTL/CARTAGE"
+          },
+          {
+            "code": "634099",
+            "name": "INSTRUMENT RNTL/CARTAGE"
+          },
+          {
+            "code": "6346",
+            "name": "SCORING FACILITY"
+          },
+          {
+            "code": "634601",
+            "name": "MIDI COMPOSITION SUITE FEE"
+          },
+          {
+            "code": "634602",
+            "name": "RECORDING STUDIO PACKAGE"
+          },
+          {
+            "code": "6370",
+            "name": "TRAVEL & LIVING"
+          },
+          {
+            "code": "637099",
+            "name": "MISC TRAVEL"
+          },
+          {
+            "code": "6390",
+            "name": "MISC."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6400",
+        "name": "POST PROD SOUND",
+        "accounts": [
+          {
+            "code": "6401",
+            "name": "TEMP DUBBING"
+          },
+          {
+            "code": "6402",
+            "name": "PRE DUB & FINAL DUB"
+          },
+          {
+            "code": "640201",
+            "name": "PRE DUB"
+          },
+          {
+            "code": "640202",
+            "name": "FINAL DUB"
+          },
+          {
+            "code": "6403",
+            "name": "ADR STAGE"
+          },
+          {
+            "code": "6404",
+            "name": "VOICE RECORDING"
+          },
+          {
+            "code": "6405",
+            "name": "VOICE TRANSFERS"
+          },
+          {
+            "code": "6407",
+            "name": "FOLEY STAGE & WALKERS"
+          },
+          {
+            "code": "6412",
+            "name": "TRANSFERS"
+          },
+          {
+            "code": "6430",
+            "name": "DOLBY/DTS LICENSE"
+          },
+          {
+            "code": "6440",
+            "name": "EQUIP PURCHASES"
+          },
+          {
+            "code": "6470",
+            "name": "TRAVEL & LIVING"
+          },
+          {
+            "code": "6490",
+            "name": "MISC."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6500",
+        "name": "PREVIEW",
+        "accounts": [
+          {
+            "code": "6501",
+            "name": "TEMP DUB FOR PREVIEW"
+          },
+          {
+            "code": "6502",
+            "name": "PREVIEWS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6600",
+        "name": "POST FILM & LAB",
+        "accounts": [
+          {
+            "code": "6601",
+            "name": "STOCK SHOTS"
+          },
+          {
+            "code": "6603",
+            "name": "OPTICALS"
+          },
+          {
+            "code": "6604",
+            "name": "REPRINTS"
+          },
+          {
+            "code": "660401",
+            "name": "DUPES FOR SHOWPRINTS"
+          },
+          {
+            "code": "6605",
+            "name": "REVERSAL DUPES"
+          },
+          {
+            "code": "6606",
+            "name": "VIDEO DUPES/TELECINE"
+          },
+          {
+            "code": "6607",
+            "name": "TAPE TO TAPE DUPES"
+          },
+          {
+            "code": "6610",
+            "name": "OPTICAL SOUND TRACK"
+          },
+          {
+            "code": "6615",
+            "name": "PROTECTION DUPES"
+          },
+          {
+            "code": "6616",
+            "name": "DIGITAL NEGATIVE"
+          },
+          {
+            "code": "6620",
+            "name": "LAB SPECIAL HANDLING"
+          },
+          {
+            "code": "6630",
+            "name": "NEGATIVE CUTTING"
+          },
+          {
+            "code": "6632",
+            "name": "ANSWER PRINT"
+          },
+          {
+            "code": "6634",
+            "name": "LOW CONTRAST PRINT"
+          },
+          {
+            "code": "6640",
+            "name": "INTERPOSITIVE"
+          },
+          {
+            "code": "6641",
+            "name": "INTERNEGATIVE"
+          },
+          {
+            "code": "6642",
+            "name": "YCM"
+          },
+          {
+            "code": "6690",
+            "name": "MISC."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6700",
+        "name": "TILES & OPTICALS",
+        "accounts": [
+          {
+            "code": "6701",
+            "name": "MAIN/END TITLES"
+          },
+          {
+            "code": "6702",
+            "name": "TITLE DESIGN"
+          },
+          {
+            "code": "6703",
+            "name": "OPTICAL EFFECTS"
+          },
+          {
+            "code": "6706",
+            "name": "OTHER TITLE/SUBTITLES"
+          },
+          {
+            "code": "6710",
+            "name": "LAB PROCESSING"
+          },
+          {
+            "code": "6715",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "6790",
+            "name": "MISC."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6900",
+        "name": "POST PROD FRINGE",
+        "accounts": [
+          {
+            "code": "6999",
+            "name": "FRINGES"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total post"
+      },
+      {
+        "kind": "category",
+        "code": "7000",
+        "name": "INSURANCE",
+        "accounts": [
+          {
+            "code": "7002",
+            "name": "INSURANCE PACKAGE"
+          },
+          {
+            "code": "7003",
+            "name": "CAST"
+          },
+          {
+            "code": "7004",
+            "name": "AUTO LIABILITY"
+          },
+          {
+            "code": "7005",
+            "name": "SPECIAL COVERAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "7100",
+        "name": "PUBLICITY",
+        "accounts": [
+          {
+            "code": "7101",
+            "name": "UNIT PUBLICIST"
+          },
+          {
+            "code": "7102",
+            "name": "PUBLICITY ALLOWANCE"
+          },
+          {
+            "code": "7103",
+            "name": "PUBLIC SRVC CONTRACT"
+          },
+          {
+            "code": "7105",
+            "name": "PHOTOGRAPH CONTRACT"
+          },
+          {
+            "code": "7108",
+            "name": "STILL FILM & PROCESSING"
+          },
+          {
+            "code": "7135",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "7140",
+            "name": "RENTALS"
+          },
+          {
+            "code": "7160",
+            "name": "LOSS & DAMAGE"
+          },
+          {
+            "code": "7190",
+            "name": "MISC."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "7500",
+        "name": "GENERAL EXPENSES",
+        "accounts": [
+          {
+            "code": "7501",
+            "name": "TELEPHONES/PAGERS"
+          },
+          {
+            "code": "7502",
+            "name": "CELLULAR PHONES"
+          },
+          {
+            "code": "750281",
+            "name": "PRODUCER CELLULAR"
+          },
+          {
+            "code": "7504",
+            "name": "POSTAGE/MSNGR/SHIP"
+          },
+          {
+            "code": "7508",
+            "name": "OFF SITE STORAGE RENTAL"
+          },
+          {
+            "code": "7510",
+            "name": "OFFICE RENTAL"
+          },
+          {
+            "code": "7512",
+            "name": "OFFICE SUPPLIES"
+          },
+          {
+            "code": "7514",
+            "name": "XEROX EQUIP/COPIES"
+          },
+          {
+            "code": "7515",
+            "name": "OFFICE MEALS/CRAFT SRVC"
+          },
+          {
+            "code": "7516",
+            "name": "OFFICE EQUIP RNTL"
+          },
+          {
+            "code": "7518",
+            "name": "COMPUTERS/SOFTWARE"
+          },
+          {
+            "code": "7519",
+            "name": "CREW INCENTIVES"
+          },
+          {
+            "code": "7520",
+            "name": "PAYROLL HANDLING"
+          },
+          {
+            "code": "7521",
+            "name": "ARCHIVING"
+          },
+          {
+            "code": "7525",
+            "name": "MOVE ALLOW"
+          },
+          {
+            "code": "7530",
+            "name": "MPAA SEAL"
+          },
+          {
+            "code": "7540",
+            "name": "LEGAL FEES"
+          },
+          {
+            "code": "7542",
+            "name": "PROFESSIONAL FEES"
+          },
+          {
+            "code": "7550",
+            "name": "EXCHANGE GAIN/LOSS"
+          },
+          {
+            "code": "7552",
+            "name": "BANK FEES"
+          },
+          {
+            "code": "7554",
+            "name": "INTEREST"
+          },
+          {
+            "code": "7590",
+            "name": "MISC."
+          },
+          {
+            "code": "7599",
+            "name": "TAXES"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total other"
+      }
+    ]
+  }
+}

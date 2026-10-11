@@ -1,0 +1,3772 @@
+{
+  "format": "method-budget",
+  "version": 1,
+  "budget": {
+    "title": "DISNEY STAGE",
+    "base_currency": "USD",
+    "account_coding": {
+      "category_width": 2,
+      "account_width": 2,
+      "sub_width": 0,
+      "set_width": 0,
+      "separator": ""
+    },
+    "units": {
+      "Allow": {
+        "plural": "Allow"
+      },
+      "Day": {
+        "plural": "Days",
+        "hours": "10"
+      },
+      "Flat": {
+        "plural": "Flat"
+      },
+      "Hour": {
+        "plural": "Hours",
+        "hours": "1"
+      },
+      "Month": {
+        "plural": "Months",
+        "hours": "200"
+      },
+      "Week": {
+        "plural": "Weeks",
+        "hours": "50"
+      }
+    },
+    "topsheet": [
+      {
+        "kind": "category",
+        "code": "1A00",
+        "name": "REVENUE",
+        "accounts": [
+          {
+            "code": "1A10",
+            "name": "GROSS BOX OFFICE RECEIPTS"
+          },
+          {
+            "code": "1A20",
+            "name": "BOX OFFICE DEDUCTIONS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "1B00",
+        "name": "REVENUE - OTHER",
+        "accounts": [
+          {
+            "code": "1B10",
+            "name": "INTEREST"
+          },
+          {
+            "code": "1B20",
+            "name": "SUBSIDIARY"
+          },
+          {
+            "code": "1B30",
+            "name": "CONCESSIONS"
+          },
+          {
+            "code": "1B40",
+            "name": "RENTALS"
+          },
+          {
+            "code": "1B50",
+            "name": "ADVERTISING"
+          },
+          {
+            "code": "1B90",
+            "name": "OTHER"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Untitled Production Total"
+      },
+      {
+        "kind": "category",
+        "code": "4",
+        "name": "STAGE PHYSICAL"
+      },
+      {
+        "kind": "category",
+        "code": "4A00",
+        "name": "SCENERY",
+        "accounts": [
+          {
+            "code": "4A01",
+            "name": "SET#1-"
+          },
+          {
+            "code": "4A02",
+            "name": "SET#2-"
+          },
+          {
+            "code": "4A03",
+            "name": "SET#3-"
+          },
+          {
+            "code": "4A04",
+            "name": "SET#4-"
+          },
+          {
+            "code": "4A05",
+            "name": "SET#5-"
+          },
+          {
+            "code": "4A06",
+            "name": "SET#6-"
+          },
+          {
+            "code": "4A07",
+            "name": "SET#7-"
+          },
+          {
+            "code": "4A08",
+            "name": "SET#8-"
+          },
+          {
+            "code": "4A09",
+            "name": "SET#9-"
+          },
+          {
+            "code": "4A10",
+            "name": "SET#10-"
+          },
+          {
+            "code": "4A11",
+            "name": "SET#11-"
+          },
+          {
+            "code": "4A12",
+            "name": "SET#12-"
+          },
+          {
+            "code": "4A13",
+            "name": "SET#13-"
+          },
+          {
+            "code": "4A14",
+            "name": "SET#14-"
+          },
+          {
+            "code": "4A15",
+            "name": "SET#15-"
+          },
+          {
+            "code": "4A16",
+            "name": "SET#16-"
+          },
+          {
+            "code": "4A17",
+            "name": "SET#17-"
+          },
+          {
+            "code": "4A18",
+            "name": "SET#18-"
+          },
+          {
+            "code": "4A19",
+            "name": "SET#19-"
+          },
+          {
+            "code": "4A30",
+            "name": "DECK"
+          },
+          {
+            "code": "4A40",
+            "name": "GENERAL SCENERY"
+          },
+          {
+            "code": "4A50",
+            "name": "ILLUSIONS & EFFECTS"
+          },
+          {
+            "code": "4A60",
+            "name": "MASKING"
+          },
+          {
+            "code": "4A70",
+            "name": "MODELS"
+          },
+          {
+            "code": "4A72",
+            "name": ""
+          },
+          {
+            "code": "4A99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4B00",
+        "name": "AUTOMATION",
+        "accounts": [
+          {
+            "code": "4B84",
+            "name": "SHOP PREP"
+          },
+          {
+            "code": "4B85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "4B89",
+            "name": "MANUFACTURE"
+          },
+          {
+            "code": "4B90",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "4B99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4C00",
+        "name": "PROPS",
+        "accounts": [
+          {
+            "code": "4C84",
+            "name": "SHOP PREP"
+          },
+          {
+            "code": "4C85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "4C89",
+            "name": "MANUFACTURE"
+          },
+          {
+            "code": "4C90",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "4C97",
+            "name": "OTHER"
+          },
+          {
+            "code": "4C99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4D00",
+        "name": "COSTUMES",
+        "accounts": [
+          {
+            "code": "4D01",
+            "name": "CHARACTER#1-"
+          },
+          {
+            "code": "4D02",
+            "name": "CHARACTER#2-"
+          },
+          {
+            "code": "4D03",
+            "name": "CHARACTER#3-"
+          },
+          {
+            "code": "4D04",
+            "name": "CHARACTER#4-"
+          },
+          {
+            "code": "4D05",
+            "name": "CHARACTER#5-"
+          },
+          {
+            "code": "4D06",
+            "name": "CHARCATER#6-"
+          },
+          {
+            "code": "4D07",
+            "name": "CHARACTER#7-"
+          },
+          {
+            "code": "4D08",
+            "name": "CHARACTER#8-"
+          },
+          {
+            "code": "4D09",
+            "name": "CHARACTER#9-"
+          },
+          {
+            "code": "4D10",
+            "name": "CHARACTER#10-"
+          },
+          {
+            "code": "4D11",
+            "name": "CHARACTER#11-"
+          },
+          {
+            "code": "4D12",
+            "name": "CHARACTER#12-"
+          },
+          {
+            "code": "4D13",
+            "name": "CHARACTER#13"
+          },
+          {
+            "code": "4D14",
+            "name": "CHARACTER#14"
+          },
+          {
+            "code": "4D15",
+            "name": "CHARACTER#15"
+          },
+          {
+            "code": "4D20",
+            "name": "ADDITIONAL LABOR"
+          },
+          {
+            "code": "4D40",
+            "name": "ENSEMBLE #1-"
+          },
+          {
+            "code": "4D41",
+            "name": "ENSEMBLE #2-"
+          },
+          {
+            "code": "4D42",
+            "name": "ENSEMBLE #3-"
+          },
+          {
+            "code": "4D43",
+            "name": "ENSEMBLE #4-"
+          },
+          {
+            "code": "4D44",
+            "name": "ENSEMBLE #5-"
+          },
+          {
+            "code": "4D45",
+            "name": "ENSEMBLE #6-"
+          },
+          {
+            "code": "4D46",
+            "name": "OTHER ENSEMBLE"
+          },
+          {
+            "code": "4D50",
+            "name": "SWINGS/UNDERSTUDIES"
+          },
+          {
+            "code": "4D55",
+            "name": "SHOP LABOR"
+          },
+          {
+            "code": "4D60",
+            "name": "ACCESSORIES"
+          },
+          {
+            "code": "4D70",
+            "name": "FITTING/REHEARSAL"
+          },
+          {
+            "code": "4D71",
+            "name": "UNDERGARMENTS"
+          },
+          {
+            "code": "4D72",
+            "name": "COSTUME CONTINGENCY"
+          },
+          {
+            "code": "4D80",
+            "name": "CLEANING & LAUNDRY"
+          },
+          {
+            "code": "4D84",
+            "name": "SHOP PREP/FEES"
+          },
+          {
+            "code": "4D95",
+            "name": "MAT'L & SUPPLIES"
+          },
+          {
+            "code": "4D97",
+            "name": "NOTIONS"
+          },
+          {
+            "code": "4D99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4E00",
+        "name": "HAIR & MAKEUP",
+        "accounts": [
+          {
+            "code": "4E01",
+            "name": "PRINCIPALS"
+          },
+          {
+            "code": "4E40",
+            "name": "SWINGS/UNDERSTUDIES/COV"
+          },
+          {
+            "code": "4E84",
+            "name": "SHOP PREP/FEES"
+          },
+          {
+            "code": "4E85",
+            "name": ""
+          },
+          {
+            "code": "4E95",
+            "name": "HAIR SUPPLIES"
+          },
+          {
+            "code": "4E96",
+            "name": ""
+          },
+          {
+            "code": "4E97",
+            "name": "OTHER"
+          },
+          {
+            "code": "4E99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4F00",
+        "name": "LIGHTING",
+        "accounts": [
+          {
+            "code": "4F71",
+            "name": ""
+          },
+          {
+            "code": "4F84",
+            "name": "SHOP PREP."
+          },
+          {
+            "code": "4F85",
+            "name": "LIGHTING PACKAGE RENTAL"
+          },
+          {
+            "code": "4F86",
+            "name": "MOVING LIGHTS RENTAL"
+          },
+          {
+            "code": "4F87",
+            "name": "PROJECTION EQUIPMENT"
+          },
+          {
+            "code": "4F88",
+            "name": "PROJECTION ART"
+          },
+          {
+            "code": "4F90",
+            "name": "LIGHTING PURCHASES"
+          },
+          {
+            "code": "4F95",
+            "name": "PERISHABLES"
+          },
+          {
+            "code": "4F97",
+            "name": "OTHER"
+          },
+          {
+            "code": "4F99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4G00",
+        "name": "SPECIAL F/X / PYRO",
+        "accounts": [
+          {
+            "code": "4G01",
+            "name": ""
+          },
+          {
+            "code": "4G84",
+            "name": "SHOP PREP."
+          },
+          {
+            "code": "4G85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "4G89",
+            "name": "MANUFACTURING"
+          },
+          {
+            "code": "4G90",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "4G95",
+            "name": "PERISHABLES"
+          },
+          {
+            "code": "4G97",
+            "name": "OTHER"
+          },
+          {
+            "code": "4G99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4H00",
+        "name": "SOUND",
+        "accounts": [
+          {
+            "code": "4H01",
+            "name": ""
+          },
+          {
+            "code": "4H02",
+            "name": ""
+          },
+          {
+            "code": "4H20",
+            "name": "RECORDING"
+          },
+          {
+            "code": "4H30",
+            "name": "MUSICAL INSTRUMENTS"
+          },
+          {
+            "code": "4H40",
+            "name": "SOUND EFFECTS PRODUCTION"
+          },
+          {
+            "code": "4H84",
+            "name": "SHOP PREP."
+          },
+          {
+            "code": "4H86",
+            "name": "MUSIC COPYING"
+          },
+          {
+            "code": "4H87",
+            "name": "MUSIC COPYING EXPENSE"
+          },
+          {
+            "code": "4H95",
+            "name": "PERISHABLES"
+          },
+          {
+            "code": "4H97",
+            "name": "OTHER"
+          },
+          {
+            "code": "4H99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4I00",
+        "name": "DESIGN STUDIO EXPENSES",
+        "accounts": [
+          {
+            "code": "4I01",
+            "name": "SCENIC DESIGN EXPENSE"
+          },
+          {
+            "code": "4I10",
+            "name": "LIGHTING DESIGN EXPENSE"
+          },
+          {
+            "code": "4I20",
+            "name": "SOUND DESIGN EXPENSE"
+          },
+          {
+            "code": "4I30",
+            "name": "COSTUME DESIGN EXPENSE"
+          },
+          {
+            "code": "4I95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "4I96",
+            "name": "SPACE RENTAL"
+          },
+          {
+            "code": "4I97",
+            "name": ""
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4J00",
+        "name": "DEPARTMENTAL EXPENSES",
+        "accounts": [
+          {
+            "code": "4J10",
+            "name": "CARPENTER DEPT SETUP"
+          },
+          {
+            "code": "4J20",
+            "name": "PROP DEPT SETUP"
+          },
+          {
+            "code": "4J30",
+            "name": "WARDROBE DEPT SETUP"
+          },
+          {
+            "code": "4J40",
+            "name": "HAIR & M-UP DEPT SETUP"
+          },
+          {
+            "code": "4J50",
+            "name": "LIGHTING DEPT SETUP"
+          },
+          {
+            "code": "4J60",
+            "name": "STAGE MANAGER DEPT SETUP"
+          },
+          {
+            "code": "4J70",
+            "name": "COMPANY MGR DEPT SETUP"
+          },
+          {
+            "code": "4J80",
+            "name": "SOUND DEPT SETUP"
+          },
+          {
+            "code": "4J81",
+            "name": ""
+          },
+          {
+            "code": "4J82",
+            "name": ""
+          },
+          {
+            "code": "4J83",
+            "name": ""
+          },
+          {
+            "code": "4J99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4K00",
+        "name": "GENERAL TOUR PREP",
+        "accounts": [
+          {
+            "code": "4K01",
+            "name": "RIGGING"
+          },
+          {
+            "code": "4K10",
+            "name": "TEST AND ADJUST"
+          },
+          {
+            "code": "4K30",
+            "name": "CRATING & PACKAGING"
+          },
+          {
+            "code": "4K40",
+            "name": "ADV. THEATRE SURVEY"
+          },
+          {
+            "code": "4K41",
+            "name": ""
+          },
+          {
+            "code": "4K42",
+            "name": ""
+          },
+          {
+            "code": "4K43",
+            "name": ""
+          },
+          {
+            "code": "4K44",
+            "name": ""
+          },
+          {
+            "code": "4K50",
+            "name": ""
+          },
+          {
+            "code": "4K97",
+            "name": "OTHER"
+          },
+          {
+            "code": "4K99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4L00",
+        "name": "VENDOR SITE SUPPORT",
+        "accounts": [
+          {
+            "code": "4L01",
+            "name": "AUTOMATION"
+          },
+          {
+            "code": "4L10",
+            "name": "CARPENTRY"
+          },
+          {
+            "code": "4L30",
+            "name": "WARDROBE"
+          },
+          {
+            "code": "4L40",
+            "name": "LIGHTING"
+          },
+          {
+            "code": "4L50",
+            "name": "SPECIAL EFFECTS"
+          },
+          {
+            "code": "4L60",
+            "name": "SOUND"
+          },
+          {
+            "code": "4L99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4M00",
+        "name": "TRANSPORTATION",
+        "accounts": [
+          {
+            "code": "4M19",
+            "name": "NOCAL HAULING"
+          },
+          {
+            "code": "4M21",
+            "name": "DISTANT HAULING"
+          },
+          {
+            "code": "4M23",
+            "name": ""
+          },
+          {
+            "code": "4M53",
+            "name": ""
+          },
+          {
+            "code": "4M54",
+            "name": ""
+          },
+          {
+            "code": "4M55",
+            "name": "GAS"
+          },
+          {
+            "code": "4M56",
+            "name": "SHIPPING/FREIGHT/CUSTOMS"
+          },
+          {
+            "code": "4M58",
+            "name": ""
+          },
+          {
+            "code": "4M97",
+            "name": "OTHER"
+          },
+          {
+            "code": "4M99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "4N00",
+        "name": "TAKE-IN EXPENSE",
+        "accounts": [
+          {
+            "code": "4N01",
+            "name": "HEAD CARPENTER"
+          },
+          {
+            "code": "4N02",
+            "name": "LOCAL CARPENTERS"
+          },
+          {
+            "code": "4N10",
+            "name": "HEAD ELECTRICIAN"
+          },
+          {
+            "code": "4N11",
+            "name": "LOCAL ELECTRICIANS"
+          },
+          {
+            "code": "4N20",
+            "name": "HEAD PROPS"
+          },
+          {
+            "code": "4N21",
+            "name": "LOCAL PROPS"
+          },
+          {
+            "code": "4N30",
+            "name": "HEAD SOUND"
+          },
+          {
+            "code": "4N31",
+            "name": "LOCAL SOUND"
+          },
+          {
+            "code": "4N40",
+            "name": "WARDROBE DRESSERS"
+          },
+          {
+            "code": "4N45",
+            "name": "HAIR/MAKE-UP ARTISTS"
+          },
+          {
+            "code": "4N50",
+            "name": "LOADERS"
+          },
+          {
+            "code": "4N55",
+            "name": "OTHER CREW"
+          },
+          {
+            "code": "4N70",
+            "name": "PERMITS & LICENSES"
+          },
+          {
+            "code": "4N75",
+            "name": "FACILITY MODIFICATIONS"
+          },
+          {
+            "code": "4N85",
+            "name": "EQUIPMENT RENTAL"
+          },
+          {
+            "code": "4N90",
+            "name": "EQUIPMENT PURCHASES"
+          },
+          {
+            "code": "4N99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total other"
+      },
+      {
+        "kind": "category",
+        "code": "5",
+        "name": "SFGA"
+      },
+      {
+        "kind": "category",
+        "code": "5A00",
+        "name": "AUTHOR FEES",
+        "accounts": [
+          {
+            "code": "5A01",
+            "name": "BOOKWRITER"
+          },
+          {
+            "code": "5A10",
+            "name": "COMPOSER"
+          },
+          {
+            "code": "5A20",
+            "name": "LYRICIST"
+          },
+          {
+            "code": "5A30",
+            "name": "UNDERLYING RIGHTS"
+          },
+          {
+            "code": "5A35",
+            "name": "CONVERSION RIGHTS"
+          },
+          {
+            "code": "5A99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5B00",
+        "name": "CREATIVE FEES & SALARIES",
+        "accounts": [
+          {
+            "code": "5B01",
+            "name": "DIRECTOR"
+          },
+          {
+            "code": "5B02",
+            "name": "ASSISTANT DIRECTOR"
+          },
+          {
+            "code": "5B03",
+            "name": "DIRECTOR OVERHEAD"
+          },
+          {
+            "code": "5B04",
+            "name": "ASSOCIATE DIRECTOR"
+          },
+          {
+            "code": "5B10",
+            "name": "CHOREOGRAPHER"
+          },
+          {
+            "code": "5B11",
+            "name": "ASST CHOREOGRAPHER"
+          },
+          {
+            "code": "5B20",
+            "name": "CASTING DIRECTOR"
+          },
+          {
+            "code": "5B30",
+            "name": "FIGHT DIRECTOR"
+          },
+          {
+            "code": "5B99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5C00",
+        "name": "DESIGN FEES & SALARIES",
+        "accounts": [
+          {
+            "code": "5C01",
+            "name": "SCENIC DESIGNER"
+          },
+          {
+            "code": "5C02",
+            "name": "SCENIC ASSISTANT"
+          },
+          {
+            "code": "5C10",
+            "name": "LIGHTING DESIGNER"
+          },
+          {
+            "code": "5C11",
+            "name": "LIGHTING ASSISTANTS"
+          },
+          {
+            "code": "5C20",
+            "name": "SOUND DESIGNER"
+          },
+          {
+            "code": "5C21",
+            "name": "SOUND ASSISTANTS"
+          },
+          {
+            "code": "5C30",
+            "name": "COSTUME DESIGNER"
+          },
+          {
+            "code": "5C31",
+            "name": "COSTUME ASSISTANTS"
+          },
+          {
+            "code": "5C40",
+            "name": "HAIR DESIGNER"
+          },
+          {
+            "code": "5C41",
+            "name": "HAIR ASSISTANTS"
+          },
+          {
+            "code": "5C42",
+            "name": "PROSTHETICS SPECIALIST"
+          },
+          {
+            "code": "5C50",
+            "name": "PANI DESIGNER"
+          },
+          {
+            "code": "5C51",
+            "name": "PYRO DESIGNER"
+          },
+          {
+            "code": "5C52",
+            "name": "ILLUSION DESIGNER"
+          },
+          {
+            "code": "5C99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5D00",
+        "name": "MANAGEMENT FEES & SALARIES",
+        "accounts": [
+          {
+            "code": "5D01",
+            "name": "GENERAL MANAGER"
+          },
+          {
+            "code": "5D02",
+            "name": "ASSOC GEN MGR"
+          },
+          {
+            "code": "5D10",
+            "name": "PRODUCTION SUPERVISOR"
+          },
+          {
+            "code": "5D11",
+            "name": "TECHNICAL ADVISOR ASST."
+          },
+          {
+            "code": "5D20",
+            "name": "COMPANY MANAGER"
+          },
+          {
+            "code": "5D21",
+            "name": "ASST COMPANY MANAGER"
+          },
+          {
+            "code": "5D30",
+            "name": "PRODUCTION STAGE MGR"
+          },
+          {
+            "code": "5D31",
+            "name": "STAGE MANAGER"
+          },
+          {
+            "code": "5D32",
+            "name": "ASSISTANT STAGE MGR"
+          },
+          {
+            "code": "5D40",
+            "name": "PRESS REPRESENTATIVE"
+          },
+          {
+            "code": "5D41",
+            "name": "LOCAL PRESS AGENT"
+          },
+          {
+            "code": "5D50",
+            "name": "BUDGET ANALYST"
+          },
+          {
+            "code": "5D51",
+            "name": "TOURING ANALYST"
+          },
+          {
+            "code": "5D52",
+            "name": "BOOKING ANALYST"
+          },
+          {
+            "code": "5D60",
+            "name": "PRODUCTION SECRETARY"
+          },
+          {
+            "code": "5D61",
+            "name": "PRODUCITON ASSISTANTS"
+          },
+          {
+            "code": "5D99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5E00",
+        "name": "TECHNICAL FEES & SALARY",
+        "accounts": [
+          {
+            "code": "5E01",
+            "name": "HEAD CARPENTER"
+          },
+          {
+            "code": "5E02",
+            "name": "ASSISTANT CARPENTER"
+          },
+          {
+            "code": "5E03",
+            "name": "FLYMAN"
+          },
+          {
+            "code": "5E04",
+            "name": "STAFF CARPENTER"
+          },
+          {
+            "code": "5E14",
+            "name": "STAFF FLYMAN"
+          },
+          {
+            "code": "5E20",
+            "name": "AUTOMATION #1"
+          },
+          {
+            "code": "5E21",
+            "name": "AUTOMATION #2"
+          },
+          {
+            "code": "5E30",
+            "name": "HEAD ELECTRICIAN"
+          },
+          {
+            "code": "5E31",
+            "name": "ASSISTANT ELECTRICIAN"
+          },
+          {
+            "code": "5E32",
+            "name": "ELEC/PYRO"
+          },
+          {
+            "code": "5E33",
+            "name": "ELEC/VARILITE"
+          },
+          {
+            "code": "5E34",
+            "name": "STAFF ELECTRICIAN"
+          },
+          {
+            "code": "5E40",
+            "name": "HEAD PROP"
+          },
+          {
+            "code": "5E41",
+            "name": "ASST PROP"
+          },
+          {
+            "code": "5E44",
+            "name": "STAFF PROP"
+          },
+          {
+            "code": "5E50",
+            "name": "HEAD SOUND"
+          },
+          {
+            "code": "5E51",
+            "name": "ASSISTANT SOUND"
+          },
+          {
+            "code": "5E54",
+            "name": "STAFF SOUND"
+          },
+          {
+            "code": "5E60",
+            "name": "VARILITE PROGRAMMER"
+          },
+          {
+            "code": "5E61",
+            "name": "VARILITE TRACKER"
+          },
+          {
+            "code": "5E70",
+            "name": "WARDROBE SUPERVISOR"
+          },
+          {
+            "code": "5E71",
+            "name": "WARDROBE ASSISTANT"
+          },
+          {
+            "code": "5E74",
+            "name": "STAFF WARDROBE"
+          },
+          {
+            "code": "5E80",
+            "name": "HAIR SUPERVISOR"
+          },
+          {
+            "code": "5E81",
+            "name": "HAIR ASSISTANT"
+          },
+          {
+            "code": "5E82",
+            "name": "MAKE-UP PROSTHETICS"
+          },
+          {
+            "code": "5E84",
+            "name": "STAFF HAIR"
+          },
+          {
+            "code": "5E85",
+            "name": "PROD CREW O.T."
+          },
+          {
+            "code": "5E99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5F00",
+        "name": "MUSIC/ORCHESTRA FEES & SALARIES",
+        "accounts": [
+          {
+            "code": "5F01",
+            "name": "MUSIC SUPERVISOR"
+          },
+          {
+            "code": "5F05",
+            "name": "MUSIC DIRECTOR"
+          },
+          {
+            "code": "5F10",
+            "name": "DANCE ARRANGER"
+          },
+          {
+            "code": "5F15",
+            "name": "MUSIC CONTRACTOR"
+          },
+          {
+            "code": "5F20",
+            "name": "COPYIST"
+          },
+          {
+            "code": "5F30",
+            "name": "MUSICIAN 1"
+          },
+          {
+            "code": "5F31",
+            "name": "MUSICIAN 2"
+          },
+          {
+            "code": "5F32",
+            "name": "MUSICIAN 3"
+          },
+          {
+            "code": "5F33",
+            "name": "MUSICIAN 4"
+          },
+          {
+            "code": "5F34",
+            "name": "MUSICIAN 5"
+          },
+          {
+            "code": "5F35",
+            "name": "MUSICIAN 6"
+          },
+          {
+            "code": "5F36",
+            "name": "MUSICIAN 7"
+          },
+          {
+            "code": "5F37",
+            "name": "MUSICIAN 8"
+          },
+          {
+            "code": "5F38",
+            "name": "MUSICIAN 9"
+          },
+          {
+            "code": "5F39",
+            "name": "MUSICIAN 10"
+          },
+          {
+            "code": "5F40",
+            "name": "MUSICIAN 11"
+          },
+          {
+            "code": "5F41",
+            "name": "MUSICIAN 12"
+          },
+          {
+            "code": "5F42",
+            "name": "MUSICIAN 13"
+          },
+          {
+            "code": "5F43",
+            "name": "MUSICIAN 14"
+          },
+          {
+            "code": "5F44",
+            "name": "MUSICIAN 15"
+          },
+          {
+            "code": "5F45",
+            "name": "MUSICIAN 16"
+          },
+          {
+            "code": "5F46",
+            "name": "MUSICIAN 17"
+          },
+          {
+            "code": "5F47",
+            "name": "MUSICIAN 18"
+          },
+          {
+            "code": "5F48",
+            "name": "MUSICIAN 19"
+          },
+          {
+            "code": "5F49",
+            "name": "MUSICIAN 20"
+          },
+          {
+            "code": "5F50",
+            "name": "MUSICIAN 21"
+          },
+          {
+            "code": "5F51",
+            "name": "MUSICIAN 22"
+          },
+          {
+            "code": "5F52",
+            "name": "MUSICIAN 23"
+          },
+          {
+            "code": "5F53",
+            "name": "MUSICIAN 24"
+          },
+          {
+            "code": "5F60",
+            "name": "REHEARSAL PIANIST"
+          },
+          {
+            "code": "5F70",
+            "name": "REHEARSAL DRUMMER"
+          },
+          {
+            "code": "5F99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "5G00",
+        "name": "TALENT SALARIES",
+        "accounts": [
+          {
+            "code": "5G01",
+            "name": "PRINCIPAL 1"
+          },
+          {
+            "code": "5G02",
+            "name": "PRINCIPAL 2"
+          },
+          {
+            "code": "5G03",
+            "name": "PRINCIPAL 3"
+          },
+          {
+            "code": "5G04",
+            "name": "PRINCIPAL 4"
+          },
+          {
+            "code": "5G05",
+            "name": "PRINCIPAL 5"
+          },
+          {
+            "code": "5G06",
+            "name": "PRINCIPAL 6"
+          },
+          {
+            "code": "5G07",
+            "name": "PRINCIPAL 7"
+          },
+          {
+            "code": "5G08",
+            "name": "PRINCIPAL 8"
+          },
+          {
+            "code": "5G09",
+            "name": "PRINCIPAL 9"
+          },
+          {
+            "code": "5G10",
+            "name": "PRINCIPAL 10"
+          },
+          {
+            "code": "5G11",
+            "name": "PRINCIPAL 11"
+          },
+          {
+            "code": "5G30",
+            "name": "ENSEMBLE"
+          },
+          {
+            "code": "5G50",
+            "name": "SWINGS/UNDERSTUDIES"
+          },
+          {
+            "code": "5G60",
+            "name": "DANCE CAPTAIN"
+          },
+          {
+            "code": "5G70",
+            "name": "OTHER"
+          },
+          {
+            "code": "5G80",
+            "name": "TUTOR"
+          },
+          {
+            "code": "5G81",
+            "name": "GUARDIAN"
+          },
+          {
+            "code": "5G99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Below-The-Line Contingencies"
+      },
+      {
+        "kind": "category",
+        "code": "6",
+        "name": "SFGA"
+      },
+      {
+        "kind": "production_total",
+        "name": "Total post"
+      },
+      {
+        "kind": "category",
+        "code": "6100",
+        "name": "SUSPENSE",
+        "accounts": [
+          {
+            "code": "6101",
+            "name": "SUSPENSE TFR"
+          },
+          {
+            "code": "6120",
+            "name": "MISCODE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6E00",
+        "name": "REHEARSAL & CASTING EXPENSE",
+        "accounts": [
+          {
+            "code": "6E10",
+            "name": "REHEARSAL HALLS"
+          },
+          {
+            "code": "6E11",
+            "name": "REHEARSAL SUPPLIES"
+          },
+          {
+            "code": "6E20",
+            "name": "AUDITION LABOR"
+          },
+          {
+            "code": "6E30",
+            "name": "AUDITION HALLS"
+          },
+          {
+            "code": "6E31",
+            "name": "AUDITION PIANIST"
+          },
+          {
+            "code": "6E32",
+            "name": "AUDITION SUPPLIES"
+          },
+          {
+            "code": "6E33",
+            "name": ""
+          },
+          {
+            "code": "6E34",
+            "name": ""
+          },
+          {
+            "code": "6E40",
+            "name": ""
+          },
+          {
+            "code": "6E41",
+            "name": ""
+          },
+          {
+            "code": "6E42",
+            "name": "AUDITION TRAVEL"
+          },
+          {
+            "code": "6E43",
+            "name": ""
+          },
+          {
+            "code": "6E97",
+            "name": "OTHER"
+          },
+          {
+            "code": "6E99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6F00",
+        "name": "PROMOTION",
+        "accounts": [
+          {
+            "code": "6F01",
+            "name": "TV COMMERCIAL PRODUCTION"
+          },
+          {
+            "code": "6F02",
+            "name": "TV COMMERCIAL AIRTIME"
+          },
+          {
+            "code": "6F03",
+            "name": "RADIO AD PRODUCTION"
+          },
+          {
+            "code": "6F04",
+            "name": "RADIO AD AIRTIME"
+          },
+          {
+            "code": "6F05",
+            "name": "NEWSPAPER ADVERTISING"
+          },
+          {
+            "code": "6F06",
+            "name": "OUTDOOR ADVERTISING"
+          },
+          {
+            "code": "6F20",
+            "name": "PHOTOGRAPHER"
+          },
+          {
+            "code": "6F21",
+            "name": "PHOTO REPRODUCTION"
+          },
+          {
+            "code": "6F30",
+            "name": "ARTWORK & MECHANICALS"
+          },
+          {
+            "code": "6F31",
+            "name": "PRINTING"
+          },
+          {
+            "code": "6F35",
+            "name": "MARQUEE"
+          },
+          {
+            "code": "6F36",
+            "name": "PLAYBILL"
+          },
+          {
+            "code": "6F40",
+            "name": "MARKETING CONSULTANT"
+          },
+          {
+            "code": "6F41",
+            "name": ""
+          },
+          {
+            "code": "6F42",
+            "name": "DISNEY MARKETING TRAVEL"
+          },
+          {
+            "code": "6F43",
+            "name": ""
+          },
+          {
+            "code": "6F50",
+            "name": "PRESS AGENT EXPENSE"
+          },
+          {
+            "code": "6F60",
+            "name": "GROUP SALES"
+          },
+          {
+            "code": "6F61",
+            "name": "GROUP SALES EXPENSES"
+          },
+          {
+            "code": "6F75",
+            "name": "BOX OFFICE BOND"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6F85",
+        "name": "NOT APPROVED MARKETING TELEPHONE-TORONTO"
+      },
+      {
+        "kind": "category",
+        "code": "6F86",
+        "name": "NOT APPROVED MARKETING SHIPPING-TORONTO"
+      },
+      {
+        "kind": "category",
+        "code": "6F87",
+        "name": "NOT APPROVED MARKETING OFFICE EXPENSE-T",
+        "accounts": [
+          {
+            "code": "6F97",
+            "name": "OTHER"
+          },
+          {
+            "code": "6F99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Below-The-Line Contingencies"
+      },
+      {
+        "kind": "category",
+        "code": "6G00",
+        "name": "THEATRE",
+        "accounts": [
+          {
+            "code": "6G01",
+            "name": "HOUSE MANAGER"
+          },
+          {
+            "code": "6G02",
+            "name": "ASSISTANT MANAGER"
+          },
+          {
+            "code": "6G10",
+            "name": "BOX OFFICE TREASURER(S)"
+          },
+          {
+            "code": "6G11",
+            "name": ""
+          },
+          {
+            "code": "6G15",
+            "name": "MAIL TICKET SELLER"
+          },
+          {
+            "code": "6G16",
+            "name": "TELEPHONE TICKET SELLER"
+          },
+          {
+            "code": "6G17",
+            "name": "GROUP SALES"
+          },
+          {
+            "code": "6G20",
+            "name": "USHERS"
+          },
+          {
+            "code": "6G21",
+            "name": "RECEPTION"
+          },
+          {
+            "code": "6G30",
+            "name": "OTHER FOH STAFF"
+          },
+          {
+            "code": "6G45",
+            "name": "THEATRE RENT"
+          },
+          {
+            "code": "6G50",
+            "name": "THEATRE EXPENSES"
+          },
+          {
+            "code": "6G97",
+            "name": "OTHER"
+          },
+          {
+            "code": "6G99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6H0",
+        "name": "SUSPENSE",
+        "accounts": [
+          {
+            "code": "6H00",
+            "name": "GENERAL & ADMINISTRATIVE"
+          },
+          {
+            "code": "6H01",
+            "name": "GM OFFICE CHARGE"
+          },
+          {
+            "code": "6H02",
+            "name": "GM OFFICE EXPENSE"
+          },
+          {
+            "code": "6H03",
+            "name": "PROD SUPVR OFFC CHG"
+          },
+          {
+            "code": "6H04",
+            "name": "PROD SUPVR OFFC EXP"
+          },
+          {
+            "code": "6H10",
+            "name": "PRODUCTION OFFICE CHARGE"
+          },
+          {
+            "code": "6H11",
+            "name": "PRODUCTION OFFICE EXPENSE"
+          },
+          {
+            "code": "6H12",
+            "name": "TORONTO OFFICE SETUP"
+          },
+          {
+            "code": "6H13",
+            "name": "TORONTO OFFICE EXPENSES"
+          },
+          {
+            "code": "6H15",
+            "name": "LEGAL FEE & DISBURSEMENT"
+          },
+          {
+            "code": "6H16",
+            "name": "ACCOUNTING FEE & DISBURSE"
+          },
+          {
+            "code": "6H17",
+            "name": "PAYROLL"
+          },
+          {
+            "code": "6H18",
+            "name": "BANK CHARGES"
+          },
+          {
+            "code": "6H19",
+            "name": "INSURANCE"
+          },
+          {
+            "code": "6H20",
+            "name": "FOREIGN EXCHANGE GAIN/LOSS"
+          },
+          {
+            "code": "6H30",
+            "name": "WRAP PARTY"
+          },
+          {
+            "code": "6H35",
+            "name": "PRODUCTION TICKETS"
+          },
+          {
+            "code": "6H55",
+            "name": "ENTERTAINMENT"
+          },
+          {
+            "code": "6H60",
+            "name": "EQUIPMENT RENTAL"
+          },
+          {
+            "code": "6H61",
+            "name": "TELEPHONE"
+          },
+          {
+            "code": "6H62",
+            "name": "FIRST AID SUPPLIES"
+          },
+          {
+            "code": "6H63",
+            "name": "MESSENGERS"
+          },
+          {
+            "code": "6H97",
+            "name": "OTHER"
+          },
+          {
+            "code": "6H99",
+            "name": "FRINGE"
+          },
+          {
+            "code": "6HOO",
+            "name": "CLEARING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6I00",
+        "name": "TRAVEL,HOUSING & PER DIEM",
+        "accounts": [
+          {
+            "code": "6I01",
+            "name": "AIRFARES"
+          },
+          {
+            "code": "6I20",
+            "name": "HOTELS"
+          },
+          {
+            "code": "6I40",
+            "name": "LIVING EXPENSE"
+          },
+          {
+            "code": "6I60",
+            "name": "RENTAL CARS"
+          },
+          {
+            "code": "6I70",
+            "name": "GROUND TRANSPORTATION"
+          },
+          {
+            "code": "6I97",
+            "name": "OTHER"
+          },
+          {
+            "code": "6I99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "6J00",
+        "name": "CONTINGENCY",
+        "accounts": [
+          {
+            "code": "6J01",
+            "name": "CONTINGENCY"
+          },
+          {
+            "code": "6J02",
+            "name": "INTER-PRODUCTION CLEARING"
+          },
+          {
+            "code": "6ZZZ",
+            "name": "CONTRA ACCT:TFR PROD COST TO BS"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total post"
+      },
+      {
+        "kind": "category",
+        "code": "8",
+        "name": "EXPENSES"
+      },
+      {
+        "kind": "category",
+        "code": "8A00",
+        "name": "EQUITY SALARIES",
+        "accounts": [
+          {
+            "code": "8A01",
+            "name": "PRINCIPAL #1"
+          },
+          {
+            "code": "8A02",
+            "name": "PRINCIPAL #2"
+          },
+          {
+            "code": "8A03",
+            "name": "PRINCIPAL #3"
+          },
+          {
+            "code": "8A04",
+            "name": "PRINCIPAL #4"
+          },
+          {
+            "code": "8A05",
+            "name": "PRINCIPAL #5"
+          },
+          {
+            "code": "8A06",
+            "name": "PRINCIPAL #6"
+          },
+          {
+            "code": "8A07",
+            "name": "PRINCIPAL #7"
+          },
+          {
+            "code": "8A08",
+            "name": "PRINCIPAL #8"
+          },
+          {
+            "code": "8A09",
+            "name": "PRINCIPAL #9"
+          },
+          {
+            "code": "8A10",
+            "name": "PRINCIPAL #10"
+          },
+          {
+            "code": "8A11",
+            "name": "PRINCIPAL #11"
+          },
+          {
+            "code": "8A40",
+            "name": "STANDBY #1"
+          },
+          {
+            "code": "8A41",
+            "name": "STANDBY #2"
+          },
+          {
+            "code": "8A49",
+            "name": "NARRATOR"
+          },
+          {
+            "code": "8A50",
+            "name": "ENSEMBLE"
+          },
+          {
+            "code": "8A80",
+            "name": "PRODUCTION STAGE MANAGER"
+          },
+          {
+            "code": "8A82",
+            "name": "ASSISTANT STAGE MANAGERS"
+          },
+          {
+            "code": "8A95",
+            "name": "AEA VACATION"
+          },
+          {
+            "code": "8A96",
+            "name": "AEA ACCRUED SICK TIME"
+          },
+          {
+            "code": "8A99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "8B00",
+        "name": "COMPANY STAGE CREW",
+        "accounts": [
+          {
+            "code": "8B01",
+            "name": "HEAD CARPENTER"
+          },
+          {
+            "code": "8B02",
+            "name": "ASSISTANT CARPENTERS"
+          },
+          {
+            "code": "8B30",
+            "name": "HEAD ELECTRICIAN"
+          },
+          {
+            "code": "8B31",
+            "name": "ASSISTANT ELECTRICIANS"
+          },
+          {
+            "code": "8B40",
+            "name": "HEAD SOUND"
+          },
+          {
+            "code": "8B41",
+            "name": "ASSISTANT SOUND"
+          },
+          {
+            "code": "8B50",
+            "name": "HEAD PROPS"
+          },
+          {
+            "code": "8B51",
+            "name": "NASSISTANT PROPS"
+          },
+          {
+            "code": "8B60",
+            "name": "SPECIAL EFFECTS/PYRO"
+          },
+          {
+            "code": "8B70",
+            "name": "WARDROBE SUPERVISOR"
+          },
+          {
+            "code": "8B71",
+            "name": "WARDRBOE ASSISTANTS"
+          },
+          {
+            "code": "8B80",
+            "name": "HAIR & MAKEUP SUPERVISORS"
+          },
+          {
+            "code": "8B81",
+            "name": "HAIR & MAKEUP ASSISTANTS"
+          },
+          {
+            "code": "8B85",
+            "name": "WORK CALLS - STAGEHANDS"
+          },
+          {
+            "code": "8B87",
+            "name": "WORK CALLS - WARDROBE"
+          },
+          {
+            "code": "8B89",
+            "name": "WORK CALLS - HAIR & MAKEUP"
+          },
+          {
+            "code": "8B99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "8C00",
+        "name": "MANAGEMENT & OTHER",
+        "accounts": [
+          {
+            "code": "8C01",
+            "name": "GENERAL MANAGER"
+          },
+          {
+            "code": "8C02",
+            "name": "ASSOCIATE GENERAL MANAGER"
+          },
+          {
+            "code": "8C20",
+            "name": "COMPANY MANAGER"
+          },
+          {
+            "code": "8C21",
+            "name": "SHOW ACCOUNTANT"
+          },
+          {
+            "code": "8C22",
+            "name": "ASSISTANT COMPANY MANAGERS"
+          },
+          {
+            "code": "8C25",
+            "name": "PRODUCTION ASSISTANTS"
+          },
+          {
+            "code": "8C40",
+            "name": "PRESS AGENT (NATIONAL)"
+          },
+          {
+            "code": "8C41",
+            "name": "PRESS AGENT (LOCAL)"
+          },
+          {
+            "code": "8C80",
+            "name": "TUTOR"
+          },
+          {
+            "code": "8C81",
+            "name": "GUARDIAN"
+          },
+          {
+            "code": "8C99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "8D00",
+        "name": "COMPANY MUSICIANS",
+        "accounts": [
+          {
+            "code": "8D01",
+            "name": "CONDUCTOR"
+          },
+          {
+            "code": "8D02",
+            "name": "ASSOCIATE CONDUCTOR"
+          },
+          {
+            "code": "8D03",
+            "name": "MUSICIANS"
+          },
+          {
+            "code": "8D99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "8E00",
+        "name": "COMPANY TAXES & BENEFITS",
+        "accounts": [
+          {
+            "code": "8E95",
+            "name": "HOLIDAY ACCRUAL"
+          },
+          {
+            "code": "8E98",
+            "name": "UNION BENEFITS"
+          },
+          {
+            "code": "8E99",
+            "name": "PAYROLL TAX"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Untitled Production Total"
+      },
+      {
+        "kind": "category",
+        "code": "8F00",
+        "name": "RENTALS",
+        "accounts": [
+          {
+            "code": "8F01",
+            "name": "CARPENTRY-AUTOMATION"
+          },
+          {
+            "code": "8F02",
+            "name": "CARPENTRY-FLYING"
+          },
+          {
+            "code": "8F03",
+            "name": "CARPENTRY-RIGGING"
+          },
+          {
+            "code": "8F30",
+            "name": "ELECTRIC-FIXED LIGHTING PACKAGE"
+          },
+          {
+            "code": "8F31",
+            "name": "ELECTRIC-MOVING LIGHTS"
+          },
+          {
+            "code": "8F32",
+            "name": "ELECTRIC-PROJECTION"
+          },
+          {
+            "code": "8F40",
+            "name": "SOUND"
+          },
+          {
+            "code": "8F50",
+            "name": "PROPS"
+          },
+          {
+            "code": "8F60",
+            "name": "SPECIAL FX/PYRO"
+          },
+          {
+            "code": "8F70",
+            "name": "WARDROBE"
+          },
+          {
+            "code": "8F80",
+            "name": "HAIR & MAKEUP"
+          },
+          {
+            "code": "8F85",
+            "name": "MUSIC-INSTRUMENTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "8G00",
+        "name": "DEPARTMENTALS",
+        "accounts": [
+          {
+            "code": "8G01",
+            "name": "CARPENTRY"
+          },
+          {
+            "code": "8G30",
+            "name": "ELECTRIC"
+          },
+          {
+            "code": "8G40",
+            "name": "SOUND"
+          },
+          {
+            "code": "8G50",
+            "name": "PROPS"
+          },
+          {
+            "code": "8G60",
+            "name": "SPECIAL FX/PYRO"
+          },
+          {
+            "code": "8G70",
+            "name": "WARDROBE"
+          },
+          {
+            "code": "8G80",
+            "name": "HAIR & MAKEUP"
+          },
+          {
+            "code": "8G85",
+            "name": "MUSIC"
+          },
+          {
+            "code": "8G87",
+            "name": "STAGE MANAGMENT"
+          },
+          {
+            "code": "8G89",
+            "name": "COMPANY MANAGEMENT"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "8H00",
+        "name": "PHYSICAL PRODUCTION RESERVES",
+        "accounts": [
+          {
+            "code": "8H01",
+            "name": "SET REFURBISHING"
+          },
+          {
+            "code": "8H05",
+            "name": "STAGEHAND REPLACEMENTS"
+          },
+          {
+            "code": "8H30",
+            "name": "LIGHTING-MOVING LIGHTS"
+          },
+          {
+            "code": "8H31",
+            "name": "LIGHTING-FOCUS TOUCH-UP"
+          },
+          {
+            "code": "8H40",
+            "name": "SOUND MAINTENANCE"
+          },
+          {
+            "code": "8H60",
+            "name": "SPECIAL FX/PYRO MAINTENANCE"
+          },
+          {
+            "code": "8H70",
+            "name": "COSTUME REPLACEMENT"
+          },
+          {
+            "code": "8H80",
+            "name": "WIG & HAIR REPLACEMENT"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Untitled Production Total"
+      },
+      {
+        "kind": "category",
+        "code": "8J00",
+        "name": "REHEARSAL & CASTING",
+        "accounts": [
+          {
+            "code": "8J01",
+            "name": ""
+          },
+          {
+            "code": "8J10",
+            "name": "AUDITION & REHEARSAL HALLS"
+          },
+          {
+            "code": "8J20",
+            "name": "CASTING LABOR"
+          },
+          {
+            "code": "8J21",
+            "name": ""
+          },
+          {
+            "code": "8J25",
+            "name": ""
+          },
+          {
+            "code": "8J26",
+            "name": ""
+          },
+          {
+            "code": "8J27",
+            "name": ""
+          },
+          {
+            "code": "8J30",
+            "name": ""
+          },
+          {
+            "code": "8J31",
+            "name": ""
+          },
+          {
+            "code": "8J32",
+            "name": ""
+          },
+          {
+            "code": "8J35",
+            "name": ""
+          },
+          {
+            "code": "8J42",
+            "name": "CASTING TRAVEL"
+          },
+          {
+            "code": "8J65",
+            "name": "CAST DIRECTOR RESERVE"
+          },
+          {
+            "code": "8J96",
+            "name": ""
+          },
+          {
+            "code": "8J97",
+            "name": "OTHER CASTING EXPENSES"
+          },
+          {
+            "code": "8J98",
+            "name": ""
+          },
+          {
+            "code": "8J99",
+            "name": ""
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Untitled Production Total"
+      },
+      {
+        "kind": "category",
+        "code": "8K00",
+        "name": "THEATRE STAFF & CREW",
+        "accounts": [
+          {
+            "code": "8K01",
+            "name": "THEATRE STAGEHANDS"
+          },
+          {
+            "code": "8K02",
+            "name": "STAGEHAND WORK CALLS"
+          },
+          {
+            "code": "8K10",
+            "name": "THEATRE WARDROBE DRESSERS"
+          },
+          {
+            "code": "8K11",
+            "name": "WARDROBE WORK CALLS"
+          },
+          {
+            "code": "8K15",
+            "name": "THEATRE MUSICIANS"
+          },
+          {
+            "code": "8K17",
+            "name": "ASSISTANT CONDUCTOR"
+          },
+          {
+            "code": "8K20",
+            "name": "HOUSE MANAGER"
+          },
+          {
+            "code": "8K21",
+            "name": "ASSISTANT HOUSE MANAGER"
+          },
+          {
+            "code": "8K25",
+            "name": "TREASURERS"
+          },
+          {
+            "code": "8K26",
+            "name": "PHONE & MAIL"
+          },
+          {
+            "code": "8K27",
+            "name": ""
+          },
+          {
+            "code": "8K30",
+            "name": "USHERS"
+          },
+          {
+            "code": "8K31",
+            "name": "ENGINEERS"
+          },
+          {
+            "code": "8K32",
+            "name": "HOUSEKEEPING"
+          },
+          {
+            "code": "8K35",
+            "name": "OTHER FRONT OF HOUSE SALARIES"
+          },
+          {
+            "code": "8K96",
+            "name": "PENSION DEFICIENCY"
+          },
+          {
+            "code": "8K98",
+            "name": "UNION BENEFITS"
+          },
+          {
+            "code": "8K99",
+            "name": "PAYROLL TAXES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "8P00",
+        "name": "THEATRE EXPENSES",
+        "accounts": [
+          {
+            "code": "8P01",
+            "name": "FIXED THEATRE RENT"
+          },
+          {
+            "code": "8P20",
+            "name": "BUSINESS TAX"
+          },
+          {
+            "code": "8P30",
+            "name": "INSURANCE"
+          },
+          {
+            "code": "8P40",
+            "name": "UTILITIES(ELECTRIC/WATER/STEAM/A-C)"
+          },
+          {
+            "code": "8P50",
+            "name": "PARKING"
+          },
+          {
+            "code": "8P97",
+            "name": "OTHER HOUSE EXPENSES"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Untitled Production Total"
+      },
+      {
+        "kind": "category",
+        "code": "8Q00",
+        "name": "COMPANY G&A",
+        "accounts": [
+          {
+            "code": "8Q01",
+            "name": "GM OFFICE CHARGE"
+          },
+          {
+            "code": "8Q02",
+            "name": "GM OFFICE EXPENSE"
+          },
+          {
+            "code": "8Q10",
+            "name": "PROD SUPER OFFICE CHARGE"
+          },
+          {
+            "code": "8Q11",
+            "name": "PROD SUPER OFFICE EXPENSE"
+          },
+          {
+            "code": "8Q20",
+            "name": "LEGAL FEES & DISBURSEMENTS"
+          },
+          {
+            "code": "8Q25",
+            "name": "PAYROLL SERVICE"
+          },
+          {
+            "code": "8Q30",
+            "name": "INSURANCE"
+          },
+          {
+            "code": "8Q35",
+            "name": "BANK CHARGES"
+          },
+          {
+            "code": "8Q36",
+            "name": "FOREIGN EXCHANGE GAIN/LOSS"
+          },
+          {
+            "code": "8Q40",
+            "name": "RENT TAX"
+          },
+          {
+            "code": "8Q50",
+            "name": "TELEPHONE"
+          },
+          {
+            "code": "8Q52",
+            "name": "MESSENGER"
+          },
+          {
+            "code": "8Q60",
+            "name": "COMPANY TICKETS"
+          },
+          {
+            "code": "8Q70",
+            "name": ""
+          },
+          {
+            "code": "8Q97",
+            "name": "OTHER"
+          },
+          {
+            "code": "8R00",
+            "name": "WDTP G&A (SOLEY FOR WDTP-FIN USE)"
+          },
+          {
+            "code": "8R01",
+            "name": ""
+          },
+          {
+            "code": "8R20",
+            "name": ""
+          },
+          {
+            "code": "8R21",
+            "name": ""
+          },
+          {
+            "code": "8R50",
+            "name": ""
+          },
+          {
+            "code": "8R65",
+            "name": ""
+          },
+          {
+            "code": "8R97",
+            "name": ""
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "8S00",
+        "name": "TRAVEL,HOUSING & PER DIEM",
+        "accounts": [
+          {
+            "code": "8S01",
+            "name": "AIRFARES"
+          },
+          {
+            "code": "8S20",
+            "name": "HOTEL"
+          },
+          {
+            "code": "8S40",
+            "name": "PER DIEM"
+          },
+          {
+            "code": "8S70",
+            "name": "GROUND TRANSPORTATION"
+          },
+          {
+            "code": "8S97",
+            "name": "OTHER"
+          },
+          {
+            "code": "8S99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Untitled Production Total"
+      },
+      {
+        "kind": "category",
+        "code": "8T00",
+        "name": "MARKETING",
+        "accounts": [
+          {
+            "code": "8T01",
+            "name": "BVPM ADVERTISING"
+          },
+          {
+            "code": "8T10",
+            "name": ""
+          },
+          {
+            "code": "8T20",
+            "name": "PRESS AGENT OFFICE CHARGE"
+          },
+          {
+            "code": "8T21",
+            "name": "PRESS AGENT EXPENSE"
+          },
+          {
+            "code": "8T30",
+            "name": ""
+          },
+          {
+            "code": "8T50",
+            "name": "PLAYBILL"
+          },
+          {
+            "code": "8T65",
+            "name": "PRODUCTION PHOTO CALL RESERVE"
+          },
+          {
+            "code": "8T70",
+            "name": ""
+          },
+          {
+            "code": "8T80",
+            "name": ""
+          },
+          {
+            "code": "8T85",
+            "name": ""
+          },
+          {
+            "code": "8T86",
+            "name": ""
+          },
+          {
+            "code": "8T97",
+            "name": "OTHER"
+          },
+          {
+            "code": "8T99",
+            "name": ""
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Untitled Production Total"
+      },
+      {
+        "kind": "category",
+        "code": "8U00",
+        "name": "CORPORATE PROMOTIONS",
+        "accounts": [
+          {
+            "code": "8U01",
+            "name": "CORPORATE PROMOTIONS"
+          },
+          {
+            "code": "8U30",
+            "name": ""
+          },
+          {
+            "code": "8U70",
+            "name": ""
+          },
+          {
+            "code": "8U85",
+            "name": ""
+          },
+          {
+            "code": "8U99",
+            "name": ""
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Untitled Production Total"
+      },
+      {
+        "kind": "category",
+        "code": "8V00",
+        "name": "FIXED FEES",
+        "accounts": [
+          {
+            "code": "8V01",
+            "name": ""
+          },
+          {
+            "code": "8V10",
+            "name": "PRODUCTION SUPERVISOR MAINTENANCE FEE"
+          },
+          {
+            "code": "8V20",
+            "name": "CARPENTRY MAINTENANCE FEE"
+          },
+          {
+            "code": "8V30",
+            "name": "ELECTRIC MAINTENANCE FEE"
+          },
+          {
+            "code": "8V40",
+            "name": ""
+          },
+          {
+            "code": "8V50",
+            "name": "PROP MAINTENANCE FEE"
+          },
+          {
+            "code": "8V70",
+            "name": "WARDROBE SUPERVISOR MAINTENANCE FEE"
+          },
+          {
+            "code": "8V80",
+            "name": "HAIR MAINTENANCE FEE"
+          },
+          {
+            "code": "8V85",
+            "name": "MUSIC SUPERVISOR MAINTENANCE FEE"
+          },
+          {
+            "code": "8V86",
+            "name": "MUSIC CONTRACTOR FEE"
+          },
+          {
+            "code": "8V99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "8W00",
+        "name": "FIXED ROYALTIES",
+        "accounts": [
+          {
+            "code": "8W01",
+            "name": "SET DESIGN"
+          },
+          {
+            "code": "8W30",
+            "name": "LIGHTING DESIGN"
+          },
+          {
+            "code": "8W70",
+            "name": "COSTUME DESIGN"
+          },
+          {
+            "code": "8W85",
+            "name": "ORCHESTRATOR"
+          },
+          {
+            "code": "8W99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Untitled Production Total"
+      },
+      {
+        "kind": "category",
+        "code": "8X00",
+        "name": "CONTINGENT ROYALTIES",
+        "accounts": [
+          {
+            "code": "8X01",
+            "name": "AUTHOR"
+          },
+          {
+            "code": "8X10",
+            "name": "COMPOSER"
+          },
+          {
+            "code": "8X20",
+            "name": "LYRICIST"
+          },
+          {
+            "code": "8X30",
+            "name": "DIRECTOR"
+          },
+          {
+            "code": "8X40",
+            "name": "CHOREOGRAPHER"
+          },
+          {
+            "code": "8X86",
+            "name": "OTHER MUSIC GROUP"
+          },
+          {
+            "code": "8X99",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "8Y00",
+        "name": "THEATRE CONTINGENT RENT",
+        "accounts": [
+          {
+            "code": "8Y01",
+            "name": "THEATRE CONTINGENT RENT"
+          },
+          {
+            "code": "8ZZZ",
+            "name": "CONTRA ACCT:TFR OP EXP TO BS"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Untitled Production Total"
+      },
+      {
+        "kind": "category",
+        "code": "B",
+        "name": "ASSETS"
+      },
+      {
+        "kind": "category",
+        "code": "B000",
+        "name": "CASH",
+        "accounts": [
+          {
+            "code": "B001",
+            "name": "CHECKING"
+          },
+          {
+            "code": "B002",
+            "name": "PAYROLL CHECKING"
+          },
+          {
+            "code": "B003",
+            "name": "MONEY MARKET"
+          },
+          {
+            "code": "B004",
+            "name": "CHECKING - OPERATING"
+          },
+          {
+            "code": "B005",
+            "name": "CASH #1"
+          },
+          {
+            "code": "B006",
+            "name": "CASH #2"
+          },
+          {
+            "code": "B007",
+            "name": "CASH #3"
+          },
+          {
+            "code": "B008",
+            "name": "CASH #4"
+          },
+          {
+            "code": "B009",
+            "name": "CASH #5"
+          },
+          {
+            "code": "B010",
+            "name": "CASH #10"
+          },
+          {
+            "code": "B100",
+            "name": "PETTY CASH"
+          },
+          {
+            "code": "B101",
+            "name": "PETTY CASH/CARPENTER"
+          },
+          {
+            "code": "B102",
+            "name": "PETTY CASH/PROPS"
+          },
+          {
+            "code": "B103",
+            "name": "PETTY CASH/ELECTRIC"
+          },
+          {
+            "code": "B104",
+            "name": "PETTY CASH/WARDROBE"
+          },
+          {
+            "code": "B105",
+            "name": "PETTY CASH/SM"
+          },
+          {
+            "code": "B106",
+            "name": "PETTY CASH/CO MGR"
+          },
+          {
+            "code": "B107",
+            "name": "PETTY CASH/PROSTHETICS"
+          },
+          {
+            "code": "B108",
+            "name": "PETTY CASH/HAIR"
+          },
+          {
+            "code": "B109",
+            "name": "PETTY CASH/CASTING"
+          },
+          {
+            "code": "B110",
+            "name": "PETTY CASH SOUND"
+          },
+          {
+            "code": "B111",
+            "name": "PETTY CASH/CHOREOGRAPHER"
+          },
+          {
+            "code": "B112",
+            "name": "PETTY CASH/PRODUCTION MGR"
+          },
+          {
+            "code": "B113",
+            "name": "PC ADV-"
+          },
+          {
+            "code": "B114",
+            "name": "PC ADV-"
+          },
+          {
+            "code": "B115",
+            "name": "PC ADV-"
+          },
+          {
+            "code": "B116",
+            "name": "PC ADV-"
+          },
+          {
+            "code": "B117",
+            "name": "PC ADV-"
+          },
+          {
+            "code": "B118",
+            "name": "PC ADV-"
+          },
+          {
+            "code": "B119",
+            "name": "PC ADV-"
+          },
+          {
+            "code": "B120",
+            "name": "PC ADV-"
+          },
+          {
+            "code": "B121",
+            "name": "PC ADV-"
+          },
+          {
+            "code": "B122",
+            "name": "PC ADV-"
+          },
+          {
+            "code": "B123",
+            "name": "PC ADV-"
+          },
+          {
+            "code": "B124",
+            "name": "PC ADV-"
+          },
+          {
+            "code": "B125",
+            "name": "PC ADV-"
+          },
+          {
+            "code": "B126",
+            "name": "PC ADV-"
+          },
+          {
+            "code": "B127",
+            "name": "PETTY CASH #15"
+          },
+          {
+            "code": "B128",
+            "name": "PETTY CASH #16"
+          },
+          {
+            "code": "B129",
+            "name": "PETTY CASH #17"
+          },
+          {
+            "code": "B130",
+            "name": "PETTY CASH #18"
+          },
+          {
+            "code": "B131",
+            "name": "PETTY CASH #19"
+          },
+          {
+            "code": "B132",
+            "name": "PETTY CASH #20"
+          },
+          {
+            "code": "B133",
+            "name": "PETTY CASH #21"
+          },
+          {
+            "code": "B134",
+            "name": "PETTY CASH #22"
+          },
+          {
+            "code": "B135",
+            "name": "PETTY CASH #23"
+          },
+          {
+            "code": "B136",
+            "name": "PETTY CASH #24"
+          },
+          {
+            "code": "B137",
+            "name": "PETTY CASH #25"
+          },
+          {
+            "code": "B138",
+            "name": "PETTY CASH #26"
+          },
+          {
+            "code": "B139",
+            "name": "PETTY CASH #27"
+          },
+          {
+            "code": "B140",
+            "name": "PETTY CASH #28"
+          },
+          {
+            "code": "B141",
+            "name": "PETTY CASH #29"
+          },
+          {
+            "code": "B142",
+            "name": "PETTY CASH #30"
+          },
+          {
+            "code": "B143",
+            "name": "PETTY CASH #31"
+          },
+          {
+            "code": "B144",
+            "name": "PETTY CASH #32"
+          },
+          {
+            "code": "B145",
+            "name": "PETTY CASH #33"
+          },
+          {
+            "code": "B146",
+            "name": "PETTY CASH #34"
+          },
+          {
+            "code": "B147",
+            "name": "PETTY CASH #35"
+          },
+          {
+            "code": "B148",
+            "name": "PETTY CASH #36"
+          },
+          {
+            "code": "B149",
+            "name": "PETTY CASH #37"
+          },
+          {
+            "code": "B150",
+            "name": "PETTY CASH #38"
+          },
+          {
+            "code": "B200",
+            "name": "RECEIVABLES"
+          },
+          {
+            "code": "B201",
+            "name": "TRADE RECEIVABLES"
+          },
+          {
+            "code": "B202",
+            "name": "THEATER RECEIVABLES"
+          },
+          {
+            "code": "B203",
+            "name": "TICKET RECEIVABLES"
+          },
+          {
+            "code": "B204",
+            "name": "OTHER RECEIVABLES"
+          },
+          {
+            "code": "B211",
+            "name": "A/R-MARKETING EXPENSES"
+          },
+          {
+            "code": "B212",
+            "name": "MISC RECEIVABLE #2"
+          },
+          {
+            "code": "B213",
+            "name": "MISC RECEIVABLE #3"
+          },
+          {
+            "code": "B214",
+            "name": "MISC RECEIVABLE #4"
+          },
+          {
+            "code": "B215",
+            "name": "MISC RECEIVABLE #5"
+          },
+          {
+            "code": "B216",
+            "name": "MISC RECEIVABLE #6"
+          },
+          {
+            "code": "B217",
+            "name": "MISC RECEIVABLE #7"
+          },
+          {
+            "code": "B218",
+            "name": "MISC RECEIVABLE #8"
+          },
+          {
+            "code": "B219",
+            "name": "MISC RECEIVABLE #9"
+          },
+          {
+            "code": "B220",
+            "name": "MISC RECEIVABLE #10"
+          },
+          {
+            "code": "B225",
+            "name": "MERCHANDISING RECEIVABLE"
+          },
+          {
+            "code": "B226",
+            "name": "KCAL RECEIVABLE"
+          },
+          {
+            "code": "B227",
+            "name": "MATERA BILLBACK"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "B300",
+        "name": "INVENTORY",
+        "accounts": [
+          {
+            "code": "B301",
+            "name": "INVENTORY"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "B400",
+        "name": "ADVANCES",
+        "accounts": [
+          {
+            "code": "B401",
+            "name": "ADVANCE/AUTHOR"
+          },
+          {
+            "code": "B402",
+            "name": "ADVANCE/COMPOSER"
+          },
+          {
+            "code": "B403",
+            "name": "ADVANCE/LYRICIST"
+          },
+          {
+            "code": "B404",
+            "name": "ADVANCE/DIRECTOR"
+          },
+          {
+            "code": "B405",
+            "name": "ADVANCE/CHOREOGRAPHER"
+          },
+          {
+            "code": "B406",
+            "name": "ADVANCE/SET DESIGNER"
+          },
+          {
+            "code": "B407",
+            "name": "ADVANCE/COSTUME DESIGNER"
+          },
+          {
+            "code": "B408",
+            "name": "ADVANCE/LIGHTING DESIGNER"
+          },
+          {
+            "code": "B409",
+            "name": "ADVANCE/ORCHESTRATOR"
+          },
+          {
+            "code": "B410",
+            "name": "ADV/ MUSIC CONTRACTOR"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "B500",
+        "name": "EXCHANGE",
+        "accounts": [
+          {
+            "code": "B501",
+            "name": "EXCHANGE"
+          },
+          {
+            "code": "B502",
+            "name": "PAYROLL EXCHANGE"
+          },
+          {
+            "code": "B503",
+            "name": "PAYROLL EXCHANGE LA"
+          },
+          {
+            "code": "B504",
+            "name": "A/P CLEARING"
+          },
+          {
+            "code": "B505",
+            "name": "BILLOVER CLEARING"
+          },
+          {
+            "code": "B506",
+            "name": "CLEARING"
+          },
+          {
+            "code": "B507",
+            "name": "CLEARING 3"
+          },
+          {
+            "code": "B508",
+            "name": "A/P SUSPENSE"
+          },
+          {
+            "code": "B509",
+            "name": "A/P SUSPENSE"
+          },
+          {
+            "code": "B510",
+            "name": "A/P SUSPENSE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "B600",
+        "name": "PREPAIDS",
+        "accounts": [
+          {
+            "code": "B601",
+            "name": "PREPAID INSURANCE"
+          },
+          {
+            "code": "B602",
+            "name": "PREPAID OTHER"
+          },
+          {
+            "code": "B603",
+            "name": "PREPAID THEATRE UTILITIES"
+          },
+          {
+            "code": "B610",
+            "name": "PREPAID SCENIC - OP."
+          },
+          {
+            "code": "B611",
+            "name": "PREPAID AUTOMATION - OP."
+          },
+          {
+            "code": "B612",
+            "name": "PREPAID PROPS. - OP."
+          },
+          {
+            "code": "B613",
+            "name": "PREPAID COSTUMES - OP."
+          },
+          {
+            "code": "B614",
+            "name": "PREPAID HAIR & MAKEUP - OP."
+          },
+          {
+            "code": "B615",
+            "name": "PREPAID LIGHTING - OP."
+          },
+          {
+            "code": "B616",
+            "name": "PREPAID VARILITE - OP."
+          },
+          {
+            "code": "B617",
+            "name": "PREPAID SPECIAL"
+          },
+          {
+            "code": "B618",
+            "name": "PREPAID SOUND - OP."
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Untitled Production Total"
+      },
+      {
+        "kind": "category",
+        "code": "B800",
+        "name": "FIXED ASSETS",
+        "accounts": [
+          {
+            "code": "B801",
+            "name": "THEATRICAL"
+          },
+          {
+            "code": "B802",
+            "name": "OFFICE"
+          },
+          {
+            "code": "B890",
+            "name": "ACCUM DEPRECIATION"
+          },
+          {
+            "code": "B899",
+            "name": "PRODUCTION COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "B900",
+        "name": "DEPOSITS",
+        "accounts": [
+          {
+            "code": "B901",
+            "name": "UNION BONDS"
+          },
+          {
+            "code": "B902",
+            "name": "OTHER DEPOSITS"
+          },
+          {
+            "code": "B903",
+            "name": "DEPOSIT #1"
+          },
+          {
+            "code": "B904",
+            "name": "DEPOSIT #2"
+          },
+          {
+            "code": "B905",
+            "name": "DEPOSIT #3"
+          },
+          {
+            "code": "B906",
+            "name": "DEPOSIT #4"
+          },
+          {
+            "code": "B907",
+            "name": "DEPOSIT #5"
+          },
+          {
+            "code": "B908",
+            "name": "DEPOSIT #6"
+          },
+          {
+            "code": "B909",
+            "name": "DEPOSIT #7"
+          },
+          {
+            "code": "B910",
+            "name": "DEPOSIT #8"
+          },
+          {
+            "code": "B911",
+            "name": "DEPOSIT #9"
+          },
+          {
+            "code": "B912",
+            "name": "DEPOSIT #10"
+          },
+          {
+            "code": "B913",
+            "name": "DEPOSIT #11"
+          },
+          {
+            "code": "B914",
+            "name": "DEPOSIT #12"
+          },
+          {
+            "code": "B915",
+            "name": "DEPOSIT #13"
+          },
+          {
+            "code": "B916",
+            "name": "DEPOSIT #14"
+          },
+          {
+            "code": "B917",
+            "name": "DEPOSIT #15"
+          },
+          {
+            "code": "B918",
+            "name": "DEPOSIT #16"
+          },
+          {
+            "code": "B919",
+            "name": "DEPOSIT #17"
+          },
+          {
+            "code": "B920",
+            "name": "DEPOSIT #18"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Untitled Production Total"
+      },
+      {
+        "kind": "category",
+        "code": "C",
+        "name": "LIABILITIES"
+      },
+      {
+        "kind": "category",
+        "code": "C000",
+        "name": "ACCOUNTS PAYABLE",
+        "accounts": [
+          {
+            "code": "C001",
+            "name": "TRADE PAYABLE"
+          },
+          {
+            "code": "C002",
+            "name": "OTHER PAYABLES"
+          },
+          {
+            "code": "C003",
+            "name": "ROYALTIES PAYABLE"
+          },
+          {
+            "code": "C004",
+            "name": "DUE TO DISNEY INTERNAL"
+          },
+          {
+            "code": "C005",
+            "name": "RENT WITHHOLDING FEE PYBL"
+          },
+          {
+            "code": "C008",
+            "name": "DUE TO PRODUCTION CO."
+          },
+          {
+            "code": "C010",
+            "name": "GST PAYABLE - R140545328"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "C100",
+        "name": "TAXES PAYABLE",
+        "accounts": [
+          {
+            "code": "C101",
+            "name": "FICA PAYABLE"
+          },
+          {
+            "code": "C102",
+            "name": "FIT PAYABLE"
+          },
+          {
+            "code": "C103",
+            "name": "SIT PAYABLE"
+          },
+          {
+            "code": "C104",
+            "name": "CIT PAYABLE"
+          },
+          {
+            "code": "C105",
+            "name": "SUI PAYABLE"
+          },
+          {
+            "code": "C106",
+            "name": "FUI PAYABLE"
+          },
+          {
+            "code": "C107",
+            "name": "GARNISHMENTS PAYABLES"
+          },
+          {
+            "code": "C110",
+            "name": "DISABILITY PAYABLES"
+          },
+          {
+            "code": "C111",
+            "name": "WORKERS COMP PAYABLE"
+          },
+          {
+            "code": "C120",
+            "name": "DUES PAYABLE"
+          },
+          {
+            "code": "C121",
+            "name": "AFCU PAYABLE"
+          },
+          {
+            "code": "C122",
+            "name": "UNION BENEFITS PAYABLE"
+          },
+          {
+            "code": "C123",
+            "name": "USA ANNUITY FUND"
+          },
+          {
+            "code": "C131",
+            "name": "CALIFORNIA SIT"
+          },
+          {
+            "code": "C132",
+            "name": "CALIFORNIA SDI"
+          },
+          {
+            "code": "C199",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "C200",
+        "name": "ACCRUALS",
+        "accounts": [
+          {
+            "code": "C201",
+            "name": "ACCRUED VACATION"
+          },
+          {
+            "code": "C202",
+            "name": "ACCRUED SICK PAY"
+          },
+          {
+            "code": "C203",
+            "name": "ACCRUED NYC COMM RENT"
+          },
+          {
+            "code": "C204",
+            "name": "ACCRUED SALES TAX"
+          },
+          {
+            "code": "C205",
+            "name": "ACCRUED PENSION DEFICIENCY"
+          },
+          {
+            "code": "C206",
+            "name": "ACCRUED HOLIDAY PAY"
+          },
+          {
+            "code": "C207",
+            "name": "ACCRUED PURCHASE ORDERS"
+          },
+          {
+            "code": "C208",
+            "name": "ACCRUED ROYALTIES"
+          },
+          {
+            "code": "C209",
+            "name": ""
+          },
+          {
+            "code": "C210",
+            "name": "ACCRUED MARKETING"
+          },
+          {
+            "code": "C211",
+            "name": ""
+          },
+          {
+            "code": "C212",
+            "name": ""
+          },
+          {
+            "code": "C299",
+            "name": "FRINGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "C300",
+        "name": "NOTES/CURRENT",
+        "accounts": [
+          {
+            "code": "C301",
+            "name": "NOTES PAYABLE/CURRENT"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Untitled Production Total"
+      },
+      {
+        "kind": "category",
+        "code": "C400",
+        "name": "RESERVE ACCRUALS",
+        "accounts": [
+          {
+            "code": "C401",
+            "name": "ACCURED LOAD-OUT"
+          },
+          {
+            "code": "C402",
+            "name": "ACCRUED COSTUME REPLACEMENT"
+          },
+          {
+            "code": "C403",
+            "name": "ACCRUED WIG REPLACEMENT"
+          },
+          {
+            "code": "C404",
+            "name": "RESERVE FOR SET REFURBISHMENT"
+          },
+          {
+            "code": "C407",
+            "name": "RESERVE FOR VARILITE REPLACEMENT"
+          },
+          {
+            "code": "C408",
+            "name": "RESERVE FOR LIGHTING FOCUS"
+          },
+          {
+            "code": "C409",
+            "name": "RESERVE FOR SOUND"
+          },
+          {
+            "code": "C415",
+            "name": "RESERVE FOR PHOTO CALL"
+          },
+          {
+            "code": "C420",
+            "name": "ACCRUED THEATRE EXPENSES"
+          },
+          {
+            "code": "C430",
+            "name": "RESERVE-CASTING DIRECTOR"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "C500",
+        "name": "LT NOTES PAYABLE",
+        "accounts": [
+          {
+            "code": "C501",
+            "name": "NOTES PAYABLE/NON-CURRENT"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "C600",
+        "name": "PAYROLL CLEARING",
+        "accounts": [
+          {
+            "code": "C609",
+            "name": "PAYROLL CLEARING - BULLOCH"
+          },
+          {
+            "code": "C610",
+            "name": "FRINGE CLEARING - BULLOCH"
+          },
+          {
+            "code": "C611",
+            "name": "PAYROLL SUSPENSE - BULLOCH"
+          },
+          {
+            "code": "C612",
+            "name": "PER DIEM CLEARING"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Untitled Production Total"
+      },
+      {
+        "kind": "category",
+        "code": "D",
+        "name": "CAPITAL"
+      },
+      {
+        "kind": "category",
+        "code": "D000",
+        "name": "CAPITAL",
+        "accounts": [
+          {
+            "code": "D001",
+            "name": "SETTLEMENTS"
+          },
+          {
+            "code": "D002",
+            "name": "CANADIAN DOLLAR ADV - TOR DOM"
+          },
+          {
+            "code": "D003",
+            "name": "US DOLLAR ADVANCES/TOR DOM"
+          },
+          {
+            "code": "D004",
+            "name": "CAPITAL #3"
+          },
+          {
+            "code": "D005",
+            "name": "DRAWING"
+          },
+          {
+            "code": "D006",
+            "name": "LOANS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "D100",
+        "name": "INCOME",
+        "accounts": [
+          {
+            "code": "D101",
+            "name": "RETAINED EARNINGS"
+          },
+          {
+            "code": "D102",
+            "name": "CURRENT YEAR PROFITS"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total Untitled Production Total"
+      }
+    ]
+  }
+}

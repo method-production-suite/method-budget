@@ -38,7 +38,7 @@
     "topsheet": [
       {
         "kind": "category",
-        "code": "31",
+        "code": "3100",
         "name": "STORY RIGHTS",
         "accounts": [
           {
@@ -69,7 +69,7 @@
       },
       {
         "kind": "category",
-        "code": "32",
+        "code": "3200",
         "name": "WRITER",
         "accounts": [
           {
@@ -104,7 +104,7 @@
       },
       {
         "kind": "category",
-        "code": "33",
+        "code": "3300",
         "name": "SCENARIO MISCELLANEOUS",
         "accounts": [
           {
@@ -151,7 +151,7 @@
       },
       {
         "kind": "category",
-        "code": "36",
+        "code": "3600",
         "name": "PRODUCER",
         "accounts": [
           {
@@ -214,7 +214,7 @@
       },
       {
         "kind": "category",
-        "code": "37",
+        "code": "3700",
         "name": "DIRECTOR",
         "accounts": [
           {
@@ -269,7 +269,7 @@
       },
       {
         "kind": "category",
-        "code": "38",
+        "code": "3800",
         "name": "CAST",
         "accounts": [
           {
@@ -348,7 +348,7 @@
       },
       {
         "kind": "category",
-        "code": "39",
+        "code": "3900",
         "name": "BITS AND STUNTS",
         "accounts": [
           {
@@ -399,7 +399,7 @@
       },
       {
         "kind": "category",
-        "code": "41",
+        "code": "4100",
         "name": "ATL TRAVEL & LIVING EXPS.",
         "accounts": [
           {
@@ -470,7 +470,7 @@
       },
       {
         "kind": "category",
-        "code": "42",
+        "code": "4200",
         "name": "EXTRAS AND STANDINS",
         "accounts": [
           {
@@ -537,7 +537,7 @@
       },
       {
         "kind": "category",
-        "code": "43",
+        "code": "4300",
         "name": "PRODUCTION STAFF",
         "accounts": [
           {
@@ -644,7 +644,7 @@
       },
       {
         "kind": "category",
-        "code": "44",
+        "code": "4400",
         "name": "WARDROBE",
         "accounts": [
           {
@@ -735,7 +735,7 @@
       },
       {
         "kind": "category",
-        "code": "45",
+        "code": "4500",
         "name": "MAKEUP AND HAIRDRESSING",
         "accounts": [
           {
@@ -802,7 +802,7 @@
       },
       {
         "kind": "category",
-        "code": "46",
+        "code": "4600",
         "name": "ANIMALS",
         "accounts": [
           {
@@ -861,7 +861,7 @@
       },
       {
         "kind": "category",
-        "code": "47",
+        "code": "4700",
         "name": "CAMERA",
         "accounts": [
           {
@@ -940,7 +940,7 @@
       },
       {
         "kind": "category",
-        "code": "48",
+        "code": "4800",
         "name": "PRODUCTION FILM & LAB",
         "accounts": [
           {
@@ -983,7 +983,7 @@
       },
       {
         "kind": "category",
-        "code": "49",
+        "code": "4900",
         "name": "SET DRESSING",
         "accounts": [
           {
@@ -1322,7 +1322,7 @@
       },
       {
         "kind": "category",
-        "code": "50",
+        "code": "5000",
         "name": "ACTION PROPS",
         "accounts": [
           {
@@ -1405,7 +1405,7 @@
       },
       {
         "kind": "category",
-        "code": "51",
+        "code": "5100",
         "name": "PICTURE VEHICLES",
         "accounts": [
           {
@@ -1480,7 +1480,7 @@
       },
       {
         "kind": "category",
-        "code": "52",
+        "code": "5200",
         "name": "CREATURES",
         "accounts": [
           {
@@ -1571,7 +1571,7 @@
       },
       {
         "kind": "category",
-        "code": "53",
+        "code": "5300",
         "name": "SET DESIGN",
         "accounts": [
           {
@@ -1634,7 +1634,7 @@
       },
       {
         "kind": "category",
-        "code": "54",
+        "code": "5400",
         "name": "SET CONSTRUCTION",
         "accounts": [
           {
@@ -1981,7 +1981,7 @@
       },
       {
         "kind": "category",
-        "code": "55",
+        "code": "5500",
         "name": "SET STRIKE",
         "accounts": [
           {
@@ -2012,7 +2012,7 @@
       },
       {
         "kind": "category",
-        "code": "56",
+        "code": "5600",
         "name": "VIDEO",
         "accounts": [
           {
@@ -2063,7 +2063,7 @@
       },
       {
         "kind": "category",
-        "code": "57",
+        "code": "5700",
         "name": "SOUND RECORDING",
         "accounts": [
           {
@@ -2114,7 +2114,7 @@
       },
       {
         "kind": "category",
-        "code": "58",
+        "code": "5800",
         "name": "SET LIGHTING",
         "accounts": [
           {
@@ -2177,7 +2177,7 @@
       },
       {
         "kind": "category",
-        "code": "59",
+        "code": "5900",
         "name": "SET OPERATION",
         "accounts": [
           {
@@ -2280,7 +2280,7 @@
       },
       {
         "kind": "category",
-        "code": "60",
+        "code": "6000",
         "name": "FACILITIES",
         "accounts": [
           {
@@ -2379,7 +2379,7 @@
       },
       {
         "kind": "category",
-        "code": "61",
+        "code": "6100",
         "name": "SPECIAL EFFECTS",
         "accounts": [
           {
@@ -2446,7 +2446,7 @@
       },
       {
         "kind": "category",
-        "code": "62",
+        "code": "6200",
         "name": "TEST/REHEARSALS",
         "accounts": [
           {
@@ -2529,7 +2529,7 @@
       },
       {
         "kind": "category",
-        "code": "63",
+        "code": "6300",
         "name": "LOCATIONS",
         "accounts": [
           {
@@ -2624,7 +2624,7 @@
       },
       {
         "kind": "category",
-        "code": "64",
+        "code": "6400",
         "name": "TRANSPORTATION",
         "accounts": [
           {
@@ -2755,7 +2755,7 @@
       },
       {
         "kind": "category",
-        "code": "65",
+        "code": "6500",
         "name": "SECOND UNIT",
         "accounts": [
           {
@@ -2906,7 +2906,7 @@
       },
       {
         "kind": "category",
-        "code": "66",
+        "code": "6600",
         "name": "AERIAL/BLUE SCREEN/SPECIAL UNITS",
         "accounts": [
           {
@@ -3025,7 +3025,7 @@
       },
       {
         "kind": "category",
-        "code": "67",
+        "code": "6700",
         "name": "PLATE UNIT",
         "accounts": [
           {
@@ -3160,7 +3160,7 @@
       },
       {
         "kind": "category",
-        "code": "68",
+        "code": "6800",
         "name": "MARINE UNIT",
         "accounts": [
           {
@@ -3231,7 +3231,7 @@
       },
       {
         "kind": "category",
-        "code": "69",
+        "code": "6900",
         "name": "BTL TRAVEL & LIVING EXPS.",
         "accounts": [
           {
@@ -3254,7 +3254,7 @@
       },
       {
         "kind": "category",
-        "code": "70",
+        "code": "7000",
         "name": "VISUAL EFFECTS",
         "accounts": [
           {
@@ -3481,7 +3481,7 @@
       },
       {
         "kind": "category",
-        "code": "71",
+        "code": "7100",
         "name": "PROJECTION",
         "accounts": [
           {
@@ -3520,7 +3520,7 @@
       },
       {
         "kind": "category",
-        "code": "72",
+        "code": "7200",
         "name": "EDITING",
         "accounts": [
           {
@@ -3607,7 +3607,7 @@
       },
       {
         "kind": "category",
-        "code": "73",
+        "code": "7300",
         "name": "TITLES",
         "accounts": [
           {
@@ -3630,7 +3630,7 @@
       },
       {
         "kind": "category",
-        "code": "74",
+        "code": "7400",
         "name": "MUSIC",
         "accounts": [
           {
@@ -3833,7 +3833,7 @@
       },
       {
         "kind": "category",
-        "code": "76",
+        "code": "7600",
         "name": "POST-PROD. SOUND",
         "accounts": [
           {
@@ -3908,7 +3908,7 @@
       },
       {
         "kind": "category",
-        "code": "78",
+        "code": "7800",
         "name": "PREVIEW EXPENSE",
         "accounts": [
           {
@@ -3959,7 +3959,7 @@
       },
       {
         "kind": "category",
-        "code": "79",
+        "code": "7900",
         "name": "FILM LAB EXPENSE",
         "accounts": [
           {
@@ -4014,7 +4014,7 @@
       },
       {
         "kind": "category",
-        "code": "80",
+        "code": "8000",
         "name": "PURCHASE FILM FOOTAGE",
         "accounts": [
           {
@@ -4049,7 +4049,7 @@
       },
       {
         "kind": "category",
-        "code": "85",
+        "code": "8500",
         "name": "INSURANCE & MEDICAL EXAMS",
         "accounts": [
           {
@@ -4096,7 +4096,7 @@
       },
       {
         "kind": "category",
-        "code": "86",
+        "code": "8600",
         "name": "RESHOOTS",
         "accounts": [
           {
@@ -4259,7 +4259,7 @@
       },
       {
         "kind": "category",
-        "code": "87",
+        "code": "8700",
         "name": "PUBLICITY",
         "accounts": [
           {
@@ -4294,7 +4294,7 @@
       },
       {
         "kind": "category",
-        "code": "88",
+        "code": "8800",
         "name": "MISC. UNCLASSIFIED EXPS.",
         "accounts": [
           {
@@ -4389,7 +4389,7 @@
       },
       {
         "kind": "category",
-        "code": "89",
+        "code": "8900",
         "name": "CERTIFS. & ROYALTIES",
         "accounts": [
           {

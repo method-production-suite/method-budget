@@ -60,28 +60,20 @@ docs/decisions.md (every product and design call, numbered), docs/FORMAT.md (`.m
   vendor tutorials 03-24), feature inventory, export test plan.
 
 ## Studio chart templates (2026-10-10, uncommitted)
-48 studio/network charts of accounts are now bundled templates, next to our own 7 (55 in
-`templates/charts/charts.json`; sources listed in `templates/charts/SOURCES.md`). Their CSVs are in
-`imports/coa-sources/` (gitignored, follows `EXPORT-SPEC.md`). 36 more are parked in
-`imports/coa-sources/needs-review/` because `method coa import` mangles or rejects them.
-**Read `imports/coa-sources/IMPORT-NOTES.md` before touching the importer or those files.** In short:
-- The importer ignores the CSV's `parent` column and guesses category vs account from code width,
-  so mixed-width charts lose most accounts (HBO NY keeps 285 of 616), merge categories (DISNEY
-  STAGE 75 to 8) or fail (NETFLIX). It also shortens category codes (`3100` saved as `31`).
-  Fix: place accounts by `parent` when present, keep codes verbatim.
-- 22 charts have categories with no accounts; the importer allows them but
-  `every_bundled_template_opens_and_recalculates` doesn't. Product call: relax the test,
-  add placeholders, or drop them.
-- Repeated account codes: the importer keeps the first and drops the rest silently. In the built
-  Academic charts that loses real accounts ("Stand-ins").
-After an importer fix, move files from `needs-review/` up a level and run
-`python3 scripts/build-coa-templates.py`, then `cargo test -p fwb-format`.
+All 84 studio/network charts in `imports/coa-sources/` (gitignored) are bundled templates
+now, next to our own 7 (91 in `templates/charts/charts.json`); `needs-review/` is empty.
+The importer fix is done (decision 53, docs/TEMPLATES.md): a `kind,code,name,parent` sheet
+keeps every number as written and places accounts by `parent`; empty categories are
+allowed; an account named `.` is dropped; a repeated number with the same name is merged,
+with another name it comes in as `10950-2` (listed in the import). Matching by number never
+cuts a number short (`AccountCoding::read`/`key`). The build script checks each template's
+counts against its CSV. Groups for the 36 new charts follow their names (unclear ones are
+Other). `imports/coa-sources/IMPORT-NOTES.md` has the per-chart detail.
 
 ## Next
 Phase 1 remaining (ROADMAP): import from MMB exports (1.16, blocked until Sam runs
 docs/research/export-test-plan.md; he tabled it for now), engine fixes from that test
 (1.17), signed Mac build (1.21, needs Sam's call on the signing team). Then Phase 2.
-Also: the importer fixes in "Studio chart templates" above.
 
 ## How to work here
 - Never launch the app or drive the GUI while Sam is at the computer unless he says so;

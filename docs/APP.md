@@ -1045,8 +1045,13 @@ zeros, and skips rows above the header, repeated headers and total rows; level h
 and level totals become production totals (our default ones are offered when the file
 names none). The numbering pattern the numbers follow is shown and can be changed (widths
 and separator). The preview lists the chart as it will come in, the rows skipped and what
-to check (duplicates, accounts without a category row, empty categories, folded
-sub-accounts). Then either:
+to check (repeated numbers, accounts without a category row, empty categories, folded
+sub-accounts). A file in the `kind,code,name,parent` layout keeps every number as written
+and puts each account in the category it names. An account number listed again with
+another name comes in under a new number (`10950-2`): a sentence at the top of the preview
+says how many, and they are listed under **Renumbered**; the same number and name listed
+twice comes in once, and accounts named `.` (unused slots) are left out, each said in a
+sentence (docs/TEMPLATES.md). Then either:
 
 - **A new budget tab with this chart and no lines** (titled Untitled, in this budget's base
   currency; the import is its first undo step, so it starts unsaved), or

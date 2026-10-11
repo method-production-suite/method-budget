@@ -28,8 +28,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use fwb_core::coa::{
-    infer_coding, join_code, level_name, split_code, total_for_heading, zero_suffix_width, Chart,
-    ChartAccount, ChartCategory, ChartRow,
+    infer_coding, infer_coding_lenient, join_code, level_name, split_code, total_for_heading,
+    zero_suffix_width, Chart, ChartAccount, ChartCategory, ChartRow,
 };
 use fwb_core::coding::{AccountCoding, SEPARATORS};
 use serde::Deserialize;
@@ -242,6 +242,14 @@ pub struct CoaRead {
     /// Read in the `kind,code,name,parent` layout (the column mapping
     /// isn't used).
     pub kinded: bool,
+    /// Accounts named `.` (unused slots in the chart) left out.
+    pub placeholders: usize,
+    /// Accounts listed again under the same number and name, merged into
+    /// the first.
+    pub merged_repeats: usize,
+    /// Accounts listed again under a number already used with another
+    /// name, kept under a new number.
+    pub renamed_repeats: Vec<RenamedAccount>,
 }
 
 // ---------------------------------------------------------------------------
@@ -885,8 +893,14 @@ pub fn read_chart(t: &Table, m: &CoaMapping, o: &CoaOptions) -> Result<CoaRead, 
     let coding = inferred;
     let mut rows: Vec<ChartRow> = Vec::new();
     let mut cat_at: BTreeMap<String, usize> = BTreeMap::new();
-    let mut acct_rows: BTreeMap<String, usize> = BTreeMap::new();
     let mut cat_rows: BTreeMap<String, usize> = BTreeMap::new();
+    let mut repeats = Repeats::new(
+        &coding,
+        evs.iter().filter_map(|e| match e {
+            Ev::Entry { code, kind, .. } if *kind != Kind::Category => Some(code.as_str()),
+            _ => None,
+        }),
+    );
     let mut current: Option<String> = None;
     let mut pending: Option<(usize, String)> = None;
     let mut section: Option<String> = None;
@@ -1043,20 +1057,12 @@ pub fn read_chart(t: &Table, m: &CoaMapping, o: &CoaOptions) -> Result<CoaRead, 
                         rows.len() - 1
                     }
                 };
-                if let Some(&first) = acct_rows.get(&code_text) {
-                    warnings.push(note(
-                        *row,
-                        format!(
-                        "account {code_text} is listed again (first on row {}): the first is kept",
-                        first + 1
-                    ),
-                    ));
+                let Some(code_text) = repeats.place(*row, &code_text, name, &mut warnings) else {
                     continue;
-                }
+                };
                 if name.is_empty() {
                     warnings.push(note(*row, format!("account {code_text} has no name")));
                 }
-                acct_rows.insert(code_text.clone(), *row);
                 if let ChartRow::Category(c) = &mut rows[i] {
                     c.accounts.push(ChartAccount {
                         code: code_text,
@@ -1133,6 +1139,9 @@ pub fn read_chart(t: &Table, m: &CoaMapping, o: &CoaOptions) -> Result<CoaRead, 
         levels_from_source,
         default_levels_added,
         kinded: false,
+        placeholders: 0,
+        merged_repeats: repeats.merged,
+        renamed_repeats: repeats.renamed,
     })
 }
 
@@ -1171,10 +1180,126 @@ fn unseparated(s: &str) -> String {
     s.chars().filter(|c| !is_separator(*c)).collect()
 }
 
+/// Whether two names are the same, ignoring case and spacing.
+fn same_name(a: &str, b: &str) -> bool {
+    let tidy = |s: &str| {
+        s.split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_lowercase()
+    };
+    tidy(a) == tidy(b)
+}
+
+/// An account listed again under a number already used with another name,
+/// kept under a new number.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RenamedAccount {
+    /// The row it is on (from 1).
+    pub row: usize,
+    /// The number the chart gives it.
+    pub old: String,
+    /// The number it is imported as.
+    pub new: String,
+    pub name: String,
+}
+
+/// Repeated account numbers (docs/TEMPLATES.md, "Repeated account
+/// numbers"). A number listed again with the same name is the same account:
+/// it is merged into the first. A number listed again with another name is
+/// another account: it keeps the chart's number with `-2`, `-3`... after it
+/// (the chart's separator when it has one other than a space), the first
+/// such number not used anywhere in the chart. Matching by number (actuals,
+/// comparison, imports) can't tell two accounts with one number apart, so
+/// both can't keep it.
+struct Repeats {
+    sep: char,
+    /// Every number in the chart and every number given.
+    taken: BTreeSet<String>,
+    /// Each number given: its account's name and row.
+    seen: BTreeMap<String, Vec<(String, usize)>>,
+    merged: usize,
+    renamed: Vec<RenamedAccount>,
+}
+
+impl Repeats {
+    fn new<'a>(coding: &AccountCoding, codes: impl Iterator<Item = &'a str>) -> Repeats {
+        Repeats {
+            sep: coding.separator.filter(|c| *c != ' ').unwrap_or('-'),
+            taken: codes.map(str::to_string).collect(),
+            seen: BTreeMap::new(),
+            merged: 0,
+            renamed: Vec::new(),
+        }
+    }
+
+    /// The number the account `code` named `name` on `row` (from 0) gets,
+    /// or `None` when it is merged into an earlier one.
+    fn place(
+        &mut self,
+        row: usize,
+        code: &str,
+        name: &str,
+        warnings: &mut Vec<RowNote>,
+    ) -> Option<String> {
+        let Some(before) = self.seen.get(code) else {
+            self.seen
+                .insert(code.to_string(), vec![(name.to_string(), row)]);
+            self.taken.insert(code.to_string());
+            return Some(code.to_string());
+        };
+        if let Some((_, first)) = before.iter().find(|(n, _)| same_name(n, name)) {
+            warnings.push(note(
+                row,
+                format!(
+                    "account {code} \"{name}\" is listed again (first on row {}): the two are merged into one",
+                    first + 1
+                ),
+            ));
+            self.merged += 1;
+            return None;
+        }
+        let first = before[0].1;
+        let new = (2u32..)
+            .map(|n| format!("{code}{}{n}", self.sep))
+            .find(|c| !self.taken.contains(c))
+            .expect("a free number");
+        warnings.push(note(
+            row,
+            format!(
+                "account {code} is listed again as \"{name}\" (first on row {}, as \"{}\"): imported as {new}",
+                first + 1,
+                before[0].0
+            ),
+        ));
+        self.seen
+            .get_mut(code)
+            .expect("seen")
+            .push((name.to_string(), row));
+        self.seen.insert(new.clone(), vec![(name.to_string(), row)]);
+        self.taken.insert(new.clone());
+        self.renamed.push(RenamedAccount {
+            row: row + 1,
+            old: code.to_string(),
+            new: new.clone(),
+            name: name.to_string(),
+        });
+        Some(new)
+    }
+}
+
 /// Reads a chart in the `kind,code,name,parent` layout: one row per
 /// category, account, sub-account or production total, in chart order.
-/// Sub-accounts become accounts of their own (numbered with their part
-/// after the account's), since a budget has no sub-account level.
+///
+/// The sheet says what each row is, so nothing is guessed from the numbers:
+/// every category and account keeps its number exactly as written (mixed
+/// widths, letters, separators), each account goes in the category its
+/// `parent` names (else the category above it), and the pattern is only
+/// worked out for typing new numbers ([`infer_coding_lenient`]). A
+/// sub-account becomes an account of its own right after its account, its
+/// number as written, since a budget has no sub-account level. An account
+/// named `.` is an unused slot in the chart and is left out (counted);
+/// repeated numbers are merged or renumbered (see [`Repeats`]).
 pub fn read_kinded(
     t: &Table,
     header: usize,
@@ -1198,6 +1323,7 @@ pub fn read_kinded(
     let mut skipped = Vec::new();
     let mut warnings = Vec::new();
     let mut rows: Vec<Row> = Vec::new();
+    let mut placeholders = 0usize;
     for r in header + 1..t.rows.len() {
         if t.rows[r].iter().all(Value::is_empty) {
             continue;
@@ -1217,11 +1343,16 @@ pub fn read_kinded(
             }
         };
         let code = cell(cols.code);
-        let name = clean_name(&cell(cols.name));
+        let raw_name = cell(cols.name);
         if kind != K::Total && code.is_empty() {
             skipped.push(note(r, "no number"));
             continue;
         }
+        if matches!(kind, K::Account | K::Sub) && raw_name == "." {
+            placeholders += 1;
+            continue;
+        }
+        let name = clean_name(&raw_name);
         if kind == K::Total && name.is_empty() {
             skipped.push(note(r, "a total row with no name"));
             continue;
@@ -1234,77 +1365,25 @@ pub fn read_kinded(
             parent: cols.parent.map(cell).unwrap_or_default(),
         });
     }
-
-    // Accounts written without separators keep them out of the pattern.
-    let accounts_plain = !rows
-        .iter()
-        .any(|x| x.kind == K::Account && x.code.chars().any(is_separator));
-    let account_code = |code: &str| -> String {
-        if accounts_plain {
-            unseparated(code)
-        } else {
-            code.to_string()
-        }
+    let of = |k: K| -> Vec<&str> {
+        rows.iter()
+            .filter(|x| x.kind == k)
+            .map(|x| x.code.as_str())
+            .collect()
     };
-    // A sub-account's number as its account's plus its own part.
-    let sub_code = |x: &Row| -> String {
-        let parent = account_code(&x.parent);
-        let own = if !x.parent.is_empty() && x.code.starts_with(&x.parent) {
-            x.code[x.parent.len()..].to_string()
-        } else if !parent.is_empty() && unseparated(&x.code).starts_with(&parent) {
-            unseparated(&x.code)[parent.len()..].to_string()
-        } else {
-            x.code.clone()
-        };
-        let own: String = own.trim_matches(is_separator).to_string();
-        if parent.is_empty() {
-            return account_code(&x.code);
-        }
-        match (accounts_plain, parent.chars().find(|c| is_separator(*c))) {
-            (false, Some(sep)) => format!("{parent}{sep}{}", unseparated(&own)),
-            _ => format!("{parent}{}", unseparated(&own)),
-        }
-    };
-    let cat_code = |code: &str| -> String {
-        if accounts_plain {
-            unseparated(code)
-        } else {
-            code.to_string()
-        }
-    };
-    let cats: Vec<String> = rows
-        .iter()
-        .filter(|x| x.kind == K::Category)
-        .map(|x| cat_code(&x.code))
-        .collect();
-    let accts: Vec<String> = rows
-        .iter()
-        .filter(|x| x.kind == K::Account)
-        .map(|x| account_code(&x.code))
-        .collect();
-    let subs: Vec<String> = rows
-        .iter()
-        .filter(|x| x.kind == K::Sub)
-        .map(sub_code)
-        .collect();
+    let (cats, accts, subs) = (of(K::Category), of(K::Account), of(K::Sub));
     if cats.is_empty() && accts.is_empty() {
         return Err("no category or account rows were found".into());
     }
-    fn refs(v: &[String]) -> Vec<&str> {
-        v.iter().map(String::as_str).collect()
-    }
-    let coding = infer_coding(&refs(&cats), &refs(&accts), &refs(&subs))?;
 
+    // Categories and totals, in order; each row's category above it.
     let mut out: Vec<ChartRow> = Vec::new();
     let mut cat_at: BTreeMap<String, usize> = BTreeMap::new();
-    // As written and as stored, so a parent column may use either.
-    let mut cat_by_written: BTreeMap<String, String> = BTreeMap::new();
-    let mut acct_cat: BTreeMap<String, String> = BTreeMap::new();
-    let mut acct_rows: BTreeMap<String, usize> = BTreeMap::new();
-    let mut current: Option<String> = None;
+    let mut cat_row: BTreeMap<usize, usize> = BTreeMap::new();
+    let mut above: Vec<Option<usize>> = Vec::with_capacity(rows.len());
+    let mut current: Option<usize> = None;
     let mut since = 0usize;
     let mut headings = 0usize;
-    let mut folded = 0usize;
     for x in &rows {
         match x.kind {
             K::Total => {
@@ -1314,143 +1393,148 @@ pub fn read_kinded(
                         "\"{}\" totals other totals: a topsheet works out its above- and below-the-line totals itself, so it was left out",
                         x.name
                     )));
-                    continue;
-                }
-                out.push(ChartRow::Level(total_for_heading(&x.name)));
-                since = 0;
-            }
-            K::Category => {
-                let parts = match split_code(&coding, &cat_code(&x.code)) {
-                    Ok(p) => p,
-                    Err(e) => {
-                        skipped.push(note(
-                            x.row,
-                            format!("{} doesn't follow the numbers' pattern: {e}", x.code),
-                        ));
-                        continue;
-                    }
-                };
-                if parts[1..].iter().any(|p| p.bytes().any(|b| b != b'0')) {
-                    warnings.push(note(
-                        x.row,
-                        format!("category number {} is read as {}", x.code, parts[0]),
-                    ));
-                }
-                let code = parts[0].clone();
-                cat_by_written.insert(x.code.clone(), code.clone());
-                cat_by_written.insert(code.clone(), code.clone());
-                if cat_at.contains_key(&code) {
-                    warnings.push(note(
-                        x.row,
-                        format!("category {code} is listed again: its accounts join the first"),
-                    ));
                 } else {
-                    cat_at.insert(code.clone(), out.len());
+                    out.push(ChartRow::Level(total_for_heading(&x.name)));
+                    since = 0;
+                }
+            }
+            K::Category => match cat_at.get(&x.code) {
+                Some(&i) => {
+                    warnings.push(note(
+                        x.row,
+                        format!(
+                            "category {} is listed again: its accounts join the first",
+                            x.code
+                        ),
+                    ));
+                    current = Some(i);
+                }
+                None => {
+                    cat_at.insert(x.code.clone(), out.len());
+                    cat_row.insert(out.len(), x.row);
+                    current = Some(out.len());
                     out.push(ChartRow::Category(ChartCategory {
-                        code: code.clone(),
+                        code: x.code.clone(),
                         name: x.name.clone(),
                         accounts: Vec::new(),
                     }));
                     since += 1;
                 }
-                current = Some(code);
-            }
-            K::Account | K::Sub => {
-                let written = if x.kind == K::Sub {
-                    sub_code(x)
+            },
+            K::Account | K::Sub => {}
+        }
+        above.push(current);
+    }
+    // A parent written another way (`11-00` for `1100`) when only one
+    // category is written that way.
+    let mut loose: BTreeMap<String, Option<usize>> = BTreeMap::new();
+    for (code, &i) in &cat_at {
+        loose
+            .entry(unseparated(code))
+            .and_modify(|v| *v = None)
+            .or_insert(Some(i));
+    }
+
+    // Each account's category.
+    let mut acct_cat: BTreeMap<&str, usize> = BTreeMap::new();
+    let mut placed: Vec<(&Row, Option<usize>)> = Vec::new();
+    for (x, above) in rows.iter().zip(&above) {
+        if !matches!(x.kind, K::Account | K::Sub) {
+            continue;
+        }
+        let cat = if x.kind == K::Sub {
+            acct_cat.get(x.parent.as_str()).copied().or(*above)
+        } else if x.parent.is_empty() {
+            *above
+        } else {
+            cat_at
+                .get(&x.parent)
+                .copied()
+                .or_else(|| loose.get(&unseparated(&x.parent)).copied().flatten())
+        };
+        if let (K::Account, Some(c)) = (x.kind, cat) {
+            acct_cat.entry(x.code.as_str()).or_insert(c);
+        }
+        placed.push((x, cat));
+    }
+    // The pattern, for typing new numbers: the one most numbers follow.
+    let cat_code = |i: usize| match out.get(i) {
+        Some(ChartRow::Category(c)) => c.code.as_str(),
+        _ => "",
+    };
+    let pairs: Vec<(&str, &str)> = placed
+        .iter()
+        .filter(|(x, _)| x.kind == K::Account)
+        .map(|(x, c)| (x.code.as_str(), c.map_or("", cat_code)))
+        .collect();
+    let coding = infer_coding_lenient(&cats, &pairs, &subs);
+
+    // Accounts, each in its category.
+    let mut repeats = Repeats::new(&coding, accts.iter().chain(&subs).copied());
+    let mut folded = 0usize;
+    for (x, cat) in placed {
+        let Some(cat) = cat else {
+            skipped.push(note(
+                x.row,
+                if x.parent.is_empty() {
+                    format!("account {} has no category above it", x.code)
                 } else {
-                    account_code(&x.code)
-                };
-                let parts = match split_code(&coding, &written) {
-                    Ok(p) => p,
-                    Err(e) => {
-                        skipped.push(note(
-                            x.row,
-                            format!("{} doesn't follow the numbers' pattern: {e}", x.code),
-                        ));
-                        continue;
-                    }
-                };
-                if parts.len() < 2 {
-                    skipped.push(note(x.row, format!("{} has no account part", x.code)));
-                    continue;
-                }
-                let code = join_code(&coding, &parts);
-                let cat = if x.kind == K::Sub {
-                    acct_cat
-                        .get(&account_code(&x.parent))
-                        .cloned()
-                        .or_else(|| current.clone())
-                } else if x.parent.is_empty() {
-                    cat_at
-                        .contains_key(&parts[0])
-                        .then(|| parts[0].clone())
-                        .or_else(|| current.clone())
-                } else {
-                    cat_by_written
-                        .get(&x.parent)
-                        .cloned()
-                        .or_else(|| cat_by_written.get(&cat_code(&x.parent)).cloned())
-                };
-                let Some(cat) = cat else {
-                    skipped.push(note(
-                        x.row,
-                        format!(
-                            "account {} names category \"{}\", which isn't listed above it",
-                            x.code, x.parent
-                        ),
-                    ));
-                    continue;
-                };
-                if let Some(&first) = acct_rows.get(&code) {
-                    warnings.push(note(
-                        x.row,
-                        format!(
-                            "account {code} is listed again (first on row {}): the first is kept",
-                            first + 1
-                        ),
-                    ));
-                    continue;
-                }
-                if x.name.is_empty() {
-                    warnings.push(note(x.row, format!("account {code} has no name")));
-                }
-                if x.kind == K::Sub {
-                    folded += 1;
-                } else {
-                    acct_cat.insert(code.clone(), cat.clone());
-                    acct_cat.insert(account_code(&x.code), cat.clone());
-                }
-                acct_rows.insert(code.clone(), x.row);
-                if let Some(ChartRow::Category(c)) = cat_at.get(&cat).and_then(|&i| out.get_mut(i))
-                {
-                    c.accounts.push(ChartAccount {
-                        code,
-                        name: x.name.clone(),
-                    });
-                }
-            }
+                    format!(
+                        "account {} names category \"{}\", which isn't in the chart",
+                        x.code, x.parent
+                    )
+                },
+            ));
+            continue;
+        };
+        let Some(code) = repeats.place(x.row, &x.code, &x.name, &mut warnings) else {
+            continue;
+        };
+        if x.name.is_empty() {
+            warnings.push(note(x.row, format!("account {code} has no name")));
+        }
+        if x.kind == K::Sub {
+            folded += 1;
+        }
+        if let Some(ChartRow::Category(c)) = out.get_mut(cat) {
+            c.accounts.push(ChartAccount {
+                code,
+                name: x.name.clone(),
+            });
         }
     }
     if folded > 0 {
         warnings.push(RowNote {
             row: 0,
             message: if folded == 1 {
-                "1 sub-account was kept as an account of its own, numbered after its account (a budget has no sub-account level)".to_string()
+                "1 sub-account was kept as an account of its own, after its account (a budget has no sub-account level)".to_string()
             } else {
-                format!("{folded} sub-accounts were kept as accounts of their own, numbered after their accounts (a budget has no sub-account level)")
+                format!("{folded} sub-accounts were kept as accounts of their own, after their accounts (a budget has no sub-account level)")
             },
         });
     }
-    for c in out.iter().filter_map(|r| match r {
-        ChartRow::Category(c) => Some(c),
-        _ => None,
-    }) {
-        if c.accounts.is_empty() {
-            warnings.push(RowNote {
-                row: 0,
-                message: format!("category {} has no accounts", c.code),
-            });
+    if placeholders > 0 {
+        warnings.push(RowNote {
+            row: 0,
+            message: format!(
+                "{placeholders} {} named \".\" (unused slots in the chart) {} left out",
+                if placeholders == 1 {
+                    "account"
+                } else {
+                    "accounts"
+                },
+                if placeholders == 1 { "was" } else { "were" }
+            ),
+        });
+    }
+    for (i, r) in out.iter().enumerate() {
+        if let ChartRow::Category(c) = r {
+            if c.accounts.is_empty() {
+                warnings.push(note(
+                    cat_row[&i],
+                    format!("category {} has no accounts", c.code),
+                ));
+            }
         }
     }
     skipped.sort_by_key(|n| n.row);
@@ -1484,6 +1568,9 @@ pub fn read_kinded(
         levels_from_source,
         default_levels_added,
         kinded: true,
+        placeholders,
+        merged_repeats: repeats.merged,
+        renamed_repeats: repeats.renamed,
     })
 }
 
@@ -2032,17 +2119,38 @@ mod tests {
             &["1100", "STORY"],
             &["1101", "Rights"],
             &["1101", "Rights again"],
+            &["1101", "RIGHTS"],
             &["1200", "EMPTY"],
             &["1301", "Orphan"],
         ]);
         let msgs: Vec<&str> = r.warnings.iter().map(|w| w.message.as_str()).collect();
-        assert!(msgs.iter().any(|m| m.contains("listed again")), "{msgs:?}");
+        assert!(
+            msgs.iter().any(|m| m.contains("imported as 1101-2")),
+            "{msgs:?}"
+        );
+        assert!(
+            msgs.iter().any(|m| m.contains("merged into one")),
+            "{msgs:?}"
+        );
         assert!(msgs.iter().any(|m| m.contains("no accounts")), "{msgs:?}");
         assert!(
             msgs.iter().any(|m| m.contains("no category row for 13")),
             "{msgs:?}"
         );
-        assert_eq!(r.chart.account_count(), 2);
+        // Another name is another account, under a new number; the same
+        // name is the same account.
+        assert_eq!(
+            lines(&r),
+            [
+                "11 STORY",
+                "  1101 Rights",
+                "  1101-2 Rights again",
+                "12 EMPTY",
+                "13 ",
+                "  1301 Orphan"
+            ]
+        );
+        assert_eq!((r.merged_repeats, r.renamed_repeats.len()), (1, 1));
     }
 
     #[test]
@@ -2182,19 +2290,19 @@ total,,TOTAL BELOW-THE-LINE,,\r\n";
         assert_eq!(
             lines(&r),
             [
-                "11 STORY & RIGHTS",
+                "1100 STORY & RIGHTS",
                 "  1101 Story rights",
-                "  110105 Option payments",
+                "  1101.05 Option payments",
                 "  1102 Writers, staff",
-                "13 DIRECTOR",
+                "1300 DIRECTOR",
                 "  1301 Director",
                 "= Total above-the-line",
-                "20 PRODUCTION STAFF",
+                "2000 PRODUCTION STAFF",
                 "  2001 Production manager",
                 "= Total production",
             ]
         );
-        assert_eq!(coding(&r), (2, 2, 2, None));
+        assert_eq!(coding(&r), (2, 2, 0, None));
         assert_eq!(r.sub_accounts, 1);
         let msgs: Vec<&str> = r.warnings.iter().map(|w| w.message.as_str()).collect();
         assert!(
@@ -2217,6 +2325,174 @@ total,,TOTAL BELOW-THE-LINE,,\r\n";
             .map(|a| a.code.as_str())
             .collect();
         assert_eq!(codes, ["11-01", "11-01-05"]);
+    }
+
+    fn kinded(csv: &str) -> CoaRead {
+        let book = crate::import::read_file(csv.as_bytes(), "Chart.csv").unwrap();
+        let t = &book.tables[0];
+        let (h, cols) = kinded_columns(t, None).unwrap();
+        read_kinded(
+            t,
+            h,
+            cols,
+            &CoaOptions {
+                default_levels: false,
+                ..CoaOptions::default()
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn named_parents_keep_every_number_as_written() {
+        // Mixed widths (`050101` and `1101` under 4-wide categories),
+        // letters, trailing dots, categories and accounts of one width,
+        // and a category with a separator inside.
+        let r = kinded(
+            "kind,code,name,parent\n\
+category,0501,BONUSES,\n\
+account,050101,.,0501\n\
+account,050199,SIGNING BONUS,0501\n\
+category,0502,RELOCATION,\n\
+category,1100,WRITING,\n\
+account,1101,STUDIO WRITER,1100\n\
+account,110201,FREELANCE,1100\n\
+account,1150,RESEARCH,1100\n\
+category,1A00,REVENUE,\n\
+account,1A10,BOX OFFICE,1A00\n\
+account,1A20,DEDUCTIONS,1A00\n\
+category,4AA0,CAMERA,\n\
+account,4AA.,,4AA0\n\
+account,4AA1,OPERATOR,4AA0\n\
+category,5600-100,POST,\n\
+account,5600-101,EDITOR,5600-100\n\
+total,,TOTAL BELOW-THE-LINE,\n",
+        );
+        assert_eq!(
+            lines(&r),
+            [
+                "0501 BONUSES",
+                "  050199 SIGNING BONUS",
+                "0502 RELOCATION",
+                "1100 WRITING",
+                "  1101 STUDIO WRITER",
+                "  110201 FREELANCE",
+                "  1150 RESEARCH",
+                "1A00 REVENUE",
+                "  1A10 BOX OFFICE",
+                "  1A20 DEDUCTIONS",
+                "4AA0 CAMERA",
+                "  4AA. ",
+                "  4AA1 OPERATOR",
+                "5600-100 POST",
+                "  5600-101 EDITOR",
+                "= Total below-the-line",
+            ]
+        );
+        assert!(r.skipped.is_empty(), "{:?}", r.skipped);
+        assert_eq!(r.placeholders, 1);
+        let msgs: Vec<&str> = r.warnings.iter().map(|w| w.message.as_str()).collect();
+        assert!(
+            msgs.iter()
+                .any(|m| m.contains("category 0502 has no accounts")),
+            "{msgs:?}"
+        );
+        assert!(
+            msgs.iter().any(|m| m.contains("account 4AA. has no name")),
+            "{msgs:?}"
+        );
+        assert!(msgs.iter().any(|m| m.contains("named \".\"")), "{msgs:?}");
+        // The pattern most numbers follow, for typing new ones.
+        assert_eq!(coding(&r), (2, 2, 0, None));
+        // The chart becomes a budget that recalculates and matches by number.
+        let b = r.chart.to_budget("Chart", "USD");
+        assert_eq!(
+            fwb_core::recalc(&b, &fwb_core::RecalcOptions::default())
+                .unwrap()
+                .grand_total,
+            0
+        );
+        let chart = fwb_core::actuals::chart(&b);
+        assert_eq!(
+            chart.values().filter(|e| !e.fringe).count(),
+            r.chart.account_count()
+        );
+    }
+
+    #[test]
+    fn without_parents_accounts_go_in_the_category_above() {
+        let r = kinded(
+            "kind,code,name\n\
+category,1100,SCRIPT,\n\
+account,1101,SCRIPT\n\
+account,1102,RESEARCH\n\
+category,1200,PRODUCERS\n\
+account,1201,PRODUCER\n",
+        );
+        assert_eq!(
+            lines(&r),
+            [
+                "1100 SCRIPT",
+                "  1101 SCRIPT",
+                "  1102 RESEARCH",
+                "1200 PRODUCERS",
+                "  1201 PRODUCER"
+            ]
+        );
+        // An account before any category, or naming one that isn't there.
+        let r = kinded(
+            "kind,code,name,parent\naccount,0101,Early,\ncategory,1100,SCRIPT,\naccount,1101,Writer,9900\naccount,1102,Editor,11-00\n",
+        );
+        assert_eq!(lines(&r), ["1100 SCRIPT", "  1102 Editor"]);
+        let skipped: Vec<&str> = r.skipped.iter().map(|w| w.message.as_str()).collect();
+        assert_eq!(skipped.len(), 2, "{skipped:?}");
+    }
+
+    #[test]
+    fn repeated_numbers_merge_or_get_a_new_number() {
+        let r = kinded(
+            "kind,code,name,parent\n\
+category,10900,LOCATIONS,\n\
+account,10950,RENTALS,10900\n\
+account,10950,REHEARSAL HALL RENTALS,10900\n\
+account,10950,VIDEO EQUIPMENT RENTALS,10900\n\
+account,10950-3,TAKEN,10900\n\
+account,10950,Rentals,10900\n\
+category,11-00,STAFF,\n\
+account,11-01,MANAGER,11-00\n\
+account,11-01,COORDINATOR,11-00\n",
+        );
+        assert_eq!(
+            lines(&r),
+            [
+                "10900 LOCATIONS",
+                "  10950 RENTALS",
+                "  10950-2 REHEARSAL HALL RENTALS",
+                "  10950-4 VIDEO EQUIPMENT RENTALS",
+                "  10950-3 TAKEN",
+                "11-00 STAFF",
+                "  11-01 MANAGER",
+                "  11-01-2 COORDINATOR",
+            ]
+        );
+        assert_eq!(r.merged_repeats, 1);
+        let renamed: Vec<(&str, &str)> = r
+            .renamed_repeats
+            .iter()
+            .map(|x| (x.old.as_str(), x.new.as_str()))
+            .collect();
+        assert_eq!(
+            renamed,
+            [
+                ("10950", "10950-2"),
+                ("10950", "10950-4"),
+                ("11-01", "11-01-2")
+            ]
+        );
+        // Each is its own account to everything that matches by number.
+        let b = r.chart.to_budget("Chart", "USD");
+        let chart = fwb_core::actuals::chart(&b);
+        assert_eq!(chart.values().filter(|e| !e.fringe).count(), 6);
     }
 
     #[test]

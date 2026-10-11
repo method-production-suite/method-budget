@@ -7,7 +7,12 @@
 //! account, sub-account, set), and two codes match when their segments are
 //! equal. So `1100`, `11-00` and `11 0` are the same account under the default
 //! pattern, and budgets that use different separators still line up. A code
-//! that does not fit its budget's pattern falls back to its trimmed text.
+//! that does not fit its budget's pattern (one the pattern could only read by
+//! cutting it short, such as `050101` under 2 + 2) falls back to its trimmed
+//! text, so two different accounts are never added together by being cut.
+//! A category is matched by the category it names
+//! ([`AccountCoding::category_key`]): `11`, `1100` and `11-00` are category
+//! `11` under the default pattern.
 //! Segments are compared exactly: `11-01` with a 2-digit account segment does
 //! not match `11-001` with a 3-digit one.
 //!
@@ -262,7 +267,8 @@ pub struct CompareRow {
 // ---------------------------------------------------------------------------
 // Matching machinery
 
-/// A code split by a budget's coding, or its trimmed text when it doesn't fit.
+/// A code split by a budget's coding, or its trimmed text when the coding
+/// can't read it without cutting something off ([`AccountCoding::read`]).
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum CodeKey {
     Coded([String; 4]),
@@ -270,9 +276,9 @@ enum CodeKey {
 }
 
 fn code_key(coding: &AccountCoding, code: &str) -> CodeKey {
-    match coding.parse(code) {
-        Ok(c) => CodeKey::Coded([c.category, c.account, c.sub, c.set]),
-        Err(_) => CodeKey::Raw(code.trim().to_string()),
+    match coding.read(code) {
+        Some(c) => CodeKey::Coded([c.category, c.account, c.sub, c.set]),
+        None => CodeKey::Raw(code.trim().to_string()),
     }
 }
 
@@ -393,14 +399,17 @@ pub fn compare(budgets: &[(String, &Budget)]) -> Result<Comparison, CalcError> {
     let n = budgets.len();
     let ovf = || overflow("comparison");
 
-    let mut cats: Matched<CodeKey, CatItem, usize> = Matched::new();
+    // Categories by the category they name (`11`, `1100` and `11-00` are
+    // one category), so a chart written with full-width category numbers
+    // lines up with one written with category parts.
+    let mut cats: Matched<String, CatItem, usize> = Matched::new();
     let mut levels: Matched<String, String, ()> = Matched::new();
     let mut charges: Matched<String, String, ()> = Matched::new();
     let mut credits: Matched<String, String, ()> = Matched::new();
     for (i, ((_, b), r)) in budgets.iter().zip(&reports).enumerate() {
         let coding = &b.account_coding;
         for (ci, cat) in r.categories.iter().enumerate() {
-            let key = code_key(coding, &cat.code);
+            let key = coding.category_key(&cat.code);
             let item = cats
                 .add(key, (n, i), ci, cat.total, || CatItem {
                     code: cat.code.clone(),

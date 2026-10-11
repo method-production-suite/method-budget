@@ -38,7 +38,7 @@
     "topsheet": [
       {
         "kind": "category",
-        "code": "11",
+        "code": "1100",
         "name": "SCRIPT",
         "accounts": [
           {
@@ -133,7 +133,7 @@
       },
       {
         "kind": "category",
-        "code": "12",
+        "code": "1200",
         "name": "PRODUCERS' UNIT",
         "accounts": [
           {
@@ -200,7 +200,7 @@
       },
       {
         "kind": "category",
-        "code": "13",
+        "code": "1300",
         "name": "DIRECTION",
         "accounts": [
           {
@@ -271,7 +271,7 @@
       },
       {
         "kind": "category",
-        "code": "14",
+        "code": "1400",
         "name": "CAST",
         "accounts": [
           {
@@ -358,7 +358,7 @@
       },
       {
         "kind": "category",
-        "code": "15",
+        "code": "1500",
         "name": "AGENCY PACKAGING FEE",
         "accounts": [
           {
@@ -369,7 +369,7 @@
       },
       {
         "kind": "category",
-        "code": "18",
+        "code": "1800",
         "name": "A-T-L PAYROLL TAXES & FRINGE",
         "accounts": [
           {
@@ -412,7 +412,7 @@
       },
       {
         "kind": "category",
-        "code": "20",
+        "code": "2000",
         "name": "PRODUCTION STAFF",
         "accounts": [
           {
@@ -507,7 +507,7 @@
       },
       {
         "kind": "category",
-        "code": "21",
+        "code": "2100",
         "name": "EXTRA TALENT",
         "accounts": [
           {
@@ -550,7 +550,7 @@
       },
       {
         "kind": "category",
-        "code": "22",
+        "code": "2200",
         "name": "SET DESIGN",
         "accounts": [
           {
@@ -613,7 +613,7 @@
       },
       {
         "kind": "category",
-        "code": "23",
+        "code": "2300",
         "name": "SET CONSTRUCTION",
         "accounts": [
           {
@@ -736,7 +736,7 @@
       },
       {
         "kind": "category",
-        "code": "24",
+        "code": "2400",
         "name": "SET DRESSING",
         "accounts": [
           {
@@ -807,7 +807,7 @@
       },
       {
         "kind": "category",
-        "code": "25",
+        "code": "2500",
         "name": "PROPERTY",
         "accounts": [
           {
@@ -866,7 +866,7 @@
       },
       {
         "kind": "category",
-        "code": "26",
+        "code": "2600",
         "name": "SPECIAL EQUIPMENT AND ANIMAL",
         "accounts": [
           {
@@ -965,7 +965,7 @@
       },
       {
         "kind": "category",
-        "code": "27",
+        "code": "2700",
         "name": "WARDROBE",
         "accounts": [
           {
@@ -1040,7 +1040,7 @@
       },
       {
         "kind": "category",
-        "code": "28",
+        "code": "2800",
         "name": "MAKE-UP AND HAIR",
         "accounts": [
           {
@@ -1103,7 +1103,7 @@
       },
       {
         "kind": "category",
-        "code": "29",
+        "code": "2900",
         "name": "SET OPERATIONS",
         "accounts": [
           {
@@ -1218,7 +1218,7 @@
       },
       {
         "kind": "category",
-        "code": "30",
+        "code": "3000",
         "name": "ELECTRICAL",
         "accounts": [
           {
@@ -1301,7 +1301,7 @@
       },
       {
         "kind": "category",
-        "code": "31",
+        "code": "3100",
         "name": "CAMERA",
         "accounts": [
           {
@@ -1444,7 +1444,7 @@
       },
       {
         "kind": "category",
-        "code": "32",
+        "code": "3200",
         "name": "PRODUCTION SOUND",
         "accounts": [
           {
@@ -1511,7 +1511,7 @@
       },
       {
         "kind": "category",
-        "code": "33",
+        "code": "3300",
         "name": "SPECIAL EFFECTS",
         "accounts": [
           {
@@ -1574,7 +1574,7 @@
       },
       {
         "kind": "category",
-        "code": "34",
+        "code": "3400",
         "name": "LOCATION EXPENSES",
         "accounts": [
           {
@@ -1689,7 +1689,7 @@
       },
       {
         "kind": "category",
-        "code": "35",
+        "code": "3500",
         "name": "STUDIO TRANSPORTATION",
         "accounts": [
           {
@@ -1756,7 +1756,7 @@
       },
       {
         "kind": "category",
-        "code": "36",
+        "code": "3600",
         "name": "LOCATION TRANSPORTATION",
         "accounts": [
           {
@@ -1823,7 +1823,7 @@
       },
       {
         "kind": "category",
-        "code": "37",
+        "code": "3700",
         "name": "STUDIO RENTALS",
         "accounts": [
           {
@@ -1842,7 +1842,7 @@
       },
       {
         "kind": "category",
-        "code": "38",
+        "code": "3800",
         "name": "PRODUCTION FILM",
         "accounts": [
           {
@@ -1857,7 +1857,7 @@
       },
       {
         "kind": "category",
-        "code": "39",
+        "code": "3900",
         "name": "PROCESS PHOTOGRAPHY",
         "accounts": [
           {
@@ -1892,7 +1892,7 @@
       },
       {
         "kind": "category",
-        "code": "40",
+        "code": "4000",
         "name": "SECOND UNIT PHOTOGRAPHY",
         "accounts": [
           {
@@ -1967,7 +1967,7 @@
       },
       {
         "kind": "category",
-        "code": "41",
+        "code": "4100",
         "name": "TESTS",
         "accounts": [
           {
@@ -2002,7 +2002,7 @@
       },
       {
         "kind": "category",
-        "code": "48",
+        "code": "4800",
         "name": "PRODUCTION PAYROLL TAXES & F",
         "accounts": [
           {
@@ -2053,7 +2053,7 @@
       },
       {
         "kind": "category",
-        "code": "50",
+        "code": "5000",
         "name": "EDITORIAL",
         "accounts": [
           {
@@ -2136,7 +2136,7 @@
       },
       {
         "kind": "category",
-        "code": "51",
+        "code": "5100",
         "name": "MUSIC",
         "accounts": [
           {
@@ -2223,7 +2223,7 @@
       },
       {
         "kind": "category",
-        "code": "52",
+        "code": "5200",
         "name": "POST-PRODUCTION SOUND",
         "accounts": [
           {
@@ -2290,7 +2290,7 @@
       },
       {
         "kind": "category",
-        "code": "53",
+        "code": "5300",
         "name": "FILM LIBRARY",
         "accounts": [
           {
@@ -2317,7 +2317,7 @@
       },
       {
         "kind": "category",
-        "code": "54",
+        "code": "5400",
         "name": "FILM/AUDIO/VIDEO STOCK",
         "accounts": [
           {
@@ -2368,7 +2368,7 @@
       },
       {
         "kind": "category",
-        "code": "55",
+        "code": "5500",
         "name": "OPTICALS AND TITLES",
         "accounts": [
           {
@@ -2391,7 +2391,7 @@
       },
       {
         "kind": "category",
-        "code": "56",
+        "code": "5600",
         "name": "FILM LABORATORY",
         "accounts": [
           {
@@ -2450,7 +2450,7 @@
       },
       {
         "kind": "category",
-        "code": "57",
+        "code": "5700",
         "name": "VIDEO POST PRODUCTION",
         "accounts": [
           {
@@ -2493,7 +2493,7 @@
       },
       {
         "kind": "category",
-        "code": "58",
+        "code": "5800",
         "name": "POST-PROD PAYROLL TAXES & FR",
         "accounts": [
           {
@@ -2520,7 +2520,7 @@
       },
       {
         "kind": "category",
-        "code": "60",
+        "code": "6000",
         "name": "A-T-L AND B-T-L AMORTIZATION",
         "accounts": [
           {
@@ -2563,7 +2563,7 @@
       },
       {
         "kind": "category",
-        "code": "70",
+        "code": "7000",
         "name": "ADMINISTRATIVE EXPENSES",
         "accounts": [
           {
@@ -2666,7 +2666,7 @@
       },
       {
         "kind": "category",
-        "code": "72",
+        "code": "7200",
         "name": "SECOND RUN COST",
         "accounts": [
           {

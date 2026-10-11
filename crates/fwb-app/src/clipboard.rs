@@ -681,8 +681,10 @@ fn free_account_code(
     taken: &BTreeSet<String>,
 ) -> EditResult<String> {
     if coding.validate().is_ok() {
-        if let Ok(mut parts) = coding.parse(code) {
-            if let Ok(cat) = coding.parse(category) {
+        // Only numbers the pattern reads without cutting are renumbered by
+        // segment; others (a chart's own numbers) are counted on as written.
+        if let Some(mut parts) = coding.read(code) {
+            if let Some(cat) = coding.read(category) {
                 parts.category = cat.category;
             }
             let first = coding.format(&parts);
@@ -720,15 +722,27 @@ fn free_account_code(
     count_on(code, taken)
 }
 
-/// The number a category numbered `code` gets: its own when free, else
-/// counted on (wrapping round) within the category width.
+/// The number a category numbered `code` gets: its own when free (as
+/// written when that is already the pattern's spelling, `1100` under 2 + 2),
+/// else counted on (wrapping round) within the category width.
 fn free_category_code(
     coding: &AccountCoding,
     code: &str,
     taken: &BTreeSet<String>,
 ) -> EditResult<String> {
+    // A number already in the pattern's spelling (`1100` written so under
+    // 2 + 2) or one the pattern can't read keeps its form when no category
+    // has its number; `5` is still written `05`.
+    let own = code.trim();
+    let key = coding.category_key(own);
+    if !own.is_empty()
+        && coding.key(own) == own
+        && !taken.iter().any(|t| coding.category_key(t) == key)
+    {
+        return Ok(own.to_string());
+    }
     if coding.validate().is_ok() {
-        if let Ok(parts) = coding.parse(code) {
+        if let Some(parts) = coding.read(code) {
             if !taken.contains(&parts.category) {
                 return Ok(parts.category);
             }

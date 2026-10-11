@@ -38,7 +38,7 @@
     "topsheet": [
       {
         "kind": "category",
-        "code": "100",
+        "code": "100 00",
         "name": "GRAPHIC DESIGNER",
         "accounts": [
           {
@@ -57,7 +57,7 @@
       },
       {
         "kind": "category",
-        "code": "102",
+        "code": "102 00",
         "name": "CREATIVE PRINT CAMPAIGN",
         "accounts": [
           {
@@ -108,7 +108,7 @@
       },
       {
         "kind": "category",
-        "code": "104",
+        "code": "104 00",
         "name": "ILLUSTRATION",
         "accounts": [
           {
@@ -135,7 +135,7 @@
       },
       {
         "kind": "category",
-        "code": "106",
+        "code": "106 00",
         "name": "PHOTO SHOOT",
         "accounts": [
           {
@@ -174,7 +174,7 @@
       },
       {
         "kind": "category",
-        "code": "108",
+        "code": "108 00",
         "name": "LOGO COSTS",
         "accounts": [
           {
@@ -197,7 +197,7 @@
       },
       {
         "kind": "category",
-        "code": "110",
+        "code": "110 00",
         "name": "STILLS",
         "accounts": [
           {
@@ -216,7 +216,7 @@
       },
       {
         "kind": "category",
-        "code": "112",
+        "code": "112 00",
         "name": "OTHER CREATIVE PRINT COST",
         "accounts": [
           {
@@ -235,7 +235,7 @@
       },
       {
         "kind": "category",
-        "code": "120",
+        "code": "120 00",
         "name": "PRODUCTION ARTIST",
         "accounts": [
           {
@@ -254,7 +254,7 @@
       },
       {
         "kind": "category",
-        "code": "122",
+        "code": "122 00",
         "name": "ONE SHEET/POSTERS",
         "accounts": [
           {
@@ -285,7 +285,7 @@
       },
       {
         "kind": "category",
-        "code": "124",
+        "code": "124 00",
         "name": "SUBWAYS",
         "accounts": [
           {
@@ -312,7 +312,7 @@
       },
       {
         "kind": "category",
-        "code": "126",
+        "code": "126 00",
         "name": "BUS SHELTERS",
         "accounts": [
           {
@@ -339,7 +339,7 @@
       },
       {
         "kind": "category",
-        "code": "128",
+        "code": "128 00",
         "name": "BUS SIDES",
         "accounts": [
           {
@@ -366,7 +366,7 @@
       },
       {
         "kind": "category",
-        "code": "130",
+        "code": "130 00",
         "name": "MALL BOARDS",
         "accounts": [
           {
@@ -393,7 +393,7 @@
       },
       {
         "kind": "category",
-        "code": "131",
+        "code": "131 00",
         "name": "VERTACULARS",
         "accounts": [
           {
@@ -420,7 +420,7 @@
       },
       {
         "kind": "category",
-        "code": "132",
+        "code": "132 00",
         "name": "BANNERS",
         "accounts": [
           {
@@ -451,7 +451,7 @@
       },
       {
         "kind": "category",
-        "code": "133",
+        "code": "133 00",
         "name": "BILLBOARDS",
         "accounts": [
           {
@@ -478,7 +478,7 @@
       },
       {
         "kind": "category",
-        "code": "134",
+        "code": "134 00",
         "name": "30 SHEETS",
         "accounts": [
           {
@@ -505,7 +505,7 @@
       },
       {
         "kind": "category",
-        "code": "136",
+        "code": "136 00",
         "name": "TEST ADS",
         "accounts": [
           {
@@ -540,7 +540,7 @@
       },
       {
         "kind": "category",
-        "code": "137",
+        "code": "137 00",
         "name": "SNEAK ADS",
         "accounts": [
           {
@@ -563,7 +563,7 @@
       },
       {
         "kind": "category",
-        "code": "138",
+        "code": "138 00",
         "name": "PRE-OPENING ADS",
         "accounts": [
           {
@@ -586,7 +586,7 @@
       },
       {
         "kind": "category",
-        "code": "139",
+        "code": "139 00",
         "name": "NATIONAL ADS",
         "accounts": [
           {
@@ -609,7 +609,7 @@
       },
       {
         "kind": "category",
-        "code": "140",
+        "code": "140 00",
         "name": "REVIEW ADS",
         "accounts": [
           {
@@ -632,7 +632,7 @@
       },
       {
         "kind": "category",
-        "code": "141",
+        "code": "141 00",
         "name": "BOOSTER CAMPAIGN",
         "accounts": [
           {
@@ -655,7 +655,7 @@
       },
       {
         "kind": "category",
-        "code": "142",
+        "code": "142 00",
         "name": "TUNE-IN ADS/GENERIC",
         "accounts": [
           {
@@ -682,7 +682,7 @@
       },
       {
         "kind": "category",
-        "code": "143",
+        "code": "143 00",
         "name": "TUNE-IN ADS/TOPICAL",
         "accounts": [
           {
@@ -709,7 +709,7 @@
       },
       {
         "kind": "category",
-        "code": "145",
+        "code": "145 00",
         "name": "MAGAZINE ADS",
         "accounts": [
           {
@@ -732,7 +732,7 @@
       },
       {
         "kind": "category",
-        "code": "147",
+        "code": "147 00",
         "name": "STANDEE/DISPLAY",
         "accounts": [
           {
@@ -763,7 +763,7 @@
       },
       {
         "kind": "category",
-        "code": "149",
+        "code": "149 00",
         "name": "COUNTER CARD",
         "accounts": [
           {
@@ -786,7 +786,7 @@
       },
       {
         "kind": "category",
-        "code": "150",
+        "code": "150 00",
         "name": "PRINTING INSERTS-MEDIA",
         "accounts": [
           {
@@ -817,7 +817,7 @@
       },
       {
         "kind": "category",
-        "code": "151",
+        "code": "151 00",
         "name": "PRINTING INSERTS-CASSETTE STK",
         "accounts": [
           {
@@ -848,7 +848,7 @@
       },
       {
         "kind": "category",
-        "code": "152",
+        "code": "152 00",
         "name": "GIANT CASSETTE BOX/MOBILE",
         "accounts": [
           {
@@ -871,7 +871,7 @@
       },
       {
         "kind": "category",
-        "code": "153",
+        "code": "153 00",
         "name": "LIGHTBOX DISPLAY/PERM FEAT",
         "accounts": [
           {
@@ -894,7 +894,7 @@
       },
       {
         "kind": "category",
-        "code": "154",
+        "code": "154 00",
         "name": "SELL SHEETS",
         "accounts": [
           {
@@ -921,7 +921,7 @@
       },
       {
         "kind": "category",
-        "code": "155",
+        "code": "155 00",
         "name": "SHELFTALKERS",
         "accounts": [
           {
@@ -944,7 +944,7 @@
       },
       {
         "kind": "category",
-        "code": "156",
+        "code": "156 00",
         "name": "FLOOR PRODUCT DISPLAYS",
         "accounts": [
           {
@@ -971,7 +971,7 @@
       },
       {
         "kind": "category",
-        "code": "157",
+        "code": "157 00",
         "name": "COUNTER PRODUCT DISPLAYS",
         "accounts": [
           {
@@ -998,7 +998,7 @@
       },
       {
         "kind": "category",
-        "code": "158",
+        "code": "158 00",
         "name": "INFLATABLES",
         "accounts": [
           {
@@ -1025,7 +1025,7 @@
       },
       {
         "kind": "category",
-        "code": "159",
+        "code": "159 00",
         "name": "WALL FLATS/MINI ONE SHEET",
         "accounts": [
           {
@@ -1048,7 +1048,7 @@
       },
       {
         "kind": "category",
-        "code": "160",
+        "code": "160 00",
         "name": "STYRENES/LIGHTBOX INSERTS",
         "accounts": [
           {
@@ -1071,7 +1071,7 @@
       },
       {
         "kind": "category",
-        "code": "161",
+        "code": "161 00",
         "name": "FLYERS",
         "accounts": [
           {
@@ -1094,7 +1094,7 @@
       },
       {
         "kind": "category",
-        "code": "162",
+        "code": "162 00",
         "name": "POSTCARDS",
         "accounts": [
           {
@@ -1117,7 +1117,7 @@
       },
       {
         "kind": "category",
-        "code": "163",
+        "code": "163 00",
         "name": "REPRODUCTION MATERIALS",
         "accounts": [
           {
@@ -1140,7 +1140,7 @@
       },
       {
         "kind": "category",
-        "code": "165",
+        "code": "165 00",
         "name": "OTHER PRINT PRODUCTION CO",
         "accounts": [
           {
@@ -1163,7 +1163,7 @@
       },
       {
         "kind": "category",
-        "code": "166",
+        "code": "166 00",
         "name": "PRINTING INSERTS-OTHER",
         "accounts": [
           {
@@ -1186,7 +1186,7 @@
       },
       {
         "kind": "category",
-        "code": "167",
+        "code": "167 00",
         "name": "DIGITAL COMP BOXES",
         "accounts": [
           {
@@ -1205,7 +1205,7 @@
       },
       {
         "kind": "category",
-        "code": "180",
+        "code": "180 00",
         "name": "CUSTOMER REIMBURSEMENTS",
         "accounts": [
           {
@@ -1224,7 +1224,7 @@
       },
       {
         "kind": "category",
-        "code": "184",
+        "code": "184 00",
         "name": "CUSTOMER CO-OP TOOLS",
         "accounts": [
           {
@@ -1255,7 +1255,7 @@
       },
       {
         "kind": "category",
-        "code": "185",
+        "code": "185 00",
         "name": "AD MATS-(CCT)",
         "accounts": [
           {
@@ -1278,7 +1278,7 @@
       },
       {
         "kind": "category",
-        "code": "186",
+        "code": "186 00",
         "name": "MAILER MATS-B&W (CCT)",
         "accounts": [
           {
@@ -1305,7 +1305,7 @@
       },
       {
         "kind": "category",
-        "code": "187",
+        "code": "187 00",
         "name": "MAILER MATS-COLOR (CCT)",
         "accounts": [
           {
@@ -1332,7 +1332,7 @@
       },
       {
         "kind": "category",
-        "code": "190",
+        "code": "190 00",
         "name": "A/V ADVERT-EDITOR'S COST",
         "accounts": [
           {
@@ -1351,7 +1351,7 @@
       },
       {
         "kind": "category",
-        "code": "192",
+        "code": "192 00",
         "name": "A/V CREATION-TRAILERS",
         "accounts": [
           {
@@ -1426,7 +1426,7 @@
       },
       {
         "kind": "category",
-        "code": "193",
+        "code": "193 00",
         "name": "A/V CREATION-TV EPISODIC",
         "accounts": [
           {
@@ -1493,7 +1493,7 @@
       },
       {
         "kind": "category",
-        "code": "194",
+        "code": "194 00",
         "name": "A/V CREATION-TV",
         "accounts": [
           {
@@ -1572,7 +1572,7 @@
       },
       {
         "kind": "category",
-        "code": "195",
+        "code": "195 00",
         "name": "A/V CREATION-RADIO",
         "accounts": [
           {
@@ -1611,7 +1611,7 @@
       },
       {
         "kind": "category",
-        "code": "196",
+        "code": "196 00",
         "name": "A/V CREATION-RADIO PROMO",
         "accounts": [
           {
@@ -1650,7 +1650,7 @@
       },
       {
         "kind": "category",
-        "code": "199",
+        "code": "199 00",
         "name": "OTHER AUDIO VISUAL COSTS",
         "accounts": [
           {
@@ -1677,7 +1677,7 @@
       },
       {
         "kind": "category",
-        "code": "210",
+        "code": "210 00",
         "name": "PRODUCTION PUBLICITY",
         "accounts": [
           {
@@ -1700,7 +1700,7 @@
       },
       {
         "kind": "category",
-        "code": "212",
+        "code": "212 00",
         "name": "PUBLICIST",
         "accounts": [
           {
@@ -1719,7 +1719,7 @@
       },
       {
         "kind": "category",
-        "code": "213",
+        "code": "213 00",
         "name": "NATIONAL FF/SPECIAL PUBLICIST",
         "accounts": [
           {
@@ -1738,7 +1738,7 @@
       },
       {
         "kind": "category",
-        "code": "214",
+        "code": "214 00",
         "name": "SPECIAL PHOTOGRAPHER",
         "accounts": [
           {
@@ -1757,7 +1757,7 @@
       },
       {
         "kind": "category",
-        "code": "215",
+        "code": "215 00",
         "name": "FILMMAKER RELATIONS",
         "accounts": [
           {
@@ -1784,7 +1784,7 @@
       },
       {
         "kind": "category",
-        "code": "216",
+        "code": "216 00",
         "name": "PUBLICITY EVENTS",
         "accounts": [
           {
@@ -1859,7 +1859,7 @@
       },
       {
         "kind": "category",
-        "code": "218",
+        "code": "218 00",
         "name": "PRESS KITS",
         "accounts": [
           {
@@ -1914,7 +1914,7 @@
       },
       {
         "kind": "category",
-        "code": "220",
+        "code": "220 00",
         "name": "PUBLICITY ITEMS",
         "accounts": [
           {
@@ -1993,7 +1993,7 @@
       },
       {
         "kind": "category",
-        "code": "221",
+        "code": "221 00",
         "name": "A/V PRESS KITS",
         "accounts": [
           {
@@ -2020,7 +2020,7 @@
       },
       {
         "kind": "category",
-        "code": "222",
+        "code": "222 00",
         "name": "FILM CLIPS",
         "accounts": [
           {
@@ -2043,7 +2043,7 @@
       },
       {
         "kind": "category",
-        "code": "223",
+        "code": "223 00",
         "name": "AGENCY EXPENSE-PUBLCITY",
         "accounts": [
           {
@@ -2090,7 +2090,7 @@
       },
       {
         "kind": "category",
-        "code": "225",
+        "code": "225 00",
         "name": "MUSIC PROMOTION",
         "accounts": [
           {
@@ -2125,7 +2125,7 @@
       },
       {
         "kind": "category",
-        "code": "229",
+        "code": "229 00",
         "name": "OTHER PUBLICITY",
         "accounts": [
           {
@@ -2180,7 +2180,7 @@
       },
       {
         "kind": "category",
-        "code": "240",
+        "code": "240 00",
         "name": "PUBLICISTS-PROMOS",
         "accounts": [
           {
@@ -2199,7 +2199,7 @@
       },
       {
         "kind": "category",
-        "code": "241",
+        "code": "241 00",
         "name": "SPECIAL PROJECTS:NATIONAL FF",
         "accounts": [
           {
@@ -2214,7 +2214,7 @@
       },
       {
         "kind": "category",
-        "code": "242",
+        "code": "242 00",
         "name": "FIELD EXPENSES",
         "accounts": [
           {
@@ -2241,7 +2241,7 @@
       },
       {
         "kind": "category",
-        "code": "243",
+        "code": "243 00",
         "name": "NATIONAL PROMOTION",
         "accounts": [
           {
@@ -2260,7 +2260,7 @@
       },
       {
         "kind": "category",
-        "code": "244",
+        "code": "244 00",
         "name": "AGENCY EXPENSES-PROMOS",
         "accounts": [
           {
@@ -2295,7 +2295,7 @@
       },
       {
         "kind": "category",
-        "code": "246",
+        "code": "246 00",
         "name": "PROMOTIONAL ITEMS/EXPENSE",
         "accounts": [
           {
@@ -2378,7 +2378,7 @@
       },
       {
         "kind": "category",
-        "code": "260",
+        "code": "260 00",
         "name": "PROMO REELS",
         "accounts": [
           {
@@ -2405,7 +2405,7 @@
       },
       {
         "kind": "category",
-        "code": "262",
+        "code": "262 00",
         "name": "FULL SCREENER CASSETTES",
         "accounts": [
           {
@@ -2432,7 +2432,7 @@
       },
       {
         "kind": "category",
-        "code": "263",
+        "code": "263 00",
         "name": "INTERNAL SCREENER CASSETTES",
         "accounts": [
           {
@@ -2451,7 +2451,7 @@
       },
       {
         "kind": "category",
-        "code": "264",
+        "code": "264 00",
         "name": "UPDATES",
         "accounts": [
           {
@@ -2474,7 +2474,7 @@
       },
       {
         "kind": "category",
-        "code": "266",
+        "code": "266 00",
         "name": "SOLICITATIONS",
         "accounts": [
           {
@@ -2497,7 +2497,7 @@
       },
       {
         "kind": "category",
-        "code": "268",
+        "code": "268 00",
         "name": "RETAIL MAILINGS",
         "accounts": [
           {
@@ -2516,7 +2516,7 @@
       },
       {
         "kind": "category",
-        "code": "270",
+        "code": "270 00",
         "name": "FULFILLMENT HOUSE",
         "accounts": [
           {
@@ -2543,7 +2543,7 @@
       },
       {
         "kind": "category",
-        "code": "272",
+        "code": "272 00",
         "name": "OTHER NONBUDGETED ADVERT.",
         "accounts": [
           {
@@ -2586,7 +2586,7 @@
       },
       {
         "kind": "category",
-        "code": "275",
+        "code": "275 00",
         "name": "MARKET RESEARCH",
         "accounts": [
           {
@@ -2633,7 +2633,7 @@
       },
       {
         "kind": "category",
-        "code": "276",
+        "code": "276 00",
         "name": "TELEVISION RESEARCH",
         "accounts": [
           {
@@ -2688,7 +2688,7 @@
       },
       {
         "kind": "category",
-        "code": "277",
+        "code": "277 00",
         "name": "ADVERTISER SUPPORT",
         "accounts": [
           {
@@ -2723,7 +2723,7 @@
       },
       {
         "kind": "category",
-        "code": "279",
+        "code": "279 00",
         "name": "SALES SUPPORT",
         "accounts": [
           {
@@ -2758,7 +2758,7 @@
       },
       {
         "kind": "category",
-        "code": "280",
+        "code": "280 00",
         "name": "NON-PARTICIPATION ACCOUNT",
         "accounts": [
           {
@@ -2785,7 +2785,7 @@
       },
       {
         "kind": "category",
-        "code": "289",
+        "code": "289 00",
         "name": "OTHER BASIC ITEMS",
         "accounts": [
           {
@@ -2848,7 +2848,7 @@
       },
       {
         "kind": "category",
-        "code": "290",
+        "code": "290 00",
         "name": "NETWORK",
         "accounts": [
           {
@@ -2887,7 +2887,7 @@
       },
       {
         "kind": "category",
-        "code": "292",
+        "code": "292 00",
         "name": "SYNDICATED TV",
         "accounts": [
           {
@@ -2922,7 +2922,7 @@
       },
       {
         "kind": "category",
-        "code": "294",
+        "code": "294 00",
         "name": "NATIONAL CABLE TV",
         "accounts": [
           {
@@ -2957,7 +2957,7 @@
       },
       {
         "kind": "category",
-        "code": "296",
+        "code": "296 00",
         "name": "NATIONAL RADIO",
         "accounts": [
           {
@@ -2980,7 +2980,7 @@
       },
       {
         "kind": "category",
-        "code": "298",
+        "code": "298 00",
         "name": "NATIONAL MAGAZINE",
         "accounts": [
           {
@@ -3015,7 +3015,7 @@
       },
       {
         "kind": "category",
-        "code": "300",
+        "code": "300 00",
         "name": "NATIONAL COLLEGE PRINT",
         "accounts": [
           {
@@ -3050,7 +3050,7 @@
       },
       {
         "kind": "category",
-        "code": "302",
+        "code": "302 00",
         "name": "NATIONAL MEDIA-OTHER",
         "accounts": [
           {
@@ -3069,7 +3069,7 @@
       },
       {
         "kind": "category",
-        "code": "303",
+        "code": "303 00",
         "name": "SPOT TV",
         "accounts": [
           {
@@ -3100,7 +3100,7 @@
       },
       {
         "kind": "category",
-        "code": "305",
+        "code": "305 00",
         "name": "REGIONAL CABLE TV",
         "accounts": [
           {
@@ -3131,7 +3131,7 @@
       },
       {
         "kind": "category",
-        "code": "307",
+        "code": "307 00",
         "name": "REGIONAL RADIO",
         "accounts": [
           {
@@ -3174,7 +3174,7 @@
       },
       {
         "kind": "category",
-        "code": "308",
+        "code": "308 00",
         "name": "REGIONAL PRINT",
         "accounts": [
           {
@@ -3261,7 +3261,7 @@
       },
       {
         "kind": "category",
-        "code": "310",
+        "code": "310 00",
         "name": "REGIONAL OUTDOOR",
         "accounts": [
           {
@@ -3320,7 +3320,7 @@
       },
       {
         "kind": "category",
-        "code": "311",
+        "code": "311 00",
         "name": "REGIONAL MEDIA-OTHER",
         "accounts": [
           {
@@ -3343,7 +3343,7 @@
       },
       {
         "kind": "category",
-        "code": "314",
+        "code": "314 00",
         "name": "LOBBY DISPLAYS/MARQUEES",
         "accounts": [
           {
@@ -3386,7 +3386,7 @@
       },
       {
         "kind": "category",
-        "code": "316",
+        "code": "316 00",
         "name": "NON PARTICIPATION ACCOUNT",
         "accounts": [
           {
@@ -3413,7 +3413,7 @@
       },
       {
         "kind": "category",
-        "code": "330",
+        "code": "330 00",
         "name": "CO-OP ADVERTISING",
         "accounts": [
           {
@@ -3496,7 +3496,7 @@
       },
       {
         "kind": "category",
-        "code": "360",
+        "code": "360 00",
         "name": "EXHIBITOR SERVICES",
         "accounts": [
           {
@@ -3531,7 +3531,7 @@
       },
       {
         "kind": "category",
-        "code": "364",
+        "code": "364 00",
         "name": "AWARDS ADVERTISEMENTS",
         "accounts": [
           {
@@ -3682,7 +3682,7 @@
       },
       {
         "kind": "category",
-        "code": "366",
+        "code": "366 00",
         "name": "INDUSTRY TRADE ADS",
         "accounts": [
           {
@@ -3721,7 +3721,7 @@
       },
       {
         "kind": "category",
-        "code": "368",
+        "code": "368 00",
         "name": "SALES MEETINGS",
         "accounts": [
           {
@@ -3776,7 +3776,7 @@
       },
       {
         "kind": "category",
-        "code": "370",
+        "code": "370 00",
         "name": "TRADE SHOWS/CONVENTIONS",
         "accounts": [
           {
@@ -3871,7 +3871,7 @@
       },
       {
         "kind": "category",
-        "code": "380",
+        "code": "380 00",
         "name": "OTHER MARKETING",
         "accounts": [
           {
@@ -3898,7 +3898,7 @@
       },
       {
         "kind": "category",
-        "code": "399",
+        "code": "399 00",
         "name": "MRKTNG-RSRVD FOR FIN RPTG",
         "accounts": [
           {
@@ -3925,7 +3925,7 @@
       },
       {
         "kind": "category",
-        "code": "500",
+        "code": "500 00",
         "name": "70 MM COLOR NEGATIVES",
         "accounts": [
           {
@@ -3940,7 +3940,7 @@
       },
       {
         "kind": "category",
-        "code": "501",
+        "code": "501 00",
         "name": "70 MM COLOR PRINTS",
         "accounts": [
           {
@@ -3971,7 +3971,7 @@
       },
       {
         "kind": "category",
-        "code": "502",
+        "code": "502 00",
         "name": "35 MM COLOR NEGATIVES",
         "accounts": [
           {
@@ -4006,7 +4006,7 @@
       },
       {
         "kind": "category",
-        "code": "504",
+        "code": "504 00",
         "name": "35 MM COLOR PRINTS",
         "accounts": [
           {
@@ -4049,7 +4049,7 @@
       },
       {
         "kind": "category",
-        "code": "506",
+        "code": "506 00",
         "name": "35 MM B&W NEGATIVES",
         "accounts": [
           {
@@ -4076,7 +4076,7 @@
       },
       {
         "kind": "category",
-        "code": "508",
+        "code": "508 00",
         "name": "35 MM B&W PRINTS",
         "accounts": [
           {
@@ -4095,7 +4095,7 @@
       },
       {
         "kind": "category",
-        "code": "510",
+        "code": "510 00",
         "name": "16 MM COLOR PRINTS",
         "accounts": [
           {
@@ -4110,7 +4110,7 @@
       },
       {
         "kind": "category",
-        "code": "511",
+        "code": "511 00",
         "name": "16 MM COLOR NEGATIVES",
         "accounts": [
           {
@@ -4137,7 +4137,7 @@
       },
       {
         "kind": "category",
-        "code": "512",
+        "code": "512 00",
         "name": "16 MM B&W NEGATIVES",
         "accounts": [
           {
@@ -4152,7 +4152,7 @@
       },
       {
         "kind": "category",
-        "code": "513",
+        "code": "513 00",
         "name": "16 MM B&W PRINTS",
         "accounts": [
           {
@@ -4167,7 +4167,7 @@
       },
       {
         "kind": "category",
-        "code": "515",
+        "code": "515 00",
         "name": "FILM WORK-OTHER",
         "accounts": [
           {
@@ -4202,7 +4202,7 @@
       },
       {
         "kind": "category",
-        "code": "519",
+        "code": "519 00",
         "name": "SUBTITLES",
         "accounts": [
           {
@@ -4233,7 +4233,7 @@
       },
       {
         "kind": "category",
-        "code": "520",
+        "code": "520 00",
         "name": "FILM TO TAPE TRANSFERS",
         "accounts": [
           {
@@ -4280,7 +4280,7 @@
       },
       {
         "kind": "category",
-        "code": "522",
+        "code": "522 00",
         "name": "TAPE TO TAPE DUPLICAT-REG",
         "accounts": [
           {
@@ -4395,7 +4395,7 @@
       },
       {
         "kind": "category",
-        "code": "524",
+        "code": "524 00",
         "name": "TAPE TO TAPE DUPLICAT-3/4",
         "accounts": [
           {
@@ -4426,7 +4426,7 @@
       },
       {
         "kind": "category",
-        "code": "526",
+        "code": "526 00",
         "name": "TAPE TO TAPE DUP-BETA,VIDEO8 & VHS",
         "accounts": [
           {
@@ -4469,7 +4469,7 @@
       },
       {
         "kind": "category",
-        "code": "528",
+        "code": "528 00",
         "name": "VIDEO TAPE-EDITING",
         "accounts": [
           {
@@ -4484,7 +4484,7 @@
       },
       {
         "kind": "category",
-        "code": "529",
+        "code": "529 00",
         "name": "VIDEO TAPE-OTHER",
         "accounts": [
           {
@@ -4559,7 +4559,7 @@
       },
       {
         "kind": "category",
-        "code": "530",
+        "code": "530 00",
         "name": "70 MM AUDIO",
         "accounts": [
           {
@@ -4586,7 +4586,7 @@
       },
       {
         "kind": "category",
-        "code": "532",
+        "code": "532 00",
         "name": "35 MM AUDIO",
         "accounts": [
           {
@@ -4613,7 +4613,7 @@
       },
       {
         "kind": "category",
-        "code": "534",
+        "code": "534 00",
         "name": "16 MM AUDIO",
         "accounts": [
           {
@@ -4640,7 +4640,7 @@
       },
       {
         "kind": "category",
-        "code": "536",
+        "code": "536 00",
         "name": "ADR, ADR",
         "accounts": [
           {
@@ -4663,7 +4663,7 @@
       },
       {
         "kind": "category",
-        "code": "538",
+        "code": "538 00",
         "name": "SIMULCAST",
         "accounts": [
           {
@@ -4678,7 +4678,7 @@
       },
       {
         "kind": "category",
-        "code": "539",
+        "code": "539 00",
         "name": "AUDIO-OTHER",
         "accounts": [
           {
@@ -4725,7 +4725,7 @@
       },
       {
         "kind": "category",
-        "code": "540",
+        "code": "540 00",
         "name": "DUPLICATION COST OF SALES",
         "accounts": [
           {
@@ -4760,7 +4760,7 @@
       },
       {
         "kind": "category",
-        "code": "541",
+        "code": "541 00",
         "name": "PRODUCT PACKAGING",
         "accounts": [
           {
@@ -4867,7 +4867,7 @@
       },
       {
         "kind": "category",
-        "code": "542",
+        "code": "542 00",
         "name": "SATELLITE CHARGES",
         "accounts": [
           {
@@ -4946,7 +4946,7 @@
       },
       {
         "kind": "category",
-        "code": "543",
+        "code": "543 00",
         "name": "PRINT/CASSETTE SHIP&HAND",
         "accounts": [
           {
@@ -4981,7 +4981,7 @@
       },
       {
         "kind": "category",
-        "code": "544",
+        "code": "544 00",
         "name": "DISTRIBUTION CHARGES",
         "accounts": [
           {
@@ -5016,7 +5016,7 @@
       },
       {
         "kind": "category",
-        "code": "545",
+        "code": "545 00",
         "name": "ASSET PROTECTION",
         "accounts": [
           {
@@ -5051,7 +5051,7 @@
       },
       {
         "kind": "category",
-        "code": "546",
+        "code": "546 00",
         "name": "FOREIGN DUTIES & LICENSES",
         "accounts": [
           {
@@ -5070,7 +5070,7 @@
       },
       {
         "kind": "category",
-        "code": "547",
+        "code": "547 00",
         "name": "RETURNS PROCESSING",
         "accounts": [
           {
@@ -5105,7 +5105,7 @@
       },
       {
         "kind": "category",
-        "code": "548",
+        "code": "548 00",
         "name": "FEES AND RECOVERIES",
         "accounts": [
           {
@@ -5136,7 +5136,7 @@
       },
       {
         "kind": "category",
-        "code": "549",
+        "code": "549 00",
         "name": "GENERAL DISTRIB COSTS-O",
         "accounts": [
           {
@@ -5191,7 +5191,7 @@
       },
       {
         "kind": "category",
-        "code": "560",
+        "code": "560 00",
         "name": "WRITERS RESIDUALS",
         "accounts": [
           {
@@ -5230,7 +5230,7 @@
       },
       {
         "kind": "category",
-        "code": "561",
+        "code": "561 00",
         "name": "DIRECTORS RESIDUALS",
         "accounts": [
           {
@@ -5277,7 +5277,7 @@
       },
       {
         "kind": "category",
-        "code": "562",
+        "code": "562 00",
         "name": "ACTORS RESIDUALS",
         "accounts": [
           {
@@ -5316,7 +5316,7 @@
       },
       {
         "kind": "category",
-        "code": "563",
+        "code": "563 00",
         "name": "MUSICIANS RESIDUALS",
         "accounts": [
           {
@@ -5343,7 +5343,7 @@
       },
       {
         "kind": "category",
-        "code": "564",
+        "code": "564 00",
         "name": "I.A.T.S.E. RESIDUALS",
         "accounts": [
           {
@@ -5366,7 +5366,7 @@
       },
       {
         "kind": "category",
-        "code": "565",
+        "code": "565 00",
         "name": "RESIDUALS REIMBURSEMENTS",
         "accounts": [
           {
@@ -5385,7 +5385,7 @@
       },
       {
         "kind": "category",
-        "code": "567",
+        "code": "567 00",
         "name": "INDUSTRY DUES",
         "accounts": [
           {
@@ -5416,7 +5416,7 @@
       },
       {
         "kind": "category",
-        "code": "568",
+        "code": "568 00",
         "name": "ASSESSMENTS:ANTI-PIRACY",
         "accounts": [
           {
@@ -5451,7 +5451,7 @@
       },
       {
         "kind": "category",
-        "code": "569",
+        "code": "569 00",
         "name": "ASSESSMENTS:ANTI-TRUST",
         "accounts": [
           {
@@ -5466,7 +5466,7 @@
       },
       {
         "kind": "category",
-        "code": "570",
+        "code": "570 00",
         "name": "ASSESSMENTS:SPEC.LEGISLAT",
         "accounts": [
           {
@@ -5481,7 +5481,7 @@
       },
       {
         "kind": "category",
-        "code": "571",
+        "code": "571 00",
         "name": "INDUSTRIAL DUES & ASSESS. ALL",
         "accounts": [
           {
@@ -5500,7 +5500,7 @@
       },
       {
         "kind": "category",
-        "code": "573",
+        "code": "573 00",
         "name": "SUBDISTRIBUTOR FEES",
         "accounts": [
           {
@@ -5531,7 +5531,7 @@
       },
       {
         "kind": "category",
-        "code": "574",
+        "code": "574 00",
         "name": "SALES COMMISSIONS",
         "accounts": [
           {
@@ -5550,7 +5550,7 @@
       },
       {
         "kind": "category",
-        "code": "575",
+        "code": "575 00",
         "name": "SALES COMMISSIONS OFFSET",
         "accounts": [
           {
@@ -5565,7 +5565,7 @@
       },
       {
         "kind": "category",
-        "code": "576",
+        "code": "576 00",
         "name": "CHECKING COSTS",
         "accounts": [
           {
@@ -5592,7 +5592,7 @@
       },
       {
         "kind": "category",
-        "code": "578",
+        "code": "578 00",
         "name": "LEGAL FEES",
         "accounts": [
           {
@@ -5631,7 +5631,7 @@
       },
       {
         "kind": "category",
-        "code": "579",
+        "code": "579 00",
         "name": "LEGAL FEES NON-OP",
         "accounts": [
           {
@@ -5654,7 +5654,7 @@
       },
       {
         "kind": "category",
-        "code": "580",
+        "code": "580 00",
         "name": "COPYRIGHTS & ROYALTIES",
         "accounts": [
           {
@@ -5689,7 +5689,7 @@
       },
       {
         "kind": "category",
-        "code": "582",
+        "code": "582 00",
         "name": "TAXES",
         "accounts": [
           {
@@ -5708,7 +5708,7 @@
       },
       {
         "kind": "category",
-        "code": "583",
+        "code": "583 00",
         "name": "TAXES OFFSETS",
         "accounts": [
           {
@@ -5731,7 +5731,7 @@
       },
       {
         "kind": "category",
-        "code": "584",
+        "code": "584 00",
         "name": "TAXES-THEATER PRINTS",
         "accounts": [
           {
@@ -5786,7 +5786,7 @@
       },
       {
         "kind": "category",
-        "code": "586",
+        "code": "586 00",
         "name": "MATERIAL STORAGE CHARGES",
         "accounts": [
           {
@@ -5821,7 +5821,7 @@
       },
       {
         "kind": "category",
-        "code": "588",
+        "code": "588 00",
         "name": "LATE PRODUCTION CHARGES",
         "accounts": [
           {
@@ -5840,7 +5840,7 @@
       },
       {
         "kind": "category",
-        "code": "590",
+        "code": "590 00",
         "name": "EXHIBITOR COSTS",
         "accounts": [
           {
@@ -5859,7 +5859,7 @@
       },
       {
         "kind": "category",
-        "code": "591",
+        "code": "591 00",
         "name": "MISCELLANEOUS EXPENSES",
         "accounts": [
           {
@@ -6070,7 +6070,7 @@
       },
       {
         "kind": "category",
-        "code": "598",
+        "code": "598 00",
         "name": "GENERAL EXPENSES",
         "accounts": [
           {
@@ -6129,7 +6129,7 @@
       },
       {
         "kind": "category",
-        "code": "599",
+        "code": "599 00",
         "name": "GENERAL EXPENSES-NON OP",
         "accounts": [
           {

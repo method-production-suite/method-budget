@@ -38,7 +38,7 @@
     "topsheet": [
       {
         "kind": "category",
-        "code": "10",
+        "code": "1000",
         "name": "STORY RIGHTS",
         "accounts": [
           {
@@ -53,7 +53,7 @@
       },
       {
         "kind": "category",
-        "code": "11",
+        "code": "1100",
         "name": "WRITING",
         "accounts": [
           {
@@ -100,7 +100,7 @@
       },
       {
         "kind": "category",
-        "code": "12",
+        "code": "1200",
         "name": "PRODUCER",
         "accounts": [
           {
@@ -155,7 +155,7 @@
       },
       {
         "kind": "category",
-        "code": "13",
+        "code": "1300",
         "name": "DIRECTOR",
         "accounts": [
           {
@@ -206,7 +206,7 @@
       },
       {
         "kind": "category",
-        "code": "14",
+        "code": "1400",
         "name": "TALENT",
         "accounts": [
           {
@@ -277,7 +277,7 @@
       },
       {
         "kind": "category",
-        "code": "17",
+        "code": "1700",
         "name": "TRAVEL & LIVING",
         "accounts": [
           {
@@ -324,7 +324,7 @@
       },
       {
         "kind": "category",
-        "code": "19",
+        "code": "1900",
         "name": "ATL FRINGE",
         "accounts": [
           {
@@ -339,7 +339,7 @@
       },
       {
         "kind": "category",
-        "code": "20",
+        "code": "2000",
         "name": "PRODUCTION STAFF",
         "accounts": [
           {
@@ -410,7 +410,7 @@
       },
       {
         "kind": "category",
-        "code": "21",
+        "code": "2100",
         "name": "ART DEPARTMENT",
         "accounts": [
           {
@@ -477,7 +477,7 @@
       },
       {
         "kind": "category",
-        "code": "22",
+        "code": "2200",
         "name": "CONSTRUCTION",
         "accounts": [
           {
@@ -560,7 +560,7 @@
       },
       {
         "kind": "category",
-        "code": "23",
+        "code": "2300",
         "name": "SET DRESSING",
         "accounts": [
           {
@@ -627,7 +627,7 @@
       },
       {
         "kind": "category",
-        "code": "24",
+        "code": "2400",
         "name": "PROPS",
         "accounts": [
           {
@@ -682,7 +682,7 @@
       },
       {
         "kind": "category",
-        "code": "25",
+        "code": "2500",
         "name": "SPECIAL EFFECTS",
         "accounts": [
           {
@@ -729,7 +729,7 @@
       },
       {
         "kind": "category",
-        "code": "26",
+        "code": "2600",
         "name": "SET OPERATIONS",
         "accounts": [
           {
@@ -824,7 +824,7 @@
       },
       {
         "kind": "category",
-        "code": "27",
+        "code": "2700",
         "name": "LIGHTING",
         "accounts": [
           {
@@ -899,7 +899,7 @@
       },
       {
         "kind": "category",
-        "code": "28",
+        "code": "2800",
         "name": "CAMERA",
         "accounts": [
           {
@@ -966,7 +966,7 @@
       },
       {
         "kind": "category",
-        "code": "29",
+        "code": "2900",
         "name": "SOUND",
         "accounts": [
           {
@@ -1013,7 +1013,7 @@
       },
       {
         "kind": "category",
-        "code": "31",
+        "code": "3100",
         "name": "WARDROBE",
         "accounts": [
           {
@@ -1080,7 +1080,7 @@
       },
       {
         "kind": "category",
-        "code": "32",
+        "code": "3200",
         "name": "MAKEUP & HAIR",
         "accounts": [
           {
@@ -1143,7 +1143,7 @@
       },
       {
         "kind": "category",
-        "code": "33",
+        "code": "3300",
         "name": "EXTRAS",
         "accounts": [
           {
@@ -1182,7 +1182,7 @@
       },
       {
         "kind": "category",
-        "code": "34",
+        "code": "3400",
         "name": "PICTURE VEHICLES & ANIMALS",
         "accounts": [
           {
@@ -1245,7 +1245,7 @@
       },
       {
         "kind": "category",
-        "code": "35",
+        "code": "3500",
         "name": "TRANSPORTATION",
         "accounts": [
           {
@@ -1312,7 +1312,7 @@
       },
       {
         "kind": "category",
-        "code": "36",
+        "code": "3600",
         "name": "LOCATIONS",
         "accounts": [
           {
@@ -1415,7 +1415,7 @@
       },
       {
         "kind": "category",
-        "code": "37",
+        "code": "3700",
         "name": "FILM & LAB",
         "accounts": [
           {
@@ -1458,7 +1458,7 @@
       },
       {
         "kind": "category",
-        "code": "38",
+        "code": "3800",
         "name": "2ND UNIT/INSERTS",
         "accounts": [
           {
@@ -1557,7 +1557,7 @@
       },
       {
         "kind": "category",
-        "code": "39",
+        "code": "3900",
         "name": "TESTS",
         "accounts": [
           {
@@ -1608,7 +1608,7 @@
       },
       {
         "kind": "category",
-        "code": "40",
+        "code": "4000",
         "name": "STAGES/FACILITIES",
         "accounts": [
           {
@@ -1647,7 +1647,7 @@
       },
       {
         "kind": "category",
-        "code": "41",
+        "code": "4100",
         "name": "SPECIAL PHOTOGRAPHY",
         "accounts": [
           {
@@ -1714,7 +1714,7 @@
       },
       {
         "kind": "category",
-        "code": "42",
+        "code": "4200",
         "name": "COMPUTER GRAPHICS",
         "accounts": [
           {
@@ -1757,7 +1757,7 @@
       },
       {
         "kind": "category",
-        "code": "43",
+        "code": "4300",
         "name": "VISUAL EFFECTS",
         "accounts": [
           {
@@ -1804,7 +1804,7 @@
       },
       {
         "kind": "category",
-        "code": "44",
+        "code": "4400",
         "name": "CREATURE FABRICATION",
         "accounts": [
           {
@@ -1835,7 +1835,7 @@
       },
       {
         "kind": "category",
-        "code": "45",
+        "code": "4500",
         "name": "CREATURE OPERATION",
         "accounts": [
           {
@@ -1858,7 +1858,7 @@
       },
       {
         "kind": "category",
-        "code": "49",
+        "code": "4900",
         "name": "BTL FRINGE",
         "accounts": [
           {
@@ -1873,7 +1873,7 @@
       },
       {
         "kind": "category",
-        "code": "61",
+        "code": "6100",
         "name": "EDITORIAL",
         "accounts": [
           {
@@ -1960,7 +1960,7 @@
       },
       {
         "kind": "category",
-        "code": "63",
+        "code": "6300",
         "name": "MUSIC",
         "accounts": [
           {
@@ -2039,7 +2039,7 @@
       },
       {
         "kind": "category",
-        "code": "64",
+        "code": "6400",
         "name": "POST PRODUCTION SOUND",
         "accounts": [
           {
@@ -2094,7 +2094,7 @@
       },
       {
         "kind": "category",
-        "code": "65",
+        "code": "6500",
         "name": "PREVIEWS",
         "accounts": [
           {
@@ -2109,7 +2109,7 @@
       },
       {
         "kind": "category",
-        "code": "66",
+        "code": "6600",
         "name": "POST FILM & LAB",
         "accounts": [
           {
@@ -2180,7 +2180,7 @@
       },
       {
         "kind": "category",
-        "code": "67",
+        "code": "6700",
         "name": "TITLES & OPTICAL",
         "accounts": [
           {
@@ -2207,7 +2207,7 @@
       },
       {
         "kind": "category",
-        "code": "69",
+        "code": "6900",
         "name": "POST PRODUCTION FRINGE",
         "accounts": [
           {
@@ -2222,7 +2222,7 @@
       },
       {
         "kind": "category",
-        "code": "70",
+        "code": "7000",
         "name": "INSURANCE",
         "accounts": [
           {
@@ -2253,7 +2253,7 @@
       },
       {
         "kind": "category",
-        "code": "71",
+        "code": "7100",
         "name": "PUBLICITY",
         "accounts": [
           {
@@ -2284,7 +2284,7 @@
       },
       {
         "kind": "category",
-        "code": "75",
+        "code": "7500",
         "name": "GENERAL EXPENSE",
         "accounts": [
           {
@@ -2379,7 +2379,7 @@
       },
       {
         "kind": "category",
-        "code": "79",
+        "code": "7900",
         "name": "OTHER FRINGE",
         "accounts": [
           {

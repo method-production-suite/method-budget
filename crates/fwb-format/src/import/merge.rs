@@ -242,6 +242,14 @@ impl Planner<'_> {
         cat_text: &str,
         cat_name: &str,
     ) -> Result<(String, bool), String> {
+        // A number already in the budget, as written or as the pattern
+        // reads it (a chart's own numbers may not follow the pattern).
+        if let Some(found) = self.accounts.get(&self.coding.key(code_text)).cloned() {
+            if !found.1 {
+                self.plan.matched_accounts.insert(found.0.clone());
+            }
+            return Ok(found);
+        }
         let code = fit_account(&self.coding, code_text)
             .map_err(|e| format!("account number \"{code_text}\" {e}"))?;
         if let Some(found) = self.accounts.get(&code) {
@@ -258,6 +266,11 @@ impl Planner<'_> {
                 .parse(&code)
                 .map(|c| c.category)
                 .map_err(|e| e.to_string())?
+        } else if self
+            .categories
+            .contains_key(&self.coding.category_key(cat_text))
+        {
+            self.coding.category_key(cat_text)
         } else {
             category_part(&self.coding, cat_text)
                 .map_err(|e| format!("category number \"{cat_text}\" {e}"))?
@@ -602,12 +615,10 @@ struct Carry {
     account_name: String,
 }
 
-/// The category number as matching compares it.
+/// The category number as matching compares it
+/// ([`AccountCoding::category_key`]: never cut short).
 fn category_key(coding: &AccountCoding, code: &str) -> String {
-    coding
-        .parse(code)
-        .map(|c| c.category)
-        .unwrap_or_else(|_| code.to_string())
+    coding.category_key(code)
 }
 
 /// What importing `t` with mapping `m` into `b` would do. `b` is not
@@ -621,7 +632,7 @@ pub fn plan(b: &Budget, t: &Table, m: &Mapping, o: &Options) -> Plan {
             .entry(category_key(&coding, &c.code))
             .or_insert_with(|| c.code.clone());
         for a in &c.accounts {
-            let key = coding.normalize(&a.code).unwrap_or_else(|_| a.code.clone());
+            let key = coding.key(&a.code);
             accounts
                 .entry(key)
                 .or_insert_with(|| (a.code.clone(), false));
@@ -754,7 +765,7 @@ pub fn apply(b: &mut Budget, plan: &Plan) -> Result<Applied, String> {
         let at = cat
             .accounts
             .iter()
-            .rposition(|a| coding.normalize(&a.code).unwrap_or_else(|_| a.code.clone()) < na.code)
+            .rposition(|a| coding.key(&a.code) < na.code)
             .map_or(0, |i| i + 1);
         cat.accounts.insert(
             at,

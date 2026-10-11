@@ -1,0 +1,4955 @@
+{
+  "format": "method-budget",
+  "version": 1,
+  "budget": {
+    "title": "FOX 20TH TV",
+    "base_currency": "USD",
+    "account_coding": {
+      "category_width": 2,
+      "account_width": 3,
+      "sub_width": 0,
+      "set_width": 0,
+      "separator": ""
+    },
+    "units": {
+      "Allow": {
+        "plural": "Allow"
+      },
+      "Day": {
+        "plural": "Days",
+        "hours": "10"
+      },
+      "Flat": {
+        "plural": "Flat"
+      },
+      "Hour": {
+        "plural": "Hours",
+        "hours": "1"
+      },
+      "Month": {
+        "plural": "Months",
+        "hours": "200"
+      },
+      "Week": {
+        "plural": "Weeks",
+        "hours": "50"
+      }
+    },
+    "topsheet": [
+      {
+        "kind": "category",
+        "code": "11000",
+        "name": "STORY AND RIGHTS",
+        "accounts": [
+          {
+            "code": "11001",
+            "name": "HEAD WRITER"
+          },
+          {
+            "code": "11002",
+            "name": "WRITERS"
+          },
+          {
+            "code": "11003",
+            "name": "STORY EDITORS"
+          },
+          {
+            "code": "11004",
+            "name": "RESEARCHER"
+          },
+          {
+            "code": "11005",
+            "name": "CONSULTANTS/MEDIATORS"
+          },
+          {
+            "code": "1100501",
+            "name": "CONSULTANT/MEDIATOR"
+          },
+          {
+            "code": "1100502",
+            "name": "CONSULTANT/LEGAL LIASON"
+          },
+          {
+            "code": "11006",
+            "name": "SCRIPT CONTINUITY"
+          },
+          {
+            "code": "11007",
+            "name": "WRITING ASSISTANTS"
+          },
+          {
+            "code": "11008",
+            "name": "SCRIPT TYPIST"
+          },
+          {
+            "code": "11009",
+            "name": "RIGHTS PURCHASED"
+          },
+          {
+            "code": "11010",
+            "name": "WRITER'S ROYALTY"
+          },
+          {
+            "code": "11011",
+            "name": "WRITER'S RE-USE FEES"
+          },
+          {
+            "code": "11012",
+            "name": "WRITER'S SEGMENT FEES"
+          },
+          {
+            "code": "11013",
+            "name": "WRITER'S FLASHBACK FEES"
+          },
+          {
+            "code": "11014",
+            "name": "WRITER'S BONUS PAYMENTS"
+          },
+          {
+            "code": "11015",
+            "name": "REWRITE/POLISH"
+          },
+          {
+            "code": "11016",
+            "name": "FORMAT/BIBLE"
+          },
+          {
+            "code": "11017",
+            "name": "SAMPLE SCRIPTS"
+          },
+          {
+            "code": "11018",
+            "name": "SAMPLE BREAKDOWNS"
+          },
+          {
+            "code": "11019",
+            "name": "TITLE SEARCH"
+          },
+          {
+            "code": "11020",
+            "name": "COPYRIGHT SEARCH"
+          },
+          {
+            "code": "11021",
+            "name": "CLEARANCES"
+          },
+          {
+            "code": "11075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "11085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "11088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "11090",
+            "name": "DEVELOPMENT/PRE-PROD CHARGES"
+          },
+          {
+            "code": "11095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "11097",
+            "name": "STORY & RIGHTS:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "12000",
+        "name": "PRODUCER'S UNIT",
+        "accounts": [
+          {
+            "code": "12001",
+            "name": "EXECUTIVE PRODUCERS"
+          },
+          {
+            "code": "1200101",
+            "name": "EXECUTIVE PRODUCER #1"
+          },
+          {
+            "code": "1200102",
+            "name": "EXECUTIVE PRODUCER #2"
+          },
+          {
+            "code": "1200103",
+            "name": "EXECUTIVE PRODUCER #3"
+          },
+          {
+            "code": "1200104",
+            "name": "EXECUTIVE PRODUCER #4"
+          },
+          {
+            "code": "1200105",
+            "name": "EXECUTIVE PRODUCER #5"
+          },
+          {
+            "code": "1200106",
+            "name": "EXECUTIVE PRODUCER #6"
+          },
+          {
+            "code": "1200107",
+            "name": "EXECUTIVE PRODUCER #7"
+          },
+          {
+            "code": "1200108",
+            "name": "EXECUTIVE PRODUCER #8"
+          },
+          {
+            "code": "1200109",
+            "name": "EXECUTIVE PRODUCER #9"
+          },
+          {
+            "code": "12002",
+            "name": "PRODUCERS"
+          },
+          {
+            "code": "1200201",
+            "name": "PRODUCER #1"
+          },
+          {
+            "code": "1200202",
+            "name": "PRODUCER #2"
+          },
+          {
+            "code": "12003",
+            "name": "SUPERVISING/COORD PRODUCERS"
+          },
+          {
+            "code": "1200301",
+            "name": "SUPERVISING PRODUCER"
+          },
+          {
+            "code": "1200302",
+            "name": "SENIOR PRODUCER"
+          },
+          {
+            "code": "12004",
+            "name": "SEGMENT PRODUCERS"
+          },
+          {
+            "code": "1200401",
+            "name": "SEGMENT PRODUCER #1"
+          },
+          {
+            "code": "1200402",
+            "name": "SEGMENT PRODUCER #2"
+          },
+          {
+            "code": "1200403",
+            "name": "SEGMENT PRODUCER #3"
+          },
+          {
+            "code": "1200404",
+            "name": "SEGMENT PRODUCER #4"
+          },
+          {
+            "code": "1200405",
+            "name": "SEGMENT PRODUCER #5"
+          },
+          {
+            "code": "1200406",
+            "name": "SEGMENT PRODUCER #6"
+          },
+          {
+            "code": "1200407",
+            "name": "SEGMENT PRODUCER #7"
+          },
+          {
+            "code": "1200408",
+            "name": "SEGMENT PRODUCER #8"
+          },
+          {
+            "code": "1200409",
+            "name": "SEGMENT PRODUCER #9"
+          },
+          {
+            "code": "12005",
+            "name": "ASSOCIATE PRODUCERS"
+          },
+          {
+            "code": "1200501",
+            "name": "ASSOCIATE PRODUCER #1"
+          },
+          {
+            "code": "1200502",
+            "name": "ASSOCIATE PRODUCER #2"
+          },
+          {
+            "code": "1200503",
+            "name": "ASSOCIATE PRODUCER #3"
+          },
+          {
+            "code": "1200504",
+            "name": "ASSOCIATE PRODUCER #4"
+          },
+          {
+            "code": "1200505",
+            "name": "ASSOCIATE PRODUCER #5"
+          },
+          {
+            "code": "1200506",
+            "name": "ASSOCIATE PRODUCER #6"
+          },
+          {
+            "code": "1200507",
+            "name": "ASSOCIATE PRODUCER #7"
+          },
+          {
+            "code": "1200508",
+            "name": "ASSOCIATE PRODUCER #8"
+          },
+          {
+            "code": "1200509",
+            "name": "ASSOCIATE PRODUCER #9"
+          },
+          {
+            "code": "12006",
+            "name": "B-ROLL PRODUCERS"
+          },
+          {
+            "code": "1200601",
+            "name": "B-ROLL PRODUCER #1"
+          },
+          {
+            "code": "1200602",
+            "name": "B-ROLL ASSOCIATE PRODUCER #1"
+          },
+          {
+            "code": "12007",
+            "name": "EDIT CONTENT PRODUCERS"
+          },
+          {
+            "code": "1200701",
+            "name": "EDIT CONTENT PRODUCER #1"
+          },
+          {
+            "code": "1200702",
+            "name": "EDIT CONTENT PRODUCER #2"
+          },
+          {
+            "code": "12008",
+            "name": "PRODUCER'S ASSISTANTS"
+          },
+          {
+            "code": "1200801",
+            "name": "PRODUCER'S ASSISTANT #1"
+          },
+          {
+            "code": "1200802",
+            "name": "PRODUCER'S ASSISTANT #2"
+          },
+          {
+            "code": "1200803",
+            "name": "PRODUCER'S ASSISTANT #3"
+          },
+          {
+            "code": "1200804",
+            "name": "PRODUCER'S ASSISTANT #4"
+          },
+          {
+            "code": "1200805",
+            "name": "PRODUCER'S ASSISTANT #5"
+          },
+          {
+            "code": "1200806",
+            "name": "PRODUCER'S ASSISTANT #6"
+          },
+          {
+            "code": "1200807",
+            "name": "PRODUCER'S ASSISTANT #7"
+          },
+          {
+            "code": "1200808",
+            "name": "PRODUCER'S ASSISTANT #8"
+          },
+          {
+            "code": "1200809",
+            "name": "PRODUCER'S ASSISTANT #9"
+          },
+          {
+            "code": "1200810",
+            "name": "PRODUCER'S ASSISTANT #10"
+          },
+          {
+            "code": "1200811",
+            "name": "PRODUCER'S ASSISTANT #11"
+          },
+          {
+            "code": "1200820",
+            "name": "OTHER PROD ASSISTANT LABOR"
+          },
+          {
+            "code": "12009",
+            "name": "OTHER PRODUCERS"
+          },
+          {
+            "code": "12010",
+            "name": "LINE PRODUCERS"
+          },
+          {
+            "code": "12012",
+            "name": "INDEPENDENT PRODUCERS"
+          },
+          {
+            "code": "12013",
+            "name": "PACKAGING FEE-AGENTS"
+          },
+          {
+            "code": "12014",
+            "name": "FINANCE & ADMINISTRATION"
+          },
+          {
+            "code": "12015",
+            "name": "BUSINESS DEVELOPMENT & PLANNING"
+          },
+          {
+            "code": "12016",
+            "name": "CREATIVE SERVICES"
+          },
+          {
+            "code": "12017",
+            "name": "FLOATERS"
+          },
+          {
+            "code": "12029",
+            "name": "LEGAL FEES"
+          },
+          {
+            "code": "1202901",
+            "name": "LEGAL FEES"
+          },
+          {
+            "code": "12050",
+            "name": "OTHER SALARIES"
+          },
+          {
+            "code": "12055",
+            "name": "TEMPORARY SERVICES"
+          },
+          {
+            "code": "12075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "12085",
+            "name": "PRODUCER'S UNIT:OTHER COSTS"
+          },
+          {
+            "code": "12088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "12090",
+            "name": "DEVELOPMENT/PRE-PROD CHARGES"
+          },
+          {
+            "code": "12095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "12097",
+            "name": "PRODUCER'S UNIT:TRAVEL AND LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "13000",
+        "name": "DIRECTION",
+        "accounts": [
+          {
+            "code": "13001",
+            "name": "DIRECTOR"
+          },
+          {
+            "code": "1300101",
+            "name": "STUDIO DIRECTOR"
+          },
+          {
+            "code": "1300102",
+            "name": "FIELD DIRECTOR"
+          },
+          {
+            "code": "13002",
+            "name": "ASSISTANT DIRECTOR"
+          },
+          {
+            "code": "13003",
+            "name": "SECOND ASSISTANT DIRECTOR"
+          },
+          {
+            "code": "13004",
+            "name": "THIRD ASSISTANT DIRECTOR"
+          },
+          {
+            "code": "13005",
+            "name": "ASSOCIATE DIRECTOR"
+          },
+          {
+            "code": "1300501",
+            "name": "ASSOCIATE DIRECTOR #1"
+          },
+          {
+            "code": "13006",
+            "name": "PRODUCTION ASSOCIATE"
+          },
+          {
+            "code": "13007",
+            "name": "DIRECTOR'S ASSISTANTS"
+          },
+          {
+            "code": "13008",
+            "name": "DGA TRAINEE"
+          },
+          {
+            "code": "13009",
+            "name": "STAGE MANAGERS"
+          },
+          {
+            "code": "1300901",
+            "name": "STAGE MANAGER #1"
+          },
+          {
+            "code": "1300902",
+            "name": "STAGE MANAGER #2"
+          },
+          {
+            "code": "1300903",
+            "name": "STAGE MANAGER #3"
+          },
+          {
+            "code": "1300904",
+            "name": "STAGE MANAGER #4"
+          },
+          {
+            "code": "1300905",
+            "name": "STAGE MANAGER #5"
+          },
+          {
+            "code": "1300906",
+            "name": "STAGE MANAGER #6"
+          },
+          {
+            "code": "1300907",
+            "name": "STAGE MANAGER #7"
+          },
+          {
+            "code": "13010",
+            "name": "BOOTH PA"
+          },
+          {
+            "code": "13011",
+            "name": "SECOND BOOTH PA"
+          },
+          {
+            "code": "13012",
+            "name": "DIRECTOR'S ROYALTIES"
+          },
+          {
+            "code": "13013",
+            "name": "DIRECTOR'S RE-USE FEES"
+          },
+          {
+            "code": "13014",
+            "name": "DIRECTOR'S SEGMENT FEES"
+          },
+          {
+            "code": "13015",
+            "name": "DIRECTOR'S FLASHBACK FEES"
+          },
+          {
+            "code": "13016",
+            "name": "DIRECTOR'S RESIDUAL PAYMENTS"
+          },
+          {
+            "code": "13020",
+            "name": "SECOND UNIT DIRECTOR"
+          },
+          {
+            "code": "13021",
+            "name": "SECOND UNIT ASSOCIATE DIRECTORS"
+          },
+          {
+            "code": "13022",
+            "name": "SECOND UNIT ASSISTANT DIRECTORS"
+          },
+          {
+            "code": "13075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "13085",
+            "name": "DIRECTION:OTHER COSTS"
+          },
+          {
+            "code": "13088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "13090",
+            "name": "DEVELOPMENT/PRE-PROD CHARGES"
+          },
+          {
+            "code": "13095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "13097",
+            "name": "DIRECTION:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "14000",
+        "name": "CAST",
+        "accounts": [
+          {
+            "code": "14001",
+            "name": "HOSTS"
+          },
+          {
+            "code": "1400101",
+            "name": "HOST #1"
+          },
+          {
+            "code": "1400102",
+            "name": "HOST #2"
+          },
+          {
+            "code": "1400103",
+            "name": "HOST #3"
+          },
+          {
+            "code": "1400104",
+            "name": "HOST #4"
+          },
+          {
+            "code": "1400105",
+            "name": "HOST #5"
+          },
+          {
+            "code": "14002",
+            "name": "CONSULTANT"
+          },
+          {
+            "code": "14003",
+            "name": "SUPPORTING CAST"
+          },
+          {
+            "code": "1400301",
+            "name": "SUPPORTING CAST #1"
+          },
+          {
+            "code": "1400302",
+            "name": "SUPPORTING CAST #2"
+          },
+          {
+            "code": "1400303",
+            "name": "SUPPORTING CAST #3"
+          },
+          {
+            "code": "14004",
+            "name": "UNDER 5'S"
+          },
+          {
+            "code": "1400401",
+            "name": "UNDER 5'S #1"
+          },
+          {
+            "code": "1400402",
+            "name": "UNDER 5'S #2"
+          },
+          {
+            "code": "14005",
+            "name": "HONORARIUM CAST"
+          },
+          {
+            "code": "14006",
+            "name": "OTHER CAST PAYMENTS"
+          },
+          {
+            "code": "14007",
+            "name": "DAY PLAYERS"
+          },
+          {
+            "code": "14008",
+            "name": "UNION GUESTS"
+          },
+          {
+            "code": "14009",
+            "name": "GUEST CAST"
+          },
+          {
+            "code": "14010",
+            "name": "ANNOUNCERS"
+          },
+          {
+            "code": "1401001",
+            "name": "ANNOUNCER #1"
+          },
+          {
+            "code": "1401002",
+            "name": "ANNOUNCER #2"
+          },
+          {
+            "code": "14011",
+            "name": "TALENT TESTING"
+          },
+          {
+            "code": "14012",
+            "name": "HOST ASSISTANT"
+          },
+          {
+            "code": "14013",
+            "name": "WARM-UP"
+          },
+          {
+            "code": "14014",
+            "name": "CUE CARDS"
+          },
+          {
+            "code": "14015",
+            "name": "SINGERS/DANCERS"
+          },
+          {
+            "code": "14016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "14017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "14018",
+            "name": "SPECIAL BUSINESS"
+          },
+          {
+            "code": "14019",
+            "name": "ADDITIONAL DAYS:CONTRACT"
+          },
+          {
+            "code": "14020",
+            "name": "ADDITIONAL DAYS:NON-CONTRACT"
+          },
+          {
+            "code": "14021",
+            "name": "PENALTIES/FEES"
+          },
+          {
+            "code": "14022",
+            "name": "ACTING COACH"
+          },
+          {
+            "code": "14023",
+            "name": "CASTING FEES"
+          },
+          {
+            "code": "14024",
+            "name": "CASTING DIRECTORS"
+          },
+          {
+            "code": "14025",
+            "name": "CASTING ASSISTANTS"
+          },
+          {
+            "code": "14026",
+            "name": "TALENT BOOKERS"
+          },
+          {
+            "code": "14027",
+            "name": "CELEBRITY BOOKERS"
+          },
+          {
+            "code": "14030",
+            "name": "TEACHER/WELFARE WORKER"
+          },
+          {
+            "code": "14040",
+            "name": "HOST"
+          },
+          {
+            "code": "14041",
+            "name": "CO-HOST"
+          },
+          {
+            "code": "14042",
+            "name": "CONTESTANTS"
+          },
+          {
+            "code": "14045",
+            "name": "LOOPING"
+          },
+          {
+            "code": "14050",
+            "name": "STUNTMEN"
+          },
+          {
+            "code": "14075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "14085",
+            "name": "CAST:OTHER COSTS"
+          },
+          {
+            "code": "14086",
+            "name": "AUDIENCE CHARGES"
+          },
+          {
+            "code": "1408601",
+            "name": "AUDIENCE COORDINATOR #1"
+          },
+          {
+            "code": "1408602",
+            "name": "AUDIENCE COORDINATOR #2"
+          },
+          {
+            "code": "1408603",
+            "name": "AUDIENCE COORDINATOR #3"
+          },
+          {
+            "code": "1408604",
+            "name": "AUDIENCE COORDINATOR #4"
+          },
+          {
+            "code": "1408605",
+            "name": "AUDIENCE COORDINATOR #5"
+          },
+          {
+            "code": "1408606",
+            "name": "AUDIENCE COORDINATOR #6"
+          },
+          {
+            "code": "1408610",
+            "name": "AUDIENCE PROCUREMENT FEES"
+          },
+          {
+            "code": "1408611",
+            "name": "AUDIENCE PAYMENTS"
+          },
+          {
+            "code": "1408685",
+            "name": "OTHER AUDIENCE COSTS"
+          },
+          {
+            "code": "14087",
+            "name": "VOICE OVERS"
+          },
+          {
+            "code": "14088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "14090",
+            "name": "DEVELOPMENT/PRE-PROD CHARGES"
+          },
+          {
+            "code": "14095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "14097",
+            "name": "CAST:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "15000",
+        "name": "TRAVEL & LIVING COSTS",
+        "accounts": [
+          {
+            "code": "15001",
+            "name": "WRITER'S TRAVEL& LIVING"
+          },
+          {
+            "code": "1500101",
+            "name": "WRITER'S AIRFARE"
+          },
+          {
+            "code": "1500102",
+            "name": "WRITER'S LODGING"
+          },
+          {
+            "code": "1500103",
+            "name": "WRITER'S TRANSPO:LOCAL"
+          },
+          {
+            "code": "1500104",
+            "name": "WRITER'S TRANSPO:DISTANT"
+          },
+          {
+            "code": "1500105",
+            "name": "WRITER'S PER DIEM"
+          },
+          {
+            "code": "1500106",
+            "name": "WRITER'S MEALS"
+          },
+          {
+            "code": "1500107",
+            "name": "WRITER'S RELOCATION ALLOWANCE"
+          },
+          {
+            "code": "15002",
+            "name": "PRODUCER'S TRAVEL&LIVING"
+          },
+          {
+            "code": "1500201",
+            "name": "PRODUCER'S AIRFARE"
+          },
+          {
+            "code": "1500202",
+            "name": "PRODUCER'S LODGING"
+          },
+          {
+            "code": "1500203",
+            "name": "PRODUCER'S TRANSPO:LOCAL"
+          },
+          {
+            "code": "1500204",
+            "name": "PRODUCER'S TRANSPO:DISTANT"
+          },
+          {
+            "code": "1500205",
+            "name": "PRODUCER'S PER DIEM"
+          },
+          {
+            "code": "1500206",
+            "name": "PRODUCER'S MEALS"
+          },
+          {
+            "code": "1500207",
+            "name": "PRODUCER'S RELOCATION ALLOWANCE"
+          },
+          {
+            "code": "15003",
+            "name": "DIRECTOR'S TRAVEL AND LIVING"
+          },
+          {
+            "code": "1500301",
+            "name": "DIRECTOR'S AIRFARE"
+          },
+          {
+            "code": "1500302",
+            "name": "DIRECTOR'S LODGING"
+          },
+          {
+            "code": "1500303",
+            "name": "DIRECTOR'S TRANSPO:LOCAL"
+          },
+          {
+            "code": "1500304",
+            "name": "DIRECTOR'S TRANSPO:DISTANT"
+          },
+          {
+            "code": "1500305",
+            "name": "DIRECTOR'S PER DIEM"
+          },
+          {
+            "code": "1500306",
+            "name": "DIRECTOR'S MEALS"
+          },
+          {
+            "code": "1500307",
+            "name": "DIRECTOR'S RELOCATION ALLOWANCE"
+          },
+          {
+            "code": "15004",
+            "name": "CAST TRAVEL&LIVING"
+          },
+          {
+            "code": "1500401",
+            "name": "CAST AIRFARE"
+          },
+          {
+            "code": "1500402",
+            "name": "CAST LODGING"
+          },
+          {
+            "code": "1500403",
+            "name": "CAST TRANSPO:LOCAL"
+          },
+          {
+            "code": "1500404",
+            "name": "CAST TRANSPO:DISTANT"
+          },
+          {
+            "code": "1500405",
+            "name": "CAST PER DIEM"
+          },
+          {
+            "code": "1500406",
+            "name": "CAST MEALS"
+          },
+          {
+            "code": "1500407",
+            "name": "CAST RELOCATION ALLOWANCE"
+          },
+          {
+            "code": "15010",
+            "name": "TRANSPORTATION-ATL"
+          },
+          {
+            "code": "15011",
+            "name": "CAR SERVICE"
+          },
+          {
+            "code": "15020",
+            "name": "AIRFARE-ATL"
+          },
+          {
+            "code": "15030",
+            "name": "PER DIEM-ATL"
+          },
+          {
+            "code": "15040",
+            "name": "MEALS-ATL"
+          },
+          {
+            "code": "15050",
+            "name": "LODGING"
+          },
+          {
+            "code": "15075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "15085",
+            "name": "TRAVEL AND LIVING:OTHER COSTS"
+          },
+          {
+            "code": "15088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "15090",
+            "name": "DEVELOPMENT/PRE-PROD CHARGES"
+          },
+          {
+            "code": "15095",
+            "name": "STUDIO CHARGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "16000",
+        "name": "PRODUCTION FEES",
+        "accounts": [
+          {
+            "code": "16001",
+            "name": "PRODUCTION FEE"
+          },
+          {
+            "code": "16010",
+            "name": "PRODUCTION BONUSES"
+          },
+          {
+            "code": "16011",
+            "name": "WRITER'S ROYALTY"
+          },
+          {
+            "code": "16012",
+            "name": "PRODUCER'S ROYALTY"
+          },
+          {
+            "code": "16013",
+            "name": "DIRECTOR'S ROYALTY"
+          },
+          {
+            "code": "16014",
+            "name": "CAST ROYALTY"
+          },
+          {
+            "code": "16015",
+            "name": "RECURRING CHARACTER PYMNT / SPINOFF"
+          },
+          {
+            "code": "16016",
+            "name": "MISCELLANEOUS ROYALTY"
+          },
+          {
+            "code": "16023",
+            "name": "DIRECTOR'S BONUS"
+          },
+          {
+            "code": "16025",
+            "name": "PACKAGING FEE"
+          },
+          {
+            "code": "16090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "16095",
+            "name": "STUDIO CHARGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "17000",
+        "name": "NEGATIVE PICK-UP",
+        "accounts": [
+          {
+            "code": "17001",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "17002",
+            "name": "INTEREST"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "18000",
+        "name": "SECOND RUN RESIDUALS",
+        "accounts": [
+          {
+            "code": "18001",
+            "name": "SECOND RUN:WRITERS"
+          },
+          {
+            "code": "18002",
+            "name": "SECOND RUN:DIRECTORS"
+          },
+          {
+            "code": "18003",
+            "name": "SECOND RUN:CAST"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "19000",
+        "name": "FRINGES BENEFITS & P/R TAXES",
+        "accounts": [
+          {
+            "code": "19075",
+            "name": "FRINGES:COMPANY SHUTDOWN"
+          },
+          {
+            "code": "19081",
+            "name": "FRINGES:WGA PH&W"
+          },
+          {
+            "code": "19082",
+            "name": "FRINGES:PRODUCER'S PH&W"
+          },
+          {
+            "code": "19083",
+            "name": "FRINGES:DGA PH&W"
+          },
+          {
+            "code": "19084",
+            "name": "FRINGES:SAG PH&W"
+          },
+          {
+            "code": "19085",
+            "name": "FRINGES:MISCELLANEOUS"
+          },
+          {
+            "code": "19088",
+            "name": "FRINGES:INSURANCE CLAIMS"
+          },
+          {
+            "code": "19091",
+            "name": "P/R TAXES:WRITERS"
+          },
+          {
+            "code": "19092",
+            "name": "P/R TAXES:PRODUCER'S"
+          },
+          {
+            "code": "19093",
+            "name": "P/R TAXES:DIRECTION"
+          },
+          {
+            "code": "19094",
+            "name": "P/R TAXES:CAST"
+          },
+          {
+            "code": "19095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "19097",
+            "name": "WORKER'S COMP INSURANCE"
+          },
+          {
+            "code": "19098",
+            "name": "VACATION/HOLIDAY"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total above-the-line"
+      },
+      {
+        "kind": "category",
+        "code": "20000",
+        "name": "PRODUCTION STAFF",
+        "accounts": [
+          {
+            "code": "20001",
+            "name": "EXECUTIVE IN CHARGE OF PRODUCTION"
+          },
+          {
+            "code": "20007",
+            "name": "PRODUCTION SECRETARY"
+          },
+          {
+            "code": "20008",
+            "name": "PRODUCTION ACCOUNTANT"
+          },
+          {
+            "code": "20009",
+            "name": "1ST ASST PRODUCTION ACCOUNTANT"
+          },
+          {
+            "code": "20010",
+            "name": "PRODUCTION MANAGER"
+          },
+          {
+            "code": "20011",
+            "name": "2ND UNIT PRODUCTION MANAGER"
+          },
+          {
+            "code": "20012",
+            "name": "PRODUCTION COORDINATOR'S"
+          },
+          {
+            "code": "2001201",
+            "name": "PRODUCTION COORDINATOR 1"
+          },
+          {
+            "code": "2001202",
+            "name": "PRODUCTION COORDINATOR 2"
+          },
+          {
+            "code": "20013",
+            "name": "PRODUCTION ASSOCIATE"
+          },
+          {
+            "code": "2001301",
+            "name": "PRODUCTION ASSOCIATE 1"
+          },
+          {
+            "code": "2001302",
+            "name": "PRODUCTION ASSOCIATE 2"
+          },
+          {
+            "code": "2001303",
+            "name": "PRODUCTION ASSOCIATE 3"
+          },
+          {
+            "code": "20014",
+            "name": "TRAVEL COORDINATOR"
+          },
+          {
+            "code": "20015",
+            "name": "ASST TRAVEL COORDINATOR"
+          },
+          {
+            "code": "2001501",
+            "name": "ASST TRAVEL COORDINATOR 1"
+          },
+          {
+            "code": "2001502",
+            "name": "ASST TRAVEL COORDINATOR 2"
+          },
+          {
+            "code": "2001503",
+            "name": "ASST TRAVEL COORDINATOR 3"
+          },
+          {
+            "code": "20040",
+            "name": "CONTESTANT COORDINATOR"
+          },
+          {
+            "code": "20041",
+            "name": "PRODUCTION ASSISTANTS"
+          },
+          {
+            "code": "2004101",
+            "name": "PA #1"
+          },
+          {
+            "code": "2004102",
+            "name": "PA #2"
+          },
+          {
+            "code": "2004103",
+            "name": "PA #3"
+          },
+          {
+            "code": "2004104",
+            "name": "PA #4"
+          },
+          {
+            "code": "2004105",
+            "name": "PA #5"
+          },
+          {
+            "code": "2004106",
+            "name": "PA #6"
+          },
+          {
+            "code": "2004107",
+            "name": "PA #7"
+          },
+          {
+            "code": "2004108",
+            "name": "PA #8"
+          },
+          {
+            "code": "2004109",
+            "name": "PA #9"
+          },
+          {
+            "code": "2004110",
+            "name": "PA #10"
+          },
+          {
+            "code": "20042",
+            "name": "RECEPTIONIST"
+          },
+          {
+            "code": "2004201",
+            "name": "RECEPTIONIST 1"
+          },
+          {
+            "code": "2004202",
+            "name": "RECEPTIONIST 2"
+          },
+          {
+            "code": "2004203",
+            "name": "RECEPTIONIST 3"
+          },
+          {
+            "code": "2004255",
+            "name": "RECEPTIONIST TEMP"
+          },
+          {
+            "code": "20043",
+            "name": "PRIZE COORDINATOR"
+          },
+          {
+            "code": "20044",
+            "name": "PROMOTIONS COORDINATOR"
+          },
+          {
+            "code": "20045",
+            "name": "TEACHER/WELFARE WORKER"
+          },
+          {
+            "code": "2004601",
+            "name": "TELEPHONE OPERATOR 1"
+          },
+          {
+            "code": "2004602",
+            "name": "TELEPHONE OPERATOR 2"
+          },
+          {
+            "code": "2004603",
+            "name": "TELEPHONE OPERATOR 3"
+          },
+          {
+            "code": "2004604",
+            "name": "TELEPHONE OPERATOR 4"
+          },
+          {
+            "code": "2004610",
+            "name": "FREELANCE OPERATORS"
+          },
+          {
+            "code": "20070",
+            "name": "INTERPRETER/INSTRUCTOR"
+          },
+          {
+            "code": "20071",
+            "name": "TECHNICAL ADVISOR"
+          },
+          {
+            "code": "20075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "20077",
+            "name": "KIT RENTALS"
+          },
+          {
+            "code": "20078",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "20085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "20088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "20090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "20095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "20097",
+            "name": "PRODUCTION STAFF:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "21000",
+        "name": "EXTRA TALENTS",
+        "accounts": [
+          {
+            "code": "21001",
+            "name": "EXTRAS"
+          },
+          {
+            "code": "21002",
+            "name": "DANCERS/SKATERS"
+          },
+          {
+            "code": "21003",
+            "name": "SIDELINE MUSICIANS"
+          },
+          {
+            "code": "21004",
+            "name": "TEACHER/WELFARE WORKER"
+          },
+          {
+            "code": "21005",
+            "name": "LOCATION EXTRAS"
+          },
+          {
+            "code": "21006",
+            "name": "SPECIAL SKILLED EXTRAS"
+          },
+          {
+            "code": "21007",
+            "name": "DRIVERS"
+          },
+          {
+            "code": "21008",
+            "name": "WARDROBE/FITTING/MAKEUP"
+          },
+          {
+            "code": "21009",
+            "name": "SET COORDINATORS"
+          },
+          {
+            "code": "21011",
+            "name": "MILEAGE"
+          },
+          {
+            "code": "21014",
+            "name": "ATMOSPHERE CARS"
+          },
+          {
+            "code": "21015",
+            "name": "INTERVIEW/CAB FARE"
+          },
+          {
+            "code": "21016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "21017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "21018",
+            "name": "STAND-INS"
+          },
+          {
+            "code": "21019",
+            "name": "PENALTIES/FEES"
+          },
+          {
+            "code": "21020",
+            "name": "SPECIAL BUSINESS"
+          },
+          {
+            "code": "21021",
+            "name": "CASTING FEE-EXTRAS"
+          },
+          {
+            "code": "21030",
+            "name": "GUILD EXTRAS"
+          },
+          {
+            "code": "21031",
+            "name": "WAVER/NON-UNION EXTRAS"
+          },
+          {
+            "code": "21040",
+            "name": "EXTRAS CASTING DIRECTOR"
+          },
+          {
+            "code": "21041",
+            "name": "EXTRAS CASTING DIRECTOR ASST"
+          },
+          {
+            "code": "21075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "21077",
+            "name": "KIT RENTALS"
+          },
+          {
+            "code": "21078",
+            "name": "CAR ALLOWANCE/SAG MILEAGE"
+          },
+          {
+            "code": "21080",
+            "name": "CAST TESTING"
+          },
+          {
+            "code": "21085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "21088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "21090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "21097",
+            "name": "EXTRAS:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "22000",
+        "name": "SET DESIGN",
+        "accounts": [
+          {
+            "code": "22001",
+            "name": "PRODUCTION DESIGNER"
+          },
+          {
+            "code": "22002",
+            "name": "ART DIRECTOR"
+          },
+          {
+            "code": "22003",
+            "name": "SET DECORATOR"
+          },
+          {
+            "code": "22004",
+            "name": "DRAFTSMEN"
+          },
+          {
+            "code": "22005",
+            "name": "SCENIC DEPT COORDINATOR"
+          },
+          {
+            "code": "22006",
+            "name": "SHOPPER"
+          },
+          {
+            "code": "22007",
+            "name": "ART DEPARTMENT ASSISTANTS"
+          },
+          {
+            "code": "22008",
+            "name": "MODEL MAKERS"
+          },
+          {
+            "code": "22009",
+            "name": "SKETCH ARTISTS"
+          },
+          {
+            "code": "22010",
+            "name": "SET ESTIMATOR"
+          },
+          {
+            "code": "22011",
+            "name": "STORYBOARD ARTIST"
+          },
+          {
+            "code": "22012",
+            "name": "SUPPLIES"
+          },
+          {
+            "code": "22013",
+            "name": "GRAPHICS"
+          },
+          {
+            "code": "2201301",
+            "name": "GRAPHICS"
+          },
+          {
+            "code": "2201302",
+            "name": "GRAPHICS"
+          },
+          {
+            "code": "22016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "22017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "22020",
+            "name": "BLUEPRINTS"
+          },
+          {
+            "code": "22030",
+            "name": "POLAROIDS (LOCATION/SET)"
+          },
+          {
+            "code": "22031",
+            "name": "RESEARCH MATERIALS"
+          },
+          {
+            "code": "22041",
+            "name": "SET DESIGN P.A.'S"
+          },
+          {
+            "code": "22075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "22077",
+            "name": "KIT RENTALS"
+          },
+          {
+            "code": "22078",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "22085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "22088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "22090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "22095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "22097",
+            "name": "SET DESIGN:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "23000",
+        "name": "SET CONSTRUCTION",
+        "accounts": [
+          {
+            "code": "23001",
+            "name": "CONSTRUCTION COORDINATOR"
+          },
+          {
+            "code": "23002",
+            "name": "CONSTRUCTION FOREPERSON"
+          },
+          {
+            "code": "23003",
+            "name": "CARPENTERS"
+          },
+          {
+            "code": "23004",
+            "name": "SCENIC PAINTER"
+          },
+          {
+            "code": "23005",
+            "name": "DAY LABOR"
+          },
+          {
+            "code": "23006",
+            "name": "BACKINGS"
+          },
+          {
+            "code": "23008",
+            "name": "SCAFFOLDS"
+          },
+          {
+            "code": "23009",
+            "name": "SCENERY"
+          },
+          {
+            "code": "23010",
+            "name": "CRANES/MANLIFTS"
+          },
+          {
+            "code": "23011",
+            "name": "MODEL SET COSTS/MOCKUPS"
+          },
+          {
+            "code": "23012",
+            "name": "OFFICE SUPPLIES"
+          },
+          {
+            "code": "23013",
+            "name": "EXPENDABLES"
+          },
+          {
+            "code": "23014",
+            "name": "CONSTRUCTION ACCOUNTANT"
+          },
+          {
+            "code": "23015",
+            "name": "NON-EXPENDABLE HARDWARE"
+          },
+          {
+            "code": "23016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "23017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "23018",
+            "name": "CHANGES/ADDS:LABOR"
+          },
+          {
+            "code": "23019",
+            "name": "CHANGES/ADDS:BACKINGS"
+          },
+          {
+            "code": "23021",
+            "name": "CHANGES/ADDS:SCAFFOLDS"
+          },
+          {
+            "code": "23022",
+            "name": "CHANGES/ADDS:MATERIALS"
+          },
+          {
+            "code": "23023",
+            "name": "CHANGES/ADDS:RENTALS"
+          },
+          {
+            "code": "23024",
+            "name": "SET AMORTIZATION/CONSTRUCTION"
+          },
+          {
+            "code": "23035",
+            "name": "TRANSPORTATION:SET"
+          },
+          {
+            "code": "23036",
+            "name": "TRANSPORTATION:LABOR"
+          },
+          {
+            "code": "23040",
+            "name": "CONSTRUCTION LABOR:LOCATION"
+          },
+          {
+            "code": "23041",
+            "name": "WAREHOUSE CONSTRUCTION"
+          },
+          {
+            "code": "23042",
+            "name": "OUTSIDE CONSTRUCTION CONTRCT"
+          },
+          {
+            "code": "23048",
+            "name": "LOSS & DAMAGE"
+          },
+          {
+            "code": "23075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "23077",
+            "name": "KIT RENTALS"
+          },
+          {
+            "code": "23078",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "23085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "23086",
+            "name": "CONSTUCTION FIRST AID"
+          },
+          {
+            "code": "23088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "23090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "23097",
+            "name": "SET CONSTRUCTION:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "24000",
+        "name": "SET STRIKING",
+        "accounts": [
+          {
+            "code": "24001",
+            "name": "SET STRIKING LABOR"
+          },
+          {
+            "code": "24002",
+            "name": "SET/PROP/WARDROBE STORAGE"
+          },
+          {
+            "code": "24016",
+            "name": "MATERIALS"
+          },
+          {
+            "code": "24017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "24075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "24077",
+            "name": "KIT RENTALS"
+          },
+          {
+            "code": "24078",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "24085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "24088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "24090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "24095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "24097",
+            "name": "SET STRIKING:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "25000",
+        "name": "SET OPERATIONS",
+        "accounts": [
+          {
+            "code": "25001",
+            "name": "KEY GRIP"
+          },
+          {
+            "code": "25002",
+            "name": "BEST BOY GRIP"
+          },
+          {
+            "code": "25003",
+            "name": "OTHER COMPANY GRIPS"
+          },
+          {
+            "code": "25004",
+            "name": "GREENSMEN"
+          },
+          {
+            "code": "25005",
+            "name": "DOLLY/CRANE GRIPS"
+          },
+          {
+            "code": "25006",
+            "name": "STANDBY PAINTER/CARPENTER"
+          },
+          {
+            "code": "25007",
+            "name": "RIGGING/STRIKING STAGEHANDS"
+          },
+          {
+            "code": "25008",
+            "name": "CRAFT SERVICE"
+          },
+          {
+            "code": "2500801",
+            "name": "CRAFT SERVICE PERSON"
+          },
+          {
+            "code": "2500802",
+            "name": "CRAFT SERVICE SUPPLIES"
+          },
+          {
+            "code": "25009",
+            "name": "FIRST AID/MEDIC"
+          },
+          {
+            "code": "25010",
+            "name": "CATERING"
+          },
+          {
+            "code": "25011",
+            "name": "STAGING SERVICES"
+          },
+          {
+            "code": "25012",
+            "name": "SECURITY"
+          },
+          {
+            "code": "25013",
+            "name": "STAGEHANDS"
+          },
+          {
+            "code": "25016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "25017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "25018",
+            "name": "DRESSING ROOM RENTALS/MOVES"
+          },
+          {
+            "code": "25019",
+            "name": "CRANES"
+          },
+          {
+            "code": "25020",
+            "name": "DOLLIES"
+          },
+          {
+            "code": "25021",
+            "name": "AIR CONDITIONING/POWER"
+          },
+          {
+            "code": "25022",
+            "name": "FIRE SAFETY OFFCIER"
+          },
+          {
+            "code": "25040",
+            "name": "AUDIENCE"
+          },
+          {
+            "code": "25048",
+            "name": "LOSS & DAMAGE"
+          },
+          {
+            "code": "25075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "25077",
+            "name": "KIT RENTALS"
+          },
+          {
+            "code": "25078",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "25085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "25088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "25090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "25095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "25097",
+            "name": "SET OPERATIONS:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "26000",
+        "name": "SPECIAL EFFECTS",
+        "accounts": [
+          {
+            "code": "26001",
+            "name": "FOREMAN & OPERATING LABOR"
+          },
+          {
+            "code": "26002",
+            "name": "MANUFACTURING LABOR"
+          },
+          {
+            "code": "26003",
+            "name": "LABOR:RIGGING"
+          },
+          {
+            "code": "26004",
+            "name": "LABOR:STRIKING"
+          },
+          {
+            "code": "26005",
+            "name": "CHANGES:LABOR"
+          },
+          {
+            "code": "26006",
+            "name": "CHANGES:MATERIALS"
+          },
+          {
+            "code": "26007",
+            "name": "OPERATING LABOR"
+          },
+          {
+            "code": "26008",
+            "name": "ASSISTANT SFX MEN"
+          },
+          {
+            "code": "26009",
+            "name": "OTHER DEPARTMENTS"
+          },
+          {
+            "code": "26016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "26017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "26020",
+            "name": "LOCAL HIRE"
+          },
+          {
+            "code": "26025",
+            "name": "GAS CYLINDER CHARGES"
+          },
+          {
+            "code": "26030",
+            "name": "CREATURE/MECH FX COORDINATOR"
+          },
+          {
+            "code": "26040",
+            "name": "VISUAL FX SUPERVISOR"
+          },
+          {
+            "code": "26041",
+            "name": "VISUAL FX COORDINATOR"
+          },
+          {
+            "code": "26042",
+            "name": "VISUAL FX EDITOR"
+          },
+          {
+            "code": "26044",
+            "name": "VISUAL FX STORYBOARD ARTIST"
+          },
+          {
+            "code": "26045",
+            "name": "VISUAL FX CONSULTANT"
+          },
+          {
+            "code": "26046",
+            "name": "VISUAL FX PLATE UNIT"
+          },
+          {
+            "code": "26049",
+            "name": "VISUAL FX TELECINE/SCANNING"
+          },
+          {
+            "code": "26050",
+            "name": "MINIATURES SUPERVISOR"
+          },
+          {
+            "code": "26051",
+            "name": "MINIATURES COORDINATOR"
+          },
+          {
+            "code": "26052",
+            "name": "MINIATURES SHOOTING CREW"
+          },
+          {
+            "code": "26053",
+            "name": "MINIATURES MODEL SHOP"
+          },
+          {
+            "code": "26054",
+            "name": "MINIATURES OTHER EXPENSES"
+          },
+          {
+            "code": "26060",
+            "name": "BLUE/GREEN SCREEN"
+          },
+          {
+            "code": "26062",
+            "name": "PROCESS"
+          },
+          {
+            "code": "26063",
+            "name": "TESTS"
+          },
+          {
+            "code": "26075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "26077",
+            "name": "KIT RENTALS"
+          },
+          {
+            "code": "26078",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "26085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "26088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "26090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "26095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "26097",
+            "name": "SPECIAL EFFECTS:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "27000",
+        "name": "SET DRESSING",
+        "accounts": [
+          {
+            "code": "27001",
+            "name": "SET DECORATOR"
+          },
+          {
+            "code": "27002",
+            "name": "LEADMAN"
+          },
+          {
+            "code": "27003",
+            "name": "SWING GANG"
+          },
+          {
+            "code": "27004",
+            "name": "ON SET DRESSER"
+          },
+          {
+            "code": "27005",
+            "name": "BUYERS"
+          },
+          {
+            "code": "27006",
+            "name": "DAY LABOR"
+          },
+          {
+            "code": "27007",
+            "name": "LOCAL HIRE"
+          },
+          {
+            "code": "27008",
+            "name": "DRAPERIES:LABOR & MATERIALS"
+          },
+          {
+            "code": "27009",
+            "name": "FIXTURES:LABOR & MATERIALS"
+          },
+          {
+            "code": "27010",
+            "name": "GREENS"
+          },
+          {
+            "code": "27011",
+            "name": "GREENS LABOR"
+          },
+          {
+            "code": "27012",
+            "name": "MANUFACTURING:LABOR"
+          },
+          {
+            "code": "27013",
+            "name": "MANUFACTURING:MATERIALS"
+          },
+          {
+            "code": "27016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "27017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "27035",
+            "name": "SET DRESSING TRANSPORTATION"
+          },
+          {
+            "code": "27046",
+            "name": "CLEAN & DYE"
+          },
+          {
+            "code": "27048",
+            "name": "LOSS & DAMAGE"
+          },
+          {
+            "code": "27075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "27077",
+            "name": "KIT RENTALS"
+          },
+          {
+            "code": "27078",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "27085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "27088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "27090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "27095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "27097",
+            "name": "SET DRESSING:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "28000",
+        "name": "PROPERTY",
+        "accounts": [
+          {
+            "code": "28001",
+            "name": "PROPERTY MASTER"
+          },
+          {
+            "code": "28002",
+            "name": "1ST ASST PROPERTY MASTER"
+          },
+          {
+            "code": "28003",
+            "name": "2ND ASST PROPERTY MASTER"
+          },
+          {
+            "code": "28004",
+            "name": "OTHER PROPERTY LABOR"
+          },
+          {
+            "code": "28005",
+            "name": "LOCAL HIRE"
+          },
+          {
+            "code": "28011",
+            "name": "MANUFACTURING:LABOR"
+          },
+          {
+            "code": "28012",
+            "name": "MANUFACTURING:MATERIALS"
+          },
+          {
+            "code": "28016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "28017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "28048",
+            "name": "LOSS & DAMAGE"
+          },
+          {
+            "code": "28075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "28077",
+            "name": "KIT RENTALS"
+          },
+          {
+            "code": "28078",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "28085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "28088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "28090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "28095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "28097",
+            "name": "PROPERTY:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "30000",
+        "name": "WARDROBE",
+        "accounts": [
+          {
+            "code": "30001",
+            "name": "COSTUME DESIGNER/STYLIST"
+          },
+          {
+            "code": "30002",
+            "name": "ASST COSTUME DESIGNER"
+          },
+          {
+            "code": "30003",
+            "name": "KEY COSTUMER"
+          },
+          {
+            "code": "30004",
+            "name": "COSTUMER"
+          },
+          {
+            "code": "30005",
+            "name": "WARDROBE ASSISTANTS"
+          },
+          {
+            "code": "30006",
+            "name": "COSTUME SKETCH ARTIST"
+          },
+          {
+            "code": "30007",
+            "name": "SEAMSTRESS/TAILOR"
+          },
+          {
+            "code": "30011",
+            "name": "MANUFACTURING:LABOR"
+          },
+          {
+            "code": "30012",
+            "name": "MANUFACTURING:MATERIALS"
+          },
+          {
+            "code": "30016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "3001601",
+            "name": "OTHER PURCHASES"
+          },
+          {
+            "code": "30017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "30021",
+            "name": "ALTERATIONS/REPAIRS"
+          },
+          {
+            "code": "30024",
+            "name": "WARDROBE SHIPPING"
+          },
+          {
+            "code": "30035",
+            "name": "CLEAN & DYE"
+          },
+          {
+            "code": "30048",
+            "name": "LOSS & DAMAGE"
+          },
+          {
+            "code": "30075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "30077",
+            "name": "KIT RENTALS"
+          },
+          {
+            "code": "30078",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "30085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "30088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "30090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "30095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "30097",
+            "name": "WARDROBE:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "31000",
+        "name": "MAKEUP & HAIRDRESSING",
+        "accounts": [
+          {
+            "code": "31001",
+            "name": "KEY MAKEUP ARTIST"
+          },
+          {
+            "code": "3100101",
+            "name": "OTHER KEY MAKEUP"
+          },
+          {
+            "code": "3100102",
+            "name": "OTHER KEY MAKEUP"
+          },
+          {
+            "code": "3100103",
+            "name": "OTHER KEY MAKEUP"
+          },
+          {
+            "code": "31002",
+            "name": "MAKEUP ARTISTS"
+          },
+          {
+            "code": "3100201",
+            "name": "MAKEUP ARTIST #1"
+          },
+          {
+            "code": "3100202",
+            "name": "MAKEUP ARTIST #2"
+          },
+          {
+            "code": "3100203",
+            "name": "MAKEUP ARTIST #3"
+          },
+          {
+            "code": "3100204",
+            "name": "MAKEUP ARTIST #4"
+          },
+          {
+            "code": "3100205",
+            "name": "MAKEUP ARTIST #5"
+          },
+          {
+            "code": "31003",
+            "name": "BODY MAKEUP ARTIST"
+          },
+          {
+            "code": "31004",
+            "name": "ADDITIONAL MAKEUP ARTISTS"
+          },
+          {
+            "code": "31005",
+            "name": "KEY PROSTHETIC MAKEUP ARTIST"
+          },
+          {
+            "code": "31006",
+            "name": "PROSTHETIC MAKEUP ARTIST"
+          },
+          {
+            "code": "31007",
+            "name": "ADDITIONAL PROSTHETIC MAKEUP"
+          },
+          {
+            "code": "31008",
+            "name": "KEY HAIRSTYLIST"
+          },
+          {
+            "code": "31009",
+            "name": "HAIRSTYLISTS"
+          },
+          {
+            "code": "31010",
+            "name": "ADDITIONAL HAIRSTYLIST"
+          },
+          {
+            "code": "31016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "31017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "31020",
+            "name": "LOCAL HIRE"
+          },
+          {
+            "code": "31048",
+            "name": "LOSS & DAMAGE"
+          },
+          {
+            "code": "31075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "31077",
+            "name": "KIT RENTALS"
+          },
+          {
+            "code": "31078",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "31085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "31088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "31090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "31097",
+            "name": "MAKEUP & HAIR:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "32000",
+        "name": "LIGHTING",
+        "accounts": [
+          {
+            "code": "32001",
+            "name": "LIGHTING DIRECTOR"
+          },
+          {
+            "code": "32002",
+            "name": "ASSISTANT LIGHTING DIRECTOR"
+          },
+          {
+            "code": "32003",
+            "name": "GAFFER"
+          },
+          {
+            "code": "32004",
+            "name": "BEST BOY"
+          },
+          {
+            "code": "32005",
+            "name": "ELECTRICIANS"
+          },
+          {
+            "code": "3200501",
+            "name": "ELECTRICIAN #1"
+          },
+          {
+            "code": "3200502",
+            "name": "ELECTRICIAN #2"
+          },
+          {
+            "code": "32006",
+            "name": "RIGGING/STRIKING ELECTRICIANS"
+          },
+          {
+            "code": "32007",
+            "name": "GENERATOR OPERATOR"
+          },
+          {
+            "code": "32008",
+            "name": "BOARD OPERATOR"
+          },
+          {
+            "code": "32009",
+            "name": "LAMPS/CARBONS/GELATINS"
+          },
+          {
+            "code": "32010",
+            "name": "RIGGING"
+          },
+          {
+            "code": "32011",
+            "name": "STRIKING"
+          },
+          {
+            "code": "32012",
+            "name": "GAS/OIL GENERATORS"
+          },
+          {
+            "code": "32013",
+            "name": "WORKLIGHTS/HOOKUP"
+          },
+          {
+            "code": "32014",
+            "name": "ELECTRIC CURRENT/TIE-INS"
+          },
+          {
+            "code": "32015",
+            "name": "LIFTS"
+          },
+          {
+            "code": "32016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "32017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "32048",
+            "name": "LOSS & DAMAGE"
+          },
+          {
+            "code": "32075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "32077",
+            "name": "KIT RENTALS"
+          },
+          {
+            "code": "32078",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "32085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "32088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "32090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "32097",
+            "name": "LIGHTING:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "33000",
+        "name": "CAMERA",
+        "accounts": [
+          {
+            "code": "33001",
+            "name": "DIRECTOR OF PHOTOGRAPHY"
+          },
+          {
+            "code": "33002",
+            "name": "CAMERA OPERATORS"
+          },
+          {
+            "code": "3300201",
+            "name": "CAMERA #1"
+          },
+          {
+            "code": "3300202",
+            "name": "CAMERA #2"
+          },
+          {
+            "code": "3300203",
+            "name": "CAMERA #3"
+          },
+          {
+            "code": "3300204",
+            "name": "CAMERA #4 HAND-HELD"
+          },
+          {
+            "code": "3300205",
+            "name": "CAMERA #5 JIB"
+          },
+          {
+            "code": "3300206",
+            "name": "CAMERA #6"
+          },
+          {
+            "code": "33003",
+            "name": "ADDITIONAL CAMERA OPERATORS"
+          },
+          {
+            "code": "3300301",
+            "name": "ADDITIONAL OPERATOR #1"
+          },
+          {
+            "code": "3300302",
+            "name": "ADDITIONAL OPERATOR #2"
+          },
+          {
+            "code": "3300303",
+            "name": "ADDITIONAL OPERATOR #3"
+          },
+          {
+            "code": "3300304",
+            "name": "ADDITIONAL OPERATOR #4"
+          },
+          {
+            "code": "33004",
+            "name": "LOADERS"
+          },
+          {
+            "code": "33005",
+            "name": "ADDITIONAL CAMERA CREW"
+          },
+          {
+            "code": "33006",
+            "name": "STEADICAM OPERATOR"
+          },
+          {
+            "code": "33007",
+            "name": "STEADICAM ASSISTANT"
+          },
+          {
+            "code": "33008",
+            "name": "STILLMAN"
+          },
+          {
+            "code": "33009",
+            "name": "1ST ASST CAMERA"
+          },
+          {
+            "code": "33010",
+            "name": "2ND ASST CAMERA"
+          },
+          {
+            "code": "33016",
+            "name": "CAMERA PURCHASES"
+          },
+          {
+            "code": "33017",
+            "name": "CAMERA RENTALS"
+          },
+          {
+            "code": "33018",
+            "name": "VTR SYSTEMS"
+          },
+          {
+            "code": "3301801",
+            "name": "VTR BETACAMERA PACKAGE"
+          },
+          {
+            "code": "33019",
+            "name": "TELEPROMPTER RENTAL"
+          },
+          {
+            "code": "33020",
+            "name": "2ND UNIT CAMERA CREW"
+          },
+          {
+            "code": "33021",
+            "name": "CAMERA TRAINEE"
+          },
+          {
+            "code": "33030",
+            "name": "VIDEO CAMERA OPERATORS"
+          },
+          {
+            "code": "3303001",
+            "name": "VIDEO CAMERA OPERATOR 1"
+          },
+          {
+            "code": "3303002",
+            "name": "VIDEO CAMERA OPERATOR 2"
+          },
+          {
+            "code": "3303003",
+            "name": "VIDEO CAMERA OPERATOR 3"
+          },
+          {
+            "code": "3303004",
+            "name": "VIDEO CAMERA OPERATOR 4"
+          },
+          {
+            "code": "3303005",
+            "name": "VIDEO CAMERA OPERATOR 5"
+          },
+          {
+            "code": "3303006",
+            "name": "VIDEO CAMERA OPERATOR 6"
+          },
+          {
+            "code": "33031",
+            "name": "VIDEO CONTROL"
+          },
+          {
+            "code": "33032",
+            "name": "TECHNICAL DIRECTOR"
+          },
+          {
+            "code": "33033",
+            "name": "VTR OPERATOR"
+          },
+          {
+            "code": "33034",
+            "name": "CAMERA UTILITY"
+          },
+          {
+            "code": "3303401",
+            "name": "CAMERA UTILITY 1"
+          },
+          {
+            "code": "3303402",
+            "name": "CAMERA UTILITY 2"
+          },
+          {
+            "code": "3303403",
+            "name": "CAMERA UTILITY 3"
+          },
+          {
+            "code": "3303404",
+            "name": "CAMERA UTILITY 4"
+          },
+          {
+            "code": "33035",
+            "name": "VIDEOTAPE STOCK"
+          },
+          {
+            "code": "33036",
+            "name": "TECHNICAL MEETING"
+          },
+          {
+            "code": "33037",
+            "name": "MAINTENANCE MAN"
+          },
+          {
+            "code": "33038",
+            "name": "VIDEO FAX PACKAGE"
+          },
+          {
+            "code": "33039",
+            "name": "QUAD SPLIT"
+          },
+          {
+            "code": "33040",
+            "name": "ESU"
+          },
+          {
+            "code": "33048",
+            "name": "LOSS & DAMAGE"
+          },
+          {
+            "code": "33075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "33077",
+            "name": "KIT RENTALS"
+          },
+          {
+            "code": "33078",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "33085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "33088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "33090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "33095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "33097",
+            "name": "CAMERA:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "34000",
+        "name": "PRODUCTION SOUND",
+        "accounts": [
+          {
+            "code": "34001",
+            "name": "MIXER"
+          },
+          {
+            "code": "34002",
+            "name": "PA MIXER"
+          },
+          {
+            "code": "34003",
+            "name": "CABLE MAN"
+          },
+          {
+            "code": "34004",
+            "name": "BOOM OPERATOR"
+          },
+          {
+            "code": "34005",
+            "name": "AUDIO PLAYBACK OPERATOR"
+          },
+          {
+            "code": "34006",
+            "name": "AUDIO PLAYBACK ASSITANT"
+          },
+          {
+            "code": "34007",
+            "name": "ADDITIONAL SOUND/AUDIO CREW"
+          },
+          {
+            "code": "34008",
+            "name": "A2"
+          },
+          {
+            "code": "3400801",
+            "name": "A2 #1"
+          },
+          {
+            "code": "3400802",
+            "name": "A2 #2"
+          },
+          {
+            "code": "34010",
+            "name": "TRANSFER COSTS"
+          },
+          {
+            "code": "34016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "34017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "34018",
+            "name": "OTHER EQUIPMENT"
+          },
+          {
+            "code": "34048",
+            "name": "LOSS & DAMAGE"
+          },
+          {
+            "code": "34075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "34077",
+            "name": "KIT RENTALS"
+          },
+          {
+            "code": "34078",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "34085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "34088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "34090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "34095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "34097",
+            "name": "PRODUCTION SOUND:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "35000",
+        "name": "TRUCKING/TRANSPORATION",
+        "accounts": [
+          {
+            "code": "35001",
+            "name": "TRANSPORTATION COORDINATOR"
+          },
+          {
+            "code": "35002",
+            "name": "TRANSPORTATION CAPTAIN"
+          },
+          {
+            "code": "35003",
+            "name": "SET TRANSPORTATION"
+          },
+          {
+            "code": "35004",
+            "name": "DRIVERS"
+          },
+          {
+            "code": "35005",
+            "name": "LOCAL HIRE DRIVERS"
+          },
+          {
+            "code": "35006",
+            "name": "PRODUCTION VAN"
+          },
+          {
+            "code": "35007",
+            "name": "PASSENGER VAN"
+          },
+          {
+            "code": "35008",
+            "name": "STAR TRAILERS"
+          },
+          {
+            "code": "35009",
+            "name": "SET CONSTRUCTION"
+          },
+          {
+            "code": "35010",
+            "name": "SET OPERATORS"
+          },
+          {
+            "code": "35011",
+            "name": "SPECIAL EFFECTS"
+          },
+          {
+            "code": "35012",
+            "name": "SET DRESSING"
+          },
+          {
+            "code": "35013",
+            "name": "PROPERTY"
+          },
+          {
+            "code": "35014",
+            "name": "WARDROBE"
+          },
+          {
+            "code": "35015",
+            "name": "MAKEUP/HAIR"
+          },
+          {
+            "code": "35016",
+            "name": "LIGHTING"
+          },
+          {
+            "code": "35017",
+            "name": "CAMERA"
+          },
+          {
+            "code": "35018",
+            "name": "SOUND"
+          },
+          {
+            "code": "35019",
+            "name": "HONEYWAGONS"
+          },
+          {
+            "code": "35020",
+            "name": "CREW BUSES"
+          },
+          {
+            "code": "35021",
+            "name": "SCHOOL ROOMS"
+          },
+          {
+            "code": "35022",
+            "name": "CAMERA CARS"
+          },
+          {
+            "code": "35023",
+            "name": "VEHICLE TRANSPORT CARRIER"
+          },
+          {
+            "code": "35024",
+            "name": "WATER TRUCK"
+          },
+          {
+            "code": "35025",
+            "name": "MISC VEHICLE/EQUIPMENT"
+          },
+          {
+            "code": "35026",
+            "name": "VEHICLE PERMITS"
+          },
+          {
+            "code": "35027",
+            "name": "PARKING"
+          },
+          {
+            "code": "35028",
+            "name": "MILEAGE"
+          },
+          {
+            "code": "35029",
+            "name": "LIMOUSINE/TAXIS"
+          },
+          {
+            "code": "35030",
+            "name": "DRIVER MEAL ALLOWANCE"
+          },
+          {
+            "code": "35031",
+            "name": "MESSENGERS"
+          },
+          {
+            "code": "35032",
+            "name": "D.O.T. FILINGS"
+          },
+          {
+            "code": "35041",
+            "name": "PICTURE VEHICLES"
+          },
+          {
+            "code": "35042",
+            "name": "OUTSIDE EQUIPMENT"
+          },
+          {
+            "code": "35043",
+            "name": "LOCATION EQUIPMENT"
+          },
+          {
+            "code": "35044",
+            "name": "GAS & OIL"
+          },
+          {
+            "code": "35045",
+            "name": "REPAIRS/MAINTENANCE"
+          },
+          {
+            "code": "35046",
+            "name": "TOLLS/FERRY"
+          },
+          {
+            "code": "35048",
+            "name": "LOSS & DAMAGE"
+          },
+          {
+            "code": "35075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "35077",
+            "name": "KIT RENTALS"
+          },
+          {
+            "code": "35078",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "35085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "35088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "35090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "35095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "35097",
+            "name": "TRANSPORTATION:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "37000",
+        "name": "FILM & LABORATORY",
+        "accounts": [
+          {
+            "code": "37002",
+            "name": "FILM STOCK"
+          },
+          {
+            "code": "37003",
+            "name": "DEVELOP"
+          },
+          {
+            "code": "37004",
+            "name": "PRINT"
+          },
+          {
+            "code": "37005",
+            "name": "PRINT ONE-LITE DAILIES"
+          },
+          {
+            "code": "37006",
+            "name": "COLOR CORRECTED DAILIES"
+          },
+          {
+            "code": "37028",
+            "name": "PROCESS PRINTS"
+          },
+          {
+            "code": "37029",
+            "name": "STILLS/LAB"
+          },
+          {
+            "code": "37035",
+            "name": "SOUND TRANSFERS:DAILIES"
+          },
+          {
+            "code": "37085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "37090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "37095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "37097",
+            "name": "FILM & LABORATORY:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "38000",
+        "name": "VIDEOTAPE",
+        "accounts": [
+          {
+            "code": "38008",
+            "name": "TECHNICAL DIRECTOR"
+          },
+          {
+            "code": "38009",
+            "name": "VIDEO CONTROL OPERATOR"
+          },
+          {
+            "code": "38010",
+            "name": "VTR RECORDING OPERATOR"
+          },
+          {
+            "code": "38016",
+            "name": "CHYRON"
+          },
+          {
+            "code": "38017",
+            "name": "CUE CARDS"
+          },
+          {
+            "code": "38018",
+            "name": "TELEPROMPTER"
+          },
+          {
+            "code": "38046",
+            "name": "TECHNICAL CREW"
+          },
+          {
+            "code": "3804601",
+            "name": "TECHNICAL CREW"
+          },
+          {
+            "code": "3804602",
+            "name": "TECHNICAL CREW"
+          },
+          {
+            "code": "38086",
+            "name": "SATELLITE/UPLINK CHARGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "40000",
+        "name": "SECOND UNIT",
+        "accounts": [
+          {
+            "code": "40012",
+            "name": "PRODUCER"
+          },
+          {
+            "code": "4001202",
+            "name": "PRODUCER"
+          },
+          {
+            "code": "4001205",
+            "name": "ASSOCIATE PRODUCER"
+          },
+          {
+            "code": "40013",
+            "name": "DIRECTOR"
+          },
+          {
+            "code": "4001305",
+            "name": "PRODUCTION SUPERVISOR"
+          },
+          {
+            "code": "40014",
+            "name": "CAST"
+          },
+          {
+            "code": "4001403",
+            "name": "PRINCIPLE CAST"
+          },
+          {
+            "code": "4001405",
+            "name": "UNDER FIVES"
+          },
+          {
+            "code": "4001415",
+            "name": "STUNT PLAYERS"
+          },
+          {
+            "code": "4001423",
+            "name": "CASTING FEES"
+          },
+          {
+            "code": "40015",
+            "name": "TRAVEL&LODGING"
+          },
+          {
+            "code": "4001520",
+            "name": "AIRFARE"
+          },
+          {
+            "code": "4001530",
+            "name": "PER DIEMS:PRODUCER"
+          },
+          {
+            "code": "4001540",
+            "name": "BUSINESS MEALS"
+          },
+          {
+            "code": "4001550",
+            "name": "LODGING:PRODUCER"
+          },
+          {
+            "code": "4001551",
+            "name": "LODGING:ASSOCIATE PRODUCER"
+          },
+          {
+            "code": "4001552",
+            "name": "LODGING:ASSOCIATE PRODUCER"
+          },
+          {
+            "code": "4001553",
+            "name": "LODGING:CREW"
+          },
+          {
+            "code": "40016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "40017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "40020",
+            "name": "PRODUCTION STAFF"
+          },
+          {
+            "code": "4002012",
+            "name": "PRODUCTION COORDINATOR"
+          },
+          {
+            "code": "4002041",
+            "name": "PRODUCTION ASSISTANTS"
+          },
+          {
+            "code": "40021",
+            "name": "EXTRA TALENT"
+          },
+          {
+            "code": "40022",
+            "name": "SET DESIGN"
+          },
+          {
+            "code": "4002213",
+            "name": "GRAPHICS"
+          },
+          {
+            "code": "40023",
+            "name": "SET CONSTRUCTION"
+          },
+          {
+            "code": "40024",
+            "name": "SET STRIKING"
+          },
+          {
+            "code": "40025",
+            "name": "SET OPERATIONS"
+          },
+          {
+            "code": "4002501",
+            "name": "KEY GRIP"
+          },
+          {
+            "code": "4002502",
+            "name": "GRIP"
+          },
+          {
+            "code": "4002503",
+            "name": "GRIP"
+          },
+          {
+            "code": "4002512",
+            "name": "SECURITY"
+          },
+          {
+            "code": "4002517",
+            "name": "RENTALS"
+          },
+          {
+            "code": "40026",
+            "name": "SPECIAL EFFECTS"
+          },
+          {
+            "code": "40027",
+            "name": "SET DRESSING"
+          },
+          {
+            "code": "40028",
+            "name": "PROPS"
+          },
+          {
+            "code": "4002801",
+            "name": "PROPMASTER"
+          },
+          {
+            "code": "40029",
+            "name": "ACTION PROPS/ANIMALS/VEHICLE"
+          },
+          {
+            "code": "4002905",
+            "name": "AUTOMOBILE PROPS/FX"
+          },
+          {
+            "code": "40030",
+            "name": "WARDROBE"
+          },
+          {
+            "code": "4003001",
+            "name": "COSTUME DESIGNER"
+          },
+          {
+            "code": "4003016",
+            "name": "WARDROBE PURCHASES"
+          },
+          {
+            "code": "40031",
+            "name": "MAKEUP/HAIR"
+          },
+          {
+            "code": "4003101",
+            "name": "MAKEUP/HAIR ARTISTS"
+          },
+          {
+            "code": "4003116",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "40032",
+            "name": "LIGHTING"
+          },
+          {
+            "code": "4003203",
+            "name": "GAFFER"
+          },
+          {
+            "code": "4003205",
+            "name": "ELECTRICIAN"
+          },
+          {
+            "code": "40033",
+            "name": "CAMERA"
+          },
+          {
+            "code": "4003301",
+            "name": "DIRECTOR OF PHOTOGRAPHY"
+          },
+          {
+            "code": "4003315",
+            "name": "EXPENDABLES"
+          },
+          {
+            "code": "4003317",
+            "name": "CAMERA RENTAL"
+          },
+          {
+            "code": "4003318",
+            "name": "VIDEO CAMERA RENTAL"
+          },
+          {
+            "code": "4003319",
+            "name": "DOLLY"
+          },
+          {
+            "code": "4003330",
+            "name": "VIDEO CAMERA OPERATOR"
+          },
+          {
+            "code": "4003334",
+            "name": "CAMERA ASSISTANT"
+          },
+          {
+            "code": "4003335",
+            "name": "VIDEOTAPE STOCK"
+          },
+          {
+            "code": "40034",
+            "name": "PRODUCTION SOUND"
+          },
+          {
+            "code": "4003401",
+            "name": "MIXER"
+          },
+          {
+            "code": "4003407",
+            "name": "ADDITIONAL SOUND CREW"
+          },
+          {
+            "code": "4003417",
+            "name": "SOUND EQUIPMENT RENTAL"
+          },
+          {
+            "code": "40035",
+            "name": "TRANSPORTATION"
+          },
+          {
+            "code": "4003519",
+            "name": "HONEYWAGON"
+          },
+          {
+            "code": "4003532",
+            "name": "VAN RENTAL"
+          },
+          {
+            "code": "4003536",
+            "name": "AUTO RENTAL"
+          },
+          {
+            "code": "4003540",
+            "name": "AUTO RENTAL"
+          },
+          {
+            "code": "4003544",
+            "name": "GENERATOR"
+          },
+          {
+            "code": "4003545",
+            "name": "MILEAGE GAS OIL"
+          },
+          {
+            "code": "40036",
+            "name": "LOCATION"
+          },
+          {
+            "code": "4003601",
+            "name": "LOCATION MANAGER"
+          },
+          {
+            "code": "4003610",
+            "name": "TELEPHONE"
+          },
+          {
+            "code": "4003617",
+            "name": "LOCATION FEES AND PERMITS"
+          },
+          {
+            "code": "4003620",
+            "name": "GRATUITIES"
+          },
+          {
+            "code": "4003675",
+            "name": "MISCELLANEOUS COSTS"
+          },
+          {
+            "code": "40037",
+            "name": "PRODUCTION FILM & LAB"
+          },
+          {
+            "code": "4003702",
+            "name": "FILM STOCK"
+          },
+          {
+            "code": "4003703",
+            "name": "FILM PROCESSING"
+          },
+          {
+            "code": "40038",
+            "name": "LIVE & TAPE PRODUCTION"
+          },
+          {
+            "code": "40039",
+            "name": "LABOR"
+          },
+          {
+            "code": "40040",
+            "name": "SHOP MATERIALS"
+          },
+          {
+            "code": "40041",
+            "name": "TOOLS & EQUIPMENT"
+          },
+          {
+            "code": "40042",
+            "name": "FABRICATION"
+          },
+          {
+            "code": "40043",
+            "name": "RIGGING & STRIKING"
+          },
+          {
+            "code": "40044",
+            "name": "TESTS"
+          },
+          {
+            "code": "40045",
+            "name": "EDITORIAL"
+          },
+          {
+            "code": "4004505",
+            "name": "ADDITIONAL EDITING STAFF"
+          },
+          {
+            "code": "4004531",
+            "name": "ON-LINE"
+          },
+          {
+            "code": "4004536",
+            "name": "SCENE-TO-SCENE TRANSFER"
+          },
+          {
+            "code": "4004537",
+            "name": "AUDIO TRANSFER AND SYNC"
+          },
+          {
+            "code": "4004548",
+            "name": "STOCK FOOTAGE"
+          },
+          {
+            "code": "4004550",
+            "name": "DIGITAL FRAME STORE"
+          },
+          {
+            "code": "40047",
+            "name": "INSURANCE"
+          },
+          {
+            "code": "40048",
+            "name": "LOSS & DAMAGE"
+          },
+          {
+            "code": "40049",
+            "name": "LOCATION MEALS/HOTEL/AIRFARE"
+          },
+          {
+            "code": "40050",
+            "name": "VIDEO MONITOR"
+          },
+          {
+            "code": "40051",
+            "name": "POST PRODUCTION"
+          },
+          {
+            "code": "40075",
+            "name": "SHUTDOWN COST"
+          },
+          {
+            "code": "40088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "40095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "40097",
+            "name": "2ND UNIT:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "41000",
+        "name": "TESTS",
+        "accounts": [
+          {
+            "code": "41001",
+            "name": "OPERATING LABOR"
+          },
+          {
+            "code": "41014",
+            "name": "NEG FILM & LAB"
+          },
+          {
+            "code": "41015",
+            "name": "SOUND TAPE & TRANSFER"
+          },
+          {
+            "code": "41016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "41017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "41025",
+            "name": "STILL NEG & PRINTS"
+          },
+          {
+            "code": "41035",
+            "name": "DRIVERS"
+          },
+          {
+            "code": "41041",
+            "name": "TALENT TESTS"
+          },
+          {
+            "code": "41042",
+            "name": "PROGRAM TESTS"
+          },
+          {
+            "code": "41077",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "41078",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "41085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "41090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "41095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "41097",
+            "name": "TESTS:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "42000",
+        "name": "STUDIO CHARGES",
+        "accounts": [
+          {
+            "code": "42002",
+            "name": "STAGE RENTALS"
+          },
+          {
+            "code": "42003",
+            "name": "STAGE TECH EQUIPMENT"
+          },
+          {
+            "code": "42010",
+            "name": "FACILITIES PACKAGE PRICE"
+          },
+          {
+            "code": "42011",
+            "name": "FACILITIES & EQUIPMENT"
+          },
+          {
+            "code": "42012",
+            "name": "FACILITIES LABOR"
+          },
+          {
+            "code": "42013",
+            "name": "LOCATION FACILITIES & LABOR"
+          },
+          {
+            "code": "42016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "42017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "42018",
+            "name": "OFFICE RELOCATION LABOR"
+          },
+          {
+            "code": "42019",
+            "name": "OFFICE SPACE"
+          },
+          {
+            "code": "42020",
+            "name": "STORAGE SPACE"
+          },
+          {
+            "code": "42021",
+            "name": "STOCK SCENERY LABOR"
+          },
+          {
+            "code": "42022",
+            "name": "OFFICE SERVICE"
+          },
+          {
+            "code": "42025",
+            "name": "FIRST AID/NURSE"
+          },
+          {
+            "code": "42026",
+            "name": "UTILITIES"
+          },
+          {
+            "code": "42050",
+            "name": "TRASH REMOVAL"
+          },
+          {
+            "code": "42085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "42086",
+            "name": "OTHER FACILITIES RENTAL/LABOR"
+          },
+          {
+            "code": "42088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "42090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "42097",
+            "name": "STUDIO CHARGES:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "43000",
+        "name": "FRINGE BENEFITS:POST PRODUCTION"
+      },
+      {
+        "kind": "production_total",
+        "name": "Total production"
+      },
+      {
+        "kind": "category",
+        "code": "45000",
+        "name": "EDITORIAL",
+        "accounts": [
+          {
+            "code": "45001",
+            "name": "EDITOR"
+          },
+          {
+            "code": "45002",
+            "name": "1ST ASSISTANT EDITOR"
+          },
+          {
+            "code": "45003",
+            "name": "2ND ASSISTANT EDITOR"
+          },
+          {
+            "code": "45004",
+            "name": "APPRENTICE EDITORS"
+          },
+          {
+            "code": "45005",
+            "name": "ADDITIONAL EDITING STAFF"
+          },
+          {
+            "code": "45006",
+            "name": "POST PRODUCTION SUPERVISOR"
+          },
+          {
+            "code": "4500601",
+            "name": "POST PRODUCTION SUPERVISOR"
+          },
+          {
+            "code": "4500602",
+            "name": "POST PRODUCTION ASSISTANT"
+          },
+          {
+            "code": "45007",
+            "name": "POST PRODUCTION ASSISTANTS"
+          },
+          {
+            "code": "45008",
+            "name": "EDIT CONTENT SUPERVISORS"
+          },
+          {
+            "code": "45009",
+            "name": "CODING"
+          },
+          {
+            "code": "45010",
+            "name": "PROJECTION"
+          },
+          {
+            "code": "45011",
+            "name": "MUSIC/SOUND FX PURCHASE"
+          },
+          {
+            "code": "45012",
+            "name": "NEGATIVE CUTTER"
+          },
+          {
+            "code": "45013",
+            "name": "CUTTING ROOM EQUIPMENT"
+          },
+          {
+            "code": "45014",
+            "name": "OTHER SUPERVISION"
+          },
+          {
+            "code": "45015",
+            "name": "ROOM & EQUIPMENT RENTALS"
+          },
+          {
+            "code": "45016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "45017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "45018",
+            "name": "EDITORIAL SUPERVISION"
+          },
+          {
+            "code": "45019",
+            "name": "TRAILER INTERGRATION/EDIT"
+          },
+          {
+            "code": "45031",
+            "name": "OFF-LINE EDITING"
+          },
+          {
+            "code": "45032",
+            "name": "ON-LINE EDITING"
+          },
+          {
+            "code": "45033",
+            "name": "SWEETENING"
+          },
+          {
+            "code": "4503301",
+            "name": "SWEETENING"
+          },
+          {
+            "code": "4503310",
+            "name": "VOICE OVER"
+          },
+          {
+            "code": "45034",
+            "name": "LAUGH TRACK"
+          },
+          {
+            "code": "45035",
+            "name": "MAIN & END TITLES"
+          },
+          {
+            "code": "4503511",
+            "name": "CATERING"
+          },
+          {
+            "code": "45036",
+            "name": "FILM TO TAPE TRANSFERS"
+          },
+          {
+            "code": "45037",
+            "name": "TAPE TO TAPE TRANSFERS"
+          },
+          {
+            "code": "45038",
+            "name": "TAPE DUPLICATION"
+          },
+          {
+            "code": "45039",
+            "name": "EDITED MASTERS"
+          },
+          {
+            "code": "45040",
+            "name": "CONVERSIONS"
+          },
+          {
+            "code": "45041",
+            "name": "VIEWING CASSETTES"
+          },
+          {
+            "code": "45042",
+            "name": "SLIDE TO TAPE TRANSFER"
+          },
+          {
+            "code": "45043",
+            "name": "SCREENING EQUIPMENT RENTAL"
+          },
+          {
+            "code": "45045",
+            "name": "DUBBING"
+          },
+          {
+            "code": "45049",
+            "name": "VIDEO EDITING PACKAGE"
+          },
+          {
+            "code": "45050",
+            "name": "TAPE EDIT:OFF-LINE"
+          },
+          {
+            "code": "45051",
+            "name": "TAPE EDIT:ON-LINE"
+          },
+          {
+            "code": "4505101",
+            "name": "TAPE EDIT"
+          },
+          {
+            "code": "4505102",
+            "name": "TAPE EDIT"
+          },
+          {
+            "code": "4505103",
+            "name": "TAPE EDIT"
+          },
+          {
+            "code": "4505104",
+            "name": "TAPE EDIT"
+          },
+          {
+            "code": "4505105",
+            "name": "TAPE EDIT"
+          },
+          {
+            "code": "4505106",
+            "name": "TAPE EDIT"
+          },
+          {
+            "code": "45052",
+            "name": "CHYRON"
+          },
+          {
+            "code": "45053",
+            "name": "ADO"
+          },
+          {
+            "code": "45054",
+            "name": "PAINT BOX"
+          },
+          {
+            "code": "45055",
+            "name": "ULTIMATTE"
+          },
+          {
+            "code": "45056",
+            "name": "ADDITIONAL EFFECTS"
+          },
+          {
+            "code": "45057",
+            "name": "TELECINE"
+          },
+          {
+            "code": "45059",
+            "name": "TELECINE FINAL (COLOR CORR)"
+          },
+          {
+            "code": "45060",
+            "name": "TELECINE XFER FILM PRINT"
+          },
+          {
+            "code": "45061",
+            "name": "AUDIO SYNCHRONIZE"
+          },
+          {
+            "code": "45062",
+            "name": "MUSIC EDITOR"
+          },
+          {
+            "code": "45063",
+            "name": "VIDEO/AUDIO TAPE STOCK"
+          },
+          {
+            "code": "4506301",
+            "name": "EDITORIAL TAPE STOCK"
+          },
+          {
+            "code": "4506302",
+            "name": "EDITORIAL TAPE STOCK"
+          },
+          {
+            "code": "4506303",
+            "name": "EDITORIAL TAPE STOCK"
+          },
+          {
+            "code": "45064",
+            "name": "CLOSE CAPTIONING"
+          },
+          {
+            "code": "45065",
+            "name": "DUB:AIRMASTER"
+          },
+          {
+            "code": "45066",
+            "name": "DUB:PROTECTION"
+          },
+          {
+            "code": "45067",
+            "name": "DUB:WORK TAPES"
+          },
+          {
+            "code": "45068",
+            "name": "DUB:VIEWING TAPES"
+          },
+          {
+            "code": "45069",
+            "name": "DUB:NETWORK COPIES"
+          },
+          {
+            "code": "45070",
+            "name": "FOREIGN TEXTLESS PLATES"
+          },
+          {
+            "code": "45073",
+            "name": "SOUND LIBRARIAN"
+          },
+          {
+            "code": "45074",
+            "name": "FILM LIBRARIAN"
+          },
+          {
+            "code": "45075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "45084",
+            "name": "STOCK FOOTAGE"
+          },
+          {
+            "code": "45085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "45086",
+            "name": "PROJECTION ROOMS"
+          },
+          {
+            "code": "45088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "45090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "45094",
+            "name": "MEALS"
+          },
+          {
+            "code": "45095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "45097",
+            "name": "FILM EDITING:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "46000",
+        "name": "MUSIC",
+        "accounts": [
+          {
+            "code": "46001",
+            "name": "MUSICIANS"
+          },
+          {
+            "code": "46002",
+            "name": "COMPOSERS/LYRICISTS"
+          },
+          {
+            "code": "46003",
+            "name": "ARRANGERS/ORCHESTRATORS"
+          },
+          {
+            "code": "46004",
+            "name": "COPYISTS"
+          },
+          {
+            "code": "46005",
+            "name": "MUSIC SUPERVISOR"
+          },
+          {
+            "code": "46006",
+            "name": "MUSIC COORDINATOR"
+          },
+          {
+            "code": "46007",
+            "name": "MUSIC ASSISTANTS"
+          },
+          {
+            "code": "46008",
+            "name": "SINGERS/VOCALISTS"
+          },
+          {
+            "code": "46009",
+            "name": "OTHER LABOR"
+          },
+          {
+            "code": "46010",
+            "name": "THEME SINGERS"
+          },
+          {
+            "code": "46011",
+            "name": "PRE-SCORE:MUSICIANS"
+          },
+          {
+            "code": "46012",
+            "name": "SCORING:MUSICIANS"
+          },
+          {
+            "code": "46013",
+            "name": "MUSIC ROYALTIES"
+          },
+          {
+            "code": "46014",
+            "name": "DIRECTOR/CONDUCTOR"
+          },
+          {
+            "code": "46015",
+            "name": "SCORING CREW & FACILITIES"
+          },
+          {
+            "code": "46016",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "46017",
+            "name": "RENTALS"
+          },
+          {
+            "code": "46018",
+            "name": "SONG PURCHASE"
+          },
+          {
+            "code": "46019",
+            "name": "ALBUM MASTERING"
+          },
+          {
+            "code": "46020",
+            "name": "ON-CAMERA MUSIC"
+          },
+          {
+            "code": "46025",
+            "name": "STUDIOS/ENGINEERS/SUPPLIES"
+          },
+          {
+            "code": "46040",
+            "name": "RECORDING STOCK & MATERIALS"
+          },
+          {
+            "code": "46046",
+            "name": "MUSIC RIGHTS & CLEARANCES"
+          },
+          {
+            "code": "46047",
+            "name": "INSTRUMENT RENTALS"
+          },
+          {
+            "code": "46048",
+            "name": "LOSS & DAMAGE"
+          },
+          {
+            "code": "46049",
+            "name": "CARTAGE"
+          },
+          {
+            "code": "46060",
+            "name": "AFM PH&W"
+          },
+          {
+            "code": "46065",
+            "name": "CD'S/TAPES"
+          },
+          {
+            "code": "46066",
+            "name": "ALBUM DEVELOPMENT"
+          },
+          {
+            "code": "46080",
+            "name": "NEW MUSIC USE"
+          },
+          {
+            "code": "46085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "46090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "46095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "46097",
+            "name": "MUSIC:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "49000",
+        "name": "MAIN & END TITLES",
+        "accounts": [
+          {
+            "code": "49001",
+            "name": "MAIN & END TITLES"
+          },
+          {
+            "code": "49002",
+            "name": "OPENING & END CREDITS"
+          },
+          {
+            "code": "49003",
+            "name": "FORMAT"
+          },
+          {
+            "code": "49004",
+            "name": "ARTWORK"
+          },
+          {
+            "code": "49005",
+            "name": "OPTICALS"
+          },
+          {
+            "code": "49006",
+            "name": "SUB-TITLES"
+          },
+          {
+            "code": "49085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "49090",
+            "name": "DEVELOPMENT CHARGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "52000",
+        "name": "FRINGE BENEFITS & P/R TAXES"
+      },
+      {
+        "kind": "production_total",
+        "name": "Total post"
+      },
+      {
+        "kind": "category",
+        "code": "65000",
+        "name": "PROMOTIONS",
+        "accounts": [
+          {
+            "code": "65045",
+            "name": "PROMOTIONS"
+          },
+          {
+            "code": "6504501",
+            "name": "PROMOTION PRODUCER"
+          },
+          {
+            "code": "6504502",
+            "name": "PROMOTION ASSISTANT"
+          },
+          {
+            "code": "65082",
+            "name": "PROMOTIONAL ITEMS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "67000",
+        "name": "INSURANCE",
+        "accounts": [
+          {
+            "code": "67001",
+            "name": "CAST INSURANCE"
+          },
+          {
+            "code": "67002",
+            "name": "NEGATIVE INSURANCE"
+          },
+          {
+            "code": "67003",
+            "name": "ERRORS & OMMISSIONS"
+          },
+          {
+            "code": "67004",
+            "name": "PROPERTY FLOATER"
+          },
+          {
+            "code": "67005",
+            "name": "OTHER INSURANCE"
+          },
+          {
+            "code": "67006",
+            "name": "FAULTY STOCK INSURANCE"
+          },
+          {
+            "code": "67007",
+            "name": "CONSOLIDATED INSURANCE"
+          },
+          {
+            "code": "67008",
+            "name": "GENERAL LIABILITY INSURANCE"
+          },
+          {
+            "code": "67009",
+            "name": "INSURANCE RECOVERIES"
+          },
+          {
+            "code": "67010",
+            "name": "INSURANCE CLAIM COSTS"
+          },
+          {
+            "code": "67011",
+            "name": "WORKER'S COMP INSURANCE"
+          },
+          {
+            "code": "67012",
+            "name": "AUTO LIABILITY"
+          },
+          {
+            "code": "67013",
+            "name": "GUILD LIABILITY"
+          },
+          {
+            "code": "67014",
+            "name": "CAST EXAMS"
+          },
+          {
+            "code": "67085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "67095",
+            "name": "STUDIO CHARGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "68000",
+        "name": "OTHER DIRECT COSTS",
+        "accounts": [
+          {
+            "code": "68001",
+            "name": "TELEPHONE"
+          },
+          {
+            "code": "6800101",
+            "name": "CELLULAR PHONES"
+          },
+          {
+            "code": "6800102",
+            "name": "PAGERS"
+          },
+          {
+            "code": "6800103",
+            "name": "TELEPHONE"
+          },
+          {
+            "code": "6800104",
+            "name": "TELEPHONE"
+          },
+          {
+            "code": "6800105",
+            "name": "TELEPHONE"
+          },
+          {
+            "code": "6800106",
+            "name": "TELEPHONE"
+          },
+          {
+            "code": "6800107",
+            "name": "TELEPHONE"
+          },
+          {
+            "code": "68002",
+            "name": "TOUR EXPENSE"
+          },
+          {
+            "code": "68003",
+            "name": "XEROX/PRINTING"
+          },
+          {
+            "code": "6800301",
+            "name": "XEROX/PRINTING"
+          },
+          {
+            "code": "6800302",
+            "name": "XEROX/PRINTING"
+          },
+          {
+            "code": "68004",
+            "name": "CITY LICENSE"
+          },
+          {
+            "code": "68005",
+            "name": "SALES TAX"
+          },
+          {
+            "code": "68006",
+            "name": "LOCAL MEALS"
+          },
+          {
+            "code": "68007",
+            "name": "FACILITY SALES TAX"
+          },
+          {
+            "code": "68008",
+            "name": "POSTAGE"
+          },
+          {
+            "code": "68010",
+            "name": "EXECUTIVE ENTERTAINMENT"
+          },
+          {
+            "code": "68011",
+            "name": "OFFICE RENT-DEVELOPMENT"
+          },
+          {
+            "code": "6801101",
+            "name": "OFFICE RENT-DEVELOPMENT"
+          },
+          {
+            "code": "6801102",
+            "name": "OFFICE RENT-DEVELOPMENT"
+          },
+          {
+            "code": "68012",
+            "name": "OFFICE SUPPLIES"
+          },
+          {
+            "code": "6801201",
+            "name": "OFFICE SUPPLIES"
+          },
+          {
+            "code": "6801202",
+            "name": "OFFICE SUPPLIES"
+          },
+          {
+            "code": "68013",
+            "name": "OFFICE WATER"
+          },
+          {
+            "code": "68014",
+            "name": "OFFICE FOOD"
+          },
+          {
+            "code": "68015",
+            "name": "OFFICE COFFEE SERVICE"
+          },
+          {
+            "code": "68016",
+            "name": "WORD PROCESSING CHARGES"
+          },
+          {
+            "code": "68017",
+            "name": "DUES/SUBSCRIPTIONS"
+          },
+          {
+            "code": "68018",
+            "name": "TELEPHONE INSTALLATION"
+          },
+          {
+            "code": "68019",
+            "name": "OFFICE EQUIPMENT"
+          },
+          {
+            "code": "68020",
+            "name": "TELEX"
+          },
+          {
+            "code": "68023",
+            "name": "DATA PROCESSING SERVICE"
+          },
+          {
+            "code": "68024",
+            "name": "OVERNIGHT SHIPPING"
+          },
+          {
+            "code": "68025",
+            "name": "MESSENGER"
+          },
+          {
+            "code": "68026",
+            "name": "MILEAGE"
+          },
+          {
+            "code": "68027",
+            "name": "SUNDRIES"
+          },
+          {
+            "code": "68028",
+            "name": "TYPEWRITER RENTAL"
+          },
+          {
+            "code": "68029",
+            "name": "LEGAL FEES"
+          },
+          {
+            "code": "68030",
+            "name": "CART STAFF"
+          },
+          {
+            "code": "68031",
+            "name": "PARKING"
+          },
+          {
+            "code": "68032",
+            "name": "SECURITY"
+          },
+          {
+            "code": "68033",
+            "name": "VAULT STORAGE"
+          },
+          {
+            "code": "68034",
+            "name": "OFFICE EQUIPMENT RENTALS"
+          },
+          {
+            "code": "68035",
+            "name": "MISC TRANSPORTATION"
+          },
+          {
+            "code": "68036",
+            "name": "MISC TRANSPORTATION LABOR"
+          },
+          {
+            "code": "68037",
+            "name": "RECRUITING FEES"
+          },
+          {
+            "code": "68038",
+            "name": "OUTSIDE TEMPS"
+          },
+          {
+            "code": "68039",
+            "name": "CORP SERVICE CHARGES"
+          },
+          {
+            "code": "68040",
+            "name": "ROYALTIES"
+          },
+          {
+            "code": "68043",
+            "name": "POST PRODUCTION ACCOUNTING"
+          },
+          {
+            "code": "68044",
+            "name": "ACCOUNTING & AUDITING"
+          },
+          {
+            "code": "6804401",
+            "name": "ACCOUNTING LABOR"
+          },
+          {
+            "code": "6804402",
+            "name": "ACCOUNTING LABOR"
+          },
+          {
+            "code": "68047",
+            "name": "PUBLICITY PHOTO EXPENSE"
+          },
+          {
+            "code": "68048",
+            "name": "PRESS KIT EXPENSE"
+          },
+          {
+            "code": "68049",
+            "name": "ADVERTISING EXPENSE"
+          },
+          {
+            "code": "68050",
+            "name": "EXCHANGE RATE"
+          },
+          {
+            "code": "68052",
+            "name": "RECEPTIONIST"
+          },
+          {
+            "code": "68053",
+            "name": "SECRETARIES"
+          },
+          {
+            "code": "68056",
+            "name": "REPAIRS/MAINTENANCE"
+          },
+          {
+            "code": "68057",
+            "name": "APPLIANCES"
+          },
+          {
+            "code": "68058",
+            "name": "CASTING EXPENSES"
+          },
+          {
+            "code": "68059",
+            "name": "CASTING SERVICE FEES"
+          },
+          {
+            "code": "68060",
+            "name": "TEACHER/WELFARE WORKER"
+          },
+          {
+            "code": "68062",
+            "name": "RELOCATION EXPENSE"
+          },
+          {
+            "code": "68063",
+            "name": "CASTING RESEARCH"
+          },
+          {
+            "code": "68064",
+            "name": "GAS"
+          },
+          {
+            "code": "68065",
+            "name": "HOTELS"
+          },
+          {
+            "code": "68066",
+            "name": "PLANT MAINTENANCE"
+          },
+          {
+            "code": "68067",
+            "name": "COMPUTERS"
+          },
+          {
+            "code": "6806701",
+            "name": "COMPUTERS:HARDWARE PURCHASE"
+          },
+          {
+            "code": "6806702",
+            "name": "COMPUTERS:HARDWARE RENTAL"
+          },
+          {
+            "code": "6806703",
+            "name": "COMPUTERS:SOFTWARE PURCHASE"
+          },
+          {
+            "code": "6806704",
+            "name": "COMPUTERS:SOFTWARE RENTAL"
+          },
+          {
+            "code": "6806705",
+            "name": "COMPUTERS:SUPPLIES"
+          },
+          {
+            "code": "6806706",
+            "name": "COMPUTERS:KIT FEE"
+          },
+          {
+            "code": "6806707",
+            "name": "COMPUTERS:MAINTENANCE/REPAIR"
+          },
+          {
+            "code": "68068",
+            "name": "PUBLICITY"
+          },
+          {
+            "code": "68069",
+            "name": "RESEARCH MATERIALS"
+          },
+          {
+            "code": "6806901",
+            "name": "RESEARCH MATERIALS"
+          },
+          {
+            "code": "6806902",
+            "name": "RESEARCH MATERIALS"
+          },
+          {
+            "code": "68070",
+            "name": "EXECUTIVE FITNESS PROGRAM"
+          },
+          {
+            "code": "68071",
+            "name": "OFFICE FURNITURE"
+          },
+          {
+            "code": "68073",
+            "name": "GIFTS/FLOWERS"
+          },
+          {
+            "code": "68074",
+            "name": "WRAP PARTY/OTHER EVENTS"
+          },
+          {
+            "code": "68075",
+            "name": "SHUTDOWN COSTS"
+          },
+          {
+            "code": "68076",
+            "name": "FREIGHT & CUSTOMS"
+          },
+          {
+            "code": "68079",
+            "name": "SCOUTING COSTS"
+          },
+          {
+            "code": "68080",
+            "name": "EMPLOYEE TALENT SHOWS"
+          },
+          {
+            "code": "68083",
+            "name": "OUTSIDE PAYROLL SERVICES"
+          },
+          {
+            "code": "68084",
+            "name": "AMPTP CHARGES"
+          },
+          {
+            "code": "68085",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "68086",
+            "name": "PREVIEW EXPENSE"
+          },
+          {
+            "code": "68087",
+            "name": "GALLERY RENTAL"
+          },
+          {
+            "code": "68088",
+            "name": "OVERTIME"
+          },
+          {
+            "code": "68089",
+            "name": "DELIVERY EXPENSE"
+          },
+          {
+            "code": "68090",
+            "name": "DEVELOPMENT CHARGES"
+          },
+          {
+            "code": "68092",
+            "name": "MISCELLANEOUS"
+          },
+          {
+            "code": "68095",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "68097",
+            "name": "OTHER:TRAVEL&LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "75000",
+        "name": "REVENUE",
+        "accounts": [
+          {
+            "code": "75001",
+            "name": "REVENUE"
+          },
+          {
+            "code": "75002",
+            "name": "REVENUE"
+          },
+          {
+            "code": "75003",
+            "name": "REVENUE"
+          },
+          {
+            "code": "75004",
+            "name": "REVENUE"
+          },
+          {
+            "code": "75099",
+            "name": "REVENUE"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total other"
+      }
+    ]
+  }
+}

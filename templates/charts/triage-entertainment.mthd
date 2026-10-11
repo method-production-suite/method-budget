@@ -38,7 +38,7 @@
     "topsheet": [
       {
         "kind": "category",
-        "code": "11",
+        "code": "1100",
         "name": "SCRIPT",
         "accounts": [
           {
@@ -89,7 +89,7 @@
       },
       {
         "kind": "category",
-        "code": "12",
+        "code": "1200",
         "name": "PRODUCERS' UNIT",
         "accounts": [
           {
@@ -124,7 +124,7 @@
       },
       {
         "kind": "category",
-        "code": "13",
+        "code": "1300",
         "name": "DIRECTION",
         "accounts": [
           {
@@ -163,7 +163,7 @@
       },
       {
         "kind": "category",
-        "code": "14",
+        "code": "1400",
         "name": "CAST",
         "accounts": [
           {
@@ -222,7 +222,7 @@
       },
       {
         "kind": "category",
-        "code": "15",
+        "code": "1500",
         "name": "TRAVEL AND LIVING",
         "accounts": [
           {
@@ -265,7 +265,7 @@
       },
       {
         "kind": "category",
-        "code": "16",
+        "code": "1600",
         "name": "CLIP COSTS",
         "accounts": [
           {
@@ -304,7 +304,7 @@
       },
       {
         "kind": "category",
-        "code": "17",
+        "code": "1700",
         "name": "SEGMENT COSTS",
         "accounts": [
           {
@@ -467,7 +467,7 @@
       },
       {
         "kind": "category",
-        "code": "18",
+        "code": "1800",
         "name": "SHORT SEGMENT COSTS",
         "accounts": [
           {
@@ -522,7 +522,7 @@
       },
       {
         "kind": "category",
-        "code": "20",
+        "code": "2000",
         "name": "PRODUCTION STAFF",
         "accounts": [
           {
@@ -609,7 +609,7 @@
       },
       {
         "kind": "category",
-        "code": "21",
+        "code": "2100",
         "name": "EXTRA TALENT",
         "accounts": [
           {
@@ -644,7 +644,7 @@
       },
       {
         "kind": "category",
-        "code": "22",
+        "code": "2200",
         "name": "SET DESIGN",
         "accounts": [
           {
@@ -691,7 +691,7 @@
       },
       {
         "kind": "category",
-        "code": "23",
+        "code": "2300",
         "name": "SET CONSTRUCTION",
         "accounts": [
           {
@@ -782,7 +782,7 @@
       },
       {
         "kind": "category",
-        "code": "24",
+        "code": "2400",
         "name": "SET DRESSING",
         "accounts": [
           {
@@ -837,7 +837,7 @@
       },
       {
         "kind": "category",
-        "code": "25",
+        "code": "2500",
         "name": "PROPERTY",
         "accounts": [
           {
@@ -888,7 +888,7 @@
       },
       {
         "kind": "category",
-        "code": "26",
+        "code": "2600",
         "name": "SPECIAL EQUIPMENT AND ANIMALS",
         "accounts": [
           {
@@ -939,7 +939,7 @@
       },
       {
         "kind": "category",
-        "code": "27",
+        "code": "2700",
         "name": "WARDROBE",
         "accounts": [
           {
@@ -994,7 +994,7 @@
       },
       {
         "kind": "category",
-        "code": "28",
+        "code": "2800",
         "name": "MAKE-UP AND HAIR",
         "accounts": [
           {
@@ -1045,7 +1045,7 @@
       },
       {
         "kind": "category",
-        "code": "29",
+        "code": "2900",
         "name": "SET OPERATIONS",
         "accounts": [
           {
@@ -1140,7 +1140,7 @@
       },
       {
         "kind": "category",
-        "code": "30",
+        "code": "3000",
         "name": "ELECTRICAL",
         "accounts": [
           {
@@ -1203,7 +1203,7 @@
       },
       {
         "kind": "category",
-        "code": "31",
+        "code": "3100",
         "name": "CAMERA",
         "accounts": [
           {
@@ -1294,7 +1294,7 @@
       },
       {
         "kind": "category",
-        "code": "32",
+        "code": "3200",
         "name": "PRODUCTION SOUND",
         "accounts": [
           {
@@ -1349,7 +1349,7 @@
       },
       {
         "kind": "category",
-        "code": "33",
+        "code": "3300",
         "name": "SPECIAL EFFECTS",
         "accounts": [
           {
@@ -1412,7 +1412,7 @@
       },
       {
         "kind": "category",
-        "code": "34",
+        "code": "3400",
         "name": "LOCATION EXPENSES",
         "accounts": [
           {
@@ -1527,7 +1527,7 @@
       },
       {
         "kind": "category",
-        "code": "35",
+        "code": "3500",
         "name": "STUDIO TRANSPORTATION",
         "accounts": [
           {
@@ -1554,7 +1554,7 @@
       },
       {
         "kind": "category",
-        "code": "36",
+        "code": "3600",
         "name": "LOCATION TRANSPORTATION",
         "accounts": [
           {
@@ -1601,7 +1601,7 @@
       },
       {
         "kind": "category",
-        "code": "37",
+        "code": "3700",
         "name": "STUDIO COSTS",
         "accounts": [
           {
@@ -1632,7 +1632,7 @@
       },
       {
         "kind": "category",
-        "code": "50",
+        "code": "5000",
         "name": "EDITORIAL",
         "accounts": [
           {
@@ -1735,7 +1735,7 @@
       },
       {
         "kind": "category",
-        "code": "51",
+        "code": "5100",
         "name": "MUSIC",
         "accounts": [
           {
@@ -1814,7 +1814,7 @@
       },
       {
         "kind": "category",
-        "code": "52",
+        "code": "5200",
         "name": "POST-PRODUCTION SOUND",
         "accounts": [
           {
@@ -1841,7 +1841,7 @@
       },
       {
         "kind": "category",
-        "code": "53",
+        "code": "5300",
         "name": "STOCK LIBRARY",
         "accounts": [
           {
@@ -1872,7 +1872,7 @@
       },
       {
         "kind": "category",
-        "code": "54",
+        "code": "5400",
         "name": "MISCELLANEOUS",
         "accounts": [
           {
@@ -1883,7 +1883,7 @@
       },
       {
         "kind": "category",
-        "code": "55",
+        "code": "5500",
         "name": "MAIN-END TITLES/OPTICALS",
         "accounts": [
           {
@@ -1898,7 +1898,7 @@
       },
       {
         "kind": "category",
-        "code": "56",
+        "code": "5600",
         "name": "FILM LABORATORY",
         "accounts": [
           {
@@ -1925,7 +1925,7 @@
       },
       {
         "kind": "category",
-        "code": "60",
+        "code": "6000",
         "name": "A-T-L AND B-T-L AMORTIZATION ACC",
         "accounts": [
           {
@@ -1964,7 +1964,7 @@
       },
       {
         "kind": "category",
-        "code": "70",
+        "code": "7000",
         "name": "ADMINISTRATIVE EXPENSES",
         "accounts": [
           {

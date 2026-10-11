@@ -101,10 +101,8 @@ fn post_fringes(
                 cat.total = sum(cat.accounts.iter().map(|a| a.total))?;
             }
             FringePosting::Category { suffix } => {
-                // Codes that don't fit the coding pattern fall back to plain concatenation.
-                let number = coding
-                    .fringe_account(&cat.code, suffix)
-                    .unwrap_or_else(|_| format!("{}{suffix}", cat.code));
+                // Codes that don't name a plain category fall back to plain concatenation.
+                let number = coding.category_fringe_account(&cat.code, suffix);
                 cat.fringe_account = Some((number, cat.fringe_total));
                 cat.total = cat.details_total.checked_add(cat.fringe_total)?;
             }

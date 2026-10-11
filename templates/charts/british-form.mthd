@@ -38,61 +38,61 @@
     "topsheet": [
       {
         "kind": "category",
-        "code": "00A",
+        "code": "A",
         "name": "STORY AND SCRIPT",
         "accounts": [
           {
-            "code": "00A 10",
+            "code": "A    10",
             "name": "Story Rights"
           },
           {
-            "code": "00A 20",
+            "code": "A    20",
             "name": "Story/Continuity"
           },
           {
-            "code": "00A 30",
+            "code": "A    30",
             "name": "Script Copy"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "00B",
+        "code": "B",
         "name": "PRODUCER/DIRECTOR",
         "accounts": [
           {
-            "code": "00B 10",
+            "code": "B    10",
             "name": "Producer"
           },
           {
-            "code": "00B 15",
+            "code": "B    15",
             "name": "Producer Living Expenses"
           },
           {
-            "code": "00B 20",
+            "code": "B    20",
             "name": "Director"
           },
           {
-            "code": "00B 25",
+            "code": "B    25",
             "name": "Director Living Expenses"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "0BE",
+        "code": "BE",
         "name": "MAIN CAST",
         "accounts": [
           {
-            "code": "0BE 01",
+            "code": "BE   01",
             "name": "Lead Artist 1:"
           },
           {
-            "code": "0BE 02",
+            "code": "BE   02",
             "name": "Lead Artist 2:"
           },
           {
-            "code": "0BE 50",
+            "code": "BE   50",
             "name": "Living Expenses"
           }
         ]
@@ -107,35 +107,35 @@
         "name": "PRODUCTION MANAGEMENT",
         "accounts": [
           {
-            "code": "C01 01",
+            "code": "C01  01",
             "name": "Production Supervisor"
           },
           {
-            "code": "C01 02",
+            "code": "C01  02",
             "name": "Production Manager"
           },
           {
-            "code": "C01 03",
+            "code": "C01  03",
             "name": "Location Manager"
           },
           {
-            "code": "C01 04",
+            "code": "C01  04",
             "name": "Producers Secretary"
           },
           {
-            "code": "C01 05",
+            "code": "C01  05",
             "name": "Production Co-ordinator"
           },
           {
-            "code": "C01 06",
+            "code": "C01  06",
             "name": "Production Office Secretary"
           },
           {
-            "code": "C01 07",
+            "code": "C01  07",
             "name": "Unit Runner"
           },
           {
-            "code": "C01 08",
+            "code": "C01  08",
             "name": "Other Staff"
           }
         ]
@@ -146,23 +146,23 @@
         "name": "ASSISTANT DIRECTOR/CONTINUITY",
         "accounts": [
           {
-            "code": "C02 01",
+            "code": "C02  01",
             "name": "First Assistant Director"
           },
           {
-            "code": "C02 02",
+            "code": "C02  02",
             "name": "Second Assistant Director"
           },
           {
-            "code": "C02 03",
+            "code": "C02  03",
             "name": "Third Assistant Director"
           },
           {
-            "code": "C02 04",
+            "code": "C02  04",
             "name": "Continuity Clerk"
           },
           {
-            "code": "C02 05",
+            "code": "C02  05",
             "name": "Second Unit(s)"
           }
         ]
@@ -173,7 +173,7 @@
         "name": "TECHNICAL ADVISORS",
         "accounts": [
           {
-            "code": "C03 01",
+            "code": "C03  01",
             "name": "Choreographer"
           }
         ]
@@ -184,31 +184,31 @@
         "name": "CAMERA CREW",
         "accounts": [
           {
-            "code": "C04 01",
+            "code": "C04  01",
             "name": "Lighting Cameraman"
           },
           {
-            "code": "C04 02",
+            "code": "C04  02",
             "name": "Operator"
           },
           {
-            "code": "C04 03",
+            "code": "C04  03",
             "name": "Focus Puller"
           },
           {
-            "code": "C04 04",
+            "code": "C04  04",
             "name": "Clapper/Loader"
           },
           {
-            "code": "C04 05",
+            "code": "C04  05",
             "name": "Camera Grip"
           },
           {
-            "code": "C04 06",
+            "code": "C04  06",
             "name": "Maintenance"
           },
           {
-            "code": "C04 10",
+            "code": "C04  10",
             "name": "Second Unit(s)"
           }
         ]
@@ -219,39 +219,39 @@
         "name": "SOUND CREW",
         "accounts": [
           {
-            "code": "C05 01",
+            "code": "C05  01",
             "name": "Mixer"
           },
           {
-            "code": "C05 02",
+            "code": "C05  02",
             "name": "Boom Man"
           },
           {
-            "code": "C05 03",
+            "code": "C05  03",
             "name": "Maintenance"
           },
           {
-            "code": "C05 04",
+            "code": "C05  04",
             "name": "Playback Operator"
           },
           {
-            "code": "C05 10",
+            "code": "C05  10",
             "name": "Second Unit(s)"
           },
           {
-            "code": "C05 21",
+            "code": "C05  21",
             "name": "Post Synch Crew"
           },
           {
-            "code": "C05 22",
+            "code": "C05  22",
             "name": "Effects Crew"
           },
           {
-            "code": "C05 23",
+            "code": "C05  23",
             "name": "Music Crew"
           },
           {
-            "code": "C05 24",
+            "code": "C05  24",
             "name": "Dubbing Crew"
           }
         ]
@@ -262,39 +262,39 @@
         "name": "EDITORIAL STAFF",
         "accounts": [
           {
-            "code": "C06 01",
+            "code": "C06  01",
             "name": "Editor"
           },
           {
-            "code": "C06 02",
+            "code": "C06  02",
             "name": "First Assistant Editor"
           },
           {
-            "code": "C06 03",
+            "code": "C06  03",
             "name": "Second Assistant Editor"
           },
           {
-            "code": "C06 04",
+            "code": "C06  04",
             "name": "Trainee Editor"
           },
           {
-            "code": "C06 05",
+            "code": "C06  05",
             "name": "Dubbing Editor"
           },
           {
-            "code": "C06 06",
+            "code": "C06  06",
             "name": "Assistant Dubbing Editor"
           },
           {
-            "code": "C06 07",
+            "code": "C06  07",
             "name": "Sound Editor"
           },
           {
-            "code": "C06 08",
+            "code": "C06  08",
             "name": "Assistant Sound Editor"
           },
           {
-            "code": "C06 10",
+            "code": "C06  10",
             "name": "Music Editor"
           }
         ]
@@ -305,11 +305,11 @@
         "name": "STILLS CAMERA STAFF",
         "accounts": [
           {
-            "code": "C07 01",
+            "code": "C07  01",
             "name": "Stills Cameraman"
           },
           {
-            "code": "C07 02",
+            "code": "C07  02",
             "name": "Special Photographers"
           }
         ]
@@ -320,23 +320,23 @@
         "name": "WARDROBE STAFF",
         "accounts": [
           {
-            "code": "C08 01",
+            "code": "C08  01",
             "name": "Wardrobe Designer"
           },
           {
-            "code": "C08 02",
+            "code": "C08  02",
             "name": "Wardrobe Master"
           },
           {
-            "code": "C08 03",
+            "code": "C08  03",
             "name": "Wardrobe Mistress"
           },
           {
-            "code": "C08 04",
+            "code": "C08  04",
             "name": "Wardrobe Assistants"
           },
           {
-            "code": "C08 05",
+            "code": "C08  05",
             "name": "Daily Staff"
           }
         ]
@@ -347,15 +347,15 @@
         "name": "MAKE-UP STAFF",
         "accounts": [
           {
-            "code": "C09 01",
+            "code": "C09  01",
             "name": "Chief Make-Up Artist"
           },
           {
-            "code": "C09 02",
+            "code": "C09  02",
             "name": "Make-Up Assistant(s)"
           },
           {
-            "code": "C09 03",
+            "code": "C09  03",
             "name": "Daily Staff"
           }
         ]
@@ -366,15 +366,15 @@
         "name": "HAIRDRESSING STAFF",
         "accounts": [
           {
-            "code": "C10 01",
+            "code": "C10  01",
             "name": "Chief Hairdresser"
           },
           {
-            "code": "C10 02",
+            "code": "C10  02",
             "name": "Hairdressing Assistant(s)"
           },
           {
-            "code": "C10 03",
+            "code": "C10  03",
             "name": "Daily Staff"
           }
         ]
@@ -385,15 +385,15 @@
         "name": "CASTING",
         "accounts": [
           {
-            "code": "C11 01",
+            "code": "C11  01",
             "name": "Casting Director"
           },
           {
-            "code": "C11 02",
+            "code": "C11  02",
             "name": "Casting Secretary"
           },
           {
-            "code": "C11 03",
+            "code": "C11  03",
             "name": "Casting Expenses"
           }
         ]
@@ -404,19 +404,19 @@
         "name": "PRODUCTION ACCOUNTANCY",
         "accounts": [
           {
-            "code": "C12 01",
+            "code": "C12  01",
             "name": "Production Accountant"
           },
           {
-            "code": "C12 02",
+            "code": "C12  02",
             "name": "Assistant Accountant(s)"
           },
           {
-            "code": "C12 03",
+            "code": "C12  03",
             "name": "Cashier"
           },
           {
-            "code": "C12 04",
+            "code": "C12  04",
             "name": "Secretary"
           }
         ]
@@ -427,7 +427,7 @@
         "name": "PROJECTIONISTS",
         "accounts": [
           {
-            "code": "C13 01",
+            "code": "C13  01",
             "name": "Projection Theatre Staff"
           }
         ]
@@ -438,15 +438,15 @@
         "name": "MISCELLANEOUS STUDIO STAFF",
         "accounts": [
           {
-            "code": "C14 01",
+            "code": "C14  01",
             "name": "H.O.D.'s"
           },
           {
-            "code": "C14 02",
+            "code": "C14  02",
             "name": "Operational Staff"
           },
           {
-            "code": "C14 03",
+            "code": "C14  03",
             "name": "Other Staff"
           }
         ]
@@ -457,62 +457,62 @@
         "name": "FOREIGN UNIT TECHNICIANS",
         "accounts": [
           {
-            "code": "C15 01",
+            "code": "C15  01",
             "name": "Foreign Staff"
           },
           {
-            "code": "C15 02",
+            "code": "C15  02",
             "name": "Foreign Staff"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "00D",
+        "code": "D",
         "name": "ART DEPARTMENT",
         "accounts": [
           {
-            "code": "00D 01",
+            "code": "D    01",
             "name": "Production Designer"
           },
           {
-            "code": "00D 02",
+            "code": "D    02",
             "name": "Art Director"
           },
           {
-            "code": "00D 03",
+            "code": "D    03",
             "name": "Assistant Art Director"
           },
           {
-            "code": "00D 04",
+            "code": "D    04",
             "name": "Draughtsman"
           },
           {
-            "code": "00D 05",
+            "code": "D    05",
             "name": "Art Department Junior"
           },
           {
-            "code": "00D 06",
+            "code": "D    06",
             "name": "Scenic Artist"
           },
           {
-            "code": "00D 07",
+            "code": "D    07",
             "name": "Sketch Artist"
           },
           {
-            "code": "00D 08",
+            "code": "D    08",
             "name": "Construction Manager"
           },
           {
-            "code": "00D 10",
+            "code": "D    10",
             "name": "Sign Writer"
           },
           {
-            "code": "00D 11",
+            "code": "D    11",
             "name": "Set Decorator"
           },
           {
-            "code": "00D 12",
+            "code": "D    12",
             "name": "Property Buyer"
           }
         ]
@@ -523,630 +523,630 @@
         "name": "CAST (non-principals)",
         "accounts": [
           {
-            "code": "E1A 01",
+            "code": "E1A  01",
             "name": "Other Cast"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "0E2",
+        "code": "E2",
         "name": "STAND INS/DOUBLES/STUNTS",
         "accounts": [
           {
-            "code": "0E2 01",
+            "code": "E2   01",
             "name": "Stand Ins"
           },
           {
-            "code": "0E2 02",
+            "code": "E2   02",
             "name": "Doubles"
           },
           {
-            "code": "0E2 03",
+            "code": "E2   03",
             "name": "Stunt Arranger"
           },
           {
-            "code": "0E2 04",
+            "code": "E2   04",
             "name": "Stuntmen"
           },
           {
-            "code": "0E2 10",
+            "code": "E2   10",
             "name": "Footstep Artists"
           },
           {
-            "code": "0E2 15",
+            "code": "E2   15",
             "name": "Central Casting Commision"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "0E3",
+        "code": "E3",
         "name": "CROWD",
         "accounts": [
           {
-            "code": "0E3 01",
+            "code": "E3   01",
             "name": "Casting Crowd"
           },
           {
-            "code": "0E3 02",
+            "code": "E3   02",
             "name": "Local Crowd"
           },
           {
-            "code": "0E3 03",
+            "code": "E3   03",
             "name": "Chaperones"
           },
           {
-            "code": "0E3 04",
+            "code": "E3   04",
             "name": "Tutor"
           },
           {
-            "code": "0E3 05",
+            "code": "E3   05",
             "name": "Central Casting Commision"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "00F",
+        "code": "F",
         "name": "MUSIC",
         "accounts": [
           {
-            "code": "00F 01",
+            "code": "F    01",
             "name": "Copyright & M.C.P.S."
           },
           {
-            "code": "00F 02",
+            "code": "F    02",
             "name": "Composer"
           },
           {
-            "code": "00F 03",
+            "code": "F    03",
             "name": "Musical Director"
           },
           {
-            "code": "00F 04",
+            "code": "F    04",
             "name": "Musicians"
           },
           {
-            "code": "00F 05",
+            "code": "F    05",
             "name": "Soloists"
           },
           {
-            "code": "00F 06",
+            "code": "F    06",
             "name": "Choir"
           },
           {
-            "code": "00F 07",
+            "code": "F    07",
             "name": "Orchestration & Copying"
           },
           {
-            "code": "00F 08",
+            "code": "F    08",
             "name": "Booking Fees & Porterage"
           },
           {
-            "code": "00F 09",
+            "code": "F    09",
             "name": "Hire: Special Instruments"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "00G",
+        "code": "G",
         "name": "COSTUMES AND WIGS",
         "accounts": [
           {
-            "code": "00G 01",
+            "code": "G    01",
             "name": "Costumes Hired"
           },
           {
-            "code": "00G 02",
+            "code": "G    02",
             "name": "Costumes Purchased"
           },
           {
-            "code": "00G 03",
+            "code": "G    03",
             "name": "Costumes Manufactured"
           },
           {
-            "code": "00G 21",
+            "code": "G    21",
             "name": "Wigs Hired"
           },
           {
-            "code": "00G 22",
+            "code": "G    22",
             "name": "Wigs Purchased"
           },
           {
-            "code": "00G 23",
+            "code": "G    23",
             "name": "Wigs Manufactured"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "00H",
+        "code": "H",
         "name": "MISCELLANEOUS PRODUCITON STORE",
         "accounts": [
           {
-            "code": "00H 01",
+            "code": "H    01",
             "name": "Art Department"
           },
           {
-            "code": "00H 02",
+            "code": "H    02",
             "name": "Lighting"
           },
           {
-            "code": "00H 03",
+            "code": "H    03",
             "name": "Lamp Spotting"
           },
           {
-            "code": "00H 04",
+            "code": "H    04",
             "name": "Camera"
           },
           {
-            "code": "00H 05",
+            "code": "H    05",
             "name": "Sound"
           },
           {
-            "code": "00H 06",
+            "code": "H    06",
             "name": "Editing"
           },
           {
-            "code": "00H 07",
+            "code": "H    07",
             "name": "Make-Up"
           },
           {
-            "code": "00H 08",
+            "code": "H    08",
             "name": "Hairdressing"
           },
           {
-            "code": "00H 09",
+            "code": "H    09",
             "name": "Stills"
           },
           {
-            "code": "00H 10",
+            "code": "H    10",
             "name": "Wardrobe"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "00I",
+        "code": "I",
         "name": "FILM & LABORATORY CHARGES",
         "accounts": [
           {
-            "code": "00I 01",
+            "code": "I    01",
             "name": "Film Stock"
           },
           {
-            "code": "00I 02",
+            "code": "I    02",
             "name": "Developing"
           },
           {
-            "code": "00I 03",
+            "code": "I    03",
             "name": "Printing"
           },
           {
-            "code": "00I 04",
+            "code": "I    04",
             "name": "Magnetic Stock"
           },
           {
-            "code": "00I 05",
+            "code": "I    05",
             "name": "Magnetic Xfers Shooting"
           },
           {
-            "code": "00I 06",
+            "code": "I    06",
             "name": "Video Transfers"
           },
           {
-            "code": "00I 07",
+            "code": "I    07",
             "name": "Magnetic Stock-Full Coat"
           },
           {
-            "code": "00I 08",
+            "code": "I    08",
             "name": "Magnetic Stock-Single Sided"
           },
           {
-            "code": "00I 09",
+            "code": "I    09",
             "name": "Optical Sound Neg. Stock"
           },
           {
-            "code": "00I 10",
+            "code": "I    10",
             "name": "Optical Sound Developed"
           },
           {
-            "code": "00I 11",
+            "code": "I    11",
             "name": "Optical Sound Printed"
           },
           {
-            "code": "00I 12",
+            "code": "I    12",
             "name": "Magnetic Stock (Outside Fx.)"
           },
           {
-            "code": "00I 13",
+            "code": "I    13",
             "name": "Film Numbering"
           },
           {
-            "code": "00I 14",
+            "code": "I    14",
             "name": "Reprints"
           },
           {
-            "code": "00I 15",
+            "code": "I    15",
             "name": "Opticals"
           },
           {
-            "code": "00I 16",
+            "code": "I    16",
             "name": "Stock Shots"
           },
           {
-            "code": "00I 17",
+            "code": "I    17",
             "name": "Negative Cutting"
           },
           {
-            "code": "00I 18",
+            "code": "I    18",
             "name": "Titles"
           },
           {
-            "code": "00I 19",
+            "code": "I    19",
             "name": "M & E Track"
           },
           {
-            "code": "00I 20",
+            "code": "I    20",
             "name": "U.S.A. Dubbed Track"
           },
           {
-            "code": "00I 21",
+            "code": "I    21",
             "name": "Cutting Copy Dupes"
           },
           {
-            "code": "00I 22",
+            "code": "I    22",
             "name": "Misc. Lab. Charges"
           },
           {
-            "code": "00I 23",
+            "code": "I    23",
             "name": "Trailer"
           },
           {
-            "code": "00I 24",
+            "code": "I    24",
             "name": "Interpositive"
           },
           {
-            "code": "00I 25",
+            "code": "I    25",
             "name": "Internegative"
           },
           {
-            "code": "00I 26",
+            "code": "I    26",
             "name": "Colour Rev. Internegative"
           },
           {
-            "code": "00I 27",
+            "code": "I    27",
             "name": "First Trial Print"
           },
           {
-            "code": "00I 28",
+            "code": "I    28",
             "name": "Answer Print"
           },
           {
-            "code": "00I 29",
+            "code": "I    29",
             "name": "Discounts"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "00J",
+        "code": "J",
         "name": "STUDIO RENTALS",
         "accounts": [
           {
-            "code": "00J 01",
+            "code": "J    01",
             "name": "Stage Rents"
           },
           {
-            "code": "00J 02",
+            "code": "J    02",
             "name": "Lot & Tank"
           },
           {
-            "code": "00J 03",
+            "code": "J    03",
             "name": "Rehearsal Rooms"
           },
           {
-            "code": "00J 04",
+            "code": "J    04",
             "name": "Transfer Theatre"
           },
           {
-            "code": "00J 05",
+            "code": "J    05",
             "name": "A.D.R. Theatre"
           },
           {
-            "code": "00J 06",
+            "code": "J    06",
             "name": "Effects Recording Theatre"
           },
           {
-            "code": "00J 07",
+            "code": "J    07",
             "name": "Music Recording Theatre"
           },
           {
-            "code": "00J 08",
+            "code": "J    08",
             "name": "Dubbing Theatre"
           },
           {
-            "code": "00J 09",
+            "code": "J    09",
             "name": "Projection Theatre"
           },
           {
-            "code": "00J 10",
+            "code": "J    10",
             "name": "Cutting Rooms"
           },
           {
-            "code": "00J 11",
+            "code": "J    11",
             "name": "Vaults"
           },
           {
-            "code": "00J 12",
+            "code": "J    12",
             "name": "Still Studio"
           },
           {
-            "code": "00J 13",
+            "code": "J    13",
             "name": "Offices"
           },
           {
-            "code": "00J 14",
+            "code": "J    14",
             "name": "Dressing Rooms"
           },
           {
-            "code": "00J 15",
+            "code": "J    15",
             "name": "Studio Handling Charges"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "00K",
+        "code": "K",
         "name": "EQUIPMENT",
         "accounts": [
           {
-            "code": "00K 01",
+            "code": "K    01",
             "name": "Cameras and Accessories"
           },
           {
-            "code": "00K 02",
+            "code": "K    02",
             "name": "Special Lenses"
           },
           {
-            "code": "00K 03",
+            "code": "K    03",
             "name": "Dollies and Tracks"
           },
           {
-            "code": "00K 04",
+            "code": "K    04",
             "name": "Camera Crane"
           },
           {
-            "code": "00K 05",
+            "code": "K    05",
             "name": "Stills Cameraman/Accessories"
           },
           {
-            "code": "00K 20",
+            "code": "K    20",
             "name": "Lamps (incl. Cables)"
           },
           {
-            "code": "00K 21",
+            "code": "K    21",
             "name": "Generators (All Costs)"
           },
           {
-            "code": "00K 31",
+            "code": "K    31",
             "name": "Sound Recording Equipment"
           },
           {
-            "code": "00K 32",
+            "code": "K    32",
             "name": "Special Microphones"
           },
           {
-            "code": "00K 33",
+            "code": "K    33",
             "name": "Public Address/Walkie Talkie"
           },
           {
-            "code": "00K 34",
+            "code": "K    34",
             "name": "Playback"
           },
           {
-            "code": "00K 41",
+            "code": "K    41",
             "name": "Cutting Room Equipment"
           },
           {
-            "code": "00K 51",
+            "code": "K    51",
             "name": "Office Equipment"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "00L",
+        "code": "L",
         "name": "POWER",
         "accounts": [
           {
-            "code": "00L 01",
+            "code": "L    01",
             "name": "Electricity Consumed"
           },
           {
-            "code": "00L 02",
+            "code": "L    02",
             "name": "Studio Site Services"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "0M1",
+        "code": "M1",
         "name": "TRAVEL AND TRANSPORT",
         "accounts": [
           {
-            "code": "0M1 A1",
+            "code": "M1   A1",
             "name": "Reconnaissance Trips"
           },
           {
-            "code": "0M1 B1",
+            "code": "M1   B1",
             "name": "Assembly/Dispersal: Units"
           },
           {
-            "code": "0M1 C1",
+            "code": "M1   C1",
             "name": "Unit Fares"
           },
           {
-            "code": "0M1 C2",
+            "code": "M1   C2",
             "name": "Artistes Fares"
           },
           {
-            "code": "0M1 C3",
+            "code": "M1   C3",
             "name": "Equipment"
           },
           {
-            "code": "0M1 D1",
+            "code": "M1   D1",
             "name": "Mileage Allowances"
           },
           {
-            "code": "0M1 D2",
+            "code": "M1   D2",
             "name": "Coaches"
           },
           {
-            "code": "0M1 D3",
+            "code": "M1   D3",
             "name": "Cars"
           },
           {
-            "code": "0M1 D4",
+            "code": "M1   D4",
             "name": "Equip & Service Vehicles"
           },
           {
-            "code": "0M1 D5",
+            "code": "M1   D5",
             "name": "Caravans/Dressing Rooms"
           },
           {
-            "code": "0M1 D6",
+            "code": "M1   D6",
             "name": "Drivers Wages"
           },
           {
-            "code": "0M1 D7",
+            "code": "M1   D7",
             "name": "Petrol & Oil"
           },
           {
-            "code": "0M1 E1",
+            "code": "M1   E1",
             "name": "Visas"
           },
           {
-            "code": "0M1 E2",
+            "code": "M1   E2",
             "name": "Freightage of Rushes"
           },
           {
-            "code": "0M1 E3",
+            "code": "M1   E3",
             "name": "Duty, Taxes & Bonds"
           },
           {
-            "code": "0M1 E4",
+            "code": "M1   E4",
             "name": "Agency & Customs' Charges"
           },
           {
-            "code": "0M1 E5",
+            "code": "M1   E5",
             "name": "Excess Baggage"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "0M2",
+        "code": "M2",
         "name": "STUDIO & OTHER TRANSPORT",
         "accounts": [
           {
-            "code": "0M2 A1",
+            "code": "M2   A1",
             "name": "Fares: Visiting Artistes"
           },
           {
-            "code": "0M2 B1",
+            "code": "M2   B1",
             "name": "Mileages & Allowances"
           },
           {
-            "code": "0M2 C1",
+            "code": "M2   C1",
             "name": "Cars"
           },
           {
-            "code": "0M2 D1",
+            "code": "M2   D1",
             "name": "Vans"
           },
           {
-            "code": "0M2 E1",
+            "code": "M2   E1",
             "name": "Drivers Wages"
           },
           {
-            "code": "0M2 F1",
+            "code": "M2   F1",
             "name": "Studio Coaches"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "0N1",
+        "code": "N1",
         "name": "HOTEL & LIVING EXPENSES",
         "accounts": [
           {
-            "code": "0N1 A1",
+            "code": "N1   A1",
             "name": "Reconnaissance Trips"
           },
           {
-            "code": "0N1 B1",
+            "code": "N1   B1",
             "name": "Travel To/From Location"
           },
           {
-            "code": "0N1 C1",
+            "code": "N1   C1",
             "name": "Unit Hotel"
           },
           {
-            "code": "0N1 C2",
+            "code": "N1   C2",
             "name": "Artistes' Hotel"
           },
           {
-            "code": "0N1 C3",
+            "code": "N1   C3",
             "name": "Foreign Staff Hotel"
           },
           {
-            "code": "0N1 D1",
+            "code": "N1   D1",
             "name": "Unit Catering"
           },
           {
-            "code": "0N1 D2",
+            "code": "N1   D2",
             "name": "Artistes' Catering"
           },
           {
-            "code": "0N1 D3",
+            "code": "N1   D3",
             "name": "Foreign Staff Catering"
           },
           {
-            "code": "0N1 D4",
+            "code": "N1   D4",
             "name": "Crowd Catering"
           },
           {
-            "code": "0N1 E1",
+            "code": "N1   E1",
             "name": "Laundry"
           },
           {
-            "code": "0N1 E2",
+            "code": "N1   E2",
             "name": "Meal Allowances"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "0N2",
+        "code": "N2",
         "name": "STUDIO HOTEL & LIVING",
         "accounts": [
           {
-            "code": "0N2 01",
+            "code": "N2   01",
             "name": "Working Meals"
           },
           {
-            "code": "0N2 02",
+            "code": "N2   02",
             "name": "Office Refreshments"
           },
           {
-            "code": "0N2 03",
+            "code": "N2   03",
             "name": "Studio Trolley Service"
           },
           {
-            "code": "0N2 04",
+            "code": "N2   04",
             "name": "Unit Meal Allowances"
           }
         ]
@@ -1157,195 +1157,195 @@
       },
       {
         "kind": "category",
-        "code": "00O",
+        "code": "O",
         "name": "INSURANCES",
         "accounts": [
           {
-            "code": "00O 01",
+            "code": "O    01",
             "name": "Pre-Production Indemnity"
           },
           {
-            "code": "00O 02",
+            "code": "O    02",
             "name": "Cast Insurance"
           },
           {
-            "code": "00O 03",
+            "code": "O    03",
             "name": "Consequential Loss"
           },
           {
-            "code": "00O 04",
+            "code": "O    04",
             "name": "Abandonment Risk"
           },
           {
-            "code": "00O 05",
+            "code": "O    05",
             "name": "Errors & Ommissions"
           },
           {
-            "code": "00O 06",
+            "code": "O    06",
             "name": "Negative & Daily Takes"
           },
           {
-            "code": "00O 07",
+            "code": "O    07",
             "name": "Employers Liability"
           },
           {
-            "code": "00O 08",
+            "code": "O    08",
             "name": "Public Liability"
           },
           {
-            "code": "00O 09",
+            "code": "O    09",
             "name": "Equipment"
           },
           {
-            "code": "00O 10",
+            "code": "O    10",
             "name": "Sets, Props and Wardrobe"
           },
           {
-            "code": "00O 11",
+            "code": "O    11",
             "name": "Action Vehicles"
           },
           {
-            "code": "00O 12",
+            "code": "O    12",
             "name": "Cash"
           },
           {
-            "code": "00O 13",
+            "code": "O    13",
             "name": "Acct. Fidelity Guarantee"
           },
           {
-            "code": "00O 14",
+            "code": "O    14",
             "name": "Unit Personal Accident"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "00P",
+        "code": "P",
         "name": "SOCIAL SECURITY & FRINGES",
         "accounts": [
           {
-            "code": "00P 01",
+            "code": "P    01",
             "name": "Unit Holiday Credits"
           },
           {
-            "code": "00P 02",
+            "code": "P    02",
             "name": "Unit N.H.I."
           },
           {
-            "code": "00P 03",
+            "code": "P    03",
             "name": "Artistes N.H.I."
           },
           {
-            "code": "00P 04",
+            "code": "P    04",
             "name": "Daily Staff N.H.I."
           },
           {
-            "code": "00P 05",
+            "code": "P    05",
             "name": "Company Surcharges"
           },
           {
-            "code": "00P 06",
+            "code": "P    06",
             "name": "Crowd N.H.I."
           }
         ]
       },
       {
         "kind": "category",
-        "code": "00Q",
+        "code": "Q",
         "name": "PUBLICITY",
         "accounts": [
           {
-            "code": "00Q 01",
+            "code": "Q    01",
             "name": "Unit Publicist"
           },
           {
-            "code": "00Q 02",
+            "code": "Q    02",
             "name": "Secretary"
           },
           {
-            "code": "00Q 03",
+            "code": "Q    03",
             "name": "Expenses"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "00R",
+        "code": "R",
         "name": "MISCELLANEOUS EXPENSES",
         "accounts": [
           {
-            "code": "00R 01",
+            "code": "R    01",
             "name": "Post Production Scripts"
           },
           {
-            "code": "00R 02",
+            "code": "R    02",
             "name": "Censor's Fees"
           },
           {
-            "code": "00R 03",
+            "code": "R    03",
             "name": "Medical Fees"
           },
           {
-            "code": "00R 04",
+            "code": "R    04",
             "name": "Telephones & Postage"
           },
           {
-            "code": "00R 05",
+            "code": "R    05",
             "name": "Printing & Stationery"
           },
           {
-            "code": "00R 06",
+            "code": "R    06",
             "name": "Protective Clothing"
           },
           {
-            "code": "00R 07",
+            "code": "R    07",
             "name": "M.P.A.A. Fee"
           },
           {
-            "code": "00R 08",
+            "code": "R    08",
             "name": "G.F.T.P.A. Subscription"
           },
           {
-            "code": "00R 09",
+            "code": "R    09",
             "name": "Other Sundry Expenses"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "0S1",
+        "code": "S1",
         "name": "CONSTRUCTION LABOR",
         "accounts": [
           {
-            "code": "0S1 01",
+            "code": "S1   01",
             "name": "Carpenters"
           },
           {
-            "code": "0S1 02",
+            "code": "S1   02",
             "name": "Painters"
           },
           {
-            "code": "0S1 03",
+            "code": "S1   03",
             "name": "Plasterers"
           },
           {
-            "code": "0S1 04",
+            "code": "S1   04",
             "name": "Riggers"
           },
           {
-            "code": "0S1 05",
+            "code": "S1   05",
             "name": "Stagehands"
           },
           {
-            "code": "0S1 06",
+            "code": "S1   06",
             "name": "Labourers"
           },
           {
-            "code": "0S1 07",
+            "code": "S1   07",
             "name": "Machinists"
           },
           {
-            "code": "0S1 08",
+            "code": "S1   08",
             "name": "Plumbers"
           }
         ]
@@ -1356,223 +1356,223 @@
         "name": "CONSTRUCTION MATERIALS",
         "accounts": [
           {
-            "code": "S1A 01",
+            "code": "S1A  01",
             "name": "Materials Purchased"
           },
           {
-            "code": "S1A 02",
+            "code": "S1A  02",
             "name": "Materials Hired"
           },
           {
-            "code": "S1A 03",
+            "code": "S1A  03",
             "name": "Plant Hired"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "0S2",
+        "code": "S2",
         "name": "SET DRESSING LABOUR",
         "accounts": [
           {
-            "code": "0S2 01",
+            "code": "S2   01",
             "name": "Property Master"
           },
           {
-            "code": "0S2 02",
+            "code": "S2   02",
             "name": "Storeman"
           },
           {
-            "code": "0S2 03",
+            "code": "S2   03",
             "name": "Dressing Gang"
           },
           {
-            "code": "0S2 08",
+            "code": "S2   08",
             "name": "Drapesman"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "0S3",
+        "code": "S3",
         "name": "OPERATING LABOUR",
         "accounts": [
           {
-            "code": "0S3 01",
+            "code": "S3   01",
             "name": "Stand Bys"
           },
           {
-            "code": "0S3 10",
+            "code": "S3   10",
             "name": "Stand By Props"
           },
           {
-            "code": "0S3 20",
+            "code": "S3   20",
             "name": "Camera Grip"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "0S4",
+        "code": "S4",
         "name": "STRIKING COSTS",
         "accounts": [
           {
-            "code": "0S4 01",
+            "code": "S4   01",
             "name": "Labour"
           },
           {
-            "code": "0S4 02",
+            "code": "S4   02",
             "name": "Plant Hired"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "0S5",
+        "code": "S5",
         "name": "LIGHTING/SPOTTING LABOUR",
         "accounts": [
           {
-            "code": "0S5 01",
+            "code": "S5   01",
             "name": "Gaffer"
           },
           {
-            "code": "0S5 02",
+            "code": "S5   02",
             "name": "Best Boy"
           },
           {
-            "code": "0S5 03",
+            "code": "S5   03",
             "name": "Electricians"
           },
           {
-            "code": "0S5 04",
+            "code": "S5   04",
             "name": "Generator Operators"
           },
           {
-            "code": "0S5 05",
+            "code": "S5   05",
             "name": "Rigging Crew(s)"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "0S7",
+        "code": "S7",
         "name": "FOREIGN LABOUR",
         "accounts": [
           {
-            "code": "0S7 01",
+            "code": "S7   01",
             "name": "Construction"
           },
           {
-            "code": "0S7 02",
+            "code": "S7   02",
             "name": "Dressing"
           },
           {
-            "code": "0S7 03",
+            "code": "S7   03",
             "name": "Operating"
           },
           {
-            "code": "0S7 04",
+            "code": "S7   04",
             "name": "Lighting"
           },
           {
-            "code": "0S7 05",
+            "code": "S7   05",
             "name": "Other"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "0S8",
+        "code": "S8",
         "name": "PROPERTIES",
         "accounts": [
           {
-            "code": "0S8 01",
+            "code": "S8   01",
             "name": "Props Hired"
           },
           {
-            "code": "0S8 02",
+            "code": "S8   02",
             "name": "Props Purchased"
           },
           {
-            "code": "0S8 03",
+            "code": "S8   03",
             "name": "Props Manufactured"
           },
           {
-            "code": "0S8 04",
+            "code": "S8   04",
             "name": "Action Vehicles"
           },
           {
-            "code": "0S8 05",
+            "code": "S8   05",
             "name": "Drapes"
           },
           {
-            "code": "0S8 06",
+            "code": "S8   06",
             "name": "Animals"
           },
           {
-            "code": "0S8 07",
+            "code": "S8   07",
             "name": "Animal Handlers"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "00T",
+        "code": "T",
         "name": "SPECIAL EFFECTS",
         "accounts": [
           {
-            "code": "00T 01",
+            "code": "T    01",
             "name": "Effects Supervisor"
           },
           {
-            "code": "00T 02",
+            "code": "T    02",
             "name": "Effects Labour"
           },
           {
-            "code": "00T 10",
+            "code": "T    10",
             "name": "Materials Purchased"
           },
           {
-            "code": "00T 20",
+            "code": "T    20",
             "name": "Equipment"
           },
           {
-            "code": "00T 30",
+            "code": "T    30",
             "name": "Optical Effects"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "00U",
+        "code": "U",
         "name": "LOCATION FACILITIES",
         "accounts": [
           {
-            "code": "00U 01",
+            "code": "U    01",
             "name": "Armed Forces"
           },
           {
-            "code": "00U 02",
+            "code": "U    02",
             "name": "Police and Security"
           },
           {
-            "code": "00U 03",
+            "code": "U    03",
             "name": "Theatre Hire for Rushes"
           },
           {
-            "code": "00U 04",
+            "code": "U    04",
             "name": "Vaults & Storage"
           },
           {
-            "code": "00U 05",
+            "code": "U    05",
             "name": "Entertaining & Gratuities"
           },
           {
-            "code": "00U 06",
+            "code": "U    06",
             "name": "Location Permissions"
           },
           {
-            "code": "00U 07",
+            "code": "U    07",
             "name": "Other Facilities"
           }
         ]
@@ -1583,42 +1583,42 @@
       },
       {
         "kind": "category",
-        "code": "00Y",
+        "code": "Y",
         "name": "FINANCE AND LEGAL",
         "accounts": [
           {
-            "code": "00Y 01",
+            "code": "Y    01",
             "name": "Audit and Form C"
           },
           {
-            "code": "00Y 02",
+            "code": "Y    02",
             "name": "Loan Interest"
           },
           {
-            "code": "00Y 03",
+            "code": "Y    03",
             "name": "Bank Commision"
           },
           {
-            "code": "00Y 04",
+            "code": "Y    04",
             "name": "Completion Guarantee Fee"
           },
           {
-            "code": "00Y 05",
+            "code": "Y    05",
             "name": "Legal Fees"
           }
         ]
       },
       {
         "kind": "category",
-        "code": "00Z",
+        "code": "Z",
         "name": "OVERHEADS",
         "accounts": [
           {
-            "code": "00Z 01",
+            "code": "Z    01",
             "name": "Production Company Overhead"
           },
           {
-            "code": "00Z 02",
+            "code": "Z    02",
             "name": "Other Overheads"
           }
         ]

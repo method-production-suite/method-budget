@@ -38,7 +38,7 @@
     "topsheet": [
       {
         "kind": "category",
-        "code": "11",
+        "code": "11000",
         "name": "WRITERS",
         "accounts": [
           {
@@ -97,7 +97,7 @@
       },
       {
         "kind": "category",
-        "code": "12",
+        "code": "12000",
         "name": "PRODUCERS",
         "accounts": [
           {
@@ -188,7 +188,7 @@
       },
       {
         "kind": "category",
-        "code": "13",
+        "code": "13000",
         "name": "DIRECTION",
         "accounts": [
           {
@@ -219,7 +219,7 @@
       },
       {
         "kind": "category",
-        "code": "14",
+        "code": "14000",
         "name": "TALENT",
         "accounts": [
           {
@@ -358,7 +358,7 @@
       },
       {
         "kind": "category",
-        "code": "18",
+        "code": "18000",
         "name": "TOTAL ATL FRINGES",
         "accounts": [
           {
@@ -401,7 +401,7 @@
       },
       {
         "kind": "category",
-        "code": "20",
+        "code": "20000",
         "name": "PRODUCTION MGMT",
         "accounts": [
           {
@@ -448,7 +448,7 @@
       },
       {
         "kind": "category",
-        "code": "21",
+        "code": "21000",
         "name": "EXTRA TALENT",
         "accounts": [
           {
@@ -459,7 +459,7 @@
       },
       {
         "kind": "category",
-        "code": "23",
+        "code": "23000",
         "name": "CONTESTANTS",
         "accounts": [
           {
@@ -510,7 +510,7 @@
       },
       {
         "kind": "category",
-        "code": "24",
+        "code": "24000",
         "name": "SET COSTS",
         "accounts": [
           {
@@ -549,7 +549,7 @@
       },
       {
         "kind": "category",
-        "code": "25",
+        "code": "25000",
         "name": "PROPS",
         "accounts": [
           {
@@ -560,7 +560,7 @@
       },
       {
         "kind": "category",
-        "code": "26",
+        "code": "26000",
         "name": "AUDIENCE COSTS",
         "accounts": [
           {
@@ -595,7 +595,7 @@
       },
       {
         "kind": "category",
-        "code": "27",
+        "code": "27000",
         "name": "WARDROBE",
         "accounts": [
           {
@@ -626,7 +626,7 @@
       },
       {
         "kind": "category",
-        "code": "28",
+        "code": "28000",
         "name": "MAKEUP & HAIR",
         "accounts": [
           {
@@ -653,7 +653,7 @@
       },
       {
         "kind": "category",
-        "code": "29",
+        "code": "29000",
         "name": "STUDI0 COSTS",
         "accounts": [
           {
@@ -768,7 +768,7 @@
       },
       {
         "kind": "category",
-        "code": "32",
+        "code": "32000",
         "name": "RESEARCH",
         "accounts": [
           {
@@ -807,7 +807,7 @@
       },
       {
         "kind": "category",
-        "code": "33",
+        "code": "33000",
         "name": "RIGHTS & CLEARANCES",
         "accounts": [
           {
@@ -830,7 +830,7 @@
       },
       {
         "kind": "category",
-        "code": "34",
+        "code": "34000",
         "name": "FIELD/REMOTE PRODUCTION",
         "accounts": [
           {
@@ -845,7 +845,7 @@
       },
       {
         "kind": "category",
-        "code": "35",
+        "code": "35000",
         "name": "STUDIO TRANSPORTATION",
         "accounts": [
           {
@@ -856,7 +856,7 @@
       },
       {
         "kind": "category",
-        "code": "38",
+        "code": "38000",
         "name": "VIDEOTAPE STOCK",
         "accounts": [
           {
@@ -867,7 +867,7 @@
       },
       {
         "kind": "category",
-        "code": "40",
+        "code": "40000",
         "name": "REMOTE SHOOT",
         "accounts": [
           {
@@ -882,7 +882,7 @@
       },
       {
         "kind": "category",
-        "code": "48",
+        "code": "48000",
         "name": "TOTAL BTL FRINGES",
         "accounts": [
           {
@@ -909,7 +909,7 @@
       },
       {
         "kind": "category",
-        "code": "50",
+        "code": "50000",
         "name": "VIDEO POST PROD",
         "accounts": [
           {
@@ -948,7 +948,7 @@
       },
       {
         "kind": "category",
-        "code": "58",
+        "code": "58000",
         "name": "TOTAL FRINGES",
         "accounts": [
           {
@@ -975,7 +975,7 @@
       },
       {
         "kind": "category",
-        "code": "60",
+        "code": "60000",
         "name": "AMORTIZATION",
         "accounts": [
           {
@@ -1010,7 +1010,7 @@
       },
       {
         "kind": "category",
-        "code": "68",
+        "code": "68000",
         "name": "TOTAL FRINGES",
         "accounts": [
           {
@@ -1037,7 +1037,7 @@
       },
       {
         "kind": "category",
-        "code": "70",
+        "code": "70000",
         "name": "ADMIN",
         "accounts": [
           {
@@ -1124,7 +1124,7 @@
       },
       {
         "kind": "category",
-        "code": "71",
+        "code": "71000",
         "name": "CORPORATE ALLOCATIONS",
         "accounts": [
           {
@@ -1171,7 +1171,7 @@
       },
       {
         "kind": "category",
-        "code": "72",
+        "code": "72000",
         "name": "2ND RUN COSTS",
         "accounts": [
           {
@@ -1218,7 +1218,7 @@
       },
       {
         "kind": "category",
-        "code": "73",
+        "code": "73000",
         "name": "FOREIGN SALE",
         "accounts": [
           {

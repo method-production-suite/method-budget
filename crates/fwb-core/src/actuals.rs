@@ -314,11 +314,7 @@ pub fn check_transaction(t: &Transaction) -> Result<(), ActualsError> {
 /// under `11-01`), is kept as typed (trimmed), so it never lands on an
 /// account it doesn't name.
 pub fn normalize_code(coding: &AccountCoding, code: &str) -> String {
-    let t = code.trim();
-    if t.is_empty() || !coding.fits(t) {
-        return t.to_string();
-    }
-    coding.normalize(t).unwrap_or_else(|_| t.to_string())
+    coding.key(code)
 }
 
 /// What an account number in the chart is.
@@ -349,9 +345,7 @@ pub fn chart(b: &Budget) -> BTreeMap<String, ChartEntry> {
     }
     if let FringePosting::Category { suffix } = &b.fringe_posting {
         for c in b.categories() {
-            let number = coding
-                .fringe_account(&c.code, suffix)
-                .unwrap_or_else(|_| format!("{}{suffix}", c.code));
+            let number = coding.category_fringe_account(&c.code, suffix);
             out.entry(normalize_code(&coding, &number))
                 .or_insert_with(|| ChartEntry {
                     code: number,

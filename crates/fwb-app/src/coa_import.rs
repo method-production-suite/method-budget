@@ -222,6 +222,15 @@ pub struct PreviewDto {
     pub padded: usize,
     pub levels_from_source: bool,
     pub default_levels_added: bool,
+    /// Accounts named `.` (unused slots in the chart) left out.
+    pub placeholders: usize,
+    /// Accounts listed again under the same number and name, merged.
+    pub merged_repeats: usize,
+    /// Accounts listed again under a number already used with another
+    /// name, kept under a new number: `10950 Rehearsal hall rentals:
+    /// 10950-2` (the first [`LISTED`]).
+    pub renumbered: Vec<String>,
+    pub renumbered_count: usize,
     pub apply: Option<ApplyDto>,
     pub truncated: bool,
 }
@@ -475,6 +484,10 @@ fn preview(b: &Budget, content: &Content, req: &Request) -> Result<PreviewDto, S
         padded: 0,
         levels_from_source: chart.level_count() > 0,
         default_levels_added: false,
+        placeholders: 0,
+        merged_repeats: 0,
+        renumbered: Vec::new(),
+        renumbered_count: 0,
         apply,
         truncated: false,
     };
@@ -522,6 +535,18 @@ fn preview(b: &Budget, content: &Content, req: &Request) -> Result<PreviewDto, S
         dto.padded = r.padded;
         dto.levels_from_source = r.levels_from_source;
         dto.default_levels_added = r.default_levels_added;
+        dto.placeholders = r.placeholders;
+        dto.merged_repeats = r.merged_repeats;
+        dto.renumbered = r
+            .renamed_repeats
+            .iter()
+            .take(LISTED)
+            .map(|x| match x.name.as_str() {
+                "" => format!("{}: {}", x.old, x.new),
+                name => format!("{} {name}: {}", x.old, x.new),
+            })
+            .collect();
+        dto.renumbered_count = r.renamed_repeats.len();
         dto.truncated = t.truncated;
     }
     Ok(dto)
@@ -751,7 +776,7 @@ mod tests {
     use super::*;
     use fwb_core::{recalc, starter, RecalcOptions};
 
-    const CSV: &[u8] = b"Account,Description\n,ABOVE THE LINE\n1100,STORY\n1101,Rights\n1101,Rights again\n,PRODUCTION\n2000,STAFF\n2001,Manager\n";
+    const CSV: &[u8] = b"Account,Description\n,ABOVE THE LINE\n1100,STORY\n1101,Rights\n1101,RIGHTS\n,PRODUCTION\n2000,STAFF\n2001,Manager\n";
 
     fn content() -> Content {
         read_content(CSV, "chart.csv").unwrap()
@@ -785,6 +810,7 @@ mod tests {
             .warnings
             .iter()
             .any(|w| w.message.contains("listed again")));
+        assert_eq!((p.merged_repeats, p.renumbered_count), (1, 0));
         assert!(p.apply.is_none());
         assert_eq!(p.rows[0].kind, "category");
         // Another pattern.
@@ -804,6 +830,20 @@ mod tests {
             separator: String::new(),
         });
         assert!(preview(&starter::budget(), &content(), &req).is_err());
+    }
+
+    #[test]
+    fn repeated_numbers_and_unused_slots_are_shown() {
+        let csv = b"kind,code,name,parent\ncategory,10900,LOCATIONS,\naccount,10950,RENTALS,10900\naccount,10950,REHEARSAL HALL RENTALS,10900\naccount,10950,Rentals,10900\naccount,10951,.,10900\n";
+        let content = read_content(csv, "chart.csv").unwrap();
+        let p = preview(&starter::budget(), &content, &start()).unwrap();
+        assert_eq!(p.accounts, 2);
+        assert_eq!(p.renumbered, ["10950 REHEARSAL HALL RENTALS: 10950-2"]);
+        assert_eq!(
+            (p.renumbered_count, p.merged_repeats, p.placeholders),
+            (1, 1, 1)
+        );
+        assert!(p.warnings.iter().any(|w| w.message.contains("10950-2")));
     }
 
     #[test]

@@ -45,6 +45,17 @@
 //! Trailing empty segments are omitted, so a category on its own formats as just
 //! the category. Segments are written as stored; `format` does not pad or
 //! truncate, that is `parse`'s job.
+//!
+//! # Numbers that don't follow the pattern
+//!
+//! The pattern is how new numbers are typed and how numbers are read for
+//! matching; it never rewrites a number already in a budget. A budget made
+//! from a studio chart keeps the chart's numbers exactly as written, so some
+//! may not follow its pattern (mixed widths, `1A00`, `4AA.`). Anything that
+//! matches numbers (actuals, comparison, imports, lookups by number) reads
+//! a number with [`AccountCoding::read`] / [`AccountCoding::key`]: through
+//! the pattern only when nothing would be cut off, else as its text, so two
+//! different numbers never become one by being cut short.
 
 use std::fmt;
 
@@ -322,6 +333,47 @@ impl AccountCoding {
         Ok(self.format(&self.parse(typed)?))
     }
 
+    /// `code` split into segments when the pattern reads it without
+    /// cutting anything off ([`AccountCoding::fits`] and
+    /// [`AccountCoding::parse`] both agree); `None` for a number that
+    /// doesn't follow the pattern (see "Numbers that don't follow the
+    /// pattern" in the module docs).
+    pub fn read(&self, code: &str) -> Option<AccountCode> {
+        let t = code.trim();
+        if t.is_empty() || !self.fits(t) {
+            return None;
+        }
+        self.parse(t).ok()
+    }
+
+    /// The number as matching compares it: the pattern's spelling when the
+    /// pattern reads it without cutting ([`AccountCoding::read`]), else its
+    /// trimmed text. `1101` and `11-01` are one number under a 2 + 2
+    /// pattern; `050101` stays `050101` under it, never `05-01`.
+    pub fn key(&self, code: &str) -> String {
+        match self.read(code) {
+            Some(c) => self.format(&c),
+            None => code.trim().to_string(),
+        }
+    }
+
+    /// The category a category's own number names, as matching compares
+    /// it: its category segment when the pattern reads it without cutting
+    /// and every later segment is empty or zeros (`11`, `1100` and `11-00`
+    /// are category `11`), else its trimmed text (`1A00-5`, `050101`).
+    pub fn category_key(&self, code: &str) -> String {
+        match self.read(code) {
+            Some(c)
+                if [&c.account, &c.sub, &c.set]
+                    .iter()
+                    .all(|s| s.bytes().all(|b| b == b'0')) =>
+            {
+                c.category
+            }
+            _ => code.trim().to_string(),
+        }
+    }
+
     /// The fringe account number for a category under category posting.
     ///
     /// `category` is parsed like any typed account number and only its category
@@ -350,6 +402,28 @@ impl AccountCoding {
             ..AccountCode::default()
         };
         Ok(self.format(&code))
+    }
+
+    /// The fringe account number of the category numbered `category` (as
+    /// stored) under category posting: [`AccountCoding::fringe_account`]
+    /// when the number names a plain category ([`AccountCoding::category_key`]
+    /// reads it as a category part: `11`, `1100`, `11-00`), else the number
+    /// as written followed by the suffix (`0501` with `99` is `050199`).
+    /// Two categories with different numbers never share a fringe account
+    /// because the pattern cut one short (`0501` and `0502` are not both
+    /// `0599`).
+    pub fn category_fringe_account(&self, category: &str, suffix: &str) -> String {
+        let plain = self.read(category).is_some_and(|c| {
+            [&c.account, &c.sub, &c.set]
+                .iter()
+                .all(|s| s.bytes().all(|b| b == b'0'))
+        });
+        if plain {
+            if let Ok(n) = self.fringe_account(category, suffix) {
+                return n;
+            }
+        }
+        format!("{}{}", category.trim(), suffix.trim())
     }
 }
 
@@ -461,6 +535,39 @@ mod tests {
         }
         assert!(pat(2, 2, 2, 0, None).fits("11-01-55"));
         assert!(!pat(2, 2, 2, 0, None).fits("1101555"));
+    }
+
+    #[test]
+    fn reading_never_cuts_and_keys_fall_back_to_the_text() {
+        let p = pat(2, 2, 0, 0, None);
+        assert_eq!(p.read("1101"), Some(code("11", "01", "", "")));
+        assert_eq!(p.key("11-01"), "1101");
+        assert_eq!(p.key(" 1101 "), "1101");
+        // Too long, a part too long, too many parts, odd characters: as written.
+        for (typed, key) in [
+            ("050101", "050101"),
+            ("4AA.", "4AA."),
+            ("10950-2", "10950-2"),
+            ("11-01-2", "11-01-2"),
+            ("79-03`", "79-03`"),
+        ] {
+            assert_eq!(p.read(typed), None, "{typed}");
+            assert_eq!(p.key(typed), key, "{typed}");
+        }
+        assert_eq!(p.key("1A00"), "1A00");
+        assert_eq!(p.key(""), "");
+        // Category keys: the category part when the rest is zeros.
+        for (typed, key) in [
+            ("11", "11"),
+            ("1100", "11"),
+            ("11-00", "11"),
+            ("1A00", "1A"),
+            ("1101", "1101"),
+            ("050101", "050101"),
+            ("5600-100", "5600-100"),
+        ] {
+            assert_eq!(p.category_key(typed), key, "{typed}");
+        }
     }
 
     #[test]
@@ -638,6 +745,19 @@ mod tests {
         assert_eq!(wide.fringe_account("2000", "99").unwrap(), "20000099");
         let narrow = pat(2, 1, 0, 0, Some('.'));
         assert_eq!(narrow.fringe_account("11", "99").unwrap(), "11.9");
+    }
+
+    #[test]
+    fn category_fringe_accounts_never_cut_a_category_short() {
+        let p = pat(2, 2, 0, 0, None);
+        assert_eq!(p.category_fringe_account("11", "99"), "1199");
+        assert_eq!(p.category_fringe_account("1100", "99"), "1199");
+        assert_eq!(p.category_fringe_account("5", "99"), "0599");
+        // Not a plain category under the pattern: the number as written.
+        assert_eq!(p.category_fringe_account("0501", "99"), "050199");
+        assert_eq!(p.category_fringe_account("0502", "99"), "050299");
+        assert_eq!(p.category_fringe_account("5600-100", "99"), "5600-10099");
+        assert_eq!(p.category_fringe_account("4AA.", "99"), "4AA.99");
     }
 
     #[test]

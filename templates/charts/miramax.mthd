@@ -1,0 +1,8205 @@
+{
+  "format": "method-budget",
+  "version": 1,
+  "budget": {
+    "title": "MIRAMAX",
+    "base_currency": "USD",
+    "units": {
+      "Allow": {
+        "plural": "Allow"
+      },
+      "Day": {
+        "plural": "Days",
+        "hours": "10"
+      },
+      "Flat": {
+        "plural": "Flat"
+      },
+      "Hour": {
+        "plural": "Hours",
+        "hours": "1"
+      },
+      "Month": {
+        "plural": "Months",
+        "hours": "200"
+      },
+      "Week": {
+        "plural": "Weeks",
+        "hours": "50"
+      }
+    },
+    "topsheet": [
+      {
+        "kind": "category",
+        "code": "31-00",
+        "name": "STORY RIGHTS",
+        "accounts": [
+          {
+            "code": "31-01",
+            "name": "STORY RIGHTS"
+          },
+          {
+            "code": "31-02",
+            "name": "TURNAROUND COST"
+          },
+          {
+            "code": "31-03",
+            "name": "OPTIONS"
+          },
+          {
+            "code": "31-04",
+            "name": "STORY RIGHTS PROCEEDS"
+          },
+          {
+            "code": "31-36",
+            "name": "SHUT-DOWN COSTS"
+          },
+          {
+            "code": "31-78",
+            "name": "RIGHTS OVERALL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "32-00",
+        "name": "WRITER",
+        "accounts": [
+          {
+            "code": "32-01",
+            "name": "WRITERS LABOR"
+          },
+          {
+            "code": "32-04",
+            "name": "WRITER'S LABOR #2"
+          },
+          {
+            "code": "32-06",
+            "name": "WRITER'S BONUSES"
+          },
+          {
+            "code": "32-09",
+            "name": "WRITERS ASSISTANTS"
+          },
+          {
+            "code": "32-78",
+            "name": "WRITER'S OVERALL"
+          },
+          {
+            "code": "32-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "32-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "32-95",
+            "name": "MATERIALS & SUPPLIES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "33-00",
+        "name": "SCENARIO MISCELLANEOUS",
+        "accounts": [
+          {
+            "code": "33-02",
+            "name": "TYPISTS"
+          },
+          {
+            "code": "33-03",
+            "name": "RESEARCH LIBRARIAN"
+          },
+          {
+            "code": "33-06",
+            "name": "STORY CONSULTANT"
+          },
+          {
+            "code": "33-15",
+            "name": "SCRIPT CLEARANCE"
+          },
+          {
+            "code": "33-20",
+            "name": "STORY BOARD DEVELOPMENT"
+          },
+          {
+            "code": "33-60",
+            "name": "PRINTING"
+          },
+          {
+            "code": "33-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "33-95",
+            "name": "MATERIALS & SUPPLIES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "36-00",
+        "name": "PRODUCER",
+        "accounts": [
+          {
+            "code": "36-01",
+            "name": "EXECUTIVE PRODUCER"
+          },
+          {
+            "code": "36-02",
+            "name": "PRODUCER"
+          },
+          {
+            "code": "36-03",
+            "name": "ASSOCIATE PRODUCER"
+          },
+          {
+            "code": "36-04",
+            "name": "ASSISTANTS"
+          },
+          {
+            "code": "36-06",
+            "name": "SECRETARIES"
+          },
+          {
+            "code": "36-07",
+            "name": "PRODUCTION EXECUTIVE"
+          },
+          {
+            "code": "36-08",
+            "name": "POST PROD SUPERVISOR"
+          },
+          {
+            "code": "36-20",
+            "name": "PRODUCTION SERVICE FEE"
+          },
+          {
+            "code": "36-39",
+            "name": "ENTERTAINMENT"
+          },
+          {
+            "code": "36-78",
+            "name": "PRODUCERS OVERALL"
+          },
+          {
+            "code": "36-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "36-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "36-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "36-98",
+            "name": "FOREIGN GUILD FEES"
+          },
+          {
+            "code": "36-99",
+            "name": "FRINGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "37-00",
+        "name": "DIRECTOR",
+        "accounts": [
+          {
+            "code": "37-01",
+            "name": "1ST UNIT DIRECTORS LABOR"
+          },
+          {
+            "code": "37-02",
+            "name": "2ND UNIT DIRECTORS LABOR"
+          },
+          {
+            "code": "37-04",
+            "name": "ASSISTANTS TO DIRECTOR"
+          },
+          {
+            "code": "37-08",
+            "name": "CHOREOGRAPHER"
+          },
+          {
+            "code": "37-09",
+            "name": "ASSISTANT CHOREOGRAPHER"
+          },
+          {
+            "code": "37-14",
+            "name": "OTHER LABOR"
+          },
+          {
+            "code": "37-39",
+            "name": "ENTERTAINMENT"
+          },
+          {
+            "code": "37-78",
+            "name": "DIRECTORS OVERALL"
+          },
+          {
+            "code": "37-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "37-86",
+            "name": "BOX RENTAL"
+          },
+          {
+            "code": "37-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "37-98",
+            "name": "FOREIGN GUILD FEES"
+          },
+          {
+            "code": "37-99",
+            "name": "FRINGE BENEFITS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "38-00",
+        "name": "CAST",
+        "accounts": [
+          {
+            "code": "38-01",
+            "name": "PRINCIPAL CAST (NAME REQ'D)"
+          },
+          {
+            "code": "38-02",
+            "name": "PRINCIPAL CAST (NAME REQ'D)"
+          },
+          {
+            "code": "38-03",
+            "name": "PRINCIPAL CAST (NAME REQ'D)"
+          },
+          {
+            "code": "38-04",
+            "name": "PRINCIPAL CAST (NAME REQ'D)"
+          },
+          {
+            "code": "38-05",
+            "name": "PRINCIPAL CAST (NAME REQ'D)"
+          },
+          {
+            "code": "38-06",
+            "name": "PRINCIPAL CAST (NAME REQ'D)"
+          },
+          {
+            "code": "38-07",
+            "name": "PRINCIPAL CAST (NAME REQ'D)"
+          },
+          {
+            "code": "38-08",
+            "name": "WELFARE WORKER/TEACHER"
+          },
+          {
+            "code": "38-11",
+            "name": "DIALOGUE COACH"
+          },
+          {
+            "code": "38-14",
+            "name": "OTHER LABOR"
+          },
+          {
+            "code": "38-15",
+            "name": "OTHER LABOR"
+          },
+          {
+            "code": "38-16",
+            "name": "OTHER LABOR"
+          },
+          {
+            "code": "38-17",
+            "name": "OTHER LABOR"
+          },
+          {
+            "code": "38-18",
+            "name": "OTHER LABOR"
+          },
+          {
+            "code": "38-19",
+            "name": "OTHER LABOR"
+          },
+          {
+            "code": "38-20",
+            "name": "CASTING SERVICES"
+          },
+          {
+            "code": "38-21",
+            "name": "CASTING ASSISTANT"
+          },
+          {
+            "code": "38-22",
+            "name": "CASTING LOCATION EXPENSES"
+          },
+          {
+            "code": "38-25",
+            "name": "OTHER CAST"
+          },
+          {
+            "code": "38-26",
+            "name": "OTHER CAST"
+          },
+          {
+            "code": "38-27",
+            "name": "OTHER CAST"
+          },
+          {
+            "code": "38-28",
+            "name": "OTHER CAST"
+          },
+          {
+            "code": "38-29",
+            "name": "OTHER CAST"
+          },
+          {
+            "code": "38-30",
+            "name": "OTHER CAST"
+          },
+          {
+            "code": "38-31",
+            "name": "OTHER CAST"
+          },
+          {
+            "code": "38-32",
+            "name": "OTHER CAST"
+          },
+          {
+            "code": "38-33",
+            "name": "OTHER CAST"
+          },
+          {
+            "code": "38-34",
+            "name": "OTHER CAST"
+          },
+          {
+            "code": "38-35",
+            "name": "OTHER CAST"
+          },
+          {
+            "code": "38-78",
+            "name": "CAST OVERALL"
+          },
+          {
+            "code": "38-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "38-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "38-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "38-98",
+            "name": "FOREIGN GUILD FEES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "39-00",
+        "name": "BITS & STUNTS",
+        "accounts": [
+          {
+            "code": "39-01",
+            "name": "BITS/DAY PLAYERS"
+          },
+          {
+            "code": "39-02",
+            "name": "STUNT COORDINATOR"
+          },
+          {
+            "code": "39-03",
+            "name": "STUNTS"
+          },
+          {
+            "code": "39-04",
+            "name": "DANCERS"
+          },
+          {
+            "code": "39-05",
+            "name": "LOOPING"
+          },
+          {
+            "code": "39-06",
+            "name": "BIT #1 (NAME REQ'D)"
+          },
+          {
+            "code": "39-07",
+            "name": "BIT #2 (NAME REQ'D)"
+          },
+          {
+            "code": "39-08",
+            "name": "BIT #3 (NAME REQ'D)"
+          },
+          {
+            "code": "39-09",
+            "name": "NARRATOR"
+          },
+          {
+            "code": "39-10",
+            "name": "BIT #4"
+          },
+          {
+            "code": "39-11",
+            "name": "BIT #5"
+          },
+          {
+            "code": "39-12",
+            "name": "BIT #6"
+          },
+          {
+            "code": "39-13",
+            "name": "BIT #7"
+          },
+          {
+            "code": "39-14",
+            "name": "BIT #8"
+          },
+          {
+            "code": "39-15",
+            "name": "BIT #9"
+          },
+          {
+            "code": "39-16",
+            "name": "BIT #10"
+          },
+          {
+            "code": "39-17",
+            "name": "BIT #11"
+          },
+          {
+            "code": "39-18",
+            "name": "BIT #12"
+          },
+          {
+            "code": "39-19",
+            "name": "BIT #13"
+          },
+          {
+            "code": "39-20",
+            "name": "BIT #14"
+          },
+          {
+            "code": "39-21",
+            "name": "BIT #15"
+          },
+          {
+            "code": "39-22",
+            "name": "BIT #16"
+          },
+          {
+            "code": "39-23",
+            "name": "BIT #17"
+          },
+          {
+            "code": "39-24",
+            "name": "BIT #18"
+          },
+          {
+            "code": "39-25",
+            "name": "BIT #19"
+          },
+          {
+            "code": "39-26",
+            "name": "BIT #20"
+          },
+          {
+            "code": "39-27",
+            "name": "BIT #21"
+          },
+          {
+            "code": "39-28",
+            "name": "BIT #22"
+          },
+          {
+            "code": "39-29",
+            "name": "BIT #23"
+          },
+          {
+            "code": "39-30",
+            "name": "BIT #24"
+          },
+          {
+            "code": "39-31",
+            "name": "BIT #25"
+          },
+          {
+            "code": "39-32",
+            "name": "BIT #26"
+          },
+          {
+            "code": "39-33",
+            "name": "BIT #27"
+          },
+          {
+            "code": "39-34",
+            "name": "BIT #28"
+          },
+          {
+            "code": "39-35",
+            "name": "BIT #29"
+          },
+          {
+            "code": "39-36",
+            "name": "BIT #30"
+          },
+          {
+            "code": "39-37",
+            "name": "BIT #31"
+          },
+          {
+            "code": "39-38",
+            "name": "BIT #32"
+          },
+          {
+            "code": "39-39",
+            "name": "BIT #33"
+          },
+          {
+            "code": "39-40",
+            "name": "BIT #34"
+          },
+          {
+            "code": "39-41",
+            "name": "BIT #35"
+          },
+          {
+            "code": "39-42",
+            "name": "BIT #36"
+          },
+          {
+            "code": "39-43",
+            "name": "BIT #37"
+          },
+          {
+            "code": "39-44",
+            "name": "BIT #38"
+          },
+          {
+            "code": "39-45",
+            "name": "BIT #39"
+          },
+          {
+            "code": "39-46",
+            "name": "BIT #40"
+          },
+          {
+            "code": "39-47",
+            "name": "BIT #41"
+          },
+          {
+            "code": "39-48",
+            "name": "BIT #42"
+          },
+          {
+            "code": "39-49",
+            "name": "BIT #43"
+          },
+          {
+            "code": "39-50",
+            "name": "BIT #44"
+          },
+          {
+            "code": "39-51",
+            "name": "BIT #45"
+          },
+          {
+            "code": "39-52",
+            "name": "BIT #46"
+          },
+          {
+            "code": "39-53",
+            "name": "BIT #47"
+          },
+          {
+            "code": "39-54",
+            "name": "BIT #48"
+          },
+          {
+            "code": "39-55",
+            "name": "BIT #49"
+          },
+          {
+            "code": "39-56",
+            "name": "BIT #50"
+          },
+          {
+            "code": "39-57",
+            "name": "BIT #51"
+          },
+          {
+            "code": "39-58",
+            "name": "BIT #52"
+          },
+          {
+            "code": "39-59",
+            "name": "BIT #53"
+          },
+          {
+            "code": "39-60",
+            "name": "BIT #54"
+          },
+          {
+            "code": "39-61",
+            "name": "BIT #55"
+          },
+          {
+            "code": "39-62",
+            "name": "BIT #56"
+          },
+          {
+            "code": "39-63",
+            "name": "BIT #57"
+          },
+          {
+            "code": "39-64",
+            "name": "BIT #58"
+          },
+          {
+            "code": "39-65",
+            "name": "BIT #59"
+          },
+          {
+            "code": "39-66",
+            "name": "BIT #60"
+          },
+          {
+            "code": "39-67",
+            "name": "BIT #61"
+          },
+          {
+            "code": "39-68",
+            "name": "BIT #62"
+          },
+          {
+            "code": "39-69",
+            "name": "BIT #63"
+          },
+          {
+            "code": "39-70",
+            "name": "BIT #64"
+          },
+          {
+            "code": "39-71",
+            "name": "BIT #65"
+          },
+          {
+            "code": "39-72",
+            "name": "BIT #66"
+          },
+          {
+            "code": "39-73",
+            "name": "BIT #67"
+          },
+          {
+            "code": "39-74",
+            "name": "BIT #68"
+          },
+          {
+            "code": "39-75",
+            "name": "BIT #69"
+          },
+          {
+            "code": "39-76",
+            "name": "BIT #70"
+          },
+          {
+            "code": "39-77",
+            "name": "BIT #71"
+          },
+          {
+            "code": "39-78",
+            "name": "BIT #72"
+          },
+          {
+            "code": "39-79",
+            "name": "BIT #73"
+          },
+          {
+            "code": "39-80",
+            "name": "BIT #74"
+          },
+          {
+            "code": "39-81",
+            "name": "BIT #75"
+          },
+          {
+            "code": "39-82",
+            "name": "BIT #76"
+          },
+          {
+            "code": "39-83",
+            "name": "BIT #77/MISC. BITS"
+          },
+          {
+            "code": "39-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "39-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "39-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "39-98",
+            "name": "FOREIGN GUILD FEES"
+          },
+          {
+            "code": "39AA",
+            "name": "BIT #78"
+          },
+          {
+            "code": "39AB",
+            "name": "BIT #79"
+          },
+          {
+            "code": "39AC",
+            "name": "BIT #80"
+          },
+          {
+            "code": "39AD",
+            "name": "BIT #81"
+          },
+          {
+            "code": "39AE",
+            "name": "BIT #82"
+          },
+          {
+            "code": "39AF",
+            "name": "BIT #83"
+          },
+          {
+            "code": "39AG",
+            "name": "BIT #84"
+          },
+          {
+            "code": "39AH",
+            "name": "BIT #85"
+          },
+          {
+            "code": "39AI",
+            "name": "BIT #86"
+          },
+          {
+            "code": "39AJ",
+            "name": "BIT #87"
+          },
+          {
+            "code": "39AK",
+            "name": "BIT #88"
+          },
+          {
+            "code": "39AL",
+            "name": "BIT #89"
+          },
+          {
+            "code": "39AM",
+            "name": "BIT #90"
+          },
+          {
+            "code": "39AN",
+            "name": "BIT #91"
+          },
+          {
+            "code": "39AO",
+            "name": "BIT #92"
+          },
+          {
+            "code": "39AP",
+            "name": "BIT #93"
+          },
+          {
+            "code": "39AQ",
+            "name": "BIT #94"
+          },
+          {
+            "code": "39AR",
+            "name": "BIT #95"
+          },
+          {
+            "code": "39AS",
+            "name": "BIT #96"
+          },
+          {
+            "code": "39AT",
+            "name": "BIT #97"
+          },
+          {
+            "code": "39AU",
+            "name": "BIT #97"
+          },
+          {
+            "code": "39AV",
+            "name": "BIT #98"
+          },
+          {
+            "code": "39AW",
+            "name": "BIT #99"
+          },
+          {
+            "code": "39AX",
+            "name": "BIT #100"
+          },
+          {
+            "code": "39AY",
+            "name": "BIT #101"
+          },
+          {
+            "code": "39AZ",
+            "name": "BIT #102"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "41-00",
+        "name": "ATL TRAVEL & LIVING",
+        "accounts": [
+          {
+            "code": "41-11",
+            "name": "WRITERS AIRFARES"
+          },
+          {
+            "code": "41-12",
+            "name": "WRITERS HOTEL"
+          },
+          {
+            "code": "41-13",
+            "name": "WRITERS LIVING EXPENSE"
+          },
+          {
+            "code": "41-21",
+            "name": "PRODUCERS AIRFARES"
+          },
+          {
+            "code": "41-22",
+            "name": "PRODUCERS HOTEL"
+          },
+          {
+            "code": "41-23",
+            "name": "PRODUCERS LIVING EXPENSE"
+          },
+          {
+            "code": "41-31",
+            "name": "DIRECTORS AIRFARES"
+          },
+          {
+            "code": "41-32",
+            "name": "DIRECTORS HOTEL"
+          },
+          {
+            "code": "41-33",
+            "name": "DIRECTORS LIVING EXPENSE"
+          },
+          {
+            "code": "41-41",
+            "name": "CAST AIRFARES"
+          },
+          {
+            "code": "41-42",
+            "name": "CAST HOTEL"
+          },
+          {
+            "code": "41-43",
+            "name": "CAST LIVING EXPENSE"
+          },
+          {
+            "code": "41-51",
+            "name": "BITS & STUNTS AIRFARES"
+          },
+          {
+            "code": "41-52",
+            "name": "BITS & STUNTS HOTEL"
+          },
+          {
+            "code": "41-53",
+            "name": "BITS & STUNTS LIVING EXP"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total above-the-line"
+      },
+      {
+        "kind": "category",
+        "code": "42-00",
+        "name": "EXTRAS & STANDINS",
+        "accounts": [
+          {
+            "code": "42-01",
+            "name": "EXTRAS/STANDINS"
+          },
+          {
+            "code": "42-02",
+            "name": "EXTRAS/STANDINS-DIST.LOC."
+          },
+          {
+            "code": "42-03",
+            "name": "EXTRAS/STANDINS-OTHER LOC"
+          },
+          {
+            "code": "42-04",
+            "name": "MUSICIANS"
+          },
+          {
+            "code": "42-05",
+            "name": "SINGERS/CHORUS"
+          },
+          {
+            "code": "42-06",
+            "name": "DANCERS"
+          },
+          {
+            "code": "42-07",
+            "name": "TEACHER/WELFARE WORKER"
+          },
+          {
+            "code": "42-08",
+            "name": "WARDROBE FITTINGS"
+          },
+          {
+            "code": "42-09",
+            "name": "INTERVIEWS"
+          },
+          {
+            "code": "42-10",
+            "name": "ADJUSTMENTS"
+          },
+          {
+            "code": "42-11",
+            "name": "MILEAGE"
+          },
+          {
+            "code": "42-50",
+            "name": "CASTING COMMISSIONS"
+          },
+          {
+            "code": "42-55",
+            "name": "CASTING COORDINATOR"
+          },
+          {
+            "code": "42-56",
+            "name": "ASS'T CASTING COORDINATOR"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "43-00",
+        "name": "PRODUCTION STAFF",
+        "accounts": [
+          {
+            "code": "43-01",
+            "name": "UNIT PRODUCTION MANAGER"
+          },
+          {
+            "code": "43-02",
+            "name": "1ST ASSISTANT DIRECTOR"
+          },
+          {
+            "code": "43-03",
+            "name": "KEY 2ND ASSIST DIRECTOR"
+          },
+          {
+            "code": "43-04",
+            "name": "ADD'L 2ND ASSIST DIRECTOR"
+          },
+          {
+            "code": "43-05",
+            "name": "TRAINEE"
+          },
+          {
+            "code": "43-06",
+            "name": "LOCATION MANAGER"
+          },
+          {
+            "code": "43-07",
+            "name": "SCRIPT SUPERVISOR"
+          },
+          {
+            "code": "43-09",
+            "name": "PRODUCTION ACCOUNTANT"
+          },
+          {
+            "code": "43-10",
+            "name": "ASSISTANT ACCOUNTANTS"
+          },
+          {
+            "code": "43-11",
+            "name": "ASSISTANT ACCOUNTANTS"
+          },
+          {
+            "code": "43-12",
+            "name": "TECHNICAL ADVISOR"
+          },
+          {
+            "code": "43-13",
+            "name": "PRODUCTION COORDINATOR"
+          },
+          {
+            "code": "43-14",
+            "name": "ASSISTANT P.O.C."
+          },
+          {
+            "code": "43-15",
+            "name": "PRODUCTION SUPERVISOR"
+          },
+          {
+            "code": "43-18",
+            "name": "OTHER LABOR"
+          },
+          {
+            "code": "43-19",
+            "name": "OFFICE P.A"
+          },
+          {
+            "code": "43-20",
+            "name": "OFFICE P.A."
+          },
+          {
+            "code": "43-21",
+            "name": "SET P.A."
+          },
+          {
+            "code": "43-22",
+            "name": "SET P.A."
+          },
+          {
+            "code": "43-23",
+            "name": "SET P.A."
+          },
+          {
+            "code": "43-26",
+            "name": "INTERPRETERS"
+          },
+          {
+            "code": "43-35",
+            "name": "BUDGETING/SCHEDULING"
+          },
+          {
+            "code": "43-37",
+            "name": "PRE-PRODUCTION EXPENSES"
+          },
+          {
+            "code": "43-38",
+            "name": "PRODUCTION EXPENSES"
+          },
+          {
+            "code": "43-45",
+            "name": "SCRIPT TIMING"
+          },
+          {
+            "code": "43-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "43-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "43-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "43-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "44-00",
+        "name": "WARDROBE",
+        "accounts": [
+          {
+            "code": "44-02",
+            "name": "DESIGNERS"
+          },
+          {
+            "code": "44-03",
+            "name": "LEAD COSTUMER"
+          },
+          {
+            "code": "44-04",
+            "name": "ADDITIONAL COSTUMER MAN"
+          },
+          {
+            "code": "44-05",
+            "name": "ADDITIONAL COSTUMER WOMAN"
+          },
+          {
+            "code": "44-06",
+            "name": "TAILOR/SEAMSTRESS"
+          },
+          {
+            "code": "44-07",
+            "name": "SEAMSTRESS"
+          },
+          {
+            "code": "44-09",
+            "name": "OTHER LABOR"
+          },
+          {
+            "code": "44-11",
+            "name": "CHARACTER #1 (NAME REQ'D)"
+          },
+          {
+            "code": "44-12",
+            "name": "CHARACTER #2"
+          },
+          {
+            "code": "44-13",
+            "name": "CHARACTER #3"
+          },
+          {
+            "code": "44-14",
+            "name": "CHARACTER #4"
+          },
+          {
+            "code": "44-15",
+            "name": "CHARACTER #5"
+          },
+          {
+            "code": "44-16",
+            "name": "CHARACTER #6"
+          },
+          {
+            "code": "44-17",
+            "name": "CHARACTER #7"
+          },
+          {
+            "code": "44-18",
+            "name": "CHARACTER #8"
+          },
+          {
+            "code": "44-19",
+            "name": "CHARACTER #9"
+          },
+          {
+            "code": "44-20",
+            "name": "CHARACTER #10"
+          },
+          {
+            "code": "44-21",
+            "name": "CHARACTER #11"
+          },
+          {
+            "code": "44-22",
+            "name": "CHARACTER #12"
+          },
+          {
+            "code": "44-23",
+            "name": "CHARACTER #13"
+          },
+          {
+            "code": "44-24",
+            "name": "CHARACTER #14"
+          },
+          {
+            "code": "44-25",
+            "name": "CHARACTER #15"
+          },
+          {
+            "code": "44-26",
+            "name": "CHARACTER #16"
+          },
+          {
+            "code": "44-27",
+            "name": "CHARACTER #17"
+          },
+          {
+            "code": "44-28",
+            "name": "CHARACTER #18"
+          },
+          {
+            "code": "44-29",
+            "name": "CHARACTER #19"
+          },
+          {
+            "code": "44-30",
+            "name": "CHARACTER #20/MISC."
+          },
+          {
+            "code": "44-40",
+            "name": "CLEANING & LAUNDRY"
+          },
+          {
+            "code": "44-60",
+            "name": "DYING"
+          },
+          {
+            "code": "44-80",
+            "name": "MILLENERY"
+          },
+          {
+            "code": "44-82",
+            "name": "FITTING ROOMS"
+          },
+          {
+            "code": "44-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "44-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "44-87",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "44-89",
+            "name": "MANUFACTURING"
+          },
+          {
+            "code": "44-90",
+            "name": "WARDROBE PURCHASES"
+          },
+          {
+            "code": "44-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "44-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "45-00",
+        "name": "MAKEUP & HAIRDRESSING",
+        "accounts": [
+          {
+            "code": "45-02",
+            "name": "KEY MAKEUP ARTIST"
+          },
+          {
+            "code": "45-03",
+            "name": "ADDITIONAL MAKEUP ARTIST"
+          },
+          {
+            "code": "45-04",
+            "name": "BODY MAKEUP"
+          },
+          {
+            "code": "45-05",
+            "name": "ADD'L BODY MAKEUP"
+          },
+          {
+            "code": "45-10",
+            "name": "HEAD HAIR STYLIST"
+          },
+          {
+            "code": "45-11",
+            "name": "ADDITIONAL HAIR STYLIST"
+          },
+          {
+            "code": "45-12",
+            "name": "ASST HEAD HAIR STYLIST"
+          },
+          {
+            "code": "45-19",
+            "name": "WIGS / HAIRPIECES"
+          },
+          {
+            "code": "45-20",
+            "name": "PROSTHETICS SUB-CONTRACT"
+          },
+          {
+            "code": "45-31",
+            "name": "PROSTHETICS TECHNICIANS"
+          },
+          {
+            "code": "45-32",
+            "name": "PROSTHETICS TECHNICIANS"
+          },
+          {
+            "code": "45-33",
+            "name": "PROSTHETICS TECHNICIANS"
+          },
+          {
+            "code": "45-34",
+            "name": "PROSTHETICS LAB"
+          },
+          {
+            "code": "45-35",
+            "name": "PROSTHETICS MANUFACTURING"
+          },
+          {
+            "code": "45-36",
+            "name": "PROSTHETICS RENTALS"
+          },
+          {
+            "code": "45-37",
+            "name": "PROSTHETICS PURCHASES"
+          },
+          {
+            "code": "45-38",
+            "name": "PROSTHETICS SUPPLIES"
+          },
+          {
+            "code": "45-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "45-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "45-89",
+            "name": "MANUFACTURING"
+          },
+          {
+            "code": "45-90",
+            "name": "PURCHASES: (HAIRPIECES/WIGS)"
+          },
+          {
+            "code": "45-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "45-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "46-00",
+        "name": "PROCESS PHOTOGRAPHY",
+        "accounts": [
+          {
+            "code": "46-01",
+            "name": "SUPERVISOR"
+          },
+          {
+            "code": "46-02",
+            "name": "CAMERA LABOR"
+          },
+          {
+            "code": "46-03",
+            "name": "ELECTRIC LABOR"
+          },
+          {
+            "code": "46-04",
+            "name": "GRIP LABOR"
+          },
+          {
+            "code": "46-05",
+            "name": "PROJECTIONIST"
+          },
+          {
+            "code": "46-06",
+            "name": "OTHER LABOR"
+          },
+          {
+            "code": "46-07",
+            "name": "PROCESS UNIT #1"
+          },
+          {
+            "code": "46-08",
+            "name": "PROCESS UNIT #2"
+          },
+          {
+            "code": "46-09",
+            "name": "PROCESS UNIT #3"
+          },
+          {
+            "code": "46-10",
+            "name": "PROCESS UNIT #4"
+          },
+          {
+            "code": "46-60",
+            "name": "FACILITIES"
+          },
+          {
+            "code": "46-69",
+            "name": "TRAVEL EXPENSES"
+          },
+          {
+            "code": "46-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "46-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "46-89",
+            "name": "MANUFACTURING"
+          },
+          {
+            "code": "46-90",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "46-95",
+            "name": "MATERIALS AND SUPPLIES"
+          },
+          {
+            "code": "46-96",
+            "name": "LOSS AND DAMAGE"
+          },
+          {
+            "code": "46-99",
+            "name": "FRINGE BENEFITS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "47-00",
+        "name": "CAMERA",
+        "accounts": [
+          {
+            "code": "47-02",
+            "name": "DIRECTOR OF PHOTOGRAPHY"
+          },
+          {
+            "code": "47-03",
+            "name": "OPERATOR"
+          },
+          {
+            "code": "47-04",
+            "name": "1ST ASSISTANT CAMERAMAN"
+          },
+          {
+            "code": "47-05",
+            "name": "2ND ASSISTANT CAMERAMAN"
+          },
+          {
+            "code": "47-06",
+            "name": "CAMERA TECHNICIAN"
+          },
+          {
+            "code": "47-07",
+            "name": "ADDITIONAL CAMERA CREW"
+          },
+          {
+            "code": "47-09",
+            "name": "STILL PHOTOGRAPHER"
+          },
+          {
+            "code": "47-12",
+            "name": "STEADICAM"
+          },
+          {
+            "code": "47-13",
+            "name": "AERIAL PHOTOGRAPHY"
+          },
+          {
+            "code": "47-14",
+            "name": "WATER PHOTOGRAPHY"
+          },
+          {
+            "code": "47-15",
+            "name": "VIDEO ASSIST"
+          },
+          {
+            "code": "47-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "47-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "47-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "47-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "48-00",
+        "name": "PRODUCTION FILM AND LAB",
+        "accounts": [
+          {
+            "code": "48-31",
+            "name": "RAW STOCK"
+          },
+          {
+            "code": "48-32",
+            "name": "DEVELOPING"
+          },
+          {
+            "code": "48-33",
+            "name": "PRINTING"
+          },
+          {
+            "code": "48-34",
+            "name": "DOUBLE PRINTING DAILIES"
+          },
+          {
+            "code": "48-35",
+            "name": "TAPE TO TAPE DUP.-DAILIES"
+          },
+          {
+            "code": "48-37",
+            "name": "1/4 INCH SOUND STOCK"
+          },
+          {
+            "code": "48-39",
+            "name": "TRANSFER SOUND DAILIES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "49-00",
+        "name": "SET DRESSING",
+        "accounts": [
+          {
+            "code": "49-02",
+            "name": "SET DECORATOR"
+          },
+          {
+            "code": "49-03",
+            "name": "LEADMAN/BUYER"
+          },
+          {
+            "code": "49-04",
+            "name": "SWING GANG"
+          },
+          {
+            "code": "49-06",
+            "name": "DRAPERY"
+          },
+          {
+            "code": "49-08",
+            "name": "OTHER LABOR"
+          },
+          {
+            "code": "49-09",
+            "name": "ON-SET DRESSER"
+          },
+          {
+            "code": "49-11",
+            "name": "SET #1 (DESCRIPTION REQ'D)"
+          },
+          {
+            "code": "49-12",
+            "name": "SET #2"
+          },
+          {
+            "code": "49-13",
+            "name": "SET #3"
+          },
+          {
+            "code": "49-14",
+            "name": "SET #4"
+          },
+          {
+            "code": "49-15",
+            "name": "SET #5"
+          },
+          {
+            "code": "49-16",
+            "name": "SET #6"
+          },
+          {
+            "code": "49-17",
+            "name": "SET #7"
+          },
+          {
+            "code": "49-18",
+            "name": "SET #8"
+          },
+          {
+            "code": "49-19",
+            "name": "SET #9"
+          },
+          {
+            "code": "49-20",
+            "name": "SET #10"
+          },
+          {
+            "code": "49-21",
+            "name": "SET #11"
+          },
+          {
+            "code": "49-22",
+            "name": "SET #12"
+          },
+          {
+            "code": "49-23",
+            "name": "SET #13"
+          },
+          {
+            "code": "49-24",
+            "name": "SET #14"
+          },
+          {
+            "code": "49-25",
+            "name": "SET #15"
+          },
+          {
+            "code": "49-26",
+            "name": "SET #16"
+          },
+          {
+            "code": "49-27",
+            "name": "SET #17"
+          },
+          {
+            "code": "49-28",
+            "name": "SET #18"
+          },
+          {
+            "code": "49-29",
+            "name": "SET #19"
+          },
+          {
+            "code": "49-30",
+            "name": "SET #20"
+          },
+          {
+            "code": "49-31",
+            "name": "SET #21"
+          },
+          {
+            "code": "49-32",
+            "name": "SET #22"
+          },
+          {
+            "code": "49-33",
+            "name": "SET #23"
+          },
+          {
+            "code": "49-34",
+            "name": "SET #24"
+          },
+          {
+            "code": "49-35",
+            "name": "SET #25"
+          },
+          {
+            "code": "49-36",
+            "name": "SET #26"
+          },
+          {
+            "code": "49-37",
+            "name": "SET #27"
+          },
+          {
+            "code": "49-38",
+            "name": "SET #28"
+          },
+          {
+            "code": "49-39",
+            "name": "SET #29"
+          },
+          {
+            "code": "49-40",
+            "name": "SET #30"
+          },
+          {
+            "code": "49-41",
+            "name": "SET #31"
+          },
+          {
+            "code": "49-42",
+            "name": "SET #32"
+          },
+          {
+            "code": "49-43",
+            "name": "SET #33"
+          },
+          {
+            "code": "49-44",
+            "name": "SET #34"
+          },
+          {
+            "code": "49-45",
+            "name": "SET #35"
+          },
+          {
+            "code": "49-46",
+            "name": "SET #36"
+          },
+          {
+            "code": "49-47",
+            "name": "SET #37"
+          },
+          {
+            "code": "49-48",
+            "name": "SET #38"
+          },
+          {
+            "code": "49-49",
+            "name": "SET #39"
+          },
+          {
+            "code": "49-50",
+            "name": "SET #40"
+          },
+          {
+            "code": "49-51",
+            "name": "SET #41"
+          },
+          {
+            "code": "49-52",
+            "name": "SET #42"
+          },
+          {
+            "code": "49-53",
+            "name": "SET #43"
+          },
+          {
+            "code": "49-54",
+            "name": "SET #44"
+          },
+          {
+            "code": "49-55",
+            "name": "SET #45"
+          },
+          {
+            "code": "49-56",
+            "name": "SET #46"
+          },
+          {
+            "code": "49-57",
+            "name": "SET #47"
+          },
+          {
+            "code": "49-58",
+            "name": "SET #48"
+          },
+          {
+            "code": "49-59",
+            "name": "SET #49"
+          },
+          {
+            "code": "49-60",
+            "name": "SET #50"
+          },
+          {
+            "code": "49-61",
+            "name": "SET #51"
+          },
+          {
+            "code": "49-62",
+            "name": "SET #52"
+          },
+          {
+            "code": "49-63",
+            "name": "SET #53"
+          },
+          {
+            "code": "49-64",
+            "name": "SET #54"
+          },
+          {
+            "code": "49-65",
+            "name": "SET #55"
+          },
+          {
+            "code": "49-66",
+            "name": "SET #56"
+          },
+          {
+            "code": "49-67",
+            "name": "SET #57"
+          },
+          {
+            "code": "49-68",
+            "name": "SET #58"
+          },
+          {
+            "code": "49-69",
+            "name": "SET #59"
+          },
+          {
+            "code": "49-70",
+            "name": "SET #60"
+          },
+          {
+            "code": "49-71",
+            "name": "SET #61"
+          },
+          {
+            "code": "49-72",
+            "name": "SET #62"
+          },
+          {
+            "code": "49-73",
+            "name": "SET #63"
+          },
+          {
+            "code": "49-74",
+            "name": "SET #64"
+          },
+          {
+            "code": "49-75",
+            "name": "SET #65"
+          },
+          {
+            "code": "49-76",
+            "name": "SET #66"
+          },
+          {
+            "code": "49-77",
+            "name": "SET #67"
+          },
+          {
+            "code": "49-78",
+            "name": "SET #68"
+          },
+          {
+            "code": "49-79",
+            "name": "SET #69"
+          },
+          {
+            "code": "49-80",
+            "name": "SET #70"
+          },
+          {
+            "code": "49-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "49-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "49-87",
+            "name": "STUDIO FEES"
+          },
+          {
+            "code": "48-89",
+            "name": "MANUFACTURING"
+          },
+          {
+            "code": "49-90",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "49-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "49-96",
+            "name": "LOSS & DAMAGE"
+          },
+          {
+            "code": "49-AA",
+            "name": "SET #71"
+          },
+          {
+            "code": "49-AB",
+            "name": "SET #72"
+          },
+          {
+            "code": "49-AC",
+            "name": "SET #73"
+          },
+          {
+            "code": "49-AD",
+            "name": "SET #74"
+          },
+          {
+            "code": "49-AE",
+            "name": "SET #75"
+          },
+          {
+            "code": "49-AF",
+            "name": "SET #76"
+          },
+          {
+            "code": "49-AG",
+            "name": "SET #77"
+          },
+          {
+            "code": "49-AH",
+            "name": "SET #78"
+          },
+          {
+            "code": "49-AI",
+            "name": "SET #79"
+          },
+          {
+            "code": "49-AJ",
+            "name": "SET #80"
+          },
+          {
+            "code": "49-AK",
+            "name": "SET #81"
+          },
+          {
+            "code": "49-AL",
+            "name": "SET #82"
+          },
+          {
+            "code": "49-AM",
+            "name": "SET #83"
+          },
+          {
+            "code": "49-AN",
+            "name": "SET #84"
+          },
+          {
+            "code": "49-AO",
+            "name": "SET #85"
+          },
+          {
+            "code": "49-AP",
+            "name": "SET #86"
+          },
+          {
+            "code": "49-AQ",
+            "name": "SET #87"
+          },
+          {
+            "code": "49-AR",
+            "name": "SET #88"
+          },
+          {
+            "code": "49-AS",
+            "name": "SET #89"
+          },
+          {
+            "code": "49-AT",
+            "name": "SET #90"
+          },
+          {
+            "code": "49-AU",
+            "name": "SET #91"
+          },
+          {
+            "code": "49-AV",
+            "name": "SET #92"
+          },
+          {
+            "code": "49-AW",
+            "name": "SET #93"
+          },
+          {
+            "code": "49-AX",
+            "name": "SET #94"
+          },
+          {
+            "code": "49-AY",
+            "name": "SET #95"
+          },
+          {
+            "code": "49-AZ",
+            "name": "SET #96"
+          },
+          {
+            "code": "49-BA",
+            "name": "SET #97"
+          },
+          {
+            "code": "49-BB",
+            "name": "SET #98"
+          },
+          {
+            "code": "49-BC",
+            "name": "SET #99"
+          },
+          {
+            "code": "49-BD",
+            "name": "SET #100"
+          },
+          {
+            "code": "49-BE",
+            "name": "SET #101"
+          },
+          {
+            "code": "49-BF",
+            "name": "SET #102"
+          },
+          {
+            "code": "49-BG",
+            "name": "SET #103"
+          },
+          {
+            "code": "49-BH",
+            "name": "SET #104"
+          },
+          {
+            "code": "49-BI",
+            "name": "SET #105"
+          },
+          {
+            "code": "49-BJ",
+            "name": "SET #106"
+          },
+          {
+            "code": "49-BK",
+            "name": "SET #107"
+          },
+          {
+            "code": "49-BL",
+            "name": "SET #108"
+          },
+          {
+            "code": "49-BM",
+            "name": "SET #109"
+          },
+          {
+            "code": "49-BN",
+            "name": "SET #110"
+          },
+          {
+            "code": "49-BO",
+            "name": "SET #111"
+          },
+          {
+            "code": "49-BP",
+            "name": "SET #112"
+          },
+          {
+            "code": "49-BQ",
+            "name": "SET #113"
+          },
+          {
+            "code": "49-BR",
+            "name": "SET #114"
+          },
+          {
+            "code": "49-BS",
+            "name": "SET #115"
+          },
+          {
+            "code": "49-BT",
+            "name": "SET #116"
+          },
+          {
+            "code": "49-BU",
+            "name": "SET #117"
+          },
+          {
+            "code": "49-BV",
+            "name": "SET #118"
+          },
+          {
+            "code": "49-BW",
+            "name": "SET #119"
+          },
+          {
+            "code": "49-BX",
+            "name": "SET #120"
+          },
+          {
+            "code": "49-BY",
+            "name": "SET #121"
+          },
+          {
+            "code": "49-BZ",
+            "name": "SET #122"
+          },
+          {
+            "code": "49-CA",
+            "name": "SET #123"
+          },
+          {
+            "code": "49-CB",
+            "name": "SET #124"
+          },
+          {
+            "code": "49-CC",
+            "name": "SET #125"
+          },
+          {
+            "code": "49-CD",
+            "name": "SET #126"
+          },
+          {
+            "code": "49-CE",
+            "name": "SET #127"
+          },
+          {
+            "code": "49-CF",
+            "name": "SET #128"
+          },
+          {
+            "code": "49-CG",
+            "name": "SET #129"
+          },
+          {
+            "code": "49-CH",
+            "name": "SET #130"
+          },
+          {
+            "code": "49-CI",
+            "name": "SET #131"
+          },
+          {
+            "code": "49-CJ",
+            "name": "SET #132"
+          },
+          {
+            "code": "49-CK",
+            "name": "SET #133"
+          },
+          {
+            "code": "49-CL",
+            "name": "SET #134"
+          },
+          {
+            "code": "49-CM",
+            "name": "SET #135"
+          },
+          {
+            "code": "49-CN",
+            "name": "SET #136"
+          },
+          {
+            "code": "49-CO",
+            "name": "SET #137"
+          },
+          {
+            "code": "49-CP",
+            "name": "SET #138"
+          },
+          {
+            "code": "49-CQ",
+            "name": "SET #139"
+          },
+          {
+            "code": "49-CR",
+            "name": "SET #140"
+          },
+          {
+            "code": "49-CS",
+            "name": "SET #141"
+          },
+          {
+            "code": "49-CT",
+            "name": "SET #142"
+          },
+          {
+            "code": "49-CU",
+            "name": "SET #143"
+          },
+          {
+            "code": "49-CU-2",
+            "name": "SET #144"
+          },
+          {
+            "code": "49-CW",
+            "name": "SET #145"
+          },
+          {
+            "code": "49-CX",
+            "name": "SET #146"
+          },
+          {
+            "code": "49-CY",
+            "name": "SET #147"
+          },
+          {
+            "code": "49-CZ",
+            "name": "SET #148"
+          },
+          {
+            "code": "49-DA",
+            "name": "SET #149"
+          },
+          {
+            "code": "49-DB",
+            "name": "SET #150"
+          },
+          {
+            "code": "49-DC",
+            "name": "SET #151"
+          },
+          {
+            "code": "49-DD",
+            "name": "SET #152"
+          },
+          {
+            "code": "49-DE",
+            "name": "SET #153"
+          },
+          {
+            "code": "49-DF",
+            "name": "SET #154"
+          },
+          {
+            "code": "49-DG",
+            "name": "SET #155"
+          },
+          {
+            "code": "49-DH",
+            "name": "SET #156"
+          },
+          {
+            "code": "49-DI",
+            "name": "SET #157"
+          },
+          {
+            "code": "49-DJ",
+            "name": "SET #158"
+          },
+          {
+            "code": "49-DK",
+            "name": "SET #159"
+          },
+          {
+            "code": "49-DL",
+            "name": "SET #160"
+          },
+          {
+            "code": "49-DM",
+            "name": "SET #161"
+          },
+          {
+            "code": "49-DN",
+            "name": "SET #162"
+          },
+          {
+            "code": "49-DO",
+            "name": "SET #163"
+          },
+          {
+            "code": "49-DP",
+            "name": "SET #164"
+          },
+          {
+            "code": "49-DQ",
+            "name": "SET #165"
+          },
+          {
+            "code": "49-DR",
+            "name": "SET #166"
+          },
+          {
+            "code": "49-DS",
+            "name": "SET #167"
+          },
+          {
+            "code": "49-DT",
+            "name": "SET #168"
+          },
+          {
+            "code": "49-DU",
+            "name": "SET #169"
+          },
+          {
+            "code": "49-DV",
+            "name": "SET #170"
+          },
+          {
+            "code": "49-DW",
+            "name": "SET #171"
+          },
+          {
+            "code": "49-DX",
+            "name": "SET #172"
+          },
+          {
+            "code": "49-DY",
+            "name": "SET #173"
+          },
+          {
+            "code": "49-DZ",
+            "name": "SET #174"
+          },
+          {
+            "code": "49-EA",
+            "name": "SET #175"
+          },
+          {
+            "code": "49-EB",
+            "name": "SET #176"
+          },
+          {
+            "code": "49-EC",
+            "name": "SET #177"
+          },
+          {
+            "code": "49-ED",
+            "name": "SET #178"
+          },
+          {
+            "code": "49-EE",
+            "name": "SET #179"
+          },
+          {
+            "code": "49-EF",
+            "name": "SET #180"
+          },
+          {
+            "code": "49-EG",
+            "name": "SET #181"
+          },
+          {
+            "code": "49-EH",
+            "name": "SET #182"
+          },
+          {
+            "code": "49-EI",
+            "name": "SET #183"
+          },
+          {
+            "code": "49-EJ",
+            "name": "SET #184"
+          },
+          {
+            "code": "49-EK",
+            "name": "SET #185"
+          },
+          {
+            "code": "49-EL",
+            "name": "SET #186"
+          },
+          {
+            "code": "49-EM",
+            "name": "SET #187"
+          },
+          {
+            "code": "49-EN",
+            "name": "SET #188"
+          },
+          {
+            "code": "49-EO",
+            "name": "SET #189"
+          },
+          {
+            "code": "49-EP",
+            "name": "SET #190"
+          },
+          {
+            "code": "49-EQ",
+            "name": "SET #191"
+          },
+          {
+            "code": "49-ER",
+            "name": "SET #192"
+          },
+          {
+            "code": "49-ES",
+            "name": "SET #193"
+          },
+          {
+            "code": "49-ET",
+            "name": "SET #194"
+          },
+          {
+            "code": "49-EU",
+            "name": "SET #195"
+          },
+          {
+            "code": "49-EV",
+            "name": "SET #196"
+          },
+          {
+            "code": "49-EW",
+            "name": "SET #197"
+          },
+          {
+            "code": "49-EX",
+            "name": "SET #198"
+          },
+          {
+            "code": "49-EY",
+            "name": "SET #199"
+          },
+          {
+            "code": "49-EZ",
+            "name": "SET #200"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "50-00",
+        "name": "ACTION PROPS",
+        "accounts": [
+          {
+            "code": "50-02",
+            "name": "PROPMASTER"
+          },
+          {
+            "code": "50-03",
+            "name": "ASSISTANT PROPMASTER"
+          },
+          {
+            "code": "50-04",
+            "name": "RAMROD/TRAINER"
+          },
+          {
+            "code": "50-05",
+            "name": "WRANGLERS/HANDLERS"
+          },
+          {
+            "code": "50-06",
+            "name": "WRANGLERS/HANDLERS"
+          },
+          {
+            "code": "50-07",
+            "name": "WRANGLERS/HANDLERS"
+          },
+          {
+            "code": "50-08",
+            "name": "WEAPONS HANDLER"
+          },
+          {
+            "code": "50-11",
+            "name": "LIVESTOCK #1"
+          },
+          {
+            "code": "50-12",
+            "name": "LIVESTOCK #2"
+          },
+          {
+            "code": "50-13",
+            "name": "LIVESTOCK #3"
+          },
+          {
+            "code": "50-14",
+            "name": "LIVESTOCK #4"
+          },
+          {
+            "code": "50-15",
+            "name": "LIVESTOCK #5"
+          },
+          {
+            "code": "50-16",
+            "name": "LIVESTOCK #6"
+          },
+          {
+            "code": "50-17",
+            "name": "LIVESTOCK #7"
+          },
+          {
+            "code": "50-18",
+            "name": "LIVESTOCK #8"
+          },
+          {
+            "code": "50-19",
+            "name": "LIVESTOCK #9"
+          },
+          {
+            "code": "50-20",
+            "name": "LIVESTOCK #10"
+          },
+          {
+            "code": "50-35",
+            "name": "LIVESTOCK FEED"
+          },
+          {
+            "code": "50-40",
+            "name": "ANIMAL SAFETY"
+          },
+          {
+            "code": "50-83",
+            "name": "ANIMAL RENTALS"
+          },
+          {
+            "code": "50-84",
+            "name": "WEAPONNS RENTALS"
+          },
+          {
+            "code": "50-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "50-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "50-87",
+            "name": "STUDIO CHARGES"
+          },
+          {
+            "code": "50-89",
+            "name": "MANUFACTURING"
+          },
+          {
+            "code": "50-90",
+            "name": "PURCHASED ACTION PROPS"
+          },
+          {
+            "code": "50-91",
+            "name": "ANIMAL PURCHASES"
+          },
+          {
+            "code": "50-92",
+            "name": "WEAPONS PURCHASES"
+          },
+          {
+            "code": "50-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "50-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "51-00",
+        "name": "PICTURE VEHICLES",
+        "accounts": [
+          {
+            "code": "51-01",
+            "name": "PICTURE VEHICLE COORDINATOR"
+          },
+          {
+            "code": "51-04",
+            "name": "MODIFY & REPAIR"
+          },
+          {
+            "code": "51-05",
+            "name": "MECHANIC"
+          },
+          {
+            "code": "51-10",
+            "name": "MOTOR VEHICLE RENTALS"
+          },
+          {
+            "code": "51-11",
+            "name": "BOAT RENTALS"
+          },
+          {
+            "code": "51-12",
+            "name": "AIRCRAFT RENTALS"
+          },
+          {
+            "code": "51-13",
+            "name": "ATMOSPHERE CARS"
+          },
+          {
+            "code": "51-14",
+            "name": "TOW TRUCK & DRIVER"
+          },
+          {
+            "code": "51-15",
+            "name": "VEHICLE #15"
+          },
+          {
+            "code": "51-16",
+            "name": "VEHICLE #16"
+          },
+          {
+            "code": "51-17",
+            "name": "VEHICLE #17"
+          },
+          {
+            "code": "51-18",
+            "name": "VEHICLE #18"
+          },
+          {
+            "code": "51-19",
+            "name": "VEHICLE #19"
+          },
+          {
+            "code": "51-20",
+            "name": "VEHICLE #20"
+          },
+          {
+            "code": "51-21",
+            "name": "VEHICLE #21"
+          },
+          {
+            "code": "51-22",
+            "name": "VEHICLE #22"
+          },
+          {
+            "code": "51-23",
+            "name": "VEHICLE #23"
+          },
+          {
+            "code": "51-24",
+            "name": "VEHICLE #24"
+          },
+          {
+            "code": "51-25",
+            "name": "VEHICLE #25"
+          },
+          {
+            "code": "51-26",
+            "name": "VEHICLE #26"
+          },
+          {
+            "code": "51-27",
+            "name": "VEHICLE #27"
+          },
+          {
+            "code": "51-28",
+            "name": "VEHICLE #28"
+          },
+          {
+            "code": "51-29",
+            "name": "VEHICLE #29/MISC.VEHICLES"
+          },
+          {
+            "code": "51-85",
+            "name": "OTHER RENTALS"
+          },
+          {
+            "code": "51-90",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "51-91",
+            "name": "RESALE OF VEHICLES"
+          },
+          {
+            "code": "51-92",
+            "name": "RESTORATION"
+          },
+          {
+            "code": "51-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "51-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "52-00",
+        "name": "CREATURES",
+        "accounts": [
+          {
+            "code": "52-01",
+            "name": "COORDINATOR"
+          },
+          {
+            "code": "52-02",
+            "name": "DESIGNERS"
+          },
+          {
+            "code": "52-03",
+            "name": "FOREMAN"
+          },
+          {
+            "code": "52-04",
+            "name": "TECHNICIANS"
+          },
+          {
+            "code": "52-05",
+            "name": "TECHNICIANS"
+          },
+          {
+            "code": "52-06",
+            "name": "MOLDMAKERS"
+          },
+          {
+            "code": "52-07",
+            "name": "SCULPTORS"
+          },
+          {
+            "code": "52-08",
+            "name": "FOAMERS"
+          },
+          {
+            "code": "52-09",
+            "name": "ADD'L LABOR"
+          },
+          {
+            "code": "52-10",
+            "name": "P.A.'S/RUNNERS"
+          },
+          {
+            "code": "52-11",
+            "name": "FACILITIES/SHOP"
+          },
+          {
+            "code": "52-12",
+            "name": "RIG & STRIKE"
+          },
+          {
+            "code": "52-13",
+            "name": "RESEARCH & DEVELOPMENT"
+          },
+          {
+            "code": "52-14",
+            "name": "DESIGN/WORKPLACE"
+          },
+          {
+            "code": "52-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "52-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "52-89",
+            "name": "MANUFACTURING"
+          },
+          {
+            "code": "52-90",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "52-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "52-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "53-00",
+        "name": "SET DESIGN",
+        "accounts": [
+          {
+            "code": "53-01",
+            "name": "PRODUCTION DESIGNER"
+          },
+          {
+            "code": "53-02",
+            "name": "ART DIRECTOR"
+          },
+          {
+            "code": "53-03",
+            "name": "ASSISTANT ART DIRECTOR"
+          },
+          {
+            "code": "53-04",
+            "name": "CONSTRUCTION COORDINATOR"
+          },
+          {
+            "code": "53-05",
+            "name": "SET DESIGNER"
+          },
+          {
+            "code": "53-06",
+            "name": "ILLUSTRATOR"
+          },
+          {
+            "code": "53-07",
+            "name": "MODEL MAKER"
+          },
+          {
+            "code": "53-08",
+            "name": "LABOR - OTHER DEPARTMENTS"
+          },
+          {
+            "code": "53-09",
+            "name": "RESEARCH"
+          },
+          {
+            "code": "53-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "53-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "53-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "53-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "54-00",
+        "name": "SET CONSTRUCTION",
+        "accounts": [
+          {
+            "code": "54-01",
+            "name": "SUPERVISION & ESTIMATING"
+          },
+          {
+            "code": "54-02",
+            "name": "LABOR - OTHER THAN BELOW"
+          },
+          {
+            "code": "54-11",
+            "name": "SET #1"
+          },
+          {
+            "code": "54-12",
+            "name": "SET #2"
+          },
+          {
+            "code": "54-13",
+            "name": "SET #3"
+          },
+          {
+            "code": "54-14",
+            "name": "SET #4"
+          },
+          {
+            "code": "54-15",
+            "name": "SET #5"
+          },
+          {
+            "code": "54-16",
+            "name": "SET #6"
+          },
+          {
+            "code": "54-17",
+            "name": "SET #7"
+          },
+          {
+            "code": "54-18",
+            "name": "SET #8"
+          },
+          {
+            "code": "54-19",
+            "name": "SET #9"
+          },
+          {
+            "code": "54-20",
+            "name": "SET #10"
+          },
+          {
+            "code": "54-21",
+            "name": "SET #11"
+          },
+          {
+            "code": "54-22",
+            "name": "SET #12"
+          },
+          {
+            "code": "54-23",
+            "name": "SET #13"
+          },
+          {
+            "code": "54-24",
+            "name": "SET #14"
+          },
+          {
+            "code": "54-25",
+            "name": "SET #15"
+          },
+          {
+            "code": "54-26",
+            "name": "SET #16"
+          },
+          {
+            "code": "54-27",
+            "name": "SET #17"
+          },
+          {
+            "code": "54-28",
+            "name": "SET #18"
+          },
+          {
+            "code": "54-29",
+            "name": "SET #19"
+          },
+          {
+            "code": "54-30",
+            "name": "SET #20"
+          },
+          {
+            "code": "54-31",
+            "name": "SET #21"
+          },
+          {
+            "code": "54-32",
+            "name": "SET #22"
+          },
+          {
+            "code": "54-33",
+            "name": "SET #23"
+          },
+          {
+            "code": "54-34",
+            "name": "SET #24"
+          },
+          {
+            "code": "54-35",
+            "name": "SET #25"
+          },
+          {
+            "code": "54-36",
+            "name": "SET #26"
+          },
+          {
+            "code": "54-37",
+            "name": "SET #27"
+          },
+          {
+            "code": "54-38",
+            "name": "SET #28"
+          },
+          {
+            "code": "54-39",
+            "name": "SET #29"
+          },
+          {
+            "code": "54-40",
+            "name": "SET #30"
+          },
+          {
+            "code": "54-41",
+            "name": "SET #31"
+          },
+          {
+            "code": "54-42",
+            "name": "SET #32"
+          },
+          {
+            "code": "54-43",
+            "name": "SET #33"
+          },
+          {
+            "code": "54-44",
+            "name": "SET #34"
+          },
+          {
+            "code": "54-45",
+            "name": "SET #35"
+          },
+          {
+            "code": "54-46",
+            "name": "SET #36"
+          },
+          {
+            "code": "54-47",
+            "name": "SET #37"
+          },
+          {
+            "code": "54-48",
+            "name": "SET #38"
+          },
+          {
+            "code": "54-49",
+            "name": "SET #39"
+          },
+          {
+            "code": "54-50",
+            "name": "SET #40"
+          },
+          {
+            "code": "54-51",
+            "name": "SET #41"
+          },
+          {
+            "code": "54-52",
+            "name": "SET #42"
+          },
+          {
+            "code": "54-53",
+            "name": "SET #43"
+          },
+          {
+            "code": "54-54",
+            "name": "SET #44"
+          },
+          {
+            "code": "54-55",
+            "name": "SET #45"
+          },
+          {
+            "code": "54-56",
+            "name": "SET #46"
+          },
+          {
+            "code": "54-57",
+            "name": "SET #47"
+          },
+          {
+            "code": "54-58",
+            "name": "SET #48"
+          },
+          {
+            "code": "54-59",
+            "name": "SET #49"
+          },
+          {
+            "code": "54-60",
+            "name": "SET #50"
+          },
+          {
+            "code": "54-61",
+            "name": "SET #51"
+          },
+          {
+            "code": "54-62",
+            "name": "SET #52"
+          },
+          {
+            "code": "54-63",
+            "name": "SET #53"
+          },
+          {
+            "code": "54-64",
+            "name": "SET #54"
+          },
+          {
+            "code": "54-65",
+            "name": "SET #55"
+          },
+          {
+            "code": "54-66",
+            "name": "SET #56"
+          },
+          {
+            "code": "54-67",
+            "name": "SET #57"
+          },
+          {
+            "code": "54-68",
+            "name": "SET #58"
+          },
+          {
+            "code": "54-69",
+            "name": "SET #59"
+          },
+          {
+            "code": "54-70",
+            "name": "SET #60"
+          },
+          {
+            "code": "54-71",
+            "name": "SET #61"
+          },
+          {
+            "code": "54-72",
+            "name": "SET #62"
+          },
+          {
+            "code": "54-73",
+            "name": "SET #63"
+          },
+          {
+            "code": "54-74",
+            "name": "SET #64"
+          },
+          {
+            "code": "54-75",
+            "name": "SET #65"
+          },
+          {
+            "code": "54-76",
+            "name": "SET #66"
+          },
+          {
+            "code": "54-77",
+            "name": "SET #67"
+          },
+          {
+            "code": "54-78",
+            "name": "SET #68"
+          },
+          {
+            "code": "54-79",
+            "name": "SET #69"
+          },
+          {
+            "code": "54-80",
+            "name": "SET #70"
+          },
+          {
+            "code": "54-81",
+            "name": "OPEN"
+          },
+          {
+            "code": "54-82",
+            "name": "OPEN"
+          },
+          {
+            "code": "54-83",
+            "name": "MILL"
+          },
+          {
+            "code": "54-84",
+            "name": "LOSS AND DAMAGE"
+          },
+          {
+            "code": "54-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "54-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "54-87",
+            "name": "HEAVY EQUIPMENT"
+          },
+          {
+            "code": "54-88",
+            "name": "BACKINGS / TRANSLIGHTS"
+          },
+          {
+            "code": "54-89",
+            "name": "SCAFFOLDING"
+          },
+          {
+            "code": "54-90",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "54-92",
+            "name": "GOLD ROOMS / SETUP"
+          },
+          {
+            "code": "54-93",
+            "name": "SIGNAGE / GRAPHICS"
+          },
+          {
+            "code": "54-94",
+            "name": "PRODUCTION SUPPORT / STANDBY"
+          },
+          {
+            "code": "54-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "54-96",
+            "name": "PAINT MATERIALS"
+          },
+          {
+            "code": "54-97",
+            "name": "RESEARCH & DEVELOPMENT"
+          },
+          {
+            "code": "54-98",
+            "name": "GREENS - MATERIALS"
+          },
+          {
+            "code": "54-AA",
+            "name": "SET #71"
+          },
+          {
+            "code": "54-AB",
+            "name": "SET #72"
+          },
+          {
+            "code": "54-AC",
+            "name": "SET #73"
+          },
+          {
+            "code": "54-AD",
+            "name": "SET #74"
+          },
+          {
+            "code": "54-AE",
+            "name": "SET #75"
+          },
+          {
+            "code": "54-AF",
+            "name": "SET #76"
+          },
+          {
+            "code": "54-AG",
+            "name": "SET #77"
+          },
+          {
+            "code": "54-AH",
+            "name": "SET #78"
+          },
+          {
+            "code": "54-AI",
+            "name": "SET #79"
+          },
+          {
+            "code": "54-AJ",
+            "name": "SET #80"
+          },
+          {
+            "code": "54-AK",
+            "name": "SET #81"
+          },
+          {
+            "code": "54-AL",
+            "name": "SET #82"
+          },
+          {
+            "code": "54-AM",
+            "name": "SET #83"
+          },
+          {
+            "code": "54-AN",
+            "name": "SET #84"
+          },
+          {
+            "code": "54-AO",
+            "name": "SET #85"
+          },
+          {
+            "code": "54-AP",
+            "name": "SET #86"
+          },
+          {
+            "code": "54-AR",
+            "name": "SET #87"
+          },
+          {
+            "code": "54-AS",
+            "name": "SET #88"
+          },
+          {
+            "code": "54-AT",
+            "name": "SET #89"
+          },
+          {
+            "code": "54-AU",
+            "name": "SET #90"
+          },
+          {
+            "code": "54-AV",
+            "name": "SET #91"
+          },
+          {
+            "code": "54-AW",
+            "name": "SET #92"
+          },
+          {
+            "code": "54-AX",
+            "name": "SET #93"
+          },
+          {
+            "code": "54-AY",
+            "name": "SET #94"
+          },
+          {
+            "code": "54-AZ",
+            "name": "SET #95"
+          },
+          {
+            "code": "54-BA",
+            "name": "SET #96"
+          },
+          {
+            "code": "54-BB",
+            "name": "SET #97"
+          },
+          {
+            "code": "54-BC",
+            "name": "SET #98"
+          },
+          {
+            "code": "54-BD",
+            "name": "SET #99"
+          },
+          {
+            "code": "54-BE",
+            "name": "SET #100"
+          },
+          {
+            "code": "54-BF",
+            "name": "SET #101"
+          },
+          {
+            "code": "54-BG",
+            "name": "SET #102"
+          },
+          {
+            "code": "54-BH",
+            "name": "SET #103"
+          },
+          {
+            "code": "54-BI",
+            "name": "SET #104"
+          },
+          {
+            "code": "54-BJ",
+            "name": "SET #105"
+          },
+          {
+            "code": "54-BK",
+            "name": "SET #106"
+          },
+          {
+            "code": "54-BL",
+            "name": "SET #107"
+          },
+          {
+            "code": "54-BM",
+            "name": "SET #108"
+          },
+          {
+            "code": "54-BN",
+            "name": "SET #109"
+          },
+          {
+            "code": "54-BO",
+            "name": "SET #110"
+          },
+          {
+            "code": "54-BP",
+            "name": "SET #111"
+          },
+          {
+            "code": "54-BQ",
+            "name": "SET #112"
+          },
+          {
+            "code": "54-BR",
+            "name": "SET #113"
+          },
+          {
+            "code": "54-BS",
+            "name": "SET #114"
+          },
+          {
+            "code": "54-BT",
+            "name": "SET #115"
+          },
+          {
+            "code": "54-BU",
+            "name": "SET #116"
+          },
+          {
+            "code": "54-BV",
+            "name": "SET #117"
+          },
+          {
+            "code": "54-BW",
+            "name": "SET #118"
+          },
+          {
+            "code": "54-BX",
+            "name": "SET #119"
+          },
+          {
+            "code": "54-BY",
+            "name": "SET #120"
+          },
+          {
+            "code": "54-BZ",
+            "name": "SET #121"
+          },
+          {
+            "code": "54-CA",
+            "name": "SET #122"
+          },
+          {
+            "code": "54-CB",
+            "name": "SET #123"
+          },
+          {
+            "code": "54-CC",
+            "name": "SET #124"
+          },
+          {
+            "code": "54-CD",
+            "name": "SET #125"
+          },
+          {
+            "code": "54-CE",
+            "name": "SET #126"
+          },
+          {
+            "code": "54-CF",
+            "name": "SET #127"
+          },
+          {
+            "code": "54-CG",
+            "name": "SET #128"
+          },
+          {
+            "code": "54-CH",
+            "name": "SET #129"
+          },
+          {
+            "code": "54-CI",
+            "name": "SET #130"
+          },
+          {
+            "code": "54-CJ",
+            "name": "SET #131"
+          },
+          {
+            "code": "54-CK",
+            "name": "SET #132"
+          },
+          {
+            "code": "54-CL",
+            "name": "SET #133"
+          },
+          {
+            "code": "54-CM",
+            "name": "SET #134"
+          },
+          {
+            "code": "54-CN",
+            "name": "SET #135"
+          },
+          {
+            "code": "54-CO",
+            "name": "SET #136"
+          },
+          {
+            "code": "54-CP",
+            "name": "SET #137"
+          },
+          {
+            "code": "54-CQ",
+            "name": "SET #138"
+          },
+          {
+            "code": "54-CR",
+            "name": "SET #139"
+          },
+          {
+            "code": "54-CS",
+            "name": "SET #140"
+          },
+          {
+            "code": "54-CT",
+            "name": "SET #141"
+          },
+          {
+            "code": "54-CU",
+            "name": "SET #142"
+          },
+          {
+            "code": "54-CV",
+            "name": "SET #143"
+          },
+          {
+            "code": "54-CW",
+            "name": "SET #144"
+          },
+          {
+            "code": "54-CX",
+            "name": "SET #145"
+          },
+          {
+            "code": "54-CY",
+            "name": "SET #146"
+          },
+          {
+            "code": "54-CZ",
+            "name": "SET #147"
+          },
+          {
+            "code": "54-DA",
+            "name": "SET #148"
+          },
+          {
+            "code": "54-DB",
+            "name": "SET #149"
+          },
+          {
+            "code": "54-DC",
+            "name": "SET #150"
+          },
+          {
+            "code": "54-DD",
+            "name": "SET #151"
+          },
+          {
+            "code": "54-DE",
+            "name": "SET #152"
+          },
+          {
+            "code": "54-DF",
+            "name": "SET #153"
+          },
+          {
+            "code": "54-DG",
+            "name": "SET #154"
+          },
+          {
+            "code": "54-DH",
+            "name": "SET #155"
+          },
+          {
+            "code": "54-DI",
+            "name": "SET #156"
+          },
+          {
+            "code": "54-DJ",
+            "name": "SET #157"
+          },
+          {
+            "code": "54-DK",
+            "name": "SET #158"
+          },
+          {
+            "code": "54-DL",
+            "name": "SET #159"
+          },
+          {
+            "code": "54-DM",
+            "name": "SET #160"
+          },
+          {
+            "code": "54-DN",
+            "name": "SET #161"
+          },
+          {
+            "code": "54-DO",
+            "name": "SET #162"
+          },
+          {
+            "code": "54-DP",
+            "name": "SET #163"
+          },
+          {
+            "code": "54-DQ",
+            "name": "SET #164"
+          },
+          {
+            "code": "54-DR",
+            "name": "SET #165"
+          },
+          {
+            "code": "54-DS",
+            "name": "SET #166"
+          },
+          {
+            "code": "54-DT",
+            "name": "SET #167"
+          },
+          {
+            "code": "54-DU",
+            "name": "SET #168"
+          },
+          {
+            "code": "54-DV",
+            "name": "SET #169"
+          },
+          {
+            "code": "54-DW",
+            "name": "SET #170"
+          },
+          {
+            "code": "54-DX",
+            "name": "SET #171"
+          },
+          {
+            "code": "54-DY",
+            "name": "SET #172"
+          },
+          {
+            "code": "54-DZ",
+            "name": "SET #173"
+          },
+          {
+            "code": "54-EA",
+            "name": "SET #174"
+          },
+          {
+            "code": "54-EB",
+            "name": "SET #175"
+          },
+          {
+            "code": "54-EC",
+            "name": "SET #176"
+          },
+          {
+            "code": "54-ED",
+            "name": "SET #177"
+          },
+          {
+            "code": "54-EE",
+            "name": "SET #178"
+          },
+          {
+            "code": "54-EF",
+            "name": "SET #179"
+          },
+          {
+            "code": "54-EG",
+            "name": "SET #180"
+          },
+          {
+            "code": "54-EH",
+            "name": "SET #181"
+          },
+          {
+            "code": "54-EI",
+            "name": "SET #182"
+          },
+          {
+            "code": "54-EJ",
+            "name": "SET #183"
+          },
+          {
+            "code": "54-EK",
+            "name": "SET #184"
+          },
+          {
+            "code": "54-EL",
+            "name": "SET #185"
+          },
+          {
+            "code": "54-EM",
+            "name": "SET #186"
+          },
+          {
+            "code": "54-EN",
+            "name": "SET #187"
+          },
+          {
+            "code": "54-EO",
+            "name": "SET #188"
+          },
+          {
+            "code": "54-EP",
+            "name": "SET #189"
+          },
+          {
+            "code": "54-EQ",
+            "name": "SET #190"
+          },
+          {
+            "code": "54-ER",
+            "name": "SET #191"
+          },
+          {
+            "code": "54-ES",
+            "name": "SET #192"
+          },
+          {
+            "code": "54-ET",
+            "name": "SET #193"
+          },
+          {
+            "code": "54-EU",
+            "name": "SET #194"
+          },
+          {
+            "code": "54-EV",
+            "name": "SET #195"
+          },
+          {
+            "code": "54-EW",
+            "name": "SET #196"
+          },
+          {
+            "code": "54-EX",
+            "name": "SET #197"
+          },
+          {
+            "code": "54-EY",
+            "name": "SET #198"
+          },
+          {
+            "code": "54-EZ",
+            "name": "SET #199"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "55-00",
+        "name": "SET STRIKE",
+        "accounts": [
+          {
+            "code": "55-01",
+            "name": "STUDIO SETS (LABOR & MATLS)"
+          },
+          {
+            "code": "55-02",
+            "name": "LOCATION SETS (LABOR & MATLS)"
+          },
+          {
+            "code": "55-08",
+            "name": "STAFF"
+          },
+          {
+            "code": "55-12",
+            "name": "STRIKE #3"
+          },
+          {
+            "code": "55-14",
+            "name": "STRIKE #4"
+          },
+          {
+            "code": "55-18",
+            "name": "STRIKE #5"
+          },
+          {
+            "code": "55-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "55-90",
+            "name": "HAZARDOUS WASTE DISPOSAL"
+          },
+          {
+            "code": "55-95",
+            "name": "MATERIALS & SUPPLIES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "56-00",
+        "name": "VIDEO",
+        "accounts": [
+          {
+            "code": "56-01",
+            "name": "VIDEO PLAYBACK OPERATOR"
+          },
+          {
+            "code": "56-06",
+            "name": "VIDEO TAPE RCRDR OPERATOR"
+          },
+          {
+            "code": "56-24",
+            "name": "VIDEO PLAYBACK BUILD"
+          },
+          {
+            "code": "56-50",
+            "name": "TRANSFER TO 24 FRAME"
+          },
+          {
+            "code": "56-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "56-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "56-90",
+            "name": "LICENSE USE FEES"
+          },
+          {
+            "code": "56-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "56-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "57-00",
+        "name": "SOUND RECORDING",
+        "accounts": [
+          {
+            "code": "57-02",
+            "name": "PRODUCTION MIXER"
+          },
+          {
+            "code": "57-03",
+            "name": "BOOM OPERATOR"
+          },
+          {
+            "code": "57-04",
+            "name": "UTILITY/CABLEMAN"
+          },
+          {
+            "code": "57-05",
+            "name": "AUDIO PLAYBACK OPERATOR"
+          },
+          {
+            "code": "57-83",
+            "name": "WALKIE TALKIES"
+          },
+          {
+            "code": "57-84",
+            "name": "AUDIO PLAYBACK RENTALS"
+          },
+          {
+            "code": "57-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "57-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "57-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "57-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "58-00",
+        "name": "SET LIGHTING",
+        "accounts": [
+          {
+            "code": "58-01",
+            "name": "STUDIO RIG & STRIKE"
+          },
+          {
+            "code": "58-02",
+            "name": "GAFFER"
+          },
+          {
+            "code": "58-03",
+            "name": "BEST BOY"
+          },
+          {
+            "code": "58-04",
+            "name": "LAMP OPERATORS"
+          },
+          {
+            "code": "58-05",
+            "name": "GENERATOR OPERATORS"
+          },
+          {
+            "code": "58-06",
+            "name": "WIND MACHINE OPERATORS"
+          },
+          {
+            "code": "58-08",
+            "name": "STUDIO ELECTRICIAN/LOCAL-40"
+          },
+          {
+            "code": "58-65",
+            "name": "POWER"
+          },
+          {
+            "code": "58-83",
+            "name": "HMI'S"
+          },
+          {
+            "code": "58-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "58-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "58-95",
+            "name": "MATERIALS & SUPPLIES/EXPENDBLS"
+          },
+          {
+            "code": "58-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "59-00",
+        "name": "SET OPERATION",
+        "accounts": [
+          {
+            "code": "59-01",
+            "name": "KEY GRIP"
+          },
+          {
+            "code": "59-02",
+            "name": "2ND COMPANY GRIP"
+          },
+          {
+            "code": "59-03",
+            "name": "COMPANY GRIPS"
+          },
+          {
+            "code": "59-04",
+            "name": "DOLLY GRIPS"
+          },
+          {
+            "code": "59-05",
+            "name": "CRANE GRIPS"
+          },
+          {
+            "code": "59-06",
+            "name": "ON LOT SECURITY"
+          },
+          {
+            "code": "59-07",
+            "name": "AIR CONDITIONING/HEATING"
+          },
+          {
+            "code": "59-08",
+            "name": "CRAFTS SERVICE"
+          },
+          {
+            "code": "59-09",
+            "name": "PROP MAKERS"
+          },
+          {
+            "code": "59-10",
+            "name": "STANDBY PAINTERS"
+          },
+          {
+            "code": "59-12",
+            "name": "STANDBY GREENSMAN"
+          },
+          {
+            "code": "59-13",
+            "name": "SCAFFOLDING"
+          },
+          {
+            "code": "59-14",
+            "name": "PLUMBERS"
+          },
+          {
+            "code": "59-15",
+            "name": "ON LOT FIRST AID"
+          },
+          {
+            "code": "59-19",
+            "name": "OTHER LABOR"
+          },
+          {
+            "code": "59-38",
+            "name": "CRAFT SERVICE"
+          },
+          {
+            "code": "59-83",
+            "name": "DOLLY RENTALS"
+          },
+          {
+            "code": "59-84",
+            "name": "CRANE RENTALS"
+          },
+          {
+            "code": "59-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "59-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "59-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "59-96",
+            "name": "PAINT - MATERIALS"
+          },
+          {
+            "code": "59-97",
+            "name": "LOSS & DAMAGE"
+          },
+          {
+            "code": "59-98",
+            "name": "GREENS - MATERIALS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "60-00",
+        "name": "FACILITIES",
+        "accounts": [
+          {
+            "code": "60-40",
+            "name": "PRODUCERS' OFFICES"
+          },
+          {
+            "code": "60-41",
+            "name": "DIRECTOR'S OFFICES"
+          },
+          {
+            "code": "60-42",
+            "name": "PRE-PRODUCTION OFFICES"
+          },
+          {
+            "code": "60-43",
+            "name": "PRODUCTION OFFICES"
+          },
+          {
+            "code": "60-44",
+            "name": "DEPARTMENT OFFICE/SHOP #1"
+          },
+          {
+            "code": "60-45",
+            "name": "DEPARTMENT OFFICE/SHOP #2"
+          },
+          {
+            "code": "60-46",
+            "name": "DEPARTMENT OFFICE/SHOP #3"
+          },
+          {
+            "code": "60-47",
+            "name": "DEPARTMENT OFFICE/SHOP #4"
+          },
+          {
+            "code": "60-48",
+            "name": "DEPARTMENT OFFICE/SHOP #5"
+          },
+          {
+            "code": "60-49",
+            "name": "OFFICE FURNITURE"
+          },
+          {
+            "code": "60-50",
+            "name": "OFFICE SUPPLIES"
+          },
+          {
+            "code": "60-51",
+            "name": "PHOTOCOPIER RENTAL/SUPPLIES"
+          },
+          {
+            "code": "60-52",
+            "name": "TELEPHONE"
+          },
+          {
+            "code": "60-59",
+            "name": "STAGE & BACKLOT CONSTR."
+          },
+          {
+            "code": "60-60",
+            "name": "STAGE & BACKLOT SHOOT"
+          },
+          {
+            "code": "60-61",
+            "name": "STAGE & BACKLOT HOLD"
+          },
+          {
+            "code": "60-62",
+            "name": "STAGE #1"
+          },
+          {
+            "code": "60-63",
+            "name": "STAGE #2"
+          },
+          {
+            "code": "60-64",
+            "name": "STAGE #3"
+          },
+          {
+            "code": "60-65",
+            "name": "STAGE #4"
+          },
+          {
+            "code": "60-66",
+            "name": "STAGE #5"
+          },
+          {
+            "code": "60-67",
+            "name": "STAGE #6"
+          },
+          {
+            "code": "60-68",
+            "name": "STAGE #7"
+          },
+          {
+            "code": "60-69",
+            "name": "STAGE #8"
+          },
+          {
+            "code": "60-70",
+            "name": "STAGE #9"
+          },
+          {
+            "code": "60-71",
+            "name": "STAGE #10"
+          },
+          {
+            "code": "60-79",
+            "name": "REFURBISHING/IMPROVEMENTS"
+          },
+          {
+            "code": "60-80",
+            "name": "JANITORIAL/TRASH REMOVAL"
+          },
+          {
+            "code": "60-85",
+            "name": "MISC. OFFICE RENTALS"
+          },
+          {
+            "code": "60-90",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "60-91",
+            "name": "FOLD & HOLD"
+          },
+          {
+            "code": "60-94",
+            "name": "STORAGE"
+          },
+          {
+            "code": "60-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "60-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "61-00",
+        "name": "SPECIAL EFFECTS",
+        "accounts": [
+          {
+            "code": "61-01",
+            "name": "SPECIAL EFFECTS FOREMAN"
+          },
+          {
+            "code": "61-02",
+            "name": "COMPANY STANDBY"
+          },
+          {
+            "code": "61-03",
+            "name": "ADDITIONAL COMPANY STNDBY"
+          },
+          {
+            "code": "61-04",
+            "name": "ADDED SPECIAL EFFECTS"
+          },
+          {
+            "code": "61-05",
+            "name": "SPECIAL EFFECTS TECHNICIAN"
+          },
+          {
+            "code": "61-06",
+            "name": "SPECIAL EFFECTS TECHNICIAN"
+          },
+          {
+            "code": "61-07",
+            "name": "SPECIAL EFFECTS TECHNICIAN"
+          },
+          {
+            "code": "61-08",
+            "name": "OTHER LABOR"
+          },
+          {
+            "code": "61-11",
+            "name": "EFFECT #1"
+          },
+          {
+            "code": "61-12",
+            "name": "EFFECT #2"
+          },
+          {
+            "code": "61-13",
+            "name": "EFFECT #3"
+          },
+          {
+            "code": "61-14",
+            "name": "EFFECT #4"
+          },
+          {
+            "code": "61-15",
+            "name": "EFFECT #5"
+          },
+          {
+            "code": "61-16",
+            "name": "EFFECT #6"
+          },
+          {
+            "code": "61-17",
+            "name": "EFFECT #7"
+          },
+          {
+            "code": "61-18",
+            "name": "EFFECT #8"
+          },
+          {
+            "code": "61-19",
+            "name": "EFFECT #9"
+          },
+          {
+            "code": "61-20",
+            "name": "EFFECT #10"
+          },
+          {
+            "code": "61-25",
+            "name": "GIMBAL"
+          },
+          {
+            "code": "61-26",
+            "name": "MOCKUPS"
+          },
+          {
+            "code": "61-31",
+            "name": "EFFECTS SUBCONTRACT #1"
+          },
+          {
+            "code": "61-32",
+            "name": "EFFECTS SUBCONTRACT #2"
+          },
+          {
+            "code": "61-33",
+            "name": "EFFECTS SUBCONTRACT #3"
+          },
+          {
+            "code": "61-34",
+            "name": "EFFECTS SUBCONTRACT #4"
+          },
+          {
+            "code": "61-35",
+            "name": "EFFECTS SUBCONTRACT #5"
+          },
+          {
+            "code": "61-40",
+            "name": "EFFECT #15"
+          },
+          {
+            "code": "61-84",
+            "name": "SHOP RENTAL"
+          },
+          {
+            "code": "61-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "61-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "61-89",
+            "name": "MANUFACTURING"
+          },
+          {
+            "code": "61-90",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "61-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "61-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "62-00",
+        "name": "TESTS / REHEARSALS",
+        "accounts": [
+          {
+            "code": "62-01",
+            "name": "TEST #1 (DESCRIPTION REQ'D)"
+          },
+          {
+            "code": "62-02",
+            "name": "TEST #2 (DESCRIPTION REQ'D)"
+          },
+          {
+            "code": "62-03",
+            "name": "TEST #3 (DESCRIPTION REQ'D)"
+          },
+          {
+            "code": "62-04",
+            "name": "TEST #4 (DESCRIPTION REQ'D)"
+          },
+          {
+            "code": "62-05",
+            "name": "TEST #5 (DESCRIPTION REQ'D)"
+          },
+          {
+            "code": "62-06",
+            "name": "TEST #6 (DESCRIPTION REQ'D)"
+          },
+          {
+            "code": "62-07",
+            "name": "TEST #7 (DESCRIPTION REQ'D)"
+          },
+          {
+            "code": "62-08",
+            "name": "TEST #8 (DESCRIPTION REQ'D)"
+          },
+          {
+            "code": "62-09",
+            "name": "TEST #9 (DESCRIPTION REQ'D)"
+          },
+          {
+            "code": "62-10",
+            "name": "TEST #10 (DESCRIPTION REQ'D)"
+          },
+          {
+            "code": "62-11",
+            "name": "TEST #11 (DESCRIPTION REQ'D)"
+          },
+          {
+            "code": "62-12",
+            "name": "TEST #12 (DESCRIPTION REQ'D)"
+          },
+          {
+            "code": "62-13",
+            "name": "TEST #13 (DESCRIPTION REQ'D)"
+          },
+          {
+            "code": "62-14",
+            "name": "TEST #14 (DESCRIPTION REQ'D)"
+          },
+          {
+            "code": "62-15",
+            "name": "TEST #15 (DESCRIPTION REQ'D)"
+          },
+          {
+            "code": "62-30",
+            "name": "REHEARSALS-LABOR"
+          },
+          {
+            "code": "62-85",
+            "name": "REHEARSALS-RENTALS"
+          },
+          {
+            "code": "62-95",
+            "name": "REHEARSAL MATERIALS & SUPPLIES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "63-00",
+        "name": "LOCATIONS",
+        "accounts": [
+          {
+            "code": "63-01",
+            "name": "SURVEY"
+          },
+          {
+            "code": "63-02",
+            "name": "LOCATION CONTACT PERSON"
+          },
+          {
+            "code": "63-03",
+            "name": "LOCATION SECRETARY"
+          },
+          {
+            "code": "63-04",
+            "name": "LOCATION SECURITY"
+          },
+          {
+            "code": "63-05",
+            "name": "LOCATION POLICE"
+          },
+          {
+            "code": "63-06",
+            "name": "WATCHMEN"
+          },
+          {
+            "code": "63-07",
+            "name": "LOCATION FIREMAN"
+          },
+          {
+            "code": "63-08",
+            "name": "FIRST AID LABOR"
+          },
+          {
+            "code": "63-09",
+            "name": "LOADING & UNLOADING"
+          },
+          {
+            "code": "63-11",
+            "name": "STANDBY AMBULANCE/FIRETRUCK"
+          },
+          {
+            "code": "63-20",
+            "name": "LOADING & UNLOADING"
+          },
+          {
+            "code": "63-39",
+            "name": "CATERED MEALS"
+          },
+          {
+            "code": "63-40",
+            "name": "CATERING STAFF"
+          },
+          {
+            "code": "63-42",
+            "name": "FEES & PERMITS"
+          },
+          {
+            "code": "63-43",
+            "name": "LOC'N TRASH/BINS/DUMPSTER"
+          },
+          {
+            "code": "63-46",
+            "name": "1ST AID SUPLIES/TREATMENT"
+          },
+          {
+            "code": "63-47",
+            "name": "ON-SITE INCIDENTALS"
+          },
+          {
+            "code": "63-51",
+            "name": "FEES & PERMITS LOC'N #2"
+          },
+          {
+            "code": "63-52",
+            "name": "FEES & PERMITS LOC'N #3"
+          },
+          {
+            "code": "63-53",
+            "name": "FEES & PERMITS LOC'N #4"
+          },
+          {
+            "code": "63-54",
+            "name": "FEES & PERMITS LOC'N #5"
+          },
+          {
+            "code": "63-55",
+            "name": "FEES & PERMITS LOC'N #6"
+          },
+          {
+            "code": "63-56",
+            "name": "FEES & PERMITS LOC'N #7"
+          },
+          {
+            "code": "63-57",
+            "name": "FEES & PERMITS LOC'N #8"
+          },
+          {
+            "code": "63-58",
+            "name": "FEES & PERMITS LOC'N #9"
+          },
+          {
+            "code": "63-59",
+            "name": "FEES & PERMITS LOC'N #10"
+          },
+          {
+            "code": "63-60",
+            "name": "FEES & PERMITS LOC'N #11"
+          },
+          {
+            "code": "63-61",
+            "name": "FEES & PERMITS LOC'N #12"
+          },
+          {
+            "code": "63-62",
+            "name": "FEES & PERMITS LOC'N #13"
+          },
+          {
+            "code": "63-63",
+            "name": "FEES & PERMITS LOC'N #14"
+          },
+          {
+            "code": "63-64",
+            "name": "FEES & PERMITS LOC'N #15"
+          },
+          {
+            "code": "63-65",
+            "name": "FEES & PERMITS LOC'N #16"
+          },
+          {
+            "code": "63-66",
+            "name": "FEES & PERMITS LOC'N #17"
+          },
+          {
+            "code": "63-67",
+            "name": "FEES & PERMITS LOC'N #18"
+          },
+          {
+            "code": "63-68",
+            "name": "FEES & PERMITS LOC'N #19"
+          },
+          {
+            "code": "63-69",
+            "name": "FEES & PERMITS LOC'N #20"
+          },
+          {
+            "code": "63-70",
+            "name": "FEES & PERMITS LOC'N #21"
+          },
+          {
+            "code": "63-71",
+            "name": "FEES & PERMITS LOC'N #22"
+          },
+          {
+            "code": "63-72",
+            "name": "FEES & PERMITS LOC'N #23"
+          },
+          {
+            "code": "63-73",
+            "name": "FEES & PERMITS LOC'N #24"
+          },
+          {
+            "code": "63-74",
+            "name": "FEES & PERMITS LOC'N #25"
+          },
+          {
+            "code": "63-75",
+            "name": "FEES & PERMITS LOC'N #26"
+          },
+          {
+            "code": "63-76",
+            "name": "FEES & PERMITS LOC'N #27"
+          },
+          {
+            "code": "63-77",
+            "name": "FEES & PERMITS LOC'N #28"
+          },
+          {
+            "code": "63-78",
+            "name": "FEES & PERMITS LOC'N #29"
+          },
+          {
+            "code": "63-79",
+            "name": "FEES & PERMITS LOC'N #30"
+          },
+          {
+            "code": "63-80",
+            "name": "FEES & PERMITS LOC'N #31"
+          },
+          {
+            "code": "63-81",
+            "name": "FEES & PERMITS LOC'N #32"
+          },
+          {
+            "code": "63-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "63-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "63-87",
+            "name": "BEEPERS"
+          },
+          {
+            "code": "63-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "63-96",
+            "name": "LOSS & DAMAGE/RESTORATION"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "64-00",
+        "name": "TRANSPORTATION",
+        "accounts": [
+          {
+            "code": "64-01",
+            "name": "COORDINATOR"
+          },
+          {
+            "code": "64-02",
+            "name": "1ST DRIVER CAPTAIN"
+          },
+          {
+            "code": "64-03",
+            "name": "ADD'L DRIVER CAPTAINS"
+          },
+          {
+            "code": "64-04",
+            "name": "DISPATCHER"
+          },
+          {
+            "code": "64-18",
+            "name": "POST PROD. TRANSPORTATION"
+          },
+          {
+            "code": "64-19",
+            "name": "LA BASED DRIVERS"
+          },
+          {
+            "code": "64-20",
+            "name": "LA BASED EQUIPMENT"
+          },
+          {
+            "code": "64-21",
+            "name": "DISTANT - STUDIO DRIVERS"
+          },
+          {
+            "code": "64-22",
+            "name": "DISTANT - STUDIO EQUIPMENT"
+          },
+          {
+            "code": "64-23",
+            "name": "DISTANT - LOCAL HIRE DRIVERS"
+          },
+          {
+            "code": "64-24",
+            "name": "DISTANT - EQUIPMENT RENTALS"
+          },
+          {
+            "code": "64-25",
+            "name": "DISTANT LOC #2 - DRIVERS"
+          },
+          {
+            "code": "64-26",
+            "name": "DISTANT LOC #2 - EQUIPMENT"
+          },
+          {
+            "code": "64-28",
+            "name": "DISTANT LOC #3 - DRIVERS"
+          },
+          {
+            "code": "64-29",
+            "name": "DISTANT LOC #3 - EQUIPMENT"
+          },
+          {
+            "code": "64-36",
+            "name": "DISTANT LOC #4 - DRIVERS"
+          },
+          {
+            "code": "64-37",
+            "name": "DISTANT LOC #4 - EQUIPMENT"
+          },
+          {
+            "code": "64-55",
+            "name": "GAS, OIL, & VEHICLE WASHES"
+          },
+          {
+            "code": "64-56",
+            "name": "TAXI FARES"
+          },
+          {
+            "code": "64-57",
+            "name": "SHIPPING FREIGHT CUSTOMS, ETC."
+          },
+          {
+            "code": "64-58",
+            "name": "CUSTOMS/BROKERAGE"
+          },
+          {
+            "code": "64-59",
+            "name": "MESSENGERS/COURIER"
+          },
+          {
+            "code": "64-66",
+            "name": "SELF DRIVES"
+          },
+          {
+            "code": "64-67",
+            "name": "MILEAGE-REPORT TO LOCATION"
+          },
+          {
+            "code": "64-68",
+            "name": "MILEAGE REIMBURSEMENT"
+          },
+          {
+            "code": "64-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "64-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "64-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "64-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "65-00",
+        "name": "SECOND UNIT",
+        "accounts": [
+          {
+            "code": "65-01",
+            "name": "SECOND UNIT #1"
+          },
+          {
+            "code": "65-02",
+            "name": "SECOND UNIT #2"
+          },
+          {
+            "code": "65-03",
+            "name": "SECOND UNIT #3"
+          },
+          {
+            "code": "65-04",
+            "name": "SECOND UNIT #4"
+          },
+          {
+            "code": "65-05",
+            "name": "SECOND UNIT #5"
+          },
+          {
+            "code": "65-06",
+            "name": "SECOND UNIT #6"
+          },
+          {
+            "code": "65-07",
+            "name": "SECOND UNIT #7"
+          },
+          {
+            "code": "65-08",
+            "name": "SECOND UNIT #8"
+          },
+          {
+            "code": "65-09",
+            "name": "SECOND UNIT #9"
+          },
+          {
+            "code": "65-10",
+            "name": "SECOND UNIT #10"
+          },
+          {
+            "code": "65-11",
+            "name": "SECOND UNIT #11"
+          },
+          {
+            "code": "65-25",
+            "name": "DIST LOC #2-DRIVERS"
+          },
+          {
+            "code": "65-26",
+            "name": "DIST LOC #2-EQUIPMENT"
+          },
+          {
+            "code": "65-28",
+            "name": "DIST LOC #2-DRIVERS"
+          },
+          {
+            "code": "65-29",
+            "name": "DIST LOC #2-EQUIPMENT"
+          },
+          {
+            "code": "65-36",
+            "name": "PRODUCER"
+          },
+          {
+            "code": "65-37",
+            "name": "DIRECTOR"
+          },
+          {
+            "code": "65-38",
+            "name": "CAST"
+          },
+          {
+            "code": "65-39",
+            "name": "BITS & STUNTS"
+          },
+          {
+            "code": "65-41",
+            "name": "ATL TRAVEL & LIVING EXPENSE"
+          },
+          {
+            "code": "65-42",
+            "name": "EXTRAS"
+          },
+          {
+            "code": "65-43",
+            "name": "PRODUCTION STAFF"
+          },
+          {
+            "code": "65-44",
+            "name": "WARDROBE"
+          },
+          {
+            "code": "65-45",
+            "name": "MAKEUP & HAIR"
+          },
+          {
+            "code": "65-47",
+            "name": "CAMERA"
+          },
+          {
+            "code": "65-48",
+            "name": "FILM & LAB"
+          },
+          {
+            "code": "65-49",
+            "name": "SET DRESSING"
+          },
+          {
+            "code": "65-50",
+            "name": "PROPERTY"
+          },
+          {
+            "code": "65-51",
+            "name": "PICTURE VEHICLE"
+          },
+          {
+            "code": "65-52",
+            "name": "CREATURES"
+          },
+          {
+            "code": "65-53",
+            "name": "SET DESIGN"
+          },
+          {
+            "code": "65-54",
+            "name": "SET CONSTRUCTION"
+          },
+          {
+            "code": "65-55",
+            "name": "SET STRIKE"
+          },
+          {
+            "code": "65-56",
+            "name": "VIDEO"
+          },
+          {
+            "code": "65-57",
+            "name": "SOUND"
+          },
+          {
+            "code": "65-58",
+            "name": "SET LIGHTING"
+          },
+          {
+            "code": "65-59",
+            "name": "SET OPERATIONS"
+          },
+          {
+            "code": "65-60",
+            "name": "FACILITY FEES"
+          },
+          {
+            "code": "65-61",
+            "name": "SPECIAL EFFECTS"
+          },
+          {
+            "code": "65-63",
+            "name": "LOCATIONS"
+          },
+          {
+            "code": "65-64",
+            "name": "TRANSPORTATION"
+          },
+          {
+            "code": "65-68",
+            "name": "STOP MOTION ANIMATION"
+          },
+          {
+            "code": "65-69",
+            "name": "BTL TRAVEL & LIVING"
+          },
+          {
+            "code": "65-85",
+            "name": "INSURANCE"
+          },
+          {
+            "code": "65-88",
+            "name": "MISCELLANEOUS"
+          },
+          {
+            "code": "65-91",
+            "name": "FACILITY FEES"
+          },
+          {
+            "code": "65-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "65-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "66-00",
+        "name": "AERIAL/BLU SCREEN/SPCL UNIT",
+        "accounts": [
+          {
+            "code": "66-01",
+            "name": "UNIT #1"
+          },
+          {
+            "code": "66-02",
+            "name": "UNIT #2"
+          },
+          {
+            "code": "66-03",
+            "name": "UNIT #3"
+          },
+          {
+            "code": "66-04",
+            "name": "UNIT #4"
+          },
+          {
+            "code": "66-37",
+            "name": "DIRECTOR"
+          },
+          {
+            "code": "66-39",
+            "name": "BITS & STUNTS"
+          },
+          {
+            "code": "66-42",
+            "name": "EXTRAS & STANDINS"
+          },
+          {
+            "code": "66-43",
+            "name": "PRODUCTION STAFF"
+          },
+          {
+            "code": "66-44",
+            "name": "WARDROBE"
+          },
+          {
+            "code": "66-45",
+            "name": "MAKE UP AND HAIR"
+          },
+          {
+            "code": "66-47",
+            "name": "CAMERA"
+          },
+          {
+            "code": "66-48",
+            "name": "PICTURE FILM & DAILIES"
+          },
+          {
+            "code": "66-49",
+            "name": "SET DRESSING"
+          },
+          {
+            "code": "66-50",
+            "name": "ACTION PROPS"
+          },
+          {
+            "code": "66-51",
+            "name": "ACTION PROPS - VEHICLES"
+          },
+          {
+            "code": "66-52",
+            "name": "CREATURES"
+          },
+          {
+            "code": "66-53",
+            "name": "SET DESIGN"
+          },
+          {
+            "code": "66-54",
+            "name": "SET CONSTRUCTION"
+          },
+          {
+            "code": "66-55",
+            "name": "SET STRIKE"
+          },
+          {
+            "code": "66-56",
+            "name": "VIDEO"
+          },
+          {
+            "code": "66-57",
+            "name": "PRODUCTION SOUND"
+          },
+          {
+            "code": "66-58",
+            "name": "SET LIGHTING"
+          },
+          {
+            "code": "66-59",
+            "name": "SET OPERATIONS"
+          },
+          {
+            "code": "66-60",
+            "name": "FACILITIES"
+          },
+          {
+            "code": "66-61",
+            "name": "SPECIAL EFFECTS"
+          },
+          {
+            "code": "66-63",
+            "name": "LOCATIONS"
+          },
+          {
+            "code": "66-64",
+            "name": "TRANSPORTATION"
+          },
+          {
+            "code": "66-66",
+            "name": "SPECIAL UNIT"
+          },
+          {
+            "code": "66-71",
+            "name": "PROJECTION"
+          },
+          {
+            "code": "66-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "66-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "67-00",
+        "name": "PLATE UNIT",
+        "accounts": [
+          {
+            "code": "67-01",
+            "name": "UNIT #1"
+          },
+          {
+            "code": "67-02",
+            "name": "UNIT #2"
+          },
+          {
+            "code": "67-03",
+            "name": "UNIT #3"
+          },
+          {
+            "code": "67-04",
+            "name": "UNIT #4"
+          },
+          {
+            "code": "67-36",
+            "name": "UNIT PRODUCER"
+          },
+          {
+            "code": "67-37",
+            "name": "UNIT DIRECTOR"
+          },
+          {
+            "code": "67-39",
+            "name": "BITS & STUNTS"
+          },
+          {
+            "code": "67-42",
+            "name": "EXTRAS & STANDINS"
+          },
+          {
+            "code": "67-43",
+            "name": "PRODUCTION STAFF"
+          },
+          {
+            "code": "67-44",
+            "name": "WARDROBE"
+          },
+          {
+            "code": "67-45",
+            "name": "MAKEUP & HAIR"
+          },
+          {
+            "code": "67-46",
+            "name": "SPECIAL PROCESS EQUIP/LABOR"
+          },
+          {
+            "code": "67-47",
+            "name": "CAMERA"
+          },
+          {
+            "code": "67-48",
+            "name": "RAW STOCK & DAILIES"
+          },
+          {
+            "code": "67-49",
+            "name": "SET DRESSING"
+          },
+          {
+            "code": "67-50",
+            "name": "ACTION PROPS"
+          },
+          {
+            "code": "67-51",
+            "name": "ACTION PROPS - VEHICLES"
+          },
+          {
+            "code": "67-52",
+            "name": "CREATURES"
+          },
+          {
+            "code": "67-53",
+            "name": "SET DESIGN"
+          },
+          {
+            "code": "67-54",
+            "name": "SET CONSTRUCTION"
+          },
+          {
+            "code": "67-55",
+            "name": "SET STRIKE"
+          },
+          {
+            "code": "67-56",
+            "name": "VIDEO"
+          },
+          {
+            "code": "67-57",
+            "name": "PRODUCTION SOUND"
+          },
+          {
+            "code": "67-58",
+            "name": "SET LIGHTING"
+          },
+          {
+            "code": "67-59",
+            "name": "SET OPERATIONS"
+          },
+          {
+            "code": "67-60",
+            "name": "FACILITIES"
+          },
+          {
+            "code": "67-61",
+            "name": "SPECIAL EFFECTS"
+          },
+          {
+            "code": "67-63",
+            "name": "LOCATIONS"
+          },
+          {
+            "code": "67-64",
+            "name": "TRANSPORTATION"
+          },
+          {
+            "code": "67-71",
+            "name": "PROJECTION"
+          },
+          {
+            "code": "67-95",
+            "name": "MATERIALS & SUPPLIES"
+          },
+          {
+            "code": "67-96",
+            "name": "LOSS & DAMAGE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "69-00",
+        "name": "BTL TRAVEL & LIVING EXPS.",
+        "accounts": [
+          {
+            "code": "69-01",
+            "name": "PRODUCTION AIRFARES"
+          },
+          {
+            "code": "69-02",
+            "name": "PRODUCTION HOTEL"
+          },
+          {
+            "code": "69-03",
+            "name": "PRODUCTION PER DIEM"
+          },
+          {
+            "code": "69-11",
+            "name": "VISUAL EFFECTS AIRFARES"
+          },
+          {
+            "code": "69-12",
+            "name": "VISUAL EFFECTS HOTELS"
+          },
+          {
+            "code": "69-13",
+            "name": "VISUAL EFFECTS PER DIEM"
+          },
+          {
+            "code": "69-21",
+            "name": "POST PRODUCTION AIRFARES"
+          },
+          {
+            "code": "69-22",
+            "name": "POST PRODUCTION HOTELS"
+          },
+          {
+            "code": "69-23",
+            "name": "POST PRODUCTION PER DIEM"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total production"
+      },
+      {
+        "kind": "category",
+        "code": "70-00",
+        "name": "VISUAL EFFECTS",
+        "accounts": [
+          {
+            "code": "70-01",
+            "name": "VISUAL EFFECTS SUPERVISION-TV"
+          },
+          {
+            "code": "70-02",
+            "name": "INSERTS-TV"
+          },
+          {
+            "code": "70-03",
+            "name": "OPTICALS, FADES & DISSOLVES-TV"
+          },
+          {
+            "code": "70-04",
+            "name": "ROTOSCOPE-TV"
+          },
+          {
+            "code": "70-05",
+            "name": "MOTION CONTROL-TV"
+          },
+          {
+            "code": "70-06",
+            "name": "OPTICAL EFFECTS ANIMATION-TV"
+          },
+          {
+            "code": "70-07",
+            "name": "OPTICAL SCENE PLANNING-TV"
+          },
+          {
+            "code": "70-08",
+            "name": "OPTICAL ANIMATION CAMERA-TV"
+          },
+          {
+            "code": "70-09",
+            "name": "MINIATURE SHOOTING (NON-ROTOSCOPE)"
+          },
+          {
+            "code": "70-11",
+            "name": "PHOTOSTATS FOR OPTICAL ANIMATION"
+          },
+          {
+            "code": "70-12",
+            "name": "MATTE PAINTINGS-TV"
+          },
+          {
+            "code": "70-13",
+            "name": "PAINTBOX-TV"
+          },
+          {
+            "code": "70-14",
+            "name": "DIGITAL VIDEO EFFECTS-TV"
+          },
+          {
+            "code": "70-15",
+            "name": "HARRY-TV"
+          },
+          {
+            "code": "70-16",
+            "name": "COMPUTER ANIMATION (CGI) - TV"
+          },
+          {
+            "code": "70-20",
+            "name": "VISUAL EFFECTS SUPERVISION"
+          },
+          {
+            "code": "70-21",
+            "name": "FREELANCE VFX SUPERVISOR"
+          },
+          {
+            "code": "70-22",
+            "name": "FREELANCE VFX PRODUCER"
+          },
+          {
+            "code": "70-23",
+            "name": "FREELANCE VFX COORDINATOR"
+          },
+          {
+            "code": "70-24",
+            "name": "PRODUCTION STAFF"
+          },
+          {
+            "code": "70-25",
+            "name": "ART DIRECTOR"
+          },
+          {
+            "code": "70-26",
+            "name": "ILLUSTRATOR"
+          },
+          {
+            "code": "70-28",
+            "name": "ESTIMATOR"
+          },
+          {
+            "code": "70-30",
+            "name": "RESEARCH & DEVELOPMENT"
+          },
+          {
+            "code": "70-32",
+            "name": "MATTE PAINTINGS"
+          },
+          {
+            "code": "70-35",
+            "name": "MODEL FABRICATION"
+          },
+          {
+            "code": "70-49",
+            "name": "VISUAL EFFECTS CONTRACTS"
+          },
+          {
+            "code": "70-50",
+            "name": "VISUAL EFFECTS CONTRACTS"
+          },
+          {
+            "code": "70-51",
+            "name": "VISUAL EFFECTS CONTRACTS"
+          },
+          {
+            "code": "70-52",
+            "name": "VISUAL EFFECTS CONTRACTS"
+          },
+          {
+            "code": "70-53",
+            "name": "VISUAL EFFECTS CONTRACTS"
+          },
+          {
+            "code": "70-54",
+            "name": "VISUAL EFFECTS CONTRACTS"
+          },
+          {
+            "code": "70-55",
+            "name": "VISUAL EFFECTS CONTRACTS"
+          },
+          {
+            "code": "70-56",
+            "name": "VISUAL EFFECTS CONTRACTS"
+          },
+          {
+            "code": "70-57",
+            "name": "VISUAL EFFECTS CONTRACTS"
+          },
+          {
+            "code": "70-58",
+            "name": "VISUAL EFFECTS CONTRACTS"
+          },
+          {
+            "code": "70-59",
+            "name": "VISUAL EFFECTS CONTRACTS"
+          },
+          {
+            "code": "70-73",
+            "name": "SCANNING"
+          },
+          {
+            "code": "70-74",
+            "name": "RECORDING"
+          },
+          {
+            "code": "70-75",
+            "name": "LAB"
+          },
+          {
+            "code": "70-76",
+            "name": "REDUCTION PRINTS"
+          },
+          {
+            "code": "70-78",
+            "name": "TEMPS FOR PREVIEWS"
+          },
+          {
+            "code": "70-85",
+            "name": "VISUAL EFFECTS - RENTALS"
+          },
+          {
+            "code": "70-95",
+            "name": "MATERIALS AND SUPPLIES"
+          },
+          {
+            "code": "70-AA",
+            "name": "SHOT #1"
+          },
+          {
+            "code": "70-AB",
+            "name": "SHOT #2"
+          },
+          {
+            "code": "70-AC",
+            "name": "SHOT #3"
+          },
+          {
+            "code": "70-AD",
+            "name": "SHOT #4"
+          },
+          {
+            "code": "70-AE",
+            "name": "SHOT #5"
+          },
+          {
+            "code": "70-AF",
+            "name": "SHOT #6"
+          },
+          {
+            "code": "70-AG",
+            "name": "SHOT #7"
+          },
+          {
+            "code": "70-AH",
+            "name": "SHOT #8"
+          },
+          {
+            "code": "70-AI",
+            "name": "SHOT #9"
+          },
+          {
+            "code": "70-AJ",
+            "name": "SHOT #10"
+          },
+          {
+            "code": "70-AK",
+            "name": "SHOT #11"
+          },
+          {
+            "code": "70-AL",
+            "name": "SHOT #12"
+          },
+          {
+            "code": "70-AM",
+            "name": "SHOT #13"
+          },
+          {
+            "code": "70-AN",
+            "name": "SHOT #14"
+          },
+          {
+            "code": "70-AO",
+            "name": "SHOT #15"
+          },
+          {
+            "code": "70-AP",
+            "name": "SHOT #16"
+          },
+          {
+            "code": "70-AQ",
+            "name": "SHOT #17"
+          },
+          {
+            "code": "70-AR",
+            "name": "SHOT #18"
+          },
+          {
+            "code": "70-AS",
+            "name": "SHOT #19"
+          },
+          {
+            "code": "70-AT",
+            "name": "SHOT #20"
+          },
+          {
+            "code": "70-AU",
+            "name": "SHOT #21"
+          },
+          {
+            "code": "70-AV",
+            "name": "SHOT #22"
+          },
+          {
+            "code": "70-AW",
+            "name": "SHOT #23"
+          },
+          {
+            "code": "70-AX",
+            "name": "SHOT #24"
+          },
+          {
+            "code": "70-AY",
+            "name": "SHOT #25"
+          },
+          {
+            "code": "70-AZ",
+            "name": "SHOT #26"
+          },
+          {
+            "code": "70-BA",
+            "name": "SHOT #27"
+          },
+          {
+            "code": "70-BB",
+            "name": "SHOT #28"
+          },
+          {
+            "code": "70-BC",
+            "name": "SHOT #29"
+          },
+          {
+            "code": "70-BD",
+            "name": "SHOT #30"
+          },
+          {
+            "code": "70-BE",
+            "name": "SHOT #31"
+          },
+          {
+            "code": "70-BF",
+            "name": "SHOT #32"
+          },
+          {
+            "code": "70-BG",
+            "name": "SHOT #33"
+          },
+          {
+            "code": "70-BH",
+            "name": "SHOT #34"
+          },
+          {
+            "code": "70-BI",
+            "name": "SHOT #35"
+          },
+          {
+            "code": "70-BJ",
+            "name": "SHOT #36"
+          },
+          {
+            "code": "70-BK",
+            "name": "SHOT #37"
+          },
+          {
+            "code": "70-BL",
+            "name": "SHOT #38"
+          },
+          {
+            "code": "70-BM",
+            "name": "SHOT #39"
+          },
+          {
+            "code": "70-BN",
+            "name": "SHOT #40"
+          },
+          {
+            "code": "70-BO",
+            "name": "SHOT #41"
+          },
+          {
+            "code": "70-BP",
+            "name": "SHOT #42"
+          },
+          {
+            "code": "70-BQ",
+            "name": "SHOT #43"
+          },
+          {
+            "code": "70-BR",
+            "name": "SHOT #44"
+          },
+          {
+            "code": "70-BS",
+            "name": "SHOT #45"
+          },
+          {
+            "code": "70-BT",
+            "name": "SHOT #46"
+          },
+          {
+            "code": "70-BU",
+            "name": "SHOT #47"
+          },
+          {
+            "code": "70-BV",
+            "name": "SHOT #48"
+          },
+          {
+            "code": "70-BW",
+            "name": "SHOT #49"
+          },
+          {
+            "code": "70-BX",
+            "name": "SHOT #50"
+          },
+          {
+            "code": "70-BY",
+            "name": "SHOT #51"
+          },
+          {
+            "code": "70-BZ",
+            "name": "SHOT #52"
+          },
+          {
+            "code": "70-CA",
+            "name": "SHOT #53"
+          },
+          {
+            "code": "70-CB",
+            "name": "SHOT #54"
+          },
+          {
+            "code": "70-CC",
+            "name": "SHOT #55"
+          },
+          {
+            "code": "70-CD",
+            "name": "SHOT #56"
+          },
+          {
+            "code": "70-CE",
+            "name": "SHOT #57"
+          },
+          {
+            "code": "70-CF",
+            "name": "SHOT #58"
+          },
+          {
+            "code": "70-CG",
+            "name": "SHOT #59"
+          },
+          {
+            "code": "70-CH",
+            "name": "SHOT #60"
+          },
+          {
+            "code": "70-CI",
+            "name": "SHOT #61"
+          },
+          {
+            "code": "70-CJ",
+            "name": "SHOT #62"
+          },
+          {
+            "code": "70-CK",
+            "name": "SHOT #63"
+          },
+          {
+            "code": "70-CL",
+            "name": "SHOT #64"
+          },
+          {
+            "code": "70-CM",
+            "name": "SHOT #65"
+          },
+          {
+            "code": "70-CN",
+            "name": "SHOT #66"
+          },
+          {
+            "code": "70-CO",
+            "name": "SHOT #67"
+          },
+          {
+            "code": "70-CP",
+            "name": "SHOT #68"
+          },
+          {
+            "code": "70-CQ",
+            "name": "SHOT #69"
+          },
+          {
+            "code": "70-CR",
+            "name": "SHOT #70"
+          },
+          {
+            "code": "70-CS",
+            "name": "SHOT #71"
+          },
+          {
+            "code": "70-CT",
+            "name": "SHOT #72"
+          },
+          {
+            "code": "70-CU",
+            "name": "SHOT #73"
+          },
+          {
+            "code": "70-CV",
+            "name": "SHOT #74"
+          },
+          {
+            "code": "70-CW",
+            "name": "SHOT #75"
+          },
+          {
+            "code": "70-CX",
+            "name": "SHOT #76"
+          },
+          {
+            "code": "70-CY",
+            "name": "SHOT #77"
+          },
+          {
+            "code": "70-CZ",
+            "name": "SHOT #78"
+          },
+          {
+            "code": "70-DA",
+            "name": "SHOT #79"
+          },
+          {
+            "code": "70-DB",
+            "name": "SHOT #80"
+          },
+          {
+            "code": "70-DC",
+            "name": "SHOT #81"
+          },
+          {
+            "code": "70-DD",
+            "name": "SHOT #82"
+          },
+          {
+            "code": "70-DE",
+            "name": "SHOT #83"
+          },
+          {
+            "code": "70-DF",
+            "name": "SHOT #84"
+          },
+          {
+            "code": "70-DG",
+            "name": "SHOT #85"
+          },
+          {
+            "code": "70-DH",
+            "name": "SHOT #86"
+          },
+          {
+            "code": "70-DI",
+            "name": "SHOT #87"
+          },
+          {
+            "code": "70-DJ",
+            "name": "SHOT #88"
+          },
+          {
+            "code": "70-DK",
+            "name": "SHOT #89"
+          },
+          {
+            "code": "70-DL",
+            "name": "SHOT #90"
+          },
+          {
+            "code": "70-DM",
+            "name": "SHOT #91"
+          },
+          {
+            "code": "70-DN",
+            "name": "SHOT #92"
+          },
+          {
+            "code": "70-DO",
+            "name": "SHOT #93"
+          },
+          {
+            "code": "70-DP",
+            "name": "SHOT #94"
+          },
+          {
+            "code": "70-DQ",
+            "name": "SHOT #95"
+          },
+          {
+            "code": "70-DR",
+            "name": "SHOT #96"
+          },
+          {
+            "code": "70-DS",
+            "name": "SHOT #97"
+          },
+          {
+            "code": "70-DT",
+            "name": "SHOT #98"
+          },
+          {
+            "code": "70-DU",
+            "name": "SHOT #99"
+          },
+          {
+            "code": "70-DV",
+            "name": "SHOT #100"
+          },
+          {
+            "code": "70-DW",
+            "name": "SHOT #101"
+          },
+          {
+            "code": "70-DX",
+            "name": "SHOT #102"
+          },
+          {
+            "code": "70-DY",
+            "name": "SHOT #103"
+          },
+          {
+            "code": "70-DZ",
+            "name": "SHOT #104"
+          },
+          {
+            "code": "70-EA",
+            "name": "SHOT #105"
+          },
+          {
+            "code": "70-EB",
+            "name": "SHOT #106"
+          },
+          {
+            "code": "70-EC",
+            "name": "SHOT #107"
+          },
+          {
+            "code": "70-ED",
+            "name": "SHOT #108"
+          },
+          {
+            "code": "70-EE",
+            "name": "SHOT #109"
+          },
+          {
+            "code": "70-EF",
+            "name": "SHOT #110"
+          },
+          {
+            "code": "70-EG",
+            "name": "SHOT #111"
+          },
+          {
+            "code": "70-EH",
+            "name": "SHOT #112"
+          },
+          {
+            "code": "70-EI",
+            "name": "SHOT #113"
+          },
+          {
+            "code": "70-EJ",
+            "name": "SHOT #114"
+          },
+          {
+            "code": "70-EK",
+            "name": "SHOT #115"
+          },
+          {
+            "code": "70-EL",
+            "name": "SHOT #116"
+          },
+          {
+            "code": "70-EM",
+            "name": "SHOT #117"
+          },
+          {
+            "code": "70-EN",
+            "name": "SHOT #118"
+          },
+          {
+            "code": "70-EO",
+            "name": "SHOT #119"
+          },
+          {
+            "code": "70-EP",
+            "name": "SHOT #120"
+          },
+          {
+            "code": "70-EQ",
+            "name": "SHOT #121"
+          },
+          {
+            "code": "70-ER",
+            "name": "SHOT #122"
+          },
+          {
+            "code": "70-ES",
+            "name": "SHOT #123"
+          },
+          {
+            "code": "70-ET",
+            "name": "SHOT #124"
+          },
+          {
+            "code": "70-EU",
+            "name": "SHOT #125"
+          },
+          {
+            "code": "70-EV",
+            "name": "SHOT #126"
+          },
+          {
+            "code": "70-EW",
+            "name": "SHOT #127"
+          },
+          {
+            "code": "70-EX",
+            "name": "SHOT #128"
+          },
+          {
+            "code": "70-EY",
+            "name": "SHOT #129"
+          },
+          {
+            "code": "70-EZ",
+            "name": "SHOT #130"
+          },
+          {
+            "code": "70-FA",
+            "name": "SHOT #131"
+          },
+          {
+            "code": "70-FB",
+            "name": "SHOT #132"
+          },
+          {
+            "code": "70-FC",
+            "name": "SHOT #133"
+          },
+          {
+            "code": "70-FD",
+            "name": "SHOT #134"
+          },
+          {
+            "code": "70-FE",
+            "name": "SHOT #135"
+          },
+          {
+            "code": "70-FF",
+            "name": "SHOT #136"
+          },
+          {
+            "code": "70-FG",
+            "name": "SHOT #137"
+          },
+          {
+            "code": "70-FH",
+            "name": "SHOT #138"
+          },
+          {
+            "code": "70-FI",
+            "name": "SHOT #139"
+          },
+          {
+            "code": "70-FJ",
+            "name": "SHOT #140"
+          },
+          {
+            "code": "70-FK",
+            "name": "SHOT #141"
+          },
+          {
+            "code": "70-FL",
+            "name": "SHOT #142"
+          },
+          {
+            "code": "70-FM",
+            "name": "SHOT #143"
+          },
+          {
+            "code": "70-FN",
+            "name": "SHOT #144"
+          },
+          {
+            "code": "70-FO",
+            "name": "SHOT #145"
+          },
+          {
+            "code": "70-FP",
+            "name": "SHOT #146"
+          },
+          {
+            "code": "70-FQ",
+            "name": "SHOT #147"
+          },
+          {
+            "code": "70-FR",
+            "name": "SHOT #148"
+          },
+          {
+            "code": "70-FS",
+            "name": "SHOT #149"
+          },
+          {
+            "code": "70-FT",
+            "name": "SHOT #150"
+          },
+          {
+            "code": "70-FU",
+            "name": "SHOT #151"
+          },
+          {
+            "code": "70-FV",
+            "name": "SHOT #152"
+          },
+          {
+            "code": "70-FW",
+            "name": "SHOT #153"
+          },
+          {
+            "code": "70-FX",
+            "name": "SHOT #154"
+          },
+          {
+            "code": "70-FY",
+            "name": "SHOT #155"
+          },
+          {
+            "code": "70-FZ",
+            "name": "SHOT #156"
+          },
+          {
+            "code": "70-GA",
+            "name": "SHOT #157"
+          },
+          {
+            "code": "70-GB",
+            "name": "SHOT #158"
+          },
+          {
+            "code": "70-GC",
+            "name": "SHOT #159"
+          },
+          {
+            "code": "70-GD",
+            "name": "SHOT #160"
+          },
+          {
+            "code": "70-GE",
+            "name": "SHOT #161"
+          },
+          {
+            "code": "70-GF",
+            "name": "SHOT #162"
+          },
+          {
+            "code": "70-GG",
+            "name": "SHOT #163"
+          },
+          {
+            "code": "70-GH",
+            "name": "SHOT #164"
+          },
+          {
+            "code": "70-GI",
+            "name": "SHOT #165"
+          },
+          {
+            "code": "70-GJ",
+            "name": "SHOT #166"
+          },
+          {
+            "code": "70-GK",
+            "name": "SHOT #167"
+          },
+          {
+            "code": "70-GL",
+            "name": "SHOT #168"
+          },
+          {
+            "code": "70-GM",
+            "name": "SHOT #169"
+          },
+          {
+            "code": "70-GN",
+            "name": "SHOT #170"
+          },
+          {
+            "code": "70-GO",
+            "name": "SHOT #171"
+          },
+          {
+            "code": "70-GP",
+            "name": "SHOT #172"
+          },
+          {
+            "code": "70-GQ",
+            "name": "SHOT #173"
+          },
+          {
+            "code": "70-GR",
+            "name": "SHOT #174"
+          },
+          {
+            "code": "70-GS",
+            "name": "SHOT #175"
+          },
+          {
+            "code": "70-GT",
+            "name": "SHOT #176"
+          },
+          {
+            "code": "70-GU",
+            "name": "SHOT #177"
+          },
+          {
+            "code": "70-GV",
+            "name": "SHOT #178"
+          },
+          {
+            "code": "70-GW",
+            "name": "SHOT #179"
+          },
+          {
+            "code": "70-GX",
+            "name": "SHOT #180"
+          },
+          {
+            "code": "70-GY",
+            "name": "SHOT #181"
+          },
+          {
+            "code": "70-GZ",
+            "name": "SHOT #182"
+          },
+          {
+            "code": "70-HA",
+            "name": "SHOT #183"
+          },
+          {
+            "code": "70-HB",
+            "name": "SHOT #184"
+          },
+          {
+            "code": "70-HC",
+            "name": "SHOT #185"
+          },
+          {
+            "code": "70-HD",
+            "name": "SHOT #186"
+          },
+          {
+            "code": "70-HE",
+            "name": "SHOT #187"
+          },
+          {
+            "code": "70-HF",
+            "name": "SHOT #188"
+          },
+          {
+            "code": "70-HG",
+            "name": "SHOT #189"
+          },
+          {
+            "code": "70-HH",
+            "name": "SHOT #190"
+          },
+          {
+            "code": "70-HI",
+            "name": "SHOT #191"
+          },
+          {
+            "code": "70-HJ",
+            "name": "SHOT #192"
+          },
+          {
+            "code": "70-HK",
+            "name": "SHOT #193"
+          },
+          {
+            "code": "70-HL",
+            "name": "SHOT #194"
+          },
+          {
+            "code": "70-HM",
+            "name": "SHOT #195"
+          },
+          {
+            "code": "70-HN",
+            "name": "SHOT #196"
+          },
+          {
+            "code": "70-HO",
+            "name": "SHOT #197"
+          },
+          {
+            "code": "70-HP",
+            "name": "SHOT #198"
+          },
+          {
+            "code": "70-HQ",
+            "name": "SHOT #199"
+          },
+          {
+            "code": "70-HR",
+            "name": "SHOT #200"
+          },
+          {
+            "code": "70-HS",
+            "name": "SHOT #201"
+          },
+          {
+            "code": "70-HT",
+            "name": "SHOT #202"
+          },
+          {
+            "code": "70-HU",
+            "name": "SHOT #203"
+          },
+          {
+            "code": "70-HV",
+            "name": "SHOT #204"
+          },
+          {
+            "code": "70-HW",
+            "name": "SHOT #205"
+          },
+          {
+            "code": "70-HX",
+            "name": "SHOT #206"
+          },
+          {
+            "code": "70-HY",
+            "name": "SHOT #207"
+          },
+          {
+            "code": "70-HZ",
+            "name": "SHOT #208"
+          },
+          {
+            "code": "70-IA",
+            "name": "SHOT #209"
+          },
+          {
+            "code": "70-IB",
+            "name": "SHOT #210"
+          },
+          {
+            "code": "70-IC",
+            "name": "SHOT #211"
+          },
+          {
+            "code": "70-ID",
+            "name": "SHOT #212"
+          },
+          {
+            "code": "70-IE",
+            "name": "SHOT #213"
+          },
+          {
+            "code": "70-IF",
+            "name": "SHOT #214"
+          },
+          {
+            "code": "70-IG",
+            "name": "SHOT #215"
+          },
+          {
+            "code": "70-IH",
+            "name": "SHOT #216"
+          },
+          {
+            "code": "70-II",
+            "name": "SHOT #217"
+          },
+          {
+            "code": "70-IJ",
+            "name": "SHOT #218"
+          },
+          {
+            "code": "70-IK",
+            "name": "SHOT #219"
+          },
+          {
+            "code": "70-IL",
+            "name": "SHOT #220"
+          },
+          {
+            "code": "70-IM",
+            "name": "SHOT #221"
+          },
+          {
+            "code": "70-IN",
+            "name": "SHOT #222"
+          },
+          {
+            "code": "70-IO",
+            "name": "SHOT #223"
+          },
+          {
+            "code": "70-IP",
+            "name": "SHOT #224"
+          },
+          {
+            "code": "70-IQ",
+            "name": "SHOT #225"
+          },
+          {
+            "code": "70-IR",
+            "name": "SHOT #226"
+          },
+          {
+            "code": "70-IS",
+            "name": "SHOT #227"
+          },
+          {
+            "code": "70-IT",
+            "name": "SHOT #228"
+          },
+          {
+            "code": "70-IU",
+            "name": "SHOT #229"
+          },
+          {
+            "code": "70-IV",
+            "name": "SHOT #230"
+          },
+          {
+            "code": "70-IW",
+            "name": "SHOT #231"
+          },
+          {
+            "code": "70-IX",
+            "name": "SHOT #232"
+          },
+          {
+            "code": "70-IY",
+            "name": "SHOT #233"
+          },
+          {
+            "code": "70-IZ",
+            "name": "SHOT #234"
+          },
+          {
+            "code": "70-JA",
+            "name": "SHOT #235"
+          },
+          {
+            "code": "70-JB",
+            "name": "SHOT #236"
+          },
+          {
+            "code": "70-JC",
+            "name": "SHOT #237"
+          },
+          {
+            "code": "70-JD",
+            "name": "SHOT #238"
+          },
+          {
+            "code": "70-JE",
+            "name": "SHOT #239"
+          },
+          {
+            "code": "70-JF",
+            "name": "SHOT #240"
+          },
+          {
+            "code": "70-JG",
+            "name": "SHOT #241"
+          },
+          {
+            "code": "70-JH",
+            "name": "SHOT #242"
+          },
+          {
+            "code": "70-JI",
+            "name": "SHOT #243"
+          },
+          {
+            "code": "70-JJ",
+            "name": "SHOT #244"
+          },
+          {
+            "code": "70-JK",
+            "name": "SHOT #245"
+          },
+          {
+            "code": "70-JL",
+            "name": "SHOT #246"
+          },
+          {
+            "code": "70-JM",
+            "name": "SHOT #247"
+          },
+          {
+            "code": "70-JN",
+            "name": "SHOT #248"
+          },
+          {
+            "code": "70-JO",
+            "name": "SHOT #249"
+          },
+          {
+            "code": "70-JP",
+            "name": "SHOT #250"
+          },
+          {
+            "code": "70-JQ",
+            "name": "SHOT #251"
+          },
+          {
+            "code": "70-JR",
+            "name": "SHOT #252"
+          },
+          {
+            "code": "70-JS",
+            "name": "SHOT #253"
+          },
+          {
+            "code": "70-JT",
+            "name": "SHOT #254"
+          },
+          {
+            "code": "70-JU",
+            "name": "SHOT #255"
+          },
+          {
+            "code": "70-JV",
+            "name": "SHOT #256"
+          },
+          {
+            "code": "70-JW",
+            "name": "SHOT #257"
+          },
+          {
+            "code": "70-JX",
+            "name": "SHOT #258"
+          },
+          {
+            "code": "70-JY",
+            "name": "SHOT #259"
+          },
+          {
+            "code": "70-JZ",
+            "name": "SHOT #260"
+          },
+          {
+            "code": "70-KA",
+            "name": "SHOT #261"
+          },
+          {
+            "code": "70-KB",
+            "name": "SHOT #262"
+          },
+          {
+            "code": "70-KC",
+            "name": "SHOT #263"
+          },
+          {
+            "code": "70-KD",
+            "name": "SHOT #264"
+          },
+          {
+            "code": "70-KE",
+            "name": "SHOT #265"
+          },
+          {
+            "code": "70-KF",
+            "name": "SHOT #266"
+          },
+          {
+            "code": "70-KG",
+            "name": "SHOT #267"
+          },
+          {
+            "code": "70-KH",
+            "name": "SHOT #268"
+          },
+          {
+            "code": "70-KI",
+            "name": "SHOT #269"
+          },
+          {
+            "code": "70-KJ",
+            "name": "SHOT #270"
+          },
+          {
+            "code": "70-KK",
+            "name": "SHOT #271"
+          },
+          {
+            "code": "70-KL",
+            "name": "SHOT #272"
+          },
+          {
+            "code": "70-KM",
+            "name": "SHOT #273"
+          },
+          {
+            "code": "70-KN",
+            "name": "SHOT #274"
+          },
+          {
+            "code": "70-KO",
+            "name": "SHOT #275"
+          },
+          {
+            "code": "70-KP",
+            "name": "SHOT #276"
+          },
+          {
+            "code": "70-KQ",
+            "name": "SHOT #277"
+          },
+          {
+            "code": "70-KR",
+            "name": "SHOT #278"
+          },
+          {
+            "code": "70-KS",
+            "name": "SHOT #279"
+          },
+          {
+            "code": "70-KT",
+            "name": "SHOT #280"
+          },
+          {
+            "code": "70-KU",
+            "name": "SHOT #281"
+          },
+          {
+            "code": "70-KV",
+            "name": "SHOT #282"
+          },
+          {
+            "code": "70-KW",
+            "name": "SHOT #283"
+          },
+          {
+            "code": "70-KX",
+            "name": "SHOT #284"
+          },
+          {
+            "code": "70-KY",
+            "name": "SHOT #285"
+          },
+          {
+            "code": "70-KZ",
+            "name": "SHOT #286"
+          },
+          {
+            "code": "70-LA",
+            "name": "SHOT #287"
+          },
+          {
+            "code": "70-LB",
+            "name": "SHOT #288"
+          },
+          {
+            "code": "70-LC",
+            "name": "SHOT #289"
+          },
+          {
+            "code": "70-LD",
+            "name": "SHOT #290"
+          },
+          {
+            "code": "70-LE",
+            "name": "SHOT #291"
+          },
+          {
+            "code": "70-LF",
+            "name": "SHOT #292"
+          },
+          {
+            "code": "70-LG",
+            "name": "SHOT #293"
+          },
+          {
+            "code": "70-LH",
+            "name": "SHOT #294"
+          },
+          {
+            "code": "70-LI",
+            "name": "SHOT #295"
+          },
+          {
+            "code": "70-LJ",
+            "name": "SHOT #296"
+          },
+          {
+            "code": "70-LK",
+            "name": "SHOT #297"
+          },
+          {
+            "code": "70-LL",
+            "name": "SHOT #298"
+          },
+          {
+            "code": "70-LM",
+            "name": "SHOT #299"
+          },
+          {
+            "code": "70-LN",
+            "name": "SHOT #300"
+          },
+          {
+            "code": "70-LO",
+            "name": "SHOT #301"
+          },
+          {
+            "code": "70-LP",
+            "name": "SHOT #302"
+          },
+          {
+            "code": "70-LQ",
+            "name": "SHOT #303"
+          },
+          {
+            "code": "70-LR",
+            "name": "SHOT #304"
+          },
+          {
+            "code": "70-LS",
+            "name": "SHOT #305"
+          },
+          {
+            "code": "70-LT",
+            "name": "SHOT #306"
+          },
+          {
+            "code": "70-LU",
+            "name": "SHOT #307"
+          },
+          {
+            "code": "70-LV",
+            "name": "SHOT #308"
+          },
+          {
+            "code": "70-LW",
+            "name": "SHOT #309"
+          },
+          {
+            "code": "70-LX",
+            "name": "SHOT #310"
+          },
+          {
+            "code": "70-LY",
+            "name": "SHOT #311"
+          },
+          {
+            "code": "70-LZ",
+            "name": "SHOT #312"
+          },
+          {
+            "code": "70-MA",
+            "name": "SHOT #313"
+          },
+          {
+            "code": "70-MB",
+            "name": "SHOT #314"
+          },
+          {
+            "code": "70-MC",
+            "name": "SHOT #315"
+          },
+          {
+            "code": "70-MD",
+            "name": "SHOT #316"
+          },
+          {
+            "code": "70-ME",
+            "name": "SHOT #317"
+          },
+          {
+            "code": "70-MF",
+            "name": "SHOT #318"
+          },
+          {
+            "code": "70-MG",
+            "name": "SHOT #319"
+          },
+          {
+            "code": "70-MH",
+            "name": "SHOT #320"
+          },
+          {
+            "code": "70-MI",
+            "name": "SHOT #321"
+          },
+          {
+            "code": "70-MJ",
+            "name": "SHOT #322"
+          },
+          {
+            "code": "70-MK",
+            "name": "SHOT #323"
+          },
+          {
+            "code": "70-ML",
+            "name": "SHOT #324"
+          },
+          {
+            "code": "70-MM",
+            "name": "SHOT #325"
+          },
+          {
+            "code": "70-MN",
+            "name": "SHOT #326"
+          },
+          {
+            "code": "70-MO",
+            "name": "SHOT #327"
+          },
+          {
+            "code": "70-MP",
+            "name": "SHOT #328"
+          },
+          {
+            "code": "70-MQ",
+            "name": "SHOT #329"
+          },
+          {
+            "code": "70-MR",
+            "name": "SHOT #330"
+          },
+          {
+            "code": "70-MS",
+            "name": "SHOT #331"
+          },
+          {
+            "code": "70-MT",
+            "name": "SHOT #332"
+          },
+          {
+            "code": "70-MU",
+            "name": "SHOT #333"
+          },
+          {
+            "code": "70-MV",
+            "name": "SHOT #334"
+          },
+          {
+            "code": "70-MW",
+            "name": "SHOT #335"
+          },
+          {
+            "code": "70-MX",
+            "name": "SHOT #336"
+          },
+          {
+            "code": "70-MY",
+            "name": "SHOT #337"
+          },
+          {
+            "code": "70-MZ",
+            "name": "SHOT #338"
+          },
+          {
+            "code": "70-NA",
+            "name": "SHOT #339"
+          },
+          {
+            "code": "70-NB",
+            "name": "SHOT #340"
+          },
+          {
+            "code": "70-NC",
+            "name": "SHOT #341"
+          },
+          {
+            "code": "70-ND",
+            "name": "SHOT #342"
+          },
+          {
+            "code": "70-NE",
+            "name": "SHOT #343"
+          },
+          {
+            "code": "70-NF",
+            "name": "SHOT #344"
+          },
+          {
+            "code": "70-NG",
+            "name": "SHOT #345"
+          },
+          {
+            "code": "70-NH",
+            "name": "SHOT #346"
+          },
+          {
+            "code": "70-NI",
+            "name": "SHOT #347"
+          },
+          {
+            "code": "70-NJ",
+            "name": "SHOT #348"
+          },
+          {
+            "code": "70-NK",
+            "name": "SHOT #349"
+          },
+          {
+            "code": "70-NL",
+            "name": "SHOT #350"
+          },
+          {
+            "code": "70-NM",
+            "name": "SHOT #351"
+          },
+          {
+            "code": "70-NN",
+            "name": "SHOT #352"
+          },
+          {
+            "code": "70-NO",
+            "name": "SHOT #353"
+          },
+          {
+            "code": "70-NP",
+            "name": "SHOT #354"
+          },
+          {
+            "code": "70-NQ",
+            "name": "SHOT #355"
+          },
+          {
+            "code": "70-NR",
+            "name": "SHOT #356"
+          },
+          {
+            "code": "70-NS",
+            "name": "SHOT #357"
+          },
+          {
+            "code": "70-NT",
+            "name": "SHOT #358"
+          },
+          {
+            "code": "70-NU",
+            "name": "SHOT #359"
+          },
+          {
+            "code": "70-NV",
+            "name": "SHOT #360"
+          },
+          {
+            "code": "70-NW",
+            "name": "SHOT #362"
+          },
+          {
+            "code": "70-NX",
+            "name": "SHOT #363"
+          },
+          {
+            "code": "70-NY",
+            "name": "SHOT #364"
+          },
+          {
+            "code": "70-NZ",
+            "name": "SHOT #365"
+          },
+          {
+            "code": "70-OA",
+            "name": "SHOT #366"
+          },
+          {
+            "code": "70-OB",
+            "name": "SHOT #367"
+          },
+          {
+            "code": "70-OC",
+            "name": "SHOT #368"
+          },
+          {
+            "code": "70-OD",
+            "name": "SHOT #369"
+          },
+          {
+            "code": "70-OE",
+            "name": "SHOT #370"
+          },
+          {
+            "code": "70-OF",
+            "name": "SHOT #371"
+          },
+          {
+            "code": "70-OG",
+            "name": "SHOT #372"
+          },
+          {
+            "code": "70-OH",
+            "name": "SHOT #373"
+          },
+          {
+            "code": "70-OI",
+            "name": "SHOT #374"
+          },
+          {
+            "code": "70-OJ",
+            "name": "SHOT #375"
+          },
+          {
+            "code": "70-OK",
+            "name": "SHOT #376"
+          },
+          {
+            "code": "70-OL",
+            "name": "SHOT #377"
+          },
+          {
+            "code": "70-OM",
+            "name": "SHOT #378"
+          },
+          {
+            "code": "70-ON",
+            "name": "SHOT #379"
+          },
+          {
+            "code": "70-OO",
+            "name": "SHOT #380"
+          },
+          {
+            "code": "70-OP",
+            "name": "SHOT #381"
+          },
+          {
+            "code": "70-OQ",
+            "name": "SHOT #382"
+          },
+          {
+            "code": "70-OR",
+            "name": "SHOT #383"
+          },
+          {
+            "code": "70-OS",
+            "name": "SHOT #384"
+          },
+          {
+            "code": "70-OT",
+            "name": "SHOT #385"
+          },
+          {
+            "code": "70-OU",
+            "name": "SHOT #386"
+          },
+          {
+            "code": "70-OV",
+            "name": "SHOT #387"
+          },
+          {
+            "code": "70-OW",
+            "name": "SHOT #388"
+          },
+          {
+            "code": "70-OX",
+            "name": "SHOT #389"
+          },
+          {
+            "code": "70-OY",
+            "name": "SHOT #390"
+          },
+          {
+            "code": "70-OZ",
+            "name": "SHOT #391"
+          },
+          {
+            "code": "70-PA",
+            "name": "SHOT #392"
+          },
+          {
+            "code": "70-PB",
+            "name": "SHOT #393"
+          },
+          {
+            "code": "70-PC",
+            "name": "SHOT #394"
+          },
+          {
+            "code": "70-PD",
+            "name": "SHOT #395"
+          },
+          {
+            "code": "70-PE",
+            "name": "SHOT #396"
+          },
+          {
+            "code": "70-PF",
+            "name": "SHOT #397"
+          },
+          {
+            "code": "70-PG",
+            "name": "SHOT #398"
+          },
+          {
+            "code": "70-PH",
+            "name": "SHOT #399"
+          },
+          {
+            "code": "70-PI",
+            "name": "SHOT #400"
+          },
+          {
+            "code": "70-PJ",
+            "name": "SHOT #401"
+          },
+          {
+            "code": "70-PK",
+            "name": "SHOT #402"
+          },
+          {
+            "code": "70-PL",
+            "name": "SHOT #403"
+          },
+          {
+            "code": "70-PM",
+            "name": "SHOT #404"
+          },
+          {
+            "code": "70-PN",
+            "name": "SHOT #405"
+          },
+          {
+            "code": "70-PO",
+            "name": "SHOT #406"
+          },
+          {
+            "code": "70-PP",
+            "name": "SHOT #407"
+          },
+          {
+            "code": "70-PQ",
+            "name": "SHOT #408"
+          },
+          {
+            "code": "70-PR",
+            "name": "SHOT #409"
+          },
+          {
+            "code": "70-PS",
+            "name": "SHOT #410"
+          },
+          {
+            "code": "70-PT",
+            "name": "SHOT #411"
+          },
+          {
+            "code": "70-PU",
+            "name": "SHOT #412"
+          },
+          {
+            "code": "70-PV",
+            "name": "SHOT #413"
+          },
+          {
+            "code": "70-PW",
+            "name": "SHOT #414"
+          },
+          {
+            "code": "70-PX",
+            "name": "SHOT #415"
+          },
+          {
+            "code": "70-PY",
+            "name": "SHOT #416"
+          },
+          {
+            "code": "70-PZ",
+            "name": "SHOT #417"
+          },
+          {
+            "code": "70-QA",
+            "name": "SHOT #418"
+          },
+          {
+            "code": "70-QB",
+            "name": "SHOT #419"
+          },
+          {
+            "code": "70-QC",
+            "name": "SHOT #420"
+          },
+          {
+            "code": "70-QD",
+            "name": "SHOT #421"
+          },
+          {
+            "code": "70-QE",
+            "name": "SHOT #422"
+          },
+          {
+            "code": "70-QF",
+            "name": "SHOT #423"
+          },
+          {
+            "code": "70-QG",
+            "name": "SHOT #424"
+          },
+          {
+            "code": "70-QH",
+            "name": "SHOT #425"
+          },
+          {
+            "code": "70-QI",
+            "name": "SHOT #426"
+          },
+          {
+            "code": "70-QJ",
+            "name": "SHOT #427"
+          },
+          {
+            "code": "70-QK",
+            "name": "SHOT #428"
+          },
+          {
+            "code": "70-QL",
+            "name": "SHOT #429"
+          },
+          {
+            "code": "70-QM",
+            "name": "SHOT #430"
+          },
+          {
+            "code": "70-QN",
+            "name": "SHOT #431"
+          },
+          {
+            "code": "70-QO",
+            "name": "SHOT #432"
+          },
+          {
+            "code": "70-QP",
+            "name": "SHOT #433"
+          },
+          {
+            "code": "70-QQ",
+            "name": "SHOT #434"
+          },
+          {
+            "code": "70-QR",
+            "name": "SHOT #435"
+          },
+          {
+            "code": "70-QS",
+            "name": "SHOT #436"
+          },
+          {
+            "code": "70-QT",
+            "name": "SHOT #437"
+          },
+          {
+            "code": "70-QU",
+            "name": "SHOT #438"
+          },
+          {
+            "code": "70-QV",
+            "name": "SHOT #439"
+          },
+          {
+            "code": "70-QW",
+            "name": "SHOT #440"
+          },
+          {
+            "code": "70-QX",
+            "name": "SHOT #441"
+          },
+          {
+            "code": "70-QY",
+            "name": "SHOT #442"
+          },
+          {
+            "code": "70-QZ",
+            "name": "SHOT #443"
+          },
+          {
+            "code": "70-RA",
+            "name": "SHOT #444"
+          },
+          {
+            "code": "70-RB",
+            "name": "SHOT #445"
+          },
+          {
+            "code": "70-RC",
+            "name": "SHOT #446"
+          },
+          {
+            "code": "70-RD",
+            "name": "SHOT #447"
+          },
+          {
+            "code": "70-RE",
+            "name": "SHOT #448"
+          },
+          {
+            "code": "70-RF",
+            "name": "SHOT #449"
+          },
+          {
+            "code": "70-RG",
+            "name": "SHOT #450"
+          },
+          {
+            "code": "70-RH",
+            "name": "SHOT #451"
+          },
+          {
+            "code": "70-RI",
+            "name": "SHOT #452"
+          },
+          {
+            "code": "70-RJ",
+            "name": "SHOT #453"
+          },
+          {
+            "code": "70-RK",
+            "name": "SHOT #454"
+          },
+          {
+            "code": "70-RL",
+            "name": "SHOT #455"
+          },
+          {
+            "code": "70-RM",
+            "name": "SHOT #456"
+          },
+          {
+            "code": "70-RN",
+            "name": "SHOT #457"
+          },
+          {
+            "code": "70-RO",
+            "name": "SHOT #458"
+          },
+          {
+            "code": "70-RP",
+            "name": "SHOT #459"
+          },
+          {
+            "code": "70-RQ",
+            "name": "SHOT #460"
+          },
+          {
+            "code": "70-RR",
+            "name": "SHOT #461"
+          },
+          {
+            "code": "70-RS",
+            "name": "SHOT #462"
+          },
+          {
+            "code": "70-RT",
+            "name": "SHOT #463"
+          },
+          {
+            "code": "70-RU",
+            "name": "SHOT #464"
+          },
+          {
+            "code": "70-RV",
+            "name": "SHOT #465"
+          },
+          {
+            "code": "70-RW",
+            "name": "SHOT #466"
+          },
+          {
+            "code": "70-RX",
+            "name": "SHOT #467"
+          },
+          {
+            "code": "70-RY",
+            "name": "SHOT #468"
+          },
+          {
+            "code": "70-RZ",
+            "name": "SHOT #469"
+          },
+          {
+            "code": "70-SA",
+            "name": "SHOT #470"
+          },
+          {
+            "code": "70-SB",
+            "name": "SHOT #471"
+          },
+          {
+            "code": "70-SC",
+            "name": "SHOT #472"
+          },
+          {
+            "code": "70-SD",
+            "name": "SHOT #473"
+          },
+          {
+            "code": "70-SE",
+            "name": "SHOT #474"
+          },
+          {
+            "code": "70-SF",
+            "name": "SHOT #475"
+          },
+          {
+            "code": "70-SG",
+            "name": "SHOT #476"
+          },
+          {
+            "code": "70-SH",
+            "name": "SHOT #477"
+          },
+          {
+            "code": "70-SI",
+            "name": "SHOT #478"
+          },
+          {
+            "code": "70-SJ",
+            "name": "SHOT #479"
+          },
+          {
+            "code": "70-SK",
+            "name": "SHOT #480"
+          },
+          {
+            "code": "70-SL",
+            "name": "SHOT #481"
+          },
+          {
+            "code": "70-SM",
+            "name": "SHOT #482"
+          },
+          {
+            "code": "70-SN",
+            "name": "SHOT #483"
+          },
+          {
+            "code": "70-SO",
+            "name": "SHOT #484"
+          },
+          {
+            "code": "70-SP",
+            "name": "SHOT #485"
+          },
+          {
+            "code": "70-SQ",
+            "name": "SHOT #486"
+          },
+          {
+            "code": "70-SR",
+            "name": "SHOT #487"
+          },
+          {
+            "code": "70-SS",
+            "name": "SHOT #488"
+          },
+          {
+            "code": "70-ST",
+            "name": "SHOT #489"
+          },
+          {
+            "code": "70-SU",
+            "name": "SHOT #490"
+          },
+          {
+            "code": "70-SV",
+            "name": "SHOT #491"
+          },
+          {
+            "code": "70-SW",
+            "name": "SHOT #492"
+          },
+          {
+            "code": "70-SX",
+            "name": "SHOT #493"
+          },
+          {
+            "code": "70-SY",
+            "name": "SHOT #494"
+          },
+          {
+            "code": "70-SZ",
+            "name": "SHOT #495"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "71-00",
+        "name": "PROJECTION",
+        "accounts": [
+          {
+            "code": "71-01",
+            "name": "PROJECTION ROOM RENTAL"
+          },
+          {
+            "code": "71-02",
+            "name": "PROJECTIONIST"
+          },
+          {
+            "code": "71-03",
+            "name": "MATTE ROOM PROJECTIONIST"
+          },
+          {
+            "code": "71-04",
+            "name": "SOUND RECORDING PROJECTION"
+          },
+          {
+            "code": "71-05",
+            "name": "VIDEO PROJECTION RENTAL"
+          },
+          {
+            "code": "71-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "71-95",
+            "name": "MATERIALS & SUPPLIES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "72-00",
+        "name": "EDITING",
+        "accounts": [
+          {
+            "code": "72-01",
+            "name": "FILM EDITORS & ASSISTANTS"
+          },
+          {
+            "code": "72-02",
+            "name": "SOUND EFFECTS EDITORS"
+          },
+          {
+            "code": "72-03",
+            "name": "MUSIC EDITORS"
+          },
+          {
+            "code": "72-04",
+            "name": "NEGATIVE CUTTING"
+          },
+          {
+            "code": "72-05",
+            "name": "ADR/DIALOGUE EDITORS"
+          },
+          {
+            "code": "72-06",
+            "name": "CONTINUITY SCRIPTS"
+          },
+          {
+            "code": "72-07",
+            "name": "VISUAL EFFECTS EDITORS"
+          },
+          {
+            "code": "72-08",
+            "name": "POST PRODUCTION FEES"
+          },
+          {
+            "code": "72-09",
+            "name": "POST PRODUCTION ACCOUNTANT"
+          },
+          {
+            "code": "72-15",
+            "name": "OTHER LABOR"
+          },
+          {
+            "code": "72-36",
+            "name": "AIRFARES"
+          },
+          {
+            "code": "72-37",
+            "name": "HOTELS"
+          },
+          {
+            "code": "72-38",
+            "name": "LIVING EXPENSE"
+          },
+          {
+            "code": "72-80",
+            "name": "POST PRODUCTION OFFICE"
+          },
+          {
+            "code": "72-84",
+            "name": "NON-LINEAR EDIT EQUIPMENT"
+          },
+          {
+            "code": "72-85",
+            "name": "CUTTING ROOM / RENTAL PACKAGE"
+          },
+          {
+            "code": "72-86",
+            "name": "KEM RENTALS"
+          },
+          {
+            "code": "72-87",
+            "name": "CODING"
+          },
+          {
+            "code": "72-88",
+            "name": "MISC. EQUIPMENT RENTALS"
+          },
+          {
+            "code": "72-95",
+            "name": "MATERIALS & SUPPLIES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "73-00",
+        "name": "TITLES",
+        "accounts": [
+          {
+            "code": "73-01",
+            "name": "DESIGN"
+          },
+          {
+            "code": "73-02",
+            "name": "SHOOTING/LAB"
+          },
+          {
+            "code": "73-95",
+            "name": "MATERIALS & SUPPLIES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "74-00",
+        "name": "MUSIC",
+        "accounts": [
+          {
+            "code": "74-01",
+            "name": "SONG WRITERS"
+          },
+          {
+            "code": "74-02",
+            "name": "COMPOSER"
+          },
+          {
+            "code": "74-03",
+            "name": "COPYING"
+          },
+          {
+            "code": "74-04",
+            "name": "ORCHESTRATIONS"
+          },
+          {
+            "code": "74-05",
+            "name": "ORCHESTRA"
+          },
+          {
+            "code": "74-07",
+            "name": "PRE-SCORE ORCHESTRA"
+          },
+          {
+            "code": "74-09",
+            "name": "PRODUCER/ENGINEER"
+          },
+          {
+            "code": "74-10",
+            "name": "MUSIC SUPERVISION"
+          },
+          {
+            "code": "74-11",
+            "name": "SONG DEMOS"
+          },
+          {
+            "code": "74-12",
+            "name": "SONG ARRANGEMENTS"
+          },
+          {
+            "code": "74-13",
+            "name": "PRE-RECORD SONGS"
+          },
+          {
+            "code": "74-14",
+            "name": "POST SONG FIXES"
+          },
+          {
+            "code": "74-15",
+            "name": "SINGERS"
+          },
+          {
+            "code": "74-36",
+            "name": "AIR FARES"
+          },
+          {
+            "code": "74-37",
+            "name": "HOTELS"
+          },
+          {
+            "code": "74-38",
+            "name": "LIVING EXPENSE"
+          },
+          {
+            "code": "74-40",
+            "name": "SONG #1"
+          },
+          {
+            "code": "74-41",
+            "name": "SONG #2"
+          },
+          {
+            "code": "74-42",
+            "name": "SONG #3"
+          },
+          {
+            "code": "74-43",
+            "name": "SONG #4"
+          },
+          {
+            "code": "74-44",
+            "name": "SONG #5"
+          },
+          {
+            "code": "74-45",
+            "name": "SONG #6"
+          },
+          {
+            "code": "74-46",
+            "name": "SONG #7"
+          },
+          {
+            "code": "74-47",
+            "name": "SONG #8"
+          },
+          {
+            "code": "74-48",
+            "name": "SONG #9"
+          },
+          {
+            "code": "74-49",
+            "name": "SONG #10"
+          },
+          {
+            "code": "74-50",
+            "name": "SONG #11"
+          },
+          {
+            "code": "74-51",
+            "name": "SONG #12"
+          },
+          {
+            "code": "74-52",
+            "name": "SONG #13"
+          },
+          {
+            "code": "74-53",
+            "name": "SONG #14"
+          },
+          {
+            "code": "74-54",
+            "name": "SONG #15"
+          },
+          {
+            "code": "74-60",
+            "name": "MUSIC RIGHTS"
+          },
+          {
+            "code": "74-61",
+            "name": "NEW USE/RE USE PAYMENTS"
+          },
+          {
+            "code": "74-62",
+            "name": "MUSIC CLEARANCE SERVICE"
+          },
+          {
+            "code": "74-63",
+            "name": "RECORD ADVANCE"
+          },
+          {
+            "code": "74-70",
+            "name": "INSTRUMENT CARTAGE"
+          },
+          {
+            "code": "74-76",
+            "name": "SCORING STAGE"
+          },
+          {
+            "code": "74-77",
+            "name": "SCORING STAGE-ADD'L EQUIP"
+          },
+          {
+            "code": "74-78",
+            "name": "COMPOSERS OVERALL"
+          },
+          {
+            "code": "74-80",
+            "name": "OTHER LABOR"
+          },
+          {
+            "code": "74-85",
+            "name": "INSTRUMENT RENTALS"
+          },
+          {
+            "code": "74-90",
+            "name": "STOCK & TAPE"
+          },
+          {
+            "code": "74-95",
+            "name": "MATERIALS & SUPPLIES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "76-00",
+        "name": "POST-PRODUCTION SOUND",
+        "accounts": [
+          {
+            "code": "76-01",
+            "name": "FOLEY"
+          },
+          {
+            "code": "76-02",
+            "name": "TEMP DUB/STUDIO RUN"
+          },
+          {
+            "code": "76-03",
+            "name": "PRE-DUB"
+          },
+          {
+            "code": "76-04",
+            "name": "FINAL DUB"
+          },
+          {
+            "code": "76-05",
+            "name": "SOUND PACKAGE - ALL-IN"
+          },
+          {
+            "code": "76-06",
+            "name": "SOUND EFFECTS EDITORS"
+          },
+          {
+            "code": "76-07",
+            "name": "ADR"
+          },
+          {
+            "code": "76-08",
+            "name": "MAGNETIC TRANSFER (L&M)"
+          },
+          {
+            "code": "76-09",
+            "name": "OPTICAL SOUNDTRACK (L&M)"
+          },
+          {
+            "code": "76-10",
+            "name": "RENTALS"
+          },
+          {
+            "code": "76-36",
+            "name": "AIRFARES"
+          },
+          {
+            "code": "76-37",
+            "name": "HOTELS"
+          },
+          {
+            "code": "76-38",
+            "name": "LIVING EXPENSE"
+          },
+          {
+            "code": "76-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "76-95",
+            "name": "MATERIALS & SUPPLIES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "78-00",
+        "name": "PREVIEW EXPENSES",
+        "accounts": [
+          {
+            "code": "78-01",
+            "name": "AUDIENCE RECRUITING FEE"
+          },
+          {
+            "code": "78-02",
+            "name": "TEMP DUBS"
+          },
+          {
+            "code": "78-03",
+            "name": "THEATRE RENTAL"
+          },
+          {
+            "code": "78-04",
+            "name": "SET UP CHARGES"
+          },
+          {
+            "code": "78-05",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "78-36",
+            "name": "AIRFARES"
+          },
+          {
+            "code": "78-37",
+            "name": "HOTELS"
+          },
+          {
+            "code": "78-38",
+            "name": "LIVING EXPENSES"
+          },
+          {
+            "code": "78-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "78-95",
+            "name": "MATERIALS & SUPPLIES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "79-00",
+        "name": "FILM LAB EXPENSE",
+        "accounts": [
+          {
+            "code": "79-03`",
+            "name": "OPTICALS, FADES, DISSOLVES"
+          },
+          {
+            "code": "79-15",
+            "name": "REPRINTS"
+          },
+          {
+            "code": "79-20",
+            "name": "WORK PRINTS"
+          },
+          {
+            "code": "79-25",
+            "name": "BLACK & WHITE/COLOR DUPES"
+          },
+          {
+            "code": "79-28",
+            "name": "FILM TO VIDEO TAPE TRANSFERS"
+          },
+          {
+            "code": "79-29",
+            "name": "VIDEO TO FILM TRANSFER"
+          },
+          {
+            "code": "79-33",
+            "name": "TAPE TO TAPE COLOR CORRECTION"
+          },
+          {
+            "code": "79-34",
+            "name": "ANSWER PRINT"
+          },
+          {
+            "code": "79-35",
+            "name": "RELEASE PRINT-TELEVISION"
+          },
+          {
+            "code": "79-36",
+            "name": "PROTECTIVE MASTERS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "80-00",
+        "name": "PURCHASE FILM FOOTAGE",
+        "accounts": [
+          {
+            "code": "80-01",
+            "name": "PURCHASE FILM RIGHTS"
+          },
+          {
+            "code": "80-03",
+            "name": "LIBRN & FILM MOVEMENT FEE"
+          },
+          {
+            "code": "80-04",
+            "name": "TALENT REUSE PAYMENTS"
+          },
+          {
+            "code": "80-50",
+            "name": "RAW STOCK"
+          },
+          {
+            "code": "80-95",
+            "name": "LAB"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "82-00",
+        "name": "POST-PRODUCTION RESHOOTS",
+        "accounts": [
+          {
+            "code": "82-01",
+            "name": "RESHOOT #1"
+          },
+          {
+            "code": "82-02",
+            "name": "RESHOOT #2"
+          },
+          {
+            "code": "82-03",
+            "name": "RESHOOT #3"
+          },
+          {
+            "code": "82-04",
+            "name": "RESHOOT #4"
+          },
+          {
+            "code": "82-32",
+            "name": "WRITER"
+          },
+          {
+            "code": "82-33",
+            "name": "SCENERIO MISCELLANEOUS"
+          },
+          {
+            "code": "82-36",
+            "name": "PRODUCERS"
+          },
+          {
+            "code": "82-37",
+            "name": "DIRECTOR"
+          },
+          {
+            "code": "82-38",
+            "name": "PRINCIPAL CAST"
+          },
+          {
+            "code": "82-39",
+            "name": "BITS AND STUNTS"
+          },
+          {
+            "code": "82-41",
+            "name": "ATL TRAVEL & LIVING"
+          },
+          {
+            "code": "82-42",
+            "name": "EXTRAS AND STANDINGS"
+          },
+          {
+            "code": "82-43",
+            "name": "PRODUCTION STAFF"
+          },
+          {
+            "code": "82-44",
+            "name": "WARDROBE"
+          },
+          {
+            "code": "82-45",
+            "name": "MAKEUP AND HAIR"
+          },
+          {
+            "code": "82-47",
+            "name": "CAMERA"
+          },
+          {
+            "code": "82-48",
+            "name": "PICTURE FILM AND DAILIES"
+          },
+          {
+            "code": "82-49",
+            "name": "SET DRESSSING"
+          },
+          {
+            "code": "82-50",
+            "name": "ACTION PROPS"
+          },
+          {
+            "code": "82-51",
+            "name": "ACTION PROPS-VEHICLES"
+          },
+          {
+            "code": "82-52",
+            "name": "MINIATURES / CREATURES"
+          },
+          {
+            "code": "82-53",
+            "name": "SET DESIGN"
+          },
+          {
+            "code": "82-54",
+            "name": "SET CONSTRUCTION"
+          },
+          {
+            "code": "82-55",
+            "name": "SET STRIKE"
+          },
+          {
+            "code": "82-56",
+            "name": "VIDEO"
+          },
+          {
+            "code": "82-57",
+            "name": "PRODUCTION SOUND"
+          },
+          {
+            "code": "82-58",
+            "name": "SET LIGHTING"
+          },
+          {
+            "code": "82-59",
+            "name": "SET OPERATIONS"
+          },
+          {
+            "code": "82-60",
+            "name": "FACILITIES"
+          },
+          {
+            "code": "82-61",
+            "name": "SPECIAL EFFECTS"
+          },
+          {
+            "code": "82-63",
+            "name": "LOCATION"
+          },
+          {
+            "code": "82-64",
+            "name": "TRANSPORTATION"
+          },
+          {
+            "code": "82-65",
+            "name": "SECOND UNIT"
+          },
+          {
+            "code": "82-68",
+            "name": "STOP MOTION ANIMATION"
+          },
+          {
+            "code": "82-69",
+            "name": "BTL TRAVEL AND LIVING"
+          },
+          {
+            "code": "82-71",
+            "name": "PROJECTION"
+          },
+          {
+            "code": "82-85",
+            "name": "INSURANCE"
+          },
+          {
+            "code": "82-87",
+            "name": "PUBLICITY"
+          },
+          {
+            "code": "82-88",
+            "name": "MISCELLANEOUS"
+          },
+          {
+            "code": "82-99",
+            "name": "FRINGES"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total post"
+      },
+      {
+        "kind": "category",
+        "code": "85-00",
+        "name": "INSURANCE & MEDICAL",
+        "accounts": [
+          {
+            "code": "85-01",
+            "name": "SAFETY REPRESENTATIVE"
+          },
+          {
+            "code": "85-25",
+            "name": "COMPLETION BOND"
+          },
+          {
+            "code": "85-30",
+            "name": "CAST INSURANCE"
+          },
+          {
+            "code": "85-32",
+            "name": "MEDICAL EXAMS"
+          },
+          {
+            "code": "85-35",
+            "name": "PRODUCER'S POLICY"
+          },
+          {
+            "code": "85-37",
+            "name": "OTHER"
+          },
+          {
+            "code": "85-65",
+            "name": "INSURANCE CLAIMS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "87-00",
+        "name": "PUBLICITY",
+        "accounts": [
+          {
+            "code": "87-01",
+            "name": "UNIT PUBLICIST"
+          },
+          {
+            "code": "87-39",
+            "name": "ENTERTAINMENT"
+          },
+          {
+            "code": "87-85",
+            "name": "RENTALS"
+          },
+          {
+            "code": "87-86",
+            "name": "BOX RENTALS"
+          },
+          {
+            "code": "87-90",
+            "name": "FILM & LAB"
+          },
+          {
+            "code": "87-95",
+            "name": "MATERIAL & SUPPLIES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "88-00",
+        "name": "MISC.UNCLASSIFED EXPENSES",
+        "accounts": [
+          {
+            "code": "88-01",
+            "name": "MISC. LABOR EXPENSE"
+          },
+          {
+            "code": "88-02",
+            "name": "MISC. MATERIAL EXPENSE"
+          },
+          {
+            "code": "88-05",
+            "name": "BUSINESS LICENSE TAXES"
+          },
+          {
+            "code": "88-45",
+            "name": "PAYROLL COMPANY FEES"
+          },
+          {
+            "code": "88-55",
+            "name": "CORPORATION FEES"
+          },
+          {
+            "code": "88-70",
+            "name": "IMMIGRATION FEES"
+          },
+          {
+            "code": "88-71",
+            "name": "OUTSIDE LEGAL EXPENSES"
+          },
+          {
+            "code": "88-73",
+            "name": "OUTSIDE TAX PREPARATION"
+          },
+          {
+            "code": "88-74",
+            "name": "ACCOUNTING FEES"
+          },
+          {
+            "code": "88-75",
+            "name": "LEGAL FEES"
+          },
+          {
+            "code": "88-76",
+            "name": "PRODUCT PLACEMENT FEES"
+          },
+          {
+            "code": "88-92",
+            "name": "WRAP PARTY"
+          },
+          {
+            "code": "88-93",
+            "name": "UNION/GUILD CLAIMS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "89-00",
+        "name": "CERTIFICATES & ROYALTIES",
+        "accounts": [
+          {
+            "code": "89-35",
+            "name": "MPAA CERTIFICATES"
+          },
+          {
+            "code": "89-36",
+            "name": "AMPTP DUES"
+          },
+          {
+            "code": "89-37",
+            "name": "DOLBY LICENSE"
+          },
+          {
+            "code": "89-41",
+            "name": "OTHER LICENSES"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total other"
+      }
+    ]
+  }
+}

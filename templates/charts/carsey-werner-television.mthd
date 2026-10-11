@@ -38,7 +38,7 @@
     "topsheet": [
       {
         "kind": "category",
-        "code": "01",
+        "code": "0100",
         "name": "SCRIPT",
         "accounts": [
           {
@@ -97,7 +97,7 @@
       },
       {
         "kind": "category",
-        "code": "02",
+        "code": "0200",
         "name": "PRODUCTION UNIT",
         "accounts": [
           {
@@ -132,7 +132,7 @@
       },
       {
         "kind": "category",
-        "code": "03",
+        "code": "0300",
         "name": "DIRECTION",
         "accounts": [
           {
@@ -175,7 +175,7 @@
       },
       {
         "kind": "category",
-        "code": "04",
+        "code": "0400",
         "name": "CAST",
         "accounts": [
           {
@@ -222,7 +222,7 @@
       },
       {
         "kind": "category",
-        "code": "05",
+        "code": "0500",
         "name": "EXTRA TALENT",
         "accounts": [
           {
@@ -253,7 +253,7 @@
       },
       {
         "kind": "category",
-        "code": "06",
+        "code": "0600",
         "name": "TRAVEL/LIVING/RELOCATION",
         "accounts": [
           {
@@ -284,7 +284,7 @@
       },
       {
         "kind": "category",
-        "code": "09",
+        "code": "0900",
         "name": "FRINGE BENEFITS",
         "accounts": [
           {
@@ -315,7 +315,7 @@
       },
       {
         "kind": "category",
-        "code": "10",
+        "code": "1000",
         "name": "PRODUCTION STAFF",
         "accounts": [
           {
@@ -390,7 +390,7 @@
       },
       {
         "kind": "category",
-        "code": "11",
+        "code": "1100",
         "name": "SET DESIGN",
         "accounts": [
           {
@@ -433,7 +433,7 @@
       },
       {
         "kind": "category",
-        "code": "12",
+        "code": "1200",
         "name": "SET CONSTRUCTION",
         "accounts": [
           {
@@ -464,7 +464,7 @@
       },
       {
         "kind": "category",
-        "code": "13",
+        "code": "1300",
         "name": "SET STRIKING",
         "accounts": [
           {
@@ -475,7 +475,7 @@
       },
       {
         "kind": "category",
-        "code": "14",
+        "code": "1400",
         "name": "SET OPERATIONS",
         "accounts": [
           {
@@ -586,7 +586,7 @@
       },
       {
         "kind": "category",
-        "code": "15",
+        "code": "1500",
         "name": "EXTRA TALENT",
         "accounts": [
           {
@@ -621,7 +621,7 @@
       },
       {
         "kind": "category",
-        "code": "16",
+        "code": "1600",
         "name": "SET DRESSING",
         "accounts": [
           {
@@ -668,7 +668,7 @@
       },
       {
         "kind": "category",
-        "code": "17",
+        "code": "1700",
         "name": "PROPERTY",
         "accounts": [
           {
@@ -711,7 +711,7 @@
       },
       {
         "kind": "category",
-        "code": "18",
+        "code": "1800",
         "name": "WARDROBE",
         "accounts": [
           {
@@ -766,7 +766,7 @@
       },
       {
         "kind": "category",
-        "code": "19",
+        "code": "1900",
         "name": "MAKEUP & HAIR",
         "accounts": [
           {
@@ -809,7 +809,7 @@
       },
       {
         "kind": "category",
-        "code": "20",
+        "code": "2000",
         "name": "LIGHTING",
         "accounts": [
           {
@@ -880,7 +880,7 @@
       },
       {
         "kind": "category",
-        "code": "21",
+        "code": "2100",
         "name": "CAMERA",
         "accounts": [
           {
@@ -935,7 +935,7 @@
       },
       {
         "kind": "category",
-        "code": "22",
+        "code": "2200",
         "name": "VIDEO EQUIPMENT",
         "accounts": [
           {
@@ -958,7 +958,7 @@
       },
       {
         "kind": "category",
-        "code": "23",
+        "code": "2300",
         "name": "VIDEOTAPE PERSON",
         "accounts": [
           {
@@ -1013,7 +1013,7 @@
       },
       {
         "kind": "category",
-        "code": "24",
+        "code": "2400",
         "name": "SOUND",
         "accounts": [
           {
@@ -1048,7 +1048,7 @@
       },
       {
         "kind": "category",
-        "code": "25",
+        "code": "2500",
         "name": "TRANSPORTATION",
         "accounts": [
           {
@@ -1119,7 +1119,7 @@
       },
       {
         "kind": "category",
-        "code": "26",
+        "code": "2600",
         "name": "LOCATION",
         "accounts": [
           {
@@ -1174,7 +1174,7 @@
       },
       {
         "kind": "category",
-        "code": "27",
+        "code": "2700",
         "name": "LIVING EXPENSES",
         "accounts": [
           {
@@ -1241,7 +1241,7 @@
       },
       {
         "kind": "category",
-        "code": "28",
+        "code": "2800",
         "name": "LOCATION",
         "accounts": [
           {
@@ -1252,7 +1252,7 @@
       },
       {
         "kind": "category",
-        "code": "29",
+        "code": "2900",
         "name": "VTR RAW STOCK",
         "accounts": [
           {
@@ -1287,7 +1287,7 @@
       },
       {
         "kind": "category",
-        "code": "30",
+        "code": "3000",
         "name": "STAGE FACILITIES",
         "accounts": [
           {
@@ -1322,7 +1322,7 @@
       },
       {
         "kind": "category",
-        "code": "31",
+        "code": "3100",
         "name": "SPECIAL EFFECTS",
         "accounts": [
           {
@@ -1341,7 +1341,7 @@
       },
       {
         "kind": "category",
-        "code": "34",
+        "code": "3400",
         "name": "IA PH & W",
         "accounts": [
           {
@@ -1372,7 +1372,7 @@
       },
       {
         "kind": "category",
-        "code": "41",
+        "code": "4100",
         "name": "OFF/ON LINE",
         "accounts": [
           {
@@ -1451,7 +1451,7 @@
       },
       {
         "kind": "category",
-        "code": "42",
+        "code": "4200",
         "name": "MUSIC",
         "accounts": [
           {
@@ -1506,7 +1506,7 @@
       },
       {
         "kind": "category",
-        "code": "43",
+        "code": "4300",
         "name": "POST SOUND",
         "accounts": [
           {
@@ -1557,7 +1557,7 @@
       },
       {
         "kind": "category",
-        "code": "44",
+        "code": "4400",
         "name": "FILM LAB",
         "accounts": [
           {
@@ -1576,7 +1576,7 @@
       },
       {
         "kind": "category",
-        "code": "45",
+        "code": "4500",
         "name": "MAIN TITLES",
         "accounts": [
           {
@@ -1587,7 +1587,7 @@
       },
       {
         "kind": "category",
-        "code": "46",
+        "code": "4600",
         "name": "FRG BEN",
         "accounts": [
           {
@@ -1618,7 +1618,7 @@
       },
       {
         "kind": "category",
-        "code": "50",
+        "code": "5000",
         "name": "PUBLICITY",
         "accounts": [
           {
@@ -1645,7 +1645,7 @@
       },
       {
         "kind": "category",
-        "code": "51",
+        "code": "5100",
         "name": "INSURANCE",
         "accounts": [
           {
@@ -1668,7 +1668,7 @@
       },
       {
         "kind": "category",
-        "code": "52",
+        "code": "5200",
         "name": "OFFICE",
         "accounts": [
           {
@@ -1743,7 +1743,7 @@
       },
       {
         "kind": "category",
-        "code": "54",
+        "code": "5400",
         "name": "FEES & CHARGES",
         "accounts": [
           {

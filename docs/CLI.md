@@ -217,8 +217,10 @@ nothing else) from an Excel workbook, a CSV or tab-delimited file, or another bu
 and writes it as a new budget with no lines: a template, titled after the file unless
 `--title` says otherwise. The header row, the columns and the numbering pattern are found
 (docs/TEMPLATES.md lists the shapes it reads, and the `kind,code,name,parent` layout that
-needs no guessing); `--sheet` picks a sheet, `--mapping` names the rest. It prints what it
-read (counts, the pattern, rows skipped and anything to check).
+needs no guessing, keeps every number as written and places each account under the
+category it names); `--sheet` picks a sheet, `--mapping` names the rest. It prints what it
+read (counts, the pattern, rows skipped and anything to check, including each repeated
+account number given a new one, `10950` as `10950-2`).
 
 `--into B.mthd` applies the chart to a copy of that budget instead and writes the result to
 `-o` (which may be the same file): categories and accounts it lacks are added in number

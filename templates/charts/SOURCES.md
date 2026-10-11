@@ -66,6 +66,42 @@ totals.
 - `sony-features-template`: SONY FEATURES TEMPLATE
 - `telefilm-besi`: TELEFILM BESI
 - `triage-entertainment`: TRIAGE ENTERTAINMENT
+- `abc-television`: ABC TELEVISION
+- `alliance-old`: ALLIANCE (OLD)
+- `alliance-atlantis-comm`: ALLIANCE ATLANTIS COMM
+- `artisan-entertainment`: ARTISAN ENTERTAINMENT
+- `channel4form`: CHANNEL4FORM
+- `disney-animation`: DISNEY ANIMATION
+- `disney-stage`: DISNEY STAGE
+- `disney`: DISNEY
+- `dreamworks-animation`: DREAMWORKS ANIMATION
+- `fox-20th-tv`: FOX 20TH TV
+- `fox-tv-animation-pilot`: FOX TV ANIMATION PILOT
+- `fox-tv-animation`: FOX TV ANIMATION
+- `fox-tv-series`: FOX TV SERIES
+- `fox-tv-studio`: FOX TV STUDIO
+- `fox-van-ness-films`: FOX VAN NESS FILMS
+- `fox-tv-pilot`: Fox Tv Pilot
+- `hallmark-mcgee-street`: HALLMARK McGEE STREET
+- `hbo-ny`: HBO NY
+- `hearst-ent-canada`: HEARST ENT CANADA
+- `miramax-features`: MIRAMAX FEATURES
+- `miramax`: MIRAMAX
+- `netflix-live-action-v4`: NETFLIX - LIVE ACTION V4
+- `revolution-studios`: REVOLUTION STUDIOS
+- `spt`: SPT
+- `superbudget-ep-2006`: SUPERBUDGET EP 2006
+- `telefilm-canada-en`: Telefilm Canada EN
+- `telefilm-canada-fr`: Telefilm Canada FR
+- `univ-network`: UNIV NETWORK
+- `usa-cable-entertainment`: USA CABLE ENTERTAINMENT
+- `warner-bros-australia`: WARNER BROS AUSTRALIA
+- `warner-bros-belair`: WARNER BROS BELAIR
+- `warner-bros-canada`: WARNER BROS CANADA
+- `warner-bros-features`: WARNER BROS FEATURES
+- `warner-bros-foreign-features`: WARNER BROS FOREIGN FEATURES
+- `warner-bros-generic`: WARNER BROS GENERIC
+- `warner-bros-tv`: WARNER BROS TV
 
 ## Production charts
 

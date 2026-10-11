@@ -2244,18 +2244,21 @@ impl Target {
 /// normalizes it (`11-5` is `11-05`), never by cutting it short.
 fn find_account(b: &Budget, code: &str) -> Option<Target> {
     let coding = &b.account_coding;
-    let norm = coding
-        .fits(code)
-        .then(|| coding.normalize(code).ok())
-        .flatten();
-    for (ci, cat) in b.categories().enumerate() {
-        for (ai, a) in cat.accounts.iter().enumerate() {
-            if a.code == code || norm.as_deref() == Some(a.code.as_str()) {
-                return Some(Target::Account { ci, ai });
-            }
-        }
+    let find = |hit: &dyn Fn(&str) -> bool| {
+        b.categories().enumerate().find_map(|(ci, cat)| {
+            cat.accounts
+                .iter()
+                .position(|a| hit(&a.code))
+                .map(|ai| Target::Account { ci, ai })
+        })
+    };
+    // As written first, so a number the pattern would read as another
+    // account's never shadows the account it names exactly.
+    if let Some(t) = find(&|a| a == code) {
+        return Some(t);
     }
-    None
+    let norm = coding.read(code).map(|c| coding.format(&c))?;
+    find(&|a| a == norm)
 }
 
 fn find_category(b: &Budget, code: &str) -> Option<Target> {

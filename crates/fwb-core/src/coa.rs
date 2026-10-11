@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::coding::{AccountCoding, MAX_WIDTH, SEPARATORS};
 use crate::model::{Account, Budget, Category, ProductionTotal, TopsheetRow};
-use crate::renumber::{carry_account, carry_category};
+use crate::renumber::{carry_account, carry_category, carry_category_part};
 
 /// One account of a chart.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -493,6 +493,77 @@ pub fn infer_coding(
     Ok(coding)
 }
 
+/// The pattern for a chart whose numbers are kept exactly as written and
+/// whose accounts are already placed in their categories (one read with
+/// its rows' kinds named): nothing depends on the pattern but typing new
+/// numbers and matching, so it is the one most of the numbers follow.
+///
+/// `accounts` are each account's number and its category's number. Every
+/// pattern of up to [`MAX_WIDTH`] + [`MAX_WIDTH`] characters, with no
+/// separator or one the account numbers use, is scored by how many account
+/// numbers it writes exactly as they are (`1101` under 2 + 2, not `11` +
+/// `1` padded) with the category part their category names (`1100` and
+/// `11-00` name `11`). The best score wins; on a tie, the pattern
+/// [`infer_coding`] gives for all the numbers, then the one under which
+/// more category numbers name a category part, then the shorter category
+/// part. Never fails: a chart with no usable numbers gets the default.
+pub fn infer_coding_lenient(
+    categories: &[&str],
+    accounts: &[(&str, &str)],
+    subs: &[&str],
+) -> AccountCoding {
+    let codes: Vec<&str> = accounts.iter().map(|(a, _)| *a).collect();
+    let inferred = infer_coding(categories, &codes, subs).ok();
+    let mut seps: Vec<Option<char>> = vec![None];
+    for c in SEPARATORS {
+        if codes.iter().any(|a| a.contains(c)) {
+            seps.push(Some(c));
+        }
+    }
+    let mut candidates: Vec<AccountCoding> = inferred.into_iter().collect();
+    for separator in seps {
+        for category_width in 1..=MAX_WIDTH {
+            for account_width in 1..=MAX_WIDTH {
+                candidates.push(AccountCoding {
+                    category_width,
+                    account_width,
+                    sub_width: 0,
+                    set_width: 0,
+                    separator,
+                });
+            }
+        }
+    }
+    let score = |k: &AccountCoding| {
+        let follows = accounts
+            .iter()
+            .filter(|(a, cat)| {
+                k.read(a).is_some_and(|c| {
+                    !c.account.is_empty()
+                        && k.format(&c) == a.trim()
+                        && (cat.is_empty() || k.category_key(cat) == c.category)
+                })
+            })
+            .count();
+        let cats = categories
+            .iter()
+            .filter(|c| k.category_key(c) != c.trim())
+            .count();
+        (
+            follows,
+            Some(*k) == inferred,
+            cats,
+            std::cmp::Reverse(k.category_width),
+        )
+    };
+    // `rev`: the first of equals wins.
+    candidates
+        .into_iter()
+        .rev()
+        .max_by_key(|k| score(k))
+        .unwrap_or_default()
+}
+
 /// A number split into the parts of `coding`, each padded to its width, or
 /// why it doesn't fit (a part too long, too many parts, or with no
 /// separator more characters than the pattern holds). Nothing is cut off.
@@ -658,7 +729,7 @@ pub fn apply(b: &mut Budget, chart: &Chart, opts: &ApplyOptions) -> Result<Apply
     // The chart's numbers in the budget's pattern.
     let mut cats: Vec<(String, String, Vec<Named>)> = Vec::new();
     for c in chart.categories() {
-        let code = match carry_category(&chart.coding, &to, &c.code) {
+        let code = match carry_category_part(&chart.coding, &to, &c.code) {
             Ok(code) => code,
             Err(e) => {
                 report.not_fitting.push(format!("category {}: {e}", c.code));
@@ -677,14 +748,26 @@ pub fn apply(b: &mut Budget, chart: &Chart, opts: &ApplyOptions) -> Result<Apply
         }
         cats.push((code, c.name.clone(), accounts));
     }
+    // Numbers are compared as the budget's pattern reads them, never cut
+    // short: category `11` is the budget's `1100`, account `1101` its `11-01`.
     let listed_accounts: BTreeSet<String> = cats
         .iter()
-        .flat_map(|(_, _, a)| a.iter().map(|a| a.code.clone()))
+        .flat_map(|(_, _, a)| a.iter().map(|a| to.key(&a.code)))
         .collect();
-    let listed_categories: BTreeSet<String> = cats.iter().map(|(c, _, _)| c.clone()).collect();
+    let listed_categories: BTreeSet<String> =
+        cats.iter().map(|(c, _, _)| to.category_key(c)).collect();
 
     for (code, name, accounts) in &cats {
-        let existing = b.categories_mut().find(|c| &c.code == code);
+        let key = to.category_key(code);
+        let at = b
+            .categories()
+            .position(|c| &c.code == code)
+            .or_else(|| b.categories().position(|c| to.category_key(&c.code) == key));
+        let existing = at.and_then(|i| b.categories_mut().nth(i));
+        // The budget's own spelling of the category, for its accounts below.
+        let code = &existing
+            .as_ref()
+            .map_or_else(|| code.clone(), |c| c.code.clone());
         match existing {
             Some(c) => {
                 if !name.trim().is_empty() && c.name != *name {
@@ -714,10 +797,21 @@ pub fn apply(b: &mut Budget, chart: &Chart, opts: &ApplyOptions) -> Result<Apply
             }
         }
         for a in accounts {
+            let exact = b
+                .categories()
+                .flat_map(|c| &c.accounts)
+                .any(|x| x.code == a.code);
+            let akey = to.key(&a.code);
             let existing = b
                 .categories_mut()
                 .flat_map(|c| c.accounts.iter_mut())
-                .find(|x| x.code == a.code);
+                .find(|x| {
+                    if exact {
+                        x.code == a.code
+                    } else {
+                        to.key(&x.code) == akey
+                    }
+                });
             match existing {
                 Some(x) => {
                     if !a.name.trim().is_empty() && x.name != a.name {
@@ -760,7 +854,7 @@ pub fn apply(b: &mut Budget, chart: &Chart, opts: &ApplyOptions) -> Result<Apply
     for c in b.categories_mut() {
         let mut keep = Vec::with_capacity(c.accounts.len());
         for a in std::mem::take(&mut c.accounts) {
-            if listed_accounts.contains(&a.code) {
+            if listed_accounts.contains(&to.key(&a.code)) {
                 keep.push(a);
                 continue;
             }
@@ -785,7 +879,7 @@ pub fn apply(b: &mut Budget, chart: &Chart, opts: &ApplyOptions) -> Result<Apply
     if opts.remove_unlisted {
         b.topsheet.retain(|r| match r {
             TopsheetRow::Category(c)
-                if !listed_categories.contains(&c.code)
+                if !listed_categories.contains(&to.category_key(&c.code))
                     && c.accounts.is_empty()
                     && c.notes.is_empty() =>
             {

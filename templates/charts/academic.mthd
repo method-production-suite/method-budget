@@ -38,7 +38,7 @@
     "topsheet": [
       {
         "kind": "category",
-        "code": "10",
+        "code": "1000",
         "name": "Story and Rights",
         "accounts": [
           {
@@ -57,7 +57,7 @@
       },
       {
         "kind": "category",
-        "code": "11",
+        "code": "1100",
         "name": "Producers",
         "accounts": [
           {
@@ -76,7 +76,7 @@
       },
       {
         "kind": "category",
-        "code": "12",
+        "code": "1200",
         "name": "Directors",
         "accounts": [
           {
@@ -95,7 +95,7 @@
       },
       {
         "kind": "category",
-        "code": "13",
+        "code": "1300",
         "name": "Cast",
         "accounts": [
           {
@@ -138,7 +138,7 @@
       },
       {
         "kind": "category",
-        "code": "14",
+        "code": "1400",
         "name": "Above-The-Line Travel/Other",
         "accounts": [
           {
@@ -165,9 +165,25 @@
       },
       {
         "kind": "category",
-        "code": "15",
+        "code": "1500",
         "name": "Production Staff",
         "accounts": [
+          {
+            "code": "1501-2",
+            "name": "Unit Production Manager"
+          },
+          {
+            "code": "1502-2",
+            "name": "1st Assistant Director"
+          },
+          {
+            "code": "1503-2",
+            "name": "Production Coordinator"
+          },
+          {
+            "code": "1504-2",
+            "name": "Script Supervisor"
+          },
           {
             "code": "1505",
             "name": "Location Manager"
@@ -200,7 +216,7 @@
       },
       {
         "kind": "category",
-        "code": "16",
+        "code": "1600",
         "name": "Extra Talent",
         "accounts": [
           {
@@ -227,7 +243,7 @@
       },
       {
         "kind": "category",
-        "code": "17",
+        "code": "1700",
         "name": "Art Department",
         "accounts": [
           {
@@ -262,7 +278,7 @@
       },
       {
         "kind": "category",
-        "code": "18",
+        "code": "1800",
         "name": "Set Dressing",
         "accounts": [
           {
@@ -293,7 +309,7 @@
       },
       {
         "kind": "category",
-        "code": "19",
+        "code": "1900",
         "name": "Set Operation",
         "accounts": [
           {
@@ -356,7 +372,7 @@
       },
       {
         "kind": "category",
-        "code": "20",
+        "code": "2000",
         "name": "Props",
         "accounts": [
           {
@@ -399,7 +415,7 @@
       },
       {
         "kind": "category",
-        "code": "21",
+        "code": "2100",
         "name": "Special Effect",
         "accounts": [
           {
@@ -434,7 +450,7 @@
       },
       {
         "kind": "category",
-        "code": "22",
+        "code": "2200",
         "name": "Wardrobe",
         "accounts": [
           {
@@ -469,7 +485,7 @@
       },
       {
         "kind": "category",
-        "code": "23",
+        "code": "2300",
         "name": "Makeup and Hairdressing",
         "accounts": [
           {
@@ -504,7 +520,7 @@
       },
       {
         "kind": "category",
-        "code": "24",
+        "code": "2400",
         "name": "Set Construction",
         "accounts": [
           {
@@ -543,7 +559,7 @@
       },
       {
         "kind": "category",
-        "code": "25",
+        "code": "2500",
         "name": "Set Lighting",
         "accounts": [
           {
@@ -586,7 +602,7 @@
       },
       {
         "kind": "category",
-        "code": "26",
+        "code": "2600",
         "name": "Camera",
         "accounts": [
           {
@@ -629,7 +645,7 @@
       },
       {
         "kind": "category",
-        "code": "27",
+        "code": "2700",
         "name": "Production Sound",
         "accounts": [
           {
@@ -672,7 +688,7 @@
       },
       {
         "kind": "category",
-        "code": "28",
+        "code": "2800",
         "name": "Locations",
         "accounts": [
           {
@@ -735,7 +751,7 @@
       },
       {
         "kind": "category",
-        "code": "29",
+        "code": "2900",
         "name": "Transportation",
         "accounts": [
           {
@@ -790,7 +806,7 @@
       },
       {
         "kind": "category",
-        "code": "30",
+        "code": "3000",
         "name": "Production Film & Lab",
         "accounts": [
           {
@@ -829,7 +845,7 @@
       },
       {
         "kind": "category",
-        "code": "31",
+        "code": "3100",
         "name": "Video",
         "accounts": [
           {
@@ -876,7 +892,7 @@
       },
       {
         "kind": "category",
-        "code": "32",
+        "code": "3200",
         "name": "Facilities",
         "accounts": [
           {
@@ -907,7 +923,7 @@
       },
       {
         "kind": "category",
-        "code": "33",
+        "code": "3300",
         "name": "Second Unit",
         "accounts": [
           {
@@ -986,7 +1002,7 @@
       },
       {
         "kind": "category",
-        "code": "34",
+        "code": "3400",
         "name": "Editing",
         "accounts": [
           {
@@ -1013,7 +1029,7 @@
       },
       {
         "kind": "category",
-        "code": "35",
+        "code": "3500",
         "name": "Music",
         "accounts": [
           {
@@ -1040,7 +1056,7 @@
       },
       {
         "kind": "category",
-        "code": "36",
+        "code": "3600",
         "name": "Post Production Sound",
         "accounts": [
           {
@@ -1075,7 +1091,7 @@
       },
       {
         "kind": "category",
-        "code": "37",
+        "code": "3700",
         "name": "Post Production Film & Lab",
         "accounts": [
           {
@@ -1126,7 +1142,7 @@
       },
       {
         "kind": "category",
-        "code": "38",
+        "code": "3800",
         "name": "Titles & Opticals",
         "accounts": [
           {
@@ -1153,7 +1169,7 @@
       },
       {
         "kind": "category",
-        "code": "39",
+        "code": "3900",
         "name": "Insurance",
         "accounts": [
           {
@@ -1176,7 +1192,7 @@
       },
       {
         "kind": "category",
-        "code": "40",
+        "code": "4000",
         "name": "Publicity",
         "accounts": [
           {
@@ -1199,7 +1215,7 @@
       },
       {
         "kind": "category",
-        "code": "41",
+        "code": "4100",
         "name": "Product Placement",
         "accounts": [
           {
@@ -1214,7 +1230,7 @@
       },
       {
         "kind": "category",
-        "code": "42",
+        "code": "4200",
         "name": "General Expense",
         "accounts": [
           {

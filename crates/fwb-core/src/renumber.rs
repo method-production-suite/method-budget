@@ -25,7 +25,8 @@
 //!    left out, as [`AccountCoding::format`] writes them.
 //!
 //! A category's own number is its category segment only, carried over the
-//! same way. An account's category segment is carried over independently of
+//! same way; one written with its later parts all zeros (`1100` for
+//! category `11`, as studio charts write them) keeps that form. An account's category segment is carried over independently of
 //! its category's number, so a mismatch that was there stays there.
 //!
 //! # Refusals
@@ -286,13 +287,40 @@ fn carry(
     }))
 }
 
-/// Carries over a category's own number.
+/// The pieces of a category number written with its later parts all zeros
+/// (`1100` for category `11`, `11-00`), or `None` for any other number.
+fn zero_rest(from: &AccountCoding, code: &str) -> Option<Vec<String>> {
+    let pieces = split(from, code).ok()?;
+    (pieces.len() > 1 && pieces[1..].iter().all(|p| p.bytes().all(|b| b == b'0'))).then_some(pieces)
+}
+
+/// Carries over a category's own number. One written with its later parts
+/// all zeros (`1100` for category `11`, as many studio charts write them)
+/// keeps that form (`1100` becomes `011000` from 2 + 2 to 3 + 3), or, when
+/// the new pattern has no room for it, becomes its category part.
 pub fn carry_category(
     from: &AccountCoding,
     to: &AccountCoding,
     code: &str,
 ) -> Result<String, String> {
-    carry(from, to, code, 1)
+    match zero_rest(from, code) {
+        Some(pieces) => carry(from, to, code, 4).or_else(|_| carry(from, to, &pieces[0], 1)),
+        None => carry(from, to, code, 1),
+    }
+}
+
+/// Carries over a category's own number as its category part only (`1100`
+/// becomes `11` under 2 + 2): how a chart's categories are written into a
+/// budget it is applied to.
+pub fn carry_category_part(
+    from: &AccountCoding,
+    to: &AccountCoding,
+    code: &str,
+) -> Result<String, String> {
+    match zero_rest(from, code) {
+        Some(pieces) => carry(from, to, &pieces[0], 1),
+        None => carry(from, to, code, 1),
+    }
 }
 
 /// Carries over an account number.
@@ -394,11 +422,11 @@ fn plan_with_maps(b: &Budget, to: &AccountCoding) -> Result<(RenumberPlan, Maps)
     if let FringePosting::Category { suffix } = &b.fringe_posting {
         let live: BTreeSet<&String> = accts.values().collect();
         for c in &plan.categories {
-            let old = from.fringe_account(&c.old, suffix).unwrap_or_default();
+            let old = from.category_fringe_account(&c.old, suffix);
             let new = if c.new.is_empty() {
                 String::new()
             } else {
-                to.fringe_account(&c.new, suffix).unwrap_or_default()
+                to.category_fringe_account(&c.new, suffix)
             };
             if old.is_empty() && new.is_empty() {
                 continue;
