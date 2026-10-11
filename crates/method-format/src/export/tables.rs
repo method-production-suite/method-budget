@@ -417,16 +417,18 @@ fn groups(b: &Budget, r: &Report) -> Sheet {
         .iter()
         .map(|(name, g)| {
             let t: GroupTotals = r.groups.get(name).cloned().unwrap_or_default();
-            let [details, fringes, total] = breakdown_cells(&t.full);
-            let counted = t.active.details_total.saturating_add(t.active.fringe_total);
+            let [details, fringes, _] = breakdown_cells(&t.full);
+            // Total and Counted Total as the app shows them: without the
+            // fringes when the group rule `fringes_in_totals` is Exclude.
+            let shown = t.shown(&b.group_rules);
             vec![
                 Cell::text(name),
                 Cell::text(&g.description),
                 yes_no(g.in_budget_total),
                 details,
                 fringes,
-                total,
-                Cell::Money(counted),
+                money_or_empty(shown.map(|(total, _)| total)),
+                money_or_empty(shown.map(|(_, counted)| counted)),
             ]
         })
         .collect();

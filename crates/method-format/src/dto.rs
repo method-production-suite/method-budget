@@ -1126,11 +1126,12 @@ impl From<FileTrailingFringes> for TrailingFringes {
     }
 }
 
-/// How a budget works out its totals: `"mmb"` (the default, left out) or
-/// `"exact"`.
+/// How a budget works out its totals: `"binary"` (the default, left out) or
+/// `"exact"`. `"mmb"`, the earlier name of `"binary"`, is still read.
 #[derive(Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum FileArithmetic {
+    #[serde(rename = "binary", alias = "mmb")]
     Mmb,
     Exact,
 }

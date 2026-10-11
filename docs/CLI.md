@@ -147,8 +147,8 @@ Changes one value and saves. Paths:
 |------|-------|
 | `title` | Text. |
 | `compact_versions` | `true` or `false`: save versions as deltas (docs/FORMAT.md, "Version deltas"). |
-| `arithmetic` | `mmb` (the default: totals worked out as Movie Magic Budgeting works them, in binary doubles) or `exact` (exact decimals, half away from zero). See decisions.md, entry 55. |
-| `trailing_level_fringes` | `keep` (the default) or `drop`: under production-level posting, keep the fringes of categories after the last production total in the grand total, or drop them as Movie Magic Budgeting does. See decisions.md, entry 56. |
+| `arithmetic` | `binary` (the default: totals worked out in binary doubles, as spreadsheets and industry-standard budgeting software work them; `mmb` is still accepted) or `exact` (exact decimals, half away from zero). See decisions.md, entry 55. |
+| `trailing_level_fringes` | `keep` (the default) or `drop`: under production-level posting, keep the fringes of categories after the last production total in the grand total, or drop them from every total. See decisions.md, entry 56. |
 | `group_rules.ungrouped_lines` | `include` (the default) or `exclude`: lines and adjustment rows with no group count, or are left out. See decisions.md, entry 57. |
 | `group_rules.conflict` | `exclude` (the default) or `include`: a line in a group that counts and a group that doesn't is left out, or counts. |
 | `group_rules.fringes_in_totals` | `include` (the default) or `exclude`: group totals shown with or without their fringes. Display only. |
@@ -394,7 +394,7 @@ remove charge Insurance
 |---------|------|
 | `set title TEXT` | The budget's title. |
 | `set compact_versions true\|false` | Save versions as deltas. |
-| `set arithmetic mmb\|exact` | How totals are worked out (see `arithmetic` above). |
+| `set arithmetic binary\|exact` | How totals are worked out (see `arithmetic` above). |
 | `set trailing_level_fringes keep\|drop` | Fringes after the last production total (see `trailing_level_fringes` above). |
 | `set group_rules RULE include\|exclude` | One group rule: `ungrouped_lines`, `conflict` or `fringes_in_totals` (see `group_rules.RULE` above). |
 | `set global NAME FORMULA` | Sets a global's formula, adding the global when it's new. |

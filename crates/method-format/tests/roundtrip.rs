@@ -318,6 +318,10 @@ fn arithmetic_round_trips_and_is_left_out_at_default() {
     };
     let read = |body: &str| method_format::from_str(&file(body)).map(|b| b.arithmetic);
     assert_eq!(read("").unwrap(), Arithmetic::Mmb);
+    assert_eq!(
+        read(r#", "arithmetic": "binary""#).unwrap(),
+        Arithmetic::Mmb
+    );
     assert_eq!(read(r#", "arithmetic": "mmb""#).unwrap(), Arithmetic::Mmb);
     assert_eq!(
         read(r#", "arithmetic": "exact""#).unwrap(),

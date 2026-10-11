@@ -5,7 +5,7 @@ use crate::script::{self, Op, RowRef, Word, LINE_FIELDS};
 
 pub const USAGE: &str = "  method set <file.mthd> <path> <value> [--dry-run]
       Change one value and save atomically. Paths: title, compact_versions,
-      arithmetic (mmb or exact), trailing_level_fringes (keep or drop),
+      arithmetic (binary or exact), trailing_level_fringes (keep or drop),
       group_rules.ungrouped_lines, group_rules.conflict and
       group_rules.fringes_in_totals (include or exclude),
       global.NAME, fringe.NAME.rate, fringe.NAME.cutoff, fringe.NAME.basis
@@ -163,7 +163,7 @@ mod tests {
             Op::Arithmetic(method_core::Arithmetic::Exact)
         );
         assert_eq!(
-            op_for("arithmetic", "mmb").unwrap(),
+            op_for("arithmetic", "binary").unwrap(),
             Op::Arithmetic(method_core::Arithmetic::Mmb)
         );
         assert!(op_for("arithmetic", "float").is_err());

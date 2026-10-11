@@ -247,7 +247,7 @@ impl Money {
     pub fn rule(self) -> &'static str {
         match self {
             Money::Exact(_) => "half away from zero",
-            Money::F64(_) => "half up on the double",
+            Money::F64(_) => "half up on the binary value",
         }
     }
 }

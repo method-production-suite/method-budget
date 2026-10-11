@@ -392,7 +392,7 @@ fn rounding(m: impl Into<Money>, rounded: Cents) -> Option<Step> {
                     format!(" is {} as a binary double, so it", dmoney(held))
                 };
                 format!(
-                    "{}{held} rounds to {} (Movie Magic rounding: {})",
+                    "{}{held} rounds to {} (spreadsheet rounding: {})",
                     dmoney(m),
                     money(rounded),
                     m.rule()
@@ -951,7 +951,7 @@ impl<'a> Explainer<'a> {
             vec![Step::note(
                 "Left out",
                 "no production total follows these categories, so their fringes post nowhere \
-                 and count in no total (trailing level fringes: drop, as Movie Magic does)",
+                 and count in no total (trailing level fringes: drop)",
             )]
         } else if self.b.fringe_posting == FringePosting::ProductionLevel {
             (lv.start..lv.end)

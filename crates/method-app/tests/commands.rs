@@ -958,6 +958,36 @@ fn category_credit_rows_and_group_rules() {
     );
 }
 
+/// Rounding and the fringes after the last production total are one
+/// command each, one undo step, and saved only when not the default.
+#[test]
+fn arithmetic_and_trailing_level_fringes() {
+    let mut s = Session::new();
+    let v0 = view(&mut s);
+    assert!(
+        v0["budget"].get("arithmetic").is_none(),
+        "default is left out"
+    );
+    assert!(v0["budget"].get("trailing_level_fringes").is_none());
+
+    one_step(&mut s, |b| edit::set_arithmetic(b, "exact"));
+    let v = view(&mut s);
+    assert_eq!(v["budget"]["arithmetic"], "exact");
+    one_step(&mut s, |b| edit::set_arithmetic(b, "binary"));
+    assert!(view(&mut s)["budget"].get("arithmetic").is_none());
+    refused(&mut s, |b| edit::set_arithmetic(b, "float"));
+    assert_eq!(s.budget().arithmetic, method_core::Arithmetic::Mmb);
+
+    one_step(&mut s, |b| edit::set_trailing_level_fringes(b, "drop"));
+    assert_eq!(view(&mut s)["budget"]["trailing_level_fringes"], "drop");
+    refused(&mut s, |b| edit::set_trailing_level_fringes(b, "lose"));
+    one_step(&mut s, |b| edit::set_trailing_level_fringes(b, "keep"));
+    assert_eq!(
+        s.budget().trailing_level_fringes,
+        method_core::TrailingFringes::Keep
+    );
+}
+
 #[test]
 fn bad_credits_are_refused_and_change_nothing() {
     let mut s = Session::new();

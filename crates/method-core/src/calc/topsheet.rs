@@ -175,7 +175,7 @@ pub(crate) fn trailing_fringes_warning(b: &Budget, r: &Report) -> Option<String>
     }
     let what = match b.trailing_level_fringes {
         TrailingFringes::Keep => {
-            "kept in the grand total; Movie Magic leaves them out (trailing_level_fringes drop matches it)"
+            "kept in the grand total (trailing_level_fringes drop leaves them out)"
         }
         TrailingFringes::Drop => "left out of every total (trailing_level_fringes drop)",
     };

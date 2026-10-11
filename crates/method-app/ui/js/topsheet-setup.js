@@ -1227,10 +1227,58 @@ function renderSettings(panel) {
   if (k.state().errors.has(fk)) fr.append(k.errorLine(k.state().errors.get(fk)));
   panel.append(fr);
 
+  panel.append(calculationGroup());
   panel.append(newLinesGroup());
   // Numbers on screen: rate decimals, summary rows, net total (display-settings.js).
   panel.append(displaySettingsGroup(k));
   panel.append(codingForm());
+}
+
+// How totals are worked out (budget settings): rounding and the fringes of
+// categories after the last production total. The file leaves out each at
+// its default (binary, keep).
+function calculationGroup() {
+  const b = k.budget();
+  const ck = k.key('settings', 'calculation');
+  const group = k.el('div', 'tss-group');
+  group.dataset.item = ck;
+  const arith = b.arithmetic === 'exact' ? 'exact' : 'binary';
+  const trailing = b.trailing_level_fringes === 'drop' ? 'drop' : 'keep';
+  const arithSel = k.selectInput({
+    fieldKey: k.key('settings', 'arithmetic'),
+    value: arith,
+    options: [
+      ['binary', 'Spreadsheet (binary)'],
+      ['exact', 'Exact decimal'],
+    ],
+    onCommit: (v, old) => k.run(ck, () => ['set_arithmetic', { value: v }], { restore: [k.key('settings', 'arithmetic'), old] }),
+  });
+  const trailingSel = k.selectInput({
+    fieldKey: k.key('settings', 'trailing'),
+    value: trailing,
+    options: [
+      ['keep', 'Keep'],
+      ['drop', 'Drop'],
+    ],
+    onCommit: (v, old) =>
+      k.run(ck, () => ['set_trailing_level_fringes', { value: v }], { restore: [k.key('settings', 'trailing'), old] }),
+  });
+  const grid = k.el('div', 'setup-fields');
+  grid.append(
+    k.field('Rounding', arithSel, { wide: true }),
+    k.field('Fringes of categories after the last production total', trailingSel, { wide: true }),
+  );
+  group.append(
+    heading('Calculation'),
+    grid,
+    k.el(
+      'p',
+      'setup-hint tss-note',
+      'Spreadsheet rounding works in binary numbers, so 1 x 1.005 is 1.00; exact decimal makes it 1.01. Dropped fringes count in no total; this only applies when fringes post above each production total.',
+    ),
+  );
+  if (k.state().errors.has(ck)) group.append(k.errorLine(k.state().errors.get(ck)));
+  return group;
 }
 
 // What a line inserted in the grid copies from its neighbor (a budget setting).

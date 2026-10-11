@@ -403,26 +403,29 @@ pub enum Arithmetic {
 impl Arithmetic {
     pub const ALL: [Arithmetic; 2] = [Arithmetic::Mmb, Arithmetic::Exact];
 
-    /// The name files and commands use: `mmb` or `exact`.
+    /// The name files and commands use: `binary` or `exact`.
     pub fn name(self) -> &'static str {
         match self {
-            Arithmetic::Mmb => "mmb",
+            Arithmetic::Mmb => "binary",
             Arithmetic::Exact => "exact",
         }
     }
 
     /// The arithmetic named `name` (as [`Arithmetic::name`] writes it).
+    /// `mmb`, the earlier name of `binary`, is still read.
     pub fn parse(name: &str) -> Option<Arithmetic> {
-        Arithmetic::ALL
-            .into_iter()
-            .find(|a| a.name() == name.trim())
+        let name = name.trim();
+        if name == "mmb" {
+            return Some(Arithmetic::Mmb);
+        }
+        Arithmetic::ALL.into_iter().find(|a| a.name() == name)
     }
 
     /// The rounding rule in words, as Explain states it.
     pub fn rule(self) -> &'static str {
         match self {
             Arithmetic::Mmb => {
-                "Movie Magic arithmetic: binary doubles, each amount rounded to cents once, half up on the double"
+                "spreadsheet arithmetic: binary doubles, each amount rounded to cents once, half up on the binary value"
             }
             Arithmetic::Exact => {
                 "exact arithmetic: decimals, each amount rounded to cents once, half away from zero"

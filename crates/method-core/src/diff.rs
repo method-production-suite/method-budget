@@ -913,7 +913,7 @@ pub(crate) fn trailing_text(t: &TrailingFringes) -> String {
 
 pub(crate) fn arithmetic_text(a: &Arithmetic) -> String {
     match a {
-        Arithmetic::Mmb => "Movie Magic (binary doubles)".into(),
+        Arithmetic::Mmb => "spreadsheet (binary doubles)".into(),
         Arithmetic::Exact => "exact decimals".into(),
     }
 }

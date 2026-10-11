@@ -5,7 +5,9 @@ use std::path::Path;
 
 use method_core::decimal::{mul_cents, Exact};
 use method_core::sample::{budget as sample_budget, SampleSpec};
-use method_core::{recalc, starter, Budget, Cents, Dec, FringePosting, RecalcOptions, Report};
+use method_core::{
+    recalc, starter, Budget, Cents, Dec, FringePosting, Inclusion, RecalcOptions, Report,
+};
 use method_format::export::{
     self, csv, money_text, render, workbook, xlsx, Cell, Format, Options, Sheet, Workbook,
     SHEET_NAMES,
@@ -145,6 +147,33 @@ fn tables_line_up_with_the_budget() {
         let fringe_dollars: Cents = r.fringes.values().map(|f| f.total).sum();
         assert_eq!(money_sum(fringes, "Total"), fringe_dollars);
     }
+}
+
+/// The Groups sheet's Total and Counted Total follow the group rule
+/// `fringes_in_totals`, as the app's group lists do.
+#[test]
+fn group_totals_follow_the_fringes_rule() {
+    let mut tested = false;
+    for mut b in budgets() {
+        for rule in [Inclusion::Include, Inclusion::Exclude] {
+            b.group_rules.fringes_in_totals = rule;
+            let r = report(&b);
+            let wb = workbook(&b, &r).unwrap();
+            let s = wb.sheet("Groups").unwrap();
+            let (total, counted) = (col(s, "Total"), col(s, "Counted Total"));
+            for (row, name) in s.rows.iter().zip(b.groups.keys()) {
+                let t = r.groups.get(name).cloned().unwrap_or_default();
+                let (want_total, want_counted) = t.shown(&b.group_rules).unwrap();
+                assert_eq!(row[total], Cell::Money(want_total), "{name}");
+                assert_eq!(row[counted], Cell::Money(want_counted), "{name}");
+                if rule == Inclusion::Exclude {
+                    assert_eq!(want_total, t.full.details_total);
+                    tested |= t.full.fringe_total != 0;
+                }
+            }
+        }
+    }
+    assert!(tested, "some group earns fringes");
 }
 
 #[test]

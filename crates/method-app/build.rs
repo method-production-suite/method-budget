@@ -53,6 +53,8 @@ const COMMANDS: &[&str] = &[
     "set_info",
     "delete_info",
     "set_fringe_posting",
+    "set_arithmetic",
+    "set_trailing_level_fringes",
     "set_account_coding",
     "set_totals_currency",
     "lock_baseline",

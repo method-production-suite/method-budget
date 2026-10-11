@@ -222,13 +222,13 @@ fn a_movie_magic_line_shows_its_double_and_rounding() {
     assert!(text.contains("Line: 1 x 1.005 = 1.005"), "{text}");
     assert!(
         text.contains(
-            "1.005 is 1.00499999999999989341... as a binary double, so it rounds to 1.00 (Movie Magic rounding: half up on the double)"
+            "1.005 is 1.00499999999999989341... as a binary double, so it rounds to 1.00 (spreadsheet rounding: half up on the binary value)"
         ),
         "{text}"
     );
     let out = e.to_text(None);
     assert!(out.contains(
-        "(Movie Magic arithmetic: binary doubles, each amount rounded to cents once, half up on the double)"
+        "(spreadsheet arithmetic: binary doubles, each amount rounded to cents once, half up on the binary value)"
     ), "{out}");
 }
 
@@ -316,7 +316,7 @@ fn currency_and_adjustment_rows_show_their_working() {
     let text = all_text(&adj.root);
     assert!(text.contains("added up in doubles"), "{text}");
     assert!(
-        text.contains("rounds to 6,125.82 (Movie Magic rounding: half up on the double)"),
+        text.contains("rounds to 6,125.82 (spreadsheet rounding: half up on the binary value)"),
         "{text}"
     );
 }

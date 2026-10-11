@@ -257,9 +257,9 @@ pub fn trailing(s: &str) -> Result<TrailingFringes, String> {
         .ok_or_else(|| format!("`{s}` is not a trailing level fringes setting: use keep or drop"))
 }
 
-/// An arithmetic by name (`mmb` or `exact`).
+/// An arithmetic by name (`binary` or `exact`; `mmb` still reads as `binary`).
 pub fn arithmetic(s: &str) -> Result<Arithmetic, String> {
-    Arithmetic::parse(s).ok_or_else(|| format!("`{s}` is not an arithmetic: use mmb or exact"))
+    Arithmetic::parse(s).ok_or_else(|| format!("`{s}` is not an arithmetic: use binary or exact"))
 }
 
 /// Parses one line. `Ok(None)` for a blank line or a comment.
@@ -280,7 +280,7 @@ pub fn parse(line: &str) -> Result<Option<Op>, String> {
             Op::CompactVersions(flag(&w[2])?)
         }
         ["set", "arithmetic"] => {
-            let w = need(&w, 3, "set arithmetic mmb|exact")?;
+            let w = need(&w, 3, "set arithmetic binary|exact")?;
             Op::Arithmetic(arithmetic(&w[2].text)?)
         }
         ["set", "trailing_level_fringes"] => {
@@ -897,6 +897,7 @@ mod tests {
             "set title \"New title\"",
             "set compact_versions true",
             "set arithmetic exact",
+            "set arithmetic binary",
             "set arithmetic mmb",
             "set trailing_level_fringes drop",
             "set trailing_level_fringes keep",

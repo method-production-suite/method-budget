@@ -802,6 +802,22 @@ pub fn set_group_rule(b: &mut Budget, rule: &str, value: &str) -> EditResult {
     Ok(())
 }
 
+/// Sets how the budget works out its totals (decisions.md, entry 55):
+/// `binary` or `exact`.
+pub fn set_arithmetic(b: &mut Budget, value: &str) -> EditResult {
+    b.arithmetic = method_core::Arithmetic::parse(value)
+        .ok_or_else(|| format!("`{value}` is not binary or exact"))?;
+    Ok(())
+}
+
+/// Sets what happens to the fringes of categories after the last production
+/// total (decisions.md, entry 56): `keep` or `drop`.
+pub fn set_trailing_level_fringes(b: &mut Budget, value: &str) -> EditResult {
+    b.trailing_level_fringes = method_core::TrailingFringes::parse(value)
+        .ok_or_else(|| format!("`{value}` is not keep or drop"))?;
+    Ok(())
+}
+
 /// Deletes a group and untags every row. Refused while a credit is based on it.
 pub fn delete_group(b: &mut Budget, name: &str) -> EditResult {
     if !b.groups.contains_key(name) {

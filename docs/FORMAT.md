@@ -111,7 +111,7 @@ Fields in written order:
 | `account_coding`  | [account coding](#account-coding) | Left out when it is the default pattern. |
 | `fringe_posting`  | [fringe posting](#fringe-posting) | Left out when it is the default (by category, suffix `"99"`). |
 | `trailing_level_fringes` | `"keep"` or `"drop"` | Under production-level posting, what happens to the fringes of categories after the last production total (see [trailing level fringes](#trailing-level-fringes)). Left out when `"keep"`, which is also what a missing field means. |
-| `arithmetic`      | `"mmb"` or `"exact"` | How totals are worked out (see [arithmetic](#arithmetic)). Left out when `"mmb"`, which is also what a missing `arithmetic` means. |
+| `arithmetic`      | `"binary"` or `"exact"` | How totals are worked out (see [arithmetic](#arithmetic)). Left out when `"binary"`, which is also what a missing `arithmetic` means. |
 | `new_line_defaults` | [new-line defaults](#new-line-defaults) | Left out when it is the default (copy fringes only). |
 | `info`            | map of [info values](#info-value) | Budget information fields, keyed by label. |
 | `currencies`      | map of [currencies](#currency) | Foreign currencies, keyed by code. |
@@ -184,7 +184,7 @@ own. It changes nothing under the other posting modes.
 | Value    | Meaning |
 |----------|---------|
 | `"keep"` | The default, also for files without the field. They post in a fringe row of the unnamed level after the last production total, so they are in the grand total and in a percent charge's base, though in neither above- nor below-the-line. `method check` warns about them. |
-| `"drop"` | As Movie Magic Budgeting does: they post nowhere, so they are in no total (lines still earn them, and fringe, group, set and location totals and credits still count them). |
+| `"drop"` | They post nowhere, so they are in no total (lines still earn them, and fringe, group, set and location totals and credits still count them). |
 
 ### Arithmetic
 
@@ -193,7 +193,7 @@ a [version](#version) keeps its own.
 
 | Value     | Meaning |
 |-----------|---------|
-| `"mmb"`   | The default, also for files without the field. As Movie Magic Budgeting works: formulas, globals and every money step (line totals, currency conversion, fringes, charges, credits, adjustment rows) are binary doubles, and each amount is rounded to cents once like JavaScript's `Math.round(v * 100) / 100`, a half going up on the double. So `1 x 1.005` is 1.00 (1.005 is 1.00499999999999989... as a double), `-1 x 0.125` is -0.12, and a global `17 / 3` is 5.666666666666667. A line in a foreign currency is converted before it is rounded. A number in a formula keeps every place it is written with. |
+| `"binary"` | The default, also for files without the field. Spreadsheet arithmetic, as industry-standard budgeting software works: formulas, globals and every money step (line totals, currency conversion, fringes, charges, credits, adjustment rows) are binary doubles, and each amount is rounded to cents once like JavaScript's `Math.round(v * 100) / 100`, a half going up on the double. So `1 x 1.005` is 1.00 (1.005 is 1.00499999999999989... as a double), `-1 x 0.125` is -0.12, and a global `17 / 3` is 5.666666666666667. A line in a foreign currency is converted before it is rounded. A number in a formula keeps every place it is written with. |
 | `"exact"` | Exact decimals: numbers keep 9 places, each amount is the exact product rounded to cents once, half away from zero (`1 x 1.005` is 1.01), and a foreign line is rounded in its own currency, then converted. A number in a formula with more than 9 places is an error. |
 
 Either way, account, category, level and grand totals are integer sums of the rounded
@@ -311,7 +311,7 @@ reader does not check.
 
 ### Group rules
 
-Movie Magic Budgeting's three budget-wide group rules (`docs/decisions.md`, entry 57),
+The three budget-wide group rules (`docs/decisions.md`, entry 57),
 each `"include"` or `"exclude"`. A budget setting; a [version](#version) keeps its own.
 Each rule is left out at its default, and the whole object is left out when every rule
 is; a missing rule means its default.
@@ -1141,9 +1141,10 @@ valid. Loading and saving it in Method Budget normalizes it.
   fringe without a `basis` now counts the Amount only, where it counted Amount x X x 4X
   before, so a flat fringe on a line with X or 4X filled in totals differently; give it
   `"basis": "quantity"` to keep the old figure.
-- Version 1, additive (2026-10): budget [`arithmetic`](#arithmetic) (`"mmb"` or
-  `"exact"`), left out at `"mmb"`. The engine changed with it (decisions.md, entry 55): a
-  file without the field is now worked out in Movie Magic arithmetic, where it was exact
+- Version 1, additive (2026-10): budget [`arithmetic`](#arithmetic) (`"binary"` or
+  `"exact"`), left out at `"binary"` (`"mmb"`, its earlier name, is still read). The
+  engine changed with it (decisions.md, entry 55): a file without the field is now
+  worked out in binary (spreadsheet) arithmetic, where it was exact
   before, so a figure that lands on or near a half cent can move by a cent (`1 x 1.005`
   is 1.00, not 1.01); give it `"arithmetic": "exact"` to keep the old figures. Formulas
   may now hold numbers with more than 9 decimal places.
@@ -1157,7 +1158,7 @@ valid. Loading and saving it in Method Budget normalizes it.
   range's per-line fringes, below-the-line, and some charges can differ from before; the
   file needs no change.
 - Version 1, additive (2026-10): budget [`group_rules`](#group-rules) (lines with no
-  group, conflicts, fringes in group totals), left out at Movie Magic's defaults, which
+  group, conflicts, fringes in group totals), left out at their defaults, which
   are what files without it already meant; credit row source kind `"category"`
   (decisions.md, entry 57). Files that don't use them are unchanged.
 

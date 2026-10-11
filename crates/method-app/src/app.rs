@@ -650,6 +650,38 @@ pub fn set_group_rule<R: Runtime>(
     })
 }
 
+/// How the budget works out its totals (decisions.md, entry 55): `value` is
+/// `binary` or `exact`.
+#[tauri::command]
+pub fn set_arithmetic<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    value: String,
+) -> CmdResult {
+    edit_budget(&window, &state, doc, "Change rounding", |b| {
+        edit::set_arithmetic(b, &value)
+    })
+}
+
+/// The fringes of categories after the last production total (decisions.md,
+/// entry 56): `value` is `keep` or `drop`.
+#[tauri::command]
+pub fn set_trailing_level_fringes<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    value: String,
+) -> CmdResult {
+    edit_budget(
+        &window,
+        &state,
+        doc,
+        "Change fringes after the last production total",
+        |b| edit::set_trailing_level_fringes(b, &value),
+    )
+}
+
 #[tauri::command]
 pub fn delete_group<R: Runtime>(
     window: WebviewWindow<R>,
@@ -1350,6 +1382,8 @@ pub fn run() {
             set_info,
             delete_info,
             set_fringe_posting,
+            set_arithmetic,
+            set_trailing_level_fringes,
             set_account_coding,
             set_totals_currency,
             lock_baseline,

@@ -34,6 +34,8 @@
     "allow-set-info",
     "allow-delete-info",
     "allow-set-fringe-posting",
+    "allow-set-arithmetic",
+    "allow-set-trailing-level-fringes",
     "allow-set-account-coding",
     "allow-set-totals-currency",
     "allow-set-new-line-defaults",

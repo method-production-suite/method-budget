@@ -366,8 +366,8 @@ Currency, Globals and Units). Each item shows how many lines use it across the b
 a link: a click shows the Find tab searching for its uses (a global: its lines' formulas).
 The lists with dollars show the item's total across the budget beside it (a fringe: its
 fringe dollars; a group, set or location: its lines' totals with fringes, a group out of
-the total: its lines at their base, with only the fringes they earn, as Movie Magic
-shows it (decisions.md, entry 58); a currency: its lines' totals in the base currency);
+the total: its lines at their base, with only the fringes they earn
+(decisions.md, entry 58); a currency: its lines' totals in the base currency);
 globals and units show the count only. The tooltip on a count also says when other setup
 uses the item (a global used by another global or a fringe rate, a unit by a flat fringe,
 a group by a credit or a charge). **Show** (All, Used or Unused) narrows the list; used
@@ -481,7 +481,9 @@ in this window's local storage, and blank signs nothing. Every change is one und
 
 **Budget.** Charges, credits, budget info, settings (currencies, fringe posting, account
 numbers, what new lines copy, numbers on screen) and the baseline, as in the setup tabs
-before. **Charges**: two switches per charge, saved in the budget, add to its topsheet label
+before. Settings > Calculation sets the rounding (Spreadsheet (binary), the default, or
+Exact decimal) and whether the fringes of categories after the last production total are
+kept or dropped; each change is one undo step. **Charges**: two switches per charge, saved in the budget, add to its topsheet label
 (screen and printed): the percent (percent charges, "Contingency 10%") and the amount left
 out ("(excluding 25,000.00)"). "Left out of this charge" lists every group with a box and
 the group's own amount in the charge's base as the totals stand now (its counted lines, with
@@ -727,8 +729,8 @@ a sum adds the steps under it, a value is worked out from the plain-words lines 
 and notes only explain. A line reads "Amount: SHOOT_DAYS + PREP_DAYS = 40 (PREP_DAYS = 10,
 SHOOT_DAYS = 30) Days", "Line: 120 x 450 = 54,000.00", the currency conversion and every
 rounding, by the budget's arithmetic (decisions.md, entry 55: "1.005 is
-1.00499999999999989341... as a binary double, so it rounds to 1.00 (Movie Magic rounding:
-half up on the double)", or "6,125.819 rounds half away from zero to 6,125.82" for exact
+1.00499999999999989341... as a binary double, so it rounds to 1.00 (spreadsheet rounding:
+half up on the binary value)", or "6,125.819 rounds half away from zero to 6,125.82" for exact
 arithmetic); a line left out says which
 group or filter left it out and what it would be. Each fringe on a line shows percent or
 flat, the cutoff and, for a range, how much of it the lines above had left (a range uses
