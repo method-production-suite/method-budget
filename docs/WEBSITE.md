@@ -1,14 +1,15 @@
 # The website, the feature list, and the release skill
 
 How Method Budget's public face stays in step with the code: one feature file feeds the
-README and the website, release notes feed the site's "What's new" box, a script
-regenerates both, CI fails when they drift, and two Claude Code skills and two hooks make
-the right order the easy one.
+README and the website, release notes feed the site's "What's new" box and its release
+notes page, a script regenerates all of it, CI fails when they drift, and two Claude Code
+skills and two hooks make the right order the easy one. How the site looks (name, voice,
+colors, type, the mark) is in [BRAND.md](BRAND.md).
 
 ```
-docs/features.toml ─┐                       ┌─> README.md        (feature section, clone command)
-                    ├─> scripts/site.py ────┤
-docs/releases/*.md ─┘   (--check in CI)     └─> site/index.html  (feature list, What's new, repo links)
+docs/features.toml ─┐                       ┌─> README.md                (feature section, clone command)
+                    ├─> scripts/site.py ────┼─> site/index.html          (feature list, What's new, repo links)
+docs/releases/*.md ─┘   (--check in CI)     └─> site/releases/index.html (every release note, repo links)
                                                      │
                                   .github/workflows/pages.yml (off until PAGES_ENABLED)
                                                      │
@@ -40,10 +41,11 @@ Python 3.11 or later, standard library only (it uses `tomllib`).
 python3 scripts/site.py           # rewrite the generated blocks
 python3 scripts/site.py --check   # change nothing; exit 1 if anything is out of date
 python3 scripts/site.py --list    # print the features with their status and refs
+python3 scripts/site.py --files   # print the files it writes (the hook reads this)
 ```
 
-It only touches text between marker comments, so everything else in README.md and
-site/index.html is edited by hand as usual:
+It only touches text between marker comments, so everything else in the generated files
+is edited by hand as usual:
 
 | File | Block | From |
 |---|---|---|
@@ -52,10 +54,15 @@ site/index.html is edited by hand as usual:
 | site/index.html | `<!-- features:start -->` to `<!-- features:end -->` | docs/features.toml |
 | site/index.html | `<!-- whatsnew:start -->` to `<!-- whatsnew:end -->` | the newest docs/releases/<version>.md |
 | site/index.html | `href` of every `<a href="..." data-repo="path">` | `[project] repo` |
+| site/releases/index.html | `<!-- releases:start -->` to `<!-- releases:end -->` | every docs/releases/<version>.md |
+| site/releases/index.html | `href` of every `data-repo` link | `[project] repo` |
 
 "What's new" takes the newest release note by version number (a prerelease sorts before
 its release): its `# ` title, its first paragraph and up to six bullets, with bold kept and
-links reduced to their text. With no release notes yet it says so.
+links reduced to their text. The release notes page renders every note in full, newest
+first, each with an anchor (`releases/#v0-1-0`): headings, paragraphs and bullets, in the
+shape docs/release-notes-template.md fixes. HTML comments are dropped; links show their
+text only, as in the app. With no release notes yet both say so.
 
 Exit codes: 0 done or up to date, 1 out of date (`--check`), 2 the input is wrong (the
 message names the entry and the problem; nothing was written).
@@ -65,25 +72,38 @@ and the Pages workflow runs it again before deploying.
 
 ## The site: site/
 
-- `index.html` is the whole site: one page, inline CSS and SVG, system fonts, no
-  JavaScript, no trackers, nothing loaded from anywhere else (a Content-Security-Policy in
-  the page enforces that). Colors are tokens on `:root` with a `prefers-color-scheme: dark`
-  override; every text pairing meets WCAG AA in both schemes. Sections: hero, What's new,
-  Features, How it's different, Download, Questions, footer.
-- `favicon.svg` is the mark: three budget rows over a double total rule. Original work.
-- `og-card.html` is the 1200x630 share card; `scripts/make-og.sh` renders it to `og.png`
-  with headless Chrome (a throwaway profile, no window). Re-run it after editing the card
-  and commit both.
-- `CNAME` holds `methodbudget.com`. With the Actions deploy below, GitHub reads the custom
-  domain from Settings, not from this file; it stays as documentation and for any host
-  that does read it.
-- Screenshots of the app are not on the site or the README yet. When they are, they will
-  be captures of an invented budget (`method sample`), never a real one and never another
-  product's screens; the README has a commented placeholder for them.
+Static files, no build step, no JavaScript, no trackers, no cookies. Every page carries
+a Content-Security-Policy that allows only this site's own styles and images
+(`default-src 'none'; style-src 'self'; img-src 'self'`), so no inline style, script or
+third-party request can slip in unnoticed. System fonts only.
 
-Links inside the page are relative, so the site works both at
-`https://ssandweiss.github.io/method-budget/` (Pages' default address for this repository)
-and at `https://methodbudget.com/`. The canonical and share-card URLs name
+| Path | What it is |
+|---|---|
+| `index.html` | The home page: hero with the wordmark, an illustration of the app window drawn in HTML, What's new, Features, Why open files, Keyboard first, Command line and coding agents, Download, FAQ |
+| `releases/index.html` | Every release note (generated block inside a hand-written page) |
+| `404.html` | Served by GitHub Pages for any address with no page. Its links start at the site root, so it is right on methodbudget.com (at the `github.io/method-budget/` preview address its styles do not load) |
+| `assets/tokens.css` | Brand colors and type, light and dark ([BRAND.md](BRAND.md)) |
+| `assets/site.css` | Layout and components; names no colors of its own |
+| `assets/brand/` | Mark and wordmark SVGs, light and dark (`scripts/make-brand.py`) |
+| `favicon.svg`, `favicon.ico`, `apple-touch-icon.png` | Browser and home-screen icons (`scripts/make-brand.py`) |
+| `og.png`, `og-card.html`, `assets/og-card.css` | The 1200x630 share card and its source; `scripts/make-og.sh` renders it with headless Chrome (a throwaway profile, no window). Re-run after editing the card and commit all three |
+| `robots.txt`, `sitemap.xml` | Crawlers: everything allowed; the sitemap lists `/` and `/releases/`. Add a line to the sitemap when a page is added |
+| `CNAME` | `methodbudget.com`. A deploy from GitHub Actions ignores this file (the custom domain is set in Settings, below); it stays as documentation and for any other host |
+
+Colors are tokens with a `prefers-color-scheme: dark` override, so the site follows the
+visitor's system setting; every text pairing meets WCAG AA in both schemes (the table is
+in BRAND.md). Layouts are mobile first and have no horizontal scroll at phone width; the
+app illustration drops columns and its tools panel on narrow screens. Each page has
+landmarks (header, nav, main, footer), a skip link and visible focus outlines.
+
+Screenshots of the app are not on the site or the README yet. When they are, they will
+be captures of an invented budget (`method sample`), never a real one and never another
+product's screens; they replace the HTML illustration, and the README has a commented
+placeholder for them.
+
+Links inside the pages are relative (except 404.html), so the site works both at
+`https://ssandweiss.github.io/method-budget/` (Pages' default address for this
+repository) and at `https://methodbudget.com/`. The canonical and share-card URLs name
 methodbudget.com.
 
 To look at it locally:
@@ -102,17 +122,26 @@ actions pinned to commit SHAs; only the deploy job gets `pages: write` and `id-t
 write`.
 
 Turning it on, once the repository is public (all by hand, in GitHub and at the domain
-registrar):
+registrar). The order matters: GitHub asks for the custom domain to be added to Pages
+**before** the DNS records point at it, so nobody else can claim the domain in between,
+and recommends verifying the domain first. Checked against GitHub's Pages documentation
+in October 2026.
 
-1. **Settings > Pages > Build and deployment > Source: GitHub Actions.**
-2. **Settings > Secrets and variables > Actions > Variables:** add `PAGES_ENABLED` with
-   the value `true`.
-3. Run the `pages` workflow (Actions > pages > Run workflow). The site appears at
+1. **Verify the domain** (prevents takeovers). Profile picture > **Settings** >
+   **Pages** (under "Code, planning, and automation") > **Add a domain** > enter
+   `methodbudget.com` > **Add domain**. Add the TXT record GitHub shows at the registrar
+   (named `_github-pages-challenge-<owner>.methodbudget.com`), wait for it to appear
+   (`dig _github-pages-challenge-<owner>.methodbudget.com +nostats +nocomments +nocmd TXT`),
+   then **Verify**. Keep the TXT record afterwards; removing it un-verifies the domain.
+   For an organization, the same lives under the organization's **Settings** > **Pages**.
+2. **Repository Settings > Pages > Build and deployment > Source: GitHub Actions.**
+3. **Repository Settings > Secrets and variables > Actions > Variables:** add
+   `PAGES_ENABLED` with the value `true`.
+4. Run the `pages` workflow (Actions > pages > Run workflow). The site appears at
    `https://ssandweiss.github.io/method-budget/`.
-4. **Verify the domain first** (recommended, prevents someone else claiming it on Pages):
-   GitHub account Settings > Pages > Add a domain > `methodbudget.com`, then add the TXT
-   record GitHub shows at the registrar and click Verify.
-5. **DNS at the registrar**, for the apex domain and www:
+5. **Repository Settings > Pages > Custom domain:** `methodbudget.com`, **Save**. With
+   the Actions source no CNAME file is committed or needed.
+6. **DNS at the registrar**, for the apex domain and www:
 
    | Name | Type | Value |
    |---|---|---|
@@ -126,16 +155,22 @@ registrar):
    | `@` | AAAA | `2606:50c0:8003::153` |
    | `www` | CNAME | `ssandweiss.github.io` |
 
-   The CNAME target is the GitHub Pages host of the account that owns the repository
+   The CNAME target is the Pages host of the account that owns the repository
    (`<owner>.github.io`, without the repository name). If the repository moves to an
    organization, it becomes `<org>.github.io`. Remove any other A, AAAA or ALIAS records
-   on `@` (registrar parking pages, for example).
-6. **Settings > Pages > Custom domain:** `methodbudget.com`, Save. GitHub checks the DNS
-   (it can take up to a day to propagate) and then serves `www` as a redirect to the apex.
-7. **Enforce HTTPS** on the same page, once GitHub has issued the certificate (the box is
-   greyed out until then).
+   on `@` first (a registrar's parking page, for example), and never add a wildcard
+   record (`*.methodbudget.com`): GitHub warns it invites takeovers even on a verified
+   domain. If the domain has CAA records, one must allow `letsencrypt.org`, which issues
+   the Pages certificate. With both the apex and `www` set up, GitHub redirects
+   `www.methodbudget.com` to `methodbudget.com` on its own.
+7. Check the records (`dig methodbudget.com +noall +answer -t A`, the same with
+   `-t AAAA`, and `dig www.methodbudget.com +nostats +nocomments +nocmd`). DNS changes can
+   take up to a day to spread.
+8. **Enforce HTTPS** on the Pages settings page once GitHub has issued the certificate
+   (the box is greyed out until then, up to a day). If it stays stuck, **Remove** the
+   custom domain and **Save** it again to restart the certificate.
 
-Nothing here has been turned on. Before step 2, a push that changes `site/` runs the
+Nothing here has been turned on. Until step 3, a push that changes `site/` runs the
 workflow, which skips the job and succeeds.
 
 ## The skills: .claude/skills/
@@ -182,8 +217,9 @@ real line.
   tag-pushing `git push` forms, `gh release create`) when `docs/releases/<version>.md` is
   not committed at HEAD. Deleting tags and listing tags always pass.
 - `require-site-regen.sh` blocks a `git commit` that would commit `docs/features.toml` or
-  a release note while README.md or site/index.html is out of date, or regenerated but not
-  staged.
+  a release note while a generated file (whatever `python3 scripts/site.py --files`
+  lists: README.md, site/index.html, site/releases/index.html) is out of date, or
+  regenerated but not staged.
 
 `bash scripts/hooks/test-hooks.sh` runs both against throwaway repositories; CI runs it in
 the `site` job.

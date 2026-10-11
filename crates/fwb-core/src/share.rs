@@ -58,6 +58,7 @@ pub fn share_copy(
             out.display = b.display.clone();
             out.setup_order = b.setup_order.clone();
             out.setup_folders = b.setup_folders.clone();
+            out.setup_sources = b.setup_sources.clone();
             // Actuals aren't version content: a version's copy has today's.
             out.actuals = b.actuals.clone();
             (out, Some(v.name.clone()))
@@ -88,6 +89,7 @@ pub fn share_copy(
         saved: saved.to_string(),
         app_version: app_version.to_string(),
         note: note.filter(|n| !n.trim().is_empty()),
+        pack: None,
     });
     Ok(out)
 }
@@ -217,7 +219,11 @@ pub fn came_from(copy: &Budget, original: &Budget) -> bool {
     let Some(p) = &copy.provenance else {
         return false;
     };
-    if p.kind == ProvenanceKind::SubBudget {
+    // A sub-budget or a setup pack is not a copy to compare or store back.
+    if matches!(
+        p.kind,
+        ProvenanceKind::SubBudget | ProvenanceKind::SetupPack
+    ) {
         return false;
     }
     if original

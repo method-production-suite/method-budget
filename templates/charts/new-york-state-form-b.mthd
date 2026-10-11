@@ -1,0 +1,2662 @@
+{
+  "format": "method-budget",
+  "version": 1,
+  "budget": {
+    "title": "New York State Form B",
+    "base_currency": "USD",
+    "account_coding": {
+      "category_width": 3,
+      "account_width": 2,
+      "sub_width": 0,
+      "set_width": 0,
+      "separator": "-"
+    },
+    "units": {
+      "Allow": {
+        "plural": "Allow"
+      },
+      "Day": {
+        "plural": "Days",
+        "hours": "10"
+      },
+      "Flat": {
+        "plural": "Flat"
+      },
+      "Hour": {
+        "plural": "Hours",
+        "hours": "1"
+      },
+      "Month": {
+        "plural": "Months",
+        "hours": "200"
+      },
+      "Week": {
+        "plural": "Weeks",
+        "hours": "50"
+      }
+    },
+    "topsheet": [
+      {
+        "kind": "category",
+        "code": "101",
+        "name": "STORY & RIGHTS",
+        "accounts": [
+          {
+            "code": "101-02",
+            "name": "Story Rights"
+          },
+          {
+            "code": "101-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "103",
+        "name": "WRITING",
+        "accounts": [
+          {
+            "code": "103-02",
+            "name": "Writers"
+          },
+          {
+            "code": "103-04",
+            "name": "Story Editor"
+          },
+          {
+            "code": "103-06",
+            "name": "Research"
+          },
+          {
+            "code": "103-08",
+            "name": "Secretaries"
+          },
+          {
+            "code": "103-10",
+            "name": "Script Printing"
+          },
+          {
+            "code": "103-12",
+            "name": "Materials & Supplies"
+          },
+          {
+            "code": "103-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "105",
+        "name": "PRODUCER & STAFF",
+        "accounts": [
+          {
+            "code": "105-02",
+            "name": "Executive Producer"
+          },
+          {
+            "code": "105-04",
+            "name": "Line Producer"
+          },
+          {
+            "code": "105-06",
+            "name": "Producers"
+          },
+          {
+            "code": "105-08",
+            "name": "Associate Producers"
+          },
+          {
+            "code": "105-10",
+            "name": "Secretaries"
+          },
+          {
+            "code": "105-12",
+            "name": "Assistants"
+          },
+          {
+            "code": "105-14",
+            "name": "Purchases and Supplies"
+          },
+          {
+            "code": "105-16",
+            "name": "Wrap Party"
+          },
+          {
+            "code": "105-18",
+            "name": "Entertainment"
+          },
+          {
+            "code": "105-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "107",
+        "name": "DIRECTOR & STAFF",
+        "accounts": [
+          {
+            "code": "107-02",
+            "name": "Director"
+          },
+          {
+            "code": "107-04",
+            "name": "Dialogue Coach"
+          },
+          {
+            "code": "107-06",
+            "name": "Secretaries"
+          },
+          {
+            "code": "107-08",
+            "name": "Choreographers"
+          },
+          {
+            "code": "107-10",
+            "name": "Assistants"
+          },
+          {
+            "code": "107-12",
+            "name": "Towncar Allowance"
+          },
+          {
+            "code": "107-14",
+            "name": "Purchases and Supplies"
+          },
+          {
+            "code": "107-16",
+            "name": "Director Assistant Computer"
+          },
+          {
+            "code": "107-18",
+            "name": "Director Office Rentals"
+          },
+          {
+            "code": "107-20",
+            "name": "Entertainment Allowance"
+          },
+          {
+            "code": "107-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "109",
+        "name": "TALENT",
+        "accounts": [
+          {
+            "code": "109-02",
+            "name": "Principal Cast"
+          },
+          {
+            "code": "109-04",
+            "name": "Supporting Cast"
+          },
+          {
+            "code": "109-06",
+            "name": "Day Player"
+          },
+          {
+            "code": "109-08",
+            "name": "Weekly Player"
+          },
+          {
+            "code": "109-10",
+            "name": "Talent Staff"
+          },
+          {
+            "code": "109-12",
+            "name": "Talent Expenses"
+          },
+          {
+            "code": "109-14",
+            "name": "Stunt Coordinator"
+          },
+          {
+            "code": "109-16",
+            "name": "Stunts"
+          },
+          {
+            "code": "109-18",
+            "name": "Looping and Expenses"
+          },
+          {
+            "code": "109-20",
+            "name": "Casting Director"
+          },
+          {
+            "code": "109-22",
+            "name": "Casting Assistants"
+          },
+          {
+            "code": "109-24",
+            "name": "Casting Office Expenses"
+          },
+          {
+            "code": "109-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "111",
+        "name": "TRAVEL & LIVING",
+        "accounts": [
+          {
+            "code": "111-02",
+            "name": "Producer Travel - General"
+          },
+          {
+            "code": "111-04",
+            "name": "Producer Travel - NYS Distant Location"
+          },
+          {
+            "code": "111-06",
+            "name": "Producers Assistants Travel - General"
+          },
+          {
+            "code": "111-08",
+            "name": "Producers Assistants Travel - to Distant NYS"
+          },
+          {
+            "code": "111-10",
+            "name": "Director - General Travel"
+          },
+          {
+            "code": "111-12",
+            "name": "Director Travel - NYS Distant Location"
+          },
+          {
+            "code": "111-14",
+            "name": "Director's Assistants Travel - General"
+          },
+          {
+            "code": "111-16",
+            "name": "Director's Assistants Travel - to Distant NYS"
+          },
+          {
+            "code": "111-18",
+            "name": "Talent Travel - General"
+          },
+          {
+            "code": "111-20",
+            "name": "Talent Travel - to Distant NYS Location"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "112",
+        "name": "FRINGE BENEFITS",
+        "accounts": [
+          {
+            "code": "112-02",
+            "name": "Pension Plan & Health and Welfare"
+          },
+          {
+            "code": "112-04",
+            "name": "Employer Taxes"
+          },
+          {
+            "code": "112-06",
+            "name": "Local Hire Fringes"
+          },
+          {
+            "code": "112-08",
+            "name": "PR Handling"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total above-the-line"
+      },
+      {
+        "kind": "category",
+        "code": "113",
+        "name": "PRODUCTION STAFF",
+        "accounts": [
+          {
+            "code": "113-02",
+            "name": "Production Manager"
+          },
+          {
+            "code": "113-04",
+            "name": "Production Supervisor"
+          },
+          {
+            "code": "113-06",
+            "name": "First Assistant Director"
+          },
+          {
+            "code": "113-08",
+            "name": "Second AD's and Trainees"
+          },
+          {
+            "code": "113-10",
+            "name": "Script Supervisor"
+          },
+          {
+            "code": "113-12",
+            "name": "Location Manager"
+          },
+          {
+            "code": "113-14",
+            "name": "Asst Location Managers & Scouts"
+          },
+          {
+            "code": "113-16",
+            "name": "Tech Advisors"
+          },
+          {
+            "code": "113-18",
+            "name": "Production Coordinators"
+          },
+          {
+            "code": "113-20",
+            "name": "Asst Production Coordinators"
+          },
+          {
+            "code": "113-22",
+            "name": "Production Secretaries"
+          },
+          {
+            "code": "113-24",
+            "name": "Production Accountants"
+          },
+          {
+            "code": "113-26",
+            "name": "Assistant Accountants"
+          },
+          {
+            "code": "113-28",
+            "name": "Payroll"
+          },
+          {
+            "code": "113-30",
+            "name": "Construction Estimator"
+          },
+          {
+            "code": "113-32",
+            "name": "Post Accounting"
+          },
+          {
+            "code": "113-34",
+            "name": "Production Assistants"
+          },
+          {
+            "code": "113-36",
+            "name": "Pre-Production Breakdown"
+          },
+          {
+            "code": "113-38",
+            "name": "Board & Budget"
+          },
+          {
+            "code": "113-40",
+            "name": "Script Timing"
+          },
+          {
+            "code": "113-42",
+            "name": "POC and Assistants"
+          },
+          {
+            "code": "113-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "115",
+        "name": "EXTRA TALENT",
+        "accounts": [
+          {
+            "code": "115-02",
+            "name": "Standins"
+          },
+          {
+            "code": "115-04",
+            "name": "Casting Commission"
+          },
+          {
+            "code": "115-06",
+            "name": "Extras - Studio"
+          },
+          {
+            "code": "115-08",
+            "name": "Non Union Extras"
+          },
+          {
+            "code": "115-10",
+            "name": "Extras - Location"
+          },
+          {
+            "code": "115-12",
+            "name": "Non Union Extras - Location"
+          },
+          {
+            "code": "115-14",
+            "name": "Sideline Musicians"
+          },
+          {
+            "code": "115-16",
+            "name": "Fittings"
+          },
+          {
+            "code": "115-18",
+            "name": "Wardrobe"
+          },
+          {
+            "code": "115-20",
+            "name": "Atmosphere Cars"
+          },
+          {
+            "code": "115-22",
+            "name": "Casting Srvc Fee and Fringes"
+          },
+          {
+            "code": "115-24",
+            "name": "Polaroid"
+          },
+          {
+            "code": "115-26",
+            "name": "Telephone/Office"
+          },
+          {
+            "code": "115-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "117",
+        "name": "CAMERA",
+        "accounts": [
+          {
+            "code": "117-02",
+            "name": "Director of Photography"
+          },
+          {
+            "code": "117-04",
+            "name": "Operator"
+          },
+          {
+            "code": "117-06",
+            "name": "Asst Cameramen & Operators"
+          },
+          {
+            "code": "117-08",
+            "name": "Steadicam Operator"
+          },
+          {
+            "code": "117-10",
+            "name": "Still Photographer"
+          },
+          {
+            "code": "117-12",
+            "name": "Loader"
+          },
+          {
+            "code": "117-14",
+            "name": "Loss and Damage"
+          },
+          {
+            "code": "117-16",
+            "name": "Purchases and Supplies"
+          },
+          {
+            "code": "117-18",
+            "name": "Camera Rentals"
+          },
+          {
+            "code": "117-20",
+            "name": "Box and Still Camera Rentals"
+          },
+          {
+            "code": "117-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "119",
+        "name": "ART DEPARTMENT",
+        "accounts": [
+          {
+            "code": "119-02",
+            "name": "Production Designer"
+          },
+          {
+            "code": "119-04",
+            "name": "Art Diector and Assistants"
+          },
+          {
+            "code": "119-06",
+            "name": "Set Designers"
+          },
+          {
+            "code": "119-08",
+            "name": "Illustrators"
+          },
+          {
+            "code": "119-10",
+            "name": "NY Hire"
+          },
+          {
+            "code": "119-12",
+            "name": "Storyboard Artist"
+          },
+          {
+            "code": "119-14",
+            "name": "Production Assistants"
+          },
+          {
+            "code": "119-16",
+            "name": "Blue Printing"
+          },
+          {
+            "code": "119-18",
+            "name": "Stock Units / Backings"
+          },
+          {
+            "code": "119-20",
+            "name": "Purchases and Supplies"
+          },
+          {
+            "code": "119-22",
+            "name": "Processing"
+          },
+          {
+            "code": "119-24",
+            "name": "Research Materials"
+          },
+          {
+            "code": "119-26",
+            "name": "Rentals"
+          },
+          {
+            "code": "119-28",
+            "name": "Equipment"
+          },
+          {
+            "code": "119-30",
+            "name": "Car and Box Rentals"
+          },
+          {
+            "code": "119-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "121",
+        "name": "SET CONSTRUCTION",
+        "accounts": [
+          {
+            "code": "121-02",
+            "name": "Construction Coordinators"
+          },
+          {
+            "code": "121-04",
+            "name": "Construction Foremen"
+          },
+          {
+            "code": "121-06",
+            "name": "Stage Set Construction Labor"
+          },
+          {
+            "code": "121-08",
+            "name": "Location Set Construction Labor"
+          },
+          {
+            "code": "121-10",
+            "name": "Stage Set Construction Materials and Purchases"
+          },
+          {
+            "code": "121-12",
+            "name": "Location Set Construction Materials"
+          },
+          {
+            "code": "121-14",
+            "name": "Stage Set Striking Labor"
+          },
+          {
+            "code": "121-16",
+            "name": "State Set Striking Marterials and Purchases"
+          },
+          {
+            "code": "121-18",
+            "name": "Location Set Striking Labor"
+          },
+          {
+            "code": "121-20",
+            "name": "Location Set Striking Materials and Purchases"
+          },
+          {
+            "code": "121-22",
+            "name": "Set Restoration"
+          },
+          {
+            "code": "121-24",
+            "name": "Fold and Hold Sets"
+          },
+          {
+            "code": "121-26",
+            "name": "Greens Purchase"
+          },
+          {
+            "code": "121-28",
+            "name": "Backings Rental/Purchase"
+          },
+          {
+            "code": "121-30",
+            "name": "Trash Removal"
+          },
+          {
+            "code": "121-32",
+            "name": "Scissor Lifts/Forklifts"
+          },
+          {
+            "code": "121-34",
+            "name": "Car and Box Rental"
+          },
+          {
+            "code": "121-36",
+            "name": "Construction Expendables"
+          },
+          {
+            "code": "121-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "123",
+        "name": "SPECIAL EFFECTS",
+        "accounts": [
+          {
+            "code": "123-02",
+            "name": "SFX Coordinator"
+          },
+          {
+            "code": "123-04",
+            "name": "SFX Assistants"
+          },
+          {
+            "code": "123-06",
+            "name": "Rig and Strike"
+          },
+          {
+            "code": "123-08",
+            "name": "Loss and Damage"
+          },
+          {
+            "code": "123-10",
+            "name": "Manufacturing Labor and Materials"
+          },
+          {
+            "code": "123-12",
+            "name": "Purchases"
+          },
+          {
+            "code": "123-14",
+            "name": "Equipment Rentals"
+          },
+          {
+            "code": "123-16",
+            "name": "Box Rental"
+          },
+          {
+            "code": "123-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "125",
+        "name": "SET OPERATIONS",
+        "accounts": [
+          {
+            "code": "125-02",
+            "name": "Key Grip"
+          },
+          {
+            "code": "125-04",
+            "name": "Grips - All"
+          },
+          {
+            "code": "125-06",
+            "name": "Craft Service Persons"
+          },
+          {
+            "code": "125-08",
+            "name": "Greensperson - Company"
+          },
+          {
+            "code": "125-10",
+            "name": "Standby Carpenters"
+          },
+          {
+            "code": "125-12",
+            "name": "Standby Painters"
+          },
+          {
+            "code": "125-14",
+            "name": "Loss and Damage"
+          },
+          {
+            "code": "125-16",
+            "name": "Set Watch/Firemen"
+          },
+          {
+            "code": "125-18",
+            "name": "First Aid and Expenses"
+          },
+          {
+            "code": "125-20",
+            "name": "Medics"
+          },
+          {
+            "code": "125-22",
+            "name": "Other Crafts"
+          },
+          {
+            "code": "125-24",
+            "name": "Heating/Air Conditioning"
+          },
+          {
+            "code": "125-26",
+            "name": "Purchases"
+          },
+          {
+            "code": "125-28",
+            "name": "Grip Expendables"
+          },
+          {
+            "code": "125-30",
+            "name": "Lumber"
+          },
+          {
+            "code": "125-32",
+            "name": "Craft Service Purchases"
+          },
+          {
+            "code": "125-34",
+            "name": "Rentals"
+          },
+          {
+            "code": "125-36",
+            "name": "Grip Package"
+          },
+          {
+            "code": "125-38",
+            "name": "Truck Package"
+          },
+          {
+            "code": "125-40",
+            "name": "Additional Equipment"
+          },
+          {
+            "code": "125-42",
+            "name": "Helicopter Rental"
+          },
+          {
+            "code": "125-44",
+            "name": "Box Rentals"
+          },
+          {
+            "code": "125-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "127",
+        "name": "ELECTRICAL",
+        "accounts": [
+          {
+            "code": "127-02",
+            "name": "Chief Lighting Technician"
+          },
+          {
+            "code": "127-04",
+            "name": "Lisghting Assistant and Technicians"
+          },
+          {
+            "code": "127-06",
+            "name": "Rig and Strike"
+          },
+          {
+            "code": "127-08",
+            "name": "Generator Operator"
+          },
+          {
+            "code": "127-10",
+            "name": "Generator Assistants"
+          },
+          {
+            "code": "127-12",
+            "name": "Special Equipment Operator"
+          },
+          {
+            "code": "127-14",
+            "name": "Electric Hookup"
+          },
+          {
+            "code": "127-16",
+            "name": "Current"
+          },
+          {
+            "code": "127-18",
+            "name": "Loss and Damage"
+          },
+          {
+            "code": "127-20",
+            "name": "Purchases - Expendables, Gels, Etc."
+          },
+          {
+            "code": "127-22",
+            "name": "Globes and Carbons"
+          },
+          {
+            "code": "127-24",
+            "name": "Rentals"
+          },
+          {
+            "code": "127-26",
+            "name": "Electric Package"
+          },
+          {
+            "code": "127-28",
+            "name": "Stage Package"
+          },
+          {
+            "code": "127-30",
+            "name": "Rigging Package"
+          },
+          {
+            "code": "127-32",
+            "name": "Additional Equipment"
+          },
+          {
+            "code": "127-34",
+            "name": "Specialty Lighting"
+          },
+          {
+            "code": "127-36",
+            "name": "Generator Rentals"
+          },
+          {
+            "code": "127-38",
+            "name": "Box Rentals"
+          },
+          {
+            "code": "127-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "129",
+        "name": "SET DRESSING",
+        "accounts": [
+          {
+            "code": "129-02",
+            "name": "Set Decorator"
+          },
+          {
+            "code": "129-04",
+            "name": "Leadman/Buyer"
+          },
+          {
+            "code": "129-06",
+            "name": "Set Dressing Labor"
+          },
+          {
+            "code": "129-08",
+            "name": "Drapery/Carpet"
+          },
+          {
+            "code": "129-10",
+            "name": "Loss, Damage and Cleaning"
+          },
+          {
+            "code": "129-12",
+            "name": "Manufacturing/Materials"
+          },
+          {
+            "code": "129-14",
+            "name": "Set Dressing Purchases & Materials"
+          },
+          {
+            "code": "129-16",
+            "name": "Fixtures"
+          },
+          {
+            "code": "129-18",
+            "name": "Rentals"
+          },
+          {
+            "code": "129-20",
+            "name": "Rentals - All Sets"
+          },
+          {
+            "code": "129-22",
+            "name": "Car and Box Rentals"
+          },
+          {
+            "code": "129-24",
+            "name": "Research"
+          },
+          {
+            "code": "129-26",
+            "name": "Film Processing"
+          },
+          {
+            "code": "129-28",
+            "name": "Expendables"
+          },
+          {
+            "code": "129-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "131",
+        "name": "ACTION PROPS",
+        "accounts": [
+          {
+            "code": "131-02",
+            "name": "Propmaster"
+          },
+          {
+            "code": "131-04",
+            "name": "Assistant Propmaster & Labor"
+          },
+          {
+            "code": "131-06",
+            "name": "Loss and Damage"
+          },
+          {
+            "code": "131-08",
+            "name": "Manufacturing NY Labor/Materials"
+          },
+          {
+            "code": "131-10",
+            "name": "Purchases and Rentals"
+          },
+          {
+            "code": "131-12",
+            "name": "Car and Box Rentals"
+          },
+          {
+            "code": "131-14",
+            "name": "Film Processing"
+          },
+          {
+            "code": "131-16",
+            "name": "Research"
+          },
+          {
+            "code": "131-18",
+            "name": "Expendables"
+          },
+          {
+            "code": "131-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "133",
+        "name": "PICTURE VEHICLES/ANIMALS",
+        "accounts": [
+          {
+            "code": "133-02",
+            "name": "Picture Car Coordinator"
+          },
+          {
+            "code": "133-04",
+            "name": "Picture Car Drivers"
+          },
+          {
+            "code": "133-06",
+            "name": "Picture Car Rentals"
+          },
+          {
+            "code": "133-08",
+            "name": "Picture Car Expense"
+          },
+          {
+            "code": "133-10",
+            "name": "Marine Expense"
+          },
+          {
+            "code": "133-12",
+            "name": "Aircraft/Helicopter Expense"
+          },
+          {
+            "code": "133-14",
+            "name": "Pic Vehicle Manufacturing"
+          },
+          {
+            "code": "133-16",
+            "name": "Mechanic"
+          },
+          {
+            "code": "133-18",
+            "name": "Animals"
+          },
+          {
+            "code": "133-20",
+            "name": "Loss and Damage"
+          },
+          {
+            "code": "133-22",
+            "name": "Wranglers, Handlers"
+          },
+          {
+            "code": "133-24",
+            "name": "Feeding and Stabling"
+          },
+          {
+            "code": "133-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "135",
+        "name": "SPECIAL PHOTOGRAPHY",
+        "accounts": [
+          {
+            "code": "135-02",
+            "name": "Process Operating"
+          },
+          {
+            "code": "135-04",
+            "name": "Blue Screen"
+          },
+          {
+            "code": "135-06",
+            "name": "Matte Shots Contract"
+          },
+          {
+            "code": "135-08",
+            "name": "Matte Crew Expenses"
+          },
+          {
+            "code": "135-10",
+            "name": "Animation"
+          },
+          {
+            "code": "135-12",
+            "name": "Miniature Contact"
+          },
+          {
+            "code": "135-14",
+            "name": "Miniature Expenses"
+          },
+          {
+            "code": "135-16",
+            "name": "Computer Graphics"
+          },
+          {
+            "code": "135-18",
+            "name": "Equipment Rentals"
+          },
+          {
+            "code": "135-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "139",
+        "name": "WARDROBE",
+        "accounts": [
+          {
+            "code": "139-02",
+            "name": "Costume Designer"
+          },
+          {
+            "code": "139-04",
+            "name": "Designer Staff"
+          },
+          {
+            "code": "139-06",
+            "name": "Wardrobe Labor"
+          },
+          {
+            "code": "139-08",
+            "name": "Costumers and Assistants"
+          },
+          {
+            "code": "139-10",
+            "name": "Cleaning and Dying"
+          },
+          {
+            "code": "139-12",
+            "name": "Loss and Damage"
+          },
+          {
+            "code": "139-14",
+            "name": "Alterations and Repairs"
+          },
+          {
+            "code": "139-16",
+            "name": "Allowance"
+          },
+          {
+            "code": "139-18",
+            "name": "Purchases and Rentals"
+          },
+          {
+            "code": "139-20",
+            "name": "Car and Box Rentals"
+          },
+          {
+            "code": "139-22",
+            "name": "Research"
+          },
+          {
+            "code": "139-24",
+            "name": "Expendables"
+          },
+          {
+            "code": "139-26",
+            "name": "Washing Machine and Dryer"
+          },
+          {
+            "code": "139-28",
+            "name": "Shop Set Up"
+          },
+          {
+            "code": "139-30",
+            "name": "Polaroid"
+          },
+          {
+            "code": "139-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "141",
+        "name": "MAKEUP & HAIRDRESSING",
+        "accounts": [
+          {
+            "code": "141-02",
+            "name": "Makeup Artist"
+          },
+          {
+            "code": "141-04",
+            "name": "Key Makeup"
+          },
+          {
+            "code": "141-06",
+            "name": "Additional Makeup"
+          },
+          {
+            "code": "141-08",
+            "name": "Additional Hairstylists"
+          },
+          {
+            "code": "141-10",
+            "name": "Makeup and Hairdressing Supplies"
+          },
+          {
+            "code": "141-12",
+            "name": "Chair Rental"
+          },
+          {
+            "code": "141-14",
+            "name": "Wigs Purchase/Rentals"
+          },
+          {
+            "code": "141-16",
+            "name": "Appliances"
+          },
+          {
+            "code": "141-18",
+            "name": "Box Rentals"
+          },
+          {
+            "code": "141-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "143",
+        "name": "PRODUCTION SOUND",
+        "accounts": [
+          {
+            "code": "143-02",
+            "name": "Mixer"
+          },
+          {
+            "code": "143-04",
+            "name": "Boom Operator"
+          },
+          {
+            "code": "143-06",
+            "name": "Additional Sound Labor"
+          },
+          {
+            "code": "143-08",
+            "name": "Loss and Damage"
+          },
+          {
+            "code": "143-10",
+            "name": "Purchases"
+          },
+          {
+            "code": "143-12",
+            "name": "Rentals"
+          },
+          {
+            "code": "143-14",
+            "name": "Sound Package"
+          },
+          {
+            "code": "143-16",
+            "name": "Additional Equipment"
+          },
+          {
+            "code": "143-18",
+            "name": "Walkie Talkies"
+          },
+          {
+            "code": "143-20",
+            "name": "Beepers"
+          },
+          {
+            "code": "143-22",
+            "name": "Box Rental"
+          },
+          {
+            "code": "143-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "145",
+        "name": "LOCATIONS",
+        "accounts": [
+          {
+            "code": "145-02",
+            "name": "Site Fee and Rentals"
+          },
+          {
+            "code": "145-04",
+            "name": "Police/Firemen/Watchmen"
+          },
+          {
+            "code": "145-06",
+            "name": "Set Security - NY"
+          },
+          {
+            "code": "145-08",
+            "name": "Scouting"
+          },
+          {
+            "code": "145-10",
+            "name": "Travel Fares"
+          },
+          {
+            "code": "145-12",
+            "name": "Airfare Rates"
+          },
+          {
+            "code": "145-14",
+            "name": "Hotels"
+          },
+          {
+            "code": "145-16",
+            "name": "Per Diems"
+          },
+          {
+            "code": "145-18",
+            "name": "Meals"
+          },
+          {
+            "code": "145-20",
+            "name": "Extras Catering"
+          },
+          {
+            "code": "145-22",
+            "name": "Off Production"
+          },
+          {
+            "code": "145-24",
+            "name": "Catering Assistants"
+          },
+          {
+            "code": "145-26",
+            "name": "Entertainment/Gratuities"
+          },
+          {
+            "code": "145-28",
+            "name": "Film Shipping"
+          },
+          {
+            "code": "145-30",
+            "name": "Shipping Negative"
+          },
+          {
+            "code": "145-32",
+            "name": "Baggage/Equipment Shipping"
+          },
+          {
+            "code": "145-34",
+            "name": "Mileage and Parking"
+          },
+          {
+            "code": "145-36",
+            "name": "Location Restoration"
+          },
+          {
+            "code": "145-38",
+            "name": "Purchases"
+          },
+          {
+            "code": "145-40",
+            "name": "Office Supplies and Equipment"
+          },
+          {
+            "code": "145-42",
+            "name": "Rentals"
+          },
+          {
+            "code": "145-44",
+            "name": "NY Office Space"
+          },
+          {
+            "code": "145-46",
+            "name": "Utilities"
+          },
+          {
+            "code": "145-48",
+            "name": "Cleaning"
+          },
+          {
+            "code": "145-50",
+            "name": "Art Dept Office"
+          },
+          {
+            "code": "145-52",
+            "name": "Set Dec/Props Warehouse"
+          },
+          {
+            "code": "145-54",
+            "name": "Construction Mill"
+          },
+          {
+            "code": "145-56",
+            "name": "Telephone/Postage"
+          },
+          {
+            "code": "145-58",
+            "name": "Install Phone Systems"
+          },
+          {
+            "code": "145-60",
+            "name": "Phone Charges"
+          },
+          {
+            "code": "145-62",
+            "name": "Cell Charges"
+          },
+          {
+            "code": "145-64",
+            "name": "Office Equipment Rental"
+          },
+          {
+            "code": "145-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "147",
+        "name": "VIDEO TAPE",
+        "accounts": [
+          {
+            "code": "147-02",
+            "name": "Supervision"
+          },
+          {
+            "code": "147-04",
+            "name": "Technical Director"
+          },
+          {
+            "code": "147-06",
+            "name": "Video Operator"
+          },
+          {
+            "code": "147-08",
+            "name": "Video Recordist"
+          },
+          {
+            "code": "147-10",
+            "name": "Additional Labor"
+          },
+          {
+            "code": "147-12",
+            "name": "Purchases"
+          },
+          {
+            "code": "147-14",
+            "name": "Supplies"
+          },
+          {
+            "code": "147-16",
+            "name": "Rentals"
+          },
+          {
+            "code": "147-18",
+            "name": "Video Assist Package"
+          },
+          {
+            "code": "147-22",
+            "name": "Video Transfers"
+          },
+          {
+            "code": "147-24",
+            "name": "Video Editing"
+          },
+          {
+            "code": "147-26",
+            "name": "Video Contact"
+          },
+          {
+            "code": "147-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "149",
+        "name": "TRANSPORTATION",
+        "accounts": [
+          {
+            "code": "149-02",
+            "name": "Transportation Coordinator"
+          },
+          {
+            "code": "149-04",
+            "name": "Captains"
+          },
+          {
+            "code": "149-06",
+            "name": "Studio Drivers"
+          },
+          {
+            "code": "149-08",
+            "name": "Location Drivers"
+          },
+          {
+            "code": "149-10",
+            "name": "Loss and Damage"
+          },
+          {
+            "code": "149-12",
+            "name": "Repairs/Maintenance"
+          },
+          {
+            "code": "149-14",
+            "name": "Box Rentals"
+          },
+          {
+            "code": "149-16",
+            "name": "Car Washes"
+          },
+          {
+            "code": "149-18",
+            "name": "Pickup Service"
+          },
+          {
+            "code": "149-20",
+            "name": "Taxis"
+          },
+          {
+            "code": "149-22",
+            "name": "Car Pickups"
+          },
+          {
+            "code": "149-24",
+            "name": "Gas and Oil"
+          },
+          {
+            "code": "149-26",
+            "name": "Genny Gas and Oil"
+          },
+          {
+            "code": "149-28",
+            "name": "Off Production"
+          },
+          {
+            "code": "149-30",
+            "name": "Tolls and Road Permits"
+          },
+          {
+            "code": "149-32",
+            "name": "Purchases"
+          },
+          {
+            "code": "149-34",
+            "name": "Honeywagon Supplies"
+          },
+          {
+            "code": "149-36",
+            "name": "Studio Vehicles"
+          },
+          {
+            "code": "149-38",
+            "name": "Production Trucks & Vehicles"
+          },
+          {
+            "code": "149-40",
+            "name": "Location Vehicles"
+          },
+          {
+            "code": "149-42",
+            "name": "Cranes"
+          },
+          {
+            "code": "149-44",
+            "name": "Insert Car"
+          },
+          {
+            "code": "149-46",
+            "name": "Camera Cars"
+          },
+          {
+            "code": "149-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "151",
+        "name": "PRODUCTION FILM & LAB",
+        "accounts": [
+          {
+            "code": "151-02",
+            "name": "Raw Stock"
+          },
+          {
+            "code": "151-04",
+            "name": "Steadicam"
+          },
+          {
+            "code": "151-06",
+            "name": "Negative Develop"
+          },
+          {
+            "code": "151-08",
+            "name": "Develop (90%)"
+          },
+          {
+            "code": "151-10",
+            "name": "Positive Printing"
+          },
+          {
+            "code": "151-12",
+            "name": "1/4\" Sound Tape"
+          },
+          {
+            "code": "151-14",
+            "name": "Sound Transfers"
+          },
+          {
+            "code": "151-16",
+            "name": "Video Cassette Dailies"
+          },
+          {
+            "code": "151-18",
+            "name": "Telecine Transfers"
+          },
+          {
+            "code": "151-20",
+            "name": "Polaroid - All Departments"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "153",
+        "name": "TESTS",
+        "accounts": [
+          {
+            "code": "153-02",
+            "name": "Talent"
+          },
+          {
+            "code": "153-04",
+            "name": "Labor"
+          },
+          {
+            "code": "153-06",
+            "name": "Purchases"
+          },
+          {
+            "code": "153-08",
+            "name": "Rentals"
+          },
+          {
+            "code": "153-10",
+            "name": "Film"
+          },
+          {
+            "code": "153-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "155",
+        "name": "FACILITY EXPENSES",
+        "accounts": [
+          {
+            "code": "155-02",
+            "name": "Studio Telephone"
+          },
+          {
+            "code": "155-04",
+            "name": "Studio Phone Charges"
+          },
+          {
+            "code": "155-06",
+            "name": "Post Phone Charges"
+          },
+          {
+            "code": "155-08",
+            "name": "Postage and Messengers"
+          },
+          {
+            "code": "155-10",
+            "name": "Studio Shipping/Messengers"
+          },
+          {
+            "code": "155-12",
+            "name": "Outside Facility"
+          },
+          {
+            "code": "155-14",
+            "name": "Stage Use / Licensing Agreement"
+          },
+          {
+            "code": "155-16",
+            "name": "Stage Includes Power/Security"
+          },
+          {
+            "code": "155-18",
+            "name": "Prep/Strike"
+          },
+          {
+            "code": "155-20",
+            "name": "Shoot"
+          },
+          {
+            "code": "155-22",
+            "name": "Power"
+          },
+          {
+            "code": "155-24",
+            "name": "Backlot Rental"
+          },
+          {
+            "code": "155-26",
+            "name": "Dressing Room Rental"
+          },
+          {
+            "code": "155-28",
+            "name": "Parking Space Rental"
+          },
+          {
+            "code": "155-30",
+            "name": "Prep - Parking"
+          },
+          {
+            "code": "155-32",
+            "name": "Shoot - Parking"
+          },
+          {
+            "code": "155-34",
+            "name": "Other Studio Facilities"
+          },
+          {
+            "code": "155-36",
+            "name": "Studio Personnel Charges"
+          },
+          {
+            "code": "155-38",
+            "name": "Dumpsters, Cleaning"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "156",
+        "name": "AUDIENCE RELATIONS",
+        "accounts": [
+          {
+            "code": "156-02",
+            "name": "Audience"
+          },
+          {
+            "code": "156-04",
+            "name": "Talent"
+          },
+          {
+            "code": "156-06",
+            "name": "Bleachers/Drapes"
+          },
+          {
+            "code": "156-08",
+            "name": "Food/Drink"
+          },
+          {
+            "code": "156-10",
+            "name": "Transport"
+          },
+          {
+            "code": "156-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "157",
+        "name": "SECOND UNIT",
+        "accounts": [
+          {
+            "code": "157-02",
+            "name": "Second Unit Director"
+          },
+          {
+            "code": "157-04",
+            "name": "Cast Talent"
+          },
+          {
+            "code": "157-06",
+            "name": "Production Staff"
+          },
+          {
+            "code": "157-08",
+            "name": "Camera"
+          },
+          {
+            "code": "157-10",
+            "name": "Art Department"
+          },
+          {
+            "code": "157-12",
+            "name": "Construction"
+          },
+          {
+            "code": "157-14",
+            "name": "Special Effects"
+          },
+          {
+            "code": "157-16",
+            "name": "Set Operations"
+          },
+          {
+            "code": "157-18",
+            "name": "Electrical"
+          },
+          {
+            "code": "157-20",
+            "name": "Set Dressing"
+          },
+          {
+            "code": "157-22",
+            "name": "Props"
+          },
+          {
+            "code": "157-24",
+            "name": "Pic Vehicles and Animals"
+          },
+          {
+            "code": "157-26",
+            "name": "Extras"
+          },
+          {
+            "code": "157-28",
+            "name": "Wardrobe"
+          },
+          {
+            "code": "157-30",
+            "name": "Makeup and Hair"
+          },
+          {
+            "code": "157-32",
+            "name": "Sound"
+          },
+          {
+            "code": "157-34",
+            "name": "Locations"
+          },
+          {
+            "code": "157-36",
+            "name": "Video Tape"
+          },
+          {
+            "code": "157-38",
+            "name": "Transportation"
+          },
+          {
+            "code": "157-40",
+            "name": "Raw Stock/Develop"
+          },
+          {
+            "code": "157-42",
+            "name": "Post Prod Labor"
+          },
+          {
+            "code": "157-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "159",
+        "name": "SPECIAL UNIT",
+        "accounts": [
+          {
+            "code": "159-02",
+            "name": "Talent"
+          },
+          {
+            "code": "159-04",
+            "name": "Staff"
+          },
+          {
+            "code": "159-06",
+            "name": "Labor"
+          },
+          {
+            "code": "159-08",
+            "name": "Transportation"
+          },
+          {
+            "code": "159-10",
+            "name": "Contract"
+          },
+          {
+            "code": "159-12",
+            "name": "Locations"
+          },
+          {
+            "code": "159-14",
+            "name": "Raw Stock/Develop"
+          },
+          {
+            "code": "159-16",
+            "name": "Purchases"
+          },
+          {
+            "code": "159-18",
+            "name": "Rentals"
+          },
+          {
+            "code": "159-20",
+            "name": "Misc Expense"
+          },
+          {
+            "code": "159-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "163",
+        "name": "FRINGES-SHOOTING PERIOD",
+        "accounts": [
+          {
+            "code": "163-02",
+            "name": "Pension Plan & Health and Welfare"
+          },
+          {
+            "code": "163-04",
+            "name": "Employer Taxes"
+          },
+          {
+            "code": "163-06",
+            "name": "Local Hire Fringes"
+          },
+          {
+            "code": "163-08",
+            "name": "PR Handling"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total below-the-line"
+      },
+      {
+        "kind": "category",
+        "code": "165",
+        "name": "EDITING & PROJECTION",
+        "accounts": [
+          {
+            "code": "165-08",
+            "name": "Film Editor"
+          },
+          {
+            "code": "165-10",
+            "name": "Assistant Film Editors"
+          },
+          {
+            "code": "165-12",
+            "name": "Conforming"
+          },
+          {
+            "code": "185-14",
+            "name": "Post Prod Supervisor"
+          },
+          {
+            "code": "185-16",
+            "name": "Projectionist"
+          },
+          {
+            "code": "165-18",
+            "name": "Coding and Misc Equipment"
+          },
+          {
+            "code": "165-20",
+            "name": "Coding Equipment"
+          },
+          {
+            "code": "165-22",
+            "name": "Sound Effects Editing"
+          },
+          {
+            "code": "165-24",
+            "name": "ADR Editing"
+          },
+          {
+            "code": "165-26",
+            "name": "Production Assistants"
+          },
+          {
+            "code": "165-28",
+            "name": "Negative Cutting"
+          },
+          {
+            "code": "165-30",
+            "name": "Music Editors"
+          },
+          {
+            "code": "165-32",
+            "name": "Post Shipping/Messengers"
+          },
+          {
+            "code": "165-34",
+            "name": "Travel and Living Expenses"
+          },
+          {
+            "code": "165-35",
+            "name": "Meals"
+          },
+          {
+            "code": "165-36",
+            "name": "Continuity Expenses"
+          },
+          {
+            "code": "165-38",
+            "name": "Purchases"
+          },
+          {
+            "code": "165-40",
+            "name": "Expendables"
+          },
+          {
+            "code": "165-42",
+            "name": "Rentals"
+          },
+          {
+            "code": "165-44",
+            "name": "Editing Room Rentals"
+          },
+          {
+            "code": "165-46",
+            "name": "KEM Equipment"
+          },
+          {
+            "code": "165-48",
+            "name": "Bins, Sync, Racks"
+          },
+          {
+            "code": "165-50",
+            "name": "Lightworks System"
+          },
+          {
+            "code": "165-52",
+            "name": "Equip Delivery/Pick-Up"
+          },
+          {
+            "code": "165-54",
+            "name": "Sound Editor's Room"
+          },
+          {
+            "code": "165-56",
+            "name": "Music Editor's Room"
+          },
+          {
+            "code": "165-58",
+            "name": "Other Equipment"
+          },
+          {
+            "code": "165-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "167",
+        "name": "MUSIC",
+        "accounts": [
+          {
+            "code": "167-02",
+            "name": "Clearances"
+          },
+          {
+            "code": "167-04",
+            "name": "Writers"
+          },
+          {
+            "code": "167-06",
+            "name": "Composers"
+          },
+          {
+            "code": "167-08",
+            "name": "Supervisor"
+          },
+          {
+            "code": "167-10",
+            "name": "Arrangers"
+          },
+          {
+            "code": "167-12",
+            "name": "Copyists"
+          },
+          {
+            "code": "167-14",
+            "name": "Pre-Score Musicians"
+          },
+          {
+            "code": "167-16",
+            "name": "Underscore Musicians"
+          },
+          {
+            "code": "167-18",
+            "name": "Star Vocalist"
+          },
+          {
+            "code": "167-20",
+            "name": "Vocalists"
+          },
+          {
+            "code": "167-22",
+            "name": "Music Editing"
+          },
+          {
+            "code": "167-24",
+            "name": "Travel and Liiving Expenses"
+          },
+          {
+            "code": "167-26",
+            "name": "Purchases"
+          },
+          {
+            "code": "167-28",
+            "name": "Cassettes"
+          },
+          {
+            "code": "167-30",
+            "name": "Rentals and Cartage"
+          },
+          {
+            "code": "167-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "169",
+        "name": "SOUND (POST PRODUCTION)",
+        "accounts": [
+          {
+            "code": "169-02",
+            "name": "Dubbing Stage"
+          },
+          {
+            "code": "169-04",
+            "name": "Temp Dub"
+          },
+          {
+            "code": "169-06",
+            "name": "Pre Dub"
+          },
+          {
+            "code": "169-08",
+            "name": "Final Dub"
+          },
+          {
+            "code": "169-10",
+            "name": "Post Preview Session"
+          },
+          {
+            "code": "169-12",
+            "name": "Foreign Mu/Fx"
+          },
+          {
+            "code": "169-14",
+            "name": "DTS"
+          },
+          {
+            "code": "169-18",
+            "name": "ADR Stage"
+          },
+          {
+            "code": "169-20",
+            "name": "Foley Efx Recording"
+          },
+          {
+            "code": "169-22",
+            "name": "Walkers"
+          },
+          {
+            "code": "169-24",
+            "name": "Video Transfer"
+          },
+          {
+            "code": "169-26",
+            "name": "Tape Transfer"
+          },
+          {
+            "code": "169-28",
+            "name": "Dubbing"
+          },
+          {
+            "code": "169-30",
+            "name": "Travel and Living Expenses"
+          },
+          {
+            "code": "169-32",
+            "name": "Purchases"
+          },
+          {
+            "code": "169-34",
+            "name": "Equipment Rentals"
+          },
+          {
+            "code": "169-36",
+            "name": "Dolby Cards"
+          },
+          {
+            "code": "169-38",
+            "name": "DTS Fee"
+          },
+          {
+            "code": "169-40",
+            "name": "License Fee"
+          },
+          {
+            "code": "169-42",
+            "name": "Dolby License"
+          },
+          {
+            "code": "169-44",
+            "name": "DTS License"
+          },
+          {
+            "code": "169-46",
+            "name": "SDDS License"
+          },
+          {
+            "code": "169-48",
+            "name": "Close Captioning"
+          },
+          {
+            "code": "169-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "171",
+        "name": "FILM & STOCK SHOTS",
+        "accounts": [
+          {
+            "code": "171-02",
+            "name": "Film Leader"
+          },
+          {
+            "code": "171-04",
+            "name": "Stock Shot Purchase"
+          },
+          {
+            "code": "171-06",
+            "name": "Stock Shots Labor"
+          },
+          {
+            "code": "171-08",
+            "name": "Stock Shots Film and Process"
+          },
+          {
+            "code": "171-10",
+            "name": "Reprints"
+          },
+          {
+            "code": "171-12",
+            "name": "Lab Special Handling"
+          },
+          {
+            "code": "171-14",
+            "name": "Video Cassettes/Tape"
+          },
+          {
+            "code": "171-16",
+            "name": "Reversal Dupes"
+          },
+          {
+            "code": "171-18",
+            "name": "Tape Purchase"
+          },
+          {
+            "code": "171-20",
+            "name": "Optical Sound Track"
+          },
+          {
+            "code": "171-22",
+            "name": "Reference Print"
+          },
+          {
+            "code": "171-24",
+            "name": "Protection Dupes"
+          },
+          {
+            "code": "171-26",
+            "name": "Composite Print"
+          },
+          {
+            "code": "171-28",
+            "name": "Laboratory Overtime"
+          },
+          {
+            "code": "171-30",
+            "name": "Negative Spliing"
+          },
+          {
+            "code": "171-32",
+            "name": "Answer Prints"
+          },
+          {
+            "code": "171-34",
+            "name": "Check Print"
+          },
+          {
+            "code": "171-36",
+            "name": "Interpositive"
+          },
+          {
+            "code": "171-38",
+            "name": "Protection Master - YCM"
+          },
+          {
+            "code": "171-40",
+            "name": "Master Postive - YCM"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "173",
+        "name": "VISUAL EFFECTS",
+        "accounts": [
+          {
+            "code": "173-02",
+            "name": "Visual Effects Supervisor"
+          },
+          {
+            "code": "173-04",
+            "name": "Miniatures"
+          },
+          {
+            "code": "173-06",
+            "name": "Wire Removal"
+          },
+          {
+            "code": "173-08",
+            "name": "Mattes"
+          },
+          {
+            "code": "173-10",
+            "name": "Purchases"
+          },
+          {
+            "code": "173-12",
+            "name": "Misc Expenses"
+          },
+          {
+            "code": "173-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "175",
+        "name": "TITLES, OPTICALS, INSERTS",
+        "accounts": [
+          {
+            "code": "175-02",
+            "name": "Main and End Titles"
+          },
+          {
+            "code": "175-04",
+            "name": "Title Designer"
+          },
+          {
+            "code": "175-06",
+            "name": "Optical Effects"
+          },
+          {
+            "code": "175-08",
+            "name": "Inserts"
+          },
+          {
+            "code": "175-10",
+            "name": "Trademarks and Rating"
+          },
+          {
+            "code": "175-12",
+            "name": "Optical Development"
+          },
+          {
+            "code": "175-99",
+            "name": "Fringes"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "179",
+        "name": "FRINGES-POST PRODUCTION",
+        "accounts": [
+          {
+            "code": "179-02",
+            "name": "Pension Plan & Health and Welfare"
+          },
+          {
+            "code": "179-04",
+            "name": "Employer Taxes"
+          },
+          {
+            "code": "179-06",
+            "name": "Local Hire Fringes"
+          },
+          {
+            "code": "179-08",
+            "name": "PR Handling"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total post"
+      },
+      {
+        "kind": "category",
+        "code": "181",
+        "name": "INSURANCE",
+        "accounts": [
+          {
+            "code": "181-02",
+            "name": "Cast Insurance"
+          },
+          {
+            "code": "181-04",
+            "name": "Negative Insurance"
+          },
+          {
+            "code": "181-06",
+            "name": "Extra Expense"
+          },
+          {
+            "code": "181-08",
+            "name": "Marine and Aircraft"
+          },
+          {
+            "code": "181-10",
+            "name": "Miscellaneous"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "183",
+        "name": "UNIT PUBLICITY",
+        "accounts": [
+          {
+            "code": "183-02",
+            "name": "Unit Publicist"
+          },
+          {
+            "code": "183-04",
+            "name": "Publicity Contract"
+          },
+          {
+            "code": "183-06",
+            "name": "Outside Photographer"
+          },
+          {
+            "code": "183-08",
+            "name": "Stills Film and Processing for Shoot"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "185",
+        "name": "PRODUCT PLACEMENT",
+        "accounts": [
+          {
+            "code": "185-02",
+            "name": "Product Placement Credits"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "187",
+        "name": "GENERAL EXPENSES",
+        "accounts": [
+          {
+            "code": "187-02",
+            "name": "MPAA Seal"
+          },
+          {
+            "code": "187-04",
+            "name": "Work Order Transfers"
+          },
+          {
+            "code": "187-06",
+            "name": "Legal Fees"
+          },
+          {
+            "code": "187-08",
+            "name": "Bank/Exchange Costs"
+          },
+          {
+            "code": "187-10",
+            "name": "Professional Fees"
+          },
+          {
+            "code": "187-12",
+            "name": "Studio Entertainment"
+          },
+          {
+            "code": "187-14",
+            "name": "Outside Bank Interest"
+          },
+          {
+            "code": "187-16",
+            "name": "Preview Expenses"
+          },
+          {
+            "code": "187-18",
+            "name": "Previews"
+          },
+          {
+            "code": "187-20",
+            "name": "Office Purchases"
+          },
+          {
+            "code": "187-22",
+            "name": "Computers and Software"
+          },
+          {
+            "code": "187-24",
+            "name": "Office Space Rental"
+          },
+          {
+            "code": "187-26",
+            "name": "Post Office"
+          },
+          {
+            "code": "187-28",
+            "name": "Office Equipment Rental"
+          },
+          {
+            "code": "187-30",
+            "name": "Post Office Equipment"
+          },
+          {
+            "code": "187-32",
+            "name": "Misc"
+          },
+          {
+            "code": "187-34",
+            "name": "OSHA Safety"
+          },
+          {
+            "code": "187-36",
+            "name": "Wrap Party"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "189",
+        "name": "FRINGES-OTHER",
+        "accounts": [
+          {
+            "code": "189-02",
+            "name": "Pension Plan & Health and Welfare"
+          },
+          {
+            "code": "189-04",
+            "name": "Employer Taxes"
+          },
+          {
+            "code": "189-06",
+            "name": "Local Hire Fringes"
+          },
+          {
+            "code": "189-08",
+            "name": "PR Handling"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "191",
+        "name": "INSURANCE CLAIMS",
+        "accounts": [
+          {
+            "code": "191-02",
+            "name": "Cast"
+          },
+          {
+            "code": "191-04",
+            "name": "Negative"
+          },
+          {
+            "code": "191-06",
+            "name": "Extra Expenes"
+          },
+          {
+            "code": "191-08",
+            "name": "Marine, Aircraft, Etc."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "193",
+        "name": "COMPLETION BOND",
+        "accounts": [
+          {
+            "code": "193-00",
+            "name": "Completion Bond"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "195",
+        "name": "CONTINGENCY",
+        "accounts": [
+          {
+            "code": "195-00",
+            "name": "Contingency"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total other"
+      }
+    ]
+  }
+}

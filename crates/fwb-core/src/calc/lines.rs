@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use crate::calc::{err, overflow, row_at, CalcError, Ctx, ErrorKind};
-use crate::decimal::{mul_cents, Dec};
+use crate::decimal::{mul_cents, Dec, Exact};
 use crate::model::{Account, RowKind};
 use crate::report::RowTotals;
 use crate::Cents;
@@ -70,9 +70,10 @@ pub(crate) fn eval_rows(ctx: &Ctx, acct: &Account) -> Result<Vec<RowTotals>, Cal
             }
             _ => {
                 let rate = ctx.eval(&d.rate, Dec::ZERO, &at("rate"))?;
-                let local = quantity
+                // The exact product, rounded to cents once.
+                let local = Exact::dec(quantity)
                     .checked_mul(rate)
-                    .and_then(Dec::to_cents)
+                    .and_then(Exact::to_cents)
                     .ok_or_else(ovf)?;
                 match &d.currency {
                     Some(c) if c != base => {

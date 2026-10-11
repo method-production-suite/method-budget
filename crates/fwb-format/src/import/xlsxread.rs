@@ -21,7 +21,9 @@
 //! guides are left out. Excel's `_xHHHH_` escapes are decoded. A cell or row
 //! without a reference follows the one before it. Chart sheets and other
 //! non-worksheet sheets are skipped. Styles (and so dates shown as dates)
-//! are not read: a date comes in as its serial number.
+//! are not read: a date comes in as its serial number. The workbook's
+//! `<workbookPr date1904="1"/>` (serials counted from 1904) is passed on as
+//! [`Table::date1904`] so dates can be read in the right system.
 
 use super::xml::{self, attr, Event, Reader};
 use super::zipread::{part_key, ZipArchive};
@@ -45,7 +47,7 @@ pub fn read_xlsx(bytes: &[u8]) -> Result<Vec<Table>, ReadError> {
     let workbook = zip
         .read(&workbook_path)?
         .ok_or_else(|| err("the file isn't an Excel workbook (it has no workbook part)"))?;
-    let sheets = sheet_list(&xml::decode(&workbook)?)?;
+    let (sheets, date1904) = sheet_list(&xml::decode(&workbook)?)?;
     let rels_path = rels_for(&workbook_path);
     let rels = match zip.read(&rels_path)? {
         Some(b) => relationships(&xml::decode(&b)?, &workbook_path)?,
@@ -77,6 +79,7 @@ pub fn read_xlsx(bytes: &[u8]) -> Result<Vec<Table>, ReadError> {
         let mut t = worksheet(&xml::decode(&part)?, &strings, &mut text_bytes)?;
         t.name = s.name;
         t.hidden = s.hidden;
+        t.date1904 = date1904;
         tables.push(t);
     }
     if tables.is_empty() {
@@ -111,25 +114,37 @@ struct SheetRef {
     hidden: bool,
 }
 
-fn sheet_list(text: &str) -> Result<Vec<SheetRef>, ReadError> {
+/// The sheets, and whether date serials count from 1904 (`workbookPr`'s
+/// `date1904`, an XML boolean: `1` or `true`).
+fn sheet_list(text: &str) -> Result<(Vec<SheetRef>, bool), ReadError> {
     let mut r = Reader::new(text);
     let mut out = Vec::new();
+    let mut date1904 = false;
     while let Some(e) = r.next()? {
-        if let Event::Start {
-            name: "sheet",
-            attrs,
-            ..
-        } = e
-        {
-            let state = attr(&attrs, "state").unwrap_or("visible");
-            out.push(SheetRef {
-                name: attr(&attrs, "name").unwrap_or("Sheet").to_string(),
-                rel_id: attr(&attrs, "id").unwrap_or("").to_string(),
-                hidden: state != "visible",
-            });
+        match e {
+            Event::Start {
+                name: "sheet",
+                attrs,
+                ..
+            } => {
+                let state = attr(&attrs, "state").unwrap_or("visible");
+                out.push(SheetRef {
+                    name: attr(&attrs, "name").unwrap_or("Sheet").to_string(),
+                    rel_id: attr(&attrs, "id").unwrap_or("").to_string(),
+                    hidden: state != "visible",
+                });
+            }
+            Event::Start {
+                name: "workbookPr",
+                attrs,
+                ..
+            } => {
+                date1904 = matches!(attr(&attrs, "date1904").map(str::trim), Some("1" | "true"));
+            }
+            _ => {}
         }
     }
-    Ok(out)
+    Ok((out, date1904))
 }
 
 struct Rel {
@@ -538,6 +553,49 @@ mod tests {
                 vec![Value::Empty, Value::Empty, Value::Bool(false)],
             ]
         );
+    }
+
+    /// A workbook in the 1904 date system says so on every table, and its
+    /// date serials import as the dates they show, not 1,462 days early.
+    #[test]
+    fn the_1904_date_system_is_passed_on_and_read() {
+        let sheet = "<worksheet><sheetData>\
+            <row><c t=\"inlineStr\"><is><t>Date</t></is></c><c t=\"inlineStr\"><is><t>Account</t></is></c><c t=\"inlineStr\"><is><t>Amount</t></is></c></row>\
+            <row><c><v>44833</v></c><c t=\"inlineStr\"><is><t>1101</t></is></c><c><v>12.5</v></c></row>\
+            </sheetData></worksheet>";
+        let book = |pr: &str| {
+            let wb = format!(
+                "<workbook xmlns:r=\"r\">{pr}<sheets><sheet name=\"S\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>"
+            );
+            read_xlsx(&package(&[
+                ("xl/workbook.xml", &wb),
+                ("xl/_rels/workbook.xml.rels", RELS),
+                ("xl/worksheets/sheet1.xml", sheet),
+            ]))
+            .unwrap()
+        };
+        assert!(book("<workbookPr date1904=\"1\"/>")[0].date1904);
+        assert!(book("<x:workbookPr date1904=\"true\" defaultThemeVersion=\"1\"/>")[0].date1904);
+        assert!(!book("<workbookPr date1904=\"0\"/>")[0].date1904);
+        assert!(!book("<workbookPr/>")[0].date1904);
+        assert!(!book("")[0].date1904);
+
+        use crate::import::actuals::{self as ia, Mapping, Options};
+        let budget = fwb_core::starter::budget();
+        let date_of = |t: &Table| {
+            let header_row = ia::detect_header(t);
+            let m = Mapping {
+                header_row,
+                columns: ia::guess(t, header_row),
+            };
+            let p = ia::plan(&budget, t, &m, &Options::default());
+            p.transactions[0].transaction.date.clone()
+        };
+        assert_eq!(
+            date_of(&book("<workbookPr date1904=\"1\"/>")[0]),
+            "2026-09-30"
+        );
+        assert_eq!(date_of(&book("")[0]), "2022-09-29");
     }
 
     #[test]

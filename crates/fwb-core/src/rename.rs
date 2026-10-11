@@ -577,6 +577,8 @@ fn rewrite(b: &mut Budget, kind: SetupKind, from: &str, to: &str) -> usize {
     crate::order::rename_in(b, kind, from, to);
     // And its folder (the library's folders, not counted either).
     crate::folders::rename_item(b, crate::folders::kind_of(kind), from, to);
+    // And where it came from (a setup pack's stamp, not counted).
+    crate::pack::rename_item(b, crate::folders::kind_of(kind), from, to);
     n
 }
 

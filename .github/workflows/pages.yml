@@ -6,7 +6,9 @@
 # cleanly. Turning it on, the custom domain and the DNS records: docs/WEBSITE.md.
 #
 # Path-filtered, so engine work never triggers a deploy. The site is static and has no
-# build step on purpose: site/ is the whole artifact. Pages must deploy from Actions
+# build step on purpose: site/ is the whole artifact, and the generated parts of it (the
+# feature list, What's new, the release notes page, the brand files) are committed, so
+# the checks below only confirm that what is committed is what the generators produce. Pages must deploy from Actions
 # (Settings > Pages > Source: GitHub Actions); with the Actions source the custom domain
 # is set in Settings > Pages, and site/CNAME only documents it.
 #
@@ -50,6 +52,9 @@ jobs:
       # release notes before anything is published (ci.yml checks this on every push too).
       - name: Site is up to date
         run: python3 scripts/site.py --check
+      # The logo, favicons and touch icon must match the drawing in scripts/make-brand.py.
+      - name: Brand files are up to date
+        run: python3 scripts/make-brand.py --check
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

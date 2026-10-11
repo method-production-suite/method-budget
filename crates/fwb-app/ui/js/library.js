@@ -14,6 +14,8 @@
 //   same review the other way round (the library keeps its version unless
 //   the user picks otherwise). Written into the library file at once.
 // - Folders: new, rename, delete (items become unfiled), and Move To.
+// - Setup packs (packs.js): exporting and importing packs, and the packs in
+//   the user's Packs folder and those that come with the app, at the foot.
 //
 // When the library is also open as a budget tab, it is read from there and
 // Rust refuses changes to it from here (the tab says so).
@@ -26,6 +28,7 @@ import { readPref, writePref } from './prefs.js';
 import { anchoredDialog, anchoredForm } from './modal.js';
 import { openContextMenu } from './menu.js';
 import { showReview } from './importsetup.js';
+import { packsSection } from './packs.js';
 
 /** The kinds, in the library's order: [kind, list heading]. */
 export const LIBRARY_KINDS = [
@@ -41,6 +44,7 @@ export const LIBRARY_KINDS = [
   ['tag_preset', 'Tag presets'],
   ['line_preset', 'Line blocks'],
   ['report_preset', 'Report presets'],
+  ['ot_pattern', 'Overtime patterns'],
 ];
 
 const KIND_IDS = LIBRARY_KINDS.map(([k]) => k);
@@ -616,6 +620,26 @@ function draw(host) {
     }
   }
   if (st.error) parts.push(el('p', { class: 'setup-error apply-error', text: st.error, attrs: { role: 'alert' } }));
+  if (lib) {
+    const usable = Boolean(lib.configured && !lib.problem);
+    parts.push(
+      packsSection(
+        {
+          call: panelCall,
+          toast,
+          focus: () => {},
+          redraw,
+          // The budget changed: draw its new view.
+          apply: () => panelCall('get_view', {}).catch(() => {}),
+          libraryChanged: (l) => {
+            setLibrary(l);
+            redraw();
+          },
+        },
+        { hasLibrary: usable, libraryWritable: usable && !lib.in_tab },
+      ),
+    );
+  }
   const box = el('div', { class: 'apply library', attrs: { 'aria-busy': st.busy || st.loading ? 'true' : 'false' } }, ...parts);
   const a = document.activeElement;
   const had = a && host.contains(a) && a.dataset ? a.dataset.key : null;

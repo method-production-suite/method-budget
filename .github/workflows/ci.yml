@@ -76,5 +76,7 @@ jobs:
           persist-credentials: false
       - name: Feature list and site are up to date
         run: python3 scripts/site.py --check
+      - name: Brand files match scripts/make-brand.py
+        run: python3 scripts/make-brand.py --check
       - name: Hook scripts
         run: bash scripts/hooks/test-hooks.sh

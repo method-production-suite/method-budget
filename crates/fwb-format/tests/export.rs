@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use fwb_core::decimal::mul_cents;
+use fwb_core::decimal::{mul_cents, Exact};
 use fwb_core::sample::{budget as sample_budget, SampleSpec};
 use fwb_core::{recalc, starter, Budget, Cents, Dec, FringePosting, RecalcOptions, Report};
 use fwb_format::export::{
@@ -180,9 +180,9 @@ fn detail_values_reproduce_the_engine() {
             .and_then(|q| q.checked_mul(num(&row[x4], Dec::ONE)));
         if row[kind] == Cell::text("Line") {
             assert_eq!(q, Some(rr.quantity));
-            let local = rr.quantity.checked_mul(num(&row[rate], Dec::ZERO));
+            let local = Exact::dec(rr.quantity).checked_mul(num(&row[rate], Dec::ZERO));
             if rr.included {
-                assert_eq!(local.and_then(Dec::to_cents), Some(rr.local_total));
+                assert_eq!(local.and_then(Exact::to_cents), Some(rr.local_total));
             }
             lines += 1;
         } else if row[kind] == Cell::text("Adjustment") && rr.included {

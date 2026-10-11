@@ -212,3 +212,34 @@
   flex-direction: column;
   gap: 4px;
 }
+
+/* Import Chart of Accounts… reuses this dialog's parts (js/coaimport.js). */
+.coa-coding {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  margin: 4px 0;
+}
+
+.modal-input.coa-width {
+  width: 56px;
+}
+
+.coa-table .coa-code {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.coa-table .coa-category td {
+  font-weight: 600;
+}
+
+.coa-table .coa-account .coa-code {
+  padding-left: 16px;
+}
+
+.coa-table .coa-level td {
+  font-style: italic;
+  color: var(--text-muted);
+}

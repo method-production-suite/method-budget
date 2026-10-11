@@ -13,7 +13,8 @@
 //!   thousands separators and `(5)` for -5, rounded once to the cent. With
 //!   [`Options::negate`], signs flip (for exports that write costs as
 //!   negative numbers). A row without an amount, or with zero, is skipped.
-//! - **Date**: a workbook date (a serial number), ISO `2026-09-30`,
+//! - **Date**: a workbook date (a serial number, in the 1904 date system
+//!   when the workbook uses it), ISO `2026-09-30`,
 //!   `2026/09/30`, `20260930`, `9/30/2026` or `30/9/2026` (which one
 //!   [`DateOrder`] says; found from the column when it can be), `30.9.2026`
 //!   (day first), and dates with month names (`Sep 30, 2026`,
@@ -388,6 +389,21 @@ pub fn serial_date(serial: i64) -> Option<String> {
     iso_date(y as i32, m, d)
 }
 
+/// Days between the 1900 and 1904 date systems: 1904-01-01 is serial 1,462
+/// in the first and serial 0 in the second.
+const DAYS_1900_TO_1904: i64 = 1_462;
+
+/// A date serial number of the 1904 date system (`date1904` workbooks) as
+/// `YYYY-MM-DD`: serial 0 is 1904-01-01, up to 9999-12-31. The fraction (a
+/// time of day) is ignored.
+pub fn serial_date_1904(serial: i64) -> Option<String> {
+    if !(0..=2_958_465 - DAYS_1900_TO_1904).contains(&serial) {
+        return None;
+    }
+    // Every 1904 date is past the 1900 system's made-up leap day.
+    serial_date(serial + DAYS_1900_TO_1904)
+}
+
 const MONTHS: [&str; 12] = [
     "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
 ];
@@ -546,8 +562,16 @@ pub fn text_date(s: &str, order: DateOrder) -> Option<String> {
 }
 
 /// A date cell as `YYYY-MM-DD`: `Ok(None)` when empty, `Err` when it isn't
-/// a date this reads.
+/// a date this reads. A number is a serial of the 1900 date system; see
+/// [`cell_date_in`] for a workbook in the 1904 system.
 pub fn cell_date(v: &Value, order: DateOrder) -> Result<Option<String>, String> {
+    cell_date_in(v, order, false)
+}
+
+/// As [`cell_date`], with numbers read as serials of the 1904 date system
+/// when `date1904` (the table's [`Table::date1904`]). Text is read the same
+/// either way.
+pub fn cell_date_in(v: &Value, order: DateOrder, date1904: bool) -> Result<Option<String>, String> {
     let bad = || format!("{:?} isn't a date this import reads", v.text().trim());
     match v {
         Value::Empty => Ok(None),
@@ -561,7 +585,12 @@ pub fn cell_date(v: &Value, order: DateOrder) -> Result<Option<String>, String> 
             if (19_000_101..=29_991_231).contains(&serial) {
                 return text_date(int, order).map(Some).ok_or_else(bad);
             }
-            serial_date(serial).map(Some).ok_or_else(bad)
+            let date = if date1904 {
+                serial_date_1904(serial)
+            } else {
+                serial_date(serial)
+            };
+            date.map(Some).ok_or_else(bad)
         }
         Value::Text(s) => text_date(s, order).map(Some).ok_or_else(bad),
         Value::Bool(_) => Err(bad()),
@@ -833,7 +862,7 @@ pub fn plan(b: &Budget, t: &Table, m: &Mapping, o: &Options) -> Plan {
         } else {
             amount
         };
-        let date = match cell_date(cell(r, Field::Date), order) {
+        let date = match cell_date_in(cell(r, Field::Date), order, t.date1904) {
             Ok(d) => d.unwrap_or_default(),
             Err(e) => {
                 p.warnings.push(RowNote {
@@ -1034,6 +1063,37 @@ mod tests {
             header_row: Some(0),
             columns: fields.iter().enumerate().map(|(i, f)| (*f, i)).collect(),
         }
+    }
+
+    #[test]
+    fn serial_dates_in_the_1904_system() {
+        assert_eq!(serial_date_1904(0).as_deref(), Some("1904-01-01"));
+        assert_eq!(serial_date_1904(59).as_deref(), Some("1904-02-29"));
+        assert_eq!(serial_date_1904(44_833).as_deref(), Some("2026-09-30"));
+        assert_eq!(serial_date_1904(2_957_003).as_deref(), Some("9999-12-31"));
+        assert_eq!(serial_date_1904(-1), None);
+        assert_eq!(serial_date_1904(2_957_004), None);
+        let v = Value::Number("44833.5".into());
+        assert_eq!(
+            cell_date_in(&v, DateOrder::MonthFirst, true).unwrap(),
+            Some("2026-09-30".into())
+        );
+        // The same number in the 1900 system is 1,462 days earlier.
+        assert_eq!(
+            cell_date_in(&v, DateOrder::MonthFirst, false).unwrap(),
+            Some("2022-09-29".into())
+        );
+        // Text and compact dates don't depend on the system.
+        let t = Value::Text("9/30/2026".into());
+        assert_eq!(
+            cell_date_in(&t, DateOrder::MonthFirst, true).unwrap(),
+            Some("2026-09-30".into())
+        );
+        let c = Value::Number("20260930".into());
+        assert_eq!(
+            cell_date_in(&c, DateOrder::MonthFirst, true).unwrap(),
+            Some("2026-09-30".into())
+        );
     }
 
     #[test]

@@ -1,0 +1,6175 @@
+{
+  "format": "method-budget",
+  "version": 1,
+  "budget": {
+    "title": "PARAMOUNT CLASSICS",
+    "base_currency": "USD",
+    "account_coding": {
+      "category_width": 3,
+      "account_width": 2,
+      "sub_width": 0,
+      "set_width": 0,
+      "separator": " "
+    },
+    "units": {
+      "Allow": {
+        "plural": "Allow"
+      },
+      "Day": {
+        "plural": "Days",
+        "hours": "10"
+      },
+      "Flat": {
+        "plural": "Flat"
+      },
+      "Hour": {
+        "plural": "Hours",
+        "hours": "1"
+      },
+      "Month": {
+        "plural": "Months",
+        "hours": "200"
+      },
+      "Week": {
+        "plural": "Weeks",
+        "hours": "50"
+      }
+    },
+    "topsheet": [
+      {
+        "kind": "category",
+        "code": "100",
+        "name": "GRAPHIC DESIGNER",
+        "accounts": [
+          {
+            "code": "100 02",
+            "name": "SUPPLIES"
+          },
+          {
+            "code": "100 30",
+            "name": "SALARIES"
+          },
+          {
+            "code": "100 96",
+            "name": "FRINGES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "102",
+        "name": "CREATIVE PRINT CAMPAIGN",
+        "accounts": [
+          {
+            "code": "102 01",
+            "name": "CREATIVE FEE"
+          },
+          {
+            "code": "102 02",
+            "name": "ROUGH COMPS"
+          },
+          {
+            "code": "102 03",
+            "name": "TIGHT COMPS"
+          },
+          {
+            "code": "102 04",
+            "name": "OUTDOOR/BULLETIN"
+          },
+          {
+            "code": "102 05",
+            "name": "STANDEE CREATION"
+          },
+          {
+            "code": "102 06",
+            "name": "GENERAL EXPENSE"
+          },
+          {
+            "code": "102 07",
+            "name": "COPY"
+          },
+          {
+            "code": "102 08",
+            "name": "ACCEPTANCE FEES"
+          },
+          {
+            "code": "102 09",
+            "name": "FINISH ART PREPARATION"
+          },
+          {
+            "code": "102 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "102 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "104",
+        "name": "ILLUSTRATION",
+        "accounts": [
+          {
+            "code": "104 10",
+            "name": "PRODUCTION COSTS"
+          },
+          {
+            "code": "104 15",
+            "name": "BUYOUT"
+          },
+          {
+            "code": "104 16",
+            "name": "ANCILLARY MARKET BUYOUT COSTS"
+          },
+          {
+            "code": "104 95",
+            "name": "OTHER/GENERAL"
+          },
+          {
+            "code": "104 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "106",
+        "name": "PHOTO SHOOT",
+        "accounts": [
+          {
+            "code": "106 01",
+            "name": "FEE"
+          },
+          {
+            "code": "106 02",
+            "name": "ASSISTANTS"
+          },
+          {
+            "code": "106 03",
+            "name": "RENTALS"
+          },
+          {
+            "code": "106 04",
+            "name": "CATERING"
+          },
+          {
+            "code": "106 10",
+            "name": "PRODUCTION COSTS"
+          },
+          {
+            "code": "106 15",
+            "name": "BUYOUT"
+          },
+          {
+            "code": "106 95",
+            "name": "OTHER/GENERAL"
+          },
+          {
+            "code": "106 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "108",
+        "name": "LOGO COSTS",
+        "accounts": [
+          {
+            "code": "108 02",
+            "name": "LOGO DEVELOPMENT"
+          },
+          {
+            "code": "108 03",
+            "name": "LOGO ILLUSTRATION"
+          },
+          {
+            "code": "108 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "108 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "110",
+        "name": "STILLS",
+        "accounts": [
+          {
+            "code": "110 02",
+            "name": "FILM PROCESSING"
+          },
+          {
+            "code": "110 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "110 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "112",
+        "name": "OTHER CREATIVE PRINT COST",
+        "accounts": [
+          {
+            "code": "112 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "112 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "112 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "120",
+        "name": "PRODUCTION ARTIST",
+        "accounts": [
+          {
+            "code": "120 02",
+            "name": "SUPPLIES"
+          },
+          {
+            "code": "120 30",
+            "name": "SALARIES"
+          },
+          {
+            "code": "120 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "122",
+        "name": "ONE SHEET/POSTERS",
+        "accounts": [
+          {
+            "code": "122 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "122 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "122 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "122 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "122 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "122 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "124",
+        "name": "SUBWAYS",
+        "accounts": [
+          {
+            "code": "124 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "124 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "124 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "124 10",
+            "name": "PRODUCTION COST"
+          },
+          {
+            "code": "124 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "126",
+        "name": "BUS SHELTERS",
+        "accounts": [
+          {
+            "code": "126 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "126 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "126 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "126 10",
+            "name": "PRODUCTION COST"
+          },
+          {
+            "code": "126 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "128",
+        "name": "BUS SIDES",
+        "accounts": [
+          {
+            "code": "128 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "128 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "128 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "128 10",
+            "name": "PRODUCTION COST"
+          },
+          {
+            "code": "128 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "130",
+        "name": "MALL BOARDS",
+        "accounts": [
+          {
+            "code": "130 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "130 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "130 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "130 10",
+            "name": "PRODUCTION COST"
+          },
+          {
+            "code": "130 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "131",
+        "name": "VERTACULARS",
+        "accounts": [
+          {
+            "code": "131 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "131 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "131 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "131 10",
+            "name": "PRODUCTION COST"
+          },
+          {
+            "code": "131 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "132",
+        "name": "BANNERS",
+        "accounts": [
+          {
+            "code": "132 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "132 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "132 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "132 10",
+            "name": "PRODUCTION COST"
+          },
+          {
+            "code": "132 50",
+            "name": "FREIGHT"
+          },
+          {
+            "code": "132 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "133",
+        "name": "BILLBOARDS",
+        "accounts": [
+          {
+            "code": "133 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "133 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "133 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "133 10",
+            "name": "PRODUCTION COST"
+          },
+          {
+            "code": "133 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "134",
+        "name": "30 SHEETS",
+        "accounts": [
+          {
+            "code": "134 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "134 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "134 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "134 10",
+            "name": "PRODUCTION COST"
+          },
+          {
+            "code": "134 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "136",
+        "name": "TEST ADS",
+        "accounts": [
+          {
+            "code": "136 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "136 03",
+            "name": "SEPARATIONS/PREPARATIONS"
+          },
+          {
+            "code": "136 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "136 10",
+            "name": "PRODUCTION"
+          },
+          {
+            "code": "136 20",
+            "name": "COMPS"
+          },
+          {
+            "code": "136 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "136 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "137",
+        "name": "SNEAK ADS",
+        "accounts": [
+          {
+            "code": "137 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "137 03",
+            "name": "SEPARATIONS/PREPARATIONS"
+          },
+          {
+            "code": "137 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "137 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "138",
+        "name": "PRE-OPENING ADS",
+        "accounts": [
+          {
+            "code": "138 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "138 03",
+            "name": "SEPARATIONS/PREPARATIONS"
+          },
+          {
+            "code": "138 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "138 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "139",
+        "name": "NATIONAL ADS",
+        "accounts": [
+          {
+            "code": "139 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "139 03",
+            "name": "SEPARATIONS/PREPARATIONS"
+          },
+          {
+            "code": "139 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "139 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "140",
+        "name": "REVIEW ADS",
+        "accounts": [
+          {
+            "code": "140 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "140 03",
+            "name": "SEPARATIONS/PREPARATIONS"
+          },
+          {
+            "code": "140 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "140 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "141",
+        "name": "BOOSTER CAMPAIGN",
+        "accounts": [
+          {
+            "code": "141 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "141 03",
+            "name": "SEPARATIONS/PREPARATIONS"
+          },
+          {
+            "code": "141 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "141 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "142",
+        "name": "TUNE-IN ADS/GENERIC",
+        "accounts": [
+          {
+            "code": "142 01",
+            "name": "CREATIVE"
+          },
+          {
+            "code": "142 10",
+            "name": "PRODUCTION"
+          },
+          {
+            "code": "142 20",
+            "name": "COMPS"
+          },
+          {
+            "code": "142 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "142 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "143",
+        "name": "TUNE-IN ADS/TOPICAL",
+        "accounts": [
+          {
+            "code": "143 01",
+            "name": "CREATIVE"
+          },
+          {
+            "code": "143 10",
+            "name": "PRODUCTION"
+          },
+          {
+            "code": "143 20",
+            "name": "COMPS"
+          },
+          {
+            "code": "143 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "143 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "145",
+        "name": "MAGAZINE ADS",
+        "accounts": [
+          {
+            "code": "145 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "145 03",
+            "name": "SEPARATIONS/PREPARATIONS"
+          },
+          {
+            "code": "145 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "145 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "147",
+        "name": "STANDEE/DISPLAY",
+        "accounts": [
+          {
+            "code": "147 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "147 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "147 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "147 09",
+            "name": "MARQUEES"
+          },
+          {
+            "code": "147 50",
+            "name": "FREIGHT"
+          },
+          {
+            "code": "147 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "149",
+        "name": "COUNTER CARD",
+        "accounts": [
+          {
+            "code": "149 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "149 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "149 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "149 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "150",
+        "name": "PRINTING INSERTS-MEDIA",
+        "accounts": [
+          {
+            "code": "150 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "150 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "150 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "150 05",
+            "name": "REPRINTS"
+          },
+          {
+            "code": "150 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "150 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "151",
+        "name": "PRINTING INSERTS-CASSETTE STK",
+        "accounts": [
+          {
+            "code": "151 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "151 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "151 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "151 05",
+            "name": "REPRINTS"
+          },
+          {
+            "code": "151 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "151 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "152",
+        "name": "GIANT CASSETTE BOX/MOBILE",
+        "accounts": [
+          {
+            "code": "152 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "152 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "152 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "152 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "153",
+        "name": "LIGHTBOX DISPLAY/PERM FEAT",
+        "accounts": [
+          {
+            "code": "153 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "153 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "153 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "153 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "154",
+        "name": "SELL SHEETS",
+        "accounts": [
+          {
+            "code": "154 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "154 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "154 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "154 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "154 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "155",
+        "name": "SHELFTALKERS",
+        "accounts": [
+          {
+            "code": "155 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "155 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "155 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "155 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "156",
+        "name": "FLOOR PRODUCT DISPLAYS",
+        "accounts": [
+          {
+            "code": "156 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "156 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "156 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "156 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "156 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "157",
+        "name": "COUNTER PRODUCT DISPLAYS",
+        "accounts": [
+          {
+            "code": "157 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "157 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "157 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "157 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "157 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "158",
+        "name": "INFLATABLES",
+        "accounts": [
+          {
+            "code": "158 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "158 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "158 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "158 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "158 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "159",
+        "name": "WALL FLATS/MINI ONE SHEET",
+        "accounts": [
+          {
+            "code": "159 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "159 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "159 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "159 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "160",
+        "name": "STYRENES/LIGHTBOX INSERTS",
+        "accounts": [
+          {
+            "code": "160 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "160 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "160 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "160 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "161",
+        "name": "FLYERS",
+        "accounts": [
+          {
+            "code": "161 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "161 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "161 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "161 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "162",
+        "name": "POSTCARDS",
+        "accounts": [
+          {
+            "code": "162 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "162 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "162 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "162 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "163",
+        "name": "REPRODUCTION MATERIALS",
+        "accounts": [
+          {
+            "code": "163 05",
+            "name": "TRANSPARENCIES/COLOR PRINTS"
+          },
+          {
+            "code": "163 06",
+            "name": "B/W PRINTS & STATS"
+          },
+          {
+            "code": "163 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "163 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "165",
+        "name": "OTHER PRINT PRODUCTION CO",
+        "accounts": [
+          {
+            "code": "165 06",
+            "name": "POP SPECIAL LABELS/STICKERS"
+          },
+          {
+            "code": "165 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "165 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "165 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "166",
+        "name": "PRINTING INSERTS-OTHER",
+        "accounts": [
+          {
+            "code": "166 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "166 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "166 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "166 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "167",
+        "name": "DIGITAL COMP BOXES",
+        "accounts": [
+          {
+            "code": "167 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "167 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "167 04",
+            "name": "PRINTING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "180",
+        "name": "CUSTOMER REIMBURSEMENTS",
+        "accounts": [
+          {
+            "code": "180 06",
+            "name": "PREMIER MAILER REIMBURSEMENTS"
+          },
+          {
+            "code": "180 07",
+            "name": "BRAND MANAGERS"
+          },
+          {
+            "code": "180 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "184",
+        "name": "CUSTOMER CO-OP TOOLS",
+        "accounts": [
+          {
+            "code": "184 06",
+            "name": "CO-OP COLOR TRANSPARENCIES"
+          },
+          {
+            "code": "184 07",
+            "name": "RADIO SCRIPT"
+          },
+          {
+            "code": "184 08",
+            "name": "PRODUCED RADIO SPOT"
+          },
+          {
+            "code": "184 09",
+            "name": "PRODUCED TV SPOT"
+          },
+          {
+            "code": "184 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "184 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "185",
+        "name": "AD MATS-(CCT)",
+        "accounts": [
+          {
+            "code": "185 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "185 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "185 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "185 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "186",
+        "name": "MAILER MATS-B&W (CCT)",
+        "accounts": [
+          {
+            "code": "186 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "186 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "186 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "186 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "186 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "187",
+        "name": "MAILER MATS-COLOR (CCT)",
+        "accounts": [
+          {
+            "code": "187 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "187 03",
+            "name": "SEPARATIONS"
+          },
+          {
+            "code": "187 04",
+            "name": "PRINTING"
+          },
+          {
+            "code": "187 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "187 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "190",
+        "name": "A/V ADVERT-EDITOR'S COST",
+        "accounts": [
+          {
+            "code": "190 02",
+            "name": "EDITORIAL SUPPLY"
+          },
+          {
+            "code": "190 30",
+            "name": "SALARIES"
+          },
+          {
+            "code": "190 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "192",
+        "name": "A/V CREATION-TRAILERS",
+        "accounts": [
+          {
+            "code": "192 01",
+            "name": "CREATIVE FEE"
+          },
+          {
+            "code": "192 10",
+            "name": "PRODUCTION COSTS"
+          },
+          {
+            "code": "192 11",
+            "name": "MUSIC"
+          },
+          {
+            "code": "192 12",
+            "name": "TAPES/DUBS"
+          },
+          {
+            "code": "192 13",
+            "name": "PRINT COSTS"
+          },
+          {
+            "code": "192 60",
+            "name": "FOREIGN PRINT COSTS/ALLOCATIONS"
+          },
+          {
+            "code": "192 61",
+            "name": "RELEASE PRINTS"
+          },
+          {
+            "code": "192 62",
+            "name": "FREIGHT INSURANCE & HANDLING"
+          },
+          {
+            "code": "192 63",
+            "name": "DUBBING,RECORDING & CENSORSHIP"
+          },
+          {
+            "code": "192 64",
+            "name": "MISC OTHER DISTRIBUTION COST"
+          },
+          {
+            "code": "192 65",
+            "name": "GENERAL ADVERTISING"
+          },
+          {
+            "code": "192 66",
+            "name": "SUBDISTRIBUTORS FEES"
+          },
+          {
+            "code": "192 67",
+            "name": "REMITTANCE TAX"
+          },
+          {
+            "code": "192 68",
+            "name": "TURNOVER TAX"
+          },
+          {
+            "code": "192 69",
+            "name": "SUBDISTRIBUTORS FEES-NON OP"
+          },
+          {
+            "code": "192 95",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "192 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "193",
+        "name": "A/V CREATION-TV EPISODIC",
+        "accounts": [
+          {
+            "code": "193 01",
+            "name": "CREATIVE FEE"
+          },
+          {
+            "code": "193 10",
+            "name": "PRODUCTION COSTS"
+          },
+          {
+            "code": "193 11",
+            "name": "MUSIC"
+          },
+          {
+            "code": "193 12",
+            "name": "TAPES/DUBS"
+          },
+          {
+            "code": "193 14",
+            "name": "TALENT RENEWALS"
+          },
+          {
+            "code": "193 15",
+            "name": "PUBLIC SERVICE ANNOUNCEMENTS"
+          },
+          {
+            "code": "193 16",
+            "name": "PERSONALIZED PROMOTION"
+          },
+          {
+            "code": "193 17",
+            "name": "DEMOS"
+          },
+          {
+            "code": "193 18",
+            "name": "COMPILATION REELS"
+          },
+          {
+            "code": "193 19",
+            "name": "GRAPHICS"
+          },
+          {
+            "code": "193 20",
+            "name": "SATELLITE COSTS"
+          },
+          {
+            "code": "193 21",
+            "name": "ALTERNATIVE VERSION"
+          },
+          {
+            "code": "193 22",
+            "name": "ANIMATION"
+          },
+          {
+            "code": "193 23",
+            "name": "LOGO DESIGN"
+          },
+          {
+            "code": "193 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "194",
+        "name": "A/V CREATION-TV",
+        "accounts": [
+          {
+            "code": "194 01",
+            "name": "CREATIVE FEE"
+          },
+          {
+            "code": "194 10",
+            "name": "PRODUCTION COSTS"
+          },
+          {
+            "code": "194 11",
+            "name": "MUSIC"
+          },
+          {
+            "code": "194 12",
+            "name": "TAPES/DUBS"
+          },
+          {
+            "code": "194 14",
+            "name": "TALENT RENEWALS"
+          },
+          {
+            "code": "194 15",
+            "name": "PUBLIC SERVICE ANNOUNCEMENTS"
+          },
+          {
+            "code": "194 16",
+            "name": "PERSONALIZED PROMOTION"
+          },
+          {
+            "code": "194 17",
+            "name": "DEMOS"
+          },
+          {
+            "code": "194 18",
+            "name": "COMPILATION REELS"
+          },
+          {
+            "code": "194 19",
+            "name": "GRAPHICS"
+          },
+          {
+            "code": "194 20",
+            "name": "SATELLITE COSTS"
+          },
+          {
+            "code": "194 21",
+            "name": "ALTERNATIVE VERSION"
+          },
+          {
+            "code": "194 22",
+            "name": "ANIMATION"
+          },
+          {
+            "code": "194 23",
+            "name": "LOGO DESIGN"
+          },
+          {
+            "code": "194 24",
+            "name": "CONCEPTS"
+          },
+          {
+            "code": "194 25",
+            "name": "AGENCY FEE"
+          },
+          {
+            "code": "194 95",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "194 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "195",
+        "name": "A/V CREATION-RADIO",
+        "accounts": [
+          {
+            "code": "195 01",
+            "name": "CREATIVE FEE"
+          },
+          {
+            "code": "195 10",
+            "name": "PRODUCTION COSTS"
+          },
+          {
+            "code": "195 11",
+            "name": "MUSIC"
+          },
+          {
+            "code": "195 12",
+            "name": "TAPES/DUBS"
+          },
+          {
+            "code": "195 14",
+            "name": "TALENT RENEWALS"
+          },
+          {
+            "code": "195 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "195 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "195 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "196",
+        "name": "A/V CREATION-RADIO PROMO",
+        "accounts": [
+          {
+            "code": "196 01",
+            "name": "CREATIVE FEE"
+          },
+          {
+            "code": "196 10",
+            "name": "PRODUCTION COSTS"
+          },
+          {
+            "code": "196 11",
+            "name": "MUSIC"
+          },
+          {
+            "code": "196 12",
+            "name": "TAPES/DUBS"
+          },
+          {
+            "code": "196 14",
+            "name": "TALENT RENEWALS"
+          },
+          {
+            "code": "196 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "196 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "196 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "199",
+        "name": "OTHER AUDIO VISUAL COSTS",
+        "accounts": [
+          {
+            "code": "199 02",
+            "name": "HOME VIDEO TRAILER"
+          },
+          {
+            "code": "199 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "199 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "199 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total above-the-line"
+      },
+      {
+        "kind": "category",
+        "code": "210",
+        "name": "PRODUCTION PUBLICITY",
+        "accounts": [
+          {
+            "code": "210 30",
+            "name": "UNIT PUBLIC SAL (OVERSCALE)"
+          },
+          {
+            "code": "210 31",
+            "name": "UNIT PHOTO SAL (OVERSCALE)"
+          },
+          {
+            "code": "210 90",
+            "name": "T&E"
+          },
+          {
+            "code": "210 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "212",
+        "name": "PUBLICIST",
+        "accounts": [
+          {
+            "code": "212 30",
+            "name": "SALARIES"
+          },
+          {
+            "code": "212 90",
+            "name": "T&E"
+          },
+          {
+            "code": "212 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "213",
+        "name": "NATIONAL FF/SPECIAL PUBLICIST",
+        "accounts": [
+          {
+            "code": "213 02",
+            "name": "AGENCY FEE"
+          },
+          {
+            "code": "213 03",
+            "name": "OUT OF POCKET EXPENSES"
+          },
+          {
+            "code": "213 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "214",
+        "name": "SPECIAL PHOTOGRAPHER",
+        "accounts": [
+          {
+            "code": "214 02",
+            "name": "FEE"
+          },
+          {
+            "code": "214 03",
+            "name": "EXPENSES"
+          },
+          {
+            "code": "214 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "215",
+        "name": "FILMMAKER RELATIONS",
+        "accounts": [
+          {
+            "code": "215 02",
+            "name": "OUTSIDE PUBLICIST FEE"
+          },
+          {
+            "code": "215 03",
+            "name": "OUTSIDE PUBLICISTS-EXPENSES"
+          },
+          {
+            "code": "215 04",
+            "name": "PUBLICITY/PHOTO SHOOT"
+          },
+          {
+            "code": "215 95",
+            "name": "OTHER EXPENSES"
+          },
+          {
+            "code": "215 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "216",
+        "name": "PUBLICITY EVENTS",
+        "accounts": [
+          {
+            "code": "216 11",
+            "name": "JUNKETS & PRESS DAY"
+          },
+          {
+            "code": "216 12",
+            "name": "LOCAL FILM FESTIVAL SCREENINGS"
+          },
+          {
+            "code": "216 13",
+            "name": "TOURS/FIELD FILM FESTIVAL"
+          },
+          {
+            "code": "216 14",
+            "name": "PREMIERES/PARTIES"
+          },
+          {
+            "code": "216 15",
+            "name": "BUSINESS CONFERENCES/CONV"
+          },
+          {
+            "code": "216 16",
+            "name": "FIELD MEETINGS"
+          },
+          {
+            "code": "216 17",
+            "name": "SATELLITE TOURS"
+          },
+          {
+            "code": "216 18",
+            "name": "SYNDITEL"
+          },
+          {
+            "code": "216 19",
+            "name": "RADIO TOURS"
+          },
+          {
+            "code": "216 20",
+            "name": "FIELD PUBLICITY-PUBLICITY SCREENINGS"
+          },
+          {
+            "code": "216 21",
+            "name": "FIELD PUBLICITY-PROMO SCREENINGS"
+          },
+          {
+            "code": "216 30",
+            "name": "NATIONAL PUBLICITY-PUBLICITY SCREENINGS"
+          },
+          {
+            "code": "216 31",
+            "name": "NATIONAL PUBLICITY-PROMO SCREENINGS"
+          },
+          {
+            "code": "216 40",
+            "name": "HFPA PRESS CONFERENCE"
+          },
+          {
+            "code": "216 90",
+            "name": "TALENT T&E"
+          },
+          {
+            "code": "216 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "216 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "218",
+        "name": "PRESS KITS",
+        "accounts": [
+          {
+            "code": "218 02",
+            "name": "STILLS"
+          },
+          {
+            "code": "218 03",
+            "name": "WRITERS"
+          },
+          {
+            "code": "218 04",
+            "name": "SEPARATIONS & PRINT"
+          },
+          {
+            "code": "218 05",
+            "name": "PHOTO COSTS"
+          },
+          {
+            "code": "218 06",
+            "name": "LETTERHEAD"
+          },
+          {
+            "code": "218 07",
+            "name": "FOLDERS"
+          },
+          {
+            "code": "218 08",
+            "name": "GALLERY SESSION"
+          },
+          {
+            "code": "218 10",
+            "name": "PRODUCTION"
+          },
+          {
+            "code": "218 20",
+            "name": "COMPS"
+          },
+          {
+            "code": "218 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "218 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "218 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "220",
+        "name": "PUBLICITY ITEMS",
+        "accounts": [
+          {
+            "code": "220 02",
+            "name": "STILL/PHOTO REPRODUCTION"
+          },
+          {
+            "code": "220 03",
+            "name": "PRODUCT REEL"
+          },
+          {
+            "code": "220 04",
+            "name": "RADIO PRESS KIT"
+          },
+          {
+            "code": "220 05",
+            "name": "PRESS MAILERS"
+          },
+          {
+            "code": "220 06",
+            "name": "STUDY GUIDES"
+          },
+          {
+            "code": "220 07",
+            "name": "TRANSCRIPTS"
+          },
+          {
+            "code": "220 15",
+            "name": "SCREENING PROGRAMS"
+          },
+          {
+            "code": "220 16",
+            "name": "FIELD SCREENING INVITATIONS"
+          },
+          {
+            "code": "220 17",
+            "name": "SCREENING TICKETS"
+          },
+          {
+            "code": "220 18",
+            "name": "SCREENING FOOD & DRINKS"
+          },
+          {
+            "code": "220 21",
+            "name": "SHIRTS"
+          },
+          {
+            "code": "220 22",
+            "name": "BUTTONS"
+          },
+          {
+            "code": "220 23",
+            "name": "HATS"
+          },
+          {
+            "code": "220 24",
+            "name": "CLIPPINGS"
+          },
+          {
+            "code": "220 25",
+            "name": "GIVEAWAYS"
+          },
+          {
+            "code": "220 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "220 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "220 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "221",
+        "name": "A/V PRESS KITS",
+        "accounts": [
+          {
+            "code": "221 01",
+            "name": "CREATIVE FEE"
+          },
+          {
+            "code": "221 10",
+            "name": "EPK PRODUCTION COSTS"
+          },
+          {
+            "code": "221 12",
+            "name": "TAPE/DUBS"
+          },
+          {
+            "code": "221 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "221 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "222",
+        "name": "FILM CLIPS",
+        "accounts": [
+          {
+            "code": "222 10",
+            "name": "PRODUCTION COSTS"
+          },
+          {
+            "code": "222 12",
+            "name": "TAPES/DUBS"
+          },
+          {
+            "code": "222 95",
+            "name": "OTHER EXPENSE"
+          },
+          {
+            "code": "222 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "223",
+        "name": "AGENCY EXPENSE-PUBLCITY",
+        "accounts": [
+          {
+            "code": "223 02",
+            "name": "NATIONAL PUBLICITY FEE/RETAINER"
+          },
+          {
+            "code": "223 03",
+            "name": "NATIONAL PUBLICITY OUT OF POCKET EXPENSE"
+          },
+          {
+            "code": "223 04",
+            "name": "CLIPPINGS"
+          },
+          {
+            "code": "223 12",
+            "name": "FIELD PUBLICITY FEE/RETAINER"
+          },
+          {
+            "code": "223 13",
+            "name": "FIELD PUBLICITY OUT OF POCKET EXPENSES"
+          },
+          {
+            "code": "223 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "223 51",
+            "name": "MESSENGER"
+          },
+          {
+            "code": "223 90",
+            "name": "T&E"
+          },
+          {
+            "code": "223 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "223 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "225",
+        "name": "MUSIC PROMOTION",
+        "accounts": [
+          {
+            "code": "225 01",
+            "name": "CREATIVE FEE"
+          },
+          {
+            "code": "225 10",
+            "name": "PRODUCTION"
+          },
+          {
+            "code": "225 12",
+            "name": "TAPES/DUBS"
+          },
+          {
+            "code": "225 13",
+            "name": "RECORD PROMOTION"
+          },
+          {
+            "code": "225 14",
+            "name": "VIDEO"
+          },
+          {
+            "code": "225 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "225 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "229",
+        "name": "OTHER PUBLICITY",
+        "accounts": [
+          {
+            "code": "229 02",
+            "name": "PHOTO COSTS"
+          },
+          {
+            "code": "229 03",
+            "name": "SPECIAL PROJECTS"
+          },
+          {
+            "code": "229 04",
+            "name": "STUDIO CHARGES-MISCELLANEOUS"
+          },
+          {
+            "code": "229 05",
+            "name": "FIELD MEETINGS"
+          },
+          {
+            "code": "229 12",
+            "name": "TAPES/DUBS"
+          },
+          {
+            "code": "229 13",
+            "name": "MAILINGS"
+          },
+          {
+            "code": "229 30",
+            "name": "SALARIES"
+          },
+          {
+            "code": "229 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "229 51",
+            "name": "MESSENGERS"
+          },
+          {
+            "code": "229 90",
+            "name": "T&E-GENERAL"
+          },
+          {
+            "code": "229 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "229 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "240",
+        "name": "PUBLICISTS-PROMOS",
+        "accounts": [
+          {
+            "code": "240 30",
+            "name": "SALARIES"
+          },
+          {
+            "code": "240 90",
+            "name": "TRAVEL & ENTERTAINMENT"
+          },
+          {
+            "code": "240 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "241",
+        "name": "SPECIAL PROJECTS:NATIONAL FF",
+        "accounts": [
+          {
+            "code": "241 95",
+            "name": "OTHER-FESTIVITIES"
+          },
+          {
+            "code": "241 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "242",
+        "name": "FIELD EXPENSES",
+        "accounts": [
+          {
+            "code": "242 02",
+            "name": "SCREENINGS"
+          },
+          {
+            "code": "242 03",
+            "name": "MEETINGS"
+          },
+          {
+            "code": "242 04",
+            "name": "SWEEPSTAKES/GIVEAWAY COSTS"
+          },
+          {
+            "code": "242 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "242 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "243",
+        "name": "NATIONAL PROMOTION",
+        "accounts": [
+          {
+            "code": "243 01",
+            "name": "NATIONAL PROMOTIONS-MATERIALS"
+          },
+          {
+            "code": "243 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "243 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "244",
+        "name": "AGENCY EXPENSES-PROMOS",
+        "accounts": [
+          {
+            "code": "244 02",
+            "name": "PROMOTIONAL FEES/RETAINERS"
+          },
+          {
+            "code": "244 03",
+            "name": "OUT OF POCKET EXPENSES"
+          },
+          {
+            "code": "244 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "244 51",
+            "name": "MESSENGER"
+          },
+          {
+            "code": "244 90",
+            "name": "T&E"
+          },
+          {
+            "code": "244 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "244 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "246",
+        "name": "PROMOTIONAL ITEMS/EXPENSE",
+        "accounts": [
+          {
+            "code": "246 02",
+            "name": "SHIRTS"
+          },
+          {
+            "code": "246 03",
+            "name": "BUTTONS"
+          },
+          {
+            "code": "246 04",
+            "name": "HATS"
+          },
+          {
+            "code": "246 05",
+            "name": "ONE SHEETS/POSTERS"
+          },
+          {
+            "code": "246 06",
+            "name": "PROMO ITEM"
+          },
+          {
+            "code": "246 07",
+            "name": "FREE VIDEOCASSETTES"
+          },
+          {
+            "code": "246 08",
+            "name": "LETTERHEAD"
+          },
+          {
+            "code": "246 09",
+            "name": "ENVELOPES"
+          },
+          {
+            "code": "246 11",
+            "name": "CARDS"
+          },
+          {
+            "code": "246 12",
+            "name": "NEWSLETTER"
+          },
+          {
+            "code": "246 13",
+            "name": "MAILING/FAXES"
+          },
+          {
+            "code": "246 14",
+            "name": "MERCHANDISE-VARIOUS"
+          },
+          {
+            "code": "246 15",
+            "name": "PREPACK PREMIUMS"
+          },
+          {
+            "code": "246 16",
+            "name": "CONTESTS"
+          },
+          {
+            "code": "246 17",
+            "name": "PRODUCT SAMPLES"
+          },
+          {
+            "code": "246 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "246 51",
+            "name": "MESSENGER"
+          },
+          {
+            "code": "246 95",
+            "name": "HFPA GIFT"
+          },
+          {
+            "code": "246 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "260",
+        "name": "PROMO REELS",
+        "accounts": [
+          {
+            "code": "260 02",
+            "name": "PROMO PRODUCTION-MASTER"
+          },
+          {
+            "code": "260 03",
+            "name": "PROMO DUPLICATION"
+          },
+          {
+            "code": "260 04",
+            "name": "PROMO PACKAGING/LABELS"
+          },
+          {
+            "code": "260 51",
+            "name": "PROMO MAILING"
+          },
+          {
+            "code": "260 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "262",
+        "name": "FULL SCREENER CASSETTES",
+        "accounts": [
+          {
+            "code": "262 02",
+            "name": "FULL SCREENER PRODUCTION MASTER"
+          },
+          {
+            "code": "262 03",
+            "name": "FULL SCREENER DUPLICATION"
+          },
+          {
+            "code": "262 04",
+            "name": "FULL SCREENER PACKAGING"
+          },
+          {
+            "code": "262 51",
+            "name": "FULL SCREENER MAILING"
+          },
+          {
+            "code": "262 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "263",
+        "name": "INTERNAL SCREENER CASSETTES",
+        "accounts": [
+          {
+            "code": "263 02",
+            "name": "PRODUCTION MASTER"
+          },
+          {
+            "code": "263 03",
+            "name": "DUPLICATION"
+          },
+          {
+            "code": "263 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "264",
+        "name": "UPDATES",
+        "accounts": [
+          {
+            "code": "264 04",
+            "name": "UPDATE PACKAGE"
+          },
+          {
+            "code": "264 05",
+            "name": "UPDATE LABOR FEE"
+          },
+          {
+            "code": "264 51",
+            "name": "UPDATE MAILING"
+          },
+          {
+            "code": "264 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "266",
+        "name": "SOLICITATIONS",
+        "accounts": [
+          {
+            "code": "266 04",
+            "name": "PACKAGING"
+          },
+          {
+            "code": "266 05",
+            "name": "LABOR FEE"
+          },
+          {
+            "code": "266 51",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "266 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "268",
+        "name": "RETAIL MAILINGS",
+        "accounts": [
+          {
+            "code": "268 05",
+            "name": "LABOR FEE"
+          },
+          {
+            "code": "268 51",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "268 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "270",
+        "name": "FULFILLMENT HOUSE",
+        "accounts": [
+          {
+            "code": "270 11",
+            "name": "ADVERT STORAGE/PREMIER HOUSE"
+          },
+          {
+            "code": "270 12",
+            "name": "PREMIER MISCELLANEOUS"
+          },
+          {
+            "code": "270 13",
+            "name": "LIST MAINTENANCE"
+          },
+          {
+            "code": "270 51",
+            "name": "PREMIER HOUSE/LIBRARY FREIGHT"
+          },
+          {
+            "code": "270 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "272",
+        "name": "OTHER NONBUDGETED ADVERT.",
+        "accounts": [
+          {
+            "code": "272 06",
+            "name": "RANK FULFILLMENT CHARGE"
+          },
+          {
+            "code": "272 07",
+            "name": "LIBRARY COLOR TRANSPARANCIES"
+          },
+          {
+            "code": "272 08",
+            "name": "CATALOG"
+          },
+          {
+            "code": "272 09",
+            "name": "FORMS/STATIONARY"
+          },
+          {
+            "code": "272 10",
+            "name": "STATS"
+          },
+          {
+            "code": "272 11",
+            "name": "LEGAL FEES"
+          },
+          {
+            "code": "272 30",
+            "name": "ADD & PROMO SALARY"
+          },
+          {
+            "code": "272 96",
+            "name": "FRINGES-PAYROLL"
+          },
+          {
+            "code": "272 98",
+            "name": "ADD & PROMO ALLOCATION"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "275",
+        "name": "MARKET RESEARCH",
+        "accounts": [
+          {
+            "code": "275 01",
+            "name": "CONSULTING & RESEARCH FEES"
+          },
+          {
+            "code": "275 02",
+            "name": "CONCEPT TEST"
+          },
+          {
+            "code": "275 03",
+            "name": "COMPETITIVE POSITIONING"
+          },
+          {
+            "code": "275 04",
+            "name": "TRAILER TEST"
+          },
+          {
+            "code": "275 05",
+            "name": "TV SPOT AD TEST"
+          },
+          {
+            "code": "275 06",
+            "name": "PRINT AD TEST"
+          },
+          {
+            "code": "275 07",
+            "name": "EXIT STUDIES"
+          },
+          {
+            "code": "275 08",
+            "name": "TRACKINGS"
+          },
+          {
+            "code": "275 09",
+            "name": "RECRUITED SCREENINGS"
+          },
+          {
+            "code": "275 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "276",
+        "name": "TELEVISION RESEARCH",
+        "accounts": [
+          {
+            "code": "276 11",
+            "name": "NEILSON RATINGS"
+          },
+          {
+            "code": "276 12",
+            "name": "PRIMARY RESEARCH"
+          },
+          {
+            "code": "276 13",
+            "name": "SPECIAL STUDIES"
+          },
+          {
+            "code": "276 14",
+            "name": "TAPE CHARGES"
+          },
+          {
+            "code": "276 15",
+            "name": "SNAP CHARGES"
+          },
+          {
+            "code": "276 16",
+            "name": "CONSULTING FEE"
+          },
+          {
+            "code": "276 17",
+            "name": "MAGID CONSULTING"
+          },
+          {
+            "code": "276 18",
+            "name": "ACI CONSULTING"
+          },
+          {
+            "code": "276 19",
+            "name": "MARKET REPORTS"
+          },
+          {
+            "code": "276 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "276 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "276 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "277",
+        "name": "ADVERTISER SUPPORT",
+        "accounts": [
+          {
+            "code": "277 11",
+            "name": "PRINT"
+          },
+          {
+            "code": "277 12",
+            "name": "TAPES"
+          },
+          {
+            "code": "277 13",
+            "name": "DUBS"
+          },
+          {
+            "code": "277 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "277 90",
+            "name": "T&E"
+          },
+          {
+            "code": "277 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "277 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "279",
+        "name": "SALES SUPPORT",
+        "accounts": [
+          {
+            "code": "279 02",
+            "name": "PRINT BROCHURES"
+          },
+          {
+            "code": "279 03",
+            "name": "OTHER PRINT"
+          },
+          {
+            "code": "279 12",
+            "name": "TAPES"
+          },
+          {
+            "code": "279 13",
+            "name": "DUBS"
+          },
+          {
+            "code": "279 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "279 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "279 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "280",
+        "name": "NON-PARTICIPATION ACCOUNT",
+        "accounts": [
+          {
+            "code": "280 01",
+            "name": "NON-OP:GIFTS"
+          },
+          {
+            "code": "280 02",
+            "name": "NON-OP:TRIBUTE REELS"
+          },
+          {
+            "code": "280 03",
+            "name": "NON-OP:TRADE ADS"
+          },
+          {
+            "code": "280 04",
+            "name": "NON-OP:CREATIVE 5555"
+          },
+          {
+            "code": "280 05",
+            "name": "NON-OP:CREATIVE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "289",
+        "name": "OTHER BASIC ITEMS",
+        "accounts": [
+          {
+            "code": "289 02",
+            "name": "PRODUCERS MEETINGS"
+          },
+          {
+            "code": "289 03",
+            "name": "CONTINGENCY"
+          },
+          {
+            "code": "289 04",
+            "name": "BRAND MANAGERS"
+          },
+          {
+            "code": "289 05",
+            "name": "FILMMAKER RELATIONS"
+          },
+          {
+            "code": "289 06",
+            "name": "SLIDE SHOWS"
+          },
+          {
+            "code": "289 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "289 90",
+            "name": "T&E"
+          },
+          {
+            "code": "289 91",
+            "name": "LODGING"
+          },
+          {
+            "code": "289 92",
+            "name": "TRANSPORTATION"
+          },
+          {
+            "code": "289 93",
+            "name": "MEALS"
+          },
+          {
+            "code": "289 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "289 96",
+            "name": "FRINGES-PAYROLL"
+          },
+          {
+            "code": "289 98",
+            "name": "ALLOCATED ADVERTISING"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total production"
+      },
+      {
+        "kind": "category",
+        "code": "290",
+        "name": "NETWORK",
+        "accounts": [
+          {
+            "code": "290 02",
+            "name": "PLACEMENT"
+          },
+          {
+            "code": "290 03",
+            "name": "PPC SHARE AGENCY COMMISSION"
+          },
+          {
+            "code": "290 08",
+            "name": "MONITORING"
+          },
+          {
+            "code": "290 09",
+            "name": "INTEGRATION"
+          },
+          {
+            "code": "290 10",
+            "name": "NETWORK TV PRODUCTION"
+          },
+          {
+            "code": "290 19",
+            "name": "NETWORK TV ESTIMATES"
+          },
+          {
+            "code": "290 55",
+            "name": "PLANNING FEE"
+          },
+          {
+            "code": "290 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "292",
+        "name": "SYNDICATED TV",
+        "accounts": [
+          {
+            "code": "292 02",
+            "name": "PLACEMENT"
+          },
+          {
+            "code": "292 03",
+            "name": "PPC SHARE AGENCY COMMISSION"
+          },
+          {
+            "code": "292 08",
+            "name": "MONITORING"
+          },
+          {
+            "code": "292 10",
+            "name": "PRODUCTION"
+          },
+          {
+            "code": "292 19",
+            "name": "SYNDICATED TV ESTIMATES"
+          },
+          {
+            "code": "292 55",
+            "name": "PLANNING FEE"
+          },
+          {
+            "code": "292 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "294",
+        "name": "NATIONAL CABLE TV",
+        "accounts": [
+          {
+            "code": "294 02",
+            "name": "PLACEMENT"
+          },
+          {
+            "code": "294 03",
+            "name": "PPC SHARE AGENCY COMMISSION"
+          },
+          {
+            "code": "294 08",
+            "name": "MONITORING"
+          },
+          {
+            "code": "294 10",
+            "name": "PRODUCTION"
+          },
+          {
+            "code": "294 19",
+            "name": "CABLE TV ESTIMATES"
+          },
+          {
+            "code": "294 55",
+            "name": "PLANNING FEE"
+          },
+          {
+            "code": "294 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "296",
+        "name": "NATIONAL RADIO",
+        "accounts": [
+          {
+            "code": "296 02",
+            "name": "PLACEMENT"
+          },
+          {
+            "code": "296 03",
+            "name": "PPC SHARE AGENCY COMMISSION"
+          },
+          {
+            "code": "296 55",
+            "name": "PLANNING FEE"
+          },
+          {
+            "code": "296 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "298",
+        "name": "NATIONAL MAGAZINE",
+        "accounts": [
+          {
+            "code": "298 02",
+            "name": "PLACEMENT"
+          },
+          {
+            "code": "298 03",
+            "name": "PPC SHARE AGENCY COMMISSION"
+          },
+          {
+            "code": "298 05",
+            "name": "CASH DISCOUNTS"
+          },
+          {
+            "code": "298 06",
+            "name": "COLOR CHARGES"
+          },
+          {
+            "code": "298 10",
+            "name": "PRODUCTION"
+          },
+          {
+            "code": "298 55",
+            "name": "PLANNING FEE"
+          },
+          {
+            "code": "298 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "300",
+        "name": "NATIONAL COLLEGE PRINT",
+        "accounts": [
+          {
+            "code": "300 02",
+            "name": "PLACEMENT"
+          },
+          {
+            "code": "300 03",
+            "name": "PPC SHARE AGENCY COMMISSION"
+          },
+          {
+            "code": "300 04",
+            "name": "COLLEGE PRINT PLCMNT(NONCOMM)"
+          },
+          {
+            "code": "300 05",
+            "name": "CASH DISCOUNTS"
+          },
+          {
+            "code": "300 15",
+            "name": "HANDLING FEE"
+          },
+          {
+            "code": "300 55",
+            "name": "PLANNING FEE"
+          },
+          {
+            "code": "300 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "302",
+        "name": "NATIONAL MEDIA-OTHER",
+        "accounts": [
+          {
+            "code": "302 10",
+            "name": "PRODUCTION"
+          },
+          {
+            "code": "302 95",
+            "name": "GENERAL"
+          },
+          {
+            "code": "302 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "303",
+        "name": "SPOT TV",
+        "accounts": [
+          {
+            "code": "303 02",
+            "name": "PLACEMENT"
+          },
+          {
+            "code": "303 03",
+            "name": "PPC SHARE AGENCY COMMISSION"
+          },
+          {
+            "code": "303 05",
+            "name": "TRADE DISCOUNT"
+          },
+          {
+            "code": "303 08",
+            "name": "MONITORING"
+          },
+          {
+            "code": "303 55",
+            "name": "PLANNING FEE"
+          },
+          {
+            "code": "303 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "305",
+        "name": "REGIONAL CABLE TV",
+        "accounts": [
+          {
+            "code": "305 02",
+            "name": "PLACEMENT"
+          },
+          {
+            "code": "305 03",
+            "name": "PPC SHARE AGENCY COMMISSION"
+          },
+          {
+            "code": "305 08",
+            "name": "MONITORING"
+          },
+          {
+            "code": "305 55",
+            "name": "PLANNING FEE"
+          },
+          {
+            "code": "305 95",
+            "name": "GENERAL"
+          },
+          {
+            "code": "305 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "307",
+        "name": "REGIONAL RADIO",
+        "accounts": [
+          {
+            "code": "307 02",
+            "name": "PLACEMENT"
+          },
+          {
+            "code": "307 03",
+            "name": "PPC SHARE AGENCY COMMISSION"
+          },
+          {
+            "code": "307 05",
+            "name": "CASH OR TRADE DISCOUNT"
+          },
+          {
+            "code": "307 08",
+            "name": "MONITORING"
+          },
+          {
+            "code": "307 10",
+            "name": "PRODUCTION"
+          },
+          {
+            "code": "307 11",
+            "name": "BARTER TIME-AGENCY PROMOS"
+          },
+          {
+            "code": "307 12",
+            "name": "BARTER TIME-PRIZES"
+          },
+          {
+            "code": "307 55",
+            "name": "PLANNING FEE"
+          },
+          {
+            "code": "307 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "308",
+        "name": "REGIONAL PRINT",
+        "accounts": [
+          {
+            "code": "308 02",
+            "name": "PLACEMENT"
+          },
+          {
+            "code": "308 03",
+            "name": "PPC SHARE AGENCY COMMISSION"
+          },
+          {
+            "code": "308 04",
+            "name": "NON-COMM PRINT PLACEMENT"
+          },
+          {
+            "code": "308 05",
+            "name": "CASH DISCOUNT"
+          },
+          {
+            "code": "308 06",
+            "name": "COLOR CHARGES"
+          },
+          {
+            "code": "308 07",
+            "name": "PRINT REBATES & SHORT RATES"
+          },
+          {
+            "code": "308 10",
+            "name": "PRODUCTION"
+          },
+          {
+            "code": "308 15",
+            "name": "HANDLING FEE"
+          },
+          {
+            "code": "308 16",
+            "name": "PRINT-NEWSPAPERS"
+          },
+          {
+            "code": "308 17",
+            "name": "PRINT-PROMO"
+          },
+          {
+            "code": "308 18",
+            "name": "MAGAZINE(LOCAL MAGAZINE)"
+          },
+          {
+            "code": "308 19",
+            "name": "ESTIMATES"
+          },
+          {
+            "code": "308 21",
+            "name": "SNEAK PLACEMENT"
+          },
+          {
+            "code": "308 26",
+            "name": "EXHIBITOR PRINT(DIRECT PYMT)"
+          },
+          {
+            "code": "308 28",
+            "name": "EXHIBITOR PRINT(DEDUCTION)"
+          },
+          {
+            "code": "308 38",
+            "name": "EXHIBITOR PRINT(DEDUCTION-NY)"
+          },
+          {
+            "code": "308 55",
+            "name": "PLANNING FEE"
+          },
+          {
+            "code": "308 88",
+            "name": "EXHIBITOR PRINT(DEDUCTION)NET"
+          },
+          {
+            "code": "308 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "308 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "310",
+        "name": "REGIONAL OUTDOOR",
+        "accounts": [
+          {
+            "code": "310 02",
+            "name": "PLACEMENT"
+          },
+          {
+            "code": "310 03",
+            "name": "PPC SHARE AGENCY COMMISSION"
+          },
+          {
+            "code": "310 04",
+            "name": "OUTDOOR PLACEMENT(NON-COMM)"
+          },
+          {
+            "code": "310 10",
+            "name": "PRODUCTION"
+          },
+          {
+            "code": "310 11",
+            "name": "MALLS"
+          },
+          {
+            "code": "310 15",
+            "name": "HANDLING FEE"
+          },
+          {
+            "code": "310 16",
+            "name": "COMMUTER RAIL/SUBWAYS"
+          },
+          {
+            "code": "310 18",
+            "name": "WILD POSTING"
+          },
+          {
+            "code": "310 19",
+            "name": "BUS SHELTER/BUS PANELS"
+          },
+          {
+            "code": "310 21",
+            "name": "30 SHEETS"
+          },
+          {
+            "code": "310 55",
+            "name": "PLANNING FEE"
+          },
+          {
+            "code": "310 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "310 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "311",
+        "name": "REGIONAL MEDIA-OTHER",
+        "accounts": [
+          {
+            "code": "311 01",
+            "name": "OUT-OF-POCKET"
+          },
+          {
+            "code": "311 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "311 95",
+            "name": "GENERAL EXPENSES"
+          },
+          {
+            "code": "311 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "314",
+        "name": "LOBBY DISPLAYS/MARQUEES",
+        "accounts": [
+          {
+            "code": "314 01",
+            "name": "CREATIVE FEE"
+          },
+          {
+            "code": "314 02",
+            "name": "PLACEMENT"
+          },
+          {
+            "code": "314 03",
+            "name": "PPC SHARE AGENCY COMMISSION"
+          },
+          {
+            "code": "314 10",
+            "name": "PRODUCTION"
+          },
+          {
+            "code": "314 15",
+            "name": "HANDLING FEE"
+          },
+          {
+            "code": "314 55",
+            "name": "PLANNING FEE"
+          },
+          {
+            "code": "314 95",
+            "name": "GENERAL"
+          },
+          {
+            "code": "314 96",
+            "name": "FRINGES-PAYROLL"
+          },
+          {
+            "code": "314 98",
+            "name": "ALLOCATION"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "316",
+        "name": "NON PARTICIPATION ACCOUNT",
+        "accounts": [
+          {
+            "code": "316 01",
+            "name": "NON-OP:GIFTS"
+          },
+          {
+            "code": "316 02",
+            "name": "NON-OP:TRIBUTE REELS"
+          },
+          {
+            "code": "316 03",
+            "name": "NON-OP:TRADE ADS"
+          },
+          {
+            "code": "316 04",
+            "name": "NON-OP:CREATIVE 5555"
+          },
+          {
+            "code": "316 05",
+            "name": "NON-OP:CREATIVE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "330",
+        "name": "CO-OP ADVERTISING",
+        "accounts": [
+          {
+            "code": "330 16",
+            "name": "THEAT SHARE BILLED BY BRANCH"
+          },
+          {
+            "code": "330 18",
+            "name": "THEAT SHARE COLL BY AGENCY"
+          },
+          {
+            "code": "330 26",
+            "name": "THEAT SHARE (DIR PMT-CODE 6)"
+          },
+          {
+            "code": "330 28",
+            "name": "THEAT SHARE (DEDUCTION CODE 8)"
+          },
+          {
+            "code": "330 30",
+            "name": "PROMOTIONAL TRACKING SYSTEM"
+          },
+          {
+            "code": "330 33",
+            "name": "THEATRE SHARE (FORMULA)"
+          },
+          {
+            "code": "330 40",
+            "name": "THEATRE SHARE (DEDUCT DIRECT)"
+          },
+          {
+            "code": "330 60",
+            "name": "CO-OP PINPOINT CLEARING ACCT."
+          },
+          {
+            "code": "330 61",
+            "name": "CO-OP ADVERTISING"
+          },
+          {
+            "code": "330 62",
+            "name": "PINPOINT SERVICE FEE"
+          },
+          {
+            "code": "330 63",
+            "name": "TERRITORY DEVELOPMENT FUND(TDF)"
+          },
+          {
+            "code": "330 64",
+            "name": "CONSUMER DEVELOPMENT FUND(CDF)"
+          },
+          {
+            "code": "330 65",
+            "name": "DISTRIBUTOR MARKETING FUND"
+          },
+          {
+            "code": "330 66",
+            "name": "DISTRIBUTOR MARKETING FUND-ABC"
+          },
+          {
+            "code": "330 67",
+            "name": "DISTRIBUTOR MARKETING FUND-INT"
+          },
+          {
+            "code": "330 68",
+            "name": "MRKTNG COSTS-BLOCKBUSTER SHARE"
+          },
+          {
+            "code": "330 96",
+            "name": "FRINGES-PAYROLL"
+          },
+          {
+            "code": "330 97",
+            "name": "ACTUAL MARKETING COST-BLOCKBUSTER"
+          },
+          {
+            "code": "330 98",
+            "name": "STATION RELATIONS ALLOCATION"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "360",
+        "name": "EXHIBITOR SERVICES",
+        "accounts": [
+          {
+            "code": "360 04",
+            "name": "FULFILLMENT"
+          },
+          {
+            "code": "360 05",
+            "name": "REIMB BY EXHIBITOR"
+          },
+          {
+            "code": "360 06",
+            "name": "EXH SERVICES"
+          },
+          {
+            "code": "360 07",
+            "name": "TRAILER CHECKS"
+          },
+          {
+            "code": "360 08",
+            "name": "POPCORN BAGS"
+          },
+          {
+            "code": "360 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "360 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "364",
+        "name": "AWARDS ADVERTISEMENTS",
+        "accounts": [
+          {
+            "code": "364 01",
+            "name": "CREATIVE PRINT"
+          },
+          {
+            "code": "364 02",
+            "name": "PRINT PRODUCTION"
+          },
+          {
+            "code": "364 03",
+            "name": "CREATIVE A/V"
+          },
+          {
+            "code": "364 04",
+            "name": "SPECIAL PUBLICIST"
+          },
+          {
+            "code": "364 05",
+            "name": "STILLS"
+          },
+          {
+            "code": "364 06",
+            "name": "MUSIC"
+          },
+          {
+            "code": "364 07",
+            "name": "TRADE AD SPACE"
+          },
+          {
+            "code": "364 08",
+            "name": "SCREENINGS"
+          },
+          {
+            "code": "364 09",
+            "name": "SCREENING SCHEDULE-MAILING"
+          },
+          {
+            "code": "364 10",
+            "name": "OUTSIDE PUBLICIST"
+          },
+          {
+            "code": "364 11",
+            "name": "OUTSIDE PUBLICIST-OUT OF POCKET EXP."
+          },
+          {
+            "code": "364 12",
+            "name": "IN-HOUSE CONSULTANT"
+          },
+          {
+            "code": "364 13",
+            "name": "IN-HOUSE CONSULTANT - OUT OF POCKET EXP."
+          },
+          {
+            "code": "364 14",
+            "name": "WALLING"
+          },
+          {
+            "code": "364 15",
+            "name": "CASSETTE DUPLICATION"
+          },
+          {
+            "code": "364 16",
+            "name": "CASSETTE MAILING/SHIPPING"
+          },
+          {
+            "code": "364 17",
+            "name": "HFPA GIFT"
+          },
+          {
+            "code": "364 18",
+            "name": "HFPA SHIPPING"
+          },
+          {
+            "code": "364 19",
+            "name": "VOP PARTY"
+          },
+          {
+            "code": "364 20",
+            "name": "AIRFARE"
+          },
+          {
+            "code": "364 21",
+            "name": "CAR SERVICE"
+          },
+          {
+            "code": "364 22",
+            "name": "HOTEL"
+          },
+          {
+            "code": "364 23",
+            "name": "PER DIEM"
+          },
+          {
+            "code": "364 24",
+            "name": "HAIR/MAKE-UP"
+          },
+          {
+            "code": "364 25",
+            "name": "ADVERTISING-CREATIVE"
+          },
+          {
+            "code": "364 26",
+            "name": "ADVERTISING-MEDIA-LA TIMES"
+          },
+          {
+            "code": "364 27",
+            "name": "ADVERTISING-MEDIA-NY TIMES"
+          },
+          {
+            "code": "364 28",
+            "name": "ADVERTISING-MEDIA-TRADE ADS"
+          },
+          {
+            "code": "364 29",
+            "name": "RELEASE PRINTS FOR ACADEMY SCREENINGS"
+          },
+          {
+            "code": "364 30",
+            "name": "GUILD MAILING FEES"
+          },
+          {
+            "code": "364 31",
+            "name": "AWARDS SUBMISSION FEES"
+          },
+          {
+            "code": "364 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "364 51",
+            "name": "MAILINGS"
+          },
+          {
+            "code": "364 90",
+            "name": "T&E"
+          },
+          {
+            "code": "364 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "364 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "366",
+        "name": "INDUSTRY TRADE ADS",
+        "accounts": [
+          {
+            "code": "366 01",
+            "name": "CREATION"
+          },
+          {
+            "code": "366 02",
+            "name": "MECHANICALS"
+          },
+          {
+            "code": "366 03",
+            "name": "PREPARATIONS"
+          },
+          {
+            "code": "366 04",
+            "name": "PRINT PRODUCTION"
+          },
+          {
+            "code": "366 05",
+            "name": "SPACE"
+          },
+          {
+            "code": "366 06",
+            "name": "ADVITORIAL"
+          },
+          {
+            "code": "366 07",
+            "name": "PHV REIMBURSED MAILER PAGES"
+          },
+          {
+            "code": "366 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "368",
+        "name": "SALES MEETINGS",
+        "accounts": [
+          {
+            "code": "368 84",
+            "name": "PLANNING/CONSULTANT"
+          },
+          {
+            "code": "368 85",
+            "name": "MEETING"
+          },
+          {
+            "code": "368 86",
+            "name": "GIFTS"
+          },
+          {
+            "code": "368 87",
+            "name": "INTERNAL PHV MEETINGS"
+          },
+          {
+            "code": "368 88",
+            "name": "REGIONAL SALES MEETINGS"
+          },
+          {
+            "code": "368 89",
+            "name": "DISTRIBUTOR SALES MEETINGS"
+          },
+          {
+            "code": "368 90",
+            "name": "ENTERTAINMENT"
+          },
+          {
+            "code": "368 91",
+            "name": "HOTEL CHARGES"
+          },
+          {
+            "code": "368 92",
+            "name": "TRANSPORTATION"
+          },
+          {
+            "code": "368 93",
+            "name": "MEALS & DRINKS"
+          },
+          {
+            "code": "368 95",
+            "name": "MISCELLANEOUS"
+          },
+          {
+            "code": "368 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "370",
+        "name": "TRADE SHOWS/CONVENTIONS",
+        "accounts": [
+          {
+            "code": "370 02",
+            "name": "PRODUCT REEL"
+          },
+          {
+            "code": "370 03",
+            "name": "POP MATERIAL"
+          },
+          {
+            "code": "370 04",
+            "name": "STILLS"
+          },
+          {
+            "code": "370 05",
+            "name": "PARTY:MISC"
+          },
+          {
+            "code": "370 72",
+            "name": "FOV MISC"
+          },
+          {
+            "code": "370 73",
+            "name": "VSDA MISC"
+          },
+          {
+            "code": "370 74",
+            "name": "AWARDS"
+          },
+          {
+            "code": "370 75",
+            "name": "PARTY:PLANNING"
+          },
+          {
+            "code": "370 76",
+            "name": "PARTY:FOOD & DRINK"
+          },
+          {
+            "code": "370 77",
+            "name": "PARTY:ENTERTAINMENT"
+          },
+          {
+            "code": "370 84",
+            "name": "REGISTRATION FEES"
+          },
+          {
+            "code": "370 85",
+            "name": "BOOTH:PLANNING"
+          },
+          {
+            "code": "370 86",
+            "name": "BOOTH:INSTALLAION"
+          },
+          {
+            "code": "370 87",
+            "name": "BOOTH EVENTS/PROMOS/GIFTS"
+          },
+          {
+            "code": "370 88",
+            "name": "SPECIAL PRESENTATION:NONBOOTH"
+          },
+          {
+            "code": "370 89",
+            "name": "MOVIE PRESENT:BOOTH/NONBOOTH"
+          },
+          {
+            "code": "370 91",
+            "name": "HOTEL CHARGES"
+          },
+          {
+            "code": "370 92",
+            "name": "TRANSPORTATION"
+          },
+          {
+            "code": "370 93",
+            "name": "MEALS & DRINKS"
+          },
+          {
+            "code": "370 95",
+            "name": "MISCELLANEOUS"
+          },
+          {
+            "code": "370 96",
+            "name": "FRINGES-PAYROLL"
+          },
+          {
+            "code": "370 98",
+            "name": "ALLOCATIONS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "380",
+        "name": "OTHER MARKETING",
+        "accounts": [
+          {
+            "code": "380 02",
+            "name": "THEATER SALES DRIVE"
+          },
+          {
+            "code": "380 50",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "380 51",
+            "name": "ACCRUAL UIP ADVERTISING"
+          },
+          {
+            "code": "380 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "380 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "399",
+        "name": "MRKTNG-RSRVD FOR FIN RPTG",
+        "accounts": [
+          {
+            "code": "399 01",
+            "name": "ALLOCAT TO PPD ADVERTISING"
+          },
+          {
+            "code": "399 02",
+            "name": "ALLOCAT FROM PPD ADVERTISING"
+          },
+          {
+            "code": "399 05",
+            "name": "ALLOCAT UIP ADVERTISING COSTS"
+          },
+          {
+            "code": "399 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total post"
+      },
+      {
+        "kind": "category",
+        "code": "500",
+        "name": "70 MM COLOR NEGATIVES",
+        "accounts": [
+          {
+            "code": "500 01",
+            "name": "65MM COLOR NEGATIVES"
+          },
+          {
+            "code": "500 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "501",
+        "name": "70 MM COLOR PRINTS",
+        "accounts": [
+          {
+            "code": "501 01",
+            "name": "ANSWER CHECK PRINT"
+          },
+          {
+            "code": "501 02",
+            "name": "STRIPING"
+          },
+          {
+            "code": "501 10",
+            "name": "RELEASE PRINTS"
+          },
+          {
+            "code": "501 11",
+            "name": "REPLACEMENT PRINTS"
+          },
+          {
+            "code": "501 12",
+            "name": "REJUVENATIONS"
+          },
+          {
+            "code": "501 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "502",
+        "name": "35 MM COLOR NEGATIVES",
+        "accounts": [
+          {
+            "code": "502 01",
+            "name": "INTERNEGATIVE FROM YCM"
+          },
+          {
+            "code": "502 02",
+            "name": "INTERNEGATIVE"
+          },
+          {
+            "code": "502 03",
+            "name": "INTERNEG FROM YCM VISTA VISION"
+          },
+          {
+            "code": "502 04",
+            "name": "INTERPOSITIVE FROM YCM"
+          },
+          {
+            "code": "502 05",
+            "name": "INTERPOSITIVE"
+          },
+          {
+            "code": "502 06",
+            "name": "INTERPOS FROM YCM VISTA VISION"
+          },
+          {
+            "code": "502 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "504",
+        "name": "35 MM COLOR PRINTS",
+        "accounts": [
+          {
+            "code": "504 01",
+            "name": "ANSWER PRINT"
+          },
+          {
+            "code": "504 02",
+            "name": "WORK PRINT"
+          },
+          {
+            "code": "504 03",
+            "name": "LO CONTRAST PRINT"
+          },
+          {
+            "code": "504 04",
+            "name": "35MM PRINT FROM VISTA VISION"
+          },
+          {
+            "code": "504 10",
+            "name": "RELEASE PRINT"
+          },
+          {
+            "code": "504 11",
+            "name": "REPLACEMENT PRINTS"
+          },
+          {
+            "code": "504 12",
+            "name": "REJUVENATIONS"
+          },
+          {
+            "code": "504 13",
+            "name": "USED PRINT SALES"
+          },
+          {
+            "code": "504 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "506",
+        "name": "35 MM B&W NEGATIVES",
+        "accounts": [
+          {
+            "code": "506 01",
+            "name": "YCM"
+          },
+          {
+            "code": "506 02",
+            "name": "DUPLICATE NEGATIVE"
+          },
+          {
+            "code": "506 03",
+            "name": "DUPLICATE NEG-VISTA VISION"
+          },
+          {
+            "code": "506 04",
+            "name": "FINE GRAIN"
+          },
+          {
+            "code": "506 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "508",
+        "name": "35 MM B&W PRINTS",
+        "accounts": [
+          {
+            "code": "508 01",
+            "name": "WORK PRINT"
+          },
+          {
+            "code": "508 10",
+            "name": "RELEASE PRINTS"
+          },
+          {
+            "code": "508 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "510",
+        "name": "16 MM COLOR PRINTS",
+        "accounts": [
+          {
+            "code": "510 01",
+            "name": "INTERNEGATIVE"
+          },
+          {
+            "code": "510 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "511",
+        "name": "16 MM COLOR NEGATIVES",
+        "accounts": [
+          {
+            "code": "511 01",
+            "name": "FIRST TRIAL PRINTS"
+          },
+          {
+            "code": "511 10",
+            "name": "RELEASE PRINTS"
+          },
+          {
+            "code": "511 11",
+            "name": "REPLACEMENT PRINTS"
+          },
+          {
+            "code": "511 12",
+            "name": "REJUVENATIONS"
+          },
+          {
+            "code": "511 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "512",
+        "name": "16 MM B&W NEGATIVES",
+        "accounts": [
+          {
+            "code": "512 01",
+            "name": "INTERNEGATIVES"
+          },
+          {
+            "code": "512 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "513",
+        "name": "16 MM B&W PRINTS",
+        "accounts": [
+          {
+            "code": "513 01",
+            "name": "PRINTS"
+          },
+          {
+            "code": "513 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "515",
+        "name": "FILM WORK-OTHER",
+        "accounts": [
+          {
+            "code": "515 01",
+            "name": "REELS AND CASES"
+          },
+          {
+            "code": "515 02",
+            "name": "OTHER LAB COSTS"
+          },
+          {
+            "code": "515 03",
+            "name": "PRINT PROOFING"
+          },
+          {
+            "code": "515 04",
+            "name": "FILM PRINT TREATMENT"
+          },
+          {
+            "code": "515 05",
+            "name": "LAB DISCOUNTS/REBATES"
+          },
+          {
+            "code": "515 95",
+            "name": "MISC FILM WORK"
+          },
+          {
+            "code": "515 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "519",
+        "name": "SUBTITLES",
+        "accounts": [
+          {
+            "code": "519 01",
+            "name": "SPANISH"
+          },
+          {
+            "code": "519 02",
+            "name": "PORTUGUESE"
+          },
+          {
+            "code": "519 03",
+            "name": "FRENCH"
+          },
+          {
+            "code": "519 04",
+            "name": "ENGLISH"
+          },
+          {
+            "code": "519 95",
+            "name": "OTHER LANGUAGES"
+          },
+          {
+            "code": "519 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "520",
+        "name": "FILM TO TAPE TRANSFERS",
+        "accounts": [
+          {
+            "code": "520 01",
+            "name": "NEW SUPERVISED RELEASES D1\""
+          },
+          {
+            "code": "520 02",
+            "name": "FULL CORRECTION TO PAL 1\""
+          },
+          {
+            "code": "520 03",
+            "name": "ON THE FLY TO 1\""
+          },
+          {
+            "code": "520 04",
+            "name": "FILM TO TAPE D1 525"
+          },
+          {
+            "code": "520 05",
+            "name": "FILM TO TAPE D1 625"
+          },
+          {
+            "code": "520 06",
+            "name": "FILM TO TAPE LETTERBOX D1-525"
+          },
+          {
+            "code": "520 07",
+            "name": "FILM TO TAPE LETTERBOX D1-625"
+          },
+          {
+            "code": "520 08",
+            "name": "16MM TRANSFERS"
+          },
+          {
+            "code": "520 95",
+            "name": "GENERAL"
+          },
+          {
+            "code": "520 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "522",
+        "name": "TAPE TO TAPE DUPLICAT-REG",
+        "accounts": [
+          {
+            "code": "522 01",
+            "name": "2\" NTSC SYNDICATION DUB & STOCK"
+          },
+          {
+            "code": "522 02",
+            "name": "D1/D2 1\" NTSC DUB & STOCK"
+          },
+          {
+            "code": "522 03",
+            "name": "1\" NTSC TO D2 DUB & STOCK"
+          },
+          {
+            "code": "522 04",
+            "name": "D1 TO 1\" NTSC"
+          },
+          {
+            "code": "522 05",
+            "name": "D1 525 TO D1 525"
+          },
+          {
+            "code": "522 06",
+            "name": "D1 625 TO D1 625"
+          },
+          {
+            "code": "522 07",
+            "name": "D1 TO D2"
+          },
+          {
+            "code": "522 08",
+            "name": "1\"PAL \"B\" DUB & STOCK"
+          },
+          {
+            "code": "522 09",
+            "name": "1\"PAL \"C\" DUB & STOCK"
+          },
+          {
+            "code": "522 10",
+            "name": "D2 TO D2 DUB & STOCK"
+          },
+          {
+            "code": "522 11",
+            "name": "D1-625 TO 1\" PAL \"C\""
+          },
+          {
+            "code": "522 12",
+            "name": "D-2 TO 1\" NTSC"
+          },
+          {
+            "code": "522 13",
+            "name": "D-2 TO 1\" PAL \"C\""
+          },
+          {
+            "code": "522 14",
+            "name": "1\" PAL \"M\" DUB & STOCK"
+          },
+          {
+            "code": "522 15",
+            "name": "1\" NTSC DUB ON RECYCLED STOCK"
+          },
+          {
+            "code": "522 16",
+            "name": "1\" NTSC SYNDICATION DUBS"
+          },
+          {
+            "code": "522 17",
+            "name": "1\" NTSC SATELLITE MASTERS"
+          },
+          {
+            "code": "522 18",
+            "name": "FREIGHT MASTERS"
+          },
+          {
+            "code": "522 19",
+            "name": "SYND DUBS VARIOUS FORMATS"
+          },
+          {
+            "code": "522 20",
+            "name": "D1 AND DIGITAL"
+          },
+          {
+            "code": "522 21",
+            "name": "D1 AND ANALOG"
+          },
+          {
+            "code": "522 22",
+            "name": "OTHER DIGITAL TO OTHER DIGITAL"
+          },
+          {
+            "code": "522 23",
+            "name": "OTHER DIGITAL AND ANALOG"
+          },
+          {
+            "code": "522 24",
+            "name": "ANALOG AND ANALOG"
+          },
+          {
+            "code": "522 25",
+            "name": "AUTHORING/COMPRESSION"
+          },
+          {
+            "code": "522 95",
+            "name": "GENERAL"
+          },
+          {
+            "code": "522 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "524",
+        "name": "TAPE TO TAPE DUPLICAT-3/4",
+        "accounts": [
+          {
+            "code": "524 01",
+            "name": "3/4\"NTSC DUBS"
+          },
+          {
+            "code": "524 02",
+            "name": "D1 TO 3/4\"NTSC"
+          },
+          {
+            "code": "524 03",
+            "name": "D2 TO 3/4\"NTSC"
+          },
+          {
+            "code": "524 04",
+            "name": "3/4\" PAL DUBS"
+          },
+          {
+            "code": "524 05",
+            "name": "3/4\" SYNDICATION DUBS"
+          },
+          {
+            "code": "524 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "526",
+        "name": "TAPE TO TAPE DUP-BETA,VIDEO8 & VHS",
+        "accounts": [
+          {
+            "code": "526 01",
+            "name": "BETA"
+          },
+          {
+            "code": "526 02",
+            "name": "VIDEO 8"
+          },
+          {
+            "code": "526 03",
+            "name": "VHS"
+          },
+          {
+            "code": "526 04",
+            "name": "D1 TO VHS"
+          },
+          {
+            "code": "526 05",
+            "name": "D2 TO VHS"
+          },
+          {
+            "code": "526 06",
+            "name": "D-1 625 TO PAL VHS"
+          },
+          {
+            "code": "526 07",
+            "name": "SUPER VHS/BETACAM"
+          },
+          {
+            "code": "526 08",
+            "name": "DVD CHK DISC"
+          },
+          {
+            "code": "526 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "528",
+        "name": "VIDEO TAPE-EDITING",
+        "accounts": [
+          {
+            "code": "528 01",
+            "name": "TAPE EDITING"
+          },
+          {
+            "code": "528 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "529",
+        "name": "VIDEO TAPE-OTHER",
+        "accounts": [
+          {
+            "code": "529 01",
+            "name": "CLOSED CAPTION"
+          },
+          {
+            "code": "529 02",
+            "name": "STANDARDS CONVERSION"
+          },
+          {
+            "code": "529 03",
+            "name": "QUALITY CONTROL"
+          },
+          {
+            "code": "529 04",
+            "name": "RANK VIEWING OF FILM"
+          },
+          {
+            "code": "529 05",
+            "name": "COMMERCIAL INTEGRATION"
+          },
+          {
+            "code": "529 06",
+            "name": "TAPE STOCK"
+          },
+          {
+            "code": "529 07",
+            "name": "\"1\" \"LAYBACK & SYNC\""
+          },
+          {
+            "code": "529 08",
+            "name": "PLAYBACK FEEDING SATELLITE"
+          },
+          {
+            "code": "529 09",
+            "name": "SPOT REEL"
+          },
+          {
+            "code": "529 10",
+            "name": "COMMERCIAL POD RECORD"
+          },
+          {
+            "code": "529 11",
+            "name": "SCREENING CASSETTES"
+          },
+          {
+            "code": "529 12",
+            "name": "BILLBOARDS"
+          },
+          {
+            "code": "529 13",
+            "name": "PROTECTION MASTER"
+          },
+          {
+            "code": "529 14",
+            "name": "AIR MASTER"
+          },
+          {
+            "code": "529 15",
+            "name": "PROMO INTEGRATION"
+          },
+          {
+            "code": "529 95",
+            "name": "GENERAL"
+          },
+          {
+            "code": "529 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "530",
+        "name": "70 MM AUDIO",
+        "accounts": [
+          {
+            "code": "530 01",
+            "name": "M&E TRACKS"
+          },
+          {
+            "code": "530 02",
+            "name": "OPTICAL TRACKS"
+          },
+          {
+            "code": "530 03",
+            "name": "MAG TRACKS"
+          },
+          {
+            "code": "530 04",
+            "name": "DUBBING"
+          },
+          {
+            "code": "530 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "532",
+        "name": "35 MM AUDIO",
+        "accounts": [
+          {
+            "code": "532 01",
+            "name": "M&E TRACKS"
+          },
+          {
+            "code": "532 02",
+            "name": "OPTICAL TRACKS"
+          },
+          {
+            "code": "532 03",
+            "name": "MAG TRACKS"
+          },
+          {
+            "code": "532 04",
+            "name": "DUBBING"
+          },
+          {
+            "code": "532 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "534",
+        "name": "16 MM AUDIO",
+        "accounts": [
+          {
+            "code": "534 01",
+            "name": "M&E TRACKS"
+          },
+          {
+            "code": "534 02",
+            "name": "OPTICAL TRACKS"
+          },
+          {
+            "code": "534 03",
+            "name": "MAG TRACKS"
+          },
+          {
+            "code": "534 04",
+            "name": "DUBBING"
+          },
+          {
+            "code": "534 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "536",
+        "name": "ADR, ADR",
+        "accounts": [
+          {
+            "code": "536 01",
+            "name": "AUDIO"
+          },
+          {
+            "code": "536 02",
+            "name": "AUDIO"
+          },
+          {
+            "code": "536 03",
+            "name": "OTHER"
+          },
+          {
+            "code": "536 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "538",
+        "name": "SIMULCAST",
+        "accounts": [
+          {
+            "code": "538 01",
+            "name": "SPANISH"
+          },
+          {
+            "code": "538 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "539",
+        "name": "AUDIO-OTHER",
+        "accounts": [
+          {
+            "code": "539 01",
+            "name": "STEREO SYNTHESIS"
+          },
+          {
+            "code": "539 02",
+            "name": "\"1/2\" \"AUDIO TAPE\""
+          },
+          {
+            "code": "539 03",
+            "name": "\"1/4\" \"AUDIO TAPE\""
+          },
+          {
+            "code": "539 04",
+            "name": "OFF-LINE EDIT SYSTEMS RENT"
+          },
+          {
+            "code": "539 05",
+            "name": "24 TRACKS"
+          },
+          {
+            "code": "539 06",
+            "name": "DEVELOP ONLY OPTICAL TRACKS"
+          },
+          {
+            "code": "539 07",
+            "name": "MAG TO CASSETTE-OFF-LINE REF."
+          },
+          {
+            "code": "539 08",
+            "name": "\"1/4\" \"EDITING\""
+          },
+          {
+            "code": "539 95",
+            "name": "GENERAL"
+          },
+          {
+            "code": "539 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "540",
+        "name": "DUPLICATION COST OF SALES",
+        "accounts": [
+          {
+            "code": "540 01",
+            "name": "DUPLICATION COST OF SALES"
+          },
+          {
+            "code": "540 02",
+            "name": "ANTI PIRACY PROTECTION"
+          },
+          {
+            "code": "540 03",
+            "name": "COS UNREALIZED A/P"
+          },
+          {
+            "code": "540 04",
+            "name": "COS REALIZED A/P"
+          },
+          {
+            "code": "540 05",
+            "name": "COS REVALUATION OF INVENTORY"
+          },
+          {
+            "code": "540 50",
+            "name": "CIC COSTS"
+          },
+          {
+            "code": "540 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "541",
+        "name": "PRODUCT PACKAGING",
+        "accounts": [
+          {
+            "code": "541 01",
+            "name": "ART WORK FOR SLEEVE"
+          },
+          {
+            "code": "541 02",
+            "name": "ART WORK FOR STICKERS/INSERTS"
+          },
+          {
+            "code": "541 03",
+            "name": "SLEEVE PRODUCTIONS"
+          },
+          {
+            "code": "541 04",
+            "name": "PRODUCT DISPLAYS/TRAYS"
+          },
+          {
+            "code": "541 05",
+            "name": "PACK CHARGES-STICKERS APPS & BETA"
+          },
+          {
+            "code": "541 06",
+            "name": "SECURITY STICKERS"
+          },
+          {
+            "code": "541 07",
+            "name": "PREPACK CHARGES"
+          },
+          {
+            "code": "541 08",
+            "name": "STICKERS"
+          },
+          {
+            "code": "541 09",
+            "name": "BOOKLET/INSERT LABOR"
+          },
+          {
+            "code": "541 10",
+            "name": "BAR CODE LABELS"
+          },
+          {
+            "code": "541 11",
+            "name": "VALUE ADDED PACKAGES-BILLABLE"
+          },
+          {
+            "code": "541 12",
+            "name": "VALUE ADDED PKGS-NOT BILLABLE"
+          },
+          {
+            "code": "541 13",
+            "name": "MERCHANDISER FEES"
+          },
+          {
+            "code": "541 14",
+            "name": "VAS PACKAGING-BILLABLE ACCRUAL"
+          },
+          {
+            "code": "541 15",
+            "name": "VAS PACKAGING-NONBILL ACCRUAL"
+          },
+          {
+            "code": "541 16",
+            "name": "VAS PACKAGING-SRVC MERCH ACCRL"
+          },
+          {
+            "code": "541 17",
+            "name": "VAS DISCOUNT DEFECTIVE RETURNS"
+          },
+          {
+            "code": "541 18",
+            "name": "MACROVISION CHARGES"
+          },
+          {
+            "code": "541 19",
+            "name": "VALUE ADDED MGMT FEES"
+          },
+          {
+            "code": "541 20",
+            "name": "AMARY CASE PROD"
+          },
+          {
+            "code": "541 21",
+            "name": "DVD JACKET/INSERTS"
+          },
+          {
+            "code": "541 22",
+            "name": "ARTWORK FOR MENUS DVD"
+          },
+          {
+            "code": "541 50",
+            "name": "FREIGHT-SLEEVES"
+          },
+          {
+            "code": "541 95",
+            "name": "GENERAL"
+          },
+          {
+            "code": "541 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "542",
+        "name": "SATELLITE CHARGES",
+        "accounts": [
+          {
+            "code": "542 01",
+            "name": "OUTBOUND DISTRIBUTION"
+          },
+          {
+            "code": "542 02",
+            "name": "BACKHAUL"
+          },
+          {
+            "code": "542 03",
+            "name": "UPLINK"
+          },
+          {
+            "code": "542 04",
+            "name": "TRANSPONDER"
+          },
+          {
+            "code": "542 05",
+            "name": "TRANSPONDER BUFFER"
+          },
+          {
+            "code": "542 06",
+            "name": "TRANSPONDER-HAWAII"
+          },
+          {
+            "code": "542 07",
+            "name": "GENERIC SHOW FEEDS"
+          },
+          {
+            "code": "542 08",
+            "name": "SATELLITE MASTER DUB"
+          },
+          {
+            "code": "542 09",
+            "name": "SATELLITE PLAYBACK"
+          },
+          {
+            "code": "542 10",
+            "name": "SATELLITE RE-FEEDS"
+          },
+          {
+            "code": "542 11",
+            "name": "TELCO LOOP (KCOP)"
+          },
+          {
+            "code": "542 12",
+            "name": "TRANSPONDER & UPLINK"
+          },
+          {
+            "code": "542 13",
+            "name": "PLAYBACK & UPLINK"
+          },
+          {
+            "code": "542 14",
+            "name": "FIBER & UPLINK"
+          },
+          {
+            "code": "542 15",
+            "name": "PROMOTION FEEDS"
+          },
+          {
+            "code": "542 16",
+            "name": "FIBER"
+          },
+          {
+            "code": "542 95",
+            "name": "GENERAL"
+          },
+          {
+            "code": "542 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "543",
+        "name": "PRINT/CASSETTE SHIP&HAND",
+        "accounts": [
+          {
+            "code": "543 50",
+            "name": "SHIP PRINTS FROM LAB TO DEPOT"
+          },
+          {
+            "code": "543 51",
+            "name": "NATIONAL FILM SERVICE SHIPPING"
+          },
+          {
+            "code": "543 53",
+            "name": "FREIGHT CLAIMS"
+          },
+          {
+            "code": "543 54",
+            "name": "FREIGHT INS & HANDLING"
+          },
+          {
+            "code": "543 59",
+            "name": "ALL OTHER FREIGHT"
+          },
+          {
+            "code": "543 96",
+            "name": "FRINGES-PAYROLL"
+          },
+          {
+            "code": "543 98",
+            "name": "ALLOCATED FREIGHT"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "544",
+        "name": "DISTRIBUTION CHARGES",
+        "accounts": [
+          {
+            "code": "544 01",
+            "name": "MONTHLY DISTRIBUTION FEE"
+          },
+          {
+            "code": "544 02",
+            "name": "BOX LOT/LOOSE PICK (MSTRCARTN)"
+          },
+          {
+            "code": "544 03",
+            "name": "BOX LOT/LOOSE PICK ACCRUAL"
+          },
+          {
+            "code": "544 04",
+            "name": "LOGISTICS CHARGES"
+          },
+          {
+            "code": "544 05",
+            "name": "ALLOCATION UIP PRINT COSTS"
+          },
+          {
+            "code": "544 95",
+            "name": "GENERAL"
+          },
+          {
+            "code": "544 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "545",
+        "name": "ASSET PROTECTION",
+        "accounts": [
+          {
+            "code": "545 01",
+            "name": "PACKING/MATERIALS"
+          },
+          {
+            "code": "545 02",
+            "name": "CLEANING/LABELING"
+          },
+          {
+            "code": "545 03",
+            "name": "EVALUATION/INSPECTION"
+          },
+          {
+            "code": "545 04",
+            "name": "MINOR REPAIRS"
+          },
+          {
+            "code": "545 06",
+            "name": "MINE HANDLING CHARGES"
+          },
+          {
+            "code": "545 96",
+            "name": "FRINGES-PAYROLL"
+          },
+          {
+            "code": "545 98",
+            "name": "ALLOCATIONS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "546",
+        "name": "FOREIGN DUTIES & LICENSES",
+        "accounts": [
+          {
+            "code": "546 01",
+            "name": "DUTIES & IMPORT FEES"
+          },
+          {
+            "code": "546 02",
+            "name": "CENSORSHIP"
+          },
+          {
+            "code": "546 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "547",
+        "name": "RETURNS PROCESSING",
+        "accounts": [
+          {
+            "code": "547 01",
+            "name": "REWORK"
+          },
+          {
+            "code": "547 02",
+            "name": "RETURNS PROCESSING FEES"
+          },
+          {
+            "code": "547 03",
+            "name": "DEGAUSSING"
+          },
+          {
+            "code": "547 04",
+            "name": "RETURNS TESTING FEES"
+          },
+          {
+            "code": "547 05",
+            "name": "DEFECTIVE RETURNS"
+          },
+          {
+            "code": "547 95",
+            "name": "GENERAL"
+          },
+          {
+            "code": "547 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "548",
+        "name": "FEES AND RECOVERIES",
+        "accounts": [
+          {
+            "code": "548 01",
+            "name": "BLACK & WHITE BOOKING FEES"
+          },
+          {
+            "code": "548 02",
+            "name": "COLOR BOOKING FEES"
+          },
+          {
+            "code": "548 03",
+            "name": "RESALES TO THIRD PARTIES"
+          },
+          {
+            "code": "548 04",
+            "name": "FILM AND TAPE JUNKING"
+          },
+          {
+            "code": "548 05",
+            "name": "CUSTOMER REBILLINGS"
+          },
+          {
+            "code": "548 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "549",
+        "name": "GENERAL DISTRIB COSTS-O",
+        "accounts": [
+          {
+            "code": "549 01",
+            "name": "FAX/NAPTENET/TWX"
+          },
+          {
+            "code": "549 02",
+            "name": "CANADIAN REVIEW BOARD FEES"
+          },
+          {
+            "code": "549 03",
+            "name": "BONDED SYNDICATION FEES"
+          },
+          {
+            "code": "549 04",
+            "name": "MAIN AND END TITLES TEXT LIST"
+          },
+          {
+            "code": "549 05",
+            "name": "CONTINUITY SCRIPTS"
+          },
+          {
+            "code": "549 06",
+            "name": "MUSIC CUE SHEETS"
+          },
+          {
+            "code": "549 07",
+            "name": "FORMAT SHEETS"
+          },
+          {
+            "code": "549 08",
+            "name": "VAULT LABOR & FRINGE"
+          },
+          {
+            "code": "549 09",
+            "name": "TELEMARKETING SERVICE REFEEDS"
+          },
+          {
+            "code": "549 95",
+            "name": "GENERAL"
+          },
+          {
+            "code": "549 96",
+            "name": "FRINGES-PAYROLL"
+          },
+          {
+            "code": "549 98",
+            "name": "ALLOCATED PRINTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "560",
+        "name": "WRITERS RESIDUALS",
+        "accounts": [
+          {
+            "code": "560 01",
+            "name": "WRITERS GUILD OF AM-WRITERS"
+          },
+          {
+            "code": "560 02",
+            "name": "WRITERS GUILD OF AM-ROYALTIES"
+          },
+          {
+            "code": "560 10",
+            "name": "BRITISH WRITERS GUILD"
+          },
+          {
+            "code": "560 11",
+            "name": "AUSTRALIAN WRITERS GUILD"
+          },
+          {
+            "code": "560 12",
+            "name": "A.C.T.R.A."
+          },
+          {
+            "code": "560 95",
+            "name": "ACCOUNTING/HANDLING FEES"
+          },
+          {
+            "code": "560 96",
+            "name": "FRINGES-PAYROLL"
+          },
+          {
+            "code": "560 97",
+            "name": "FRINGES-PENSION H&W"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "561",
+        "name": "DIRECTORS RESIDUALS",
+        "accounts": [
+          {
+            "code": "561 01",
+            "name": "DIR GUILD OF AMER-DIRECTOR"
+          },
+          {
+            "code": "561 02",
+            "name": "DIR GUILD OF AMER-U.P.M."
+          },
+          {
+            "code": "561 03",
+            "name": "DIR GUILD OF AMER-FIRST A.D."
+          },
+          {
+            "code": "561 04",
+            "name": "DIR GUILD OF AMER-2ND A.D."
+          },
+          {
+            "code": "561 10",
+            "name": "BRITISH DIRECTORS GUILD"
+          },
+          {
+            "code": "561 11",
+            "name": "AUSTRALIAN DIRECTORS GUILD"
+          },
+          {
+            "code": "561 12",
+            "name": "DIRECTORS GUILD OF CANADA"
+          },
+          {
+            "code": "561 95",
+            "name": "ACCOUNTING/HANDLING FEES"
+          },
+          {
+            "code": "561 96",
+            "name": "FRINGES-PAYROLL"
+          },
+          {
+            "code": "561 97",
+            "name": "FRINGES-PENSION H&W"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "562",
+        "name": "ACTORS RESIDUALS",
+        "accounts": [
+          {
+            "code": "562 01",
+            "name": "SCREEN ACTORS GUILD"
+          },
+          {
+            "code": "562 02",
+            "name": "A.F.T.R.A."
+          },
+          {
+            "code": "562 10",
+            "name": "BRITISH ACTORS EQUITY"
+          },
+          {
+            "code": "562 11",
+            "name": "AUSTRALIAN ACTORS EQUITY"
+          },
+          {
+            "code": "562 12",
+            "name": "A.C.T.R.A."
+          },
+          {
+            "code": "562 95",
+            "name": "ACCOUNTING/HANDLING FEES"
+          },
+          {
+            "code": "562 96",
+            "name": "FRINGES-PAYROLL"
+          },
+          {
+            "code": "562 97",
+            "name": "FRINGES-PENSION H&W"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "563",
+        "name": "MUSICIANS RESIDUALS",
+        "accounts": [
+          {
+            "code": "563 01",
+            "name": "AMERICAN FEDER OF MUSICIANS"
+          },
+          {
+            "code": "563 10",
+            "name": "BRITISH MUSICIANS GUILD"
+          },
+          {
+            "code": "563 95",
+            "name": "ACCOUNTING/HANDLING FEES"
+          },
+          {
+            "code": "563 96",
+            "name": "FRINGES-PAYROLL"
+          },
+          {
+            "code": "563 97",
+            "name": "FRINGES-PENSION H&W"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "564",
+        "name": "I.A.T.S.E. RESIDUALS",
+        "accounts": [
+          {
+            "code": "564 01",
+            "name": "CONTRIBUTIONS"
+          },
+          {
+            "code": "564 95",
+            "name": "ACCOUNTING/HANDLING FEES"
+          },
+          {
+            "code": "564 96",
+            "name": "FRINGES-PAYROLL"
+          },
+          {
+            "code": "564 97",
+            "name": "FRINGES-PENSION H&W"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "565",
+        "name": "RESIDUALS REIMBURSEMENTS",
+        "accounts": [
+          {
+            "code": "565 95",
+            "name": "ACCOUNTING/HANDLING FEES"
+          },
+          {
+            "code": "565 96",
+            "name": "FRINGES-PAYROLL"
+          },
+          {
+            "code": "565 97",
+            "name": "FRINGES-PENSION H&W"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "567",
+        "name": "INDUSTRY DUES",
+        "accounts": [
+          {
+            "code": "567 01",
+            "name": "DUES MPAA"
+          },
+          {
+            "code": "567 02",
+            "name": "DUES MPEAA"
+          },
+          {
+            "code": "567 03",
+            "name": "DUES CMPDA"
+          },
+          {
+            "code": "567 04",
+            "name": "DUES AMPTP"
+          },
+          {
+            "code": "567 05",
+            "name": "FOREIGN LOCAL ASSOC DUES"
+          },
+          {
+            "code": "567 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "568",
+        "name": "ASSESSMENTS:ANTI-PIRACY",
+        "accounts": [
+          {
+            "code": "568 01",
+            "name": "MPAA/MPEAA ANTI-PIR ASSESSMENT"
+          },
+          {
+            "code": "568 02",
+            "name": "MPAA/MPEAA ANTI-PIR RECOVERIES"
+          },
+          {
+            "code": "568 03",
+            "name": "SARGOY STEIN ANTI-PIRACY"
+          },
+          {
+            "code": "568 04",
+            "name": "SARGOY STEIN ANTI-PIR RECOVERIES"
+          },
+          {
+            "code": "568 05",
+            "name": "ROSE & BRUTOCAO ANTI-PIRACY"
+          },
+          {
+            "code": "568 06",
+            "name": "ROSE & BRUTOCAO ANTI-PIR RECOVERIES"
+          },
+          {
+            "code": "568 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "569",
+        "name": "ASSESSMENTS:ANTI-TRUST",
+        "accounts": [
+          {
+            "code": "569 01",
+            "name": "MPAA ANTI-TRUST ASSESSMENTS"
+          },
+          {
+            "code": "569 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "570",
+        "name": "ASSESSMENTS:SPEC.LEGISLAT",
+        "accounts": [
+          {
+            "code": "570 01",
+            "name": "MPAA SPEC LEGISLATION ASSESSMENTS"
+          },
+          {
+            "code": "570 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "571",
+        "name": "INDUSTRIAL DUES & ASSESS. ALL",
+        "accounts": [
+          {
+            "code": "571 01",
+            "name": "DUES ALLOCATIONS"
+          },
+          {
+            "code": "571 02",
+            "name": "ASSESSMENTS ALLOCATION"
+          },
+          {
+            "code": "571 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "573",
+        "name": "SUBDISTRIBUTOR FEES",
+        "accounts": [
+          {
+            "code": "573 01",
+            "name": "SUBDISTRIBUTOR FEE"
+          },
+          {
+            "code": "573 02",
+            "name": "SUBDISTRIBUT FEE-COLLEGES"
+          },
+          {
+            "code": "573 03",
+            "name": "SUBDISTRIBUT FEE-OTHER INSTITUTES"
+          },
+          {
+            "code": "573 04",
+            "name": "SUBDISTRIBUT FEE-CLOSED CLASSROOM"
+          },
+          {
+            "code": "573 05",
+            "name": "SUBDISTRIBUT FEE-NON-OP"
+          },
+          {
+            "code": "573 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "574",
+        "name": "SALES COMMISSIONS",
+        "accounts": [
+          {
+            "code": "574 01",
+            "name": "SALES COMMISSIONS"
+          },
+          {
+            "code": "574 02",
+            "name": "SALES COMMISSIONS-ADN"
+          },
+          {
+            "code": "574 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "575",
+        "name": "SALES COMMISSIONS OFFSET",
+        "accounts": [
+          {
+            "code": "575 10",
+            "name": "SALES COMMISSIONS OFFSET"
+          },
+          {
+            "code": "575 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "576",
+        "name": "CHECKING COSTS",
+        "accounts": [
+          {
+            "code": "576 01",
+            "name": "CHECKING COSTS-DIRECT"
+          },
+          {
+            "code": "576 02",
+            "name": "CHECKING COSTS-INDIRECT"
+          },
+          {
+            "code": "576 03",
+            "name": "ALLOCATION OF CHECKING COSTS"
+          },
+          {
+            "code": "576 04",
+            "name": "CHECKING COSTS-GROSS TRACKING"
+          },
+          {
+            "code": "576 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "578",
+        "name": "LEGAL FEES",
+        "accounts": [
+          {
+            "code": "578 01",
+            "name": "LEGAL FEES"
+          },
+          {
+            "code": "578 02",
+            "name": "LEGAL FEES-COORD ACTIONS"
+          },
+          {
+            "code": "578 03",
+            "name": "LEGAL SETTLEMENTS"
+          },
+          {
+            "code": "578 05",
+            "name": "O.P. LITIGATION EXPENSES"
+          },
+          {
+            "code": "578 06",
+            "name": "LEGAL FEES-MPAA INDUST LAWSUITS"
+          },
+          {
+            "code": "578 07",
+            "name": "MPAA GENERAL INDUSTRY MATTERS"
+          },
+          {
+            "code": "578 08",
+            "name": "THEATRE UNDERREPORTING"
+          },
+          {
+            "code": "578 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "579",
+        "name": "LEGAL FEES NON-OP",
+        "accounts": [
+          {
+            "code": "579 01",
+            "name": "LEGAL FEES"
+          },
+          {
+            "code": "579 02",
+            "name": "LEGAL FEES-COORD ACTIONS"
+          },
+          {
+            "code": "579 03",
+            "name": "LEGAL SETTLEMENTS"
+          },
+          {
+            "code": "579 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "580",
+        "name": "COPYRIGHTS & ROYALTIES",
+        "accounts": [
+          {
+            "code": "580 01",
+            "name": "COPYRIGHT FEES"
+          },
+          {
+            "code": "580 02",
+            "name": "TITLE SEARCH"
+          },
+          {
+            "code": "580 03",
+            "name": "TITLE REGISTRATION"
+          },
+          {
+            "code": "580 04",
+            "name": "MUSIC CLEARANCE"
+          },
+          {
+            "code": "580 05",
+            "name": "TRADEMARK"
+          },
+          {
+            "code": "580 06",
+            "name": "CLIP CLEARANCE"
+          },
+          {
+            "code": "580 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "582",
+        "name": "TAXES",
+        "accounts": [
+          {
+            "code": "582 01",
+            "name": "REMITTANCE"
+          },
+          {
+            "code": "582 02",
+            "name": "TURNOVER"
+          },
+          {
+            "code": "582 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "583",
+        "name": "TAXES OFFSETS",
+        "accounts": [
+          {
+            "code": "583 01",
+            "name": "REMITTANCE"
+          },
+          {
+            "code": "583 02",
+            "name": "TURNOVER"
+          },
+          {
+            "code": "583 03",
+            "name": "VAT"
+          },
+          {
+            "code": "583 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "584",
+        "name": "TAXES-THEATER PRINTS",
+        "accounts": [
+          {
+            "code": "584 01",
+            "name": "CONN THEA PRINTS"
+          },
+          {
+            "code": "584 02",
+            "name": "IL STATE THEA PRINTS"
+          },
+          {
+            "code": "584 03",
+            "name": "COLORADO THEA PRINTS"
+          },
+          {
+            "code": "584 04",
+            "name": "FLORIDA THEA PRINTS"
+          },
+          {
+            "code": "584 05",
+            "name": "GEORGIA THEA PRINTS"
+          },
+          {
+            "code": "584 06",
+            "name": "CHICAGO THEA PRINTS"
+          },
+          {
+            "code": "584 07",
+            "name": "IOWA THEA PRINTS"
+          },
+          {
+            "code": "584 08",
+            "name": "LOUISIANA THEA PRINTS"
+          },
+          {
+            "code": "584 09",
+            "name": "N CAROLINA THEA PRINTS"
+          },
+          {
+            "code": "584 10",
+            "name": "OHIO THEA PRINTS"
+          },
+          {
+            "code": "584 11",
+            "name": "PA. THEA PRINTS"
+          },
+          {
+            "code": "584 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "586",
+        "name": "MATERIAL STORAGE CHARGES",
+        "accounts": [
+          {
+            "code": "586 01",
+            "name": "RENTAL"
+          },
+          {
+            "code": "586 02",
+            "name": "STORAGE FEES"
+          },
+          {
+            "code": "586 03",
+            "name": "EXCESS INVENTORY CHARGES"
+          },
+          {
+            "code": "586 04",
+            "name": "EXCESS PACK CHARGES (SLEEVES)"
+          },
+          {
+            "code": "586 95",
+            "name": "GENERAL"
+          },
+          {
+            "code": "586 96",
+            "name": "FRINGES-PAYROLL"
+          },
+          {
+            "code": "586 98",
+            "name": "ALLOCATIONS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "588",
+        "name": "LATE PRODUCTION CHARGES",
+        "accounts": [
+          {
+            "code": "588 01",
+            "name": "LATE PROD CHARGES LATE PYMT"
+          },
+          {
+            "code": "588 02",
+            "name": "PRODUCTION CHARGES"
+          },
+          {
+            "code": "588 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "590",
+        "name": "EXHIBITOR COSTS",
+        "accounts": [
+          {
+            "code": "590 01",
+            "name": "EXHIBITOR SCREENINGS EXHIBITOR"
+          },
+          {
+            "code": "590 02",
+            "name": "PROMOTIONS"
+          },
+          {
+            "code": "590 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "591",
+        "name": "MISCELLANEOUS EXPENSES",
+        "accounts": [
+          {
+            "code": "591 01",
+            "name": "ART GRAPHIC DESIGN"
+          },
+          {
+            "code": "591 02",
+            "name": "ART OTHER ART"
+          },
+          {
+            "code": "591 10",
+            "name": "CODING PROGRAMMING"
+          },
+          {
+            "code": "591 11",
+            "name": "FORMAT CONVERSION"
+          },
+          {
+            "code": "591 20",
+            "name": "WRITERS-FREELANCE"
+          },
+          {
+            "code": "591 21",
+            "name": "TALENT-FREELANCE"
+          },
+          {
+            "code": "591 22",
+            "name": "PHOTOGRAPHY-FREELANCE"
+          },
+          {
+            "code": "591 23",
+            "name": "MOBILE UNIT/CAMERA-FREELANCE"
+          },
+          {
+            "code": "591 24",
+            "name": "OTHER PRODUCTION-FREELANCE"
+          },
+          {
+            "code": "591 25",
+            "name": "WRITER PRODUCTION"
+          },
+          {
+            "code": "591 26",
+            "name": "PRODUCER PRODUCTION"
+          },
+          {
+            "code": "591 27",
+            "name": "ASSISTANT/INTERNS PRODUCTION"
+          },
+          {
+            "code": "591 28",
+            "name": "MISC PRODUCTION"
+          },
+          {
+            "code": "591 30",
+            "name": "GAME LICENSES"
+          },
+          {
+            "code": "591 31",
+            "name": "CLEARANCE-CLIP FEES"
+          },
+          {
+            "code": "591 32",
+            "name": "CLEARANCE-STOCK PHOTOS"
+          },
+          {
+            "code": "591 33",
+            "name": "CLEARANCE-OTHER"
+          },
+          {
+            "code": "591 40",
+            "name": "PRODUCTION STAFF-WRITER"
+          },
+          {
+            "code": "591 41",
+            "name": "PROD STAFF-PRODUCTION ASST."
+          },
+          {
+            "code": "591 42",
+            "name": "PROD STAFF-PRODUCTION COORD."
+          },
+          {
+            "code": "591 43",
+            "name": "PROD STAFF-WEB SITE PROGRAMMER"
+          },
+          {
+            "code": "591 44",
+            "name": "PROD STAFF-PRODUCER"
+          },
+          {
+            "code": "591 45",
+            "name": "PROD STAFF-ART DIRECTOR"
+          },
+          {
+            "code": "591 49",
+            "name": "PROD STAFF-MISCELLANEOUS"
+          },
+          {
+            "code": "591 50",
+            "name": "AIRFARE"
+          },
+          {
+            "code": "591 51",
+            "name": "HOTEL"
+          },
+          {
+            "code": "591 52",
+            "name": "PRODUCTION MEALS"
+          },
+          {
+            "code": "591 53",
+            "name": "ENTERTAINMENT"
+          },
+          {
+            "code": "591 54",
+            "name": "MISC TRAVEL"
+          },
+          {
+            "code": "591 55",
+            "name": "PARKING/MILEAGE"
+          },
+          {
+            "code": "591 56",
+            "name": "TAXIS/RENTAL CAR"
+          },
+          {
+            "code": "591 57",
+            "name": "SET COSTS"
+          },
+          {
+            "code": "591 60",
+            "name": "XEROX"
+          },
+          {
+            "code": "591 61",
+            "name": "TELEPHONE/FAX"
+          },
+          {
+            "code": "591 62",
+            "name": "MESSENGER/SHIPPING"
+          },
+          {
+            "code": "591 63",
+            "name": "PERIODICALS/SUBSCRIPTIONS"
+          },
+          {
+            "code": "591 64",
+            "name": "OTHER ADMINISTRATIVE"
+          },
+          {
+            "code": "591 65",
+            "name": "SUPPLIES/PRESENTATION MATERIAL"
+          },
+          {
+            "code": "591 66",
+            "name": "INTERNET ACCESS"
+          },
+          {
+            "code": "591 67",
+            "name": "PRODUCTION RENTALS"
+          },
+          {
+            "code": "591 68",
+            "name": "HEALTH/DENTAL BENEFITS"
+          },
+          {
+            "code": "591 70",
+            "name": "TAPE STOCK"
+          },
+          {
+            "code": "591 71",
+            "name": "EDITING COSTS"
+          },
+          {
+            "code": "591 72",
+            "name": "SOUND"
+          },
+          {
+            "code": "591 80",
+            "name": "INFORMATION SERVICES"
+          },
+          {
+            "code": "591 85",
+            "name": "TRAINING COSTS"
+          },
+          {
+            "code": "591 86",
+            "name": "FURNITURE/EQUIPMENT"
+          },
+          {
+            "code": "591 87",
+            "name": "COMPUTER SOFTWARE PURCHASE"
+          },
+          {
+            "code": "591 88",
+            "name": "COMPUTER HARDWARE PURCHASE"
+          },
+          {
+            "code": "591 89",
+            "name": "MISCELLANEOUS CAPITAL"
+          },
+          {
+            "code": "591 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "598",
+        "name": "GENERAL EXPENSES",
+        "accounts": [
+          {
+            "code": "598 01",
+            "name": "ACCOUNTING FEES"
+          },
+          {
+            "code": "598 02",
+            "name": "AUDIT FEES"
+          },
+          {
+            "code": "598 03",
+            "name": "BANK FEE"
+          },
+          {
+            "code": "598 10",
+            "name": "PROJECTION"
+          },
+          {
+            "code": "598 11",
+            "name": "FOUR WALL HOUSE EXPENSES"
+          },
+          {
+            "code": "598 12",
+            "name": "SECURITY"
+          },
+          {
+            "code": "598 13",
+            "name": "THEATER ALIGNMENT"
+          },
+          {
+            "code": "598 14",
+            "name": "EDI GROSSES"
+          },
+          {
+            "code": "598 15",
+            "name": "PERMIT/LICENSE TAX"
+          },
+          {
+            "code": "598 16",
+            "name": "MPAA CERTIFICATE/AMPTP ETC"
+          },
+          {
+            "code": "598 95",
+            "name": "OTHER"
+          },
+          {
+            "code": "598 96",
+            "name": "FRINGES-PAYROLL"
+          },
+          {
+            "code": "598 98",
+            "name": "ALLOCATED OTHER DISTRIBUTION"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "599",
+        "name": "GENERAL EXPENSES-NON OP",
+        "accounts": [
+          {
+            "code": "599 01",
+            "name": "FINANCIAL ALLOCAT NOT CHARGED TO"
+          },
+          {
+            "code": "599 02",
+            "name": "PARTICIPANTS ALLOCAT-FINANCE"
+          },
+          {
+            "code": "599 03",
+            "name": "ALLOCAT-ADVERTISING PROMOTIONS"
+          },
+          {
+            "code": "599 04",
+            "name": "ALLOCAT-PROGRAMMING"
+          },
+          {
+            "code": "599 05",
+            "name": "ALLOCAT-BUSINESS AFFAIRS"
+          },
+          {
+            "code": "599 06",
+            "name": "ALLOCAT-LEGAL AFFAIRS ALLOC"
+          },
+          {
+            "code": "599 07",
+            "name": "GENERAL"
+          },
+          {
+            "code": "599 96",
+            "name": "FRINGES-PAYROLL"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total other"
+      }
+    ]
+  }
+}

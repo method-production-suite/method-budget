@@ -583,6 +583,8 @@ mod tests {
             // The Library tab (its reviews run its own commands, never
             // importsetup.js's import_setup).
             include_str!("../ui/js/library.js"),
+            // Its Packs section (setup packs, src/packs.rs).
+            include_str!("../ui/js/packs.js"),
         ];
         let mut named = std::collections::BTreeSet::new();
         for js in panel_js {

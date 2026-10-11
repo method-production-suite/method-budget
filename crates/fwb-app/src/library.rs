@@ -69,14 +69,14 @@ fn library_kind(w: What) -> bool {
 // Reading and writing the library file
 
 /// What a tab is called, for messages.
-fn tab_name(docs: &Docs, id: DocId) -> String {
+pub(crate) fn tab_name(docs: &Docs, id: DocId) -> String {
     docs.get(id)
         .map(|s| s.tab_label())
         .unwrap_or_else(|| "it".into())
 }
 
 /// The message for a change refused because the library is open as a tab.
-fn in_tab_refusal(name: &str) -> String {
+pub(crate) fn in_tab_refusal(name: &str) -> String {
     format!(
         "Your library is open as the budget tab \u{201c}{name}\u{201d}. Make the change there, or close that tab and try again."
     )
@@ -338,7 +338,7 @@ fn copied_message(c: &Imported, saving: bool) -> String {
 }
 
 /// Refuses picks of the budget settings (Rust checks what the page sends).
-fn check_picks(picks: &[ItemRef]) -> Result<(), String> {
+pub(crate) fn check_picks(picks: &[ItemRef]) -> Result<(), String> {
     for p in picks {
         if !library_kind(What::parse(&p.kind)?) {
             return Err(format!(
@@ -471,7 +471,7 @@ impl Library {
     }
 
     /// Keeps the library as a review saw it; returns the review's token.
-    fn keep(&self, lib: Budget) -> u64 {
+    pub(crate) fn keep(&self, lib: Budget) -> u64 {
         let mut g = self.lock();
         g.token += 1;
         let t = g.token;
@@ -480,7 +480,7 @@ impl Library {
     }
 
     /// The library as review `token` saw it.
-    fn reviewed(&self, token: u64) -> Result<Arc<Budget>, String> {
+    pub(crate) fn reviewed(&self, token: u64) -> Result<Arc<Budget>, String> {
         let g = self.lock();
         g.reviewed
             .as_ref()
@@ -490,11 +490,11 @@ impl Library {
     }
 
     /// Forgets the review (the library was just written).
-    fn changed(&self) {
+    pub(crate) fn changed(&self) {
         self.lock().reviewed = None;
     }
 
-    fn required(&self) -> Result<PathBuf, String> {
+    pub(crate) fn required(&self) -> Result<PathBuf, String> {
         self.path().ok_or_else(|| NO_LIBRARY.to_string())
     }
 }

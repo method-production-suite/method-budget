@@ -1,0 +1,109 @@
+Number,Name
+,ABOVE THE LINE
+10,Story and research
+10-01,Researchers
+10-02,Story consultants
+10-03,Rights and releases
+11,Writing
+11-01,Writer
+11-02,Narration script
+12,Producers
+12-01,Executive producers
+12-02,Producers
+12-03,Associate producers
+12-04,Producers' expenses
+13,Director
+13-01,Director
+13-02,Director's expenses
+14,Talent and participants
+14-01,Host
+14-02,Narrator
+14-03,Participant expenses
+,PRODUCTION
+20,Production staff
+20-01,Line producer
+20-02,Production manager
+20-03,Production coordinator
+20-04,Field producers
+20-05,Production assistants
+20-06,Fixers and local producers
+21,Camera
+21-01,Director of photography
+21-02,Camera operators
+21-03,Camera assistants
+21-04,Camera package
+21-05,Aerial and specialty camera
+22,Sound
+22-01,Sound recordist
+22-02,Sound package
+23,Lighting and grip
+23-01,Gaffer and grip
+23-02,Lighting and grip package
+24,Locations and permits
+24-01,Site fees
+24-02,Filming permits
+24-03,Location expenses
+25,Travel and living
+25-01,Airfare
+25-02,Hotels
+25-03,Per diems
+25-04,Ground transportation
+25-05,Visas
+26,Shipping and carnets
+26-01,Freight
+26-02,Carnets and customs
+27,Media and data
+27-01,Drives and media
+27-02,Data management
+27-03,Backup and storage
+28,Re-creations
+28-01,Re-creation cast
+28-02,Art and props
+28-03,Wardrobe and makeup
+,POST PRODUCTION
+40,Editorial
+40-01,Editor
+40-02,Assistant editor
+40-03,Edit system
+40-04,Post production supervisor
+41,Archival and stock footage
+41-01,Archival research
+41-02,Footage licensing
+41-03,Stills licensing
+42,Music
+42-01,Composer
+42-02,Music licensing
+43,Post sound
+43-01,Sound editing
+43-02,Narration recording
+43-03,Mix
+44,Graphics and animation
+44-01,Graphics
+44-02,Animation
+44-03,Titles
+45,Picture finishing
+45-01,Color grading
+45-02,Online and conform
+46,Transcription and translation
+46-01,Transcription
+46-02,Translation
+46-03,Subtitles and captions
+47,Deliverables
+47-01,Masters
+47-02,Deliverables
+,OTHER
+50,Insurance
+50-01,Production insurance
+50-02,Errors and omissions
+51,Legal and clearances
+51-01,Production legal
+51-02,Clearance review
+52,Outreach and festivals
+52-01,Festival fees
+52-02,Outreach and impact
+52-03,Marketing materials
+53,General expenses
+53-01,Office expenses
+53-02,Bank and fiscal sponsor fees
+54,Contingency
+54-01,Contingency

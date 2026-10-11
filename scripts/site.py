@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """Regenerate the feature list in README.md and site/index.html from docs/features.toml,
-and the website's "What's new" box from the newest file in docs/releases/.
+the website's "What's new" box from the newest file in docs/releases/, and the site's
+release notes page from all of them.
 
     python3 scripts/site.py           rewrite the generated blocks in place
     python3 scripts/site.py --check   change nothing; exit 1 if a block is out of date
     python3 scripts/site.py --list    print the features, one per line, for a quick look
+    python3 scripts/site.py --files   print the files this script writes, one per line
 
 Generated blocks sit between marker comments, and only the text between them is touched:
 
-    README.md        <!-- features:start ... -->  ...  <!-- features:end -->
-    site/index.html  <!-- features:start ... -->  ...  <!-- features:end -->
-    site/index.html  <!-- whatsnew:start ... -->  ...  <!-- whatsnew:end -->
-    README.md        <!-- clone:start ... -->     ...  <!-- clone:end -->
+    README.md                <!-- features:start ... -->  ...  <!-- features:end -->
+    README.md                <!-- clone:start ... -->     ...  <!-- clone:end -->
+    site/index.html          <!-- features:start ... -->  ...  <!-- features:end -->
+    site/index.html          <!-- whatsnew:start ... -->  ...  <!-- whatsnew:end -->
+    site/releases/index.html <!-- releases:start ... -->  ...  <!-- releases:end -->
 
 It also points every site link written as <a href="..." data-repo="docs/X.md"> at the
 repository named by [project] repo in docs/features.toml (data-repo="" is the repository
@@ -51,6 +54,8 @@ DECISIONS = ROOT / "docs" / "decisions.md"
 RELEASES = ROOT / "docs" / "releases"
 README = ROOT / "README.md"
 SITE = ROOT / "site" / "index.html"
+RELEASES_PAGE = ROOT / "site" / "releases" / "index.html"
+GENERATED = (README, SITE, RELEASES_PAGE)
 
 STATUSES = ("have", "soon")
 EM_DASH = "\u2014"
@@ -189,21 +194,64 @@ def decision_numbers() -> set[int] | None:
     return {int(n) for n in re.findall(r"^## (\d+)\.", text, flags=re.M)}
 
 
-def latest_release() -> tuple[str, Path] | None:
-    """The newest docs/releases/<version>.md by version number (a prerelease sorts
-    before its release). Other files there (templates, readmes) are ignored."""
+def all_releases() -> list[tuple[str, Path]]:
+    """Every docs/releases/<version>.md, newest first by version number (a prerelease
+    sorts before its release). Other files there (templates, readmes) are ignored."""
     if not RELEASES.is_dir():
-        return None
-    best = None
+        return []
+    found = []
     for p in RELEASES.iterdir():
         m = VERSION_FILE.match(p.name)
         if not m or not p.is_file():
             continue
         major, minor, patch, pre = m.groups()
         key = (int(major), int(minor), int(patch), pre is None, pre or "")
-        if best is None or key > best[0]:
-            best = (key, p.name[:-3], p)
-    return None if best is None else (best[1], best[2])
+        found.append((key, p.name[:-3], p))
+    found.sort(reverse=True)
+    return [(version, p) for _, version, p in found]
+
+
+def latest_release() -> tuple[str, Path] | None:
+    """The newest release note, or None when there is none yet."""
+    found = all_releases()
+    return found[0] if found else None
+
+
+def release_blocks(path: Path) -> tuple[str, list[tuple[str, object]]]:
+    """A release note in the shape docs/release-notes-template.md fixes: the `# `
+    title, then paragraphs, `## ` sections and bullets (a bullet's indented lines
+    continue it). HTML comments are dropped. Returns the title and a list of
+    ("p", text), ("h", text) and ("ul", [text, ...]) blocks."""
+    text = re.sub(r"<!--.*?-->", "", path.read_text(encoding="utf-8"), flags=re.S)
+    if EM_DASH in text:
+        raise Invalid(f"{rel(path)} has an em dash")
+    title, blocks, paragraph = "", [], []
+
+    def flush():
+        if paragraph:
+            blocks.append(("p", " ".join(paragraph)))
+            paragraph.clear()
+
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("# ") and not title:
+            title = line[2:].strip()
+        elif line.startswith("#"):
+            flush()
+            blocks.append(("h", line.lstrip("#").strip()))
+        elif line.startswith(("- ", "* ")):
+            flush()
+            if not blocks or blocks[-1][0] != "ul":
+                blocks.append(("ul", []))
+            blocks[-1][1].append(line[2:].strip())
+        elif not line:
+            flush()
+        elif blocks and blocks[-1][0] == "ul" and raw.startswith((" ", "\t")) and not paragraph:
+            blocks[-1][1][-1] += " " + line
+        else:
+            paragraph.append(line)
+    flush()
+    return title, blocks
 
 
 def parse_release(path: Path) -> tuple[str, str, list[str]]:
@@ -331,6 +379,35 @@ def site_whatsnew_block() -> list[str]:
     return lines
 
 
+def version_id(version: str) -> str:
+    return "v" + re.sub(r"[^0-9A-Za-z]+", "-", version)
+
+
+def site_releases_block() -> list[str]:
+    found = all_releases()
+    if not found:
+        return ['<p>No release yet. Until the first one, Method Budget builds from source.</p>']
+    lines = []
+    for version, path in found:
+        title, blocks = release_blocks(path)
+        vid = version_id(version)
+        lines.append(f'<article class="release" id="{vid}" aria-labelledby="{vid}-t">')
+        lines.append(
+            f'  <h2 id="{vid}-t">{html_inline(title or "Method Budget " + version)}</h2>'
+        )
+        for kind, body in blocks:
+            if kind == "p":
+                lines.append(f"  <p>{html_inline(body, rich=True)}</p>")
+            elif kind == "h":
+                lines.append(f"  <h3>{html_inline(body, rich=True)}</h3>")
+            else:
+                lines.append("  <ul>")
+                lines += [f"    <li>{html_inline(b, rich=True)}</li>" for b in body]
+                lines.append("  </ul>")
+        lines.append("</article>")
+    return lines
+
+
 # ----------------------------------------------------------------------------- splice
 
 
@@ -378,7 +455,7 @@ def expected_files() -> dict[Path, str]:
     project, groups, features = load_features()
     repo = project["repo"]
     out = {}
-    for path in (README, SITE):
+    for path in GENERATED:
         try:
             out[path] = path.read_text(encoding="utf-8")
         except FileNotFoundError:
@@ -396,6 +473,11 @@ def expected_files() -> dict[Path, str]:
     )
     out[SITE] = splice(
         out[SITE], "whatsnew", site_whatsnew_block(), "the newest docs/releases/*.md", SITE
+    )
+    out[RELEASES_PAGE] = repo_links(out[RELEASES_PAGE], repo, RELEASES_PAGE)
+    out[RELEASES_PAGE] = splice(
+        out[RELEASES_PAGE], "releases", site_releases_block(), "docs/releases/*.md",
+        RELEASES_PAGE,
     )
     return out
 
@@ -419,8 +501,13 @@ def main(argv: list[str]) -> int:
     mode = ap.add_mutually_exclusive_group()
     mode.add_argument("--check", action="store_true", help="exit 1 if anything is out of date")
     mode.add_argument("--list", action="store_true", help="print the features and exit")
+    mode.add_argument("--files", action="store_true", help="print the generated files and exit")
     args = ap.parse_args(argv)
 
+    if args.files:
+        for p in GENERATED:
+            print(rel(p))
+        return 0
     try:
         if args.list:
             _, groups, features = load_features()
@@ -445,7 +532,7 @@ def main(argv: list[str]) -> int:
                 " (docs/WEBSITE.md)\n"
             )
             return 1
-        print("site.py: README.md and site/index.html are up to date")
+        print("site.py: " + ", ".join(rel(p) for p in GENERATED) + " are up to date")
         return 0
     for p in stale:
         p.write_text(files[p], encoding="utf-8")

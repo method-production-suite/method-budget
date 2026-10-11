@@ -1,0 +1,142 @@
+/* Setup packs (js/packs.js) and setup lists in spreadsheets
+   (js/setuplists.js). The dialogs reuse Import Setup's review (.imp-* in
+   importsetup.css), the dialogs' inputs (.modal-field, .modal-input in
+   styles.css), the report setup's checkboxes (.rs-check) and the column
+   mapping grid (.si-* in sheetimport.css); the Packs section in the Library
+   tab reuses the library and apply classes. Uses only the app's :root
+   tokens; every class of its own is prefixed with pk-. */
+
+.pk-scroll {
+  max-height: 34vh;
+  min-height: 72px;
+}
+
+/* The dialog fits below the backdrop's top padding (14vh, styles.css), and
+   the details shrink and scroll before its buttons leave the window. */
+.modal.pk-dialog {
+  max-height: calc(86vh - 24px);
+}
+
+/* The details shrink and scroll before the dialog's buttons leave the
+   window. */
+.pk-dialog .pk-form {
+  flex: 0 1 auto;
+  min-height: 72px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.pk-folder {
+  margin: 4px 0 0 18px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.safety-list.pk-in-folder {
+  margin-left: 18px;
+}
+
+.pk-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+}
+
+.pk-wide {
+  grid-column: 1 / -1;
+}
+
+.pk-text {
+  resize: vertical;
+  min-height: 2.6em;
+}
+
+.pk-about {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.pk-about-title {
+  font-weight: 600;
+}
+
+.pk-about-line,
+.pk-about-link {
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.imp-source {
+  font-style: italic;
+}
+
+.pk-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.pk-section-title {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.pk-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+}
+
+.pk-item-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pk-kinds {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px 12px;
+}
+
+.pk-formats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.pk-sheet-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.pk-problems:empty {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .pk-form,
+  .pk-kinds {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.pk-sheet-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}

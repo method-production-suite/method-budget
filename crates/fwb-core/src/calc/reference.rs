@@ -334,6 +334,51 @@ mod tests {
         }
     }
 
+    /// Numbers on rounding edges, under every posting mode and filter: the
+    /// optimized engine matches the old one to the cent, and the review's
+    /// case (0.5 x 0.009999999) totals 0.00.
+    #[test]
+    fn rounding_edges_match_the_old_engine() {
+        for seed in 1..=8u64 {
+            let mut b = sample::budget(&SampleSpec {
+                seed,
+                rows: 250 + (seed as usize) * 41,
+                accounts: 9 + seed as usize,
+                fringes: 8,
+                groups: 4,
+                ..SampleSpec::default()
+            });
+            sample::fine_decimals(&mut b, seed);
+            b.fringe_posting = match seed % 4 {
+                0 => FringePosting::Budget,
+                1 => FringePosting::ProductionLevel,
+                2 => FringePosting::Account,
+                _ => FringePosting::Category {
+                    suffix: "99".into(),
+                },
+            };
+            let groups: Vec<String> = b.groups.keys().cloned().collect();
+            same(&b, &RecalcOptions::default(), &format!("seed {seed}"));
+            let exclude = RecalcOptions {
+                exclude_groups: groups.iter().take(1).cloned().collect(),
+                only_groups: None,
+            };
+            same(&b, &exclude, &format!("seed {seed} exclude"));
+        }
+
+        let mut b = sample::budget(&SampleSpec {
+            rows: 10,
+            accounts: 1,
+            categories: 1,
+            ..SampleSpec::default()
+        });
+        let d = &mut all_details(&mut b)[0];
+        **d = Detail::line(d.id, "edge", "0.5", "Allow", "0.009999999");
+        let r = recalc(&b, &RecalcOptions::default()).unwrap();
+        let row = &r.categories[0].accounts[0].rows[0];
+        assert_eq!((row.local_total, row.total), (0, 0));
+    }
+
     /// The shortcut for plain numbers and bare globals agrees with parsing
     /// and evaluating, and leaves everything else to the parser.
     #[test]

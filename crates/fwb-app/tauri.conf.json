@@ -37,6 +37,9 @@
     "longDescription": "An open-source, clean-room film and TV budgeting app. Budgets are plain .mthd files on your disk.",
     "license": "MIT OR Apache-2.0",
     "homepage": "https://methodbudget.com",
+    "resources": {
+      "../../packs/": "packs/"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

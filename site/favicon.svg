@@ -1,14 +1,5 @@
-<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-  <!-- Method Budget mark: three budget rows over a double total rule (the sum that
-       adds up). Original artwork for this project. -->
-  <style>
-    .tile{fill:#1A1F2B}.row{fill:#FAF8F4}.dim{fill:#FAF8F4;opacity:.62}.sum{fill:#6FD0A6}
-    @media (prefers-color-scheme: dark){.tile{fill:#ECEEF2}.row{fill:#1A1F2B}.dim{fill:#1A1F2B;opacity:.62}.sum{fill:#1D6A50}}
-  </style>
-  <rect class="tile" width="64" height="64" rx="14"/>
-  <rect class="row" x="14" y="14" width="36" height="6" rx="3"/>
-  <rect class="dim" x="14" y="25" width="26" height="6" rx="3"/>
-  <rect class="dim" x="14" y="36" width="31" height="6" rx="3"/>
-  <rect class="sum" x="14" y="46.5" width="36" height="2.5" rx="1.25"/>
-  <rect class="sum" x="14" y="51.5" width="36" height="2.5" rx="1.25"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+<!-- Method Budget favicon. Drawn by scripts/make-brand.py; edit that, not this file. -->
+<style>path{fill:#0E7468}@media (prefers-color-scheme:dark){path{fill:#2CC7B2}}</style>
+<path fill-rule="evenodd" d="M3 1H10V4.5a.5.5 0 0 0 .5.5H14V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1ZM6 7h6v2H6ZM4 10.5h8v1H4ZM4 12.5h8v1H4Z"/><path opacity=".5" d="M11 1.6L13.4 4H11.5a.5.5 0 0 1-.5-.5Z"/>
 </svg>

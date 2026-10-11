@@ -472,6 +472,82 @@ pub fn budget(spec: &SampleSpec) -> Budget {
     b
 }
 
+/// Rewrites the numbers of `b` (from [`budget`]) with up to nine decimal
+/// places, many of them on a rounding edge: products a hair under, at or over
+/// half a cent, such as 0.5 x 0.009999999. Lines, fringe rates, unit hours,
+/// currency rates and credits all change; the shape of the budget does not.
+/// For tests that money is rounded to cents once, and the same way everywhere.
+pub fn fine_decimals(b: &mut Budget, seed: u64) {
+    const AMOUNTS: [&str; 8] = [
+        "0.5",
+        "1.5",
+        "2.5",
+        "0.333333333",
+        "3",
+        "0.000000001",
+        "12.75",
+        "0.999999999",
+    ];
+    const RATES: [&str; 9] = [
+        "0.009999999",
+        "0.010000001",
+        "0.01",
+        "0.019999999",
+        "19.999999999",
+        "1234.567890123",
+        "0.003333333",
+        "99.990000001",
+        "0.005",
+    ];
+    let mut rng = Rng::new(seed);
+    for c in b.categories_mut() {
+        for a in &mut c.accounts {
+            for d in &mut a.details {
+                if d.kind == crate::model::RowKind::Line {
+                    if rng.chance(70) {
+                        d.amount = (*rng.pick(&AMOUNTS)).into();
+                    }
+                    if rng.chance(30) {
+                        d.x = (*rng.pick(&AMOUNTS)).into();
+                    }
+                    if rng.chance(70) {
+                        d.rate = (*rng.pick(&RATES)).into();
+                    }
+                }
+            }
+        }
+    }
+    for f in b.fringes.values_mut() {
+        f.rate = match f.kind {
+            FringeKind::Percent { .. } => *rng.pick(&["18.123456789", "0.05", "7.649999999"]),
+            FringeKind::Flat { .. } => *rng.pick(&["0.009999999", "12.345678901", "0.015"]),
+        }
+        .into();
+    }
+    for u in b.units.values_mut() {
+        if u.hours.is_some() {
+            u.hours = Some(*rng.pick(&[
+                Dec::from_int(7),
+                Dec::from_int(12),
+                "10.333333333".parse().unwrap_or(Dec::ONE),
+            ]));
+        }
+    }
+    for cur in b.currencies.values_mut() {
+        cur.rate = (*rng.pick(&["0.733333333", "1.000000005", "0.499999999"]))
+            .parse()
+            .unwrap_or(Dec::ONE);
+    }
+    for cr in &mut b.credits {
+        cr.discount_percent = "4.999999999".parse().unwrap_or(Dec::ZERO);
+        for row in &mut cr.rows {
+            row.percent = (*rng.pick(&["25.000000005", "12.5", "33.333333333"]))
+                .parse()
+                .unwrap_or(Dec::ONE);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

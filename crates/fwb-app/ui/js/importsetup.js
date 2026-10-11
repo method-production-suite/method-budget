@@ -30,6 +30,7 @@ const GROUPS = [
   ['Tag presets', ['tag_preset']],
   ['Line blocks', ['line_preset']],
   ['Report presets', ['report_preset']],
+  ['Overtime patterns', ['ot_pattern']],
   ['Budget settings', ['account_coding', 'fringe_posting', 'new_line_defaults']],
 ];
 
@@ -46,6 +47,7 @@ const KIND_LABELS = {
   tag_preset: 'Tag preset',
   line_preset: 'Line block',
   report_preset: 'Report preset',
+  ot_pattern: 'Overtime pattern',
   account_coding: 'Account numbering',
   fringe_posting: 'Fringe posting',
   new_line_defaults: 'New line defaults',
@@ -163,9 +165,12 @@ export async function importSetup(ctx) {
 
 /**
  * The review dialog: Import Setup's, or (library.js) a copy to or from the
- * library. `opts`: words to use instead of REVIEW_TEXT's, `picked` (items to
- * tick at the start) and `run(request)`, which does the copy and resolves
- * with { view, message } (Import Setup's runs `import_setup`).
+ * library, or (packs.js) a setup pack. `opts`: words to use instead of
+ * REVIEW_TEXT's, `picked` (items to tick at the start), `header` (nodes
+ * shown under the intro: a pack's details), `itemNote(item)` (a line of
+ * text under an item: where it came from) and `run(request)`, which does the
+ * copy and resolves with { view, message } (Import Setup's runs
+ * `import_setup`).
  */
 export function showReview(ctx, p, opts = {}) {
   const text = { ...REVIEW_TEXT, ...opts };
@@ -211,6 +216,7 @@ export function showReview(ctx, p, opts = {}) {
     const parts = [];
     parts.push(el('h2', { class: 'modal-title', text: text.title(p), attrs: { id: 'imp-title' } }));
     parts.push(el('p', { class: 'modal-message', text: text.intro }));
+    for (const node of opts.header || []) if (node) parts.push(node);
     for (const note of p.notes || []) parts.push(el('p', { class: 'modal-message', text: note }));
     const scroll = el('div', { class: 'imp-scroll' });
     for (const [heading, kinds] of GROUPS) {
@@ -247,6 +253,8 @@ export function showReview(ctx, p, opts = {}) {
         } else if (it.imported) {
           body.append(el('div', { class: 'safety-item-sub', text: it.imported, title: it.imported }));
         }
+        const note = typeof opts.itemNote === 'function' ? opts.itemNote(it) : '';
+        if (note) body.append(el('div', { class: 'safety-item-sub imp-source', text: note, title: note }));
         const comes = el('div', { class: 'safety-item-sub imp-comes' });
         comes.hidden = true;
         body.append(comes);
@@ -292,11 +300,26 @@ export function showReview(ctx, p, opts = {}) {
   refresh();
 }
 
+/** The groups bundled charts are listed under, in order (src/coa_import.rs). */
+export const CHART_GROUPS = ['Feature', 'Television', 'Commercial', 'Other'];
+
+/** Bundled charts grouped for the dialog: [[group, [chart...]]...], empty groups left out. */
+export function groupCharts(charts) {
+  const list = Array.isArray(charts) ? charts.filter((c) => c && typeof c.id === 'string' && typeof c.name === 'string') : [];
+  const known = new Set(CHART_GROUPS);
+  const groups = CHART_GROUPS.map((g) => [g, list.filter((c) => c.group === g)]);
+  const other = groups.find(([g]) => g === 'Other');
+  for (const c of list) if (!known.has(c.group)) other[1].push(c);
+  return groups.filter(([, cs]) => cs.length);
+}
+
 /**
  * A short dialog before a template's Open or Save dialog: what it does, and
- * "Keep the detail lines". Resolves { keepLines } on go, null on cancel.
+ * "Keep the detail lines". With `charts` (New From Template), the bundled
+ * charts of accounts are listed too, by group. Resolves { keepLines } on go,
+ * { chart: id } for a bundled chart, null on cancel.
  */
-function templateDialog({ title, message, submitText }) {
+function templateDialog({ title, message, submitText, charts }) {
   return new Promise((resolve) => {
     let settled = false;
     const done = (v) => {
@@ -314,31 +337,65 @@ function templateDialog({ title, message, submitText }) {
           done({ keepLines: keep.checked });
           closeDialog();
         });
-        return el(
-          'div',
-          { class: 'modal', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'tpl-title' } },
+        const parts = [
           el('h2', { class: 'modal-title', text: title, attrs: { id: 'tpl-title' } }),
           el('p', { class: 'modal-message', text: message }),
           el('label', { class: 'rs-check', attrs: { for: 'tpl-keep-lines' } }, keep, el('span', { text: 'Keep the detail lines (without their notes)' })),
-          el('div', { class: 'modal-actions' }, cancel, ok),
-        );
+        ];
+        const groups = groupCharts(charts);
+        if (groups.length) {
+          const sections = groups.map(([group, cs]) =>
+            el(
+              'div',
+              { class: 'tpl-chart-group' },
+              el('h4', { class: 'tpl-chart-group-title', text: group }),
+              ...cs.map((c) => {
+                const b = el(
+                  'button',
+                  { class: 'tpl-chart', attrs: { type: 'button' }, data: { chart: c.id } },
+                  el('span', { class: 'tpl-chart-name', text: c.name }),
+                  el('span', { class: 'tpl-chart-desc', text: c.description || '' }),
+                );
+                b.addEventListener('click', () => {
+                  done({ chart: c.id });
+                  closeDialog();
+                });
+                return b;
+              }),
+            ),
+          );
+          parts.push(
+            el('h3', { class: 'si-heading', text: 'Charts of accounts' }),
+            el('p', { class: 'modal-message', text: 'Or start from one of these charts: categories, accounts and production totals only, no lines or setup.' }),
+            el('div', { class: 'tpl-charts' }, ...sections),
+          );
+        }
+        parts.push(el('div', { class: 'modal-actions' }, cancel, ok));
+        return el('div', { class: `modal${groups.length ? ' tpl-dialog' : ''}`, attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'tpl-title' } }, ...parts);
       },
       { onClose: () => done(null) },
     );
   });
 }
 
-/** File > New From Template…: a new budget from a picked file, in a new tab. */
+/** File > New From Template…: a new budget from a picked file or a bundled chart, in a new tab. */
 export async function newFromTemplate(ctx) {
+  let charts = [];
+  try {
+    charts = (await ctx.invoke('chart_templates')) || [];
+  } catch (_) {
+    charts = [];
+  }
   const opts = await templateDialog({
     title: 'New From Template',
     message:
       'Starts a new budget, in a new tab, from another budget file: its categories, accounts, setup and settings. Its info, baseline, versions and notes are left out. Any budget file can be a template.',
     submitText: 'Choose Template…',
+    charts,
   });
   if (!opts) return ctx.focus();
   try {
-    const v = await ctx.invoke('template_new', { keepLines: opts.keepLines });
+    const v = opts.chart ? await ctx.invoke('chart_template_new', { id: opts.chart }) : await ctx.invoke('template_new', { keepLines: opts.keepLines });
     if (v) ctx.apply(v);
   } catch (e) {
     ctx.toast(e);

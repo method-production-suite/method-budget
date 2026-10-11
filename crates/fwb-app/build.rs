@@ -180,6 +180,12 @@ const COMMANDS: &[&str] = &[
     "sheet_import_pick",
     "sheet_import_preview",
     "sheet_import",
+    // Charts of accounts: import, apply, bundled templates (src/coa_import.rs)
+    "coa_import_pick",
+    "coa_import_preview",
+    "coa_import",
+    "chart_templates",
+    "chart_template_new",
     // Actuals and the cost report (src/actuals.rs)
     "actuals_pick",
     "actuals_preview",
@@ -209,6 +215,20 @@ const COMMANDS: &[&str] = &[
     "library_save",
     "library_folder",
     "library_move",
+    // Setup packs (src/packs.rs)
+    "packs_list",
+    "packs_reveal",
+    "pack_items",
+    "pack_export",
+    "pack_import_pick",
+    "pack_review",
+    "pack_import",
+    "pack_import_library",
+    // Setup lists as spreadsheets (src/setup_sheets.rs)
+    "setup_sheet_export",
+    "setup_sheet_pick",
+    "setup_sheet_guess",
+    "setup_sheet_review",
     // Explain This Number (src/explain.rs)
     "explain_number",
     // The overtime helper (src/overtime.rs)

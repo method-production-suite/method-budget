@@ -5,14 +5,15 @@
 # Claude Code PreToolUse hook body for Bash tool calls. Wiring: docs/WEBSITE.md.
 #
 # Purpose: block a `git commit` that would commit docs/features.toml or a release note
-# (docs/releases/*.md) without the README.md and site/index.html that
-# `python3 scripts/site.py` generates from them. It blocks when either
+# (docs/releases/*.md) without the files `python3 scripts/site.py` generates from them
+# (README.md, site/index.html and site/releases/index.html; `site.py --files` lists
+# them, so this script never hard-codes the list). It blocks when either
 #
-#   1. a staged change touches docs/features.toml, docs/releases/*.md, README.md or
-#      site/index.html, and `python3 scripts/site.py --check` says the working tree is
-#      out of date; or
-#   2. docs/features.toml or a release note is staged while README.md or site/index.html
-#      has changes that are NOT staged (regenerated, but left out of the commit).
+#   1. a staged change touches docs/features.toml, docs/releases/*.md or a generated
+#      file, and `python3 scripts/site.py --check` says the working tree is out of
+#      date; or
+#   2. docs/features.toml or a release note is staged while a generated file has
+#      changes that are NOT staged (regenerated, but left out of the commit).
 #
 # Like require-release-notes.sh, THIS IS AN ERGONOMICS GUARD, NOT A SECURITY BOUNDARY.
 # A commit typed in a terminal is never seen here. The real check is the `site` job in
@@ -58,32 +59,38 @@ if [[ "$cmd" =~ git[[:space:]]+commit([[:space:]].*)?[[:space:]](-a|--all|-[A-Za
   staged="$staged"$'\n'"$(git diff --name-only 2>/dev/null || true)"
 fi
 
+# The files site.py writes, one per line. Older copies of site.py had no --files.
+generated="$(python3 scripts/site.py --files 2>/dev/null)" || generated=$'README.md\nsite/index.html'
+
 source_staged=0
 touches_site=0
 while IFS= read -r f; do
+  [ -n "$f" ] || continue
   case "$f" in
     docs/features.toml|docs/releases/*.md) source_staged=1; touches_site=1 ;;
-    README.md|site/index.html) touches_site=1 ;;
+    *) if grep -qxF -- "$f" <<< "$generated"; then touches_site=1; fi ;;
   esac
 done <<< "$staged"
+gen_list="$(tr '\n' ' ' <<< "$generated" | sed 's/ *$//')"
 
 [ "$touches_site" -eq 1 ] || exit 0
 
 if ! check_out="$(python3 scripts/site.py --check 2>&1)"; then
   cat >&2 <<EOF
-require-site-regen: blocked -- README.md or site/index.html is out of date with
-docs/features.toml or the newest release note:
+require-site-regen: blocked -- a generated file ($gen_list) is out of date with
+docs/features.toml or the release notes:
 
 $check_out
 
-Run \`python3 scripts/site.py\`, stage README.md and site/index.html with the rest,
+Run \`python3 scripts/site.py\`, stage $gen_list with the rest,
 then commit again. (This is an ergonomics guard; CI runs the same check.)
 EOF
   exit 2
 fi
 
 if [ "$source_staged" -eq 1 ]; then
-  unstaged="$(git diff --name-only -- README.md site/index.html 2>/dev/null || true)"
+  # shellcheck disable=SC2086 # the generated paths have no spaces; split them on purpose
+  unstaged="$(git diff --name-only -- $gen_list 2>/dev/null || true)"
   if [ -n "$unstaged" ] && ! [[ "$cmd" =~ git[[:space:]]+commit([[:space:]].*)?[[:space:]](-a|--all|-[A-Za-z]*a[A-Za-z]*)([[:space:]]|$) ]]; then
     cat >&2 <<EOF
 require-site-regen: blocked -- the feature list or a release note is staged, but the
@@ -91,7 +98,7 @@ regenerated file(s) below are not:
 
 $unstaged
 
-Stage them too (git add README.md site/index.html), then commit again.
+Stage them too (git add $gen_list), then commit again.
 EOF
     exit 2
   fi

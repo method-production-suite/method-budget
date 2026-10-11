@@ -1,0 +1,23 @@
+/* The share card (og-card.html), drawn at exactly 1200x630 by scripts/make-og.sh. */
+* { box-sizing: border-box; margin: 0; }
+html, body { width: 1200px; height: 630px; overflow: hidden; }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+.card { position: absolute; inset: 0; padding: 64px 80px; }
+.card::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 10px; background: var(--accent); }
+.wm { position: absolute; top: 60px; left: 80px; height: 50px; width: auto; }
+.tag { position: absolute; top: 74px; right: 80px; font-size: 18px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.copy { position: absolute; left: 80px; top: 196px; width: 560px; }
+h1 { font-size: 58px; line-height: 1.06; letter-spacing: -.03em; font-weight: 750; margin-bottom: 22px; }
+.copy p { font-size: 25px; line-height: 1.35; color: var(--ink-soft); }
+.sheet {
+  position: absolute; right: 80px; top: 196px; width: 430px; background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 16px; padding: 20px 26px 22px;
+  box-shadow: 0 10px 36px rgba(28, 34, 40, .1); font-size: 19px;
+}
+.sheet .head { display: flex; justify-content: space-between; font-size: 15px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding-bottom: 10px; border-bottom: 2px solid var(--accent); }
+.sheet div { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.sheet div.sub { padding-left: 16px; color: var(--ink-soft); }
+.sheet b { font-family: var(--mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+.sheet .net { font-weight: 700; border-top: 1px solid var(--ink); border-bottom: 4px double var(--ink); margin-top: -1px; }
+.sheet .net b { font-weight: 700; }
+.url { position: absolute; left: 80px; bottom: 52px; font-size: 22px; color: var(--muted); }

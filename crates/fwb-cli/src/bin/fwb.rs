@@ -8,7 +8,7 @@
 mod method;
 
 // The modules' own `crate::cli` (and so on) paths resolve through these.
-use method::{cli, render, script};
+use method::{cli, cmd, mcp, render, script};
 
 fn main() -> std::process::ExitCode {
     method::main()

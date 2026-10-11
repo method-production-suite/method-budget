@@ -302,6 +302,42 @@ mod tests {
         }
     }
 
+    /// With numbers on rounding edges (money rounded to cents once, from
+    /// the exact product), the cache still gives exactly what the full
+    /// recalc and the frozen reference engine give, edit after edit.
+    #[test]
+    fn cached_recalc_equals_reference_on_rounding_edges() {
+        for seed in 1..=4u64 {
+            let mut b = sample::budget(&SampleSpec {
+                seed,
+                rows: 300,
+                accounts: 10,
+                categories: 3,
+                fringes: 10,
+                groups: 4,
+                baseline: false,
+            });
+            sample::fine_decimals(&mut b, seed);
+            if seed % 2 == 1 {
+                b.fringe_posting = FringePosting::Account;
+            }
+            let opts = RecalcOptions::default();
+            let mut cache = RecalcCache::new();
+            let mut rng = Rng(seed * 7_919 + 3);
+            for step in 0..40 {
+                if step > 0 {
+                    edit(&mut rng, &mut b);
+                    if step % 4 == 0 {
+                        sample::fine_decimals(&mut b, seed * 100 + step);
+                    }
+                }
+                let want = super::super::reference::recalc(&b, &opts);
+                assert_eq!(cache.recalc(&b, &opts), want, "seed {seed} step {step}");
+                assert_eq!(recalc(&b, &opts), want, "seed {seed} step {step}");
+            }
+        }
+    }
+
     #[test]
     fn unchanged_accounts_are_not_evaluated_again() {
         let mut b = sample::budget(&SampleSpec {

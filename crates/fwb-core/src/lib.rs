@@ -5,6 +5,7 @@
 
 pub mod actuals;
 pub mod calc;
+pub mod coa;
 pub mod coding;
 pub mod compare;
 pub mod comparison;
@@ -17,6 +18,7 @@ pub mod merge;
 pub mod model;
 pub mod order;
 pub mod overtime;
+pub mod pack;
 pub mod presets;
 pub mod rename;
 pub mod renumber;

@@ -59,11 +59,12 @@ expect 0 $H 'grep -rn "git tag" docs/' 'a command that only mentions git tag pas
 
 # ------------------------------------------------------------ require-site-regen
 r2="$work/site"
-mkdir -p "$r2/docs" "$r2/scripts" "$r2/site"
+mkdir -p "$r2/docs" "$r2/scripts" "$r2/site/releases"
 cp "$repo/scripts/site.py" "$r2/scripts/"
 cp "$repo/docs/features.toml" "$repo/docs/ROADMAP.md" "$repo/docs/decisions.md" "$r2/docs/"
 cp "$repo/README.md" "$r2/"
 cp "$repo/site/index.html" "$r2/site/"
+cp "$repo/site/releases/index.html" "$r2/site/releases/"
 cd "$r2"
 gitq init -q
 python3 scripts/site.py >/dev/null
@@ -95,6 +96,8 @@ gitq add docs/releases/0.1.0.md
 expect 2 $H 'git commit -m "notes"' 'release note staged without regenerating is blocked'
 python3 scripts/site.py >/dev/null
 gitq add site/index.html
+expect 2 $H 'git commit -m "notes"' 'release note with the release notes page left unstaged is blocked'
+gitq add site/releases/index.html
 expect 0 $H 'git commit -m "notes"' 'release note with regenerated site passes'
 
 if [ "$fails" -ne 0 ]; then

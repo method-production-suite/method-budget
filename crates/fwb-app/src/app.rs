@@ -1227,6 +1227,8 @@ pub fn run() {
         .manage(crate::import_setup::ImportSources::default())
         // The spreadsheet picked to import lines from (src/sheet_import.rs).
         .manage(crate::sheet_import::SheetSources::default())
+        // The chart of accounts picked to import (src/coa_import.rs).
+        .manage(crate::coa_import::CoaSources::default())
         // The accounting export picked to import actuals from (src/actuals.rs).
         .manage(crate::actuals::ActualsSources::default())
         // Which budget change the other window has heard about (src/tools.rs).
@@ -1465,6 +1467,13 @@ pub fn run() {
             crate::sheet_import::sheet_import_pick,
             crate::sheet_import::sheet_import_preview,
             crate::sheet_import::sheet_import,
+            // Charts of accounts: import, apply, bundled templates
+            // (src/coa_import.rs)
+            crate::coa_import::coa_import_pick,
+            crate::coa_import::coa_import_preview,
+            crate::coa_import::coa_import,
+            crate::coa_import::chart_templates,
+            crate::coa_import::chart_template_new,
             // Actuals and the cost report (src/actuals.rs)
             crate::actuals::actuals_pick,
             crate::actuals::actuals_preview,
@@ -1494,6 +1503,20 @@ pub fn run() {
             crate::library::library_save,
             crate::library::library_folder,
             crate::library::library_move,
+            // Setup packs: export, import, the Packs list (src/packs.rs)
+            crate::packs::packs_list,
+            crate::packs::packs_reveal,
+            crate::packs::pack_items,
+            crate::packs::pack_export,
+            crate::packs::pack_import_pick,
+            crate::packs::pack_review,
+            crate::packs::pack_import,
+            crate::packs::pack_import_library,
+            // Setup lists as spreadsheets (src/setup_sheets.rs)
+            crate::setup_sheets::setup_sheet_export,
+            crate::setup_sheets::setup_sheet_pick,
+            crate::setup_sheets::setup_sheet_guess,
+            crate::setup_sheets::setup_sheet_review,
             // Explain This Number (src/explain.rs)
             crate::explain::explain_number,
             // The overtime helper (src/overtime.rs)
@@ -1518,6 +1541,9 @@ pub fn run() {
             crate::safety_app::init(app.handle());
             // Which file is the personal setup library (src/library.rs).
             crate::library::init(app.handle());
+            // Where setup packs are: the user's Packs folder and the
+            // bundled ones (src/packs.rs).
+            crate::packs::init(app.handle());
             // Update checks, What's New and the Help menu's switch
             // (src/updater.rs).
             crate::updater::init(app.handle());

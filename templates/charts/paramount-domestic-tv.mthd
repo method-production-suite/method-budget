@@ -1,0 +1,699 @@
+{
+  "format": "method-budget",
+  "version": 1,
+  "budget": {
+    "title": "PARAMOUNT DOMESTIC TV",
+    "base_currency": "USD",
+    "account_coding": {
+      "category_width": 3,
+      "account_width": 2,
+      "sub_width": 0,
+      "set_width": 0,
+      "separator": ""
+    },
+    "units": {
+      "Allow": {
+        "plural": "Allow"
+      },
+      "Day": {
+        "plural": "Days",
+        "hours": "10"
+      },
+      "Flat": {
+        "plural": "Flat"
+      },
+      "Hour": {
+        "plural": "Hours",
+        "hours": "1"
+      },
+      "Month": {
+        "plural": "Months",
+        "hours": "200"
+      },
+      "Week": {
+        "plural": "Weeks",
+        "hours": "50"
+      }
+    },
+    "topsheet": [
+      {
+        "kind": "category",
+        "code": "615",
+        "name": "PRODUCERS-NEWS/VARIETY/GS",
+        "accounts": [
+          {
+            "code": "61501",
+            "name": "EXECUTIVE PRODUCERS"
+          },
+          {
+            "code": "61502",
+            "name": "SENIOR PRODUCERS"
+          },
+          {
+            "code": "61504",
+            "name": "PRODUCERS"
+          },
+          {
+            "code": "61506",
+            "name": "ASSOCIATE PRODUCERS"
+          },
+          {
+            "code": "61508",
+            "name": "FIELD PRODUCERS"
+          },
+          {
+            "code": "61514",
+            "name": "EXECUTIVE IN CHARGE OF PRODUCTION"
+          },
+          {
+            "code": "61546",
+            "name": "PRODUCER CONTRACTUALS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "617",
+        "name": "ATL SUPP STAFF-NEWS/VAR/GS/OTH",
+        "accounts": [
+          {
+            "code": "61701",
+            "name": "PRODUCTION MANAGER"
+          },
+          {
+            "code": "61705",
+            "name": "ASSISTANT TO THE EXEC PRODUCER"
+          },
+          {
+            "code": "61706",
+            "name": "ASSISTANT TO THE PRODUCER"
+          },
+          {
+            "code": "61708",
+            "name": "PRODUCTION COORDINATOR"
+          },
+          {
+            "code": "61710",
+            "name": "PRODUCTION ASSISTANTS"
+          },
+          {
+            "code": "61714",
+            "name": "STORY COORDINATORS"
+          },
+          {
+            "code": "61716",
+            "name": "TALENT ASSISTANTS"
+          },
+          {
+            "code": "61719",
+            "name": "AUDIENCE COORDINATOR"
+          },
+          {
+            "code": "61721",
+            "name": "PRODUCTION CONTROLLER"
+          },
+          {
+            "code": "61722",
+            "name": "ACCOUNTING STAFF"
+          },
+          {
+            "code": "61729",
+            "name": "RECEPTIONISTS"
+          },
+          {
+            "code": "61730",
+            "name": "PRODUCTION ASSOCIATE"
+          },
+          {
+            "code": "61731",
+            "name": "SECURITY PERSONNEL"
+          },
+          {
+            "code": "61732",
+            "name": "POST PRODUCTION SUPERVISORS"
+          },
+          {
+            "code": "61738",
+            "name": "AFTER CARE DIRECTOR"
+          },
+          {
+            "code": "61739",
+            "name": "VIEWER SERVICES COORDINATOR"
+          },
+          {
+            "code": "61795",
+            "name": "OTHER"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "625",
+        "name": "DIRECTOR-NEWS/VAR/GS/OTHER",
+        "accounts": [
+          {
+            "code": "62501",
+            "name": "DIRECTOR"
+          },
+          {
+            "code": "62502",
+            "name": "STAGE MANAGER"
+          },
+          {
+            "code": "62507",
+            "name": "ASSOCIATE DIRECTOR"
+          },
+          {
+            "code": "62508",
+            "name": "ASSISTANT TO DIRECTOR"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "635",
+        "name": "CAST-NEWS/VAR/GS/OTHER",
+        "accounts": [
+          {
+            "code": "63502",
+            "name": "GUEST STARS"
+          },
+          {
+            "code": "63506",
+            "name": "ANNOUCER"
+          },
+          {
+            "code": "63555",
+            "name": "GUEST LIMO"
+          },
+          {
+            "code": "63559",
+            "name": "EXPENDABLES"
+          },
+          {
+            "code": "63587",
+            "name": "PRODUCT PLACEMENT-BARTER"
+          },
+          {
+            "code": "63595",
+            "name": "OTHER"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "640",
+        "name": "FRINGES COSTS: ABOVE LINE",
+        "accounts": [
+          {
+            "code": "64001",
+            "name": "FRINGES/PAYROLL SYSTEM"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "650",
+        "name": "ABOVE THE LINE TRAVEL",
+        "accounts": [
+          {
+            "code": "65031",
+            "name": "CAST AIRFARES"
+          },
+          {
+            "code": "65032",
+            "name": "CAST LIVING EXPENSE"
+          },
+          {
+            "code": "65033",
+            "name": "CAST CAR & OTHER TRAVEL"
+          },
+          {
+            "code": "65087",
+            "name": "PRODUCT PLACEMENT-BARTER"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total above-the-line"
+      },
+      {
+        "kind": "category",
+        "code": "705",
+        "name": "PRODUCTION STAFF",
+        "accounts": [
+          {
+            "code": "70540",
+            "name": "PRE-PRODUCTION EXPENSES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "720",
+        "name": "SET CONSTRUCTION",
+        "accounts": [
+          {
+            "code": "72001",
+            "name": "LABOR"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "725",
+        "name": "SET OPERATIONS",
+        "accounts": [
+          {
+            "code": "72510",
+            "name": "CRAFT SERVICES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "730",
+        "name": "SET LIGHTING",
+        "accounts": [
+          {
+            "code": "73010",
+            "name": "LIGHTING DIRECTOR"
+          },
+          {
+            "code": "73093",
+            "name": "RENTALS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "741",
+        "name": "VIDEOTAPE EQUIPMENT",
+        "accounts": [
+          {
+            "code": "74101",
+            "name": "MOBILE UNIT/CAMERA/VTR"
+          },
+          {
+            "code": "74115",
+            "name": "MICROWAVE INSTALL"
+          },
+          {
+            "code": "74116",
+            "name": "ADDITIONAL TECH. EQUIPMENT"
+          },
+          {
+            "code": "74187",
+            "name": "PRODUCT PLACEMENT-BARTER"
+          },
+          {
+            "code": "74195",
+            "name": "OTHER"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "742",
+        "name": "VIDEOTAPE TECH. PERSONNEL",
+        "accounts": [
+          {
+            "code": "74202",
+            "name": "VIDEO CONTROL TECHNICIAN"
+          },
+          {
+            "code": "74218",
+            "name": "VIDEOTAPE EDITORS"
+          },
+          {
+            "code": "74219",
+            "name": "VIDEOTAPE CREW"
+          },
+          {
+            "code": "74221",
+            "name": "OTHER TECHNICAL DEPT. #1"
+          },
+          {
+            "code": "74222",
+            "name": "OTHER TECHNICAL DEPT. #2"
+          },
+          {
+            "code": "74223",
+            "name": "OTHER TECHNICAL DEPT. #3"
+          },
+          {
+            "code": "74295",
+            "name": "OTHER"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "745",
+        "name": "SET DRESSING",
+        "accounts": [
+          {
+            "code": "74587",
+            "name": "PRODUCT PLACEMENT-BARTER"
+          },
+          {
+            "code": "74593",
+            "name": "RENTALS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "751",
+        "name": "PRODUCTION GRAPHICS",
+        "accounts": [
+          {
+            "code": "75101",
+            "name": "GRAPHICS DESIGN/TITLES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "755",
+        "name": "WARDROBE",
+        "accounts": [
+          {
+            "code": "75501",
+            "name": "COSTUME DESIGNER"
+          },
+          {
+            "code": "75506",
+            "name": "ALTERATIONS"
+          },
+          {
+            "code": "75587",
+            "name": "PRODUCT PLACEMENT-BARTER"
+          },
+          {
+            "code": "75594",
+            "name": "PURCHASES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "760",
+        "name": "MAKEUP & HAIRDRESSING",
+        "accounts": [
+          {
+            "code": "76001",
+            "name": "KEY MAKEUP ARTIST"
+          },
+          {
+            "code": "76002",
+            "name": "ADDITIONAL MAKEUP ARTIST"
+          },
+          {
+            "code": "76011",
+            "name": "KEY HAIRSTYLIST"
+          },
+          {
+            "code": "76095",
+            "name": "OTHER"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "775",
+        "name": "LOCATION EXPENSE",
+        "accounts": [
+          {
+            "code": "77513",
+            "name": "PHONE/FAX INSTALL/RENT/HOOKUP"
+          },
+          {
+            "code": "77553",
+            "name": "PER DIEM"
+          },
+          {
+            "code": "77555",
+            "name": "AIRPORT PICKUPS"
+          },
+          {
+            "code": "77556",
+            "name": "MISC. TRAVEL"
+          },
+          {
+            "code": "77587",
+            "name": "PRODUCT PLACEMENT-BARTER"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "781",
+        "name": "CLIPS",
+        "accounts": [
+          {
+            "code": "78101",
+            "name": "CLIP FEES"
+          },
+          {
+            "code": "78104",
+            "name": "DIR GUILD OF AMER-DIRECTORS"
+          },
+          {
+            "code": "78106",
+            "name": "A.F.T.R.A."
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "795",
+        "name": "FRINGE COSTS:BELOW THE LINE",
+        "accounts": [
+          {
+            "code": "79501",
+            "name": "FRINGES-PAYROLL SYSTEM"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "798",
+        "name": "FACILITIES FEES",
+        "accounts": [
+          {
+            "code": "79814",
+            "name": "SECURITY"
+          },
+          {
+            "code": "79895",
+            "name": "OTHER"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total production"
+      },
+      {
+        "kind": "category",
+        "code": "801",
+        "name": "POST PRODUCTION VIDEO",
+        "accounts": [
+          {
+            "code": "80106",
+            "name": "TAPE DUPLICATION"
+          },
+          {
+            "code": "80108",
+            "name": "TAPE STOCK"
+          },
+          {
+            "code": "80115",
+            "name": "CLOSED CAPTIONS"
+          },
+          {
+            "code": "80118",
+            "name": "INCOMING SATELLITES FEEDS"
+          },
+          {
+            "code": "80130",
+            "name": "OTHER CHARGES"
+          },
+          {
+            "code": "80187",
+            "name": "PRODUCT PLACEMENT-BARTER"
+          },
+          {
+            "code": "80194",
+            "name": "PURCHASES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "810",
+        "name": "MUSIC",
+        "accounts": [
+          {
+            "code": "81012",
+            "name": "MUSIC CLEARANCE SALARIES"
+          },
+          {
+            "code": "81013",
+            "name": "MUSIC SUPERVISOR"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total post"
+      },
+      {
+        "kind": "category",
+        "code": "910",
+        "name": "ADMINISTRATIVE EXPENSES",
+        "accounts": [
+          {
+            "code": "91001",
+            "name": "ACCOUNTING/COMPUTER FEES"
+          },
+          {
+            "code": "91003",
+            "name": "OFFICE EXP,POSTAGE & SUPPLY"
+          },
+          {
+            "code": "91005",
+            "name": "LEGAL FEES"
+          },
+          {
+            "code": "91006",
+            "name": "TELEPHONE AND FAX"
+          },
+          {
+            "code": "91013",
+            "name": "AUTOMOBILE"
+          },
+          {
+            "code": "91014",
+            "name": "BEVERAGES"
+          },
+          {
+            "code": "91015",
+            "name": "MESSENGER"
+          },
+          {
+            "code": "91017",
+            "name": "VIDEO/AUDIO RENTAL CHARGES"
+          },
+          {
+            "code": "91018",
+            "name": "WIRE SERVICES"
+          },
+          {
+            "code": "91019",
+            "name": "PERIODICALS"
+          },
+          {
+            "code": "91022",
+            "name": "OFFICE EQUIPMENT/REPAIRS"
+          },
+          {
+            "code": "91023",
+            "name": "COMPUTER SOFTWARE PURCHASES"
+          },
+          {
+            "code": "91025",
+            "name": "COMPUTER HARDWARE PURCHASES"
+          },
+          {
+            "code": "91028",
+            "name": "800/900 LINE CHARGES"
+          },
+          {
+            "code": "91029",
+            "name": "PAGERS"
+          },
+          {
+            "code": "91030",
+            "name": "INSURANCE PREMIUMS"
+          },
+          {
+            "code": "91033",
+            "name": "HEALTH INSURANCE BENEFITS"
+          },
+          {
+            "code": "91045",
+            "name": "ENTERTAINMENT"
+          },
+          {
+            "code": "91091",
+            "name": "OFFICE REFURBISHMENT"
+          },
+          {
+            "code": "91092",
+            "name": "OFFICE EQUIPMENT"
+          },
+          {
+            "code": "91093",
+            "name": "OFFICE RENT & OTHER EXPENSE"
+          },
+          {
+            "code": "91094",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "91095",
+            "name": "OTHER"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "915",
+        "name": "AUDIENCE COSTS",
+        "accounts": [
+          {
+            "code": "91502",
+            "name": "TICKETS"
+          },
+          {
+            "code": "91503",
+            "name": "BUSES"
+          },
+          {
+            "code": "91507",
+            "name": "AUDIENCE SHOW COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "930",
+        "name": "PRODUCTION/FACILITIES FEES",
+        "accounts": [
+          {
+            "code": "93099",
+            "name": "CLOSE OUT ACCOUNT"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "932",
+        "name": "INTERNAL PROD/FACILITIES FEE",
+        "accounts": [
+          {
+            "code": "93203",
+            "name": "FACILITIES FEES"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total other"
+      }
+    ]
+  }
+}

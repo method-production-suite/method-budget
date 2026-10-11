@@ -24,6 +24,24 @@ Money is rounded to cents **once per detail line**, never in the rollups:
 Accounts, categories, the subtotal, fringe totals and the grand total are integer sums of
 those cents, so they always agree exactly. Contractual charges round once each, on their base.
 
+**Amended 2026-10-10: money rounds once from the exact product.** Before, `quantity x rate`
+went through a `Dec` multiply, which rounds to 9 places, and that result was rounded again
+to cents: `0.5 x 0.009999999` is `0.0049999995`, became `0.005`, then `0.01`. Now each money
+step keeps the exact product (`decimal::Exact`: a wide integer over a power of ten, no
+rounding while multiplying, overflow an error rather than a panic) and rounds to cents once,
+half away from zero, so that case is `0.00`. This covers the line total (`quantity x rate`),
+flat fringes per unit (`rate x quantity x line hours / fringe hours`, the division folded
+into the one rounding), credits (each row's `percent of net` with its caps, the rows' sum,
+the overall cap and the `(100 - discount) / 100` share, rounded once at the end) and the
+totals-currency conversion (`base total / totals rate`). The quantity itself (`amount x X x
+4X`) is still a `Dec` at 9 places: it is a shown figure, like a formula's value, and flat
+fringes and adjustment rows use the same quantity the line shows. The credit row figures in
+the report (`credit`, `cap_variance`, `capped`) are the exact values rounded to 9 places for
+showing; the amount is rounded from the exact values, not from those. Explain shows the
+exact product in full (`0.5 x 0.009999999 = 0.0049999995`, rounding to `0.00`); for a flat
+fringe per unit, whose division need not end, it shows the quotient to 9 places. The
+hand-checked tutorial figures are unchanged.
+
 ## 3. Fringe cutoffs are per earner (2026-10-08, revised)
 
 A percent fringe's cutoff applies per **earner**: a single line, or a **fringe range** (a run
@@ -1619,3 +1637,219 @@ people shorten Movie Magic Budgeting), and no file extension of ours resembles `
   cleanly when its secrets are absent (the build is then ad-hoc signed, as before).
   Roadmap 1.21 is built as a pipeline; the first signed release needs the secrets
   (docs/RELEASING.md).
+
+## 49. Brand system, a multi-page static site, and generated brand files (2026-10-10)
+
+- **The mark is a budget page with its corner turned back**: right-aligned figures and the
+  accountant's double rule under the total, cut out of the page so it sits on any
+  background. It replaces the film-frame-and-bars app icon and the three-rows favicon.
+  Drawn on a 64-unit grid, with a separate 16-unit drawing for favicons so it stays sharp
+  at 16 pixels. No wands, stars, clapperboards or letterforms, nothing that echoes another
+  product's mark.
+- **The wordmark is drawn, not typed**: lowercase `method budget` from strokes on a
+  100-unit x-height (geometric, one weight), so it looks the same everywhere and ships no
+  font file. `scripts/make-brand.py` (standard library only) draws the mark and wordmark
+  SVGs, `favicon.svg`, `favicon.ico` and `apple-touch-icon.png`; `--check` runs in CI and
+  before a Pages deploy, comparing PNG pixels rather than bytes so zlib differences between
+  machines don't matter. `make_icon.py` draws the app icon from the same geometry (white
+  mark on a teal tile); the bundle's sizes and formats are unchanged.
+- **The accent is the app's teal** (`#0E7468` light, `#2CC7B2` dark), on warm paper and
+  ink, so the site and the app read as one product. The indigo explored during naming was
+  dropped for that reason. Tokens live in `site/assets/tokens.css`; every text pairing
+  meets WCAG AA in both schemes (docs/BRAND.md lists the ratios).
+- **System fonts only**, as in the app: nothing downloaded, no font license to carry.
+  A serif wordmark (an OFL face, self-hosted) was the alternative; drawing the wordmark
+  made it unnecessary.
+- **No JavaScript on the site at all**, not even a theme toggle: the site follows
+  `prefers-color-scheme`. CSS moved to files so every page's CSP is
+  `default-src 'none'; style-src 'self'; img-src 'self'`, with no `'unsafe-inline'`.
+- **The site is several static pages**: home (hero, an HTML illustration of the app
+  window with an invented budget, What's new, features, open files, keyboard, command line
+  and coding agents, download, FAQ), a release notes page generated from every
+  `docs/releases/*.md`, a 404 page, robots.txt and a sitemap. `scripts/site.py --files`
+  lists the files it generates, and the `require-site-regen` hook reads that list instead
+  of naming the files itself.
+- **Brand rules are written down** in docs/BRAND.md: always "Method Budget", never
+  initials; plain, specific voice with no hype and no em dashes; other vendors named only
+  in one factual non-affiliation line.
+
+## 50. Setup packs, where setup items came from, and setup lists in spreadsheets (2026-10-10)
+
+Sets of setup items to share and start from, built on Import Setup (entry 29), the library
+(entry 37) and the paste review's rules (entry 23). As built:
+
+- **A setup pack is a budget file, stamped.** No new file type: a `.mthd` with setup and no
+  lines whose `provenance` has the new kind `setup_pack` and a `pack` with its details
+  (title, description, author as free text, version, effective date, region, source notes
+  and links). Putting the details in the provenance kept the change to one optional field
+  on an existing object instead of a new budget field; a pack is never read-only, is never
+  "a copy of" another budget for compare or store-as-version (`share::came_from` says no),
+  and opens, edits and saves like any budget. The three budget settings never go in a pack.
+- **Where an item came from is its own field.** `setup_sources` (kind, item name, then pack
+  title, pack version, effective date, notes, links) rather than text stamped into an item's
+  description: a description is part of the definition, so stamping it would make every
+  re-import of the same pack read "different here" and would change what prints. Like
+  `setup_folders` it is about the items, not content: versions don't carry it, restoring
+  keeps it, Rename everywhere carries it, a writer keeps only items that exist. Every copy
+  between budgets (Import Setup, the library, packs) brings an item's source along and
+  replacing an item replaces its source; importing a pack then stamps what came in with the
+  pack's title, version and effective date (an item's own effective date wins).
+- **The import logic moved to fwb_format::setup** so the command line can share it: the
+  dependency walk, statuses, conflict choices and renaming (`setup::import`, from
+  src/import_setup.rs) and the setup half of the row clipboard (`setup::copy`, from
+  src/clipboard.rs) moved verbatim, and the app re-exports them, so the app's behavior and
+  tests are unchanged. fwb-format already held the spreadsheet import, so this added no
+  crate and no dependency. While there: overtime patterns became an importable kind
+  (Import Setup, the library and packs), and a global's description, unit and display
+  settings now come with it.
+- **Export builds by importing into an empty budget**, so a pack's contents are exactly
+  Import Setup's closure of the picks, with the source's folders and item sources kept. The
+  page lists items by kind and folder with a box for each (dependencies ticked along as in
+  the review); Rust walks the closure again, checks the details (a title; dates
+  `YYYY-MM-DD`; links `http://` or `https://` only, shown as text and never opened) and
+  writes atomically after its own Save dialog, refusing a file open in a tab.
+- **Import is Import Setup's review** with the pack's details on top and each item's source
+  under it, into a budget (one undo step) or the library (its checked write, entry 37). The
+  pack commands are allowed in all three windows because the Library tab, where packs are
+  listed, is in each; the spreadsheet commands are the main window's File menu only.
+- **Where packs live**: the user's `Packs` folder in the app's local data folder (made when
+  first listed, so dropped-in packs appear; Show Packs Folder opens it) and the repository's
+  `packs/` folder, bundled as a resource. That folder ships empty but for a README: rate
+  packs come from a separate data project after review (CLEAN-ROOM.md). A listed pack is
+  named to Rust by a token from the last listing, never a path.
+- **Setup lists in spreadsheets** reuse the export writers and the import readers: a sheet
+  (or CSV file) per kind with each item's whole definition and its source columns; reading
+  maps columns by title per sheet, checks every row and lists every problem with its sheet
+  and row, imports nothing while any is left, and hands a clean read to Import Setup's
+  review. A charge's excluded amounts, line blocks, report presets and the settings stay
+  out of sheets. Into a pack: open the pack as a tab and import there.
+- **The command line**: `method pack export`, `import` (`--ours` by default, `--theirs`,
+  `--dry-run`) and `show`; `--created` defaults to today's UTC date, the one place the
+  command line reads the clock for a stamp.
+- **The source shows** in the review, the spreadsheet export, `method pack show` and the
+  Budget Setup window's tooltips for fringes, groups, sets, locations, currencies and
+  globals. **Not yet**: editing an item's source in the app, clearing a stamp when its
+  figure is edited by hand, removing a source when an item is deleted (the writer drops it;
+  until saved, an item re-added under the same name in the same session would show it).
+
+## 51. Charts of accounts: importing any chart, and bundled chart templates (2026-10-10)
+
+Roadmap 3.16, under CLEAN-ROOM.md's exception for studio charts of accounts:
+
+- **A chart is numbers, names and levels.** `fwb_core::coa::Chart` holds categories,
+  accounts and production totals in topsheet order with the numbering pattern they are in,
+  and nothing else. It becomes a budget with no lines or setup (`to_budget`, our default
+  units only) or is applied to a budget (`apply`). Every other column of a source file is
+  ignored, so no description, note, fringe, global or rate can come in by accident.
+- **One importer, many shapes** (`fwb_format::import::coa`, on the readers of decision 36):
+  a flat list, a one-column or indented outline, side-by-side category and account columns
+  (blank category cells below the first, as merged cells read), number and name in one
+  cell; numbers with or without separators; rows above the header, repeated headers, total
+  rows and level headings. Columns are guessed from titles and, failing that, from the
+  cells (the leftmost column of numbers; a second one is the account column when its
+  numbers start with the first's or seldom share a row with it). A category written
+  `1100` over accounts `1101` is category `11`, since our categories are the category
+  segment (decision 11); `101-00` with a separator is category `101`.
+- **The pattern is inferred, never assumed.** The commonest separator sets it; widths come
+  from the parts, or without separators from the smallest category width whose prefixes
+  cover at least half the accounts (so a stray account with no category row doesn't throw
+  it off). Numbers one character short of the others of their kind are taken to have lost
+  a leading zero in a spreadsheet and get it back, said in the preview. The user can ask
+  for another pattern; numbers are carried over as renumbering does (decision 39) and a
+  clash refuses.
+- **The owner's studio-chart layout is first class.** A header with `kind`, `code`,
+  `name` (and `parent`) switches to a reader that takes each row's kind as given:
+  categories, accounts, sub-accounts and totals, codes as written. A budget has no
+  sub-account level, so sub-accounts become accounts of their own numbered after their
+  account (`1102.01` under `1102` as `110201`, a sub-account width added to the pattern)
+  and the import says so. A total right after another total (`TOTAL BELOW-THE-LINE` after
+  `TOTAL OTHER`) sums totals, which our production totals can't express (each subtotals the
+  categories since the previous one), so it is left out with a note.
+- **Levels.** Headings and totals with the usual level words become production totals
+  with our names (`Total above-the-line`, `Total production`, `Total post`, `Total other`);
+  others become `Total <heading>`. A chart naming none gets ours by the category number's
+  first digit (1 above the line, 2 and 3 production, 4 post, the rest other), offered as a
+  switch, never when all categories fall in one group.
+- **Applying never loses work.** Missing categories and accounts are added in number order
+  (a new category after the last one numbered below it, so it stays inside its level),
+  existing ones renamed by number, production totals untouched. Accounts the chart doesn't
+  list are kept and listed; the opt-in removal takes only accounts with no lines and no
+  notes, then categories left empty. One undo step; property: the grand total never moves.
+- **A new budget from a chart starts unsaved** (the import is its first undo step, as a
+  sheet import into a new tab), while a bundled template opens like New From Template
+  (no unsaved changes): picking a shipped chart is not work to lose.
+- **Templates are built, not hand-edited.** `templates/charts/charts.json` lists each
+  template and its source; `scripts/build-coa-templates.py` runs `method coa import` on
+  each source and writes `templates/charts/<id>.mthd` and the bundled list
+  (`charts_bundled.rs`, `include_str!` of each file, so the app and `method new --template`
+  carry them with no runtime files). Same source, same bytes; a test rebuilds every
+  template whose source is in the repository and compares. Studio sources stay in the
+  ignored `imports/coa-sources/`; a machine without one keeps its committed template.
+  New files dropped there are added to the manifest by the script, named after the file.
+- **What ships**: seven charts written by us (feature, low-budget feature, one-hour and
+  half-hour TV with amortization, commercial, music video, documentary) in the default
+  2 + 2 hyphen pattern, plus the studio and network charts built from the owner's CSV
+  exports, each listed in `templates/charts/SOURCES.md`. Public incentive-program charts
+  found during research are listed there too but not bundled: downloading them needs the
+  owner's go-ahead, and they are PDFs to convert first.
+- **Not yet**: a sub-account level in the model, reading PDFs, saved column mappings for
+  chart imports (the sheet import's presets aren't shared), production totals applied to
+  an existing budget, a mapping from one chart's numbers to another's (cross-walk).
+
+## 52. Coding agents work on budget files through an MCP server (2026-10-10)
+
+Roadmap 3.17. Coding agents (Claude Code and others) should be able to push the buttons
+and help build budgets. `method mcp` is a Model Context Protocol server in the command line
+(docs/MCP.md):
+
+- **Files first, the app later.** The server works on budget files: each tool names a
+  budget by path, reads it and writes the whole file back atomically, as `method set` does.
+  A live bridge into the running app (local socket, a token the user approves, edits through
+  `Session::edit` so they show in History and undo, shared copies and per-window rules
+  respected) is designed in docs/MCP.md and left for later: it needs app UI that isn't
+  designed yet.
+- **No new dependency.** JSON-RPC over stdio is written by hand on `serde_json`, which
+  `fwb-format` already uses and now re-exports, so Cargo.lock is unchanged. One message per
+  line, logs to stderr only.
+- **Both protocol eras.** The `initialize` handshake (revisions 2024-11-05 to 2025-11-25,
+  answered with the client's revision or the newest we know) and revision 2026-07-28, where
+  every request carries its version and capabilities in `_meta` and is served on its own
+  (`server/discover`, `-32022` for an unknown version). Clients today mostly speak the first;
+  the second is the current specification.
+- **The path is the handle.** The protocol's current revision is stateless and asks state to
+  be named on every call; a budget's real path does that. Per file the server keeps the bytes
+  it last read or wrote, the budget as it opened it (for `diff` since the session started)
+  and up to 50 undo steps of its own changes.
+- **Outside changes win.** A change is refused, nothing written, when the file isn't byte for
+  byte what the server last read or wrote (the app or a person saved it); the agent re-opens
+  it and decides again. Reads show the file as it is now, flagged. Clients see a 64-bit
+  fingerprint as the file's revision; conflicts are decided on the bytes.
+- **Reuse, not a second engine.** Line fields go through the command line's edit language
+  (`script::apply`), so values are checked exactly as `method set` checks them; renames use
+  the engine's rename (decision 32), deletes its use counts, explain, diff, merge, export,
+  report rendering and import are the engine's, the format's and the command line's own.
+  Setup and charge editing follow the app's rules (unique names, short codes, a currency in
+  use can't go, a group a credit is based on can't go); they are small and written again in
+  the command line because it never depends on the app. Moving them into the engine, so both
+  share one copy, is a candidate cleanup.
+- **Every change is checked**: made on a copy; refused when the budget added up before and
+  wouldn't after; a change that changes nothing writes nothing; shared copies are refused as
+  the app refuses them.
+- **Safety model.** Every path resolves inside a root (`--root`, default the current folder)
+  with symlinks followed; nothing is written through a symlink; nothing below a root whose
+  name starts with `.` is touched; budgets are only `.mthd`/`.fwb`, sheets only spreadsheet
+  extensions, exports only their format's extension, so the server can't write a script or a
+  hook; existing files are replaced only with `overwrite`, and never a file that isn't a
+  readable budget; `--read-only` removes the writing tools from the list; no program is run,
+  no socket opened. Inputs have limits (8 MB messages, 128 MB files, 5,000 rows a batch,
+  text, name, formula and path lengths). Arguments are checked against each tool's schema
+  before it runs. Budget text is returned as data and the server's instructions say never to
+  follow it.
+- **Results for both people and programs**: a short summary, the JSON as text, and the same
+  JSON as `structuredContent`. Money is integer cents in keys ending `_cents`, so a model
+  can't read cents as dollars; rates are exact decimal strings. Problems a model can fix are
+  tool errors with a kind (`invalid_input`, `not_found`, `refused`, `conflict`,
+  `path_refused`, `io`); malformed messages are JSON-RPC errors.
+- **Not yet**: resources and prompts, output schemas, versions and the baseline, budget info
+  fields, report presets, notes on accounts and categories, renumbering, sub-budgets and
+  actuals as tools, and the live app bridge.

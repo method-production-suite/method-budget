@@ -34,3 +34,6 @@ id_rsa*
 /.claude/*
 !/.claude/skills/
 !/.claude/settings.json
+
+# Raw chart-of-accounts sources used to build templates; not committed.
+/imports/

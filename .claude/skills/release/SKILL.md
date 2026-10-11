@@ -131,8 +131,9 @@ python3 scripts/site.py
 ```
 
 That rewrites the README feature section and the site's feature list from
-`docs/features.toml`, and the site's "What's new" box from the newest
-`docs/releases/*.md`, which is now the draft. Keep the list of files it wrote.
+`docs/features.toml`, the site's "What's new" box from the newest
+`docs/releases/*.md` (which is now the draft), and the site's release notes page
+(`site/releases/index.html`) from all of them. Keep the list of files it wrote.
 
 ## Step 5: moment one, the header block, then the files
 
@@ -178,8 +179,10 @@ committed:
    cargo test --workspace --locked
    ```
 
-5. Stage explicit paths only: the notes, the files the bump wrote, `README.md`,
-   `site/index.html`, and `docs/features.toml` if it changed. Never `git add -A`.
+5. Stage explicit paths only: the notes, the files the bump wrote, the files
+   `python3 scripts/site.py --files` lists (`README.md`, `site/index.html`,
+   `site/releases/index.html`), and `docs/features.toml` if it changed. Never
+   `git add -A`.
 
    ```bash
    git diff --cached --name-only
@@ -236,8 +239,9 @@ Backing the tag out is one paste: git tag -d v<version>
 
 `scripts/hooks/require-release-notes.sh` blocks `git tag`, tag-pushing `git push` forms and
 `gh release create` when `docs/releases/<version>.md` is not committed at HEAD.
-`scripts/hooks/require-site-regen.sh` blocks a `git commit` that would leave README.md or
-site/index.html out of date with `docs/features.toml` or the newest release note. Both are
+`scripts/hooks/require-site-regen.sh` blocks a `git commit` that would leave a generated
+file (README.md, site/index.html, site/releases/index.html) out of date with
+`docs/features.toml` or the release notes. Both are
 ergonomics guards, not security boundaries; CI runs the same site check. If one blocks
 you, you almost always tagged before committing, or committed before regenerating. Fix the
 order; don't work around the hook. Deleting a tag and listing tags always pass.

@@ -1,0 +1,109 @@
+Number,Name
+,ABOVE THE LINE
+10,Story and screenplay
+10-01,Rights
+10-02,Screenwriter
+10-03,Script expenses
+11,Producers
+11-01,Producers
+11-02,Associate producers
+11-03,Producers' expenses
+12,Director
+12-01,Director
+12-02,Director's expenses
+13,Cast
+13-01,Principal cast
+13-02,Supporting cast and day players
+13-03,Casting
+13-04,Cast expenses
+,PRODUCTION
+20,Production staff
+20-01,Line producer
+20-02,First assistant director
+20-03,Second assistant director
+20-04,Production coordinator
+20-05,Script supervisor
+20-06,Production assistants
+20-07,Production accountant
+21,Camera
+21-01,Director of photography
+21-02,Camera assistants
+21-03,Digital imaging technician
+21-04,Camera package
+21-05,Camera supplies
+22,Grip and electric
+22-01,Gaffer
+22-02,Key grip
+22-03,Grip and electric crew
+22-04,Lighting and grip package
+22-05,Expendables
+23,Production sound
+23-01,Sound mixer
+23-02,Boom operator
+23-03,Sound package
+24,Art department
+24-01,Production designer
+24-02,Art department crew
+24-03,Set dressing and props
+24-04,Construction
+25,Wardrobe makeup and hair
+25-01,Costume designer
+25-02,Wardrobe assistant
+25-03,Wardrobe purchases and rentals
+25-04,Makeup and hair artists
+25-05,Makeup and hair supplies
+26,Locations
+26-01,Location manager
+26-02,Site fees
+26-03,Permits and insurance certificates
+26-04,Location expenses
+27,Transportation
+27-01,Vehicles
+27-02,Fuel and parking
+28,Catering
+28-01,Meals
+28-02,Craft service
+29,Production office
+29-01,Office and supplies
+29-02,Communications
+29-03,Shipping
+30,Media and data
+30-01,Drives and media
+30-02,Backup and storage
+,POST PRODUCTION
+40,Editorial
+40-01,Editor
+40-02,Assistant editor
+40-03,Edit system
+41,Post sound
+41-01,Sound design and editing
+41-02,Mix
+41-03,ADR and foley
+42,Music
+42-01,Composer
+42-02,Music licensing
+43,Visual effects and titles
+43-01,Visual effects
+43-02,Titles and graphics
+44,Color and finishing
+44-01,Color grading
+44-02,Conform and online
+45,Deliverables
+45-01,Masters
+45-02,Digital cinema package
+45-03,Closed captions and subtitles
+,OTHER
+50,Insurance
+50-01,Production insurance
+50-02,Errors and omissions
+51,Legal and accounting
+51-01,Legal
+51-02,Accounting and payroll fees
+52,Festivals and marketing
+52-01,Festival fees
+52-02,Marketing materials
+53,General expenses
+53-01,Bank fees
+53-02,Miscellaneous
+54,Contingency
+54-01,Contingency

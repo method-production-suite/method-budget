@@ -1,0 +1,563 @@
+{
+  "format": "method-budget",
+  "version": 1,
+  "budget": {
+    "title": "HEARST ENT USA",
+    "base_currency": "USD",
+    "account_coding": {
+      "category_width": 2,
+      "account_width": 2,
+      "sub_width": 0,
+      "set_width": 0,
+      "separator": ""
+    },
+    "units": {
+      "Allow": {
+        "plural": "Allow"
+      },
+      "Day": {
+        "plural": "Days",
+        "hours": "10"
+      },
+      "Flat": {
+        "plural": "Flat"
+      },
+      "Hour": {
+        "plural": "Hours",
+        "hours": "1"
+      },
+      "Month": {
+        "plural": "Months",
+        "hours": "200"
+      },
+      "Week": {
+        "plural": "Weeks",
+        "hours": "50"
+      }
+    },
+    "topsheet": [
+      {
+        "kind": "category",
+        "code": "11",
+        "name": "STORY & RIGHTS",
+        "accounts": [
+          {
+            "code": "1102",
+            "name": "STORY RESEARCH"
+          },
+          {
+            "code": "1104",
+            "name": "ROYALTIES"
+          },
+          {
+            "code": "1109",
+            "name": "TITLE REPORTS"
+          },
+          {
+            "code": "1198",
+            "name": "PAYROLL TAXES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "12",
+        "name": "PRODUCERS",
+        "accounts": [
+          {
+            "code": "1201",
+            "name": "EXECUTIVE PRODUCER"
+          },
+          {
+            "code": "1202",
+            "name": "PRODUCER"
+          },
+          {
+            "code": "1203",
+            "name": "SHOW PRODUCERS"
+          },
+          {
+            "code": "1204",
+            "name": "ASSOCIATE PRODUCERS"
+          },
+          {
+            "code": "1208",
+            "name": "PRODUCER ENTERTAINMENT"
+          },
+          {
+            "code": "1211",
+            "name": "PACKAGING FEE"
+          },
+          {
+            "code": "1298",
+            "name": "PAYROLL TAXES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "14",
+        "name": "TALENT",
+        "accounts": [
+          {
+            "code": "1401",
+            "name": "HOST"
+          },
+          {
+            "code": "1406",
+            "name": "LOOPING/VOICE OVERS"
+          },
+          {
+            "code": "1480",
+            "name": "HONORARIUMS"
+          },
+          {
+            "code": "1498",
+            "name": "PAYROLL TAXES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "15",
+        "name": "TRAVEL & LIVING",
+        "accounts": [
+          {
+            "code": "1503",
+            "name": "PRODUCER TRAVEL"
+          },
+          {
+            "code": "1504",
+            "name": "PRODUCER LIVING"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total above-the-line"
+      },
+      {
+        "kind": "category",
+        "code": "20",
+        "name": "PRODUCTION STAFF",
+        "accounts": [
+          {
+            "code": "2006",
+            "name": "RESEARCHERS"
+          },
+          {
+            "code": "2007",
+            "name": "PROD COORDINATOR"
+          },
+          {
+            "code": "2079",
+            "name": "CAR EXPENSE"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "35",
+        "name": "TRANSPORTATION",
+        "accounts": [
+          {
+            "code": "3549",
+            "name": "CAB FARES/LIMOS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "36",
+        "name": "LOCATION",
+        "accounts": [
+          {
+            "code": "3610",
+            "name": "CREW TRAVEL"
+          },
+          {
+            "code": "3611",
+            "name": "HOTELS & LODGING"
+          },
+          {
+            "code": "3612",
+            "name": "PER DIEM"
+          },
+          {
+            "code": "3613",
+            "name": "CATERING"
+          },
+          {
+            "code": "3614",
+            "name": "CRAFT SERVICE"
+          },
+          {
+            "code": "3617",
+            "name": "OFFICE RENTALS"
+          },
+          {
+            "code": "3618",
+            "name": "OFFICE SUPPLIES"
+          },
+          {
+            "code": "3619",
+            "name": "TELEPHONE"
+          },
+          {
+            "code": "3620",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "3621",
+            "name": "COPYING"
+          },
+          {
+            "code": "3623",
+            "name": "MESSENGERS"
+          },
+          {
+            "code": "3626",
+            "name": "LOCATION PERMITS"
+          },
+          {
+            "code": "3627",
+            "name": "PARKING"
+          },
+          {
+            "code": "3628",
+            "name": "LOCATION SITE RENTALS"
+          },
+          {
+            "code": "3680",
+            "name": "MISC. EXPENSES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "37",
+        "name": "FILM & LABORATORY",
+        "accounts": [
+          {
+            "code": "3701",
+            "name": "TAPE STOCK"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "40",
+        "name": "REMOTES",
+        "accounts": [
+          {
+            "code": "4001",
+            "name": "REMOTE SHOOTS"
+          },
+          {
+            "code": "4002",
+            "name": "RECREATIONS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "43",
+        "name": "STOCK FOOTAGE",
+        "accounts": [
+          {
+            "code": "4301",
+            "name": "STOCK FOOTAGE"
+          },
+          {
+            "code": "4302",
+            "name": "STILLS"
+          },
+          {
+            "code": "4303",
+            "name": "FOOTAGE RESEARCH"
+          },
+          {
+            "code": "4304",
+            "name": "MASTER FOOTAGE DUBS"
+          },
+          {
+            "code": "4305",
+            "name": "MOTION CONTROL"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "44",
+        "name": "FRINGES",
+        "accounts": [
+          {
+            "code": "4401",
+            "name": "PAYROLL TAXES"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total production"
+      },
+      {
+        "kind": "category",
+        "code": "45",
+        "name": "EDITORIAL",
+        "accounts": [
+          {
+            "code": "4501",
+            "name": "OFF-LINE"
+          },
+          {
+            "code": "4502",
+            "name": "ON-LINE"
+          },
+          {
+            "code": "4503",
+            "name": "ASST. EDITORS"
+          },
+          {
+            "code": "4506",
+            "name": "TRANSCRIPTIONS"
+          },
+          {
+            "code": "4509",
+            "name": "HEARST POST SUPERVISOR"
+          },
+          {
+            "code": "4514",
+            "name": "EDIT ROOM RENTAL"
+          },
+          {
+            "code": "4515",
+            "name": "POST EXPENDABLES"
+          },
+          {
+            "code": "4516",
+            "name": "POST PURCHASES"
+          },
+          {
+            "code": "4517",
+            "name": "EDIT EQUIPMENT RENTAL"
+          },
+          {
+            "code": "4518",
+            "name": "DOMESTIC DELIVERY"
+          },
+          {
+            "code": "4530",
+            "name": "HEARST POST SUPERVISOR"
+          },
+          {
+            "code": "4531",
+            "name": "POST PROD. P.A."
+          },
+          {
+            "code": "4535",
+            "name": "VCR EQUIPMENT"
+          },
+          {
+            "code": "4540",
+            "name": "VIDEO STOCK"
+          },
+          {
+            "code": "4541",
+            "name": "TRANSFERS"
+          },
+          {
+            "code": "4542",
+            "name": "FOREIGN DELIVERY"
+          },
+          {
+            "code": "4545",
+            "name": "SHIPPING TO NETWORKS"
+          },
+          {
+            "code": "4546",
+            "name": "MILEAGE"
+          },
+          {
+            "code": "4550",
+            "name": "CONTINUITY"
+          },
+          {
+            "code": "4580",
+            "name": "MISC. EXPENSES"
+          },
+          {
+            "code": "4598",
+            "name": "EDITORIAL PAYROLL TAXES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "46",
+        "name": "MUSIC",
+        "accounts": [
+          {
+            "code": "4601",
+            "name": "MUSIC PACKAGE"
+          },
+          {
+            "code": "4613",
+            "name": "CLEARANCE"
+          },
+          {
+            "code": "4680",
+            "name": "MISC. EXPENSES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "47",
+        "name": "POST PRODUCTION SOUND",
+        "accounts": [
+          {
+            "code": "4707",
+            "name": "MAIN DUB/SWEETENING"
+          },
+          {
+            "code": "4780",
+            "name": "MISC. EXPENSES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "49",
+        "name": "TITLES, OPTICALS & INSERTS",
+        "accounts": [
+          {
+            "code": "4901",
+            "name": "TITLES"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total post"
+      },
+      {
+        "kind": "category",
+        "code": "65",
+        "name": "PUBLICITY",
+        "accounts": [
+          {
+            "code": "6580",
+            "name": "MISC. PUBLICITY EXPENSES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "67",
+        "name": "INSURANCE",
+        "accounts": [
+          {
+            "code": "6701",
+            "name": "PRODUCTION PACKAGE"
+          },
+          {
+            "code": "6702",
+            "name": "GUILD TRAVEL"
+          },
+          {
+            "code": "6703",
+            "name": "ERRORS & OMISSIONS"
+          },
+          {
+            "code": "6705",
+            "name": "LIABILITY"
+          },
+          {
+            "code": "6710",
+            "name": "UMBRELLA LIABILITY"
+          },
+          {
+            "code": "6750",
+            "name": "CAST EXAMS"
+          },
+          {
+            "code": "6780",
+            "name": "MISC. INSURANCE EXPENSES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "68",
+        "name": "GENERAL EXPENSES",
+        "accounts": [
+          {
+            "code": "6804",
+            "name": "LEGAL FEES"
+          },
+          {
+            "code": "6805",
+            "name": "ACCOUNTING FEES"
+          },
+          {
+            "code": "6806",
+            "name": "PAYROLL SERVICE FEES"
+          },
+          {
+            "code": "6807",
+            "name": "DISC LICENSE FEES"
+          },
+          {
+            "code": "6810",
+            "name": "TELEPHONE"
+          },
+          {
+            "code": "6811",
+            "name": "COPIES"
+          },
+          {
+            "code": "6812",
+            "name": "POSTAGE & FREIGHT"
+          },
+          {
+            "code": "6815",
+            "name": "SUPPLIES"
+          },
+          {
+            "code": "6816",
+            "name": "MESSENGER SERVICE"
+          },
+          {
+            "code": "6817",
+            "name": "SHIPPING"
+          },
+          {
+            "code": "6821",
+            "name": "DEVELOPMENT COSTS"
+          },
+          {
+            "code": "6822",
+            "name": "BANK FEES"
+          },
+          {
+            "code": "6823",
+            "name": "PARKING"
+          },
+          {
+            "code": "6850",
+            "name": "PROD. MANAGEMENT FEE"
+          },
+          {
+            "code": "6880",
+            "name": "MISC. EXPENSES"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total other"
+      }
+    ]
+  }
+}

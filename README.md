@@ -1,26 +1,36 @@
-# Method Budget
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/assets/brand/wordmark-dark.svg">
+    <img src="site/assets/brand/wordmark.svg" alt="Method Budget" width="380">
+  </picture>
+</p>
 
-**Free, open-source film and TV budgeting that runs on your own computer.**
+<p align="center"><strong>Film and TV budgeting that shows its working.</strong></p>
 
-Method Budget is a desktop app for building and running production budgets: topsheet,
-accounts and detail lines, fringes, globals, groups, charges and credits, versions and
-cost reports. It is written in Rust, keeps your budgets as plain files on your own disk,
-and never needs an account or a network connection.
+<p align="center">
+  <a href="https://methodbudget.com">methodbudget.com</a> ·
+  <a href="docs/INSTALL.md">Install</a> ·
+  <a href="docs/CLI.md">Command line</a> ·
+  <a href="docs/FORMAT.md">File format</a> ·
+  <a href="docs/ROADMAP.md">Roadmap</a>
+</p>
 
-[methodbudget.com](https://methodbudget.com) · [Install](docs/INSTALL.md) ·
-[Command line](docs/CLI.md) · [File format](docs/FORMAT.md) · [Roadmap](docs/ROADMAP.md)
+Method Budget is a free, open-source desktop app for building and running production
+budgets: topsheet, accounts and detail lines, fringes, globals, groups, charges and
+credits, versions and cost reports. It keeps your budgets as plain, documented files on
+your own disk, works offline, and never needs an account.
 
 <!-- Screenshots go here once we have our own captures of the app (an invented sample
      budget, never a real one, and never another product's screens). Planned markup:
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/screens/budget-dark.png">
-    <img src="assets/screens/budget-light.png" alt="Method Budget showing an invented sample budget" width="92%">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/budget-dark.png">
+    <img src="docs/assets/screens/budget-light.png" alt="Method Budget showing an invented sample budget" width="92%">
   </picture>
 </p>
 -->
 
-## Why Method Budget
+## Highlights
 
 - **Your budget is an open file.** Budgets are `.mthd` files: plain, documented JSON
   ([docs/FORMAT.md](docs/FORMAT.md)). Any tool can read them, they diff cleanly, and you
@@ -33,7 +43,9 @@ and never needs an account or a network connection.
 - **Every number explains itself.** Pick any total and trace it down to the lines,
   fringes, cutoffs and rounding steps that make it up. Money is kept in whole cents, so
   the topsheet always adds up.
-- **No subscription.** Free and open source under MIT or Apache-2.0, for good.
+- **Scriptable.** The `method` command line runs the same engine with no window, and a
+  git merge driver combines two people's edits to one budget.
+- **No subscription.** Free and open source under MIT or Apache-2.0.
 
 ## Features
 
@@ -131,7 +143,7 @@ tested by hand yet. **Ready-made downloads are not public yet.** Until they are,
 from source. [docs/INSTALL.md](docs/INSTALL.md) covers building, installing on a Mac, the
 one-time security step for builds that are not notarized, and what signed releases need.
 
-## Build from source
+### Build from source
 
 Get the code:
 
@@ -192,6 +204,20 @@ git config merge.method.driver "method merge-driver %O %A %B %P"
 Edits to different lines merge on their own; real clashes are left for you to settle in
 the app. Details: [docs/MERGE.md](docs/MERGE.md).
 
+## Coding agents
+
+`method mcp` is an MCP server, so Claude Code and other MCP clients can open, read and edit
+budgets with typed tools: lines, globals, fringes, charges, totals, explain, export, import and
+undo, all through the same engine and the same exact arithmetic as the app. It only touches
+files inside the folders you give it, writes atomically, won't overwrite a file someone else
+just saved, and has a read-only mode. Nothing is sent anywhere.
+
+```bash
+claude mcp add method -- method mcp --root ~/Budgets
+```
+
+Every tool and the safety model: [docs/MCP.md](docs/MCP.md).
+
 ## File format
 
 Budgets are pretty-printed JSON with a fixed key order, money as integer cents and
@@ -199,15 +225,20 @@ decimals as strings, so the same budget always produces the same bytes. The full
 specification is [docs/FORMAT.md](docs/FORMAT.md). It is ours to document and yours to
 use: write tools that read or produce it.
 
+## Templates and charts of accounts
+
+Any budget can be a template: File > New From Template starts a new budget from another
+one's chart of accounts, setup and settings without its lines, and File > Save as
+Template writes one. Starter templates with charts of accounts written for this project
+are being added now.
+
 ## Clean room
 
 Method Budget is an independent, clean-room project by the Method Budget contributors,
 not affiliated with Entertainment Partners or Movie Magic Budgeting. Trademarks belong to
-their respective owners.
-
-It uses no other vendor's code, templates, help text, icons or bundled data, and reads
-budgets from other tools only through the open files they export. The rules every
-contribution follows are in [CLEAN-ROOM.md](CLEAN-ROOM.md).
+their respective owners. It uses no other vendor's code, templates, help text, icons or
+data, and reads budgets from other tools only through the open files they export. The
+rules every contribution follows are in [CLEAN-ROOM.md](CLEAN-ROOM.md).
 
 ## Contributing
 
@@ -215,8 +246,9 @@ Bug reports and patches are welcome. Read [CLEAN-ROOM.md](CLEAN-ROOM.md) first: 
 short, and it is the one hard rule. Please never attach a real budget to an issue; an
 invented one that shows the problem (`method sample` makes a large test budget) is always
 enough. Design choices and their reasons are numbered in
-[docs/decisions.md](docs/decisions.md), and what comes next is in
-[docs/ROADMAP.md](docs/ROADMAP.md).
+[docs/decisions.md](docs/decisions.md), what comes next is in
+[docs/ROADMAP.md](docs/ROADMAP.md), and how the project looks and sounds is in
+[docs/BRAND.md](docs/BRAND.md).
 
 ## License
 

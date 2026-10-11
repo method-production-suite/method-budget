@@ -42,7 +42,7 @@ import {
 } from './setuplist.js';
 import { globalValueText } from './display.js';
 import { globalInfoBlock } from './display-settings.js';
-import { str, plural, errText } from './util.js';
+import { str, plural, errText, sourceText } from './util.js';
 
 const GLOBAL_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)$/;
@@ -717,6 +717,9 @@ function renderGlobals(panel) {
     const unitWord = gInfo && gInfo.unit ? (raw !== '1' && unitDef && unitDef.plural ? unitDef.plural : gInfo.unit) : '';
     const unitName = unitWord ? ` ${unitWord}` : '';
     value.title = issues.length ? 'This global has a problem' : `${shown}${unitName}`;
+    // Where it came from (a setup pack's stamp), in Budget Setup.
+    const from = compact ? '' : sourceText(state.view, 'global', name);
+    if (from) value.title = `${value.title}\n${from}`;
     const use = inUse(state.view, 'globals', name);
     const usedBy = use.lines ? `${plural(use.lines, 'line uses', 'lines use')} it. ` : '';
     li.append(

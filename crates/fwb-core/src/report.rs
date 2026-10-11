@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::decimal::Dec;
+use crate::decimal::{Dec, Exact};
 use crate::model::{RowId, RowKind};
 use crate::Cents;
 
@@ -44,7 +44,7 @@ impl Report {
     /// Converts a base-currency amount for display in `totals_currency`,
     /// rounded once. `None` on overflow or a zero rate.
     pub fn in_totals_currency(&self, c: Cents) -> Option<Cents> {
-        Dec::from_cents(c).checked_div(self.totals_rate)?.to_cents()
+        Exact::cents(c).div_to_cents(self.totals_rate)
     }
 }
 

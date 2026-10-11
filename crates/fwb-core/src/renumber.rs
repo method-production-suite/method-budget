@@ -65,6 +65,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+use crate::actuals::normalize_code;
 use crate::coding::{AccountCode, AccountCoding, CodingError, SEPARATORS};
 use crate::model::{Budget, FringePosting, TopsheetRow};
 
@@ -499,6 +500,17 @@ pub fn renumber(b: &mut Budget, to: AccountCoding) -> Result<RenumberPlan, Renum
     let acct_new: BTreeSet<String> = accts.values().cloned().collect();
     let cat_conv = |c: &str| carry_category(&from, &to, c);
     let acct_conv = |c: &str| carry_account(&from, &to, c);
+    // Actuals match accounts by the number as the pattern reads it (`1001`
+    // is `10-01`), the first account of any that share one, as the cost
+    // report does: keyed that way here, before the numbers change.
+    let mut acct_read: BTreeMap<String, String> = BTreeMap::new();
+    for c in b.categories() {
+        for a in &c.accounts {
+            acct_read
+                .entry(normalize_code(&from, &a.code))
+                .or_insert_with(|| accts[&a.code].clone());
+        }
+    }
 
     for row in &mut b.topsheet {
         if let TopsheetRow::Category(c) = row {
@@ -528,8 +540,12 @@ pub fn renumber(b: &mut Budget, to: AccountCoding) -> Result<RenumberPlan, Renum
     if !b.actuals.is_empty() {
         carry_actuals(
             std::sync::Arc::make_mut(&mut b.actuals),
-            &accts,
-            &acct_new,
+            &Live {
+                by_code: &accts,
+                by_reading: &acct_read,
+                new: &acct_new,
+                from: &from,
+            },
             acct_conv,
         );
     }
@@ -537,21 +553,51 @@ pub fn renumber(b: &mut Budget, to: AccountCoding) -> Result<RenumberPlan, Renum
     Ok(plan)
 }
 
-/// Transactions and estimate-to-complete overrides follow their accounts.
-/// A transaction coded to a number not in the chart is carried over by the
-/// same rule, but keeps its spelling when it would start naming a live
-/// account it never named (it stays unassigned).
+/// The live accounts as actuals see them.
+struct Live<'a> {
+    /// Old number as the chart spells it to new number.
+    by_code: &'a BTreeMap<String, String>,
+    /// Old number as the old pattern reads it ([`normalize_code`]) to new
+    /// number.
+    by_reading: &'a BTreeMap<String, String>,
+    /// Every new number.
+    new: &'a BTreeSet<String>,
+    from: &'a AccountCoding,
+}
+
+impl Live<'_> {
+    /// The new number of the live account `code` names, read the way the
+    /// cost report reads it: `1001` names `10-01` under a `11-01` pattern,
+    /// but a number too long for the pattern (`10012`) names nothing.
+    fn get(&self, code: &str) -> Option<&String> {
+        self.by_code
+            .get(code)
+            .or_else(|| self.by_reading.get(&normalize_code(self.from, code)))
+    }
+
+    fn carry(&self, code: &str, convert: impl Fn(&str) -> Result<String, String>) -> Carried {
+        match self.get(code) {
+            Some(new) => Carried::Keep(new.clone()),
+            None => carry_ref(code, self.by_code, self.new, convert),
+        }
+    }
+}
+
+/// Transactions and estimate-to-complete overrides follow their accounts,
+/// matched the way the cost report matches them (any spelling of a live
+/// number). A transaction coded to a number not in the chart is carried
+/// over by the same rule, but keeps its spelling when it would start naming
+/// a live account it never named (it stays unassigned).
 fn carry_actuals(
     a: &mut crate::actuals::Actuals,
-    live: &BTreeMap<String, String>,
-    live_new: &BTreeSet<String>,
+    live: &Live<'_>,
     convert: impl Fn(&str) -> Result<String, String> + Copy,
 ) {
     for t in &mut a.transactions {
         if t.account.is_empty() {
             continue;
         }
-        let new = match carry_ref(&t.account, live, live_new, convert) {
+        let new = match live.carry(&t.account, convert) {
             Carried::Keep(n) => n,
             Carried::Clash(_) => continue,
         };
@@ -559,7 +605,19 @@ fn carry_actuals(
             std::sync::Arc::make_mut(t).account = new;
         }
     }
-    a.etc = carry_keys(&a.etc, live, live_new, convert);
+    let mut etc = BTreeMap::new();
+    // Live numbers first, so a stale key can never take a live one's place.
+    for (k, v) in &a.etc {
+        if let Some(new) = live.get(k) {
+            etc.insert(new.clone(), *v);
+        }
+    }
+    for (k, v) in a.etc.iter().filter(|(k, _)| live.get(k).is_none()) {
+        if let Carried::Keep(n) = live.carry(k, convert) {
+            etc.entry(n).or_insert(*v);
+        }
+    }
+    a.etc = etc;
 }
 
 #[cfg(test)]
@@ -977,5 +1035,71 @@ mod tests {
             round_trips > 500,
             "enough cases went through ({round_trips})"
         );
+    }
+
+    /// A transaction typed `1001` names account `10-01` (the cost report
+    /// reads it that way), so a width change carries it to `010-01` instead
+    /// of leaving it on a spelling that now reads as `100-01`. A number too
+    /// long for the old pattern named nothing and keeps its spelling.
+    #[test]
+    fn actuals_follow_any_spelling_of_their_account() {
+        use crate::actuals::{add_batch, chart, cost_report_of, set_etc, EtcMethod, Transaction};
+        let mut b = budget(
+            pat(2, 2, 0, 0, Some('-')),
+            &[("10", &["10-01", "10-02"]), ("20", &["20-01"])],
+        );
+        let tx = |account: &str, amount| Transaction {
+            account: account.into(),
+            amount,
+            ..Transaction::default()
+        };
+        let txs = vec![
+            tx("1001", 100),
+            tx("10-02", 200),
+            tx("10.01", 300),
+            tx("10012", 400),
+            tx("98-01", 500),
+        ];
+        add_batch(&mut b, "ledger.csv", "", txs).unwrap();
+        set_etc(&mut b, "20-01", Some(EtcMethod::Manual(42))).unwrap();
+        // An override under another spelling of a live number.
+        std::sync::Arc::make_mut(&mut b.actuals)
+            .etc
+            .insert("1002".into(), EtcMethod::Manual(7));
+        let actual_of = |b: &Budget| {
+            let r = recalc(b, &RecalcOptions::default()).unwrap();
+            let c = cost_report_of(b, &r).unwrap();
+            let per: Vec<_> = c
+                .categories
+                .iter()
+                .flat_map(|c| &c.accounts)
+                .map(|a| (a.figures.actual, a.figures.etc))
+                .collect();
+            (per, c.unassigned.actual, c.total.etc)
+        };
+        let before = actual_of(&b);
+        assert_eq!(before.0[0].0, 400, "1001 and 10.01 are 10-01");
+        assert_eq!(before.1, 900, "10012 and 98-01 name nothing");
+
+        renumber(&mut b, pat(3, 2, 0, 0, Some('-'))).unwrap();
+        let accounts: Vec<&str> = b
+            .actuals
+            .transactions
+            .iter()
+            .map(|t| t.account.as_str())
+            .collect();
+        assert_eq!(accounts, ["010-01", "010-02", "010-01", "10012", "098-01"]);
+        let etc: Vec<_> = b.actuals.etc.iter().collect();
+        assert_eq!(
+            etc,
+            [
+                (&"010-02".to_string(), &EtcMethod::Manual(7)),
+                (&"020-01".to_string(), &EtcMethod::Manual(42)),
+            ]
+        );
+        assert_eq!(actual_of(&b), before, "nothing moves between accounts");
+        // The too-long number still names nothing in the new chart.
+        let c = chart(&b);
+        assert!(!c.contains_key(&normalize_code(&b.account_coding, "10012")));
     }
 }

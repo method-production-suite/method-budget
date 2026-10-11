@@ -10,6 +10,7 @@ use std::fmt;
 use fwb_core::actuals::{Actuals, EtcMethod, ImportBatch, Transaction};
 use fwb_core::coding::AccountCoding;
 use fwb_core::order::SetupOrder;
+use fwb_core::pack::{ItemSource, PackInfo};
 use fwb_core::{
     Account, Baseline, Budget, Category, Cents, Charge, ChargeKind, Credit, CreditCap, CreditRow,
     CreditSource, Currency, Dec, Detail, DisplayPrefs, Formula, Fringe, FringeKind, FringePosting,
@@ -218,6 +219,8 @@ pub(crate) struct FileBudget {
     setup_order: Option<FileSetupOrder>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     setup_folders: BTreeMap<String, BTreeMap<String, Vec<String>>>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    setup_sources: BTreeMap<String, BTreeMap<String, FileItemSource>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     report_presets: Vec<FileReportPreset>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -263,6 +266,7 @@ impl From<&Budget> for FileBudget {
             ot_patterns,
             setup_order: _,
             setup_folders: _,
+            setup_sources: _,
             provenance,
             actuals,
         } = b;
@@ -303,6 +307,12 @@ impl From<&Budget> for FileBudget {
                 .map(FileSetupOrder::from),
             // Only names that exist, each once; left out when no kind has a folder.
             setup_folders: fwb_core::folders::normalized(b).0,
+            // Only items that exist and sources that say something.
+            setup_sources: fwb_core::pack::normalized(b)
+                .0
+                .iter()
+                .map(|(k, m)| (k.clone(), map(m, FileItemSource::from)))
+                .collect(),
             report_presets: report_presets.iter().map(FileReportPreset::from).collect(),
             tag_presets: tag_presets.iter().map(FileTagPreset::from).collect(),
             line_presets: line_presets.iter().map(FileLinePreset::from).collect(),
@@ -356,6 +366,12 @@ impl From<FileBudget> for Budget {
             display: f.display.map(DisplayPrefs::from).unwrap_or_default(),
             setup_order: f.setup_order.map(SetupOrder::from).unwrap_or_default(),
             setup_folders: fwb_core::folders::SetupFolders(f.setup_folders),
+            setup_sources: fwb_core::pack::SetupSources(
+                f.setup_sources
+                    .into_iter()
+                    .map(|(k, m)| (k, unmap(m, ItemSource::from)))
+                    .collect(),
+            ),
             provenance: f.provenance.map(Provenance::from),
             actuals: std::sync::Arc::new(f.actuals.map(Actuals::from).unwrap_or_default()),
             compact_versions: f.compact_versions,
@@ -383,6 +399,7 @@ enum FileProvenanceKind {
     SharedCopy,
     EditableCopy,
     SubBudget,
+    SetupPack,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -396,6 +413,8 @@ struct FileProvenance {
     app_version: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     note: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pack: Option<FilePackInfo>,
 }
 
 impl From<&Provenance> for FileProvenance {
@@ -407,18 +426,21 @@ impl From<&Provenance> for FileProvenance {
             saved,
             app_version,
             note,
+            pack,
         } = p;
         FileProvenance {
             kind: match kind {
                 ProvenanceKind::SharedCopy => FileProvenanceKind::SharedCopy,
                 ProvenanceKind::EditableCopy => FileProvenanceKind::EditableCopy,
                 ProvenanceKind::SubBudget => FileProvenanceKind::SubBudget,
+                ProvenanceKind::SetupPack => FileProvenanceKind::SetupPack,
             },
             source_title: source_title.clone(),
             source_version: source_version.clone(),
             saved: saved.clone(),
             app_version: app_version.clone(),
             note: note.clone(),
+            pack: pack.as_ref().map(FilePackInfo::from),
         }
     }
 }
@@ -430,12 +452,127 @@ impl From<FileProvenance> for Provenance {
                 FileProvenanceKind::SharedCopy => ProvenanceKind::SharedCopy,
                 FileProvenanceKind::EditableCopy => ProvenanceKind::EditableCopy,
                 FileProvenanceKind::SubBudget => ProvenanceKind::SubBudget,
+                FileProvenanceKind::SetupPack => ProvenanceKind::SetupPack,
             },
             source_title: f.source_title,
             source_version: f.source_version,
             saved: f.saved,
             app_version: f.app_version,
             note: f.note,
+            pack: f.pack.map(PackInfo::from),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Setup packs: a pack's details, and where setup items came from
+
+/// A setup pack's details (`provenance.pack`); every field left out when
+/// empty but the title.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FilePackInfo {
+    title: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    description: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    author: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    version: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    effective: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    region: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    notes: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    urls: Vec<String>,
+}
+
+impl From<&PackInfo> for FilePackInfo {
+    fn from(p: &PackInfo) -> FilePackInfo {
+        let PackInfo {
+            title,
+            description,
+            author,
+            version,
+            effective,
+            region,
+            notes,
+            urls,
+        } = p;
+        FilePackInfo {
+            title: title.clone(),
+            description: description.clone(),
+            author: author.clone(),
+            version: version.clone(),
+            effective: effective.clone(),
+            region: region.clone(),
+            notes: notes.clone(),
+            urls: urls.clone(),
+        }
+    }
+}
+
+impl From<FilePackInfo> for PackInfo {
+    fn from(f: FilePackInfo) -> PackInfo {
+        PackInfo {
+            title: f.title,
+            description: f.description,
+            author: f.author,
+            version: f.version,
+            effective: f.effective,
+            region: f.region,
+            notes: f.notes,
+            urls: f.urls,
+        }
+    }
+}
+
+/// Where one setup item came from (`setup_sources`); every field left out
+/// when empty.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileItemSource {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pack: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pack_version: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    effective: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    notes: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    urls: Vec<String>,
+}
+
+impl From<&ItemSource> for FileItemSource {
+    fn from(s: &ItemSource) -> FileItemSource {
+        let ItemSource {
+            pack,
+            pack_version,
+            effective,
+            notes,
+            urls,
+        } = s;
+        FileItemSource {
+            pack: pack.clone(),
+            pack_version: pack_version.clone(),
+            effective: effective.clone(),
+            notes: notes.clone(),
+            urls: urls.clone(),
+        }
+    }
+}
+
+impl From<FileItemSource> for ItemSource {
+    fn from(f: FileItemSource) -> ItemSource {
+        ItemSource {
+            pack: f.pack,
+            pack_version: f.pack_version,
+            effective: f.effective,
+            notes: f.notes,
+            urls: f.urls,
         }
     }
 }
@@ -799,6 +936,11 @@ impl<'de> Deserialize<'de> for FileSnapshot {
         if !b.setup_folders.is_empty() {
             return Err(de::Error::custom(
                 "a version's budget cannot have setup folders",
+            ));
+        }
+        if !b.setup_sources.is_empty() {
+            return Err(de::Error::custom(
+                "a version's budget cannot have setup sources",
             ));
         }
         if b.provenance.is_some() {

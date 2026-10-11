@@ -12,6 +12,7 @@ fn stamped(kind: ProvenanceKind, version: Option<&str>, note: Option<&str>) -> B
         saved: "2026-10-09T14:30:00-07:00".into(),
         app_version: "0.0.1".into(),
         note: note.map(str::to_string),
+        pack: None,
     });
     b
 }

@@ -1,44 +1,29 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <!-- Source for site/og.png, the 1200x630 share card. Not linked from the site; it exists
-     to be rendered: scripts/make-og.sh. Same colors as index.html's light scheme, system
-     fonts only. -->
+     to be rendered: scripts/make-og.sh. Light brand tokens, system fonts, invented
+     figures (the same as the home page's illustration). -->
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'">
 <title>Method Budget share card</title>
-<style>
-*{box-sizing:border-box;margin:0}
-html,body{width:1200px;height:630px;overflow:hidden}
-body{background:#FAF8F4;color:#1A1F2B;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
-.card{position:absolute;inset:0;display:grid;grid-template-columns:1fr 430px;gap:56px;
-  align-items:center;padding:0 80px}
-.brand{position:absolute;top:56px;left:80px;display:flex;align-items:center;gap:16px;
-  font-weight:700;font-size:28px;letter-spacing:-.01em}
-.brand svg{width:48px;height:48px}
-.fine{position:absolute;top:66px;right:80px;font-size:18px;font-weight:600;letter-spacing:.06em;
-  text-transform:uppercase;color:#1D6A50}
-h1{font-size:64px;line-height:1.06;letter-spacing:-.03em;font-weight:750}
-h1 span{display:block;color:#5A6170;font-weight:600}
-.url{position:absolute;bottom:56px;left:80px;font-size:22px;color:#3D4453}
-.sheet{background:#fff;border:1px solid #DCD7CC;border-radius:16px;padding:22px 24px;
-  box-shadow:0 8px 32px rgba(26,31,43,.08);font-size:20px}
-.sheet div{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #DCD7CC}
-.sheet b{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-weight:500}
-.sheet .net{font-weight:700;border-top:2px solid #1A1F2B;border-bottom:4px double #1A1F2B}
-.sheet .net b{font-weight:700}
-</style></head>
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/og-card.css">
+</head>
 <body>
   <div class="card">
-    <div class="brand">
-      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1A1F2B"/><rect x="14" y="14" width="36" height="6" rx="3" fill="#FAF8F4"/><rect x="14" y="25" width="26" height="6" rx="3" fill="#FAF8F4" opacity=".62"/><rect x="14" y="36" width="31" height="6" rx="3" fill="#FAF8F4" opacity=".62"/><rect x="14" y="46.5" width="36" height="2.5" rx="1.25" fill="#6FD0A6"/><rect x="14" y="51.5" width="36" height="2.5" rx="1.25" fill="#6FD0A6"/></svg>
-      Method Budget
+    <img class="wm" src="assets/brand/wordmark.svg" alt="Method Budget">
+    <p class="tag">Free and open source</p>
+    <div class="copy">
+      <h1>Film and TV budgeting that shows its working.</h1>
+      <p>Open files on your own computer. Every number explained.</p>
     </div>
-    <div class="fine">Free and open source</div>
-    <h1>Film and TV budgeting that stays yours.<span>Open files. Every number explained.</span></h1>
     <div class="sheet">
-      <div><span>Total above the line</span><b>635,500.00</b></div>
-      <div><span>Total below the line</span><b>441,550.00</b></div>
-      <div><span>Contingency 10%</span><b>107,705.00</b></div>
-      <div class="net"><span>Net total</span><b>1,184,755.00</b></div>
+      <p class="head"><span>Explain</span><span>2300 Camera</span></p>
+      <div><span>6 detail lines</span><b>198,550.00</b></div>
+      <div class="sub"><span>Payroll taxes 18%</span><b>23,229.00</b></div>
+      <div class="sub"><span>Health and pension 4.5%</span><b>5,807.25</b></div>
+      <div class="net"><span>Account total</span><b>227,586.25</b></div>
     </div>
-    <div class="url">methodbudget.com</div>
+    <p class="url">methodbudget.com</p>
   </div>
 </body></html>

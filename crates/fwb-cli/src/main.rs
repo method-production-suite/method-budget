@@ -12,18 +12,23 @@
 pub(crate) mod cli;
 pub(crate) mod render;
 pub(crate) mod script;
+// The MCP server behind `method mcp` (docs/MCP.md).
+pub(crate) mod mcp;
 
 pub(crate) mod cmd {
     pub mod apply;
     pub mod check;
+    pub mod coa;
     pub mod diff;
     pub mod explain;
     pub mod export;
     pub mod fmt;
     pub mod import;
+    pub mod mcp;
     pub mod merge;
     pub mod merge_driver;
     pub mod new;
+    pub mod pack;
     pub mod report;
     pub mod sample;
     pub mod set;
@@ -100,6 +105,11 @@ const COMMANDS: &[Command] = &[
         run: cmd::import::run,
     },
     Command {
+        name: "coa",
+        usage: cmd::coa::USAGE,
+        run: cmd::coa::run,
+    },
+    Command {
         name: "explain",
         usage: cmd::explain::USAGE,
         run: cmd::explain::run,
@@ -118,6 +128,16 @@ const COMMANDS: &[Command] = &[
         name: "merge-driver",
         usage: cmd::merge_driver::USAGE,
         run: cmd::merge_driver::run,
+    },
+    Command {
+        name: "pack",
+        usage: cmd::pack::USAGE,
+        run: cmd::pack::run,
+    },
+    Command {
+        name: "mcp",
+        usage: cmd::mcp::USAGE,
+        run: cmd::mcp::run,
     },
 ];
 

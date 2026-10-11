@@ -1,0 +1,68 @@
+Number,Name
+,ABOVE THE LINE
+10,Director and creative
+10-01,Director
+10-02,Treatment
+10-03,Creative director
+11,Producers
+11-01,Producer
+11-02,Production manager
+12,Artist and talent
+12-01,Artist expenses
+12-02,Dancers
+12-03,Choreographer
+12-04,Featured talent
+12-05,Background talent
+,PRODUCTION
+20,Crew
+20-01,Assistant director
+20-02,Production coordinator
+20-03,Production assistants
+21,Camera
+21-01,Director of photography
+21-02,Camera assistants
+21-03,Camera package
+22,Grip and electric
+22-01,Gaffer and key grip
+22-02,Grip and electric crew
+22-03,Lighting and grip package
+23,Art and props
+23-01,Production designer
+23-02,Art department crew
+23-03,Props and set dressing
+24,Wardrobe makeup and hair
+24-01,Stylist
+24-02,Wardrobe
+24-03,Makeup and hair
+25,Locations and studio
+25-01,Site fees and permits
+25-02,Studio rental
+26,Equipment and vehicles
+26-01,Equipment rental
+26-02,Production vehicles
+27,Catering
+27-01,Catering
+27-02,Craft service
+28,Media and playback
+28-01,Playback system
+28-02,Drives and media
+,POST PRODUCTION
+40,Editorial
+40-01,Editor
+40-02,Edit suite
+41,Color and finishing
+41-01,Color grading
+41-02,Online
+42,Visual effects and graphics
+42-01,Visual effects
+42-02,Graphics and titles
+43,Deliverables
+43-01,Masters and delivery
+,OTHER
+50,Insurance
+50-01,Production insurance
+51,Production fee
+51-01,Production fee
+52,General and contingency
+52-01,General expenses
+52-02,Contingency

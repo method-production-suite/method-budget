@@ -1,0 +1,91 @@
+Number,Name
+,ABOVE THE LINE
+10,Director and creative
+10-01,Director
+10-02,Treatment and pitch
+10-03,Director's prep and post
+11,Talent
+11-01,Principal talent
+11-02,Supporting talent
+11-03,Background talent
+11-04,Casting
+11-05,Talent agency fees
+12,Talent expenses
+12-01,Fittings and rehearsals
+12-02,Talent travel
+,PRODUCTION
+20,Production crew
+20-01,Line producer
+20-02,Production manager
+20-03,Assistant directors
+20-04,Production coordinator
+20-05,Production assistants
+21,Camera
+21-01,Director of photography
+21-02,Camera assistants
+21-03,Digital imaging technician
+21-04,Camera package
+22,Grip and electric
+22-01,Gaffer
+22-02,Key grip
+22-03,Grip and electric crew
+22-04,Lighting and grip package
+23,Production sound
+23-01,Sound mixer
+23-02,Sound package
+24,Art department
+24-01,Production designer
+24-02,Art department crew
+24-03,Set construction
+24-04,Props and set dressing
+25,Wardrobe makeup and hair
+25-01,Stylist
+25-02,Wardrobe purchases and rentals
+25-03,Makeup and hair artists
+26,Locations and studio
+26-01,Location scout
+26-02,Site fees and permits
+26-03,Studio rental
+26-04,Studio expenses
+27,Equipment and vehicles
+27-01,Equipment rental
+27-02,Production vehicles
+27-03,Specialty equipment
+28,Catering
+28-01,Catering
+28-02,Craft service
+29,Media and data
+29-01,Drives and media
+29-02,Data management
+30,Pre-production and wrap
+30-01,Pre-production expenses
+30-02,Wrap expenses
+30-03,Shipping and couriers
+,POST PRODUCTION
+40,Editorial
+40-01,Editor
+40-02,Assistant editor
+40-03,Edit suite
+41,Color and finishing
+41-01,Color grading
+41-02,Online and conform
+42,Sound and music
+42-01,Sound design
+42-02,Mix
+42-03,Music licensing
+42-04,Original music
+43,Visual effects and graphics
+43-01,Visual effects
+43-02,Graphics and supers
+44,Deliverables
+44-01,Versions and cutdowns
+44-02,Masters and delivery
+,OTHER
+50,Insurance
+50-01,Production insurance
+51,Production fee
+51-01,Production fee
+52,Payroll and handling
+52-01,Payroll service fees
+53,Contingency
+53-01,Weather and contingency

@@ -1,0 +1,544 @@
+{
+  "format": "method-budget",
+  "version": 1,
+  "budget": {
+    "title": "Low-budget feature",
+    "base_currency": "USD",
+    "units": {
+      "Allow": {
+        "plural": "Allow"
+      },
+      "Day": {
+        "plural": "Days",
+        "hours": "10"
+      },
+      "Flat": {
+        "plural": "Flat"
+      },
+      "Hour": {
+        "plural": "Hours",
+        "hours": "1"
+      },
+      "Month": {
+        "plural": "Months",
+        "hours": "200"
+      },
+      "Week": {
+        "plural": "Weeks",
+        "hours": "50"
+      }
+    },
+    "topsheet": [
+      {
+        "kind": "category",
+        "code": "10",
+        "name": "Story and screenplay",
+        "accounts": [
+          {
+            "code": "10-01",
+            "name": "Rights"
+          },
+          {
+            "code": "10-02",
+            "name": "Screenwriter"
+          },
+          {
+            "code": "10-03",
+            "name": "Script expenses"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "11",
+        "name": "Producers",
+        "accounts": [
+          {
+            "code": "11-01",
+            "name": "Producers"
+          },
+          {
+            "code": "11-02",
+            "name": "Associate producers"
+          },
+          {
+            "code": "11-03",
+            "name": "Producers' expenses"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "12",
+        "name": "Director",
+        "accounts": [
+          {
+            "code": "12-01",
+            "name": "Director"
+          },
+          {
+            "code": "12-02",
+            "name": "Director's expenses"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "13",
+        "name": "Cast",
+        "accounts": [
+          {
+            "code": "13-01",
+            "name": "Principal cast"
+          },
+          {
+            "code": "13-02",
+            "name": "Supporting cast and day players"
+          },
+          {
+            "code": "13-03",
+            "name": "Casting"
+          },
+          {
+            "code": "13-04",
+            "name": "Cast expenses"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total above-the-line"
+      },
+      {
+        "kind": "category",
+        "code": "20",
+        "name": "Production staff",
+        "accounts": [
+          {
+            "code": "20-01",
+            "name": "Line producer"
+          },
+          {
+            "code": "20-02",
+            "name": "First assistant director"
+          },
+          {
+            "code": "20-03",
+            "name": "Second assistant director"
+          },
+          {
+            "code": "20-04",
+            "name": "Production coordinator"
+          },
+          {
+            "code": "20-05",
+            "name": "Script supervisor"
+          },
+          {
+            "code": "20-06",
+            "name": "Production assistants"
+          },
+          {
+            "code": "20-07",
+            "name": "Production accountant"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "21",
+        "name": "Camera",
+        "accounts": [
+          {
+            "code": "21-01",
+            "name": "Director of photography"
+          },
+          {
+            "code": "21-02",
+            "name": "Camera assistants"
+          },
+          {
+            "code": "21-03",
+            "name": "Digital imaging technician"
+          },
+          {
+            "code": "21-04",
+            "name": "Camera package"
+          },
+          {
+            "code": "21-05",
+            "name": "Camera supplies"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "22",
+        "name": "Grip and electric",
+        "accounts": [
+          {
+            "code": "22-01",
+            "name": "Gaffer"
+          },
+          {
+            "code": "22-02",
+            "name": "Key grip"
+          },
+          {
+            "code": "22-03",
+            "name": "Grip and electric crew"
+          },
+          {
+            "code": "22-04",
+            "name": "Lighting and grip package"
+          },
+          {
+            "code": "22-05",
+            "name": "Expendables"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "23",
+        "name": "Production sound",
+        "accounts": [
+          {
+            "code": "23-01",
+            "name": "Sound mixer"
+          },
+          {
+            "code": "23-02",
+            "name": "Boom operator"
+          },
+          {
+            "code": "23-03",
+            "name": "Sound package"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "24",
+        "name": "Art department",
+        "accounts": [
+          {
+            "code": "24-01",
+            "name": "Production designer"
+          },
+          {
+            "code": "24-02",
+            "name": "Art department crew"
+          },
+          {
+            "code": "24-03",
+            "name": "Set dressing and props"
+          },
+          {
+            "code": "24-04",
+            "name": "Construction"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "25",
+        "name": "Wardrobe makeup and hair",
+        "accounts": [
+          {
+            "code": "25-01",
+            "name": "Costume designer"
+          },
+          {
+            "code": "25-02",
+            "name": "Wardrobe assistant"
+          },
+          {
+            "code": "25-03",
+            "name": "Wardrobe purchases and rentals"
+          },
+          {
+            "code": "25-04",
+            "name": "Makeup and hair artists"
+          },
+          {
+            "code": "25-05",
+            "name": "Makeup and hair supplies"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "26",
+        "name": "Locations",
+        "accounts": [
+          {
+            "code": "26-01",
+            "name": "Location manager"
+          },
+          {
+            "code": "26-02",
+            "name": "Site fees"
+          },
+          {
+            "code": "26-03",
+            "name": "Permits and insurance certificates"
+          },
+          {
+            "code": "26-04",
+            "name": "Location expenses"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "27",
+        "name": "Transportation",
+        "accounts": [
+          {
+            "code": "27-01",
+            "name": "Vehicles"
+          },
+          {
+            "code": "27-02",
+            "name": "Fuel and parking"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "28",
+        "name": "Catering",
+        "accounts": [
+          {
+            "code": "28-01",
+            "name": "Meals"
+          },
+          {
+            "code": "28-02",
+            "name": "Craft service"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "29",
+        "name": "Production office",
+        "accounts": [
+          {
+            "code": "29-01",
+            "name": "Office and supplies"
+          },
+          {
+            "code": "29-02",
+            "name": "Communications"
+          },
+          {
+            "code": "29-03",
+            "name": "Shipping"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "30",
+        "name": "Media and data",
+        "accounts": [
+          {
+            "code": "30-01",
+            "name": "Drives and media"
+          },
+          {
+            "code": "30-02",
+            "name": "Backup and storage"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total production"
+      },
+      {
+        "kind": "category",
+        "code": "40",
+        "name": "Editorial",
+        "accounts": [
+          {
+            "code": "40-01",
+            "name": "Editor"
+          },
+          {
+            "code": "40-02",
+            "name": "Assistant editor"
+          },
+          {
+            "code": "40-03",
+            "name": "Edit system"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "41",
+        "name": "Post sound",
+        "accounts": [
+          {
+            "code": "41-01",
+            "name": "Sound design and editing"
+          },
+          {
+            "code": "41-02",
+            "name": "Mix"
+          },
+          {
+            "code": "41-03",
+            "name": "ADR and foley"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "42",
+        "name": "Music",
+        "accounts": [
+          {
+            "code": "42-01",
+            "name": "Composer"
+          },
+          {
+            "code": "42-02",
+            "name": "Music licensing"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "43",
+        "name": "Visual effects and titles",
+        "accounts": [
+          {
+            "code": "43-01",
+            "name": "Visual effects"
+          },
+          {
+            "code": "43-02",
+            "name": "Titles and graphics"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "44",
+        "name": "Color and finishing",
+        "accounts": [
+          {
+            "code": "44-01",
+            "name": "Color grading"
+          },
+          {
+            "code": "44-02",
+            "name": "Conform and online"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "45",
+        "name": "Deliverables",
+        "accounts": [
+          {
+            "code": "45-01",
+            "name": "Masters"
+          },
+          {
+            "code": "45-02",
+            "name": "Digital cinema package"
+          },
+          {
+            "code": "45-03",
+            "name": "Closed captions and subtitles"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total post"
+      },
+      {
+        "kind": "category",
+        "code": "50",
+        "name": "Insurance",
+        "accounts": [
+          {
+            "code": "50-01",
+            "name": "Production insurance"
+          },
+          {
+            "code": "50-02",
+            "name": "Errors and omissions"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "51",
+        "name": "Legal and accounting",
+        "accounts": [
+          {
+            "code": "51-01",
+            "name": "Legal"
+          },
+          {
+            "code": "51-02",
+            "name": "Accounting and payroll fees"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "52",
+        "name": "Festivals and marketing",
+        "accounts": [
+          {
+            "code": "52-01",
+            "name": "Festival fees"
+          },
+          {
+            "code": "52-02",
+            "name": "Marketing materials"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "53",
+        "name": "General expenses",
+        "accounts": [
+          {
+            "code": "53-01",
+            "name": "Bank fees"
+          },
+          {
+            "code": "53-02",
+            "name": "Miscellaneous"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "54",
+        "name": "Contingency",
+        "accounts": [
+          {
+            "code": "54-01",
+            "name": "Contingency"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total other"
+      }
+    ]
+  }
+}

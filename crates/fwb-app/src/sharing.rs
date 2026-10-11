@@ -241,6 +241,7 @@ pub fn make_sub_budget(
         saved,
         app_version: APP_VERSION.to_string(),
         note: Some(subbudget::describe(&spec)),
+        pack: None,
     });
     Ok(b)
 }

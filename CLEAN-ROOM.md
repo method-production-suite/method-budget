@@ -8,10 +8,12 @@ with Entertainment Partners or Movie Magic Budgeting.
   books, payroll fringe rules, public industry training material.
 - Observed behaviour of other budgeting tools, used normally through their UI.
 - Files that those tools *export* in open formats (Excel, CSV, PDF) for import.
+- Studio and network charts of accounts, which studios share with their production partners
+  so budgets are built to the right chart.
 
 **Never**
 - Decompile, disassemble or debug another vendor's binaries.
-- Copy their code, templates, help text, icons or bundled data (rate tables, fringe libraries).
+- Copy their code, help text, icons or bundled data (rate tables, fringe libraries).
 - Reverse engineer a proprietary native file format (e.g. `.mbd`). Native interop needs a
   lawyer's sign-off first and is out of scope for now.
 

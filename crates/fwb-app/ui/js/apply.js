@@ -63,7 +63,7 @@ import {
   MOVE_KEYS,
   inUse,
 } from './setuplist.js';
-import { obj, str, plural, errText } from './util.js';
+import { obj, str, plural, errText, sourceText } from './util.js';
 
 const LISTS = [
   {
@@ -1125,7 +1125,7 @@ function setupItem(list, name, def, movable) {
   const key = itemKey(list.id, name);
   const infoId = nextId();
   const cells = setupCells(list, name, def);
-  const tip = [str(def.description), budgetWide(list, name, def), 'Double-click to edit'].filter(Boolean).join('\n');
+  const tip = [str(def.description), sourceText(st.view, list.what, name), budgetWide(list, name, def), 'Double-click to edit'].filter(Boolean).join('\n');
   const b = el(
     'button',
     {

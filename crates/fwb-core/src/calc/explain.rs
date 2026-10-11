@@ -24,8 +24,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use super::fringes::{allocate, earners};
+use super::topsheet::{credit_cap, credit_keep, credit_row};
 use super::{recalc, CalcError, Ctx, RecalcOptions};
-use crate::decimal::{mul_cents, percent_of, Dec};
+use crate::decimal::{mul_cents, percent_of, Dec, Exact};
 use crate::expr::Expr;
 use crate::model::{
     Budget, ChargeKind, CreditCap, CreditSource, Detail, Formula, FringeKind, FringePosting, RowId,
@@ -319,7 +320,7 @@ pub fn money(c: Cents) -> String {
 }
 
 /// A decimal amount of money: at least two places, more when it has them.
-pub(crate) fn dmoney(d: Dec) -> String {
+pub(crate) fn dmoney(d: impl std::fmt::Display) -> String {
     let s = d.to_string();
     let (sign, s) = match s.strip_prefix('-') {
         Some(r) => ("-", r),
@@ -359,8 +360,9 @@ fn group(digits: &str) -> String {
 }
 
 /// "rounded half away from zero to X" when rounding changed `exact`.
-fn rounding(exact: Dec, rounded: Cents) -> Option<Step> {
-    (exact != Dec::from_cents(rounded)).then(|| {
+fn rounding(exact: impl Into<Exact>, rounded: Cents) -> Option<Step> {
+    let exact = exact.into();
+    (!exact.is_cents(rounded)).then(|| {
         Step::note(
             "Rounding",
             format!(
@@ -1260,9 +1262,9 @@ impl<'a> Explainer<'a> {
                     Step::note_amount("Excluded", "taken off the base", excluded).with(ex_children),
                 );
                 let net = base.checked_sub(excluded).ok_or_else(ovf)?;
-                let exact = Dec::from_cents(net)
+                let exact = Exact::cents(net)
                     .checked_mul(*p)
-                    .and_then(|v| v.checked_div(Dec::from_int(100)))
+                    .map(Exact::percent)
                     .ok_or_else(ovf)?;
                 let amount = percent_of(net, *p).ok_or_else(ovf)?;
                 notes.push(Step::note(
@@ -1287,7 +1289,7 @@ impl<'a> Explainer<'a> {
                             .get(cur)
                             .ok_or_else(|| gone(&format!("currency {cur}")))?
                             .rate;
-                        let exact = Dec::from_cents(*amount).checked_mul(rate).ok_or_else(ovf)?;
+                        let exact = Exact::cents(*amount).checked_mul(rate).ok_or_else(ovf)?;
                         let conv = mul_cents(*amount, rate).ok_or_else(ovf)?;
                         notes.push(Step::note(
                             "Fee",
@@ -1341,9 +1343,8 @@ impl<'a> Explainer<'a> {
 
     fn credit_step(&self, i: usize) -> R<Step> {
         let c = self.applied_credit(i)?;
-        let hundred = Dec::from_int(100);
         let mut notes = Vec::new();
-        let mut total = Dec::ZERO;
+        let mut total = Exact::cents(0);
         for (k, cr) in c.rows.iter().enumerate() {
             let mut row_notes = Vec::new();
             let (gross, excluded) = match &cr.source {
@@ -1407,21 +1408,24 @@ impl<'a> Explainer<'a> {
                 format!("{} - {}", money(gross), money(excluded)),
                 net,
             ));
-            let pct = |v: Dec| v.checked_mul(cr.percent)?.checked_div(hundred);
-            let net_dec = Dec::from_cents(net);
-            let credit = match cr.cap {
+            // The engine's own exact working, so the amounts agree.
+            let (credit, _) = credit_row(net, cr.percent, cr.cap).ok_or_else(ovf)?;
+            let pct = |v: Exact| v.checked_mul(cr.percent).map(Exact::percent);
+            let net_x = Exact::cents(net);
+            match cr.cap {
                 CreditCap::None => {
-                    let v = pct(net_dec).ok_or_else(ovf)?;
                     row_notes.push(Step::note(
                         "Credit",
-                        format!("{}% of {} = {}", num(cr.percent), money(net), dmoney(v)),
+                        format!(
+                            "{}% of {} = {}",
+                            num(cr.percent),
+                            money(net),
+                            dmoney(credit)
+                        ),
                     ));
-                    v
                 }
                 CreditCap::QualifiedSpend(cap) => {
-                    let capd = Dec::from_cents(cap);
-                    let spend = net_dec.min(capd);
-                    let v = pct(spend).ok_or_else(ovf)?;
+                    let spend = net_x.checked_min(Exact::cents(cap)).ok_or_else(ovf)?;
                     row_notes.push(Step::note(
                         "Cap on spend",
                         format!(
@@ -1432,14 +1436,16 @@ impl<'a> Explainer<'a> {
                     ));
                     row_notes.push(Step::note(
                         "Credit",
-                        format!("{}% of {} = {}", num(cr.percent), dmoney(spend), dmoney(v)),
+                        format!(
+                            "{}% of {} = {}",
+                            num(cr.percent),
+                            dmoney(spend),
+                            dmoney(credit)
+                        ),
                     ));
-                    v
                 }
                 CreditCap::Credit(cap) => {
-                    let capd = Dec::from_cents(cap);
-                    let uncapped = pct(net_dec).ok_or_else(ovf)?;
-                    let v = uncapped.min(capd);
+                    let uncapped = pct(net_x).ok_or_else(ovf)?;
                     row_notes.push(Step::note(
                         "Credit",
                         format!(
@@ -1448,12 +1454,11 @@ impl<'a> Explainer<'a> {
                             money(net),
                             dmoney(uncapped),
                             money(cap),
-                            dmoney(v)
+                            dmoney(credit)
                         ),
                     ));
-                    v
                 }
-            };
+            }
             row_notes.push(Step::note(
                 "Not rounded yet",
                 "rows are added, capped and discounted before the one rounding",
@@ -1467,23 +1472,15 @@ impl<'a> Explainer<'a> {
             notes.push(Step::note(label, dmoney(credit)).with(row_notes));
         }
         notes.push(Step::note("Rows added", dmoney(total)));
-        let capped = match c.cap {
-            Some(cap) => {
-                let v = total.min(Dec::from_cents(cap));
-                notes.push(Step::note(
-                    "Credit cap",
-                    format!("at most {}: {}", money(cap), dmoney(v)),
-                ));
-                v
-            }
-            None => total,
-        };
-        let keep = c
-            .discount_percent
-            .checked_div(hundred)
-            .and_then(|d| Dec::ONE.checked_sub(d))
-            .ok_or_else(ovf)?;
-        let exact = capped.checked_mul(keep).ok_or_else(ovf)?;
+        let capped = credit_cap(total, c.cap).ok_or_else(ovf)?;
+        if let Some(cap) = c.cap {
+            notes.push(Step::note(
+                "Credit cap",
+                format!("at most {}: {}", money(cap), dmoney(capped)),
+            ));
+        }
+        let keep = credit_keep(c.discount_percent).ok_or_else(ovf)?;
+        let exact = capped.checked_mul_exact(keep).ok_or_else(ovf)?;
         if !c.discount_percent.is_zero() {
             notes.push(Step::note(
                 "Discount",
@@ -1491,7 +1488,7 @@ impl<'a> Explainer<'a> {
                     "less {}%: {} x {} = {}",
                     num(c.discount_percent),
                     dmoney(capped),
-                    num(keep),
+                    keep,
                     dmoney(exact)
                 ),
             ));
@@ -1714,7 +1711,7 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
 
         let total = match d.kind {
             RowKind::Adjustment => {
-                let exact = Dec::from_cents(since_adjustment)
+                let exact = Exact::cents(since_adjustment)
                     .checked_mul(quantity)
                     .ok_or_else(ovf)?;
                 let t = mul_cents(since_adjustment, quantity).ok_or_else(ovf)?;
@@ -1760,7 +1757,7 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
                     )
                 };
                 notes.push(Step::note("Rate", rate_text));
-                let exact = quantity.checked_mul(rate).ok_or_else(ovf)?;
+                let exact = Exact::dec(quantity).checked_mul(rate).ok_or_else(ovf)?;
                 let local = exact.to_cents().ok_or_else(ovf)?;
                 let cur_code = match &d.currency {
                     Some(c) if c != base => Some(c),
@@ -1784,9 +1781,7 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
                             .currencies
                             .get(c)
                             .ok_or_else(|| gone(&format!("currency {c}")))?;
-                        let exact = Dec::from_cents(local)
-                            .checked_mul(cur.rate)
-                            .ok_or_else(ovf)?;
+                        let exact = Exact::cents(local).checked_mul(cur.rate).ok_or_else(ovf)?;
                         let t = mul_cents(local, cur.rate).ok_or_else(ovf)?;
                         notes.push(Step::note(
                             "Currency",
@@ -1957,9 +1952,9 @@ fn fringes_calc(
                 None => base,
             };
             let amount = percent_of(capped, rate).ok_or_else(ovf)?;
-            let exact = Dec::from_cents(capped)
+            let exact = Exact::cents(capped)
                 .checked_mul(rate)
-                .and_then(|v| v.checked_div(Dec::from_int(100)))
+                .map(Exact::percent)
                 .ok_or_else(ovf)?;
             let shares = allocate(amount, &weights).ok_or_else(ovf)?;
             let cutoff_use = allocate(capped, &weights).ok_or_else(ovf)?;
@@ -2073,12 +2068,15 @@ fn fringes_calc(
             let lh = hours(&d.unit);
             let (amount, text) = match (fh, lh) {
                 (Some(fh), Some(lh)) if !fh.is_zero() => {
-                    let exact = rate
+                    // Rounded once from the exact amount, as the engine does.
+                    // The division need not end, so the working shows it
+                    // to 9 places.
+                    let product = Exact::dec(rate)
                         .checked_mul(q)
                         .and_then(|v| v.checked_mul(lh))
-                        .and_then(|v| v.checked_div(fh))
                         .ok_or_else(ovf)?;
-                    let amount = exact.to_cents().ok_or_else(ovf)?;
+                    let amount = product.div_to_cents(fh).ok_or_else(ovf)?;
+                    let exact = product.div_to_dec(fh).ok_or_else(ovf)?;
                     let fu = unit.as_deref().unwrap_or_default();
                     notes.push(Step::note(
                         "Fringe",
@@ -2275,9 +2273,11 @@ mod tests {
         assert_eq!(money(0), "0.00");
         assert_eq!(money(-5), "-0.05");
         assert_eq!(money(123_456_789), "1,234,567.89");
-        assert_eq!(dmoney("1296.315".parse().unwrap()), "1,296.315");
-        assert_eq!(dmoney("-54000".parse().unwrap()), "-54,000.00");
-        assert_eq!(dmoney("0.5".parse().unwrap()), "0.50");
+        assert_eq!(dmoney("1296.315".parse::<Dec>().unwrap()), "1,296.315");
+        assert_eq!(dmoney("-54000".parse::<Dec>().unwrap()), "-54,000.00");
+        assert_eq!(dmoney("0.5".parse::<Dec>().unwrap()), "0.50");
+        assert_eq!(dmoney(Exact::new(49_999_995, 10)), "0.0049999995");
+        assert_eq!(dmoney(Exact::new(-5_400_000, 2)), "-54,000.00");
         assert_eq!(num("1234567.25".parse().unwrap()), "1,234,567.25");
         assert_eq!(num("-12".parse().unwrap()), "-12");
     }

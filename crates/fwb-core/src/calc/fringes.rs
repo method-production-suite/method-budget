@@ -11,7 +11,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::calc::{err, overflow, row_at, sum, CalcError, Ctx, ErrorKind};
-use crate::decimal::{percent_of, Dec};
+use crate::decimal::{percent_of, Dec, Exact};
 use crate::model::{Account, Detail, Fringe, FringeKind, RowKind};
 use crate::report::RowTotals;
 use crate::Cents;
@@ -229,7 +229,8 @@ pub(super) fn allocate(amount: Cents, weights: &[Cents]) -> Option<Vec<Cents>> {
 
 /// A flat fringe on one line. Per unit, scaled by the hours ratio, when the
 /// fringe's unit and the line's primary unit both have hours (and the
-/// fringe's are not zero); otherwise `rate` once. Rounded to cents once.
+/// fringe's are not zero); otherwise `rate` once. The exact amount is
+/// rounded to cents once.
 pub(super) fn flat_amount(
     ctx: &Ctx,
     fringe_unit: Option<&str>,
@@ -239,11 +240,10 @@ pub(super) fn flat_amount(
 ) -> Option<Cents> {
     let hours = |u: &str| ctx.b.units.get(u).and_then(|def| def.hours);
     match (fringe_unit.and_then(hours), hours(line_unit)) {
-        (Some(fh), Some(lh)) if !fh.is_zero() => rate
+        (Some(fh), Some(lh)) if !fh.is_zero() => Exact::dec(rate)
             .checked_mul(quantity)?
             .checked_mul(lh)?
-            .checked_div(fh)?
-            .to_cents(),
+            .div_to_cents(fh),
         _ => rate.to_cents(),
     }
 }

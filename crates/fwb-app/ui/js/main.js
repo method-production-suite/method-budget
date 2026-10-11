@@ -69,6 +69,9 @@ import { showCompare } from './compare.js';
 import { showWhatChanged, showMerge } from './diffmerge.js';
 import { importSetup, newFromTemplate, saveAsTemplate } from './importsetup.js';
 import { importSpreadsheet } from './sheetimport.js';
+import { importChart } from './coaimport.js';
+import { exportPack, importPack } from './packs.js';
+import { exportSetupLists, importSetupLists } from './setuplists.js';
 import { importActuals } from './actualsimport.js';
 import { saveShareCopy, newSubBudget, renderShareBanner, offerReturnedCopy } from './sharing.js';
 import { displayCommands, userDisplay, withoutZeroRows } from './display.js';
@@ -291,6 +294,7 @@ const NOT_EDITS = new Set([
   'open_pending',
   'open_recovered',
   'template_new',
+  'chart_template_new',
   // Split view (src/tabs.rs): the panes changed, not the budget.
   'split_view',
   'close_split',
@@ -2148,6 +2152,21 @@ Object.assign(COMMANDS, {
   'file.import_setup': () => startFromBudget(importSetup, 'import_setup'),
 });
 
+// File > Import Setup Pack…, Export Setup Pack…, Import Setup Lists… and
+// Export > Setup Lists… (packs.js, setuplists.js; src/packs.rs,
+// src/setup_sheets.rs).
+Object.assign(COMMANDS, {
+  'file.import_setup_pack': () => startFromBudget((c) => importPack(packsCtx(c), 'budget'), 'pack_import'),
+  'file.export_setup_pack': () => startFromBudget((c) => exportPack(packsCtx(c), 'budget'), 'pack_export'),
+  'file.import_setup_lists': () => startFromBudget((c) => importSetupLists(packsCtx(c)), 'import_setup'),
+  'file.export_setup_lists': () => startFromBudget((c) => exportSetupLists(packsCtx(c)), 'setup_sheet_export'),
+});
+
+/** What packs.js and setuplists.js need, from startFromBudget's context. */
+function packsCtx(c) {
+  return { call: (cmd, args) => c.invoke(cmd, args), apply: c.apply, toast: c.toast, focus: c.focus };
+}
+
 // File > Save a Copy for Sharing… and New Sub-Budget… (sharing.js;
 // src/sharing.rs).
 Object.assign(COMMANDS, {
@@ -2193,6 +2212,17 @@ Object.assign(COMMANDS, {
       focus: () => grid.focus(),
       account: () => (state.level === 'details' && state.acct ? state.acct.code : ''),
     });
+  },
+});
+
+// File > Import Chart of Accounts…: a chart from a spreadsheet or another
+// budget, as a new budget or applied to this one (coaimport.js;
+// src/coa_import.rs).
+Object.assign(COMMANDS, {
+  'file.import_chart': () => {
+    if (grid.editor) grid.commitEdit(null);
+    if (!state.view) return;
+    importChart({ invoke, apply: (v) => apply(v, { cmd: 'coa_import' }), toast, focus: () => grid.focus() });
   },
 });
 

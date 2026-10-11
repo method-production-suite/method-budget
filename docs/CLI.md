@@ -52,10 +52,12 @@ Reads and recalculates the budget. Prints `<file>: ok, net total 1,234.56`, or f
 Rewrites the file in canonical form (key order, decimals, indentation), the bytes the
 app would save.
 
-### `method new <file.mthd>` and `method sample <file.mthd>`
+### `method new <file.mthd> [--template NAME]` and `method sample <file.mthd>`
 
 Write a starter budget, or a large invented test budget (5,000 rows). Both refuse to
-replace an existing file.
+replace an existing file. `--template` starts instead from one of the bundled charts of
+accounts (its id or name, any case; `method coa list` names them): its categories, accounts
+and production totals, no lines, titled Untitled (docs/TEMPLATES.md).
 
 ### `method totals <file.mthd> [--json] [--exclude GROUP]...`
 
@@ -208,6 +210,53 @@ The **mapping file** is JSON; every field may be left out:
 
 Our own Excel export imports back with no mapping at all.
 
+### `method coa import <chart> -o <out.mthd> [--sheet N|NAME] [--mapping M.json] [--title T] [--currency C] [--into B.mthd] [--remove-unlisted] [--force] [--dry-run]`
+
+Reads a chart of accounts (category and account numbers, names and production totals,
+nothing else) from an Excel workbook, a CSV or tab-delimited file, or another budget file,
+and writes it as a new budget with no lines: a template, titled after the file unless
+`--title` says otherwise. The header row, the columns and the numbering pattern are found
+(docs/TEMPLATES.md lists the shapes it reads, and the `kind,code,name,parent` layout that
+needs no guessing); `--sheet` picks a sheet, `--mapping` names the rest. It prints what it
+read (counts, the pattern, rows skipped and anything to check).
+
+`--into B.mthd` applies the chart to a copy of that budget instead and writes the result to
+`-o` (which may be the same file): categories and accounts it lacks are added in number
+order, the ones it has are renamed to the chart's names, numbers are carried over to the
+budget's own pattern (ones that don't fit are left out and listed), production totals are
+left as they are. Accounts the chart doesn't list are kept and listed; with
+`--remove-unlisted` the empty ones (no lines, no notes) are removed, and categories the
+chart doesn't list once they are empty. An account with lines is never removed.
+
+The same input always writes the same bytes, which is what makes the bundled templates
+reproducible (`scripts/build-coa-templates.py` runs this command).
+
+A chart mapping file:
+
+```json
+{
+  "sheet": 1,
+  "header_row": 3,
+  "columns": { "category_code": "A", "account_code": "A", "account_name": "B", "level": "C" },
+  "coding": { "category": 2, "account": 2, "sub": 0, "separator": "-" },
+  "sub_accounts": false,
+  "default_levels": true
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `sheet` | A sheet name (any case) or number from 1. Default: the visible sheet with the most numbers. |
+| `header_row` | The row of column titles, from 1; `"none"`; `"detect"` (the default). |
+| `columns` | Field to column (letter or number from 1): `category_code`, `category_name`, `account_code`, `account_name`, `level`. The category and account number may be the same column (a one-column outline); a name left out is the text to the right of the number. Default: guessed from the titles and the cells. |
+| `coding` | Write the numbers in this pattern (widths 1 to 6, separator one of `-` `.` space `/` `:` `;` `,` or `""`). Default: the pattern the numbers follow. |
+| `sub_accounts` | Keep sub-accounts as accounts of their own (else left out). The `kind,code,name,parent` layout always keeps them. |
+| `default_levels` | Add our production totals by category number when the file names none (default true). |
+
+### `method coa list`
+
+Lists the bundled chart-of-accounts templates by group, with their ids.
+
 ### `method explain <file.mthd> <total> [--depth N] [--exclude GROUP]...`
 
 Prints how one total is worked out, as an indented tree whose leaves add up to it exactly
@@ -255,6 +304,52 @@ git marks the file conflicted (it stays a valid budget, conflicts settled for ou
 up with `*.mthd merge=method-budget` (and `*.fwb merge=method-budget`) in `.gitattributes`
 and `git config merge.method-budget.driver "method merge-driver %O %A %B %P"` (docs/MERGE.md,
 "With git").
+
+### Setup packs: `method pack export`, `import` and `show`
+
+A setup pack is a budget file with setup items and no lines, stamped with the pack's
+details (docs/FORMAT.md, "Setup packs"; docs/APP.md, "Setup packs").
+
+`method pack export <budget.mthd> -o <pack.mthd> [--kinds K,K] [--items NAME,NAME] [--item NAME] [--title T] [--description D] [--author A] [--pack-version V] [--effective YYYY-MM-DD] [--region R] [--notes N] [--url URL]... [--created DATE]`
+writes a pack of the budget's setup items of `--kinds` (`globals`, `fringes`, `groups`,
+`units`, `sets`, `locations`, `currencies`, `charges`, `credits`, `tag-presets`,
+`line-blocks`, `report-presets`, `ot-patterns`; every kind when left out), or only the
+named `--items` (split on commas; `--item` takes a name whole, for names with commas;
+`kind:Name` says which kind), with everything they need: a fringe's globals and unit, a
+global's globals, a charge's groups, a credit's groups and fringes, a tag preset's tags.
+The budget settings never go in a pack. The title defaults to the budget's; `--created`
+defaults to today (UTC). The details are checked (a date `YYYY-MM-DD`, links `http://` or
+`https://`); a refusal is exit 3. The pack is written atomically, never over the budget.
+
+`method pack import <pack.mthd> <budget.mthd> [--ours | --theirs] [--kinds K,K] [--items NAME,NAME] [--item NAME] [--dry-run]`
+imports the pack's items (or the picked ones, with what they need) into the budget and
+saves it atomically: items the budget lacks are added; where it has an item of the same
+name set up differently it keeps its own (`--ours`, the default) or takes the pack's
+(`--theirs`). Every item that comes in is stamped with the pack's title, version and
+effective date (`setup_sources`). Any budget file can be imported from (nothing is
+stamped then). `--dry-run` lists each item as add, same, keep (ours) or replace (theirs)
+and writes nothing.
+
+`method pack show <pack.mthd>` prints the pack's details, its items with their
+definitions, and where each came from.
+
+```sh
+method pack export show.mthd -o "Crew Rates.mthd" --kinds fringes,globals \
+  --title "Crew Rates" --pack-version 2026.1 --effective 2026-01-01 --region "Example"
+method pack import "Crew Rates.mthd" new-show.mthd --dry-run
+method pack import "Crew Rates.mthd" new-show.mthd --theirs
+```
+
+### `method mcp [--root DIR]... [--read-only]`
+
+A Model Context Protocol server on stdin and stdout, so coding agents (Claude Code and
+other MCP clients) can open, read, edit, check, diff, merge, export and import budgets with
+typed tools instead of shell commands. Every path must be inside a `--root` folder
+(repeatable; default: the current folder); `--read-only` hides every tool that writes.
+Changes are written atomically, refused when the file changed on disk since the server read
+it, and undoable within the session. It runs until stdin closes; logs go to stderr. Register
+it with `claude mcp add method -- method mcp --root ~/Budgets`. The tools, the safety model
+and the limits are in docs/MCP.md.
 
 ## Edit scripts
 

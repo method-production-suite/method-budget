@@ -1,0 +1,1601 @@
+{
+  "format": "method-budget",
+  "version": 1,
+  "budget": {
+    "title": "MGM ANIMATION",
+    "base_currency": "USD",
+    "account_coding": {
+      "category_width": 3,
+      "account_width": 1,
+      "sub_width": 0,
+      "set_width": 0,
+      "separator": ""
+    },
+    "units": {
+      "Allow": {
+        "plural": "Allow"
+      },
+      "Day": {
+        "plural": "Days",
+        "hours": "10"
+      },
+      "Flat": {
+        "plural": "Flat"
+      },
+      "Hour": {
+        "plural": "Hours",
+        "hours": "1"
+      },
+      "Month": {
+        "plural": "Months",
+        "hours": "200"
+      },
+      "Week": {
+        "plural": "Weeks",
+        "hours": "50"
+      }
+    },
+    "topsheet": [
+      {
+        "kind": "category",
+        "code": "110",
+        "name": "STORY AND RIGHTS",
+        "accounts": [
+          {
+            "code": "1101",
+            "name": "SCREENWRITER"
+          },
+          {
+            "code": "1103",
+            "name": "RIGHTS PURCHASE"
+          },
+          {
+            "code": "1104",
+            "name": "ROYALTIES / PROGRAM FEES"
+          },
+          {
+            "code": "1105",
+            "name": "STORY EDITORS / CONSULTANTS"
+          },
+          {
+            "code": "1106",
+            "name": "XEROX / MIMEO"
+          },
+          {
+            "code": "1107",
+            "name": "SECRETARIES / TYPISTS"
+          },
+          {
+            "code": "1108",
+            "name": "RESEARCH"
+          },
+          {
+            "code": "1111",
+            "name": "ABANDONED SCRIPTS"
+          },
+          {
+            "code": "1185",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "120",
+        "name": "PRODUCER'S UNIT",
+        "accounts": [
+          {
+            "code": "1201",
+            "name": "EXECUTIVE PRODUCER(S)"
+          },
+          {
+            "code": "1202",
+            "name": "PRODUCER(S)"
+          },
+          {
+            "code": "1203",
+            "name": "ASSOCIATE PRODUCER(S)"
+          },
+          {
+            "code": "1204",
+            "name": "PRODUCER ASSISTANT(S)"
+          },
+          {
+            "code": "1206",
+            "name": "TECHNICAL / CREATIVE CONSULTANT"
+          },
+          {
+            "code": "1207",
+            "name": "SECRETARIES"
+          },
+          {
+            "code": "1208",
+            "name": "LEGAL / AUDITING EXPENSE"
+          },
+          {
+            "code": "1285",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "130",
+        "name": "DIRECTION",
+        "accounts": [
+          {
+            "code": "1301",
+            "name": "DIRECTOR"
+          },
+          {
+            "code": "1302",
+            "name": "DIRECTOR'S ASSOCIATE(S)"
+          },
+          {
+            "code": "1303",
+            "name": "DIRECTOR'S ASSISTANT(S)"
+          },
+          {
+            "code": "1304",
+            "name": "OTHER DIRECTORS"
+          },
+          {
+            "code": "1306",
+            "name": "TECH DIRECTOR / ADVISOR"
+          },
+          {
+            "code": "1307",
+            "name": "SECRETARIES"
+          },
+          {
+            "code": "1308",
+            "name": "DIALOGUE DIRECTOR"
+          },
+          {
+            "code": "1385",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "140",
+        "name": "CAST",
+        "accounts": [
+          {
+            "code": "1401",
+            "name": "STARS / LEADING PLAYERS"
+          },
+          {
+            "code": "1402",
+            "name": "SUPPORTING CAST"
+          },
+          {
+            "code": "1403",
+            "name": "STUNT COORDINATOR"
+          },
+          {
+            "code": "1404",
+            "name": "STUNT PLAYERS"
+          },
+          {
+            "code": "1405",
+            "name": "CASTING EXPENSES"
+          },
+          {
+            "code": "1406",
+            "name": "CAST OVERTIME / LOOPING"
+          },
+          {
+            "code": "1407",
+            "name": "SCRATCH TRACK RECORDING"
+          },
+          {
+            "code": "1409",
+            "name": "STUDIO TEACHER"
+          },
+          {
+            "code": "1410",
+            "name": "SINGERS"
+          },
+          {
+            "code": "1417",
+            "name": "RENTALS - STUNT EQUIPMENT"
+          },
+          {
+            "code": "1451",
+            "name": "CASTING DIRECTOR"
+          },
+          {
+            "code": "1485",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "150",
+        "name": "ATL TRAVEL/LIVING EXPENSE",
+        "accounts": [
+          {
+            "code": "1501",
+            "name": "WRITERS LIVING ALLOWANCE"
+          },
+          {
+            "code": "1502",
+            "name": "WRITERS TRAVEL ALLOWANCE"
+          },
+          {
+            "code": "1503",
+            "name": "PRODUCER LIVING ALLOWANCE"
+          },
+          {
+            "code": "1504",
+            "name": "PRODUCER TRAVEL ALLOWANCE"
+          },
+          {
+            "code": "1505",
+            "name": "DIRECTOR LIVING ALLOWANCE"
+          },
+          {
+            "code": "1506",
+            "name": "DIRECTOR TRAVEL ALLOWANCE"
+          },
+          {
+            "code": "1507",
+            "name": "CAST LIVING ALLOWANCE"
+          },
+          {
+            "code": "1508",
+            "name": "CAST TRAVEL ALLOWANCE"
+          },
+          {
+            "code": "1511",
+            "name": "POST PROD - TRAVEL/LIVING"
+          },
+          {
+            "code": "1540",
+            "name": "ATL MEALS & ENTERTAINMENT"
+          },
+          {
+            "code": "1585",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total above-the-line"
+      },
+      {
+        "kind": "category",
+        "code": "440",
+        "name": "PHOTOGRAPHIC EFX & INSERTS",
+        "accounts": [
+          {
+            "code": "4411",
+            "name": "OPTICALS"
+          },
+          {
+            "code": "4412",
+            "name": "INSERTS"
+          },
+          {
+            "code": "4413",
+            "name": "ANIMATION"
+          },
+          {
+            "code": "4414",
+            "name": "MATTE SHOTS"
+          },
+          {
+            "code": "4415",
+            "name": "OPTICALS-PRE-OPT FILM/LAB"
+          },
+          {
+            "code": "4419",
+            "name": "INSERTS - LAB PROCESSING"
+          },
+          {
+            "code": "4420",
+            "name": "SPECIAL NEGOTIATED JOBS"
+          },
+          {
+            "code": "4421",
+            "name": "CAMERA CUT TRAILERS"
+          },
+          {
+            "code": "4485",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "450",
+        "name": "EDITORIAL & PROJECTION",
+        "accounts": [
+          {
+            "code": "4501",
+            "name": "FILM EDITOR"
+          },
+          {
+            "code": "4502",
+            "name": "ASSISTANT EDITOR"
+          },
+          {
+            "code": "4503",
+            "name": "POST PROD SUPERVISOR"
+          },
+          {
+            "code": "4505",
+            "name": "SOUND FX EDITORS & ASSTS"
+          },
+          {
+            "code": "4506",
+            "name": "MUSIC EDITOR & ASSISTANTS"
+          },
+          {
+            "code": "4507",
+            "name": "LOOPING EDITOR & ASSTS"
+          },
+          {
+            "code": "4508",
+            "name": "TRAILER EDITOR & ASSTS"
+          },
+          {
+            "code": "4511",
+            "name": "CODING"
+          },
+          {
+            "code": "4512",
+            "name": "CUTTING CONTINUITY"
+          },
+          {
+            "code": "4513",
+            "name": "FOREIGN DELIVERY REQ"
+          },
+          {
+            "code": "4514",
+            "name": "PROJECTION - LOCAL & DISTANT"
+          },
+          {
+            "code": "4515",
+            "name": "SCREENING ROOM CHARGES"
+          },
+          {
+            "code": "4516",
+            "name": "PURCHASES-EDITING SUPPLIES"
+          },
+          {
+            "code": "4517",
+            "name": "RENTALS-CUTTING RMS,EQUIP"
+          },
+          {
+            "code": "4518",
+            "name": "BOX / CAR ALLOWANCE"
+          },
+          {
+            "code": "4531",
+            "name": "OFF-LINE EDITING"
+          },
+          {
+            "code": "4532",
+            "name": "OFF-LINE EDITING"
+          },
+          {
+            "code": "4538",
+            "name": "TAPE DUPLICATION"
+          },
+          {
+            "code": "4544",
+            "name": "CHYRON / TITLE GENERATOR"
+          },
+          {
+            "code": "4548",
+            "name": "STOCK FOOTAGE & PROCESSING"
+          },
+          {
+            "code": "4550",
+            "name": "FILM SHIPPING / MESSENGER"
+          },
+          {
+            "code": "4585",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "460",
+        "name": "MUSIC",
+        "accounts": [
+          {
+            "code": "4601",
+            "name": "COMPOSER / CONDUCTOR"
+          },
+          {
+            "code": "4602",
+            "name": "ARRANGER / ORCHESTRATORS"
+          },
+          {
+            "code": "4603",
+            "name": "COPYISTS"
+          },
+          {
+            "code": "4604",
+            "name": "MUSICIANS"
+          },
+          {
+            "code": "4605",
+            "name": "STUDIO TIME"
+          },
+          {
+            "code": "4608",
+            "name": "SINGERS"
+          },
+          {
+            "code": "4609",
+            "name": "ORCHESTRA CONTRACTOR"
+          },
+          {
+            "code": "4611",
+            "name": "MUSIC"
+          },
+          {
+            "code": "4626",
+            "name": "VERIFY"
+          },
+          {
+            "code": "4628",
+            "name": "STUDIO TIME"
+          },
+          {
+            "code": "4630",
+            "name": "ORIGINAL SONG PROD COST"
+          },
+          {
+            "code": "4646",
+            "name": "MUSIC RIGHTS"
+          },
+          {
+            "code": "4647",
+            "name": "RENTALS"
+          },
+          {
+            "code": "4648",
+            "name": "CARTAGE"
+          },
+          {
+            "code": "4685",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "4699",
+            "name": "RESCORING"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "470",
+        "name": "POST PRODUCTION SOUND",
+        "accounts": [
+          {
+            "code": "4701",
+            "name": "PRE LAY / PRE MIX"
+          },
+          {
+            "code": "4704",
+            "name": "DIALOGUE LOOPING"
+          },
+          {
+            "code": "4711",
+            "name": "SOUND TRANSFERS-LAB & FACILITIES"
+          },
+          {
+            "code": "4712",
+            "name": "MAGNETIC FILM"
+          },
+          {
+            "code": "4713",
+            "name": "LOOPS & NARRATION"
+          },
+          {
+            "code": "4714",
+            "name": "FOLEY"
+          },
+          {
+            "code": "4715",
+            "name": "SOUND FX RECORDING"
+          },
+          {
+            "code": "4716",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "4717",
+            "name": "RENTALS"
+          },
+          {
+            "code": "4720",
+            "name": "MUSIC RECORDING"
+          },
+          {
+            "code": "4721",
+            "name": "DUB DOWNS"
+          },
+          {
+            "code": "4722",
+            "name": "DUBBING"
+          },
+          {
+            "code": "4723",
+            "name": "SOUND NEGATIVE STOCK"
+          },
+          {
+            "code": "4724",
+            "name": "FOREIGN DELIVERY REQ"
+          },
+          {
+            "code": "4785",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "480",
+        "name": "FILM & LAB - POST PRODUCTION",
+        "accounts": [
+          {
+            "code": "4820",
+            "name": "EDITORIAL REPRINTS"
+          },
+          {
+            "code": "4821",
+            "name": "INTERPOSITIVES"
+          },
+          {
+            "code": "4823",
+            "name": "BLACK & WHITE REVERSALS"
+          },
+          {
+            "code": "4824",
+            "name": "NEG CUTTING & SPLICING"
+          },
+          {
+            "code": "4825",
+            "name": "SOUND NEG DEVELOPING"
+          },
+          {
+            "code": "4826",
+            "name": "SYNC SOUND TRACKS"
+          },
+          {
+            "code": "4827",
+            "name": "PROJECTION MASTERS"
+          },
+          {
+            "code": "4828",
+            "name": "ANSWER / CHECK PRINT"
+          },
+          {
+            "code": "4830",
+            "name": "RELEASE PRINT"
+          },
+          {
+            "code": "4831",
+            "name": "PICTURE LEADER"
+          },
+          {
+            "code": "4832",
+            "name": "REELS / CAMS / CASES"
+          },
+          {
+            "code": "4833",
+            "name": "MISC LAB CHARGES"
+          },
+          {
+            "code": "4885",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "490",
+        "name": "TITLES",
+        "accounts": [
+          {
+            "code": "4920",
+            "name": "MAIN TITLES - ARTWORK"
+          },
+          {
+            "code": "4921",
+            "name": "END TITLES - ARTWORK"
+          },
+          {
+            "code": "4922",
+            "name": "SUBTITLES"
+          },
+          {
+            "code": "4923",
+            "name": "LOCAL TITLES"
+          },
+          {
+            "code": "4924",
+            "name": "MAIN TITLES - OPTICAL"
+          },
+          {
+            "code": "4925",
+            "name": "END TITLES - OPTICAL"
+          },
+          {
+            "code": "4985",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "500",
+        "name": "VIDEO POST PRODUCTION",
+        "accounts": [
+          {
+            "code": "5001",
+            "name": "VIDEO EDITING - LAB & FACILITIES"
+          },
+          {
+            "code": "5002",
+            "name": "VIDEO TRANSFER TELECINE"
+          },
+          {
+            "code": "5003",
+            "name": "VIDEO LABOR & MATERIAL"
+          },
+          {
+            "code": "5004",
+            "name": "VIDEO NETWORK REQUIREMENT"
+          },
+          {
+            "code": "5013",
+            "name": "EQUIPMENT PURCHASES"
+          },
+          {
+            "code": "5014",
+            "name": "VIDEO STOCK PURCHASES"
+          },
+          {
+            "code": "5016",
+            "name": "EQUIPMENT RENTALS"
+          },
+          {
+            "code": "5017",
+            "name": "STUDIO FACILITIES"
+          },
+          {
+            "code": "5020",
+            "name": "SATELLITE TRANS CHARGES"
+          },
+          {
+            "code": "5085",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "510",
+        "name": "STOCK FOOTAGE",
+        "accounts": [
+          {
+            "code": "5101",
+            "name": "STOCK SHOTS"
+          },
+          {
+            "code": "5102",
+            "name": "FILM LIBRARY LAB SUPPLIES"
+          },
+          {
+            "code": "5103",
+            "name": "TRANS, MESSENGER, P/U'S"
+          },
+          {
+            "code": "5111",
+            "name": "STOCK FILM PRE OPT/PROC"
+          },
+          {
+            "code": "5115",
+            "name": "STOCK - VIDEO CASSETES"
+          },
+          {
+            "code": "5116",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "5117",
+            "name": "RENTALS"
+          },
+          {
+            "code": "5185",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total post"
+      },
+      {
+        "kind": "category",
+        "code": "530",
+        "name": "ANIMATION PRODUCTION STAFF",
+        "accounts": [
+          {
+            "code": "5301",
+            "name": "ASSOC PRODUCER/STORYBOARD SUPERVISOR"
+          },
+          {
+            "code": "5302",
+            "name": "PRODUCTION MANAGER"
+          },
+          {
+            "code": "5303",
+            "name": "PRODUCTION COORDINATOR"
+          },
+          {
+            "code": "5304",
+            "name": "PRODUCTION ASSOCIATE(S)"
+          },
+          {
+            "code": "5305",
+            "name": "PRODUCTION ASSISTANT(S)"
+          },
+          {
+            "code": "5308",
+            "name": "ACCOUNTANT + ASSISTANT(S)"
+          },
+          {
+            "code": "5310",
+            "name": "SCRIPT CONTINUITY"
+          },
+          {
+            "code": "5325",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "5345",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "535",
+        "name": "PRE PRODUCTION STORYBOARD/TIMING",
+        "accounts": [
+          {
+            "code": "5351",
+            "name": "STORYBOARD SUPERVISOR"
+          },
+          {
+            "code": "5352",
+            "name": "ROUGH BOARD"
+          },
+          {
+            "code": "5353",
+            "name": "STORYBOARD"
+          },
+          {
+            "code": "5354",
+            "name": "ROUGH SLUG"
+          },
+          {
+            "code": "5355",
+            "name": "SLUGGED BOARD"
+          },
+          {
+            "code": "5356",
+            "name": "ROUGH SHEET TIMING"
+          },
+          {
+            "code": "5357",
+            "name": "SHEET TIMING"
+          },
+          {
+            "code": "5358",
+            "name": "TRACK READING"
+          },
+          {
+            "code": "5360",
+            "name": "SCENE PLANNER"
+          },
+          {
+            "code": "5361",
+            "name": "ASSISTANT SCENE PLANNER"
+          },
+          {
+            "code": "5376",
+            "name": "SUPPLIES"
+          },
+          {
+            "code": "5385",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "540",
+        "name": "CONCEPTUAL ART",
+        "accounts": [
+          {
+            "code": "5401",
+            "name": "CONCEPTUAL ARTIST"
+          },
+          {
+            "code": "5402",
+            "name": "PRESENTATION ARTIST(S)"
+          },
+          {
+            "code": "5403",
+            "name": "RESEARCH"
+          },
+          {
+            "code": "5416",
+            "name": "SUPPLIES"
+          },
+          {
+            "code": "5445",
+            "name": "OTHER COSTS"
+          },
+          {
+            "code": "5450",
+            "name": "PRE-PRODUCTION SOUND"
+          },
+          {
+            "code": "5451",
+            "name": "SCRATCH VOICE SUPERVISOR"
+          },
+          {
+            "code": "5452",
+            "name": "VOICE RECORDING"
+          },
+          {
+            "code": "5453",
+            "name": "PICK-UP SESSION RECORDING"
+          },
+          {
+            "code": "5454",
+            "name": "CASSETTES AND TRANSFERS"
+          },
+          {
+            "code": "5460",
+            "name": "PRE-PROD SOUND PACKAGE"
+          },
+          {
+            "code": "5461",
+            "name": "RECORD NORMAL PAUSES"
+          },
+          {
+            "code": "5462",
+            "name": "TRACK SLUG"
+          },
+          {
+            "code": "5465",
+            "name": "AUDITION COSTS"
+          },
+          {
+            "code": "5466",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "5485",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "550",
+        "name": "CHARACTER / MODEL DESIGN",
+        "accounts": [
+          {
+            "code": "5501",
+            "name": "MODEL DESIGN SUPERVISOR"
+          },
+          {
+            "code": "5502",
+            "name": "MODEL DESIGNERS"
+          },
+          {
+            "code": "5503",
+            "name": "FREELANCE MODEL DESIGNERS"
+          },
+          {
+            "code": "5512",
+            "name": "SCULPTURES / MOLDS"
+          },
+          {
+            "code": "5516",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "5545",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "555",
+        "name": "ART DIRECTION",
+        "accounts": [
+          {
+            "code": "5551",
+            "name": "ART DIRECTOR"
+          },
+          {
+            "code": "5552",
+            "name": "ASSISTANT ART DIRECTOR"
+          },
+          {
+            "code": "5553",
+            "name": "COLOR STYLIST"
+          },
+          {
+            "code": "5554",
+            "name": "PRODUCTION ASSISTANT"
+          },
+          {
+            "code": "5555",
+            "name": "RESEARCH"
+          },
+          {
+            "code": "5556",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "5585",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "560",
+        "name": "LAYOUTS",
+        "accounts": [
+          {
+            "code": "5601",
+            "name": "LAYOUT SUPERVISOR"
+          },
+          {
+            "code": "5602",
+            "name": "LAYOUT ARTIST"
+          },
+          {
+            "code": "5603",
+            "name": "LAYOUT ASSISTANT"
+          },
+          {
+            "code": "5604",
+            "name": "FREELANCE LAYOUT"
+          },
+          {
+            "code": "5616",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "5645",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "570",
+        "name": "BACKGROUNDS",
+        "accounts": [
+          {
+            "code": "5701",
+            "name": "BACKGROUND SUPERVISOR"
+          },
+          {
+            "code": "5702",
+            "name": "BACKGROUND DESIGNER"
+          },
+          {
+            "code": "5703",
+            "name": "FREELANCE B/G DESIGNERS"
+          },
+          {
+            "code": "5716",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "5745",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "575",
+        "name": "PRODUCTION BACKGROUNDS",
+        "accounts": [
+          {
+            "code": "5751",
+            "name": "PROD. BG DESIGN SUPV."
+          },
+          {
+            "code": "5752",
+            "name": "BACKGROUND PAINTERS"
+          },
+          {
+            "code": "5753",
+            "name": "FREELANCE BG PAINTERS"
+          },
+          {
+            "code": "5766",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "5785",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "580",
+        "name": "CHARACTER ANIMATION",
+        "accounts": [
+          {
+            "code": "5801",
+            "name": "DIRECTING ANIMATOR(S)"
+          },
+          {
+            "code": "5802",
+            "name": "ANIMATORS"
+          },
+          {
+            "code": "5803",
+            "name": "ROUGH IN BETWEEN"
+          },
+          {
+            "code": "5816",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "5845",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "585",
+        "name": "CLEANUP",
+        "accounts": [
+          {
+            "code": "5851",
+            "name": "CLEANUP SUPERVISOR"
+          },
+          {
+            "code": "5852",
+            "name": "KEY CLEANUP"
+          },
+          {
+            "code": "5853",
+            "name": "IN BETWEEN CLEANUP"
+          },
+          {
+            "code": "5866",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "5885",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "590",
+        "name": "EFFECTS + COMPUTER ANIMATION",
+        "accounts": [
+          {
+            "code": "5901",
+            "name": "EFFECTS SUPERVISOR"
+          },
+          {
+            "code": "5902",
+            "name": "EFFECTS ANIMATOR(S)"
+          },
+          {
+            "code": "5903",
+            "name": "ASSISTANT EFFECTS ANIMATOR"
+          },
+          {
+            "code": "5904",
+            "name": "FREELANCE EFFECTS"
+          },
+          {
+            "code": "5912",
+            "name": "TESTS"
+          },
+          {
+            "code": "5916",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "5920",
+            "name": "COMPUTER ANIMATION"
+          },
+          {
+            "code": "5945",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "595",
+        "name": "PRE-PROD COMPUTER COLOR",
+        "accounts": [
+          {
+            "code": "5951",
+            "name": "COLOR KEY OPERATOR"
+          },
+          {
+            "code": "5952",
+            "name": "COMPUTER OPERATOR"
+          },
+          {
+            "code": "5962",
+            "name": "TESTS"
+          },
+          {
+            "code": "5966",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "5967",
+            "name": "FIERY CONTROLLER RENTAL"
+          },
+          {
+            "code": "5968",
+            "name": "REPAIR / MAINTENANCE"
+          },
+          {
+            "code": "5985",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "600",
+        "name": "LIVE ACTION REFERENCE",
+        "accounts": [
+          {
+            "code": "6001",
+            "name": "LIVE ACTION REFERENCE"
+          },
+          {
+            "code": "6016",
+            "name": "TAPE"
+          },
+          {
+            "code": "6045",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "605",
+        "name": "XEROX / INK / PAINT",
+        "accounts": [
+          {
+            "code": "6051",
+            "name": "INK + PAINT SUPERVISOR"
+          },
+          {
+            "code": "6052",
+            "name": "INKERS"
+          },
+          {
+            "code": "6053",
+            "name": "CEL PAINTERS"
+          },
+          {
+            "code": "6062",
+            "name": "COLOR COPIER"
+          },
+          {
+            "code": "6063",
+            "name": "COLOR ENLARGER"
+          },
+          {
+            "code": "6065",
+            "name": "COLOR XEROX PAPER ETC."
+          },
+          {
+            "code": "6066",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "6085",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "610",
+        "name": "ANIMATION CAMERA",
+        "accounts": [
+          {
+            "code": "6101",
+            "name": "COLOR CAMERA LABOR"
+          },
+          {
+            "code": "6102",
+            "name": "PENCIL TEST CAMERA LABOR"
+          },
+          {
+            "code": "6103",
+            "name": "LINE TEST OPERATOR"
+          },
+          {
+            "code": "6106",
+            "name": "VIDEO LINE TESTER"
+          },
+          {
+            "code": "6107",
+            "name": "DIGITAL LINE TESTER"
+          },
+          {
+            "code": "6112",
+            "name": "LEICA REEL"
+          },
+          {
+            "code": "6116",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "6118",
+            "name": "REPAIRS & MAINTENANCE"
+          },
+          {
+            "code": "6145",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "615",
+        "name": "ANIMATION CHECKING",
+        "accounts": [
+          {
+            "code": "6151",
+            "name": "HEAD ANIMATION CHECKER"
+          },
+          {
+            "code": "6152",
+            "name": "ANIMATION CHECKERS"
+          },
+          {
+            "code": "6153",
+            "name": "PAINT CHECKERS"
+          },
+          {
+            "code": "6154",
+            "name": "XEROX CHECKERS"
+          },
+          {
+            "code": "6155",
+            "name": "INK CHECKERS"
+          },
+          {
+            "code": "6160",
+            "name": "FINAL CHECKING SUPERVISOR"
+          },
+          {
+            "code": "6161",
+            "name": "FINAL CHECKERS"
+          },
+          {
+            "code": "6185",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "620",
+        "name": "OVERSEAS PRODUCTION SUPERVISOR",
+        "accounts": [
+          {
+            "code": "6201",
+            "name": "OVERSEAS SUPERVISOR"
+          },
+          {
+            "code": "6202",
+            "name": "OVERSEAS SUPERVISOR TRAVEL"
+          },
+          {
+            "code": "6203",
+            "name": "OVERSEAS SUPERVISOR HOUSING"
+          },
+          {
+            "code": "6204",
+            "name": "OVERSEAS SUPERVISOR PER DIEM"
+          },
+          {
+            "code": "6205",
+            "name": "OUTSIDE PRODUCTION DEALS"
+          },
+          {
+            "code": "6210",
+            "name": "DOMESTIC FREIGHT / SHIPPING"
+          },
+          {
+            "code": "6211",
+            "name": "FOREIGN FREIGHT / SHIPPING"
+          },
+          {
+            "code": "6220",
+            "name": "PRODUCTION LAYOUTS"
+          },
+          {
+            "code": "6223",
+            "name": "ANIMATION THRU CAMERA"
+          },
+          {
+            "code": "6230",
+            "name": "ANIMATION THRU CAMERA"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "625",
+        "name": "VIDEO GAMES",
+        "accounts": [
+          {
+            "code": "6251",
+            "name": "VIDEO GAMES"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "630",
+        "name": "ANIMATION FILM/LAB PRODUCTION",
+        "accounts": [
+          {
+            "code": "6311",
+            "name": "NEGATIVE RAW STOCK"
+          },
+          {
+            "code": "6312",
+            "name": "DEVELOP RAW STOCK"
+          },
+          {
+            "code": "6313",
+            "name": "PRINT DAILIES"
+          },
+          {
+            "code": "6314",
+            "name": "PROCESS PLATES"
+          },
+          {
+            "code": "6315",
+            "name": "STILLS - FILM PROCESS"
+          },
+          {
+            "code": "6345",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "635",
+        "name": "VIDEO PRODUCTION",
+        "accounts": [
+          {
+            "code": "6351",
+            "name": "VIDEO ASSISTANT OPERATOR"
+          },
+          {
+            "code": "6352",
+            "name": "VIDEO MONITOR OPERATOR"
+          },
+          {
+            "code": "6353",
+            "name": "OTHER VIDEO OPERATOR"
+          },
+          {
+            "code": "6361",
+            "name": "VIDEO ASSIST RENTAL"
+          },
+          {
+            "code": "6363",
+            "name": "OTHER VIDEO RENTALS"
+          },
+          {
+            "code": "6364",
+            "name": "VIDEO CASSETTES / DAILIES"
+          },
+          {
+            "code": "6365",
+            "name": "VIDEO TRANSFERS"
+          },
+          {
+            "code": "6385",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total production"
+      },
+      {
+        "kind": "category",
+        "code": "650",
+        "name": "PUBLICITY",
+        "accounts": [
+          {
+            "code": "6501",
+            "name": "PUBLICIST"
+          },
+          {
+            "code": "6502",
+            "name": "SECRETARY"
+          },
+          {
+            "code": "6516",
+            "name": "PURCHASES"
+          },
+          {
+            "code": "6517",
+            "name": "RENTALS"
+          },
+          {
+            "code": "6518",
+            "name": "CAR ALLOWANCE"
+          },
+          {
+            "code": "6585",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "670",
+        "name": "INSURANCE",
+        "accounts": [
+          {
+            "code": "6701",
+            "name": "CAST INSURANCE"
+          },
+          {
+            "code": "6702",
+            "name": "ERRORS & OMISSIONS"
+          },
+          {
+            "code": "6713",
+            "name": "INSURANCE EXAMS"
+          },
+          {
+            "code": "6714",
+            "name": "CLAIMS & RECOVERABLES"
+          },
+          {
+            "code": "6785",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "680",
+        "name": "GENERAL EXPENSE",
+        "accounts": [
+          {
+            "code": "6801",
+            "name": "DUES AND SUBSCRIPTIONS"
+          },
+          {
+            "code": "6811",
+            "name": "TELEPHONE"
+          },
+          {
+            "code": "6812",
+            "name": "XEROX / MIMEO / COPIER"
+          },
+          {
+            "code": "6813",
+            "name": "ACCOUNTING FEES/LICENSES"
+          },
+          {
+            "code": "6814",
+            "name": "POSTAGE / SHIPPING"
+          },
+          {
+            "code": "6815",
+            "name": "EXECUTIVE EXPENSES"
+          },
+          {
+            "code": "6816",
+            "name": "OFFICE SUPPLIES"
+          },
+          {
+            "code": "6817",
+            "name": "OFFICE & EQUIPMENT RENTALS"
+          },
+          {
+            "code": "6819",
+            "name": "COMPUTERS & SOFTWARE"
+          },
+          {
+            "code": "6820",
+            "name": "OFFICE FOOD & REFRESHMENT"
+          },
+          {
+            "code": "6821",
+            "name": "OFFICE CLEANING & REPAIRS"
+          },
+          {
+            "code": "6822",
+            "name": "MISCELLANEOUS STORAGE"
+          },
+          {
+            "code": "6823",
+            "name": "LEGAL FEES"
+          },
+          {
+            "code": "6824",
+            "name": "PREVIEW EXPENSE"
+          },
+          {
+            "code": "6825",
+            "name": "BANK CHARGES"
+          },
+          {
+            "code": "6826",
+            "name": "MESSENGER SERVICE"
+          },
+          {
+            "code": "6827",
+            "name": "MPAA CODE FEE"
+          },
+          {
+            "code": "6828",
+            "name": "RESEARCH"
+          },
+          {
+            "code": "6830",
+            "name": "PROMO & MERCHANDISING"
+          },
+          {
+            "code": "6885",
+            "name": "OTHER COSTS"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total other"
+      }
+    ]
+  }
+}

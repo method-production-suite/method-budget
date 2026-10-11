@@ -99,7 +99,7 @@ pub struct MappingFile {
 }
 
 /// `A` as 0, `Z` as 25, `AA` as 26.
-fn column_letters(s: &str) -> Option<usize> {
+pub(crate) fn column_letters(s: &str) -> Option<usize> {
     let s = s.trim();
     if s.is_empty() || s.len() > 3 || !s.bytes().all(|b| b.is_ascii_alphabetic()) {
         return None;

@@ -10,6 +10,8 @@
 //! assert_eq!(fwb_format::from_str(&text).unwrap(), b);
 //! ```
 
+/// The bundled chart-of-accounts templates (templates/charts, docs/TEMPLATES.md).
+pub mod charts;
 /// Version deltas: versions written as changes (`compact_versions`).
 mod delta;
 mod dto;
@@ -19,6 +21,14 @@ pub mod export;
 /// Spreadsheet import (Excel workbook, CSV, tab-delimited) with a column
 /// mapping. Read by hand: our own inflate, ZIP and XML readers.
 pub mod import;
+/// Setup items between budgets (dependency walk, conflict review, import),
+/// setup packs, and setup lists as spreadsheets.
+pub mod setup;
+
+/// The JSON library the format is read and written with, for the
+/// workspace's tools that speak JSON (the `method mcp` server in
+/// `fwb-cli`), so they share this copy instead of adding a dependency.
+pub use serde_json;
 
 use std::fmt;
 

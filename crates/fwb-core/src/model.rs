@@ -124,6 +124,10 @@ pub struct Budget {
     /// order (see [`crate::overtime`]). Tools, not content, like tag
     /// presets: versions don't carry them.
     pub ot_patterns: Vec<crate::overtime::OtPattern>,
+    /// Where setup items came from: the setup pack each was imported from
+    /// and source notes (see [`crate::pack`]). About the items, not
+    /// content: versions don't carry it.
+    pub setup_sources: crate::pack::SetupSources,
 }
 
 impl Budget {
@@ -159,6 +163,7 @@ impl Budget {
             provenance: None,
             actuals: Arc::default(),
             ot_patterns: Vec::new(),
+            setup_sources: crate::pack::SetupSources::default(),
         }
     }
 
@@ -700,6 +705,9 @@ pub enum ProvenanceKind {
     EditableCopy,
     /// A filtered copy of a parent budget (File > New Sub-Budget).
     SubBudget,
+    /// A setup pack: setup items and no lines, made to share (see
+    /// [`crate::pack`]). Its [`Provenance::pack`] holds the pack's details.
+    SetupPack,
 }
 
 /// Where a budget came from: stamped on copies made for sharing and on
@@ -719,6 +727,9 @@ pub struct Provenance {
     pub app_version: String,
     /// A note from whoever made it, or (for a sub-budget) what it keeps.
     pub note: Option<String>,
+    /// A setup pack's details (title, version, effective date, sources).
+    /// Only on [`ProvenanceKind::SetupPack`].
+    pub pack: Option<crate::pack::PackInfo>,
 }
 
 impl Provenance {
@@ -813,6 +824,7 @@ impl Budget {
             provenance: _,
             actuals: _,
             ot_patterns: _,
+            setup_sources: _,
         } = self;
         BudgetSnapshot {
             title: title.clone(),
@@ -871,6 +883,7 @@ impl Budget {
             provenance: _,
             actuals: _,
             ot_patterns: _,
+            setup_sources: _,
         } = self;
         let content = BudgetSnapshot {
             title,
@@ -995,6 +1008,7 @@ impl BudgetSnapshot {
             provenance: None,
             actuals: Arc::default(),
             ot_patterns: Vec::new(),
+            setup_sources: crate::pack::SetupSources::default(),
         }
     }
 

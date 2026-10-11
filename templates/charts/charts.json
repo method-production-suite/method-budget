@@ -1,0 +1,389 @@
+{
+  "charts": [
+    {
+      "id": "feature",
+      "name": "Feature film",
+      "group": "Feature",
+      "description": "Our own chart for a studio-scale feature, 2 + 2 numbering",
+      "source": "templates/charts/src/feature.csv"
+    },
+    {
+      "id": "low-budget-feature",
+      "name": "Low-budget feature",
+      "group": "Feature",
+      "description": "Our own compact chart for an independent feature",
+      "source": "templates/charts/src/low-budget-feature.csv"
+    },
+    {
+      "id": "tv-one-hour",
+      "name": "TV episodic, one hour",
+      "group": "Television",
+      "description": "Our own chart for a one-hour series episode, with amortized series costs",
+      "source": "templates/charts/src/tv-one-hour.csv"
+    },
+    {
+      "id": "tv-half-hour",
+      "name": "TV episodic, half hour",
+      "group": "Television",
+      "description": "Our own chart for a half-hour series episode, single or multi-camera",
+      "source": "templates/charts/src/tv-half-hour.csv"
+    },
+    {
+      "id": "commercial",
+      "name": "Commercial",
+      "group": "Commercial",
+      "description": "Our own chart for a commercial or branded spot",
+      "source": "templates/charts/src/commercial.csv"
+    },
+    {
+      "id": "music-video",
+      "name": "Music video",
+      "group": "Commercial",
+      "description": "Our own chart for a music video",
+      "source": "templates/charts/src/music-video.csv"
+    },
+    {
+      "id": "documentary",
+      "name": "Documentary",
+      "group": "Other",
+      "description": "Our own chart for a documentary feature or series episode",
+      "source": "templates/charts/src/documentary.csv"
+    },
+    {
+      "id": "abc-cable-network-group",
+      "name": "ABC CABLE NETWORK GROUP",
+      "group": "Television",
+      "description": "Follows the ABC CABLE NETWORK GROUP chart of accounts",
+      "source": "imports/coa-sources/ABC CABLE NETWORK GROUP.csv"
+    },
+    {
+      "id": "ae-global-media-unscripted",
+      "name": "AE GLOBAL MEDIA UNSCRIPTED",
+      "group": "Television",
+      "description": "Follows the AE GLOBAL MEDIA UNSCRIPTED chart of accounts",
+      "source": "imports/coa-sources/AE GLOBAL MEDIA UNSCRIPTED.csv"
+    },
+    {
+      "id": "american-cinema",
+      "name": "AMERICAN CINEMA",
+      "group": "Feature",
+      "description": "Follows the AMERICAN CINEMA chart of accounts",
+      "source": "imports/coa-sources/AMERICAN CINEMA.csv"
+    },
+    {
+      "id": "asmith-company",
+      "name": "ASMITH & COMPANY",
+      "group": "Other",
+      "description": "Follows the ASMITH & COMPANY chart of accounts",
+      "source": "imports/coa-sources/ASMITH & COMPANY.csv"
+    },
+    {
+      "id": "academic-template",
+      "name": "Academic Template",
+      "group": "Other",
+      "description": "Follows the Academic Template chart of accounts",
+      "source": "imports/coa-sources/Academic Template.csv"
+    },
+    {
+      "id": "academic",
+      "name": "Academic",
+      "group": "Other",
+      "description": "Follows the Academic chart of accounts",
+      "source": "imports/coa-sources/Academic.csv"
+    },
+    {
+      "id": "bet-chart-of-accounts-template",
+      "name": "BET CHART OF ACCOUNTS TEMPLATE",
+      "group": "Television",
+      "description": "Follows the BET CHART OF ACCOUNTS TEMPLATE chart of accounts",
+      "source": "imports/coa-sources/BET CHART OF ACCOUNTS TEMPLATE.csv"
+    },
+    {
+      "id": "brad-grey",
+      "name": "BRAD GREY",
+      "group": "Other",
+      "description": "Follows the BRAD GREY chart of accounts",
+      "source": "imports/coa-sources/BRAD GREY.csv"
+    },
+    {
+      "id": "british-form",
+      "name": "BRITISH FORM",
+      "group": "Other",
+      "description": "Follows the BRITISH FORM chart of accounts",
+      "source": "imports/coa-sources/BRITISH FORM.csv"
+    },
+    {
+      "id": "carsey-werner-television",
+      "name": "CARSEY-WERNER TELEVISION",
+      "group": "Television",
+      "description": "Follows the CARSEY-WERNER TELEVISION chart of accounts",
+      "source": "imports/coa-sources/CARSEY-WERNER TELEVISION.csv"
+    },
+    {
+      "id": "cbs-television",
+      "name": "CBS TELEVISION",
+      "group": "Television",
+      "description": "Follows the CBS TELEVISION chart of accounts",
+      "source": "imports/coa-sources/CBS TELEVISION.csv"
+    },
+    {
+      "id": "crusader-entertainment",
+      "name": "CRUSADER ENTERTAINMENT",
+      "group": "Feature",
+      "description": "Follows the CRUSADER ENTERTAINMENT chart of accounts",
+      "source": "imports/coa-sources/CRUSADER ENTERTAINMENT.csv"
+    },
+    {
+      "id": "disney-features",
+      "name": "DISNEY FEATURES",
+      "group": "Feature",
+      "description": "Follows the DISNEY FEATURES chart of accounts",
+      "source": "imports/coa-sources/DISNEY FEATURES.csv"
+    },
+    {
+      "id": "dreamworks-features",
+      "name": "DREAMWORKS FEATURES",
+      "group": "Feature",
+      "description": "Follows the DREAMWORKS FEATURES chart of accounts",
+      "source": "imports/coa-sources/DREAMWORKS FEATURES.csv"
+    },
+    {
+      "id": "dreamworks-television",
+      "name": "DREAMWORKS TELEVISION",
+      "group": "Television",
+      "description": "Follows the DREAMWORKS TELEVISION chart of accounts",
+      "source": "imports/coa-sources/DREAMWORKS TELEVISION.csv"
+    },
+    {
+      "id": "dufferin-gate",
+      "name": "DUFFERIN GATE",
+      "group": "Other",
+      "description": "Follows the DUFFERIN GATE chart of accounts",
+      "source": "imports/coa-sources/DUFFERIN GATE.csv"
+    },
+    {
+      "id": "eco-challenge",
+      "name": "ECO-CHALLENGE",
+      "group": "Television",
+      "description": "Follows the ECO-CHALLENGE chart of accounts",
+      "source": "imports/coa-sources/ECO-CHALLENGE.csv"
+    },
+    {
+      "id": "evolution-film-tape",
+      "name": "EVOLUTION FILM & TAPE",
+      "group": "Feature",
+      "description": "Follows the EVOLUTION FILM & TAPE chart of accounts",
+      "source": "imports/coa-sources/EVOLUTION FILM & TAPE.csv"
+    },
+    {
+      "id": "goldheart",
+      "name": "GOLDHEART",
+      "group": "Other",
+      "description": "Follows the GOLDHEART chart of accounts",
+      "source": "imports/coa-sources/GOLDHEART.csv"
+    },
+    {
+      "id": "hallmark-ent",
+      "name": "HALLMARK ENT",
+      "group": "Television",
+      "description": "Follows the HALLMARK ENT chart of accounts",
+      "source": "imports/coa-sources/HALLMARK ENT.csv"
+    },
+    {
+      "id": "hbo-episodic",
+      "name": "HBO EPISODIC",
+      "group": "Television",
+      "description": "Follows the HBO EPISODIC chart of accounts",
+      "source": "imports/coa-sources/HBO EPISODIC.csv"
+    },
+    {
+      "id": "hbo-master",
+      "name": "HBO MASTER",
+      "group": "Television",
+      "description": "Follows the HBO MASTER chart of accounts",
+      "source": "imports/coa-sources/HBO MASTER.csv"
+    },
+    {
+      "id": "hearst-actuality",
+      "name": "HEARST ACTUALITY",
+      "group": "Television",
+      "description": "Follows the HEARST ACTUALITY chart of accounts",
+      "source": "imports/coa-sources/HEARST ACTUALITY.csv"
+    },
+    {
+      "id": "hearst-ent-usa",
+      "name": "HEARST ENT USA",
+      "group": "Other",
+      "description": "Follows the HEARST ENT USA chart of accounts",
+      "source": "imports/coa-sources/HEARST ENT USA.csv"
+    },
+    {
+      "id": "henson-features",
+      "name": "HENSON FEATURES",
+      "group": "Feature",
+      "description": "Follows the HENSON FEATURES chart of accounts",
+      "source": "imports/coa-sources/HENSON FEATURES.csv"
+    },
+    {
+      "id": "henson-prod-tv",
+      "name": "HENSON PROD TV",
+      "group": "Television",
+      "description": "Follows the HENSON PROD TV chart of accounts",
+      "source": "imports/coa-sources/HENSON PROD TV.csv"
+    },
+    {
+      "id": "hit-entertainment",
+      "name": "HIT ENTERTAINMENT",
+      "group": "Other",
+      "description": "Follows the HIT ENTERTAINMENT chart of accounts",
+      "source": "imports/coa-sources/HIT ENTERTAINMENT.csv"
+    },
+    {
+      "id": "king-world",
+      "name": "KING WORLD",
+      "group": "Television",
+      "description": "Follows the KING WORLD chart of accounts",
+      "source": "imports/coa-sources/KING WORLD.csv"
+    },
+    {
+      "id": "mandalay-features",
+      "name": "MANDALAY FEATURES",
+      "group": "Feature",
+      "description": "Follows the MANDALAY FEATURES chart of accounts",
+      "source": "imports/coa-sources/MANDALAY FEATURES.csv"
+    },
+    {
+      "id": "mgm-animation",
+      "name": "MGM ANIMATION",
+      "group": "Other",
+      "description": "Follows the MGM ANIMATION chart of accounts",
+      "source": "imports/coa-sources/MGM ANIMATION.csv"
+    },
+    {
+      "id": "mgm-features",
+      "name": "MGM FEATURES",
+      "group": "Feature",
+      "description": "Follows the MGM FEATURES chart of accounts",
+      "source": "imports/coa-sources/MGM FEATURES.csv"
+    },
+    {
+      "id": "mgm-television",
+      "name": "MGM TELEVISION",
+      "group": "Television",
+      "description": "Follows the MGM TELEVISION chart of accounts",
+      "source": "imports/coa-sources/MGM TELEVISION.csv"
+    },
+    {
+      "id": "motion-international",
+      "name": "MOTION INTERNATIONAL",
+      "group": "Other",
+      "description": "Follows the MOTION INTERNATIONAL chart of accounts",
+      "source": "imports/coa-sources/MOTION INTERNATIONAL.csv"
+    },
+    {
+      "id": "marvel",
+      "name": "Marvel",
+      "group": "Feature",
+      "description": "Follows the Marvel chart of accounts",
+      "source": "imports/coa-sources/Marvel.csv"
+    },
+    {
+      "id": "nbc-tv",
+      "name": "NBC TV",
+      "group": "Television",
+      "description": "Follows the NBC TV chart of accounts",
+      "source": "imports/coa-sources/NBC TV.csv"
+    },
+    {
+      "id": "new-york-state-form-b",
+      "name": "New York State Form B",
+      "group": "Other",
+      "description": "Follows the New York State Form B chart of accounts",
+      "source": "imports/coa-sources/New York State Form B.csv"
+    },
+    {
+      "id": "paramount-classics",
+      "name": "PARAMOUNT CLASSICS",
+      "group": "Feature",
+      "description": "Follows the PARAMOUNT CLASSICS chart of accounts",
+      "source": "imports/coa-sources/PARAMOUNT CLASSICS.csv"
+    },
+    {
+      "id": "paramount-domestic-tv",
+      "name": "PARAMOUNT DOMESTIC TV",
+      "group": "Television",
+      "description": "Follows the PARAMOUNT DOMESTIC TV chart of accounts",
+      "source": "imports/coa-sources/PARAMOUNT DOMESTIC TV.csv"
+    },
+    {
+      "id": "paramount-features",
+      "name": "PARAMOUNT FEATURES",
+      "group": "Feature",
+      "description": "Follows the PARAMOUNT FEATURES chart of accounts",
+      "source": "imports/coa-sources/PARAMOUNT FEATURES.csv"
+    },
+    {
+      "id": "paramount-mow",
+      "name": "PARAMOUNT MOW",
+      "group": "Television",
+      "description": "Follows the PARAMOUNT MOW chart of accounts",
+      "source": "imports/coa-sources/PARAMOUNT MOW.csv"
+    },
+    {
+      "id": "paramount-network-episodic",
+      "name": "PARAMOUNT NETWORK EPISODIC",
+      "group": "Television",
+      "description": "Follows the PARAMOUNT NETWORK EPISODIC chart of accounts",
+      "source": "imports/coa-sources/PARAMOUNT NETWORK EPISODIC.csv"
+    },
+    {
+      "id": "paramount-viacom-episodic",
+      "name": "PARAMOUNT VIACOM EPISODIC",
+      "group": "Television",
+      "description": "Follows the PARAMOUNT VIACOM EPISODIC chart of accounts",
+      "source": "imports/coa-sources/PARAMOUNT VIACOM EPISODIC.csv"
+    },
+    {
+      "id": "salter-st-corp",
+      "name": "SALTER ST CORP",
+      "group": "Other",
+      "description": "Follows the SALTER ST CORP chart of accounts",
+      "source": "imports/coa-sources/SALTER ST CORP.csv"
+    },
+    {
+      "id": "sony-columbia-tristar-features",
+      "name": "SONY COLUMBIA TRISTAR FEATURES",
+      "group": "Feature",
+      "description": "Follows the SONY COLUMBIA TRISTAR FEATURES chart of accounts",
+      "source": "imports/coa-sources/SONY COLUMBIA TRISTAR FEATURES.csv"
+    },
+    {
+      "id": "sony-features-template",
+      "name": "SONY FEATURES TEMPLATE",
+      "group": "Feature",
+      "description": "Follows the SONY FEATURES TEMPLATE chart of accounts",
+      "source": "imports/coa-sources/SONY FEATURES TEMPLATE.csv"
+    },
+    {
+      "id": "stg-pre-prelim-ky-tier-1",
+      "name": "STG Pre-Prelim KY Tier 1",
+      "group": "Feature",
+      "description": "Follows the STG Pre-Prelim KY Tier 1 chart of accounts",
+      "source": "imports/coa-sources/STG Pre-Prelim KY Tier 1.csv"
+    },
+    {
+      "id": "telefilm-besi",
+      "name": "TELEFILM BESI",
+      "group": "Other",
+      "description": "Follows the TELEFILM BESI chart of accounts",
+      "source": "imports/coa-sources/TELEFILM BESI.csv"
+    },
+    {
+      "id": "triage-entertainment",
+      "name": "TRIAGE ENTERTAINMENT",
+      "group": "Other",
+      "description": "Follows the TRIAGE ENTERTAINMENT chart of accounts",
+      "source": "imports/coa-sources/TRIAGE ENTERTAINMENT.csv"
+    }
+  ]
+}

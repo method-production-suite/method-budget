@@ -120,8 +120,15 @@ pub const FILE: &[Entry] = &[
     plain("file.save_share_copy", "Save a Copy for Sharing…"),
     SEP,
     plain("file.import_setup", "Import Setup From…"),
+    // Setup packs: setup items to share, with where they came from (src/packs.rs).
+    plain("file.import_setup_pack", "Import Setup Pack…"),
+    plain("file.export_setup_pack", "Export Setup Pack…"),
     // Detail lines from a spreadsheet, with a column mapping (src/sheet_import.rs).
     plain("file.import_spreadsheet", "Import Spreadsheet…"),
+    // A chart of accounts as a new budget, or applied to this one (src/coa_import.rs).
+    plain("file.import_chart", "Import Chart of Accounts…"),
+    // Setup lists from a workbook or CSV files (src/setup_sheets.rs).
+    plain("file.import_setup_lists", "Import Setup Lists…"),
     // Actual costs from an accounting export (src/actuals.rs).
     plain("file.import_actuals", "Import Actuals…"),
     SEP,
@@ -148,6 +155,8 @@ pub const EXPORT: &[Entry] = &[
     plain("file.export_xlsx", "Excel Workbook…"),
     plain("file.export_csv", "CSV Files…"),
     plain("file.export_tsv", "Tab-Delimited Detail…"),
+    // Setup lists, a sheet or CSV file per kind (src/setup_sheets.rs).
+    plain("file.export_setup_lists", "Setup Lists…"),
 ];
 
 /// Windows and Linux end the File menu with Quit; macOS has it in the app menu.

@@ -1,0 +1,201 @@
+Number,Name
+,ABOVE THE LINE
+10,Story and rights
+10-01,Rights and format fees
+10-02,Research
+10-03,Script clearance
+11,Writing
+11-01,Episode scripts
+11-02,Staff writers
+11-03,Story editors
+11-04,Writers' room expenses
+11-05,Writers' assistants
+11-06,Script coordinator
+12,Producers
+12-01,Executive producers
+12-02,Co-executive producers
+12-03,Producers
+12-04,Co-producers
+12-05,Associate producers
+12-06,Producers' assistants
+13,Director
+13-01,Episode director
+13-02,Director's prep and post
+13-03,Director's assistant
+14,Cast
+14-01,Series regulars
+14-02,Recurring cast
+14-03,Guest cast
+14-04,Day players
+14-05,Casting director
+14-06,Casting associates
+14-07,Casting expenses
+15,Stunts
+15-01,Stunt coordinator
+15-02,Stunt performers
+15-03,Stunt equipment and rigging
+16,Above-the-line travel and living
+16-01,Airfare
+16-02,Hotels
+16-03,Per diems
+,PRODUCTION
+20,Production staff
+20-01,Unit production manager
+20-02,First assistant director
+20-03,Second assistant directors
+20-04,Production coordinator
+20-05,Assistant production coordinators
+20-06,Script supervisor
+20-07,Production accountant
+20-08,Accounting assistants
+20-09,Production assistants
+21,Background performers
+21-01,Background performers
+21-02,Stand-ins
+21-03,Background casting
+22,Art department
+22-01,Production designer
+22-02,Art director
+22-03,Set designers
+22-04,Art department coordinator
+22-05,Graphic designers
+22-06,Art department purchases and rentals
+23,Set construction
+23-01,Construction coordinator
+23-02,Construction crew
+23-03,Construction materials
+23-04,Striking
+24,Set dressing
+24-01,Set decorator
+24-02,Leadperson and set dressers
+24-03,Set dressing purchases
+24-04,Set dressing rentals
+25,Property
+25-01,Property master
+25-02,Assistant property masters
+25-03,Prop purchases and rentals
+26,Picture vehicles and animals
+26-01,Picture vehicles
+26-02,Animals and handlers
+27,Camera
+27-01,Director of photography
+27-02,Camera operators
+27-03,Camera assistants
+27-04,Digital imaging technician
+27-05,Camera package rentals
+27-06,Camera purchases and supplies
+28,Electric
+28-01,Gaffer
+28-02,Best boy electric
+28-03,Lighting technicians
+28-04,Lighting package rentals
+28-05,Lighting expendables
+29,Grip
+29-01,Key grip
+29-02,Best boy grip
+29-03,Dolly and company grips
+29-04,Grip package rentals
+29-05,Grip expendables
+30,Production sound
+30-01,Production sound mixer
+30-02,Boom operators and utility
+30-03,Sound package rentals
+31,Special effects
+31-01,Special effects coordinator
+31-02,Special effects crew
+31-03,Special effects rentals and purchases
+32,Wardrobe
+32-01,Costume designer
+32-02,Costume supervisor
+32-03,Costumers
+32-04,Wardrobe purchases and rentals
+32-05,Cleaning and alterations
+33,Makeup and hair
+33-01,Makeup artists
+33-02,Hairstylists
+33-03,Makeup and hair supplies
+34,Video assist and playback
+34-01,Video assist operator
+34-02,Video assist rentals
+35,Locations
+35-01,Location manager
+35-02,Location scouts
+35-03,Site fees
+35-04,Permits
+35-05,Police and security
+35-06,Location expenses
+36,Transportation
+36-01,Transportation coordinator and captain
+36-02,Drivers
+36-03,Production vehicles
+36-04,Fuel and maintenance
+37,Catering and craft service
+37-01,Catering
+37-02,Craft service
+38,Stage and facilities
+38-01,Stage rental
+38-02,Production office
+38-03,Office equipment and supplies
+39,Production media
+39-01,Media and drives
+39-02,Dailies and data
+40,Below-the-line travel and living
+40-01,Airfare
+40-02,Hotels
+40-03,Per diems
+,POST PRODUCTION
+50,Picture editorial
+50-01,Episode editors
+50-02,Assistant editors
+50-03,Post production supervisor
+50-04,Edit suite rentals
+51,Post production sound
+51-01,Sound editorial
+51-02,ADR and foley
+51-03,Mix
+52,Music
+52-01,Composer
+52-02,Music supervisor
+52-03,Music licensing
+53,Visual effects
+53-01,Visual effects supervisor
+53-02,Visual effects vendors
+54,Titles and graphics
+54-01,Episode titles and credits
+54-02,Graphics
+55,Finishing and deliverables
+55-01,Color grading
+55-02,Online and conform
+55-03,Closed captions and subtitles
+55-04,Masters and deliverables
+,OTHER
+60,Insurance
+60-01,Production package
+60-02,Errors and omissions
+61,Legal and accounting
+61-01,Production legal
+61-02,Payroll service fees
+62,General expenses
+62-01,Office expenses
+62-02,Licenses and fees
+63,Publicity
+63-01,Unit publicist
+63-02,Publicity stills
+64,Contingency
+64-01,Contingency
+,AMORTIZATION
+70,Series development and pilot
+70-01,Development costs
+70-02,Pilot costs carried forward
+71,Standing sets
+71-01,Set design and construction
+71-02,Set maintenance
+72,Series wardrobe and props
+72-01,Initial wardrobe
+72-02,Initial props and set dressing
+73,Series equipment
+73-01,Equipment purchases
+73-02,Office setup
+74,Main titles and theme
+74-01,Main title sequence
+74-02,Series theme music

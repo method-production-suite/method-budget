@@ -216,6 +216,7 @@ pub fn base_as_shared(base: &Budget, ours: &Budget, copy: &Budget) -> Budget {
     out.setup_order = copy.setup_order.clone();
     out.setup_folders = copy.setup_folders.clone();
     out.ot_patterns = copy.ot_patterns.clone();
+    out.setup_sources = copy.setup_sources.clone();
     out.compact_versions = copy.compact_versions;
     out.actuals = copy.actuals.clone();
     out
@@ -777,6 +778,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         provenance: _,
         actuals: _,
         ot_patterns: _,
+        setup_sources: _,
     } = o;
 
     // Budget settings.
@@ -1163,6 +1165,12 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         (&b.setup_folders, &o.setup_folders, &t.setup_folders),
         |_| "changed".into(),
     );
+    let setup_sources = merge_value(
+        cx,
+        &setting_at("setup_sources", "Where setup items came from"),
+        (&b.setup_sources, &o.setup_sources, &t.setup_sources),
+        |_| "changed".into(),
+    );
     let ot_patterns = merge_list(
         cx,
         tool("ot_pattern", "Overtime pattern"),
@@ -1222,6 +1230,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         provenance: o.provenance.clone(),
         actuals,
         ot_patterns,
+        setup_sources,
     };
     (merged, renumbered_rows + renumbered_versions)
 }

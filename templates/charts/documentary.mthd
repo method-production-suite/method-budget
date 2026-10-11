@@ -1,0 +1,547 @@
+{
+  "format": "method-budget",
+  "version": 1,
+  "budget": {
+    "title": "Documentary",
+    "base_currency": "USD",
+    "units": {
+      "Allow": {
+        "plural": "Allow"
+      },
+      "Day": {
+        "plural": "Days",
+        "hours": "10"
+      },
+      "Flat": {
+        "plural": "Flat"
+      },
+      "Hour": {
+        "plural": "Hours",
+        "hours": "1"
+      },
+      "Month": {
+        "plural": "Months",
+        "hours": "200"
+      },
+      "Week": {
+        "plural": "Weeks",
+        "hours": "50"
+      }
+    },
+    "topsheet": [
+      {
+        "kind": "category",
+        "code": "10",
+        "name": "Story and research",
+        "accounts": [
+          {
+            "code": "10-01",
+            "name": "Researchers"
+          },
+          {
+            "code": "10-02",
+            "name": "Story consultants"
+          },
+          {
+            "code": "10-03",
+            "name": "Rights and releases"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "11",
+        "name": "Writing",
+        "accounts": [
+          {
+            "code": "11-01",
+            "name": "Writer"
+          },
+          {
+            "code": "11-02",
+            "name": "Narration script"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "12",
+        "name": "Producers",
+        "accounts": [
+          {
+            "code": "12-01",
+            "name": "Executive producers"
+          },
+          {
+            "code": "12-02",
+            "name": "Producers"
+          },
+          {
+            "code": "12-03",
+            "name": "Associate producers"
+          },
+          {
+            "code": "12-04",
+            "name": "Producers' expenses"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "13",
+        "name": "Director",
+        "accounts": [
+          {
+            "code": "13-01",
+            "name": "Director"
+          },
+          {
+            "code": "13-02",
+            "name": "Director's expenses"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "14",
+        "name": "Talent and participants",
+        "accounts": [
+          {
+            "code": "14-01",
+            "name": "Host"
+          },
+          {
+            "code": "14-02",
+            "name": "Narrator"
+          },
+          {
+            "code": "14-03",
+            "name": "Participant expenses"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total above-the-line"
+      },
+      {
+        "kind": "category",
+        "code": "20",
+        "name": "Production staff",
+        "accounts": [
+          {
+            "code": "20-01",
+            "name": "Line producer"
+          },
+          {
+            "code": "20-02",
+            "name": "Production manager"
+          },
+          {
+            "code": "20-03",
+            "name": "Production coordinator"
+          },
+          {
+            "code": "20-04",
+            "name": "Field producers"
+          },
+          {
+            "code": "20-05",
+            "name": "Production assistants"
+          },
+          {
+            "code": "20-06",
+            "name": "Fixers and local producers"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "21",
+        "name": "Camera",
+        "accounts": [
+          {
+            "code": "21-01",
+            "name": "Director of photography"
+          },
+          {
+            "code": "21-02",
+            "name": "Camera operators"
+          },
+          {
+            "code": "21-03",
+            "name": "Camera assistants"
+          },
+          {
+            "code": "21-04",
+            "name": "Camera package"
+          },
+          {
+            "code": "21-05",
+            "name": "Aerial and specialty camera"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "22",
+        "name": "Sound",
+        "accounts": [
+          {
+            "code": "22-01",
+            "name": "Sound recordist"
+          },
+          {
+            "code": "22-02",
+            "name": "Sound package"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "23",
+        "name": "Lighting and grip",
+        "accounts": [
+          {
+            "code": "23-01",
+            "name": "Gaffer and grip"
+          },
+          {
+            "code": "23-02",
+            "name": "Lighting and grip package"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "24",
+        "name": "Locations and permits",
+        "accounts": [
+          {
+            "code": "24-01",
+            "name": "Site fees"
+          },
+          {
+            "code": "24-02",
+            "name": "Filming permits"
+          },
+          {
+            "code": "24-03",
+            "name": "Location expenses"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "25",
+        "name": "Travel and living",
+        "accounts": [
+          {
+            "code": "25-01",
+            "name": "Airfare"
+          },
+          {
+            "code": "25-02",
+            "name": "Hotels"
+          },
+          {
+            "code": "25-03",
+            "name": "Per diems"
+          },
+          {
+            "code": "25-04",
+            "name": "Ground transportation"
+          },
+          {
+            "code": "25-05",
+            "name": "Visas"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "26",
+        "name": "Shipping and carnets",
+        "accounts": [
+          {
+            "code": "26-01",
+            "name": "Freight"
+          },
+          {
+            "code": "26-02",
+            "name": "Carnets and customs"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "27",
+        "name": "Media and data",
+        "accounts": [
+          {
+            "code": "27-01",
+            "name": "Drives and media"
+          },
+          {
+            "code": "27-02",
+            "name": "Data management"
+          },
+          {
+            "code": "27-03",
+            "name": "Backup and storage"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "28",
+        "name": "Re-creations",
+        "accounts": [
+          {
+            "code": "28-01",
+            "name": "Re-creation cast"
+          },
+          {
+            "code": "28-02",
+            "name": "Art and props"
+          },
+          {
+            "code": "28-03",
+            "name": "Wardrobe and makeup"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total production"
+      },
+      {
+        "kind": "category",
+        "code": "40",
+        "name": "Editorial",
+        "accounts": [
+          {
+            "code": "40-01",
+            "name": "Editor"
+          },
+          {
+            "code": "40-02",
+            "name": "Assistant editor"
+          },
+          {
+            "code": "40-03",
+            "name": "Edit system"
+          },
+          {
+            "code": "40-04",
+            "name": "Post production supervisor"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "41",
+        "name": "Archival and stock footage",
+        "accounts": [
+          {
+            "code": "41-01",
+            "name": "Archival research"
+          },
+          {
+            "code": "41-02",
+            "name": "Footage licensing"
+          },
+          {
+            "code": "41-03",
+            "name": "Stills licensing"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "42",
+        "name": "Music",
+        "accounts": [
+          {
+            "code": "42-01",
+            "name": "Composer"
+          },
+          {
+            "code": "42-02",
+            "name": "Music licensing"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "43",
+        "name": "Post sound",
+        "accounts": [
+          {
+            "code": "43-01",
+            "name": "Sound editing"
+          },
+          {
+            "code": "43-02",
+            "name": "Narration recording"
+          },
+          {
+            "code": "43-03",
+            "name": "Mix"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "44",
+        "name": "Graphics and animation",
+        "accounts": [
+          {
+            "code": "44-01",
+            "name": "Graphics"
+          },
+          {
+            "code": "44-02",
+            "name": "Animation"
+          },
+          {
+            "code": "44-03",
+            "name": "Titles"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "45",
+        "name": "Picture finishing",
+        "accounts": [
+          {
+            "code": "45-01",
+            "name": "Color grading"
+          },
+          {
+            "code": "45-02",
+            "name": "Online and conform"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "46",
+        "name": "Transcription and translation",
+        "accounts": [
+          {
+            "code": "46-01",
+            "name": "Transcription"
+          },
+          {
+            "code": "46-02",
+            "name": "Translation"
+          },
+          {
+            "code": "46-03",
+            "name": "Subtitles and captions"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "47",
+        "name": "Deliverables",
+        "accounts": [
+          {
+            "code": "47-01",
+            "name": "Masters"
+          },
+          {
+            "code": "47-02",
+            "name": "Deliverables"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total post"
+      },
+      {
+        "kind": "category",
+        "code": "50",
+        "name": "Insurance",
+        "accounts": [
+          {
+            "code": "50-01",
+            "name": "Production insurance"
+          },
+          {
+            "code": "50-02",
+            "name": "Errors and omissions"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "51",
+        "name": "Legal and clearances",
+        "accounts": [
+          {
+            "code": "51-01",
+            "name": "Production legal"
+          },
+          {
+            "code": "51-02",
+            "name": "Clearance review"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "52",
+        "name": "Outreach and festivals",
+        "accounts": [
+          {
+            "code": "52-01",
+            "name": "Festival fees"
+          },
+          {
+            "code": "52-02",
+            "name": "Outreach and impact"
+          },
+          {
+            "code": "52-03",
+            "name": "Marketing materials"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "53",
+        "name": "General expenses",
+        "accounts": [
+          {
+            "code": "53-01",
+            "name": "Office expenses"
+          },
+          {
+            "code": "53-02",
+            "name": "Bank and fiscal sponsor fees"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "54",
+        "name": "Contingency",
+        "accounts": [
+          {
+            "code": "54-01",
+            "name": "Contingency"
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total other"
+      }
+    ]
+  }
+}

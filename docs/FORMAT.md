@@ -109,7 +109,7 @@ Fields in written order:
 | `title`           | text, **required** | Budget title. |
 | `base_currency`   | text, **required** | Currency code that totals are computed in and that lines without a currency use. |
 | `totals_currency` | optional text | Currency the totals are shown in, when not the base currency. |
-| `provenance`      | [provenance](#provenance) | Where this budget came from, when it is a copy saved for sharing or a sub-budget. Left out otherwise. |
+| `provenance`      | [provenance](#provenance) | Where this budget came from, when it is a copy saved for sharing, a sub-budget or a [setup pack](#setup-packs). Left out otherwise. |
 | `account_coding`  | [account coding](#account-coding) | Left out when it is the default pattern. |
 | `fringe_posting`  | [fringe posting](#fringe-posting) | Left out when it is the default (by category, suffix `"99"`). |
 | `new_line_defaults` | [new-line defaults](#new-line-defaults) | Left out when it is the default (copy fringes only). |
@@ -130,6 +130,7 @@ Fields in written order:
 | `display`         | [display settings](#display-settings) | How numbers show on screen. Left out when every setting is the default. |
 | `setup_order`     | [setup order](#setup-order) | Hand-made display order of the setup tables. Left out when every table is in name order. |
 | `setup_folders`   | [setup folders](#setup-folders) | Folders of setup items per kind (the personal library's). Left out when no kind has a folder. |
+| `setup_sources`   | [setup sources](#setup-sources) | Where setup items came from: the setup pack each was imported from, and source notes and links. Left out when no item has one. |
 | `report_presets`  | list of [report presets](#report-preset) | Saved report setups, in the user's order. Left out when there are none. |
 | `tag_presets`     | list of [tag presets](#tag-preset) | Saved bundles of line tags, in the user's order. Left out when there are none. |
 | `line_presets`    | list of [line blocks](#line-block) | Saved blocks of rows to insert, in the user's order. Left out when there are none. |
@@ -516,19 +517,20 @@ field is.
 
 ### Provenance
 
-Where a budget came from: stamped on a copy saved for sharing and on a sub-budget. It is
-about the file, not its content: a [version](#version) never has one, and restoring a
-version keeps the current one. It names its source by title only, never by path. Fields
+Where a budget came from: stamped on a copy saved for sharing, a sub-budget and a setup
+pack. It is about the file, not its content: a [version](#version) never has one, and
+restoring a version keeps the current one. It names its source by title only, never by path. Fields
 in written order:
 
 | Field            | Type | Notes |
 |------------------|------|-------|
-| `kind`           | text, **required** | `"shared_copy"` (saved for sharing; Method Budget opens it read-only), `"editable_copy"` (an editable copy made from a shared copy), or `"sub_budget"` (a filtered copy of another budget). |
+| `kind`           | text, **required** | `"shared_copy"` (saved for sharing; Method Budget opens it read-only), `"editable_copy"` (an editable copy made from a shared copy), `"sub_budget"` (a filtered copy of another budget), or `"setup_pack"` (a [setup pack](#setup-packs)). |
 | `source_title`   | text, **required** | The title of the budget it was made from. |
 | `source_version` | optional text | The name of the saved version it was made from, when it wasn't the budget as it stood. |
 | `saved`          | text, **required** | When it was made, as an ISO 8601 date-time such as `"2026-10-09T14:30:00-07:00"`. Stored as given; the reader does not check it. |
 | `app_version`    | text, **required** | The version of the program that made it. |
 | `note`           | optional text | A note from whoever made it; for a sub-budget, what it keeps (`"Categories 10, 20; groups Night; without fringes"`). |
+| `pack`           | [pack details](#setup-packs) | A setup pack's details. Only with `"setup_pack"`; left out otherwise. |
 
 Read-only is a request, not a lock: any program may edit the file, and Method Budget
 offers an editable copy instead.
@@ -564,7 +566,7 @@ the type-ahead follow it; nothing else depends on it. Layout, not content: a
 
 Named folders of setup items, one set of folders per kind: an object whose keys are kinds
 (`global`, `fringe`, `group`, `unit`, `set`, `location`, `currency`, `charge`, `credit`,
-`tag_preset`, `line_preset`, `report_preset`), each an object of folder names to lists of
+`tag_preset`, `line_preset`, `report_preset`, `ot_pattern`), each an object of folder names to lists of
 item names (exact names: a charge, credit or preset by its `name`). An item is in at most
 one folder of its kind; an item in none is unfiled. A folder may be empty. A folder name is
 1 to 60 characters with no control characters, unique within its kind ignoring case (the
@@ -581,6 +583,84 @@ setup, no `topsheet`, and usually `setup_folders`; nothing else marks it as a li
 "setup_folders": { "fringe": { "Payroll": ["FICA", "FUI"], "Union": [] } }
 ```
 
+### Setup sources
+
+Where setup items came from: an object whose keys are kinds (as for
+[setup folders](#setup-folders)), each an object of item names (exact names) to a source.
+Importing a [setup pack](#setup-packs) stamps every item it brings with the pack's title,
+version and effective date; a pack's maker can give any item notes and links of its own;
+copying an item between budgets (Import Setup, the library, packs) brings its source along,
+and replacing an item with another's version replaces its source too. A source's fields,
+in written order, each left out when empty:
+
+| Field          | Type | Notes |
+|----------------|------|-------|
+| `pack`         | text | The title of the setup pack it was imported from. |
+| `pack_version` | text | That pack's `version`. |
+| `effective`    | text | When its figure takes effect, `YYYY-MM-DD` (the item's own, else the pack's). |
+| `notes`        | text | Where its figure comes from, in words. |
+| `urls`         | list of text | Links to its sources, each `http://` or `https://`. Shown as text; never fetched. |
+
+A reader takes the object as is (checking nothing but the shape); a writer keeps only
+known kinds' items that exist and sources that say something, and leaves `setup_sources`
+out when none is left. About the items, not content: no amount depends on it, a
+[version](#version) never has one, and saving or restoring a version keeps the current
+sources. Renaming an item everywhere renames its source's key.
+
+```json
+"setup_sources": {
+  "fringe": {
+    "PENSION": { "pack": "Example Rates", "pack_version": "2026.1", "effective": "2026-01-01", "notes": "Scale sheet, page 4" }
+  }
+}
+```
+
+### Setup packs
+
+A setup pack is an ordinary budget file made to share setup items: setup and no
+`topsheet`, a [`provenance`](#provenance) whose `kind` is `"setup_pack"` (its
+`source_title` names the budget it was made from and `saved` when), and the pack's details
+in the provenance's `pack`. It usually has [setup folders](#setup-folders) (the maker's)
+and [setup sources](#setup-sources) (per-item notes and links). A pack holds whatever
+setup items its maker picked plus everything they need (a fringe's globals and flat unit,
+a global's globals, a charge's excluded groups and currency, a credit's groups and
+excluded fringes, a tag preset's tags, what a line block's rows use, a report preset's
+groups and header and footer globals), and never the three budget settings
+(`account_coding`, `fringe_posting`, `new_line_defaults`), which belong to a production.
+It opens in Method Budget like any budget. The pack details, in written order, each left
+out when empty but the title:
+
+| Field         | Type | Notes |
+|---------------|------|-------|
+| `title`       | text, **required** | 1 to 200 characters, one line. |
+| `description` | text | Up to 4,000 characters. |
+| `author`      | text | Who made it: free text. |
+| `version`     | text | The pack's own version, as its maker writes it. |
+| `effective`   | text | When its figures take effect, `YYYY-MM-DD`. |
+| `region`      | text | The region or jurisdiction its figures apply to. |
+| `notes`       | text | Where its figures come from, in words. Up to 4,000 characters. |
+| `urls`        | list of text | Up to 20 links to its sources, each `http://` or `https://`. Shown as text; never fetched. |
+
+The limits are the application's (the reader checks only the shape). Method Budget ships
+no rate packs: they come from a separate data project after review (CLEAN-ROOM.md).
+
+```json
+"provenance": {
+  "kind": "setup_pack",
+  "source_title": "Payroll Desk Setup",
+  "saved": "2026-10-10T09:00:00-07:00",
+  "app_version": "0.1.0",
+  "pack": {
+    "title": "Example Rates",
+    "author": "Payroll desk",
+    "version": "2026.1",
+    "effective": "2026-01-01",
+    "region": "Example region",
+    "urls": ["https://example.org/scale"]
+  }
+}
+```
+
 ### Version
 
 A named, full copy of the budget's content, saved inside the budget so it can be restored
@@ -592,7 +672,7 @@ or compared later. Fields in written order:
 | `name`    | text, **required** | |
 | `created` | text, **required** | When the version was saved, as an ISO 8601 date-time such as `"2026-10-09T14:30:00Z"`. Stored as given; the reader does not check it. |
 | `note`    | optional text | |
-| `budget`  | object | A [budget](#budget) object with every field except `versions`, `compact_versions`, `report_presets`, `tag_presets`, `line_presets`, `ot_patterns`, `display`, `setup_order`, `setup_folders`, `provenance` and `actuals`: a version cannot contain versions, presets, overtime patterns, display settings, a setup order, setup folders, a provenance or actuals, and a reader rejects one that does. |
+| `budget`  | object | A [budget](#budget) object with every field except `versions`, `compact_versions`, `report_presets`, `tag_presets`, `line_presets`, `ot_patterns`, `display`, `setup_order`, `setup_folders`, `setup_sources`, `provenance` and `actuals`: a version cannot contain versions, presets, overtime patterns, display settings, a setup order, setup folders, setup sources, a provenance or actuals, and a reader rejects one that does. |
 | `delta`   | object | Instead of `budget`: the version written as changes ([version deltas](#version-deltas)). |
 
 Exactly one of `budget` and `delta` is required.
@@ -666,7 +746,7 @@ A delta is an object with two fields, both **required**:
 The **base** is always a budget object exactly as the reference writer writes it, in
 canonical form: for `"budget"`, the file's top-level budget with every field a version
 can't have left out (`versions`, `compact_versions`, the presets, `display`,
-`setup_order`, `setup_folders`, `provenance`, `actuals`); for `"next"`, the next
+`setup_order`, `setup_folders`, `setup_sources`, `provenance`, `actuals`); for `"next"`, the next
 version's budget (rebuilt first if it is a delta too). The newest version's base must be
 `"budget"`. The reference writer gives the newest version `"budget"` and every older one
 `"next"`, so each delta holds what changed between neighbors, and it writes a version in
@@ -981,6 +1061,10 @@ valid. Loading and saving it in Method Budget normalizes it.
 - Version 1, additive (2026-10): budget [`actuals`](#actuals) (transactions, import
   batches and estimate-to-complete methods) and report preset section `"cost_report"`.
   Left out when there are none, so files without them are unchanged.
+- Version 1, additive (2026-10): [setup packs](#setup-packs): provenance kind
+  `"setup_pack"` and provenance `pack` (a pack's details), budget
+  [`setup_sources`](#setup-sources) (where setup items came from), and setup folders for
+  `ot_pattern`. Each is left out when empty, so files that don't use them are unchanged.
 
 ## Complete example
 

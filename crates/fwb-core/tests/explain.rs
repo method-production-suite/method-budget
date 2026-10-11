@@ -101,6 +101,61 @@ fn every_total_of_the_hand_checked_sample_adds_up() {
     }
 }
 
+/// Numbers on rounding edges (money rounded to cents once, from the exact
+/// product): every explanation still adds up to the reported total.
+#[test]
+fn every_total_adds_up_on_rounding_edges() {
+    for seed in 1..=4 {
+        let spec = SampleSpec {
+            seed,
+            categories: 4,
+            accounts: 12,
+            rows: 300,
+            fringes: 10,
+            groups: 4,
+            baseline: false,
+        };
+        let mut base = sample::budget(&spec);
+        sample::fine_decimals(&mut base, seed);
+        for posting in postings() {
+            let mut b = base.clone();
+            b.fringe_posting = posting;
+            check_all(&b, &RecalcOptions::default());
+        }
+    }
+    let mut b = sample();
+    sample::fine_decimals(&mut b, 9);
+    check_all(&b, &RecalcOptions::default());
+}
+
+/// 0.5 x 0.009999999 is 0.0049999995: shown in full, and rounded once to 0.00.
+#[test]
+fn an_edge_line_shows_its_exact_product_and_one_rounding() {
+    let mut b = sample();
+    let d = b
+        .categories_mut()
+        .flat_map(|c| &mut c.accounts)
+        .flat_map(|a| &mut a.details)
+        .find(|d| d.id == 2)
+        .unwrap();
+    d.amount = "0.5".into();
+    d.x = "".into();
+    d.x4 = "".into();
+    d.rate = "0.009999999".into();
+    d.currency = None;
+    let e = explain(&b, &RecalcOptions::default(), &Target::Line(2)).unwrap();
+    assert_eq!(e.reported, 0);
+    let text = all_text(&e.root);
+    assert!(
+        text.contains("Line: 0.5 x 0.009999999 = 0.0049999995"),
+        "{text}"
+    );
+    assert!(
+        text.contains("0.0049999995 rounds half away from zero to 0.00"),
+        "{text}"
+    );
+}
+
 /// The first step (depth first) whose label is `label`.
 fn find<'a>(s: &'a Step, label: &str) -> Option<&'a Step> {
     if s.label == label {

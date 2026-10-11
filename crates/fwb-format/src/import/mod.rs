@@ -24,6 +24,8 @@
 //! short by them says so ([`Table::truncated`]).
 
 pub mod actuals;
+/// A chart of accounts (numbers, names, levels) from a sheet or a budget.
+pub mod coa;
 pub mod csvread;
 pub mod inflate;
 pub mod mapping;
@@ -114,6 +116,10 @@ pub struct Table {
     /// Numbers in text cells use a decimal comma (`1.234,56`): set for
     /// semicolon-delimited files, which come from places that write them.
     pub decimal_comma: bool,
+    /// Date serial numbers count from 1904-01-01 (serial 0), not the usual
+    /// 1900 system: set for a workbook that says so (`date1904`, older Mac
+    /// Excel). Every sheet of such a workbook has it; `false` otherwise.
+    pub date1904: bool,
 }
 
 impl Table {

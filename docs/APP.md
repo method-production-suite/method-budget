@@ -1027,12 +1027,47 @@ front to a new file, stripped the same way and titled after the file, without ch
 budget or its own file; it won't write over a file open in a tab. A template is an
 ordinary `.mthd`: there is no template format and no template folder.
 
+New From Template also lists the **bundled charts of accounts** under "Charts of accounts",
+grouped Feature, Television, Commercial and Other: our own feature, low-budget feature,
+one-hour and half-hour TV, commercial, music video and documentary charts, and any studio
+chart built into the app from a source the owner supplied (docs/TEMPLATES.md). Picking one
+opens it like a template file: a new Untitled tab with its categories, accounts and
+production totals, no lines and no setup.
+
+**Import Chart of Accounts…** (File menu) brings in any chart: from an Excel workbook (any
+sheet), a CSV or tab-delimited file, or another budget file (its own chart). For a
+spreadsheet the dialog works like Import Spreadsheet: the sheet, the header row and a
+column for each field (category number, category name, account number, account name,
+level), guessed from the titles and the cells; a file in the `kind,code,name,parent` layout
+needs no columns. It reads flat lists, outlines, side-by-side category and account columns,
+numbers and names in one cell, numbers with or without separators or with lost leading
+zeros, and skips rows above the header, repeated headers and total rows; level headings
+and level totals become production totals (our default ones are offered when the file
+names none). The numbering pattern the numbers follow is shown and can be changed (widths
+and separator). The preview lists the chart as it will come in, the rows skipped and what
+to check (duplicates, accounts without a category row, empty categories, folded
+sub-accounts). Then either:
+
+- **A new budget tab with this chart and no lines** (titled Untitled, in this budget's base
+  currency; the import is its first undo step, so it starts unsaved), or
+- **This budget**: categories and accounts it lacks are added in number order, the ones it
+  has are renamed by number, numbers are carried over to this budget's pattern (ones that
+  don't fit are listed and left out), production totals are left alone. Accounts the chart
+  doesn't list are kept; "Also remove empty accounts the chart doesn't list" removes those
+  with no lines and no notes. An account with lines is never removed, and the preview lists
+  them. One undo step.
+
 | Command | Arguments | Returns |
 |---|---|---|
 | `import_setup_pick` | none (shows the Open dialog) | the review, or `null` when cancelled |
 | `import_setup` | `token` (from the review), `picks` (`[{kind, name}]`, settings with an empty name), `resolutions` (`[{kind, name, choice}]`, choice `keep`, `imported` or `rename`) | `{view, message, added, replaced, kept}` |
 | `template_new` | `keepLines` (shows the Open dialog) | View of the new tab, or `null` when cancelled |
 | `template_save` | `keepLines` (shows the Save dialog) | `{name, path}`, or `null` when cancelled |
+| `chart_templates` | none | the bundled charts `[{id, name, group, description}]` |
+| `chart_template_new` | `id` | View of the new tab |
+| `coa_import_pick` | none (shows the Open dialog) | `{token, file, kind, sheets, sheet, fields}` (kind `xlsx`, `csv`, `tsv` or `budget`), or `null` when cancelled |
+| `coa_import_preview` | `token`, `request` (`{sheet, header_row, mapping, detect_header, guess, coding: {category, account, sub, separator} or null, sub_accounts, default_levels, target, remove_unlisted}`, `target` `"current"` to apply to the budget) | the preview: `{budget_file, kinded, header_row, mapping, columns, raw, inferred, coding, rows: [{kind, code, name}], categories, accounts, levels, skipped, warnings, totals_skipped, sub_accounts, padded, levels_from_source, default_levels_added, apply, truncated}`; changes nothing |
+| `coa_import` | `token`, `request` | `{view, message}` |
 
 The review has `token`, `source` (the file's or tab's name), `path`, `notes` and `items`
 (`[{kind, name, status, imported, here, rename_to, needs}]`: kind `global`, `fringe`,
@@ -1155,6 +1190,98 @@ the library as the review saw it; adding or saving with it is refused ("The libr
 since") once the library has been written since. The Library tab works in the tools window
 too (its commands are in `capabilities/tools.json`); the dialogs are Rust's, parented to
 the window that asked.
+
+### Setup packs
+
+Sets of setup items to share, keep or start from (decisions.md entry 50; the file is
+described in FORMAT.md, "Setup packs"). **A setup pack is a budget file** with setup and no
+lines, stamped `setup_pack` with the pack's details: a title, a description, who made it
+(free text), a version, the date its figures take effect, the region or jurisdiction they
+apply to, and where its figures come from (notes and links, for the pack and for any item).
+It opens in the app like any budget, so a pack is edited by opening it as a tab, and New
+From Template… starts a budget from one.
+
+- **Export Setup Pack…** (File menu, and **Export Pack…** or **Export Library…** in the
+  Library tab's Setup packs section, so also from the Budget Setup window's library rail)
+  lists the budget's (or the library's) setup items by kind and folder: a box per kind,
+  per folder and per item, and what a ticked item needs (a fringe's globals and unit, a
+  charge's groups, a tag preset's tags, however deep) comes along, shown as such. Below,
+  the pack's details. **Export Pack…** builds the pack in Rust (the same dependency walk as
+  Import Setup, the source's folders and item sources kept, the three budget settings never
+  included), checks the details (a title; the date `YYYY-MM-DD`; links `http://` or
+  `https://`) and shows Rust's Save dialog, in your Packs folder at first; the file is
+  written through a temporary file, and a budget open in a tab is never written over.
+- **Import Setup Pack…** (File menu; **Import Pack…** and **Import into Library…** in the
+  Setup packs section; **Add to This Budget…** and **Add to Library…** on a listed pack)
+  shows Import Setup's review with the pack's details on top and each item's source under
+  it: each item **New**, **Same here** or **Different here**, keep this budget's (the
+  default), use the pack's, or add the pack's under a new name; what an item needs comes
+  along. Into a budget it is one undo step; into the library it is the library's own
+  checked write (refused while the library is open as a tab). **Every item that comes in is
+  stamped** with the pack's title, version and effective date (`setup_sources`), and its
+  own notes and links come with it, so you can always see where a rate came from. A budget
+  that isn't a pack can be imported this way too (nothing is stamped).
+- **The Setup packs section** at the foot of the Library tab lists the packs in your
+  **Packs folder** (`Packs` in the app's local data folder, made the first time it is
+  listed; **Show Packs Folder** opens it, so you can drop packs in) and the packs that come
+  with the app (the repository's `packs/` folder, bundled as a resource: empty but for a
+  README, since rate packs come from a separate data project after review, CLEAN-ROOM.md),
+  each with its title, version, effective date, region and item count. **Refresh** looks
+  again.
+- **Where an item came from** travels with it: Import Setup From…, the library and packs all
+  carry an item's source along, and replacing an item replaces its source. Renaming an item
+  everywhere keeps it. Overtime patterns are setup items now too (Import Setup, the library,
+  packs and spreadsheets all carry them).
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `packs_list` | none | `{folder, packs: [{token, file, place, title, version, effective, region, items, problem}]}` (`place`: `yours` or `bundled`) |
+| `packs_reveal` | none | opens the Packs folder in the file manager |
+| `pack_items` | `source` (`budget` or `library`) | `{source, title, kinds}` as the library's `kinds` |
+| `pack_export` | `source`, `picks`, `details` (`{title, description, author, version, effective, region, notes, urls}`), `created` | `{name, message}`, or `null` when cancelled |
+| `pack_import_pick` | `into` (`budget` or `library`); shows Rust's Open dialog | the review, or `null` when cancelled |
+| `pack_review` | `token` (from `packs_list`), `into` | the review |
+| `pack_import` | `token`, `picks`, `resolutions` (as `import_setup`) | `{view, message}`, one undo step |
+| `pack_import_library` | `token`, `sourceToken`, `picks`, `resolutions` | `{library, message}` |
+
+A pack review is Import Setup's (`token`, `source`, `items`, `notes`) plus `pack`
+(`{is_pack, details, source_title, created, sources: [{kind, name, text}]}`), `into` and
+`source_token` (the pack, for an import into the library, whose `token` names the library
+as the review saw it). The pack commands are allowed in all three windows, since the
+Library tab is in each; the dialogs are Rust's and the page never names a path.
+
+### Setup lists in a spreadsheet
+
+**File > Export > Setup Lists…** writes the budget's setup items as tables, one row per item
+(per credit row for credits) with every part of its definition and where it came from
+(Effective, Source Notes, Source Links): globals, fringes, groups, units, sets, locations,
+currencies, charges, credits, tag presets and overtime patterns, whichever are ticked, as an
+Excel workbook (a sheet per kind) or CSV files (one per kind, named `<file> - Fringes.csv`
+and so on). Lists (a charge's excluded groups, a tag preset's fringes) are names joined with
+commas; an overtime pattern's bands read `2 @ 1.5; rest @ 2`. A charge's excluded amounts
+belong to one budget's lines and stay out (the message says how many charges have them);
+line blocks, report presets and the budget settings are not lists.
+
+**File > Import Setup Lists…** reads a workbook, CSV or tab-delimited file (Import
+Spreadsheet's readers and limits). Each sheet gets a kind (guessed from its name, or the
+file's) and a column per field, guessed from the titles (our own export maps itself; a
+department sheet's `Fringe Name`, `Percentage`, `Wage Cap` and `Notes` come out right) and
+changeable. **Check and Review…** reads every chosen sheet and lists every problem with its
+sheet and row number (names missing or listed twice, numbers that aren't numbers, formulas
+that don't parse or name a global neither the sheet nor the budget has, a cutoff on a flat
+fringe, dates that aren't `YYYY-MM-DD`, links that aren't web links); nothing is imported
+while any is left. A clean read goes to Import Setup's review (keep, take or add under a
+new name; one undo step). To fill a pack from a spreadsheet, open the pack as a tab and
+import there.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `setup_sheet_export` | `kinds` (empty: all), `format` (`xlsx` or `csv`); shows Rust's Save dialog | `{done, files, message}` |
+| `setup_sheet_pick` | none (shows Rust's Open dialog) | `{token, file, sheets: [{index, name, rows, kind, mapping, titles}], kinds: [{kind, label, columns}]}`, or `null` |
+| `setup_sheet_guess` | `token`, `index`, `kind` | the sheet with that kind's guessed `mapping` and `titles` |
+| `setup_sheet_review` | `token`, `choices` (`[{index, kind, mapping: {header_row, columns}}]`) | `{errors: [{sheet, row, message}], preview}`: the problems, or Import Setup's review (its token goes to `import_setup`) |
+
+These are the main window's only (File menu).
 
 ### Versions and comparing
 
@@ -1795,9 +1922,16 @@ crates/fwb-app/
                      (status, what each needs), importing the picks as one undo step
   src/templates.rs   New From Template and Save as Template: a budget stripped to its
                      chart, setup and settings
+  src/coa_import.rs  Import Chart of Accounts (preview, new tab or apply to the budget as
+                     one undo step) and the bundled chart templates
   src/library.rs     the personal setup library: which file it is (library.json), its
                      view, copying items in and out through Import Setup's review, its
                      folders, atomic writes, refusing changes while it is open as a tab
+  src/packs.rs       setup packs: export from the budget or the library, import into
+                     either through Import Setup's review with the pack's stamp, the
+                     Packs list (the user's Packs folder and the bundled packs)
+  src/setup_sheets.rs  setup lists as spreadsheets: export by kind, import with a column
+                     mapping per sheet, checked row by row, then Import Setup's review
   src/sheet_import.rs  Import Spreadsheet: the picked file kept by token, the mapping
                      dialog's preview and the import (fwb_format::import does the work)
   src/actuals.rs     Import Actuals, the Actuals tab's commands and the cost figures
@@ -2228,6 +2362,13 @@ setup lists' right-click menus (its logic is tested in Rust, the tab in a browse
 Import Setup From, New From Template and Save as Template need a live check of their
 native dialogs and of the review with a large library budget (the review's logic and
 dialog are tested in Rust and in a browser harness).
+Setup packs and setup lists need a live check of their Save and Open dialogs, Show Packs
+Folder, the bundled packs folder in a built app, and the Setup packs section in the tools
+and Budget Setup windows (their logic is tested in Rust, the dialogs in a browser
+harness). Not yet: editing an item's source notes in the app (a pack's maker sets them
+through a spreadsheet's Source columns or by editing the pack), clearing an item's stamp
+when its figure is edited by hand, and showing an item's source in the setup tables (the
+review, the spreadsheet export and `method pack show` show it).
 Reports need a live check in the app: Print… and Save as PDF… through the native print
 operation (checked here only in a hidden test web view: each page box is one sheet,
 portrait and landscape, with backgrounds and colors), the print sheet's orientation, and

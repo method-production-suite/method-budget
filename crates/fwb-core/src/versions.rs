@@ -117,6 +117,7 @@ pub fn restore_version(
     let display = std::mem::take(&mut b.display);
     let order = std::mem::take(&mut b.setup_order);
     let folders = std::mem::take(&mut b.setup_folders);
+    let sources = std::mem::take(&mut b.setup_sources);
     // Where the budget came from is about the file, not its content.
     let provenance = b.provenance.take();
     // How versions are stored is a file setting.
@@ -127,6 +128,7 @@ pub fn restore_version(
     b.actuals = actuals;
     b.setup_order = order;
     b.setup_folders = folders;
+    b.setup_sources = sources;
     b.provenance = provenance;
     b.compact_versions = compact;
     b.report_presets = presets;

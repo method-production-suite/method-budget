@@ -2,7 +2,7 @@
 
 use crate::calc::{err, overflow, sum, CalcError, Ctx, ErrorKind};
 use crate::coding::AccountCoding;
-use crate::decimal::{mul_cents, percent_of, Dec};
+use crate::decimal::{mul_cents, percent_of, Dec, Exact};
 use crate::model::{
     Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource, Detail, FringePosting, TopsheetRow,
 };
@@ -269,10 +269,9 @@ fn charge(
 
 fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals, CalcError> {
     let ovf = || overflow(format!("credit {}", c.name));
-    let hundred = Dec::from_int(100);
 
     let mut rows = Vec::with_capacity(c.rows.len());
-    let mut total = Dec::ZERO;
+    let mut total = Exact::cents(0);
     for (i, cr) in c.rows.iter().enumerate() {
         let at = || format!("credit {} row {} ({})", c.name, i + 1, cr.description);
         let row_ovf = || overflow(at());
@@ -306,53 +305,71 @@ fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals
         };
         let net = gross.checked_sub(excluded_fringes).ok_or_else(row_ovf)?;
 
-        // Unrounded: rows are summed, capped and discounted before rounding.
-        let pct = |v: Dec| v.checked_mul(cr.percent)?.checked_div(hundred);
-        let net_dec = Dec::from_cents(net);
-        let (credit, cap_variance) = match cr.cap {
-            CreditCap::None => (pct(net_dec), None),
-            CreditCap::QualifiedSpend(cap) => {
-                let cap = Dec::from_cents(cap);
-                (pct(net_dec.min(cap)), Some(cap.checked_sub(net_dec)))
-            }
-            CreditCap::Credit(cap) => {
-                let cap = Dec::from_cents(cap);
-                let uncapped = pct(net_dec);
-                (
-                    uncapped.map(|v| v.min(cap)),
-                    Some(uncapped.and_then(|v| cap.checked_sub(v))),
-                )
-            }
-        };
-        let credit = credit.ok_or_else(row_ovf)?;
-        let cap_variance = cap_variance.map(|v| v.ok_or_else(row_ovf)).transpose()?;
+        // Exact: rows are summed, capped and discounted before the one rounding.
+        let (credit, cap_variance) = credit_row(net, cr.percent, cr.cap).ok_or_else(row_ovf)?;
         total = total.checked_add(credit).ok_or_else(ovf)?;
         rows.push(CreditRowTotals {
             gross,
             excluded_fringes,
             net,
-            credit,
-            cap_variance,
+            credit: credit.to_dec().ok_or_else(row_ovf)?,
+            cap_variance: cap_variance
+                .map(|v| v.to_dec().ok_or_else(row_ovf))
+                .transpose()?,
         });
     }
 
-    let capped = match c.cap {
-        Some(cap) => total.min(Dec::from_cents(cap)),
-        None => total,
-    };
-    let amount = c
-        .discount_percent
-        .checked_div(hundred)
-        .and_then(|d| Dec::ONE.checked_sub(d))
-        .and_then(|keep| capped.checked_mul(keep))
-        .and_then(Dec::to_cents)
+    let capped = credit_cap(total, c.cap).ok_or_else(ovf)?;
+    let amount = capped
+        .checked_mul_exact(credit_keep(c.discount_percent).ok_or_else(ovf)?)
+        .and_then(Exact::to_cents)
         .ok_or_else(ovf)?;
     Ok(CreditTotals {
         name: c.name.clone(),
         rows,
-        capped,
+        capped: capped.to_dec().ok_or_else(ovf)?,
         amount,
     })
+}
+
+/// One credit row, exactly: `percent` of `net` (or of the capped spend, or
+/// capped itself), and how far it is under its cap. `None` on overflow.
+pub(crate) fn credit_row(
+    net: Cents,
+    percent: Dec,
+    cap: CreditCap,
+) -> Option<(Exact, Option<Exact>)> {
+    let pct = |v: Exact| Some(v.checked_mul(percent)?.percent());
+    let net = Exact::cents(net);
+    Some(match cap {
+        CreditCap::None => (pct(net)?, None),
+        CreditCap::QualifiedSpend(cap) => {
+            let cap = Exact::cents(cap);
+            (pct(net.checked_min(cap)?)?, Some(cap.checked_sub(net)?))
+        }
+        CreditCap::Credit(cap) => {
+            let cap = Exact::cents(cap);
+            let uncapped = pct(net)?;
+            (uncapped.checked_min(cap)?, Some(cap.checked_sub(uncapped)?))
+        }
+    })
+}
+
+/// The rows' total under the credit's overall cap, exactly.
+pub(crate) fn credit_cap(total: Exact, cap: Option<Cents>) -> Option<Exact> {
+    match cap {
+        Some(cap) => total.checked_min(Exact::cents(cap)),
+        None => Some(total),
+    }
+}
+
+/// The share kept after a discount: `(100 - discount) / 100`, exactly.
+pub(crate) fn credit_keep(discount_percent: Dec) -> Option<Exact> {
+    Some(
+        Exact::dec(Dec::from_int(100))
+            .checked_sub(Exact::dec(discount_percent))?
+            .percent(),
+    )
 }
 
 #[cfg(test)]

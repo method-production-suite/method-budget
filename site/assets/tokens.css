@@ -1,0 +1,68 @@
+/* Method Budget brand tokens: the one place the site's colors and type are defined.
+   docs/BRAND.md explains them and lists the contrast checks. The accent is the desktop
+   app's own teal (crates/fwb-app/ui/styles.css, --accent), so the site and the app read
+   as one product. Every text pairing below meets WCAG AA (4.5:1) in both schemes. */
+
+:root {
+  /* Surfaces: warm paper behind white cards. */
+  --bg: #F7F6F2;
+  --surface: #FFFFFF;
+  --surface-2: #EFEDE7;
+
+  /* Text. */
+  --ink: #1C2228;        /* the app's text color */
+  --ink-soft: #3A424C;
+  --muted: #59626D;
+
+  /* Lines. --rule-strong is for borders that carry meaning (3:1 or more). */
+  --rule: #DEDBD3;
+  --rule-strong: #8F897C;
+
+  /* Teal, the app's accent. */
+  --accent: #0E7468;
+  --accent-strong: #0A5C53;
+  --accent-ink: #FFFFFF;  /* text on a teal fill */
+  --accent-soft: #E1F1EE; /* the app's selection color */
+
+  /* Pencil amber, for notes and the odd highlight. */
+  --note: #8A5A00;
+  --note-fill: #D29A12;
+
+  --code-bg: #EFEDE7;
+  --shadow: 0 1px 2px rgba(28, 34, 40, .06), 0 10px 32px rgba(28, 34, 40, .08);
+
+  /* The terminal sample stays dark in both schemes, like a terminal. */
+  --term-bg: #14181C;
+  --term-ink: #E4E8EC;
+  --term-dim: #9AA3AD;
+  --term-prompt: #2CC7B2;
+  --term-rule: #2B3138;
+
+  /* Type: the system's own faces, as in the app. Nothing is downloaded. */
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111417;
+    --surface: #1B1F24;    /* the app's dark surface */
+    --surface-2: #22272E;
+    --ink: #E4E8EC;
+    --ink-soft: #C3CAD2;
+    --muted: #9AA3AD;
+    --rule: #2B3138;
+    --rule-strong: #67717D;
+    --accent: #2CC7B2;     /* the app's dark accent */
+    --accent-strong: #5ED6C5;
+    --accent-ink: #08201D;
+    --accent-soft: #173A35;
+    --note: #E3B341;
+    --note-fill: #E3B341;
+    --code-bg: #22272E;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 10px 32px rgba(0, 0, 0, .3);
+    color-scheme: dark;
+  }
+}

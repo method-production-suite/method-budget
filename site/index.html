@@ -3,15 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- No scripts, no trackers, no third-party requests: everything this page needs is in
-     this file and the favicon beside it. The policy below holds the page to that. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<!-- No scripts, no trackers, no cookies, nothing from anyone else: the policy below
+     holds every page to files served from this site. How the site is built and
+     published: docs/WEBSITE.md. Brand rules: docs/BRAND.md. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
-<title>Method Budget</title>
-<meta name="description" content="Method Budget is free, open-source film and TV budgeting that runs on your own computer: open files, keyboard first, every number explained, no subscription.">
+<title>Method Budget: open-source film and TV budgeting</title>
+<meta name="description" content="Method Budget is free, open-source film and TV budgeting that runs on your own computer. Open files, keyboard first, every number explained, no subscription.">
 <link rel="canonical" href="https://methodbudget.com/">
-<!-- Share cards. og:image must be an absolute URL at 1200x630. The picture is drawn from
-     og-card.html by scripts/make-og.sh. -->
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="16x16 32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F7F6F2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111417" media="(prefers-color-scheme: dark)">
+<!-- Share cards. og:image is an absolute URL at 1200x630, drawn from og-card.html by
+     scripts/make-og.sh. -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Method Budget">
 <meta property="og:url" content="https://methodbudget.com/">
@@ -20,179 +27,34 @@
 <meta property="og:image" content="https://methodbudget.com/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Method Budget: film and TV budgeting that stays yours.">
+<meta property="og:image:alt" content="Method Budget: film and TV budgeting that shows its working.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Method Budget: open-source film and TV budgeting">
 <meta name="twitter:description" content="Free desktop budgeting for film and TV. Open files, keyboard first, every number explained, no subscription.">
 <meta name="twitter:image" content="https://methodbudget.com/og.png">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#FAF8F4" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#11151B" media="(prefers-color-scheme: dark)">
-<style>
-/* Colors are tokens, redefined once for dark mode. Every text pairing meets WCAG AA
-   (4.5:1 for body text) in both schemes. System fonts only: nothing is downloaded. */
-:root{
-  --bg:#FAF8F4; --surface:#FFFFFF; --surface-2:#F2EFE8;
-  --ink:#1A1F2B; --ink-soft:#3D4453; --muted:#5A6170;
-  --rule:#DCD7CC; --rule-strong:#B9B2A3;
-  --accent:#1D6A50; --accent-ink:#FFFFFF; --accent-soft:#E2EFE9;
-  --mark:#B5532A;
-  --code-bg:#F2EFE8;
-  --shadow:0 1px 2px rgba(26,31,43,.06),0 6px 24px rgba(26,31,43,.06);
-  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
-  --wrap:1080px;
-}
-@media (prefers-color-scheme: dark){
-  :root{
-    --bg:#11151B; --surface:#171C24; --surface-2:#1E2430;
-    --ink:#ECEEF2; --ink-soft:#C9CED8; --muted:#A3AAB8;
-    --rule:#2C3440; --rule-strong:#414B5A;
-    --accent:#6FD0A6; --accent-ink:#0D1A14; --accent-soft:#1C2E27;
-    --mark:#F0A57E;
-    --code-bg:#1E2430;
-    --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 24px rgba(0,0,0,.25);
-  }
-}
-*{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
-  font-size:17px;line-height:1.6;overflow-wrap:break-word}
-a{color:var(--accent);text-underline-offset:.18em}
-a:hover{text-decoration-thickness:2px}
-:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:3px}
-code{font-family:var(--mono);font-size:.88em;background:var(--code-bg);
-  padding:.08em .35em;border-radius:4px}
-.wrap{max-width:var(--wrap);margin:0 auto;padding:0 16px}
-@media (min-width:640px){.wrap{padding:0 28px}}
-.skip{position:absolute;left:-9999px;top:8px;z-index:10;background:var(--surface);
-  color:var(--ink);padding:10px 16px;border:2px solid var(--accent);border-radius:6px}
-.skip:focus{left:8px}
-
-/* header */
-.top{border-bottom:1px solid var(--rule)}
-.top .wrap{display:flex;align-items:center;gap:20px;min-height:64px;flex-wrap:wrap}
-.brand{display:inline-flex;align-items:center;gap:10px;color:var(--ink);
-  text-decoration:none;font-weight:700;letter-spacing:-.01em;font-size:18px}
-.brand svg{width:28px;height:28px;display:block}
-.brand .acc{fill:var(--accent)}
-.nav{display:flex;gap:18px;margin-left:auto;flex-wrap:wrap}
-.nav a{color:var(--ink-soft);text-decoration:none;font-size:15px;padding:4px 0}
-.nav a:hover{color:var(--ink);text-decoration:underline}
-@media (max-width:560px){.nav{margin-left:0;width:100%;gap:14px;padding-bottom:10px}}
-
-/* hero */
-.hero{padding:56px 0 40px}
-.hero .wrap{display:grid;gap:40px;align-items:center}
-@media (min-width:900px){.hero .wrap{grid-template-columns:1.05fr .95fr}.hero{padding:88px 0 64px}}
-.eyebrow{font-size:14px;font-weight:600;color:var(--accent);letter-spacing:.04em;
-  text-transform:uppercase;margin:0 0 12px}
-h1{font-size:clamp(34px,5.4vw,54px);line-height:1.08;letter-spacing:-.025em;margin:0 0 18px}
-.lede{font-size:clamp(18px,2.1vw,20px);color:var(--ink-soft);margin:0 0 28px;max-width:34em}
-.cta{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-.btn{display:inline-block;padding:12px 20px;border-radius:8px;font-weight:600;
-  text-decoration:none;font-size:16px;border:2px solid var(--accent)}
-.btn.primary{background:var(--accent);color:var(--accent-ink)}
-.btn.ghost{color:var(--accent);background:transparent}
-.fine{font-size:14px;color:var(--muted);margin:16px 0 0}
-
-/* illustration: an invented topsheet */
-.sheet{margin:0;background:var(--surface);border:1px solid var(--rule);border-radius:12px;
-  box-shadow:var(--shadow);padding:18px 18px 14px;font-size:14px;min-width:0}
-.sheet figcaption{display:flex;justify-content:space-between;gap:12px;color:var(--muted);
-  font-size:13px;margin-bottom:8px}
-.sheet table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-.sheet th{text-align:left;font-weight:600;color:var(--muted);font-size:12px;
-  text-transform:uppercase;letter-spacing:.05em;padding:6px 4px;border-bottom:1px solid var(--rule-strong)}
-.sheet th:last-child,.sheet td:last-child{text-align:right;font-family:var(--mono);white-space:nowrap}
-.sheet td{padding:5px 4px;border-bottom:1px solid var(--rule)}
-.sheet tr.sum td{font-weight:700;border-bottom:1px solid var(--rule-strong)}
-.sheet tr.net td{font-weight:700;border-top:2px solid var(--ink);border-bottom:3px double var(--ink)}
-.sheet tr.hl td{background:var(--accent-soft)}
-.explain{margin:12px 0 0;padding:10px 12px;border-left:3px solid var(--accent);
-  background:var(--surface-2);border-radius:0 8px 8px 0;font-size:13px;color:var(--ink-soft)}
-.explain b{color:var(--ink)}
-.explain .m{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
-
-/* sections */
-section.band{padding:56px 0;border-top:1px solid var(--rule)}
-h2{font-size:clamp(26px,3.4vw,34px);line-height:1.15;letter-spacing:-.02em;margin:0 0 10px}
-.intro{color:var(--ink-soft);max-width:40em;margin:0 0 32px}
-h3{font-size:18px;line-height:1.3;margin:0 0 12px;letter-spacing:-.01em}
-
-/* what's new */
-.news{display:grid;gap:24px}
-@media (min-width:800px){.news{grid-template-columns:240px 1fr}}
-.news .box{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:20px 22px}
-.news .box p{margin:0 0 10px}
-.wn-ver{font-weight:700}
-.wn-list{margin:0;padding-left:20px}
-.wn-list li{margin:4px 0}
-
-/* features (the lists are generated by scripts/site.py) */
-.groups{display:grid;gap:20px}
-@media (min-width:720px){.groups{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.group,.soon{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:22px 22px 10px}
-.feats{list-style:none;margin:0;padding:0}
-.feats li{padding:0 0 12px;color:var(--ink-soft);font-size:15.5px}
-.feats strong{display:block;color:var(--ink);font-size:16px}
-.soon{margin-top:20px;background:transparent;border-style:dashed;border-color:var(--rule-strong)}
-@media (min-width:720px){.soon .feats{columns:2;column-gap:28px}.soon .feats li{break-inside:avoid}}
-
-/* differences */
-.diff{display:grid;gap:20px}
-@media (min-width:720px){.diff{grid-template-columns:repeat(3,minmax(0,1fr))}}
-.diff div{padding:4px 0}
-.diff svg{width:28px;height:28px;color:var(--accent);display:block;margin-bottom:10px}
-.diff p{margin:0;color:var(--ink-soft);font-size:15.5px}
-
-/* download */
-.dl{display:grid;gap:24px}
-@media (min-width:860px){.dl{grid-template-columns:1fr 1fr}}
-.card{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:22px}
-.card p{margin:0 0 12px;color:var(--ink-soft)}
-.badge{display:inline-block;font-size:13px;font-weight:600;padding:2px 10px;border-radius:999px;
-  background:var(--surface-2);color:var(--ink-soft);border:1px solid var(--rule);margin-bottom:10px}
-pre{background:var(--code-bg);border-radius:8px;padding:14px 16px;overflow-x:auto;margin:0 0 12px;
-  font-size:14px;line-height:1.55}
-pre code{background:none;padding:0;font-size:inherit}
-
-/* faq */
-.faq{max-width:46em}
-.faq details{border-bottom:1px solid var(--rule);padding:14px 0}
-.faq summary{cursor:pointer;font-weight:600;font-size:17px;list-style-position:outside}
-.faq details p{margin:10px 0 0;color:var(--ink-soft)}
-
-/* footer */
-footer{border-top:1px solid var(--rule);padding:36px 0 48px;color:var(--muted);font-size:14px}
-footer .wrap{display:grid;gap:12px}
-footer p{margin:0;max-width:52em}
-footer nav{display:flex;gap:18px;flex-wrap:wrap}
-footer a{color:var(--ink-soft)}
-</style>
+<meta name="twitter:image:alt" content="Method Budget: film and TV budgeting that shows its working.">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="./" aria-label="Method Budget home">
-      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-        <rect width="32" height="32" rx="8" fill="currentColor" opacity=".08"/>
-        <rect x="7" y="8" width="18" height="2.6" rx="1.3" fill="currentColor"/>
-        <rect x="7" y="13" width="13" height="2.6" rx="1.3" fill="currentColor" opacity=".6"/>
-        <rect x="7" y="18" width="15.5" height="2.6" rx="1.3" fill="currentColor" opacity=".6"/>
-        <rect x="7" y="23" width="18" height="1.2" rx=".6" class="acc"/>
-        <rect x="7" y="25.4" width="18" height="1.2" rx=".6" class="acc"/>
-      </svg>
-      Method Budget
+    <a class="home" href="./" aria-label="Method Budget home">
+      <picture>
+        <source srcset="assets/brand/mark-dark.svg" media="(prefers-color-scheme: dark)">
+        <img src="assets/brand/mark.svg" alt="" width="32" height="32">
+      </picture>
     </a>
     <nav class="nav" aria-label="Main">
       <a href="#features">Features</a>
-      <a href="#different">Why it's different</a>
+      <a href="#open-files">Open files</a>
+      <a href="#keyboard">Keyboard</a>
+      <a href="#cli">Command line</a>
       <a href="#download">Download</a>
       <a href="#faq">FAQ</a>
+      <a href="releases/">Release notes</a>
       <a href="https://github.com/ssandweiss/method-budget" data-repo="">Source</a>
     </nav>
   </div>
@@ -201,49 +63,82 @@ footer a{color:var(--ink-soft)}
 <main id="main">
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
-      <div>
-        <p class="eyebrow">Free and open source</p>
-        <h1 id="hero-title">Film and TV budgeting that stays yours.</h1>
-        <p class="lede">Method Budget is a desktop app for production budgets: topsheet,
-          fringes, globals, charges, versions and cost reports. Your budgets are open files on
-          your own computer, every key does something useful, and every number can tell you
-          where it came from.</p>
-        <div class="cta">
-          <a class="btn primary" href="#download">Get Method Budget</a>
-          <a class="btn ghost" href="#features">See what it does</a>
-        </div>
-        <p class="fine">No account, no subscription, no cloud. macOS first; Windows and Linux builds are on the way.</p>
+      <h1 id="hero-title">
+        <picture>
+          <source srcset="assets/brand/wordmark-dark.svg" media="(prefers-color-scheme: dark)">
+          <img src="assets/brand/wordmark.svg" alt="Method Budget" width="660" height="98">
+        </picture>
+      </h1>
+      <p class="pitch">Film and TV budgeting that shows its working.</p>
+      <p class="lede">A free, open-source desktop app for production budgets: topsheet,
+        fringes, globals, charges, versions and cost reports. Your budgets are open files on
+        your own computer, the grid is built for the keyboard, and every total can tell you
+        exactly where it came from.</p>
+      <div class="cta">
+        <a class="btn primary" href="#download">Get Method Budget</a>
+        <a class="btn ghost" href="#features">See what it does</a>
       </div>
-      <figure class="sheet" aria-labelledby="sheet-cap">
-        <figcaption id="sheet-cap"><span>Topsheet</span><span>Illustration, invented figures</span></figcaption>
-        <table>
-          <thead><tr><th scope="col">Category</th><th scope="col">Total</th></tr></thead>
-          <tbody>
-            <tr><td>Story and rights</td><td>85,000.00</td></tr>
-            <tr><td>Producers and director</td><td>240,000.00</td></tr>
-            <tr><td>Cast</td><td>310,500.00</td></tr>
-            <tr class="sum"><td>Total above the line</td><td>635,500.00</td></tr>
-            <tr><td>Production staff</td><td>96,250.00</td></tr>
-            <tr class="hl"><td>Camera</td><td>128,400.00</td></tr>
-            <tr><td>Locations</td><td>74,900.00</td></tr>
-            <tr><td>Post production</td><td>142,000.00</td></tr>
-            <tr class="sum"><td>Total below the line</td><td>441,550.00</td></tr>
-            <tr><td>Contingency 10%</td><td>107,705.00</td></tr>
-            <tr class="net"><td>Net total</td><td>1,184,755.00</td></tr>
-          </tbody>
-        </table>
-        <p class="explain"><b>Explain this number:</b> Camera is 14 lines
-          (<span class="m">104,000.00</span>) plus the fringes they earn
-          (<span class="m">24,400.00</span>), each step down to the cent.</p>
-      </figure>
+      <p class="fine">No account, no subscription, no cloud. macOS first; Windows and Linux builds are on the way.</p>
     </div>
   </section>
 
-  <section class="band" id="news" aria-labelledby="news-title">
+  <div class="shot">
+    <div class="wrap">
+      <figure class="window" role="img" aria-label="Illustration of the Method Budget window: the Camera account of an invented budget, with six detail lines and the Explain panel showing how the account total of 227,586.25 is made up.">
+        <div aria-hidden="true">
+          <div class="w-bar"><i></i><i></i><i></i><span>Method Budget</span></div>
+          <div class="w-tools">
+            <span><b>New</b><b>Open</b><b>Save</b></span>
+            <span><b>Undo</b><b>Redo</b></span>
+            <span class="opt"><b>Versions</b><b>Compare</b></span>
+            <span class="opt"><b>Setup</b></span>
+            <span class="doc opt">Feature-Draft.mthd</span>
+            <span><b class="on">Tools</b></span>
+          </div>
+          <div class="w-tabs"><span class="on">Feature-Draft</span><span>Feature-Draft, rev 2</span></div>
+          <div class="w-body">
+            <div class="w-main">
+              <div class="w-crumbs">Topsheet &rsaquo; 2000 Production &rsaquo; <b>2300 Camera</b></div>
+              <div class="w-formula"><span>Amount</span>PREP_WKS + SHOOT_WKS</div>
+              <table class="w-grid">
+                <thead><tr><th>Description</th><th class="n">Amt</th><th class="c-unit">Unit</th><th class="n c-x">X</th><th class="n">Rate</th><th class="n">Total</th><th class="c-fr">Fringes</th></tr></thead>
+                <tbody>
+                  <tr class="sel"><td>Director of photography</td><td class="n cur">10</td><td class="c-unit">Weeks</td><td class="n c-x">1</td><td class="n">4,850.00</td><td class="n">48,500.00</td><td class="c-fr"><span class="tag">PT, HP</span></td></tr>
+                  <tr><td>Camera operator</td><td class="n">9</td><td class="c-unit">Weeks</td><td class="n c-x">1</td><td class="n">3,600.00</td><td class="n">32,400.00</td><td class="c-fr"><span class="tag">PT, HP</span></td></tr>
+                  <tr><td>First assistant camera</td><td class="n">9</td><td class="c-unit">Weeks</td><td class="n c-x">1</td><td class="n">2,950.00</td><td class="n">26,550.00</td><td class="c-fr"><span class="tag">PT, HP</span></td></tr>
+                  <tr><td>Second assistant camera</td><td class="n">9</td><td class="c-unit">Weeks</td><td class="n c-x">1</td><td class="n">2,400.00</td><td class="n">21,600.00</td><td class="c-fr"><span class="tag">PT, HP</span></td></tr>
+                  <tr><td>Camera package</td><td class="n">10</td><td class="c-unit">Weeks</td><td class="n c-x">1</td><td class="n">6,500.00</td><td class="n">65,000.00</td><td class="c-fr"></td></tr>
+                  <tr><td>Expendables</td><td class="n">1</td><td class="c-unit">Allow</td><td class="n c-x">1</td><td class="n">4,500.00</td><td class="n">4,500.00</td><td class="c-fr"></td></tr>
+                  <tr class="tot"><td>Total 2300 Camera</td><td class="n"></td><td class="c-unit"></td><td class="n c-x"></td><td class="n"></td><td class="n">227,586.25</td><td class="c-fr"></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="w-panel">
+              <div class="w-ptabs"><span class="on">Explain</span><span>Find</span><span>Apply</span></div>
+              <h4>2300 Camera</h4>
+              <p class="big">227,586.25</p>
+              <ul class="w-steps">
+                <li><span>6 detail lines</span><span>198,550.00</span></li>
+                <li><span>Fringes on 129,050.00 of pay</span><span>29,036.25</span></li>
+                <li class="sub"><span>PT payroll taxes 18%</span><span>23,229.00</span></li>
+                <li class="sub"><span>HP health and pension 4.5%</span><span>5,807.25</span></li>
+                <li class="sum"><span>Account total</span><span>227,586.25</span></li>
+              </ul>
+            </div>
+          </div>
+          <div class="w-foot"><span>6 lines</span><span>Budget total 4,862,310.40</span><span class="ok">Saved</span></div>
+        </div>
+        <figcaption>Illustration with an invented budget. Screenshots of the app are on the way.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <section class="band alt" id="news" aria-labelledby="news-title">
     <div class="wrap news">
       <div>
+        <p class="kicker">Release notes</p>
         <h2 id="news-title">What's new</h2>
-        <p class="intro">From the latest release notes.</p>
+        <p><a href="releases/">Every release</a></p>
       </div>
       <div class="box">
         <!-- whatsnew:start (generated by scripts/site.py from the newest docs/releases/*.md: edit that, then run python3 scripts/site.py) -->
@@ -264,9 +159,10 @@ footer a{color:var(--ink-soft)}
 
   <section class="band" id="features" aria-labelledby="features-title">
     <div class="wrap">
-      <h2 id="features-title">Features</h2>
-      <p class="intro">Everything below is built and in the code today, except the last box,
-        which is what comes next.</p>
+      <p class="kicker">Features</p>
+      <h2 id="features-title">Everything a production budget needs</h2>
+      <p class="intro">All of this is built and in the code today. The dashed box at the end
+        is what comes next.</p>
       <!-- features:start (generated by scripts/site.py from docs/features.toml: edit that, then run python3 scripts/site.py) -->
       <div class="groups">
         <section class="group" aria-labelledby="g-engine">
@@ -372,46 +268,100 @@ footer a{color:var(--ink-soft)}
     </div>
   </section>
 
-  <section class="band" id="different" aria-labelledby="different-title">
+  <section class="band alt" id="open-files" aria-labelledby="open-title">
+    <div class="wrap split">
+      <div>
+        <p class="kicker">Why open files</p>
+        <h2 id="open-title">Your budget is a file you own</h2>
+        <p class="intro">A budget is the record of months of decisions. It should outlive any
+          app, any subscription and any company, including this one.</p>
+        <ul class="points">
+          <li><strong>Plain, documented JSON.</strong> Budgets are <code>.mthd</code> files with a
+            published specification. Any tool can read them, today or in twenty years.</li>
+          <li><strong>Exact money.</strong> Amounts are whole cents and rates are written as
+            typed, so the same budget always produces the same bytes.</li>
+          <li><strong>Made for version control.</strong> Files diff line by line, and a git merge
+            driver combines two people's edits to the same budget.</li>
+          <li><strong>On your disk, not ours.</strong> Save a budget wherever you keep your
+            work. Nothing is uploaded, and the app works with no connection.</li>
+        </ul>
+        <p class="fine"><a href="https://github.com/ssandweiss/method-budget/blob/main/docs/FORMAT.md" data-repo="docs/FORMAT.md">Read the file format</a></p>
+      </div>
+      <div>
+<pre class="code"><code><span class="c">// one detail line, as written in the file</span>
+{
+  <span class="k">"id"</span>: 1042,
+  <span class="k">"description"</span>: "Director of photography",
+  <span class="k">"amount"</span>: "PREP_WKS + SHOOT_WKS",
+  <span class="k">"unit"</span>: "Weeks",
+  <span class="k">"rate"</span>: "4850",
+  <span class="k">"fringes"</span>: ["HP", "PT"],
+  <span class="k">"groups"</span>: ["Main unit"]
+}</code></pre>
+        <p class="caption">Formulas are stored as typed, and fields left at their default are
+          left out, so a change to one line is a change to a few lines of the file.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="keyboard" aria-labelledby="keys-title">
+    <div class="wrap split">
+      <div>
+        <p class="kicker">Keyboard first</p>
+        <h2 id="keys-title">Hands stay on the keys</h2>
+        <p class="intro">Budgeting is typing. Drill into an account, climb back to the
+          topsheet, step to the next account, fill down and move rows without reaching for
+          the mouse.</p>
+        <p>Type-ahead completes units, currencies, sets, locations and globals as you type,
+          and a new one can be added right from the cell. A shortcut sheet lists every key.</p>
+        <p class="fine">Shown with Mac keys. On Windows and Linux, Ctrl takes the place of
+          <span aria-hidden="true">&#8984;</span><span class="sr">Command</span> and Alt the place of
+          <span aria-hidden="true">&#8997;</span><span class="sr">Option</span>.</p>
+      </div>
+      <table class="keys">
+        <caption class="sr">Some of the keyboard shortcuts</caption>
+        <tbody>
+          <tr><th scope="row"><kbd>Return</kbd></th><td>Open the category or account</td></tr>
+          <tr><th scope="row"><kbd><span aria-hidden="true">&#8984;</span><span class="sr">Command</span></kbd><kbd><span aria-hidden="true">&uarr;</span><span class="sr">Up arrow</span></kbd></th><td>Up a level</td></tr>
+          <tr><th scope="row"><kbd><span aria-hidden="true">&#8984;</span><span class="sr">Command</span></kbd><kbd><span aria-hidden="true">&#8679;</span><span class="sr">Shift</span></kbd><kbd><span aria-hidden="true">&uarr;</span><span class="sr">Up arrow</span></kbd></th><td>Go to the topsheet</td></tr>
+          <tr><th scope="row"><kbd><span aria-hidden="true">&#8984;</span><span class="sr">Command</span></kbd><kbd><span aria-hidden="true">&rarr;</span><span class="sr">Right arrow</span></kbd></th><td>Next account (with <span aria-hidden="true">&larr;</span><span class="sr">Left arrow</span>, the previous one)</td></tr>
+          <tr><th scope="row"><kbd><span aria-hidden="true">&#8984;</span><span class="sr">Command</span></kbd><kbd><span aria-hidden="true">&#8679;</span><span class="sr">Shift</span></kbd><kbd>D</kbd></th><td>Fill down</td></tr>
+          <tr><th scope="row"><kbd><span aria-hidden="true">&#8997;</span><span class="sr">Option</span></kbd><kbd><span aria-hidden="true">&uarr;</span><span class="sr">Up arrow</span></kbd></th><td>Move the selected rows up (with <span aria-hidden="true">&darr;</span><span class="sr">Down arrow</span>, down)</td></tr>
+          <tr><th scope="row"><kbd><span aria-hidden="true">&#8984;</span><span class="sr">Command</span></kbd><kbd>E</kbd></th><td>Explain the total under the cursor</td></tr>
+          <tr><th scope="row"><kbd><span aria-hidden="true">&#8984;</span><span class="sr">Command</span></kbd><kbd><span aria-hidden="true">&#8679;</span><span class="sr">Shift</span></kbd><kbd>F</kbd></th><td>Find and replace</td></tr>
+          <tr><th scope="row"><kbd><span aria-hidden="true">&#8984;</span><span class="sr">Command</span></kbd><kbd>?</kbd></th><td>Every shortcut, on one sheet</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="band alt" id="cli" aria-labelledby="cli-title">
     <div class="wrap">
-      <h2 id="different-title">How it's different</h2>
-      <p class="intro">A few commitments shape everything in Method Budget.</p>
-      <div class="diff">
-        <div>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 14l-2 2 2 2"/><path d="M15 14l2 2-2 2"/></svg>
-          <h3>An open file, not a locked one</h3>
-          <p>Budgets are plain, documented JSON. Read them with any tool, keep them in git,
-            and never wait on a vendor to get your own numbers out.</p>
+      <p class="kicker">Command line and coding agents</p>
+      <h2 id="cli-title">The same engine, without the window</h2>
+      <p class="intro">The <code>method</code> command reads and writes budgets with no window
+        and no network, so budgets fit into scripts, build steps and automated checks.</p>
+<pre class="term"><code><span class="p">$ </span>method show my-film.mthd                  <span class="c"># the topsheet</span>
+<span class="p">$ </span>method check my-film.mthd                 <span class="c"># recalculate, report problems</span>
+<span class="p">$ </span>method totals my-film.mthd --json         <span class="c"># every total, in cents</span>
+<span class="p">$ </span>method explain my-film.mthd net           <span class="c"># how a total is made up</span>
+<span class="p">$ </span>method diff old.mthd new.mthd             <span class="c"># what changed, in plain words</span>
+<span class="p">$ </span>method report my-film.mthd -o budget.pdf  <span class="c"># a PDF report</span></code></pre>
+      <div class="cards after-term">
+        <div class="card">
+          <span class="badge now">Available now</span>
+          <h3>Command line</h3>
+          <p>Check budgets, print totals, draw reports as PDF, HTML or CSV, export and import
+            spreadsheets, and run batch edits all or nothing with a dry run first. A git
+            merge driver merges edits to different lines on its own.
+            <a href="https://github.com/ssandweiss/method-budget/blob/main/docs/CLI.md" data-repo="docs/CLI.md">Every command</a></p>
         </div>
-        <div>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16v4"/></svg>
-          <h3>On your computer, offline</h3>
-          <p>No account and no cloud. The app goes online only to check for its own updates,
-            so a budget under NDA stays exactly where you put it.</p>
-        </div>
-        <div>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>
-          <h3>Keyboard first</h3>
-          <p>Drill in, climb out, step between accounts, fill down and move rows without the
-            mouse, with the shortcuts budget people already know.</p>
-        </div>
-        <div>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M11 8v6M8 11h6"/></svg>
-          <h3>Every number explains itself</h3>
-          <p>Ask any total how it was made and get the lines, fringes, cutoffs and rounding
-            steps, adding up exactly. Money is kept in whole cents.</p>
-        </div>
-        <div>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M6 8.5v7"/><path d="M8.3 7.2c4 1 6.7 2.4 7.4 3.6"/></svg>
-          <h3>Diff and merge, like code</h3>
-          <p>See what changed between two budgets in plain words, and merge two copies that
-            changed apart instead of retyping one into the other.</p>
-        </div>
-        <div>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/></svg>
-          <h3>Free, for good</h3>
-          <p>No subscription and no seat licences. The code is open under MIT or Apache-2.0,
-            so the tool can't be taken away from you.</p>
+        <div class="card">
+          <h3>Coding agents</h3>
+          <p>An MCP server lets Claude Code and other agents open, read and edit budgets
+            through the same engine, with the same exact arithmetic. It only touches the
+            folders you allow and nothing is sent anywhere.
+            <a href="https://github.com/ssandweiss/method-budget/blob/main/docs/MCP.md" data-repo="docs/MCP.md">How to connect</a></p>
         </div>
       </div>
     </div>
@@ -419,32 +369,34 @@ footer a{color:var(--ink-soft)}
 
   <section class="band" id="download" aria-labelledby="download-title">
     <div class="wrap">
-      <h2 id="download-title">Download</h2>
-      <p class="intro">Ready-made downloads are coming soon. Until then, Method Budget builds
+      <p class="kicker">Download</p>
+      <h2 id="download-title">Get Method Budget</h2>
+      <p class="intro">Ready-made installers are coming soon. Until then, Method Budget builds
         from source in a few minutes with nothing but Rust.</p>
-      <div class="dl">
+      <div class="cards">
         <div class="card">
           <span class="badge">Coming soon</span>
           <h3>Installers</h3>
-          <p>A Mac app (Apple silicon and Intel), plus Windows and Linux installers. The Mac
-            build will be signed and notarized, so it opens without a security detour.</p>
-          <p>Follow the <a href="https://github.com/ssandweiss/method-budget" data-repo="">project on GitHub</a>
+          <p>A Mac app for Apple silicon and Intel, signed and notarized so it opens without a
+            security detour, then Windows and Linux installers.</p>
+          <p>Watch the <a href="https://github.com/ssandweiss/method-budget" data-repo="">project on GitHub</a>
             to hear when the first release is out.</p>
         </div>
         <div class="card">
-          <span class="badge">Available now</span>
+          <span class="badge now">Available now</span>
           <h3>Build from source</h3>
-          <p>Install <a href="https://rustup.rs">Rust</a>, then from a checkout:</p>
+          <p>Install <a href="https://rustup.rs">Rust</a>, get the <a href="https://github.com/ssandweiss/method-budget" data-repo="">code</a>, then from the checkout:</p>
           <pre><code>cargo run -p fwb-app</code></pre>
-          <p>The full steps, installers and the one-time macOS security step are in the
+          <p>Installers, the command line and the one-time macOS security step are in the
             <a href="https://github.com/ssandweiss/method-budget/blob/main/docs/INSTALL.md" data-repo="docs/INSTALL.md">install guide</a>.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="band" id="faq" aria-labelledby="faq-title">
+  <section class="band alt" id="faq" aria-labelledby="faq-title">
     <div class="wrap">
+      <p class="kicker">FAQ</p>
       <h2 id="faq-title">Questions</h2>
       <div class="faq">
         <details>
@@ -454,32 +406,38 @@ footer a{color:var(--ink-soft)}
         </details>
         <details>
           <summary>Can it open budgets from other apps?</summary>
-          <p>It imports the open files other apps export, not their native files.
-            Spreadsheet exports (Excel, CSV, tab-delimited) come in today with a column
-            mapping and a check of the totals; readers for XML and JSON exports are next on
-            the roadmap.</p>
+          <p>It imports the open files other apps export, never their native files.
+            Spreadsheet exports (Excel, CSV and tab-delimited) come in today, with a column
+            mapping and a line-by-line check of the totals. Readers for XML and JSON exports
+            are next on the roadmap.</p>
         </details>
         <details>
-          <summary>Is my data local?</summary>
-          <p>Yes. Budgets are files on your own disk, wherever you save them. There is no
-            account and no cloud, and the app goes online only to check for its own updates,
-            which you can turn off.</p>
+          <summary>Where does my data live?</summary>
+          <p>On your own computer, in files you save wherever you like. There is no account
+            and no cloud. The app goes online only to check for its own updates, and you can
+            turn that off.</p>
         </details>
         <details>
           <summary>What does it cost?</summary>
           <p>Nothing. Method Budget is free and open source, dual-licensed under MIT or
-            Apache-2.0.</p>
+            Apache-2.0, so it can't be taken away from you.</p>
         </details>
         <details>
           <summary>Which computers does it run on?</summary>
-          <p>The Mac is first: the app is built and used there every day. Windows and Linux
-            installers are built from the same code but have not been tested by hand yet.</p>
+          <p>The Mac comes first: the app is built and used there every day. Windows and Linux
+            installers are built from the same code and are waiting on a hands-on test.</p>
         </details>
         <details>
           <summary>Can I script it or keep budgets in git?</summary>
           <p>Yes. The <code>method</code> command line checks budgets, prints totals, draws
-            reports and makes batch edits, and a git merge driver merges two people's edits to
-            the same budget.</p>
+            reports and makes batch edits, and its git merge driver combines two people's
+            edits to the same budget.</p>
+        </details>
+        <details>
+          <summary>How can I help?</summary>
+          <p>Try it, report what breaks, and send patches. Please never attach a real budget
+            to an issue: an invented one that shows the problem is always enough. Start with
+            the <a href="https://github.com/ssandweiss/method-budget" data-repo="">repository</a>.</p>
         </details>
       </div>
     </div>
@@ -488,17 +446,22 @@ footer a{color:var(--ink-soft)}
 
 <footer>
   <div class="wrap">
+    <picture>
+      <source srcset="assets/brand/wordmark-dark.svg" media="(prefers-color-scheme: dark)">
+      <img src="assets/brand/wordmark.svg" alt="Method Budget" width="148" height="22">
+    </picture>
     <nav aria-label="Footer">
+      <a href="releases/">Release notes</a>
       <a href="https://github.com/ssandweiss/method-budget" data-repo="">Source code</a>
       <a href="https://github.com/ssandweiss/method-budget/blob/main/docs/FORMAT.md" data-repo="docs/FORMAT.md">File format</a>
       <a href="https://github.com/ssandweiss/method-budget/blob/main/docs/CLI.md" data-repo="docs/CLI.md">Command line</a>
       <a href="https://github.com/ssandweiss/method-budget/blob/main/docs/ROADMAP.md" data-repo="docs/ROADMAP.md">Roadmap</a>
       <a href="https://github.com/ssandweiss/method-budget/blob/main/CLEAN-ROOM.md" data-repo="CLEAN-ROOM.md">Clean room</a>
     </nav>
-    <p>Method Budget is free and open source, dual-licensed under MIT or Apache-2.0.</p>
-    <p>An independent, clean-room project by the Method Budget contributors. Trademarks
-      belong to their respective owners.</p>
-    <p>This site sets no cookies and loads nothing from anyone else.</p>
+    <p>Free and open source, dual-licensed under MIT or Apache-2.0. An independent,
+      clean-room project by the Method Budget contributors. Trademarks belong to their
+      respective owners.</p>
+    <p>This site sets no cookies, runs no scripts and loads nothing from anyone else.</p>
   </div>
 </footer>
 </body>

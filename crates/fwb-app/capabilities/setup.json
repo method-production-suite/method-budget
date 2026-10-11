@@ -1,6 +1,6 @@
 {
   "identifier": "setup",
-  "description": "The Budget Setup window (every setup table's full editor, in a window of its own) may call only the commands its tabs use: get_view; the fringe, group, global, unit, set, location and currency tables (editing, adding, deleting, renaming everywhere, their order, short codes and in-use counts, a global's details and the numbers-on-screen settings); charges, credits, info, settings with renumbering accounts to a new pattern, and the baseline; and the personal setup library beside each table (its view, copying items to and from it, its folders, and picking its file in Rust's own dialogs: no path comes from the page); and send and receive events between the windows. Nothing on the selected lines, no notes, find, history, file, save, undo, tab or window commands: it passes those keys to the main window.",
+  "description": "The Budget Setup window (every setup table's full editor, in a window of its own) may call only the commands its tabs use: get_view; the fringe, group, global, unit, set, location and currency tables (editing, adding, deleting, renaming everywhere, their order, short codes and in-use counts, a global's details and the numbers-on-screen settings); charges, credits, info, settings with renumbering accounts to a new pattern, and the baseline; and the personal setup library beside each table (its view, copying items to and from it, its folders, and picking its file in Rust's own dialogs: no path comes from the page) with its Setup packs section (listing packs, exporting and importing them through Rust's own dialogs, showing the Packs folder); and send and receive events between the windows. Nothing on the selected lines, no notes, find, history, file, save, undo, tab or window commands: it passes those keys to the main window.",
   "windows": [
     "setup"
   ],
@@ -54,6 +54,14 @@
     "allow-library-save",
     "allow-library-folder",
     "allow-library-move",
+    "allow-packs-list",
+    "allow-packs-reveal",
+    "allow-pack-items",
+    "allow-pack-export",
+    "allow-pack-import-pick",
+    "allow-pack-review",
+    "allow-pack-import",
+    "allow-pack-import-library",
     "core:event:allow-listen",
     "core:event:allow-emit-to"
   ]
