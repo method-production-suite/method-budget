@@ -2205,9 +2205,10 @@ we didn't. The owner's rule is to match it by default (entries 55 and 56).
   category row's fringes are those its lines earn, so a category after the last production
   total keeps them when `trailing_level_fringes` is `drop` (entry 56), and a left-out line
   earns none.
-- **Excluded fringes on a category row: our reading, not checked.** Movie Magic keeps one
-  excluded-fringe list per credit and applies it to group rows; the run did not try it on a
-  category row. We apply it the same way: the listed fringes come off the category row's
+- **Excluded fringes on a category row: checked in Movie Magic on 2026-10-11.** Movie Magic
+  keeps one excluded-fringe list per credit and applies it to group and category rows alike
+  (a credit excluding ZFDAY, with category 1100 added: gross 4,500.00, excluded 100.00, net
+  4,400.00). We apply it the same way: the listed fringes come off the category row's
   gross (2100 less ZP10N is 4,300.00 - 300.00 = 4,000.00, so 10% is 400.00). As for group
   rows, our list is per row (entry 9's model), so a credit carried over from Movie Magic
   would copy its list onto each of its group and category rows.
