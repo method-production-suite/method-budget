@@ -129,7 +129,7 @@ from a time, for the bases that read them.)
   category and account exclusions too.)
 - Credit rows are summed **unrounded**, then capped and discounted, then rounded once.
   (Amended by entry 57: a credit row can also be a topsheet category, its total with its
-  own fringes.)
+  own fringes, and excluded fringes are one list per credit, not per row.)
 
 ## 10. Currency direction (2026-10-08)
 
@@ -2209,12 +2209,20 @@ we didn't. The owner's rule is to match it by default (entries 55 and 56).
   keeps one excluded-fringe list per credit and applies it to group and category rows alike
   (a credit excluding ZFDAY, with category 1100 added: gross 4,500.00, excluded 100.00, net
   4,400.00). We apply it the same way: the listed fringes come off the category row's
-  gross (2100 less ZP10N is 4,300.00 - 300.00 = 4,000.00, so 10% is 400.00). As for group
-  rows, our list is per row (entry 9's model), so a credit carried over from Movie Magic
-  would copy its list onto each of its group and category rows.
+  gross (2100 less ZP10N is 4,300.00 - 300.00 = 4,000.00, so 10% is 400.00).
+  **Amended 2026-10-11: the list belongs to the credit.** Our first model kept a list on
+  each group and category row, and the app's credit editor dropped it when a row's Spend
+  changed from a group to a category. Now, as in Movie Magic, a credit has one
+  `excluded_fringes` list (FORMAT.md, "Credit") applied to all its group and category rows
+  (a typed amount has none), the app shows it once under the credit's Discount, and the
+  MCP `set_credit` takes it on the credit. A file with per-row lists is read as the union
+  of them on the credit (FORMAT.md, changelog). Diff, merge, rename, usage, delete, setup
+  sheets (the Excluded Fringes column repeats the credit's list on each of its rows) and
+  import handle it as a credit field. ZTEST10 V10-1 still holds (ZCR1 1,205.40, net
+  5,450.47), and switching ZCR1's group row to category 1100 keeps its ZFDAY exclusion.
 - **A row's category follows the chart.** Renumbering carries it like a charge's excluded
-  categories; renaming a fringe renames it in the row's exclusions; a fringe's use count
-  includes them. A row on a category the budget doesn't have counts 0 (as a charge's
+  categories; renaming a fringe renames it in the credit's exclusions; a fringe's use
+  count includes them. A row on a category the budget doesn't have counts 0 (as a charge's
   excluded category that matches nothing), and `method check` and the MCP `validate` tool
   warn: "credit ZCAT row 1 is on category 9900, which is not in the budget, so its spend is
   0". The app and the MCP `set_credit` refuse a category the budget doesn't have, as they

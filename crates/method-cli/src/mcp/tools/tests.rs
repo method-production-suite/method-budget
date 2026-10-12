@@ -993,9 +993,41 @@ fn charges_credits_categories_accounts_and_title() {
         .unwrap();
     assert_eq!(
         credit["rows"][0]["source"],
-        json!({"kind": "category", "category": "21", "excluded_fringes": []})
+        json!({"kind": "category", "category": "21"})
     );
     assert!(credit["amount_cents"].as_i64().unwrap() > 0);
+    // One excluded-fringe list per credit, kept when the rows change.
+    let full = credit["amount_cents"].as_i64().unwrap();
+    f.tool(
+        "set_credit",
+        json!({"path": "film.mthd", "name": "Camera credit", "excluded_fringes": ["PAYROLL"]}),
+    )
+    .unwrap();
+    f.tool(
+        "set_credit",
+        json!({"path": "film.mthd", "name": "Camera credit", "rows": [
+            {"source": {"kind": "category", "category": "21"}, "percent": 10}
+        ]}),
+    )
+    .unwrap();
+    let cr = f
+        .tool("list_charges", json!({"path": "film.mthd"}))
+        .unwrap();
+    let credit = cr["credits"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "Camera credit")
+        .unwrap();
+    assert_eq!(credit["excluded_fringes"], json!(["PAYROLL"]));
+    assert!(credit["amount_cents"].as_i64().unwrap() < full);
+    err_contains(
+        f.tool(
+            "set_credit",
+            json!({"path": "film.mthd", "name": "Camera credit", "excluded_fringes": ["NOPE"]}),
+        ),
+        "no fringe NOPE",
+    );
     err_contains(
         f.tool("set_credit", json!({"path": "film.mthd", "name": "Bad", "rows": [{"source": {"kind": "category", "category": "99"}, "percent": 1}]})),
         "no category",

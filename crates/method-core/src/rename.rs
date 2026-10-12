@@ -216,12 +216,7 @@ pub fn references(b: &Budget, kind: SetupKind, name: &str) -> usize {
         SetupKind::Fringe => b
             .credits
             .iter()
-            .flat_map(|c| &c.rows)
-            .filter(|r| {
-                r.source
-                    .excluded_fringes()
-                    .is_some_and(|ex| ex.contains(name))
-            })
+            .filter(|c| c.excluded_fringes.contains(name))
             .count(),
         SetupKind::Group => {
             b.charges
@@ -519,10 +514,8 @@ fn rewrite(b: &mut Budget, kind: SetupKind, from: &str, to: &str) -> usize {
         }
         SetupKind::Fringe => {
             rekey(&mut b.fringes, from, to);
-            for r in b.credits.iter_mut().flat_map(|c| &mut c.rows) {
-                if let Some(excluded_fringes) = r.source.excluded_fringes_mut() {
-                    count(swap_in(excluded_fringes, from, to));
-                }
+            for c in &mut b.credits {
+                count(swap_in(&mut c.excluded_fringes, from, to));
             }
         }
         SetupKind::Group => {
@@ -675,11 +668,11 @@ mod tests {
             applied: true,
             cap: None,
             discount_percent: Dec::ZERO,
+            excluded_fringes: ["PEN".to_string()].into(),
             rows: vec![CreditRow {
                 description: String::new(),
                 source: CreditSource::Group {
                     group: "Crew".into(),
-                    excluded_fringes: ["PEN".to_string()].into(),
                 },
                 percent: "25".parse().unwrap(),
                 cap: CreditCap::None,

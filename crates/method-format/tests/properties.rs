@@ -219,18 +219,15 @@ fn gen_credit(rng: &mut Rng) -> Credit {
         applied: rng.chance(50),
         cap: rng.chance(50).then(|| rng.cents()),
         discount_percent: rng.dec(),
+        excluded_fringes: rng.texts(),
         rows: (0..rng.below(4))
             .map(|_| CreditRow {
                 description: rng.text(),
                 source: match rng.below(3) {
                     0 => CreditSource::Flat(rng.cents()),
-                    1 => CreditSource::Group {
-                        group: rng.text(),
-                        excluded_fringes: rng.texts(),
-                    },
+                    1 => CreditSource::Group { group: rng.text() },
                     _ => CreditSource::Category {
                         category: rng.text(),
-                        excluded_fringes: rng.texts(),
                     },
                 },
                 percent: rng.dec(),

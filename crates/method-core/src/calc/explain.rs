@@ -1406,6 +1406,7 @@ impl<'a> Explainer<'a> {
         let c = self.applied_credit(i)?;
         let arith = self.b.arithmetic;
         let mut notes = Vec::new();
+        let excluded_fringes = &c.excluded_fringes;
         let mut total = Money::cents(arith, 0);
         for (k, cr) in c.rows.iter().enumerate() {
             let mut row_notes = Vec::new();
@@ -1414,10 +1415,7 @@ impl<'a> Explainer<'a> {
                     row_notes.push(Step::note_amount("Gross", "typed in", *g));
                     (*g, 0)
                 }
-                CreditSource::Group {
-                    group,
-                    excluded_fringes,
-                } => {
+                CreditSource::Group { group } => {
                     let mut gross: Cents = 0;
                     let mut ex: Cents = 0;
                     let mut per_account: BTreeMap<(usize, usize), (Cents, Cents)> = BTreeMap::new();
@@ -1463,10 +1461,7 @@ impl<'a> Explainer<'a> {
                     }
                     (gross, ex)
                 }
-                CreditSource::Category {
-                    category,
-                    excluded_fringes,
-                } => {
+                CreditSource::Category { category } => {
                     let mut gross: Cents = 0;
                     let mut ex: Cents = 0;
                     let mut found = None;

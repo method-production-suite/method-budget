@@ -878,11 +878,9 @@ fn list_charges(ctx: &mut Ctx, a: &Args) -> ToolResult {
                 .map(|row| {
                     let source = match &row.source {
                         CreditSource::Flat(amt) => json!({"kind": "flat", "amount_cents": amt}),
-                        CreditSource::Group { group, excluded_fringes } => {
-                            json!({"kind": "group", "group": group, "excluded_fringes": excluded_fringes})
-                        }
-                        CreditSource::Category { category, excluded_fringes } => {
-                            json!({"kind": "category", "category": category, "excluded_fringes": excluded_fringes})
+                        CreditSource::Group { group } => json!({"kind": "group", "group": group}),
+                        CreditSource::Category { category } => {
+                            json!({"kind": "category", "category": category})
                         }
                     };
                     let cap = match row.cap {
@@ -899,6 +897,7 @@ fn list_charges(ctx: &mut Ctx, a: &Args) -> ToolResult {
                 "account": c.account,
                 "cap_cents": c.cap,
                 "discount_percent": c.discount_percent.to_string(),
+                "excluded_fringes": c.excluded_fringes,
                 "rows": rows,
                 "amount_cents": computed.map(|t| t.amount),
             })

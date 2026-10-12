@@ -747,11 +747,7 @@ pub fn delete_fringe(b: &mut Budget, name: &str) -> EditResult {
         }
     }
     for credit in &mut b.credits {
-        for row in &mut credit.rows {
-            if let Some(excluded_fringes) = row.source.excluded_fringes_mut() {
-                excluded_fringes.remove(name);
-            }
-        }
+        credit.excluded_fringes.remove(name);
     }
     method_core::order::forget(b, method_core::SetupKind::Fringe, name);
     Ok(())
@@ -1236,17 +1232,11 @@ pub fn move_charge(b: &mut Budget, index: usize, to: usize) -> EditResult {
 pub enum CreditSourceInput {
     /// A gross amount typed in, as money text.
     Flat { amount: String },
-    Group {
-        group: String,
-        #[serde(default)]
-        excluded_fringes: Vec<String>,
-    },
-    /// A topsheet category's total with its fringes (decisions.md, entry 57).
-    Category {
-        category: String,
-        #[serde(default)]
-        excluded_fringes: Vec<String>,
-    },
+    /// A group's lines with their fringes, less the credit's excluded ones.
+    Group { group: String },
+    /// A topsheet category's total with its fringes, less the credit's
+    /// excluded ones (decisions.md, entry 57).
+    Category { category: String },
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -1284,6 +1274,10 @@ pub struct CreditInput {
     /// Taken off after the cap; `5` is 5%. Blank means 0.
     #[serde(default)]
     pub discount_percent: Option<String>,
+    /// Fringes left out of every group and category row's spend: one list
+    /// per credit (decisions.md, entry 57).
+    #[serde(default)]
+    pub excluded_fringes: Vec<String>,
     #[serde(default)]
     pub rows: Vec<CreditRowInput>,
 }
@@ -1321,18 +1315,20 @@ pub fn set_credit(b: &mut Budget, index: Option<usize>, c: &CreditInput) -> Edit
     // Old rows' references stay valid while editing, like charge exclusions.
     let mut old_groups = BTreeSet::new();
     let mut old_categories = BTreeSet::new();
-    let mut old_fringes = BTreeSet::new();
+    let old_fringes = old
+        .as_ref()
+        .map(|o| o.excluded_fringes.clone())
+        .unwrap_or_default();
     for r in old.iter().flat_map(|o| &o.rows) {
         match &r.source {
-            CreditSource::Group { group, .. } => {
+            CreditSource::Group { group } => {
                 old_groups.insert(group.clone());
             }
-            CreditSource::Category { category, .. } => {
+            CreditSource::Category { category } => {
                 old_categories.insert(category.clone());
             }
             CreditSource::Flat(_) => {}
         }
-        old_fringes.extend(r.source.excluded_fringes().into_iter().flatten().cloned());
     }
     let groups: BTreeSet<String> = b.groups.keys().cloned().collect();
     let categories: BTreeSet<String> = b.categories().map(|c| c.code.clone()).collect();
@@ -1344,10 +1340,7 @@ pub fn set_credit(b: &mut Budget, index: Option<usize>, c: &CreditInput) -> Edit
             CreditSourceInput::Flat { amount } => {
                 CreditSource::Flat(money_at_least_zero(amount, &format!("row {n}'s amount"))?)
             }
-            CreditSourceInput::Group {
-                group,
-                excluded_fringes,
-            } => {
+            CreditSourceInput::Group { group } => {
                 let g = group.trim();
                 if g.is_empty() {
                     return Err(format!("row {n} needs a group"));
@@ -1357,18 +1350,9 @@ pub fn set_credit(b: &mut Budget, index: Option<usize>, c: &CreditInput) -> Edit
                 }
                 CreditSource::Group {
                     group: g.to_string(),
-                    excluded_fringes: picked_names(
-                        excluded_fringes,
-                        &fringes,
-                        Some(&old_fringes),
-                        "fringe",
-                    )?,
                 }
             }
-            CreditSourceInput::Category {
-                category,
-                excluded_fringes,
-            } => {
+            CreditSourceInput::Category { category } => {
                 let c = category.trim();
                 if c.is_empty() {
                     return Err(format!("row {n} needs a category"));
@@ -1378,12 +1362,6 @@ pub fn set_credit(b: &mut Budget, index: Option<usize>, c: &CreditInput) -> Edit
                 }
                 CreditSource::Category {
                     category: c.to_string(),
-                    excluded_fringes: picked_names(
-                        excluded_fringes,
-                        &fringes,
-                        Some(&old_fringes),
-                        "fringe",
-                    )?,
                 }
             }
         };
@@ -1409,6 +1387,12 @@ pub fn set_credit(b: &mut Budget, index: Option<usize>, c: &CreditInput) -> Edit
         applied: c.applied,
         cap: optional_money(c.cap.as_deref(), "the cap")?,
         discount_percent,
+        excluded_fringes: picked_names(
+            &c.excluded_fringes,
+            &fringes,
+            Some(&old_fringes),
+            "fringe",
+        )?,
         rows,
     };
     Ok(match index {

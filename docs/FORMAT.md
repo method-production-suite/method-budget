@@ -463,6 +463,7 @@ catch it).
 | `applied`          | boolean, default `true` | |
 | `cap`              | optional cents | Ceiling on the sum of the row credits. |
 | `discount_percent` | decimal, default `"0"` | Taken off after the cap (`"5"` is 5%). |
+| `excluded_fringes` | name set, default empty | Fringes left out of the spend of every `group` and `category` row (one list per credit; `docs/decisions.md`, entry 57). A typed `flat` amount has no fringes, so it is unaffected. |
 | `rows`             | list of [credit rows](#credit-row) | |
 
 ### Credit row
@@ -479,8 +480,12 @@ catch it).
 | `kind`  | Fields | Meaning |
 |---------|--------|---------|
 | `flat`  | `amount` cents, **required** | A gross amount typed in directly. |
-| `group` | `group` text, **required**; `excluded_fringes` name set | Lines tagged with the group, plus their fringes except the excluded ones. |
-| `category` | `category` text, **required**; `excluded_fringes` name set | The topsheet category with that code: its total (lines and adjustment rows that count) plus the fringes they earn, wherever fringes post, except the excluded ones (`docs/decisions.md`, entry 57). A code that names no category counts 0, and `method check` warns. |
+| `group` | `group` text, **required** | Lines tagged with the group, plus their fringes except the credit's `excluded_fringes`. |
+| `category` | `category` text, **required** | The topsheet category with that code: its total (lines and adjustment rows that count) plus the fringes they earn, wherever fringes post, except the credit's `excluded_fringes` (`docs/decisions.md`, entry 57). A code that names no category counts 0, and `method check` warns. |
+
+Older files put an `excluded_fringes` name set on each `group` and `category` source. A
+reader still accepts it there and gives the credit the union of its rows' lists; a writer
+writes the list on the credit only.
 
 `cap` kinds:
 
@@ -1148,6 +1153,12 @@ valid. Loading and saving it in Method Budget normalizes it.
   before, so a figure that lands on or near a half cent can move by a cent (`1 x 1.005`
   is 1.00, not 1.01); give it `"arithmetic": "exact"` to keep the old figures. Formulas
   may now hold numbers with more than 9 decimal places.
+- Version 1 (2026-10): credit `excluded_fringes`, one list per credit for all its group
+  and category rows (decisions.md, entry 57). Left out when empty. The per-row
+  `excluded_fringes` on a `group` or `category` source is still read, and the credit takes
+  the union of its rows' lists, but it is no longer written, so a file whose rows had
+  different lists now leaves every listed fringe out of each of those rows (it changes
+  only when saved again).
 - Version 1, additive (2026-10): budget
   [`trailing_level_fringes`](#trailing-level-fringes) (`"keep"` or `"drop"`), left out at
   `"keep"`; fringes on adjustment rows; global names that start with digits. The engine

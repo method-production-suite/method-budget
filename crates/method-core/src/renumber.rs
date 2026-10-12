@@ -834,6 +834,7 @@ mod tests {
             applied: true,
             cap: None,
             discount_percent: Dec::ZERO,
+            excluded_fringes: BTreeSet::new(),
             rows: Vec::new(),
         });
         let mut preset = crate::ReportPreset {

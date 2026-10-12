@@ -688,9 +688,9 @@ function creditRowInput(r0) {
     description: k.str(r.description),
     source:
       src.kind === 'group'
-        ? { kind: 'group', group: k.str(src.group), excluded_fringes: arr(src.excluded_fringes).map(k.str) }
+        ? { kind: 'group', group: k.str(src.group) }
         : src.kind === 'category'
-          ? { kind: 'category', category: k.str(src.category), excluded_fringes: arr(src.excluded_fringes).map(k.str) }
+          ? { kind: 'category', category: k.str(src.category) }
           : { kind: 'flat', amount: k.centsToText(isNone(src.amount) ? 0 : src.amount) },
     percent: k.str(r.percent) || '0',
     cap:
@@ -708,6 +708,9 @@ function creditInput(c0) {
     applied: c.applied !== false,
     cap: isNone(c.cap) ? null : k.centsToText(c.cap),
     discount_percent: k.str(c.discount_percent) || '0',
+    // One list per credit, for all its group and category rows
+    // (decisions.md, entry 57), so changing a row's spend keeps it.
+    excluded_fringes: arr(c.excluded_fringes).map(k.str),
     rows: arr(c.rows).map(creditRowInput),
   };
 }
@@ -794,6 +797,13 @@ function renderCredits(panel) {
         }),
         { extra: '%' },
       ),
+      chips({
+        fieldKey: fk('fringes'),
+        label: 'Fringes left out of the spend',
+        selected: c.excluded_fringes,
+        options: withKept(fringeNames(), c.excluded_fringes),
+        onChange: (list) => k.run(ik, () => creditArgs(i, { excluded_fringes: list })),
+      }),
       k.field(
         'Posts to account',
         k.textInput({
@@ -842,7 +852,7 @@ function renderCredits(panel) {
       },
       build: (v) => [
         'set_credit',
-        { index: null, credit: { name: v.name.trim(), account: null, applied: true, cap: null, discount_percent: '0', rows: [] } },
+        { index: null, credit: { name: v.name.trim(), account: null, applied: true, cap: null, discount_percent: '0', excluded_fringes: [], rows: [] } },
       ],
     }),
   );
@@ -899,8 +909,8 @@ function creditRow(i, n, row, raw, entry, ik) {
             v === 'flat'
               ? { source: { kind: 'flat', amount: '0' } }
               : v.startsWith('category:')
-                ? { source: { kind: 'category', category: v.slice(9), excluded_fringes: [] } }
-                : { source: { kind: 'group', group: v.slice(6), excluded_fringes: [] } },
+                ? { source: { kind: 'category', category: v.slice(9) } }
+                : { source: { kind: 'group', group: v.slice(6) } },
           ),
       }),
       { wide: true },
@@ -958,18 +968,6 @@ function creditRow(i, n, row, raw, entry, ik) {
           onCommit: (v, old) => send(fk('cap-amount'), old)({ cap: { kind: row.cap.kind, amount: v.trim() } }),
         }),
       ),
-    );
-  }
-  if (row.source.kind === 'group' || row.source.kind === 'category') {
-    grid.append(
-      chips({
-        fieldKey: fk('fringes'),
-        label: 'Fringes left out of the spend',
-        selected: row.source.excluded_fringes,
-        options: withKept(fringeNames(), row.source.excluded_fringes),
-        onChange: (list) =>
-          k.run(ik, () => creditArgs(i, rowPatch(n, (r) => ({ source: { ...r.source, excluded_fringes: list } })))),
-      }),
     );
   }
   li.append(head);

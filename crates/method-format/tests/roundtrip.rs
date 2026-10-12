@@ -831,7 +831,7 @@ fn group_rules_round_trip_and_are_left_out_at_default() {
 }
 
 /// A credit row on a topsheet category (decisions.md, entry 57) keeps its
-/// category and the fringes it leaves out.
+/// category, and the credit the fringes it leaves out.
 #[test]
 fn category_credit_rows_round_trip() {
     let mut b = rich();
@@ -841,12 +841,12 @@ fn category_credit_rows_round_trip() {
         applied: true,
         cap: None,
         discount_percent: Dec::ZERO,
+        excluded_fringes: set(&["P"]),
         rows: vec![
             CreditRow {
                 description: "Electric".into(),
                 source: CreditSource::Category {
                     category: "2100".into(),
-                    excluded_fringes: set(&[]),
                 },
                 percent: d("10"),
                 cap: CreditCap::QualifiedSpend(100_000),
@@ -855,7 +855,6 @@ fn category_credit_rows_round_trip() {
                 description: "Less pension".into(),
                 source: CreditSource::Category {
                     category: "2100".into(),
-                    excluded_fringes: set(&["P"]),
                 },
                 percent: d("5"),
                 cap: CreditCap::None,
@@ -872,6 +871,74 @@ fn category_credit_rows_round_trip() {
     );
     assert_eq!(
         rows[1]["source"],
-        serde_json::json!({"kind": "category", "category": "2100", "excluded_fringes": ["P"]})
+        serde_json::json!({"kind": "category", "category": "2100"})
     );
+    assert_eq!(
+        credits.last().unwrap()["excluded_fringes"],
+        serde_json::json!(["P"])
+    );
+}
+
+/// Older files kept excluded fringes on each group or category row: the
+/// credit takes the union of them, and writes the list on the credit.
+#[test]
+fn per_row_excluded_fringes_become_the_credits_list() {
+    let mut b = rich();
+    b.credits.push(Credit {
+        name: "Old credit".into(),
+        account: None,
+        applied: true,
+        cap: None,
+        discount_percent: Dec::ZERO,
+        excluded_fringes: set(&[]),
+        rows: vec![
+            CreditRow {
+                description: "Group".into(),
+                source: CreditSource::Group { group: "G".into() },
+                percent: d("10"),
+                cap: CreditCap::None,
+            },
+            CreditRow {
+                description: "Category".into(),
+                source: CreditSource::Category {
+                    category: "2100".into(),
+                },
+                percent: d("5"),
+                cap: CreditCap::None,
+            },
+            CreditRow {
+                description: "Typed".into(),
+                source: CreditSource::Flat(100),
+                percent: d("5"),
+                cap: CreditCap::None,
+            },
+        ],
+    });
+    let mut v: Value = serde_json::from_str(&method_format::to_string(&b)).unwrap();
+    let credit = v["budget"]["credits"]
+        .as_array_mut()
+        .unwrap()
+        .last_mut()
+        .unwrap();
+    credit["rows"][0]["source"]["excluded_fringes"] = serde_json::json!(["P", "F"]);
+    credit["rows"][1]["source"]["excluded_fringes"] = serde_json::json!(["P", "H"]);
+    let back = method_format::from_str(&v.to_string()).unwrap();
+    let c = back.credits.last().unwrap();
+    assert_eq!(c.excluded_fringes, set(&["F", "H", "P"]));
+    assert_eq!(c.rows[0].source, CreditSource::Group { group: "G".into() });
+    let text = method_format::to_string(&back);
+    let v: Value = serde_json::from_str(&text).unwrap();
+    let credit = v["budget"]["credits"]
+        .as_array()
+        .unwrap()
+        .last()
+        .unwrap()
+        .clone();
+    assert_eq!(
+        credit["excluded_fringes"],
+        serde_json::json!(["F", "H", "P"])
+    );
+    assert!(credit["rows"][0]["source"]
+        .get("excluded_fringes")
+        .is_none());
 }

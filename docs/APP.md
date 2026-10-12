@@ -494,7 +494,9 @@ Enter commits it (`preview_charge`, about a tenth of a second after the last key
 that isn't a number yet dims the old total. **Credits**: a row's **Spend** is an amount
 typed in, a group's lines or a topsheet category ("Category: 2100 Electric": the
 category's total with the fringes its lines earn, wherever fringes post; decisions.md,
-entry 57), and a group or category row can leave fringes out. Each row shows its spend, the
+entry 57). **Fringes left out of the spend**, under Discount, is one list per credit: it
+applies to every group and category row (a typed amount has no fringes), so changing a
+row's Spend keeps it. Each row shows its spend, the
 fringes left out of it, the net spend the percent applies to, the credit (rounded for
 display; its tooltip has the exact figure, since rows add up before rounding), and with a
 cap, how far the row is under or over it (spend for a cap on the spend, credit for a cap on
@@ -662,8 +664,9 @@ The setup lists' counts, order and short codes, in `src/setup_lists.rs` (both wi
 
 The group rules are one command, `set_group_rule` (`rule`: `ungrouped_lines`, `conflict`
 or `fringes_in_totals`; `value`: `include` or `exclude`; returns the View), one undo
-step each. `set_credit`'s rows take a `source` of `{kind: "category", category,
-excluded_fringes}` besides `flat` and `group`.
+step each. `set_credit`'s rows take a `source` of `{kind: "category", category}` besides
+`flat` and `group`; the credit itself takes `excluded_fringes` (one list for all its group
+and category rows).
 
 `delete_unit` and `delete_currency` take `clearLines` (default false): blank the unit on
 the lines that name it, or put the currency's lines back in the base currency, before

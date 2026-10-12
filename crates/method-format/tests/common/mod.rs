@@ -180,12 +180,12 @@ pub fn sample() -> Budget {
         applied: true,
         cap: None,
         discount_percent: d("10"),
+        excluded_fringes: BTreeSet::new(),
         rows: vec![
             CreditRow {
                 description: "Qualified labor".into(),
                 source: CreditSource::Group {
                     group: "Incentive".into(),
-                    excluded_fringes: set(&[]),
                 },
                 percent: d("30"),
                 cap: CreditCap::None,
@@ -331,12 +331,12 @@ pub fn rich() -> Budget {
         applied: false,
         cap: Some(i64::MAX),
         discount_percent: Dec::ZERO,
+        excluded_fringes: set(&["FICA", "PH"]),
         rows: vec![
             CreditRow {
                 description: "Spend cap".into(),
                 source: CreditSource::Group {
                     group: "OptionA".into(),
-                    excluded_fringes: set(&["FICA", "PH"]),
                 },
                 percent: d("12.345678901"),
                 cap: CreditCap::QualifiedSpend(5_000_000),
@@ -355,6 +355,7 @@ pub fn rich() -> Budget {
         applied: true,
         cap: None,
         discount_percent: d("2.5"),
+        excluded_fringes: BTreeSet::new(),
         rows: vec![],
     });
 

@@ -900,6 +900,10 @@ pub struct Credit {
     pub cap: Option<Cents>,
     /// Taken off after the cap, e.g. a broker's fee for selling the credit. `5` = 5%.
     pub discount_percent: Dec,
+    /// Fringes left out of the spend of every group and category row of
+    /// this credit (typed-amount rows have no fringes). One list per
+    /// credit, not per row (decisions.md, entry 57).
+    pub excluded_fringes: BTreeSet<String>,
     pub rows: Vec<CreditRow>,
 }
 
@@ -917,46 +921,20 @@ pub enum CreditSource {
     /// A gross amount typed in directly.
     Flat(Cents),
     /// The total of lines tagged with `group`, plus their fringes except
-    /// `excluded_fringes`.
-    Group {
-        group: String,
-        excluded_fringes: BTreeSet<String>,
-    },
+    /// the credit's `excluded_fringes`.
+    Group { group: String },
     /// The total of topsheet category `category` (its counted lines and
     /// adjustment rows), plus their fringes wherever fringes post, except
-    /// `excluded_fringes` (decisions.md, entry 57). A category that isn't
-    /// in the budget is 0.
-    Category {
-        category: String,
-        excluded_fringes: BTreeSet<String>,
-    },
+    /// the credit's `excluded_fringes` (decisions.md, entry 57). A category
+    /// that isn't in the budget is 0.
+    Category { category: String },
 }
 
 impl CreditSource {
-    /// The fringes left out of the row's spend (none for a typed amount).
-    pub fn excluded_fringes(&self) -> Option<&BTreeSet<String>> {
-        match self {
-            CreditSource::Flat(_) => None,
-            CreditSource::Group {
-                excluded_fringes, ..
-            }
-            | CreditSource::Category {
-                excluded_fringes, ..
-            } => Some(excluded_fringes),
-        }
-    }
-
-    /// [`CreditSource::excluded_fringes`], to change.
-    pub fn excluded_fringes_mut(&mut self) -> Option<&mut BTreeSet<String>> {
-        match self {
-            CreditSource::Flat(_) => None,
-            CreditSource::Group {
-                excluded_fringes, ..
-            }
-            | CreditSource::Category {
-                excluded_fringes, ..
-            } => Some(excluded_fringes),
-        }
+    /// Whether the row's spend includes fringes, so the credit's excluded
+    /// fringes apply to it (group and category rows; not a typed amount).
+    pub fn has_fringes(&self) -> bool {
+        !matches!(self, CreditSource::Flat(_))
     }
 }
 

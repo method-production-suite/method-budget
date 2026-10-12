@@ -271,12 +271,12 @@ fn needs(b: &Budget, w: What, name: &str) -> BTreeSet<Key> {
         What::Credit => {
             if let Some(c) = b.credits.iter().find(|c| c.name == name) {
                 for r in &c.rows {
-                    if let CreditSource::Group { group, .. } = &r.source {
+                    if let CreditSource::Group { group } = &r.source {
                         add(What::Group, group);
                     }
-                    for f in r.source.excluded_fringes().into_iter().flatten() {
-                        add(What::Fringe, f);
-                    }
+                }
+                for f in &c.excluded_fringes {
+                    add(What::Fringe, f);
                 }
             }
         }
@@ -1028,16 +1028,15 @@ pub fn import(
                 let mut c = c.clone();
                 c.name = to.clone();
                 for r in &mut c.rows {
-                    if let CreditSource::Group { group, .. } = &mut r.source {
+                    if let CreditSource::Group { group } = &mut r.source {
                         *group = clipboard::renamed(&renames.groups, group);
                     }
-                    if let Some(excluded_fringes) = r.source.excluded_fringes_mut() {
-                        *excluded_fringes = excluded_fringes
-                            .iter()
-                            .map(|f| clipboard::renamed(&renames.fringes, f))
-                            .collect();
-                    }
                 }
+                c.excluded_fringes = c
+                    .excluded_fringes
+                    .iter()
+                    .map(|f| clipboard::renamed(&renames.fringes, f))
+                    .collect();
                 match b.credits.iter().position(|x| x.name == to) {
                     Some(i) => b.credits[i] = c,
                     None => b.credits.push(c),

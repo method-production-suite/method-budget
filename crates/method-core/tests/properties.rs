@@ -211,12 +211,10 @@ fn gen_budget(rng: &mut Rng) -> Budget {
         applied: true,
         cap: Some(rng.below(2_000_000) as i64),
         discount_percent: d("5"),
+        excluded_fringes: set(&["FLAT"]),
         rows: vec![CreditRow {
             description: String::new(),
-            source: CreditSource::Group {
-                group: "A".into(),
-                excluded_fringes: set(&["FLAT"]),
-            },
+            source: CreditSource::Group { group: "A".into() },
             percent: d("25"),
             cap: CreditCap::QualifiedSpend(rng.below(5_000_000) as i64),
         }],

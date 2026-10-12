@@ -636,8 +636,8 @@ def ts10():
 
 def credits10():
     return [
-        {"name": "ZCR1", "account": "7901", "cap": 124000, "discount_percent": "2", "rows": [
-            {"description": "Group row", "source": {"kind": "group", "group": "ZCRED", "excluded_fringes": ["ZFDAY"]}, "percent": "20"},
+        {"name": "ZCR1", "account": "7901", "cap": 124000, "discount_percent": "2", "excluded_fringes": ["ZFDAY"], "rows": [
+            {"description": "Group row", "source": {"kind": "group", "group": "ZCRED"}, "percent": "20"},
             {"description": "Flat credit cap", "source": {"kind": "flat", "amount": 100000}, "percent": "10",
              "cap": {"kind": "credit", "amount": 5000}},
             {"description": "Flat spend cap", "source": {"kind": "flat", "amount": 300000}, "percent": "15",

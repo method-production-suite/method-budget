@@ -442,6 +442,7 @@ fn credit_rows_round_once_together() {
             applied: true,
             cap: None,
             discount_percent: Dec::ZERO,
+            excluded_fringes: set(&[]),
             rows: vec![row.clone(), row],
         });
         let (_, r) = totals(&b);
@@ -1192,14 +1193,21 @@ fn explained(b: &Budget, t: Target) -> String {
     words(&ex.explain(&t).unwrap().root)
 }
 
-/// A credit of `rows`, applied, with no cap or discount.
+/// A credit of `rows`, applied, with no cap, discount or excluded fringes.
 fn credit(name: &str, rows: Vec<CreditRow>) -> Credit {
+    credit_less(name, &[], rows)
+}
+
+/// A credit of `rows` that leaves `excluded` fringes out of every group
+/// and category row (one list per credit, decisions.md, entry 57).
+fn credit_less(name: &str, excluded: &[&str], rows: Vec<CreditRow>) -> Credit {
     Credit {
         name: name.into(),
         account: None,
         applied: true,
         cap: None,
         discount_percent: Dec::ZERO,
+        excluded_fringes: set(excluded),
         rows,
     }
 }
@@ -1213,11 +1221,10 @@ fn credit_row(source: CreditSource, percent: &str, cap: CreditCap) -> CreditRow 
     }
 }
 
-/// Credit row on topsheet category `code`, less `excluded` fringes.
-fn on_category(code: &str, excluded: &[&str]) -> CreditSource {
+/// Credit row on topsheet category `code`.
+fn on_category(code: &str) -> CreditSource {
     CreditSource::Category {
         category: code.into(),
-        excluded_fringes: set(excluded),
     }
 }
 
@@ -1289,7 +1296,7 @@ fn v10_3_a_category_credit_row_counts_the_category_with_its_fringes() {
             let mut b = ztest10(arith, posting.clone());
             b.credits.push(credit(
                 "ZCAT",
-                vec![credit_row(on_category("2100", &[]), "10", CreditCap::None)],
+                vec![credit_row(on_category("2100"), "10", CreditCap::None)],
             ));
             let (_, r) = totals(&b);
             assert_eq!(r.grand_total, 880_000, "{arith:?} {posting:?}");
@@ -1321,7 +1328,7 @@ fn v10_3_a_category_row_joins_a_credit_at_zero_percent() {
             "ZCR3",
             vec![
                 credit_row(CreditSource::Flat(123_457), "33.333", CreditCap::None),
-                credit_row(on_category("2100", &[]), "0", CreditCap::None),
+                credit_row(on_category("2100"), "0", CreditCap::None),
             ],
         ));
         let (_, r) = totals(&b);
@@ -1338,22 +1345,35 @@ fn v10_3_a_category_row_joins_a_credit_at_zero_percent() {
 }
 
 /// A category row leaves out the credit's excluded fringes like a group
-/// row (our reading, decisions.md, entry 57), and takes either cap.
+/// row (decisions.md, entry 57), and takes either cap. 1100 with ZFDAY
+/// left out is gross 4,500.00, excluded 100.00, net 4,400.00.
 #[test]
 fn a_category_credit_row_leaves_out_fringes_and_takes_caps() {
     for arith in Arithmetic::ALL {
         let mut b = ztest10(arith, FringePosting::Budget);
-        b.credits.push(credit(
+        b.credits.push(credit_less(
             "ZCAT",
+            &["ZP10N"],
+            vec![credit_row(on_category("2100"), "10", CreditCap::None)],
+        ));
+        b.credits.push(credit(
+            "ZCAT2",
             vec![
-                credit_row(on_category("2100", &["ZP10N"]), "10", CreditCap::None),
                 credit_row(
-                    on_category("2100", &[]),
+                    on_category("2100"),
                     "10",
                     CreditCap::QualifiedSpend(200_000),
                 ),
-                credit_row(on_category("1100", &[]), "10", CreditCap::Credit(5_000)),
-                credit_row(on_category("1100", &["ZFDAY"]), "10", CreditCap::None),
+                credit_row(on_category("1100"), "10", CreditCap::Credit(5_000)),
+            ],
+        ));
+        b.credits.push(credit_less(
+            "ZCAT3",
+            &["ZFDAY"],
+            vec![
+                credit_row(on_category("1100"), "10", CreditCap::None),
+                // A typed amount has no fringes to leave out.
+                credit_row(CreditSource::Flat(100_000), "10", CreditCap::None),
             ],
         ));
         let (_, r) = totals(&b);
@@ -1363,29 +1383,122 @@ fn a_category_credit_row_leaves_out_fringes_and_takes_caps() {
             (430_000, 30_000, 400_000)
         );
         assert_eq!(rows[0].credit, d("400"));
-        assert_eq!(rows[1].credit, d("200"));
-        assert_eq!(rows[1].cap_variance, Some(d("-2300")));
+        let rows = &r.credits[1].rows;
+        assert_eq!(rows[0].excluded_fringes, 0);
+        assert_eq!(rows[0].credit, d("200"));
+        assert_eq!(rows[0].cap_variance, Some(d("-2300")));
         // 1100 is 4,000.00 + 500.00 (the suppressed line earns nothing).
-        assert_eq!(rows[2].gross, 450_000);
-        assert_eq!(rows[2].credit, d("50"));
-        assert_eq!((rows[3].excluded_fringes, rows[3].net), (10_000, 440_000));
-        assert_eq!(r.credits[0].amount, 40_000 + 20_000 + 5_000 + 44_000);
+        assert_eq!(rows[1].gross, 450_000);
+        assert_eq!(rows[1].credit, d("50"));
+        let rows = &r.credits[2].rows;
+        assert_eq!(
+            (rows[0].gross, rows[0].excluded_fringes, rows[0].net),
+            (450_000, 10_000, 440_000)
+        );
+        assert_eq!(
+            (rows[1].gross, rows[1].excluded_fringes, rows[1].net),
+            (100_000, 0, 100_000)
+        );
+        let amounts: Vec<Cents> = r.credits.iter().map(|c| c.amount).collect();
+        assert_eq!(amounts, vec![40_000, 25_000, 54_000]);
         let text = explained(&b, Target::Credit(0));
         assert!(text.contains("Excluded fringes: ZP10N"), "{text}");
     }
 }
 
+/// ZTEST10 V10-1 (parity plan 4.10, run log): ZCR1 is 1,205.40 and the net
+/// total 5,450.47, with ZFDAY left out of ZCR1 as a credit-wide list.
+/// Switching ZCR1's group row to category 1100 keeps the credit's list: the
+/// row is gross 4,500.00, excluded 100.00, net 4,400.00 either way.
+#[test]
+fn v10_1_credits_and_the_credit_wide_excluded_fringes() {
+    let flat = |amount: Cents, percent: &str, cap: CreditCap| {
+        credit_row(CreditSource::Flat(amount), percent, cap)
+    };
+    for arith in Arithmetic::ALL {
+        let mut b = ztest10(arith, FringePosting::Budget);
+        let zcred = CreditSource::Group {
+            group: "ZCRED".into(),
+        };
+        b.credits = vec![
+            Credit {
+                cap: Some(124_000),
+                discount_percent: d("2"),
+                ..credit_less(
+                    "ZCR1",
+                    &["ZFDAY"],
+                    vec![
+                        credit_row(zcred, "20", CreditCap::None),
+                        flat(100_000, "10", CreditCap::Credit(5_000)),
+                        flat(300_000, "15", CreditCap::QualifiedSpend(200_000)),
+                    ],
+                )
+            },
+            credit(
+                "ZCR2",
+                vec![credit_row(
+                    CreditSource::Group {
+                        group: "ZCRED2".into(),
+                    },
+                    "25",
+                    CreditCap::None,
+                )],
+            ),
+            credit("ZCR3", vec![flat(123_457, "33.333", CreditCap::None)]),
+            credit(
+                "ZCR4",
+                vec![
+                    flat(5, "10", CreditCap::None),
+                    flat(5, "10", CreditCap::None),
+                ],
+            ),
+            Credit {
+                discount_percent: d("2.5"),
+                ..credit("ZCR5", vec![flat(100_100, "10", CreditCap::None)])
+            },
+            Credit {
+                cap: Some(90_000),
+                discount_percent: d("10"),
+                ..credit("ZCR6", vec![flat(1_000_000, "10", CreditCap::None)])
+            },
+        ];
+        let (_, r) = totals(&b);
+        let row = &r.credits[0].rows[0];
+        assert_eq!(
+            (row.gross, row.excluded_fringes, row.net),
+            (450_000, 10_000, 440_000),
+            "{arith:?}"
+        );
+        assert_eq!(r.credits[0].amount, 120_540, "{arith:?}");
+        assert_eq!(r.credits[1].amount, 82_500, "{arith:?}");
+        assert_eq!(r.grand_total, 880_000, "{arith:?}");
+        assert_eq!(r.net_total, 545_047, "{arith:?}");
+
+        b.credits[0].rows[0].source = on_category("1100");
+        assert_eq!(b.credits[0].excluded_fringes, set(&["ZFDAY"]));
+        let (_, r) = totals(&b);
+        let row = &r.credits[0].rows[0];
+        assert_eq!(
+            (row.gross, row.excluded_fringes, row.net),
+            (450_000, 10_000, 440_000),
+            "{arith:?}"
+        );
+        assert_eq!(r.credits[0].amount, 120_540, "{arith:?}");
+    }
+}
+
 /// A row on a category the budget doesn't have counts 0, and `warnings`
 /// says so; renumbering carries the row's category along, and renaming a
-/// fringe renames it in the row's exclusions.
+/// fringe renames it in the credit's exclusions.
 #[test]
 fn a_category_credit_row_follows_the_chart() {
     let mut b = ztest10(Arithmetic::Mmb, FringePosting::Budget);
-    b.credits.push(credit(
+    b.credits.push(credit_less(
         "ZCAT",
+        &["ZP10N"],
         vec![
-            credit_row(on_category("9900", &[]), "10", CreditCap::None),
-            credit_row(on_category("2100", &["ZP10N"]), "10", CreditCap::None),
+            credit_row(on_category("9900"), "10", CreditCap::None),
+            credit_row(on_category("2100"), "10", CreditCap::None),
         ],
     ));
     let (_, r) = totals(&b);
@@ -1399,7 +1512,8 @@ fn a_category_credit_row_follows_the_chart() {
     assert!(explained(&b, Target::Credit(0)).contains("category 9900 is not in the budget"));
 
     rename(&mut b, SetupKind::Fringe, "ZP10N", "ZPCT").unwrap();
-    assert_eq!(b.credits[0].rows[1].source, on_category("2100", &["ZPCT"]));
+    assert_eq!(b.credits[0].rows[1].source, on_category("2100"));
+    assert_eq!(b.credits[0].excluded_fringes, set(&["ZPCT"]));
     let usage = method_core::usage::usage(&b, SetupKind::Fringe);
     assert!(usage["ZPCT"].other >= 1);
 
@@ -1410,7 +1524,7 @@ fn a_category_credit_row_follows_the_chart() {
     method_core::renumber::renumber(&mut b, to).unwrap();
     let cat = b.categories().nth(1).unwrap().code.clone();
     assert_ne!(cat, "2100");
-    assert_eq!(b.credits[0].rows[1].source, on_category(&cat, &["ZPCT"]));
+    assert_eq!(b.credits[0].rows[1].source, on_category(&cat));
     let r2 = recalc(&b, &RecalcOptions::default()).unwrap();
     assert_eq!(r2.credits[0].amount, r.credits[0].amount);
 }

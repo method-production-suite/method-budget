@@ -387,10 +387,7 @@ fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals
 
         let (gross, excluded_fringes) = match &cr.source {
             CreditSource::Flat(g) => (*g, 0),
-            CreditSource::Group {
-                group,
-                excluded_fringes,
-            } => {
+            CreditSource::Group { group } => {
                 if !ctx.b.groups.contains_key(group) {
                     return Err(err(at(), ErrorKind::UnknownGroup(group.clone())));
                 }
@@ -404,17 +401,14 @@ fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals
                         .and_then(|g| g.checked_add(l.row.fringe_total))
                         .ok_or_else(row_ovf)?;
                     for (name, amt) in &l.row.fringes {
-                        if excluded_fringes.contains(name) {
+                        if c.excluded_fringes.contains(name) {
                             ex = ex.checked_add(*amt).ok_or_else(row_ovf)?;
                         }
                     }
                 }
                 (gross, ex)
             }
-            CreditSource::Category {
-                category,
-                excluded_fringes,
-            } => {
+            CreditSource::Category { category } => {
                 // The category's total with its own fringes, wherever
                 // fringes post, as Movie Magic counts a category row
                 // (decisions.md, entry 57). One that isn't in the budget
@@ -428,7 +422,7 @@ fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals
                         .ok_or_else(row_ovf)?;
                     let rows = cat.accounts.iter().flat_map(|a| &a.rows);
                     for (name, amt) in rows.flat_map(|r| &r.fringes) {
-                        if excluded_fringes.contains(name) {
+                        if c.excluded_fringes.contains(name) {
                             ex = ex.checked_add(*amt).ok_or_else(row_ovf)?;
                         }
                     }
@@ -694,6 +688,7 @@ mod tests {
             applied: true,
             cap: None,
             discount_percent: Dec::ZERO,
+            excluded_fringes: BTreeSet::new(),
             rows,
         }
     }
@@ -1135,25 +1130,27 @@ mod tests {
         let mut b = fixture(FringePosting::Account);
         let tax = CreditSource::Group {
             group: "TAX".into(),
-            excluded_fringes: set(["UNION"]),
         };
-        b.credits = vec![credit(
-            "State incentive",
-            vec![
-                // TAX: rows 3 and 5 = 300,000 + 52,950 + 200,000; less UNION 30,000
-                credit_row(tax, "25", CreditCap::None),
-                credit_row(
-                    CreditSource::Flat(1_000_000),
-                    "20",
-                    CreditCap::QualifiedSpend(400_000),
-                ),
-                credit_row(
-                    CreditSource::Flat(1_000_000),
-                    "30",
-                    CreditCap::Credit(250_000),
-                ),
-            ],
-        )];
+        b.credits = vec![Credit {
+            excluded_fringes: set(["UNION"]),
+            ..credit(
+                "State incentive",
+                vec![
+                    // TAX: rows 3 and 5 = 300,000 + 52,950 + 200,000; less UNION 30,000
+                    credit_row(tax, "25", CreditCap::None),
+                    credit_row(
+                        CreditSource::Flat(1_000_000),
+                        "20",
+                        CreditCap::QualifiedSpend(400_000),
+                    ),
+                    credit_row(
+                        CreditSource::Flat(1_000_000),
+                        "30",
+                        CreditCap::Credit(250_000),
+                    ),
+                ],
+            )
+        }];
         let ts = run(&b);
         let c = &ts.credits[0];
         assert_eq!(
@@ -1288,7 +1285,6 @@ mod tests {
             vec![credit_row(
                 CreditSource::Group {
                     group: "TAX".into(),
-                    excluded_fringes: BTreeSet::new(),
                 },
                 "100",
                 CreditCap::None,
@@ -1323,7 +1319,6 @@ mod tests {
             vec![credit_row(
                 CreditSource::Group {
                     group: "NOPE".into(),
-                    excluded_fringes: BTreeSet::new(),
                 },
                 "25",
                 CreditCap::None,

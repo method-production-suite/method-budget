@@ -246,12 +246,10 @@ mod tests {
             applied: true,
             cap: None,
             discount_percent: Dec::ZERO,
+            excluded_fringes: ["KIT".to_string()].into(),
             rows: vec![method_core::CreditRow {
                 description: "Labor".into(),
-                source: CreditSource::Group {
-                    group: "OT".into(),
-                    excluded_fringes: ["KIT".to_string()].into(),
-                },
+                source: CreditSource::Group { group: "OT".into() },
                 percent: Dec::from_int(25),
                 cap: CreditCap::None,
             }],

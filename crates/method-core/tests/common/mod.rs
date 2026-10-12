@@ -179,12 +179,12 @@ pub fn sample() -> Budget {
         applied: true,
         cap: None,
         discount_percent: d("10"),
+        excluded_fringes: BTreeSet::new(),
         rows: vec![
             CreditRow {
                 description: "Qualified labor".into(),
                 source: CreditSource::Group {
                     group: "Incentive".into(),
-                    excluded_fringes: set(&[]),
                 },
                 percent: d("30"),
                 cap: CreditCap::None,

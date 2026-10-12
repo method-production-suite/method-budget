@@ -837,22 +837,8 @@ pub(crate) fn credit_rows_text(c: &Credit) -> String {
         .map(|r| {
             let source = match &r.source {
                 CreditSource::Flat(a) => money(*a),
-                CreditSource::Group {
-                    group,
-                    excluded_fringes,
-                } if excluded_fringes.is_empty() => format!("group {group}"),
-                CreditSource::Group {
-                    group,
-                    excluded_fringes,
-                } => format!("group {group} less {}", set_text(excluded_fringes)),
-                CreditSource::Category {
-                    category,
-                    excluded_fringes,
-                } if excluded_fringes.is_empty() => format!("category {category}"),
-                CreditSource::Category {
-                    category,
-                    excluded_fringes,
-                } => format!("category {category} less {}", set_text(excluded_fringes)),
+                CreditSource::Group { group } => format!("group {group}"),
+                CreditSource::Category { category } => format!("category {category}"),
             };
             let cap = match r.cap {
                 CreditCap::None => String::new(),
@@ -879,6 +865,7 @@ pub(crate) fn credit_fields(c: &Credit) -> Vec<Field> {
             "discount",
             format!("{}%", c.discount_percent),
         ),
+        names("excluded_fringes", "excluded fringes", &c.excluded_fringes),
         text("rows", "rows", credit_rows_text(c)),
     ]
 }

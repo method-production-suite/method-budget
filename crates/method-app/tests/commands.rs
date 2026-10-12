@@ -870,10 +870,11 @@ fn credits_reduce_the_net_total() {
     let v0 = view(&mut s);
     let credit: edit::CreditInput = input(serde_json::json!({
         "name": "State incentive", "applied": true, "cap": null, "discount_percent": "0",
+        "excluded_fringes": ["PAYROLL"],
         "rows": [
             {"description": "Typed spend", "source": {"kind": "flat", "amount": "100,000"},
              "percent": "25", "cap": {"kind": "none"}},
-            {"description": "Local crew", "source": {"kind": "group", "group": "Local", "excluded_fringes": ["PAYROLL"]},
+            {"description": "Local crew", "source": {"kind": "group", "group": "Local"},
              "percent": "30", "cap": {"kind": "credit", "amount": "5,000"}}
         ]
     }));
@@ -886,7 +887,8 @@ fn credits_reduce_the_net_total() {
     let rows = &v["budget"]["credits"][0]["rows"];
     assert_eq!(rows[0]["source"]["amount"], 10_000_000);
     assert_eq!(rows[1]["source"]["group"], "Local");
-    assert_eq!(rows[1]["source"]["excluded_fringes"][0], "PAYROLL");
+    assert!(rows[1]["source"].get("excluded_fringes").is_none());
+    assert_eq!(v["budget"]["credits"][0]["excluded_fringes"][0], "PAYROLL");
     assert_eq!(rows[1]["cap"]["kind"], "credit");
     assert_eq!(rows[1]["cap"]["amount"], 500_000);
 

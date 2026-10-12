@@ -362,13 +362,16 @@ below-the-line) or flat `amount`, and is applied unless `applied` is false.
   "charge_kind": "percent", "percent": 10, "excluded_categories": ["50"]}}
 ```
 
-**`set_credit`** `{path, name, new_name?, account?, applied?, cap?, discount_percent?, rows?}`:
-adds a credit or changes it; `rows` replaces every row. Each row: `source` (`{"kind": "flat",
-"amount": "250000"}`, `{"kind": "group", "group": "Local hire", "excluded_fringes": [...]}`
-or `{"kind": "category", "category": "2100", "excluded_fringes": [...]}`: a topsheet
-category's total with the fringes its lines earn, wherever fringes post; decisions.md,
-entry 57), `percent`, `cap` (`{"kind": "none" | "qualified_spend" | "credit", "amount"}`),
-`description`. A group or category the budget doesn't have is refused.
+**`set_credit`** `{path, name, new_name?, account?, applied?, cap?, discount_percent?,
+excluded_fringes?, rows?}`: adds a credit or changes it; `rows` replaces every row.
+`excluded_fringes` is the credit's one list of fringes left out of every group and category
+row's spend (decisions.md, entry 57); left out keeps it, and changing the rows never
+changes it. Each row: `source` (`{"kind": "flat", "amount": "250000"}`, `{"kind": "group",
+"group": "Local hire"}` or `{"kind": "category", "category": "2100"}`: a topsheet
+category's total with the fringes its lines earn, wherever fringes post), `percent`, `cap`
+(`{"kind": "none" | "qualified_spend" | "credit", "amount"}`), `description`. A group,
+category or fringe the budget doesn't have is refused. `list_charges` shows each credit's
+`excluded_fringes`.
 
 **`apply_charge`** `{path, type, name, applied}`: makes a charge or credit count or stop
 counting. **`delete_charge`** `{path, type, name}` removes it.

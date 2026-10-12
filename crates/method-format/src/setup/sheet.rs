@@ -474,35 +474,24 @@ pub fn sheet(b: &Budget, w: What) -> Sheet {
                 if c.rows.is_empty() {
                     let mut cells = Vec::new();
                     head(&mut cells);
-                    cells.extend(std::iter::repeat_n(Cell::Empty, 8));
+                    cells.extend(std::iter::repeat_n(Cell::Empty, 7));
+                    cells.push(list(&c.excluded_fringes));
                     push(&c.name, cells);
                 }
                 for r in &c.rows {
                     let mut cells = Vec::new();
                     head(&mut cells);
-                    let (group, category, amount, excluded) = match &r.source {
-                        CreditSource::Flat(a) => {
-                            (Cell::Empty, Cell::Empty, Cell::Money(*a), Cell::Empty)
+                    let (group, category, amount) = match &r.source {
+                        CreditSource::Flat(a) => (Cell::Empty, Cell::Empty, Cell::Money(*a)),
+                        CreditSource::Group { group } => {
+                            (Cell::text(group.clone()), Cell::Empty, Cell::Empty)
                         }
-                        CreditSource::Group {
-                            group,
-                            excluded_fringes,
-                        } => (
-                            Cell::text(group.clone()),
-                            Cell::Empty,
-                            Cell::Empty,
-                            list(excluded_fringes),
-                        ),
-                        CreditSource::Category {
-                            category,
-                            excluded_fringes,
-                        } => (
-                            Cell::Empty,
-                            Cell::text(category.clone()),
-                            Cell::Empty,
-                            list(excluded_fringes),
-                        ),
+                        CreditSource::Category { category } => {
+                            (Cell::Empty, Cell::text(category.clone()), Cell::Empty)
+                        }
                     };
+                    // The credit's one list, repeated on each of its rows.
+                    let excluded = list(&c.excluded_fringes);
                     let (on, cap) = match r.cap {
                         CreditCap::None => (Cell::Empty, Cell::Empty),
                         CreditCap::QualifiedSpend(x) => (Cell::text("Spend"), Cell::Money(x)),
@@ -1062,7 +1051,6 @@ pub fn read(
                         "percent",
                         "row_cap",
                         "row_cap_on",
-                        "excluded_fringes",
                     ]
                     .iter()
                     .any(|k| !row.get(k).is_empty());
@@ -1077,24 +1065,23 @@ pub fn read(
                                 discount_percent: row
                                     .number("discount", "the discount")?
                                     .unwrap_or(Dec::ZERO),
+                                excluded_fringes: BTreeSet::new(),
                                 rows: Vec::new(),
                             });
                             into.credits.len() - 1
                         }
                     };
+                    // One list per credit: every sheet row of it adds to it.
+                    into.credits[i]
+                        .excluded_fringes
+                        .extend(row.names("excluded_fringes"));
                     if has_row {
                         let group = row.opt("group");
                         let category = row.opt("category");
                         let amount = row.money("amount", "the flat amount")?;
                         let source = match (group, category, amount) {
-                            (Some(g), None, None) => CreditSource::Group {
-                                group: g,
-                                excluded_fringes: row.names("excluded_fringes"),
-                            },
-                            (None, Some(c), None) => CreditSource::Category {
-                                category: c,
-                                excluded_fringes: row.names("excluded_fringes"),
-                            },
+                            (Some(g), None, None) => CreditSource::Group { group: g },
+                            (None, Some(c), None) => CreditSource::Category { category: c },
                             (None, None, Some(a)) => CreditSource::Flat(a),
                             (None, None, None) => {
                                 return Err(
@@ -1334,13 +1321,11 @@ mod tests {
             applied: true,
             cap: Some(100_000_000),
             discount_percent: Dec::from_int(5),
+            excluded_fringes: ["KIT".to_string()].into(),
             rows: vec![
                 CreditRow {
                     description: "Labor".into(),
-                    source: CreditSource::Group {
-                        group: "OT".into(),
-                        excluded_fringes: ["KIT".to_string()].into(),
-                    },
+                    source: CreditSource::Group { group: "OT".into() },
                     percent: Dec::from_int(25),
                     cap: CreditCap::Credit(500_000),
                 },
@@ -1354,7 +1339,6 @@ mod tests {
                     description: "Electric".into(),
                     source: CreditSource::Category {
                         category: "10".into(),
-                        excluded_fringes: ["KIT".to_string()].into(),
                     },
                     percent: Dec::from_int(10),
                     cap: CreditCap::None,
@@ -1367,6 +1351,7 @@ mod tests {
             applied: false,
             cap: None,
             discount_percent: Dec::ZERO,
+            excluded_fringes: BTreeSet::new(),
             rows: Vec::new(),
         });
         b.tag_presets.push(TagPreset {

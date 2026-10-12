@@ -2127,6 +2127,9 @@ struct FileCredit {
     cap: Option<Cents>,
     #[serde(default = "zero", skip_serializing_if = "DecStr::is_zero")]
     discount_percent: DecStr,
+    /// Fringes left out of every group and category row's spend.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    excluded_fringes: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     rows: Vec<FileCreditRow>,
 }
@@ -2143,6 +2146,7 @@ impl From<&Credit> for FileCredit {
             applied,
             cap,
             discount_percent,
+            excluded_fringes,
             rows,
         } = c;
         FileCredit {
@@ -2151,6 +2155,7 @@ impl From<&Credit> for FileCredit {
             applied: *applied,
             cap: *cap,
             discount_percent: DecStr(*discount_percent),
+            excluded_fringes: excluded_fringes.clone(),
             rows: rows.iter().map(FileCreditRow::from).collect(),
         }
     }
@@ -2158,12 +2163,29 @@ impl From<&Credit> for FileCredit {
 
 impl From<FileCredit> for Credit {
     fn from(f: FileCredit) -> Credit {
+        // Older files kept the list on each group or category row: the
+        // credit takes the union of them (FORMAT.md, changelog).
+        let mut excluded_fringes = f.excluded_fringes;
+        for r in &f.rows {
+            match &r.source {
+                FileCreditSource::Flat { .. } => {}
+                FileCreditSource::Group {
+                    excluded_fringes: old,
+                    ..
+                }
+                | FileCreditSource::Category {
+                    excluded_fringes: old,
+                    ..
+                } => excluded_fringes.extend(old.iter().cloned()),
+            }
+        }
         Credit {
             name: f.name,
             account: f.account,
             applied: f.applied,
             cap: f.cap,
             discount_percent: f.discount_percent.0,
+            excluded_fringes,
             rows: f.rows.into_iter().map(CreditRow::from).collect(),
         }
     }
@@ -2187,11 +2209,14 @@ enum FileCreditSource {
     },
     Group {
         group: String,
+        /// Read only, from older files: the credit takes the union of its
+        /// rows' lists. Never written.
         #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
         excluded_fringes: BTreeSet<String>,
     },
     Category {
         category: String,
+        /// As for `Group`: read from older files only.
         #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
         excluded_fringes: BTreeSet<String>,
     },
@@ -2216,19 +2241,13 @@ impl From<&CreditRow> for FileCreditRow {
             description: description.clone(),
             source: match source {
                 CreditSource::Flat(amount) => FileCreditSource::Flat { amount: *amount },
-                CreditSource::Group {
-                    group,
-                    excluded_fringes,
-                } => FileCreditSource::Group {
+                CreditSource::Group { group } => FileCreditSource::Group {
                     group: group.clone(),
-                    excluded_fringes: excluded_fringes.clone(),
+                    excluded_fringes: BTreeSet::new(),
                 },
-                CreditSource::Category {
-                    category,
-                    excluded_fringes,
-                } => FileCreditSource::Category {
+                CreditSource::Category { category } => FileCreditSource::Category {
                     category: category.clone(),
-                    excluded_fringes: excluded_fringes.clone(),
+                    excluded_fringes: BTreeSet::new(),
                 },
             },
             percent: DecStr(*percent),
@@ -2247,20 +2266,8 @@ impl From<FileCreditRow> for CreditRow {
             description: f.description,
             source: match f.source {
                 FileCreditSource::Flat { amount } => CreditSource::Flat(amount),
-                FileCreditSource::Group {
-                    group,
-                    excluded_fringes,
-                } => CreditSource::Group {
-                    group,
-                    excluded_fringes,
-                },
-                FileCreditSource::Category {
-                    category,
-                    excluded_fringes,
-                } => CreditSource::Category {
-                    category,
-                    excluded_fringes,
-                },
+                FileCreditSource::Group { group, .. } => CreditSource::Group { group },
+                FileCreditSource::Category { category, .. } => CreditSource::Category { category },
             },
             percent: f.percent.0,
             cap: match f.cap {

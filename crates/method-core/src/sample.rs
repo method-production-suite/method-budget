@@ -435,15 +435,14 @@ pub fn budget(spec: &SampleSpec) -> Budget {
         percent: Dec::from_int(15),
         cap: CreditCap::Credit(5_000_000),
     }];
+    let mut credit_excluded = BTreeSet::new();
     if let Some(g) = group(5) {
+        credit_excluded = fringe_names.iter().take(1).cloned().collect();
         credit_rows.insert(
             0,
             CreditRow {
                 description: "Local labor".into(),
-                source: CreditSource::Group {
-                    group: g,
-                    excluded_fringes: fringe_names.iter().take(1).cloned().collect(),
-                },
+                source: CreditSource::Group { group: g },
                 percent: Dec::from_int(25),
                 cap: CreditCap::QualifiedSpend(400_000_000),
             },
@@ -455,6 +454,7 @@ pub fn budget(spec: &SampleSpec) -> Budget {
         applied: true,
         cap: Some(100_000_000),
         discount_percent: Dec::from_int(5),
+        excluded_fringes: credit_excluded,
         rows: credit_rows,
     }];
 

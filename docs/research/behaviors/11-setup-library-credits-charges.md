@@ -55,9 +55,9 @@ cloud-era features. The 2026 notes have not covered the credits or charges scree
    cap, percent, credit amount and cap variance shown live. We have credit rows with caps
    and a discount; check that the editor shows the per-row breakdown and the variance to
    cap.
-4. [have] P3 **Credit "exclude fringes"**: our group credit rows already carry
-   `excluded_fringes` (per row; the reference sets the list once per credit, a UI
-   convenience we could add).
+4. [have] P3 **Credit "exclude fringes"**: one `excluded_fringes` list per credit,
+   applied to its group and category rows, as the reference has it (decisions.md,
+   entry 57).
 5. [missing] P3 **Library of saved setup items with folders** (also note 09, item 5).
 6. [have] P1 **Percentage and flat fringes in one table**; [missing] P3 a footer with
    percent total, flat total and their sum.
