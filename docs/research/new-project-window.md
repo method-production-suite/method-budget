@@ -1,7 +1,9 @@
 # The start window and New Budget (roadmap 3.19)
 
 Status: design, 2026-10-12. Phase 1 (section 9) is built: decisions.md, entry 63; docs/APP.md,
-"The start window".
+"The start window". Part of phase 2 is built with the owner's answers to questions 1, 2, 4
+and 5 (decisions.md, entry 65): the start window when the last tab closes, a chart picker,
+Save In at creation, and pinned and recent following moved files.
 
 The owner likes the reference product's home screen, the one shown before a budget is
 open, minus its cloud parts. This note says what that screen offers, from the reference's

@@ -2821,3 +2821,55 @@ budget", says what it does; this records the choices.
   showed both values with names and times, Use put the other value back as a change the
   second person received, and Undo took it back (the second person saw "Undo: Put back
   rate"). `method log` read the same log and the same actor as the app.
+
+## 65. The start window and New Budget, phase 2 (2026-10-12, the owner's answers)
+
+Roadmap 3.19; phase 1 is entry 63, the design docs/research/new-project-window.md, the
+behavior docs/APP.md, "The start window and New Budget". The owner answered phase 1's
+open questions:
+
+- **Closing the last tab shows the start window** instead of closing the window, as the
+  reference product does. The tab gives its place to an untouched Untitled budget (as at
+  launch) and the start window shows over it; Escape leaves that Untitled budget, and
+  whatever is opened or made next takes its tab. It goes through Close Tab's own steps
+  (Autosave first, which also writes a shared budget's pending changes, entry 64; then
+  Save, Close Without Saving or Cancel). **The one box governs both**: "Show this window
+  when the app starts and when the last tab closes". Someone who turned the window off
+  at launch doesn't want it here either, so with the box off Cmd+W on the last tab closes
+  the window as before. Close Window and Quit are unchanged.
+- **Picking a chart of accounts is its own step** of the form, right under the title and
+  type: A chart of accounts, Starter budget, Empty or A budget file, then (for a chart)
+  every bundled chart grouped by budget type (Feature, Television, Commercial, Other),
+  the chosen type's group first, our own charts before the studios' (by name), each with
+  its description and account count and a search box. The type's own chart is chosen until
+  the user picks something by hand. Studio charts are only surfaced as bundled (numbers,
+  names and levels, entry 51); no studio data was added. "Ours" is read from the
+  manifest's description ("Our own chart…"), which `scripts/build-coa-templates.py`
+  writes differently for studio charts. The sizes are read from the bundled files once
+  per run.
+- **Create saves into a folder at once (Save In).** The folder is the one the last new
+  budget went to (`start.json`, `last_folder`), else Documents, else the home folder; a
+  folder dialog in Rust changes it. The file name follows the title (as the Save dialog
+  suggests one) until typed by hand. The file is written whole to a temporary file and
+  hard-linked into place, so it is **never written over an existing file** (where a file
+  system has no links, it is renamed after checking again); a clash makes nothing and
+  offers the first free "Title 2", "Title 3"… name in one click. The budget then opens as a
+  saved tab (no unsaved changes; its first undo step is the next edit) through the same
+  open path as Open, so it is listed in Open Recent and a shared folder's log is joined.
+  It is a new file, never a Save As, so a shared budget's refusal of Save As doesn't arise.
+  Without a folder (none found), the budget opens with no file as in phase 1. Paths stay
+  in Rust: the page has the folder's token and its display text only.
+- **Pinned and recent follow files moved in the Finder.** Each entry in `start.json` and
+  `recent.json` keeps a macOS bookmark (hex, by path, beside the old path list, so older
+  versions still read the files). When a path no longer names a file the bookmark is
+  resolved, quietly (no UI, no mounting), and the path is updated and kept; a file moved
+  to the Trash counts as gone. The bookmark is CoreFoundation's own
+  (`CFURLCreateBookmarkData`), called directly as src/pdf_mac.rs calls AppKit: **no new
+  crate**. A plain bookmark, not a security-scoped one: the app isn't sandboxed. Windows
+  and Linux keep paths only ("Can't find this file." with Remove). Open Recent's menu
+  follows moved files the same way before it drops missing ones.
+- **Net totals are kept between runs**: `start-cache.json` beside `start.json` holds each
+  listed file's title, net total and currency with the modified time and size they were
+  read at (at most 200), so the start window reads a file again only when it changed.
+- **Not built** (phase 2 still open): projects as folders, thumbnails, setup library and
+  packs at creation, duplicate and new sub-budget from a row.

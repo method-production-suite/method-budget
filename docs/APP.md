@@ -52,7 +52,9 @@ double-clicked in the Finder open in a new tab; a file that is open already just
 tab brought forward, and an untouched Untitled budget alone in the window gives its tab up
 to the file. Close Tab (Cmd+W), the × or a middle-click closes a tab: with Autosave on its
 changes go into its file first, and whatever is still unsaved asks **Save**, **Close
-Without Saving** or **Cancel**. Cmd+W on the last tab closes the window. Drag a tab (or
+Without Saving** or **Cancel**. Closing the last tab gives its place to an untouched
+Untitled budget and shows the start window over it (below; with the start window's box
+turned off, Cmd+W on the last tab closes the window instead). Drag a tab (or
 Option+Shift+Left and Right on a focused tab) to move it. Ctrl+Tab and Ctrl+Shift+Tab, or
 Shift+Cmd+] and Shift+Cmd+[, go to the next and previous tab; Cmd+1 and Cmd+2 to the first
 and second (Cmd+3 to Cmd+9 are the Budget Setup tabs); Left, Right, Home and End move between tabs
@@ -1126,10 +1128,11 @@ choice is unknown.
 
 ### The start window and New Budget
 
-**The start window** (roadmap 3.19; decisions.md, entry 63; design and later phases:
-docs/research/new-project-window.md) shows when the app starts with nothing to reopen (no
-tabs from last time, no file handed over by the system, no recovered budgets to offer),
-over the untouched Untitled budget, and any time from **File > New…** (Cmd+N) or the
+**The start window** (roadmap 3.19; decisions.md, entries 63 and 65; design and later
+phases: docs/research/new-project-window.md) shows when the app starts with nothing to
+reopen (no tabs from last time, no file handed over by the system, no recovered budgets to
+offer), over the untouched Untitled budget; when the last tab closes, over the untouched
+Untitled budget that takes its place; and any time from **File > New…** (Cmd+N) or the
 toolbar's New. **Pinned** budgets come first, then **Recent** (Open Recent's list, without
 the pinned ones). Each row has the budget's title, its file name and folder (the home
 folder written `~`), its net total in its base currency, when the file last changed, "Open
@@ -1142,7 +1145,11 @@ never touched), any other letter goes back to the search box, Escape clears the 
 then closes the window. A row's own buttons (Pin or Unpin, Show in Folder, Remove) show
 under the pointer and with the keyboard on the row. **New Budget…** (Cmd+N in the window)
 opens the form; **Open…** (Cmd+O) shows the Open dialog and keeps the window if it is
-cancelled. "Show this window when the app starts" is kept in this window's local storage.
+cancelled. "Show this window when the app starts and when the last tab closes" is kept in
+this window's local storage; turned off, the window shows only from New, and Cmd+W on the
+last tab closes the window. A pinned or recent budget moved or renamed in the Finder is
+found again at its new place (macOS keeps a bookmark with each; one moved to the Trash
+counts as gone); on Windows and Linux it shows as "Can't find this file.".
 Opening or making a budget closes the window; one opened and an untouched Untitled budget
 alone in the window gives its tab up to it, as Open does. A budget opened another way
 while the window shows (a file from the system) closes it too. New Tab and the **+** still
@@ -1153,13 +1160,25 @@ episode, TV season, Commercial, Documentary, Other; a season and an episode numb
 episode, a season and the number of episodes for a season), the prep start, shoot start,
 shoot end and wrap end dates (`YYYY-MM-DD`), the schedule's length (prep weeks, shoot days,
 wrap weeks), the country, region or state and city, the base currency (blank: USD; the last
-one used is offered next time), what to start from, how fringes post and the arithmetic.
-Start From lists the starter budget (a small sample with placeholder rates), an empty
-budget, and the bundled charts of accounts by group; **Use a Budget File…** picks any
-budget file (read from its tab when it is open) as New From Template uses one. Until Start
-From is changed by hand, the type picks our own chart for it (feature, one-hour TV,
-commercial, documentary). Enter in a text box, or Cmd+Enter anywhere, creates; Escape goes
-back to the lists keeping what was typed. Where things go:
+one used is offered next time), the chart of accounts, where to save, how fringes post and
+the arithmetic.
+
+**Chart of accounts**, right under the title and type: **A chart of accounts**, **Starter
+budget** (a small sample with placeholder rates), **Empty** or **A budget file** (any
+budget file, picked in the Open dialog and read from its tab when it is open, as New From
+Template uses one). For a chart, every bundled chart is listed by budget type (Feature,
+Television, Commercial, Other; the chosen type's group first), our own charts first, then
+the studios' and networks' by name (numbers, names and levels only), each with its
+description and number of accounts; a search box narrows the list (Down or Enter goes into
+it, arrows move). Until something is picked by hand, the type picks our own chart for it
+(feature, one-hour TV, commercial, documentary). A line under the choice says how many
+accounts and categories it has.
+
+**Save in**: the folder the last new budget was saved in, else Documents, else the home
+folder; **Choose Folder…** changes it. The file name follows the title (characters a file
+name can't have become spaces) until it is typed by hand; `.mthd` is added. Enter in a text
+box, or Cmd+Enter anywhere, creates; Escape goes back to the lists keeping what was typed.
+Where things go:
 
 - the title is the budget's title;
 - budget info fields **Production type**, **Season**, **Episode**, **Episodes** (a
@@ -1175,9 +1194,13 @@ back to the lists keeping what was typed. Where things go:
 
 A chart or a budget file starts without lines, info, baseline, versions or notes (as New
 From Template). Every value goes through the setup tabs' own checks, and a refusal is shown
-in the form with nothing made. The budget opens in front with no file (the first Save asks
-where, suggesting the title), as one undo step, so closing it asks to save; a message says
-how many categories, accounts and lines it has.
+in the form with nothing made. The budget is written into the folder as a new file and
+opens in front as a saved budget, listed in Open Recent; a message says how many
+categories, accounts and lines it has and where it was saved. An existing file is never
+written over: when the name is taken nothing is made, and the form says so and offers the
+first free name ("Big Show 2") in one click. With no folder to offer (none of the three is
+there), the budget opens with no file (the first Save asks where, suggesting the title),
+as one undo step, so closing it asks to save.
 
 | Command | Arguments | Returns |
 |---|---|---|
@@ -1187,11 +1210,17 @@ how many categories, accounts and lines it has.
 | `start_forget` | `token` (off the recent list and unpinned) | the lists again |
 | `start_reveal` | `token` (shown in Finder, Explorer or the file manager) | nothing |
 | `new_budget_pick_template` | none (shows the Open dialog) | `{token, file, title, categories, accounts}`, or `null` when cancelled |
-| `new_budget_create` | `spec` (`{title, kind, season, episode, episodes, prep_start, shoot_start, shoot_end, wrap_end, prep_weeks, shoot_days, wrap_weeks, country, region, city, currency, start, chart, template, fringe_posting, arithmetic}`; `start` is `starter`, `blank`, `chart` with `chart` an id, or `file` with `template` the picked token) | `{view, message}` |
+| `new_budget_charts` | none | every bundled chart: `[{id, name, group, description, ours, categories, accounts}]` |
+| `new_budget_folder` | none | Save In's first folder: `{token, folder}` (`folder` to show, `~` for home), or `null` |
+| `new_budget_pick_folder` | `current` (a folder token, or `null`; shows the folder dialog from there) | `{token, folder}`, or `null` when cancelled |
+| `new_budget_create` | `spec` (`{title, kind, season, episode, episodes, prep_start, shoot_start, shoot_end, wrap_end, prep_weeks, shoot_days, wrap_weeks, country, region, city, currency, start, chart, template, fringe_posting, arithmetic, folder, file_name}`; `start` is `starter`, `blank`, `chart` with `chart` an id, or `file` with `template` the picked token; `folder` a folder token or `null` for no file; `file_name` blank for the title) | `{view, message, taken}`: `taken` (a free file name, without `.mthd`) when a file of that name is there, and then nothing was made (`view` is `null`) |
 
-The pinned list (at most 100) is the data folder's `start.json`. A file is read once for
-its row and read again only when its modified time or size changes. A token names a row of
-the last listing only (the picked file: the last one picked).
+The pinned list (at most 100), each file's bookmark and the last Save In folder are the
+data folder's `start.json`. A file is read once for its row and read again only when its
+modified time or size changes; the summaries (title, net total, currency, with the modified
+time and size they were read at; at most 200) are kept in `start-cache.json`, so a new
+run doesn't read every file again. A token names a row of the last listing only (the
+picked file: the last one picked; the folder: the last one offered or picked).
 
 ### Starting from another budget
 
@@ -2151,6 +2180,9 @@ project folders, there is room for more than one version, and the dialog finds t
 settings and recent lists) goes to a temporary file in the same folder, is flushed to disk,
 then renamed over the target (and the folder flushed, on macOS and Linux). A budget file
 keeps the permissions of the file it replaces. A failed write leaves the old file whole.
+A new budget saved by New Budget is linked into place from its temporary file instead, so
+it can never replace a file that is there (renamed after checking again where the folder
+can't hold links).
 
 **Reopening tabs.** The files open as tabs, in tab order, and which one is in front are kept
 in the data folder's `tabs.json`, rewritten whenever a tab opens, closes, moves, comes to the
@@ -2164,7 +2196,9 @@ untouched takes that tab's place.
 
 **File > Open Recent** lists the last 10 budgets opened or saved (newest first, each once;
 two files with one name show their folder), kept in the data folder's `recent.json`. Files
-that no longer exist drop off when the menu is refreshed (every open and save). Clear Menu
+moved or renamed in the Finder are followed to their new place (each is kept with a macOS
+bookmark), and files that no longer exist drop off when the menu is refreshed (every open
+and save). Clear Menu
 empties it; the start window's Remove takes one file off. macOS's own system-wide recent
 documents list is not updated.
 
@@ -2386,7 +2420,7 @@ account.
 | `new_tab` | none | View of a starter budget in a new tab, in front |
 | `switch_tab` | `doc` | View of that budget, now in front |
 | `move_tab` | `doc`, `to` (its place afterwards) | the tabs |
-| `close_tab` | `doc`, `discard` | `{closed, unsaved, last, view}`: closed (view: the budget now in front); or not, because of unsaved changes (ask, then again with `discard`, or save first) or because it is the last tab (close the window) |
+| `close_tab` | `doc`, `discard`, `toStart` | `{closed, unsaved, last, view}`: closed (view: the budget now in front); or not, because of unsaved changes (ask, then again with `discard`, or save first) or because it is the last tab (close the window). With `toStart`, the last tab closes too and an untouched Untitled budget takes its place (the page then shows the start window) |
 | `list_tabs` | none | the tabs |
 | `switch_tab` (split) | `doc`, `pane` | View of that budget, in front in that pane, which becomes the target |
 | `close_tab` (split) | `doc`, `discard`, `pane` | as above; when the other pane shows the budget too, only this pane's tab goes |
@@ -2632,7 +2666,10 @@ untrusted (a budget file is data from anywhere).
   "keep the lines" from the page. The start window gets each pinned and recent budget's
   file name and folder to show, and names a row only by a token from the last listing
   (`start.json` and `recent.json` hold the paths); New Budget's budget file is picked in
-  Rust's Open dialog and named by its token. Show in Folder runs the system's `open -R`,
+  Rust's Open dialog and named by its token, and Save In's folder is picked in Rust's
+  folder dialog (or offered from `start.json` or the system's Documents folder) and named
+  by its token; the page sends only a file name, checked in Rust, which never writes over
+  a file. Show in Folder runs the system's `open -R`,
   `explorer /select,` or `xdg-open` on a listed file. Import Spreadsheet is the same: Rust shows the Open
   dialog and reads the file; the page gets its name (never its path) and names it by a
   token afterwards (only the last file picked is kept). Import Actuals is the same, with
