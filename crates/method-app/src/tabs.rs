@@ -1,31 +1,26 @@
-//! Budgets as tabs in the one window (decisions.md, entries 19 and 25): the
-//! commands the tab strip calls (`ui/js/tabs.js`), the Window menu's list of
-//! open budgets, and remembering which files are open for the next start.
-//! The documents themselves are kept in src/docs.rs; opening and closing
-//! them, with their recovery copies, is in src/safety_app.rs.
+//! Budgets as tabs in the one window (decisions.md, entries 19 and 25).
+//! What the tab strip's commands (`ui/js/tabs.js`) and the split view's do is
+//! in method-session's `tabs` module (re-exported here); these are the Tauri
+//! commands, the Window menu's list of open budgets, and remembering which
+//! files are open for the next start. Opening and closing budgets with their
+//! recovery copies is in src/safety_app.rs.
 //!
 //! Every command still works on the budget in front unless it names another
-//! with `doc` (src/app.rs).
-//!
-//! Split view (roadmap 2.26): two panes side by side, each with its own tabs
-//! (src/docs.rs, `Split`). The pane commands here split and merge the
-//! window, pick the target pane, move tabs within a pane and to the other
-//! one, and give the other pane its own view of a budget (`pane_view`: its
-//! own account on screen, nothing changed and nobody told). Opening a file (Open, Open Recent, a double-click
+//! with `doc` (src/app.rs). Opening a file (Open, Open Recent, a double-click
 //! in the Finder, a recovered budget) puts it in a new tab, or brings its tab
 //! forward when it is open already.
 
 use std::sync::{Mutex, MutexGuard};
 
-use serde::Serialize;
 use tauri::menu::{CheckMenuItem, MenuItemKind};
 use tauri::{AppHandle, Manager, Runtime, State, WebviewWindow};
 
 use crate::app::{finish, AppState, DocId};
 use crate::docs::{Docs, TabInfo};
-use crate::safety_app::{self, Closed, Safety};
-use crate::view::Focus;
+use crate::safety_app::{self, Safety};
 use crate::view::View;
+
+pub use method_session::tabs::*;
 
 type CmdResult<T = View> = Result<T, String>;
 
@@ -153,13 +148,7 @@ pub fn switch_tab<R: Runtime>(
     doc: DocId,
     pane: Option<usize>,
 ) -> CmdResult {
-    if let Some(p) = pane {
-        state.docs().switch_in(p, doc)?;
-    }
-    let mut s = state.lock_doc(Some(doc))?;
-    if pane.is_none() {
-        s.bring_to_front();
-    }
+    let mut s = method_session::tabs::switch_tab(&state, doc, pane)?;
     Ok(finish(&window, &mut s, None))
 }
 
@@ -173,29 +162,15 @@ pub fn move_tab<R: Runtime>(
     to: usize,
 ) -> CmdResult<Vec<TabInfo>> {
     let mut docs = state.docs();
-    docs.move_tab(doc, to)?;
+    let tabs = method_session::tabs::move_tab(&mut docs, doc, to)?;
     after_command(&app, &docs);
-    Ok(docs.tabs())
+    Ok(tabs)
 }
 
 /// The open budgets' tabs, in order.
 #[tauri::command]
 pub fn list_tabs(state: State<'_, AppState>) -> Vec<TabInfo> {
-    state.docs().tabs()
-}
-
-/// What `close_tab` did.
-#[derive(Debug, Serialize)]
-pub struct Closing {
-    /// The tab closed; `view` is the budget now in front.
-    pub closed: bool,
-    /// Not closed: it has unsaved changes Autosave couldn't save. Ask, then
-    /// close it with `discard` (or save it first).
-    pub unsaved: bool,
-    /// Not closed: it is the only tab. Close the window instead (which asks
-    /// about unsaved changes on its way out).
-    pub last: bool,
-    pub view: Option<View>,
+    method_session::tabs::list_tabs(&state.docs())
 }
 
 /// Closes budget `doc`'s tab (`None`: the one in front). Its unsaved changes
@@ -205,7 +180,8 @@ pub struct Closing {
 /// is: when the other pane shows the budget too, only this tab goes. With
 /// `to_start`, the last tab closes too and an untouched Untitled budget takes
 /// its place, for the start window to show over (src/start.rs); without it,
-/// the last tab answers `last`.
+/// the last tab answers `last`. (method-session's `close_tab` is the same
+/// without Autosave and recovery copies.)
 #[tauri::command]
 pub fn close_tab<R: Runtime>(
     window: WebviewWindow<R>,
@@ -217,16 +193,10 @@ pub fn close_tab<R: Runtime>(
     to_start: Option<bool>,
 ) -> CmdResult<Closing> {
     let id = state.lock_doc(doc)?.id();
-    let mut out = Closing {
-        closed: false,
-        unsaved: false,
-        last: false,
-        view: None,
-    };
     if pane.is_some_and(|p| state.docs().close_in_pane(p, id)) {
-        out.closed = true;
-        out.view = Some(finish(&window, &mut state.lock(), None));
-        return Ok(out);
+        return Ok(Closing::of(Closed::Closed, || {
+            finish(&window, &mut state.lock(), None)
+        }));
     }
     if !discard {
         safety_app::autosave_one(window.app_handle(), id);
@@ -236,53 +206,33 @@ pub fn close_tab<R: Runtime>(
     } else {
         safety_app::close_doc(&state, &safety, id, discard)?
     };
-    match closed {
-        Closed::Last => out.last = true,
-        Closed::Unsaved => out.unsaved = true,
-        Closed::Closed => {
-            out.closed = true;
-            out.view = Some(finish(&window, &mut state.lock(), None));
-        }
-    }
-    Ok(out)
+    Ok(Closing::of(closed, || {
+        finish(&window, &mut state.lock(), None)
+    }))
 }
 
 // ---------------------------------------------------------------------------
 // Split view (registered like the tab commands: the main window only)
 
-/// The view of the budget in front, after a change to the panes.
-fn front_view<R: Runtime>(window: &WebviewWindow<R>, state: &AppState) -> View {
-    finish(window, &mut state.lock(), None)
-}
-
 /// Splits the window: a second pane at the right showing the budget in front
 /// too, now the target.
 #[tauri::command]
 pub fn split_view<R: Runtime>(window: WebviewWindow<R>, state: State<'_, AppState>) -> CmdResult {
-    state.docs().split_right()?;
-    Ok(front_view(&window, &state))
+    Ok(finish(
+        &window,
+        &mut method_session::tabs::split_view(&state)?,
+        None,
+    ))
 }
 
 /// Closes the split: every tab back in one strip, the target's budget in front.
 #[tauri::command]
 pub fn close_split<R: Runtime>(window: WebviewWindow<R>, state: State<'_, AppState>) -> CmdResult {
-    state.docs().close_split()?;
-    Ok(front_view(&window, &state))
-}
-
-/// The account named as `focus_account` names it, or `None`.
-fn focus_of(
-    category: Option<String>,
-    ti: Option<usize>,
-    account: Option<String>,
-    ai: Option<usize>,
-) -> Option<Focus> {
-    category.zip(account).map(|(category, account)| Focus {
-        category,
-        ti: ti.unwrap_or(usize::MAX),
-        account,
-        ai: ai.unwrap_or(usize::MAX),
-    })
+    Ok(finish(
+        &window,
+        &mut method_session::tabs::close_split(&state)?,
+        None,
+    ))
 }
 
 /// Makes `pane` the target (a click or focus in it): its budget in front
@@ -299,9 +249,7 @@ pub fn set_target_pane<R: Runtime>(
     account: Option<String>,
     ai: Option<usize>,
 ) -> CmdResult {
-    state.docs().set_target(pane)?;
-    let mut s = state.lock();
-    s.set_focus(focus_of(category, ti, account, ai));
+    let mut s = method_session::tabs::set_target_pane(&state, pane, category, ti, account, ai)?;
     Ok(finish(&window, &mut s, None))
 }
 
@@ -314,8 +262,8 @@ pub fn move_tab_in_pane<R: Runtime>(
     doc: DocId,
     to: usize,
 ) -> CmdResult {
-    state.docs().move_in_pane(pane, doc, to)?;
-    Ok(front_view(&window, &state))
+    let mut s = method_session::tabs::move_tab_in_pane(&state, pane, doc, to)?;
+    Ok(finish(&window, &mut s, None))
 }
 
 /// Moves budget `doc`'s tab from pane `from` to the other pane (at place
@@ -328,8 +276,8 @@ pub fn move_to_pane<R: Runtime>(
     from: usize,
     to: Option<usize>,
 ) -> CmdResult {
-    state.docs().move_to_pane(doc, from, to)?;
-    Ok(front_view(&window, &state))
+    let mut s = method_session::tabs::move_to_pane(&state, doc, from, to)?;
+    Ok(finish(&window, &mut s, None))
 }
 
 /// Budget `doc` as the pane that isn't the target draws it: with its own
@@ -345,13 +293,7 @@ pub fn pane_view(
     account: Option<String>,
     ai: Option<usize>,
 ) -> CmdResult {
-    let mut s = state.lock_doc(Some(doc))?;
-    let focus = focus_of(category, ti, account, ai);
-    let mut view = s.view_at(focus.as_ref());
-    view.doc = s.id();
-    view.tabs = s.docs().tabs();
-    view.panes = Some(s.docs().layout());
-    Ok(view)
+    method_session::tabs::pane_view(&state, doc, category, ti, account, ai)
 }
 
 #[cfg(test)]

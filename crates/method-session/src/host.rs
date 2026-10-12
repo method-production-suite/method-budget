@@ -37,7 +37,10 @@ use crate::view::View;
 mod apply;
 mod b64;
 mod clipboard;
+mod compare;
+mod diffmerge;
 mod explain;
+mod export;
 mod find;
 mod import_setup;
 mod moverows;
@@ -48,14 +51,16 @@ mod presets;
 mod quickadd;
 mod rename;
 mod renumber;
+mod reports;
 mod rowstyle;
 mod setup_lists;
 mod sharing;
+mod tabs;
 mod templates;
 mod versions;
 
 #[cfg(test)]
-mod test_files;
+pub(crate) mod test_files;
 
 /// A file's bytes as the contract's JSON carries them (base64).
 pub use b64::{decode as b64_decode, encode as b64_encode};
@@ -219,6 +224,32 @@ pub const COMMANDS: &[&str] = &[
     "clear_fringe_range",
     // Rename
     "rename_setup_item",
+    // Tabs
+    "new_tab",
+    "switch_tab",
+    "move_tab",
+    "close_tab",
+    "list_tabs",
+    "split_view",
+    "close_split",
+    "set_target_pane",
+    "move_tab_in_pane",
+    "move_to_pane",
+    "pane_view",
+    // Compare
+    "compare_budgets",
+    "compare_detail",
+    "compare_pick_files",
+    // What Changed, Merge Changes From
+    "what_changed",
+    "merge_preview",
+    "merge_apply",
+    "merge_pick_file",
+    // Export
+    "export_budget",
+    // Report presets
+    "save_report_preset",
+    "delete_report_preset",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -587,6 +618,11 @@ const MODULES: &[Dispatch] = &[
     presets::dispatch,
     apply::dispatch,
     rename::dispatch,
+    tabs::dispatch,
+    compare::dispatch,
+    diffmerge::dispatch,
+    export::dispatch,
+    reports::dispatch,
 ];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
