@@ -1,6 +1,11 @@
 # Collaboration: many people in one budget, no server
 
-Status: research and design, October 2026. No code changes. Written for the owner's
+Status: design approved by the owner on 2026-10-12 ("do it"). Phases 1 and 2, engine
+side, are built: `method_core::log` (the change log, capture, projection, repairs, undo),
+`method_format::log` (the folder and segments), `method log` and `method sync`
+(decisions.md, entry 62). Not yet built: app wiring (the Session, presence, the review
+panel and badges, Who Changed This), signatures and roles (phase 3), iroh (phase 4).
+Written for the owner's
 direction from a design discussion: a change log under the model, shared-folder sync
 first (Dropbox, iCloud Drive, Google Drive, LucidLink; each person writes their own
 change files next to the budget), then live peer-to-peer sessions over iroh (QUIC, hole
@@ -987,8 +992,8 @@ reviewing), and are honest rather than tight.
 | Phase | What | Effort | Milestone |
 |---|---|---|---|
 | 0. Spike | Change model, fold and projection for rows and setup in `method-core`; convergence property tests; measure state and log size on a 5,000-row budget; compare against a Loro prototype for ordering | 2 weeks | Go or no-go on the hand-rolled model |
-| 1. The log, single-user | `uid`s for all entities; random row ids; capture by diff in `Session::edit`; the log written beside the budget; replay equals the budget, always; per-person undo on top of the log | 4 to 6 weeks | Every edit in the app is in the log, invisible to the user |
-| 2. Shared folder | Per-actor segments, polling, ingestion of outside edits, keeper, presence heartbeats, status item, first-run, review panel, conflict badges, Who Changed This, Activity | 5 to 7 weeks | Three computers on Dropbox editing one 5,000-row budget for a week without a lost change; iCloud, Google Drive and LucidLink tested and documented |
+| 1. The log, single-user (built in the engine, 2026-10-12) | `uid`s for all entities; random row ids; capture by diff in `Session::edit`; the log written beside the budget; replay equals the budget, always; per-person undo on top of the log | 4 to 6 weeks | Every edit in the app is in the log, invisible to the user |
+| 2. Shared folder (engine side built: segments, outside edits, keeper, `method sync`) | Per-actor segments, polling, ingestion of outside edits, keeper, presence heartbeats, status item, first-run, review panel, conflict badges, Who Changed This, Activity | 5 to 7 weeks | Three computers on Dropbox editing one 5,000-row budget for a week without a lost change; iCloud, Google Drive and LucidLink tested and documented |
 | 3. People and permissions | Keys in the keychain, signatures, membership and scopes, verification, revocation, invites for folder mode, read-only and department UI, access requests | 3 to 4 weeks | A department editor can't change what they mustn't; removing someone works |
 | 4. Live | `method-sync` crate with iroh, our sync protocol, links and the join page, cursors, follow, relay settings, docs for self-hosting a relay | 4 to 6 weeks | Two people on different networks see each other's cursors and edits instantly; falls back to the relay behind a UDP-blocking network |
 | 5. Extras | LAN discovery and codes, compaction and archive, encryption at rest, proposals, personal what-ifs, notifications | 3 to 5 weeks, pick and choose | |

@@ -1345,3 +1345,178 @@ checked by the test suite (`crates/method-format/tests/golden/small.json`).
   }
 }
 ```
+
+## The change log
+
+A shared budget (docs/research/collaboration.md; decisions.md, entry 62) keeps a change
+log beside the `.mthd`, in a folder named after the file: `Feature.mthd` has
+`Feature.mthd-log/`. The `.mthd` itself is unchanged, format version 1 as above, and
+carries no marker: a program recognizes a shared budget by the folder beside it. The log
+is the truth; the `.mthd` is a snapshot of the merged state that one computer (the
+keeper) rewrites. The reference implementation is `crates/method-format/src/log.rs`
+(the files) over `crates/method-core/src/log/` (the model).
+
+### Layout
+
+```
+Feature.mthd                       the snapshot, written by the keeper only
+Feature.mthd-log/
+  budget.json                      which budget this is
+  actors/
+    <actor>/                       one folder per computer, written by it only
+      000001-000140.chg            a sealed segment: changes 1 to 140 of this actor
+      000141-000163.chg
+    <actor>/
+      ...
+```
+
+- **One writer per file.** Only the computer that owns an actor folder writes in it. A
+  person with two computers is two actors. No file ever has two writers, so sync services
+  never make conflicted copies.
+- **Sealed segments.** A segment is written to a temporary name (`.~name.<pid>`, which
+  sync services skip) and renamed into place; it is never appended to afterwards. A
+  computer may roll its own small segments into one bigger one, writing the new file
+  before removing the old ones.
+- **Temporary and foreign files are ignored**: anything that is not `<from>-<to>.chg` in
+  an actor folder named by 64 hex characters.
+
+### `budget.json`
+
+```json
+{
+  "format": "method-budget-log",
+  "version": 1,
+  "budget_id": "<64 hex characters>",
+  "file": "Feature.mthd",
+  "genesis": { "actor": "<64 hex characters>", "seq": 1 }
+}
+```
+
+`budget_id` is the SHA-256 of the genesis change's line (below). `file` is the budget's
+file name, never a path. Readers reject another `format` and a newer `version`.
+
+### Segment files
+
+A segment is UTF-8 text: a header line, then one change per line, each a single-line
+JSON object. The header is
+
+```json
+{"segment": {"format": 1, "actor": "<hex>", "from": 1, "to": 140, "hash": "<sha-256 hex>"}}
+```
+
+where `hash` is the SHA-256 of every byte after the header's newline. A reader checks the
+hash before using a file: a segment that is still syncing (or was altered) fails the
+check and is left alone until it is whole. The changes run from `from` to `to` in
+sequence, all by `actor`.
+
+### A change
+
+```json
+{"actor": "<hex>", "seq": 57, "deps": {"<hex>": 12, "<hex>": 40}, "lamport": 1093,
+ "time": "2026-10-12T14:03:22Z", "label": "Edit rate on 21-01 line 3", "ops": [...]}
+```
+
+| Field | Meaning |
+|---|---|
+| `actor` | The computer that made it: 32 bytes as 64 hex characters (its public key, once changes are signed). |
+| `seq` | This actor's count, from 1 with no gaps. `(actor, seq)` names the change. |
+| `deps` | The last `seq` the author had seen from each actor (a version vector; actors at 0 are left out). A reader holds a change until everything in `deps` has been applied. |
+| `lamport` | 1 + the highest `lamport` the author had seen. Two writes to one field are settled by `(lamport, actor, seq, index)`: the higher wins everywhere. Wall clocks decide nothing. |
+| `time` | The author's wall clock, ISO 8601, shown but never used to order anything. |
+| `label` | What the person did, in the words the application's undo uses. |
+| `ops` | The operations, in order. |
+
+Each line is written in canonical form (keys in this order, no spaces, UTF-8), so the
+same change always gives the same bytes; the budget id and, later, signatures cover those
+bytes. A `sig` field is reserved for signed changes (phase 3 of the design).
+
+### Operations
+
+Every op names its entity by id: `"root"` for the budget's own settings, otherwise 32 hex
+characters (a 128-bit id drawn by the actor that created the entity; never written into
+the `.mthd`). Entity kinds: `category`, `production_total`, `account`, `row`, `note`,
+`info`, `currency`, `global`, `unit`, `fringe`, `group`, `set`, `location`, `charge`,
+`excluded_amount`, `credit`, `credit_row`, `version`, `transaction`, `batch`, `etc`.
+
+| `op` | Fields | Meaning |
+|---|---|---|
+| `create` | `entity`, `kind`, `place` (for kinds that live in a list), `fields`, `sets` | A new entity with its initial fields and tag sets. |
+| `set` | `entity`, `field`, `value` | One field, last writer wins. |
+| `move` | `entity`, `place` | Where the entity is, last writer wins. |
+| `delete`, `restore` | `entity` | The tombstone, last writer wins. |
+| `add` | `entity`, `field`, `member` | Adds to a tag set; an add wins over a concurrent remove. |
+| `remove` | `entity`, `field`, `member`, `seen` | Removes the adds the remover had seen (`seen` lists their stamps). |
+
+A **stamp** is written `"<lamport>/<actor hex>/<seq>/<index>"`: the change's clock and
+actor, its seq, and the op's index in it.
+
+A **place** is `{"parent": <entity>, "list": <name>, "pos": <stamp>, "node": {"parent":
+<stamp or absent>, "side": "left"|"right"}}`. Lists: `topsheet`, `charges`, `credits`,
+`versions`, `transactions` and `batches` under `root`; `accounts` under a category;
+`rows` under an account; `notes` under a category, account or row; `excluded_amounts`
+under a charge; `credit_rows` under a credit. Positions form a tree per list (Fugue's
+rule: a new position is a right child of the position before it when that one has no
+right children, otherwise a left child of the position after it); the list order is the
+in-order walk of the tree, so two people's runs of inserted lines never interleave.
+`node` is absent when the op points an entity back at a position that already exists
+(an undo).
+
+A **member** is `{"ref": <entity>}` or `{"text": "..."}`.
+
+A **value** is a JSON scalar (`null`, `true`/`false`, an integer, a string) or a one-key
+object naming its type: `{"dec": "7.65"}` (a decimal as a string, as in the `.mthd`),
+`{"ref": <entity>}` (another entity: a row's unit, a transaction's account),
+`{"formula": "..."}` (a formula with every global name replaced by `{g:<entity>}`, so a
+rename is one write to the global's `name`), and the compound settings written exactly as
+the `.mthd` writes them: `info`, `coding`, `posting`, `fringe_row`, `new_line_defaults`,
+`group_rules`, `display`, `baseline`, `snapshot` (a version's content), `report_presets`,
+`tag_presets`, `line_presets`, `ot_patterns`, `setup_order`, `setup_folders`,
+`setup_sources`.
+
+### Fields by kind
+
+Field names follow the `.mthd` (`description`, `rate`, `fringe_range`, `in_budget_total`
+and so on). The differences: every named item (setup items, info fields, charges, credits)
+has a `name` field, since its id is not its name; a row's `unit`, `currency`, `set` and
+`location` are references when the item exists and text otherwise; a row's `fringes` and
+`groups`, a charge's `excluded_groups`, `excluded_categories` and `excluded_accounts`, a
+credit's `excluded_fringes` and a transaction's `tags` are sets; a fringe's `kind` is
+`"percent"` or `"flat"` with `cutoff`, `unit`, `basis` and `max_hours_per_day` as
+separate fields; a charge's `kind` is `"percent"` (with `percent`) or `"flat"` (with
+`amount` and `currency`); a credit row's `source` is `"flat"` (`amount`), `"group"`
+(`group`) or `"category"` (`category`) and its `cap_kind` is `"none"`,
+`"qualified_spend"` or `"credit"` (with `cap`); a version has `id`, `name`, `created`,
+`note` and `content`; a global's info (`description`, `unit`, `decimals`,
+`show_by_name`, `folder`) sits on the global itself. The budget's settings and tools are
+fields of `root`: `title`, `base_currency`, `totals_currency`, `fringe_posting`,
+`trailing_level_fringes`, `cutoff_factor`, `fringe_row`, `arithmetic`, `account_coding`,
+`new_line_defaults`, `group_rules`, `display`, `compact_versions`, `report_presets`,
+`tag_presets`, `line_presets`, `setup_order`, `setup_folders`, `setup_sources`,
+`ot_patterns` and `baseline`. The provenance is about one file and is not logged.
+
+### Reading rules
+
+1. Apply changes in causal order: a change waits until `seq - 1` of its actor and
+   everything in `deps` has been applied. The result does not depend on the order
+   changes arrive in.
+2. A change that names an entity that doesn't exist, puts an entity in a list its kind
+   can't be in, or hangs a position on a missing one is refused whole, listed for the
+   owner, and the actor's count moves past it.
+3. A second change with the same `(actor, seq)` and different content is a fork: the
+   first stays, the second is refused.
+4. The budget is a pure function of the applied changes, with these repairs made on the
+   way out and never written back: two live rows with one id (the later shows with an id
+   derived from its creating op, in the shared range `[2^32, 2^53)`); two live items of
+   one kind with one name (identical ones are one item; otherwise the later shows as
+   `"Name 2"`); a deleted item still used by a live one, or a deleted account or
+   category still holding a live one, is kept; account numbers and global cycles are kept
+   as written and flagged.
+
+### Versioning
+
+The log format has its own `version` in `budget.json` and in every segment header, with
+the same rules as the `.mthd`: additive changes (a new op field, a new kind, a new value
+type) keep the version and are left out when unused; breaking changes raise it, and
+readers refuse a newer version with a message to update.
+
+- **Version 1** (2026-10): first form, unsigned.

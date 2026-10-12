@@ -409,6 +409,27 @@ it, and undoable within the session. It runs until stdin closes; logs go to stde
 it with `claude mcp add method -- method mcp --root ~/Budgets`. The tools, the safety model
 and the limits are in docs/MCP.md.
 
+### `method log <file.mthd> [--init] [--last N] [--json]`
+
+The budget's change log, the folder `<file.mthd>-log/` beside it (docs/FORMAT.md, "The
+change log"; decisions.md, entry 62): the budget id, every actor (computer) with how many
+changes it made and its last one, changes waiting for ones that haven't arrived or
+refused, what to review after a merge (a value two people changed at once, a deleted item
+still in use, two items with one name...), and the last N changes (10) with their actor,
+time, label and operations. `--init` starts the log: the file as it is becomes the first
+change, by this computer. `--json` prints one JSON object. This computer's actor id lives
+in `~/.method/actor` (or `$METHOD_ACTOR_FILE`), made on first use.
+
+### `method sync <file.mthd|FOLDER> [--no-write] [--roll]`
+
+Merges a shared budget: reads every actor's segments, records an outside edit to the
+`.mthd` (a save by a program that doesn't write the log, such as `method set`) as a change
+by this computer, writes this computer's unwritten changes as a sealed segment, and writes
+the merged budget back as the `.mthd`, which is the keeper's job (collaboration design,
+4.3). With a folder, every `.mthd` in it that has a log beside it. `--no-write` merges and
+reports without rewriting the `.mthd`; `--roll` joins this computer's segment files into
+one. Prints what it did and what to review; exit 1 when a budget could not be merged.
+
 ## Edit scripts
 
 `method apply` reads one command per line (UTF-8; a byte order mark at the start is
