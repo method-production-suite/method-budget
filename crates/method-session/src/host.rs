@@ -34,7 +34,11 @@ use crate::edit::{
 use crate::session::Session;
 use crate::view::View;
 
+mod b64;
 mod versions;
+
+/// A file's bytes as the contract's JSON carries them (base64).
+pub use b64::{decode as b64_decode, encode as b64_encode};
 
 /// The command contract's version (see the module's notes).
 pub const COMMANDS_VERSION: u32 = 1;
@@ -177,19 +181,23 @@ pub struct Host {
 
 /// A file the person picked, as a host hands it in where the desktop shows
 /// an Open dialog: the command of the same name takes it as `file`. The
-/// name is only shown (no path).
+/// name is only shown (no path); the bytes are one base64 string in the
+/// JSON ([`b64_encode`]).
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct FileIn {
     pub name: String,
+    #[serde(with = "b64")]
     pub bytes: Vec<u8>,
 }
 
 /// A file for the person to keep, where the desktop shows a Save dialog
 /// and writes it: the host's command of the same name gives it back, and
-/// the host offers it as a download under `name`.
+/// the host offers it as a download under `name`. The bytes are one
+/// base64 string in the JSON.
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct FileOut {
     pub name: String,
+    #[serde(with = "b64")]
     pub bytes: Vec<u8>,
 }
 
