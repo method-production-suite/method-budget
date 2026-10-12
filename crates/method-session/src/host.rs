@@ -37,6 +37,7 @@ use crate::view::View;
 mod coa_import;
 mod export_import;
 mod import_setup;
+mod open_any;
 mod sheet_import;
 mod templates;
 mod versions;
@@ -145,6 +146,8 @@ pub const COMMANDS: &[&str] = &[
     "export_import_pick",
     "export_import_preview",
     "export_import",
+    // Open
+    "open_budget",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -497,6 +500,7 @@ const MODULES: &[Dispatch] = &[
     sheet_import::dispatch,
     coa_import::dispatch,
     export_import::dispatch,
+    open_any::dispatch,
 ];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
@@ -897,7 +901,7 @@ mod tests {
             );
         }
         assert!(matches!(
-            h.dispatch("open_budget", json!({})),
+            h.dispatch("open_recent", json!({})),
             Err(Error::UnknownCommand(_))
         ));
         let mut seen = std::collections::BTreeSet::new();

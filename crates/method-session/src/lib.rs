@@ -22,6 +22,7 @@ pub mod export_import;
 pub mod history;
 pub mod host;
 pub mod import_setup;
+pub mod open_any;
 pub mod report_dto;
 pub mod safety;
 pub mod session;
