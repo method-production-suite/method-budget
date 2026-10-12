@@ -73,7 +73,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "REPLACE-WITH-THE-RELEASE-PUBLIC-KEY",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENDRDI2QTg5ODlERkJCQTYKUldTbXU5K0ppV3JTekFLRFg2TUV3UDFZTnJYb3RTakhoSDhMbHk0U0pFQWdrRlU0aVUxRktZdG4K",
       "endpoints": [
         "https://github.com/ssandweiss/method-budget/releases/latest/download/latest.json"
       ]
