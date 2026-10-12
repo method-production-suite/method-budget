@@ -1,18 +1,22 @@
-{"metadata": {"budgetdata": {"BudgetName": "", "BudgetUUID": "00000000-0000-0000-0000-000000000000", "ProjectName": "", "ProjectUUID": "", "Created": "2001-01-01", "Modified": "", "BaseCurrency": "USD", "ConvCurrency": "USD", "CategoryCount": 1, "DetailAccountCount": 2, "DetailLineCount": 5, "FringeCount": 1, "GlobalCount": 0, "UnitCount": 6, "LocationCount": 0, "SetCount": 0, "CurrencyCount": 1}, "defaultfields": {"Title": "Whole units"}, "customfields": []},
+{"metadata": {"budgetdata": {"BudgetName": "", "BudgetUUID": "00000000-0000-0000-0000-000000000000", "ProjectName": "", "ProjectUUID": "", "Created": "2001-01-01", "Modified": "", "BaseCurrency": "USD", "ConvCurrency": "USD", "CategoryCount": 1, "DetailAccountCount": 3, "DetailLineCount": 7, "FringeCount": 1, "GlobalCount": 0, "UnitCount": 6, "LocationCount": 0, "SetCount": 0, "CurrencyCount": 1}, "defaultfields": {"Title": "Whole units"}, "customfields": []},
  "categories": [
-  {"cID": 0, "cNumber": "3100", "cDescription": "Cat Whole", "cFringe": 24.88, "cOriginal": 0, "cTotal": 501.0, "cVariance": 501.0},
+  {"cID": 0, "cNumber": "3100", "cDescription": "Cat Whole", "cFringe": 24.88, "cOriginal": 0, "cTotal": 702.0, "cVariance": 702.0},
   {"cID": 1, "cNumber": "", "cDescription": "", "cFringe": 0, "cOriginal": 0, "cTotal": 0, "cVariance": 0},
-  {"cID": 2, "cNumber": "", "cDescription": "Total Fringes", "cFringe": null, "cOriginal": 0, "cTotal": 24.88, "cVariance": 24.88, "fringeDetail": [{"type": "pctFringe", "name": "QFICA", "rate": 6.2, "amount": 401.25, "total": 24.8775}]}
+  {"cID": 2, "cNumber": "", "cDescription": "Total Fringes", "cFringe": null, "cOriginal": 0, "cTotal": 24.88, "cVariance": 24.88, "fringeDetail": [{"type": "pctFringe", "name": "QFICA", "rate": 6.2, "amount": 401.25, "total": 24.8775}]},
+  {"cID": 3, "cNumber": "9800-00", "cDescription": "Contingency Q : 10%", "cFringe": null, "cOriginal": 0, "cTotal": 72.69, "cVariance": 72.69}
  ],
  "accounts": [
   {"categoryID": 0, "aID": 0, "aNumber": "3101", "aDescription": "Acct Cents", "aFringe": 24.88, "aOriginal": 0, "aTotal": 401.0, "aVariance": 401.0},
-  {"categoryID": 0, "aID": 1, "aNumber": "3102", "aDescription": "Acct Round", "aFringe": 0.0, "aOriginal": 0, "aTotal": 100.0, "aVariance": 100.0}
+  {"categoryID": 0, "aID": 1, "aNumber": "3102", "aDescription": "Acct Round", "aFringe": 0.0, "aOriginal": 0, "aTotal": 100.0, "aVariance": 100.0},
+  {"categoryID": 0, "aID": 2, "aNumber": "3103", "aDescription": "Acct Half", "aFringe": 0.0, "aOriginal": 0, "aTotal": 201.0, "aVariance": 201.0}
  ],
  "details": [
   {"accountID": 0, "dAggPercent": "6.2%", "dAggSumPercent": "6.2%", "dFringes": ["QFICA"], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "Shoot", "dAmount": 3, "dUnit": "Days", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 100.25, "dUnit3": "", "dUnit4": "", "dSubtotal": 300.75, "dFourthMlt": 1},
   {"accountID": 0, "dAggPercent": "6.2%", "dAggSumPercent": "6.2%", "dFringes": ["QFICA"], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "Wrap", "dAmount": 1, "dUnit": "Day", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 100.5, "dUnit3": "", "dUnit4": "", "dSubtotal": 100.5, "dFourthMlt": 1},
   {"accountID": 0, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1},
   {"accountID": 1, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "Kit", "dAmount": 2, "dUnit": "Weeks", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 50, "dUnit3": "", "dUnit4": "", "dSubtotal": 100.0, "dFourthMlt": 1},
-  {"accountID": 1, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1}
+  {"accountID": 1, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1},
+  {"accountID": 2, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "Hire", "dAmount": 1, "dUnit": "Allow", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 200.5, "dUnit3": "", "dUnit4": "", "dSubtotal": 200.5, "dFourthMlt": 1},
+  {"accountID": 2, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1}
  ]
 }

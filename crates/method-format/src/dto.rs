@@ -195,6 +195,8 @@ pub(crate) struct FileBudget {
     fringe_row: Option<FileFringeRow>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     arithmetic: Option<FileArithmetic>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    round_account_totals: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     new_line_defaults: Option<FileNewLineDefaults>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -266,6 +268,7 @@ impl From<&Budget> for FileBudget {
             cutoff_factor,
             fringe_row,
             arithmetic,
+            round_account_totals,
             account_coding,
             new_line_defaults,
             groups,
@@ -310,6 +313,8 @@ impl From<&Budget> for FileBudget {
             // don't say.
             arithmetic: (*arithmetic != Arithmetic::default())
                 .then(|| FileArithmetic::from(*arithmetic)),
+            // Off is the default, also for files that don't say.
+            round_account_totals: *round_account_totals,
             new_line_defaults: (*new_line_defaults != NewLineDefaults::default())
                 .then(|| FileNewLineDefaults::from(new_line_defaults)),
             info: map(info, FileInfo::from),
@@ -389,6 +394,7 @@ impl From<FileBudget> for Budget {
             cutoff_factor: f.cutoff_factor.map(|c| c.0).unwrap_or_default(),
             fringe_row: f.fringe_row.map(FringeRow::from).unwrap_or_default(),
             arithmetic: f.arithmetic.map(Arithmetic::from).unwrap_or_default(),
+            round_account_totals: f.round_account_totals,
             account_coding: f
                 .account_coding
                 .map(AccountCoding::from)

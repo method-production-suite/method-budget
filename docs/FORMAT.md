@@ -114,6 +114,7 @@ Fields in written order:
 | `cutoff_factor`   | `"1.0"`, `"1.5"`, `"2.0"`, `"2.5"` or `"3.0"` | What every percent fringe's cutoff is multiplied by (see [cutoff factor](#cutoff-factor)). Left out when `"1.0"`, which is also what a missing field means. |
 | `fringe_row`      | [fringe row](#fringe-row) | The account number, description and place of the budget's one fringe row (fringes posted by budget). Left out when every field is the default. |
 | `arithmetic`      | `"binary"` or `"exact"` | How totals are worked out (see [arithmetic](#arithmetic)). Left out when `"binary"`, which is also what a missing `arithmetic` means. |
+| `round_account_totals` | `true` or `false` | Round every account's total to a whole unit and work out everything above accounts from the rounded totals (see [account totals](#account-totals)). Default `false`, left out then. |
 | `new_line_defaults` | [new-line defaults](#new-line-defaults) | Left out when it is the default (copy fringes only). |
 | `info`            | map of [info values](#info-value) | Budget information fields, keyed by label. |
 | `currencies`      | map of [currencies](#currency) | Foreign currencies, keyed by code. |
@@ -235,6 +236,20 @@ a [version](#version) keeps its own.
 
 Either way, account, category, level and grand totals are integer sums of the rounded
 cents, and credit rows are added up before the credit's one rounding.
+
+### Account totals
+
+`round_account_totals` (`docs/decisions.md`, entry 69), as the "Decimal Places in Totals"
+setting of industry-standard budgeting software works at 0: when `true`, each account's
+lines total is rounded to the nearest whole unit (3,426.50 is 3,427.00), and categories,
+production levels, the total before charges, a percent charge, the grand total and the net
+total are worked out from the rounded accounts. Lines, fringes (on lines, accounts,
+categories and the budget's fringe row), a charge's excluded lines and a credit's spend
+keep their cents. Under fringe posting by account, an account's total is its rounded
+lines plus its fringes. A half rounds up in `"binary"` [arithmetic](#arithmetic) and away
+from zero in `"exact"`; the two differ only on a negative half (-50.50 is -50.00 or
+-51.00). Default `false` (nothing is rounded beyond cents), also for files without the
+field. A budget setting; a [version](#version) keeps its own.
 
 ### New-line defaults
 
@@ -1224,6 +1239,9 @@ valid. Loading and saving it in Method Budget normalizes it.
   budgets start with different settings (posting by budget, set width 3, a 12-hour Day,
   60-hour Week and 240-hour Month), all written in the file; a file without those fields
   reads exactly as before, so existing files are unchanged.
+- Version 1, additive (2026-10): budget [`round_account_totals`](#account-totals)
+  (decisions.md, entry 69), left out when `false`, which is what files without it mean,
+  so existing files are unchanged.
 - Version 1, additive (2026-10): credit row source kind `"account"`, currency
   `symbol_after` and `separators`, and baseline `frozen` (decisions.md, entry 61), each
   left out at its default, so files that don't use them are unchanged. New budgets'
@@ -1513,7 +1531,8 @@ fields of `root`: `title`, `base_currency`, `totals_currency`, `fringe_posting`,
 `trailing_level_fringes`, `cutoff_factor`, `fringe_row`, `arithmetic`, `account_coding`,
 `new_line_defaults`, `group_rules`, `display`, `compact_versions`, `report_presets`,
 `tag_presets`, `line_presets`, `setup_order`, `setup_folders`, `setup_sources`,
-`ot_patterns` and `baseline`. The provenance is about one file and is not logged.
+`ot_patterns`, `baseline` and `round_account_totals` (always written; a log from before
+reads as `false`). The provenance is about one file and is not logged.
 
 ### Reading rules
 

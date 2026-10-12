@@ -1023,6 +1023,17 @@ fn category_credit_rows_and_group_rules() {
 /// Rounding and the fringes after the last production total are one
 /// command each, one undo step, and saved only when not the default.
 #[test]
+fn round_account_totals_setting() {
+    let mut s = session();
+    assert!(view(&mut s)["budget"].get("round_account_totals").is_none());
+    one_step(&mut s, |b| edit::set_round_account_totals(b, true));
+    assert_eq!(view(&mut s)["budget"]["round_account_totals"], true);
+    assert!(s.budget().round_account_totals);
+    one_step(&mut s, |b| edit::set_round_account_totals(b, false));
+    assert!(view(&mut s)["budget"].get("round_account_totals").is_none());
+}
+
+#[test]
 fn arithmetic_and_trailing_level_fringes() {
     let mut s = session();
     let v0 = view(&mut s);

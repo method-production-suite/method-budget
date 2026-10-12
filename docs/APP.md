@@ -517,7 +517,10 @@ in this window's local storage, and blank signs nothing. Every change is one und
 numbers, what new lines copy, numbers on screen; the base and totals currency are the
 Currency tab's band) and the baseline, as in the setup tabs
 before. Settings > Calculation sets the rounding (Spreadsheet (binary), the default, or
-Exact decimal), the percent fringe cutoff factor (1.0, the default, 1.5, 2.0, 2.5 or 3.0:
+Exact decimal), **Round account totals to whole units** (off by default: each account's
+total is rounded to the nearest whole unit and categories, charges and the grand and net
+totals add up the rounded accounts; lines and fringes keep their cents; decision 69), the
+percent fringe cutoff factor (1.0, the default, 1.5, 2.0, 2.5 or 3.0:
 every percent fringe's cutoff is multiplied by it) and whether the fringes of categories
 after the last production total are kept or dropped; each change is one undo step. With
 fringes posted by budget, Settings > Fringe totals also has the fringe row's number,
@@ -769,7 +772,8 @@ The setup lists' counts, order and short codes, in `src/setup_lists.rs` (both wi
 The group rules are one command, `set_group_rule` (`rule`: `ungrouped_lines`, `conflict`
 or `fringes_in_totals`; `value`: `include` or `exclude`; returns the View), one undo
 step each. The cutoff factor is `set_cutoff_factor` (`value`: `1.0`, `1.5`, `2.0`, `2.5`
-or `3.0`), and the budget's fringe row `set_fringe_row` (`row`: `{account, description,
+or `3.0`), account totals in whole units `set_round_account_totals` (`value`: `true` or
+`false`), and the budget's fringe row `set_fringe_row` (`row`: `{account, description,
 position}`; blank text is none or the default description, `position` `null` or a
 topsheet row from 0 up to the number of rows); each returns the View and is one undo
 step. `set_credit`'s rows take a `source` of `{kind: "category", category}` or `{kind:

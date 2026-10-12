@@ -56,6 +56,7 @@ const COMMANDS: &[&str] = &[
     "set_arithmetic",
     "set_trailing_level_fringes",
     "set_cutoff_factor",
+    "set_round_account_totals",
     "set_fringe_row",
     "set_account_coding",
     "set_totals_currency",

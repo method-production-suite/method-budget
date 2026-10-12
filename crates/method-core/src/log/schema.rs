@@ -207,6 +207,10 @@ pub fn encode_root(b: &Budget) -> Record {
         .put(Field::CutoffFactor, Value::text(b.cutoff_factor.name()))
         .put(Field::FringeRow, Value::FringeRow(b.fringe_row.clone()))
         .put(Field::Arithmetic, Value::text(b.arithmetic.name()))
+        .put(
+            Field::RoundAccountTotals,
+            Value::Bool(b.round_account_totals),
+        )
         .put(Field::AccountCoding, Value::Coding(b.account_coding))
         .put(
             Field::NewLineDefaults,
@@ -261,6 +265,7 @@ pub fn decode_root(e: &Entity, b: &mut Budget) {
         b.fringe_row = f.clone();
     }
     b.arithmetic = Arithmetic::parse(&text(g(Field::Arithmetic))).unwrap_or_default();
+    b.round_account_totals = boolean(g(Field::RoundAccountTotals));
     if let Some(Value::Coding(c)) = g(Field::AccountCoding) {
         b.account_coding = *c;
     }

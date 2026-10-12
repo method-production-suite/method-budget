@@ -4,7 +4,8 @@ Status: private research notes. Last reconciled 2026-10-11 against engine `main`
 then updated for decision 60 (new-budget defaults, cutoff factor, totals currency, topsheet
 order, fringe row, global units, formula entry) and for decision 61 with parity run 2 of
 2026-10-12 (new-budget separator, account credit rows, fringe account numbers, the full
-fringe percent, frozen original totals, currency formats).
+fringe percent, frozen original totals, currency formats), and for decision 69 (account
+totals in whole units, percent charges from an export).
 
 One row per feature of Movie Magic Budgeting 10 (MMB, 10.35.7) that we track, mapped to where
 Method Budget has it and how we know it matches. It reconciles five sources:
@@ -84,8 +85,8 @@ Counts of rows per status, per section.
 | 21 Import and export formats | 0 | 5 | 0 | 2 | 1 | 0 | 8 |
 | 22 Rounding and number display | 4 | 2 | 1 | 0 | 0 | 1 | 8 |
 | 24 Competitor features MMB lacks | 0 | 4 | 0 | 4 | 3 | 0 | 11 |
-| F MMB behavior facts | 15 | 8 | 3 | 0 | 0 | 3 | 29 |
-| **Total** | **145** | **114** | **19** | **16** | **10** | **10** | **314** |
+| F MMB behavior facts | 16 | 8 | 3 | 0 | 0 | 3 | 30 |
+| **Total** | **146** | **114** | **19** | **16** | **10** | **10** | **315** |
 
 Section 23 (calculation quirks) has no rows of its own: each quirk is a row in the section it
 belongs to. Section 19 is informational in the inventory; only its concrete screens are listed.
@@ -469,7 +470,7 @@ belongs to. Section 19 is informational in the inventory; only its concrete scre
 |---|---|---|---|---|---|
 | Rounding points: each line once; rollups are sums of rounded cents | v1 | Verified | D2, D55, EC 11 | ZTEST01 grand 10,000,010,005,314.61 | none |
 | Half-up on the double (1.005 is 1.00) | v1 | Verified | D55 | LM-14, LM-17, LM-18, F-19 | none |
-| Totals with or without cents | v1 | Differs by choice | 2.18 (View menu), D60 | MMB System Prefs default 0 decimals (C2) | Owner: totals keep showing cents (D60) |
+| Totals with or without cents | v1 | Differs by choice | 2.18 (View menu), D60, D69 | MMB System Prefs default 0 decimals (C2); at 0 it is not display only: account totals are rounded and everything above adds them up (STG exports at 0 and 2, 2026-10-12) | Owner: totals keep showing cents (D60). The calculation is a budget setting, `round_account_totals`, off by default (D69); MMB's preference is machine-wide |
 | Rate display band (decimals below and above a cutoff) | later | Built | 2.18, display `rate_cutoff` | MMB default cutoff blank (C2) | none |
 | Global display decimals | later | Built | 2.10 | MMB shows 0 dp for a whole-number global rate (parity B) | none |
 | Shown values are decimals even in binary arithmetic | v1 | Verified | D55 | ZTEST01 LM-23 Amt 1/3 | none |
@@ -501,7 +502,8 @@ we stand against each.
 |---|---|---|---|---|---|
 | New budgets post fringes by Budget | v1 | Verified | D60, `starter::new_budget_settings` | C2, ZTEST06 | none (a file without the field still reads by category) |
 | New budgets: cutoff factor 1.0, copy Fringe from line above on, Lock Original Totals off | v1 | Verified | 1.4, D29, D60 | C2 | none |
-| Decimal places in totals defaults to 0 (whole units) | v1 | Differs by choice | 2.18, D60 | C2 | Owner: keep cents |
+| Decimal places in totals defaults to 0 (whole units) | v1 | Differs by choice | 2.18, D60, D69 | C2; STG at 0 and 2 | Owner: keep cents (D60, chosen as display only). At 0, MMB rounds account totals (D69): new budgets keep it off; open for the owner |
+| Account totals in whole units (Decimal Places in Totals 0) | v1 | Verified | D69, FORMAT `round_account_totals`, Settings > Calculation | STG export at 0: 356 accounts, 3,426.50 to 3,427.00, grand 5,874,815.47, net 4,474,880.32; at 2: 5,874,822.45, 4,474,887.30 | Negative half and fringe posting by account not read (chosen) |
 | Unit hours must be whole numbers; 0 shows blank and means no hours | v1 | Built | FORMAT unit `hours` | ZTEST05 | Ours accepts decimals (superset, no decision); 0 behaves the same (Verified F-24) |
 | Set codes are 1 to 3 characters | v1 | Built | FORMAT set | ZTEST07 | Ours has no limit (superset, no decision) |
 | A fringe rate can't be a global; rate 0 refused | v1 | Built | FORMAT fringe `rate` | ZTEST04 | Ours allows both (superset, no decision) |

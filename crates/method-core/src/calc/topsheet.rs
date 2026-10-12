@@ -426,9 +426,11 @@ fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals
                 let mut gross: Cents = 0;
                 let mut ex: Cents = 0;
                 if let Some(cat) = cats.iter().find(|c| c.code == *category) {
-                    gross = cat
-                        .details_total
-                        .checked_add(cat.fringe_total)
+                    // Its lines as they are, not rounded to whole units
+                    // (decisions.md, entry 69).
+                    let lines = sum(cat.accounts.iter().flat_map(|a| &a.rows).map(|r| r.total));
+                    gross = lines
+                        .and_then(|l| l.checked_add(cat.fringe_total))
                         .ok_or_else(row_ovf)?;
                     let rows = cat.accounts.iter().flat_map(|a| &a.rows);
                     for (name, amt) in rows.flat_map(|r| &r.fringes) {
@@ -452,9 +454,8 @@ fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals
                     .flat_map(|c| &c.accounts)
                     .find(|a| a.code == *account);
                 if let Some(a) = found {
-                    gross = a
-                        .details_total
-                        .checked_add(a.fringe_total)
+                    gross = sum(a.rows.iter().map(|r| r.total))
+                        .and_then(|l| l.checked_add(a.fringe_total))
                         .ok_or_else(row_ovf)?;
                     for (name, amt) in a.rows.iter().flat_map(|r| &r.fringes) {
                         if c.excluded_fringes.contains(name) {

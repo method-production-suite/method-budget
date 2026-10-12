@@ -863,6 +863,13 @@ pub fn set_arithmetic(b: &mut Budget, value: &str) -> EditResult {
     Ok(())
 }
 
+/// Turns rounding account totals to whole units on or off (decisions.md,
+/// entry 69).
+pub fn set_round_account_totals(b: &mut Budget, on: bool) -> EditResult {
+    b.round_account_totals = on;
+    Ok(())
+}
+
 /// Sets what every percent fringe's cutoff is multiplied by (decisions.md,
 /// entry 60): `1.0`, `1.5`, `2.0`, `2.5` or `3.0`.
 pub fn set_cutoff_factor(b: &mut Budget, value: &str) -> EditResult {

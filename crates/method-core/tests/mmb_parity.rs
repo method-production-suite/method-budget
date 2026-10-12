@@ -2616,3 +2616,105 @@ fn r2_07_category_fringe_accounts_take_the_category_part() {
         assert_eq!(r.categories[0].fringe_account.as_ref().unwrap().0, "1199");
     }
 }
+
+/// Account totals in whole units (decisions.md, entry 69; the reference's
+/// "Decimal Places in Totals" at 0, read on a feature budget's exports at
+/// 0 and 2 places, 2026-10-12): each account's lines total is rounded to
+/// the nearest whole unit (3,426.50 is 3,427.00, as the export shows), and
+/// categories, the total before charges, a percent charge and the grand
+/// and net totals are worked out from the rounded accounts; lines, fringes
+/// and a credit on a category row keep their cents. Exact arithmetic
+/// rounds a negative half away from zero, binary toward plus infinity.
+#[test]
+fn account_totals_in_whole_units() {
+    fn whole(arith: Arithmetic, round: bool, posting: FringePosting) -> Budget {
+        let mut lead = Detail::line(1, "Lead", "1", "", "3426.50");
+        lead.fringes = set(&["ZFICA"]);
+        let mut b = budget(
+            arith,
+            vec![category(
+                "1100",
+                "Z whole",
+                vec![
+                    account("1101", "Z half", vec![lead]),
+                    account(
+                        "1102",
+                        "Z up",
+                        vec![Detail::line(2, "Kit", "1", "", "1975.70")],
+                    ),
+                    account(
+                        "1103",
+                        "Z down",
+                        vec![Detail::line(3, "Fee", "1", "", "100.25")],
+                    ),
+                    account(
+                        "1104",
+                        "Z refund",
+                        vec![Detail::line(4, "Back", "-1", "", "50.50")],
+                    ),
+                ],
+            )],
+        );
+        b.fringe_posting = posting;
+        b.round_account_totals = round;
+        b.fringes.insert("ZFICA".into(), percent("6.2", None));
+        b.charges.push(percent_charge("ZCONT", "10"));
+        b.credits.push(credit(
+            "ZCREDIT",
+            vec![credit_row(on_category("1100"), "10", CreditCap::None)],
+        ));
+        b
+    }
+    for arith in Arithmetic::ALL {
+        let (rows, r) = totals(&whole(arith, true, FringePosting::Budget));
+        // Lines and fringes keep their cents.
+        assert_eq!(rows[&1], 342_650);
+        assert_eq!(r.budget_fringes, 21_244);
+        let accts: Vec<Cents> = r.categories[0].accounts.iter().map(|a| a.total).collect();
+        let refund = match arith {
+            Arithmetic::Mmb => -5_000,
+            Arithmetic::Exact => -5_100,
+        };
+        assert_eq!(accts, [342_700, 197_600, 10_000, refund], "{arith:?}");
+        let cat = 342_700 + 197_600 + 10_000 + refund;
+        assert_eq!(r.categories[0].total, cat);
+        // 10% of the rounded total before charges.
+        let base = cat + 21_244;
+        let charge = match arith {
+            Arithmetic::Mmb => 56_654,
+            Arithmetic::Exact => 56_644,
+        };
+        assert_eq!(r.charges[0].base, base);
+        assert_eq!(r.charges[0].amount, charge, "{arith:?}");
+        assert_eq!(r.grand_total, base + charge);
+        // The credit's category row counts the lines as they are:
+        // 5,451.95 + 212.44, 10% of it 566.439.
+        assert_eq!(r.credits[0].rows[0].gross, 566_439);
+        assert_eq!(r.credits[0].amount, 56_644);
+        assert_eq!(r.net_total, base + charge - 56_644);
+
+        // Off, nothing is rounded: 5,451.95 + 212.44 = 5,664.39, 566.44.
+        let (_, off) = totals(&whole(arith, false, FringePosting::Budget));
+        assert_eq!(off.categories[0].total, 545_195);
+        assert_eq!(off.grand_total, 566_439 + 56_644);
+
+        // Posted by account, the fringes add to the rounded lines.
+        let (_, by_account) = totals(&whole(arith, true, FringePosting::Account));
+        assert_eq!(by_account.categories[0].accounts[0].total, 342_700 + 21_244);
+
+        // Explain shows the step.
+        let b = whole(arith, true, FringePosting::Budget);
+        let e = Explainer::new(&b, &RecalcOptions::default())
+            .unwrap()
+            .explain(&Target::AccountLines { ci: 0, ai: 0 })
+            .unwrap();
+        let text = e.to_text(None);
+        assert!(
+            text.contains(
+                "the budget rounds account totals to whole units: the lines come to 3,426.50"
+            ),
+            "{text}"
+        );
+        assert_eq!(e.reported, 342_700);
+    }
+}

@@ -1907,9 +1907,10 @@ function fringeRowRows(fk) {
   ];
 }
 
-// How totals are worked out (budget settings): rounding, the percent fringe
-// cutoff factor and the fringes of categories after the last production
-// total. The file leaves out each at its default (binary, 1.0, keep).
+// How totals are worked out (budget settings): rounding, account totals in
+// whole units, the percent fringe cutoff factor and the fringes of
+// categories after the last production total. The file leaves out each at
+// its default (binary, off, 1.0, keep).
 function calculationGroup() {
   const b = k.budget();
   const ck = k.key('settings', 'calculation');
@@ -1944,6 +1945,10 @@ function calculationGroup() {
     options: factors.map((f) => [f, f]),
     onCommit: (v, old) => k.run(ck, () => ['set_cutoff_factor', { value: v }], { restore: [k.key('settings', 'cutoff_factor'), old] }),
   });
+  const wholeKey = k.key('settings', 'round_account_totals');
+  const whole = checkbox(wholeKey, b.round_account_totals === true, 'Round account totals to whole units', (on) =>
+    k.run(ck, () => ['set_round_account_totals', { value: on }], { restore: [wholeKey, !on] }),
+  );
   arithSel.classList.add('ts-w-m');
   trailingSel.classList.add('ts-w-s');
   factorSel.classList.add('ts-w-xs');
@@ -1952,6 +1957,10 @@ function calculationGroup() {
     tsRow('Rounding', [arithSel], {
       hint: '1 x 1.005: 1.00 binary, 1.01 exact.',
       tip: 'Spreadsheet rounding works in binary numbers, so 1 x 1.005 is 1.00; exact decimal makes it 1.01.',
+    }),
+    tsRow('Account totals', [whole], {
+      hint: 'Categories and the grand total add up the rounded accounts.',
+      tip: 'Each account’s total is rounded to the nearest whole unit (3,426.50 is 3,427.00), and categories, levels, charges and the grand and net totals are worked out from the rounded accounts. Lines and fringes keep their cents.',
     }),
     tsRow('Percent fringe cutoff factor', [factorSel], {
       hint: 'Multiplies every percent fringe’s cutoff.',

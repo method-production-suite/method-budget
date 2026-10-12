@@ -922,6 +922,14 @@ pub(crate) fn arithmetic_text(a: &Arithmetic) -> String {
     }
 }
 
+pub(crate) fn account_totals_text(round: &bool) -> String {
+    if *round {
+        "account totals rounded to whole units".into()
+    } else {
+        "account totals in cents".into()
+    }
+}
+
 pub(crate) fn cutoff_factor_text(f: &CutoffFactor) -> String {
     format!("percent fringe cutoffs x {}", f.name())
 }
@@ -1019,6 +1027,11 @@ pub(crate) fn setting_fields(b: &Budget) -> Vec<Field> {
         ),
         text("fringe_row", "fringe row", fringe_row_text(&b.fringe_row)),
         text("arithmetic", "arithmetic", arithmetic_text(&b.arithmetic)),
+        text(
+            "round_account_totals",
+            "account totals",
+            account_totals_text(&b.round_account_totals),
+        ),
         text(
             "group_rules",
             "group rules",

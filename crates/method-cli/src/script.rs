@@ -8,6 +8,7 @@
 //! set title "Feature, draft 3"
 //! set compact_versions true
 //! set arithmetic exact
+//! set round_account_totals true
 //! set trailing_level_fringes drop
 //! set cutoff_factor 1.5
 //! set fringe_row account 9900
@@ -201,6 +202,9 @@ pub enum Op {
     CompactVersions(bool),
     /// How totals are worked out (docs/FORMAT.md, "Budget").
     Arithmetic(Arithmetic),
+    /// Round account totals to whole units (docs/FORMAT.md, "Account
+    /// totals").
+    RoundAccountTotals(bool),
     /// Under production-level posting, keep or drop the fringes of
     /// categories after the last production total (docs/FORMAT.md, "Budget").
     TrailingLevelFringes(TrailingFringes),
@@ -324,6 +328,10 @@ pub fn parse(line: &str) -> Result<Option<Op>, String> {
         ["set", "arithmetic"] => {
             let w = need(&w, 3, "set arithmetic binary|exact")?;
             Op::Arithmetic(arithmetic(&w[2].text)?)
+        }
+        ["set", "round_account_totals"] => {
+            let w = need(&w, 3, "set round_account_totals true|false")?;
+            Op::RoundAccountTotals(flag(&w[2])?)
         }
         ["set", "trailing_level_fringes"] => {
             let w = need(&w, 3, "set trailing_level_fringes keep|drop")?;
@@ -779,6 +787,13 @@ pub fn apply(b: &mut Budget, op: &Op) -> Result<Vec<String>, String> {
             ));
             b.arithmetic = *a;
         }
+        Op::RoundAccountTotals(on) => {
+            log.push(format!(
+                "round_account_totals {} -> {on}",
+                b.round_account_totals
+            ));
+            b.round_account_totals = *on;
+        }
         Op::TrailingLevelFringes(t) => {
             log.push(format!(
                 "trailing_level_fringes {} -> {}",
@@ -999,6 +1014,8 @@ mod tests {
             "set arithmetic exact",
             "set arithmetic binary",
             "set arithmetic mmb",
+            "set round_account_totals true",
+            "set round_account_totals off",
             "set trailing_level_fringes drop",
             "set trailing_level_fringes keep",
             "set cutoff_factor 1.5",

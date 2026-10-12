@@ -388,10 +388,12 @@ pub enum Field {
     // the fields above never changes.
     SymbolAfter,
     Separators,
+    // Added by entry 69, at the end for the same reason.
+    RoundAccountTotals,
 }
 
 impl Field {
-    pub const ALL: [Field; 94] = [
+    pub const ALL: [Field; 95] = [
         Field::Name,
         Field::Code,
         Field::Description,
@@ -486,6 +488,7 @@ impl Field {
         Field::Baseline,
         Field::SymbolAfter,
         Field::Separators,
+        Field::RoundAccountTotals,
     ];
 
     /// The name files use.
@@ -585,6 +588,7 @@ impl Field {
             Field::Baseline => "baseline",
             Field::SymbolAfter => "symbol_after",
             Field::Separators => "separators",
+            Field::RoundAccountTotals => "round_account_totals",
         }
     }
 

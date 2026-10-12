@@ -751,7 +751,30 @@ impl<'a> Explainer<'a> {
     /// and are left out).
     fn lines_step(&self, ci: usize, ai: usize) -> R<Step> {
         let calc = &self.accounts[ci][ai];
-        let children = calc.rows.iter().filter_map(|r| r.value.clone()).collect();
+        let mut children: Vec<Step> = calc.rows.iter().filter_map(|r| r.value.clone()).collect();
+        if self.b.round_account_totals {
+            let lines = calc
+                .rows
+                .iter()
+                .try_fold(0, |a: Cents, r| a.checked_add(r.total))
+                .ok_or_else(ovf)?;
+            let whole = super::arith::whole_units(self.b.arithmetic, lines).ok_or_else(ovf)?;
+            if whole != lines {
+                let rule = match self.b.arithmetic {
+                    Arithmetic::Mmb => "to the nearest whole unit, a half up",
+                    Arithmetic::Exact => "to the nearest whole unit, a half away from zero",
+                };
+                children.push(Step::value(
+                    "Rounding",
+                    format!(
+                        "the budget rounds account totals to whole units: the lines come to {}, which rounds {rule} to {}",
+                        money(lines),
+                        money(whole)
+                    ),
+                    whole.checked_sub(lines).ok_or_else(ovf)?,
+                ));
+            }
+        }
         Ok(Step::sum(
             "Lines",
             format!("every line of {}", self.account_name(ci, ai)),

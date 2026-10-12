@@ -154,6 +154,7 @@ fn eval_categories(ctx: &Ctx) -> Result<Vec<CategoryTotals>, CalcError> {
             let mut rows = lines::eval_rows(ctx, acct)?;
             apply_fringes(ctx, acct, &mut rows)?;
             let details_total = sum(rows.iter().map(|r| r.total)).ok_or_else(ovf)?;
+            let details_total = ctx.account_total(details_total).ok_or_else(ovf)?;
             let fringe_total = sum(rows.iter().map(|r| r.fringe_total)).ok_or_else(ovf)?;
             accounts.push(AccountTotals {
                 code: acct.code.clone(),

@@ -2072,7 +2072,8 @@ default, and keep our exact decimals (entries 1 and 2) as a setting per budget.*
   - Credit rows are added up unrounded, capped and discounted, then rounded once, as
     before, in doubles.
   - Accounts, categories, levels, the grand and net totals stay integer sums of the
-    rounded cents, so rollups always agree.
+    rounded cents, so rollups always agree. (A budget may round its account totals to
+    whole units first: entry 69.)
 - **Not checked, chosen**: where the order of operations could matter and no figure
   decided it, we multiply left to right as written above (percent: base x percent, then /
   100, since decided otherwise by entry 68; flat: count, then x rate; a capped flat count: Amount x line hours x hours a day /
@@ -2341,7 +2342,8 @@ five. docs/IMPORT.md is the user's account; this is why it works the way it does
   under production-level posting, where the fringe rows show the levels), suppressed lines
   (the exports omit them), and the rules of charges and credits (they come in as fixed
   amounts that give the same totals; a charge that is a round percentage of the total
-  before charges is pointed out).
+  before charges is pointed out; since entry 69 a simple percentage comes in as a percent
+  charge).
 - **The starter units' hours** are the reference product's (Day 12, Week 60, Hour 1, Month
   240, entry 54's checks), since the exports carry none and a budget made there starts with
   them; the note says so.
@@ -3024,7 +3026,7 @@ in the export's own figures (CLEAN-ROOM.md: the open export only).
   Weeks at a 0 rate with a 10.00 per Week fringe are charged (account 104-01). A line that
   would be charged once (no unit, or a unit without hours) counts 0 when its Amount is 0;
   Explain says "the Amount is 0: nothing counted". The `quantity` basis keeps its old rule.
-- **Account totals in whole units: not matched, pointed out.** Every account total in this
+- **Account totals in whole units: not matched, pointed out** (since matched: entry 69). Every account total in this
   export is its lines' total rounded to a whole dollar (all 356; categories add the rounded
   accounts; fringes, charges, credits and the grand total keep cents), so the exporting
   budget rounds account totals. We have no such setting; the import says so under Check
@@ -3055,3 +3057,90 @@ in the export's own figures (CLEAN-ROOM.md: the open export only).
   wrong) and `account_totals_in_whole_units_are_pointed_out` (whole-units.json);
   crates/method-core/tests/mmb_parity.rs `a_percent_fringe_takes_its_rate_as_a_fraction_first`
   and `a_flat_fringe_counts_nothing_on_an_amount_of_0`.
+
+## 69. Account totals in whole units, and percent charges from an export (2026-10-12)
+
+The reference product has a machine-wide preference, "Decimal Places in Totals" (0 or 2).
+Entry 60 took it for display only (the owner kept cents on screen). It is not: on the
+feature budget of entry 68, switching it from 0 to 2 in the reference moved the grand
+total from 5,874,815.47 to 5,874,822.45 and the net from 4,474,880.32 to 4,474,887.30 (read
+2026-10-12; the preference was restored). The budget was exported both ways (JSON; not in
+the repository) and the two files were compared figure by figure (CLEAN-ROOM.md: the open
+export only).
+
+- **What 0 does, from the two exports.** Every line, every account's fringes, every
+  category's fringes, the Total Fringes row (933,992.34) and the credit (-1,399,935.15) are
+  the same in both. 46 of 356 account totals differ: at 0 each is its lines' total rounded
+  to the nearest whole unit. One is a half, 3,426.50, which is 3,427.00 (so not half to
+  even; no negative half exists). 14 category totals differ: each is the sum of its
+  rounded accounts. The percent charge (contingency, 10%) is 534,074.13 at 0 and 534,074.77
+  at 2: 10% of a total before charges made of the rounded categories plus the fringe row.
+  The grand total is the rounded categories, the fringe row and that charge; the net total
+  the grand less the credit, which didn't move.
+- **The setting is ours per budget**: `round_account_totals` (FORMAT.md, "Account totals"),
+  off by default and left out of the file then, so every existing file reads as before.
+  The reference's preference is per machine; a budget file is the nearer place for us,
+  since its figures depend on it. Versions carry it, diff lists it with the budget
+  settings, merge merges it like one, the change log writes it on the root (a log from
+  before reads it as off). `method set FILE round_account_totals true`, the script's `set
+  round_account_totals true`, and Settings > Calculation's **Round account totals to whole
+  units** set it. Import Setup doesn't carry it (it carries none of the calculation
+  settings but the cutoff factor; left as is).
+- **New budgets keep it off**, so they keep entry 60's figures (cents). The reference's
+  default is 0, so a new budget there rounds; entry 60's choice to keep cents was made
+  as a display choice. **Open for the owner**: whether new budgets should round.
+- **The engine**: `calc::arith::whole_units` rounds an account's lines total (an integer
+  sum of cents, so exactly): to the nearest whole unit, a half up (toward plus infinity,
+  Math.round's rule, as cents are rounded) in binary arithmetic and away from zero in
+  exact arithmetic (entry 2's rule; the two differ only on a negative half, -50.50 is
+  -50.00 or -51.00, which no figure decided). The account's `details_total` is the rounded
+  figure, so categories, levels, the total before charges, percent charges, the grand and
+  net totals all add up the rounded accounts as integer sums, as before. The rows keep
+  their cents.
+- **Not rounded, chosen where no figure decided it**: fringes (they are earned by lines;
+  the exports show them unchanged), a charge's excluded lines (lines, as before), a
+  credit's spend on a category or account row (its lines as they are, plus fringes: the
+  export's credit didn't move, though no figure showed what it was a percentage of),
+  group, set and location totals (lines). Under fringe posting by account an account's
+  total is its rounded lines plus its fringes in cents (the exports post by budget).
+- **Exact arithmetic** (entry 55) is independent of it: either arithmetic works the lines
+  out its own way, then the setting rounds each account total by that arithmetic's rule
+  for a half. Exact with the setting on is the reference's 0 places with our exact cents
+  below.
+- **Explain** shows the step under an account's lines: a Rounding value ("the budget
+  rounds account totals to whole units: the lines come to 3,426.50, which rounds to the
+  nearest whole unit, a half up, to 3,427.00") that adds the difference, so every sum
+  still adds up to the reported total.
+- **The importer turns it on** when the export has cents (not whole-unit layouts), every
+  account total is whole and its lines' total rounded, and at least one account's lines
+  have cents (so rounding reproduces the export and not rounding doesn't); the note says
+  so under Check. It replaces entry 68's note that this program doesn't round them. A
+  budget shown in another currency keeps it off (the figures are converted; the note
+  says so).
+- **Percent charges from an export** (amends entries 59 and 68, which brought every charge
+  as a fixed amount and pointed out a round percentage). The owner confirms a charge that
+  is a round percentage of the total before charges is very common. A charge now comes
+  in as a percent charge with no exclusions when the percentage has at most 2 decimal
+  places, the fewest places that work give exactly one value, our engine (the budget's
+  arithmetic, `percent_of`) gives the export's figure to the cent with it from the
+  export's total before charges, and a step at that many places moves the charge by 1.00
+  or more (on a base of 100.00 every amount is some 0.01%, so a fixed fee there must not
+  be read as a percentage). Layouts with cents in the base currency only; anything else
+  stays a fixed amount, listed under Not imported. The STG contingency is 10%. **Credits
+  stay fixed**: a credit's spend may be a group, a category, an account or a flat amount
+  with caps and a discount, and the export gives only the result, so no rule is
+  unambiguous.
+- **Result**: `method import-export` on the 0-places export: 0 differences (was 62), grand
+  5,874,815.47, net 4,474,880.32, the setting on and the charge 10%; on the 2-places
+  export: 0 differences, grand 5,874,822.45, net 4,474,887.30, the setting off and the
+  charge 10%. The parity runs' exports (2026-10-10, 2026-10-11, 2026-10-12) still all
+  come to their figures.
+- Tests: `calc::arith` unit tests (the half, negatives, both arithmetics);
+  crates/method-core/tests/mmb_parity.rs `account_totals_in_whole_units` (both
+  arithmetics, posting by budget and by account, the charge, the credit, Explain, the
+  cache); the format round trip; `method set` and the script parser; the app's
+  `set_round_account_totals`; crates/method-format/tests/exchange.rs
+  `account_totals_in_whole_units_round_the_budget` (invented twins
+  tests/fixtures/exchange/whole-units.json and whole-units-cents.json, each reconciling
+  only with its own setting) and `percent_charges_come_in_as_percent_charges`, with
+  `charge_percent`'s unit test for the rule.

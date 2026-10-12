@@ -160,6 +160,7 @@ Changes one value and saves. Paths:
 | `title` | Text. |
 | `compact_versions` | `true` or `false`: save versions as deltas (docs/FORMAT.md, "Version deltas"). |
 | `arithmetic` | `binary` (the default: totals worked out in binary doubles, as spreadsheets and industry-standard budgeting software work them; `mmb` is still accepted) or `exact` (exact decimals, half away from zero). See decisions.md, entry 55. |
+| `round_account_totals` | `true` or `false` (the default): round every account's total to a whole unit and work out categories, charges and the grand and net totals from the rounded accounts. See decisions.md, entry 69. |
 | `trailing_level_fringes` | `keep` (the default) or `drop`: under production-level posting, keep the fringes of categories after the last production total in the grand total, or drop them from every total. See decisions.md, entry 56. |
 | `cutoff_factor` | `1.0` (the default), `1.5`, `2.0`, `2.5` or `3.0`: what every percent fringe's cutoff is multiplied by. See decisions.md, entry 60. |
 | `fringe_row.account` | The account number on the budget's fringe row (fringes posted by budget), or `none`. Display only. |
@@ -464,6 +465,7 @@ remove charge Insurance
 | `set title TEXT` | The budget's title. |
 | `set compact_versions true\|false` | Save versions as deltas. |
 | `set arithmetic binary\|exact` | How totals are worked out (see `arithmetic` above). |
+| `set round_account_totals true\|false` | Account totals in whole units (see `round_account_totals` above). |
 | `set trailing_level_fringes keep\|drop` | Fringes after the last production total (see `trailing_level_fringes` above). |
 | `set cutoff_factor 1.0\|1.5\|2.0\|2.5\|3.0` | What every percent fringe's cutoff is multiplied by (see `cutoff_factor` above). |
 | `set fringe_row account\|description\|position VALUE` | One field of the budget's fringe row, `none` to clear it (see `fringe_row.FIELD` above). |

@@ -290,6 +290,24 @@ pub fn percent_of(arith: Arithmetic, c: Cents, percent: Num) -> Option<Money> {
     }
 }
 
+/// An account's lines total `c` rounded to a whole unit, for a budget that
+/// rounds account totals (decisions.md, entry 69): the nearest whole unit,
+/// a half going toward plus infinity in Movie Magic arithmetic (Math.round's
+/// rule, as a cent is rounded; 3,426.50 is 3,427.00, as the reference's
+/// export shows) and away from zero in exact arithmetic (entry 2's rule).
+/// The two differ only on a negative half (-3,426.50 is -3,426.00 or
+/// -3,427.00). `c` is a sum of cents, so this is exact. `None` on overflow.
+pub fn whole_units(arith: Arithmetic, c: Cents) -> Option<Cents> {
+    let (units, rest) = (c.div_euclid(100), c.rem_euclid(100));
+    let up = match arith {
+        Arithmetic::Mmb => rest >= 50,
+        // Below zero, `rest` is how far above the next whole unit down.
+        Arithmetic::Exact => rest > 50 || (rest == 50 && c > 0),
+    };
+    let units = if up { units.checked_add(1)? } else { units };
+    units.checked_mul(100)
+}
+
 /// A line converted from its own currency at `rate` (base units per one
 /// unit of it), before rounding: exact arithmetic converts the line's
 /// rounded total `local` (decisions.md, entry 2, step 3); Movie Magic
@@ -363,6 +381,24 @@ mod tests {
         assert_eq!(mmb_cents(-0.005), Some(0));
         assert_eq!(mmb_cents(f64::INFINITY), None);
         assert_eq!(mmb_cents(1e20), None);
+    }
+
+    /// Account totals in whole units (decisions.md, entry 69): 3,426.50
+    /// rounds up in both arithmetics (the reference's export), a negative
+    /// half toward plus infinity or away from zero.
+    #[test]
+    fn rounds_account_totals_to_whole_units() {
+        for a in [Arithmetic::Mmb, Arithmetic::Exact] {
+            assert_eq!(whole_units(a, 342_650), Some(342_700));
+            assert_eq!(whole_units(a, 342_649), Some(342_600));
+            assert_eq!(whole_units(a, 1_975_570), Some(1_975_600));
+            assert_eq!(whole_units(a, 0), Some(0));
+            assert_eq!(whole_units(a, -342_651), Some(-342_700));
+            assert_eq!(whole_units(a, -342_649), Some(-342_600));
+            assert_eq!(whole_units(a, Cents::MAX), Some(Cents::MAX - 7));
+        }
+        assert_eq!(whole_units(Arithmetic::Mmb, -342_650), Some(-342_600));
+        assert_eq!(whole_units(Arithmetic::Exact, -342_650), Some(-342_700));
     }
 
     #[test]

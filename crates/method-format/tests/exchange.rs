@@ -15,8 +15,8 @@
 use std::path::PathBuf;
 
 use method_core::{
-    recalc, Budget, Cents, FringeKind, FringePosting, InfoValue, RecalcOptions, RowKind,
-    TopsheetRow, TrailingFringes,
+    recalc, Budget, Cents, ChargeKind, Dec, FringeKind, FringePosting, InfoValue, RecalcOptions,
+    RowKind, TopsheetRow, TrailingFringes,
 };
 use method_format::import::exchange::{
     self, build, detect, json, reconcile, BuildOptions, ExportFormat, Imported, Level, NoteKind,
@@ -34,7 +34,7 @@ fn import(name: &str) -> (Imported, Reconciliation) {
     exchange::import(&fixture(name), name, None).unwrap_or_else(|e| panic!("{name}: {e}"))
 }
 
-const FIXTURES: [&str; 25] = [
+const FIXTURES: [&str; 27] = [
     "adjustments.json",
     "by-account.json",
     "by-budget-credits.json",
@@ -60,6 +60,8 @@ const FIXTURES: [&str; 25] = [
     "originals.json",
     "sets-locations.json",
     "totals-currency.json",
+    "whole-units.json",
+    "whole-units-cents.json",
 ];
 
 fn lines<'a>(b: &'a Budget, account: &str) -> Vec<&'a method_core::Detail> {
@@ -570,25 +572,84 @@ fn crew_ranges_and_percent_units() {
     assert_eq!(rec.export_net, 18_914_318);
 }
 
-/// An export whose account totals are their lines rounded to whole units:
-/// the import says so, and the cents are the only difference.
+/// An export whose account totals are their lines rounded to whole units
+/// (one of them a half, 200.50, which rounds up), and its twin with cents
+/// (decisions.md, entry 69): the first turns the budget's whole-unit
+/// account totals on and comes to its figures only with them, the second
+/// leaves them off and comes to its figures only without them. Both bring
+/// the 10% contingency as a percent charge.
 #[test]
-fn account_totals_in_whole_units_are_pointed_out() {
+fn account_totals_in_whole_units_round_the_budget() {
+    let flipped = |im: &Imported| {
+        let mut other = im.clone();
+        other.budget.round_account_totals = !other.budget.round_account_totals;
+        reconcile(&other)
+    };
+
     let (im, rec) = import("whole-units.json");
+    assert!(im.budget.round_account_totals);
     assert!(has_note(
         &im,
         NoteKind::Check,
-        "rounds account totals, which this program doesn't, so 1 account"
+        "so the budget rounds account totals to whole units"
     ));
-    assert_eq!(rec.tallies[&Level::Line].different, 0);
-    assert_eq!(rec.tallies[&Level::AccountFringes].different, 0);
-    assert_eq!(rec.tallies[&Level::Account].different, 1);
-    assert_eq!(
-        rec.differences[0].ours - rec.differences[0].export,
-        25,
-        "{:#?}",
-        rec.differences
-    );
+    assert!(rec.matches(), "{:#?}", rec.differences);
+    // 702.00 + 24.88, then 10% of it (72.688): 72.69.
+    assert_eq!(rec.grand, Some(79_957));
+    let r = recalc(&im.budget, &RecalcOptions::default()).unwrap();
+    let accts: Vec<Cents> = r.categories[0]
+        .accounts
+        .iter()
+        .map(|a| a.details_total)
+        .collect();
+    assert_eq!(accts, [40_100, 10_000, 20_100]);
+    // Lines and fringes keep their cents.
+    assert_eq!(r.categories[0].accounts[0].rows[0].total, 30_075);
+    assert_eq!(r.budget_fringes, 2_488);
+    let off = flipped(&im);
+    assert_eq!(off.tallies[&Level::Account].different, 2);
+    assert_eq!(off.tallies[&Level::Line].different, 0);
+    assert_eq!(off.grand, Some(79_929));
+
+    let (im, rec) = import("whole-units-cents.json");
+    assert!(!im.budget.round_account_totals);
+    assert!(!has_note(&im, NoteKind::Check, "whole unit"));
+    assert!(rec.matches(), "{:#?}", rec.differences);
+    assert_eq!(rec.grand, Some(79_929));
+    let on = flipped(&im);
+    assert_eq!(on.tallies[&Level::Account].different, 2);
+    assert_eq!(on.grand, Some(79_957));
+}
+
+/// A charge that is a simple percentage of the total before charges comes
+/// in as a percent charge (decisions.md, entry 69); one that isn't stays a
+/// fixed amount, with the note.
+#[test]
+fn percent_charges_come_in_as_percent_charges() {
+    let (im, _) = import("whole-units.json");
+    let c = &im.budget.charges[0];
+    assert_eq!(c.kind, ChargeKind::Percent(Dec::from_int(10)));
+    assert_eq!(c.account.as_deref(), Some("9800-00"));
+    assert!(has_note(
+        &im,
+        NoteKind::Check,
+        "Contingency Q : 10% is 10%: it comes in as a percent charge"
+    ));
+    assert!(!has_note(
+        &im,
+        NoteKind::Lost,
+        "Charges come in as fixed amounts"
+    ));
+    // 12,345.67 of the crew budget's total before charges is no simple
+    // percentage.
+    let (im, rec) = import("crew-ranges.json");
+    assert!(rec.matches());
+    assert!(matches!(im.budget.charges[0].kind, ChargeKind::Flat { .. }));
+    assert!(has_note(
+        &im,
+        NoteKind::Lost,
+        "Charges come in as fixed amounts (their percentages and exclusions aren't in the export): Contingency Q."
+    ));
 }
 
 /// The real exports of the parity runs, when the environment points at

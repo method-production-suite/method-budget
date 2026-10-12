@@ -135,6 +135,17 @@ impl<'a> Ctx<'a> {
         })
     }
 
+    /// An account's lines total as the topsheet counts it: rounded to a
+    /// whole unit when the budget rounds account totals (decisions.md,
+    /// entry 69), else as it is. `None` on overflow.
+    pub fn account_total(&self, lines: Cents) -> Option<Cents> {
+        if self.b.round_account_totals {
+            arith::whole_units(self.arith, lines)
+        } else {
+            Some(lines)
+        }
+    }
+
     /// `d` in the budget's arithmetic.
     pub fn num(&self, d: Dec) -> Num {
         Num::of(self.arith, d)
@@ -344,6 +355,7 @@ fn eval_categories_with(
                 }
             };
             k += 1;
+            let details_total = ctx.account_total(details_total).ok_or_else(ovf)?;
             accounts.push(AccountTotals {
                 code: acct.code.clone(),
                 name: acct.name.clone(),

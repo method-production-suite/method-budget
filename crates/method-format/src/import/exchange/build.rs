@@ -26,12 +26,16 @@
 //!   units by their singular and plural.
 //! - **Percent units**: a number in `%` is a percentage when the line's
 //!   total says so; it comes in divided by 100 (`1.5/100`).
+//! - **Account totals in whole units**: when every account total is its
+//!   lines rounded to a whole unit, the budget rounds them too.
+//! - **Percent charges**: a charge that is a simple percentage of the total
+//!   before charges ([`charge_percent`]).
 //!
 //! What can't come over: formulas and globals (lines keep the values;
 //! each line that used globals gets a note naming them), production totals
 //! (except under production-level posting), lines left out of the totals by
-//! a group (the export omits them), and the rules of charges and credits
-//! (they come in as fixed amounts that give the same totals).
+//! a group (the export omits them), and the rules of other charges and of
+//! credits (they come in as fixed amounts that give the same totals).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -2148,7 +2152,10 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
         );
     }
     // Account totals in whole units over lines with cents: the exporting
-    // budget rounds its account totals, which ours doesn't.
+    // budget rounds its account totals (decisions.md, entry 69). When every
+    // account total is its lines rounded to a whole unit and some aren't
+    // their lines as they are, rounding reproduces the export and not
+    // rounding doesn't, so the budget rounds them too.
     if x.places >= 2 && !x.totals_only {
         let accts: Vec<(f64, f64)> = cats
             .iter()
@@ -2170,13 +2177,23 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
                 .iter()
                 .all(|(t, l)| t.fract() == 0.0 && *t == l.round())
         {
-            im.note(
-                NoteKind::Check,
-                format!(
-                    "Every account total in the export is its lines rounded to a whole unit: the budget rounds account totals, which this program doesn't, so {off} account{} (and the categories and totals above them) differ by those cents.",
-                    if off == 1 { "" } else { "s" }
-                ),
-            );
+            let s = if off == 1 { "" } else { "s" };
+            if converted {
+                im.note(
+                    NoteKind::Check,
+                    format!(
+                        "Every account total in the export is its lines rounded to a whole unit, so the exporting budget rounds account totals; its figures are in another currency, so this budget doesn't, and {off} account{s} (and the categories and totals above them) differ by those cents (Settings: Round account totals to whole units)."
+                    ),
+                );
+            } else {
+                b.round_account_totals = true;
+                im.note(
+                    NoteKind::Check,
+                    format!(
+                        "Every account total in the export is its lines rounded to a whole unit ({off} account{s} with cents in the lines), so the budget rounds account totals to whole units, as the exporting budget does (Settings: Round account totals to whole units)."
+                    ),
+                );
+            }
         }
     }
     if percent_lines > 0 {
@@ -2198,50 +2215,50 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
             ),
         );
     }
-    // A charge that is exactly a round percentage of the total before
-    // charges may well be a percent charge: say so.
+    // A charge that is a simple percentage of the total before charges (at
+    // most 2 decimal places, the fewest that work and only one of them)
+    // that the engine reproduces to the cent becomes a percent charge
+    // (decisions.md, entry 69); any other stays a fixed amount.
     let before_charges: f64 = im.links.categories.iter().map(|c| c.total).sum::<f64>()
         + im.links.level_fringes.iter().sum::<f64>()
         + im.links.budget_fringes.unwrap_or(0.0);
     let base_cents = cents(before_charges);
-    let hints: Vec<String> = im
-        .links
-        .charges
-        .iter()
-        .filter_map(|(name, total)| {
-            let t = cents(*total);
-            if t == 0 || base_cents == 0 {
-                return None;
+    let mut made_percent = Vec::new();
+    if x.places >= 2 && !converted && !x.totals_only {
+        let arith = b.arithmetic;
+        for (c, (_, total)) in b.charges.iter_mut().zip(&im.links.charges) {
+            if let Some(p) = charge_percent(arith, base_cents, cents(*total)) {
+                made_percent.push(format!("{} is {}%", c.name, p));
+                c.kind = ChargeKind::Percent(p);
             }
-            let p = t as f64 / base_cents as f64 * 100.0;
-            (0..=3).find_map(|dp| {
-                let cand: f64 = format!("{p:.dp$}").parse().ok()?;
-                ((base_cents as f64 * cand / 100.0).round() as Cents == t && cand > 0.0)
-                    .then(|| format!("{name} is {}%", trim_zeros(&format!("{cand:.dp$}"))))
-            })
-        })
-        .collect();
-    if !hints.is_empty() {
+        }
+    }
+    if !made_percent.is_empty() {
         im.note(
             NoteKind::Check,
             format!(
-                "Of the total before charges, {}: re-enter {} as a percent charge if that is what {}.",
-                hints.join(", "),
-                if hints.len() == 1 { "it" } else { "them" },
-                if hints.len() == 1 { "it is" } else { "they are" }
+                "Of the total before charges, {}: {} as a percent charge, with no exclusions.",
+                made_percent.join(", "),
+                if made_percent.len() == 1 {
+                    "it comes in"
+                } else {
+                    "they come in"
+                }
             ),
         );
     }
-    if !b.charges.is_empty() {
+    let fixed: Vec<String> = b
+        .charges
+        .iter()
+        .filter(|c| matches!(c.kind, ChargeKind::Flat { .. }))
+        .map(|c| c.name.clone())
+        .collect();
+    if !fixed.is_empty() {
         im.note(
             NoteKind::Lost,
             format!(
                 "Charges come in as fixed amounts (their percentages and exclusions aren't in the export): {}.",
-                b.charges
-                    .iter()
-                    .map(|c| c.name.clone())
-                    .collect::<Vec<_>>()
-                    .join(", ")
+                fixed.join(", ")
             ),
         );
     }
@@ -2322,9 +2339,78 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
     im
 }
 
+/// The percentage `amount` is of `base` (cents), when it is a simple one:
+/// at most 2 decimal places, above 0 and at most 100, the fewest places
+/// that give `amount` to the cent in `arith` as the engine works a percent
+/// charge out, and the only such value at that many places. A step at
+/// that many places must move the charge by 1.00 or more, so a fixed
+/// amount on a small base isn't taken for a percentage by chance (on
+/// 100.00 any amount is some 0.01%). `None` otherwise (decisions.md,
+/// entry 69).
+pub(super) fn charge_percent(
+    arith: method_core::Arithmetic,
+    base: Cents,
+    amount: Cents,
+) -> Option<Dec> {
+    use method_core::calc::arith::{percent_of, Num};
+    if amount <= 0 || base <= 0 || amount > base {
+        return None;
+    }
+    let gives = |p: Dec| {
+        percent_of(arith, base, Num::of(arith, p))
+            .and_then(|m| m.to_cents())
+            .is_some_and(|c| c == amount)
+    };
+    let p = amount as f64 / base as f64 * 100.0;
+    for places in 0..=2u32 {
+        let step = 10i64.pow(places);
+        if base < 10_000 * step {
+            break;
+        }
+        let near = (p * step as f64).round() as i64;
+        let hits: Vec<Dec> = (near - 1..=near + 1)
+            .filter(|n| *n > 0 && *n <= 100 * step)
+            .filter_map(|n| format!("{}", n as f64 / step as f64).parse::<Dec>().ok())
+            .filter(|d| gives(*d))
+            .collect();
+        match hits.len() {
+            0 => continue,
+            1 => return Some(hits[0]),
+            _ => return None,
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn percent_charges_only_when_simple() {
+        let mmb = method_core::Arithmetic::Mmb;
+        let pct = |b, a| charge_percent(mmb, b, a).map(|d| d.to_string());
+        // 10% of 5,340,741.34 is 534,074.134.
+        assert_eq!(pct(534_074_134, 53_407_413), Some("10".into()));
+        assert_eq!(pct(100_000, 2_500), Some("2.5".into()));
+        assert_eq!(pct(1_000_000, 125_000), Some("12.5".into()));
+        // 1.25% of 1,000.00: a step of 0.01% is only 0.10.
+        assert_eq!(pct(100_000, 1_250), None);
+        assert_eq!(pct(10_000_000, 1_234_000), Some("12.34".into()));
+        // 1.2345% needs 4 places.
+        assert_eq!(pct(10_000_000, 123_450), None);
+        // On 1,000.00 a step of 0.01% is 0.10, too fine to tell a fixed
+        // 123.40 from 12.34%; 25% (a step of 10.00) is still found.
+        assert_eq!(pct(100_000, 12_340), None);
+        assert_eq!(pct(100_000, 25_000), Some("25".into()));
+        // On a base under 100.00 nothing is.
+        assert_eq!(pct(100, 10), None);
+        // Nothing, negatives and more than the base aren't percent charges.
+        assert_eq!(pct(100_000, 0), None);
+        assert_eq!(pct(100_000, -1_000), None);
+        assert_eq!(pct(100_000, 200_000), None);
+        assert_eq!(pct(0, 100), None);
+    }
 
     #[test]
     fn simplest_rates() {

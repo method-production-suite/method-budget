@@ -64,8 +64,13 @@ works it out, and the notes list each one under **Check**:
   shows its totals in another currency keeps that setting.
 - **Unit hours**: the usual starter hours (Day 12, Week 60, Hour 1, Month 240); a unit the
   budget added gets its hours from what the flat fringes counted when only one value fits.
-- **Percent charges**: a charge that is exactly a round percentage of the total before
-  charges is pointed out (it still comes in as a fixed amount).
+- **Percent charges**: a charge that is a simple percentage of the total before charges
+  (`Contingency 10%`) comes in as a percent charge with no exclusions: the percentage has
+  at most 2 decimal places (the fewest that work, and only one value at that many), our
+  engine gives the export's figure to the cent with it, and a step of that size moves the
+  charge by 1.00 or more (so a fixed fee on a small budget isn't taken for a percentage).
+  Any other charge comes in as a fixed amount. Layouts with cents in the base currency
+  only.
 - **Charges and credits with account numbers**: a topsheet row with a number but no fringe
   figure and no accounts (`600-00 Contingency`, `900-01 Tax credit`) is a charge, or a
   credit when it is negative, posted to that number; an empty category still shows a
@@ -75,8 +80,11 @@ works it out, and the notes list each one under **Check**:
   number comes in divided by 100 (`1.5 %` of 5,500,000 is Amount `1.5/100`, 82,500.00),
   the unit is dropped and the line has a note.
 - **Account totals in whole units**: when every account total in the export is its lines
-  rounded to a whole unit, the budget rounds its account totals, which this program
-  doesn't; the notes say so, and those cents are the only differences.
+  rounded to a whole unit and some aren't their lines as they are, the exporting budget
+  rounds account totals (the other program's "Decimal Places in Totals" at 0), so the
+  budget does too (`round_account_totals`, Settings > Calculation): categories, charges
+  and the grand and net totals then come out of the rounded accounts as the export's do.
+  A budget shown in another currency keeps cents and the notes say so.
 
 ## What can't come over
 
@@ -88,9 +96,11 @@ Listed in the notes under **Not imported**:
   are 0 until they are added in Budget Setup.
 - **Lines left out of the totals by a group** (suppressed lines): the exports omit them, and
   their groups unless other lines use them. The groups that come over count in the total.
-- **Charges and credits** come in as fixed amounts that give the same totals; their
-  percentages, exclusions, rows, caps and discounts aren't in the export. In the layouts
-  with whole units they come in at the whole unit.
+- **Charges and credits** come in as fixed amounts that give the same totals (but simple
+  percent charges, above); their exclusions, rows, caps and discounts aren't in the
+  export. A credit is never made a percentage: its spend can be a group, a category, an
+  account or a flat amount, and the export doesn't say which. In the layouts with whole
+  units they come in at the whole unit.
 - **Unit hours** of the starter units, currency names and symbols, location details, fringe
   descriptions, line notes, styles and fringe cutoff factors.
 - The basic XML has no groups or globals on its lines; the tab-delimited file has no lines
@@ -110,10 +120,12 @@ differs is listed with both values.
 - A budget shown in another currency is compared as the export shows it: each line, and
   each fringe's total, converted and rounded, then added up.
 - A difference is information, not an error: the budget still imports. Usual causes are a
-  cutoff or range the figures didn't decide, unit hours of a unit no fringe counted,
-  account totals the exporting budget rounds to whole units, and figures the exporting
-  program only shows (an adjustment row converted in the totals currency).
+  cutoff or range the figures didn't decide, unit hours of a unit no fringe counted, and
+  figures the exporting program only shows (an adjustment row converted in the totals
+  currency).
 
 The exports of the 2026-10-10 and 2026-10-11 parity runs all come to their own figures, but
 one shown in pounds, which is off by 0.01 to 0.03 there; the JSON writes a 100.005 charge as
-100.00 where the workbook keeps 100.005 (shown as 100.01).
+100.00 where the workbook keeps 100.005 (shown as 100.01). A feature budget's JSON exports
+(2026-10-12), written with account totals in whole units and with cents, both come to
+their own figures (decisions 68 and 69).

@@ -84,6 +84,10 @@ pub struct Budget {
     /// How totals are worked out: as Movie Magic Budgeting does (binary
     /// doubles, the default) or in exact decimals (decisions.md, entry 55).
     pub arithmetic: Arithmetic,
+    /// Round every account's lines total to a whole unit, and work out
+    /// everything above accounts from the rounded totals (decisions.md,
+    /// entry 69). Off unless the budget says otherwise.
+    pub round_account_totals: bool,
     /// How account numbers are segmented and written.
     pub account_coding: AccountCoding,
     /// What a line inserted in the editor copies from its neighbor.
@@ -163,6 +167,7 @@ impl Budget {
             cutoff_factor: CutoffFactor::default(),
             fringe_row: FringeRow::default(),
             arithmetic: Arithmetic::default(),
+            round_account_totals: false,
             account_coding: AccountCoding::default(),
             new_line_defaults: NewLineDefaults::default(),
             groups: BTreeMap::new(),
@@ -1219,6 +1224,7 @@ pub struct BudgetSnapshot {
     pub cutoff_factor: CutoffFactor,
     pub fringe_row: FringeRow,
     pub arithmetic: Arithmetic,
+    pub round_account_totals: bool,
     pub account_coding: AccountCoding,
     pub new_line_defaults: NewLineDefaults,
     pub groups: BTreeMap<String, Group>,
@@ -1250,6 +1256,7 @@ impl Budget {
             cutoff_factor,
             fringe_row,
             arithmetic,
+            round_account_totals,
             account_coding,
             new_line_defaults,
             groups,
@@ -1288,6 +1295,7 @@ impl Budget {
             cutoff_factor: *cutoff_factor,
             fringe_row: fringe_row.clone(),
             arithmetic: *arithmetic,
+            round_account_totals: *round_account_totals,
             account_coding: *account_coding,
             new_line_defaults: *new_line_defaults,
             groups: groups.clone(),
@@ -1319,6 +1327,7 @@ impl Budget {
             cutoff_factor,
             fringe_row,
             arithmetic,
+            round_account_totals,
             account_coding,
             new_line_defaults,
             groups,
@@ -1357,6 +1366,7 @@ impl Budget {
             cutoff_factor,
             fringe_row,
             arithmetic,
+            round_account_totals,
             account_coding,
             new_line_defaults,
             groups,
@@ -1433,6 +1443,7 @@ impl BudgetSnapshot {
             cutoff_factor,
             fringe_row,
             arithmetic,
+            round_account_totals,
             account_coding,
             new_line_defaults,
             groups,
@@ -1459,6 +1470,7 @@ impl BudgetSnapshot {
             cutoff_factor,
             fringe_row,
             arithmetic,
+            round_account_totals,
             account_coding,
             new_line_defaults,
             groups,

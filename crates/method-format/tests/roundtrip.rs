@@ -1039,3 +1039,18 @@ fn cutoff_factor_and_fringe_row_round_trip_and_are_left_out_at_default() {
     let r = read(r#", "fringe_row": {"account": " ", "description": ""}"#).unwrap();
     assert!(r.fringe_row.is_default());
 }
+
+/// `round_account_totals` (decisions.md, entry 69): left out when off,
+/// written as `true` when on.
+#[test]
+fn round_account_totals_round_trips_and_is_left_out_when_off() {
+    let mut b = rich();
+    let text = round_trip(&b);
+    assert!(!text.contains("round_account_totals"), "off is left out");
+    b.round_account_totals = true;
+    let text = round_trip(&b);
+    let v: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(v["budget"]["round_account_totals"], true);
+    let file = r#"{"format": "method-budget", "version": 1, "budget": {"title": "T", "base_currency": "USD", "round_account_totals": "yes"}}"#;
+    assert!(method_format::from_str(file).is_err());
+}

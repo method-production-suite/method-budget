@@ -833,6 +833,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         cutoff_factor: _,
         fringe_row: _,
         arithmetic: _,
+        round_account_totals: _,
         account_coding: _,
         new_line_defaults: _,
         groups: _,
@@ -915,6 +916,16 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         &setting_at("arithmetic", "Arithmetic"),
         (&b.arithmetic, &o.arithmetic, &t.arithmetic),
         crate::diff::arithmetic_text,
+    );
+    let round_account_totals = merge_value(
+        cx,
+        &setting_at("round_account_totals", "Account totals"),
+        (
+            &b.round_account_totals,
+            &o.round_account_totals,
+            &t.round_account_totals,
+        ),
+        crate::diff::account_totals_text,
     );
     let group_rules = merge_value(
         cx,
@@ -1318,6 +1329,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         cutoff_factor,
         fringe_row,
         arithmetic,
+        round_account_totals,
         account_coding,
         new_line_defaults,
         groups,

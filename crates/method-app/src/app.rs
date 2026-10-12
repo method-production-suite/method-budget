@@ -701,6 +701,20 @@ pub fn set_arithmetic<R: Runtime>(
     })
 }
 
+/// Whether account totals are rounded to whole units (decisions.md, entry
+/// 69).
+#[tauri::command]
+pub fn set_round_account_totals<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    value: bool,
+) -> CmdResult {
+    edit_budget(&window, &state, doc, "Change account total rounding", |b| {
+        edit::set_round_account_totals(b, value)
+    })
+}
+
 /// What every percent fringe's cutoff is multiplied by (decisions.md, entry
 /// 59): `value` is `1.0`, `1.5`, `2.0`, `2.5` or `3.0`.
 #[tauri::command]
@@ -1478,6 +1492,7 @@ pub fn run() {
             set_arithmetic,
             set_trailing_level_fringes,
             set_cutoff_factor,
+            set_round_account_totals,
             set_fringe_row,
             set_account_coding,
             set_totals_currency,

@@ -217,7 +217,9 @@ pub struct AccountTotals {
     pub code: String,
     pub name: String,
     pub rows: Vec<RowTotals>,
-    /// Sum of rows' `total`.
+    /// Sum of rows' `total`, rounded to a whole unit when the budget rounds
+    /// account totals (`Budget::round_account_totals`, decisions.md, entry
+    /// 69).
     pub details_total: Cents,
     /// Sum of rows' `fringe_total`.
     pub fringe_total: Cents,

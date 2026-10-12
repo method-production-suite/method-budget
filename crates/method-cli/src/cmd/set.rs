@@ -5,7 +5,8 @@ use crate::script::{self, Op, RowRef, Word, LINE_FIELDS};
 
 pub const USAGE: &str = "  method set <file.mthd> <path> <value> [--dry-run]
       Change one value and save atomically. Paths: title, compact_versions,
-      arithmetic (binary or exact), trailing_level_fringes (keep or drop),
+      arithmetic (binary or exact), round_account_totals (true or false),
+      trailing_level_fringes (keep or drop),
       cutoff_factor (1.0, 1.5, 2.0, 2.5 or 3.0), fringe_row.account,
       fringe_row.description, fringe_row.position (the topsheet row the
       budget's fringe row shows above, from 0; none for after the summary
@@ -39,6 +40,9 @@ pub fn op_for(path: &str, value: &str) -> Result<Op, CliError> {
             Op::CompactVersions(script::flag(&v).map_err(bad)?)
         }
         "arithmetic" if rest.is_empty() => Op::Arithmetic(script::arithmetic(value).map_err(bad)?),
+        "round_account_totals" if rest.is_empty() => {
+            Op::RoundAccountTotals(script::flag(&v).map_err(bad)?)
+        }
         "trailing_level_fringes" if rest.is_empty() => {
             Op::TrailingLevelFringes(script::trailing(value).map_err(bad)?)
         }
@@ -180,6 +184,10 @@ mod tests {
             Op::TrailingLevelFringes(method_core::TrailingFringes::Drop)
         );
         assert!(op_for("trailing_level_fringes", "lose").is_err());
+        assert_eq!(
+            op_for("round_account_totals", "true").unwrap(),
+            Op::RoundAccountTotals(true)
+        );
         assert_eq!(
             op_for("cutoff_factor", "1.5").unwrap(),
             Op::CutoffFactor(method_core::CutoffFactor::OneAndAHalf)
