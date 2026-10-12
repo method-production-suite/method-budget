@@ -17,15 +17,18 @@ pub mod diagnose;
 pub mod display;
 pub mod docs;
 pub mod edit;
+pub mod explain;
 pub mod find;
 pub mod history;
 pub mod host;
 pub mod moverows;
+pub mod overtime;
 pub mod quickadd;
 pub mod renumber;
 pub mod report_dto;
 pub mod safety;
 pub mod session;
+pub mod setup_lists;
 pub mod versions;
 pub mod view;
 
