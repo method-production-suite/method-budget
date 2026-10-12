@@ -322,6 +322,10 @@ pub struct Session {
     /// The host shows this budget read-only (a partner's viewer): every
     /// edit, undo and redo is refused ([`HELD_READ_ONLY`]).
     held: bool,
+    /// The banner of a budget converted from an export ("Converted from
+    /// <file>..."; decisions.md, entry 67): every view carries it until the
+    /// first Save. Never written into the file.
+    converted: Option<String>,
 }
 
 /// What autosave needs to know about one open budget.
@@ -396,6 +400,7 @@ impl Session {
             remap: HashMap::new(),
             save_hint: None,
             held: false,
+            converted: None,
         }
     }
 
@@ -491,6 +496,8 @@ impl Session {
         self.safety.confirm_overwrite = false;
         self.safety.disk = Some(stamp);
         self.safety.conflict = false;
+        // Saved as a Method Budget file: no longer just converted.
+        self.converted = None;
     }
 
     /// What the budget's file looked like when it was last read or written.
@@ -771,6 +778,17 @@ impl Session {
     /// Something to tell the person with the next view.
     pub fn set_notice(&mut self, text: String) {
         self.notice = Some(text);
+    }
+
+    /// Shows `text` as the banner of a budget converted from an export, on
+    /// every view until the first Save ([`Session::mark_saved`]).
+    pub fn set_converted(&mut self, text: String) {
+        self.converted = Some(text);
+    }
+
+    /// The converted budget's banner, until it is first saved.
+    pub fn converted(&self) -> Option<&str> {
+        self.converted.as_deref()
     }
 
     /// A copy saved for sharing opens read-only (src/sharing.rs): its
@@ -1136,6 +1154,7 @@ impl Session {
         let mut view = View::build(&mut self.budget, &st, focus, None);
         view.cost = self.cost(focus, false);
         view.shared = self.shared.is_some();
+        view.converted = self.converted.clone();
         view
     }
 
@@ -1157,6 +1176,7 @@ impl Session {
         view.cost = self.cost(focus, false);
         view.shared = self.shared.is_some();
         view.notice = self.notice.take();
+        view.converted = self.converted.clone();
         view
     }
 

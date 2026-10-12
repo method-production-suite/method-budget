@@ -29,6 +29,7 @@ export class Pane {
     this.main = els.main;
     this.crumbs = els.crumbs;
     this.banner = els.banner;
+    this.converted = els.converted; // a converted export's banner (convertbanner.js)
     this.actions = els.actions;
     this.host = els.host; // the grid's host
     this.footer = els.footer;
@@ -65,6 +66,7 @@ export function firstPane() {
     main: document.querySelector('.workspace > .main'),
     crumbs: $('crumbs'),
     banner: $('banner'),
+    converted: $('convert-banner'),
     actions: $('actions'),
     host: $('grid-host'),
     footer: $('footer'),
@@ -77,12 +79,14 @@ export function secondPane() {
   const crumbs = el('nav', { class: 'crumbs', attrs: { 'aria-label': 'Budget level, right pane' } });
   const banner = el('div', { class: 'banner', attrs: { role: 'status' } });
   banner.hidden = true;
+  const converted = el('div', { class: 'convert-banner', attrs: { role: 'status' } });
+  converted.hidden = true;
   const actions = el('div', { class: 'actions' });
   const host = el('div', { class: 'grid-host', attrs: { 'aria-label': 'Budget grid, right pane' } });
-  const main = el('div', { class: 'main' }, crumbs, banner, actions, host);
+  const main = el('div', { class: 'main' }, crumbs, banner, converted, actions, host);
   const footer = el('footer', { class: 'footer' });
   const root = el('section', { class: 'pane pane-1', attrs: { 'aria-label': 'Right pane' } }, tabbar, main, footer);
-  return new Pane(1, { root, tabbar, main, crumbs, banner, actions, host, footer });
+  return new Pane(1, { root, tabbar, main, crumbs, banner, converted, actions, host, footer });
 }
 
 // ---------------------------------------------------------------------------

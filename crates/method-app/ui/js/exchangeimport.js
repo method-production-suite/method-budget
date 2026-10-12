@@ -11,7 +11,8 @@
 //   budget in a new tab, unsaved.
 // - An export opened with Open, from Finder or dropped on the window
 //   (`review.convert`) gets the same review, worded as converting it; the
-//   new tab says once where it came from (the view's notice; decisions.md,
+//   new tab shows where it came from in a banner until it is closed or
+//   first saved (the view's `converted`, convertbanner.js; decisions.md,
 //   entry 67).
 //
 // Everything is drawn with el() and textContent: text from a file is never

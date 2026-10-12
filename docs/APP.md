@@ -2017,17 +2017,21 @@ budget.mthd"); the Save dialog asks before replacing a file, as always.
 Open, the start window's Open…, the Finder (double-click, Open With) or a drop gets the
 same review, worded as converting it: the title is "Convert budget export: <file>", the
 introduction says the original file is left as it is, and the button is **Convert to
-Method Budget** (the review's `convert` is true). The new tab then says once (the view's
-notice, shown as a toast): "Converted from <file>. The original file is left as it was.
-Saving keeps this budget as a Method Budget file (.mthd)." and its first Save starts
-beside the export as above. Nothing is ever written in the export's layout: the `.mthd`
+Method Budget** (the review's `convert` is true). The new tab then shows a slim banner
+at the top of its budget view (every view's `converted`, kept by the session): "Converted
+from <file>. The original file is left as it was. Saving keeps this budget as a Method
+Budget file (.mthd)." It belongs to that tab (switching tabs hides and shows it with the
+tab; each pane of a split view shows its own), stays until its close button is clicked
+(or Escape is pressed on it), which is remembered for that tab for the rest of the run,
+and goes by itself after the first successful Save. It is never saved into the file
+(js/convertbanner.js). The first Save starts beside the export as above. Nothing is ever written in the export's layout: the `.mthd`
 is the working file.
 
 | Command | Arguments | Returns |
 |---|---|---|
 | `export_import_pick` | none (shows the Open dialog) | the review, or `null` when cancelled: `{token, file, format, format_label, formats, title, categories, accounts, lines, adjustments, fringes, groups, sets, locations, currencies, charges, credits, notes: [{kind, text}], currency, tallies: [{kind, label, compared, different}], differences: [{kind, what, export, imported}], difference_count, export_grand, grand, export_net, net, calc_error, matches, convert}` (`convert`: false here, true from Open) |
 | `export_import_preview` | `token`, `format` (`null` to detect) | the review, read as that layout; changes nothing |
-| `export_import` | `token`, `format` | `{view, message}`: the budget in a new tab in front; `message` is `null` for a conversion, whose notice comes with the view |
+| `export_import` | `token`, `format` | `{view, message}`: the budget in a new tab in front; `message` is `null` for a conversion, whose banner comes with every view (`converted`) until saved |
 
 ### Actuals and the cost report
 

@@ -77,6 +77,11 @@ pub struct View {
     /// shared budget that couldn't put everything back).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub notice: Option<String>,
+    /// A budget converted from an export and not saved yet: the banner the
+    /// page shows on its tab until it is dismissed or saved (decisions.md,
+    /// entry 67).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub converted: Option<String>,
 }
 
 /// One account in full: its rows in file-format JSON and their totals.
@@ -487,6 +492,7 @@ impl View {
             cost: None,
             shared: false,
             notice: None,
+            converted: None,
         }
     }
 }

@@ -71,6 +71,7 @@ import { importSetup, newFromTemplate, saveAsTemplate } from './importsetup.js';
 import { importSpreadsheet, showDialog as showSheetImport } from './sheetimport.js';
 import { importChart } from './coaimport.js';
 import { importBudgetExport, showExportDialog } from './exchangeimport.js';
+import { renderConvertBanner } from './convertbanner.js';
 import { exportPack, importPack } from './packs.js';
 import { exportSetupLists, importSetupLists } from './setuplists.js';
 import { importActuals } from './actualsimport.js';
@@ -392,6 +393,8 @@ function render(opts = {}) {
   if (cur === target) renderTitle(v);
   renderCrumbs(entry, ai);
   renderBanner(v);
+  // A budget converted from an export, until saved or closed (convertbanner.js).
+  renderConvertBanner(P().converted, v, () => grid.focus());
   // A copy saved for sharing: read-only, and where it came from (sharing.js);
   // the target pane's budget, split.
   if (cur === target) renderShareBanner(v, sharingCtx());
