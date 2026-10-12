@@ -299,6 +299,8 @@ export function initSafety(ctx) {
       ctx.toast(e);
     }
     if (recovered.length) {
+      // After the review of a file the app was started with (an export).
+      while (isModalOpen()) await new Promise((r) => setTimeout(r, 300));
       showRecoveryDialog(recovered, {
         open: (key) => ctx.openBy('open_recovered', { key }),
         discard: (key) => invoke('discard_recovered', { key }).catch((e) => {

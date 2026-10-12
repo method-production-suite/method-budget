@@ -68,9 +68,9 @@ import { showVersions } from './versions.js';
 import { showCompare } from './compare.js';
 import { showWhatChanged, showMerge } from './diffmerge.js';
 import { importSetup, newFromTemplate, saveAsTemplate } from './importsetup.js';
-import { importSpreadsheet } from './sheetimport.js';
+import { importSpreadsheet, showDialog as showSheetImport } from './sheetimport.js';
 import { importChart } from './coaimport.js';
-import { importBudgetExport } from './exchangeimport.js';
+import { importBudgetExport, showExportDialog } from './exchangeimport.js';
 import { exportPack, importPack } from './packs.js';
 import { exportSetupLists, importSetupLists } from './setuplists.js';
 import { importActuals } from './actualsimport.js';
@@ -1469,16 +1469,41 @@ async function doNew() {
  */
 function openStart(opts = {}) {
   if (grid.editor) grid.commitEdit(null);
-  return showStart({ invoke, apply: (v, cmd) => apply(v, { cmd }), toast, focus: () => grid.focus() }, opts);
+  return showStart({ invoke, apply: (v, cmd) => apply(v, { cmd }), opened, toast, focus: () => grid.focus() }, opts);
+}
+
+/**
+ * What Open, or a file from the system, gave back (src/open_any.rs): a
+ * budget in a tab (`{kind: 'budget', view}`), a budget export
+ * (`{kind: 'export', review}`: Import Budget Export's review) or a
+ * spreadsheet (`{kind: 'sheet', picked}`: Import Spreadsheet's dialog,
+ * starting on a new tab). The start window goes either way. True when a
+ * dialog now shows (the grid shouldn't take the focus).
+ */
+function opened(r, cmd) {
+  if (!r) return false;
+  closeStart();
+  const focus = () => grid.focus();
+  if (r.kind === 'export') {
+    showExportDialog({ invoke, apply: (v) => apply(v, { cmd: 'export_import' }), toast, focus }, r.review);
+    return true;
+  }
+  if (r.kind === 'sheet') {
+    const ctx = { invoke, apply: (v) => apply(v, { cmd: 'sheet_import' }), toast, focus, account: () => '' };
+    showSheetImport(ctx, r.picked, { target: 'new' });
+    return true;
+  }
+  apply(r.kind === 'budget' ? r.view : r, { cmd });
+  return false;
 }
 
 /** Open: the chosen file in a new tab (or its own tab, when it is open). */
 async function doOpen() {
   if (grid.editor) grid.commitEdit(null);
   try {
-    // Resolves null when the user cancels the dialog.
-    const v = await invoke('open_budget');
-    if (v) apply(v, { cmd: 'open_budget' });
+    // Resolves null when the user cancels the dialog. A budget export or a
+    // spreadsheet shows its import's dialog instead (opened()).
+    if (opened(await invoke('open_budget'), 'open_budget')) return;
   } catch (e) {
     toast(e);
   }
@@ -1502,14 +1527,16 @@ function doRedo() {
 // Saving safety: Autosave, recovered budgets, backups, Open Recent and files
 // the system opens (safety.js, src/safety_app.rs).
 
-/** Opens the budget `cmd` returns (null: nothing) in a tab: its own when it is open already. */
+/**
+ * Opens what `cmd` returns (null: nothing): a budget in a tab (its own when
+ * it is open already), or for a file from the system that is a budget
+ * export or a spreadsheet, its import's dialog (opened()). A budget opened
+ * another way closes the start window.
+ */
 async function openBy(cmd, args = {}) {
   if (grid.editor) grid.commitEdit(null);
   try {
-    const v = await invoke(cmd, args);
-    // A budget opened another way (a file from the system): the start window goes.
-    if (v) closeStart();
-    if (v) apply(v, { cmd });
+    if (opened(await invoke(cmd, args), cmd)) return;
   } catch (e) {
     toast(e);
   }

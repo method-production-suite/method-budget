@@ -1,0 +1,60 @@
+name: Bug report
+description: Something is wrong, a total doesn't add up, or the app crashed.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please never attach a real budget: an invented one that shows the problem is always enough (`method sample` or the app's sample budgets are a good start).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the sample feature budget
+        2. Set the rate on line 2101-01 to 500
+        3. The account total shows ...
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Help > About Method Budget, or `method --version`.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Computer
+      options:
+        - macOS
+        - Windows
+        - Linux
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where
+      options:
+        - Math or totals
+        - Fringes, globals, charges or credits
+        - Importing a budget or spreadsheet
+        - Reports, PDF or export
+        - Editing the grid
+        - Versions or compare
+        - Sharing a budget
+        - Command line
+        - Something else
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots of invented budgets, error messages, or a small invented file that shows the problem.
