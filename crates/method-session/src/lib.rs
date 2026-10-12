@@ -23,6 +23,7 @@ pub mod export;
 pub mod history;
 pub mod host;
 pub mod report_dto;
+pub mod reports;
 pub mod safety;
 pub mod session;
 pub mod tabs;
