@@ -151,10 +151,12 @@ function open(ctx, first, charts) {
 
   const openFile = () =>
     once(async () => {
-      const v = await ctx.invoke('open_budget');
-      if (!v) return; // cancelled: the window stays
+      const r = await ctx.invoke('open_budget');
+      if (!r) return; // cancelled: the window stays
       close();
-      ctx.apply(v, 'open_budget');
+      // A budget, or a budget export or spreadsheet for its import (main.js).
+      if (ctx.opened) ctx.opened(r, 'open_budget');
+      else ctx.apply(r.kind === 'budget' ? r.view : r, 'open_budget');
     });
 
   /** Redraws from a fresh listing, keeping the focus on the same file. */

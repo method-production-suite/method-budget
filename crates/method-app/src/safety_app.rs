@@ -812,8 +812,9 @@ pub fn on_exit<R: Runtime>(app: &AppHandle<R>) {
 }
 
 /// The system asked to open `paths` (macOS: double-click, Open With, a drop
-/// on the Dock icon). The first one is opened in a tab (the web view asks
-/// for it with `open_pending`, after finishing any edit).
+/// on the Dock icon), or they were dropped on the main window. The first one
+/// is opened as Open opens a file (the web view asks for it with
+/// `open_pending`, after finishing any edit).
 pub fn on_opened<R: Runtime>(app: &AppHandle<R>, paths: Vec<PathBuf>) {
     let Some(path) = paths.into_iter().find(|p| p.is_file()) else {
         return;
@@ -997,20 +998,20 @@ pub fn flush_autosave<R: Runtime>(
     Ok(finish(&window, &mut state.lock_doc(Some(id))?, None))
 }
 
-/// Opens the file the system asked to open, if there is one, in a tab (its
-/// own tab, if it is open already).
+/// Opens the file the system asked to open (or one dropped on the window),
+/// if there is one, as Open does (src/open_any.rs): a budget in a tab (its
+/// own tab, if it is open already), a budget export as Import Budget
+/// Export's review, a spreadsheet as Import Spreadsheet's dialog.
 #[tauri::command]
 pub fn open_pending<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
     safety: State<'_, Safety>,
-) -> CmdResult<Option<View>> {
+) -> CmdResult<Option<crate::open_any::Opened>> {
     let Some(path) = lock(&safety.pending_open).take() else {
         return Ok(None);
     };
-    let id = open_path(&state, &safety, &path)?;
-    refresh_menu(window.app_handle());
-    Ok(Some(finish(&window, &mut state.lock_doc(Some(id))?, None)))
+    crate::open_any::open_any(&window, &state, &path).map(Some)
 }
 
 /// Opens File > Open Recent's `index`-th file in a tab (its own tab, if it
