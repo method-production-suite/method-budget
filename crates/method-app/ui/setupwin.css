@@ -108,25 +108,6 @@ body.setup-window > .sw-host {
   flex: 1 1 auto;
 }
 
-/* Tabs not drawn as a frame (their own forms) read best at a measured width. */
-.sw-main:not(.sw-framed):not(.sw-main-framed) > * {
-  max-width: 1120px;
-}
-
-.sw-main-charges:not(.sw-framed) > *,
-.sw-main-credits:not(.sw-framed) > *,
-.sw-main-info:not(.sw-framed) > *,
-.sw-main-settings:not(.sw-framed) > *,
-.sw-main-baseline:not(.sw-framed) > * {
-  max-width: 820px;
-}
-
-.sw-main .setup-intro {
-  margin: 0 0 8px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
 /* The left rail: Budget or Library, then the tab's or the library's
    controls (sort, Show, kind, folders). */
 
@@ -198,6 +179,7 @@ body.setup-window > .sw-host {
 
 .sw-rail-field {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 2px;
   min-width: 0;
 }
@@ -265,7 +247,8 @@ body.setup-window > .sw-host {
   background: var(--row-hover);
 }
 
-.sw-tree-item[aria-pressed="true"] {
+.sw-tree-item[aria-pressed="true"],
+.sw-tree-item[aria-current="true"] {
   background: var(--selection);
   font-weight: 600;
 }

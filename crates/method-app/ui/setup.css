@@ -32,13 +32,18 @@
    .sw-cell          a cell (clipped to one line); .sw-num right-aligns
                      figures; .sw-cell-input is a field drawn flat in its
                      cell (an outline on hover and focus); .sw-cell-name a
-                     row's name button; .sw-cell-text muted text
+                     row's name button; .sw-cell-text muted text and
+                     .sw-cell-label plain text
+   .sw-acts          a row's own buttons (details, delete) at its right end
    .sw-after         anything after the table, in the same scroll
+   .setup-empty      in the scroll: what shows instead of an empty table
+                     ("No charges yet.", "Nothing matches the search.")
    .sw-foot          the window's footer (setupwin.js): .sw-foot-totals at
                      the left, Close at the right. A tab sets its totals
-                     with setFooterTotals([{ label, value, title }]): one
-                     .sw-foot-stat each (.sw-foot-label, .sw-foot-value); a
-                     blank label shows the value alone ("6 fringes")
+                     with setFooterTotals([{ label, value, title, dim }]):
+                     one .sw-foot-stat each (.sw-foot-label,
+                     .sw-foot-value; .is-dim while not current); a blank
+                     label shows the value alone ("6 fringes")
    .sw-rail          the left rail (setupwin.css); a tab can put its own
                      content in it while it shows the budget: railHost() */
 
@@ -89,14 +94,6 @@
 
 .setup-panel[aria-busy="true"] .setup-list {
   cursor: progress;
-}
-
-.setup-intro {
-  color: var(--text-muted);
-  font-size: 12px;
-  margin: 0 0 10px;
-  display: grid;
-  gap: 4px;
 }
 
 .setup-empty {
@@ -842,6 +839,7 @@ ul.sw-grid {
 
 .sw-cell > span.sw-num,
 .sw-cell > .sw-cell-text,
+.sw-cell > .sw-cell-label,
 .sw-grid-row > .sw-cell-text {
   display: block;
   padding: 0 5px;
@@ -852,6 +850,11 @@ ul.sw-grid {
 .sw-cell-text {
   color: var(--text-muted);
   font-size: 12px;
+  white-space: nowrap;
+}
+
+.sw-cell-label {
+  color: var(--text);
   white-space: nowrap;
 }
 
@@ -977,6 +980,10 @@ select.setup-input.sw-cell-input {
 .sw-foot-value {
   font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
+}
+
+.sw-foot-stat.is-dim {
+  opacity: 0.5;
 }
 
 .sw-act.sw-foot-close {

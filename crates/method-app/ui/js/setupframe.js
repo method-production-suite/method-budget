@@ -183,7 +183,7 @@ function drawTotals() {
     ...footItems.map((t) =>
       el(
         'span',
-        { class: 'sw-foot-stat', title: t.title || undefined },
+        { class: `sw-foot-stat${t.dim ? ' is-dim' : ''}`, title: t.title || undefined },
         t.label ? el('span', { class: 'sw-foot-label', text: t.label }) : null,
         el('span', { class: 'sw-foot-value', text: t.value === undefined || t.value === null ? '' : String(t.value) }),
       ),
@@ -192,9 +192,11 @@ function drawTotals() {
 }
 
 /**
- * The tab's totals in the footer: `items` is [{ label, value, title }] (a
- * blank label shows the value alone, like "6 fringes"). Shown at once, and
- * kept until the tab sets others or setupwin.js draws another tab.
+ * The tab's totals in the footer: `items` is [{ label, value, title, dim }]
+ * (a blank label shows the value alone, like "6 fringes"; `dim` marks a
+ * figure as not current, like a total while its value is being typed).
+ * Shown at once, and kept until the tab sets others or setupwin.js draws
+ * another tab.
  */
 export function setFooterTotals(items) {
   footItems = Array.isArray(items) ? items.filter(Boolean) : [];

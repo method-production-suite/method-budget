@@ -427,7 +427,7 @@ lines, in charges' excluded groups, the credits based on it, and report presets'
 filters, keeping its color; a unit in all four unit columns and flat fringes; a set or
 location on lines; a currency on lines, flat charges and the totals currency. Tag presets
 and line blocks follow too (a block's saved copies of setup are filed under the new name).
-Renaming the base currency (Budget Setup > Settings) works the same way. The new name has to be
+Renaming the base currency (Budget Setup > Currency, the band over the table) works the same way. The new name has to be
 free: not another item, and not a name something already uses without an item behind it
 (a unit typed on lines, a global a formula names), so a rename never merges two names and
 renaming back gives the identical budget. Saved versions keep their own names.
@@ -481,28 +481,30 @@ off as reviewed (and back), **Open only** hides the ticked ones, and a click goe
 a category). **Your name on new notes** at the bottom signs the notes you add; it is kept
 in this window's local storage, and blank signs nothing. Every change is one undo step.
 
-**Budget.** Charges, credits, budget info, settings (currencies, fringe posting, account
-numbers, what new lines copy, numbers on screen) and the baseline, as in the setup tabs
+**Budget.** Charges, credits, budget info, settings (fringe posting, calculation, account
+numbers, what new lines copy, numbers on screen; the base and totals currency are the
+Currency tab's band) and the baseline, as in the setup tabs
 before. Settings > Calculation sets the rounding (Spreadsheet (binary), the default, or
 Exact decimal) and whether the fringes of categories after the last production total are
 kept or dropped; each change is one undo step. **Charges**: two switches per charge, saved in the budget, add to its topsheet label
 (screen and printed): the percent (percent charges, "Contingency 10%") and the amount left
-out ("(excluding 25,000.00)"). "Left out of this charge" lists every group with a box and
-the group's own amount in the charge's base as the totals stand now (its counted lines, with
-their fringes unless fringes post by budget), the typed amounts, categories and accounts,
-and the total left out (each line once). While a percent, a flat amount or a left-out amount
-is being typed, the charge's total in its heading is figured from the typed text before
-Enter commits it (`preview_charge`, about a tenth of a second after the last key); a value
-that isn't a number yet dims the old total. **Credits**: a row's **Spend** is an amount
-typed in, a group's lines or a topsheet category ("Category: 2100 Electric": the
-category's total with the fringes its lines earn, wherever fringes post; decisions.md,
-entry 57). **Fringes left out of the spend**, under Discount, is one list per credit: it
-applies to every group and category row (a typed amount has no fringes), so changing a
-row's Spend keeps it. Each row shows its spend, the
+out ("(excluding 25,000.00)"). The charge's **Left out** table lists the typed amounts, the
+groups (each with its own amount in the charge's base as the totals stand now: its counted
+lines, with their fringes unless fringes post by budget), categories and accounts it leaves
+out, and the footer has the total left out (each line once). While a percent, a flat amount
+or a left-out amount is being typed, the charge's total in the footer is figured from the
+typed text before Enter commits it (`preview_charge`, about a tenth of a second after the
+last key); a value that isn't a number yet dims the old total. **Credits**: a row's
+**Spend** is an amount typed in, a group's lines or a topsheet category ("Category: 2100
+Electric": the category's total with the fringes its lines earn, wherever fringes post;
+decisions.md, entry 57). **Fringes left out of the spend**, under the credit's own fields,
+is one list per credit: it applies to every group and category row (a typed amount has no
+fringes), so changing a row's Spend keeps it. Each row shows its spend, the
 fringes left out of it, the net spend the percent applies to, the credit (rounded for
 display; its tooltip has the exact figure, since rows add up before rounding), and with a
 cap, how far the row is under or over it (spend for a cap on the spend, credit for a cap on
-the credit).
+the credit). The footer adds the rows up (gross, fringes out, net, credit) and shows the
+discount and the net credit taken off the grand total.
 
 | Command | Arguments | Returns |
 |---|---|---|
@@ -614,7 +616,8 @@ at the left and **Close** at the right.
   **Lines in a counted and an uncounted group** (Exclude, the default, leaves them out) and
   **Fringes in group totals** (display only: the group dollars in the tables and the
   printed Groups section with or without their fringes); on Currency, the **Base
-  currency** (renaming it renames it everywhere, as in Settings) and **Show totals in**.
+  currency** (renaming it renames it everywhere) and **Show totals in** (Settings only
+  points here).
 - **The footer** shows how many items the table lists and, on Fringes, the budget's
   fringe total and its percent and flat parts.
 - **In Library** the tab's area is the library's items of the kind and folder as a table
@@ -623,9 +626,31 @@ at the left and **Close** at the right.
   the count and how many are ticked in the footer.
 
 Charges, Credits, Info, Settings (renumbering accounts included) and Baseline are the
-forms the tools panel's Budget tab used to hold. The layout pieces (strip, band, table,
-footer totals, the rail's own content) are `ui/js/setupframe.js`, described at the top of
-`ui/setup.css`, for any tab to use.
+forms the tools panel's Budget tab used to hold, drawn in the same layout (strip, bands,
+tables, footer), each with its explanation in its tab's tooltip:
+
+- **Charges and Credits** list their items in the rail (name and amount; a click, or Up
+  and Down, picks one, and Option+Shift+Up and Down move it), with the New charge or New
+  credit form under the list. The strip has **New…** (the form's name box), **Move up**,
+  **Move down**, **Delete…** (asking at the top of the editor) and **Save to Library…**
+  for the picked item, whose editor fills the area: a band with its own fields (name,
+  Applied, type and value or cap and discount, the account it posts to), a band of
+  topsheet label switches (a charge) or the fringes left out of its spend (a credit),
+  a band that adds to its table (Exclude amount, group, category or account; Add row),
+  then the table. The footer has the count and the picked item's figures: a charge's
+  **Total charge** and **Left out**; a credit's rows added up (**Gross**, **Fringes
+  out**, **Net**, **Credit**), its **Discount** and **Net credit**.
+- **Info** is one table (Name, Kind, Value, ×) with **New field…** (a small form: label,
+  kind, value), **Delete…** for the selected row and a search on the strip, and the count
+  in the footer.
+- **Settings** is its groups of rows (Fringe totals, Calculation, New lines, Numbers on
+  screen, Account numbers), under a strip with only Undo and Redo.
+- **Baseline** has **Lock current totals**, or **Lock again…** and **Clear…**, on the
+  strip, the grand and net totals' original, current and change as a table, and what has
+  changed since (lines and accounts) in the footer.
+
+The layout pieces (strip, band, table, footer totals, the rail's own content) are
+`ui/js/setupframe.js`, described at the top of `ui/setup.css`, for any tab to use.
 
 Open it with the toolbar's **Setup** button, View > Budget Setup, or a setup key (Cmd+3
 Fringes, Cmd+4 Groups, Cmd+G Globals, Cmd+5 Locations, Cmd+6 Currency, Cmd+7 Units, Cmd+8

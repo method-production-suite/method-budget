@@ -53,11 +53,29 @@ export const SETUP_TABS = Object.freeze([
     list: true,
     hint: 'Currencies other than the base currency, each with its rate. Lines in another currency are converted at that rate.',
   },
-  { id: 'charges', label: 'Charges', library: 'charge', list: false, hint: '' },
-  { id: 'credits', label: 'Credits', library: 'credit', list: false, hint: '' },
-  { id: 'info', label: 'Info', library: null, list: false, hint: '' },
+  {
+    id: 'charges',
+    label: 'Charges',
+    library: 'charge',
+    list: false,
+    hint: 'Fees worked out on the above- plus below-the-line total, like contingency or insurance. Each one is figured on that total alone, never on another charge.',
+  },
+  {
+    id: 'credits',
+    label: 'Credits',
+    library: 'credit',
+    list: false,
+    hint: 'Incentives and rebates taken off the grand total to give the net total. Each row is a percent of some spend; the row credits add up, then the cap and discount apply.',
+  },
+  { id: 'info', label: 'Info', library: null, list: false, hint: 'Facts about the production. Notes only; they don’t feed formulas.' },
   { id: 'settings', label: 'Settings', library: null, list: false, hint: '' },
-  { id: 'baseline', label: 'Baseline', library: null, list: false, hint: '' },
+  {
+    id: 'baseline',
+    label: 'Baseline',
+    library: null,
+    list: false,
+    hint: 'Lock the current totals as the original budget, so every line, account and category shows how far it has moved.',
+  },
 ]);
 
 export const SETUP_TAB_IDS = Object.freeze(SETUP_TABS.map((t) => t.id));

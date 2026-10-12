@@ -1,109 +1,171 @@
-/* The tools panel's Budget tab (charges, credits, info, settings, baseline).
-   Builds on setup.css; uses only the app's :root tokens. Every class here is
-   prefixed with tss-. */
+/* Budget Setup's Charges, Credits, Info, Settings and Baseline tabs
+   (js/topsheet-setup.js). They are drawn in the shared layout (setup.css,
+   documented at its top: the strip, bands, tables and footer); what is
+   here is their own: the tables' columns, the charges and credits lists in
+   the rail, the chips, and the Settings rows. Uses only the app's :root
+   tokens; every class here is prefixed with tss- or ts-. */
 
-.tss-heading {
-  margin: 0 0 4px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
+/* Each table's columns: the lead column (where the list tables keep their
+   drag handle), then the cells in order. */
+
+.sw-cols-charge-excl .sw-grid-head,
+.sw-cols-charge-excl .sw-grid-row {
+  grid-template-columns: 14px 96px minmax(120px, 1fr) minmax(160px, 2fr) 140px 32px;
 }
 
-.tss-group {
-  padding: 8px 0 10px;
-  border-bottom: 1px solid var(--border);
+.sw-cols-credit-rows .sw-grid-head,
+.sw-cols-credit-rows .sw-grid-row {
+  grid-template-columns:
+    14px minmax(140px, 1.3fr) minmax(110px, 1.6fr) minmax(88px, 1fr)
+    minmax(92px, 1fr) minmax(92px, 1fr) minmax(92px, 1fr) 132px
+    minmax(88px, 1fr) 56px minmax(92px, 1fr) minmax(88px, 1fr) 32px;
 }
 
-.tss-group:first-child {
-  padding-top: 0;
+.sw-cols-info .sw-grid-head,
+.sw-cols-info .sw-grid-row {
+  grid-template-columns: 14px minmax(140px, 1fr) 112px minmax(200px, 2.5fr) 32px;
 }
 
-.tss-note {
-  margin-top: 6px !important;
+/* A field's value reads from the left, a number too (the column mixes text,
+   numbers and dates). */
+.sw-cols-info .setup-input.sw-cell-input.setup-num {
+  text-align: left;
 }
 
-/* Up / down buttons */
-
-.tss-move {
-  display: inline-flex;
-  flex: 0 0 auto;
-  gap: 1px;
+.sw-cols-baseline .sw-grid-head,
+.sw-cols-baseline .sw-grid-row {
+  grid-template-columns: 14px minmax(160px, 260px) 150px 150px 150px;
 }
 
-.tss-move-btn {
-  appearance: none;
-  width: 20px;
-  height: 22px;
-  padding: 0;
-  font: inherit;
-  font-size: 13px;
-  line-height: 1;
-  border: 0;
-  border-radius: var(--radius);
-  background: transparent;
+/* An amount left out of a charge: its description spans Name and
+   Description. */
+.tss-span2 {
+  grid-column: span 2;
+}
+
+/* Charges and credits: the list in the rail, then the add form. */
+
+.tss-pick .sw-tree-count {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.tss-pick-item.is-off .sw-tree-name {
   color: var(--text-muted);
-  cursor: pointer;
 }
 
-.tss-move-btn:hover:not(:disabled):not([aria-disabled="true"]) {
-  color: var(--text);
-  background: var(--surface-2);
+.tss-pick-item.is-bad {
+  box-shadow: inset 2px 0 0 var(--danger);
 }
 
-.tss-move-btn:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-
-.tss-move-btn:focus-visible,
-.tss-chip-x:focus-visible,
-.tss-more-title:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.setup-btn.tss-small {
-  height: 22px;
-  padding: 0 8px;
+.tss-pick-empty {
+  margin: 0;
+  padding: 2px 6px;
   font-size: 12px;
+  font-style: italic;
+  color: var(--text-muted);
 }
 
-/* Collapsible "left out" section */
+/* The add form in the rail: one field a line, its label above, as the
+   rail's own fields. */
+.setup-add.tss-rail-add {
+  margin: 0;
+  padding: 6px;
+}
 
-.tss-more {
+.tss-rail-add .setup-add-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.tss-rail-add .setup-fields {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+
+.tss-rail-add .setup-add-actions {
   margin-top: 6px;
 }
 
-.tss-more-title {
+.tss-rail-add .setup-btn {
+  height: 22px;
+  padding: 0 10px;
   font-size: 12px;
-  color: var(--text-muted);
+}
+
+/* The picked item's editor: its bands, then its table. */
+
+.tss-ed[hidden] {
+  display: none;
+}
+
+.tss-ed.setup-item-bad {
+  box-shadow: inset 2px 0 0 var(--danger);
+}
+
+.tss-ed > .setup-empty,
+.tss-body > .setup-empty,
+.tss-editors > .setup-empty {
+  margin: 6px 10px;
+}
+
+.tss-ed > .setup-issue,
+.tss-ed > .setup-error,
+.tss-ed > .setup-confirm,
+.tss-body > .setup-error,
+.tss-body > .setup-confirm,
+.tss-body > .tss-note {
+  margin: 6px 10px;
+}
+
+.sw-band .setup-input.tss-w-name {
+  width: 220px;
+}
+
+.sw-band .setup-input.tss-w-num {
+  width: 110px;
+}
+
+.sw-band .setup-input.tss-w-pct {
+  width: 64px;
+}
+
+.sw-band .setup-input.tss-w-acct {
+  width: 104px;
+}
+
+.sw-band .setup-check-label {
+  font-size: 12px;
+}
+
+/* A pick that adds something reads as one of the band's buttons. */
+.sw-band .setup-input.tss-picker,
+.sw-band .setup-input.tss-chip-add {
+  max-width: 180px;
+  border-color: transparent;
+  background: none;
   cursor: pointer;
-  border-radius: var(--radius);
-  padding: 1px 0;
 }
 
-.tss-more-title:hover {
-  color: var(--text);
+.sw-band .setup-input.tss-picker:hover,
+.sw-band .setup-input.tss-chip-add:hover {
+  border-color: var(--border);
+  background: var(--row-hover);
 }
 
-.tss-more[open] > .tss-more-title {
-  color: var(--text);
-}
+/* Chips: a credit's fringes left out of its spend. */
 
-.tss-more-body {
-  margin-top: 4px;
-  padding-left: 8px;
-  border-left: 2px solid var(--border);
+.tss-chipfield {
+  flex: 1 1 auto;
 }
-
-/* Chips */
 
 .tss-chips {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
-  min-height: 24px;
+  min-width: 0;
 }
 
 .tss-chips-empty {
@@ -117,10 +179,10 @@
   align-items: center;
   gap: 2px;
   max-width: 100%;
-  height: 22px;
+  height: 20px;
   padding: 0 2px 0 8px;
   font-size: 12px;
-  border-radius: 11px;
+  border-radius: 10px;
   background: var(--selection);
   color: var(--text);
 }
@@ -134,14 +196,14 @@
 .tss-chip-x {
   appearance: none;
   flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   padding: 0;
   font: inherit;
   font-size: 13px;
   line-height: 1;
   border: 0;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
@@ -152,483 +214,34 @@
   background: var(--danger-bg);
 }
 
-.setup-input.tss-chip-add {
-  width: auto;
-  max-width: 140px;
-  height: 22px;
-  font-size: 12px;
-}
-
-/* A live total that doesn't match what is typed yet */
-
-.tss-stale {
-  opacity: 0.5;
-}
-
-/* Charges and credits: a narrow list at the left, the picked item's editor
-   at the right, filling the window's height; the tables scroll. */
-
-.setup-panel.tss-fill {
-  display: flex;
-  flex-direction: column;
-}
-
-.tss-fill > .setup-intro {
-  flex: none;
-  margin-bottom: 8px;
-}
-
-.tss-md {
-  flex: 1 1 auto;
-  min-height: 260px;
-  display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
-  gap: 12px;
-}
-
-/* Wider than the measured width setupwin.css gives forms: the tables use
-   the room. */
-.sw-main > .tss-md {
-  max-width: none;
-}
-
-.tss-side {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-  min-height: 0;
-}
-
-.tss-pick {
-  flex: 1 1 auto;
-  min-height: 48px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.tss-pick-btn {
-  appearance: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  height: 24px;
-  padding: 0 6px;
-  border: 0;
-  border-bottom: 1px solid var(--border-soft);
-  background: transparent;
-  font: inherit;
-  font-size: 12.5px;
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-}
-
-.tss-pick-btn:hover {
-  background: var(--row-hover);
-}
-
-.tss-pick-btn:focus-visible {
+.tss-chip-x:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  outline-offset: -1px;
 }
 
-.tss-pick-item.is-picked > .tss-pick-btn {
-  background: var(--selection);
-  font-weight: 600;
+.sw-band .setup-input.tss-chip-add {
+  max-width: 140px;
 }
 
-.tss-pick-item.is-bad > .tss-pick-btn {
-  box-shadow: inset 2px 0 0 var(--danger);
-}
-
-.tss-pick-name {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tss-pick-item.is-off .tss-pick-name {
-  color: var(--text-muted);
-}
-
-.tss-pick-fig {
-  flex: none;
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--text-muted);
-}
-
-.tss-side .setup-add {
-  margin-top: 0;
-  padding: 6px;
-}
-
-/* One field a line, its label at the left. */
-.tss-side .setup-add .setup-fields {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 4px;
-}
-
-.tss-side .setup-add .setup-field {
-  grid-template-columns: 64px minmax(0, 1fr);
-  align-items: center;
-  column-gap: 6px;
-}
-
-.tss-side .setup-add-actions {
-  margin-top: 4px;
-}
-
-.tss-confirm {
-  margin-top: 0;
-}
-
-/* The editor */
-
-.tss-main {
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.tss-ed {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-}
-
-.tss-ed[hidden] {
-  display: none;
-}
-
-.tss-ed.setup-item-bad {
-  padding-left: 6px;
-}
-
-.tss-ed > .setup-issue,
-.tss-ed > .setup-error {
-  flex: none;
-  margin-top: 0;
-}
-
-.tss-hrow {
-  flex: none;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 14px;
-  min-width: 0;
-}
-
-.tss-if {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.tss-if-grow {
-  flex: 1 1 240px;
-}
-
-.tss-if-label {
-  flex: none;
-  font-size: 11.5px;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.tss-if > .setup-input {
-  width: auto;
-  flex: none;
-}
-
-.tss-if-grow > .setup-input {
-  flex: 1 1 auto;
-  width: 100%;
-}
-
-.tss-if > .setup-input.tss-w-num {
-  width: 110px;
-}
-
-.tss-if > .setup-input.tss-w-pct {
-  width: 64px;
-}
-
-.tss-if > .setup-input.tss-w-acct {
-  width: 104px;
-}
-
-.tss-if > .setup-input.tss-w-kind {
-  width: 150px;
-}
-
-.tss-if > .setup-input.tss-w-cur {
-  width: 104px;
-}
-
-.tss-sum {
-  font-size: 12px;
-}
-
-.tss-fig {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.tss-fig-label {
-  color: var(--text-muted);
-}
-
-.tss-sum .setup-check-label {
-  font-size: 12px;
-}
-
-/* A credit's fringes left out of its spend: the label at the left. */
-.tss-ed .tss-chiprow {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.tss-ed .tss-chiprow > .setup-label {
-  flex: none;
-  font-size: 11.5px;
-  white-space: nowrap;
-}
-
-.tss-ed .tss-chiprow > .tss-chips {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-/* Action strips: a small title, then buttons and pickers */
-
-.tss-strip {
-  flex: none;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  min-height: 24px;
-}
-
-.tss-ed .tss-strip {
-  margin-top: 4px;
-}
-
-.tss-strip-title {
-  margin-right: 6px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.tss-strip-end {
-  margin-left: auto;
-}
-
-.setup-input.tss-picker {
-  width: auto;
-  max-width: 180px;
-  height: 22px;
-  font-size: 12px;
-  background: var(--surface-2);
-  cursor: pointer;
-}
-
-/* Grid tables: one line per row, edited in place */
-
-.tss-gridwrap {
-  flex: 1 1 auto;
-  min-height: 76px;
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.tss-grid {
-  width: 100%;
-  table-layout: fixed;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 12.5px;
-}
-
-/* A credit's rows are laid out by their content, so a figure is never cut
-   off: the column widths below are least widths, and Description takes the
-   room left. */
-.tss-grid-credit {
-  table-layout: auto;
-}
-
-.tss-grid-credit .setup-input.tss-cell {
-  min-width: 92px;
-}
-
-.tss-grid-credit .setup-input.tss-desc {
-  min-width: 120px;
-}
-
-.tss-grid-credit .setup-input.tss-spend {
-  min-width: 128px;
-}
-
-.tss-grid-credit .setup-input.tss-captype {
-  min-width: 124px;
-}
-
-.tss-grid-credit .setup-input.tss-pct {
-  min-width: 48px;
-}
-
-.tss-grid-excl {
-  min-width: 460px;
-}
-
-.tss-grid th,
-.tss-grid td {
-  height: 24px;
-  padding: 0 4px;
-  border-bottom: 1px solid var(--border-soft);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: left;
-}
-
-.tss-grid .tss-r {
-  text-align: right;
-}
-
-.tss-grid thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  height: 22px;
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--text-muted);
-  background: var(--surface-2);
-  border-bottom-color: var(--border);
-}
-
-.tss-grid tbody tr:hover,
-.tss-grid tbody tr:focus-within {
-  background: var(--row-hover);
-}
-
-.tss-grid tfoot td {
-  position: sticky;
-  bottom: 0;
-  font-weight: 600;
-  background: var(--surface-2);
-  border-top: 1px solid var(--border);
-  border-bottom: 0;
-}
-
-.tss-grid-empty td {
-  font-style: italic;
-  font-size: 12px;
-}
-
-.tss-grid td.tss-td-in {
-  padding: 0 1px;
-}
-
-.setup-input.tss-cell {
-  width: 100%;
-  height: 22px;
-  padding: 1px 4px;
-  border-color: transparent;
-  background: transparent;
-}
-
-.tss-grid tr:hover .setup-input.tss-cell,
-.setup-input.tss-cell:hover {
-  border-color: var(--border);
-}
-
-.setup-input.tss-cell:focus {
-  border-color: var(--accent);
-  background: var(--surface);
-}
-
-.setup-input.tss-cell.setup-num {
-  text-align: right;
-}
-
-.setup-del.tss-row-del {
-  width: 20px;
-  height: 20px;
-  font-size: 14px;
-}
-
-.tss-c-del {
-  width: 28px;
-}
-
-.tss-grid td.tss-td-del {
-  padding: 0 4px;
-  overflow: visible;
-  text-overflow: clip;
-}
-
-.tss-c-fig {
-  width: 84px;
-}
-
-.tss-c-spend {
-  width: 132px;
-}
-
-.tss-c-cap {
-  width: 110px;
-}
-
-.tss-c-pct {
-  width: 52px;
-}
-
-.tss-c-type {
-  width: 80px;
-}
+/* Baseline: a change up or down */
 
-.tss-c-name {
-  width: 130px;
+.tss-up {
+  color: var(--danger);
 }
 
-.tss-grid-excl .tss-c-fig {
-  width: 120px;
+.tss-down {
+  color: var(--accent);
 }
 
-/* Settings: compact rows, a fixed label column and the controls beside it */
+/* Settings: groups of rows, each a fixed label column and the controls
+   beside it, at the strip's control size. */
 
 .ts-settings .tss-group {
-  padding: 6px 0 8px;
+  padding: 6px 10px 8px;
+  border-bottom: 1px solid var(--border);
 }
 
-.ts-settings .tss-heading {
+.tss-heading {
   margin: 0 0 2px;
   font-size: 11px;
   font-weight: 600;
@@ -642,8 +255,8 @@
   grid-template-columns: 220px minmax(0, 1fr);
   column-gap: 10px;
   align-items: center;
-  min-height: 30px;
-  padding: 2px 0;
+  min-height: 28px;
+  padding: 1px 0;
 }
 
 .ts-row-label {
@@ -671,10 +284,15 @@
   gap: 4px;
 }
 
+.ts-settings .setup-input {
+  height: 22px;
+  font-size: 12px;
+}
+
 .ts-inline {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .ts-inline-label {
@@ -691,6 +309,13 @@
 
 .ts-row-note {
   margin: 2px 0 0 230px !important;
+}
+
+.ts-pointer {
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
 }
 
 .ts-row-ctl > .setup-input.ts-w-xs,
@@ -720,7 +345,7 @@
 }
 
 .tss-example {
-  font-size: 12.5px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -739,166 +364,4 @@
   .ts-settings .setup-hint-bad {
     margin-left: 0 !important;
   }
-}
-
-/* Budget info: one dense table (heads, add row, a row per field) */
-
-.ts-info-table {
-  border-top: 1px solid var(--border);
-}
-
-.ts-info-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) 96px minmax(0, 1.6fr) 40px;
-  column-gap: 6px;
-  align-items: center;
-  min-height: 28px;
-  padding: 2px 2px 2px 6px;
-  border-bottom: 1px solid var(--border);
-}
-
-.ts-info-cols {
-  min-height: 22px;
-  font-size: 11px;
-  color: var(--text-muted);
-  background: var(--surface-2);
-}
-
-.ts-info-list {
-  margin: 0;
-  border-top: 0;
-}
-
-.ts-info-row > .setup-issue,
-.ts-info-row > .setup-error,
-.ts-info-row > .setup-confirm {
-  grid-column: 1 / -1;
-  margin-bottom: 2px;
-}
-
-/* The add row reuses the kit's add form, laid out on the table's columns:
-   its labels are read out but not shown (each input has a placeholder). */
-.setup-add.ts-info-add {
-  margin: 0;
-  padding: 2px 2px 2px 6px;
-  border: 0;
-  border-bottom: 1px solid var(--border);
-  border-radius: 0;
-  background: transparent;
-}
-
-.ts-info-add > .setup-add-title {
-  display: none;
-}
-
-.ts-info-add > .setup-fields,
-.ts-info-add > .setup-add-actions {
-  display: contents;
-}
-
-.ts-info-add .setup-field {
-  position: relative;
-}
-
-.ts-info-add .setup-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
-.ts-info-add .setup-btn {
-  height: 22px;
-  padding: 0 6px;
-  font-size: 12px;
-}
-
-.ts-info-row > .setup-del,
-.ts-info-add .setup-btn {
-  justify-self: center;
-}
-
-/* Baseline: a status and actions strip over a dense table */
-
-.ts-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 28px;
-  margin-bottom: 4px;
-}
-
-.ts-strip-status {
-  font-size: 12px;
-  color: var(--text-muted);
-  min-width: 0;
-}
-
-.ts-strip-status.setup-empty {
-  padding: 0;
-}
-
-.ts-strip-actions {
-  display: flex;
-  gap: 6px;
-  flex: 0 0 auto;
-}
-
-.ts-strip-actions .setup-btn {
-  height: 22px;
-  padding: 0 8px;
-  font-size: 12px;
-}
-
-.ts-baseline .tss-group {
-  padding-top: 0;
-  border-bottom: 0;
-}
-
-.tss-table.ts-dense th,
-.tss-table.ts-dense td {
-  padding: 2px 6px;
-  height: 24px;
-}
-
-.tss-table.ts-dense thead th {
-  background: var(--surface-2);
-  border-top: 1px solid var(--border);
-}
-
-/* Baseline summary */
-
-.tss-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12.5px;
-}
-
-.tss-table th,
-.tss-table td {
-  padding: 3px 4px;
-  border-bottom: 1px solid var(--border-soft);
-  white-space: nowrap;
-}
-
-.tss-table thead th {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--text-muted);
-}
-
-.tss-table tbody th {
-  text-align: left;
-  font-weight: 600;
-}
-
-.tss-up {
-  color: var(--danger);
-}
-
-.tss-down {
-  color: var(--accent);
 }

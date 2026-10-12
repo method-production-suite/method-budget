@@ -1,16 +1,24 @@
-// The tools panel's Budget tab and its own tabs: charges, credits, budget
-// info, settings (currencies, fringe posting, account numbers, new lines) and
-// the baseline.
+// Budget Setup's Charges, Credits, Info, Settings and Baseline tabs: the
+// budget's own setup (currencies are the Currency tab's band, setupbands.js;
+// sets and locations are lists in apply.js).
 //
-// tools.js draws the Budget tab's tab strip; setup.js owns the command queue
-// and focus handling and passes its helpers in as `kit`, so every tab looks
-// and behaves the same. Budget text only reaches the page through
-// textContent and input values, never innerHTML. (Sets and locations are
-// lists in apply.js.)
+// setupwin.js draws them through setup.js, which owns the command queue and
+// focus handling and passes its helpers in as `kit`, so every tab looks and
+// behaves the same. Each tab is drawn in the shared layout (setupframe.js;
+// the classes are documented at the top of setup.css): an action strip, the
+// tab's content scrolling under it, and its totals in the window's footer.
+// Charges and Credits list their items in the left rail (railHost()), with
+// the add form under the list, and edit the picked item at the area's full
+// width. Budget text only reaches the page through textContent and input
+// values, never innerHTML.
 
 import { displaySettingsGroup } from './display-settings.js';
 import { invoke } from './api.js';
 import { applyCoding, pendingRenumber, previewBox } from './renumber.js';
+import { anchoredForm } from './modal.js';
+import { saveItemToLibrary } from './library.js';
+import { redrawLists } from './setuplist.js';
+import { mountFrame, actionStrip, stripButton, searchBox, gridTable, band, bandField, setFooterTotals, railHost } from './setupframe.js';
 import { obj } from './util.js';
 
 const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)$/;
@@ -27,9 +35,6 @@ const SEPARATORS = [
 ];
 
 let k = null; // the kit from setup.js, set on every render
-
-// <details> sections that are open, by key, so a re-render keeps them open.
-const openSections = new Set();
 
 export function renderExtraTab(tab, panel, kit) {
   k = kit;
@@ -52,10 +57,6 @@ function arr(v) {
 
 function isNone(v) {
   return v === undefined || v === null;
-}
-
-function intro(text) {
-  return k.el('p', 'setup-intro', text);
 }
 
 function heading(text) {
@@ -106,43 +107,45 @@ function checkbox(fieldKey, checked, labelText, onChange) {
   return wrap;
 }
 
-// Up and down buttons for an ordered list. Focus follows the moved item.
-function moveButtons(tab, index, count, what, name, command) {
-  const wrap = k.el('span', 'tss-move');
-  const go = (to) => {
-    k.setFocusKey(k.key(tab, to, to === 0 ? 'down' : 'up'));
-    k.run(k.key(tab, index), () => [command, { index, to }], {
-      onError: () => k.setFocusKey(null),
-    });
+// What Save to Library… and New… use: the window's own call and toast.
+function windowCtx() {
+  const c = k.state().ctx || {};
+  return {
+    call: (cmd, args) => (typeof c.call === 'function' ? c.call(cmd, args) : Promise.reject(new Error('Not connected'))),
+    toast: (m) => typeof c.toast === 'function' && c.toast(m),
   };
-  const up = button('↑', 'tss-move-btn', k.key(tab, index, 'up'), () => go(index - 1), `Move ${what} ${name} up`);
-  const down = button('↓', 'tss-move-btn', k.key(tab, index, 'down'), () => go(index + 1), `Move ${what} ${name} down`);
-  up.disabled = index === 0;
-  down.disabled = index >= count - 1;
-  wrap.append(up, down);
-  return wrap;
 }
 
-// A collapsible section that stays open across re-renders.
-function section(sectionKey, title, ...children) {
-  const d = k.el('details', 'tss-more');
-  d.open = openSections.has(sectionKey);
-  const s = k.el('summary', 'tss-more-title', title);
-  s.dataset.key = k.key('section', sectionKey);
-  d.addEventListener('toggle', () => {
-    if (d.open) openSections.add(sectionKey);
-    else openSections.delete(sectionKey);
-  });
-  d.append(s, ...children);
-  return d;
+// A field in a band (setupframe.js): its label, the control, then a unit
+// like "%". `size` is a width class for the control.
+function bandInput(text, control, { size = '', unit = '', title = '' } = {}) {
+  if (size) control.classList.add(size);
+  const f = bandField(text, control, title);
+  if (unit) {
+    const u = k.el('span', 'setup-adorn', unit);
+    u.setAttribute('aria-hidden', 'true');
+    f.append(u);
+  }
+  return f;
 }
 
-// Chips for a set of names picked from `options`, with a select to add one.
+// A band's short title, at its left.
+function bandTitle(text) {
+  return k.el('span', 'sw-band-title', text);
+}
+
+// A compact button in a band (the strip's style), acting on the picked item.
+function bandButton(text, fieldKey, onClick) {
+  return button(text, 'sw-act', fieldKey, onClick);
+}
+
+// Chips for a set of names picked from `options`, with a select to add one,
+// as a band field.
 function chips({ fieldKey, label, selected, options, onChange, emptyText = 'None' }) {
-  const wrap = k.el('div', 'setup-field setup-field-wide');
-  const head = k.el('span', 'setup-label', label);
+  const wrap = k.el('span', 'sw-band-field tss-chipfield');
+  const head = k.el('span', 'sw-band-label', label);
   head.id = k.nextId();
-  const row = k.el('div', 'tss-chips');
+  const row = k.el('span', 'tss-chips');
   row.setAttribute('role', 'list');
   row.setAttribute('aria-labelledby', head.id);
   if (!selected.length) row.append(k.el('span', 'tss-chips-empty', emptyText));
@@ -194,7 +197,7 @@ function chips({ fieldKey, label, selected, options, onChange, emptyText = 'None
   return wrap;
 }
 
-// A yes/no box under an item, in the same style as setup.js's delete confirm.
+// A yes/no box in an item, in the same style as setup.js's delete confirm.
 function confirmBox(itemKey, opener, text, yesText, danger, build) {
   const li = k.findByData('item', itemKey);
   if (!li) return;
@@ -275,10 +278,122 @@ function withKept(options, picked) {
   return out;
 }
 
+// A select that reads as a small button: picking an option runs
+// `onPick(value)` and the select goes back to its title.
+function addPicker(fieldKey, title, options, noneText, onPick) {
+  const sel = k.el('select', 'setup-input setup-select tss-picker');
+  sel.id = k.nextId();
+  sel.dataset.key = fieldKey;
+  sel.setAttribute('aria-label', title.replace('…', ''));
+  const first = k.el('option', null, title);
+  first.value = '';
+  sel.append(first);
+  if (!options.length) {
+    const none = k.el('option', null, noneText);
+    none.value = '';
+    none.disabled = true;
+    sel.append(none);
+  }
+  for (const [v, text] of options) {
+    const o = k.el('option', null, text);
+    o.value = v;
+    sel.append(o);
+  }
+  sel.addEventListener('change', () => {
+    const v = sel.value;
+    sel.value = '';
+    if (v === '' || k.isBusy()) return;
+    onPick(v);
+  });
+  return sel;
+}
+
 // ---------------------------------------------------------------------------
-// Charges and credits: a narrow list of the items at the left, the picked
-// item's editor at the right. Every item's editor is drawn and only the
-// picked one shows, so picking another needs no redraw.
+// Tables (setupframe.js gridTable: the shared heads, rows and cells)
+
+/** A column head; `num` right-aligns it over figures. */
+function head(text, { num = false, title = '' } = {}) {
+  const h = k.el('span', num ? 'sw-head sw-num' : 'sw-head', text);
+  if (title) h.title = title;
+  return h;
+}
+
+/** A cell holding `content` (a control, or nothing). */
+function cell(content, cls = '') {
+  const c = k.el('span', cls ? `sw-cell ${cls}` : 'sw-cell');
+  if (content instanceof Node) c.append(content);
+  return c;
+}
+
+/** A cell of text: a figure (`num`), muted text, or plain text. */
+function textCell(text, { num = false, muted = false, title = '' } = {}) {
+  const span = k.el('span', num ? 'sw-num' : muted ? 'sw-cell-text' : 'sw-cell-label', text);
+  const c = cell(span, num ? 'sw-num' : '');
+  if (title) c.title = title;
+  return c;
+}
+
+/** The first column, where the list tables keep their drag handle. */
+function lead() {
+  return k.el('span', 'sw-cell');
+}
+
+/** A row; a focus inside it selects it, as in the list tables. */
+function gridRow() {
+  const li = k.el('li', 'sw-grid-row');
+  li.addEventListener('focusin', () => {
+    const ul = li.parentElement;
+    if (ul) for (const x of ul.querySelectorAll(':scope > .is-selected')) if (x !== li) x.classList.remove('is-selected');
+    li.classList.add('is-selected');
+  });
+  return li;
+}
+
+/** A row's own buttons (delete), at its right end. */
+function acts(...buttons) {
+  const c = k.el('span', 'sw-cell sw-acts');
+  c.append(...buttons);
+  return c;
+}
+
+// Cents (numbers or BigInt) added up exactly.
+function centsSum(list) {
+  let total = 0n;
+  for (const v of list) {
+    try {
+      total += BigInt(v);
+    } catch {
+      return null;
+    }
+  }
+  return total;
+}
+
+// Decimal strings ("1307.375") added up exactly; null when one isn't a number.
+function decimalSum(list) {
+  const parts = [];
+  let scale = 0;
+  for (const v of list) {
+    const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(k.str(v));
+    if (!m) return null;
+    parts.push(m);
+    scale = Math.max(scale, (m[3] || '').length);
+  }
+  let total = 0n;
+  for (const m of parts) {
+    const n = BigInt(m[2] + (m[3] || '').padEnd(scale, '0'));
+    total += m[1] ? -n : n;
+  }
+  const neg = total < 0n;
+  const digits = (neg ? -total : total).toString().padStart(scale + 1, '0');
+  const text = scale ? `${digits.slice(0, -scale)}.${digits.slice(-scale)}` : digits;
+  return neg ? `-${text}` : text;
+}
+
+// ---------------------------------------------------------------------------
+// Charges and credits: the items listed in the left rail, the picked item's
+// editor filling the area under the strip. Every item's editor is drawn and
+// only the picked one shows, so picking another needs no redraw.
 
 // The picked item of each tab, by index, kept across redraws; and the index
 // a newly added item will have, picked once it shows up.
@@ -286,14 +401,16 @@ const picked = { charges: 0, credits: 0 };
 const pickNew = { charges: null, credits: null };
 
 /**
- * Draws the list-and-editor layout of `tab` into `panel`. `items` are
- * { name, applied, figure, title, bad, editor }, in order; `add` is the add
- * form under the list; `move` the reorder command; `deleteText(i)` and
- * `deleteBuild(i)` the delete confirm's question and command; `onShow(i)`
+ * Draws `tab` into `panel`: its items in the left rail (railHost()) with
+ * `add` (the add form) under them, and the picked item's editor under the
+ * action strip (New…, Move Up, Move Down, Delete… and Save to Library…).
+ * `items` are { name, applied, figure, title, bad, editor }, in order;
+ * `library` is the library kind (Save to Library…); `move` the reorder
+ * command; `deleteText(i)` and `deleteBuild(i)` the delete question and
+ * command; `foot(i)` the footer's totals with item i picked; `onShow(i)`
  * runs when item i's editor shows.
  */
-function listEditor(panel, { tab, what, label, items, add, empty, move, deleteText, deleteBuild, onShow }) {
-  panel.classList.add('tss-fill');
+function pickEditor(panel, { tab, what, label, library, items, add, empty, move, deleteText, deleteBuild, foot, onShow }) {
   const count = items.length;
   if (pickNew[tab] !== null && pickNew[tab] < count) {
     picked[tab] = pickNew[tab];
@@ -301,25 +418,15 @@ function listEditor(panel, { tab, what, label, items, add, empty, move, deleteTe
   }
   let at = count ? Math.min(Math.max(0, Number(picked[tab]) || 0), count - 1) : 0;
   picked[tab] = at;
+  const editors = k.el('div', 'tss-editors');
 
-  const root = k.el('div', 'tss-md');
-  const side = k.el('div', 'tss-side');
-  const main = k.el('div', 'tss-main');
-
-  // Reorder and delete act on the picked item.
-  const strip = k.el('div', 'tss-strip');
-  const up =button('↑', 'tss-move-btn', k.key(tab, 'up'), () => moveBy(-1));
-  const down = button('↓', 'tss-move-btn', k.key(tab, 'down'), () => moveBy(1));
-  const del = button('Delete', 'setup-btn tss-small tss-strip-end', k.key('del', tab), () => confirmDelete());
-  strip.append(up, down, del);
-
-  // Moves the picked item by `by`; focus goes to `focusKey`, or stays on
-  // the arrow pressed while it can still move that way.
+  // Moves the picked item by `by`; focus stays on the button pressed (or
+  // goes to `focusKey`).
   const moveBy = (by, focusKey) => {
     const from = at;
     const to = at + by;
     if (!count || to < 0 || to >= count) return;
-    k.setFocusKey(focusKey || k.key(tab, to === 0 ? 'down' : to === count - 1 ? 'up' : by < 0 ? 'up' : 'down'));
+    k.setFocusKey(focusKey || k.key(tab, by < 0 ? 'up' : 'down'));
     k.run(
       k.key(tab, from),
       () => {
@@ -335,10 +442,11 @@ function listEditor(panel, { tab, what, label, items, add, empty, move, deleteTe
     );
   };
 
-  // The delete question, under the strip, as setup.js asks it for a list item.
+  // The delete question, at the top of the picked item's editor, as
+  // setup.js asks it for a list item.
   const confirmDelete = () => {
     if (!count) return;
-    const open = side.querySelector(':scope > .setup-confirm');
+    const open = editors.querySelector('.tss-confirm');
     if (open) {
       open.querySelector('.setup-btn-danger').focus();
       return;
@@ -385,23 +493,42 @@ function listEditor(panel, { tab, what, label, items, add, empty, move, deleteTe
     const actions = k.el('div', 'setup-confirm-actions');
     actions.append(yes, no);
     box.append(text, actions);
-    strip.after(box);
+    items[i].editor.prepend(box);
     yes.focus();
   };
 
-  const ul = k.el('ul', 'tss-pick');
+  // New…: the add form's first box, in the rail.
+  const focusAdd = () => {
+    const f = k.findByData('key', k.key('add', tab, 'name'));
+    if (!f) return;
+    f.focus();
+    if (typeof f.scrollIntoView === 'function') f.scrollIntoView({ block: 'nearest' });
+  };
+
+  const busy = (fn) => () => {
+    if (!k.isBusy()) fn();
+  };
+  const neu = stripButton(`New ${what}…`, k.key('new', tab), focusAdd, { title: `Add a ${what} to this budget` });
+  const up = stripButton('Move up', k.key(tab, 'up'), busy(() => moveBy(-1)));
+  const down = stripButton('Move down', k.key(tab, 'down'), busy(() => moveBy(1)));
+  const del = stripButton('Delete…', k.key('del', tab), busy(confirmDelete));
+  const save = stripButton('Save to Library…', k.key('save', tab), () => {
+    if (count) saveItemToLibrary(windowCtx(), library, items[at].name);
+  });
+
+  const ul = k.el('ul', 'sw-tree tss-pick');
   ul.setAttribute('aria-label', label);
   const buttons = items.map((it, n) => {
-    const li = k.el('li', 'tss-pick-item');
-    if (!it.applied) li.classList.add('is-off');
-    if (it.bad) li.classList.add('is-bad');
-    const b = k.el('button', 'tss-pick-btn');
+    const li = k.el('li');
+    const b = k.el('button', 'sw-tree-item tss-pick-item');
+    if (!it.applied) b.classList.add('is-off');
+    if (it.bad) b.classList.add('is-bad');
     b.type = 'button';
     b.dataset.key = k.key(tab, 'pick', n);
     b.dataset.nobusy = '1';
     b.title = it.title;
     b.setAttribute('aria-keyshortcuts', 'Alt+Shift+ArrowUp Alt+Shift+ArrowDown');
-    b.append(k.el('span', 'tss-pick-name', it.name), k.el('span', it.applied ? 'tss-pick-fig setup-num' : 'tss-pick-fig', it.figure));
+    b.append(k.el('span', 'sw-tree-name', it.name), k.el('span', it.applied ? 'sw-tree-count setup-num' : 'sw-tree-count', it.figure));
     if (it.bad) b.append(k.el('span', 'setup-sr', `, ${what} has a problem`));
     b.addEventListener('click', () => pick(n));
     b.addEventListener('keydown', (e) => listKey(e, n));
@@ -431,48 +558,58 @@ function listEditor(panel, { tab, what, label, items, add, empty, move, deleteTe
     buttons[j].focus();
   };
 
+  // The strip's buttons, the list and the footer follow the picked item.
   const sync = () => {
     items.forEach((it, n) => {
       it.editor.hidden = n !== at;
       buttons[n].setAttribute('aria-current', n === at ? 'true' : 'false');
-      buttons[n].parentElement.classList.toggle('is-picked', n === at);
     });
     const name = count ? items[at].name : '';
-    up.disabled = !count || at === 0;
-    down.disabled = !count || at >= count - 1;
-    del.disabled = !count;
-    const labels = [
-      [up, `Move ${what} ${name} up`],
-      [down, `Move ${what} ${name} down`],
-      [del, `Delete ${what} ${name}`],
-    ];
-    for (const [b, text] of labels) {
-      b.setAttribute('aria-label', text);
-      b.title = text;
-    }
+    const able = (b, on, text, none) => {
+      if (on) b.removeAttribute('aria-disabled');
+      else b.setAttribute('aria-disabled', 'true');
+      b.title = on ? text : none;
+      b.setAttribute('aria-label', on ? text : none);
+    };
+    const first = `Add a ${what} first`;
+    able(up, count > 0 && at > 0, `Move ${what} ${name} up`, count ? `${name} is first` : first);
+    able(down, count > 0 && at < count - 1, `Move ${what} ${name} down`, count ? `${name} is last` : first);
+    able(del, count > 0, `Delete ${what} ${name}`, first);
+    able(save, count > 0, `Copy to your library, with what it needs: ${what} ${name}`, first);
+    setFooterTotals(foot(at));
   };
 
   const pick = (n) => {
     if (n === at) return;
     at = n;
     picked[tab] = n;
-    const open = side.querySelector(':scope > .setup-confirm');
+    const open = editors.querySelector('.tss-confirm');
     if (open) open.remove();
     sync();
     if (onShow) onShow(n);
   };
 
-  side.append(strip, ul, add);
-  if (!count) main.append(k.emptyNote(empty));
+  const listLabel = k.el('span', 'sw-rail-label', label);
+  listLabel.setAttribute('aria-hidden', 'true');
+  const list = k.el('div', 'sw-rail-field');
+  list.append(listLabel, count ? ul : k.el('p', 'tss-pick-empty', 'None yet'));
+  add.classList.add('tss-rail-add');
+  const rail = railHost();
+  if (rail) rail.append(list, add);
+
+  if (!count) editors.append(k.emptyNote(empty));
   items.forEach((it, n) => {
     it.editor.id = k.nextId();
     buttons[n].setAttribute('aria-controls', it.editor.id);
-    main.append(it.editor);
+    editors.append(it.editor);
+  });
+  mountFrame(panel, {
+    strip: actionStrip(label, [neu, up, down, del, save]),
+    // No rail (it shows the library): the list and the add form go first.
+    body: rail ? [editors] : [list, add, editors],
   });
   sync();
   if (count && onShow) onShow(at);
-  root.append(side, main);
-  panel.append(root);
 }
 
 // An item's editor: errors and problems go at its end (setup.js finds it by
@@ -482,162 +619,6 @@ function editorShell(itemKey, label) {
   ed.dataset.item = itemKey;
   ed.setAttribute('aria-label', label);
   return ed;
-}
-
-// A line of the editor's head: fields side by side, wrapping when narrow.
-function hrow(cls, ...children) {
-  const row = k.el('div', cls ? `tss-hrow ${cls}` : 'tss-hrow');
-  row.append(...children);
-  return row;
-}
-
-// A field with its label at its left. `size` is a width class for the
-// control; `grow` lets it take the line's spare room; `extra` is a trailing
-// unit like "%".
-function inlineField(labelText, control, { extra = '', grow = false, size = '' } = {}) {
-  const wrap = k.el('div', grow ? 'tss-if tss-if-grow' : 'tss-if');
-  const label = k.el('label', 'tss-if-label', labelText);
-  label.htmlFor = control.id;
-  if (size) control.classList.add(size);
-  wrap.append(label, control);
-  if (extra) {
-    const tag = k.el('span', 'setup-adorn', extra);
-    tag.setAttribute('aria-hidden', 'true');
-    wrap.append(tag);
-  }
-  return wrap;
-}
-
-// A labelled figure for a summary line.
-function figure(labelText, valueEl) {
-  const f = k.el('span', 'tss-fig');
-  f.append(k.el('span', 'tss-fig-label', labelText), valueEl);
-  return f;
-}
-
-// A small action strip over a table, with a title at its left.
-function actionStrip(title, ...controls) {
-  const strip = k.el('div', 'tss-strip');
-  strip.append(k.el('span', 'tss-strip-title', title), ...controls);
-  return strip;
-}
-
-// A select that reads as a small button: picking an option runs
-// `onPick(value)` and the select goes back to its title.
-function addPicker(fieldKey, title, options, noneText, onPick) {
-  const sel = k.el('select', 'setup-input setup-select tss-picker');
-  sel.id = k.nextId();
-  sel.dataset.key = fieldKey;
-  sel.setAttribute('aria-label', title.replace('…', ''));
-  const first = k.el('option', null, title);
-  first.value = '';
-  sel.append(first);
-  if (!options.length) {
-    const none = k.el('option', null, noneText);
-    none.value = '';
-    none.disabled = true;
-    sel.append(none);
-  }
-  for (const [v, text] of options) {
-    const o = k.el('option', null, text);
-    o.value = v;
-    sel.append(o);
-  }
-  sel.addEventListener('change', () => {
-    const v = sel.value;
-    sel.value = '';
-    if (v === '' || k.isBusy()) return;
-    onPick(v);
-  });
-  return sel;
-}
-
-// A table cell holding `content` (text, or a control drawn as a cell).
-function cell(content, cls) {
-  const td = k.el('td', cls);
-  if (content instanceof Node) {
-    if (content.classList && content.classList.contains('setup-input')) {
-      content.classList.add('tss-cell');
-      td.classList.add('tss-td-in');
-    }
-    td.append(content);
-  } else if (content !== undefined && content !== null) {
-    td.textContent = String(content);
-  }
-  return td;
-}
-
-// A grid table with `cols` ([class, heading, align right]) and a hidden
-// heading for the delete column at the end.
-function gridTable(cls, label, cols) {
-  const table = k.el('table', `tss-grid ${cls}`);
-  table.setAttribute('aria-label', label);
-  const group = k.el('colgroup');
-  const head = k.el('tr');
-  for (const [c, text, right] of cols) {
-    group.append(k.el('col', c));
-    const th = k.el('th', right ? 'tss-r' : null, text);
-    th.scope = 'col';
-    head.append(th);
-  }
-  group.append(k.el('col', 'tss-c-del'));
-  const delHead = k.el('th');
-  delHead.append(k.el('span', 'setup-sr', 'Delete'));
-  head.append(delHead);
-  const thead = k.el('thead');
-  thead.append(head);
-  table.append(group, thead);
-  return table;
-}
-
-// A table in a box that takes the editor's spare height and scrolls.
-function gridWrap(table) {
-  const wrap = k.el('div', 'tss-gridwrap');
-  wrap.append(table);
-  return wrap;
-}
-
-// A body row standing in for an empty table.
-function emptyRow(colspan, text) {
-  const tr = k.el('tr', 'tss-grid-empty');
-  const td = k.el('td', 'setup-muted', text);
-  td.colSpan = colspan;
-  tr.append(td);
-  return tr;
-}
-
-// Cents (numbers or BigInt) added up exactly.
-function centsSum(list) {
-  let total = 0n;
-  for (const v of list) {
-    try {
-      total += BigInt(v);
-    } catch {
-      return null;
-    }
-  }
-  return total;
-}
-
-// Decimal strings ("1307.375") added up exactly; null when one isn't a number.
-function decimalSum(list) {
-  const parts = [];
-  let scale = 0;
-  for (const v of list) {
-    const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(k.str(v));
-    if (!m) return null;
-    parts.push(m);
-    scale = Math.max(scale, (m[3] || '').length);
-  }
-  let total = 0n;
-  for (const m of parts) {
-    const n = BigInt(m[2] + (m[3] || '').padEnd(scale, '0'));
-    total += m[1] ? -n : n;
-  }
-  const neg = total < 0n;
-  const digits = (neg ? -total : total).toString().padStart(scale + 1, '0');
-  const text = scale ? `${digits.slice(0, -scale)}.${digits.slice(-scale)}` : digits;
-  return neg ? `-${text}` : text;
 }
 
 // ---------------------------------------------------------------------------
@@ -680,23 +661,48 @@ function currencyOptions(current) {
   return [['', base ? `${base} (base)` : 'Base currency'], ...codes.map((c) => [c, c])];
 }
 
-// Per charge, what fills its editor's left-out totals when it shows.
+// Per charge, what fills its editor's left-out totals when it shows, and
+// its footer figures as saved: { applied, entry }.
 let chargeLoaders = [];
+let chargeFeet = [];
+
+// The footer with charge `i` picked: how many charges, its total and what
+// it leaves out. `live` is a total figured from typed text (preview_charge);
+// `stale` dims it while the text isn't a number yet.
+function chargeFoot(i, live = null, stale = false) {
+  const out = [{ label: '', value: k.plural(chargeFeet.length, 'charge', 'charges') }];
+  const f = chargeFeet[i];
+  if (!f) return out;
+  if (!f.applied) {
+    out.push({ label: 'Total charge', value: 'Not applied' });
+    return out;
+  }
+  const t = live || f.entry;
+  if (!t) return out;
+  out.push(
+    {
+      label: 'Total charge',
+      value: k.formatCents(t.amount),
+      title: stale ? 'Finish typing a number to see the new total' : chargeTitle(t, Boolean(live)),
+      dim: stale,
+    },
+    { label: 'Left out', value: k.formatCents(t.excluded), title: 'Everything the charge leaves out: each line counts once, even when several rows pick it', dim: stale },
+  );
+  return out;
+}
 
 function renderCharges(panel) {
   const b = k.budget();
   const r = k.report();
   const charges = arr(b.charges);
   chargeLoaders = [];
-  panel.append(
-    intro(
-      'Fees worked out on the above- plus below-the-line total, like contingency or insurance. Each one is figured on that total alone, never on another charge.',
-    ),
-  );
+  chargeFeet = [];
+  preview.live = null;
   const items = charges.map((c0, i) => {
     const c = chargeInput(c0);
     const entry = appliedEntry(charges, r && r.charges, i);
     const issues = issuesAt('charge', i);
+    chargeFeet[i] = { applied: c.applied, entry: entry || null };
     const fig = !c.applied ? 'Not applied' : entry ? k.formatCents(entry.amount) : '';
     const figTitle = !c.applied ? 'Not applied' : entry ? `Total charge, ${chargeTitle(entry, false).toLowerCase()}` : '';
     return {
@@ -705,7 +711,7 @@ function renderCharges(panel) {
       figure: fig,
       title: [c.name, figTitle, issues.length ? 'This charge has a problem' : ''].filter(Boolean).join('\n'),
       bad: issues.length > 0,
-      editor: chargeEditor(i, c0, c, entry, issues),
+      editor: chargeEditor(i, c0, c, issues),
     };
   });
 
@@ -758,25 +764,28 @@ function renderCharges(panel) {
     },
   });
 
-  listEditor(panel, {
+  pickEditor(panel, {
     tab: 'charges',
     what: 'charge',
     label: 'Charges',
+    library: 'charge',
     items,
     add,
     empty: 'No charges yet.',
     move: 'move_charge',
     deleteText: (i) => `Delete charge ${items[i].name}?`,
     deleteBuild: (i) => ['delete_charge', { index: i }],
+    foot: (i) => chargeFoot(i),
     onShow: (i) => {
       if (chargeLoaders[i]) chargeLoaders[i]();
     },
   });
 }
 
-// Charge `i`'s editor: name and Applied, then type, value and account, then
-// its total and the topsheet label choices, then what it leaves out.
-function chargeEditor(i, c0, c, entry, issues) {
+// Charge `i`'s editor: a band with its name, Applied, type, value and
+// account; one with the topsheet label choices; then what it leaves out.
+// Its total and what it leaves out in all are the footer's.
+function chargeEditor(i, c0, c, issues) {
   const ik = k.key('charges', i);
   const fk = (f) => k.key('charges', i, f);
   const commit = (f, patchOf) => (v, old) =>
@@ -787,8 +796,6 @@ function chargeEditor(i, c0, c, entry, issues) {
   const applied = checkbox(fk('applied'), c.applied, 'Applied', (v) =>
     k.run(ik, () => chargeArgs(i, { applied: v }), { restore: [fk('applied'), !v] }),
   );
-  ed.append(hrow('', inlineField('Name', name, { grow: true }), applied));
-
   const kind = k.selectInput({
     fieldKey: fk('kind'),
     value: c.kind,
@@ -802,7 +809,7 @@ function chargeEditor(i, c0, c, entry, issues) {
         : { kind: 'percent', percent: cur.percent === null ? '0' : cur.percent },
     ),
   });
-  const values = hrow('', inlineField('Type', kind, { size: 'tss-w-kind' }));
+  const values = [];
   if (c.kind === 'percent') {
     const pct = k.textInput({
       fieldKey: fk('percent'),
@@ -811,7 +818,7 @@ function chargeEditor(i, c0, c, entry, issues) {
       onCommit: commit('percent', (v) => ({ percent: v.trim() })),
     });
     livePreview(pct, i);
-    values.append(inlineField('Percent', pct, { extra: '%', size: 'tss-w-pct' }));
+    values.push(bandInput('Percent', pct, { size: 'tss-w-pct', unit: '%' }));
   } else {
     const amount = k.textInput({
       fieldKey: fk('amount'),
@@ -826,7 +833,7 @@ function chargeEditor(i, c0, c, entry, issues) {
       options: currencyOptions(c.currency),
       onCommit: commit('currency', (v) => ({ currency: v === '' ? null : v })),
     });
-    values.append(inlineField('Amount', amount, { size: 'tss-w-num' }), inlineField('Currency', cur, { size: 'tss-w-cur' }));
+    values.push(bandInput('Amount', amount, { size: 'tss-w-num' }), bandInput('Currency', cur));
   }
   const account = k.textInput({
     fieldKey: fk('account'),
@@ -834,37 +841,38 @@ function chargeEditor(i, c0, c, entry, issues) {
     placeholder: 'None',
     onCommit: commit('account', (v) => ({ account: v.trim() === '' ? null : v.trim() })),
   });
-  values.append(inlineField('Posts to account', account, { size: 'tss-w-acct' }));
-  ed.append(values);
+  ed.append(
+    band(
+      `Charge ${c.name}`,
+      bandInput('Name', name, { size: 'tss-w-name' }),
+      applied,
+      bandInput('Type', kind),
+      ...values,
+      bandInput('Posts to account', account, { size: 'tss-w-acct' }),
+    ),
+  );
 
-  // The total, and what the topsheet label shows besides the name (display only).
-  const sum = hrow('tss-sum');
-  if (!c.applied) sum.append(k.el('span', 'setup-muted', 'Not applied'));
-  else if (entry) {
-    const t = k.el('span', 'setup-num', k.formatCents(entry.amount));
-    t.title = chargeTitle(entry, false);
-    t.dataset.key = fk('total');
-    sum.append(figure('Total charge', t));
-  }
+  // What the topsheet label shows besides the name (display only).
+  const labels = [];
   if (c.kind === 'percent') {
-    sum.append(
+    labels.push(
       checkbox(fk('label-percent'), c.label_percent, 'Show the percent on the topsheet', (v) =>
         k.run(ik, () => chargeArgs(i, { label_percent: v }), { restore: [fk('label-percent'), !v] }),
       ),
     );
   }
-  sum.append(
+  labels.push(
     checkbox(fk('label-excluded'), c.label_excluded, 'Show the amount left out on the topsheet', (v) =>
       k.run(ik, () => chargeArgs(i, { label_excluded: v }), { restore: [fk('label-excluded'), !v] }),
     ),
   );
-  ed.append(sum);
-  ed.append(...chargeExclusions(i, c, ik, entry));
+  ed.append(band('Topsheet label', bandTitle('Topsheet label'), ...labels));
+  ed.append(...chargeExclusions(i, c, ik));
   k.finishItem(ed, ik, issues, null);
   return ed;
 }
 
-// The head figure's tooltip: what the charge is figured on.
+// The footer figure's tooltip: what the charge is figured on.
 function chargeTitle(t, typing) {
   const on = `On ${k.formatCents(t.base)}, less ${k.formatCents(t.excluded)} left out`;
   return typing ? `${on} (with the value being typed)` : on;
@@ -872,9 +880,9 @@ function chargeTitle(t, typing) {
 
 // Live preview: while a charge's percent, amount or a left-out amount is
 // being typed, its total (and what it leaves out) is figured from the typed
-// text, before Enter commits it. Charges whose total isn't shown (not
-// applied) have nothing to update.
-const preview = { timer: null, seq: 0 };
+// text, before Enter commits it, and shown in the footer. Charges whose
+// total isn't shown (not applied) have nothing to update.
+const preview = { timer: null, seq: 0, live: null };
 const PREVIEW_MS = 120;
 
 function livePreview(input, i) {
@@ -907,22 +915,20 @@ function draftCharge(i) {
 }
 
 async function runPreview(i) {
-  const total = k.findByData('key', k.key('charges', i, 'total'));
-  if (!total) return;
+  const f = chargeFeet[i];
+  if (!f || !f.applied || !f.entry || picked.charges !== i) return;
   const seq = ++preview.seq;
+  const shown = () => seq === preview.seq && picked.charges === i && chargeFeet[i] === f;
   try {
     const t = await invoke('preview_charge', { index: i, charge: draftCharge(i) });
-    if (seq !== preview.seq || !total.isConnected) return;
-    total.textContent = k.formatCents(t.amount);
-    total.title = chargeTitle(t, true);
-    total.classList.remove('tss-stale');
-    const out = k.findByData('key', k.key('charges', i, 'excluded'));
-    if (out) out.textContent = k.formatCents(t.excluded);
+    if (!shown()) return;
+    preview.live = { i, t };
+    setFooterTotals(chargeFoot(i, t));
   } catch {
-    // Not a number yet: keep the last total, marked as not current.
-    if (seq !== preview.seq || !total.isConnected) return;
-    total.classList.add('tss-stale');
-    total.title = 'Finish typing a number to see the new total';
+    // Not a number yet: keep the last total, dimmed as not current.
+    if (!shown()) return;
+    const last = preview.live && preview.live.i === i ? preview.live.t : null;
+    setFooterTotals(chargeFoot(i, last, true));
   }
 }
 
@@ -933,7 +939,7 @@ async function runPreview(i) {
 // last one shows until the new one arrives.
 const leftOut = { stamp: '', now: new Map(), last: new Map() };
 
-function leftOutTotal(i, f, name, td) {
+function leftOutTotal(i, f, name, span) {
   const v = obj(k.view());
   const stamp = `${v.doc}:${v.rev}`;
   if (leftOut.stamp !== stamp) {
@@ -941,7 +947,7 @@ function leftOutTotal(i, f, name, td) {
     leftOut.now = new Map();
   }
   const id = JSON.stringify([v.doc, f, name]);
-  if (leftOut.last.has(id)) td.textContent = k.formatCents(leftOut.last.get(id));
+  if (leftOut.last.has(id)) span.textContent = k.formatCents(leftOut.last.get(id));
   let p = leftOut.now.get(id);
   if (!p) {
     const one = {
@@ -960,18 +966,19 @@ function leftOutTotal(i, f, name, td) {
   }
   p.then(
     (cents) => {
-      td.textContent = k.formatCents(cents);
+      span.textContent = k.formatCents(cents);
     },
     () => {
-      td.textContent = '';
+      span.textContent = '';
     },
   );
 }
 
-// What charge `i` leaves out, as one table: amounts typed in, then groups,
-// categories and accounts, each with what it takes off. An item the charge
-// names that the budget no longer has stays listed until it is removed.
-function chargeExclusions(i, c, ik, entry) {
+// What charge `i` leaves out: a band with the ways to leave more out, then
+// one table: amounts typed in, then groups, categories and accounts, each
+// with what it takes off. An item the charge names that the budget no
+// longer has stays listed until it is removed.
+function chargeExclusions(i, c, ik) {
   const fk = (f) => k.key('charges', i, f);
   const rawAmounts = arr(obj(arr(k.budget().charges)[i]).excluded_amounts);
   const groupDefs = obj(k.budget().groups);
@@ -982,9 +989,10 @@ function chargeExclusions(i, c, ik, entry) {
     k.run(ik, () => chargeArgs(i, (cur) => ({ [f]: [...cur[f].filter((x) => x !== value), value] })));
   const named = (map, f) =>
     [...map.keys()].filter((code) => !c[f].includes(code)).map((code) => [code, `${code} ${map.get(code)}`.trim()]);
-  const strip = actionStrip(
-    'Left out',
-    button('Exclude amount', 'setup-btn tss-small', fk('amount-add'), () => {
+  const adders = band(
+    `Left out of ${c.name}`,
+    bandTitle('Left out'),
+    bandButton('Exclude amount', fk('amount-add'), () => {
       k.setFocusKey(fk(`amount-desc-${c.excluded_amounts.length}`));
       k.run(ik, () => chargeArgs(i, (cur) => ({ excluded_amounts: [...cur.excluded_amounts, { description: '', amount: '0' }] })), {
         onError: () => k.setFocusKey(null),
@@ -1007,13 +1015,8 @@ function chargeExclusions(i, c, ik, entry) {
     ),
   );
 
-  const table = gridTable('tss-grid-excl', `Left out of ${c.name}`, [
-    ['tss-c-type', 'Type'],
-    ['tss-c-name', 'Name'],
-    ['tss-c-desc', 'Description'],
-    ['tss-c-fig', 'Total', true],
-  ]);
-  const tbody = k.el('tbody');
+  const ul = k.el('ul');
+  ul.setAttribute('aria-label', `Left out of ${c.name}`);
   // Each row's delete key, so focus can go to a neighbour once one is removed.
   const rows = [];
   const focusAfter = (p) => {
@@ -1025,7 +1028,7 @@ function chargeExclusions(i, c, ik, entry) {
   };
   const removeButton = (delKey, label, build) => {
     const p = rows.length;
-    return button('×', 'setup-del tss-row-del', delKey, () => {
+    return button('×', 'setup-del', delKey, () => {
       k.setFocusKey(focusAfter(p));
       k.run(ik, () => chargeArgs(i, build), { onError: () => k.setFocusKey(null) });
     }, label);
@@ -1037,6 +1040,7 @@ function chargeExclusions(i, c, ik, entry) {
       value: x.description,
       placeholder: 'Description',
       label: `Description of amount ${n + 1}`,
+      cls: 'sw-cell-input',
       onCommit: (v, old) =>
         k.run(
           ik,
@@ -1049,6 +1053,7 @@ function chargeExclusions(i, c, ik, entry) {
       value: k.formatCents(obj(rawAmounts[n]).amount),
       num: true,
       label: `Amount ${n + 1}`,
+      cls: 'sw-cell-input',
       onCommit: (v, old) =>
         k.run(
           ik,
@@ -1062,9 +1067,9 @@ function chargeExclusions(i, c, ik, entry) {
       excluded_amounts: cur.excluded_amounts.filter((_, j) => j !== n),
     }));
     rows.push({ del: delKey, amount: n });
-    const tr = k.el('tr');
-    tr.append(cell('Amount', 'setup-muted'), cell(''), cell(desc), cell(amt), cell(del, 'tss-td-del'));
-    tbody.append(tr);
+    const li = gridRow();
+    li.append(lead(), textCell('Amount', { muted: true }), cell(desc, 'tss-span2'), cell(amt), acts(del));
+    ul.append(li);
   });
 
   const loads = [];
@@ -1072,18 +1077,23 @@ function chargeExclusions(i, c, ik, entry) {
     const delKey = fk(`excl-${type}-del-${name}`);
     const del = removeButton(delKey, `Remove ${type} ${name}`, (cur) => ({ [f]: cur[f].filter((x) => x !== name) }));
     rows.push({ del: delKey });
-    const total = cell('', 'tss-r setup-num');
+    const figure = k.el('span', 'sw-num');
+    const total = cell(figure, 'sw-num');
     if (known) {
       total.title = title;
-      loads.push(() => leftOutTotal(i, f, name, total));
+      loads.push(() => leftOutTotal(i, f, name, figure));
     }
-    const descCell = known ? cell(desc) : cell('Not in this budget', 'setup-muted');
-    if (known && desc) descCell.title = desc;
-    const nameCell = cell(name);
-    nameCell.title = name;
-    const tr = k.el('tr');
-    tr.append(cell(type[0].toUpperCase() + type.slice(1), 'setup-muted'), nameCell, descCell, total, cell(del, 'tss-td-del'));
-    tbody.append(tr);
+    const descCell = known ? textCell(desc, { title: desc }) : textCell('Not in this budget', { muted: true });
+    const li = gridRow();
+    li.append(
+      lead(),
+      textCell(type[0].toUpperCase() + type.slice(1), { muted: true }),
+      textCell(name, { title: name }),
+      descCell,
+      total,
+      acts(del),
+    );
+    ul.append(li);
   };
   const usual = 'Its lines with their fringes, as the totals stand now';
   for (const g of c.excluded_groups) {
@@ -1098,26 +1108,16 @@ function chargeExclusions(i, c, ik, entry) {
   for (const code of c.excluded_accounts) {
     namedRow('account', 'excluded_accounts', code, accts.get(code) || '', accts.has(code), usual);
   }
-  if (!rows.length) tbody.append(emptyRow(5, 'Nothing left out'));
   chargeLoaders[i] = () => loads.forEach((fn) => fn());
-
-  table.append(tbody);
-  if (entry) {
-    // Everything left out together: each line once, even when several rows
-    // pick it.
-    const n = k.el('span', 'setup-num', k.formatCents(entry.excluded));
-    n.dataset.key = fk('excluded');
-    const label = cell('Left out in all');
-    label.colSpan = 3;
-    label.title = 'Each line counts once, even when several rows pick it';
-    const total = cell(n, 'tss-r');
-    const tr = k.el('tr');
-    tr.append(label, total, cell(''));
-    const tfoot = k.el('tfoot');
-    tfoot.append(tr);
-    table.append(tfoot);
-  }
-  return [strip, gridWrap(table)];
+  if (!rows.length) return [adders, k.emptyNote('Nothing left out.')];
+  return [
+    adders,
+    gridTable(
+      'charge-excl',
+      [lead(), head('Type'), head('Name'), head('Description'), head('Total', { num: true, title: 'What leaving it out takes off the charge' }), head('')],
+      ul,
+    ),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -1168,19 +1168,62 @@ function rowPatch(n, f) {
   return (cur) => ({ rows: cur.rows.map((r, j) => (j === n ? { ...r, ...f(r) } : r)) });
 }
 
+// Per credit, its footer figures: { applied, entry, rows (the report's) }.
+let creditFeet = [];
+
+// The footer with credit `i` picked: how many credits, its rows' spend,
+// fringes left out, net spend and credit added up, then the discount and the
+// net credit taken off the grand total.
+function creditFoot(i) {
+  const out = [{ label: '', value: k.plural(creditFeet.length, 'credit', 'credits') }];
+  const f = creditFeet[i];
+  if (!f) return out;
+  if (!f.applied) {
+    out.push({ label: 'Net credit', value: 'Not applied' });
+    return out;
+  }
+  if (f.rows.length) {
+    const add = (field) => {
+      const s = centsSum(f.rows.map((t) => (isNone(t[field]) ? 0 : t[field])));
+      return s === null ? '' : k.formatCents(s);
+    };
+    const credit = decimalSum(f.rows.map((t) => t.credit));
+    out.push(
+      { label: 'Gross', value: add('gross'), title: 'The rows’ spend before fringes are left out' },
+      { label: 'Fringes out', value: add('excluded_fringes'), title: 'Fringes left out of the spend' },
+      { label: 'Net', value: add('net'), title: 'The spend the percents apply to' },
+      {
+        label: 'Credit',
+        value: credit === null ? '' : money(credit),
+        title: credit === null ? '' : `The rows added up: exactly ${k.formatDecimal(credit)}, before the credit’s cap and discount`,
+      },
+    );
+  }
+  if (f.entry) {
+    // The discount comes off after the cap; the credit is rounded once.
+    const before = dollarsToCents(f.entry.capped);
+    if (before !== null && before !== BigInt(f.entry.amount)) {
+      out.push({
+        label: 'Discount',
+        value: k.formatCents(before - BigInt(f.entry.amount)),
+        title: `Exactly ${k.formatDecimal(f.entry.capped)} before the discount, after the cap`,
+      });
+    }
+    out.push({ label: 'Net credit', value: k.formatCents(f.entry.amount), title: 'Credit taken off the grand total' });
+  }
+  return out;
+}
+
 function renderCredits(panel) {
   const b = k.budget();
   const r = k.report();
   const credits = arr(b.credits);
-  panel.append(
-    intro(
-      'Incentives and rebates taken off the grand total to give the net total. Each row is a percent of some spend; the row credits add up, then the cap and discount apply.',
-    ),
-  );
+  creditFeet = [];
   const items = credits.map((c0, i) => {
     const c = creditInput(c0);
     const entry = appliedEntry(credits, r && r.credits, i);
     const issues = issuesAt('credit', i);
+    creditFeet[i] = { applied: c.applied, entry: entry || null, rows: entry && Array.isArray(entry.rows) ? entry.rows.map(obj) : [] };
     return {
       name: c.name,
       applied: c.applied,
@@ -1214,21 +1257,24 @@ function renderCredits(panel) {
     },
   });
 
-  listEditor(panel, {
+  pickEditor(panel, {
     tab: 'credits',
     what: 'credit',
     label: 'Credits',
+    library: 'credit',
     items,
     add,
     empty: 'No credits yet.',
     move: 'move_credit',
     deleteText: (i) => `Delete credit ${items[i].name} and its ${k.plural(arr(obj(credits[i]).rows).length, 'row', 'rows')}?`,
     deleteBuild: (i) => ['delete_credit', { index: i }],
+    foot: (i) => creditFoot(i),
   });
 }
 
-// Credit `i`'s editor: name and Applied; cap, discount and account; the
-// fringes left out of its spend; its figures; then its rows as one table.
+// Credit `i`'s editor: a band with its name, Applied, cap, discount and
+// account; one with the fringes left out of its spend; one with Add row;
+// then its rows as one table. Its figures are the footer's.
 function creditEditor(i, c0, c, entry, issues) {
   const raw = obj(c0);
   const ik = k.key('credits', i);
@@ -1241,8 +1287,6 @@ function creditEditor(i, c0, c, entry, issues) {
   const applied = checkbox(fk('applied'), c.applied, 'Applied', (v) =>
     k.run(ik, () => creditArgs(i, { applied: v }), { restore: [fk('applied'), !v] }),
   );
-  ed.append(hrow('', inlineField('Name', name, { grow: true }), applied));
-
   const cap = k.textInput({
     fieldKey: fk('cap'),
     value: isNone(raw.cap) ? '' : k.formatCents(raw.cap),
@@ -1263,41 +1307,30 @@ function creditEditor(i, c0, c, entry, issues) {
     onCommit: commit('account', (v) => ({ account: v.trim() === '' ? null : v.trim() })),
   });
   ed.append(
-    hrow(
-      '',
-      inlineField('Cap on the credit', cap, { size: 'tss-w-num' }),
-      inlineField('Discount', discount, { extra: '%', size: 'tss-w-pct' }),
-      inlineField('Posts to account', account, { size: 'tss-w-acct' }),
+    band(
+      `Credit ${c.name}`,
+      bandInput('Name', name, { size: 'tss-w-name' }),
+      applied,
+      bandInput('Cap on the credit', cap, { size: 'tss-w-num' }),
+      bandInput('Discount', discount, { size: 'tss-w-pct', unit: '%' }),
+      bandInput('Posts to account', account, { size: 'tss-w-acct' }),
     ),
   );
 
-  const fringes = chips({
-    fieldKey: fk('fringes'),
-    label: 'Fringes left out of the spend',
-    selected: c.excluded_fringes,
-    options: withKept(fringeNames(), c.excluded_fringes),
-    onChange: (list) => k.run(ik, () => creditArgs(i, { excluded_fringes: list })),
-  });
-  fringes.classList.add('tss-chiprow');
-  ed.append(fringes);
+  ed.append(
+    band(
+      'Fringes left out of the spend',
+      chips({
+        fieldKey: fk('fringes'),
+        label: 'Fringes left out of the spend',
+        selected: c.excluded_fringes,
+        options: withKept(fringeNames(), c.excluded_fringes),
+        onChange: (list) => k.run(ik, () => creditArgs(i, { excluded_fringes: list })),
+      }),
+    ),
+  );
 
-  const sum = hrow('tss-sum');
-  if (!c.applied) sum.append(k.el('span', 'setup-muted', 'Not applied'));
-  else if (entry) {
-    // The discount comes off after the cap; the credit is rounded once.
-    const before = dollarsToCents(entry.capped);
-    if (before !== null) {
-      const d = k.el('span', 'setup-num', k.formatCents(before - BigInt(entry.amount)));
-      d.title = `Exactly ${k.formatDecimal(entry.capped)} before the discount, after the cap`;
-      sum.append(figure('Discount', d));
-    }
-    const net = k.el('span', 'setup-num', k.formatCents(entry.amount));
-    net.title = 'Credit taken off the grand total';
-    sum.append(figure('Net credit', net));
-  }
-  if (sum.childNodes.length) ed.append(sum);
-
-  const addRow = button('Add row', 'setup-btn tss-small', fk('add-row'), () => {
+  const addRow = bandButton('Add row', fk('add-row'), () => {
     k.setFocusKey(k.key('credits', i, c.rows.length, 'description'));
     k.run(
       ik,
@@ -1308,65 +1341,39 @@ function creditEditor(i, c0, c, entry, issues) {
       { onError: () => k.setFocusKey(null) },
     );
   });
-  ed.append(actionStrip('Rows', addRow), gridWrap(creditGrid(i, c, raw, entry, ik)));
+  ed.append(band(`Rows of ${c.name}`, bandTitle('Rows'), addRow));
+  ed.append(creditGrid(i, c, raw, entry, ik));
   k.finishItem(ed, ik, issues, null);
   return ed;
 }
 
 // A credit's rows as one table: what each is a percent of, its figures from
-// the totals, its cap, and a totals line under them.
+// the totals, its cap. Their sums are the footer's.
 function creditGrid(i, c, raw, entry, ik) {
-  const table = gridTable('tss-grid-credit', `Rows of ${c.name}`, [
-    ['tss-c-spend', 'Spend'],
-    ['tss-c-desc', 'Description'],
-    ['tss-c-fig', 'Amount', true],
-    ['tss-c-fig', 'Gross', true],
-    ['tss-c-fig', 'Fringes out', true],
-    ['tss-c-fig', 'Net', true],
-    ['tss-c-cap', 'Cap type'],
-    ['tss-c-fig', 'Cap', true],
-    ['tss-c-pct', '%', true],
-    ['tss-c-fig', 'Credit', true],
-    ['tss-c-fig', 'Over cap', true],
-  ]);
+  if (!c.rows.length) return k.emptyNote('No rows yet.');
   const totals = entry && Array.isArray(entry.rows) ? entry.rows.map(obj) : [];
-  const tbody = k.el('tbody');
-  c.rows.forEach((row, n) => tbody.append(creditRow(i, n, row, raw, totals[n] || null, ik, c.rows.length)));
-  if (!c.rows.length) tbody.append(emptyRow(12, 'No rows yet'));
-  table.append(tbody);
-
-  if (c.rows.length && totals.length) {
-    const add = (f) => {
-      const s = centsSum(totals.map((t) => (isNone(t[f]) ? 0 : t[f])));
-      return s === null ? '' : k.formatCents(s);
-    };
-    const label = cell('Total');
-    label.colSpan = 3;
-    const credit = decimalSum(totals.map((t) => t.credit));
-    const creditCell = cell(credit === null ? '' : money(credit), 'tss-r setup-num');
-    if (credit !== null) creditCell.title = `Exactly ${k.formatDecimal(credit)}, before the credit's cap and discount`;
-    const gap = cell('');
-    gap.colSpan = 3;
-    const tr = k.el('tr');
-    tr.append(
-      label,
-      cell(add('gross'), 'tss-r setup-num'),
-      cell(add('excluded_fringes'), 'tss-r setup-num'),
-      cell(add('net'), 'tss-r setup-num'),
-      gap,
-      creditCell,
-      cell(''),
-      cell(''),
-    );
-    const tfoot = k.el('tfoot');
-    tfoot.append(tr);
-    table.append(tfoot);
-  }
-  return table;
+  const ul = k.el('ul');
+  ul.setAttribute('aria-label', `Rows of ${c.name}`);
+  c.rows.forEach((row, n) => ul.append(creditRow(i, n, row, raw, totals[n] || null, ik, c.rows.length)));
+  return gridTable('credit-rows', [
+    lead(),
+    head('Spend'),
+    head('Description'),
+    head('Amount', { num: true }),
+    head('Gross', { num: true, title: 'The row’s spend before fringes are left out' }),
+    head('Fringes out', { num: true, title: 'Fringes left out of the spend' }),
+    head('Net', { num: true, title: 'The spend the percent applies to' }),
+    head('Cap type'),
+    head('Cap', { num: true }),
+    head('%', { num: true }),
+    head('Credit', { num: true }),
+    head('Over cap', { num: true }),
+    head(''),
+  ], ul);
 }
 
 function creditRow(i, n, row, raw, rt, ik, count) {
-  const tr = k.el('tr');
+  const li = gridRow();
   const fk = (f) => k.key('credits', i, n, f);
   const send = (f, old) => (v) => k.run(ik, () => creditArgs(i, rowPatch(n, () => v)), old === undefined ? {} : { restore: [f, old] });
   const rawRow = obj(arr(raw.rows)[n]);
@@ -1380,6 +1387,7 @@ function creditRow(i, n, row, raw, rt, ik, count) {
   const spend = k.selectInput({
     fieldKey: fk('source'),
     value: current,
+    cls: 'sw-cell-input',
     options: [
       ['flat', 'Amount typed in'],
       ...withKept(groups, row.source.kind === 'group' ? [row.source.group] : []).map((g) => [`group:${g}`, `Group: ${g}`]),
@@ -1396,16 +1404,15 @@ function creditRow(i, n, row, raw, rt, ik, count) {
       ),
   });
   spend.setAttribute('aria-label', of('Spend'));
-  spend.classList.add('tss-spend');
   spend.title = spend.options[spend.selectedIndex] ? spend.options[spend.selectedIndex].textContent : '';
 
   const desc = k.textInput({
     fieldKey: fk('description'),
     value: row.description,
     label: of('Description'),
+    cls: 'sw-cell-input',
     onCommit: (v, old) => send(fk('description'), old)({ description: v }),
   });
-  desc.classList.add('tss-desc');
 
   const amount =
     row.source.kind === 'flat'
@@ -1414,13 +1421,15 @@ function creditRow(i, n, row, raw, rt, ik, count) {
           value: k.formatCents(obj(rawRow.source).amount || 0),
           num: true,
           label: of('Amount'),
+          cls: 'sw-cell-input',
           onCommit: (v, old) => send(fk('amount'), old)({ source: { kind: 'flat', amount: v.trim() } }),
         })
-      : '';
+      : null;
 
   const capKind = k.selectInput({
     fieldKey: fk('cap-kind'),
     value: row.cap.kind,
+    cls: 'sw-cell-input',
     options: [
       ['none', 'None'],
       ['qualified_spend', 'Qualified spend'],
@@ -1429,7 +1438,6 @@ function creditRow(i, n, row, raw, rt, ik, count) {
     onCommit: (v, old) => send(fk('cap-kind'), old)({ cap: v === 'none' ? { kind: 'none' } : { kind: v, amount: row.cap.amount || '0' } }),
   });
   capKind.setAttribute('aria-label', of('Cap type'));
-  capKind.classList.add('tss-captype');
   capKind.title = 'Qualified spend caps the spend the percent applies to; Credit cap caps the row’s credit';
   const capAmount =
     row.cap.kind !== 'none'
@@ -1438,36 +1446,33 @@ function creditRow(i, n, row, raw, rt, ik, count) {
           value: k.formatCents(obj(rawRow.cap).amount || 0),
           num: true,
           label: of('Cap'),
+          cls: 'sw-cell-input',
           onCommit: (v, old) => send(fk('cap-amount'), old)({ cap: { kind: row.cap.kind, amount: v.trim() } }),
         })
-      : '';
+      : null;
   const percent = k.textInput({
     fieldKey: fk('percent'),
     value: row.percent,
     num: true,
     label: of('Percent'),
+    cls: 'sw-cell-input',
     onCommit: (v, old) => send(fk('percent'), old)({ percent: v.trim() }),
   });
-  percent.classList.add('tss-pct');
 
-  const fig = (v, title) => {
-    const td = cell(v, 'tss-r setup-num');
-    if (title) td.title = title;
-    return td;
-  };
   const has = rt && !isNone(rt.net);
-  const credit = has ? fig(money(rt.credit), `Exactly ${k.formatDecimal(rt.credit)}; rows are added before rounding`) : fig('');
+  const fig = (v, title) => textCell(has ? v : '', { num: true, title: has ? title : '' });
   const [overText, overTitle] = has ? overCap(rt, row) : ['', ''];
 
   // Focus goes to the row taking this one's place, else the one before,
   // else Add row.
   const after = n < count - 1 ? fk('del') : n > 0 ? k.key('credits', i, n - 1, 'del') : k.key('credits', i, 'add-row');
-  const del = button('×', 'setup-del tss-row-del', fk('del'), () => {
+  const del = button('×', 'setup-del', fk('del'), () => {
     k.setFocusKey(after);
     k.run(ik, () => creditArgs(i, (cur) => ({ rows: cur.rows.filter((_, j) => j !== n) })), { onError: () => k.setFocusKey(null) });
   }, `Delete row ${n + 1}`);
 
-  tr.append(
+  li.append(
+    lead(),
     cell(spend),
     cell(desc),
     cell(amount),
@@ -1477,11 +1482,11 @@ function creditRow(i, n, row, raw, rt, ik, count) {
     cell(capKind),
     cell(capAmount),
     cell(percent),
-    credit,
+    fig(has ? money(rt.credit) : '', has ? `Exactly ${k.formatDecimal(rt.credit)}; rows are added before rounding` : ''),
     fig(overText, overTitle),
-    cell(del, 'tss-td-del'),
+    acts(del),
   );
-  return tr;
+  return li;
 }
 
 // A credit row against its cap: how far over it is (in parentheses when
@@ -1529,45 +1534,93 @@ function infoCheck(kind, value) {
   return null;
 }
 
-// One dense table: column heads, an add row, then a row per field (name,
-// kind, value, delete). Rows stay list items so the kit's delete confirmation
-// and error lines attach to them.
-function renderInfo(panel) {
-  const b = k.budget();
-  panel.classList.add('ts-info-tab');
-  panel.append(intro('Facts about the production. Notes only; they don’t feed formulas.'));
-  const items = k.entries(b.info);
-  const names = items.map(([n]) => n);
-  const cols = k.el('div', 'ts-info-row ts-info-cols');
-  cols.setAttribute('aria-hidden', 'true');
-  cols.append(k.el('span', null, 'Name'), k.el('span', null, 'Kind'), k.el('span', null, 'Value'), k.el('span'));
-  const add = k.addForm('info', {
+// New field…: a small form next to the strip's button; focus goes to the
+// new field's value once it is added, else back to the button.
+function newInfoField(anchor) {
+  const ctx = windowCtx();
+  let added = null;
+  anchoredForm({
+    anchor,
     title: 'New field',
     fields: [
-      k.addInput('info', 'name', { label: 'Label', placeholder: 'New field, like Director' }),
-      k.addSelect('info', 'kind', 'Kind', INFO_KINDS),
-      k.addInput('info', 'value', { label: 'Value', placeholder: 'Value' }),
+      { key: 'name', label: 'Label', value: '', placeholder: 'Director' },
+      { key: 'kind', label: 'Kind', type: 'select', options: INFO_KINDS, value: 'text' },
+      { key: 'value', label: 'Value', value: '' },
     ],
-    validate: (v) => {
-      const name = v.name.trim();
-      if (name === '') return ['name', 'Enter a label.'];
-      if (k.own(b.info, name) !== undefined) return ['name', `There is already a field named ${name}.`];
-      const bad = infoCheck(v.kind, v.value);
-      return bad ? ['value', bad] : null;
+    submitText: 'Add',
+    onSubmit: (v) => {
+      const name = k.str(v.name).trim();
+      if (name === '') return Promise.reject('Enter a label.');
+      if (k.own(k.budget().info, name) !== undefined) return Promise.reject(`There is already a field named ${name}.`);
+      const kind = k.str(v.kind) || 'text';
+      const bad = infoCheck(kind, k.str(v.value));
+      if (bad) return Promise.reject(bad);
+      return ctx.call('set_info', { name, value: { kind, value: k.str(v.value).trim() } }).then(() => {
+        added = name;
+      });
     },
-    build: (v) => ['set_info', { name: v.name.trim(), value: { kind: v.kind, value: v.value.trim() } }],
+  }).then(() => {
+    const f = k.findByData('key', added === null ? k.key('add', 'info') : k.key('info', added, 'value'));
+    if (f) f.focus();
   });
-  add.classList.add('ts-info-row', 'ts-info-add');
-  const table = k.el('div', 'ts-info-table');
-  table.append(cols, add);
+}
+
+// One table: a row per field (name, kind, value, delete), an action strip
+// over it (New field…, Delete… for the selected row, the search) and the
+// count in the footer.
+function renderInfo(panel) {
+  const b = k.budget();
+  const st = k.state();
+  if (!st.filters) st.filters = {};
+  if (!st.selected) st.selected = {};
+  const q = k.str(st.filters.info).trim().toLowerCase();
+  const all = k.entries(b.info);
+  const items = all.filter(([n, v0]) => !q || [n, obj(v0).value].some((x) => k.str(x).toLowerCase().includes(q)));
+  const names = items.map(([n]) => n);
+  const selected = () => (st.selected.info !== undefined && k.own(k.budget().info, st.selected.info) !== undefined ? st.selected.info : null);
+
+  const remove = stripButton('Delete…', k.key('strip', 'info', 'delete'), () => {
+    const n = selected();
+    if (n === null || k.isBusy()) return;
+    const d = k.findByData('key', k.key('del', k.key('info', n)));
+    if (d) d.click();
+  });
+  const syncStrip = () => {
+    const n = selected();
+    if (n === null) remove.setAttribute('aria-disabled', 'true');
+    else remove.removeAttribute('aria-disabled');
+    remove.title = n === null ? 'Select a field first' : `Delete field ${n}`;
+  };
+  const strip = actionStrip(
+    'Info',
+    [stripButton('New field…', k.key('add', 'info'), (btn) => newInfoField(btn), { title: 'Add a field to this budget' }), remove],
+    searchBox({
+      key: k.key('search', 'info'),
+      value: k.str(st.filters.info),
+      label: 'Search info',
+      placeholder: 'Search info',
+      onChange: (v) => {
+        st.filters.info = v;
+        redrawLists();
+      },
+    }),
+  );
+
   const ul = k.list('Budget information');
-  ul.classList.add('ts-info-list');
   items.forEach(([name, v0], i) => {
     const v = obj(v0);
     const kind = ['text', 'number', 'date'].includes(v.kind) ? v.kind : 'text';
     const ik = k.key('info', name);
-    const li = k.itemShell(ik, 'ts-info-row');
-    const nameEl = k.el('span', 'setup-name ts-info-name', name);
+    const li = k.itemShell(ik, 'sw-grid-row');
+    if (st.selected.info === name) li.classList.add('is-selected');
+    li.addEventListener('focusin', () => {
+      if (st.selected.info === name) return;
+      st.selected.info = name;
+      for (const x of ul.querySelectorAll(':scope > .is-selected')) x.classList.remove('is-selected');
+      li.classList.add('is-selected');
+      syncStrip();
+    });
+    const nameEl = k.el('span', 'setup-name', name);
     nameEl.title = name;
     const valueKey = k.key('info', name, 'value');
     const value = k.textInput({
@@ -1576,41 +1629,53 @@ function renderInfo(panel) {
       num: kind === 'number',
       placeholder: kind === 'date' ? 'YYYY-MM-DD' : '',
       label: `${name} value`,
+      cls: 'sw-cell-input',
       onCommit: (val, old) => k.run(ik, () => ['set_info', { name, value: { kind, value: val } }], { restore: [valueKey, old] }),
     });
     const kindSel = k.selectInput({
       fieldKey: k.key('info', name, 'kind'),
       value: kind,
       options: INFO_KINDS,
+      label: `${name} kind`,
+      cls: 'sw-cell-input',
       onCommit: (nk, old) =>
         k.run(ik, () => ['set_info', { name, value: { kind: nk, value: k.str(obj(k.own(k.budget().info, name)).value) } }], {
           restore: [k.key('info', name, 'kind'), old],
         }),
     });
-    kindSel.setAttribute('aria-label', `${name} kind`);
     li.append(
-      nameEl,
-      kindSel,
-      value,
-      k.deleteButton({
-        itemKey: ik,
-        name,
-        what: 'field',
-        confirmText: `Delete the field ${name}?`,
-        build: () => ['delete_info', { name }],
-        neighborKey: k.neighbor('info', names, i, k.key('add', 'info', 'name')),
-      }),
+      lead(),
+      cell(nameEl),
+      cell(kindSel),
+      cell(value),
+      acts(
+        k.deleteButton({
+          itemKey: ik,
+          name,
+          what: 'field',
+          confirmText: `Delete the field ${name}?`,
+          build: () => ['delete_info', { name }],
+          neighborKey: k.neighbor('info', names, i, k.key('add', 'info')),
+        }),
+      ),
     );
     k.finishItem(li, ik, [], null);
     ul.append(li);
   });
-  if (items.length) table.append(ul);
-  panel.append(table);
-  if (!items.length) panel.append(k.emptyNote('No fields yet.'));
+  const body = [];
+  if (!all.length) body.push(k.emptyNote('No fields yet.'));
+  else if (!items.length) body.push(k.emptyNote('Nothing matches the search.'));
+  else body.push(gridTable('info', [lead(), head('Name'), head('Kind'), head('Value'), head('')], ul));
+  mountFrame(panel, { strip, body });
+  syncStrip();
+  setFooterTotals([
+    { label: '', value: items.length === all.length ? k.plural(all.length, 'field', 'fields') : `${items.length} of ${k.plural(all.length, 'field', 'fields')}` },
+  ]);
 }
 
 // ---------------------------------------------------------------------------
-// Settings: currencies, fringe posting, account numbers
+// Settings: fringe posting, calculation, new lines, numbers on screen,
+// account numbers (the base and totals currency are the Currency tab's)
 
 function coding() {
   const c = obj(k.budget().account_coding);
@@ -1708,42 +1773,11 @@ function tsInline(labelText, control) {
 
 function renderSettings(panel) {
   const b = k.budget();
-  const base = k.baseCode();
   panel.classList.add('ts-settings');
-  const ik = k.key('settings', 'currency');
 
-  // Currency
+  // Currency: a pointer to where it moved.
   const cur = k.el('div', 'tss-group');
-  cur.dataset.item = ik;
-  const baseInput = k.textInput({
-    fieldKey: k.key('settings', 'base'),
-    value: base,
-    // Renaming the base currency renames it on every line, charge and
-    // setting that names it too (src/rename.rs), as one undo step.
-    onCommit: (v, old) =>
-      k.run(ik, () => ['rename_setup_item', { kind: 'currency', from: k.baseCode(), to: v.trim() }], {
-        restore: [k.key('settings', 'base'), old],
-      }),
-  });
-  const totals = k.selectInput({
-    fieldKey: k.key('settings', 'totals'),
-    value: k.str(b.totals_currency),
-    options: currencyOptions(k.str(b.totals_currency)),
-    onCommit: (v, old) =>
-      k.run(ik, () => ['set_totals_currency', { code: v === '' ? null : v }], { restore: [k.key('settings', 'totals'), old] }),
-  });
-  baseInput.classList.add('ts-w-s');
-  totals.classList.add('ts-w-m');
-  cur.append(
-    heading('Currency'),
-    tsRow('Base currency', [baseInput], {
-      hint: 'Renaming doesn’t convert amounts.',
-      tip: 'Everything is worked out in the base currency. Renaming it doesn’t convert any amounts or rates.',
-    }),
-    tsRow('Show totals in', [totals]),
-  );
-  if (k.state().errors.has(ik)) cur.append(k.errorLine(k.state().errors.get(ik)));
-  panel.append(cur);
+  cur.append(heading('Currency'), k.el('p', 'ts-hint ts-pointer', 'The base currency and Show totals in are on the Currency tab.'));
 
   // Fringe posting
   const fk = k.key('settings', 'fringes');
@@ -1789,13 +1823,19 @@ function renderSettings(panel) {
     fr.append(tsRow('Account number ends in', [suf], { hint: ex ? `Category ${ex.cat}: ${ex.number}` : '' }));
   }
   if (k.state().errors.has(fk)) fr.append(k.errorLine(k.state().errors.get(fk)));
-  panel.append(fr);
 
-  panel.append(calculationGroup());
-  panel.append(newLinesGroup());
-  // Numbers on screen: rate decimals, summary rows, net total (display-settings.js).
-  panel.append(displaySettingsGroup(k));
-  panel.append(codingForm());
+  mountFrame(panel, {
+    strip: actionStrip('Settings'),
+    body: [
+      cur,
+      fr,
+      calculationGroup(),
+      newLinesGroup(),
+      // Numbers on screen: rate decimals, summary rows, net total (display-settings.js).
+      displaySettingsGroup(k),
+      codingForm(),
+    ],
+  });
 }
 
 // How totals are worked out (budget settings): rounding and the fringes of
@@ -1936,7 +1976,7 @@ function codingForm() {
     set_width: Number(sels.set_width.value),
     separator: sep.value,
   });
-  const apply = k.el('button', 'setup-btn setup-btn-primary', 'Apply');
+  const apply = k.el('button', 'sw-act sw-act-primary', 'Apply');
   apply.type = 'submit';
   apply.dataset.key = k.key('settings', 'coding', 'apply');
   const update = () => {
@@ -2004,86 +2044,79 @@ function changedCount(map) {
   return n;
 }
 
+// The action strip (Lock current totals, or Lock again… and Clear…), the
+// original, current and change of the grand and net totals as a table, and
+// what has changed since in the footer.
 function renderBaseline(panel) {
   const b = k.budget();
   const view = k.view() || {};
   const variance = view.variance && typeof view.variance === 'object' ? view.variance : null;
   const has = b.baseline && typeof b.baseline === 'object';
   const ik = k.key('baseline');
-  panel.classList.add('ts-baseline');
-  panel.append(intro('Lock the current totals as the original budget, so every line, account and category shows how far it has moved.'));
-  const box = k.el('div', 'tss-group');
+  const box = k.el('div', 'tss-body');
   box.dataset.item = ik;
-  // A compact strip: the status on the left, the actions on the right.
-  const strip = k.el('div', 'ts-strip');
-  const status = k.el('p', 'ts-strip-status');
-  const actions = k.el('div', 'ts-strip-actions');
-  strip.append(status, actions);
-  box.append(strip);
+  const actions = [];
+  const foot = [];
 
   if (has) {
-    const table = k.el('table', 'tss-table ts-dense');
-    const thead = k.el('thead');
-    const hr = k.el('tr');
-    for (const h of ['', 'Original', 'Current', 'Change']) {
-      const th = k.el('th', h ? 'setup-right' : null, h);
-      th.scope = 'col';
-      hr.append(th);
-    }
-    thead.append(hr);
-    const tbody = k.el('tbody');
+    const ul = k.el('ul');
+    ul.setAttribute('aria-label', 'Original and current totals');
     const line = (label, ch0, fallback) => {
       const ch = obj(ch0);
-      const tr = k.el('tr');
-      const th = k.el('th', null, label);
-      th.scope = 'row';
       const orig = isNone(ch.original) ? fallback : ch.original;
       const v = ch.variance;
-      const change = k.el('td', 'setup-num setup-right', isNone(v) ? '' : k.formatCents(v));
+      const change = textCell(isNone(v) ? '' : k.formatCents(v), { num: true });
       if (typeof v === 'number' && v !== 0) change.classList.add(v > 0 ? 'tss-up' : 'tss-down');
-      tr.append(
-        th,
-        k.el('td', 'setup-num setup-right', isNone(orig) ? '' : k.formatCents(orig)),
-        k.el('td', 'setup-num setup-right', isNone(ch.current) ? '' : k.formatCents(ch.current)),
+      const li = gridRow();
+      li.append(
+        lead(),
+        cell(k.el('span', 'setup-name', label)),
+        textCell(isNone(orig) ? '' : k.formatCents(orig), { num: true }),
+        textCell(isNone(ch.current) ? '' : k.formatCents(ch.current), { num: true }),
         change,
       );
-      tbody.append(tr);
+      ul.append(li);
     };
     line('Grand total', variance && variance.grand_total, b.baseline.grand_total);
     line('Net total', variance && variance.net_total, b.baseline.net_total);
-    table.append(thead, tbody);
-    box.append(table);
+    box.append(gridTable('baseline', [lead(), head(''), head('Original', { num: true }), head('Current', { num: true }), head('Change', { num: true })], ul));
     if (variance) {
       // Views list only the rows on screen; the count covers every row.
       const lines = typeof variance.rows_changed === 'number' ? variance.rows_changed : changedCount(variance.rows);
       const accounts = changedCount(variance.accounts);
-      status.textContent =
+      foot.push(
         lines || accounts
-          ? `Changed since locked: ${k.plural(lines, 'line', 'lines')} in ${k.plural(accounts, 'account', 'accounts')}.`
-          : 'Nothing has changed since the totals were locked.';
+          ? { label: 'Changed since locked', value: `${k.plural(lines, 'line', 'lines')} in ${k.plural(accounts, 'account', 'accounts')}` }
+          : { label: '', value: 'Nothing has changed since the totals were locked' },
+      );
     } else {
-      status.textContent = 'Current totals can’t be worked out right now, so there is nothing to compare.';
+      foot.push({ label: '', value: 'Current totals can’t be worked out right now, so there is nothing to compare' });
     }
-    if (view.partial) box.append(k.el('p', 'ts-hint ts-row-note', 'Current totals are partial while the budget has errors.'));
-    const relock = button('Lock again', 'setup-btn', k.key('baseline', 'relock'), () =>
-      confirmBox(ik, relock, 'Replace the original totals with the current ones?', 'Lock again', false, () => ['lock_baseline', {}]),
-    );
-    const clear = button('Clear', 'setup-btn', k.key('baseline', 'clear'), () =>
-      confirmBox(ik, clear, 'Clear the original totals? The budget stops showing what changed.', 'Clear', true, () => ['clear_baseline', {}]),
-    );
-    actions.append(relock, clear);
+    if (view.partial) box.append(k.el('p', 'setup-hint tss-note', 'Current totals are partial while the budget has errors.'));
+    const relock = stripButton('Lock again…', k.key('baseline', 'relock'), () => {
+      if (!k.isBusy()) confirmBox(ik, relock, 'Replace the original totals with the current ones?', 'Lock again', false, () => ['lock_baseline', {}]);
+    }, { title: 'Replace the original totals with the current ones' });
+    const clear = stripButton('Clear…', k.key('baseline', 'clear'), () => {
+      if (!k.isBusy()) confirmBox(ik, clear, 'Clear the original totals? The budget stops showing what changed.', 'Clear', true, () => ['clear_baseline', {}]);
+    }, { title: 'Clear the original totals' });
+    actions.push(relock, clear);
   } else {
-    status.textContent = view.error
-      ? 'No original totals locked yet. The budget has a problem to fix before its totals can be locked.'
-      : 'No original totals locked yet.';
-    status.classList.add('setup-empty');
-    actions.append(
-      button('Lock current totals', 'setup-btn setup-btn-primary', k.key('baseline', 'lock'), () => {
+    box.append(
+      k.emptyNote(
+        view.error
+          ? 'No original totals locked yet. The budget has a problem to fix before its totals can be locked.'
+          : 'No original totals locked yet.',
+      ),
+    );
+    actions.push(
+      stripButton('Lock current totals', k.key('baseline', 'lock'), () => {
+        if (k.isBusy()) return;
         k.setFocusKey(k.key('baseline', 'relock'));
         k.run(ik, () => ['lock_baseline', {}], { onError: () => k.setFocusKey(null) });
-      }),
+      }, { primary: true, title: 'Keep the current totals as the original budget' }),
     );
   }
   if (k.state().errors.has(ik)) box.append(k.errorLine(k.state().errors.get(ik)));
-  panel.append(box);
+  mountFrame(panel, { strip: actionStrip('Baseline', actions), body: [box] });
+  setFooterTotals(foot);
 }
