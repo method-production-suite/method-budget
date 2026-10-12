@@ -144,7 +144,7 @@ function show(at, onRow) {
     items = topsheetItems(onRow);
     label = 'Topsheet actions';
   }
-  items = [...explainItems(), ...items];
+  items = [...explainItems(), ...blameItems(), ...items];
   openContextMenu(at, { label, items: tidy(items), returnFocus: () => ctx.grid.focus() });
 }
 
@@ -284,6 +284,20 @@ function explainItems() {
       title: 'Every step of how this total is worked out, in the Explain tab',
       run: () => ctx.explain(c.row, c.colKey),
     }),
+    SEP,
+  ];
+}
+
+/** Who Changed This… on a cell of a shared budget (share.js). */
+function blameItems() {
+  const c = menuCell;
+  if (!c || typeof ctx.blameable !== 'function' || !ctx.blameable(c.row, c.colKey)) return [];
+  return [
+    {
+      label: 'Who Changed This…',
+      title: 'Every value this cell has had since the budget was shared, and who typed it',
+      run: () => ctx.blame(c.row, c.colKey),
+    },
     SEP,
   ];
 }

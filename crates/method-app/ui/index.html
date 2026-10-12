@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="actuals.css">
     <link rel="stylesheet" href="display.css">
     <link rel="stylesheet" href="sharing.css">
+    <link rel="stylesheet" href="shared.css">
     <link rel="stylesheet" href="explain.css">
     <link rel="stylesheet" href="setupwin.css">
     <link rel="stylesheet" href="updates.css">
@@ -58,6 +59,11 @@
           <span class="update-text" id="update-text" hidden></span>
           <button type="button" class="btn update-restart" id="btn-update" hidden></button>
         </div>
+        <div class="share-area" id="share-area" hidden>
+          <div class="share-people" id="share-people" role="group" aria-label="People in this budget"></div>
+          <button type="button" class="share-status" id="share-status" aria-haspopup="dialog" data-tone="quiet"><span class="share-dot" aria-hidden="true"></span><span class="share-status-text" id="share-status-text"></span></button>
+        </div>
+        <button type="button" class="btn" id="btn-share">Share</button>
         <button type="button" class="btn" id="btn-panel" aria-pressed="true" aria-controls="panel">Tools</button>
       </header>
 

@@ -1,0 +1,671 @@
+/* Working together through a shared folder (js/share.js, js/review.js,
+   js/activity.js; src/shared.rs): the toolbar's status item and people,
+   the status panel, the Share dialog, the colors people pick, the wash a
+   changed cell gets, the badge on a value changed by two people, and the
+   Review and Activity tabs. Colors are the theme's tokens plus the person
+   palette below, which keeps its names in light and dark. */
+
+:root {
+  --pc-teal: #0e7468;
+  --pc-blue: #2a63c9;
+  --pc-purple: #7246c4;
+  --pc-orange: #c96a12;
+  --pc-rose: #c42f63;
+  --pc-green: #35862f;
+  --pc-amber: #a67c00;
+  --pc-slate: #5b6b7c;
+  --share-ok: #3a9d3a;
+  --share-warn: #d29a12;
+  --share-bad: var(--danger);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pc-teal: #2cc7b2;
+    --pc-blue: #6ea1f0;
+    --pc-purple: #b094f2;
+    --pc-orange: #f0a35c;
+    --pc-rose: #f07aa5;
+    --pc-green: #7fcf72;
+    --pc-amber: #e3b341;
+    --pc-slate: #a4b1be;
+    --share-ok: #6fcf6f;
+  }
+}
+
+/* The person palette: one class per color name, on avatars, chips,
+   flashes and swatches. */
+.pc-teal { --pc: var(--pc-teal); }
+.pc-blue { --pc: var(--pc-blue); }
+.pc-purple { --pc: var(--pc-purple); }
+.pc-orange { --pc: var(--pc-orange); }
+.pc-rose { --pc: var(--pc-rose); }
+.pc-green { --pc: var(--pc-green); }
+.pc-amber { --pc: var(--pc-amber); }
+.pc-slate { --pc: var(--pc-slate); }
+
+/* ------------------------------------------------------------------------ */
+/* Toolbar */
+
+.share-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.share-people {
+  display: flex;
+  align-items: center;
+}
+
+.share-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: -4px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--pc, var(--pc-slate));
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  cursor: default;
+  user-select: none;
+}
+
+.share-avatar:first-child {
+  margin-left: 0;
+}
+
+.share-avatar.is-away {
+  opacity: 0.45;
+}
+
+.share-avatar.share-more {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.share-avatar-sm {
+  width: 18px;
+  height: 18px;
+  margin-left: 0;
+  border-width: 0;
+  font-size: 9px;
+}
+
+.share-alone {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.share-status {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 320px;
+  padding: 3px 8px 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.share-status:hover {
+  background: var(--surface-2);
+}
+
+.share-status:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.share-status-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.share-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.share-status[data-tone="ok"] .share-dot {
+  background: var(--share-ok);
+}
+
+.share-status[data-tone="busy"] .share-dot {
+  background: var(--share-ok);
+  animation: share-pulse 1.2s ease-in-out infinite;
+}
+
+.share-status[data-tone="warn"] .share-dot {
+  background: var(--share-warn);
+}
+
+.share-status[data-tone="bad"] .share-dot {
+  background: var(--share-bad);
+}
+
+.share-status[data-tone="bad"] {
+  color: var(--danger);
+}
+
+.share-review-count {
+  padding: 1px 6px;
+  border-radius: 9px;
+  background: var(--share-warn);
+  color: #1c1400;
+  font-weight: 600;
+}
+
+@keyframes share-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ------------------------------------------------------------------------ */
+/* The status panel (under the status item) and conflict popovers */
+
+.share-panel,
+.share-popover {
+  position: fixed;
+  z-index: 46;
+  width: min(380px, calc(100vw - 16px));
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+  padding: 10px 12px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  font-size: 12.5px;
+}
+
+.share-panel {
+  top: 44px;
+  right: 8px;
+}
+
+.share-popover {
+  top: 80px;
+  left: 8px;
+}
+
+.share-panel-title,
+.share-popover-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.share-panel-sub {
+  margin: 10px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.share-line {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 2px 0;
+}
+
+.share-line-label {
+  flex: 0 0 150px;
+  color: var(--text-muted);
+}
+
+.share-line-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-line.is-busy .share-line-value {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.share-line.is-warn .share-line-value {
+  color: var(--share-warn);
+  font-weight: 600;
+}
+
+.share-problem {
+  margin: 6px 0;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.share-muted {
+  margin: 6px 0;
+  color: var(--text-muted);
+}
+
+.share-people-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.share-person {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.share-person.is-away {
+  color: var(--text-muted);
+}
+
+.share-person-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.share-person-where,
+.share-person-when {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.share-panel-actions,
+.share-popover-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* Values (a conflict's two values, Who Changed This, the Review tab) */
+
+.share-values {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0;
+}
+
+.share-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: var(--radius);
+}
+
+.share-value.is-kept {
+  background: var(--selection);
+}
+
+.share-value-who {
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+
+.share-value-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.share-value-when,
+.share-value-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.share-value-kept {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.share-values-dialog {
+  max-height: 50vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px;
+}
+
+.share-values-dialog .share-value-text {
+  flex: 0 0 140px;
+  font-weight: 600;
+}
+
+.share-values-dialog .share-value-label {
+  flex: 1 1 auto;
+}
+
+/* ------------------------------------------------------------------------ */
+/* The Share dialog */
+
+.share-dialog .modal-message {
+  margin-bottom: 6px;
+}
+
+.share-mode {
+  margin: 4px 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.share-mode.is-later {
+  color: var(--text-muted);
+}
+
+.share-mode-text {
+  margin: 2px 0 6px 22px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.share-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.share-radio.is-disabled {
+  font-weight: 500;
+}
+
+.share-where {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 22px;
+  font-size: 12px;
+}
+
+.share-where .share-line-label {
+  flex: none;
+}
+
+.share-where-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-movecopy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0 0 22px;
+  font-size: 12px;
+}
+
+.share-movecopy .share-radio {
+  font-weight: 500;
+}
+
+.share-me {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 8px 0 4px;
+}
+
+.share-me .modal-field {
+  margin: 0;
+}
+
+.share-colors {
+  display: flex;
+  gap: 4px;
+  padding-top: 2px;
+}
+
+.share-color {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--pc, var(--pc-slate));
+  cursor: pointer;
+}
+
+.share-color[aria-checked="true"] {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px var(--surface) inset;
+}
+
+.share-color:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.share-people-dialog {
+  margin-bottom: 6px;
+}
+
+/* ------------------------------------------------------------------------ */
+/* In the grid: people in rows, changes arriving, values changed by two
+   people. Every color cue also has a shape or text. */
+
+.share-here {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 15px;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--pc, var(--pc-slate));
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: middle;
+  pointer-events: none;
+}
+
+.grid td.share-flash,
+.grid tr.share-flash > td {
+  animation: share-wash 1.6s ease-out;
+  box-shadow: inset 0 0 0 2px var(--pc, var(--accent));
+}
+
+@keyframes share-wash {
+  0% { background-color: color-mix(in srgb, var(--pc, var(--accent)) 28%, transparent); }
+  100% { background-color: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grid td.share-flash,
+  .grid tr.share-flash > td {
+    animation: none;
+  }
+  .share-status[data-tone="busy"] .share-dot {
+    animation: none;
+  }
+}
+
+/* The dot that stays until the row is looked at: on the first cell. */
+.grid tr.share-changed > td:first-child {
+  position: relative;
+}
+
+.grid tr.share-changed > td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background: var(--pc, var(--accent));
+}
+
+.grid td.share-conflict {
+  position: relative;
+  box-shadow: inset 0 0 0 1px var(--share-warn);
+}
+
+.share-conflict-badge {
+  appearance: none;
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--share-warn);
+  color: #1c1400;
+  font: 700 10px/14px var(--font-ui);
+  text-align: center;
+  cursor: pointer;
+}
+
+.share-conflict-badge:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+/* ------------------------------------------------------------------------ */
+/* The Review and Activity tabs (tools panel) */
+
+.review-list,
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.review-item {
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.review-sentence {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.activity-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.activity-filter {
+  max-width: 100%;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px 4px;
+}
+
+.activity-hour {
+  margin: 10px 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.activity-item {
+  padding: 4px 2px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.activity-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.activity-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+
+.activity-who {
+  font-weight: 600;
+}
+
+.activity-time {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-where {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0 26px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.activity-go {
+  font-size: 11px;
+  padding: 0 6px;
+}

@@ -47,6 +47,8 @@ pub mod session;
 pub mod setup_lists;
 pub mod setup_sheets;
 pub mod setupwin;
+pub mod shared;
+pub mod shared_app;
 pub mod sharing;
 pub mod sheet_import;
 pub mod start;

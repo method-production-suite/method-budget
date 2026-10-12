@@ -52,6 +52,8 @@ import { renderExplain } from './explain.js';
 import { renderOvertime } from './overtime.js';
 // Actuals and estimates to complete (actuals.js).
 import { renderActuals } from './actuals.js';
+import { renderReview } from './review.js';
+import { renderActivity } from './activity.js';
 
 const TOOL_TABS = [
   { id: 'fringes', label: 'Fringes' },
@@ -69,13 +71,16 @@ const TOOL_TABS = [
   { id: 'explain', label: 'Explain' },
   { id: 'overtime', label: 'Overtime' },
   { id: 'actuals', label: 'Actuals' },
+  // A shared budget's review list and everyone's changes (src/shared_app.rs).
+  { id: 'review', label: 'Review' },
+  { id: 'activity', label: 'Activity' },
 ];
 
 const PANES = ['top', 'bottom'];
 const TAB_IDS = TOOL_TABS.map((t) => t.id);
 
 const DEFAULT_LAYOUT = Object.freeze({
-  panes: { top: ['fringes', 'groups', 'globals', 'units', 'presets', 'find', 'explain'], bottom: ['sets', 'locations', 'currencies', 'notes', 'library', 'history', 'overtime', 'actuals'] },
+  panes: { top: ['fringes', 'groups', 'globals', 'units', 'presets', 'find', 'explain'], bottom: ['sets', 'locations', 'currencies', 'notes', 'library', 'history', 'overtime', 'actuals', 'review', 'activity'] },
   active: { top: 'fringes', bottom: 'sets' },
 });
 
@@ -311,6 +316,14 @@ function content(body, id, view, ctx) {
   } else if (id === 'actuals') {
     const host = el('div', { class: 'actuals-host' });
     renderActuals(host, view, ctx);
+    body.append(host);
+  } else if (id === 'review') {
+    const host = el('div', { class: 'review-host' });
+    renderReview(host, view, ctx);
+    body.append(host);
+  } else if (id === 'activity') {
+    const host = el('div', { class: 'activity-host' });
+    renderActivity(host, view, ctx);
     body.append(host);
   }
 }

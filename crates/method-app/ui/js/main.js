@@ -76,6 +76,7 @@ import { exportSetupLists, importSetupLists } from './setuplists.js';
 import { importActuals } from './actualsimport.js';
 import { saveShareCopy, newSubBudget, renderShareBanner, offerReturnedCopy } from './sharing.js';
 import { displayCommands, userDisplay, withoutZeroRows } from './display.js';
+import { initShare, renderBar as renderShareBar, decorateShare, reportPlace, openShareDialog, whoChangedThis, lookedAt, shareShown } from './share.js';
 import { setExplainTarget, explainTargetAt } from './explain.js';
 import { showStart, closeStart, startMenu, isStartOpen, startAtLaunch, startOnLastClose } from './start.js';
 
@@ -208,6 +209,9 @@ initContextMenu({
   // Explain This Number… on the cell right-clicked (explain.js).
   explainable: (row, colKey) => Boolean(explainTargetFor(row, colKey)),
   explain: (row, colKey) => explainCell(row, colKey),
+  // Who Changed This… in a shared budget (share.js).
+  blameable: (row, colKey) => Boolean(state.view && state.view.shared && placeOfCell(row, colKey)),
+  blame: (row, colKey) => whoChangedCell(row, colKey),
 });
 // The right-click menu's preset submenus (presets.js) need the selection, and
 // a call that rejects so a form can show its message.
@@ -280,6 +284,10 @@ function applyHere(view, opts = {}) {
   if (state.level === 'details') requestSelectionTotals(grid.selectedKeys());
   // A returned copy next to the budget it came from: offer once (sharing.js).
   if (switched) offerReturnedCopy(view, sharingCtx());
+  // Something the command wants said once (an undo in a shared budget that
+  // couldn't put everything back; share.js).
+  if (typeof view.notice === 'string' && view.notice) toast(view.notice);
+  if (switched) shareShown(view);
 }
 
 // Commands that return a view without changing the budget.
@@ -309,6 +317,8 @@ const NOT_EDITS = new Set([
   'pane_view',
   'share_copy_editable',
   'sub_budget_new',
+  // Other people's changes arriving in a shared budget (share.js).
+  'share-changed',
 ]);
 
 /**
@@ -406,9 +416,104 @@ function render(opts = {}) {
     }
     grid.setData(cols, rows, opts);
   }
-  if (cur === target) renderPanel();
+  if (cur === target) {
+    // Sharing (share.js): the status item and people, who is in which row,
+    // the badges on values changed by two people, and where this person is.
+    renderShareBar(v);
+    decorateShare(v);
+    reportPlace(v);
+    renderPanel();
+  }
   renderFooterNow();
 }
+
+// ---------------------------------------------------------------------------
+// Sharing through a folder (share.js; src/shared_app.rs)
+
+/**
+ * The grid row (and column) a place from Rust is at on screen, or null when
+ * it isn't on this level: { kind: 'row' | 'account' | 'category' |
+ * 'production_total', key, parent, field }.
+ */
+function rowKeyFor(place) {
+  if (!place || !state.ix) return null;
+  const col = place.field && GRID_FIELDS.has(place.field) ? place.field : null;
+  if (state.level === 'details') {
+    if (place.kind !== 'row' || !state.acct || place.parent !== state.acct.code) return null;
+    return { key: `r${place.key}`, col };
+  }
+  if (state.level === 'accounts') {
+    if (place.kind !== 'account' || !state.cat) return null;
+    const c = state.ix.cats.find((x) => x.ti === state.cat.ti);
+    const ai = c ? (c.cat.accounts || []).findIndex((a) => a.code === place.key) : -1;
+    if (ai < 0) return null;
+    return { key: `a${ai}`, col: col === 'code' ? 'code' : col === 'name' ? 'name' : null };
+  }
+  if (place.kind === 'category') {
+    const c = state.ix.cats.find((x) => x.cat.code === place.key);
+    return c ? { key: `t${c.ti}`, col: col === 'code' ? 'code' : col === 'name' ? 'name' : null } : null;
+  }
+  if (place.kind === 'production_total') {
+    const ti = state.ix.topsheet.findIndex((r) => r.kind === 'production_total' && r.name === place.key);
+    return ti >= 0 ? { key: `t${ti}`, col: col === 'name' ? 'name' : null } : null;
+  }
+  return null;
+}
+
+// Fields a cell shows under the same name the change log uses.
+const GRID_FIELDS = new Set(['description', 'amount', 'unit', 'x', 'unit2', 'rate', 'unit3', 'currency', 'x4', 'unit4', 'fringes', 'groups', 'set', 'location', 'name', 'code']);
+
+/** The place and field of a grid cell, for Who Changed This; null for a cell nobody types in. */
+function placeOfCell(row, colKey) {
+  if (!row || !colKey || !GRID_FIELDS.has(colKey)) return null;
+  if (state.level === 'details') {
+    if (!row.key || !row.key.startsWith('r') || !state.acct) return null;
+    const id = row.key.slice(1);
+    return { kind: 'row', key: id, parent: state.acct.code, field: colKey, text: `line ${row.cells && row.cells.num ? row.cells.num.text : ''} in ${state.acct.code}`.replace('line  in', 'a line in') };
+  }
+  if (state.level === 'accounts') {
+    if (!row.code || (colKey !== 'name' && colKey !== 'code')) return null;
+    return { kind: 'account', key: row.code, parent: state.cat ? state.cat.code : null, field: colKey, text: `account ${row.code}` };
+  }
+  if (row.kind === 'category' && row.cells && row.cells.code && (colKey === 'name' || colKey === 'code')) {
+    return { kind: 'category', key: row.cells.code.text, field: colKey, text: `category ${row.cells.code.text}` };
+  }
+  if (row.kind === 'level' && row.cells && row.cells.name && colKey === 'name') {
+    return { kind: 'production_total', key: row.cells.name.text, field: 'name', text: `production total ${row.cells.name.text}` };
+  }
+  return null;
+}
+
+/** Right-click > Who Changed This…, or its menu item, on the cursor cell. */
+function whoChangedCell(row, colKey) {
+  if (!state.view || !state.view.shared) {
+    toast('Share the budget through a folder to see who changed what.');
+    return;
+  }
+  const place = placeOfCell(row, colKey);
+  if (!place) {
+    toast('Put the cursor on a cell someone types in: totals are worked out, not typed.');
+    return;
+  }
+  whoChangedThis(place);
+}
+
+initShare({
+  view: () => state.view,
+  doc: () => state.doc,
+  invoke,
+  apply: (v, opts) => apply(v, opts),
+  toast,
+  refresh: () => refreshView('share-changed'),
+  grid: () => grid,
+  level: () => state.level,
+  place: () => ({ category: state.level !== 'topsheet' && state.cat ? state.cat.code : null, account: state.level === 'details' && state.acct ? state.acct.code : null }),
+  focus: () => grid.focus(),
+  showTab: (tab) => showTab(tab),
+  rowKeyFor,
+  jumpTo: (entry) => jumpTo(entry),
+});
+
 
 /**
  * Topsheet and account-list rows without the zero-balance ones, when the
@@ -1611,6 +1716,9 @@ function broadcastSelection() {
 function cursorMoved() {
   document.dispatchEvent(new CustomEvent('method:cursor'));
   broadcastSelection();
+  // A row someone else changed loses its dot once the cursor lands on it.
+  const k = grid.cursorKey();
+  if (k !== null) lookedAt(grid.rowEl(k));
 }
 
 /**
@@ -1671,7 +1779,7 @@ function jumpTo(entry) {
 let refreshing = false;
 let refreshAgain = false;
 
-async function refreshView() {
+async function refreshView(cmd = 'view-changed') {
   if (refreshing) {
     refreshAgain = true;
     return;
@@ -1683,8 +1791,9 @@ async function refreshView() {
       try {
         // The budget on screen; the one in front if it has gone meanwhile.
         const v = await invoke('get_view').catch(() => invoke('get_view', { doc: null }));
-        // An edit made in the tools window: it counts in the footer's changes.
-        if (v) apply(v, { cmd: 'view-changed' });
+        // An edit made in the tools window: it counts in the footer's changes
+        // (other people's changes, 'share-changed', don't: share.js).
+        if (v) apply(v, { cmd });
       } catch (e) {
         toast(e);
       }
@@ -2199,6 +2308,15 @@ Object.assign(COMMANDS, {
     if (grid.editor) grid.commitEdit(null);
     if (state.view) newSubBudget(sharingCtx());
   },
+});
+
+// File > Share… and Who Changed This… (share.js; src/shared_app.rs).
+Object.assign(COMMANDS, {
+  'file.share': () => {
+    if (grid.editor) grid.commitEdit(null);
+    openShareDialog();
+  },
+  'share.blame': () => whoChangedCell(grid.cursorRow(), grid.cursorColKey()),
 });
 
 /** What sharing.js needs from the shell. */
@@ -2944,6 +3062,7 @@ function wire() {
     'btn-undo': ['Undo', 'edit.undo'],
     'btn-redo': ['Redo', 'edit.redo'],
     'btn-panel': ['Show or hide the tools panel', 'view.toggle_panel'],
+    'btn-share': ['Share this budget through a folder, or see who is in it', 'file.share'],
   };
   for (const [id, [label, cmd]] of Object.entries(tips)) $(id).title = withShortcut(label, cmd);
   window.addEventListener('keydown', onKeyDown);

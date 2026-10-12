@@ -585,6 +585,9 @@ mod tests {
             include_str!("../ui/js/library.js"),
             // Its Packs section (setup packs, src/packs.rs).
             include_str!("../ui/js/packs.js"),
+            // The Review and Activity tabs of a shared budget (src/shared_app.rs).
+            include_str!("../ui/js/review.js"),
+            include_str!("../ui/js/activity.js"),
         ];
         let mut named = std::collections::BTreeSet::new();
         for js in panel_js {

@@ -59,7 +59,7 @@ pub(crate) fn finish<R: Runtime>(
     view
 }
 
-fn apply<R: Runtime, T>(
+pub(crate) fn apply<R: Runtime, T>(
     window: &WebviewWindow<R>,
     state: &AppState,
     doc: Option<DocId>,
@@ -1323,7 +1323,9 @@ pub fn run() {
         // The budget export picked to import (src/export_import.rs).
         .manage(crate::export_import::ExportSources::default())
         // Which budget change the other window has heard about (src/tools.rs).
-        .manage(crate::tools::Broadcast::default());
+        .manage(crate::tools::Broadcast::default())
+        // The folder picked for sharing and the last status sent (src/shared_app.rs).
+        .manage(crate::shared_app::ShareState::default());
 
     // The menu bar (src/menu.rs). Quit asks about unsaved changes first, like
     // closing the window; every other item goes to menu::handle.
@@ -1606,6 +1608,17 @@ pub fn run() {
             crate::sharing::share_copy_original,
             crate::sharing::share_copy_store,
             crate::sharing::sub_budget_new,
+            // Working together through a shared folder (src/shared_app.rs)
+            crate::shared_app::share_status,
+            crate::shared_app::share_setup,
+            crate::shared_app::share_pick_folder,
+            crate::shared_app::share_start,
+            crate::shared_app::share_set_me,
+            crate::shared_app::share_place,
+            crate::shared_app::share_review,
+            crate::shared_app::share_activity,
+            crate::shared_app::share_blame,
+            crate::shared_app::share_use_value,
             // The personal setup library (src/library.rs)
             crate::library::library_view,
             crate::library::library_create,

@@ -9,7 +9,7 @@ use method_core::Budget;
 use serde::Serialize;
 use tauri::{Runtime, State, WebviewWindow};
 
-use crate::app::{edit_budget, AppState, DocId};
+use crate::app::{AppState, DocId};
 use crate::edit::EditResult;
 use crate::view::View;
 
@@ -70,9 +70,16 @@ pub fn rename_setup_item<R: Runtime>(
         from.trim(),
         to.trim()
     );
-    let view = edit_budget(&window, &state, doc, label, |b| {
-        out = rename_item(b, &kind, &from, &to)?;
-        Ok(())
+    // A shared budget's change log records the rename as one write to the
+    // item's name (src/shared.rs), not a delete and an add.
+    let hints: Vec<method_core::log::Hint> = SetupKind::from_name(&kind)
+        .map(|k| vec![method_core::log::Hint::rename(k, &from, &to)])
+        .unwrap_or_default();
+    let view = crate::app::apply(&window, &state, doc, |s| {
+        s.edit_with_hints(label, &hints, |b| {
+            out = rename_item(b, &kind, &from, &to)?;
+            Ok(())
+        })
     })?;
     Ok(Renamed {
         view,

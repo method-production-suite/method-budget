@@ -1098,6 +1098,92 @@ pub fn open(path: &Path, actor: ActorId, ids: Ids) -> Result<(Shared, LoadReport
     ))
 }
 
+// ---------------------------------------------------------------------------
+// Presence (docs/research/collaboration.md, section 5): each actor rewrites
+// its own `presence.json` every few seconds while the budget is open.
+
+/// The name of the heartbeat file in an actor's folder.
+pub const PRESENCE_FILE: &str = "presence.json";
+
+/// One actor's heartbeat: who they are, where they are in the budget and
+/// when they last wrote it. Never stored in the log.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Presence {
+    /// The person's display name, as they typed it.
+    pub name: String,
+    /// A color name from the application's palette ("teal").
+    pub color: String,
+    /// The category they are in (its code), if any.
+    pub category: Option<String>,
+    /// The account they are in (its code), if any.
+    pub account: Option<String>,
+    /// When this was written, ISO 8601 UTC.
+    pub at: String,
+    /// The frontier digest of their log at that moment.
+    pub frontier: String,
+}
+
+impl LogDir {
+    /// Writes `actor`'s heartbeat (only that actor's own application
+    /// does), through a temporary file and a rename like a segment.
+    pub fn write_presence(&self, actor: ActorId, p: &Presence) -> Result<(), LogFileError> {
+        let dir = self.actor_dir(actor);
+        fs::create_dir_all(&dir).map_err(|e| io_err(&dir, e))?;
+        let mut text = serde_json::to_string_pretty(p).expect("presence serializes");
+        text.push('\n');
+        write_sealed(&dir.join(PRESENCE_FILE), text.as_bytes())
+    }
+
+    /// `actor`'s heartbeat, if it has written one that reads.
+    pub fn read_presence(&self, actor: ActorId) -> Option<Presence> {
+        let text = fs::read_to_string(self.actor_dir(actor).join(PRESENCE_FILE)).ok()?;
+        serde_json::from_str(&text).ok()
+    }
+
+    /// Every actor's heartbeat that reads.
+    pub fn presences(&self) -> BTreeMap<ActorId, Presence> {
+        self.actors()
+            .into_iter()
+            .filter_map(|a| self.read_presence(a).map(|p| (a, p)))
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// This computer's actor id
+
+/// Where this computer's actor id lives: `$METHOD_ACTOR_FILE`, or
+/// `~/.method/actor`. `None` without a home folder.
+pub fn actor_id_path() -> Option<PathBuf> {
+    if let Some(p) = std::env::var_os("METHOD_ACTOR_FILE") {
+        return Some(PathBuf::from(p));
+    }
+    let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))?;
+    Some(Path::new(&home).join(".method").join("actor"))
+}
+
+/// The actor id kept in `path` (64 hex characters), made with `ids` the
+/// first time and kept readable by its owner only. The command line and
+/// the application share it, so one computer is one actor.
+pub fn load_or_make_actor(path: &Path, ids: &mut Ids) -> Result<ActorId, LogFileError> {
+    if let Ok(text) = fs::read_to_string(path) {
+        return ActorId::parse(&text)
+            .ok_or_else(|| LogFileError(format!("{}: not an actor id", path.display())));
+    }
+    let actor = ActorId::random(ids);
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| io_err(dir, e))?;
+    }
+    fs::write(path, format!("{}\n", actor.hex())).map_err(|e| io_err(path, e))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
+    }
+    Ok(actor)
+}
+
 /// Records an outside edit to the `.mthd` (someone saved it with a
 /// program that doesn't write the log; docs/research/collaboration.md,
 /// 4.4): the difference between the file and the merged state becomes a

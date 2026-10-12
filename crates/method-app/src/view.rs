@@ -70,6 +70,13 @@ pub struct View {
     /// actuals: every account, category and summary row, and the lines of
     /// `account` (src/actuals.rs). The session fills it in.
     pub cost: Option<crate::actuals::CostDto>,
+    /// The budget is shared through a folder (src/shared.rs): the page shows
+    /// the status item, the people and the review badges.
+    pub shared: bool,
+    /// Something to tell the person once, after this command (an undo in a
+    /// shared budget that couldn't put everything back).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notice: Option<String>,
 }
 
 /// One account in full: its rows in file-format JSON and their totals.
@@ -478,6 +485,8 @@ impl View {
             tabs: Vec::new(),
             panes: None,
             cost: None,
+            shared: false,
+            notice: None,
         }
     }
 }

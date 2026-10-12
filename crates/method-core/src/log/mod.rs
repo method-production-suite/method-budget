@@ -371,6 +371,38 @@ impl Log {
         Ok((Some(new), inv))
     }
 
+    /// Records one write by this actor: `field` of `entity` set to
+    /// `value` (a person picking a value back from the history, or the
+    /// one that lost to a concurrent write). `None` when the entity is
+    /// unknown.
+    pub fn set_field(
+        &mut self,
+        entity: Uid,
+        field: Field,
+        value: Value,
+        label: &str,
+        time: &str,
+    ) -> Result<Option<ChangeId>, Malformed> {
+        if self.state.entity(entity).is_none() {
+            return Ok(None);
+        }
+        let ops = vec![Op::Set {
+            entity,
+            field,
+            value,
+        }];
+        self.record_ops(ops, label, time).map(Some)
+    }
+
+    /// The applied changes from the `from`th one on, in applied order
+    /// (what arrived since the log had `from` changes).
+    pub fn changes_from(&self, from: usize) -> impl Iterator<Item = &Change> {
+        self.order
+            .iter()
+            .skip(from)
+            .filter_map(|id| self.changes.get(id))
+    }
+
     /// Every write to one field of an entity, oldest first: who set it,
     /// when (its change's time), and to what.
     pub fn blame(&self, entity: Uid, field: Field) -> Vec<(Stamp, String, Value)> {
