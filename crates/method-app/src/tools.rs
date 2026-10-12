@@ -565,8 +565,8 @@ mod tests {
             include_str!("../ui/js/apply.js"),
             // Compact Globals and Units (the full tables, charges, credits,
             // info, settings and the baseline are the Budget Setup window's,
-            // src/setupwin.rs: topsheet-setup.js, display-settings.js and
-            // renumber.js are not the panel's).
+            // src/setupwin.rs: topsheet-setup.js, display-settings.js,
+            // setupbands.js and renumber.js are not the panel's).
             include_str!("../ui/js/setup.js"),
             include_str!("../ui/js/notes.js"),
             include_str!("../ui/js/find.js"),

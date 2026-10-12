@@ -20,6 +20,12 @@
 // When the library is also open as a budget tab, it is read from there and
 // Rust refuses changes to it from here (the tab says so).
 //
+// The Budget Setup window draws the same library in two places
+// (renderLibrarySetup, when a tab's rail is switched to Library): its rail
+// gets the name, the kind, the sort and the folders as a short tree with
+// their buttons; its main area the items as a table (setupframe.js) with
+// the actions on a strip above and the packs below.
+//
 // Text from the library only reaches the page through textContent (dom.js
 // el()); styling is classes (apply.css, presets.css, tools.css).
 
@@ -29,6 +35,7 @@ import { anchoredDialog, anchoredForm } from './modal.js';
 import { openContextMenu } from './menu.js';
 import { showReview } from './importsetup.js';
 import { packsSection } from './packs.js';
+import { mountFrame, actionStrip, stripButton, searchBox, gridTable, setFooterTotals } from './setupframe.js';
 
 /** The kinds, in the library's order: [kind, list heading]. */
 export const LIBRARY_KINDS = [
@@ -67,6 +74,12 @@ const st = {
   folder: ALL,
   filter: '',
   ticked: new Set(),
+  // Budget Setup draws the library in two places (renderLibrarySetup): its
+  // rail and its main area. `sort` is that table's order.
+  layout: 'panel',
+  rail: null,
+  main: null,
+  sort: 'library', // 'library' | 'asc' | 'desc'
 };
 
 function str(v) {
@@ -279,6 +292,7 @@ export function saveItemToLibrary(ctx, kind, name) {
 export function renderLibrary(host, view, ctx) {
   st.view = view && typeof view === 'object' ? view : {};
   st.ctx = ctx || {};
+  st.layout = 'panel';
   st.host = host;
   const sig = signature(st.view);
   if (st.lib === null || sig !== st.sig) {
@@ -286,6 +300,29 @@ export function renderLibrary(host, view, ctx) {
     load();
   }
   draw(host);
+}
+
+/**
+ * Draws the library as Budget Setup shows it (setupwin.js, on every view,
+ * while a tab's rail is switched to Library): into `rail` the library's
+ * name, the kind, the sort and the folders with their buttons; into `main`
+ * the items of the kind and folder as a table (setupframe.js), with Add to
+ * This Budget…, Move To… and Save to Library… above it and the setup packs
+ * under it.
+ */
+export function renderLibrarySetup(rail, main, view, ctx) {
+  st.view = view && typeof view === 'object' ? view : {};
+  st.ctx = ctx || {};
+  st.layout = 'setup';
+  st.rail = rail;
+  st.main = main;
+  st.host = null;
+  const sig = signature(st.view);
+  if (st.lib === null || sig !== st.sig) {
+    st.sig = sig;
+    load();
+  }
+  drawSetup();
 }
 
 /**
@@ -301,7 +338,8 @@ export function setLibraryKind(kind) {
 }
 
 function redraw() {
-  if (st.host && st.host.isConnected) draw(st.host);
+  if (st.layout === 'setup') drawSetup();
+  else if (st.host && st.host.isConnected) draw(st.host);
 }
 
 function button(text, key, onClick, { title = '', label = '', enabled = true, primary = false } = {}) {
@@ -321,8 +359,12 @@ function button(text, key, onClick, { title = '', label = '', enabled = true, pr
 }
 
 function byKey(key) {
-  if (!st.host) return null;
-  return [...st.host.querySelectorAll('[data-key]')].find((e) => e.dataset.key === key) || null;
+  for (const h of [st.host, st.rail, st.main]) {
+    if (!h) continue;
+    const found = [...h.querySelectorAll('[data-key]')].find((e) => e.dataset.key === key);
+    if (found) return found;
+  }
+  return null;
 }
 
 function pickFile(cmd) {
@@ -431,7 +473,13 @@ function pointBelow(b) {
   return { x: r.left, y: r.bottom + 2 };
 }
 
-function itemRow(k, it, writable) {
+/**
+ * One library item: its tick box and its name (a button: Enter or a
+ * double-click adds it, Space ticks it, Up and Down move along). `grid`:
+ * Budget Setup's table row, with the definition and the folder in cells of
+ * their own.
+ */
+function itemRow(k, it, writable, grid = false) {
   const key = `library:item:${k.kind}:${it.name}`;
   const box = el('input', {
     class: 'library-tick',
@@ -455,7 +503,7 @@ function itemRow(k, it, writable) {
       data: { key, nobusy: '1' },
     },
     el('span', { class: 'apply-name', text: str(it.name) }),
-    el('span', { class: 'apply-desc', text: str(it.definition) }),
+    grid ? null : el('span', { class: 'apply-desc', text: str(it.definition) }),
   );
   const add = () => addToBudget(k.kind, [it.name]);
   name.addEventListener('dblclick', (e) => {
@@ -471,7 +519,8 @@ function itemRow(k, it, writable) {
       e.preventDefault();
       box.click();
     } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && plain) {
-      const all = [...st.host.querySelectorAll('.library-name')];
+      const list = name.closest('ul');
+      const all = list ? [...list.querySelectorAll('.library-name')] : [];
       const i = all.indexOf(name);
       const to = all[i + (e.key === 'ArrowDown' ? 1 : -1)];
       if (to) {
@@ -493,6 +542,15 @@ function itemRow(k, it, writable) {
     openContextMenu({ x: e.clientX, y: e.clientY }, { label: what, items, returnFocus: () => name.focus() });
   });
   const parts = [el('label', { class: 'imp-tick library-tickbox' }, box), name];
+  if (grid) {
+    parts.push(
+      el('span', { class: 'sw-cell sw-cell-text library-def', text: str(it.definition), title: str(it.definition) || undefined }),
+      el('span', { class: 'sw-cell sw-cell-text library-in', text: str(it.folder), title: it.folder ? 'Its folder' : undefined }),
+    );
+    const row = el('li', { class: 'library-item sw-grid-row' }, ...parts);
+    if (st.ticked.has(it.name)) row.classList.add('is-selected');
+    return row;
+  }
   if (st.folder === ALL && it.folder) parts.push(el('span', { class: 'library-in', text: str(it.folder), title: 'Its folder' }));
   return el('li', { class: 'library-item' }, ...parts);
 }
@@ -620,26 +678,7 @@ function draw(host) {
     }
   }
   if (st.error) parts.push(el('p', { class: 'setup-error apply-error', text: st.error, attrs: { role: 'alert' } }));
-  if (lib) {
-    const usable = Boolean(lib.configured && !lib.problem);
-    parts.push(
-      packsSection(
-        {
-          call: panelCall,
-          toast,
-          focus: () => {},
-          redraw,
-          // The budget changed: draw its new view.
-          apply: () => panelCall('get_view', {}).catch(() => {}),
-          libraryChanged: (l) => {
-            setLibrary(l);
-            redraw();
-          },
-        },
-        { hasLibrary: usable, libraryWritable: usable && !lib.in_tab },
-      ),
-    );
-  }
+  if (lib) parts.push(packsPart(lib));
   const box = el('div', { class: 'apply library', attrs: { 'aria-busy': st.busy || st.loading ? 'true' : 'false' } }, ...parts);
   const a = document.activeElement;
   const had = a && host.contains(a) && a.dataset ? a.dataset.key : null;
@@ -648,4 +687,245 @@ function draw(host) {
     const again = byKey(had);
     if (again) again.focus({ preventScroll: true });
   }
+}
+
+/** The setup packs section (packs.js), for the library `lib`. */
+function packsPart(lib) {
+  const usable = Boolean(lib.configured && !lib.problem);
+  return packsSection(
+    {
+      call: panelCall,
+      toast,
+      focus: () => {},
+      redraw,
+      // The budget changed: draw its new view.
+      apply: () => panelCall('get_view', {}).catch(() => {}),
+      libraryChanged: (l) => {
+        setLibrary(l);
+        redraw();
+      },
+    },
+    { hasLibrary: usable, libraryWritable: usable && !lib.in_tab },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Budget Setup's library: the rail and the main area (renderLibrarySetup)
+
+const FOLDER_KEYS = { [ALL]: 'all', [UNFILED]: 'unfiled' };
+
+function folderKey(f) {
+  return `library:folder-pick:${FOLDER_KEYS[f] || `f:${f}`}`;
+}
+
+/** The folders of kind `k` as a short tree: All, Unfiled, then each folder, with counts. */
+function folderTree(k) {
+  const items = k.items || [];
+  const count = (f) => (f === ALL ? items.length : f === UNFILED ? items.filter((i) => !i.folder).length : items.filter((i) => i.folder === f).length);
+  const ul = el('ul', { class: 'sw-tree', attrs: { 'aria-label': 'Folders' } });
+  const picks = [
+    [ALL, 'All folders'],
+    [UNFILED, 'Unfiled'],
+    ...(k.folders || []).map((f) => [f, f]),
+  ];
+  for (const [f, label] of picks) {
+    const real = f !== ALL && f !== UNFILED;
+    const b = el(
+      'button',
+      {
+        class: `sw-tree-item${real ? ' is-folder' : ''}`,
+        title: real ? `Show the folder ${f}` : f === ALL ? 'Show every item' : 'Show the items in no folder',
+        attrs: { type: 'button', 'aria-pressed': String(st.folder === f) },
+        data: { key: folderKey(f), nobusy: '1' },
+      },
+      el('span', { class: 'sw-tree-name', text: label }),
+      el('span', { class: 'sw-tree-count', text: String(count(f)), attrs: { 'aria-label': `${count(f)} items` } }),
+    );
+    b.addEventListener('click', () => {
+      st.folder = f;
+      redraw();
+    });
+    b.addEventListener('keydown', (e) => {
+      if (e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      const all = [...ul.querySelectorAll('.sw-tree-item')];
+      const to = all[all.indexOf(b) + (e.key === 'ArrowDown' ? 1 : -1)];
+      if (to) {
+        e.preventDefault();
+        to.focus();
+      }
+    });
+    ul.append(el('li', {}, b));
+  }
+  return ul;
+}
+
+/** The library table's order: the library's own, or by name. */
+function sortPick() {
+  const sel = el('select', {
+    class: 'setup-input setup-select setup-sortpick',
+    attrs: { 'aria-label': 'Sort' },
+    data: { key: 'library:sort', nobusy: '1' },
+  });
+  for (const [v, text] of [
+    ['library', 'Library order'],
+    ['asc', 'Name, A to Z'],
+    ['desc', 'Name, Z to A'],
+  ]) {
+    sel.append(el('option', { text, attrs: { value: v } }));
+  }
+  sel.value = st.sort;
+  sel.addEventListener('change', () => {
+    st.sort = sel.value;
+    redraw();
+  });
+  return sel;
+}
+
+function railLabel(text) {
+  return el('span', { class: 'sw-rail-label', text, attrs: { 'aria-hidden': 'true' } });
+}
+
+/** The rail: the library's name, its kind, the sort, then the folders. */
+function railParts() {
+  const lib = st.lib;
+  if (!lib) return [el('p', { class: 'setup-empty', text: st.loading ? 'Reading the library…' : 'The library could not be read.' })];
+  if (!lib.configured) return [el('p', { class: 'setup-empty', text: 'No library yet.' })];
+  const parts = [header(lib)];
+  if (lib.problem) return parts;
+  const k = kindOf(lib, st.kind);
+  const writable = !lib.in_tab;
+  parts.push(
+    el('div', { class: 'sw-rail-field' }, railLabel('Kind'), kindSelect(lib)),
+    el('div', { class: 'sw-rail-field' }, railLabel('Sort'), sortPick()),
+    el('div', { class: 'sw-rail-field' }, railLabel('Folders'), folderTree(k)),
+    folderButtons(k, writable),
+  );
+  return parts;
+}
+
+/** The main area: the strip, the items as a table, then the packs. */
+function mainFrame(main) {
+  const lib = st.lib;
+  const usable = Boolean(lib && lib.configured && !lib.problem);
+  const k = kindOf(lib, st.kind);
+  const writable = usable && !lib.in_tab;
+  const ticked = [...st.ticked];
+  const folders = k.folders || [];
+  const strip = actionStrip(
+    'Library',
+    [
+      stripButton(ticked.length > 1 ? `Add ${ticked.length} to This Budget…` : 'Add to This Budget…', 'library:add', () => addToBudget(k.kind, ticked), {
+        enabled: usable && ticked.length > 0,
+        title: ticked.length ? 'Copy the picked items, and what they need, into this budget' : 'Tick items first (or double-click one)',
+      }),
+      stripButton('Move To…', 'library:move', (b) => moveMenu(pointBelow(b), k, ticked, b), {
+        enabled: writable && ticked.length > 0 && folders.length > 0,
+        title: folders.length ? 'Put the picked items in a folder' : 'Make a folder first',
+      }),
+      stripButton('Save to Library…', 'library:save', () => saveToLibrary(panelCall, toast, null), {
+        enabled: writable,
+        title: writable ? 'Copy setup items from this budget into the library' : 'The library is open as a tab: change it there',
+      }),
+    ],
+    usable
+      ? searchBox({
+          key: 'library:filter',
+          value: st.filter,
+          label: 'Search the library',
+          placeholder: `Search the library’s ${kindLabel(k.kind).toLowerCase()}`,
+          onChange: (v) => {
+            st.filter = v;
+            redraw();
+          },
+        })
+      : null,
+  );
+  const body = [];
+  let shownCount = 0;
+  if (!lib) {
+    body.push(el('p', { class: 'setup-empty', text: st.loading ? 'Reading the library…' : 'The library could not be read.' }));
+  } else if (!lib.configured) {
+    noLibrary(body);
+  } else if (lib.problem) {
+    body.push(el('p', { class: 'setup-error apply-error', text: lib.problem, attrs: { role: 'alert' } }));
+  } else {
+    if (lib.in_tab) {
+      body.push(el('p', { class: 'setup-empty', text: 'Your library is open as a budget tab: you can add from it here, and change it in that tab.' }));
+    }
+    let shown = shownItems(k, st.folder, st.filter);
+    if (st.sort !== 'library') {
+      shown = [...shown].sort((a, b) => {
+        const x = str(a.name).toLowerCase();
+        const y = str(b.name).toLowerCase();
+        return x < y ? -1 : x > y ? 1 : 0;
+      });
+      if (st.sort === 'desc') shown.reverse();
+    }
+    shownCount = shown.length;
+    const list = el('ul', { class: 'apply-items library-list', attrs: { 'aria-label': `${kindLabel(k.kind)} in the library` } });
+    for (const it of shown) list.append(itemRow(k, it, writable, true));
+    if (!(k.items || []).length) body.push(el('p', { class: 'setup-empty', text: `No ${kindLabel(k.kind).toLowerCase()} in the library yet.` }));
+    else if (!shown.length) body.push(el('p', { class: 'setup-empty', text: 'Nothing here matches.' }));
+    if (shown.length) {
+      body.push(
+        gridTable(
+          'library',
+          [
+            el('span', { class: 'sw-head' }),
+            el('span', { class: 'sw-head', text: 'Name' }),
+            el('span', { class: 'sw-head', text: 'Definition' }),
+            el('span', { class: 'sw-head', text: 'Folder' }),
+          ],
+          list,
+        ),
+      );
+    }
+  }
+  if (st.error) body.push(el('p', { class: 'setup-error apply-error', text: st.error, attrs: { role: 'alert' } }));
+  const after = lib ? [el('div', { class: 'sw-after' }, packsPart(lib))] : [];
+  mountFrame(main, { strip, body, after });
+  main.setAttribute('aria-busy', st.busy || st.loading ? 'true' : 'false');
+  const items = (k.items || []).length;
+  setFooterTotals(
+    usable
+      ? [
+          { label: '', value: shownCount === items ? `${items} ${items === 1 ? 'item' : 'items'}` : `${shownCount} of ${items} items` },
+          ticked.length ? { label: '', value: `${ticked.length} ticked` } : null,
+        ]
+      : [],
+  );
+}
+
+/** Draws the rail and the main area, keeping focus (and a search box's caret) where it was. */
+function paintSetup() {
+  const { rail, main } = st;
+  if (!rail || !main) return;
+  const a = document.activeElement;
+  const inside = a && (rail.contains(a) || main.contains(a));
+  const had = inside && a.dataset ? a.dataset.key : null;
+  const caret = inside && typeof a.selectionStart === 'number' ? [a.selectionStart, a.selectionEnd] : null;
+  rail.replaceChildren(...railParts());
+  main.replaceChildren();
+  mainFrame(main);
+  if (had) {
+    const again = byKey(had);
+    if (again) {
+      again.focus({ preventScroll: true });
+      if (caret && typeof again.setSelectionRange === 'function') {
+        try {
+          again.setSelectionRange(caret[0], caret[1]);
+        } catch {
+          // Not a text control.
+        }
+      }
+    }
+  }
+}
+
+/** Budget Setup: draws now (a new view), or again while still on screen (the library changed). */
+function drawSetup() {
+  if (!st.main) return;
+  // A redraw for hosts an older render left behind does nothing.
+  if (st.main.isConnected || !st.main.childNodes.length) paintSetup();
 }

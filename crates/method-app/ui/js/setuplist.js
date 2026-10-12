@@ -8,9 +8,11 @@
 //   lists draw without them until they arrive (onUsage tells tools.js to
 //   redraw). A click on an item's count runs Find for its uses (setFindHook).
 // - Show: All, Used or Unused items (used: lines or other setup name it).
-// - Order: the budget's own order (order.js), or the name header's sort,
-//   which a click cycles A to Z, Z to A, then back to the budget's order. The
-//   sort is a view: it never changes the budget's order.
+// - Order: the budget's own order (order.js), or a column head's sort,
+//   which a click cycles A to Z, Z to A, then back to the budget's order (the
+//   name's in the tools panel; Budget Setup's tables sort on any column,
+//   giving listNames() each item's value, and its rail picks the order too:
+//   sortSelect). The sort is a view: it never changes the budget's order.
 // - Reordering: drag an item by its handle, or Option+Shift+Up and Down on
 //   it (Alt+Shift on Windows and Linux). Only in the budget's own order with
 //   no filter (text, Show or Applied only), so items that are not shown never
@@ -36,6 +38,7 @@ const st = {
   timer: null,
   seq: 0,
   sort: {}, // table -> 'custom' | 'asc' | 'desc'
+  sortCol: {}, // table -> the column sorted on ('name' unless a head picked another)
   show: {}, // table -> 'all' | 'used' | 'unused'
   listeners: new Set(),
   findHook: null,
@@ -106,6 +109,11 @@ export function sortOf(table) {
   return st.sort[table] || 'custom';
 }
 
+/** The column `table` is sorted on: 'name' unless a column head picked another. */
+export function sortColOf(table) {
+  return sortOf(table) === 'custom' ? 'name' : st.sortCol[table] || 'name';
+}
+
 function caseless(a, b) {
   const x = a.toLowerCase();
   const y = b.toLowerCase();
@@ -113,17 +121,33 @@ function caseless(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+/** Two column values: numbers by size, anything else as caseless text; blanks last. */
+function compareValues(a, b) {
+  const blank = (v) => v === null || v === undefined || v === '';
+  if (blank(a) || blank(b)) return blank(a) === blank(b) ? 0 : blank(a) ? 1 : -1;
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return caseless(String(a), String(b));
+}
+
 /**
  * The names `table` shows: in the budget's order or the header's sort, less
  * those the Show choice and `keep(name)` (a text filter) leave out.
  * `filtered` is true when anything could be hidden (reordering is off then).
+ * `sortValue(name, col)` gives an item's value in a column other than the
+ * name (Budget Setup's tables); without it the name sort is used.
  */
-export function listNames(view, table, keep = null, { textFilter = false } = {}) {
+export function listNames(view, table, keep = null, { textFilter = false, sortValue = null } = {}) {
   const budget = obj(obj(view).budget);
   let names = orderedNames(budget, table);
   const sort = sortOf(table);
   if (sort !== 'custom') {
-    names = [...names].sort(caseless);
+    const col = sortColOf(table);
+    if (col !== 'name' && typeof sortValue === 'function') {
+      const value = new Map(names.map((n) => [n, sortValue(n, col)]));
+      names = [...names].sort((a, b) => compareValues(value.get(a), value.get(b)) || caseless(a, b));
+    } else {
+      names = [...names].sort(caseless);
+    }
     if (sort === 'desc') names.reverse();
   }
   const show = st.show[table] || 'all';
@@ -139,17 +163,23 @@ export function canReorder(table, filtered) {
   return sortOf(table) === 'custom' && !filtered;
 }
 
-/** The name header: a button cycling the sort (A to Z, Z to A, the budget's order). */
-export function sortButton(table, label, onChange, key) {
-  const sort = sortOf(table);
+/**
+ * A column head: a button cycling the sort on column `col` (the name by
+ * default): A to Z, Z to A, then the budget's order. A click on another
+ * column's head starts it at A to Z.
+ */
+export function sortButton(table, label, onChange, key, col = 'name') {
+  const on = sortOf(table) !== 'custom' && sortColOf(table) === col;
+  const sort = on ? sortOf(table) : 'custom';
   const next = { custom: 'asc', asc: 'desc', desc: 'custom' }[sort];
-  const says = { custom: 'in the budget’s order', asc: 'A to Z', desc: 'Z to A' };
+  const says = { custom: col === 'name' ? 'in the budget’s order' : 'not sorted', asc: col === 'name' ? 'A to Z' : 'ascending', desc: col === 'name' ? 'Z to A' : 'descending' };
+  const then = next === 'custom' ? 'the budget’s order' : says[next];
   const b = el(
     'button',
     {
-      class: `setup-sort${sort === 'custom' ? '' : ' is-sorted'}`,
-      title: `${label} ${says[sort]}. Click for ${says[next]}.`,
-      attrs: { type: 'button', 'aria-label': `${label}, ${says[sort]}; click for ${says[next]}` },
+      class: `setup-sort${on ? ' is-sorted' : ''}`,
+      title: `${label} ${says[sort]}. Click for ${then}.`,
+      attrs: { type: 'button', 'aria-label': `${label}, ${says[sort]}; click for ${then}` },
       data: { key, nobusy: '1' },
     },
     el('span', { text: label }),
@@ -157,9 +187,48 @@ export function sortButton(table, label, onChange, key) {
   );
   b.addEventListener('click', () => {
     st.sort[table] = next;
+    st.sortCol[table] = col;
     onChange();
   });
   return b;
+}
+
+/**
+ * The order as a choice (Budget Setup's rail): the budget's order, or by
+ * name A to Z or Z to A; while a column head sorts on another column, that
+ * sort is listed too. `cols` gives the columns' labels ({ id: label }).
+ */
+export function sortSelect(table, onChange, key, cols = {}) {
+  const sel = el('select', {
+    class: 'setup-input setup-select setup-sortpick',
+    title: 'The order the table lists its items in. Items can be moved only in the budget’s order.',
+    attrs: { 'aria-label': 'Sort' },
+    data: { key, nobusy: '1' },
+  });
+  const options = [
+    ['custom', 'Budget order'],
+    ['name:asc', 'Name, A to Z'],
+    ['name:desc', 'Name, Z to A'],
+  ];
+  const col = sortColOf(table);
+  const sort = sortOf(table);
+  if (sort !== 'custom' && col !== 'name') options.push([`${col}:${sort}`, `${cols[col] || col}, ${sort === 'asc' ? 'ascending' : 'descending'}`]);
+  for (const [v, text] of options) {
+    const o = el('option', { text });
+    o.value = v;
+    sel.append(o);
+  }
+  sel.value = sort === 'custom' ? 'custom' : `${col}:${sort}`;
+  sel.addEventListener('change', () => {
+    if (sel.value === 'custom') st.sort[table] = 'custom';
+    else {
+      const [c, dir] = sel.value.split(':');
+      st.sortCol[table] = c;
+      st.sort[table] = dir;
+    }
+    onChange();
+  });
+  return sel;
 }
 
 /** The Show choice: All, Used or Unused items. */

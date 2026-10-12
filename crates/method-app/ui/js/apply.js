@@ -27,10 +27,11 @@
 // exactly the rows the panel shows.
 //
 // The Budget Setup window (setupwin.js) draws the same lists as setup tables
-// (ctx.mode 'setup'): every column of each item's definition, a footer of
-// budget-wide totals for fringes, and the same editing, adding, deleting,
-// renaming and ordering, but no selection, so no summary is fetched there
-// and nothing is applied. In the tools panel each list shows the item's key
+// (ctx.mode 'setup'; "Setup tables" below): one dense table each, with every
+// column of each item's definition, most edited in place, an action strip,
+// the footer's totals, and the same editing, adding, deleting, renaming and
+// ordering, but no selection, so no summary is fetched there and nothing is
+// applied. In the tools panel each list shows the item's key
 // figure (a fringe's rate, a currency's rate) and a Setup button and
 // right-click item that open the item in Budget Setup (ctx.openSetup).
 //
@@ -57,12 +58,17 @@ import {
   sortButton,
   showSelect,
   usesButton,
+  usageOf,
   totalText,
   dragHandle,
   moveKey,
   MOVE_KEYS,
   inUse,
+  redrawLists,
 } from './setuplist.js';
+import { saveItemToLibrary } from './library.js';
+import { mountFrame, actionStrip, stripButton, searchBox, band, bandField, gridTable, setFooterTotals } from './setupframe.js';
+import { currencyBand } from './setupbands.js';
 import { obj, str, plural, errText, sourceText, FLAT_BASES, isHourUnit, flatCountWords } from './util.js';
 
 const LISTS = [
@@ -148,6 +154,10 @@ const st = {
   heads: [], // mounted head hosts
   lists: new Map(), // list id -> mounted host
 };
+
+// True while draw() swaps a host's content: a removed setup table cell's
+// blur (some engines send one) must not commit half-typed text.
+let swapping = false;
 
 /**
  * A new render of the tools panel: the view and context it draws from. The
@@ -520,6 +530,8 @@ function captureFocus() {
   const a = document.activeElement;
   if (!a || !a.dataset || !a.dataset.key || !mounted().some((h) => h.contains(a))) return null;
   const info = { key: a.dataset.key };
+  // A cell being typed in (setup tables) keeps its text.
+  if (a.dataset.orig !== undefined && a.value !== a.dataset.orig) info.value = a.value;
   if (typeof a.selectionStart === 'number') {
     info.start = a.selectionStart;
     info.end = a.selectionEnd;
@@ -531,6 +543,7 @@ function restoreFocus(info) {
   if (!info) return;
   const target = byKey(info.key);
   if (!target) return;
+  if (info.value !== undefined && 'value' in target) target.value = info.value;
   target.focus({ preventScroll: true });
   if (info.start !== undefined && typeof target.setSelectionRange === 'function') {
     try {
@@ -560,10 +573,15 @@ function button(text, cls, key, onClick, { label = '', title = '', enabled = tru
 /** Redraws every mounted host (new numbers, a new filter, busy or not). */
 function draw() {
   const focus = captureFocus();
-  for (const h of st.heads) if (h.isConnected) drawHead(h);
-  for (const [id, h] of st.lists) {
-    const list = LISTS.find((l) => l.id === id);
-    if (h.isConnected && list) drawList(h, list);
+  swapping = true;
+  try {
+    for (const h of st.heads) if (h.isConnected) drawHead(h);
+    for (const [id, h] of st.lists) {
+      const list = LISTS.find((l) => l.id === id);
+      if (h.isConnected && list) drawList(h, list);
+    }
+  } finally {
+    swapping = false;
   }
   restoreFocus(focus);
 }
@@ -980,62 +998,451 @@ function keyFigure(list, name, def) {
 
 // ---------------------------------------------------------------------------
 // Setup tables (the Budget Setup window)
+//
+// Each list is one dense table (setupframe.js, setup.css): a row per item,
+// its definition edited in place (a fringe's description, rate, unit and
+// cutoff; a group's description, total switch and color; a set's,
+// location's and currency's fields), its line count (a click finds them)
+// and its dollars. The name is a button: a click selects the row,
+// double-click, Enter or F2 opens the item's editor for the rest (a
+// fringe's basis, short codes, renaming), Delete deletes it, and its
+// right-click menu has the rest. Above the table the action strip (New,
+// Edit, Delete and Save to Library for the selected row, and the search),
+// and for groups and currencies a band of their budget-wide settings. The
+// footer has the count and, for fringes, the budget's fringe dollars.
+//
+// A cell commits on Enter or when it loses focus (Escape puts the old value
+// back), as one command built from the newest view when its turn comes
+// (saveCell), so two quick edits to one item never undo each other.
 
-const SETUP_INTROS = {
-  fringes: 'Fringes add to the lines that carry them: a percent of pay, up to an optional cutoff per earner, or a flat amount per line or per unit of time.',
-  groups: 'Groups gather lines from any account for reports and totals. A group that does not count in the total leaves its lines out of the budget total.',
-  sets: 'Sets mark lines with the set they belong to, for reports and totals.',
-  locations: 'Locations mark lines with where the work happens, for reports and totals.',
-  currencies: 'Currencies other than the base currency, each with its rate. Lines in another currency are converted at that rate.',
-};
-
-/** The columns after the name, as heads: [label, title]. */
-const SETUP_HEADS = {
+/** The column heads of each table after the name: [id, label, title, numeric]. */
+const SETUP_COLS = {
   fringes: [
-    ['Description', ''],
-    ['Rate', 'Percent of pay, or a flat amount per line or per unit of time'],
-    ['Cutoff', 'The most pay per earner a percent fringe is figured on'],
+    ['description', 'Description', ''],
+    ['rate', 'Rate', 'A percent of pay, or a flat amount per line or per unit of time', true],
+    ['unit', 'Unit', 'Percent of pay, or flat per line or per unit of time'],
+    ['cutoff', 'Cutoff', 'The most pay per earner a percent fringe is figured on', true],
+    ['uses', 'In use', 'Lines using it in the whole budget; click a count to find them', true],
+    ['total', 'Total', 'Its fringe dollars in the whole budget', true],
   ],
   groups: [
-    ['Description', ''],
-    ['Color', 'The color its lines show in'],
-    ['Total', 'Whether its lines count in the budget total'],
+    ['description', 'Description', ''],
+    ['counted', 'In budget total', 'Whether its lines count in the budget total'],
+    ['color', 'Color', 'The color its lines show in'],
+    ['uses', 'In use', 'Lines using it in the whole budget; click a count to find them', true],
+    ['total', 'Total', 'Its lines’ dollars, counted in the total or not', true],
+    ['active', 'Active total', 'Its lines’ dollars that count in the budget total', true],
   ],
-  sets: [['Description', '']],
+  sets: [
+    ['description', 'Description', ''],
+    ['uses', 'In use', 'Lines using it in the whole budget; click a count to find them', true],
+    ['total', 'Total', 'Its lines’ dollars in the whole budget', true],
+  ],
   locations: [
-    ['Description', ''],
-    ['Place', 'City, region and country'],
+    ['description', 'Description', ''],
+    ['city', 'City', ''],
+    ['region', 'Region', ''],
+    ['country', 'Country', ''],
+    ['uses', 'In use', 'Lines using it in the whole budget; click a count to find them', true],
+    ['total', 'Total', 'Its lines’ dollars in the whole budget', true],
   ],
   currencies: [
-    ['Rate', 'What one unit is worth in the base currency'],
-    ['Symbol', ''],
-    ['Description', ''],
+    ['description', 'Description', ''],
+    ['symbol', 'Symbol', ''],
+    ['uses', 'In use', 'Lines using it in the whole budget; click a count to find them', true],
+    ['rate', 'Rate', 'What one unit is worth in the base currency', true],
+    ['total', 'Total', 'Its lines’ dollars in the base currency', true],
   ],
 };
 
-/** An item's cells after its name: [text, title]. */
-function setupCells(list, name, def) {
+function has(o, k) {
+  return Object.prototype.hasOwnProperty.call(obj(o), k);
+}
+
+/** A group's dollars in the whole budget, `part` 'full' or 'active', with fringes unless the group rule leaves them out. */
+function groupDollars(name, part) {
+  const bd = obj(obj(obj(report().groups)[name])[part]);
+  if (bd.details_total === undefined) return null;
+  const fringes = groupRules().fringes_in_totals === 'exclude' ? 0 : Number(bd.fringe_total) || 0;
+  return (Number(bd.details_total) || 0) + fringes;
+}
+
+/** A fringe's unit as the Unit cell picks it: 'percent', or 'flat:' and the unit it is charged per. */
+function fringeUnitValue(def) {
+  return def.kind === 'flat' ? `flat:${str(def.unit)}` : 'percent';
+}
+
+function fringeUnitOptions(def) {
+  return [
+    ['percent', 'Percent'],
+    ['flat:', 'Flat per line'],
+    ...timeUnits(def.kind === 'flat' ? str(def.unit) : '').map((u) => [`flat:${u}`, `Flat per ${u}`]),
+  ];
+}
+
+/** Item `name`'s value in column `col`, for sorting. */
+function setupSortValue(list, name, col) {
+  const def = obj(obj(list.defs(budget()))[name]);
+  const use = usageOf(st.view, list.id, name);
+  if (col === 'uses') return use ? Number(use.lines) || 0 : null;
+  if (col === 'total') {
+    if (list.id === 'groups') return groupDollars(name, 'full');
+    return use && use.total !== null && use.total !== undefined ? Number(use.total) : null;
+  }
+  if (col === 'active') return groupDollars(name, 'active');
+  if (col === 'rate' || col === 'cutoff') {
+    const n = Number(str(def[col]));
+    return str(def[col]) === '' || Number.isNaN(n) ? null : n;
+  }
+  if (col === 'unit') return (fringeUnitOptions(def).find(([v]) => v === fringeUnitValue(def)) || ['', ''])[1];
+  if (col === 'counted') return def.in_budget_total === false ? 0 : 1;
+  if (col === 'color') {
+    const named = paletteColor(typeof def.color === 'string' ? def.color : '');
+    return named ? named.label : str(def.color);
+  }
+  return str(def[col]);
+}
+
+// ---------------------------------------------------------------------------
+// Cells edited in place
+
+let cellQueue = Promise.resolve();
+
+/**
+ * Runs a cell's edit after any before it: `build()` makes [command, args]
+ * from the newest view when its turn comes. On a refusal, `undo()` puts
+ * the cell back and the message shows under the table.
+ */
+function saveCell(build, undo) {
+  st.error = '';
+  cellQueue = cellQueue.then(async () => {
+    try {
+      const step = build();
+      if (step) await call(step[0], step[1]);
+    } catch (e) {
+      st.error = errText(e);
+      undo();
+      draw();
+    }
+  });
+}
+
+/** A text cell: commits on Enter or blur, Escape puts the saved value (data-orig) back. */
+function cellInput(key, value, label, save, { num = false, placeholder = '', title = '' } = {}) {
+  const input = el('input', {
+    class: `setup-input sw-cell-input${num ? ' setup-num sw-num' : ''}`,
+    title: title || undefined,
+    attrs: {
+      type: 'text',
+      'aria-label': label,
+      placeholder: placeholder || null,
+      autocomplete: 'off',
+      spellcheck: 'false',
+      autocapitalize: 'off',
+      autocorrect: 'off',
+    },
+    data: { key, orig: value },
+  });
+  input.value = value;
+  const commit = () => {
+    if (swapping || !input.isConnected) return;
+    const v = input.value;
+    const old = input.dataset.orig;
+    if (v === old) return;
+    input.dataset.orig = v;
+    save(v, () => {
+      input.value = old;
+      input.dataset.orig = old;
+    });
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.isComposing) {
+      e.preventDefault();
+      commit();
+    } else if (e.key === 'Escape' && input.value !== input.dataset.orig) {
+      e.preventDefault();
+      e.stopPropagation();
+      input.value = input.dataset.orig;
+    }
+  });
+  input.addEventListener('blur', commit);
+  return input;
+}
+
+/** A pick cell: saves on change. */
+function cellSelect(key, value, options, label, save, title = '') {
+  const sel = el('select', {
+    class: 'setup-input setup-select sw-cell-input',
+    title: title || undefined,
+    attrs: { 'aria-label': label },
+    data: { key, orig: value },
+  });
+  for (const [v, text] of options) sel.append(el('option', { text, attrs: { value: v } }));
+  sel.value = value;
+  sel.addEventListener('change', () => {
+    const old = sel.dataset.orig;
+    if (sel.value === old) return;
+    sel.dataset.orig = sel.value;
+    save(sel.value, () => {
+      sel.value = old;
+      sel.dataset.orig = old;
+    });
+  });
+  return sel;
+}
+
+function cellKey(list, name, col) {
+  return `apply:cell:${list.id}:${name}:${col}`;
+}
+
+/** Fringe `name` as set_fringe takes it, from the newest view, with `patch` (editor values) on top. */
+function fringeStep(name, patch) {
+  const defs = obj(budget().fringes);
+  if (!has(defs, name)) throw `Fringe ${name} no longer exists.`;
+  const start = fringeFields(obj(defs[name])).filter((f) => f.type !== 'note');
+  const values = Object.fromEntries(start.map((f) => [f.key, str(f.value)]));
+  const fringe = fringeInput({ ...values, ...patch });
+  delete fringe.short_code; // left out: the fringe keeps its own
+  return ['set_fringe', { name, fringe }];
+}
+
+/** Group `name` as update_group takes it, from the newest view, with `patch` on top. */
+function groupStep(name, patch) {
+  const defs = obj(budget().groups);
+  if (!has(defs, name)) throw `Group ${name} no longer exists.`;
+  const def = obj(defs[name]);
+  const color = typeof def.color === 'string' && def.color ? def.color : null;
+  return [
+    'update_group',
+    {
+      name,
+      group: {
+        description: 'description' in patch ? patch.description : str(def.description),
+        in_budget_total: 'counted' in patch ? patch.counted : def.in_budget_total !== false,
+        short_code: str(def.short_code),
+      },
+      color: 'color' in patch ? patch.color : color,
+    },
+  ];
+}
+
+function locationStep(name, patch) {
+  const defs = obj(budget().locations);
+  if (!has(defs, name)) throw `Location ${name} no longer exists.`;
+  const def = obj(defs[name]);
+  const location = Object.fromEntries(['description', 'city', 'region', 'country'].map((k) => [k, str(def[k])]));
+  return ['set_location', { name, location: { ...location, ...patch } }];
+}
+
+function currencyStep(code, patch) {
+  const defs = obj(budget().currencies);
+  if (!has(defs, code)) throw `Currency ${code} no longer exists.`;
+  const def = obj(defs[code]);
+  return ['set_currency', { code, currency: { description: str(def.description), symbol: str(def.symbol), rate: str(def.rate), ...patch } }];
+}
+
+/** Item `name`'s cell in column `col` of `list`. */
+function setupCell(list, name, def, col) {
+  const label = (what) => `${what} of ${list.what} ${name}`;
+  const text = (field, step, opts = {}) =>
+    cellInput(cellKey(list, name, field), opts.value !== undefined ? opts.value : str(def[field]), label(opts.label || field[0].toUpperCase() + field.slice(1)), (v, undo) => saveCell(() => step(v), undo), opts);
+  if (col === 'uses') return usesButton(st.view, list.id, name, `apply:uses:${list.id}:${name}`);
+  if (col === 'total' || col === 'active') {
+    if (list.id === 'groups') {
+      const v = groupDollars(name, col === 'total' ? 'full' : 'active');
+      const off = col === 'active' && def.in_budget_total === false;
+      return el('span', { class: `sw-num${off ? ' apply-off' : ''}`, text: v === null ? '' : money(v), title: off ? 'Not in the budget total' : undefined });
+    }
+    return el('span', { class: 'sw-num', text: totalText(st.view, list.id, name) });
+  }
   if (list.id === 'fringes') {
-    const cutoff = def.kind !== 'flat' && def.cutoff !== undefined && def.cutoff !== null ? money(def.cutoff) : '';
-    return [[str(def.description), ''], [fringeRate(def), ''], [cutoff, cutoff ? 'Pay per earner above this earns no fringe' : '']];
+    if (col === 'description') return text('description', (v) => fringeStep(name, { description: v }));
+    if (col === 'rate') {
+      return text('rate', (v) => fringeStep(name, { rate: v }), { value: str(def.rate) === '' ? '' : rateText(def.rate), num: true, title: fringeRate(def) });
+    }
+    if (col === 'unit') {
+      return cellSelect(cellKey(list, name, 'unit'), fringeUnitValue(def), fringeUnitOptions(def), label('Unit'), (v, undo) =>
+        saveCell(() => fringeStep(name, v === 'percent' ? { kind: 'percent' } : { kind: 'flat', unit: v.slice('flat:'.length) }), undo),
+      );
+    }
+    if (col === 'cutoff') {
+      const cutoff = def.cutoff === undefined || def.cutoff === null ? '' : money(def.cutoff);
+      if (def.kind === 'flat') {
+        return el('span', { class: 'sw-num apply-off', text: cutoff, title: cutoff ? 'Kept but not used: cutoffs apply to percent fringes only' : 'Cutoffs apply to percent fringes only' });
+      }
+      return text('cutoff', (v) => fringeStep(name, { cutoff: v }), { value: cutoff, num: true, placeholder: 'None', title: cutoff ? 'Pay per earner above this earns no fringe' : '' });
+    }
   }
   if (list.id === 'groups') {
-    const hex = typeof def.color === 'string' ? def.color.toLowerCase() : '';
-    const named = paletteColor(hex);
-    const color = named ? named.label : hex;
-    const off = def.in_budget_total === false;
-    return [[str(def.description), ''], [color, ''], [off ? 'Not counted' : 'Counted', off ? 'Its lines are left out of the budget total' : '']];
+    if (col === 'description') return text('description', (v) => groupStep(name, { description: v }));
+    if (col === 'counted') {
+      const box = el('input', {
+        class: 'setup-check',
+        title: 'Whether its lines count in the budget total',
+        attrs: { type: 'checkbox', 'aria-label': `${name} counts in the budget total` },
+        data: { key: cellKey(list, name, 'counted') },
+      });
+      box.checked = def.in_budget_total !== false;
+      box.addEventListener('change', () => {
+        const on = box.checked;
+        saveCell(() => groupStep(name, { counted: on }), () => {
+          box.checked = !on;
+        });
+      });
+      return box;
+    }
+    if (col === 'color') {
+      const current = typeof def.color === 'string' ? def.color.toLowerCase() : '';
+      const ours = paletteColor(current);
+      const options = [['', 'None'], ...PALETTE.map((c) => [c.id, c.label])];
+      if (current && !ours) options.push(['keep', `Other (${current})`]);
+      const sel = cellSelect(cellKey(list, name, 'color'), ours ? ours.id : current ? 'keep' : '', options, label('Color'), (v, undo) => {
+        const picked = PALETTE.find((c) => c.id === v);
+        saveCell(() => groupStep(name, { color: v === 'keep' ? current : picked ? picked.light : null }), undo);
+      });
+      const chip = el('span', { class: `sw-chip ${ours ? `sw-${ours.id}` : current ? 'sw-keep' : 'sw-none'}`, attrs: { 'aria-hidden': 'true' } });
+      return el('span', { class: 'sw-color' }, chip, sel);
+    }
   }
-  if (list.id === 'locations') {
-    const place = ['city', 'region', 'country'].map((k) => str(def[k]).trim()).filter(Boolean).join(', ');
-    return [[str(def.description), ''], [place, '']];
+  if (list.id === 'sets' && col === 'description') {
+    return text('description', (v) => {
+      if (!has(budget().sets, name)) throw `Set ${name} no longer exists.`;
+      return ['set_set', { name, set: { description: v } }];
+    });
+  }
+  if (list.id === 'locations') return text(col, (v) => locationStep(name, { [col]: v }));
+  if (list.id === 'currencies') {
+    if (col === 'rate') {
+      return text('rate', (v) => currencyStep(name, { rate: v.trim() }), {
+        value: str(def.rate) ? rateText(def.rate) : '',
+        num: true,
+        title: str(def.rate) ? `1 ${name} = ${rateText(def.rate)} ${str(budget().base_currency)}`.trim() : '',
+      });
+    }
+    return text(col, (v) => currencyStep(name, { [col]: v }));
+  }
+  return el('span');
+}
+
+// ---------------------------------------------------------------------------
+// Drawing a setup table
+
+/** The selected row's name in `list`, when it still exists. */
+function setupSelected(list) {
+  const name = st.selected[list.id];
+  return name !== undefined && has(list.defs(budget()), name) ? name : null;
+}
+
+/** Marks row `name` as selected without moving focus (a cell in it got focus). */
+function markRow(list, name, li) {
+  st.selected[list.id] = name;
+  const ul = li.closest('.apply-items');
+  if (ul) for (const x of ul.querySelectorAll('.apply-item.is-selected')) if (x !== li) x.classList.remove('is-selected');
+  li.classList.add('is-selected');
+  syncStrip(list);
+}
+
+/** The strip's Edit, Delete and Save to Library follow the selected row. */
+function syncStrip(list) {
+  const name = setupSelected(list);
+  for (const h of mounted()) {
+    for (const b of h.querySelectorAll('[data-needs-item]')) {
+      if (name === null) b.setAttribute('aria-disabled', 'true');
+      else b.removeAttribute('aria-disabled');
+      b.title = name === null ? `Select a ${list.what} first` : `${b.dataset.does} ${name}`;
+    }
+  }
+}
+
+/** The action strip of `list`'s table. */
+function setupStrip(list) {
+  const name = setupSelected(list);
+  const needs = (text, key, does, run) => {
+    const b = stripButton(text, key, () => {
+      const n = setupSelected(list);
+      if (n !== null) run(n);
+    }, { enabled: name !== null, title: name === null ? `Select a ${list.what} first` : `${does} ${name}` });
+    b.dataset.needsItem = '1';
+    b.dataset.does = does;
+    return b;
+  };
+  return actionStrip(
+    list.label,
+    [
+      stripButton(`New ${list.what}…`, addKey(list.id), () => addItem(list), { title: `Add a ${list.what} to this budget` }),
+      needs('Edit…', `apply:edit:${list.id}`, `Edit ${list.what}`, (n) => editItem(list, n)),
+      needs('Delete…', `apply:delete:${list.id}`, `Delete ${list.what}`, (n) => deleteItem(list, n)),
+      needs('Save to Library…', `apply:save:${list.id}`, `Copy to your library, with what it needs: ${list.what}`, (n) => saveItemToLibrary(renameCtx(), list.what, n)),
+    ],
+    searchBox({
+      key: `apply:filter:${list.id}`,
+      value: str(st.filters[list.id]),
+      label: `Search ${list.label.toLowerCase()}`,
+      placeholder: `Search ${list.label.toLowerCase()}`,
+      onChange: (v) => {
+        st.filters[list.id] = v;
+        draw();
+      },
+    }),
+  );
+}
+
+/** The band of budget-wide settings over a table: the group rules, or the base and totals currency. */
+function setupBand(list) {
+  if (list.id === 'groups') {
+    const now = groupRules();
+    const fields = GROUP_RULES.map(([rule, label, , title]) => {
+      const sel = el(
+        'select',
+        { class: 'setup-input setup-select', title, attrs: { disabled: st.busy }, data: { key: `apply:grouprule:${rule}` } },
+        el('option', { attrs: { value: 'include' }, text: 'Include' }),
+        el('option', { attrs: { value: 'exclude' }, text: 'Exclude' }),
+      );
+      sel.value = now[rule];
+      sel.addEventListener('change', () => {
+        if (st.busy) return;
+        st.busy = true;
+        st.error = '';
+        call('set_group_rule', { rule, value: sel.value })
+          .catch((e) => {
+            st.error = errText(e);
+          })
+          .finally(() => {
+            st.busy = false;
+            draw();
+          });
+      });
+      return bandField(label, sel, title);
+    });
+    const b = band('Group rules', el('span', { class: 'sw-band-title', text: 'Group rules' }), ...fields);
+    b.title = 'They apply to the whole budget. A line left out still shows, but counts as 0.';
+    return b;
   }
   if (list.id === 'currencies') {
-    const base = str(budget().base_currency);
-    const rate = str(def.rate) ? `${rateText(def.rate)}${base ? ` ${base}` : ''}` : '';
-    return [[rate, rate ? `1 ${name} = ${rate}` : ''], [str(def.symbol), ''], [str(def.description), '']];
+    // The base and totals currency (setupbands.js: Budget Setup's own commands).
+    return currencyBand(budget(), {
+      call: (cmd, args) => call(cmd, args),
+      onError: (message) => {
+        st.error = message;
+        draw();
+      },
+    });
   }
-  return [[str(def.description), '']];
+  return null;
+}
+
+function setupHead(list) {
+  const cols = SETUP_COLS[list.id] || [];
+  const head = (id, label, title, num) => {
+    const b = sortButton(list.id, label, redrawLists, `apply:sort:${list.id}:${id}`, id);
+    if (title) b.title = `${title}. ${b.title}`;
+    return el('span', { class: `sw-head${num ? ' sw-num' : ''}` }, b);
+  };
+  return [
+    el('span', { class: 'sw-head' }),
+    head('name', list.id === 'currencies' ? 'Code' : 'Name', '', false),
+    ...cols.map(([id, label, title, num]) => head(id, label, title, num)),
+  ];
 }
 
 function drawSetupList(host, list) {
@@ -1044,13 +1451,7 @@ function drawSetupList(host, list) {
   host.setAttribute('aria-busy', st.busy ? 'true' : 'false');
   host.classList.add('apply-setup', `apply-setup-${list.id}`);
   wantUsage(st.view);
-  const parts = [];
-  let intro = SETUP_INTROS[list.id] || '';
-  if (list.id === 'currencies' && str(budget().base_currency)) intro += ` The base currency is ${str(budget().base_currency)}.`;
-  if (intro) parts.push(el('p', { class: 'setup-intro', text: intro }));
-
   const q = str(st.filters[list.id]).trim().toLowerCase();
-  if (names.length) parts.push(setupTools(list));
   const { names: shown, filtered } = listNames(
     st.view,
     list.id,
@@ -1059,81 +1460,31 @@ function drawSetupList(host, list) {
       const def = obj(defs[n]);
       return [n, def.description, def.short_code, def.city, def.region, def.country, def.symbol].some((v) => str(v).toLowerCase().includes(q));
     },
-    { textFilter: Boolean(q) },
+    { textFilter: Boolean(q), sortValue: (n, col) => setupSortValue(list, n, col) },
   );
   const movable = canReorder(list.id, filtered);
   const ul = el('ul', { class: 'apply-items', attrs: { 'aria-label': list.label }, data: { list: list.id } });
   for (const n of shown) ul.append(setupItem(list, n, obj(defs[n]), movable));
-  ul.append(addRow(list));
-  if (names.length) parts.push(setupColHead(list));
-  if (!names.length) parts.push(el('p', { class: 'setup-empty', text: list.none }));
-  else if (!shown.length) parts.push(el('p', { class: 'setup-empty', text: 'Nothing matches the filter.' }));
-  parts.push(ul);
-  if (list.id === 'fringes' && names.length) parts.push(setupFringeFoot(defs));
-  if (list.id === 'groups') parts.push(setupGroupRules());
-  if (st.error) parts.push(el('p', { class: 'setup-error apply-error', text: st.error, attrs: { role: 'alert' } }));
-  host.replaceChildren(...parts);
+  const body = [];
+  if (st.error) body.push(el('p', { class: 'setup-error apply-error', text: st.error, attrs: { role: 'alert' } }));
+  if (!names.length) body.push(el('p', { class: 'setup-empty', text: list.none }));
+  else if (!shown.length) body.push(el('p', { class: 'setup-empty', text: 'Nothing matches the search.' }));
+  else body.push(gridTable(list.id, setupHead(list), ul));
+  host.replaceChildren();
+  mountFrame(host, { strip: setupStrip(list), band: setupBand(list), body });
+  setupFooter(list, defs, shown.length, names.length);
 }
 
-/** Above a setup table: its filter and the Show choice. */
-function setupTools(list) {
-  const row = el('div', { class: 'apply-tools' });
-  const input = el('input', {
-    class: 'setup-input apply-filter',
-    attrs: {
-      type: 'text',
-      placeholder: 'Filter',
-      'aria-label': `Filter ${list.label.toLowerCase()}`,
-      autocomplete: 'off',
-      spellcheck: 'false',
-      autocapitalize: 'off',
-      autocorrect: 'off',
-    },
-    data: { key: `apply:filter:${list.id}` },
-  });
-  input.value = str(st.filters[list.id]);
-  input.addEventListener('input', (e) => {
-    st.filters[list.id] = input.value;
-    if (!e.isComposing) draw();
-  });
-  input.addEventListener('compositionend', () => {
-    st.filters[list.id] = input.value;
-    draw();
-  });
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && input.value) {
-      e.preventDefault();
-      e.stopPropagation();
-      st.filters[list.id] = '';
-      draw();
-    }
-  });
-  row.append(input, showSelect(list.id, draw, `apply:show:${list.id}`));
-  return row;
-}
-
-function setupColHead(list) {
-  const heads = (SETUP_HEADS[list.id] || []).map(([label, title]) => el('span', { class: 'apply-colhead-cell', text: label, title: title || undefined }));
-  return el(
-    'div',
-    { class: 'apply-colhead' },
-    el('span'),
-    el('span', { class: 'apply-colhead-row' }, el('span', { class: 'apply-colhead-cell' }, sortButton(list.id, 'Name', draw, `apply:sort:${list.id}`)), ...heads),
-    el('span', { class: 'apply-colhead-num', text: 'Lines', title: 'Lines using it in the whole budget; click a count to find them' }),
-    el('span', { class: 'apply-colhead-num', text: 'Budget', title: 'Its dollars in the whole budget' }),
-  );
-}
-
-/** One row of a setup table: a click selects it, a double-click (Enter, F2) edits it. */
+/** One row of a setup table: the handle, the name (a button), then the cells. */
 function setupItem(list, name, def, movable) {
   const key = itemKey(list.id, name);
   const infoId = nextId();
-  const cells = setupCells(list, name, def);
+  const said = [str(def.description), list.id === 'fringes' ? fringeRate(def) : ''].filter(Boolean).join('; ');
   const tip = [str(def.description), sourceText(st.view, list.what, name), budgetWide(list, name, def), 'Double-click to edit'].filter(Boolean).join('\n');
   const b = el(
     'button',
     {
-      class: 'apply-check apply-row',
+      class: 'apply-check apply-row sw-cell-name',
       title: tip,
       attrs: { type: 'button', 'aria-label': name, 'aria-describedby': infoId, 'aria-keyshortcuts': `Enter F2 Delete ${MOVE_KEYS}` },
       data: { key, nobusy: '1' },
@@ -1144,10 +1495,12 @@ function setupItem(list, name, def, movable) {
       name,
       str(def.short_code) ? el('span', { class: 'apply-code', text: str(def.short_code), title: 'Short code: the grid shows it for this item' }) : null,
     ),
-    ...cells.map(([text, title]) => el('span', { class: 'apply-cell', text, title: title || text || undefined })),
-    el('span', { class: 'setup-sr', text: cells.map(([t]) => t).filter(Boolean).join('; '), attrs: { id: infoId } }),
+    el('span', { class: 'setup-sr', text: said, attrs: { id: infoId } }),
   );
-  b.addEventListener('click', () => select(list.id, name, b));
+  b.addEventListener('click', () => {
+    select(list.id, name, b);
+    syncStrip(list);
+  });
   b.addEventListener('dblclick', (e) => {
     e.preventDefault();
     editItem(list, name);
@@ -1155,6 +1508,7 @@ function setupItem(list, name, def, movable) {
   b.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     select(list.id, name, b);
+    syncStrip(list);
     itemMenu(e, {
       kind: list.what,
       name,
@@ -1183,42 +1537,44 @@ function setupItem(list, name, def, movable) {
       return;
     }
     moveFocus(e, b);
+    if (document.activeElement !== b) syncStrip(list);
   });
-  const off = list.id === 'groups' && def.in_budget_total === false;
-  const total = totalText(st.view, list.id, name);
+  const cells = (SETUP_COLS[list.id] || []).map(([col, , , num]) => el('span', { class: `sw-cell${num ? ' sw-num' : ''}` }, setupCell(list, name, def, col)));
   const li = el(
     'li',
-    { class: 'apply-item', data: { name } },
+    { class: 'apply-item sw-grid-row', data: { name } },
     dragHandle(list.id, name, movable, (cmd, args) => call(cmd, args)),
-    b,
-    usesButton(st.view, list.id, name, `apply:uses:${list.id}:${name}`),
-    el('span', { class: `apply-num apply-total${off ? ' apply-off' : ''}`, text: total, title: off && total ? 'Not in the budget total' : undefined }),
+    el('span', { class: 'sw-cell' }, b),
+    ...cells,
   );
+  li.addEventListener('focusin', () => {
+    if (st.selected[list.id] !== name) markRow(list, name, li);
+  });
   if (st.selected[list.id] === name) li.classList.add('is-selected');
   return li;
 }
 
-/** Under the fringe table: the budget's fringe dollars from percent and flat fringes. */
-function setupFringeFoot(defs) {
-  const r = obj(report().fringes);
-  let percent = 0;
-  let flat = 0;
-  for (const [n, def] of Object.entries(defs)) {
-    const t = Number(obj(r[n]).total) || 0;
-    if (obj(def).kind === 'flat') flat += t;
-    else percent += t;
+/** The footer: how many items, and for fringes the budget's fringe dollars from percent and flat fringes. */
+function setupFooter(list, defs, shown, all) {
+  const words = { fringes: ['fringe', 'fringes'], groups: ['group', 'groups'], sets: ['set', 'sets'], locations: ['location', 'locations'], currencies: ['currency', 'currencies'] }[list.id];
+  const count = shown === all ? plural(all, words[0], words[1]) : `${shown} of ${plural(all, words[0], words[1])}`;
+  const items = [{ label: '', value: count }];
+  if (list.id === 'fringes' && all) {
+    const r = obj(report().fringes);
+    let percent = 0;
+    let flat = 0;
+    for (const [n, def] of Object.entries(defs)) {
+      const t = Number(obj(r[n]).total) || 0;
+      if (obj(def).kind === 'flat') flat += t;
+      else percent += t;
+    }
+    items.push(
+      { label: 'Fringe total', value: money(percent + flat), title: 'Every fringe dollar in the budget' },
+      { label: 'Percent', value: money(percent), title: 'Fringe dollars from percent fringes in the whole budget' },
+      { label: 'Flat', value: money(flat), title: 'Fringe dollars from flat fringes in the whole budget' },
+    );
   }
-  return el(
-    'div',
-    { class: 'apply-foot' },
-    el(
-      'p',
-      { class: 'apply-stats' },
-      stat('Percent', money(percent), 'Fringe dollars from percent fringes in the whole budget'),
-      stat('Flat', money(flat), 'Fringe dollars from flat fringes in the whole budget'),
-      stat('Fringe total', money(percent + flat), 'Every fringe dollar in the budget'),
-    ),
-  );
+  setFooterTotals(items);
 }
 
 /**
@@ -1237,43 +1593,6 @@ function groupRules() {
   const out = {};
   for (const [rule, , def] of GROUP_RULES) out[rule] = r[rule] === 'include' || r[rule] === 'exclude' ? r[rule] : def;
   return out;
-}
-
-/** Under the group table: the group rules, as Budget > Settings lays out its choices. */
-function setupGroupRules() {
-  const now = groupRules();
-  const fields = el('div', { class: 'setup-fields' });
-  for (const [rule, label, , title] of GROUP_RULES) {
-    const id = nextId();
-    const sel = el(
-      'select',
-      { class: 'setup-input setup-select', title, attrs: { id, disabled: st.busy }, data: { key: `apply:grouprule:${rule}` } },
-      el('option', { attrs: { value: 'include' }, text: 'Include' }),
-      el('option', { attrs: { value: 'exclude' }, text: 'Exclude' }),
-    );
-    sel.value = now[rule];
-    sel.addEventListener('change', () => {
-      if (st.busy) return;
-      st.busy = true;
-      st.error = '';
-      call('set_group_rule', { rule, value: sel.value })
-        .catch((e) => {
-          st.error = errText(e);
-        })
-        .finally(() => {
-          st.busy = false;
-          draw();
-        });
-    });
-    fields.append(el('div', { class: 'setup-field setup-field-wide' }, el('label', { class: 'setup-label', text: label, attrs: { for: id } }), sel));
-  }
-  return el(
-    'div',
-    { class: 'tss-group' },
-    el('h3', { class: 'tss-heading', text: 'Group rules' }),
-    fields,
-    el('p', { class: 'setup-hint tss-note', text: 'They apply to the whole budget. A line left out still shows, but counts as 0.' }),
-  );
 }
 
 // ---------------------------------------------------------------------------
