@@ -107,6 +107,7 @@ this section.
 - **More than the topsheet.** Category summaries, account detail, setup tables, chart of accounts, group totals, budget information and a notes list.
 - **Spreadsheet export.** One Excel workbook with topsheet, accounts, detail and setup tables, plus CSV and tab-delimited files for accounting.
 - **Spreadsheet import.** Turn any department's Excel, CSV or tab-delimited sheet into budget lines with a column mapping and a line-by-line check of the totals.
+- **Import from other budgeting apps.** Open a budget from another program's JSON, XML, Excel or tab-delimited export, with a line-by-line check against that program's own totals.
 
 ### Setup library and templates
 
@@ -126,7 +127,6 @@ this section.
 
 ### On the roadmap
 
-- **Import from other budgeting apps.** Readers for the open exports (XML, JSON, Excel) other budgeting apps write, checked line by line against their own totals.
 - **Signed and notarized Mac app.** Install on a Mac without the one-time security step.
 - **Windows and Linux, tested.** Installers for both are built today; printing, keys and file types still need a hands-on check.
 - **Review files.** A reviewer marks up a read-only copy, and their comments come back in a small file you merge.

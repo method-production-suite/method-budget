@@ -328,6 +328,13 @@ ref = ["2.2", "D36"]
 # ---------------------------------------------------------------- setup
 
 [[feature]]
+group = "reports"
+title = "Import from other budgeting apps"
+text = "Open a budget from another program's JSON, XML, Excel or tab-delimited export, with a line-by-line check against that program's own totals."
+status = "have"
+ref = ["1.16", "D59"]
+
+[[feature]]
 group = "setup"
 title = "Start from another budget"
 text = "Import setup items from any budget, with what they depend on, or start a new budget from a template."
@@ -400,13 +407,6 @@ status = "have"
 ref = ["3.2", "D44"]
 
 # ---------------------------------------------------------------- soon
-
-[[feature]]
-group = "reports"
-title = "Import from other budgeting apps"
-text = "Readers for the open exports (XML, JSON, Excel) other budgeting apps write, checked line by line against their own totals."
-status = "soon"
-ref = "1.16"
 
 [[feature]]
 group = "editor"
