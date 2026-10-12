@@ -72,8 +72,8 @@ status = "have"
 
 [[feature]]
 group = "engine"
-title = "Money exact to the cent"
-text = "Every amount is kept in whole cents, never floating point, with one documented rounding rule, so the topsheet always adds up."
+title = "Money to the cent"
+text = "Every amount is kept in whole cents and rounds the way production budgets have always rounded, with an exact mode if you want one."
 status = "have"
 ref = ["D1", "D2"]
 

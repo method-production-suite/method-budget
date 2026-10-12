@@ -329,11 +329,21 @@ def readme_block(groups, features) -> list[str]:
 
 
 def site_features_block(groups, features) -> list[str]:
+    # Each group is a closed card: its title, how many features, and the first few
+    # titles as a teaser; opening it shows the list. The roadmap stays open below.
     lines = ['<div class="groups">']
     for g, items in by_group(groups, features, "have"):
-        gid = f"g-{g['id']}"
-        lines.append(f'  <section class="group" aria-labelledby="{gid}">')
-        lines.append(f'    <h3 id="{gid}">{html_inline(g["title"])}</h3>')
+        teaser = ", ".join(html_inline(f["title"]) for f in items[:3])
+        if len(items) > 3:
+            teaser += ", and more"
+        lines.append(f'  <details class="group" id="g-{g["id"]}">')
+        lines.append("    <summary>")
+        lines.append(
+            f'      <span class="group-head"><span class="group-title">{html_inline(g["title"])}</span>'
+            f' <span class="group-count">{len(items)}</span></span>'
+        )
+        lines.append(f'      <span class="group-teaser">{teaser}</span>')
+        lines.append("    </summary>")
         lines.append('    <ul class="feats">')
         for f in items:
             lines.append(
@@ -341,7 +351,7 @@ def site_features_block(groups, features) -> list[str]:
                 f" {html_inline(f['text'])}</li>"
             )
         lines.append("    </ul>")
-        lines.append("  </section>")
+        lines.append("  </details>")
     lines.append("</div>")
     soon = [f for f in features if f["status"] == "soon"]
     if soon:

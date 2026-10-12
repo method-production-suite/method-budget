@@ -57,7 +57,7 @@ this section.
 ### Budgeting engine
 
 - **Topsheet, accounts and detail lines.** The familiar three levels, with every total rolling up live as you type.
-- **Money exact to the cent.** Every amount is kept in whole cents, never floating point, with one documented rounding rule, so the topsheet always adds up.
+- **Money to the cent.** Every amount is kept in whole cents and rounds the way production budgets have always rounded, with an exact mode if you want one.
 - **Formulas and globals.** Amount, quantity and rate cells take formulas and named globals; change a global and every line that uses it follows.
 - **Currencies.** Any line can be in its own currency, converted to the budget's base currency at rates you set.
 - **Groups and what-ifs.** Tag lines into groups, leave a group out of the total to see a what-if, and get back to the exact cent when you put it back.
