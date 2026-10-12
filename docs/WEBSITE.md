@@ -79,12 +79,13 @@ third-party request can slip in unnoticed. System fonts only.
 
 | Path | What it is |
 |---|---|
-| `index.html` | The home page: hero with the wordmark, an illustration of the app window drawn in HTML, What's new, Features, Why open files, Keyboard first, Command line and coding agents, Download, FAQ |
+| `index.html` | The home page: hero with the wordmark, an illustration of the app window drawn in HTML, Screenshots, What's new, Features, Why open files, Keyboard first, Command line and coding agents, Download, FAQ |
 | `releases/index.html` | Every release note (generated block inside a hand-written page) |
 | `404.html` | Served by GitHub Pages for any address with no page. Its links start at the site root, so it is right on methodbudget.com (at the `github.io/method-budget/` preview address its styles do not load) |
 | `assets/tokens.css` | Brand colors and type, light and dark ([BRAND.md](BRAND.md)) |
 | `assets/site.css` | Layout and components; names no colors of its own |
 | `assets/brand/` | Mark and wordmark SVGs, light and dark (`scripts/make-brand.py`) |
+| `assets/shots/` | Screenshots of the app with invented budgets, WebP with PNG fallbacks (Screenshots, below) |
 | `favicon.svg`, `favicon.ico`, `apple-touch-icon.png` | Browser and home-screen icons (`scripts/make-brand.py`) |
 | `og.png`, `og-card.html`, `assets/og-card.css` | The 1200x630 share card and its source; `scripts/make-og.sh` renders it with headless Chrome (a throwaway profile, no window). Re-run after editing the card and commit all three |
 | `robots.txt`, `sitemap.xml` | Crawlers: everything allowed; the sitemap lists `/` and `/releases/`. Add a line to the sitemap when a page is added |
@@ -96,10 +97,36 @@ in BRAND.md). Layouts are mobile first and have no horizontal scroll at phone wi
 app illustration drops columns and its tools panel on narrow screens. Each page has
 landmarks (header, nav, main, footer), a skip link and visible focus outlines.
 
-Screenshots of the app are not on the site or the README yet. When they are, they will
-be captures of an invented budget (`method sample`), never a real one and never another
-product's screens; they replace the HTML illustration, and the README has a commented
-placeholder for them.
+### Screenshots
+
+The home page's Screenshots section shows six captures of the real Mac app, below the
+HTML illustration in the hero: topsheet, detail lines with fringes, Explain this number,
+Budget Setup's fringes, Compare, and the cost report. Every budget in them is invented
+(titles, people, figures), never a real one and never another product's screens. The
+README still has a commented placeholder for them.
+
+To make them again:
+
+1. `cargo build --release -p method-cli`, then `python3 scripts/make-showcase-budgets.py`
+   writes the invented budgets into `target/showcase/` (`--force` to replace them): an
+   independent feature in two drafts (draft 3 keeps draft 2 as a version and carries
+   invented actuals), one episode of a one-hour series, and a 30-second commercial. They
+   are built from bundled charts of accounts through `method mcp`, the same tools a coding
+   agent uses.
+2. Build the app (`cd crates/method-app && cargo tauri build --bundles app`), copy the
+   budgets somewhere disposable, open them in it, set the window to 1440x900 points and
+   capture each window at 2x without its shadow (`screencapture -x -o -l <window id>
+   <name>.png`). Budget Setup is captured as its own window at 1160x460. The file names
+   are the gallery's: `topsheet`, `detail`, `explain`, `setup`, `compare`, `cost-report`.
+3. `scripts/make-screenshots.sh <folder of captures>` writes `site/assets/shots/<name>.webp`
+   and a 256-color `<name>.png` fallback at half the capture's size (needs `cwebp` and
+   `ffmpeg`). The twelve files come to about 1.2 MB; a visitor's browser loads only the
+   WebP ones (about 400 KB), and only as they scroll near them (`loading="lazy"`).
+
+The screenshots are light only: the app follows the system's light or dark setting, so a
+dark set means capturing with the Mac in dark mode. If one is made, add it as
+`<name>-dark.webp` and a `<source media="(prefers-color-scheme: dark)">` in each
+`<picture>`.
 
 Links inside the pages are relative (except 404.html), so the site works both at
 `https://ssandweiss.github.io/method-budget/` (Pages' default address for this
