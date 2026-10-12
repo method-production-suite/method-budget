@@ -11,6 +11,7 @@
 pub mod actuals;
 pub mod batch;
 pub mod clock;
+pub mod coa_import;
 pub mod collab;
 pub mod commands;
 pub mod diagnose;
