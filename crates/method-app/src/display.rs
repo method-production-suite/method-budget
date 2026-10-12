@@ -3,7 +3,9 @@
 
 use tauri::{Runtime, State, WebviewWindow};
 
-use crate::app::{edit_budget, AppState, DocId};
+use method_session::commands;
+
+use crate::app::{apply, AppState, DocId};
 use crate::view::View;
 
 pub use method_session::display::*;
@@ -20,13 +22,9 @@ pub fn set_global_info<R: Runtime>(
     name: String,
     info: GlobalInfoInput,
 ) -> Result<View, String> {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        format!("Edit the details of global {}", name.trim()),
-        |b| apply_global_info(b, &name, &info),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::set_global_info(s, &name, &info)
+    })
 }
 
 /// `{prefs: {rate_cutoff, rate_decimals_below, rate_decimals_above,
@@ -38,7 +36,7 @@ pub fn set_display_prefs<R: Runtime>(
     doc: Option<DocId>,
     prefs: DisplayPrefsInput,
 ) -> Result<View, String> {
-    edit_budget(&window, &state, doc, "Change numbers on screen", |b| {
-        apply_display_prefs(b, &prefs)
+    apply(&window, &state, doc, |s| {
+        commands::set_display_prefs(s, &prefs)
     })
 }

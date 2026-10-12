@@ -1,5 +1,8 @@
 //! Tauri glue: the commands the UI invokes, native file dialogs, and the
-//! unsaved-changes guard on close and quit.
+//! unsaved-changes guard on close and quit. What a budget command does is in
+//! method-session (`method_session::commands`, decision 70): the commands
+//! here lock the budget, call it, and draw the view with the window's side
+//! ([`finish`]).
 //!
 //! Security notes (see docs/APP.md): file paths only ever come from native
 //! dialogs shown here in Rust, never from the web view; every command works on
@@ -20,7 +23,8 @@ use crate::edit::{self, CurrencyInput, FringeInput, GroupInput, UnitInput};
 use crate::edit::{ChargeInput, CreditInput, InfoInput, LocationInput, SetInput};
 use crate::report_dto::SelectionDto;
 use crate::session::Session;
-use crate::view::{Focus, FullView, View};
+use crate::view::{FullView, View};
+use method_session::commands;
 
 pub(crate) const APP_NAME: &str = "Method Budget";
 /// The product's website (the About box links it).
@@ -50,10 +54,7 @@ pub(crate) fn finish<R: Runtime>(
             let _ = main.set_title(&window_title(s));
         }
     }
-    let mut view = s.view_with(created);
-    view.doc = s.id();
-    view.tabs = s.docs().tabs();
-    view.panes = Some(s.docs().layout());
+    let view = s.finish(created);
     crate::tools::changed(window, view.doc, view.rev);
     crate::tabs::after_command(window.app_handle(), s.docs());
     view
@@ -131,15 +132,10 @@ pub fn focus_account<R: Runtime>(
     account: Option<String>,
     ai: Option<usize>,
 ) -> CmdResult {
-    let mut s = state.lock_doc(doc)?;
-    let focus = category.zip(account).map(|(category, account)| Focus {
-        category,
-        ti: ti.unwrap_or(usize::MAX),
-        account,
-        ai: ai.unwrap_or(usize::MAX),
-    });
-    s.set_focus(focus);
-    Ok(finish(&window, &mut s, None))
+    apply(&window, &state, doc, |s| {
+        commands::focus_account(s, category, ti, account, ai);
+        Ok(())
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -374,13 +370,7 @@ pub fn set_title<R: Runtime>(
     doc: Option<DocId>,
     title: String,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        format!("Rename budget to {}", title.trim()),
-        |b| edit::set_title(b, &title),
-    )
+    apply(&window, &state, doc, |s| commands::set_title(s, &title))
 }
 
 #[tauri::command]
@@ -392,13 +382,9 @@ pub fn add_category<R: Runtime>(
     name: String,
     at: Option<usize>,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        label2("Add category", &code, &name),
-        |b| edit::add_category(b, &code, &name, at),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::add_category(s, &code, &name, at)
+    })
 }
 
 #[tauri::command]
@@ -409,13 +395,9 @@ pub fn add_production_total<R: Runtime>(
     name: String,
     at: Option<usize>,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        format!("Add production total {}", name.trim()),
-        |b| edit::add_production_total(b, &name, at),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::add_production_total(s, &name, at)
+    })
 }
 
 #[tauri::command]
@@ -427,13 +409,9 @@ pub fn update_topsheet_row<R: Runtime>(
     code: Option<String>,
     name: String,
 ) -> CmdResult {
-    edit_budget_as(
-        &window,
-        &state,
-        doc,
-        |b| topsheet_label("Edit", b, index),
-        |b| edit::update_topsheet_row(b, index, code.as_deref(), &name),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::update_topsheet_row(s, index, code.as_deref(), &name)
+    })
 }
 
 #[tauri::command]
@@ -443,13 +421,9 @@ pub fn delete_topsheet_row<R: Runtime>(
     doc: Option<DocId>,
     index: usize,
 ) -> CmdResult {
-    edit_budget_as(
-        &window,
-        &state,
-        doc,
-        |b| topsheet_label("Delete", b, index),
-        |b| edit::delete_topsheet_row(b, index),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::delete_topsheet_row(s, index)
+    })
 }
 
 #[tauri::command]
@@ -462,13 +436,9 @@ pub fn add_account<R: Runtime>(
     name: String,
     after: Option<String>,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        label2("Add account", &code, &name),
-        |b| edit::add_account(b, &category_code, &code, &name, after.as_deref()),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::add_account(s, &category_code, &code, &name, after.as_deref())
+    })
 }
 
 #[tauri::command]
@@ -480,13 +450,8 @@ pub fn update_account<R: Runtime>(
     new_code: String,
     name: String,
 ) -> CmdResult {
-    let label = if code.trim() == new_code.trim() {
-        format!("Rename account {}", code.trim())
-    } else {
-        format!("Renumber account {} to {}", code.trim(), new_code.trim())
-    };
-    edit_budget(&window, &state, doc, label, |b| {
-        edit::update_account(b, &code, &new_code, &name)
+    apply(&window, &state, doc, |s| {
+        commands::update_account(s, &code, &new_code, &name)
     })
 }
 
@@ -497,13 +462,7 @@ pub fn delete_account<R: Runtime>(
     doc: Option<DocId>,
     code: String,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        format!("Delete account {}", code.trim()),
-        |b| edit::delete_account(b, &code),
-    )
+    apply(&window, &state, doc, |s| commands::delete_account(s, &code))
 }
 
 // ---------------------------------------------------------------------------
@@ -519,7 +478,7 @@ pub fn set_detail_field<R: Runtime>(
     value: String,
 ) -> CmdResult {
     apply(&window, &state, doc, |s| {
-        s.set_detail_field(row_id, &field, &value)
+        commands::set_detail_field(s, row_id, &field, &value)
     })
 }
 
@@ -532,10 +491,8 @@ pub fn set_rows_field<R: Runtime>(
     field: String,
     value: String,
 ) -> CmdResult {
-    let parsed = edit::Field::parse(&field)?;
-    let label = |b: &method_core::Budget| crate::history::rows_field_label(b, &row_ids, &field);
-    edit_budget_as(&window, &state, doc, label, |b| {
-        edit::set_rows_field(b, &row_ids, parsed, &value)
+    apply(&window, &state, doc, |s| {
+        commands::set_rows_field(s, &row_ids, &field, &value)
     })
 }
 
@@ -560,13 +517,9 @@ pub fn delete_details<R: Runtime>(
     doc: Option<DocId>,
     row_ids: Vec<RowId>,
 ) -> CmdResult {
-    edit_budget_as(
-        &window,
-        &state,
-        doc,
-        |b| crate::history::delete_rows_label(b, &row_ids),
-        |b| edit::delete_details(b, &row_ids),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::delete_details(s, &row_ids)
+    })
 }
 
 #[tauri::command]
@@ -589,20 +542,9 @@ pub fn set_global<R: Runtime>(
     name: String,
     formula: String,
 ) -> CmdResult {
-    edit_budget_as(
-        &window,
-        &state,
-        doc,
-        |b| {
-            let verb = if b.globals.contains_key(name.trim()) {
-                "Set"
-            } else {
-                "Add"
-            };
-            format!("{verb} global {} = {}", name.trim(), formula.trim())
-        },
-        |b| edit::set_global(b, &name, &formula),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::set_global(s, &name, &formula)
+    })
 }
 
 #[tauri::command]
@@ -612,13 +554,7 @@ pub fn delete_global<R: Runtime>(
     doc: Option<DocId>,
     name: String,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        format!("Delete global {}", name.trim()),
-        |b| edit::delete_global(b, &name),
-    )
+    apply(&window, &state, doc, |s| commands::delete_global(s, &name))
 }
 
 #[tauri::command]
@@ -629,13 +565,9 @@ pub fn set_fringe<R: Runtime>(
     name: String,
     fringe: FringeInput,
 ) -> CmdResult {
-    edit_budget_as(
-        &window,
-        &state,
-        doc,
-        |b| upsert_label("fringe", b.fringes.contains_key(name.trim()), &name),
-        |b| edit::set_fringe(b, &name, &fringe),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::set_fringe(s, &name, &fringe)
+    })
 }
 
 #[tauri::command]
@@ -645,13 +577,7 @@ pub fn delete_fringe<R: Runtime>(
     doc: Option<DocId>,
     name: String,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        format!("Delete fringe {}", name.trim()),
-        |b| edit::delete_fringe(b, &name),
-    )
+    apply(&window, &state, doc, |s| commands::delete_fringe(s, &name))
 }
 
 #[tauri::command]
@@ -662,13 +588,9 @@ pub fn set_group<R: Runtime>(
     name: String,
     group: GroupInput,
 ) -> CmdResult {
-    edit_budget_as(
-        &window,
-        &state,
-        doc,
-        |b| upsert_label("group", b.groups.contains_key(name.trim()), &name),
-        |b| edit::set_group(b, &name, &group),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::set_group(s, &name, &group)
+    })
 }
 
 /// One of the budget's group rules (decisions.md, entry 57): `rule` is
@@ -682,8 +604,8 @@ pub fn set_group_rule<R: Runtime>(
     rule: String,
     value: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, doc, "Change a group rule", |b| {
-        edit::set_group_rule(b, &rule, &value)
+    apply(&window, &state, doc, |s| {
+        commands::set_group_rule(s, &rule, &value)
     })
 }
 
@@ -696,8 +618,8 @@ pub fn set_arithmetic<R: Runtime>(
     doc: Option<DocId>,
     value: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, doc, "Change rounding", |b| {
-        edit::set_arithmetic(b, &value)
+    apply(&window, &state, doc, |s| {
+        commands::set_arithmetic(s, &value)
     })
 }
 
@@ -710,8 +632,8 @@ pub fn set_round_account_totals<R: Runtime>(
     doc: Option<DocId>,
     value: bool,
 ) -> CmdResult {
-    edit_budget(&window, &state, doc, "Change account total rounding", |b| {
-        edit::set_round_account_totals(b, value)
+    apply(&window, &state, doc, |s| {
+        commands::set_round_account_totals(s, value)
     })
 }
 
@@ -724,8 +646,8 @@ pub fn set_cutoff_factor<R: Runtime>(
     doc: Option<DocId>,
     value: String,
 ) -> CmdResult {
-    edit_budget(&window, &state, doc, "Change the cutoff factor", |b| {
-        edit::set_cutoff_factor(b, &value)
+    apply(&window, &state, doc, |s| {
+        commands::set_cutoff_factor(s, &value)
     })
 }
 
@@ -738,9 +660,7 @@ pub fn set_fringe_row<R: Runtime>(
     doc: Option<DocId>,
     row: edit::FringeRowInput,
 ) -> CmdResult {
-    edit_budget(&window, &state, doc, "Change the fringe row", |b| {
-        edit::set_fringe_row(b, &row)
-    })
+    apply(&window, &state, doc, |s| commands::set_fringe_row(s, &row))
 }
 
 /// The fringes of categories after the last production total (decisions.md,
@@ -752,13 +672,9 @@ pub fn set_trailing_level_fringes<R: Runtime>(
     doc: Option<DocId>,
     value: String,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        "Change fringes after the last production total",
-        |b| edit::set_trailing_level_fringes(b, &value),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::set_trailing_level_fringes(s, &value)
+    })
 }
 
 #[tauri::command]
@@ -768,13 +684,7 @@ pub fn delete_group<R: Runtime>(
     doc: Option<DocId>,
     name: String,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        format!("Delete group {}", name.trim()),
-        |b| edit::delete_group(b, &name),
-    )
+    apply(&window, &state, doc, |s| commands::delete_group(s, &name))
 }
 
 #[tauri::command]
@@ -785,13 +695,9 @@ pub fn set_unit<R: Runtime>(
     name: String,
     unit: UnitInput,
 ) -> CmdResult {
-    edit_budget_as(
-        &window,
-        &state,
-        doc,
-        |b| upsert_label("unit", b.units.contains_key(name.trim()), &name),
-        |b| edit::set_unit(b, &name, &unit),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::set_unit(s, &name, &unit)
+    })
 }
 
 #[tauri::command]
@@ -802,14 +708,9 @@ pub fn delete_unit<R: Runtime>(
     name: String,
     clear_lines: Option<bool>,
 ) -> CmdResult {
-    // `clearLines`: also blank the unit columns that name it.
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        format!("Delete unit {}", name.trim()),
-        |b| edit::delete_unit_with(b, &name, clear_lines.unwrap_or(false)),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::delete_unit(s, &name, clear_lines.unwrap_or(false))
+    })
 }
 
 #[tauri::command]
@@ -820,13 +721,9 @@ pub fn set_currency<R: Runtime>(
     code: String,
     currency: CurrencyInput,
 ) -> CmdResult {
-    edit_budget_as(
-        &window,
-        &state,
-        doc,
-        |b| upsert_label("currency", b.currencies.contains_key(code.trim()), &code),
-        |b| edit::set_currency(b, &code, &currency),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::set_currency(s, &code, &currency)
+    })
 }
 
 #[tauri::command]
@@ -837,14 +734,9 @@ pub fn delete_currency<R: Runtime>(
     code: String,
     clear_lines: Option<bool>,
 ) -> CmdResult {
-    // `clearLines`: lines in it go back to the base currency first.
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        format!("Delete currency {}", code.trim()),
-        |b| edit::delete_currency_with(b, &code, clear_lines.unwrap_or(false)),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::delete_currency(s, &code, clear_lines.unwrap_or(false))
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -859,17 +751,9 @@ pub fn set_charge<R: Runtime>(
     index: Option<usize>,
     charge: ChargeInput,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        if index.is_some() {
-            "Edit a charge"
-        } else {
-            "Add a charge"
-        },
-        |b| edit::set_charge(b, index, &charge),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::set_charge(s, index, &charge)
+    })
 }
 
 /// What charge `index` (or a new charge, `null`) would come to as `charge`
@@ -893,15 +777,7 @@ pub fn charge_preview_in(
     index: Option<usize>,
     charge: &ChargeInput,
 ) -> CmdResult<crate::report_dto::ChargeDto> {
-    let (budget, outcome) = s.totals();
-    let c = edit::build_charge(budget, index, charge)?;
-    let report = outcome
-        .report
-        .as_ref()
-        .ok_or("the totals can't be worked out until the budget's problems are fixed")?;
-    let figured = outcome.sanitized.as_ref().unwrap_or(budget);
-    let t = method_core::charge_preview(figured, report, &c).map_err(|e| e.to_string())?;
-    Ok(crate::report_dto::ChargeDto::from(&t))
+    commands::preview_charge(s, index, charge)
 }
 
 #[tauri::command]
@@ -911,9 +787,7 @@ pub fn delete_charge<R: Runtime>(
     doc: Option<DocId>,
     index: usize,
 ) -> CmdResult {
-    edit_budget(&window, &state, doc, "Delete a charge", |b| {
-        edit::delete_charge(b, index)
-    })
+    apply(&window, &state, doc, |s| commands::delete_charge(s, index))
 }
 
 #[tauri::command]
@@ -924,8 +798,8 @@ pub fn move_charge<R: Runtime>(
     index: usize,
     to: usize,
 ) -> CmdResult {
-    edit_budget(&window, &state, doc, "Move a charge", |b| {
-        edit::move_charge(b, index, to)
+    apply(&window, &state, doc, |s| {
+        commands::move_charge(s, index, to)
     })
 }
 
@@ -937,17 +811,9 @@ pub fn set_credit<R: Runtime>(
     index: Option<usize>,
     credit: CreditInput,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        if index.is_some() {
-            "Edit a credit"
-        } else {
-            "Add a credit"
-        },
-        |b| edit::set_credit(b, index, &credit),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::set_credit(s, index, &credit)
+    })
 }
 
 #[tauri::command]
@@ -957,9 +823,7 @@ pub fn delete_credit<R: Runtime>(
     doc: Option<DocId>,
     index: usize,
 ) -> CmdResult {
-    edit_budget(&window, &state, doc, "Delete a credit", |b| {
-        edit::delete_credit(b, index)
-    })
+    apply(&window, &state, doc, |s| commands::delete_credit(s, index))
 }
 
 #[tauri::command]
@@ -970,8 +834,8 @@ pub fn move_credit<R: Runtime>(
     index: usize,
     to: usize,
 ) -> CmdResult {
-    edit_budget(&window, &state, doc, "Move a credit", |b| {
-        edit::move_credit(b, index, to)
+    apply(&window, &state, doc, |s| {
+        commands::move_credit(s, index, to)
     })
 }
 
@@ -983,13 +847,7 @@ pub fn set_set<R: Runtime>(
     name: String,
     set: SetInput,
 ) -> CmdResult {
-    edit_budget_as(
-        &window,
-        &state,
-        doc,
-        |b| upsert_label("set", b.sets.contains_key(name.trim()), &name),
-        |b| edit::set_set(b, &name, &set),
-    )
+    apply(&window, &state, doc, |s| commands::set_set(s, &name, &set))
 }
 
 #[tauri::command]
@@ -999,13 +857,7 @@ pub fn delete_set<R: Runtime>(
     doc: Option<DocId>,
     name: String,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        format!("Delete set {}", name.trim()),
-        |b| edit::delete_set(b, &name),
-    )
+    apply(&window, &state, doc, |s| commands::delete_set(s, &name))
 }
 
 #[tauri::command]
@@ -1016,13 +868,9 @@ pub fn set_location<R: Runtime>(
     name: String,
     location: LocationInput,
 ) -> CmdResult {
-    edit_budget_as(
-        &window,
-        &state,
-        doc,
-        |b| upsert_label("location", b.locations.contains_key(name.trim()), &name),
-        |b| edit::set_location(b, &name, &location),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::set_location(s, &name, &location)
+    })
 }
 
 #[tauri::command]
@@ -1032,13 +880,9 @@ pub fn delete_location<R: Runtime>(
     doc: Option<DocId>,
     name: String,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        format!("Delete location {}", name.trim()),
-        |b| edit::delete_location(b, &name),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::delete_location(s, &name)
+    })
 }
 
 #[tauri::command]
@@ -1049,13 +893,9 @@ pub fn set_info<R: Runtime>(
     name: String,
     value: InfoInput,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        format!("Edit budget info {}", name.trim()),
-        |b| edit::set_info(b, &name, &value),
-    )
+    apply(&window, &state, doc, |s| {
+        commands::set_info(s, &name, &value)
+    })
 }
 
 #[tauri::command]
@@ -1065,13 +905,7 @@ pub fn delete_info<R: Runtime>(
     doc: Option<DocId>,
     name: String,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        format!("Delete budget info {}", name.trim()),
-        |b| edit::delete_info(b, &name),
-    )
+    apply(&window, &state, doc, |s| commands::delete_info(s, &name))
 }
 
 #[tauri::command]
@@ -1082,8 +916,8 @@ pub fn set_fringe_posting<R: Runtime>(
     mode: String,
     suffix: Option<String>,
 ) -> CmdResult {
-    edit_budget(&window, &state, doc, "Change fringe posting", |b| {
-        edit::set_fringe_posting(b, &mode, suffix.as_deref())
+    apply(&window, &state, doc, |s| {
+        commands::set_fringe_posting(s, &mode, suffix.as_deref())
     })
 }
 
@@ -1101,12 +935,9 @@ pub fn set_account_coding<R: Runtime>(
     set_width: u8,
     separator: Option<String>,
 ) -> CmdResult {
-    edit_budget(&window, &state, doc, "Change account numbering", |b| {
-        edit::set_account_coding(
-            b,
-            [category_width, account_width, sub_width, set_width],
-            separator.as_deref(),
-        )
+    let widths = [category_width, account_width, sub_width, set_width];
+    apply(&window, &state, doc, |s| {
+        commands::set_account_coding(s, widths, separator.as_deref())
     })
 }
 
@@ -1117,8 +948,8 @@ pub fn set_totals_currency<R: Runtime>(
     doc: Option<DocId>,
     code: Option<String>,
 ) -> CmdResult {
-    edit_budget(&window, &state, doc, "Change the totals currency", |b| {
-        edit::set_totals_currency(b, code.as_deref())
+    apply(&window, &state, doc, |s| {
+        commands::set_totals_currency(s, code.as_deref())
     })
 }
 
@@ -1128,13 +959,7 @@ pub fn lock_baseline<R: Runtime>(
     state: State<'_, AppState>,
     doc: Option<DocId>,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        "Lock the baseline",
-        edit::lock_baseline,
-    )
+    apply(&window, &state, doc, commands::lock_baseline)
 }
 
 #[tauri::command]
@@ -1144,13 +969,8 @@ pub fn set_baseline_frozen<R: Runtime>(
     doc: Option<DocId>,
     frozen: bool,
 ) -> CmdResult {
-    let label = if frozen {
-        "Freeze the original totals"
-    } else {
-        "Unfreeze the original totals"
-    };
-    edit_budget(&window, &state, doc, label, |b| {
-        edit::set_baseline_frozen(b, frozen)
+    apply(&window, &state, doc, |s| {
+        commands::set_baseline_frozen(s, frozen)
     })
 }
 
@@ -1160,13 +980,7 @@ pub fn clear_baseline<R: Runtime>(
     state: State<'_, AppState>,
     doc: Option<DocId>,
 ) -> CmdResult {
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        "Clear the baseline",
-        edit::clear_baseline,
-    )
+    apply(&window, &state, doc, commands::clear_baseline)
 }
 
 // ---------------------------------------------------------------------------
@@ -1181,42 +995,9 @@ pub fn set_cells<R: Runtime>(
     edits: Vec<crate::batch::CellEdit>,
     action: Option<String>,
 ) -> CmdResult {
-    // `action`: what the page was doing (paste, fill, cut, clear), for the
-    // step's name in the History list; only known words are used.
-    let label = |b: &method_core::Budget| {
-        let cells: Vec<(RowId, &str, &str)> = edits
-            .iter()
-            .map(|e| (e.row_id, e.field.as_str(), e.value.as_str()))
-            .collect();
-        crate::history::cells_label(b, &cells, action.as_deref())
-    };
-    edit_budget_as(&window, &state, doc, label, |b| {
-        crate::batch::set_cells(b, &edits)
+    apply(&window, &state, doc, |s| {
+        commands::set_cells(s, &edits, action.as_deref())
     })
-}
-
-/// "Add account 21-01 Camera": a verb, a code and a name.
-fn label2(verb: &str, code: &str, name: &str) -> String {
-    format!("{verb} {} {}", code.trim(), name.trim())
-        .trim_end()
-        .to_string()
-}
-
-/// "Add fringe FICA" or "Edit fringe FICA".
-fn upsert_label(kind: &str, exists: bool, name: &str) -> String {
-    let verb = if exists { "Edit" } else { "Add" };
-    format!("{verb} {kind} {}", name.trim())
-}
-
-/// "Edit category 10", "Delete production total Total above the line".
-fn topsheet_label(verb: &str, b: &method_core::Budget, index: usize) -> String {
-    match b.topsheet.get(index) {
-        Some(method_core::TopsheetRow::Category(c)) => format!("{verb} category {}", c.code),
-        Some(method_core::TopsheetRow::ProductionTotal(p)) => {
-            format!("{verb} production total {}", p.name)
-        }
-        None => format!("{verb} a topsheet row"),
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1820,6 +1601,22 @@ mod tests {
         );
         assert_eq!(buttons, ["Save All", "Discard All", "Cancel"]);
         assert!(!two.contains('\u{2014}'), "no em dashes");
+    }
+
+    /// Every command method-session's dispatcher runs is a desktop command
+    /// of the same name (decision 70), apart from the host's own two, so the
+    /// page runs against either.
+    #[test]
+    fn dispatched_commands_are_desktop_commands() {
+        const BUILD_RS: &str = include_str!("../build.rs");
+        let host_only = ["open_mthd", "save_mthd"];
+        for c in method_session::COMMANDS {
+            if host_only.contains(c) {
+                assert!(!BUILD_RS.contains(&format!("\"{c}\"")), "{c}");
+            } else {
+                assert!(BUILD_RS.contains(&format!("    \"{c}\",")), "{c}");
+            }
+        }
     }
 
     /// Every command is in `generate_handler!` above and in build.rs's list

@@ -689,6 +689,18 @@ impl DocGuard<'_> {
         let id = self.id();
         let _ = self.docs.switch(id);
     }
+
+    /// The view after a command, with this budget's id, every tab and the
+    /// panes (`created`: a row the command made, for the page to select).
+    /// The desktop adds the window's side (its title, telling the other
+    /// windows) around this.
+    pub fn finish(&mut self, created: Option<method_core::RowId>) -> crate::view::View {
+        let mut view = self.view_with(created);
+        view.doc = self.id();
+        view.tabs = self.docs().tabs();
+        view.panes = Some(self.docs().layout());
+        view
+    }
 }
 
 impl Deref for DocGuard<'_> {
