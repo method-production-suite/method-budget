@@ -20,6 +20,7 @@ import { saveItemToLibrary } from './library.js';
 import { redrawLists } from './setuplist.js';
 import { mountFrame, actionStrip, stripButton, searchBox, gridTable, band, bandField, setFooterTotals, railHost } from './setupframe.js';
 import { obj } from './util.js';
+import { fringeRowOf } from './levels.js';
 
 const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -1704,11 +1705,10 @@ function exampleNumber(p) {
 // before it is applied. The app checks them again.
 function codingProblem(p) {
   if (p.category_width < 1) return 'Every account number starts with a category, so its width is at least 1.';
-  const w = [p.category_width, p.account_width, p.sub_width, p.set_width];
-  const names = ['category', 'account', 'sub-account', 'set'];
-  for (let i = 1; i < 4; i += 1) {
-    if (w[i] > 0 && w[i - 1] === 0) return `The ${names[i]} part needs the ${names[i - 1]} part before it.`;
-  }
+  // The sub-account and the set each need the account; the set may follow
+  // the account directly when there is no sub-account.
+  if (p.sub_width > 0 && p.account_width === 0) return 'The sub-account part needs the account part before it.';
+  if (p.set_width > 0 && p.account_width === 0) return 'The set part needs the account part before it.';
   return null;
 }
 
@@ -1822,6 +1822,7 @@ function renderSettings(panel) {
     const ex = fringeAccountExample(coding(), suffix);
     fr.append(tsRow('Account number ends in', [suf], { hint: ex ? `Category ${ex.cat}: ${ex.number}` : '' }));
   }
+  if (mode === 'budget') fr.append(...fringeRowRows(fk));
   if (k.state().errors.has(fk)) fr.append(k.errorLine(k.state().errors.get(fk)));
 
   mountFrame(panel, {
@@ -1838,9 +1839,63 @@ function renderSettings(panel) {
   });
 }
 
-// How totals are worked out (budget settings): rounding and the fringes of
-// categories after the last production total. The file leaves out each at
-// its default (binary, keep).
+// The budget's one fringe row (fringes posted by budget; decisions.md, entry
+// 59): its account number, description and place on the topsheet. Display
+// only; the file leaves it out at its defaults (no number, "Total Fringes",
+// after the summary rows).
+function fringeRowRows(fk) {
+  const b = k.budget();
+  const now = fringeRowOf(b);
+  const send = (patch) => ({
+    account: now.account,
+    description: obj(b.fringe_row).description || '',
+    position: now.position,
+    ...patch,
+  });
+  const acct = k.textInput({
+    fieldKey: k.key('settings', 'fringe_row', 'account'),
+    value: now.account,
+    onCommit: (v, old) =>
+      k.run(fk, () => ['set_fringe_row', { row: send({ account: v.trim() }) }], { restore: [k.key('settings', 'fringe_row', 'account'), old] }),
+  });
+  acct.classList.add('ts-w-s');
+  const desc = k.textInput({
+    fieldKey: k.key('settings', 'fringe_row', 'description'),
+    value: now.description,
+    onCommit: (v, old) =>
+      k.run(fk, () => ['set_fringe_row', { row: send({ description: v.trim() }) }], { restore: [k.key('settings', 'fringe_row', 'description'), old] }),
+  });
+  desc.classList.add('ts-w-m');
+  // Its place: after the summary rows, or above one of the topsheet's rows.
+  const ts = arr(b.topsheet);
+  const options = [['', 'After the summary rows']];
+  ts.forEach((r, i) => {
+    const row = obj(r);
+    const label = row.kind === 'production_total' ? k.str(row.name) : `${k.str(row.code)} ${k.str(row.name)}`.trim();
+    options.push([String(i), `Above ${label}`]);
+  });
+  if (ts.length) options.push([String(ts.length), 'After the last topsheet row']);
+  const at = now.position === null ? '' : String(Math.min(now.position, ts.length));
+  const place = k.selectInput({
+    fieldKey: k.key('settings', 'fringe_row', 'position'),
+    value: at,
+    options,
+    onCommit: (v, old) =>
+      k.run(fk, () => ['set_fringe_row', { row: send({ position: v === '' ? null : Number(v) }) }], { restore: [k.key('settings', 'fringe_row', 'position'), old] }),
+  });
+  place.classList.add('ts-w-l');
+  return [
+    tsRow('Fringe row number', [acct], { hint: 'Blank for none.' }),
+    tsRow('Fringe row description', [desc]),
+    tsRow('Fringe row place', [place], {
+      tip: 'Where the budget’s fringe row shows on the topsheet. Moving it changes no total.',
+    }),
+  ];
+}
+
+// How totals are worked out (budget settings): rounding, the percent fringe
+// cutoff factor and the fringes of categories after the last production
+// total. The file leaves out each at its default (binary, 1.0, keep).
 function calculationGroup() {
   const b = k.budget();
   const ck = k.key('settings', 'calculation');
@@ -1867,13 +1922,26 @@ function calculationGroup() {
     onCommit: (v, old) =>
       k.run(ck, () => ['set_trailing_level_fringes', { value: v }], { restore: [k.key('settings', 'trailing'), old] }),
   });
+  const factors = ['1.0', '1.5', '2.0', '2.5', '3.0'];
+  const factor = factors.includes(k.str(b.cutoff_factor)) ? k.str(b.cutoff_factor) : '1.0';
+  const factorSel = k.selectInput({
+    fieldKey: k.key('settings', 'cutoff_factor'),
+    value: factor,
+    options: factors.map((f) => [f, f]),
+    onCommit: (v, old) => k.run(ck, () => ['set_cutoff_factor', { value: v }], { restore: [k.key('settings', 'cutoff_factor'), old] }),
+  });
   arithSel.classList.add('ts-w-m');
   trailingSel.classList.add('ts-w-s');
+  factorSel.classList.add('ts-w-xs');
   group.append(
     heading('Calculation'),
     tsRow('Rounding', [arithSel], {
       hint: '1 x 1.005: 1.00 binary, 1.01 exact.',
       tip: 'Spreadsheet rounding works in binary numbers, so 1 x 1.005 is 1.00; exact decimal makes it 1.01.',
+    }),
+    tsRow('Percent fringe cutoff factor', [factorSel], {
+      hint: 'Multiplies every percent fringe’s cutoff.',
+      tip: 'Every percent fringe’s cutoff is multiplied by this: a 2,222.22 cutoff at 1.5 is 3,333.33. Flat fringes have no cutoff.',
     }),
     tsRow('Fringes after the last total', [trailingSel], {
       hint: 'Only when fringes post above each production total.',

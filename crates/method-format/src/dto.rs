@@ -13,10 +13,10 @@ use method_core::order::SetupOrder;
 use method_core::pack::{ItemSource, PackInfo};
 use method_core::{
     Account, Arithmetic, Baseline, Budget, Category, Cents, Charge, ChargeKind, Credit, CreditCap,
-    CreditRow, CreditSource, Currency, Dec, Detail, DisplayPrefs, FlatBasis, Formula, Fringe,
-    FringeKind, FringePosting, GlobalInfo, Group, GroupRules, Inclusion, InfoValue, Location,
-    NewLineDefaults, Note, ProductionTotal, RowId, RowKind, SetDef, TopsheetRow, TrailingFringes,
-    UnitDef, Version,
+    CreditRow, CreditSource, Currency, CutoffFactor, Dec, Detail, DisplayPrefs, FlatBasis, Formula,
+    Fringe, FringeKind, FringePosting, FringeRow, GlobalInfo, Group, GroupRules, Inclusion,
+    InfoValue, Location, NewLineDefaults, Note, ProductionTotal, RowId, RowKind, SetDef,
+    TopsheetRow, TrailingFringes, UnitDef, Version,
 };
 use method_core::{
     Band, BandField, FontSize, ReportColumn, ReportPreset, ReportSection, ReportSpec,
@@ -189,6 +189,10 @@ pub(crate) struct FileBudget {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     trailing_level_fringes: Option<FileTrailingFringes>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    cutoff_factor: Option<FileCutoffFactor>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    fringe_row: Option<FileFringeRow>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     arithmetic: Option<FileArithmetic>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     new_line_defaults: Option<FileNewLineDefaults>,
@@ -258,6 +262,8 @@ impl From<&Budget> for FileBudget {
             fringes,
             fringe_posting,
             trailing_level_fringes,
+            cutoff_factor,
+            fringe_row,
             arithmetic,
             account_coding,
             new_line_defaults,
@@ -295,6 +301,10 @@ impl From<&Budget> for FileBudget {
             // Keeping them is the default, also for files that don't say.
             trailing_level_fringes: (*trailing_level_fringes != TrailingFringes::default())
                 .then(|| FileTrailingFringes::from(*trailing_level_fringes)),
+            // 1.0 is the default, also for files that don't say.
+            cutoff_factor: (*cutoff_factor != CutoffFactor::One)
+                .then_some(FileCutoffFactor(*cutoff_factor)),
+            fringe_row: (!fringe_row.is_default()).then(|| FileFringeRow::from(fringe_row)),
             // Movie Magic arithmetic is the default, also for files that
             // don't say.
             arithmetic: (*arithmetic != Arithmetic::default())
@@ -375,6 +385,8 @@ impl From<FileBudget> for Budget {
                 .trailing_level_fringes
                 .map(TrailingFringes::from)
                 .unwrap_or_default(),
+            cutoff_factor: f.cutoff_factor.map(|c| c.0).unwrap_or_default(),
+            fringe_row: f.fringe_row.map(FringeRow::from).unwrap_or_default(),
             arithmetic: f.arithmetic.map(Arithmetic::from).unwrap_or_default(),
             account_coding: f
                 .account_coding
@@ -1094,6 +1106,69 @@ impl From<FileNewLineDefaults> for NewLineDefaults {
             set: f.set,
             location: f.location,
             currency: f.currency,
+        }
+    }
+}
+
+/// The budget's percent fringe cutoff factor as text, `"1.5"`: one of
+/// `1.0`, `1.5`, `2.0`, `2.5` and `3.0` (`"2"` reads as `2.0`). Left out at
+/// 1.0.
+pub(crate) struct FileCutoffFactor(CutoffFactor);
+
+impl Serialize for FileCutoffFactor {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(self.0.name())
+    }
+}
+
+impl<'de> Deserialize<'de> for FileCutoffFactor {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<FileCutoffFactor, D::Error> {
+        let text = String::deserialize(d)?;
+        CutoffFactor::parse(&text)
+            .map(FileCutoffFactor)
+            .ok_or_else(|| {
+                de::Error::custom(format!(
+                    "cutoff_factor {text:?} is not one of \"1.0\", \"1.5\", \"2.0\", \"2.5\", \"3.0\""
+                ))
+            })
+    }
+}
+
+/// The budget's one fringe row (fringes posted by budget): its account
+/// number, description and place. Left out when all are the defaults.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FileFringeRow {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    account: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    position: Option<usize>,
+}
+
+impl From<&FringeRow> for FileFringeRow {
+    fn from(r: &FringeRow) -> FileFringeRow {
+        let FringeRow {
+            account,
+            description,
+            position,
+        } = r;
+        FileFringeRow {
+            account: account.clone(),
+            description: description.clone(),
+            position: *position,
+        }
+    }
+}
+
+impl From<FileFringeRow> for FringeRow {
+    fn from(f: FileFringeRow) -> FringeRow {
+        let blank = |s: Option<String>| s.filter(|s| !s.trim().is_empty());
+        FringeRow {
+            account: blank(f.account),
+            description: blank(f.description),
+            position: f.position,
         }
     }
 }

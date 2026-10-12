@@ -26,14 +26,16 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use super::arith::{converted, float_digits, float_text, percent_of, Money, Num, Window};
-use super::fringes::{earners, flat_count, percent_step, CountFrom, Factor, Factors, FlatCount};
+use super::fringes::{
+    earners, factored_cutoff, flat_count, percent_step, CountFrom, Factor, Factors, FlatCount,
+};
 use super::topsheet::{credit_cap, credit_keep, credit_row, dropped_from};
 use super::{recalc, CalcError, Ctx, RecalcOptions};
 use crate::decimal::{Dec, Exact};
 use crate::expr::Expr;
 use crate::model::{
-    Arithmetic, Budget, ChargeKind, CreditCap, CreditSource, Detail, FlatBasis, Formula,
-    FringeKind, FringePosting, LeftOut, RowId, RowKind, TopsheetRow,
+    Arithmetic, Budget, ChargeKind, CreditCap, CreditSource, CutoffFactor, Detail, FlatBasis,
+    Formula, FringeKind, FringePosting, LeftOut, RowId, RowKind, TopsheetRow,
 };
 use crate::report::{Report, RowTotals};
 use crate::Cents;
@@ -1204,7 +1206,16 @@ impl<'a> Explainer<'a> {
         }
         let kind = match &f.kind {
             FringeKind::Percent { cutoff: Some(c) } => {
-                format!("a percent fringe with a {} cutoff per earner", money(*c))
+                let factor = self.b.cutoff_factor;
+                match factored_cutoff(self.b.arithmetic, Some(*c), factor) {
+                    Some(Some(eff)) if factor != CutoffFactor::One => format!(
+                        "a percent fringe with a {} cutoff per earner ({} x the budget's cutoff factor {})",
+                        money(eff),
+                        money(*c),
+                        factor.name()
+                    ),
+                    _ => format!("a percent fringe with a {} cutoff per earner", money(*c)),
+                }
             }
             FringeKind::Percent { cutoff: None } => "a percent fringe, no cutoff".into(),
             FringeKind::Flat { .. } => "a flat fringe".into(),
@@ -2111,9 +2122,11 @@ fn fringes_calc(
         let range = details[earner[0]].fringe_range;
         for name in names {
             let f = &ctx.b.fringes[name];
-            let FringeKind::Percent { cutoff } = f.kind else {
+            let FringeKind::Percent { cutoff: typed } = f.kind else {
                 continue;
             };
+            // Times the budget's cutoff factor, as the engine applies it.
+            let cutoff = factored_cutoff(ctx.arith, typed, ctx.b.cutoff_factor).ok_or_else(ovf)?;
             let rate = rates[name];
             let lines: Vec<usize> = earner
                 .iter()
@@ -2140,6 +2153,20 @@ fn fringes_calc(
                     ));
                 }
                 notes.push(Step::note_amount("Earnings", "this line's total", total));
+                if let (Some(t), Some(c)) = (typed, cutoff) {
+                    if ctx.b.cutoff_factor != CutoffFactor::One {
+                        notes.push(Step::note(
+                            "Cutoff factor",
+                            format!(
+                                "the budget multiplies every percent cutoff by {}: {} x {} = {}",
+                                ctx.b.cutoff_factor.name(),
+                                money(t),
+                                ctx.b.cutoff_factor.name(),
+                                money(c)
+                            ),
+                        ));
+                    }
+                }
                 if let (Some(c), Some(l)) = (cutoff, before) {
                     let above = if k == 0 {
                         String::new()

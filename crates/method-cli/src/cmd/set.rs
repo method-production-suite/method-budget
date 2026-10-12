@@ -6,6 +6,10 @@ use crate::script::{self, Op, RowRef, Word, LINE_FIELDS};
 pub const USAGE: &str = "  method set <file.mthd> <path> <value> [--dry-run]
       Change one value and save atomically. Paths: title, compact_versions,
       arithmetic (binary or exact), trailing_level_fringes (keep or drop),
+      cutoff_factor (1.0, 1.5, 2.0, 2.5 or 3.0), fringe_row.account,
+      fringe_row.description, fringe_row.position (the topsheet row the
+      budget's fringe row shows above, from 0; none for after the summary
+      rows),
       group_rules.ungrouped_lines, group_rules.conflict and
       group_rules.fringes_in_totals (include or exclude),
       global.NAME, fringe.NAME.rate, fringe.NAME.cutoff, fringe.NAME.basis
@@ -38,6 +42,10 @@ pub fn op_for(path: &str, value: &str) -> Result<Op, CliError> {
         "trailing_level_fringes" if rest.is_empty() => {
             Op::TrailingLevelFringes(script::trailing(value).map_err(bad)?)
         }
+        "cutoff_factor" if rest.is_empty() => {
+            Op::CutoffFactor(script::cutoff_factor(value).map_err(bad)?)
+        }
+        "fringe_row" if !rest.is_empty() => script::fringe_row(rest, &v).map_err(bad)?,
         "global" if !rest.is_empty() => Op::Global(rest.to_string(), value.to_string()),
         "fringe" => match middle(rest, path)? {
             (name, "rate") => Op::FringeRate(name.to_string(), value.to_string()),
@@ -172,6 +180,21 @@ mod tests {
             Op::TrailingLevelFringes(method_core::TrailingFringes::Drop)
         );
         assert!(op_for("trailing_level_fringes", "lose").is_err());
+        assert_eq!(
+            op_for("cutoff_factor", "1.5").unwrap(),
+            Op::CutoffFactor(method_core::CutoffFactor::OneAndAHalf)
+        );
+        assert!(op_for("cutoff_factor", "1.75").is_err());
+        assert_eq!(
+            op_for("fringe_row.account", "9900").unwrap(),
+            Op::FringeRow("account", Some("9900".into()))
+        );
+        assert_eq!(
+            op_for("fringe_row.position", "none").unwrap(),
+            Op::FringeRow("position", None)
+        );
+        assert!(op_for("fringe_row.position", "two").is_err());
+        assert!(op_for("fringe_row.colour", "red").is_err());
         assert_eq!(
             op_for("group_rules.ungrouped_lines", "exclude").unwrap(),
             Op::GroupRule("ungrouped_lines", method_core::Inclusion::Exclude)

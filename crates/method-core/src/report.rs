@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use crate::decimal::{Dec, Exact};
-use crate::model::{GroupRules, Inclusion, RowId, RowKind};
+use crate::model::{Budget, FringePosting, GroupRules, Inclusion, RowId, RowKind, TopsheetRow};
 use crate::Cents;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -40,14 +40,145 @@ pub struct Report {
     pub groups: BTreeMap<String, GroupTotals>,
     pub sets: BTreeMap<String, Breakdown>,
     pub locations: BTreeMap<String, Breakdown>,
+    /// The topsheet's figures in `totals_currency`, converted row by row
+    /// (decisions.md, entry 59); `None` when totals show in the base
+    /// currency (or a figure doesn't fit).
+    pub display: Option<DisplayTotals>,
 }
 
 impl Report {
-    /// Converts a base-currency amount for display in `totals_currency`,
-    /// rounded once. `None` on overflow or a zero rate.
+    /// Converts one base-currency amount for display in `totals_currency`,
+    /// rounded once, exactly. `None` on overflow or a zero rate. The
+    /// topsheet's totals in that currency are [`Report::display`], which
+    /// converts each line, fringe, charge and credit before adding them up.
     pub fn in_totals_currency(&self, c: Cents) -> Option<Cents> {
         Exact::cents(c).div_to_cents(self.totals_rate)
     }
+}
+
+/// One row of the topsheet, in the order [`Report::topsheet_lines`] lists
+/// them (decisions.md, entries 9 and 59). Indexes are into the report's
+/// lists.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TopsheetLine {
+    /// Category `n` of [`Report::categories`].
+    Category(usize),
+    /// The fringe row of level `n` of [`Report::levels`] (fringes posted by
+    /// production level), just above its production total.
+    LevelFringes(usize),
+    /// The production total closing level `n` of [`Report::levels`].
+    Level(usize),
+    /// Total above-the-line.
+    Atl,
+    /// Total below-the-line.
+    Btl,
+    /// Total above and below-the-line.
+    AtlBtl,
+    /// The budget's one fringe row (fringes posted by budget), where
+    /// [`crate::FringeRow::position`] puts it.
+    BudgetFringes,
+    /// Applied charge `n` of [`Report::charges`].
+    Charge(usize),
+    Grand,
+    /// Applied credit `n` of [`Report::credits`].
+    Credit(usize),
+    /// The applied credits added up, when there are two or more.
+    CreditsSubtotal,
+    Net,
+}
+
+impl Report {
+    /// Every row of the topsheet `b` (this report's budget) shows, in order,
+    /// as the reference product lists them (decisions.md, entry 59): the
+    /// categories and production totals, a level's fringe row above its
+    /// production total; the summary rows; the budget's fringe row (in its
+    /// default place, or above the topsheet row its position names); the
+    /// applied charges newest first, which is the reverse of the budget's
+    /// list; the grand total; the applied credits in reverse application
+    /// order; their subtotal, with two or more; and the net total. Which of
+    /// the summary rows and the net total to show is the caller's choice
+    /// (display settings): they are all listed. The budget's fringe row is
+    /// listed when fringes post by budget and come to something.
+    pub fn topsheet_lines(&self, b: &Budget) -> Vec<TopsheetLine> {
+        let fringe_row = b.fringe_posting == FringePosting::Budget && self.budget_fringes != 0;
+        let above = if fringe_row {
+            b.fringe_row.above(b.topsheet.len())
+        } else {
+            None
+        };
+        let mut out = Vec::new();
+        let (mut ci, mut li) = (0, 0);
+        for (ti, row) in b.topsheet.iter().enumerate() {
+            if above == Some(ti) {
+                out.push(TopsheetLine::BudgetFringes);
+            }
+            match row {
+                TopsheetRow::Category(_) => {
+                    if ci < self.categories.len() {
+                        out.push(TopsheetLine::Category(ci));
+                    }
+                    ci += 1;
+                }
+                TopsheetRow::ProductionTotal(_) => {
+                    if let Some(l) = self.levels.get(li) {
+                        if l.posted_fringes != 0 {
+                            out.push(TopsheetLine::LevelFringes(li));
+                        }
+                        out.push(TopsheetLine::Level(li));
+                    }
+                    li += 1;
+                }
+            }
+        }
+        // The unnamed level after the last production total keeps its
+        // fringe row (`trailing_level_fringes` keep).
+        if let Some(l) = self.levels.get(li) {
+            if l.posted_fringes != 0 {
+                out.push(TopsheetLine::LevelFringes(li));
+            }
+        }
+        if above == Some(b.topsheet.len()) {
+            out.push(TopsheetLine::BudgetFringes);
+        }
+        out.extend([TopsheetLine::Atl, TopsheetLine::Btl, TopsheetLine::AtlBtl]);
+        if fringe_row && above.is_none() {
+            out.push(TopsheetLine::BudgetFringes);
+        }
+        out.extend((0..self.charges.len()).rev().map(TopsheetLine::Charge));
+        out.push(TopsheetLine::Grand);
+        out.extend((0..self.credits.len()).rev().map(TopsheetLine::Credit));
+        if self.credits.len() >= 2 {
+            out.push(TopsheetLine::CreditsSubtotal);
+        }
+        out.push(TopsheetLine::Net);
+        out
+    }
+}
+
+/// The topsheet in the totals currency (decisions.md, entry 59), as the
+/// reference product shows it: each line's base total converted and
+/// rounded, an adjustment row's percent taken of the converted rows above
+/// it, each fringe of a fringe row converted on its own, each charge and
+/// credit converted on its own; everything above that adds those cents up.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DisplayTotals {
+    /// One per category, in `Report::categories` order (with its fringe
+    /// account or account fringe rows when fringes post there).
+    pub categories: Vec<Cents>,
+    /// One per level, in `Report::levels` order (with its fringe row when
+    /// fringes post by production level).
+    pub levels: Vec<Cents>,
+    pub budget_fringes: Cents,
+    pub total_atl: Cents,
+    pub total_btl: Cents,
+    pub atl_btl: Cents,
+    /// One per applied charge, in `Report::charges` order.
+    pub charges: Vec<Cents>,
+    pub grand_total: Cents,
+    /// One per applied credit, in `Report::credits` order.
+    pub credits: Vec<Cents>,
+    pub credits_total: Cents,
+    pub net_total: Cents,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

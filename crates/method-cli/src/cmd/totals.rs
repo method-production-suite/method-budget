@@ -136,12 +136,10 @@ pub fn json(b: &Budget, r: &Report) -> String {
     for (name, amount) in &lines {
         let _ = writeln!(o, "  \"{name}\": {amount},");
     }
-    match r.in_totals_currency(r.net_total) {
-        Some(n) => {
-            let _ = writeln!(o, "  \"net_total_in_totals_currency\": {n}");
-        }
-        None => o.push_str("  \"net_total_in_totals_currency\": null\n"),
-    }
+    // Converted account by account (decisions.md, entry 59); the net total
+    // itself when totals show in the base currency.
+    let shown = r.display.as_ref().map_or(r.net_total, |d| d.net_total);
+    let _ = writeln!(o, "  \"net_total_in_totals_currency\": {shown}");
     o.push_str("}\n");
     o
 }

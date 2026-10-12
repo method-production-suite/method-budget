@@ -3,7 +3,10 @@
 //!
 //! Validation here is about structure (a name is valid, a code is unique, a row
 //! exists). Formulas are stored as typed: a formula that doesn't evaluate is
-//! kept and flagged by recalc (see `diagnose`), never rejected.
+//! kept and flagged by recalc (see `diagnose`), except that a formula typed
+//! into a line or a global is refused when it divides by zero or uses a
+//! global that refers back to itself, as the reference product refuses them
+//! (decisions.md, entry 59).
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -239,19 +242,66 @@ pub fn apply_field(d: &mut Detail, field: Field, value: &str) -> EditResult {
     Ok(())
 }
 
+/// Refuses a formula typed into Amt, X, Rate or 4X that divides by zero or
+/// uses a global that refers back to itself (decisions.md, entry 59).
+fn check_entry(b: &Budget, field: Field, value: &str) -> EditResult {
+    if !matches!(field, Field::Amount | Field::X | Field::Rate | Field::X4) {
+        return Ok(());
+    }
+    match method_core::edit::refused_formula(b, value) {
+        Some(why) => Err(format!(
+            "{} can't be {}: {why}",
+            field_label(field),
+            value.trim()
+        )),
+        None => Ok(()),
+    }
+}
+
+/// How the grid names a formula column.
+fn field_label(field: Field) -> &'static str {
+    match field {
+        Field::Amount => "Amt",
+        Field::X => "X",
+        Field::Rate => "Rate",
+        Field::X4 => "4X",
+        _ => "This cell",
+    }
+}
+
+/// Sets a field, and an empty Unit from the global an Amt names
+/// ([`method_core::edit::unit_from_global`]).
+fn apply_entry(d: &mut Detail, field: Field, value: &str, unit: Option<&str>) -> EditResult {
+    apply_field(d, field, value)?;
+    if let Some(u) = unit {
+        if d.unit.trim().is_empty() {
+            d.unit = u.to_string();
+        }
+    }
+    Ok(())
+}
+
 pub fn set_detail_field(b: &mut Budget, id: RowId, field: Field, value: &str) -> EditResult {
-    apply_field(detail_mut(b, id)?, field, value)
+    check_entry(b, field, value)?;
+    let unit = (field == Field::Amount)
+        .then(|| method_core::edit::unit_from_global(b, value).map(str::to_string))
+        .flatten();
+    apply_entry(detail_mut(b, id)?, field, value, unit.as_deref())
 }
 
 /// Sets one field on several rows. Rows that don't use the field are skipped;
 /// it's an error only if none do.
 pub fn set_rows_field(b: &mut Budget, ids: &[RowId], field: Field, value: &str) -> EditResult {
+    check_entry(b, field, value)?;
+    let unit = (field == Field::Amount)
+        .then(|| method_core::edit::unit_from_global(b, value).map(str::to_string))
+        .flatten();
     let mut rows = rows_by_id(b, &ids.iter().copied().collect());
     let mut applied = 0;
     for &id in ids {
         let d = rows.get_mut(&id).ok_or_else(|| row_gone(id))?;
         if field.applies_to(d.kind) {
-            apply_field(d, field, value)?;
+            apply_entry(d, field, value, unit.as_deref())?;
             applied += 1;
         }
     }
@@ -390,6 +440,8 @@ fn account_exists(b: &Budget, code: &str, except: Option<&str>) -> bool {
 fn insert_at(b: &mut Budget, at: Option<usize>, row: TopsheetRow) -> usize {
     let at = at.unwrap_or(b.topsheet.len()).min(b.topsheet.len());
     b.topsheet.insert(at, row);
+    // The budget's fringe row stays above the row it was above.
+    b.fringe_row.row_inserted(at);
     at
 }
 
@@ -463,6 +515,7 @@ pub fn delete_topsheet_row(b: &mut Budget, index: usize) -> EditResult {
         return Err("that topsheet row no longer exists".into());
     }
     b.topsheet.remove(index);
+    b.fringe_row.row_removed(index);
     Ok(())
 }
 
@@ -558,6 +611,10 @@ pub fn set_global(b: &mut Budget, name: &str, formula: &str) -> EditResult {
     let formula = formula.trim();
     if formula.is_empty() {
         return Err(format!("global {name} needs a value"));
+    }
+    // Refused as the reference product refuses it (decisions.md, entry 59).
+    if let Some(why) = method_core::edit::refused_global(b, name, formula) {
+        return Err(format!("global {name} can't be {formula}: {why}"));
     }
     b.globals
         .insert(name.to_string(), Formula(formula.to_string()));
@@ -803,6 +860,79 @@ pub fn set_group_rule(b: &mut Budget, rule: &str, value: &str) -> EditResult {
 pub fn set_arithmetic(b: &mut Budget, value: &str) -> EditResult {
     b.arithmetic = method_core::Arithmetic::parse(value)
         .ok_or_else(|| format!("`{value}` is not binary or exact"))?;
+    Ok(())
+}
+
+/// Sets what every percent fringe's cutoff is multiplied by (decisions.md,
+/// entry 59): `1.0`, `1.5`, `2.0`, `2.5` or `3.0`.
+pub fn set_cutoff_factor(b: &mut Budget, value: &str) -> EditResult {
+    b.cutoff_factor = method_core::CutoffFactor::parse(value).ok_or_else(|| {
+        format!(
+            "`{}` is not a cutoff factor: use 1.0, 1.5, 2.0, 2.5 or 3.0",
+            value.trim()
+        )
+    })?;
+    Ok(())
+}
+
+/// The budget's fringe row as the Settings tab sends it (decisions.md,
+/// entry 59).
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct FringeRowInput {
+    /// Account number shown on the row; blank for none.
+    #[serde(default)]
+    pub account: Option<String>,
+    /// What the row says; blank for "Total Fringes".
+    #[serde(default)]
+    pub description: Option<String>,
+    /// The topsheet row it shows above (the topsheet's length: after the
+    /// last row); `None` for after the summary rows.
+    #[serde(default)]
+    pub position: Option<usize>,
+}
+
+/// Longest fringe row description, in characters.
+pub const MAX_FRINGE_ROW_CHARS: usize = 200;
+
+/// Sets the budget's fringe row: its account number, description and place
+/// on the topsheet (decisions.md, entry 59). Display only: no total
+/// changes. The number may be any letters, digits and separators, like a
+/// charge's account.
+pub fn set_fringe_row(b: &mut Budget, r: &FringeRowInput) -> EditResult {
+    let blank = |s: &Option<String>| {
+        s.as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+    };
+    let account = blank(&r.account);
+    if let Some(a) = &account {
+        if let Some(c) = a
+            .chars()
+            .find(|c| !c.is_ascii_alphanumeric() && !method_core::coding::SEPARATORS.contains(c))
+        {
+            return Err(format!(
+                "the fringe row's account number can only use letters, digits and separators, not {c:?}"
+            ));
+        }
+    }
+    let description = blank(&r.description);
+    if description
+        .as_ref()
+        .is_some_and(|d| d.chars().count() > MAX_FRINGE_ROW_CHARS)
+    {
+        return Err(format!(
+            "the fringe row's description is longer than {MAX_FRINGE_ROW_CHARS} characters"
+        ));
+    }
+    if r.position.is_some_and(|p| p > b.topsheet.len()) {
+        return Err("that topsheet row no longer exists".into());
+    }
+    b.fringe_row = method_core::FringeRow {
+        account,
+        description,
+        position: r.position,
+    };
     Ok(())
 }
 

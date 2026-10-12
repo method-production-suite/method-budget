@@ -235,8 +235,9 @@ cutoff it never uses. The base currency is listed first with `base: true`.
 **`totals`** `{path, exclude_groups?}`: `levels` (each production total with its categories
 and their accounts), `total_atl_cents`, `total_btl_cents`, `atl_btl_cents`,
 `budget_fringes_cents`, `charges_cents` and each charge, `grand_total_cents`, `credits_cents`
-and each credit, `net_total_cents`, `net_total_in_totals_currency_cents`. The summary is the
-topsheet as `method show` prints it.
+and each credit, `net_total_cents`, `net_total_in_totals_currency_cents` (converted
+account by account, fringe by fringe, charge by charge and credit by credit, then added up;
+decisions.md, entry 59). The summary is the topsheet as `method show` prints it.
 
 **`explain`** `{path, total, depth?}`: how one total is worked out (the engine's explain, as
 `method explain` and the app's Explain tab show it). `total` is an account (`21-01`,
@@ -394,7 +395,9 @@ they hold rows, unless `force`. **`delete_production_total`** `{path, name}`.
 starter budget (a small chart of accounts with placeholder rates; the default), a `blank`
 one, or one from a `template` budget: its chart, setup and settings, its lines only with
 `keep_lines`, never its info, versions, notes, actuals or provenance (as the app's New From
-Template).
+Template). The starter and a blank budget start with the new-budget settings
+(decisions.md, entry 59): fringes posted by budget, account numbers of category 2, account
+2 and set 3, a Day of 12 hours, a Week of 60, a Month of 240, and a cutoff factor of 1.0.
 
 **`save_as`** `{path, out, editable?, overwrite?}`: a copy in the canonical form;
 `editable: true` turns a shared copy's copy editable, keeping its provenance.

@@ -36,6 +36,8 @@
     "allow-set-fringe-posting",
     "allow-set-arithmetic",
     "allow-set-trailing-level-fringes",
+    "allow-set-cutoff-factor",
+    "allow-set-fringe-row",
     "allow-set-account-coding",
     "allow-set-totals-currency",
     "allow-set-new-line-defaults",

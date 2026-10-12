@@ -9,8 +9,11 @@
 //!
 //! - Every width is at most [`MAX_WIDTH`] (6).
 //! - The category width is at least 1: every account number starts with a category.
-//! - Used segments are contiguous: a segment with a width cannot follow an unused
-//!   one (for example sub-account 0 with set 2 is rejected).
+//! - Used segments are contiguous, except that the set may follow the account
+//!   when there is no sub-account: a segment with a width cannot follow an unused
+//!   one (account 0 with sub-account 2, or account 0 with set 2, is rejected), but
+//!   category 2, account 2, sub-account 0, set 3 is allowed (the reference
+//!   product's default, decisions.md, entry 59).
 //! - The separator is none, or one of space, `-`, `.`, `,`, `/`, `:`, `;`.
 //!
 //! # Parsing rules ([`AccountCoding::parse`])
@@ -95,8 +98,23 @@ pub struct AccountCoding {
     pub separator: Option<char>,
 }
 
+impl AccountCoding {
+    /// The pattern a new budget starts with (decisions.md, entry 59), as the
+    /// reference product starts one: category 2, account 2, no
+    /// sub-account, set 3, separator `-`. A file that doesn't say has
+    /// [`AccountCoding::default`], so budgets already saved keep theirs.
+    pub fn new_budget() -> AccountCoding {
+        AccountCoding {
+            set_width: 3,
+            ..AccountCoding::default()
+        }
+    }
+}
+
 impl Default for AccountCoding {
-    /// Category 2, account 2, no sub-account, no set, separator `-`.
+    /// Category 2, account 2, no sub-account, no set, separator `-`: what a
+    /// file that doesn't say has. New budgets start from
+    /// [`AccountCoding::new_budget`].
     ///
     /// Two plus two characters is the common four-digit film chart of accounts
     /// (category `11`, account `11-01`), and it leaves room for 100 categories with
@@ -121,6 +139,27 @@ pub struct AccountCode {
     pub account: String,
     pub sub: String,
     pub set: String,
+}
+
+impl AccountCode {
+    /// The text of one segment.
+    pub fn segment(&self, segment: Segment) -> &str {
+        match segment {
+            Segment::Category => &self.category,
+            Segment::Account => &self.account,
+            Segment::Sub => &self.sub,
+            Segment::Set => &self.set,
+        }
+    }
+
+    fn segment_mut(&mut self, segment: Segment) -> &mut String {
+        match segment {
+            Segment::Category => &mut self.category,
+            Segment::Account => &mut self.account,
+            Segment::Sub => &mut self.sub,
+            Segment::Set => &mut self.set,
+        }
+    }
 }
 
 /// Why a pattern or an account number was rejected.
@@ -206,24 +245,31 @@ impl AccountCoding {
         ]
     }
 
-    /// Number of used segments (valid patterns have them contiguous from the start).
-    fn used(&self) -> usize {
-        self.widths().iter().take_while(|(_, w)| *w > 0).count()
+    /// The used segments with their widths, in order (a valid pattern has
+    /// them contiguous from the start, but for a set after the account with
+    /// no sub-account).
+    fn used_segments(&self) -> Vec<(Segment, u8)> {
+        self.widths().into_iter().filter(|(_, w)| *w > 0).collect()
     }
 
     /// Checks the pattern rules listed in the module docs.
     pub fn validate(&self) -> Result<(), CodingError> {
-        let mut seen_unused = false;
         for (segment, width) in self.widths() {
             if width > MAX_WIDTH {
                 return Err(CodingError::WidthTooLarge { segment, width });
             }
-            if width == 0 {
-                if segment == Segment::Category {
-                    return Err(CodingError::CategoryRequired);
-                }
-                seen_unused = true;
-            } else if seen_unused {
+        }
+        if self.category_width == 0 {
+            return Err(CodingError::CategoryRequired);
+        }
+        // The segment each one needs before it: the set may skip an unused
+        // sub-account, never an unused account.
+        let needs = [
+            (Segment::Sub, self.sub_width, self.account_width),
+            (Segment::Set, self.set_width, self.account_width),
+        ];
+        for (segment, width, before) in needs {
+            if width > 0 && before == 0 {
                 return Err(CodingError::SegmentGap { segment });
             }
         }
@@ -246,8 +292,8 @@ impl AccountCoding {
         {
             return Err(CodingError::InvalidChar(c));
         }
-        let used = self.used();
-        let widths = self.widths();
+        let segments = self.used_segments();
+        let used = segments.len();
         let mut pieces: Vec<String> = Vec::with_capacity(used);
 
         if typed.chars().any(is_separator) {
@@ -265,8 +311,8 @@ impl AccountCoding {
                     found: parts.len(),
                 });
             }
-            for (part, (_, width)) in parts.iter().zip(widths) {
-                pieces.push(fit(part, width));
+            for (part, (_, width)) in parts.iter().zip(&segments) {
+                pieces.push(fit(part, *width));
             }
         } else {
             // Width mode: cut by widths, drop anything past the total.
@@ -274,7 +320,7 @@ impl AccountCoding {
                 return Err(CodingError::Empty);
             }
             let mut rest = typed;
-            for (_, width) in widths.iter().take(used) {
+            for (_, width) in &segments {
                 let n = rest.len().min(*width as usize);
                 let (head, tail) = rest.split_at(n);
                 pieces.push(fit(head, *width));
@@ -282,14 +328,11 @@ impl AccountCoding {
             }
         }
 
-        let mut it = pieces.into_iter();
-        let mut next = || it.next().unwrap_or_default();
-        Ok(AccountCode {
-            category: next(),
-            account: next(),
-            sub: next(),
-            set: next(),
-        })
+        let mut code = AccountCode::default();
+        for ((segment, _), piece) in segments.into_iter().zip(pieces) {
+            *code.segment_mut(segment) = piece;
+        }
+        Ok(code)
     }
 
     /// Whether `typed` reads without anything cut off: no separated piece
@@ -298,7 +341,7 @@ impl AccountCoding {
     /// about whether `typed` parses.
     pub fn fits(&self, typed: &str) -> bool {
         let typed = typed.trim();
-        let used = self.widths().into_iter().take(self.used());
+        let used = self.used_segments().into_iter();
         if typed.chars().any(is_separator) {
             typed
                 .split(is_separator)
@@ -313,18 +356,17 @@ impl AccountCoding {
     /// Formats segments with the pattern's separator, omitting unused segments and
     /// trailing empty ones. Segments are written as stored.
     pub fn format(&self, code: &AccountCode) -> String {
-        let segs = [&code.category, &code.account, &code.sub, &code.set];
-        let used = self.used();
-        let last = segs[..used]
+        let segs: Vec<&str> = self
+            .used_segments()
+            .into_iter()
+            .map(|(segment, _)| code.segment(segment))
+            .collect();
+        let last = segs
             .iter()
             .rposition(|s| !s.is_empty())
             .map_or(0, |i| i + 1);
         let sep = self.separator.map(String::from).unwrap_or_default();
-        segs[..last]
-            .iter()
-            .map(|s| s.as_str())
-            .collect::<Vec<_>>()
-            .join(&sep)
+        segs[..last].join(&sep)
     }
 
     /// Parses then formats: the canonical spelling of a typed account number.
@@ -494,11 +536,33 @@ mod tests {
             })
         );
         assert_eq!(
-            pat(2, 2, 0, 2, None).validate(),
+            pat(2, 0, 0, 2, None).validate(),
             Err(CodingError::SegmentGap {
                 segment: Segment::Set
             })
         );
+        // The set may follow the account when there is no sub-account.
+        assert_eq!(pat(2, 2, 0, 2, None).validate(), Ok(()));
+    }
+
+    /// The new-budget pattern (category 2, account 2, set 3): the set is
+    /// the third part, read and written after the account.
+    #[test]
+    fn a_set_after_the_account() {
+        let p = AccountCoding::new_budget();
+        assert_eq!(p, pat(2, 2, 0, 3, Some('-')));
+        assert_eq!(p.validate(), Ok(()));
+        assert_eq!(p.parse("11-01-5"), Ok(code("11", "01", "", "005")));
+        assert_eq!(p.parse("1101005"), Ok(code("11", "01", "", "005")));
+        assert_eq!(norm(&p, "1101"), "11-01");
+        assert_eq!(norm(&p, "11-01-ABC"), "11-01-ABC");
+        assert_eq!(p.format(&code("11", "01", "", "005")), "11-01-005");
+        assert!(p.fits("11-01-005") && !p.fits("11-01-0005"));
+        assert_eq!(
+            p.parse("1-2-3-4"),
+            Err(CodingError::TooManySegments { max: 3, found: 4 })
+        );
+        assert_eq!(p.fringe_account("11", "99"), Ok("11-99".into()));
     }
 
     #[test]

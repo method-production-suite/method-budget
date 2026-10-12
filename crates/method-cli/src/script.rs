@@ -9,6 +9,10 @@
 //! set compact_versions true
 //! set arithmetic exact
 //! set trailing_level_fringes drop
+//! set cutoff_factor 1.5
+//! set fringe_row account 9900
+//! set fringe_row description "Payroll fringes"
+//! set fringe_row position 4
 //! set group_rules ungrouped_lines exclude
 //! set global SHOOT_DAYS 32
 //! set fringe FICA rate 7.65
@@ -30,8 +34,8 @@ use std::str::FromStr;
 
 use method_core::rename::{rename, valid_name, SetupKind};
 use method_core::{
-    recalc, Arithmetic, Budget, Cents, Dec, Detail, FlatBasis, Formula, FringeKind, Inclusion,
-    RecalcOptions, Report, RowId, TrailingFringes,
+    recalc, Arithmetic, Budget, Cents, CutoffFactor, Dec, Detail, FlatBasis, Formula, FringeKind,
+    Inclusion, RecalcOptions, Report, RowId, TrailingFringes,
 };
 
 use crate::cli::{money, CliError, Outcome};
@@ -200,9 +204,47 @@ pub enum Op {
     /// Under production-level posting, keep or drop the fringes of
     /// categories after the last production total (docs/FORMAT.md, "Budget").
     TrailingLevelFringes(TrailingFringes),
+    /// What every percent fringe's cutoff is multiplied by (docs/FORMAT.md,
+    /// "Budget").
+    CutoffFactor(CutoffFactor),
+    /// One field of the budget's fringe row (`account`, `description` or
+    /// `position`; [`FRINGE_ROW_FIELDS`]), `None` to clear it
+    /// (docs/FORMAT.md, "Fringe row").
+    FringeRow(&'static str, Option<String>),
     /// One of the group rules ([`GROUP_RULES`]; docs/FORMAT.md, "Group
     /// rules").
     GroupRule(&'static str, Inclusion),
+}
+
+/// The budget's fringe row fields, by the names files and commands use.
+pub const FRINGE_ROW_FIELDS: [&str; 3] = ["account", "description", "position"];
+
+/// A fringe row field by name, with its value (`none` or blank clears it).
+pub fn fringe_row(field: &str, value: &Word) -> Result<Op, String> {
+    let name = FRINGE_ROW_FIELDS
+        .into_iter()
+        .find(|f| *f == field.trim())
+        .ok_or_else(|| {
+            format!(
+                "`{field}` is not a fringe row field: use {}",
+                FRINGE_ROW_FIELDS.join(", ")
+            )
+        })?;
+    let v = (!value.is_none()).then(|| value.text.trim().to_string());
+    if name == "position" {
+        if let Some(p) = &v {
+            p.parse::<usize>().map_err(|_| {
+                format!("`{p}` is not a topsheet row: use a number from 0, or none")
+            })?;
+        }
+    }
+    Ok(Op::FringeRow(name, v))
+}
+
+/// A cutoff factor by name (`1.0`, `1.5`, `2.0`, `2.5` or `3.0`).
+pub fn cutoff_factor(s: &str) -> Result<CutoffFactor, String> {
+    CutoffFactor::parse(s)
+        .ok_or_else(|| format!("`{s}` is not a cutoff factor: use 1.0, 1.5, 2.0, 2.5 or 3.0"))
 }
 
 /// The group rules by the names files and commands use.
@@ -286,6 +328,14 @@ pub fn parse(line: &str) -> Result<Option<Op>, String> {
         ["set", "trailing_level_fringes"] => {
             let w = need(&w, 3, "set trailing_level_fringes keep|drop")?;
             Op::TrailingLevelFringes(trailing(&w[2].text)?)
+        }
+        ["set", "cutoff_factor"] => {
+            let w = need(&w, 3, "set cutoff_factor 1.0|1.5|2.0|2.5|3.0")?;
+            Op::CutoffFactor(cutoff_factor(&w[2].text)?)
+        }
+        ["set", "fringe_row"] => {
+            let w = need(&w, 4, "set fringe_row account|description|position VALUE")?;
+            fringe_row(&w[2].text, &w[3])?
         }
         ["set", "group_rules"] => {
             let w = need(
@@ -737,6 +787,56 @@ pub fn apply(b: &mut Budget, op: &Op) -> Result<Vec<String>, String> {
             ));
             b.trailing_level_fringes = *t;
         }
+        Op::CutoffFactor(f) => {
+            log.push(format!(
+                "cutoff_factor {} -> {}",
+                b.cutoff_factor.name(),
+                f.name()
+            ));
+            b.cutoff_factor = *f;
+        }
+        Op::FringeRow(field, v) => {
+            let r = &mut b.fringe_row;
+            let shown = |v: &Option<String>| v.clone().unwrap_or_else(|| "none".into());
+            match *field {
+                "account" => {
+                    log.push(format!(
+                        "fringe_row account {} -> {}",
+                        shown(&r.account),
+                        shown(v)
+                    ));
+                    r.account = v.clone().filter(|s| !s.is_empty());
+                }
+                "description" => {
+                    log.push(format!(
+                        "fringe_row description {} -> {}",
+                        shown(&r.description),
+                        shown(v)
+                    ));
+                    r.description = v.clone().filter(|s| !s.is_empty());
+                }
+                _ => {
+                    let at = match v {
+                        Some(p) => Some(
+                            p.parse::<usize>()
+                                .map_err(|_| format!("`{p}` is not a topsheet row"))?,
+                        ),
+                        None => None,
+                    };
+                    if at.is_some_and(|p| p > b.topsheet.len()) {
+                        return Err(format!(
+                            "the topsheet has {} rows, so the fringe row can be above row 0 to {}",
+                            b.topsheet.len(),
+                            b.topsheet.len()
+                        ));
+                    }
+                    let old = r.position.map_or("none".into(), |p| p.to_string());
+                    let new = at.map_or("none".into(), |p| p.to_string());
+                    log.push(format!("fringe_row position {old} -> {new}"));
+                    r.position = at;
+                }
+            }
+        }
         Op::GroupRule(rule, v) => {
             let slot = group_rule_slot(b, rule);
             log.push(format!(
@@ -901,6 +1001,12 @@ mod tests {
             "set arithmetic mmb",
             "set trailing_level_fringes drop",
             "set trailing_level_fringes keep",
+            "set cutoff_factor 1.5",
+            "set cutoff_factor 3",
+            "set fringe_row account 9900",
+            "set fringe_row description \"Payroll fringes\"",
+            "set fringe_row position 4",
+            "set fringe_row position none",
             "set group_rules ungrouped_lines exclude",
             "set group_rules conflict include",
             "set group_rules fringes_in_totals exclude",

@@ -1372,7 +1372,10 @@ mod tests {
 
     #[test]
     fn the_preview_guesses_and_reviews() {
-        let b = starter::budget();
+        let mut b = starter::budget();
+        b.fringe_posting = method_core::FringePosting::Category {
+            suffix: "99".into(),
+        };
         let p = picked(3, "ledger.csv".into(), &ledger());
         assert_eq!(p.fields.len(), Field::ALL.len());
         let pv = preview_dto(&b, &ledger(), &guessing()).unwrap();

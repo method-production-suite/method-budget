@@ -109,8 +109,10 @@ Fields in written order:
 | `totals_currency` | optional text | Currency the totals are shown in, when not the base currency. |
 | `provenance`      | [provenance](#provenance) | Where this budget came from, when it is a copy saved for sharing, a sub-budget or a [setup pack](#setup-packs). Left out otherwise. |
 | `account_coding`  | [account coding](#account-coding) | Left out when it is the default pattern. |
-| `fringe_posting`  | [fringe posting](#fringe-posting) | Left out when it is the default (by category, suffix `"99"`). |
+| `fringe_posting`  | [fringe posting](#fringe-posting) | Left out when it is the default (by category, suffix `"99"`), which is also what a missing field means. A new budget posts by budget, so its file has the field. |
 | `trailing_level_fringes` | `"keep"` or `"drop"` | Under production-level posting, what happens to the fringes of categories after the last production total (see [trailing level fringes](#trailing-level-fringes)). Left out when `"keep"`, which is also what a missing field means. |
+| `cutoff_factor`   | `"1.0"`, `"1.5"`, `"2.0"`, `"2.5"` or `"3.0"` | What every percent fringe's cutoff is multiplied by (see [cutoff factor](#cutoff-factor)). Left out when `"1.0"`, which is also what a missing field means. |
+| `fringe_row`      | [fringe row](#fringe-row) | The account number, description and place of the budget's one fringe row (fringes posted by budget). Left out when every field is the default. |
 | `arithmetic`      | `"binary"` or `"exact"` | How totals are worked out (see [arithmetic](#arithmetic)). Left out when `"binary"`, which is also what a missing `arithmetic` means. |
 | `new_line_defaults` | [new-line defaults](#new-line-defaults) | Left out when it is the default (copy fringes only). |
 | `info`            | map of [info values](#info-value) | Budget information fields, keyed by label. |
@@ -124,8 +126,8 @@ Fields in written order:
 | `sets`            | map of [sets](#set) | Keyed by set name. |
 | `locations`       | map of [locations](#location) | Keyed by location name. |
 | `topsheet`        | list of [topsheet rows](#topsheet-row) | Categories and production totals, in display order. |
-| `charges`         | list of [charges](#charge) | Contractual charges, in application order. |
-| `credits`         | list of [credits](#credit) | Applied credits (incentives), in application order. |
+| `charges`         | list of [charges](#charge) | Contractual charges, in the order they were made (charges never apply to each other, so the order changes no figure). The topsheet lists them newest first, the reverse of this list. |
+| `credits`         | list of [credits](#credit) | Applied credits (incentives), in application order. The topsheet lists them in reverse, then their subtotal when there are two or more. |
 | `baseline`        | [baseline](#baseline) | Frozen totals for comparison. Left out when there is none. |
 | `actuals`         | [actuals](#actuals) | Actual costs from accounting and estimates to complete. Left out when there are none. |
 | `display`         | [display settings](#display-settings) | How numbers show on screen. Left out when every setting is the default. |
@@ -139,15 +141,21 @@ Fields in written order:
 | `compact_versions` | `true` or `false` | Write `versions` as changes instead of full copies ([version deltas](#version-deltas)). A file setting, not content. Default `false`, left out then. |
 | `versions`        | list of [versions](#version) | Named copies of the budget, oldest first. Left out when there are none. |
 
-A new budget in Method Budget starts with a set of editable starter units (Allow,
-Day, Flat, Hour, Month, Week). They are ordinary data and are written out like any other
-units, so a file with no `units` field really has no units.
+A new budget in Method Budget starts with a set of editable starter units: Day (12
+hours), Week (60), Month (240), Hour (1), and Allow and Flat with no hours. They are
+ordinary data and are written out like any other units, so a file with no `units` field
+really has no units, and a file keeps the hours it has. A new budget also starts posting
+fringes by budget, with account numbers of category 2, account 2 and set 3 (so both
+`fringe_posting` and `account_coding` are written), a new line copying only its fringes
+from the line above, and a cutoff factor of 1.0 (`docs/decisions.md`, entry 59). A file
+without those fields keeps the defaults this page gives them.
 
 ### Account coding
 
 How account numbers are split into segments and written. Left out entirely when it equals
 the default: category width 2, account width 2, no sub-account, no set, separator `"-"`.
-When present, every field is required.
+When present, every field is required. A new budget starts with a set width of 3 (category
+2, account 2, no sub-account, set 3, `"-"`), so its file has the field.
 
 | Field            | Type | Notes |
 |------------------|------|-------|
@@ -158,7 +166,9 @@ When present, every field is required.
 | `separator`      | string | One character placed between segments, or `""` for none. |
 
 The file stores the pattern as is. The application's own rules (widths up to 6, which
-separators are allowed) are checked by the application, not by the file reader.
+separators are allowed, each used segment after a used one except that the set may follow
+the account when there is no sub-account) are checked by the application, not by the file
+reader.
 
 ### Fringe posting
 
@@ -185,6 +195,31 @@ own. It changes nothing under the other posting modes.
 |----------|---------|
 | `"keep"` | The default, also for files without the field. They post in a fringe row of the unnamed level after the last production total, so they are in the grand total and in a percent charge's base, though in neither above- nor below-the-line. `method check` warns about them. |
 | `"drop"` | They post nowhere, so they are in no total (lines still earn them, and fringe, group, set and location totals and credits still count them). |
+
+### Cutoff factor
+
+What every percent [fringe](#fringe)'s `cutoff` is multiplied by before it is used, as
+the percentage fringe cutoff factor of industry-standard budgeting software works
+(`docs/decisions.md`, entry 59): a 2,222.22 cutoff at `"1.5"` is 3,333.33. The product is
+rounded to cents by the budget's [arithmetic](#arithmetic). Flat fringes have no cutoff,
+so it changes nothing for them. One of `"1.0"` (the default, also for files without the
+field), `"1.5"`, `"2.0"`, `"2.5"` and `"3.0"`, written as text; `"2"` reads as `"2.0"`,
+and any other value is an error. A budget setting; a [version](#version) keeps its own.
+
+### Fringe row
+
+The budget's one fringe row, when fringes [post](#fringe-posting) by budget
+(`docs/decisions.md`, entry 59). Display only: where it shows and what it says never
+changes a total, above-the-line or below-the-line. Left out entirely when every field is
+the default. A budget setting; a [version](#version) keeps its own.
+
+| Field         | Type | Notes |
+|---------------|------|-------|
+| `account`     | optional text | The account number shown on the row. Not set (the default): none. |
+| `description` | optional text | What the row says. Not set (the default): `Total Fringes`. |
+| `position`    | optional integer | The [topsheet row](#topsheet-row) it shows just above, counted from 0; the topsheet's length or more puts it after the last one. Not set (the default): after the above- and below-the-line summary rows. |
+
+A blank `account` or `description` reads as not set.
 
 ### Arithmetic
 
@@ -1172,6 +1207,12 @@ valid. Loading and saving it in Method Budget normalizes it.
   group, conflicts, fringes in group totals), left out at their defaults, which
   are what files without it already meant; credit row source kind `"category"`
   (decisions.md, entry 57). Files that don't use them are unchanged.
+- Version 1, additive (2026-10): budget [`cutoff_factor`](#cutoff-factor) and
+  [`fringe_row`](#fringe-row), each left out at its default (decisions.md, entry 59). An
+  account coding may now use a set right after the account with no sub-account. New
+  budgets start with different settings (posting by budget, set width 3, a 12-hour Day,
+  60-hour Week and 240-hour Month), all written in the file; a file without those fields
+  reads exactly as before, so existing files are unchanged.
 
 ## Complete example
 
@@ -1196,14 +1237,14 @@ checked by the test suite (`crates/method-format/tests/golden/small.json`).
     "units": {
       "Day": {
         "plural": "Days",
-        "hours": "10"
+        "hours": "12"
       },
       "Flat": {
         "plural": "Flat"
       },
       "Week": {
         "plural": "Weeks",
-        "hours": "50"
+        "hours": "60"
       }
     },
     "globals": {

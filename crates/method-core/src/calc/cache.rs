@@ -2,8 +2,9 @@
 //!
 //! Stages 1 and 2 (evaluating rows and their fringes) are most of a recalc,
 //! and they work account by account: an account's rows depend only on the
-//! account itself and on the budget's arithmetic, globals, fringes,
-//! currencies, units, groups and group rules (and the recalc options). An edit usually changes one account, so
+//! account itself and on the budget's arithmetic, globals, fringes, cutoff
+//! factor, currencies, units, groups and group rules (and the recalc
+//! options). An edit usually changes one account, so
 //! [`RecalcCache`] keeps every account's evaluated rows, and the next recalc
 //! evaluates again only the accounts whose rows changed (all of them when one
 //! of those tables changed). Stages 3 and 4 run in full every time. The
@@ -13,7 +14,8 @@ use std::collections::BTreeMap;
 
 use crate::calc::{recalc_with, CalcError, RecalcOptions};
 use crate::model::{
-    Account, Arithmetic, Budget, Currency, Formula, Fringe, Group, GroupRules, UnitDef,
+    Account, Arithmetic, Budget, Currency, CutoffFactor, Formula, Fringe, Group, GroupRules,
+    UnitDef,
 };
 use crate::report::{Report, RowTotals};
 use crate::Cents;
@@ -36,6 +38,7 @@ struct Key {
     globals: BTreeMap<String, Formula>,
     units: BTreeMap<String, UnitDef>,
     fringes: BTreeMap<String, Fringe>,
+    cutoff_factor: CutoffFactor,
     groups: BTreeMap<String, Group>,
     group_rules: GroupRules,
     opts: RecalcOptions,
@@ -50,6 +53,7 @@ impl Key {
             globals: b.globals.clone(),
             units: b.units.clone(),
             fringes: b.fringes.clone(),
+            cutoff_factor: b.cutoff_factor,
             groups: b.groups.clone(),
             group_rules: b.group_rules,
             opts: opts.clone(),
@@ -63,6 +67,7 @@ impl Key {
             && self.globals == b.globals
             && self.units == b.units
             && self.fringes == b.fringes
+            && self.cutoff_factor == b.cutoff_factor
             && self.groups == b.groups
             && self.group_rules == b.group_rules
             && self.opts == *opts
@@ -344,6 +349,10 @@ mod tests {
             sample::fine_decimals(&mut b, seed);
             if seed % 2 == 1 {
                 b.fringe_posting = FringePosting::Account;
+            }
+            // Cutoffs times a factor that can land on half a cent.
+            if seed > 2 {
+                b.cutoff_factor = crate::model::CutoffFactor::OneAndAHalf;
             }
             let opts = RecalcOptions::default();
             let mut cache = RecalcCache::new();

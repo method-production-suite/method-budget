@@ -664,6 +664,34 @@ pub fn set_arithmetic<R: Runtime>(
     })
 }
 
+/// What every percent fringe's cutoff is multiplied by (decisions.md, entry
+/// 59): `value` is `1.0`, `1.5`, `2.0`, `2.5` or `3.0`.
+#[tauri::command]
+pub fn set_cutoff_factor<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    value: String,
+) -> CmdResult {
+    edit_budget(&window, &state, doc, "Change the cutoff factor", |b| {
+        edit::set_cutoff_factor(b, &value)
+    })
+}
+
+/// The budget's fringe row: its account number, description and place on
+/// the topsheet (decisions.md, entry 59).
+#[tauri::command]
+pub fn set_fringe_row<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    row: edit::FringeRowInput,
+) -> CmdResult {
+    edit_budget(&window, &state, doc, "Change the fringe row", |b| {
+        edit::set_fringe_row(b, &row)
+    })
+}
+
 /// The fringes of categories after the last production total (decisions.md,
 /// entry 56): `value` is `keep` or `drop`.
 #[tauri::command]
@@ -1384,6 +1412,8 @@ pub fn run() {
             set_fringe_posting,
             set_arithmetic,
             set_trailing_level_fringes,
+            set_cutoff_factor,
+            set_fringe_row,
             set_account_coding,
             set_totals_currency,
             lock_baseline,

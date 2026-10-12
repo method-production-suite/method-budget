@@ -207,9 +207,10 @@ impl Chart {
     }
 
     /// A new budget titled `title` holding this chart and nothing else: no
-    /// lines, setup or charges (our default units, as every new budget has).
+    /// lines, setup or charges, with the settings every new budget starts
+    /// with ([`crate::starter::blank`]) but the chart's own account numbers.
     pub fn to_budget(&self, title: &str, base_currency: &str) -> Budget {
-        let mut b = Budget::new(title.trim(), base_currency);
+        let mut b = crate::starter::blank(title.trim(), base_currency);
         b.account_coding = self.coding;
         b.topsheet = self
             .rows
@@ -585,7 +586,7 @@ pub fn split_code(coding: &AccountCoding, code: &str) -> Result<Vec<String>, Str
         coding.set_width,
     ]
     .into_iter()
-    .take_while(|w| *w > 0)
+    .filter(|w| *w > 0)
     .map(usize::from)
     .collect();
     let raw: Vec<String> = if code.chars().any(is_separator) {

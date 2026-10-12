@@ -75,6 +75,12 @@ pub struct Budget {
     /// categories after the last production total: kept (the default) or
     /// dropped, as Movie Magic Budgeting does (decisions.md, entry 56).
     pub trailing_level_fringes: TrailingFringes,
+    /// What every percent fringe's cutoff is multiplied by (decisions.md,
+    /// entry 59). 1.0 unless the budget says otherwise.
+    pub cutoff_factor: CutoffFactor,
+    /// The account number, description and place of the budget's one
+    /// fringe row, when fringes post by budget (decisions.md, entry 59).
+    pub fringe_row: FringeRow,
     /// How totals are worked out: as Movie Magic Budgeting does (binary
     /// doubles, the default) or in exact decimals (decisions.md, entry 55).
     pub arithmetic: Arithmetic,
@@ -154,6 +160,8 @@ impl Budget {
             fringes: BTreeMap::new(),
             fringe_posting: FringePosting::default(),
             trailing_level_fringes: TrailingFringes::default(),
+            cutoff_factor: CutoffFactor::default(),
+            fringe_row: FringeRow::default(),
             arithmetic: Arithmetic::default(),
             account_coding: AccountCoding::default(),
             new_line_defaults: NewLineDefaults::default(),
@@ -195,7 +203,10 @@ impl Budget {
     }
 }
 
-/// Our starter units. Hours equivalences are editable per budget (decisions.md).
+/// The starter units a new budget has, as the reference product starts
+/// them (decisions.md, entry 59): a Day is 12 hours, a Week 60, a Month 240
+/// and an Hour 1; Allow and Flat have no hours. Hours are editable per
+/// budget, and a budget file keeps its own units.
 pub fn default_units() -> BTreeMap<String, UnitDef> {
     let u = |plural: &str, hours: Option<i64>| UnitDef {
         plural: plural.into(),
@@ -204,11 +215,11 @@ pub fn default_units() -> BTreeMap<String, UnitDef> {
     };
     BTreeMap::from([
         ("Allow".into(), u("Allow", None)),
-        ("Day".into(), u("Days", Some(10))),
+        ("Day".into(), u("Days", Some(12))),
         ("Flat".into(), u("Flat", None)),
         ("Hour".into(), u("Hours", Some(1))),
-        ("Month".into(), u("Months", Some(200))),
-        ("Week".into(), u("Weeks", Some(50))),
+        ("Month".into(), u("Months", Some(240))),
+        ("Week".into(), u("Weeks", Some(60))),
     ])
 }
 
@@ -382,6 +393,145 @@ impl TrailingFringes {
         TrailingFringes::ALL
             .into_iter()
             .find(|t| t.name() == name.trim())
+    }
+}
+
+/// What every percent fringe's cutoff is multiplied by, as the reference
+/// product's percentage fringe cutoff factor does (decisions.md, entry 59):
+/// a 2,222.22 cutoff at 1.5 is 3,333.33. Flat fringes have no cutoff, so it
+/// changes nothing for them. A budget setting, saved with the file only
+/// when it isn't 1.0; versions carry it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CutoffFactor {
+    /// 1.0: cutoffs as typed. The default.
+    #[default]
+    One,
+    /// 1.5.
+    OneAndAHalf,
+    /// 2.0.
+    Two,
+    /// 2.5.
+    TwoAndAHalf,
+    /// 3.0.
+    Three,
+}
+
+impl CutoffFactor {
+    pub const ALL: [CutoffFactor; 5] = [
+        CutoffFactor::One,
+        CutoffFactor::OneAndAHalf,
+        CutoffFactor::Two,
+        CutoffFactor::TwoAndAHalf,
+        CutoffFactor::Three,
+    ];
+
+    /// The name files and commands use: `1.0`, `1.5`, `2.0`, `2.5` or `3.0`.
+    pub fn name(self) -> &'static str {
+        match self {
+            CutoffFactor::One => "1.0",
+            CutoffFactor::OneAndAHalf => "1.5",
+            CutoffFactor::Two => "2.0",
+            CutoffFactor::TwoAndAHalf => "2.5",
+            CutoffFactor::Three => "3.0",
+        }
+    }
+
+    /// The factor written as a number (`1.5`, `2`, `2.00`, `3.0`), or
+    /// `None` when it isn't one of the five.
+    pub fn parse(text: &str) -> Option<CutoffFactor> {
+        let d: Dec = text.trim().parse().ok()?;
+        CutoffFactor::ALL.into_iter().find(|f| f.value() == d)
+    }
+
+    /// The factor as a number.
+    pub fn value(self) -> Dec {
+        let tenths = match self {
+            CutoffFactor::One => 10,
+            CutoffFactor::OneAndAHalf => 15,
+            CutoffFactor::Two => 20,
+            CutoffFactor::TwoAndAHalf => 25,
+            CutoffFactor::Three => 30,
+        };
+        Dec::from_int(tenths)
+            .checked_div(Dec::from_int(10))
+            .unwrap_or(Dec::ONE)
+    }
+}
+
+/// The budget's one fringe row when fringes post by budget (decisions.md,
+/// entry 59): an account number (none by default), a description ("Total
+/// Fringes" by default) and its place on the topsheet. Display only: where
+/// it shows never changes a total, ATL or BTL. A budget setting, saved with
+/// the file only when it isn't the default; versions carry it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct FringeRow {
+    /// Account number shown on the row, or `None` for none.
+    pub account: Option<String>,
+    /// What the row says, or `None` for [`FringeRow::DEFAULT_DESCRIPTION`].
+    pub description: Option<String>,
+    /// Where it shows: just above topsheet row `n` (categories and
+    /// production totals counted from 0; the topsheet's length or more puts
+    /// it after the last of them). `None`, the default, shows it after the
+    /// above- and below-the-line summary rows.
+    pub position: Option<usize>,
+}
+
+impl FringeRow {
+    /// What the row says when the budget doesn't say otherwise.
+    pub const DEFAULT_DESCRIPTION: &'static str = "Total Fringes";
+
+    /// What the row says.
+    pub fn description(&self) -> &str {
+        self.description
+            .as_deref()
+            .filter(|d| !d.trim().is_empty())
+            .unwrap_or(FringeRow::DEFAULT_DESCRIPTION)
+    }
+
+    /// The account number shown on the row, if any.
+    pub fn account(&self) -> Option<&str> {
+        self.account.as_deref().filter(|a| !a.trim().is_empty())
+    }
+
+    pub fn is_default(&self) -> bool {
+        *self == FringeRow::default()
+    }
+
+    /// The topsheet row the fringe row shows above, for a topsheet of
+    /// `len` rows (`len` itself: after the last one); `None` after the
+    /// summary rows, its default place.
+    pub fn above(&self, len: usize) -> Option<usize> {
+        self.position.map(|p| p.min(len))
+    }
+
+    /// Keeps the row in place when a topsheet row is inserted at `at`.
+    pub fn row_inserted(&mut self, at: usize) {
+        if let Some(p) = &mut self.position {
+            if *p >= at {
+                *p += 1;
+            }
+        }
+    }
+
+    /// Keeps the row in place when the topsheet row at `at` is removed.
+    pub fn row_removed(&mut self, at: usize) {
+        if let Some(p) = &mut self.position {
+            if *p > at {
+                *p -= 1;
+            }
+        }
+    }
+
+    /// Keeps the row above the same topsheet row when the rows are put in
+    /// a new order (`order[new]` is the old index of the row now at `new`).
+    /// After the last row, it stays after the last row.
+    pub fn rows_reordered(&mut self, order: &[usize]) {
+        if let Some(p) = &mut self.position {
+            *p = order
+                .iter()
+                .position(|&old| old == *p)
+                .unwrap_or(order.len());
+        }
     }
 }
 
@@ -1051,6 +1201,8 @@ pub struct BudgetSnapshot {
     pub fringes: BTreeMap<String, Fringe>,
     pub fringe_posting: FringePosting,
     pub trailing_level_fringes: TrailingFringes,
+    pub cutoff_factor: CutoffFactor,
+    pub fringe_row: FringeRow,
     pub arithmetic: Arithmetic,
     pub account_coding: AccountCoding,
     pub new_line_defaults: NewLineDefaults,
@@ -1080,6 +1232,8 @@ impl Budget {
             fringes,
             fringe_posting,
             trailing_level_fringes,
+            cutoff_factor,
+            fringe_row,
             arithmetic,
             account_coding,
             new_line_defaults,
@@ -1116,6 +1270,8 @@ impl Budget {
             fringes: fringes.clone(),
             fringe_posting: fringe_posting.clone(),
             trailing_level_fringes: *trailing_level_fringes,
+            cutoff_factor: *cutoff_factor,
+            fringe_row: fringe_row.clone(),
             arithmetic: *arithmetic,
             account_coding: *account_coding,
             new_line_defaults: *new_line_defaults,
@@ -1145,6 +1301,8 @@ impl Budget {
             fringes,
             fringe_posting,
             trailing_level_fringes,
+            cutoff_factor,
+            fringe_row,
             arithmetic,
             account_coding,
             new_line_defaults,
@@ -1181,6 +1339,8 @@ impl Budget {
             fringes,
             fringe_posting,
             trailing_level_fringes,
+            cutoff_factor,
+            fringe_row,
             arithmetic,
             account_coding,
             new_line_defaults,
@@ -1255,6 +1415,8 @@ impl BudgetSnapshot {
             fringes,
             fringe_posting,
             trailing_level_fringes,
+            cutoff_factor,
+            fringe_row,
             arithmetic,
             account_coding,
             new_line_defaults,
@@ -1279,6 +1441,8 @@ impl BudgetSnapshot {
             fringes,
             fringe_posting,
             trailing_level_fringes,
+            cutoff_factor,
+            fringe_row,
             arithmetic,
             account_coding,
             new_line_defaults,

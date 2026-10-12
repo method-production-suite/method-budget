@@ -4,13 +4,16 @@
   "budget": {
     "title": "DISNEY",
     "base_currency": "USD",
+    "fringe_posting": {
+      "kind": "budget"
+    },
     "units": {
       "Allow": {
         "plural": "Allow"
       },
       "Day": {
         "plural": "Days",
-        "hours": "10"
+        "hours": "12"
       },
       "Flat": {
         "plural": "Flat"
@@ -21,11 +24,11 @@
       },
       "Month": {
         "plural": "Months",
-        "hours": "200"
+        "hours": "240"
       },
       "Week": {
         "plural": "Weeks",
-        "hours": "50"
+        "hours": "60"
       }
     },
     "topsheet": [

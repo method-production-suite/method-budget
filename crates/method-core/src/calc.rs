@@ -26,6 +26,7 @@ use arith::Num;
 pub mod arith;
 pub mod breakdown;
 pub mod cache;
+pub(crate) mod display;
 pub mod explain;
 pub(crate) mod fringes;
 pub(crate) mod lines;
@@ -485,6 +486,13 @@ fn recalc_with(
     let globals = ctx.shown_globals()?;
     let categories = eval_categories_with(&ctx, cache.as_deref_mut())?;
     let ts = topsheet::finish(&ctx, categories)?;
+    // The topsheet in the totals currency, converted row by row.
+    let display = b
+        .totals_currency
+        .as_ref()
+        .is_some_and(|c| *c != b.base_currency)
+        .then(|| display::display_totals(&ctx, &ts, totals_rate).ok())
+        .flatten();
 
     let full_ctx = Ctx {
         unfiltered: true,
@@ -517,5 +525,6 @@ fn recalc_with(
         groups: bd.groups,
         sets: bd.sets,
         locations: bd.locations,
+        display,
     })
 }

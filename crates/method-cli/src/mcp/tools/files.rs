@@ -726,7 +726,10 @@ fn new_budget(ctx: &mut Ctx, a: &Args) -> ToolResult {
             )
         }
         None if a.str("from") == Some("blank") => (
-            Budget::new("Untitled", currency.clone().unwrap_or_else(|| "USD".into())),
+            method_core::starter::blank(
+                "Untitled",
+                currency.clone().unwrap_or_else(|| "USD".into()),
+            ),
             "blank".to_string(),
         ),
         None => (method_core::starter::budget(), "starter".to_string()),

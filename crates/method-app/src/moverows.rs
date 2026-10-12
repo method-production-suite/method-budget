@@ -267,6 +267,8 @@ pub fn shift_topsheet_rows(b: &mut Budget, indexes: &[usize], by: i32) -> EditRe
             .map(Some)
             .collect();
         b.topsheet = order.iter().filter_map(|&i| old[i].take()).collect();
+        // The budget's fringe row stays above the row it was above.
+        b.fringe_row.rows_reordered(&order);
     }
     Ok(Moved {
         items: places,

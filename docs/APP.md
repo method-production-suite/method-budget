@@ -86,9 +86,15 @@ which files are in which pane and the target are reopened at the next start.
 The window has three levels, with a breadcrumb above the grid:
 
 1. **Topsheet**: categories with their totals, production totals (the first one ends
-   above-the-line), then the summary rows: above and below-the-line totals, charges, the
-   grand total, credits and the net total (Budget Setup > Settings > Numbers on screen can leave
-   out the above and below-the-line rows and the net total).
+   above-the-line), then the summary rows: above and below-the-line totals, the budget's
+   fringe row (fringes posted by budget), charges newest first, the grand total, credits in
+   reverse application order with a Sub Total when there are two or more, and the net total
+   (Budget Setup > Settings > Numbers on screen can leave out the above and below-the-line
+   rows and the net total). The budget's fringe row shows its account number and
+   description (no number and "Total Fringes" unless Settings > Fringe totals says
+   otherwise) and can be placed above any topsheet row instead; it is the same figure
+   wherever it shows and never changes a total (decisions.md, entry 59). The printed
+   topsheet follows the same order.
 2. **Accounts** in one category with each account's fringes and total. When fringes post
    by category, the category's fringe account is a bold row before the category total;
    when they post by account, the Fringes column is part of each account's total.
@@ -125,7 +131,14 @@ starts at an exchange rate of 1, and a message says to set its rate); a name typ
 other capitals is written the way setup spells it. "Create global" asks for the global's
 value in a small box next to the cell, then adds the global and sets the cell as one undo
 step; Cancel goes back to the cell with the formula as typed. A formula that names an
-unknown global without creating it is kept and flagged, as before.
+unknown global without creating it is kept and flagged, as before. Two kinds are refused
+as you commit them, with a message, and nothing changes (decisions.md, entry
+59): one that divides by zero (`SHOOT_DAYS / 0`), and one that uses a global that refers
+back to itself through other globals. A global's formula is refused the same way when it
+divides by zero or would make globals refer to each other. A global that does anyway (from
+a file) shows #ERR in the Globals table and counts as 0; `method check` still names it.
+When the Amt typed is exactly a global with a unit (Budget Setup > Globals, its details)
+and the line's Unit is empty, the Unit fills with that unit.
 
 **New lines.** An inserted line starts with an empty description (the cell shows a hint)
 and copies tags from the nearest line above it, or below it when there is none above.
@@ -485,8 +498,14 @@ in this window's local storage, and blank signs nothing. Every change is one und
 numbers, what new lines copy, numbers on screen; the base and totals currency are the
 Currency tab's band) and the baseline, as in the setup tabs
 before. Settings > Calculation sets the rounding (Spreadsheet (binary), the default, or
-Exact decimal) and whether the fringes of categories after the last production total are
-kept or dropped; each change is one undo step. **Charges**: two switches per charge, saved in the budget, add to its topsheet label
+Exact decimal), the percent fringe cutoff factor (1.0, the default, 1.5, 2.0, 2.5 or 3.0:
+every percent fringe's cutoff is multiplied by it) and whether the fringes of categories
+after the last production total are kept or dropped; each change is one undo step. With
+fringes posted by budget, Settings > Fringe totals also has the fringe row's number,
+description and place (after the summary rows, or above any topsheet row); adding or
+removing topsheet rows above it keeps it above the same row. A new budget posts fringes
+by budget, numbers accounts category 2, account 2, set 3, and starts with a Day of 12
+hours, a Week of 60 and a Month of 240 (decisions.md, entry 59). **Charges**: two switches per charge, saved in the budget, add to its topsheet label
 (screen and printed): the percent (percent charges, "Contingency 10%") and the amount left
 out ("(excluding 25,000.00)"). The charge's **Left out** table lists the typed amounts, the
 groups (each with its own amount in the charge's base as the totals stand now: its counted
@@ -725,7 +744,11 @@ The setup lists' counts, order and short codes, in `src/setup_lists.rs` (both wi
 
 The group rules are one command, `set_group_rule` (`rule`: `ungrouped_lines`, `conflict`
 or `fringes_in_totals`; `value`: `include` or `exclude`; returns the View), one undo
-step each. `set_credit`'s rows take a `source` of `{kind: "category", category}` besides
+step each. The cutoff factor is `set_cutoff_factor` (`value`: `1.0`, `1.5`, `2.0`, `2.5`
+or `3.0`), and the budget's fringe row `set_fringe_row` (`row`: `{account, description,
+position}`; blank text is none or the default description, `position` `null` or a
+topsheet row from 0 up to the number of rows); each returns the View and is one undo
+step. `set_credit`'s rows take a `source` of `{kind: "category", category}` besides
 `flat` and `group`; the credit itself takes `excluded_fringes` (one list for all its group
 and category rows).
 

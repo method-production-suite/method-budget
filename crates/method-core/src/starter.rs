@@ -1,13 +1,39 @@
 //! The starter budget for new files (`method new` and the app's New): our own small
 //! chart of accounts with placeholder rates to replace. Not derived from any
 //! vendor template.
+//!
+//! Every new budget, the starter or an empty one ([`blank`]), starts with
+//! the reference product's new-budget settings (decisions.md, entry 59):
+//! fringes posted by budget, account numbers of category 2, account 2 and
+//! set 3, the starter units (a Day of 12 hours, a Week of 60, a Month of
+//! 240, an Hour; Allow and Flat with no hours), a new line copying its
+//! fringes from the line above, and a cutoff factor of 1.0. A budget file
+//! keeps its own settings: these are only where a new one starts.
 
 use std::collections::BTreeSet;
 
+use crate::coding::AccountCoding;
 use crate::model::{
-    Account, Budget, Category, Charge, ChargeKind, Detail, Fringe, FringeKind, ProductionTotal,
-    TopsheetRow,
+    default_units, Account, Budget, Category, Charge, ChargeKind, CutoffFactor, Detail, Fringe,
+    FringeKind, FringePosting, NewLineDefaults, ProductionTotal, TopsheetRow,
 };
+
+/// Gives `b` the settings a new budget starts with (the module docs).
+pub fn new_budget_settings(b: &mut Budget) {
+    b.fringe_posting = FringePosting::Budget;
+    b.account_coding = AccountCoding::new_budget();
+    b.units = default_units();
+    b.new_line_defaults = NewLineDefaults::default();
+    b.cutoff_factor = CutoffFactor::One;
+}
+
+/// A new, empty budget titled `title` in `base_currency`, with the
+/// new-budget settings (the module docs) and nothing else.
+pub fn blank(title: impl Into<String>, base_currency: impl Into<String>) -> Budget {
+    let mut b = Budget::new(title, base_currency);
+    new_budget_settings(&mut b);
+    b
+}
 
 fn category(code: &str, name: &str, accounts: Vec<Account>) -> TopsheetRow {
     TopsheetRow::Category(Category {
@@ -33,7 +59,7 @@ fn account(code: &str, name: &str, details: Vec<Detail>) -> Account {
 
 /// A fresh starter budget. Row ids start at 1 and are unique.
 pub fn budget() -> Budget {
-    let mut b = Budget::new("Untitled feature", "USD");
+    let mut b = blank("Untitled feature", "USD");
     for (name, value) in [
         ("PREP_WEEKS", "4"),
         ("SHOOT_DAYS", "25"),
@@ -176,7 +202,46 @@ pub fn budget() -> Budget {
 mod tests {
     use std::collections::BTreeSet;
 
-    use crate::{recalc, RecalcOptions};
+    use crate::coding::AccountCoding;
+    use crate::{recalc, CutoffFactor, Dec, FringePosting, RecalcOptions};
+
+    /// A new budget starts as the reference product starts one
+    /// (decisions.md, entry 59).
+    #[test]
+    fn new_budgets_start_with_the_reference_settings() {
+        for b in [super::budget(), super::blank("New", "USD")] {
+            assert_eq!(b.fringe_posting, FringePosting::Budget);
+            assert_eq!(b.account_coding, AccountCoding::new_budget());
+            assert_eq!(
+                (
+                    b.account_coding.category_width,
+                    b.account_coding.account_width,
+                    b.account_coding.sub_width,
+                    b.account_coding.set_width
+                ),
+                (2, 2, 0, 3)
+            );
+            assert_eq!(b.cutoff_factor, CutoffFactor::One);
+            let n = b.new_line_defaults;
+            assert!(n.fringes && !n.groups && !n.location && !n.set && !n.currency);
+            let hours: Vec<(&str, Option<Dec>)> = b
+                .units
+                .iter()
+                .map(|(name, u)| (name.as_str(), u.hours))
+                .collect();
+            assert_eq!(
+                hours,
+                vec![
+                    ("Allow", None),
+                    ("Day", Some(Dec::from_int(12))),
+                    ("Flat", None),
+                    ("Hour", Some(Dec::from_int(1))),
+                    ("Month", Some(Dec::from_int(240))),
+                    ("Week", Some(Dec::from_int(60))),
+                ]
+            );
+        }
+    }
 
     #[test]
     fn recalcs_with_unique_ids() {
