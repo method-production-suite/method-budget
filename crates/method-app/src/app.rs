@@ -83,21 +83,6 @@ pub(crate) fn edit_budget<R: Runtime, T>(
     apply(window, state, doc, |s| s.edit(label, f))
 }
 
-/// Like [`edit_budget`], with the step's label worked out from the budget as
-/// it is before the edit (to name a row by its account and line).
-pub(crate) fn edit_budget_as<R: Runtime, T>(
-    window: &WebviewWindow<R>,
-    state: &AppState,
-    doc: Option<DocId>,
-    label: impl FnOnce(&method_core::Budget) -> String,
-    f: impl FnOnce(&mut method_core::Budget) -> edit::EditResult<T>,
-) -> CmdResult {
-    apply(window, state, doc, |s| {
-        let label = label(s.budget());
-        s.edit(label, f)
-    })
-}
-
 // ---------------------------------------------------------------------------
 // Views
 
