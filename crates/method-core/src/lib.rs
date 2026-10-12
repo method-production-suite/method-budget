@@ -15,6 +15,7 @@ pub mod diff;
 pub mod edit;
 pub mod expr;
 pub mod folders;
+pub mod log;
 pub mod merge;
 pub mod model;
 pub mod order;

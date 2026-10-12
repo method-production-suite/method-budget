@@ -224,6 +224,13 @@ ref = ["2.8", "D35"]
 # ---------------------------------------------------------------- versions
 
 [[feature]]
+group = "editor"
+title = "Signed and notarized Mac app"
+text = "The Mac app is signed and notarized by Apple, so it opens like any other app with no extra security step."
+status = "have"
+ref = "1.21"
+
+[[feature]]
 group = "versions"
 title = "Named versions"
 text = "Save, rename, annotate and restore versions, all kept inside the budget file."
@@ -408,12 +415,6 @@ ref = ["3.2", "D44"]
 
 # ---------------------------------------------------------------- soon
 
-[[feature]]
-group = "editor"
-title = "Signed and notarized Mac app"
-text = "Install on a Mac without the one-time security step."
-status = "soon"
-ref = "1.21"
 
 [[feature]]
 group = "editor"
@@ -449,3 +450,24 @@ title = "Accessibility and translations"
 text = "A full accessibility pass and the app in more languages."
 status = "soon"
 ref = "3.14"
+
+[[feature]]
+group = "versions"
+title = "Work on a budget together"
+text = "Several people in one budget at once, through a shared Dropbox or iCloud folder or a live link, with who changed what and undo that only takes back your own edits."
+status = "soon"
+ref = "3.18"
+
+[[feature]]
+group = "fringes"
+title = "Rate card lookup"
+text = "Pick a union classification and fill in the rate from public rate cards, with the source and effective date shown."
+status = "soon"
+ref = "3.9"
+
+[[feature]]
+group = "setup"
+title = "New project window"
+text = "Start a budget from one window with its title, chart of accounts, schedule, currency and rate setup, ready to fill in."
+status = "soon"
+ref = "3.19"

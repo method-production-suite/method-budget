@@ -84,6 +84,7 @@ this section.
 - **Find and replace.** Search descriptions, account numbers, fringes, globals, groups, notes and formulas, then replace only in the results you tick, as one undo step.
 - **Copy rows with everything on them.** Rows keep their fringes, groups, notes, style and ranges when copied, even between budgets, with a review of what the paste will change.
 - **Notes.** Dated notes on lines, accounts and categories, and a notes list that works as a review checklist.
+- **Signed and notarized Mac app.** The Mac app is signed and notarized by Apple, so it opens like any other app with no extra security step.
 
 ### Versions, compare, diff and merge
 
@@ -127,12 +128,14 @@ this section.
 
 ### On the roadmap
 
-- **Signed and notarized Mac app.** Install on a Mac without the one-time security step.
 - **Windows and Linux, tested.** Installers for both are built today; printing, keys and file types still need a hands-on check.
 - **Review files.** A reviewer marks up a read-only copy, and their comments come back in a small file you merge.
 - **Incentive modeling.** Qualified spend by location, several programs side by side, caps and what-ifs, from rules you enter yourself.
 - **Schedule-linked quantities.** Read day counts from a schedule's export and let them drive your globals.
 - **Accessibility and translations.** A full accessibility pass and the app in more languages.
+- **Work on a budget together.** Several people in one budget at once, through a shared Dropbox or iCloud folder or a live link, with who changed what and undo that only takes back your own edits.
+- **Rate card lookup.** Pick a union classification and fill in the rate from public rate cards, with the source and effective date shown.
+- **New project window.** Start a budget from one window with its title, chart of accounts, schedule, currency and rate setup, ready to fill in.
 
 <!-- features:end -->
 

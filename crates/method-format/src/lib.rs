@@ -21,6 +21,9 @@ pub mod export;
 /// Spreadsheet import (Excel workbook, CSV, tab-delimited) with a column
 /// mapping. Read by hand: our own inflate, ZIP and XML readers.
 pub mod import;
+/// The change log on disk beside a shared budget (docs/FORMAT.md, "The
+/// change log").
+pub mod log;
 /// Setup items between budgets (dependency walk, conflict review, import),
 /// setup packs, and setup lists as spreadsheets.
 pub mod setup;

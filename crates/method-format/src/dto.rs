@@ -575,7 +575,7 @@ impl From<FilePackInfo> for PackInfo {
 /// when empty.
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct FileItemSource {
+pub(crate) struct FileItemSource {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pack: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -698,7 +698,7 @@ impl From<FileGlobalInfo> for GlobalInfo {
 /// the default; each field is left out at its default.
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct FileDisplay {
+pub(crate) struct FileDisplay {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     rate_cutoff: Option<DecStr>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -754,7 +754,7 @@ impl From<FileDisplay> for DisplayPrefs {
 /// out when its table is in byte order; the object when all are.
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct FileSetupOrder {
+pub(crate) struct FileSetupOrder {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     units: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -1029,7 +1029,7 @@ impl From<&Version> for FileVersion {
 /// Written only when it differs from the default; then every field is present.
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct FileCoding {
+pub(crate) struct FileCoding {
     category_width: u8,
     account_width: u8,
     sub_width: u8,
@@ -1072,7 +1072,7 @@ impl From<FileCoding> for AccountCoding {
 /// differs from the default; then every field is present.
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct FileNewLineDefaults {
+pub(crate) struct FileNewLineDefaults {
     fringes: bool,
     groups: bool,
     set: bool,
@@ -1261,7 +1261,7 @@ impl From<FileInclusion> for Inclusion {
 /// rule that is.
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct FileGroupRules {
+pub(crate) struct FileGroupRules {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     ungrouped_lines: Option<FileInclusion>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1296,7 +1296,7 @@ impl From<FileGroupRules> for GroupRules {
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-enum FilePosting {
+pub(crate) enum FilePosting {
     Budget {},
     ProductionLevel {},
     Category { suffix: String },
@@ -1329,7 +1329,7 @@ impl From<FilePosting> for FringePosting {
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-enum FileInfo {
+pub(crate) enum FileInfo {
     Text { value: String },
     Number { value: DecStr },
     Date { value: String },
@@ -2411,7 +2411,7 @@ impl From<FileCreditRow> for CreditRow {
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct FileBaseline {
+pub(crate) struct FileBaseline {
     /// Keyed by row id; JSON object keys are strings, so ids are written as `"17"`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     rows: BTreeMap<RowId, Cents>,
@@ -2999,7 +2999,7 @@ impl From<FileTagPreset> for TagPreset {
 /// A saved block of rows, with the setup items they use.
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct FileLinePreset {
+pub(crate) struct FileLinePreset {
     name: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     rows: Vec<FileBlockRow>,
