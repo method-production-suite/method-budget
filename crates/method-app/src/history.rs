@@ -4,43 +4,19 @@
 //! or redo to it); and saving any step as a named version without changing
 //! the budget as it is now.
 //!
-//! The steps themselves live in the session's undo and redo stacks
-//! (src/session.rs): each keeps its label and time beside what it changed.
-//! This module names steps (the helpers every command uses for its label)
-//! and holds the three commands the History tab calls (ui/js/history.js).
-//! The tools window may list the steps; jumping and saving a version run in
-//! the main window, like Undo (decisions.md, entry 24).
+//! Naming steps and saving a step as a version are method-session's
+//! `history` module (re-exported here); these are the three commands the
+//! History tab calls (ui/js/history.js). The tools window may list the
+//! steps; jumping and saving a version run in the main window, like Undo
+//! (decisions.md, entry 24).
 
-use std::sync::Arc;
-
-use method_core::Budget;
 use tauri::{Runtime, State, WebviewWindow};
 
-use crate::app::{finish, AppState, DocId};
+use crate::app::{apply, finish, AppState, DocId};
 use crate::session::History;
 use crate::view::View;
 
 pub use method_session::history::*;
-
-// ---------------------------------------------------------------------------
-// Saving a step as a version
-
-/// Saves `past` (the budget as it was at some step) as a new version of `b`,
-/// named and noted as the Versions dialog checks names and notes. Returns its
-/// id. Only the version list of `b` changes.
-pub fn save_step_as_version(
-    b: &mut Budget,
-    past: &Budget,
-    name: &str,
-    note: Option<&str>,
-    created: &str,
-) -> crate::edit::EditResult<method_core::VersionId> {
-    let id = crate::versions::save(b, name, note, created)?;
-    if let Some(v) = b.versions.iter_mut().find(|v| v.id == id) {
-        v.budget = Arc::new(past.snapshot());
-    }
-    Ok(id)
-}
 
 // ---------------------------------------------------------------------------
 // Commands (registered in app.rs, build.rs and capabilities/main.json; the
@@ -80,65 +56,13 @@ pub fn history_save_version<R: Runtime>(
     note: Option<String>,
     created: String,
 ) -> Result<View, String> {
-    let mut s = state.lock_doc(doc)?;
-    let checked = crate::versions::check_name(&name)?;
-    let past = s.budget_at(step)?;
-    let label = format!("Save version \u{201c}{checked}\u{201d} from the history");
-    s.edit(label, |b| {
-        save_step_as_version(b, &past, &checked, note.as_deref(), &created)
-    })?;
-    Ok(finish(&window, &mut s, None))
+    apply(&window, &state, doc, |s| {
+        method_session::history::history_save_version(s, step, &name, note.as_deref(), &created)
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::session::Session;
-    use method_core::{RowId, RowKind};
-
-    const AT: &str = "2026-10-09T14:30:00-07:00";
-
-    fn first_line(s: &Session) -> RowId {
-        crate::edit::details(s.budget())
-            .find(|d| d.kind == RowKind::Line)
-            .unwrap()
-            .id
-    }
-
-    #[test]
-    fn a_step_saved_as_a_version_keeps_the_budget_as_it_is() {
-        let mut s = Session::new();
-        let id = first_line(&s);
-        s.set_detail_field(id, "rate", "100").unwrap();
-        let at_one = s.budget().clone();
-        s.set_detail_field(id, "rate", "200").unwrap();
-        let now = s.budget().clone();
-        let past = s.budget_at(1).unwrap();
-        s.edit("Save version", |b| {
-            save_step_as_version(b, &past, " Rate at 100 ", Some("first try"), AT)
-        })
-        .unwrap();
-        // The content is unchanged; the new version holds the step's content.
-        let b = s.budget();
-        assert_eq!(b.snapshot(), now.snapshot());
-        let v = b.versions.last().unwrap();
-        assert_eq!(v.name, "Rate at 100");
-        assert_eq!(v.note.as_deref(), Some("first try"));
-        assert_eq!(*v.budget, at_one.snapshot());
-        // One undo step, which takes the version back off.
-        assert_eq!(s.history().steps.len(), 3);
-        s.undo();
-        assert!(s.budget().versions.is_empty());
-        // Names and times are checked as the Versions dialog checks them.
-        let past = s.budget_at(0).unwrap();
-        assert!(s
-            .edit("x", |b| save_step_as_version(b, &past, "  ", None, AT))
-            .is_err());
-        assert!(s
-            .edit("x", |b| save_step_as_version(b, &past, "Ok", None, "soon"))
-            .is_err());
-    }
-
     #[test]
     fn history_commands_are_wired() {
         const APP_RS: &str = include_str!("app.rs");

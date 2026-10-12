@@ -46,6 +46,9 @@ pub struct Docs {
     next_id: DocId,
     /// Two panes side by side, or `None` (one pane, every tab in it).
     split: Option<Split>,
+    /// Every budget is shown read-only (a partner's viewer; see
+    /// [`Docs::set_read_only`]).
+    read_only: bool,
 }
 
 /// Which tabs are in which of the two panes, the budget in front in each,
@@ -126,6 +129,7 @@ impl Docs {
             active: 1,
             next_id: 2,
             split: None,
+            read_only: false,
         }
     }
 
@@ -186,6 +190,20 @@ impl Docs {
             .collect()
     }
 
+    /// Whether every budget is shown read-only.
+    pub fn read_only(&self) -> bool {
+        self.read_only
+    }
+
+    /// Shows every budget read-only, those open now and any opened later,
+    /// or lets them be changed again ([`Session::set_held_read_only`]).
+    pub fn set_read_only(&mut self, on: bool) {
+        self.read_only = on;
+        for d in &mut self.tabs {
+            d.session.set_held_read_only(on);
+        }
+    }
+
     fn new_id(&mut self) -> DocId {
         let id = self.next_id;
         self.next_id += 1;
@@ -194,7 +212,8 @@ impl Docs {
 
     /// Opens `s` as a new tab at the end (of the target pane, when split)
     /// and brings it to the front.
-    pub fn add(&mut self, s: Session) -> DocId {
+    pub fn add(&mut self, mut s: Session) -> DocId {
+        s.set_held_read_only(self.read_only);
         let id = self.new_id();
         self.tabs.push(Doc { id, session: s });
         self.active = id;
@@ -207,7 +226,8 @@ impl Docs {
 
     /// Puts `s` in the place of tab `id`, as a new document (a new id), and
     /// brings it to the front. Returns the new id and the session it replaced.
-    pub fn replace(&mut self, id: DocId, s: Session) -> Result<(DocId, Session), String> {
+    pub fn replace(&mut self, id: DocId, mut s: Session) -> Result<(DocId, Session), String> {
+        s.set_held_read_only(self.read_only);
         let at = self.index_of(id).ok_or(CLOSED)?;
         let new = self.new_id();
         let old = std::mem::replace(

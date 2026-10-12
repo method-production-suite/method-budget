@@ -14,7 +14,10 @@
 //! Budgets come and go as `.mthd` text ([`Host::open_mthd`],
 //! [`Host::save_mthd`]): where they are kept is the host's business.
 
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 use method_core::RowId;
 use serde::de::DeserializeOwned;
@@ -30,6 +33,8 @@ use crate::edit::{
 };
 use crate::session::Session;
 use crate::view::View;
+
+mod versions;
 
 /// The command contract's version (see the module's notes).
 pub const COMMANDS_VERSION: u32 = 1;
@@ -50,6 +55,7 @@ pub const COMMANDS: &[&str] = &[
     "redo",
     "history_list",
     "history_jump",
+    "history_save_version",
     // Structure
     "set_title",
     "add_category",
@@ -104,9 +110,18 @@ pub const COMMANDS: &[&str] = &[
     "lock_baseline",
     "set_baseline_frozen",
     "clear_baseline",
+    // Phase 1b (docs/research/web-session.md), each module's commands
+    // dispatched in src/host/<module>.rs.
+    // Versions
+    "save_version",
+    "restore_version",
+    "rename_version",
+    "delete_version",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
+    // What the host is (the desktop has it too)
+    "host_info",
 ];
 
 /// Why a command didn't run.
@@ -153,6 +168,52 @@ impl From<String> for Error {
 #[derive(Debug, Default)]
 pub struct Host {
     state: AppState,
+    /// What a module keeps between calls (a picked file by its token, as
+    /// the desktop keeps it in Tauri's state): one of each type, made on
+    /// first use ([`Call::kept`]).
+    #[allow(dead_code)] // until the first module keeps something
+    kept: Mutex<HashMap<TypeId, Arc<dyn Any + Send + Sync>>>,
+}
+
+/// A file the person picked, as a host hands it in where the desktop shows
+/// an Open dialog: the command of the same name takes it as `file`. The
+/// name is only shown (no path).
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct FileIn {
+    pub name: String,
+    pub bytes: Vec<u8>,
+}
+
+/// A file for the person to keep, where the desktop shows a Save dialog
+/// and writes it: the host's command of the same name gives it back, and
+/// the host offers it as a download under `name`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub struct FileOut {
+    pub name: String,
+    pub bytes: Vec<u8>,
+}
+
+/// What `host_info` gives back: which host the page runs in, so it can
+/// hide what only the desktop does (File > Open, printing, pop-out
+/// windows).
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct HostInfo {
+    /// `"desktop"` or `"web"`.
+    pub kind: String,
+    /// [`COMMANDS_VERSION`].
+    pub commands_version: u32,
+    /// Every budget is shown read-only ([`Host::set_read_only`]).
+    pub read_only: bool,
+}
+
+impl HostInfo {
+    pub fn new(kind: &str, read_only: bool) -> HostInfo {
+        HostInfo {
+            kind: kind.to_string(),
+            commands_version: COMMANDS_VERSION,
+            read_only,
+        }
+    }
 }
 
 /// What `save_mthd` gives back.
@@ -173,12 +234,30 @@ impl Host {
     pub fn with(docs: Docs) -> Host {
         Host {
             state: AppState::with(docs),
+            kept: Mutex::default(),
         }
     }
 
     /// Every open budget, for the host's own use.
     pub fn state(&self) -> &AppState {
         &self.state
+    }
+
+    /// Shows every budget read-only (a partner's viewer), those open now
+    /// and any opened later, or lets them be changed again. While on, every
+    /// edit, undo, redo and history jump is refused with a plain message
+    /// and nothing changes.
+    pub fn set_read_only(&self, on: bool) {
+        self.state.docs().set_read_only(on);
+    }
+
+    pub fn read_only(&self) -> bool {
+        self.state.docs().read_only()
+    }
+
+    /// What `host_info` gives back: a web host.
+    pub fn info(&self) -> HostInfo {
+        HostInfo::new("web", self.read_only())
     }
 
     /// Opens `.mthd` text as a budget named `name` (a file name, shown in
@@ -254,6 +333,15 @@ impl Host {
             }),
             "history_list" => json(self.state.lock_doc(doc)?.history()),
             "history_jump" => d.view_with(|s, a: To| s.jump_to(a.to)),
+            "history_save_version" => d.view_with(|s, a: StepVersion| {
+                crate::history::history_save_version(
+                    s,
+                    a.step,
+                    &a.name,
+                    a.note.as_deref(),
+                    &a.created,
+                )
+            }),
             "set_title" => d.view_with(|s, a: Title| cmd::set_title(s, &a.title)),
             "add_category" => {
                 d.view_with(|s, a: AddCategory| cmd::add_category(s, &a.code, &a.name, a.at))
@@ -361,10 +449,21 @@ impl Host {
                 let a: SaveMthd = d.args()?;
                 json(self.save_mthd(doc, a.name.as_deref())?)
             }
-            other => Err(Error::UnknownCommand(other.to_string())),
+            "host_info" => json(self.info()),
+            other => MODULES
+                .iter()
+                .find_map(|f| f(&d))
+                .unwrap_or_else(|| Err(Error::UnknownCommand(other.to_string()))),
         }
     }
 }
+
+/// A module's own commands (src/host/*.rs): `None` when the call names
+/// none of them.
+type Dispatch = fn(&Call<'_>) -> Option<Result<Value, Error>>;
+
+/// The modules moved in phase 1b, each dispatching its own commands.
+const MODULES: &[Dispatch] = &[versions::dispatch];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
 fn stamp(text: &str) -> crate::safety::DiskStamp {
@@ -375,7 +474,7 @@ fn stamp(text: &str) -> crate::safety::DiskStamp {
     }
 }
 
-fn json<T: serde::Serialize>(v: T) -> Result<Value, Error> {
+pub(crate) fn json<T: serde::Serialize>(v: T) -> Result<Value, Error> {
     serde_json::to_value(v).map_err(|e| Error::Refused(e.to_string()))
 }
 
@@ -393,7 +492,7 @@ fn doc_of(command: &str, args: &Value) -> Result<Option<DocId>, Error> {
 }
 
 /// One call being dispatched.
-struct Call<'a> {
+pub(crate) struct Call<'a> {
     host: &'a Host,
     command: &'a str,
     args: Value,
@@ -401,7 +500,37 @@ struct Call<'a> {
 }
 
 impl Call<'_> {
-    fn args<A: DeserializeOwned>(&self) -> Result<A, Error> {
+    /// The command's name.
+    pub(crate) fn command(&self) -> &str {
+        self.command
+    }
+
+    /// The budget the command names (`None`: the one in front).
+    #[allow(dead_code)] // until the first module needs it
+    pub(crate) fn doc(&self) -> Option<DocId> {
+        self.doc
+    }
+
+    /// Every open budget.
+    #[allow(dead_code)] // until the first module needs it
+    pub(crate) fn state(&self) -> &AppState {
+        &self.host.state
+    }
+
+    /// The host's one `T`, made on first use: what a module keeps between
+    /// calls (a picked file by its token).
+    #[allow(dead_code)] // until the first module keeps something
+    pub(crate) fn kept<T: Default + Send + Sync + 'static>(&self) -> Arc<T> {
+        let mut kept = self.host.kept.lock().unwrap_or_else(|e| e.into_inner());
+        let any = kept
+            .entry(TypeId::of::<T>())
+            .or_insert_with(|| Arc::new(T::default()))
+            .clone();
+        any.downcast::<T>()
+            .unwrap_or_else(|_| unreachable!("kept by its own type"))
+    }
+
+    pub(crate) fn args<A: DeserializeOwned>(&self) -> Result<A, Error> {
         // The page sends `{}` or nothing for a command without arguments.
         let args = match &self.args {
             Value::Null => Value::Object(Default::default()),
@@ -413,12 +542,15 @@ impl Call<'_> {
         })
     }
 
-    fn lock(&self) -> Result<DocGuard<'_>, Error> {
+    pub(crate) fn lock(&self) -> Result<DocGuard<'_>, Error> {
         Ok(self.host.state.lock_doc(self.doc)?)
     }
 
     /// Runs `f` on the budget and replies with its view.
-    fn view<T>(&self, f: impl FnOnce(&mut Session) -> EditResult<T>) -> Result<Value, Error> {
+    pub(crate) fn view<T>(
+        &self,
+        f: impl FnOnce(&mut Session) -> EditResult<T>,
+    ) -> Result<Value, Error> {
         let mut s = self.lock()?;
         f(&mut s)?;
         json(s.finish(None))
@@ -426,7 +558,7 @@ impl Call<'_> {
 
     /// Reads the arguments as `A`, runs `f` on the budget and replies with
     /// its view.
-    fn view_with<A: DeserializeOwned, T>(
+    pub(crate) fn view_with<A: DeserializeOwned, T>(
         &self,
         f: impl FnOnce(&mut Session, A) -> EditResult<T>,
     ) -> Result<Value, Error> {
@@ -435,7 +567,7 @@ impl Call<'_> {
     }
 
     /// As [`Call::view_with`], the view noting the row `f` made.
-    fn created<A: DeserializeOwned>(
+    pub(crate) fn created<A: DeserializeOwned>(
         &self,
         f: impl FnOnce(&mut Session, A) -> EditResult<RowId>,
     ) -> Result<Value, Error> {
@@ -472,6 +604,14 @@ struct ChargeArgs {
 #[derive(Deserialize)]
 struct To {
     to: usize,
+}
+
+#[derive(Deserialize)]
+struct StepVersion {
+    step: usize,
+    name: String,
+    note: Option<String>,
+    created: String,
 }
 
 #[derive(Deserialize)]
@@ -789,6 +929,71 @@ mod tests {
         let e = h.dispatch("get_view", json!({"doc": 99})).unwrap_err();
         assert_eq!(e.message(), "That budget has been closed.");
         assert_eq!(call(&h, "get_view", json!({}))["rev"], before);
+    }
+
+    #[test]
+    fn versions_and_a_step_saved_as_a_version() {
+        let h = Host::new();
+        let at = "2026-10-09T14:30:00-07:00";
+        call(&h, "set_title", json!({"title": "One"}));
+        let v = call(
+            &h,
+            "save_version",
+            json!({"name": "First", "note": null, "created": at}),
+        );
+        let id = v["budget"]["versions"][0]["id"].clone();
+        call(&h, "rename_version", json!({"id": id, "name": "Draft"}));
+        call(&h, "set_title", json!({"title": "Two"}));
+        let v = call(
+            &h,
+            "history_save_version",
+            json!({"step": 1, "name": "From the history", "created": at}),
+        );
+        assert_eq!(v["budget"]["title"], "Two", "the content stays as it is");
+        assert_eq!(v["budget"]["versions"][1]["name"], "From the history");
+        let v = call(&h, "restore_version", json!({"id": id, "created": at}));
+        assert_eq!(v["budget"]["title"], "One");
+        let v = call(&h, "delete_version", json!({"id": id}));
+        assert!(v["budget"]["versions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|x| x["name"] != "Draft"));
+    }
+
+    #[test]
+    fn a_read_only_host_refuses_every_edit_and_changes_nothing() {
+        let h = Host::new();
+        call(&h, "set_title", json!({"title": "Mine"}));
+        let info = call(&h, "host_info", json!({}));
+        assert_eq!(info["kind"], "web");
+        assert_eq!(info["commands_version"], COMMANDS_VERSION);
+        assert_eq!(info["read_only"], false);
+
+        h.set_read_only(true);
+        assert_eq!(call(&h, "host_info", json!({}))["read_only"], true);
+        let before = call(&h, "get_view", json!({}));
+        let e = h
+            .dispatch("set_title", json!({"title": "Theirs"}))
+            .unwrap_err();
+        assert_eq!(e.message(), crate::session::HELD_READ_ONLY);
+        let e = h.dispatch("history_jump", json!({"to": 0})).unwrap_err();
+        assert_eq!(e.message(), crate::session::HELD_READ_ONLY);
+        // Undo and redo do nothing; views still come.
+        call(&h, "undo", json!({}));
+        let after = call(&h, "get_view", json!({}));
+        assert_eq!(after["rev"], before["rev"]);
+        assert_eq!(after["budget"]["title"], "Mine");
+
+        // A budget opened later is read-only too, and saving still works.
+        let text = method_format::to_string(&method_core::starter::budget());
+        call(&h, "open_mthd", json!({"name": "Later.mthd", "text": text}));
+        assert!(h.dispatch("set_title", json!({"title": "x"})).is_err());
+        call(&h, "save_mthd", json!({}));
+
+        h.set_read_only(false);
+        let v = call(&h, "set_title", json!({"title": "Editable"}));
+        assert_eq!(v["budget"]["title"], "Editable");
     }
 
     #[test]

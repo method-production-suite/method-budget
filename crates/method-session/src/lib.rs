@@ -22,9 +22,10 @@ pub mod host;
 pub mod report_dto;
 pub mod safety;
 pub mod session;
+pub mod versions;
 pub mod view;
 
 pub use docs::{AppState, DocGuard, DocId, Docs};
-pub use host::{Error, Host, COMMANDS, COMMANDS_VERSION};
+pub use host::{Error, Host, HostInfo, COMMANDS, COMMANDS_VERSION};
 pub use session::Session;
 pub use view::View;

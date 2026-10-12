@@ -9,6 +9,7 @@
 const COMMANDS: &[&str] = &[
     "get_view",
     "get_full_view",
+    "host_info",
     "focus_account",
     "open_budget",
     "save_budget",

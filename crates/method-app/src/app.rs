@@ -112,6 +112,14 @@ pub fn get_view<R: Runtime>(
     Ok(finish(&window, &mut state.lock_doc(doc)?, None))
 }
 
+/// Which host the page runs in: the desktop, with the command contract's
+/// version (`method_session::host`), never read-only. The page will use it
+/// to hide what only the desktop does when it runs in a browser.
+#[tauri::command]
+pub fn host_info(state: State<'_, AppState>) -> method_session::HostInfo {
+    method_session::HostInfo::new("desktop", state.docs().read_only())
+}
+
 /// Everything, every row: for printing. Other commands return the lean view.
 #[tauri::command]
 pub fn get_full_view(state: State<'_, AppState>, doc: Option<DocId>) -> CmdResult<FullView> {
@@ -1226,6 +1234,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_view,
             get_full_view,
+            host_info,
             focus_account,
             open_budget,
             save_budget,

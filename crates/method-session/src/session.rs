@@ -34,6 +34,10 @@ pub const SHARED_STAYS: &str = "A shared budget stays in its shared folder. To g
 pub const READ_ONLY: &str =
     "This is a copy saved for sharing, so it opens read-only. Make an editable copy to change it.";
 
+/// What an edit is told while the host shows budgets read-only
+/// (`Host::set_read_only`).
+pub const HELD_READ_ONLY: &str = "This budget is open read-only here, so it can't be changed.";
+
 /// Undo steps kept. Each step keeps only what its edit changed (see [`Patch`]).
 pub const UNDO_LIMIT: usize = 200;
 
@@ -315,6 +319,9 @@ pub struct Session {
     /// converted from an export: next to the export, under its name with
     /// `.mthd`; decisions.md, entry 67).
     save_hint: Option<PathBuf>,
+    /// The host shows this budget read-only (a partner's viewer): every
+    /// edit, undo and redo is refused ([`HELD_READ_ONLY`]).
+    held: bool,
 }
 
 /// What autosave needs to know about one open budget.
@@ -388,6 +395,7 @@ impl Session {
             notice: None,
             remap: HashMap::new(),
             save_hint: None,
+            held: false,
         }
     }
 
@@ -775,8 +783,26 @@ impl Session {
             .is_some_and(method_core::Provenance::is_shared_copy)
     }
 
-    /// Refused for a copy saved for sharing ([`READ_ONLY`]).
+    /// Whether the host shows this budget read-only
+    /// ([`Session::set_held_read_only`]).
+    pub fn is_held_read_only(&self) -> bool {
+        self.held
+    }
+
+    /// Shows this budget read-only for the host (a partner's viewer), or
+    /// lets it be changed again: while on, every edit, undo, redo and
+    /// history jump is refused ([`HELD_READ_ONLY`]). Set through
+    /// [`crate::docs::Docs::set_read_only`], which covers every tab.
+    pub fn set_held_read_only(&mut self, on: bool) {
+        self.held = on;
+    }
+
+    /// Refused while the host shows budgets read-only ([`HELD_READ_ONLY`])
+    /// and for a copy saved for sharing ([`READ_ONLY`]).
     pub fn check_writable(&self) -> EditResult {
+        if self.held {
+            return Err(HELD_READ_ONLY.into());
+        }
         if self.is_read_only() {
             return Err(READ_ONLY.into());
         }
@@ -872,6 +898,9 @@ impl Session {
     }
 
     pub fn undo(&mut self) -> bool {
+        if self.held {
+            return false;
+        }
         if self.shared.is_some() {
             return self.shared_step(true);
         }
@@ -883,6 +912,9 @@ impl Session {
     }
 
     pub fn redo(&mut self) -> bool {
+        if self.held {
+            return false;
+        }
         if self.shared.is_some() {
             return self.shared_step(false);
         }
@@ -976,6 +1008,9 @@ impl Session {
     /// of the list). One change, however many steps it passes. Refused
     /// when there is no such position.
     pub fn jump_to(&mut self, pos: usize) -> Result<(), String> {
+        if self.held {
+            return Err(HELD_READ_ONLY.into());
+        }
         if let Some(sh) = &self.shared {
             if pos > sh.history_len() {
                 return Err("That step is no longer in the history.".into());

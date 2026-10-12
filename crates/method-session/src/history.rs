@@ -2,10 +2,14 @@
 //! labels its step with what it did ("Edit rate on 21-01 line 3", "Paste 12
 //! rows", "Rename fringe FICA to Payroll"). The steps themselves live in the
 //! session's undo and redo stacks (src/session.rs), each with its label and
-//! time beside what it changed. The History tab's commands are in
-//! src/commands.rs; saving a step as a version is the desktop app's.
+//! time beside what it changed. The History tab's list and jump are in
+//! src/commands.rs; saving a step as a version is here.
+
+use std::sync::Arc;
 
 use method_core::{Budget, RowId, RowKind};
+
+use crate::session::Session;
 
 // ---------------------------------------------------------------------------
 // Step labels
@@ -156,10 +160,48 @@ pub fn rows_phrase(b: &Budget, ids: &[RowId]) -> String {
     )
 }
 
+// ---------------------------------------------------------------------------
+// Saving a step as a version
+
+/// Saves `past` (the budget as it was at some step) as a new version of `b`,
+/// named and noted as the Versions dialog checks names and notes. Returns its
+/// id. Only the version list of `b` changes.
+pub fn save_step_as_version(
+    b: &mut Budget,
+    past: &Budget,
+    name: &str,
+    note: Option<&str>,
+    created: &str,
+) -> crate::edit::EditResult<method_core::VersionId> {
+    let id = crate::versions::save(b, name, note, created)?;
+    if let Some(v) = b.versions.iter_mut().find(|v| v.id == id) {
+        v.budget = Arc::new(past.snapshot());
+    }
+    Ok(id)
+}
+
+/// The History tab's Save as Version: the budget as it was with `step`
+/// steps applied, saved as a new version named `name` (one undo step, like
+/// any version save), leaving its content as it is now. `created` is the
+/// page's local time.
+pub fn history_save_version(
+    s: &mut Session,
+    step: usize,
+    name: &str,
+    note: Option<&str>,
+    created: &str,
+) -> crate::edit::EditResult<method_core::VersionId> {
+    let checked = crate::versions::check_name(name)?;
+    let past = s.budget_at(step)?;
+    let label = format!("Save version \u{201c}{checked}\u{201d} from the history");
+    s.edit(label, |b| {
+        save_step_as_version(b, &past, &checked, note, created)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::session::Session;
 
     fn first_line(s: &Session) -> RowId {
         crate::edit::details(s.budget())
@@ -361,5 +403,41 @@ mod tests {
         assert_eq!(h.steps.len(), crate::session::UNDO_LIMIT);
         assert!(h.trimmed);
         assert_eq!(h.current, crate::session::UNDO_LIMIT);
+    }
+
+    const AT: &str = "2026-10-09T14:30:00-07:00";
+
+    #[test]
+    fn a_step_saved_as_a_version_keeps_the_budget_as_it_is() {
+        let mut s = Session::new();
+        let id = first_line(&s);
+        s.set_detail_field(id, "rate", "100").unwrap();
+        let at_one = s.budget().clone();
+        s.set_detail_field(id, "rate", "200").unwrap();
+        let now = s.budget().clone();
+        let past = s.budget_at(1).unwrap();
+        s.edit("Save version", |b| {
+            save_step_as_version(b, &past, " Rate at 100 ", Some("first try"), AT)
+        })
+        .unwrap();
+        // The content is unchanged; the new version holds the step's content.
+        let b = s.budget();
+        assert_eq!(b.snapshot(), now.snapshot());
+        let v = b.versions.last().unwrap();
+        assert_eq!(v.name, "Rate at 100");
+        assert_eq!(v.note.as_deref(), Some("first try"));
+        assert_eq!(*v.budget, at_one.snapshot());
+        // One undo step, which takes the version back off.
+        assert_eq!(s.history().steps.len(), 3);
+        s.undo();
+        assert!(s.budget().versions.is_empty());
+        // Names and times are checked as the Versions dialog checks them.
+        let past = s.budget_at(0).unwrap();
+        assert!(s
+            .edit("x", |b| save_step_as_version(b, &past, "  ", None, AT))
+            .is_err());
+        assert!(s
+            .edit("x", |b| save_step_as_version(b, &past, "Ok", None, "soon"))
+            .is_err());
     }
 }
