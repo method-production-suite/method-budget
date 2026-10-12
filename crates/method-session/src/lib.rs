@@ -23,6 +23,7 @@ pub mod import_setup;
 pub mod report_dto;
 pub mod safety;
 pub mod session;
+pub mod sheet_import;
 pub mod templates;
 pub mod versions;
 pub mod view;

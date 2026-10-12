@@ -35,6 +35,7 @@ use crate::session::Session;
 use crate::view::View;
 
 mod import_setup;
+mod sheet_import;
 mod templates;
 mod versions;
 
@@ -128,6 +129,10 @@ pub const COMMANDS: &[&str] = &[
     // Import setup
     "import_setup_pick",
     "import_setup",
+    // Import spreadsheet
+    "sheet_import_pick",
+    "sheet_import_preview",
+    "sheet_import",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -477,6 +482,7 @@ const MODULES: &[Dispatch] = &[
     versions::dispatch,
     templates::dispatch,
     import_setup::dispatch,
+    sheet_import::dispatch,
 ];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
@@ -520,7 +526,6 @@ impl Call<'_> {
     }
 
     /// The budget the command names (`None`: the one in front).
-    #[allow(dead_code)] // until the first module needs it
     pub(crate) fn doc(&self) -> Option<DocId> {
         self.doc
     }
