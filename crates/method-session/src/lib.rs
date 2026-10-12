@@ -24,6 +24,7 @@ pub mod library;
 pub mod report_dto;
 pub mod safety;
 pub mod session;
+pub mod sharing;
 pub mod templates;
 pub mod versions;
 pub mod view;

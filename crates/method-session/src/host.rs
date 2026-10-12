@@ -36,6 +36,7 @@ use crate::view::View;
 
 mod b64;
 mod import_setup;
+mod sharing;
 mod templates;
 mod versions;
 
@@ -132,6 +133,12 @@ pub const COMMANDS: &[&str] = &[
     // Import setup
     "import_setup_pick",
     "import_setup",
+    // Sharing
+    "share_copy_save",
+    "share_copy_editable",
+    "share_copy_original",
+    "share_copy_store",
+    "sub_budget_new",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -485,6 +492,7 @@ const MODULES: &[Dispatch] = &[
     versions::dispatch,
     templates::dispatch,
     import_setup::dispatch,
+    sharing::dispatch,
 ];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
