@@ -258,11 +258,12 @@ function categoryNames() {
   return out;
 }
 
-function accountCodes() {
-  const out = [];
+// Account codes with their names, in topsheet order.
+function accountNames() {
+  const out = new Map();
   for (const r of arr(k.budget().topsheet)) {
     if (obj(r).kind !== 'category') continue;
-    for (const a of arr(r.accounts)) out.push(k.str(obj(a).code));
+    for (const a of arr(r.accounts)) out.set(k.str(obj(a).code), k.str(obj(a).name));
   }
   return out;
 }
@@ -272,6 +273,371 @@ function withKept(options, picked) {
   const out = [...options];
   for (const p of picked) if (!out.includes(p)) out.push(p);
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Charges and credits: a narrow list of the items at the left, the picked
+// item's editor at the right. Every item's editor is drawn and only the
+// picked one shows, so picking another needs no redraw.
+
+// The picked item of each tab, by index, kept across redraws; and the index
+// a newly added item will have, picked once it shows up.
+const picked = { charges: 0, credits: 0 };
+const pickNew = { charges: null, credits: null };
+
+/**
+ * Draws the list-and-editor layout of `tab` into `panel`. `items` are
+ * { name, applied, figure, title, bad, editor }, in order; `add` is the add
+ * form under the list; `move` the reorder command; `deleteText(i)` and
+ * `deleteBuild(i)` the delete confirm's question and command; `onShow(i)`
+ * runs when item i's editor shows.
+ */
+function listEditor(panel, { tab, what, label, items, add, empty, move, deleteText, deleteBuild, onShow }) {
+  panel.classList.add('tss-fill');
+  const count = items.length;
+  if (pickNew[tab] !== null && pickNew[tab] < count) {
+    picked[tab] = pickNew[tab];
+    pickNew[tab] = null;
+  }
+  let at = count ? Math.min(Math.max(0, Number(picked[tab]) || 0), count - 1) : 0;
+  picked[tab] = at;
+
+  const root = k.el('div', 'tss-md');
+  const side = k.el('div', 'tss-side');
+  const main = k.el('div', 'tss-main');
+
+  // Reorder and delete act on the picked item.
+  const strip = k.el('div', 'tss-strip');
+  const up =button('↑', 'tss-move-btn', k.key(tab, 'up'), () => moveBy(-1));
+  const down = button('↓', 'tss-move-btn', k.key(tab, 'down'), () => moveBy(1));
+  const del = button('Delete', 'setup-btn tss-small tss-strip-end', k.key('del', tab), () => confirmDelete());
+  strip.append(up, down, del);
+
+  // Moves the picked item by `by`; focus goes to `focusKey`, or stays on
+  // the arrow pressed while it can still move that way.
+  const moveBy = (by, focusKey) => {
+    const from = at;
+    const to = at + by;
+    if (!count || to < 0 || to >= count) return;
+    k.setFocusKey(focusKey || k.key(tab, to === 0 ? 'down' : to === count - 1 ? 'up' : by < 0 ? 'up' : 'down'));
+    k.run(
+      k.key(tab, from),
+      () => {
+        picked[tab] = to;
+        return [move, { index: from, to }];
+      },
+      {
+        onError: () => {
+          picked[tab] = from;
+          k.setFocusKey(null);
+        },
+      },
+    );
+  };
+
+  // The delete question, under the strip, as setup.js asks it for a list item.
+  const confirmDelete = () => {
+    if (!count) return;
+    const open = side.querySelector(':scope > .setup-confirm');
+    if (open) {
+      open.querySelector('.setup-btn-danger').focus();
+      return;
+    }
+    const i = at;
+    const ik = k.key(tab, i);
+    const box = k.el('div', 'setup-confirm tss-confirm');
+    box.setAttribute('role', 'group');
+    box.setAttribute('aria-label', `Delete ${what} ${items[i].name}`);
+    const text = k.el('p', 'setup-confirm-text', deleteText(i));
+    text.id = k.nextId();
+    const yes = k.el('button', 'setup-btn setup-btn-danger', 'Delete');
+    yes.type = 'button';
+    yes.dataset.key = k.key('del-yes', ik);
+    yes.setAttribute('aria-describedby', text.id);
+    const no = k.el('button', 'setup-btn setup-btn-quiet', 'Cancel');
+    no.type = 'button';
+    no.dataset.key = k.key('del-no', ik);
+    const close = () => {
+      box.remove();
+      del.focus();
+    };
+    no.addEventListener('click', close);
+    box.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        close();
+      }
+    });
+    yes.addEventListener('click', () => {
+      if (k.isBusy()) return;
+      // The item that takes its place gets focus, else the add form.
+      k.setFocusKey(count > 1 ? k.key(tab, 'pick', Math.min(i, count - 2)) : k.key('add', tab, 'name'));
+      k.run(ik, () => deleteBuild(i), {
+        onError: () => {
+          k.setFocusKey(null);
+          box.remove();
+          const b = k.findByData('key', k.key('del', tab));
+          if (b) b.focus();
+        },
+      });
+    });
+    const actions = k.el('div', 'setup-confirm-actions');
+    actions.append(yes, no);
+    box.append(text, actions);
+    strip.after(box);
+    yes.focus();
+  };
+
+  const ul = k.el('ul', 'tss-pick');
+  ul.setAttribute('aria-label', label);
+  const buttons = items.map((it, n) => {
+    const li = k.el('li', 'tss-pick-item');
+    if (!it.applied) li.classList.add('is-off');
+    if (it.bad) li.classList.add('is-bad');
+    const b = k.el('button', 'tss-pick-btn');
+    b.type = 'button';
+    b.dataset.key = k.key(tab, 'pick', n);
+    b.dataset.nobusy = '1';
+    b.title = it.title;
+    b.setAttribute('aria-keyshortcuts', 'Alt+Shift+ArrowUp Alt+Shift+ArrowDown');
+    b.append(k.el('span', 'tss-pick-name', it.name), k.el('span', it.applied ? 'tss-pick-fig setup-num' : 'tss-pick-fig', it.figure));
+    if (it.bad) b.append(k.el('span', 'setup-sr', `, ${what} has a problem`));
+    b.addEventListener('click', () => pick(n));
+    b.addEventListener('keydown', (e) => listKey(e, n));
+    li.append(b);
+    ul.append(li);
+    return b;
+  });
+
+  // Arrows pick the next or previous item; Option+Shift+arrows move it.
+  const listKey = (e, n) => {
+    if (e.altKey && e.shiftKey && !e.metaKey && !e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (k.isBusy()) return;
+      if (n !== at) pick(n);
+      const by = e.key === 'ArrowUp' ? -1 : 1;
+      moveBy(by, k.key(tab, 'pick', n + by));
+      return;
+    }
+    if (e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    const j = { ArrowDown: n + 1, ArrowUp: n - 1, Home: 0, End: count - 1 }[e.key];
+    if (j === undefined) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (j < 0 || j >= count) return;
+    pick(j);
+    buttons[j].focus();
+  };
+
+  const sync = () => {
+    items.forEach((it, n) => {
+      it.editor.hidden = n !== at;
+      buttons[n].setAttribute('aria-current', n === at ? 'true' : 'false');
+      buttons[n].parentElement.classList.toggle('is-picked', n === at);
+    });
+    const name = count ? items[at].name : '';
+    up.disabled = !count || at === 0;
+    down.disabled = !count || at >= count - 1;
+    del.disabled = !count;
+    const labels = [
+      [up, `Move ${what} ${name} up`],
+      [down, `Move ${what} ${name} down`],
+      [del, `Delete ${what} ${name}`],
+    ];
+    for (const [b, text] of labels) {
+      b.setAttribute('aria-label', text);
+      b.title = text;
+    }
+  };
+
+  const pick = (n) => {
+    if (n === at) return;
+    at = n;
+    picked[tab] = n;
+    const open = side.querySelector(':scope > .setup-confirm');
+    if (open) open.remove();
+    sync();
+    if (onShow) onShow(n);
+  };
+
+  side.append(strip, ul, add);
+  if (!count) main.append(k.emptyNote(empty));
+  items.forEach((it, n) => {
+    it.editor.id = k.nextId();
+    buttons[n].setAttribute('aria-controls', it.editor.id);
+    main.append(it.editor);
+  });
+  sync();
+  if (count && onShow) onShow(at);
+  root.append(side, main);
+  panel.append(root);
+}
+
+// An item's editor: errors and problems go at its end (setup.js finds it by
+// data-item).
+function editorShell(itemKey, label) {
+  const ed = k.el('section', 'tss-ed');
+  ed.dataset.item = itemKey;
+  ed.setAttribute('aria-label', label);
+  return ed;
+}
+
+// A line of the editor's head: fields side by side, wrapping when narrow.
+function hrow(cls, ...children) {
+  const row = k.el('div', cls ? `tss-hrow ${cls}` : 'tss-hrow');
+  row.append(...children);
+  return row;
+}
+
+// A field with its label at its left. `size` is a width class for the
+// control; `grow` lets it take the line's spare room; `extra` is a trailing
+// unit like "%".
+function inlineField(labelText, control, { extra = '', grow = false, size = '' } = {}) {
+  const wrap = k.el('div', grow ? 'tss-if tss-if-grow' : 'tss-if');
+  const label = k.el('label', 'tss-if-label', labelText);
+  label.htmlFor = control.id;
+  if (size) control.classList.add(size);
+  wrap.append(label, control);
+  if (extra) {
+    const tag = k.el('span', 'setup-adorn', extra);
+    tag.setAttribute('aria-hidden', 'true');
+    wrap.append(tag);
+  }
+  return wrap;
+}
+
+// A labelled figure for a summary line.
+function figure(labelText, valueEl) {
+  const f = k.el('span', 'tss-fig');
+  f.append(k.el('span', 'tss-fig-label', labelText), valueEl);
+  return f;
+}
+
+// A small action strip over a table, with a title at its left.
+function actionStrip(title, ...controls) {
+  const strip = k.el('div', 'tss-strip');
+  strip.append(k.el('span', 'tss-strip-title', title), ...controls);
+  return strip;
+}
+
+// A select that reads as a small button: picking an option runs
+// `onPick(value)` and the select goes back to its title.
+function addPicker(fieldKey, title, options, noneText, onPick) {
+  const sel = k.el('select', 'setup-input setup-select tss-picker');
+  sel.id = k.nextId();
+  sel.dataset.key = fieldKey;
+  sel.setAttribute('aria-label', title.replace('…', ''));
+  const first = k.el('option', null, title);
+  first.value = '';
+  sel.append(first);
+  if (!options.length) {
+    const none = k.el('option', null, noneText);
+    none.value = '';
+    none.disabled = true;
+    sel.append(none);
+  }
+  for (const [v, text] of options) {
+    const o = k.el('option', null, text);
+    o.value = v;
+    sel.append(o);
+  }
+  sel.addEventListener('change', () => {
+    const v = sel.value;
+    sel.value = '';
+    if (v === '' || k.isBusy()) return;
+    onPick(v);
+  });
+  return sel;
+}
+
+// A table cell holding `content` (text, or a control drawn as a cell).
+function cell(content, cls) {
+  const td = k.el('td', cls);
+  if (content instanceof Node) {
+    if (content.classList && content.classList.contains('setup-input')) {
+      content.classList.add('tss-cell');
+      td.classList.add('tss-td-in');
+    }
+    td.append(content);
+  } else if (content !== undefined && content !== null) {
+    td.textContent = String(content);
+  }
+  return td;
+}
+
+// A grid table with `cols` ([class, heading, align right]) and a hidden
+// heading for the delete column at the end.
+function gridTable(cls, label, cols) {
+  const table = k.el('table', `tss-grid ${cls}`);
+  table.setAttribute('aria-label', label);
+  const group = k.el('colgroup');
+  const head = k.el('tr');
+  for (const [c, text, right] of cols) {
+    group.append(k.el('col', c));
+    const th = k.el('th', right ? 'tss-r' : null, text);
+    th.scope = 'col';
+    head.append(th);
+  }
+  group.append(k.el('col', 'tss-c-del'));
+  const delHead = k.el('th');
+  delHead.append(k.el('span', 'setup-sr', 'Delete'));
+  head.append(delHead);
+  const thead = k.el('thead');
+  thead.append(head);
+  table.append(group, thead);
+  return table;
+}
+
+// A table in a box that takes the editor's spare height and scrolls.
+function gridWrap(table) {
+  const wrap = k.el('div', 'tss-gridwrap');
+  wrap.append(table);
+  return wrap;
+}
+
+// A body row standing in for an empty table.
+function emptyRow(colspan, text) {
+  const tr = k.el('tr', 'tss-grid-empty');
+  const td = k.el('td', 'setup-muted', text);
+  td.colSpan = colspan;
+  tr.append(td);
+  return tr;
+}
+
+// Cents (numbers or BigInt) added up exactly.
+function centsSum(list) {
+  let total = 0n;
+  for (const v of list) {
+    try {
+      total += BigInt(v);
+    } catch {
+      return null;
+    }
+  }
+  return total;
+}
+
+// Decimal strings ("1307.375") added up exactly; null when one isn't a number.
+function decimalSum(list) {
+  const parts = [];
+  let scale = 0;
+  for (const v of list) {
+    const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(k.str(v));
+    if (!m) return null;
+    parts.push(m);
+    scale = Math.max(scale, (m[3] || '').length);
+  }
+  let total = 0n;
+  for (const m of parts) {
+    const n = BigInt(m[2] + (m[3] || '').padEnd(scale, '0'));
+    total += m[1] ? -n : n;
+  }
+  const neg = total < 0n;
+  const digits = (neg ? -total : total).toString().padStart(scale + 1, '0');
+  const text = scale ? `${digits.slice(0, -scale)}.${digits.slice(-scale)}` : digits;
+  return neg ? `-${text}` : text;
 }
 
 // ---------------------------------------------------------------------------
@@ -314,230 +680,194 @@ function currencyOptions(current) {
   return [['', base ? `${base} (base)` : 'Base currency'], ...codes.map((c) => [c, c])];
 }
 
+// Per charge, what fills its editor's left-out totals when it shows.
+let chargeLoaders = [];
+
 function renderCharges(panel) {
   const b = k.budget();
   const r = k.report();
   const charges = arr(b.charges);
+  chargeLoaders = [];
   panel.append(
     intro(
       'Fees worked out on the above- plus below-the-line total, like contingency or insurance. Each one is figured on that total alone, never on another charge.',
     ),
   );
-  if (!charges.length) panel.append(k.emptyNote('No charges yet.'));
-  const ul = k.list('Charges');
-  charges.forEach((c0, i) => {
+  const items = charges.map((c0, i) => {
     const c = chargeInput(c0);
-    const ik = k.key('charges', i);
-    const li = k.itemShell(ik, 'setup-block');
-    if (!c.applied) li.classList.add('setup-item-off');
-    const fk = (f) => k.key('charges', i, f);
-    const commit = (f, patchOf) => (v, old) =>
-      k.run(ik, () => chargeArgs(i, patchOf(v)), { restore: [fk(f), old] });
-
-    const head = k.el('div', 'setup-head');
-    const nameEl = k.el('span', 'setup-name', c.name);
-    nameEl.title = c.name;
-    const figs = k.el('span', 'setup-figs');
     const entry = appliedEntry(charges, r && r.charges, i);
-    if (!c.applied) figs.append(k.el('span', 'setup-muted', 'Not applied'));
-    else if (entry) {
-      const t = k.el('span', 'setup-num', k.formatCents(entry.amount));
-      t.title = chargeTitle(entry, false);
-      t.dataset.key = fk('total');
-      figs.append(t);
-    }
-    head.append(
-      nameEl,
-      figs,
-      moveButtons('charges', i, charges.length, 'charge', c.name, 'move_charge'),
-      k.deleteButton({
-        itemKey: ik,
-        name: c.name,
-        what: 'charge',
-        confirmText: `Delete charge ${c.name}?`,
-        build: () => ['delete_charge', { index: i }],
-        neighborKey: charges.length > 1 ? k.key('del', k.key('charges', i < charges.length - 1 ? i : i - 1)) : k.key('add', 'charges', 'name'),
-      }),
-    );
-
-    const grid = k.el('div', 'setup-fields');
-    const name = k.textInput({ fieldKey: fk('name'), value: c.name, onCommit: commit('name', (v) => ({ name: v })) });
-    const applied = checkbox(fk('applied'), c.applied, 'Applied', (v) =>
-      k.run(ik, () => chargeArgs(i, { applied: v }), { restore: [fk('applied'), !v] }),
-    );
-    const kind = k.selectInput({
-      fieldKey: fk('kind'),
-      value: c.kind,
-      options: [
-        ['percent', 'Percent of the total'],
-        ['flat', 'Flat fee'],
-      ],
-      onCommit: commit('kind', (v) => (cur) =>
-        v === 'flat'
-          ? { kind: 'flat', amount: cur.amount === null ? '0' : cur.amount }
-          : { kind: 'percent', percent: cur.percent === null ? '0' : cur.percent },
-      ),
-    });
-    grid.append(k.field('Name', name), applied, k.field('Kind', kind));
-    if (c.kind === 'percent') {
-      const pct = k.textInput({
-        fieldKey: fk('percent'),
-        value: k.str(c.percent),
-        num: true,
-        onCommit: commit('percent', (v) => ({ percent: v.trim() })),
-      });
-      livePreview(pct, i);
-      grid.append(k.field('Percent', pct, { extra: '%' }));
-    } else {
-      const amount = k.textInput({
-        fieldKey: fk('amount'),
-        value: isNone(c0.amount) ? '' : k.formatCents(c0.amount),
-        num: true,
-        onCommit: commit('amount', (v) => ({ amount: v.trim() })),
-      });
-      livePreview(amount, i);
-      grid.append(k.field('Amount', amount));
-      const cur = k.selectInput({
-        fieldKey: fk('currency'),
-        value: c.currency || '',
-        options: currencyOptions(c.currency),
-        onCommit: commit('currency', (v) => ({ currency: v === '' ? null : v })),
-      });
-      grid.append(k.field('Currency', cur));
-    }
-    const account = k.textInput({
-      fieldKey: fk('account'),
-      value: c.account || '',
-      placeholder: 'None',
-      onCommit: commit('account', (v) => ({ account: v.trim() === '' ? null : v.trim() })),
-    });
-    grid.append(k.field('Posts to account', account, { wide: c.kind === 'percent' }));
-    // What the topsheet label shows besides the name (display only).
-    if (c.kind === 'percent') {
-      grid.append(
-        checkbox(fk('label-percent'), c.label_percent, 'Show the percent on the topsheet', (v) =>
-          k.run(ik, () => chargeArgs(i, { label_percent: v }), { restore: [fk('label-percent'), !v] }),
-        ),
-      );
-    }
-    grid.append(
-      checkbox(fk('label-excluded'), c.label_excluded, 'Show the amount left out on the topsheet', (v) =>
-        k.run(ik, () => chargeArgs(i, { label_excluded: v }), { restore: [fk('label-excluded'), !v] }),
-      ),
-    );
-    li.append(head, grid, chargeExclusions(i, c, ik, entry));
-    k.finishItem(li, ik, issuesAt('charge', i), null);
-    ul.append(li);
+    const issues = issuesAt('charge', i);
+    const fig = !c.applied ? 'Not applied' : entry ? k.formatCents(entry.amount) : '';
+    const figTitle = !c.applied ? 'Not applied' : entry ? `Total charge, ${chargeTitle(entry, false).toLowerCase()}` : '';
+    return {
+      name: c.name,
+      applied: c.applied,
+      figure: fig,
+      title: [c.name, figTitle, issues.length ? 'This charge has a problem' : ''].filter(Boolean).join('\n'),
+      bad: issues.length > 0,
+      editor: chargeEditor(i, c0, c, entry, issues),
+    };
   });
-  if (charges.length) panel.append(ul);
 
   const taken = {};
   for (const c of charges) taken[k.str(obj(c).name)] = true;
-  panel.append(
-    k.addForm('charges', {
-      title: 'New charge',
-      fields: [
-        k.addInput('charges', 'name', { label: 'Name', placeholder: 'Insurance' }),
-        k.addSelect('charges', 'kind', 'Kind', [
-          ['percent', 'Percent'],
-          ['flat', 'Flat fee'],
-        ]),
-        k.addInput('charges', 'value', { label: 'Percent or amount', placeholder: '10', num: true }),
-      ],
-      validate: (v) => {
-        const name = v.name.trim();
-        if (name === '') return ['name', 'Enter a charge name.'];
-        if (taken[name]) return ['name', `There is already a charge named ${name}.`];
-        const val = v.value.trim();
-        if (val === '') return ['value', v.kind === 'flat' ? 'Enter an amount.' : 'Enter a percent.'];
-        if (v.kind !== 'flat' && !DECIMAL.test(val)) return ['value', 'The percent must be a number, like 10 or 2.5.'];
-        return null;
-      },
-      build: (v) => {
-        const flat = v.kind === 'flat';
-        return [
-          'set_charge',
-          {
-            index: null,
-            charge: {
-              name: v.name.trim(),
-              account: null,
-              applied: true,
-              kind: flat ? 'flat' : 'percent',
-              percent: flat ? null : v.value.trim(),
-              amount: flat ? v.value.trim() : null,
-              currency: null,
-              excluded_amounts: [],
-              excluded_groups: [],
-              excluded_categories: [],
-              excluded_accounts: [],
-              label_percent: false,
-              label_excluded: false,
-            },
+  const add = k.addForm('charges', {
+    title: 'New charge',
+    fields: [
+      k.addInput('charges', 'name', { label: 'Name', placeholder: 'Insurance' }),
+      k.addSelect('charges', 'kind', 'Type', [
+        ['percent', 'Percent'],
+        ['flat', 'Flat fee'],
+      ]),
+      k.addInput('charges', 'value', { label: 'Percent or amount', placeholder: '10', num: true }),
+    ],
+    validate: (v) => {
+      const name = v.name.trim();
+      if (name === '') return ['name', 'Enter a charge name.'];
+      if (taken[name]) return ['name', `There is already a charge named ${name}.`];
+      const val = v.value.trim();
+      if (val === '') return ['value', v.kind === 'flat' ? 'Enter an amount.' : 'Enter a percent.'];
+      if (v.kind !== 'flat' && !DECIMAL.test(val)) return ['value', 'The percent must be a number, like 10 or 2.5.'];
+      return null;
+    },
+    build: (v) => {
+      const flat = v.kind === 'flat';
+      // The new charge is picked once it shows up.
+      pickNew.charges = arr(k.budget().charges).length;
+      return [
+        'set_charge',
+        {
+          index: null,
+          charge: {
+            name: v.name.trim(),
+            account: null,
+            applied: true,
+            kind: flat ? 'flat' : 'percent',
+            percent: flat ? null : v.value.trim(),
+            amount: flat ? v.value.trim() : null,
+            currency: null,
+            excluded_amounts: [],
+            excluded_groups: [],
+            excluded_categories: [],
+            excluded_accounts: [],
+            label_percent: false,
+            label_excluded: false,
           },
-        ];
-      },
-    }),
-  );
+        },
+      ];
+    },
+  });
+
+  listEditor(panel, {
+    tab: 'charges',
+    what: 'charge',
+    label: 'Charges',
+    items,
+    add,
+    empty: 'No charges yet.',
+    move: 'move_charge',
+    deleteText: (i) => `Delete charge ${items[i].name}?`,
+    deleteBuild: (i) => ['delete_charge', { index: i }],
+    onShow: (i) => {
+      if (chargeLoaders[i]) chargeLoaders[i]();
+    },
+  });
 }
 
-// Every group with a box to leave it out of the charge, and the group's own
-// amount in the charge's base from the current totals. A group the charge
-// names that the budget no longer has stays listed until it is unticked.
-function groupGrid(i, c, ik) {
+// Charge `i`'s editor: name and Applied, then type, value and account, then
+// its total and the topsheet label choices, then what it leaves out.
+function chargeEditor(i, c0, c, entry, issues) {
+  const ik = k.key('charges', i);
   const fk = (f) => k.key('charges', i, f);
-  const wrap = k.el('div', 'setup-field setup-field-wide');
-  const head = k.el('span', 'setup-label', 'Groups');
-  head.id = k.nextId();
-  const grid = k.el('div', 'tss-excl');
-  grid.setAttribute('role', 'group');
-  grid.setAttribute('aria-labelledby', head.id);
-  const defs = obj(k.budget().groups);
-  const names = withKept(groupNames(), c.excluded_groups);
-  if (!names.length) grid.append(k.el('span', 'tss-chips-empty', 'No groups yet'));
-  for (const name of names) {
-    const row = k.el('div', 'tss-excl-row');
-    const box = k.el('input', 'setup-check');
-    box.type = 'checkbox';
-    box.id = k.nextId();
-    box.checked = c.excluded_groups.includes(name);
-    box.dataset.key = fk(`excl-group-${name}`);
-    box.addEventListener('change', () => {
-      const on = box.checked;
-      k.run(ik, () => chargeArgs(i, (cur) => ({ excluded_groups: on ? [...cur.excluded_groups.filter((g) => g !== name), name] : cur.excluded_groups.filter((g) => g !== name) })), {
-        restore: [fk(`excl-group-${name}`), !on],
-      });
+  const commit = (f, patchOf) => (v, old) =>
+    k.run(ik, () => chargeArgs(i, patchOf(v)), { restore: [fk(f), old] });
+  const ed = editorShell(ik, `Charge ${c.name}`);
+
+  const name = k.textInput({ fieldKey: fk('name'), value: c.name, onCommit: commit('name', (v) => ({ name: v })) });
+  const applied = checkbox(fk('applied'), c.applied, 'Applied', (v) =>
+    k.run(ik, () => chargeArgs(i, { applied: v }), { restore: [fk('applied'), !v] }),
+  );
+  ed.append(hrow('', inlineField('Name', name, { grow: true }), applied));
+
+  const kind = k.selectInput({
+    fieldKey: fk('kind'),
+    value: c.kind,
+    options: [
+      ['percent', 'Percent of the total'],
+      ['flat', 'Flat fee'],
+    ],
+    onCommit: commit('kind', (v) => (cur) =>
+      v === 'flat'
+        ? { kind: 'flat', amount: cur.amount === null ? '0' : cur.amount }
+        : { kind: 'percent', percent: cur.percent === null ? '0' : cur.percent },
+    ),
+  });
+  const values = hrow('', inlineField('Type', kind, { size: 'tss-w-kind' }));
+  if (c.kind === 'percent') {
+    const pct = k.textInput({
+      fieldKey: fk('percent'),
+      value: k.str(c.percent),
+      num: true,
+      onCommit: commit('percent', (v) => ({ percent: v.trim() })),
     });
-    const label = k.el('label', 'tss-excl-name', name);
-    label.htmlFor = box.id;
-    const known = Object.prototype.hasOwnProperty.call(defs, name);
-    const amount = known ? groupInBase(name) : null;
-    const total = k.el('span', 'setup-num tss-excl-total', known ? (amount === null ? '' : k.formatCents(amount)) : 'Not in this budget');
-    if (!known) total.classList.add('setup-muted');
-    else if (obj(defs[name]).in_budget_total === false) total.title = 'Left out of the budget total, so nothing to leave out here';
-    else total.title = 'The group’s lines in the base, as the totals stand now';
-    row.append(box, label, total);
-    grid.append(row);
+    livePreview(pct, i);
+    values.append(inlineField('Percent', pct, { extra: '%', size: 'tss-w-pct' }));
+  } else {
+    const amount = k.textInput({
+      fieldKey: fk('amount'),
+      value: isNone(c0.amount) ? '' : k.formatCents(c0.amount),
+      num: true,
+      onCommit: commit('amount', (v) => ({ amount: v.trim() })),
+    });
+    livePreview(amount, i);
+    const cur = k.selectInput({
+      fieldKey: fk('currency'),
+      value: c.currency || '',
+      options: currencyOptions(c.currency),
+      onCommit: commit('currency', (v) => ({ currency: v === '' ? null : v })),
+    });
+    values.append(inlineField('Amount', amount, { size: 'tss-w-num' }), inlineField('Currency', cur, { size: 'tss-w-cur' }));
   }
-  wrap.append(head, grid);
-  return wrap;
+  const account = k.textInput({
+    fieldKey: fk('account'),
+    value: c.account || '',
+    placeholder: 'None',
+    onCommit: commit('account', (v) => ({ account: v.trim() === '' ? null : v.trim() })),
+  });
+  values.append(inlineField('Posts to account', account, { size: 'tss-w-acct' }));
+  ed.append(values);
+
+  // The total, and what the topsheet label shows besides the name (display only).
+  const sum = hrow('tss-sum');
+  if (!c.applied) sum.append(k.el('span', 'setup-muted', 'Not applied'));
+  else if (entry) {
+    const t = k.el('span', 'setup-num', k.formatCents(entry.amount));
+    t.title = chargeTitle(entry, false);
+    t.dataset.key = fk('total');
+    sum.append(figure('Total charge', t));
+  }
+  if (c.kind === 'percent') {
+    sum.append(
+      checkbox(fk('label-percent'), c.label_percent, 'Show the percent on the topsheet', (v) =>
+        k.run(ik, () => chargeArgs(i, { label_percent: v }), { restore: [fk('label-percent'), !v] }),
+      ),
+    );
+  }
+  sum.append(
+    checkbox(fk('label-excluded'), c.label_excluded, 'Show the amount left out on the topsheet', (v) =>
+      k.run(ik, () => chargeArgs(i, { label_excluded: v }), { restore: [fk('label-excluded'), !v] }),
+    ),
+  );
+  ed.append(sum);
+  ed.append(...chargeExclusions(i, c, ik, entry));
+  k.finishItem(ed, ik, issues, null);
+  return ed;
 }
 
 // The head figure's tooltip: what the charge is figured on.
 function chargeTitle(t, typing) {
   const on = `On ${k.formatCents(t.base)}, less ${k.formatCents(t.excluded)} left out`;
   return typing ? `${on} (with the value being typed)` : on;
-}
-
-// A group's own amount in a charge's base: its counted lines' totals, with
-// their fringes unless fringes post outside the above- and below-the-line
-// totals (Budget > Settings). Null when the group isn't in the report.
-function groupInBase(name) {
-  const g = obj(obj(k.report() && k.report().groups)[name]);
-  const a = obj(g.active);
-  if (isNone(a.details_total)) return null;
-  const posting = obj(k.budget().fringe_posting).kind;
-  return (Number(a.details_total) || 0) + (posting === 'budget' ? 0 : Number(a.fringe_total) || 0);
 }
 
 // Live preview: while a charge's percent, amount or a left-out amount is
@@ -596,34 +926,112 @@ async function runPreview(i) {
   }
 }
 
+// What leaving out one group, category or account takes off a charge, as
+// the totals work it out (each line with its fringes): the saved charge with
+// only that exclusion, through preview_charge. The figure doesn't depend on
+// the charge, so it is kept per budget revision by what is left out; the
+// last one shows until the new one arrives.
+const leftOut = { stamp: '', now: new Map(), last: new Map() };
+
+function leftOutTotal(i, f, name, td) {
+  const v = obj(k.view());
+  const stamp = `${v.doc}:${v.rev}`;
+  if (leftOut.stamp !== stamp) {
+    leftOut.stamp = stamp;
+    leftOut.now = new Map();
+  }
+  const id = JSON.stringify([v.doc, f, name]);
+  if (leftOut.last.has(id)) td.textContent = k.formatCents(leftOut.last.get(id));
+  let p = leftOut.now.get(id);
+  if (!p) {
+    const one = {
+      ...chargeInput(arr(k.budget().charges)[i]),
+      excluded_amounts: [],
+      excluded_groups: [],
+      excluded_categories: [],
+      excluded_accounts: [],
+      [f]: [name],
+    };
+    p = invoke('preview_charge', { index: i, charge: one }).then((t) => {
+      leftOut.last.set(id, t.excluded);
+      return t.excluded;
+    });
+    leftOut.now.set(id, p);
+  }
+  p.then(
+    (cents) => {
+      td.textContent = k.formatCents(cents);
+    },
+    () => {
+      td.textContent = '';
+    },
+  );
+}
+
+// What charge `i` leaves out, as one table: amounts typed in, then groups,
+// categories and accounts, each with what it takes off. An item the charge
+// names that the budget no longer has stays listed until it is removed.
 function chargeExclusions(i, c, ik, entry) {
   const fk = (f) => k.key('charges', i, f);
-  const count =
-    c.excluded_groups.length + c.excluded_amounts.length + (c.kind === 'percent' ? c.excluded_categories.length + c.excluded_accounts.length : 0);
-  const body = k.el('div', 'setup-fields tss-more-body');
-  const pick = (f, label, options) =>
-    chips({
-      fieldKey: fk(f),
-      label,
-      selected: c[f],
-      options: withKept(options, c[f]),
-      onChange: (list) => k.run(ik, () => chargeArgs(i, { [f]: list })),
-    });
-  body.append(groupGrid(i, c, ik));
-  if (c.kind === 'percent') {
-    body.append(pick('excluded_categories', 'Categories', categoryCodes()));
-    body.append(pick('excluded_accounts', 'Accounts', accountCodes()));
-  } else {
-    body.append(k.el('p', 'setup-hint setup-field-wide', 'A flat fee only leaves out groups and the amounts below.'));
-  }
-
-  // Amounts typed in by hand.
   const rawAmounts = arr(obj(arr(k.budget().charges)[i]).excluded_amounts);
-  const amounts = k.el('div', 'setup-field setup-field-wide');
-  amounts.append(k.el('span', 'setup-label', 'Amounts'));
-  const rows = k.el('div', 'tss-amounts');
+  const groupDefs = obj(k.budget().groups);
+  const cats = categoryNames();
+  const accts = accountNames();
+
+  const leave = (f, value) =>
+    k.run(ik, () => chargeArgs(i, (cur) => ({ [f]: [...cur[f].filter((x) => x !== value), value] })));
+  const named = (map, f) =>
+    [...map.keys()].filter((code) => !c[f].includes(code)).map((code) => [code, `${code} ${map.get(code)}`.trim()]);
+  const strip = actionStrip(
+    'Left out',
+    button('Exclude amount', 'setup-btn tss-small', fk('amount-add'), () => {
+      k.setFocusKey(fk(`amount-desc-${c.excluded_amounts.length}`));
+      k.run(ik, () => chargeArgs(i, (cur) => ({ excluded_amounts: [...cur.excluded_amounts, { description: '', amount: '0' }] })), {
+        onError: () => k.setFocusKey(null),
+      });
+    }),
+    addPicker(
+      fk('excl-add-group'),
+      'Exclude group…',
+      groupNames()
+        .filter((g) => !c.excluded_groups.includes(g))
+        .map((g) => [g, g]),
+      'No groups left',
+      (g) => leave('excluded_groups', g),
+    ),
+    addPicker(fk('excl-add-category'), 'Exclude category…', named(cats, 'excluded_categories'), 'No categories left', (v) =>
+      leave('excluded_categories', v),
+    ),
+    addPicker(fk('excl-add-account'), 'Exclude account…', named(accts, 'excluded_accounts'), 'No accounts left', (v) =>
+      leave('excluded_accounts', v),
+    ),
+  );
+
+  const table = gridTable('tss-grid-excl', `Left out of ${c.name}`, [
+    ['tss-c-type', 'Type'],
+    ['tss-c-name', 'Name'],
+    ['tss-c-desc', 'Description'],
+    ['tss-c-fig', 'Total', true],
+  ]);
+  const tbody = k.el('tbody');
+  // Each row's delete key, so focus can go to a neighbour once one is removed.
+  const rows = [];
+  const focusAfter = (p) => {
+    const next = rows[p + 1];
+    const prev = rows[p - 1];
+    if (next) return next.amount !== undefined && rows[p].amount !== undefined ? fk(`amount-del-${next.amount - 1}`) : next.del;
+    if (prev) return prev.del;
+    return fk('amount-add');
+  };
+  const removeButton = (delKey, label, build) => {
+    const p = rows.length;
+    return button('×', 'setup-del tss-row-del', delKey, () => {
+      k.setFocusKey(focusAfter(p));
+      k.run(ik, () => chargeArgs(i, build), { onError: () => k.setFocusKey(null) });
+    }, label);
+  };
+
   c.excluded_amounts.forEach((x, n) => {
-    const row = k.el('div', 'tss-amount');
     const desc = k.textInput({
       fieldKey: fk(`amount-desc-${n}`),
       value: x.description,
@@ -648,33 +1056,68 @@ function chargeExclusions(i, c, ik, entry) {
           { restore: [fk(`amount-value-${n}`), old] },
         ),
     });
-    const del = button('×', 'setup-del', fk(`amount-del-${n}`), () =>
-      k.run(ik, () => chargeArgs(i, (cur) => ({ excluded_amounts: cur.excluded_amounts.filter((_, j) => j !== n) }))),
-      `Remove amount ${n + 1}`,
-    );
     livePreview(amt, i);
-    row.append(desc, amt, del);
-    rows.append(row);
+    const delKey = fk(`amount-del-${n}`);
+    const del = removeButton(delKey, `Remove amount ${n + 1}`, (cur) => ({
+      excluded_amounts: cur.excluded_amounts.filter((_, j) => j !== n),
+    }));
+    rows.push({ del: delKey, amount: n });
+    const tr = k.el('tr');
+    tr.append(cell('Amount', 'setup-muted'), cell(''), cell(desc), cell(amt), cell(del, 'tss-td-del'));
+    tbody.append(tr);
   });
-  const add = button('Add amount', 'setup-btn tss-small', fk('amount-add'), () => {
-    k.setFocusKey(fk(`amount-desc-${c.excluded_amounts.length}`));
-    k.run(ik, () => chargeArgs(i, (cur) => ({ excluded_amounts: [...cur.excluded_amounts, { description: '', amount: '0' }] })), {
-      onError: () => k.setFocusKey(null),
-    });
-  });
-  rows.append(add);
-  amounts.append(rows);
-  body.append(amounts);
+
+  const loads = [];
+  const namedRow = (type, f, name, desc, known, title) => {
+    const delKey = fk(`excl-${type}-del-${name}`);
+    const del = removeButton(delKey, `Remove ${type} ${name}`, (cur) => ({ [f]: cur[f].filter((x) => x !== name) }));
+    rows.push({ del: delKey });
+    const total = cell('', 'tss-r setup-num');
+    if (known) {
+      total.title = title;
+      loads.push(() => leftOutTotal(i, f, name, total));
+    }
+    const descCell = known ? cell(desc) : cell('Not in this budget', 'setup-muted');
+    if (known && desc) descCell.title = desc;
+    const nameCell = cell(name);
+    nameCell.title = name;
+    const tr = k.el('tr');
+    tr.append(cell(type[0].toUpperCase() + type.slice(1), 'setup-muted'), nameCell, descCell, total, cell(del, 'tss-td-del'));
+    tbody.append(tr);
+  };
+  const usual = 'Its lines with their fringes, as the totals stand now';
+  for (const g of c.excluded_groups) {
+    const known = Object.prototype.hasOwnProperty.call(groupDefs, g);
+    const def = obj(groupDefs[g]);
+    const title = def.in_budget_total === false ? 'Left out of the budget total, so nothing to leave out here' : usual;
+    namedRow('group', 'excluded_groups', g, k.str(def.description), known, title);
+  }
+  for (const code of c.excluded_categories) {
+    namedRow('category', 'excluded_categories', code, cats.get(code) || '', cats.has(code), usual);
+  }
+  for (const code of c.excluded_accounts) {
+    namedRow('account', 'excluded_accounts', code, accts.get(code) || '', accts.has(code), usual);
+  }
+  if (!rows.length) tbody.append(emptyRow(5, 'Nothing left out'));
+  chargeLoaders[i] = () => loads.forEach((fn) => fn());
+
+  table.append(tbody);
   if (entry) {
-    // Everything left out together: each line once, even when several rules
+    // Everything left out together: each line once, even when several rows
     // pick it.
-    const all = k.el('p', 'setup-hint setup-field-wide tss-excl-all');
     const n = k.el('span', 'setup-num', k.formatCents(entry.excluded));
     n.dataset.key = fk('excluded');
-    all.append(k.el('span', null, 'Left out in all: '), n);
-    body.append(all);
+    const label = cell('Left out in all');
+    label.colSpan = 3;
+    label.title = 'Each line counts once, even when several rows pick it';
+    const total = cell(n, 'tss-r');
+    const tr = k.el('tr');
+    tr.append(label, total, cell(''));
+    const tfoot = k.el('tfoot');
+    tfoot.append(tr);
+    table.append(tfoot);
   }
-  return section(`charge-${i}`, count ? `Left out of this charge (${count})` : 'Left out of this charge', body);
+  return [strip, gridWrap(table)];
 }
 
 // ---------------------------------------------------------------------------
@@ -734,246 +1177,324 @@ function renderCredits(panel) {
       'Incentives and rebates taken off the grand total to give the net total. Each row is a percent of some spend; the row credits add up, then the cap and discount apply.',
     ),
   );
-  if (!credits.length) panel.append(k.emptyNote('No credits yet.'));
-  const ul = k.list('Credits');
-  credits.forEach((c0, i) => {
+  const items = credits.map((c0, i) => {
     const c = creditInput(c0);
-    const raw = obj(c0);
-    const ik = k.key('credits', i);
-    const li = k.itemShell(ik, 'setup-block');
-    if (!c.applied) li.classList.add('setup-item-off');
-    const fk = (f) => k.key('credits', i, f);
-    const commit = (f, patchOf) => (v, old) =>
-      k.run(ik, () => creditArgs(i, patchOf(v)), { restore: [fk(f), old] });
     const entry = appliedEntry(credits, r && r.credits, i);
-
-    const head = k.el('div', 'setup-head');
-    const nameEl = k.el('span', 'setup-name', c.name);
-    nameEl.title = c.name;
-    const figs = k.el('span', 'setup-figs');
-    if (!c.applied) figs.append(k.el('span', 'setup-muted', 'Not applied'));
-    else if (entry) {
-      const t = k.el('span', 'setup-num', k.formatCents(entry.amount));
-      t.title = 'Credit taken off the grand total';
-      figs.append(t);
-    }
-    head.append(
-      nameEl,
-      figs,
-      moveButtons('credits', i, credits.length, 'credit', c.name, 'move_credit'),
-      k.deleteButton({
-        itemKey: ik,
-        name: c.name,
-        what: 'credit',
-        confirmText: `Delete credit ${c.name} and its ${k.plural(c.rows.length, 'row', 'rows')}?`,
-        build: () => ['delete_credit', { index: i }],
-        neighborKey: credits.length > 1 ? k.key('del', k.key('credits', i < credits.length - 1 ? i : i - 1)) : k.key('add', 'credits', 'name'),
-      }),
-    );
-
-    const grid = k.el('div', 'setup-fields');
-    grid.append(
-      k.field('Name', k.textInput({ fieldKey: fk('name'), value: c.name, onCommit: commit('name', (v) => ({ name: v })) })),
-      checkbox(fk('applied'), c.applied, 'Applied', (v) =>
-        k.run(ik, () => creditArgs(i, { applied: v }), { restore: [fk('applied'), !v] }),
-      ),
-      k.field(
-        'Cap on the credit',
-        k.textInput({
-          fieldKey: fk('cap'),
-          value: isNone(raw.cap) ? '' : k.formatCents(raw.cap),
-          num: true,
-          placeholder: 'None',
-          onCommit: commit('cap', (v) => ({ cap: v.trim() === '' ? null : v.trim() })),
-        }),
-      ),
-      k.field(
-        'Discount',
-        k.textInput({
-          fieldKey: fk('discount'),
-          value: c.discount_percent,
-          num: true,
-          onCommit: commit('discount', (v) => ({ discount_percent: v.trim() })),
-        }),
-        { extra: '%' },
-      ),
-      chips({
-        fieldKey: fk('fringes'),
-        label: 'Fringes left out of the spend',
-        selected: c.excluded_fringes,
-        options: withKept(fringeNames(), c.excluded_fringes),
-        onChange: (list) => k.run(ik, () => creditArgs(i, { excluded_fringes: list })),
-      }),
-      k.field(
-        'Posts to account',
-        k.textInput({
-          fieldKey: fk('account'),
-          value: c.account || '',
-          placeholder: 'None',
-          onCommit: commit('account', (v) => ({ account: v.trim() === '' ? null : v.trim() })),
-        }),
-        { wide: true },
-      ),
-    );
-
-    const rows = k.el('ol', 'tss-rows');
-    rows.setAttribute('aria-label', `Rows of ${c.name}`);
-    c.rows.forEach((row, n) => rows.append(creditRow(i, n, row, raw, entry, ik)));
-    const addRow = button('Add row', 'setup-btn tss-small', fk('add-row'), () => {
-      k.setFocusKey(k.key('credits', i, c.rows.length, 'description'));
-      k.run(
-        ik,
-        () =>
-          creditArgs(i, (cur) => ({
-            rows: [...cur.rows, { description: '', source: { kind: 'flat', amount: '0' }, percent: '0', cap: { kind: 'none' } }],
-          })),
-        { onError: () => k.setFocusKey(null) },
-      );
-    });
-    const rowsWrap = k.el('div', 'tss-rows-wrap');
-    rowsWrap.append(k.el('p', 'setup-label', c.rows.length ? 'Rows' : 'No rows yet'), rows, addRow);
-    li.append(head, grid, rowsWrap);
-    k.finishItem(li, ik, issuesAt('credit', i), null);
-    ul.append(li);
+    const issues = issuesAt('credit', i);
+    return {
+      name: c.name,
+      applied: c.applied,
+      figure: !c.applied ? 'Not applied' : entry ? k.formatCents(entry.amount) : '',
+      title: [c.name, !c.applied ? 'Not applied' : entry ? 'Credit taken off the grand total' : '', issues.length ? 'This credit has a problem' : '']
+        .filter(Boolean)
+        .join('\n'),
+      bad: issues.length > 0,
+      editor: creditEditor(i, c0, c, entry, issues),
+    };
   });
-  if (credits.length) panel.append(ul);
 
   const taken = {};
   for (const c of credits) taken[k.str(obj(c).name)] = true;
-  panel.append(
-    k.addForm('credits', {
-      title: 'New credit',
-      fields: [k.addInput('credits', 'name', { label: 'Name', placeholder: 'State incentive' })],
-      validate: (v) => {
-        const name = v.name.trim();
-        if (name === '') return ['name', 'Enter a credit name.'];
-        if (taken[name]) return ['name', `There is already a credit named ${name}.`];
-        return null;
-      },
-      build: (v) => [
+  const add = k.addForm('credits', {
+    title: 'New credit',
+    fields: [k.addInput('credits', 'name', { label: 'Name', placeholder: 'State incentive' })],
+    validate: (v) => {
+      const name = v.name.trim();
+      if (name === '') return ['name', 'Enter a credit name.'];
+      if (taken[name]) return ['name', `There is already a credit named ${name}.`];
+      return null;
+    },
+    build: (v) => {
+      // The new credit is picked once it shows up.
+      pickNew.credits = arr(k.budget().credits).length;
+      return [
         'set_credit',
         { index: null, credit: { name: v.name.trim(), account: null, applied: true, cap: null, discount_percent: '0', excluded_fringes: [], rows: [] } },
-      ],
-    }),
-  );
+      ];
+    },
+  });
+
+  listEditor(panel, {
+    tab: 'credits',
+    what: 'credit',
+    label: 'Credits',
+    items,
+    add,
+    empty: 'No credits yet.',
+    move: 'move_credit',
+    deleteText: (i) => `Delete credit ${items[i].name} and its ${k.plural(arr(obj(credits[i]).rows).length, 'row', 'rows')}?`,
+    deleteBuild: (i) => ['delete_credit', { index: i }],
+  });
 }
 
-function creditRow(i, n, row, raw, entry, ik) {
-  const li = k.el('li', 'tss-row');
+// Credit `i`'s editor: name and Applied; cap, discount and account; the
+// fringes left out of its spend; its figures; then its rows as one table.
+function creditEditor(i, c0, c, entry, issues) {
+  const raw = obj(c0);
+  const ik = k.key('credits', i);
+  const fk = (f) => k.key('credits', i, f);
+  const commit = (f, patchOf) => (v, old) =>
+    k.run(ik, () => creditArgs(i, patchOf(v)), { restore: [fk(f), old] });
+  const ed = editorShell(ik, `Credit ${c.name}`);
+
+  const name = k.textInput({ fieldKey: fk('name'), value: c.name, onCommit: commit('name', (v) => ({ name: v })) });
+  const applied = checkbox(fk('applied'), c.applied, 'Applied', (v) =>
+    k.run(ik, () => creditArgs(i, { applied: v }), { restore: [fk('applied'), !v] }),
+  );
+  ed.append(hrow('', inlineField('Name', name, { grow: true }), applied));
+
+  const cap = k.textInput({
+    fieldKey: fk('cap'),
+    value: isNone(raw.cap) ? '' : k.formatCents(raw.cap),
+    num: true,
+    placeholder: 'None',
+    onCommit: commit('cap', (v) => ({ cap: v.trim() === '' ? null : v.trim() })),
+  });
+  const discount = k.textInput({
+    fieldKey: fk('discount'),
+    value: c.discount_percent,
+    num: true,
+    onCommit: commit('discount', (v) => ({ discount_percent: v.trim() })),
+  });
+  const account = k.textInput({
+    fieldKey: fk('account'),
+    value: c.account || '',
+    placeholder: 'None',
+    onCommit: commit('account', (v) => ({ account: v.trim() === '' ? null : v.trim() })),
+  });
+  ed.append(
+    hrow(
+      '',
+      inlineField('Cap on the credit', cap, { size: 'tss-w-num' }),
+      inlineField('Discount', discount, { extra: '%', size: 'tss-w-pct' }),
+      inlineField('Posts to account', account, { size: 'tss-w-acct' }),
+    ),
+  );
+
+  const fringes = chips({
+    fieldKey: fk('fringes'),
+    label: 'Fringes left out of the spend',
+    selected: c.excluded_fringes,
+    options: withKept(fringeNames(), c.excluded_fringes),
+    onChange: (list) => k.run(ik, () => creditArgs(i, { excluded_fringes: list })),
+  });
+  fringes.classList.add('tss-chiprow');
+  ed.append(fringes);
+
+  const sum = hrow('tss-sum');
+  if (!c.applied) sum.append(k.el('span', 'setup-muted', 'Not applied'));
+  else if (entry) {
+    // The discount comes off after the cap; the credit is rounded once.
+    const before = dollarsToCents(entry.capped);
+    if (before !== null) {
+      const d = k.el('span', 'setup-num', k.formatCents(before - BigInt(entry.amount)));
+      d.title = `Exactly ${k.formatDecimal(entry.capped)} before the discount, after the cap`;
+      sum.append(figure('Discount', d));
+    }
+    const net = k.el('span', 'setup-num', k.formatCents(entry.amount));
+    net.title = 'Credit taken off the grand total';
+    sum.append(figure('Net credit', net));
+  }
+  if (sum.childNodes.length) ed.append(sum);
+
+  const addRow = button('Add row', 'setup-btn tss-small', fk('add-row'), () => {
+    k.setFocusKey(k.key('credits', i, c.rows.length, 'description'));
+    k.run(
+      ik,
+      () =>
+        creditArgs(i, (cur) => ({
+          rows: [...cur.rows, { description: '', source: { kind: 'flat', amount: '0' }, percent: '0', cap: { kind: 'none' } }],
+        })),
+      { onError: () => k.setFocusKey(null) },
+    );
+  });
+  ed.append(actionStrip('Rows', addRow), gridWrap(creditGrid(i, c, raw, entry, ik)));
+  k.finishItem(ed, ik, issues, null);
+  return ed;
+}
+
+// A credit's rows as one table: what each is a percent of, its figures from
+// the totals, its cap, and a totals line under them.
+function creditGrid(i, c, raw, entry, ik) {
+  const table = gridTable('tss-grid-credit', `Rows of ${c.name}`, [
+    ['tss-c-spend', 'Spend'],
+    ['tss-c-desc', 'Description'],
+    ['tss-c-fig', 'Amount', true],
+    ['tss-c-fig', 'Gross', true],
+    ['tss-c-fig', 'Fringes out', true],
+    ['tss-c-fig', 'Net', true],
+    ['tss-c-cap', 'Cap type'],
+    ['tss-c-fig', 'Cap', true],
+    ['tss-c-pct', '%', true],
+    ['tss-c-fig', 'Credit', true],
+    ['tss-c-fig', 'Over cap', true],
+  ]);
+  const totals = entry && Array.isArray(entry.rows) ? entry.rows.map(obj) : [];
+  const tbody = k.el('tbody');
+  c.rows.forEach((row, n) => tbody.append(creditRow(i, n, row, raw, totals[n] || null, ik, c.rows.length)));
+  if (!c.rows.length) tbody.append(emptyRow(12, 'No rows yet'));
+  table.append(tbody);
+
+  if (c.rows.length && totals.length) {
+    const add = (f) => {
+      const s = centsSum(totals.map((t) => (isNone(t[f]) ? 0 : t[f])));
+      return s === null ? '' : k.formatCents(s);
+    };
+    const label = cell('Total');
+    label.colSpan = 3;
+    const credit = decimalSum(totals.map((t) => t.credit));
+    const creditCell = cell(credit === null ? '' : money(credit), 'tss-r setup-num');
+    if (credit !== null) creditCell.title = `Exactly ${k.formatDecimal(credit)}, before the credit's cap and discount`;
+    const gap = cell('');
+    gap.colSpan = 3;
+    const tr = k.el('tr');
+    tr.append(
+      label,
+      cell(add('gross'), 'tss-r setup-num'),
+      cell(add('excluded_fringes'), 'tss-r setup-num'),
+      cell(add('net'), 'tss-r setup-num'),
+      gap,
+      creditCell,
+      cell(''),
+      cell(''),
+    );
+    const tfoot = k.el('tfoot');
+    tfoot.append(tr);
+    table.append(tfoot);
+  }
+  return table;
+}
+
+function creditRow(i, n, row, raw, rt, ik, count) {
+  const tr = k.el('tr');
   const fk = (f) => k.key('credits', i, n, f);
   const send = (f, old) => (v) => k.run(ik, () => creditArgs(i, rowPatch(n, () => v)), old === undefined ? {} : { restore: [f, old] });
   const rawRow = obj(arr(raw.rows)[n]);
-
-  const head = k.el('div', 'tss-row-head');
-  head.append(k.el('span', 'tss-row-num', `Row ${n + 1}`));
-  const figs = k.el('span', 'setup-figs');
-  const rt = entry && Array.isArray(entry.rows) ? obj(entry.rows[n]) : null;
-  head.append(
-    figs,
-    button('×', 'setup-del', fk('del'), () => k.run(ik, () => creditArgs(i, (cur) => ({ rows: cur.rows.filter((_, j) => j !== n) }))), `Delete row ${n + 1}`),
-  );
-
-  const grid = k.el('div', 'setup-fields');
-  grid.append(
-    k.field(
-      'Description',
-      k.textInput({
-        fieldKey: fk('description'),
-        value: row.description,
-        onCommit: (v, old) => send(fk('description'), old)({ description: v }),
-      }),
-      { wide: true },
-    ),
-  );
+  const of = (what) => `${what} of row ${n + 1}`;
 
   const groups = groupNames();
   const cats = categoryNames();
   const current =
     row.source.kind === 'group' ? `group:${row.source.group}` : row.source.kind === 'category' ? `category:${row.source.category}` : 'flat';
-  const catLabel = (c) => (cats.get(c) ? `Category: ${c} ${cats.get(c)}` : `Category: ${c}`);
-  const srcOptions = [
-    ['flat', 'Amount typed in'],
-    ...withKept(groups, row.source.kind === 'group' ? [row.source.group] : []).map((g) => [`group:${g}`, `Group: ${g}`]),
-    // A topsheet category's total with its fringes (decisions.md, entry 57).
-    ...withKept([...cats.keys()], row.source.kind === 'category' ? [row.source.category] : []).map((c) => [`category:${c}`, catLabel(c)]),
-  ];
-  grid.append(
-    k.field(
-      'Spend',
-      k.selectInput({
-        fieldKey: fk('source'),
-        value: current,
-        options: srcOptions,
-        onCommit: (v, old) =>
-          send(fk('source'), old)(
-            v === 'flat'
-              ? { source: { kind: 'flat', amount: '0' } }
-              : v.startsWith('category:')
-                ? { source: { kind: 'category', category: v.slice(9) } }
-                : { source: { kind: 'group', group: v.slice(6) } },
-          ),
-      }),
-      { wide: true },
-    ),
-  );
-  if (row.source.kind === 'flat') {
-    grid.append(
-      k.field(
-        'Amount',
-        k.textInput({
+  const catLabel = (code) => (cats.get(code) ? `Category: ${code} ${cats.get(code)}` : `Category: ${code}`);
+  const spend = k.selectInput({
+    fieldKey: fk('source'),
+    value: current,
+    options: [
+      ['flat', 'Amount typed in'],
+      ...withKept(groups, row.source.kind === 'group' ? [row.source.group] : []).map((g) => [`group:${g}`, `Group: ${g}`]),
+      // A topsheet category's total with its fringes (decisions.md, entry 57).
+      ...withKept([...cats.keys()], row.source.kind === 'category' ? [row.source.category] : []).map((code) => [`category:${code}`, catLabel(code)]),
+    ],
+    onCommit: (v, old) =>
+      send(fk('source'), old)(
+        v === 'flat'
+          ? { source: { kind: 'flat', amount: '0' } }
+          : v.startsWith('category:')
+            ? { source: { kind: 'category', category: v.slice(9) } }
+            : { source: { kind: 'group', group: v.slice(6) } },
+      ),
+  });
+  spend.setAttribute('aria-label', of('Spend'));
+  spend.classList.add('tss-spend');
+  spend.title = spend.options[spend.selectedIndex] ? spend.options[spend.selectedIndex].textContent : '';
+
+  const desc = k.textInput({
+    fieldKey: fk('description'),
+    value: row.description,
+    label: of('Description'),
+    onCommit: (v, old) => send(fk('description'), old)({ description: v }),
+  });
+  desc.classList.add('tss-desc');
+
+  const amount =
+    row.source.kind === 'flat'
+      ? k.textInput({
           fieldKey: fk('amount'),
           value: k.formatCents(obj(rawRow.source).amount || 0),
           num: true,
+          label: of('Amount'),
           onCommit: (v, old) => send(fk('amount'), old)({ source: { kind: 'flat', amount: v.trim() } }),
-        }),
-      ),
-    );
-  }
-  grid.append(
-    k.field(
-      'Percent',
-      k.textInput({
-        fieldKey: fk('percent'),
-        value: row.percent,
-        num: true,
-        onCommit: (v, old) => send(fk('percent'), old)({ percent: v.trim() }),
-      }),
-      { extra: '%' },
-    ),
-  );
-  grid.append(
-    k.field(
-      'Cap',
-      k.selectInput({
-        fieldKey: fk('cap-kind'),
-        value: row.cap.kind,
-        options: [
-          ['none', 'No cap'],
-          ['qualified_spend', 'Cap the spend'],
-          ['credit', 'Cap the credit'],
-        ],
-        onCommit: (v, old) =>
-          send(fk('cap-kind'), old)({ cap: v === 'none' ? { kind: 'none' } : { kind: v, amount: row.cap.amount || '0' } }),
-      }),
-    ),
-  );
-  if (row.cap.kind !== 'none') {
-    grid.append(
-      k.field(
-        'Cap amount',
-        k.textInput({
+        })
+      : '';
+
+  const capKind = k.selectInput({
+    fieldKey: fk('cap-kind'),
+    value: row.cap.kind,
+    options: [
+      ['none', 'None'],
+      ['qualified_spend', 'Qualified spend'],
+      ['credit', 'Credit cap'],
+    ],
+    onCommit: (v, old) => send(fk('cap-kind'), old)({ cap: v === 'none' ? { kind: 'none' } : { kind: v, amount: row.cap.amount || '0' } }),
+  });
+  capKind.setAttribute('aria-label', of('Cap type'));
+  capKind.classList.add('tss-captype');
+  capKind.title = 'Qualified spend caps the spend the percent applies to; Credit cap caps the row’s credit';
+  const capAmount =
+    row.cap.kind !== 'none'
+      ? k.textInput({
           fieldKey: fk('cap-amount'),
           value: k.formatCents(obj(rawRow.cap).amount || 0),
           num: true,
+          label: of('Cap'),
           onCommit: (v, old) => send(fk('cap-amount'), old)({ cap: { kind: row.cap.kind, amount: v.trim() } }),
-        }),
-      ),
-    );
-  }
-  li.append(head);
-  if (rt && !isNone(rt.net)) li.append(creditFigures(rt, row));
-  li.append(grid);
-  return li;
+        })
+      : '';
+  const percent = k.textInput({
+    fieldKey: fk('percent'),
+    value: row.percent,
+    num: true,
+    label: of('Percent'),
+    onCommit: (v, old) => send(fk('percent'), old)({ percent: v.trim() }),
+  });
+  percent.classList.add('tss-pct');
+
+  const fig = (v, title) => {
+    const td = cell(v, 'tss-r setup-num');
+    if (title) td.title = title;
+    return td;
+  };
+  const has = rt && !isNone(rt.net);
+  const credit = has ? fig(money(rt.credit), `Exactly ${k.formatDecimal(rt.credit)}; rows are added before rounding`) : fig('');
+  const [overText, overTitle] = has ? overCap(rt, row) : ['', ''];
+
+  // Focus goes to the row taking this one's place, else the one before,
+  // else Add row.
+  const after = n < count - 1 ? fk('del') : n > 0 ? k.key('credits', i, n - 1, 'del') : k.key('credits', i, 'add-row');
+  const del = button('×', 'setup-del tss-row-del', fk('del'), () => {
+    k.setFocusKey(after);
+    k.run(ik, () => creditArgs(i, (cur) => ({ rows: cur.rows.filter((_, j) => j !== n) })), { onError: () => k.setFocusKey(null) });
+  }, `Delete row ${n + 1}`);
+
+  tr.append(
+    cell(spend),
+    cell(desc),
+    cell(amount),
+    fig(has ? k.formatCents(rt.gross) : '', 'The row’s spend before fringes are left out'),
+    fig(has ? k.formatCents(rt.excluded_fringes) : '', 'Fringes left out of the spend'),
+    fig(has ? k.formatCents(rt.net) : '', 'The spend the percent applies to'),
+    cell(capKind),
+    cell(capAmount),
+    cell(percent),
+    credit,
+    fig(overText, overTitle),
+    cell(del, 'tss-td-del'),
+  );
+  return tr;
+}
+
+// A credit row against its cap: how far over it is (in parentheses when
+// under), and a tooltip that says which and by exactly how much.
+function overCap(rt, row) {
+  if (isNone(rt.cap_variance) || row.cap.kind === 'none') return ['', ''];
+  const what = row.cap.kind === 'qualified_spend' ? 'Spend' : 'Credit';
+  const exact = k.formatDecimal(k.str(rt.cap_variance).replace(/^-/, ''));
+  const c = dollarsToCents(rt.cap_variance);
+  if (c === null) return [k.str(rt.cap_variance), `Exactly ${exact} against the cap`];
+  if (c === 0n) return [k.formatCents(0), 'At the cap'];
+  const over = c < 0n;
+  return [k.formatCents(-c), `${what} ${over ? 'over' : 'under'} the cap by exactly ${exact}`];
 }
 
 // Dollars as a decimal string ("1307.375") rounded half away from zero to
@@ -990,34 +1511,6 @@ function dollarsToCents(v) {
 function money(v) {
   const c = dollarsToCents(v);
   return c === null ? k.str(v) : k.formatCents(c);
-}
-
-// A credit row's figures from the totals: its spend, the fringes left out of
-// it, the net it is figured on, the credit, and how far it is from its cap.
-function creditFigures(rt, row) {
-  const figs = k.el('p', 'setup-figs tss-row-figs');
-  const fig = (label, text, title) => {
-    const f = k.el('span', 'tss-fig');
-    f.append(k.el('span', 'setup-muted', label), k.el('span', 'setup-num', text));
-    if (title) f.title = title;
-    figs.append(f);
-  };
-  fig('Spend', k.formatCents(rt.gross), 'The row’s spend before fringes are left out');
-  fig('Fringes out', k.formatCents(rt.excluded_fringes), 'Fringes left out of the spend');
-  fig('Net', k.formatCents(rt.net), 'The spend the percent applies to');
-  fig('Credit', money(rt.credit), `Exactly ${k.formatDecimal(rt.credit)}; rows are added before rounding`);
-  if (!isNone(rt.cap_variance) && row.cap.kind !== 'none') {
-    const what = row.cap.kind === 'qualified_spend' ? 'Spend' : 'Credit';
-    const c = dollarsToCents(rt.cap_variance);
-    const exact = `Exactly ${k.formatDecimal(rt.cap_variance)} against the cap`;
-    if (c === null) fig('Cap', k.str(rt.cap_variance), exact);
-    else if (c === 0n) fig('Cap', 'At the cap', exact);
-    else {
-      const over = c < 0n;
-      fig(over ? `${what} over the cap by` : `${what} under the cap by`, k.formatCents(over ? -c : c), exact);
-    }
-  }
-  return figs;
 }
 
 // ---------------------------------------------------------------------------
