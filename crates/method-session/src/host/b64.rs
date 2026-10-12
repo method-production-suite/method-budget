@@ -33,7 +33,7 @@ pub fn encode(bytes: &[u8]) -> String {
 pub fn decode(text: &str) -> Result<Vec<u8>, String> {
     let bad = || "the file's bytes aren't base64".to_string();
     let digits: Vec<u8> = text.bytes().filter(|c| !c.is_ascii_whitespace()).collect();
-    if digits.len() % 4 != 0 {
+    if !digits.len().is_multiple_of(4) {
         return Err(bad());
     }
     let mut out = Vec::with_capacity(digits.len() / 4 * 3);
