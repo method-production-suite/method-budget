@@ -7,9 +7,10 @@
 //!   JSON, so a budget saved as `.json` is one) opens in a tab, as before.
 //! - **A budget export** (budget exchange JSON or XML, the export's Excel
 //!   workbook or tab-delimited topsheet, found by content) goes to Import
-//!   Budget Export…'s review with the file already picked: the page shows
-//!   the line-by-line check and Import opens the budget in a new unsaved
-//!   tab.
+//!   Budget Export…'s review with the file already picked, worded as
+//!   converting it (entry 67): the page shows the line-by-line check and
+//!   Convert opens the budget in a new unsaved tab that says where it came
+//!   from and is first saved beside the export as a `.mthd`.
 //! - **A spreadsheet** that isn't an export (`.xlsx`, `.csv`, `.tsv`,
 //!   `.txt`, `.tab`) goes to Import Spreadsheet's dialog with the file
 //!   picked; the page starts it on "a new budget tab".
@@ -174,9 +175,18 @@ pub(crate) fn open_any<R: Runtime>(
         }
         Plan::Export(done) => {
             let (built, rec) = *done;
-            let token = window.state::<ExportSources>().keep(file.clone(), bytes);
+            // Opened, not imported: the review converts it (decisions.md,
+            // entry 67), and the first Save starts beside it.
+            let token = window.state::<ExportSources>().keep(
+                file.clone(),
+                bytes,
+                Some(path.to_path_buf()),
+                true,
+            );
+            let mut review = crate::export_import::review(token, &file, &built, &rec);
+            review.convert = true;
             Ok(Opened::Export {
-                review: Box::new(crate::export_import::review(token, &file, &built, &rec)),
+                review: Box::new(review),
             })
         }
         Plan::Sheet(book) => {
@@ -275,6 +285,52 @@ mod tests {
         let csv = b"Account,Description,Amount,Rate\n1101,Writer,1,5000\n";
         assert_eq!(kind(&plan("lines.csv", csv)), "sheet");
         assert_eq!(kind(&plan("lines.txt", b"a\tb\tc\n1\t2\t3\n")), "sheet");
+    }
+
+    /// Finder offers the app for budget exports on macOS only, as a second
+    /// choice (entry 67): tauri.macos.conf.json replaces the associations
+    /// there and must keep the `.mthd` one as it is everywhere else.
+    #[test]
+    fn macos_offers_the_app_for_exports_as_a_second_choice() {
+        let parse = |s: &str| serde_json::from_str::<serde_json::Value>(s).unwrap();
+        let all = parse(include_str!("../tauri.conf.json"));
+        let mac = parse(include_str!("../tauri.macos.conf.json"));
+        let base = all["bundle"]["fileAssociations"].as_array().unwrap();
+        let ours = mac["bundle"]["fileAssociations"].as_array().unwrap();
+        // Every platform: .mthd only, so Windows and Linux register nothing else.
+        assert_eq!(base.len(), 1);
+        assert_eq!(base[0]["ext"], serde_json::json!(["mthd"]));
+        // macOS: the same .mthd association, first and unchanged.
+        assert_eq!(ours[0], base[0]);
+        // Only the associations differ from the shared file.
+        assert_eq!(mac.as_object().unwrap().len(), 1);
+        assert_eq!(mac["bundle"].as_object().unwrap().len(), 1);
+        // The rest: existing system types, viewer, never the default.
+        let mut exts = Vec::new();
+        for a in &ours[1..] {
+            assert_eq!(a["role"], "Viewer", "{a}");
+            assert_eq!(a["rank"], "Alternate", "{a}");
+            assert!(a.get("exportedType").is_none(), "{a}");
+            for t in a["contentTypes"].as_array().unwrap() {
+                assert!(
+                    t.as_str().unwrap().starts_with("public.")
+                        || t.as_str().unwrap().starts_with("org.openxmlformats."),
+                    "{t}"
+                );
+            }
+            for e in a["ext"].as_array().unwrap() {
+                exts.push(e.as_str().unwrap().to_string());
+            }
+        }
+        // Each one is an extension the budget export reader takes.
+        for e in &exts {
+            assert!(exchange::READABLE_EXTENSIONS.contains(&e.as_str()), "{e}");
+        }
+        for e in ["json", "xml", "xlsx"] {
+            assert!(exts.iter().any(|x| x == e), "{e}");
+        }
+        // Not plain text: every text and source file conforms to it.
+        assert!(!exts.iter().any(|x| x == "txt"));
     }
 
     #[test]

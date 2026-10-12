@@ -306,6 +306,10 @@ pub struct Session {
     /// shared budget): old -> new, so the row a command made can still be
     /// found.
     remap: HashMap<RowId, RowId>,
+    /// Where the first Save suggests putting a budget never saved (a budget
+    /// converted from an export: next to the export, under its name with
+    /// `.mthd`; decisions.md, entry 67).
+    save_hint: Option<PathBuf>,
 }
 
 /// What autosave needs to know about one open budget.
@@ -378,6 +382,7 @@ impl Session {
             shared: None,
             notice: None,
             remap: HashMap::new(),
+            save_hint: None,
         }
     }
 
@@ -400,6 +405,16 @@ impl Session {
 
     pub fn path(&self) -> Option<&Path> {
         self.path.as_deref()
+    }
+
+    /// Where the first Save suggests putting the budget, when it has no
+    /// file yet (a converted export's folder and name).
+    pub fn save_hint(&self) -> Option<&Path> {
+        self.save_hint.as_deref()
+    }
+
+    pub fn set_save_hint(&mut self, path: Option<PathBuf>) {
+        self.save_hint = path;
     }
 
     /// Unsaved changes. In a shared budget: changes of this person's not yet

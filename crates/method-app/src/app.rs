@@ -7,7 +7,7 @@
 //! `doc` argument names: src/docs.rs); navigation away from the bundled UI is
 //! blocked.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use method_core::RowId;
 use tauri::{AppHandle, Manager, Runtime, State, WebviewWindow};
@@ -240,14 +240,10 @@ fn save_doc<R: Runtime>(
     save_as: bool,
     dialog_title: Option<&str>,
 ) -> CmdResult<Option<bool>> {
-    let (current, suggested) = {
+    let (current, start) = {
         let s = state.lock_doc(Some(id))?;
-        let title = s.budget().title.trim().to_string();
-        let suggested = match s.path().and_then(|p| p.file_stem()) {
-            Some(stem) => stem.to_string_lossy().into_owned(),
-            None => title,
-        };
-        (s.path().map(PathBuf::from), suggested)
+        let start = save_dialog_start(s.path(), s.save_hint(), &s.budget().title);
+        (s.path().map(PathBuf::from), start)
     };
     let path = match current {
         Some(p) if !save_as => {
@@ -268,13 +264,9 @@ fn save_doc<R: Runtime>(
                 .file()
                 .set_title(title)
                 .add_filter(FILTER_NAME, &[method_format::EXTENSION])
-                .set_file_name(format!(
-                    "{}.{}",
-                    safe_file_stem(&suggested),
-                    method_format::EXTENSION
-                ))
+                .set_file_name(start.1)
                 .set_parent(window);
-            if let Some(dir) = current.as_deref().and_then(|p| p.parent()) {
+            if let Some(dir) = start.0 {
                 dialog = dialog.set_directory(dir);
             }
             let Some(picked) = dialog.blocking_save_file() else {
@@ -288,6 +280,32 @@ fn save_doc<R: Runtime>(
     // If the file changed outside the app, nothing is written and the page
     // asks what to do instead.
     crate::safety_app::save_from(window, state, id, &path).map(Some)
+}
+
+/// Where the Save dialog starts and the file name it suggests, for a budget
+/// at `path` (`None`: never saved) titled `title`. A budget never saved
+/// that came from a file (`hint`: a converted export's folder and name with
+/// `.mthd`, decisions.md entry 67) starts there; otherwise a saved budget's
+/// own folder and name, or the title. The dialog asks before replacing a
+/// file, as always.
+pub(crate) fn save_dialog_start(
+    path: Option<&Path>,
+    hint: Option<&Path>,
+    title: &str,
+) -> (Option<PathBuf>, String) {
+    let at = path.or(hint);
+    let stem = match at.and_then(|p| p.file_stem()) {
+        Some(stem) => stem.to_string_lossy().into_owned(),
+        None => title.trim().to_string(),
+    };
+    let dir = at
+        .and_then(|p| p.parent())
+        .filter(|d| !d.as_os_str().is_empty())
+        .map(PathBuf::from);
+    (
+        dir,
+        format!("{}.{}", safe_file_stem(&stem), method_format::EXTENSION),
+    )
 }
 
 /// A file name stem from a budget title: path separators and other characters
@@ -1730,6 +1748,30 @@ mod tests {
         assert!(!ok("file:///etc/passwd"));
         assert!(!ok("tauri://evil/"));
         assert!(!ok("http://tauri.localhost.example.com/"));
+    }
+
+    #[test]
+    fn the_save_dialog_starts_by_the_file_the_budget_came_from() {
+        // A converted export: its folder, its name with .mthd.
+        let hint = crate::export_import::save_path_for(Path::new("/films/Pilot budget.json"));
+        assert_eq!(hint, PathBuf::from("/films/Pilot budget.mthd"));
+        assert_eq!(
+            save_dialog_start(None, Some(&hint), "Something else"),
+            (
+                Some(PathBuf::from("/films")),
+                "Pilot budget.mthd".to_string()
+            )
+        );
+        // Once saved, its own file decides.
+        assert_eq!(
+            save_dialog_start(Some(Path::new("/b/Mine.mthd")), Some(&hint), "x"),
+            (Some(PathBuf::from("/b")), "Mine.mthd".to_string())
+        );
+        // Never saved, from nowhere: the title, wherever the dialog likes.
+        assert_eq!(
+            save_dialog_start(None, None, " My Film: Part 2 "),
+            (None, "My Film  Part 2.mthd".to_string())
+        );
     }
 
     #[test]

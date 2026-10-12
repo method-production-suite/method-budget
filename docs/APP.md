@@ -53,9 +53,11 @@ tab brought forward, and an untouched Untitled budget alone in the window gives 
 to the file. **Open also reads budget exports and spreadsheets** (decisions.md, entry 66;
 src/open_any.rs): its dialog allows `.mthd`, `.json`, `.xml`, `.xlsx`, `.csv`, `.tsv`,
 `.txt` and `.tab`, and the file's content decides what happens. A budget (any file in our
-format, `.json` included) opens in a tab; a budget export goes to Import Budget Export…'s
-review with the file picked (below, "Importing a budget export"), so Import as New Budget
-opens it in a new unsaved tab; another spreadsheet goes to Import Spreadsheet's dialog with
+format, `.json` included) opens in a tab; a budget export is converted: it goes to Import
+Budget Export…'s review with the file picked, worded as a conversion (below, "Importing a
+budget export"; entry 67), and Convert to Method Budget opens it in a new unsaved tab that
+says once where it came from and is first saved beside the export as a `.mthd`; another
+spreadsheet goes to Import Spreadsheet's dialog with
 the file picked and "A new budget tab" chosen; anything else gets a message saying what
 Open reads. The start window's Open…, a file from the system and a file dropped on the
 window go the same way. Close Tab (Cmd+W), the × or a middle-click closes a tab: with Autosave on its
@@ -2003,13 +2005,25 @@ before anything changes:
 
 **Import as New Budget** opens it in a new tab, unsaved (its first undo step), like Import
 Chart of Accounts' new budget; the toast says what came in. It is disabled when the budget
-doesn't recalculate or has no categories.
+doesn't recalculate or has no categories. The new tab's first Save (or Save As) starts in
+the export's folder with the export's name and `.mthd` ("Pilot budget.json" gives "Pilot
+budget.mthd"); the Save dialog asks before replacing a file, as always.
+
+**Converting an export** (decisions.md, entry 67). An export that arrives through File >
+Open, the start window's Open…, the Finder (double-click, Open With) or a drop gets the
+same review, worded as converting it: the title is "Convert budget export: <file>", the
+introduction says the original file is left as it is, and the button is **Convert to
+Method Budget** (the review's `convert` is true). The new tab then says once (the view's
+notice, shown as a toast): "Converted from <file>. The original file is left as it was.
+Saving keeps this budget as a Method Budget file (.mthd)." and its first Save starts
+beside the export as above. Nothing is ever written in the export's layout: the `.mthd`
+is the working file.
 
 | Command | Arguments | Returns |
 |---|---|---|
-| `export_import_pick` | none (shows the Open dialog) | the review, or `null` when cancelled: `{token, file, format, format_label, formats, title, categories, accounts, lines, adjustments, fringes, groups, sets, locations, currencies, charges, credits, notes: [{kind, text}], currency, tallies: [{kind, label, compared, different}], differences: [{kind, what, export, imported}], difference_count, export_grand, grand, export_net, net, calc_error, matches}` |
+| `export_import_pick` | none (shows the Open dialog) | the review, or `null` when cancelled: `{token, file, format, format_label, formats, title, categories, accounts, lines, adjustments, fringes, groups, sets, locations, currencies, charges, credits, notes: [{kind, text}], currency, tallies: [{kind, label, compared, different}], differences: [{kind, what, export, imported}], difference_count, export_grand, grand, export_net, net, calc_error, matches, convert}` (`convert`: false here, true from Open) |
 | `export_import_preview` | `token`, `format` (`null` to detect) | the review, read as that layout; changes nothing |
-| `export_import` | `token`, `format` | `{view, message}`: the budget in a new tab in front |
+| `export_import` | `token`, `format` | `{view, message}`: the budget in a new tab in front; `message` is `null` for a conversion, whose notice comes with the view |
 
 ### Actuals and the cost report
 
@@ -2214,9 +2228,14 @@ documents list is not updated.
 the Dock icon or the window opens it in a tab (its own tab, when it is open already): on
 macOS the app receives an open event, on Windows and Linux the path arrives on the command
 line, and a drop on the window is Tauri's drop event, handled in Rust. A budget export or
-spreadsheet handed over this way goes where Open sends it (above, entry 66); the bundle
-still declares `.mthd` only, so Finder offers the app for other files through Open With >
-Other…. Nothing
+spreadsheet handed over this way goes where Open sends it (above, entry 66). On macOS the
+bundle also offers the app for `.json`, `.xml`, `.xlsx` and `.tsv` files as a second choice
+under Open With (role Viewer, rank Alternate, on the system's own types: public.json,
+public.xml, org.openxmlformats.spreadsheetml.sheet, public.tab-separated-values-text;
+`crates/method-app/tauri.macos.conf.json`, entry 67), never as their default app; `.txt`
+is left out (every text and source file is plain text). Windows and Linux declare `.mthd`
+only, so there the app is offered for other files through the system's own "choose
+another app". Nothing
 is asked: no budget is replaced. When several files arrive at once, the first one opens. On macOS a
 second double-click goes to the running app. On Windows and Linux there is no
 single-instance handling: a second launch with a path starts a second copy of the app with
@@ -2231,7 +2250,7 @@ The app's data folder is the platform's local app data folder for
 | `autosave_setting`, `set_autosave` | `on` (set) | the setting |
 | `flush_autosave` | `doc` | View (autosaved now, if anything was unsaved) |
 | `open_pending` | none | what Open returns for a file the system asked to open or one dropped on the window (below), or `null` |
-| `open_budget` | none (shows the Open dialog) | `{kind: "budget", view}` (in a tab), `{kind: "export", review}` (`export_import_pick`'s review), `{kind: "sheet", picked}` (`sheet_import_pick`'s result), or `null` when cancelled; anything else is an error saying what Open reads |
+| `open_budget` | none (shows the Open dialog) | `{kind: "budget", view}` (in a tab), `{kind: "export", review}` (`export_import_pick`'s review, with `convert` true), `{kind: "sheet", picked}` (`sheet_import_pick`'s result), or `null` when cancelled; anything else is an error saying what Open reads |
 | `open_recent` | `index` (its place in Open Recent) | View (in a tab), or `null` |
 | `recovery_list` | none | `[{ key, path, name, title, saved_at_ms }]`, newest first |
 | `open_recovered`, `discard_recovered` | `key` | View (in a tab); the remaining list |
@@ -2330,7 +2349,7 @@ crates/method-app/
                      dialog's preview and the import (method_format::import does the work)
   src/export_import.rs  Import Budget Export: the picked export kept by token, the review
                      (method_format::import::exchange reads, builds and checks) and the
-                     new tab
+                     new tab (a conversion's notice, the first Save beside the export)
   src/open_any.rs    Open's routing by content: a budget in a tab, a budget export to
                      Import Budget Export's review, a spreadsheet to Import Spreadsheet
   src/actuals.rs     Import Actuals, the Actuals tab's commands and the cost figures

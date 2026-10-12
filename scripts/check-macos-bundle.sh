@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Inspects a built macOS bundle without opening it: architecture, minimum macOS,
-# the .mthd document type, and the code signature.
+# the document types, and the code signature.
 # Usage: scripts/check-macos-bundle.sh [path/to/Method Budget.app]
 set -euo pipefail
 
@@ -28,6 +28,9 @@ else
   exit 1
 fi
 /usr/libexec/PlistBuddy -c "Print :UTExportedTypeDeclarations:0:UTTypeIdentifier" "$plist"
+# The budget exports offered under Open With (rank Alternate; tauri.macos.conf.json).
+/usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes" "$plist" \
+  | grep -E "CFBundleTypeName|LSHandlerRank|CFBundleTypeRole" || true
 
 echo "== Signature"
 codesign -dv "$app" 2>&1

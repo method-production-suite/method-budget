@@ -2911,9 +2911,60 @@ where it belongs (src/open_any.rs; docs/APP.md, "Tabs" and "Opening from the sys
   `.json`, `.xml`, `.xlsx`, `.csv` and `.txt` would put the app in Finder's Open With
   list and let the Dock icon take them, but on Windows the installer would register the
   app for those types system-wide; left for the owner. Open With > Other… already works.
+  (The owner's answer, entry 67: macOS only, as a second choice.)
 - Tests: src/open_any.rs (a budget saved as `.json` and `.txt`, a `.mthd` by name, JSON,
   XML, workbook and tab-delimited exports from the exchange fixtures, a plain workbook,
   CSV and tab-delimited text, and files Open doesn't read).
+
+## 67. Opening a budget export converts it; macOS offers the app for exports (2026-10-12, the owner)
+
+The owner's answers to entry 66's open question and to how an opened export should
+behave. docs/APP.md ("Tabs", "Importing a budget export", "Opening from the system") is
+the user's account.
+
+- **Finder's Open With, macOS only.** `crates/method-app/tauri.macos.conf.json` lists the
+  bundle's file associations for macOS: the `.mthd` one exactly as `tauri.conf.json` has it
+  (first, so `scripts/check-macos-bundle.sh` still finds it at index 0), then `.json`
+  (public.json), `.xml` (public.xml), `.xlsx` (org.openxmlformats.spreadsheetml.sheet) and
+  `.tsv`/`.tab` (public.tab-separated-values-text), each role Viewer and rank Alternate:
+  offered under Open With, never the default. They name the system's own types
+  (`LSItemContentTypes`); no type is exported or imported for them. Tauri merges a
+  platform file over `tauri.conf.json` as a JSON merge patch, so the array is replaced
+  whole and must repeat the `.mthd` entry; Windows and Linux read `tauri.conf.json` alone
+  and still register `.mthd` only (no system-wide `.json`/`.xml`/`.txt` claim). The release
+  workflow's macOS job runs `cargo tauri build` in `crates/method-app`, which picks the
+  platform file up by itself; xtask, the release tooling and the tests that read
+  `tauri.conf.json` (version, updater key, windows, capabilities) read nothing the platform
+  file changes.
+- **Not `.txt`.** The tab-delimited topsheet is often a `.txt`, but every text and source
+  file conforms to public.plain-text, so claiming it would offer the app for all of them.
+  Such a file opens with File > Open, a drop on the window or Open With > Other….
+- **An opened export is converted, and the app says so.** An export that arrives through
+  Open, the start window, the Finder or a drop (entry 66's export route) still gets the
+  line-by-line review, worded as converting: "Convert budget export: <file>", an
+  introduction that says the original is left as it is, and **Convert to Method Budget**.
+  File > Import Budget Export… keeps its import wording (it is the import, chosen as such).
+  Rust marks the review (`convert`) and keeps the mark with the file by token, so the
+  page decides nothing about where the file came from.
+- **The notice.** The converted tab's first view carries a notice (the session's one-time
+  notice, shown as a toast): "Converted from <file>. The original file is left as it was.
+  Saving keeps this budget as a Method Budget file (.mthd)." An import keeps its toast
+  saying what came in instead.
+- **The first Save beside the export.** A budget from an export (converted or imported)
+  remembers where the export is (`Session::save_hint`); while it has no file, Save and Save
+  As start the Save dialog in the export's folder with the export's name and `.mthd`
+  ("Pilot budget.json" gives "Pilot budget.mthd"). It is the normal Save dialog, which asks
+  before replacing a file; paths stay in Rust.
+- **Never written back.** Nothing is saved in the export's layout; the `.mthd` is the
+  working file. Writing the other program's layouts is a separate export feature, not this.
+- Tests: src/export_import.rs (the converted tab's notice, once, and its save path; an
+  import's message and save path; the saved name for several exports), src/app.rs (where
+  the Save dialog starts and what it suggests), src/open_any.rs
+  (`tauri.macos.conf.json` parses, keeps the `.mthd` association unchanged and first,
+  changes nothing else, and claims only exports the reader takes, as Viewer and
+  Alternate). The bundle was built (`cargo tauri build --bundles app`) and its Info.plist
+  read: `CFBundleDocumentTypes` lists Method Budget (Editor, Owner,
+  com.methodbudget.mthd) and the four export types (Viewer, Alternate).
 
 ## 68. A real budget's export: ranges, percent units, numbered charges, the percent order (2026-10-12)
 

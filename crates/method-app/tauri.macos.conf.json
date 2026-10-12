@@ -1,0 +1,68 @@
+{
+  "bundle": {
+    "fileAssociations": [
+      {
+        "ext": [
+          "mthd"
+        ],
+        "name": "Method Budget",
+        "description": "Method Budget",
+        "role": "Editor",
+        "rank": "Owner",
+        "mimeType": "application/vnd.method-budget+json",
+        "exportedType": {
+          "identifier": "com.methodbudget.mthd",
+          "conformsTo": [
+            "public.json",
+            "public.data"
+          ]
+        }
+      },
+      {
+        "ext": [
+          "json"
+        ],
+        "contentTypes": [
+          "public.json"
+        ],
+        "name": "Budget export (JSON)",
+        "role": "Viewer",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "xml"
+        ],
+        "contentTypes": [
+          "public.xml"
+        ],
+        "name": "Budget export (XML)",
+        "role": "Viewer",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "xlsx"
+        ],
+        "contentTypes": [
+          "org.openxmlformats.spreadsheetml.sheet"
+        ],
+        "name": "Budget export (Excel)",
+        "role": "Viewer",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "tsv",
+          "tab"
+        ],
+        "contentTypes": [
+          "public.tab-separated-values-text"
+        ],
+        "name": "Budget export (tab-delimited)",
+        "role": "Viewer",
+        "rank": "Alternate"
+      }
+    ]
+  }
+}

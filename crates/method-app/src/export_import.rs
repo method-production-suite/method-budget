@@ -13,9 +13,15 @@
 //!   every figure that differs. The layout is detected; the dialog can read
 //!   the file as another one.
 //! - **Importing** opens the budget in a new tab, unsaved (its first undo
-//!   step), like Import Chart of Accounts' new budget.
+//!   step), like Import Chart of Accounts' new budget. Its first Save starts
+//!   in the export's folder under the export's name with `.mthd`.
+//! - **Converting.** An export opened with Open, from Finder or dropped on
+//!   the window (src/open_any.rs) gets the same review, worded as a
+//!   conversion, and the new tab says once where it came from, that the
+//!   export is left as it was and that saving keeps a `.mthd` (decisions.md,
+//!   entry 67). Nothing is ever written in the export's own layout.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use method_core::Cents;
@@ -42,6 +48,18 @@ struct Source {
     token: u64,
     file: String,
     bytes: Arc<Vec<u8>>,
+    /// Where the export is (for the first Save's folder and name).
+    path: Option<PathBuf>,
+    /// It arrived through Open, Finder or a drop: a conversion.
+    convert: bool,
+}
+
+/// What the import needs of the picked export.
+struct Picked {
+    file: String,
+    bytes: Arc<Vec<u8>>,
+    path: Option<PathBuf>,
+    convert: bool,
 }
 
 /// The last export picked (the app's state; one for every budget).
@@ -55,7 +73,15 @@ impl ExportSources {
         self.inner.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    pub(crate) fn keep(&self, file: String, bytes: Vec<u8>) -> u64 {
+    /// Keeps the export read from `path` (named `file`); `convert` when it
+    /// arrived through Open rather than Import Budget Export….
+    pub(crate) fn keep(
+        &self,
+        file: String,
+        bytes: Vec<u8>,
+        path: Option<PathBuf>,
+        convert: bool,
+    ) -> u64 {
         let mut g = self.lock();
         g.0 += 1;
         let token = g.0;
@@ -63,15 +89,22 @@ impl ExportSources {
             token,
             file,
             bytes: Arc::new(bytes),
+            path,
+            convert,
         });
         token
     }
 
-    fn get(&self, token: u64) -> Result<(String, Arc<Vec<u8>>), String> {
+    fn get(&self, token: u64) -> Result<Picked, String> {
         let g = self.lock();
         g.1.as_ref()
             .filter(|s| s.token == token)
-            .map(|s| (s.file.clone(), s.bytes.clone()))
+            .map(|s| Picked {
+                file: s.file.clone(),
+                bytes: s.bytes.clone(),
+                path: s.path.clone(),
+                convert: s.convert,
+            })
             .ok_or_else(|| "Another file was picked since. Import again.".to_string())
     }
 }
@@ -143,13 +176,17 @@ pub struct Review {
     pub calc_error: Option<String>,
     /// Every compared figure is the same.
     pub matches: bool,
+    /// The export arrived through Open (or Finder, or a drop): the review
+    /// is worded as converting it.
+    pub convert: bool,
 }
 
-/// What `export_import` did.
+/// What `export_import` did. A conversion's notice comes with the view
+/// (`view.notice`), so there is no message then.
 #[derive(Debug, Serialize)]
 pub struct Imported {
     pub view: View,
-    pub message: String,
+    pub message: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -243,12 +280,38 @@ pub fn review(token: u64, file: &str, im: &Built, rec: &Reconciliation) -> Revie
         net: rec.net,
         calc_error: rec.calc_error.clone(),
         matches: rec.matches(),
+        convert: false,
     }
 }
 
+/// Where a budget converted from the export at `export` is first offered
+/// to be saved: the export's folder, its name with `.mthd`
+/// ("Pilot budget.json" -> "Pilot budget.mthd").
+pub fn save_path_for(export: &Path) -> PathBuf {
+    let stem = export
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let name = format!(
+        "{}.{}",
+        crate::app::safe_file_stem(&stem),
+        method_format::EXTENSION
+    );
+    export.with_file_name(name)
+}
+
+/// What a converted budget's tab says once.
+pub fn converted_notice(file: &str) -> String {
+    format!(
+        "Converted from {file}. The original file is left as it was. Saving keeps this \
+budget as a Method Budget file (.mthd)."
+    )
+}
+
 /// A new session holding the imported budget, as its first undo step (so
-/// it starts unsaved).
-fn new_session(im: Built) -> Result<(Session, String), String> {
+/// it starts unsaved), first saved next to the export. A conversion says
+/// so with its first view; an import has a message for the toast.
+fn new_session(im: Built, from: &Picked) -> Result<(Session, Option<String>), String> {
     let c = im.counts.clone();
     if c.categories == 0 {
         return Err("The export has no categories to import.".into());
@@ -262,13 +325,18 @@ fn new_session(im: Built) -> Result<(Session, String), String> {
         *b = made;
         Ok(())
     })?;
+    s.set_save_hint(from.path.as_deref().map(save_path_for));
+    if from.convert {
+        s.set_notice(converted_notice(&from.file));
+        return Ok((s, None));
+    }
     let msg = format!(
         "Imported {}, {} and {}: check the notes in the review before relying on it.",
         count(c.categories, "category", "categories"),
         count(c.accounts, "account", "accounts"),
         count(c.lines, "line", "lines")
     );
-    Ok((s, msg))
+    Ok((s, Some(msg)))
 }
 
 // ---------------------------------------------------------------------------
@@ -310,7 +378,7 @@ pub async fn export_import_pick<R: Runtime>(
         .unwrap_or_default();
     let bytes = read_capped(&path)?;
     let (im, rec) = read(&file, &bytes, None)?;
-    let token = sources.keep(file.clone(), bytes);
+    let token = sources.keep(file.clone(), bytes, Some(path), false);
     Ok(Some(review(token, &file, &im, &rec)))
 }
 
@@ -322,9 +390,11 @@ pub fn export_import_preview(
     token: u64,
     format: Option<String>,
 ) -> Result<Review, String> {
-    let (file, bytes) = sources.get(token)?;
-    let (im, rec) = read(&file, &bytes, format_of(format.as_deref())?)?;
-    Ok(review(token, &file, &im, &rec))
+    let p = sources.get(token)?;
+    let (im, rec) = read(&p.file, &p.bytes, format_of(format.as_deref())?)?;
+    let mut r = review(token, &p.file, &im, &rec);
+    r.convert = p.convert;
+    Ok(r)
 }
 
 /// Imports the picked export as a new budget in a new tab.
@@ -336,9 +406,9 @@ pub fn export_import<R: Runtime>(
     token: u64,
     format: Option<String>,
 ) -> Result<Imported, String> {
-    let (file, bytes) = sources.get(token)?;
-    let (im, _) = read(&file, &bytes, format_of(format.as_deref())?)?;
-    let (session, message) = new_session(im)?;
+    let p = sources.get(token)?;
+    let (im, _) = read(&p.file, &p.bytes, format_of(format.as_deref())?)?;
+    let (session, message) = new_session(im, &p)?;
     let id = state.docs().add(session);
     Ok(Imported {
         view: finish(&window, &mut state.lock_doc(Some(id))?, None),
@@ -369,10 +439,64 @@ mod tests {
         assert!(r.formats.iter().any(|f| f.key == "json"));
         // Things to check come first.
         assert_eq!(r.notes[0].kind, "check");
-        let (s, msg) = new_session(im).unwrap();
+        let from = Picked {
+            file: "x.json".into(),
+            bytes: Arc::new(Vec::new()),
+            path: Some(PathBuf::from("/films/x.json")),
+            convert: false,
+        };
+        let (mut s, msg) = new_session(im, &from).unwrap();
         assert!(s.is_dirty());
         assert_eq!(s.budget().charges.len(), 1);
+        let msg = msg.unwrap();
         assert!(msg.contains("1 line"), "{msg}");
+        // Imported, not converted: no notice; still saved by the export.
+        assert_eq!(s.take_notice(), None);
+        assert_eq!(s.save_hint(), Some(Path::new("/films/x.mthd")));
+    }
+
+    #[test]
+    fn a_converted_export_says_so_once_and_saves_beside_it() {
+        let (im, _) = read("x.json", EXPORT.as_bytes(), None).unwrap();
+        let from = Picked {
+            file: "Pilot budget.json".into(),
+            bytes: Arc::new(Vec::new()),
+            path: Some(PathBuf::from("/films/Pilot budget.json")),
+            convert: true,
+        };
+        let (mut s, msg) = new_session(im, &from).unwrap();
+        assert_eq!(msg, None, "the notice comes with the view instead");
+        assert!(s.is_dirty() && s.path().is_none(), "never written anywhere");
+        assert_eq!(s.save_hint(), Some(Path::new("/films/Pilot budget.mthd")));
+        let notice = s.take_notice().unwrap();
+        assert_eq!(notice, converted_notice("Pilot budget.json"));
+        assert!(
+            notice.starts_with("Converted from Pilot budget.json."),
+            "{notice}"
+        );
+        assert!(
+            notice.contains("original file is left as it was"),
+            "{notice}"
+        );
+        assert!(notice.contains(".mthd"), "{notice}");
+        assert!(!notice.contains('\u{2014}'), "no em dashes");
+        // Once.
+        assert_eq!(s.take_notice(), None);
+    }
+
+    #[test]
+    fn the_saved_name_is_the_exports_with_mthd() {
+        for (export, saved) in [
+            ("/a/Pilot budget.json", "/a/Pilot budget.mthd"),
+            ("/a/b/ZTEST.XML", "/a/b/ZTEST.mthd"),
+            ("/a/topsheet.tab.txt", "/a/topsheet.tab.mthd"),
+        ] {
+            assert_eq!(
+                save_path_for(Path::new(export)),
+                PathBuf::from(saved),
+                "{export}"
+            );
+        }
     }
 
     #[test]
@@ -384,9 +508,9 @@ mod tests {
         assert_eq!(format_of(Some("")).unwrap(), None);
         assert_eq!(format_of(Some("json")).unwrap(), Some(ExportFormat::Json));
         let sources = ExportSources::default();
-        let t = sources.keep("a.json".into(), b"{}".to_vec());
-        assert!(sources.get(t).is_ok());
-        let t2 = sources.keep("b.json".into(), b"{}".to_vec());
-        assert!(sources.get(t).is_err() && sources.get(t2).is_ok());
+        let t = sources.keep("a.json".into(), b"{}".to_vec(), None, false);
+        assert!(sources.get(t).is_ok_and(|p| !p.convert));
+        let t2 = sources.keep("b.json".into(), b"{}".to_vec(), None, true);
+        assert!(sources.get(t).is_err() && sources.get(t2).is_ok_and(|p| p.convert));
     }
 }
