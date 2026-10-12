@@ -34,6 +34,8 @@ use crate::edit::{
 use crate::session::Session;
 use crate::view::View;
 
+mod notes;
+mod rowstyle;
 mod versions;
 
 /// The command contract's version (see the module's notes).
@@ -117,6 +119,16 @@ pub const COMMANDS: &[&str] = &[
     "restore_version",
     "rename_version",
     "delete_version",
+    // Notes
+    "add_note",
+    "update_note",
+    "delete_note",
+    "set_note_done",
+    "notes_list",
+    // Row style
+    "set_row_style",
+    "set_group_color",
+    "update_group",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -463,7 +475,7 @@ impl Host {
 type Dispatch = fn(&Call<'_>) -> Option<Result<Value, Error>>;
 
 /// The modules moved in phase 1b, each dispatching its own commands.
-const MODULES: &[Dispatch] = &[versions::dispatch];
+const MODULES: &[Dispatch] = &[versions::dispatch, notes::dispatch, rowstyle::dispatch];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
 fn stamp(text: &str) -> crate::safety::DiskStamp {
