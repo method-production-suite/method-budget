@@ -5,7 +5,7 @@ parity, then go past it. Local files only: no cloud, no accounts, no network bey
 Every cloud or sharing feature below has a local-first stand-in.
 
 Sources are cited by behavior note number (`01` to `24` in `docs/research/behaviors/`),
-`inv` (sections of `docs/research/mmb-feature-inventory.md`), `ETP` (export test plan),
+`inv` (sections of the feature inventory in `docs/research/`), `ETP` (export test plan),
 `APP` (the "Not yet" list in `docs/APP.md`) and `D` (entries in `docs/decisions.md`).
 Notes 01 and 02 are 2026 recordings and win over the 2020/2021 tutorials (03 to 24).
 
@@ -217,15 +217,9 @@ Where competitors and the pain points (inv "Gaps and pain points", inv 24) say w
 | 3.17 | **Agents can work on budgets**: a Model Context Protocol server so Claude Code and other coding agents open, read, edit, check and report on budgets with typed tools. Built (decision 52; docs/MCP.md): `method mcp [--root DIR]... [--read-only]` over stdio, both protocol eras (the `initialize` handshake from 2024-11-05 to 2025-11-25, and 2026-07-28 per-request metadata); 43 tools: open and summarize, topsheet, accounts, lines with what they work out to, globals, setup tables, charges and credits, totals, explain, find, validate, diff, merge, add, update, delete, move and tag lines, setup add, change, rename everywhere and delete with a use check, charges and credits, categories, production totals and accounts, export and reports, spreadsheet import, new budgets from the starter or a template, copies and undo; every path inside a root (symlinks out, hidden folders and wrong extensions refused), atomic writes, a change refused when the file changed on disk since the server read it, shared copies read-only, input limits; an example agent skill in docs/agents/. A live bridge to the running app (edits through the session, in History and undo) is designed in docs/MCP.md, not built | agents should push the buttons too | [have] | L | 3.12 |
 
 Skipped on purpose: accounts and sign-in, cloud sync, a send-to-user inbox, live currency
-rates (no network), vendor template or rate data, native `.mbd`/`.mmbx` files.
+rates (no network), vendor template or rate data, other products' native file formats.
 
 ---
-
-## Optional, outside this repo: native file converter
-
-| Item | Notes |
-|---|---|
-| **`.mmbx` / `.mbd` <-> `.mthd` converter, as a separate tool** | The owner's idea (2026-10-09). Lives in its own repository, never in this one. It converts between the reference product's native files and our documented `.mthd` format (docs/FORMAT.md), so Method Budget itself never contains, links or reads any native-format code and stays clean-room. Built only by people or sessions that never work on Method Budget's code. Gate: a short consult with an IP lawyer on the interoperability exceptions (US DMCA 1201(f), EU Software Directive art. 6) before anything is published. Method Budget's own path in stays the clean one: import from the reference's open XML/JSON/Excel exports (Phase 1). |
 
 ## Engine checks to run
 
