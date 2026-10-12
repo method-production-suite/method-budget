@@ -73,7 +73,11 @@ removing the app never touches them.
 
 The app registers the `.mthd` file type ("Method Budget"), so
 Finder shows those files as belonging to it and offers it under Open With; double-clicking one opens it in the
-app (asking first if the open budget has unsaved changes).
+app (asking first if the open budget has unsaved changes). It also offers itself under
+Open With, never as the default, for the budget exports it reads (`.json`, `.xml`, `.xlsx`,
+`.tsv`): opening one there converts it to a new budget, after a line-by-line check, and
+leaves the export as it was (the build's `tauri.macos.conf.json`; the Windows and Linux
+installers register `.mthd` only).
 
 ### First launch: "unidentified developer"
 

@@ -9,6 +9,10 @@
 //   checked, and what the export can't carry. The layout is detected; it
 //   can be read as another. Nothing changes until Import, which opens the
 //   budget in a new tab, unsaved.
+// - An export opened with Open, from Finder or dropped on the window
+//   (`review.convert`) gets the same review, worded as converting it; the
+//   new tab says once where it came from (the view's notice; decisions.md,
+//   entry 67).
 //
 // Everything is drawn with el() and textContent: text from a file is never
 // read as HTML.
@@ -39,6 +43,25 @@ const NOTE_GROUPS = [
   ['not_imported', 'Not in the export, or not brought over', true],
   ['info', 'Notes', false],
 ];
+
+/**
+ * The review's title, introduction and button: converting an export that
+ * was opened, importing one picked with Import Budget Export….
+ */
+export function reviewWording(p) {
+  if (p.convert) {
+    return {
+      title: `Convert budget export: ${p.file}`,
+      intro: 'This budget export becomes a new Method Budget tab. Its totals are worked out again and checked against the export’s own, figure by figure. The original file is left as it is. Nothing changes until you convert.',
+      button: 'Convert to Method Budget',
+    };
+  }
+  return {
+    title: `Import budget export: ${p.file}`,
+    intro: 'A whole budget from another program’s export, as a new budget tab. Its totals are worked out again and checked against the export’s own, figure by figure. Nothing changes until you import.',
+    button: 'Import as New Budget',
+  };
+}
 
 /** What came over, in one sentence. */
 export function cameOver(p) {
@@ -229,11 +252,9 @@ export function showExportDialog(ctx, first) {
 
   customDialog(
     (closeDialog) => {
-      const title = el('h2', { class: 'modal-title', text: `Import budget export: ${first.file}`, attrs: { id: 'xi-title' } });
-      const intro = el('p', {
-        class: 'modal-message',
-        text: 'A whole budget from another program’s export, as a new budget tab. Its totals are worked out again and checked against the export’s own, figure by figure. Nothing changes until you import.',
-      });
+      const words = reviewWording(first);
+      const title = el('h2', { class: 'modal-title', text: words.title, attrs: { id: 'xi-title' } });
+      const intro = el('p', { class: 'modal-message', text: words.intro });
       ui.top = el('div', { class: 'si-top' });
       ui.summary = el('div', { class: 'si-summary', attrs: { 'aria-live': 'polite' } });
       ui.recon = el('div', { class: 'si-recon' });
@@ -241,7 +262,7 @@ export function showExportDialog(ctx, first) {
       ui.error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
       ui.error.hidden = true;
       const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button', 'data-autofocus': true } });
-      ui.ok = el('button', { class: 'btn btn-primary', text: 'Import as New Budget', attrs: { type: 'button' } });
+      ui.ok = el('button', { class: 'btn btn-primary', text: words.button, attrs: { type: 'button' } });
       cancel.addEventListener('click', () => closeDialog());
       ui.ok.addEventListener('click', async () => {
         if (ui.ok.disabled) return;
