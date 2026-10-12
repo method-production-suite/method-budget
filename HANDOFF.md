@@ -58,7 +58,8 @@ docs/decisions.md (every product and design call, numbered), docs/FORMAT.md (`.m
   print setup with presets and PDF, autosave into the file with recovery and backups,
   outside-change guard, Movie Magic-style shortcuts. ~5 ms per edit at 5,000 lines.
 - **Research**: docs/research/behaviors/01-24 (the 2026 recordings 01-02 outrank the 2020/2021
-  vendor tutorials 03-24), feature inventory, interop formats, the overnight parity test plan.
+  vendor tutorials 03-24), feature inventory, interop formats, the overnight parity test plan,
+  and docs/research/parity-tracker.md (every MMB feature: status, evidence, what's left).
 - **Also built**: diff and three-way merge with a git driver, Explain This Number, overtime
   helper, actuals and cost report, setup packs and library, chart of accounts import with 91
   bundled templates, the `method mcp` server for coding agents, updater and release tooling,
