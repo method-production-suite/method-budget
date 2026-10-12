@@ -3,9 +3,9 @@
 //! vendor template.
 //!
 //! Every new budget, the starter or an empty one ([`blank`]), starts with
-//! the reference product's new-budget settings (decisions.md, entry 60):
-//! fringes posted by budget, account numbers of category 2, account 2 and
-//! set 3, the starter units (a Day of 12 hours, a Week of 60, a Month of
+//! the reference product's new-budget settings (decisions.md, entries 60
+//! and 61): fringes posted by budget, account numbers of category 2,
+//! account 2 and set 3 with no separator (`1301`), the starter units (a Day of 12 hours, a Week of 60, a Month of
 //! 240, an Hour; Allow and Flat with no hours), a new line copying its
 //! fringes from the line above, and a cutoff factor of 1.0. A budget file
 //! keeps its own settings: these are only where a new one starts.
@@ -57,7 +57,21 @@ fn account(code: &str, name: &str, details: Vec<Detail>) -> Account {
     }
 }
 
-/// A fresh starter budget. Row ids start at 1 and are unique.
+/// The starter numbered with `separator` between the parts of its account
+/// numbers (`13-01` with `-`) instead of the new-budget pattern's none
+/// (`1301`): for tests and examples written against that numbering.
+pub fn budget_with_separator(separator: char) -> Budget {
+    let mut b = budget();
+    let to = AccountCoding {
+        separator: Some(separator),
+        ..b.account_coding
+    };
+    crate::renumber::renumber(&mut b, to).expect("the starter's numbers fit any separator");
+    b
+}
+
+/// A fresh starter budget. Row ids start at 1 and are unique. Its account
+/// numbers follow the new-budget pattern (`1301`).
 pub fn budget() -> Budget {
     let mut b = blank("Untitled feature", "USD");
     for (name, value) in [
@@ -90,22 +104,22 @@ pub fn budget() -> Budget {
     };
 
     let writing = account(
-        "10-01",
+        "1001",
         "Writing",
         vec![line("Screenplay", "1", "Flat", "50000", true)],
     );
     let producers = account(
-        "11-01",
+        "1101",
         "Producers",
         vec![line("Producer", "1", "Flat", "75000", true)],
     );
     let director = account(
-        "12-01",
+        "1201",
         "Director",
         vec![line("Director", "1", "Flat", "100000", true)],
     );
     let cast = account(
-        "13-01",
+        "1301",
         "Cast",
         vec![
             line("Lead", "SHOOT_WEEKS + 1", "Week", "5000", true),
@@ -113,7 +127,7 @@ pub fn budget() -> Budget {
         ],
     );
     let staff = account(
-        "20-01",
+        "2001",
         "Production staff",
         vec![
             line(
@@ -133,7 +147,7 @@ pub fn budget() -> Budget {
         ],
     );
     let camera = account(
-        "21-01",
+        "2101",
         "Camera",
         vec![
             line(
@@ -147,22 +161,22 @@ pub fn budget() -> Budget {
         ],
     );
     let locations = account(
-        "22-01",
+        "2201",
         "Locations",
         vec![line("Location fees", "SHOOT_DAYS", "Day", "1500", false)],
     );
     let editorial = account(
-        "40-01",
+        "4001",
         "Editorial",
         vec![line("Editor", "12", "Week", "3000", true)],
     );
     let sound = account(
-        "41-01",
+        "4101",
         "Post sound",
         vec![line("Mix", "1", "Allow", "20000", false)],
     );
     let insurance = account(
-        "50-01",
+        "5001",
         "Insurance",
         vec![line("Production package", "1", "Allow", "15000", false)],
     );
@@ -241,6 +255,31 @@ mod tests {
                 ]
             );
         }
+    }
+
+    /// The starter's numbers follow its pattern; with a separator they
+    /// read `13-01` and nothing else changes.
+    #[test]
+    fn the_starter_numbers_follow_the_pattern() {
+        let b = super::budget();
+        for a in b.categories().flat_map(|c| &c.accounts) {
+            assert_eq!(
+                b.account_coding.normalize(&a.code).as_deref(),
+                Ok(a.code.as_str())
+            );
+            assert_eq!(a.code.len(), 4, "{}", a.code);
+        }
+        let d = super::budget_with_separator('-');
+        assert_eq!(d.account_coding.separator, Some('-'));
+        let codes: Vec<&str> = d
+            .categories()
+            .flat_map(|c| &c.accounts)
+            .map(|a| a.code.as_str())
+            .collect();
+        assert_eq!(codes[3], "13-01");
+        let r = recalc(&b, &RecalcOptions::default()).unwrap();
+        let rd = recalc(&d, &RecalcOptions::default()).unwrap();
+        assert_eq!(r.grand_total, rd.grand_total);
     }
 
     #[test]

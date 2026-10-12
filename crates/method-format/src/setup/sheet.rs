@@ -25,8 +25,8 @@ use method_core::overtime::{OtBand, OtPattern};
 use method_core::pack::{self as core_pack, ItemSource};
 use method_core::{
     Budget, Cents, Charge, ChargeKind, Credit, CreditCap, CreditRow, CreditSource, Currency, Dec,
-    FlatBasis, Formula, Fringe, FringeKind, GlobalInfo, Group, Location, SetDef, TagPreset,
-    UnitDef,
+    FlatBasis, Formula, Fringe, FringeKind, GlobalInfo, Group, Location, Separators, SetDef,
+    TagPreset, UnitDef,
 };
 use serde::{Deserialize, Serialize};
 
@@ -136,11 +136,17 @@ const LOCATION: [Column; 5] = [
     col("region", "Region", &["state", "province"]),
     col("country", "Country", &[]),
 ];
-const CURRENCY: [Column; 4] = [
+const CURRENCY: [Column; 6] = [
     col("name", "Code", &["currency", "name"]),
     col("description", "Description", &["desc"]),
     col("symbol", "Symbol", &["sign"]),
     col("rate", "Rate", &["exchangerate", "fx"]),
+    col(
+        "symbol_after",
+        "Symbol After",
+        &["symbolafteramount", "symbolaftervalue"],
+    ),
+    col("separators", "Separators", &["separator", "numberformat"]),
 ];
 const CHARGE: [Column; 9] = [
     col("name", "Name", &["charge"]),
@@ -161,7 +167,7 @@ const CHARGE: [Column; 9] = [
         &["excludeaccounts"],
     ),
 ];
-const CREDIT: [Column; 13] = [
+const CREDIT: [Column; 14] = [
     col("name", "Credit", &["name", "incentive"]),
     col("account", "Account", &["acct"]),
     col("applied", "Applied", &["on", "active"]),
@@ -170,6 +176,11 @@ const CREDIT: [Column; 13] = [
     col("row", "Row", &["rowdescription", "description"]),
     col("group", "Group", &["sourcegroup"]),
     col("category", "Category", &["sourcecategory"]),
+    col(
+        "row_account",
+        "Row Account",
+        &["sourceaccount", "spendaccount"],
+    ),
     col("amount", "Flat Amount", &["flat", "grossamount"]),
     col("percent", "Percent", &["rate", "creditpercent"]),
     col("row_cap_on", "Row Cap On", &["capon", "capkind"]),
@@ -428,6 +439,11 @@ pub fn sheet(b: &Budget, w: What) -> Sheet {
                         Cell::text(c.description.clone()),
                         Cell::text(c.symbol.clone()),
                         Cell::Number(c.rate),
+                        yes_no(c.format.symbol_after),
+                        Cell::text(match c.format.separators {
+                            Separators::CommaPoint => "1,234.56",
+                            Separators::PointComma => "1.234,56",
+                        }),
                     ],
                 );
             }
@@ -474,21 +490,35 @@ pub fn sheet(b: &Budget, w: What) -> Sheet {
                 if c.rows.is_empty() {
                     let mut cells = Vec::new();
                     head(&mut cells);
-                    cells.extend(std::iter::repeat_n(Cell::Empty, 7));
+                    cells.extend(std::iter::repeat_n(Cell::Empty, 8));
                     cells.push(list(&c.excluded_fringes));
                     push(&c.name, cells);
                 }
                 for r in &c.rows {
                     let mut cells = Vec::new();
                     head(&mut cells);
-                    let (group, category, amount) = match &r.source {
-                        CreditSource::Flat(a) => (Cell::Empty, Cell::Empty, Cell::Money(*a)),
-                        CreditSource::Group { group } => {
-                            (Cell::text(group.clone()), Cell::Empty, Cell::Empty)
+                    let (group, category, account, amount) = match &r.source {
+                        CreditSource::Flat(a) => {
+                            (Cell::Empty, Cell::Empty, Cell::Empty, Cell::Money(*a))
                         }
-                        CreditSource::Category { category } => {
-                            (Cell::Empty, Cell::text(category.clone()), Cell::Empty)
-                        }
+                        CreditSource::Group { group } => (
+                            Cell::text(group.clone()),
+                            Cell::Empty,
+                            Cell::Empty,
+                            Cell::Empty,
+                        ),
+                        CreditSource::Category { category } => (
+                            Cell::Empty,
+                            Cell::text(category.clone()),
+                            Cell::Empty,
+                            Cell::Empty,
+                        ),
+                        CreditSource::Account { account } => (
+                            Cell::Empty,
+                            Cell::Empty,
+                            Cell::text(account.clone()),
+                            Cell::Empty,
+                        ),
                     };
                     // The credit's one list, repeated on each of its rows.
                     let excluded = list(&c.excluded_fringes);
@@ -501,6 +531,7 @@ pub fn sheet(b: &Budget, w: What) -> Sheet {
                         Cell::text(r.description.clone()),
                         group,
                         category,
+                        account,
                         amount,
                         Cell::Number(r.percent),
                         on,
@@ -1005,12 +1036,24 @@ pub fn read(
                     if rate <= Dec::ZERO {
                         return Err("an exchange rate must be more than 0".into());
                     }
+                    let separators = match row.get("separators").trim() {
+                        "" => Separators::default(),
+                        s => Separators::parse(s).ok_or_else(|| {
+                            format!(
+                                "separators should be 1,234.56 or 1.234,56, not \u{201c}{s}\u{201d}"
+                            )
+                        })?,
+                    };
                     into.currencies.insert(
                         name.clone(),
                         Currency {
                             description: row.get("description"),
                             symbol: row.get("symbol"),
                             rate,
+                            format: method_core::CurrencyFormat {
+                                symbol_after: row.yes("symbol_after", "Symbol After", false)?,
+                                separators,
+                            },
                         },
                     );
                 }
@@ -1047,6 +1090,7 @@ pub fn read(
                         "row",
                         "group",
                         "category",
+                        "row_account",
                         "amount",
                         "percent",
                         "row_cap",
@@ -1078,19 +1122,21 @@ pub fn read(
                     if has_row {
                         let group = row.opt("group");
                         let category = row.opt("category");
+                        let account = row.opt("row_account");
                         let amount = row.money("amount", "the flat amount")?;
-                        let source = match (group, category, amount) {
-                            (Some(g), None, None) => CreditSource::Group { group: g },
-                            (None, Some(c), None) => CreditSource::Category { category: c },
-                            (None, None, Some(a)) => CreditSource::Flat(a),
-                            (None, None, None) => {
+                        let source = match (group, category, account, amount) {
+                            (Some(g), None, None, None) => CreditSource::Group { group: g },
+                            (None, Some(c), None, None) => CreditSource::Category { category: c },
+                            (None, None, Some(a), None) => CreditSource::Account { account: a },
+                            (None, None, None, Some(a)) => CreditSource::Flat(a),
+                            (None, None, None, None) => {
                                 return Err(
-                                    "a credit row needs a group, a category or a flat amount"
+                                    "a credit row needs a group, a category, an account or a flat amount"
                                         .into(),
                                 )
                             }
                             _ => return Err(
-                                "a credit row takes one of a group, a category or a flat amount"
+                                "a credit row takes one of a group, a category, an account or a flat amount"
                                     .into(),
                             ),
                         };
@@ -1298,6 +1344,10 @@ mod tests {
                 description: "Euro".into(),
                 symbol: "\u{20ac}".into(),
                 rate: "1.08".parse().unwrap(),
+                format: method_core::CurrencyFormat {
+                    symbol_after: true,
+                    separators: Separators::PointComma,
+                },
             },
         );
         b.charges.push(Charge {
@@ -1341,6 +1391,14 @@ mod tests {
                         category: "10".into(),
                     },
                     percent: Dec::from_int(10),
+                    cap: CreditCap::None,
+                },
+                CreditRow {
+                    description: "Writers".into(),
+                    source: CreditSource::Account {
+                        account: "1001".into(),
+                    },
+                    percent: Dec::from_int(5),
                     cap: CreditCap::None,
                 },
             ],

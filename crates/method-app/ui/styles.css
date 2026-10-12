@@ -936,6 +936,7 @@ table.grid {
 .grid col.c-unit4 { width: 72px; }
 .grid col.c-fringes { width: 140px; }
 .grid col.c-fringe_pct { width: 76px; }
+.grid col.c-fringe_full_pct { width: 96px; }
 .grid col.c-fringe_total { width: 104px; }
 .grid col.c-groups { width: 130px; }
 .grid col.c-set { width: 90px; }

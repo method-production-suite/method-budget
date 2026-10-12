@@ -2478,3 +2478,109 @@ we didn't. The owner's rule is to match it by default, with our extras opt-in (e
   settings); the coding, format, CLI, MCP and app tests cover the rest. The hand-checked
   sample keeps its figures; tests that leaned on the starter posting by category set it
   explicitly.
+
+## 61. Account numbers without a separator, account credit rows, fringe account numbers, the full fringe percent, frozen original totals and currency formats, as the reference product has them (2026-10-12, the owner)
+
+The owner's rule is to match the reference product by default, with our extras opt-in
+(entries 55 to 60). This entry settles what entry 60 left open and takes in parity run 2
+(imports/mmb-parity/2026-10-12/run-log.md, cases R2-01 to R2-08; gitignored, main checkout
+only) and the 2026-10-11 exports. Tracker: docs/research/parity-tracker.md.
+
+- **New budgets number accounts with no separator** (amends entry 60, which kept `-` and
+  left it open). `AccountCoding::new_budget` is category 2, account 2, no sub-account, set
+  3 and no separator, so numbers read `1101`, as the reference's exports write them. The
+  starter's own accounts follow it (`1001` to `5001`, were `10-01` to `50-01`): left
+  dashed, its numbers didn't follow its own pattern, and pasting accounts into a category
+  picked a free-looking `2001` beside `20-01`, which the pattern reads as the same number.
+  Existing files are unchanged: a file without `account_coding` still reads as 2 + 2 with
+  `-`. A typed separator still splits (`11-01` is stored as `1101`). Lookups by number in
+  edit scripts and the MCP line and account tools stay exact as before, so `21-01` doesn't
+  find `2101` there (as `2101` never found `21-01`); Explain targets and imports read
+  numbers through the pattern as before. Tests that name the starter's accounts with a dash
+  use `starter::budget_with_separator('-')`.
+- **The Fringe totals hint** (Settings) said charges don't apply to the budget's fringe
+  row. Since entry 56 a percent charge counts it, so it now says so.
+- **Import Setup carries the cutoff factor and the fringe row** as budget settings, like
+  account numbering, fringe posting and new-line defaults: items `cutoff_factor` and
+  `fringe_row`, kept as this budget has them unless the imported one is picked. The fringe
+  row brings its number and description; its place stays this budget's, since it names a
+  row of one topsheet (amends entry 60, "Import Setup doesn't carry it"). Setup packs and
+  the setup library hold no budget setting, these two included.
+- **Account credit rows** (R2-04; amends entry 57). Selecting an account and ticking a
+  credit adds a row on that account: its gross is the account's lines plus the fringes
+  they earn, wherever fringes post (1101: 4,000.00 of lines and 500.00 of fringes posted by
+  budget, 4,500.00). Ours: credit row source `{"kind": "account", "account": "1101"}`
+  (FORMAT.md, "Credit row"): the account's counted lines and adjustment rows plus the
+  fringes they earn, less the credit's excluded fringes; of two accounts with the same
+  number, the first. One the budget doesn't have counts 0, and `method check` and the MCP
+  `validate` tool warn, as for a category row. Renumbering carries it. The credit editor's
+  Spend menu lists the accounts after the categories ("Account: 1101 Crew"); `set_credit`
+  in the app and over MCP takes it and refuses an account the budget doesn't have; setup
+  sheets carry it in a Row Account column; Explain names the account. Changing an
+  account's number by hand doesn't follow into credit rows, as it never did into charge
+  exclusions or category rows.
+- **Category fringe account numbers** (R2-07; amends entry 53). Under category posting
+  the reference numbers a category's fringe account from the category's first
+  category-width characters and the suffix: with category 2, account 2 and suffix 98,
+  category `510` is `5198`, `63` is `6398`, `7000` is `7098`, and `1100` with 99 is `1199`.
+  Ours took a number that isn't a plain category whole (`51098`) so two categories would
+  never share one; now `AccountCoding::category_fringe_account` takes the first
+  category-width letters and digits when the pattern can't read the number as a plain
+  category, written with the pattern (`51-98` with `-`). Two categories whose numbers
+  start alike now share a fringe account number (`0501` and `0502` are both `0599`), as in
+  the reference; renumbering already warns when a fringe account's number is an account's.
+  Plain categories (`11`, `1100`, `11-00`, `5` as `05`) are as before.
+- **Flat fringes ignore ranges and cutoffs** (R2-06): ZFDAYR, 100.00 a Day with a 500.00
+  cutoff, on two 3-Day lines in one range is 300.00 + 300.00, as ours already worked it
+  (entry 54). Test added.
+- **Fringe percents on a suppressed line** (R2-05, EC 15): the reference shows 0.00 for
+  the effective percent and 0.00% for the full one; a suppressed line earns nothing either
+  way, as ours. **Still different, display only**: our grid leaves the Fringe % cell blank
+  on a suppressed line, a line without fringes and an adjustment row without fringes,
+  where the reference writes 0.00%. Left for the owner.
+- **Fringes in group totals set to Exclude** (R2-02): ZIN 8,000.00 / 5,000.00, ZIN2
+  4,600.00 / 4,600.00, ZOFF 5,000.00 / 0.00, grand total unchanged: as ours (entries 57
+  and 58). Test added.
+- **Moving the budget's fringe row** (R2-01, PM-POS): above 2100 ZPROD it changed nothing
+  (ATL 15,000.00, BTL 13,400.00, grand 34,125.00): display only, as ours (entry 60).
+- **The full fringe percent** (the reference's optional Agg Sum column). The 2026-10-11
+  exports rule out "the sum of the percent rates": a 0.04 line with a 12.5% fringe shows
+  25% (0.005 rounds to 0.01) and a line with a flat fringe counts it (Grip days, 100.00 flat
+  and 400.00 at 10% on 4,000.00, shows 12.5%). So it is the line's fringes with no cutoff
+  and no range over its total: `RowTotals::fringe_full_total` is each percent fringe on the
+  row's whole total, rounded on its own, plus the flat fringes as earned, and 0 on a row
+  that doesn't earn (the reference shows 0.00% on a suppressed line, R2-05). A range's
+  line past the cutoff earns 0.00 and is still 12.5% before cutoffs, as the exports show.
+  The grid's optional **Full fringe %** column (hidden until chosen, like the reference's)
+  shows it; MCP `get_account` rows carry `fringe_full_total_cents`; the reference engine
+  works it out on its own. **Chosen, not checked**: each percent fringe is rounded before
+  they are added up (no figure decided the order).
+- **Frozen original totals** (the reference's "lock original totals for comparison",
+  ZTEST12). The switch only freezes the original column: capturing it again is disabled
+  while it is on. Ours: the baseline's `frozen` flag (FORMAT.md, "Baseline"), set by
+  `set_baseline_frozen` from the Baseline tab's **Freeze the original totals**; while it is
+  on, Lock again and Clear are refused (and off on the tab), and edits still move the
+  variance. **Still different**: the reference's original totals exist from the start (at
+  0 until captured); ours exist once locked, so the switch shows only then.
+- **Currency formats** (inventory section 8, from the reference's documentation; no run
+  read them). A currency has `symbol_after` (`1.234,56 €` rather than `€1.234,56`) and
+  `separators` (`comma_point`, `1,234.56`, or `point_comma`, `1.234,56`), both display
+  only and left out of the file at their defaults (`method_core::currency_format`,
+  `Currency::amount_text`). Totals shown in another currency are written in its format:
+  the topsheet's "Net total in" row, the printed topsheet's "Grand total in" and "Net
+  total in" lines, and `method show`'s last line. The currency editor, `set_currency`,
+  the MCP `add_setup` / `update_setup` and `list_setup`, setup sheets (Symbol After and
+  Separators columns), diff, merge and Import Setup carry them. **Not done**: the
+  reference writes every computed total in the totals currency's format; ours writes base
+  figures as `1,234.56` everywhere, and spreadsheet exports keep numbers as numbers.
+- **Changing the base currency** (R2-03, V08-3): the reference keeps every rate as typed,
+  reads blank-currency lines as the new base (Base line 1,000.00 becomes 1,234.57 at
+  1.23457) and converts other currencies through an extra hop (CAD 123,456.51, was .50).
+  Ours renames the base (entry 32), so amounts don't move. Recorded; not built.
+- **Next account at the end of a category** (R2-08) was not driven; EC 16 stays open.
+- Tests: crates/method-core/tests/mmb_parity.rs (R2-02, R2-04 in every posting mode and
+  both arithmetics, R2-05, R2-06, R2-07, the full fringe percent on the exports' figures,
+  the new-budget separator), the coding, starter and currency-format unit tests, the
+  format round trips (account rows, currency formats, a frozen baseline), the app's
+  credit, currency, baseline and Import Setup tests, the MCP credit tool test and `method
+  show`'s.

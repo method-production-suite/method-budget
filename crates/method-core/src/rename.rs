@@ -592,6 +592,7 @@ mod tests {
                 description: String::new(),
                 symbol: "$".into(),
                 rate: "0.73".parse().unwrap(),
+                format: Default::default(),
             },
         );
         b.fringes.insert(

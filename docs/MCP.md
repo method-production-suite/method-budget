@@ -209,7 +209,9 @@ default (5,000 at most). Each row: `id`, `n`, `kind` (`line`, `subtotal`, `adjus
 `currency`, `fringes`, `groups`, `set`, `location`, `fringe_range`, `bold`, `italic`,
 `indent`, `color`, `notes`; and what it works out to: `included`, `quantity`,
 `row_currency`, `local_total_cents`, `total_cents`, `subtotal_cents`, `fringes_cents` (per
-fringe), `fringe_total_cents`.
+fringe), `fringe_total_cents`, `fringe_full_total_cents` (the fringes with no cutoff and no
+range: each percent fringe on the whole total, the flat ones as earned; 0 on a row that
+doesn't count; decisions.md, entry 61).
 
 ```json
 {"name": "get_account", "arguments": {"path": "film.mthd", "account": "21-01"}}
@@ -225,7 +227,8 @@ something (a fringe's `total_cents`, a group's active and full totals: `active_t
 fringes earned; decisions.md, entry 58), a set's or location's
 totals). A percent fringe has `cutoff_cents`; a flat fringe has `unit`, `basis` and
 `max_hours_per_day` (a decimal string or null), and `unused_cutoff_cents` when it keeps a
-cutoff it never uses. The base currency is listed first with `base: true`.
+cutoff it never uses. The base currency is listed first with `base: true`; the others have
+`symbol_after` and `separators` (`comma_point` or `point_comma`; decisions.md, entry 61).
 
 **`list_charges`** `{path}`: charges (`charge_kind`, `percent` or `flat_amount_cents` and
 `currency`, `applied`, `account`, the exclusions, and `base_cents`, `excluded_cents`,
@@ -262,8 +265,8 @@ names, setup item names, charges and credits. 100 matches by default, 1,000 at m
 `net_total_cents` and `warnings`: lines naming units, sets or locations the budget doesn't
 have, account or category numbers used twice, fringes of categories after the last
 production total that no level holds (fringes posted by production level; decisions.md,
-entry 56), and credit rows on a category the budget doesn't have, which count 0 (entry
-57).
+entry 56), and credit rows on a category or account the budget doesn't have, which count
+0 (entries 57 and 61).
 
 **`diff`** `{path, against?, since?}`: what changed, in plain words, with the money that
 moved per account, category and topsheet line (the engine's diff, as `method diff`).
@@ -330,7 +333,7 @@ optional one). Fields by type:
 | set | `description` |
 | location | `description`, `city`, `region`, `country` |
 | unit | `plural`, `description`, `hours` (hours in one of it, or null) |
-| currency | `rate` (base-currency units per one of it, more than 0), `description`, `symbol` |
+| currency | `rate` (base-currency units per one of it, more than 0), `description`, `symbol`, `symbol_after` (true writes totals shown in it as `1.234,56 €` instead of `€1.234,56`), `separators` (`comma_point`, `1,234.56`, or `point_comma`, `1.234,56`; decisions.md, entry 61). Left out, they keep their value |
 
 ```json
 {"name": "add_setup", "arguments": {"path": "film.mthd", "type": "fringe", "name": "FICA",
@@ -365,13 +368,15 @@ below-the-line) or flat `amount`, and is applied unless `applied` is false.
 
 **`set_credit`** `{path, name, new_name?, account?, applied?, cap?, discount_percent?,
 excluded_fringes?, rows?}`: adds a credit or changes it; `rows` replaces every row.
-`excluded_fringes` is the credit's one list of fringes left out of every group and category
-row's spend (decisions.md, entry 57); left out keeps it, and changing the rows never
-changes it. Each row: `source` (`{"kind": "flat", "amount": "250000"}`, `{"kind": "group",
-"group": "Local hire"}` or `{"kind": "category", "category": "2100"}`: a topsheet
-category's total with the fringes its lines earn, wherever fringes post), `percent`, `cap`
-(`{"kind": "none" | "qualified_spend" | "credit", "amount"}`), `description`. A group,
-category or fringe the budget doesn't have is refused. `list_charges` shows each credit's
+`excluded_fringes` is the credit's one list of fringes left out of every group, category
+and account row's spend (decisions.md, entries 57 and 61); left out keeps it, and changing
+the rows never changes it. Each row: `source` (`{"kind": "flat", "amount": "250000"}`,
+`{"kind": "group", "group": "Local hire"}`, `{"kind": "category", "category": "2100"}`: a
+topsheet category's total with the fringes its lines earn, wherever fringes post, or
+`{"kind": "account", "account": "2101"}`: an account's lines with the fringes they earn,
+wherever fringes post), `percent`, `cap` (`{"kind": "none" | "qualified_spend" |
+"credit", "amount"}`), `description`. A group, category, account or fringe the budget
+doesn't have is refused. `list_charges` shows each credit's
 `excluded_fringes`.
 
 **`apply_charge`** `{path, type, name, applied}`: makes a charge or credit count or stop

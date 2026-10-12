@@ -1730,11 +1730,26 @@ const EDITORS = {
         { key: 'rate', label: `Rate (${base || 'base'} per 1 ${name || 'unit'})`, value: str(def.rate), placeholder: '1.08' },
         { key: 'symbol', label: 'Symbol', value: str(def.symbol) },
         { key: 'description', label: 'Description', value: str(def.description) },
+        // How amounts in it are written where totals show in it (decisions.md, entry 61).
+        { key: 'separators', label: 'Separators', type: 'select', options: CURRENCY_SEPARATORS, value: def.separators === 'point_comma' ? 'point_comma' : 'comma_point' },
+        { key: 'symbol_after', label: 'Symbol after the amount', type: 'check', value: def.symbol_after === true },
       ],
-      build: (v) => ['set_currency', { code: name, currency: { description: v.description, symbol: v.symbol, rate: v.rate.trim() } }],
+      build: (v) => [
+        'set_currency',
+        {
+          code: name,
+          currency: { description: v.description, symbol: v.symbol, rate: v.rate.trim(), separators: v.separators, symbol_after: Boolean(v.symbol_after) },
+        },
+      ],
     };
   },
 };
+
+/** A currency's separators, as its editor offers them (decisions.md, entry 61). */
+const CURRENCY_SEPARATORS = [
+  ['comma_point', '1,234.56'],
+  ['point_comma', '1.234,56'],
+];
 
 /** What a new item of each list asks for, and the command that adds it. */
 const ADDERS = {
@@ -1761,7 +1776,10 @@ const ADDERS = {
   },
   currencies: {
     fields: () => EDITORS.currencies('', {}).fields,
-    build: (code, v) => ['set_currency', { code, currency: { description: v.description, symbol: v.symbol, rate: v.rate.trim() } }],
+    build: (code, v) => [
+      'set_currency',
+      { code, currency: { description: v.description, symbol: v.symbol, rate: v.rate.trim(), separators: v.separators, symbol_after: Boolean(v.symbol_after) } },
+    ],
     check: (v) => {
       const rate = v.rate.trim();
       if (rate === '') return 'Enter a rate.';

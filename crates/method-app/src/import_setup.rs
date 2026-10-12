@@ -223,6 +223,7 @@ mod tests {
                 description: "Euro".into(),
                 symbol: "€".into(),
                 rate: "1.1".parse().unwrap(),
+                format: Default::default(),
             },
         );
         b.charges.push(Charge {
@@ -464,6 +465,69 @@ mod tests {
         )
         .unwrap();
         assert_eq!(b.fringe_posting, FringePosting::Account);
+    }
+
+    /// The cutoff factor and the budget's fringe row are budget settings
+    /// like the others (decisions.md, entry 61): listed, kept unless the
+    /// imported one is picked, and the fringe row's place stays this
+    /// budget's (it is a row of one topsheet).
+    #[test]
+    fn the_cutoff_factor_and_fringe_row_import_as_settings() {
+        let mut src = source();
+        src.cutoff_factor = method_core::CutoffFactor::OneAndAHalf;
+        src.fringe_row = method_core::FringeRow {
+            account: Some("9999".into()),
+            description: Some("All fringes".into()),
+            position: Some(0),
+        };
+        let mut here = starter::budget();
+        here.fringe_row.position = Some(3);
+        let p = preview(&here, &src, 1, "Source", "/x/Source.mthd");
+        let factor = item(&p, "cutoff_factor", "");
+        assert_eq!(factor.status, "differs");
+        assert_eq!(factor.imported, "every percent fringe cutoff times 1.5");
+        assert_eq!(
+            factor.here.as_deref(),
+            Some("percent fringe cutoffs as typed (1.0)")
+        );
+        let row = item(&p, "fringe_row", "");
+        assert_eq!(row.status, "differs");
+        assert_eq!(row.imported, "the budget's fringe row is 9999 All fringes");
+        assert_eq!(factor.rename_to, None);
+
+        // Kept by default.
+        let mut b = here.clone();
+        import(
+            &mut b,
+            &src,
+            &[pick("cutoff_factor", ""), pick("fringe_row", "")],
+            &[],
+        )
+        .unwrap();
+        assert_eq!(b, here);
+        // The imported ones: the number and description come, the place stays.
+        let done = import(
+            &mut b,
+            &src,
+            &[pick("cutoff_factor", ""), pick("fringe_row", "")],
+            &[
+                res("cutoff_factor", "", "imported"),
+                res("fringe_row", "", "imported"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(done.replaced, 2);
+        assert_eq!(b.cutoff_factor, method_core::CutoffFactor::OneAndAHalf);
+        assert_eq!(b.fringe_row.account.as_deref(), Some("9999"));
+        assert_eq!(b.fringe_row.description(), "All fringes");
+        assert_eq!(b.fringe_row.position, Some(3));
+        // Only the place differs now, so the fringe row is the same.
+        let p = preview(&b, &src, 2, "Source", "/x/Source.mthd");
+        assert_eq!(item(&p, "fringe_row", "").status, "same");
+        assert_eq!(item(&p, "cutoff_factor", "").status, "same");
+        // A setup pack never holds them, as it holds no budget setting.
+        assert!(!method_format::setup::pack::pack_kind(What::CutoffFactor));
+        assert!(!method_format::setup::pack::pack_kind(What::FringeRow));
     }
 
     #[test]

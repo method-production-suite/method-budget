@@ -59,12 +59,15 @@ pub fn topsheet(b: &Budget, r: &Report) -> String {
             TopsheetLine::Net => {}
         }
     }
-    // Converted account by account (decisions.md, entry 60).
+    // Converted account by account (decisions.md, entry 60), written in
+    // that currency's own separators and symbol (entry 61).
     if let Some(shown) = &r.display {
-        line(
-            &format!("Net total in {}", r.totals_currency),
-            shown.net_total,
-        );
+        let text = match b.currencies.get(&r.totals_currency) {
+            Some(c) => c.amount_text(shown.net_total),
+            None => money(shown.net_total),
+        };
+        let label = format!("Net total in {}", r.totals_currency);
+        let _ = writeln!(out, "{label:<48}{text:>18}");
     }
     out.push_str(&rule);
     out.push('\n');
@@ -89,5 +92,32 @@ mod tests {
             method_format::from_str(&method_format::to_string(&b)).unwrap(),
             b
         );
+    }
+
+    /// Totals shown in another currency are written in its own separators
+    /// and symbol (decisions.md, entry 61).
+    #[test]
+    fn the_totals_currency_line_uses_its_format() {
+        let mut b = starter::budget();
+        b.currencies.insert(
+            "EUR".into(),
+            method_core::Currency {
+                description: "Euro".into(),
+                symbol: "\u{20ac}".into(),
+                rate: "2".parse().unwrap(),
+                format: method_core::CurrencyFormat {
+                    symbol_after: true,
+                    separators: method_core::Separators::PointComma,
+                },
+            },
+        );
+        b.totals_currency = Some("EUR".into());
+        let r = recalc(&b, &RecalcOptions::default()).unwrap();
+        let shown = r.display.as_ref().unwrap().net_total;
+        let text = topsheet(&b, &r);
+        let want = b.currencies["EUR"].amount_text(shown);
+        assert!(want.ends_with(" \u{20ac}") && want.contains(','), "{want}");
+        assert!(text.contains("Net total in EUR"), "{text}");
+        assert!(text.contains(&want), "{text}");
     }
 }

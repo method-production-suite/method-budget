@@ -106,7 +106,7 @@ export function explainTargetAt({ level, row, colKey, ix, cat = null, ai = null 
   }
   if (!cat || typeof cat.ci !== 'number') return null;
   const ci = cat.ci;
-  const fringeCol = colKey === 'fringe_total' || colKey === 'fringe_pct';
+  const fringeCol = colKey === 'fringe_total' || colKey === 'fringe_pct' || colKey === 'fringe_full_pct';
   if (level === 'accounts') {
     const m = /^a(\d+)$/.exec(key);
     if (m) return { kind: fringeCol ? 'account_fringes' : 'account', ci, ai: Number(m[1]) };

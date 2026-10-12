@@ -25,7 +25,7 @@
 // preset"), or one of the older kinds "topsheet", "detail" or "both".
 
 import { el } from './dom.js';
-import { money, decimal } from './format.js';
+import { money, decimal, currencyMoney } from './format.js';
 import { rowColor, fringePercent, chargeLabel, fringeRowOf, topsheetOrder } from './levels.js';
 import { setRules } from './sheet.js';
 import { orderedNames } from './order.js';
@@ -542,7 +542,7 @@ function topsheet(ctx) {
       tr.append(cell);
     }
     if (fringes) tr.append(td(extra.fringes ? money(extra.fringes) : '', 'num muted-fig'));
-    tr.append(td(m(total), 'num'), ...baseCells(ctx, bc, total, ch));
+    tr.append(td(extra.text !== undefined ? extra.text : m(total), 'num'), ...baseCells(ctx, bc, total, ch));
     rows.push(row(tr, keep));
   };
   const baseFor = (code) => (base && base.categories.get(code)) || null;
@@ -582,7 +582,7 @@ function topsheet(ctx) {
   if (frAt !== null && frAt >= tsLen) line('posted', fr.account, fr.description, r.budget_fringes, null, true);
   // The summary stays together.
   const sum = [];
-  const sline = (cls, label, total, ch, code = '') => sum.push([cls, label, total, ch, code]);
+  const sline = (cls, label, total, ch, code = '', text = undefined) => sum.push([cls, label, total, ch, code, text]);
   if (r) {
     sline('sum first', 'Total above-the-line', r.total_atl, null);
     sline('sum', 'Total below-the-line', r.total_btl, null);
@@ -600,13 +600,15 @@ function topsheet(ctx) {
     if (r.display) {
       const cur = r.totals_currency;
       const rate = `1 ${cur} = ${decimal(r.totals_rate)} ${r.base_currency}`;
-      sline('sum display first', `Grand total in ${cur} (${rate})`, r.display.grand_total, null);
-      if (credits.length) sline('sum display', `Net total in ${cur}`, r.display.net_total, null);
+      // In that currency's own separators and symbol (decisions.md, entry 61).
+      const c = (ctx.b.currencies || {})[cur];
+      sline('sum display first', `Grand total in ${cur} (${rate})`, r.display.grand_total, null, '', currencyMoney(r.display.grand_total, c));
+      if (credits.length) sline('sum display', `Net total in ${cur}`, r.display.net_total, null, '', currencyMoney(r.display.net_total, c));
     }
   } else {
     sline('sum first', 'Totals unavailable', null, null);
   }
-  sum.forEach(([cls, label, total, ch, code], i) => line(cls, code, label, total, ch, i < sum.length - 1));
+  sum.forEach(([cls, label, total, ch, code, text], i) => line(cls, code, label, total, ch, i < sum.length - 1, text === undefined ? {} : { text }));
   if (ctx.items.length === 0) rows.unshift(row(el('tr', { class: 'rpt-row empty' }, td('This budget has no categories yet.', 'muted', cols.length))));
   return [{ name: 'Topsheet', cls: `rpt-ts${bc.length ? ' has-baseline' : ''}${pages || fringes ? ' has-extra' : ''}`, cols, head, rows }];
 }

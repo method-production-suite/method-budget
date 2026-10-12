@@ -1070,7 +1070,7 @@ mod tests {
 
     #[test]
     fn applying_adds_renames_and_never_removes_lines() {
-        let mut b = starter::budget();
+        let mut b = starter::budget_with_separator('-');
         let lines_before: usize = b
             .categories()
             .flat_map(|c| &c.accounts)

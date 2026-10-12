@@ -340,14 +340,14 @@ mod tests {
 
     #[test]
     fn clean_budget_has_no_issues() {
-        let o = lenient_recalc(&starter::budget());
+        let o = lenient_recalc(&starter::budget_with_separator('-'));
         assert!(o.report.is_some() && o.error.is_none() && o.issues.is_empty());
         assert!(!o.partial());
     }
 
     #[test]
     fn bad_cells_are_flagged_and_the_rest_still_totals() {
-        let mut b = starter::budget();
+        let mut b = starter::budget_with_separator('-');
         let good = recalc(&b, &RecalcOptions::default()).unwrap();
         let id = first_row_id(&b, "50-01");
         let other = first_row_id(&b, "10-01");
@@ -390,7 +390,7 @@ mod tests {
 
     #[test]
     fn broken_globals_are_flagged_and_count_as_zero() {
-        let mut b = starter::budget();
+        let mut b = starter::budget_with_separator('-');
         b.globals.insert("A".into(), "B + 1".into());
         b.globals.insert("B".into(), "A".into());
         b.globals.insert("C".into(), "1 / 0".into());
@@ -410,7 +410,7 @@ mod tests {
 
     #[test]
     fn bad_fringe_rate_and_currency_are_flagged() {
-        let mut b = starter::budget();
+        let mut b = starter::budget_with_separator('-');
         b.fringes.get_mut("PAYROLL").unwrap().rate = "TEN".into();
         let id = first_row_id(&b, "41-01");
         detail_mut(&mut b, id).currency = Some("XYZ".into());
@@ -434,7 +434,7 @@ mod tests {
     /// unknown one on it is flagged on its cell like a line's.
     #[test]
     fn an_unknown_fringe_on_an_adjustment_row_is_flagged() {
-        let mut b = starter::budget();
+        let mut b = starter::budget_with_separator('-');
         let id = 900;
         let acct = b
             .categories_mut()
@@ -455,7 +455,7 @@ mod tests {
 
     #[test]
     fn unfixable_problems_give_no_report_but_keep_the_error() {
-        let mut b = starter::budget();
+        let mut b = starter::budget_with_separator('-');
         // Duplicate row ids can't be neutralized.
         let id = first_row_id(&b, "10-01");
         let other = first_row_id(&b, "11-01");

@@ -33,6 +33,7 @@ pub(crate) fn apply_fringes(
     for r in rows.iter_mut() {
         r.fringes.clear();
         r.fringe_total = 0;
+        r.fringe_full_total = 0;
     }
 
     // Check every name (excluded rows too) and evaluate each rate once.
@@ -150,8 +151,36 @@ pub(crate) fn apply_fringes(
         let r = &mut rows[i];
         r.fringe_total = sum(r.fringes.values().copied())
             .ok_or_else(|| overflow(row_at(&acct.code, i, d, "fringes")))?;
+        if earns[i] {
+            r.fringe_full_total = full_fringes(ctx.arith, d, r, &rates)
+                .ok_or_else(|| overflow(row_at(&acct.code, i, d, "fringes")))?;
+        }
     }
     Ok(())
+}
+
+/// What row `r` (of line `d`, which earns) would earn with no cutoff and no
+/// range (decisions.md, entry 61): each percent fringe its percent of the
+/// row's total, rounded on its own, plus the flat fringes it earned (they
+/// never have a cutoff or a range). `None` on overflow.
+fn full_fringes(
+    arith: Arithmetic,
+    d: &Detail,
+    r: &RowTotals,
+    rates: &BTreeMap<&str, (&Fringe, Num)>,
+) -> Option<Cents> {
+    let mut total: Cents = 0;
+    for name in &d.fringes {
+        let Some(&(f, rate)) = rates.get(name.as_str()) else {
+            continue;
+        };
+        let amount = match f.kind {
+            FringeKind::Percent { .. } => percent_of(arith, r.total, rate)?.to_cents()?,
+            FringeKind::Flat { .. } => r.fringes.get(name).copied().unwrap_or(0),
+        };
+        total = total.checked_add(amount)?;
+    }
+    Some(total)
 }
 
 /// Percent-fringe earners as lists of row indexes (lines and adjustment

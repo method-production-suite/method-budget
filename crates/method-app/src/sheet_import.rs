@@ -780,7 +780,7 @@ mod tests {
 
     #[test]
     fn the_preview_guesses_and_reconciles() {
-        let b = starter::budget();
+        let b = starter::budget_with_separator('-');
         let s = sheet();
         let p = picked(7, "dept.csv".into(), &s);
         assert_eq!(p.kind, "csv");
@@ -942,14 +942,14 @@ mod tests {
             guess: true,
             ..Request::default()
         };
-        let pv = preview_dto(&starter::budget(), &sheet(), &req).unwrap();
+        let pv = preview_dto(&starter::budget_with_separator('-'), &sheet(), &req).unwrap();
         assert_eq!(pv.header_row, Some(2));
         assert_eq!(pv.mapping.get("rate"), Some(&3));
         let req = Request {
             header_row: Some(99),
             ..Request::default()
         };
-        assert!(preview_dto(&starter::budget(), &sheet(), &req).is_err());
+        assert!(preview_dto(&starter::budget_with_separator('-'), &sheet(), &req).is_err());
     }
 
     #[test]
@@ -975,7 +975,7 @@ mod tests {
     fn no_em_dashes_in_messages() {
         let s = sheet();
         let pv = preview_dto(
-            &starter::budget(),
+            &starter::budget_with_separator('-'),
             &s,
             &Request {
                 detect_header: true,

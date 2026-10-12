@@ -884,7 +884,7 @@ mod tests {
     /// The starter budget with a second fringe, two groups, two sets, two
     /// locations and a currency.
     fn budget() -> Budget {
-        let mut b = method_core::starter::budget();
+        let mut b = method_core::starter::budget_with_separator('-');
         b.fringes.insert(
             "PENSION".into(),
             Fringe {

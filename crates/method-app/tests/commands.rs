@@ -38,6 +38,13 @@ fn account<'a>(v: &'a Value, code: &str) -> &'a Value {
         .unwrap()
 }
 
+/// A session on the starter numbered with a dash (`13-01`), as these tests
+/// name its accounts (a new budget's numbers have no separator,
+/// decisions.md, entry 61).
+fn session() -> Session {
+    Session::with_budget(method_core::starter::budget_with_separator('-'), None)
+}
+
 fn temp_dir() -> PathBuf {
     static N: AtomicUsize = AtomicUsize::new(0);
     let dir = std::env::temp_dir().join(format!(
@@ -66,7 +73,7 @@ fn starter_view_has_budget_json_and_totals() {
 
 #[test]
 fn editing_a_cell_recalcs_and_undo_redo_restore() {
-    let mut s = Session::new();
+    let mut s = session();
     let before = view(&mut s);
     let id = ids_in(&s, "50-01")[0];
     assert_eq!(account(&before, "50-01")["total"], 1_500_000);
@@ -102,7 +109,7 @@ fn editing_a_cell_recalcs_and_undo_redo_restore() {
 
 #[test]
 fn no_op_edits_leave_history_alone() {
-    let mut s = Session::new();
+    let mut s = session();
     let id = ids_in(&s, "50-01")[0];
     s.set_detail_field(id, "rate", "15000").unwrap(); // already 15000
     assert!(!s.can_undo() && !s.is_dirty());
@@ -110,7 +117,7 @@ fn no_op_edits_leave_history_alone() {
 
 #[test]
 fn rejected_edits_change_nothing() {
-    let mut s = Session::new();
+    let mut s = session();
     assert!(s.set_detail_field(999_999, "rate", "1").is_err());
     assert!(s.set_detail_field(1, "bogus", "1").is_err());
     assert!(s
@@ -126,7 +133,7 @@ fn rejected_edits_change_nothing() {
 
 #[test]
 fn a_bad_formula_is_kept_flagged_and_the_rest_still_totals() {
-    let mut s = Session::new();
+    let mut s = session();
     let good = view(&mut s);
     let id = ids_in(&s, "21-01")[0];
     s.set_detail_field(id, "amount", "SHOOT_WEKS + 1").unwrap();
@@ -162,7 +169,7 @@ fn a_bad_formula_is_kept_flagged_and_the_rest_still_totals() {
 
 #[test]
 fn unknown_fringe_on_a_row_is_flagged_on_that_cell() {
-    let mut s = Session::new();
+    let mut s = session();
     let id = ids_in(&s, "22-01")[0];
     s.set_detail_field(id, "fringes", "PAYROLL, NOPE").unwrap();
     let v = view(&mut s);
@@ -179,7 +186,7 @@ fn unknown_fringe_on_a_row_is_flagged_on_that_cell() {
 
 #[test]
 fn adding_and_deleting_rows() {
-    let mut s = Session::new();
+    let mut s = session();
     let ids = ids_in(&s, "20-01");
     let line = s.add_detail("20-01", Some(ids[0]), "line").unwrap();
     let sub = s.add_detail("20-01", None, "subtotal").unwrap();
@@ -235,7 +242,7 @@ fn adding_and_deleting_rows() {
 
 #[test]
 fn bulk_field_edits_are_one_undo_step() {
-    let mut s = Session::new();
+    let mut s = session();
     let ids = ids_in(&s, "21-01");
     s.edit("Test edit", |b| {
         edit::set_group(
@@ -268,7 +275,7 @@ fn bulk_field_edits_are_one_undo_step() {
 
 #[test]
 fn groups_out_of_the_total_grey_rows_and_drop_their_money() {
-    let mut s = Session::new();
+    let mut s = session();
     let id = ids_in(&s, "21-01")[1];
     let g = |on| GroupInput {
         short_code: None,
@@ -301,7 +308,7 @@ fn groups_out_of_the_total_grey_rows_and_drop_their_money() {
 
 #[test]
 fn globals_set_evaluate_and_delete_by_freezing() {
-    let mut s = Session::new();
+    let mut s = session();
     s.edit("Test edit", |b| edit::set_global(b, "SHOOT_DAYS", "30"))
         .unwrap();
     let v = view(&mut s);
@@ -340,7 +347,7 @@ fn globals_set_evaluate_and_delete_by_freezing() {
 
 #[test]
 fn fringes_units_and_currencies() {
-    let mut s = Session::new();
+    let mut s = session();
     let pension = FringeInput {
         short_code: None,
         kind: "percent".into(),
@@ -481,9 +488,39 @@ fn fringes_units_and_currencies() {
         description: "Euro".into(),
         symbol: "€".into(),
         rate: "1.1".into(),
+        symbol_after: Some(true),
+        separators: Some("point_comma".into()),
     };
     s.edit("Test edit", |b| edit::set_currency(b, "EUR", &eur))
         .unwrap();
+    // How amounts in it are written (decisions.md, entry 61): kept when an
+    // edit leaves them out, refused when unknown.
+    let c = &view(&mut s)["budget"]["currencies"]["EUR"];
+    assert_eq!(
+        (&c["symbol_after"], &c["separators"]),
+        (&Value::Bool(true), &Value::from("point_comma"))
+    );
+    let plain = CurrencyInput {
+        symbol_after: None,
+        separators: None,
+        ..eur.clone()
+    };
+    s.edit("Test edit", |b| edit::set_currency(b, "EUR", &plain))
+        .unwrap();
+    assert_eq!(
+        s.budget().currencies["EUR"].amount_text(123_456),
+        "1.234,56 €"
+    );
+    refused(&mut s, |b| {
+        edit::set_currency(
+            b,
+            "EUR",
+            &CurrencyInput {
+                separators: Some("1 234,56".into()),
+                ..eur.clone()
+            },
+        )
+    });
     let mix = ids_in(&s, "41-01")[0];
     s.set_detail_field(mix, "currency", "EUR").unwrap();
     let v = view(&mut s);
@@ -516,7 +553,7 @@ fn fringes_units_and_currencies() {
 
 #[test]
 fn categories_accounts_and_production_totals() {
-    let mut s = Session::new();
+    let mut s = session();
     // Codes are normalized by the budget's coding pattern.
     s.edit("Test edit", |b| edit::add_category(b, "6", "Other", None))
         .unwrap();
@@ -584,12 +621,15 @@ fn categories_accounts_and_production_totals() {
         .unwrap();
     s.edit("Test edit", |b| edit::delete_topsheet_row(b, idx))
         .unwrap();
-    assert_eq!(s.budget(), &method_core::starter::budget());
+    assert_eq!(
+        s.budget(),
+        &method_core::starter::budget_with_separator('-')
+    );
 }
 
 #[test]
 fn selection_totals_sum_the_chosen_rows() {
-    let mut s = Session::new();
+    let mut s = session();
     let ids = ids_in(&s, "13-01");
     let sel = serde_json::to_value(s.selection(&ids)).unwrap();
     let v = view(&mut s);
@@ -605,7 +645,7 @@ fn selection_totals_sum_the_chosen_rows() {
 fn save_open_round_trip_and_dirty_flag() {
     let dir = temp_dir();
     let path = dir.join("film.mthd");
-    let mut s = Session::new();
+    let mut s = session();
     s.edit("Test edit", |b| edit::set_title(b, "Round Trip"))
         .unwrap();
     assert!(s.is_dirty());
@@ -640,7 +680,7 @@ fn save_open_round_trip_and_dirty_flag() {
 fn a_file_with_unfixable_errors_still_opens_and_shows_the_problem() {
     let dir = temp_dir();
     let path = dir.join("dupe.mthd");
-    let mut b: Budget = method_core::starter::budget();
+    let mut b: Budget = method_core::starter::budget_with_separator('-');
     // Two rows with the same id: the engine refuses to total this budget.
     let first = b.categories().next().unwrap().accounts[0].details[0].id;
     b.categories_mut().nth(1).unwrap().accounts[0].details[0].id = first;
@@ -659,7 +699,7 @@ fn a_file_with_unfixable_errors_still_opens_and_shows_the_problem() {
 
 #[test]
 fn undo_history_is_capped() {
-    let mut s = Session::new();
+    let mut s = session();
     let id = ids_in(&s, "50-01")[0];
     for i in 0..(method_app::session::UNDO_LIMIT + 20) {
         s.set_detail_field(id, "amount", &(i + 2).to_string())
@@ -727,7 +767,7 @@ fn net(v: &Value) -> i64 {
 
 #[test]
 fn charges_are_added_edited_moved_and_deleted() {
-    let mut s = Session::new();
+    let mut s = session();
     let v0 = view(&mut s);
     let insurance: edit::ChargeInput = input(serde_json::json!({
         "name": "Insurance", "kind": "flat", "amount": "$1,000.00",
@@ -781,7 +821,7 @@ fn charges_are_added_edited_moved_and_deleted() {
 
 #[test]
 fn bad_charges_are_refused_and_change_nothing() {
-    let mut s = Session::new();
+    let mut s = session();
     let charge = |v: Value| -> edit::ChargeInput { input(v) };
     let ok = serde_json::json!({"name": "Fee", "kind": "percent", "percent": "5"});
     let with = |k: &str, val: Value| {
@@ -827,7 +867,7 @@ fn bad_charges_are_refused_and_change_nothing() {
 
 #[test]
 fn a_charge_keeps_an_exclusion_whose_group_is_gone() {
-    let mut s = Session::new();
+    let mut s = session();
     // A file can name a group the budget no longer has; editing the charge's
     // other fields must still work.
     s.edit("Test edit", |b| {
@@ -854,7 +894,7 @@ fn a_charge_keeps_an_exclusion_whose_group_is_gone() {
 
 #[test]
 fn credits_reduce_the_net_total() {
-    let mut s = Session::new();
+    let mut s = session();
     s.edit("Test edit", |b| {
         edit::set_group(
             b,
@@ -917,7 +957,7 @@ fn credits_reduce_the_net_total() {
 /// each.
 #[test]
 fn category_credit_rows_and_group_rules() {
-    let mut s = Session::new();
+    let mut s = session();
     let v0 = view(&mut s);
     let code = s.budget().categories().next().unwrap().code.clone();
     let cat = &v0["report"]["categories"][0];
@@ -936,6 +976,26 @@ fn category_credit_rows_and_group_rules() {
     );
     assert_eq!(v["report"]["credits"][0]["rows"][0]["gross"], want);
     assert_eq!(v["report"]["credits"][0]["amount"], (want + 5) / 10);
+
+    // A row on an account counts the account with its fringes
+    // (decisions.md, entry 61).
+    let acct = &cat["accounts"][0];
+    let acct_code = acct["code"].as_str().unwrap().to_string();
+    let want = acct["details_total"].as_i64().unwrap() + acct["fringe_total"].as_i64().unwrap();
+    let credit: edit::CreditInput = input(serde_json::json!({
+        "name": "Account", "rows": [
+            {"description": "First account", "source": {"kind": "account", "account": acct_code},
+             "percent": "10", "cap": {"kind": "none"}}
+        ]
+    }));
+    one_step(&mut s, |b| edit::set_credit(b, None, &credit));
+    let v = view(&mut s);
+    assert_eq!(
+        v["budget"]["credits"][1]["rows"][0]["source"],
+        serde_json::json!({"kind": "account", "account": acct_code})
+    );
+    assert_eq!(v["report"]["credits"][1]["rows"][0]["gross"], want);
+    one_step(&mut s, |b| edit::delete_credit(b, 1));
 
     assert!(
         v["budget"].get("group_rules").is_none(),
@@ -964,7 +1024,7 @@ fn category_credit_rows_and_group_rules() {
 /// command each, one undo step, and saved only when not the default.
 #[test]
 fn arithmetic_and_trailing_level_fringes() {
-    let mut s = Session::new();
+    let mut s = session();
     let v0 = view(&mut s);
     assert!(
         v0["budget"].get("arithmetic").is_none(),
@@ -992,7 +1052,7 @@ fn arithmetic_and_trailing_level_fringes() {
 
 #[test]
 fn bad_credits_are_refused_and_change_nothing() {
-    let mut s = Session::new();
+    let mut s = session();
     let row = |src: Value, pct: &str, cap: Value| serde_json::json!({"description": "r", "source": src, "percent": pct, "cap": cap});
     let flat = serde_json::json!({"kind": "flat", "amount": "10"});
     let none = serde_json::json!({"kind": "none"});
@@ -1028,6 +1088,12 @@ fn bad_credits_are_refused_and_change_nothing() {
             serde_json::json!({"rows": [row(serde_json::json!({"kind": "category", "category": " "}), "5", none.clone())]}),
         ),
         credit(
+            serde_json::json!({"rows": [row(serde_json::json!({"kind": "account", "account": "99-99"}), "5", none.clone())]}),
+        ),
+        credit(
+            serde_json::json!({"rows": [row(serde_json::json!({"kind": "account", "account": ""}), "5", none.clone())]}),
+        ),
+        credit(
             serde_json::json!({"rows": [row(flat.clone(), "5", serde_json::json!({"kind": "qualified_spend", "amount": "-1"}))]}),
         ),
     ];
@@ -1056,7 +1122,7 @@ fn bad_credits_are_refused_and_change_nothing() {
 
 #[test]
 fn sets_and_locations_tag_rows_and_deleting_untags_them() {
-    let mut s = Session::new();
+    let mut s = session();
     let id = ids_in(&s, "21-01")[0];
     let set: edit::SetInput = input(serde_json::json!({"description": "Diner interior"}));
     one_step(&mut s, |b| edit::set_set(b, "Diner", &set));
@@ -1095,7 +1161,7 @@ fn sets_and_locations_tag_rows_and_deleting_untags_them() {
 
 #[test]
 fn budget_info_fields_are_typed() {
-    let mut s = Session::new();
+    let mut s = session();
     let info = |kind: &str, value: &str| -> edit::InfoInput {
         input(serde_json::json!({"kind": kind, "value": value}))
     };
@@ -1136,7 +1202,7 @@ fn budget_info_fields_are_typed() {
 
 #[test]
 fn fringe_posting_coding_and_currencies() {
-    let mut s = Session::new();
+    let mut s = session();
     // A new budget posts fringes by budget (decisions.md, entry 60): one
     // fringe row, no fringe accounts.
     let v = view(&mut s);
@@ -1207,6 +1273,8 @@ fn fringe_posting_coding_and_currencies() {
                 description: String::new(),
                 symbol: String::new(),
                 rate: "2".into(),
+                symbol_after: None,
+                separators: None,
             },
         )
     })
@@ -1231,7 +1299,7 @@ fn fringe_posting_coding_and_currencies() {
 
 #[test]
 fn baseline_lock_shows_variance_and_clear_removes_it() {
-    let mut s = Session::new();
+    let mut s = session();
     assert!(view(&mut s)["variance"].is_null());
     refused(&mut s, edit::clear_baseline);
 
@@ -1286,9 +1354,39 @@ fn baseline_lock_shows_variance_and_clear_removes_it() {
     assert!(v["budget"].get("baseline").is_none());
 }
 
+/// Frozen original totals (decisions.md, entry 61): Lock again and Clear
+/// are refused until they are unfrozen; edits still move the variance.
+#[test]
+fn frozen_original_totals_refuse_lock_again_and_clear() {
+    let mut s = session();
+    refused(&mut s, |b| edit::set_baseline_frozen(b, true));
+    one_step(&mut s, edit::lock_baseline);
+    assert!(
+        view(&mut s)["budget"]["baseline"].get("frozen").is_none(),
+        "left out when not frozen"
+    );
+    one_step(&mut s, |b| edit::set_baseline_frozen(b, true));
+    let v = view(&mut s);
+    assert_eq!(v["budget"]["baseline"]["frozen"], true);
+    let original = v["variance"]["grand_total"]["original"].clone();
+
+    let id = ids_in(&s, "50-01")[0];
+    s.set_detail_field(id, "rate", "20000").unwrap();
+    let v = view(&mut s);
+    assert_eq!(v["variance"]["grand_total"]["original"], original);
+    assert_ne!(v["variance"]["grand_total"]["variance"], 0);
+    let e = refused(&mut s, edit::lock_baseline);
+    assert!(e.contains("frozen"), "{e}");
+    refused(&mut s, edit::clear_baseline);
+
+    one_step(&mut s, |b| edit::set_baseline_frozen(b, false));
+    one_step(&mut s, edit::lock_baseline);
+    assert_eq!(view(&mut s)["variance"]["grand_total"]["variance"], 0);
+}
+
 #[test]
 fn baseline_is_refused_while_the_budget_has_errors() {
-    let mut s = Session::new();
+    let mut s = session();
     let id = ids_in(&s, "21-01")[0];
     s.set_detail_field(id, "amount", "NOPE * 2").unwrap();
     let e = refused(&mut s, edit::lock_baseline);
@@ -1456,7 +1554,7 @@ fn lean_view_is_the_full_view_cut_down() {
 /// A focused account is found by code first, as the UI finds its place.
 #[test]
 fn focus_follows_the_account_code() {
-    let mut s = Session::new();
+    let mut s = session();
     // 21-01 is the only account in category 21, at topsheet index 6.
     s.set_focus(Some(Focus {
         category: "21".into(),
@@ -1483,7 +1581,7 @@ fn focus_follows_the_account_code() {
 /// topsheet row when rows are added or removed above it.
 #[test]
 fn cutoff_factor_and_fringe_row() {
-    let mut s = Session::new();
+    let mut s = session();
     let v0 = view(&mut s);
     assert!(v0["budget"].get("cutoff_factor").is_none());
     assert!(v0["budget"].get("fringe_row").is_none());
@@ -1529,7 +1627,7 @@ fn cutoff_factor_and_fringe_row() {
 /// Unit.
 #[test]
 fn formula_entry_refusals_and_a_global_unit() {
-    let mut s = Session::new();
+    let mut s = session();
     let id = ids_in(&s, "13-01")[0];
     let e = refused(&mut s, |b| {
         edit::set_detail_field(b, id, edit::Field::Amount, "SHOOT_DAYS / 0")

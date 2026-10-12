@@ -60,6 +60,7 @@
     "allow-set-totals-currency",
     "allow-lock-baseline",
     "allow-clear-baseline",
+    "allow-set-baseline-frozen",
     "allow-set-cells",
     "allow-set-row-style",
     "allow-add-note",

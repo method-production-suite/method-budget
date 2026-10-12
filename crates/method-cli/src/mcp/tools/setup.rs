@@ -64,7 +64,7 @@ pub fn tools() -> Vec<Tool> {
                 {in_budget_total, description, short_code, \
                 color}; set {description}; location {description, city, region, country}; unit \
                 {plural, description, hours}; currency {rate (base units per one of it), \
-                description, symbol}.",
+                description, symbol, symbol_after, separators}.",
             mutating: true,
             destructive: false,
             schema: || setup_schema(false),
@@ -174,9 +174,10 @@ pub fn tools() -> Vec<Tool> {
             name: "set_credit",
             title: "Add or change a credit",
             description: "Adds a credit (an incentive, by name) or changes the one with that name: \
-                rows that each take a percent of a flat amount, of a group's lines or of a \
-                topsheet category's total, with their fringes (less the credit's excluded \
-                fringes, one list for all its group and category rows), with \
+                rows that each take a percent of a flat amount, of a group's lines, of a \
+                topsheet category's total or of an account's total, with their fringes (less \
+                the credit's excluded fringes, one list for all its group, category and \
+                account rows), with \
                 caps, an overall cap and a discount. rows replaces every \
                 row when given. New credits are applied unless applied is false.",
             mutating: true,
@@ -184,10 +185,11 @@ pub fn tools() -> Vec<Tool> {
             schema: || {
                 let source = object(
                     vec![
-                        ("kind", s::one_of("flat, group or category.", &["flat", "group", "category"])),
+                        ("kind", s::one_of("flat, group, category or account.", &["flat", "group", "category", "account"])),
                         ("amount", money_schema("flat: the gross amount.")),
                         ("group", s::name("group: the group whose lines count.")),
                         ("category", s::name("category: the topsheet category whose total counts, with its fringes.")),
+                        ("account", s::name("account: the account whose total counts, with its fringes.")),
                     ],
                     &["kind"],
                 );
@@ -216,7 +218,7 @@ pub fn tools() -> Vec<Tool> {
                         ("applied", s::boolean("Whether it counts.")),
                         ("cap", s::nullable(money_schema("Ceiling on the sum of the rows' credits, or null."))),
                         ("discount_percent", s::formula("Taken off after the cap (5 means 5%).")),
-                        ("excluded_fringes", s::array("Fringes left out of the spend of every group and category row (replaces the list).", s::name("A fringe."), 100)),
+                        ("excluded_fringes", s::array("Fringes left out of the spend of every group, category and account row (replaces the list).", s::name("A fringe."), 100)),
                         ("rows", s::array("The credit's rows (replaces them all).", row, 200)),
                     ],
                     &["path", "name"],
@@ -448,6 +450,8 @@ fn setup_schema(update: bool) -> Value {
             ("plural", s::text("unit: plural name.")),
             ("hours", s::nullable(json!({"type": ["string", "number"], "description": "unit: hours in one of it, or null.", "maxLength": 40}))),
             ("symbol", s::text("currency: symbol.")),
+            ("symbol_after", s::boolean("currency: write the symbol after the value (1.234,56 €) instead of before it ($1,234.56).")),
+            ("separators", s::one_of("currency: comma_point (1,234.56) or point_comma (1.234,56).", &["comma_point", "point_comma"])),
         ],
         &[],
     );
@@ -598,7 +602,13 @@ fn check_fields(kind: SetupKind, f: &Map<String, Value>) -> Result<(), ToolError
         SetupKind::Set => &["description"],
         SetupKind::Location => &["description", "city", "region", "country"],
         SetupKind::Unit => &["description", "plural", "hours"],
-        SetupKind::Currency => &["description", "symbol", "rate"],
+        SetupKind::Currency => &[
+            "description",
+            "symbol",
+            "rate",
+            "symbol_after",
+            "separators",
+        ],
         SetupKind::Global => &[],
     };
     for k in f.keys() {
@@ -833,6 +843,23 @@ fn put_item(
             if rate <= Dec::ZERO {
                 return Err(ToolError::invalid("an exchange rate must be more than 0"));
             }
+            // How amounts in it are written (decisions.md, entry 61): kept
+            // unless given.
+            let was = old.as_ref().map(|o| o.format).unwrap_or_default();
+            let symbol_after = match f.get("symbol_after") {
+                None => was.symbol_after,
+                Some(v) => v
+                    .as_bool()
+                    .ok_or_else(|| ToolError::invalid("symbol_after should be true or false"))?,
+            };
+            let separators = match text(f, "separators") {
+                None => was.separators,
+                Some(s) => method_core::Separators::parse(&s).ok_or_else(|| {
+                    ToolError::invalid(
+                        "separators should be comma_point (1,234.56) or point_comma (1.234,56)",
+                    )
+                })?,
+            };
             b.currencies.insert(
                 name.to_string(),
                 Currency {
@@ -843,6 +870,10 @@ fn put_item(
                         .or_else(|| old.as_ref().map(|o| o.symbol.clone()))
                         .unwrap_or_default(),
                     rate,
+                    format: method_core::CurrencyFormat {
+                        symbol_after,
+                        separators,
+                    },
                 },
             );
         }
@@ -1430,6 +1461,19 @@ fn set_credit(ctx: &mut Ctx, a: &Args) -> ToolResult {
                             )));
                         }
                         CreditSource::Category { category: c }
+                    }
+                    Some("account") => {
+                        let acct = text("account");
+                        if !b
+                            .categories()
+                            .flat_map(|cat| &cat.accounts)
+                            .any(|x| x.code == acct)
+                        {
+                            return Err(ToolError::not_found(format!(
+                                "row {n}: there is no account `{acct}`"
+                            )));
+                        }
+                        CreditSource::Account { account: acct }
                     }
                     _ => {
                         let amt = src.get("amount").ok_or_else(|| {

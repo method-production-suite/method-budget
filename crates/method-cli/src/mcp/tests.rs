@@ -22,9 +22,12 @@ impl Fixture {
         let dir = std::env::temp_dir().join(format!("method-mcp-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
+        // Numbered with a dash (`21-01`), as the tool tests name its
+        // accounts (a new budget's numbers have none, decisions.md,
+        // entry 61).
         crate::cli::save(
             dir.join("film.mthd").to_str().unwrap(),
-            &method_core::starter::budget(),
+            &method_core::starter::budget_with_separator('-'),
         )
         .unwrap();
         let server = Server::new(&Config {

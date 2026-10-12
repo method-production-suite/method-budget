@@ -216,17 +216,18 @@ mod tests {
             crate::edit::add_account(b, "50", "50-12", "Twelve", None)
         })
         .unwrap();
-        // A one-character account part can't hold 12.
+        // A one-character account part can't hold 12 (the new-budget
+        // pattern has no separator, so it reads 5012).
         let p = preview(s.budget(), [2, 1, 0, 0], Some("-")).unwrap();
         assert!(
-            p.conflicts.iter().any(|c| c.contains("50-12")),
+            p.conflicts.iter().any(|c| c.contains("5012")),
             "{:?}",
             p.conflicts
         );
         assert!(p
             .accounts
             .iter()
-            .any(|c| c.old == "50-12" && c.new.is_empty()));
+            .any(|c| c.old == "5012" && c.new.is_empty()));
         let before = s.budget().clone();
         let e = s
             .edit("Renumber", |b| apply(b, [2, 1, 0, 0], Some("-")))

@@ -1515,6 +1515,54 @@ impl<'a> Explainer<'a> {
                     }
                     (gross, ex)
                 }
+                CreditSource::Account { account } => {
+                    // The first account with the number, as the engine
+                    // takes it.
+                    let found = self.b.categories().enumerate().find_map(|(ci, cat)| {
+                        cat.accounts
+                            .iter()
+                            .position(|a| a.code == *account)
+                            .map(|ai| (ci, ai))
+                    });
+                    let mut gross: Cents = 0;
+                    let mut ex: Cents = 0;
+                    if let Some(at) = found {
+                        for (ci, ai, _, _, _, r) in self.costed() {
+                            if (ci, ai) != at {
+                                continue;
+                            }
+                            let v = r.total.checked_add(r.fringe_total).ok_or_else(ovf)?;
+                            gross = gross.checked_add(v).ok_or_else(ovf)?;
+                            for (name, s) in &r.fringes {
+                                if excluded_fringes.contains(name) {
+                                    ex = ex.checked_add(s.amount.unwrap_or(0)).ok_or_else(ovf)?;
+                                }
+                            }
+                        }
+                    }
+                    let gross_note = match found {
+                        Some((ci, ai)) => Step::note_amount(
+                            "Gross",
+                            format!(
+                                "account {} with its fringes, wherever fringes post",
+                                self.account_name(ci, ai)
+                            ),
+                            gross,
+                        )
+                        .with_link(Link::Account { ci, ai }),
+                        None => Step::note_amount(
+                            "Gross",
+                            format!("account {account} is not in the budget, so 0"),
+                            gross,
+                        ),
+                    };
+                    row_notes.push(gross_note);
+                    if !excluded_fringes.is_empty() {
+                        let names = excluded_fringes.iter().cloned().collect::<Vec<_>>();
+                        row_notes.push(Step::note_amount("Excluded fringes", names.join(", "), ex));
+                    }
+                    (gross, ex)
+                }
             };
             let net = gross.checked_sub(excluded).ok_or_else(ovf)?;
             row_notes.push(Step::note_amount(
@@ -2107,6 +2155,7 @@ fn fringes_calc(
             subtotal: None,
             fringes: BTreeMap::new(),
             fringe_total: 0,
+            fringe_full_total: 0,
         })
         .collect();
     let mut found: Vec<BTreeMap<String, Step>> = vec![BTreeMap::new(); details.len()];

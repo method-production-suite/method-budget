@@ -556,9 +556,17 @@ pub fn renumber(b: &mut Budget, to: AccountCoding) -> Result<RenumberPlan, Renum
     for cr in &mut b.credits {
         cr.account = carry_label(&cr.account, &accts, &acct_new, acct_conv);
         for row in &mut cr.rows {
-            if let CreditSource::Category { category, .. } = &mut row.source {
-                let label = Some(std::mem::take(category));
-                *category = carry_label(&label, &cats, &cat_new, cat_conv).unwrap_or_default();
+            match &mut row.source {
+                CreditSource::Category { category } => {
+                    let label = Some(std::mem::take(category));
+                    *category = carry_label(&label, &cats, &cat_new, cat_conv).unwrap_or_default();
+                }
+                CreditSource::Account { account } => {
+                    let label = Some(std::mem::take(account));
+                    *account =
+                        carry_label(&label, &accts, &acct_new, acct_conv).unwrap_or_default();
+                }
+                _ => {}
             }
         }
     }

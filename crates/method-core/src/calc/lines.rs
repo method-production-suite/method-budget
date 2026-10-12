@@ -34,6 +34,7 @@ pub(crate) fn eval_rows(ctx: &Ctx, acct: &Account) -> Result<Vec<RowTotals>, Cal
                 subtotal: Some(since_subtotal),
                 fringes: BTreeMap::new(),
                 fringe_total: 0,
+                fringe_full_total: 0,
             });
             since_subtotal = 0;
             continue;
@@ -51,6 +52,7 @@ pub(crate) fn eval_rows(ctx: &Ctx, acct: &Account) -> Result<Vec<RowTotals>, Cal
                 subtotal: None,
                 fringes: BTreeMap::new(),
                 fringe_total: 0,
+                fringe_full_total: 0,
             });
             continue;
         }
@@ -118,6 +120,7 @@ pub(crate) fn eval_rows(ctx: &Ctx, acct: &Account) -> Result<Vec<RowTotals>, Cal
             subtotal: None,
             fringes: BTreeMap::new(),
             fringe_total: 0,
+            fringe_full_total: 0,
         });
     }
     Ok(out)

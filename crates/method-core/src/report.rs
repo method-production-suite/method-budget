@@ -245,6 +245,14 @@ pub struct RowTotals {
     /// rows; a range uses its cutoff up in row order).
     pub fringes: BTreeMap<String, Cents>,
     pub fringe_total: Cents,
+    /// What the row's fringes come to with no cutoff and no range: each
+    /// percent fringe its percent of the row's total, rounded on its own,
+    /// plus the flat fringes as earned (decisions.md, entry 61). Over the
+    /// row's total it is the full fringe percent, the reference product's
+    /// Agg Sum (`fringe_total` over it is the effective percent, its Agg).
+    /// 0 for a row that doesn't earn (suppressed, filtered out, subtotal
+    /// or separator).
+    pub fringe_full_total: Cents,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

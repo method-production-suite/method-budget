@@ -1117,6 +1117,14 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
             ),
             symbol: th.field(cx, at, "symbol", "symbol", |c| &c.symbol, |v| quoted(v)),
             rate: th.field(cx, at, "rate", "rate", |c| &c.rate, |v| v.to_string()),
+            format: th.field(
+                cx,
+                at,
+                "format",
+                "format",
+                |c| &c.format,
+                crate::diff::currency_format_text,
+            ),
         },
     );
     let sets = merge_map(

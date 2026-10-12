@@ -139,26 +139,26 @@ fn an_agent_builds_a_budget_over_stdio() {
     );
     s.ok(
         "add_account",
-        json!({"path": p, "category": "10", "code": "10-01", "name": "Writer"}),
+        json!({"path": p, "category": "10", "code": "1001", "name": "Writer"}),
     );
     s.ok(
         "add_account",
-        json!({"path": p, "category": "11", "code": "11-01", "name": "Lead"}),
+        json!({"path": p, "category": "11", "code": "1101", "name": "Lead"}),
     );
     s.ok(
         "add_account",
-        json!({"path": p, "category": "20", "code": "20-01", "name": "Camera crew"}),
+        json!({"path": p, "category": "20", "code": "2001", "name": "Camera crew"}),
     );
     // Units are in a blank budget's table; a unit that isn't is refused.
     let e = s
-        .call("add_lines", json!({"path": p, "account": "10-01", "lines": [{"description": "Script", "amount": 1, "unit": "Draft", "rate": 10000}]}))
+        .call("add_lines", json!({"path": p, "account": "1001", "lines": [{"description": "Script", "amount": 1, "unit": "Draft", "rate": 10000}]}))
         .unwrap_err();
     assert!(e.contains("no unit Draft"), "{e}");
-    s.ok("add_lines", json!({"path": p, "account": "10-01", "lines": [{"description": "Script", "amount": 1, "unit": "Flat", "rate": 10000}]}));
-    s.ok("add_lines", json!({"path": p, "account": "11-01", "lines": [{"description": "Lead actor", "amount": "SHOOT_DAYS", "unit": "Day", "rate": 800, "fringes": ["FICA"]}]}));
+    s.ok("add_lines", json!({"path": p, "account": "1001", "lines": [{"description": "Script", "amount": 1, "unit": "Flat", "rate": 10000}]}));
+    s.ok("add_lines", json!({"path": p, "account": "1101", "lines": [{"description": "Lead actor", "amount": "SHOOT_DAYS", "unit": "Day", "rate": 800, "fringes": ["FICA"]}]}));
     let added = s.ok(
         "add_lines",
-        json!({"path": p, "account": "20-01", "lines": [
+        json!({"path": p, "account": "2001", "lines": [
             {"description": "Director of photography", "amount": "SHOOT_DAYS", "unit": "Day", "rate": 600, "fringes": ["FICA"]},
             {"description": "Camera package", "amount": 1, "unit": "Flat", "rate": "5000"}
         ]}),
@@ -166,7 +166,7 @@ fn an_agent_builds_a_budget_over_stdio() {
     let package = added["added"][1]["id"].as_u64().unwrap();
     // The package copied FICA from the line above (the budget's new-line
     // default); it is gear, so take it off.
-    let cam = s.ok("get_account", json!({"path": p, "account": "20-01"}));
+    let cam = s.ok("get_account", json!({"path": p, "account": "2001"}));
     assert_eq!(cam["rows"][1]["fringes"], json!(["FICA"]));
     s.ok(
         "tag_lines",

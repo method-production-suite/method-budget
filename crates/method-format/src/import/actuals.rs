@@ -1202,7 +1202,7 @@ mod tests {
 
     #[test]
     fn rows_become_transactions_with_review() {
-        let b = starter::budget();
+        let b = starter::budget_with_separator('-');
         let t = table(&[
             &["Date", "Account", "Vendor", "Description", "Amount"],
             &["9/1/2026", "1001", "Writer", "Draft", "$2,500.00"],
@@ -1287,7 +1287,7 @@ mod tests {
 
     #[test]
     fn debits_credits_signs_and_carried_accounts() {
-        let b = starter::budget();
+        let b = starter::budget_with_separator('-');
         let t = table(&[
             &["Account", "Date", "Memo", "Debit", "Credit"],
             &["10-01", "", "", "", ""],
@@ -1325,7 +1325,7 @@ mod tests {
 
     #[test]
     fn duplicates_are_found_and_reviewed() {
-        let mut b = starter::budget();
+        let mut b = starter::budget_with_separator('-');
         let t = table(&[
             &["Date", "Account", "Description", "Amount"],
             &["2026-09-01", "10-01", "Draft", "100"],
@@ -1380,7 +1380,7 @@ mod tests {
 
     #[test]
     fn long_text_is_cut_and_said() {
-        let b = starter::budget();
+        let b = starter::budget_with_separator('-');
         let long = "x".repeat(MAX_TEXT_CHARS + 5);
         let t = table(&[
             &["Account", "Description", "Amount"],
@@ -1404,7 +1404,7 @@ mod tests {
     fn what_a_plan_keeps_the_budget_takes() {
         // Whatever a plan lists as imported must pass the engine's checks,
         // or one odd row refuses the whole import.
-        let mut b = starter::budget();
+        let mut b = starter::budget_with_separator('-');
         let long_account = "9".repeat(80);
         let t = table(&[
             &["Account", "Description", "Amount", "Tags"],

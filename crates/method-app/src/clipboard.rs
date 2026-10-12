@@ -1104,7 +1104,7 @@ mod tests {
     /// The starter budget with tags on 20-01's two lines, and a setup
     /// table entry of every kind.
     fn source() -> Budget {
-        let mut b = starter::budget();
+        let mut b = starter::budget_with_separator('-');
         b.title = "Source".into();
         for (n, f) in [
             ("DAYS", "20"),
@@ -1172,6 +1172,7 @@ mod tests {
                 description: "Euro".into(),
                 symbol: "€".into(),
                 rate: "1.1".parse().unwrap(),
+                format: Default::default(),
             },
         );
         let rows = &mut account_mut(&mut b, "20-01").details;
@@ -1377,7 +1378,7 @@ mod tests {
     fn paste_into_another_budget_adds_what_is_missing() {
         // Two sessions: two budgets (two tabs, later).
         let src = Session::with_budget(source(), None);
-        let mut dst = Session::new();
+        let mut dst = Session::with_budget(starter::budget_with_separator('-'), None);
         let original = dst.budget().clone();
         let clip = copy(src.budget(), &rows(&[6, 7]));
         let p = preview(dst.budget(), &clip);
@@ -1434,7 +1435,7 @@ mod tests {
 
     /// A target that has FICA, OT and DAYS, each defined differently.
     fn conflicted() -> Budget {
-        let mut b = starter::budget();
+        let mut b = starter::budget_with_separator('-');
         b.title = "Target".into();
         b.fringes.insert(
             "FICA".into(),
@@ -1865,7 +1866,7 @@ mod tests {
         assert_eq!(clip.content.details()[1].currency, None);
 
         // Pasted where EUR is the base: EUR lines become base lines.
-        let mut euro = starter::budget();
+        let mut euro = starter::budget_with_separator('-');
         euro.base_currency = "EUR".into();
         let p = preview(&euro, &clip);
         assert!(p.items.iter().all(|i| i.kind != "currency"));

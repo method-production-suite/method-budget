@@ -10,8 +10,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use method_core::coding::AccountCoding;
 use method_core::{
-    Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource, FringeKind, FringePosting,
-    NewLineDefaults, ReportPreset, TrailingFringes, MAX_PRESETS, MAX_PRESET_NAME_CHARS,
+    Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource, CutoffFactor, FringeKind,
+    FringePosting, FringeRow, NewLineDefaults, ReportPreset, TrailingFringes, MAX_PRESETS,
+    MAX_PRESET_NAME_CHARS,
 };
 use serde::{Deserialize, Serialize};
 
@@ -47,11 +48,13 @@ pub enum What {
     OtPattern,
     AccountCoding,
     FringePosting,
+    FringeRow,
+    CutoffFactor,
     NewLineDefaults,
 }
 
 impl What {
-    pub const ALL: [What; 16] = [
+    pub const ALL: [What; 18] = [
         What::Global,
         What::Fringe,
         What::Group,
@@ -67,6 +70,8 @@ impl What {
         What::OtPattern,
         What::AccountCoding,
         What::FringePosting,
+        What::FringeRow,
+        What::CutoffFactor,
         What::NewLineDefaults,
     ];
 
@@ -87,6 +92,8 @@ impl What {
             What::OtPattern => "ot_pattern",
             What::AccountCoding => "account_coding",
             What::FringePosting => "fringe_posting",
+            What::FringeRow => "fringe_row",
+            What::CutoffFactor => "cutoff_factor",
             What::NewLineDefaults => "new_line_defaults",
         }
     }
@@ -117,7 +124,11 @@ impl What {
     pub fn is_setting(self) -> bool {
         matches!(
             self,
-            What::AccountCoding | What::FringePosting | What::NewLineDefaults
+            What::AccountCoding
+                | What::FringePosting
+                | What::FringeRow
+                | What::CutoffFactor
+                | What::NewLineDefaults
         )
     }
 
@@ -409,10 +420,25 @@ fn status_of(src: &Budget, here: &Budget, w: What, name: &str) -> Status {
             Some(&(&src.fringe_posting, src.trailing_level_fringes)),
             Some(&(&here.fringe_posting, here.trailing_level_fringes)),
         ),
+        // The budget's fringe row: its number and description. Its place
+        // is a row of one topsheet, so it stays as this budget has it.
+        What::FringeRow => clipboard::status(
+            Some(&fringe_row_text(&src.fringe_row)),
+            Some(&fringe_row_text(&here.fringe_row)),
+        ),
+        What::CutoffFactor => {
+            clipboard::status(Some(&src.cutoff_factor), Some(&here.cutoff_factor))
+        }
         What::NewLineDefaults => {
             clipboard::status(Some(&src.new_line_defaults), Some(&here.new_line_defaults))
         }
     }
+}
+
+/// What Import Setup carries of a budget's fringe row: its number and
+/// description, as the row shows them.
+fn fringe_row_text(r: &FringeRow) -> (Option<String>, String) {
+    (r.account().map(str::to_string), r.description().to_string())
 }
 
 /// Item `name` of kind `w` in `b`, in words (empty when `b` has none).
@@ -453,6 +479,8 @@ pub fn describe(b: &Budget, w: What, name: &str) -> String {
             &b.fringe_posting,
             b.trailing_level_fringes,
         )),
+        What::FringeRow => Some(describe_fringe_row(&b.fringe_row)),
+        What::CutoffFactor => Some(describe_cutoff_factor(b.cutoff_factor)),
         What::NewLineDefaults => Some(describe_line_defaults(&b.new_line_defaults)),
     }
     .unwrap_or_default()
@@ -604,6 +632,24 @@ fn describe_posting(p: &FringePosting, trailing: TrailingFringes) -> String {
     }
 }
 
+fn describe_fringe_row(r: &FringeRow) -> String {
+    match r.account() {
+        Some(a) => format!("the budget's fringe row is {a} {}", r.description()),
+        None => format!(
+            "the budget's fringe row is {}, with no number",
+            r.description()
+        ),
+    }
+}
+
+fn describe_cutoff_factor(f: CutoffFactor) -> String {
+    if f == CutoffFactor::One {
+        "percent fringe cutoffs as typed (1.0)".to_string()
+    } else {
+        format!("every percent fringe cutoff times {}", f.name())
+    }
+}
+
 fn describe_line_defaults(d: &NewLineDefaults) -> String {
     let mut on = Vec::new();
     for (yes, what) in [
@@ -692,10 +738,10 @@ fn statuses(here: &Budget, src: &Budget) -> Vec<(Key, Status)> {
 pub struct ImportItem {
     /// `global`, `fringe`, `group`, `unit`, `set`, `location`, `currency`,
     /// `charge`, `credit`, `tag_preset`, `line_preset`, `report_preset`,
-    /// `account_coding`,
-    /// `fringe_posting` or `new_line_defaults`.
+    /// `account_coding`, `fringe_posting`, `fringe_row`, `cutoff_factor` or
+    /// `new_line_defaults`.
     pub kind: &'static str,
-    /// Empty for the three settings.
+    /// Empty for the budget settings.
     pub name: String,
     /// `new` (not here: it will be added), `same` (nothing to do) or
     /// `differs` (here under the same name with another definition).
@@ -1144,6 +1190,15 @@ pub fn import(
                 b.fringe_posting = src.fringe_posting.clone();
                 b.trailing_level_fringes = src.trailing_level_fringes;
             }
+            What::FringeRow => {
+                b.fringe_row.account = src.fringe_row.account().map(str::to_string);
+                b.fringe_row.description = src
+                    .fringe_row
+                    .description
+                    .clone()
+                    .filter(|d| !d.trim().is_empty());
+            }
+            What::CutoffFactor => b.cutoff_factor = src.cutoff_factor,
             What::NewLineDefaults => b.new_line_defaults = src.new_line_defaults,
             _ => {}
         }

@@ -21,6 +21,7 @@ fn apply_fringes(ctx: &Ctx, acct: &Account, rows: &mut [RowTotals]) -> Result<()
     for r in rows.iter_mut() {
         r.fringes.clear();
         r.fringe_total = 0;
+        r.fringe_full_total = 0;
     }
     let mut rates: BTreeMap<&str, (&Fringe, Num)> = BTreeMap::new();
     for (i, d) in details.iter().enumerate() {
@@ -117,6 +118,24 @@ fn apply_fringes(ctx: &Ctx, acct: &Account, rows: &mut [RowTotals]) -> Result<()
         let r = &mut rows[i];
         r.fringe_total = sum(r.fringes.values().copied())
             .ok_or_else(|| overflow(row_at(&acct.code, i, d, "fringes")))?;
+        // With no cutoff and no range: every percent fringe on the whole
+        // total, the flat ones as earned.
+        if earns[i] {
+            let mut full: Cents = 0;
+            for name in &d.fringes {
+                let (f, rate) = rates[name.as_str()];
+                let amount = match f.kind {
+                    FringeKind::Percent { .. } => percent_of(ctx.arith, r.total, rate)
+                        .and_then(Money::to_cents)
+                        .ok_or_else(|| overflow("fringes"))?,
+                    FringeKind::Flat { .. } => r.fringes[name],
+                };
+                full = full
+                    .checked_add(amount)
+                    .ok_or_else(|| overflow("fringes"))?;
+            }
+            r.fringe_full_total = full;
+        }
     }
     Ok(())
 }

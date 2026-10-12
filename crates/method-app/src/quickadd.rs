@@ -120,6 +120,8 @@ pub fn create_and_set(
                 description: String::new(),
                 symbol: String::new(),
                 rate: if extra.is_empty() { "1" } else { extra }.to_string(),
+                symbol_after: None,
+                separators: None,
             },
         ),
         "global" => edit::set_global(b, name, extra),
@@ -447,6 +449,8 @@ mod tests {
                     description: String::new(),
                     symbol: String::new(),
                     rate: "1.1".into(),
+                    symbol_after: None,
+                    separators: None,
                 },
             )?;
             let fringe = b.fringes.keys().next().cloned().unwrap();

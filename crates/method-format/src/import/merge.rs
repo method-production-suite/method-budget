@@ -708,6 +708,7 @@ fn add_setup(b: &mut Budget, kind: SetupKind, name: &str) {
                 description: String::new(),
                 symbol: String::new(),
                 rate: Dec::ONE,
+                format: Default::default(),
             });
         }
         SetupKind::Global => {}
@@ -995,7 +996,7 @@ mod tests {
 
     #[test]
     fn lines_go_to_matching_accounts_with_carried_accounts() {
-        let b = starter::budget();
+        let b = starter::budget_with_separator('-');
         let t = table(&[
             &["Acct", "Description", "Qty", "Rate", "Total"],
             &["10-01", "Rewrite", "1", "$2,500.00", "2500"],
@@ -1031,7 +1032,7 @@ mod tests {
 
     #[test]
     fn reconciliation_lists_mismatches() {
-        let b = starter::budget();
+        let b = starter::budget_with_separator('-');
         let t = table(&[
             &["Acct", "Description", "Qty", "Rate", "Total"],
             &["10-01", "Right", "2", "10", "20"],
@@ -1063,7 +1064,7 @@ mod tests {
 
     #[test]
     fn missing_accounts_and_setup_are_created_or_skipped() {
-        let b = starter::budget();
+        let b = starter::budget_with_separator('-');
         let t = table(&[
             &[
                 "Cat",
@@ -1193,7 +1194,7 @@ mod tests {
 
     #[test]
     fn numbers_formulas_and_kinds() {
-        let mut b = starter::budget();
+        let mut b = starter::budget_with_separator('-');
         b.globals.insert("DAYS".into(), "20".into());
         let t = table(&[
             &[
@@ -1264,7 +1265,7 @@ mod tests {
 
     #[test]
     fn account_headings_name_new_accounts() {
-        let b = starter::budget();
+        let b = starter::budget_with_separator('-');
         let t = table(&[
             &["Acct", "Description", "Qty", "Rate"],
             &["55-02", "Camera package", "", ""],
@@ -1297,7 +1298,7 @@ mod tests {
 
     #[test]
     fn default_account_and_bad_numbers() {
-        let b = starter::budget();
+        let b = starter::budget_with_separator('-');
         let t = table(&[
             &["Acct", "Description", "Rate"],
             &["", "Coffee", "40"],

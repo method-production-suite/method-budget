@@ -455,6 +455,7 @@ pub fn row_json(d: &Detail, n: usize, rt: Option<&RowTotals>) -> Value {
         v["subtotal_cents"] = json!(r.subtotal);
         v["fringes_cents"] = json!(r.fringes);
         v["fringe_total_cents"] = json!(r.fringe_total);
+        v["fringe_full_total_cents"] = json!(r.fringe_full_total);
     }
     v
 }
@@ -813,6 +814,7 @@ fn list_setup(ctx: &mut Ctx, a: &Args) -> ToolResult {
             for (code, c) in &b.currencies {
                 items.push(json!({
                     "name": code, "base": false, "description": c.description, "symbol": c.symbol,
+                    "symbol_after": c.format.symbol_after, "separators": c.format.separators.name(),
                     "rate": c.rate.to_string(), "lines": used(code).lines, "other_uses": used(code).other,
                 }));
             }
@@ -881,6 +883,9 @@ fn list_charges(ctx: &mut Ctx, a: &Args) -> ToolResult {
                         CreditSource::Group { group } => json!({"kind": "group", "group": group}),
                         CreditSource::Category { category } => {
                             json!({"kind": "category", "category": category})
+                        }
+                        CreditSource::Account { account } => {
+                            json!({"kind": "account", "account": account})
                         }
                     };
                     let cap = match row.cap {

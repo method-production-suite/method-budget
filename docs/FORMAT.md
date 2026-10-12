@@ -145,17 +145,19 @@ A new budget in Method Budget starts with a set of editable starter units: Day (
 hours), Week (60), Month (240), Hour (1), and Allow and Flat with no hours. They are
 ordinary data and are written out like any other units, so a file with no `units` field
 really has no units, and a file keeps the hours it has. A new budget also starts posting
-fringes by budget, with account numbers of category 2, account 2 and set 3 (so both
-`fringe_posting` and `account_coding` are written), a new line copying only its fringes
-from the line above, and a cutoff factor of 1.0 (`docs/decisions.md`, entry 60). A file
+fringes by budget, with account numbers of category 2, account 2 and set 3 and no
+separator (so both `fringe_posting` and `account_coding` are written), a new line copying
+only its fringes from the line above, and a cutoff factor of 1.0 (`docs/decisions.md`,
+entries 60 and 61). A file
 without those fields keeps the defaults this page gives them.
 
 ### Account coding
 
 How account numbers are split into segments and written. Left out entirely when it equals
 the default: category width 2, account width 2, no sub-account, no set, separator `"-"`.
-When present, every field is required. A new budget starts with a set width of 3 (category
-2, account 2, no sub-account, set 3, `"-"`), so its file has the field.
+When present, every field is required. A new budget starts with a set width of 3 and no
+separator (category 2, account 2, no sub-account, set 3, `""`, so numbers read `1101`;
+`docs/decisions.md`, entry 61), so its file has the field.
 
 | Field            | Type | Notes |
 |------------------|------|-------|
@@ -178,7 +180,7 @@ Where fringe totals appear. A tagged object:
 |--------------------|--------------|---------|
 | `budget`           | none | One fringe total for the whole budget. |
 | `production_level` | none | One fringe row above each production total. |
-| `category`         | `suffix`: text, **required** | A fringe account at the end of each category, numbered from the category code and the suffix. |
+| `category`         | `suffix`: text, **required** | A fringe account at the end of each category, numbered from the category's part and the suffix, written with the account coding: `1100` with `"99"` is `1199`; a number that isn't a plain category gives its first category-width characters (`510` with `"98"` is `5198`; `docs/decisions.md`, entry 61). |
 | `account`          | none | A fringe line at the end of each account. |
 
 Wherever fringes post, a percent [charge](#charge) applies to them, budget-wide ones too.
@@ -268,6 +270,12 @@ Dates should be ISO 8601 (`YYYY-MM-DD`). The reader does not check the date text
 | `description` | text | |
 | `symbol`      | text | |
 | `rate`        | decimal, **required** | Base-currency units per one unit of this currency. |
+| `symbol_after` | boolean, default `false` | Write the symbol after the value (`1.234,56 €`) instead of before it (`$1,234.56`). Left out when `false`. |
+| `separators`  | `"comma_point"` or `"point_comma"`, default `"comma_point"` | Thousands and decimal separators: `1,234.56` or `1.234,56`. Left out at the default. |
+
+`symbol_after` and `separators` are display only (`docs/decisions.md`, entry 61): totals
+shown in this currency (a budget's `totals_currency`) are written with them; no figure
+depends on them.
 
 ### Unit
 
@@ -498,7 +506,7 @@ catch it).
 | `applied`          | boolean, default `true` | |
 | `cap`              | optional cents | Ceiling on the sum of the row credits. |
 | `discount_percent` | decimal, default `"0"` | Taken off after the cap (`"5"` is 5%). |
-| `excluded_fringes` | name set, default empty | Fringes left out of the spend of every `group` and `category` row (one list per credit; `docs/decisions.md`, entry 57). A typed `flat` amount has no fringes, so it is unaffected. |
+| `excluded_fringes` | name set, default empty | Fringes left out of the spend of every `group`, `category` and `account` row (one list per credit; `docs/decisions.md`, entries 57 and 61). A typed `flat` amount has no fringes, so it is unaffected. |
 | `rows`             | list of [credit rows](#credit-row) | |
 
 ### Credit row
@@ -517,6 +525,7 @@ catch it).
 | `flat`  | `amount` cents, **required** | A gross amount typed in directly. |
 | `group` | `group` text, **required** | Lines tagged with the group, plus their fringes except the credit's `excluded_fringes`. |
 | `category` | `category` text, **required** | The topsheet category with that code: its total (lines and adjustment rows that count) plus the fringes they earn, wherever fringes post, except the credit's `excluded_fringes` (`docs/decisions.md`, entry 57). A code that names no category counts 0, and `method check` warns. |
+| `account` | `account` text, **required** | The account with that number (the first, if two share it): its lines and adjustment rows that count plus the fringes they earn, wherever fringes post, except the credit's `excluded_fringes` (`docs/decisions.md`, entry 61). A number that names no account counts 0, and `method check` warns. |
 
 Older files put an `excluded_fringes` name set on each `group` and `category` source. A
 reader still accepts it there and gives the credit the union of its rows' lists; a writer
@@ -541,6 +550,7 @@ budget can show what changed. Rows are matched by id, accounts and categories by
 | `categories`  | map of cents | Keyed by category code. |
 | `grand_total` | cents, **required** | |
 | `net_total`   | cents, **required** | |
+| `frozen`      | boolean, default `false` | The original totals are frozen: the application refuses to lock them again or clear them until this is turned off (`docs/decisions.md`, entry 61). Left out when `false`. |
 
 ### Actuals
 
@@ -735,8 +745,9 @@ and [setup sources](#setup-sources) (per-item notes and links). A pack holds wha
 setup items its maker picked plus everything they need (a fringe's globals and flat unit,
 a global's globals, a charge's excluded groups and currency, a credit's groups and
 excluded fringes, a tag preset's tags, what a line block's rows use, a report preset's
-groups and header and footer globals), and never the three budget settings
-(`account_coding`, `fringe_posting`, `new_line_defaults`), which belong to a production.
+groups and header and footer globals), and never the budget settings Import Setup carries
+(`account_coding`, `fringe_posting`, `fringe_row`, `cutoff_factor`, `new_line_defaults`),
+which belong to a production.
 It opens in Method Budget like any budget. The pack details, in written order, each left
 out when empty but the title:
 
@@ -1213,6 +1224,14 @@ valid. Loading and saving it in Method Budget normalizes it.
   budgets start with different settings (posting by budget, set width 3, a 12-hour Day,
   60-hour Week and 240-hour Month), all written in the file; a file without those fields
   reads exactly as before, so existing files are unchanged.
+- Version 1, additive (2026-10): credit row source kind `"account"`, currency
+  `symbol_after` and `separators`, and baseline `frozen` (decisions.md, entry 61), each
+  left out at its default, so files that don't use them are unchanged. New budgets'
+  account coding has no separator (`"separator": ""`, numbers read `1101`), written in
+  the file as before. A category's fringe account under category posting is now numbered
+  from the category's first category-width characters when its number isn't a plain
+  category (`510` with suffix `98` is `5198`, was `51098`); only those budgets' fringe
+  account numbers change, no figure.
 
 ## Complete example
 

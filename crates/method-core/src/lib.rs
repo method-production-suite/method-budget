@@ -9,6 +9,7 @@ pub mod coa;
 pub mod coding;
 pub mod compare;
 pub mod comparison;
+pub mod currency_format;
 pub mod decimal;
 pub mod diff;
 pub mod edit;
@@ -40,6 +41,7 @@ pub use comparison::{
     CompareItem, CompareLevel, CompareLine, CompareRow, CompareTotals, Comparison, Diff, RowMatch,
     MAX_COMPARED, MIN_COMPARED,
 };
+pub use currency_format::{CurrencyFormat, Separators};
 pub use decimal::Dec;
 pub use edit::delete_global;
 pub use model::*;

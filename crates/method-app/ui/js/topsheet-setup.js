@@ -1135,7 +1135,9 @@ function creditRowInput(r0) {
         ? { kind: 'group', group: k.str(src.group) }
         : src.kind === 'category'
           ? { kind: 'category', category: k.str(src.category) }
-          : { kind: 'flat', amount: k.centsToText(isNone(src.amount) ? 0 : src.amount) },
+          : src.kind === 'account'
+            ? { kind: 'account', account: k.str(src.account) }
+            : { kind: 'flat', amount: k.centsToText(isNone(src.amount) ? 0 : src.amount) },
     percent: k.str(r.percent) || '0',
     cap:
       cap.kind === 'qualified_spend' || cap.kind === 'credit'
@@ -1152,8 +1154,8 @@ function creditInput(c0) {
     applied: c.applied !== false,
     cap: isNone(c.cap) ? null : k.centsToText(c.cap),
     discount_percent: k.str(c.discount_percent) || '0',
-    // One list per credit, for all its group and category rows
-    // (decisions.md, entry 57), so changing a row's spend keeps it.
+    // One list per credit, for all its group, category and account rows
+    // (decisions.md, entries 57 and 61), so changing a row's spend keeps it.
     excluded_fringes: arr(c.excluded_fringes).map(k.str),
     rows: arr(c.rows).map(creditRowInput),
   };
@@ -1382,9 +1384,17 @@ function creditRow(i, n, row, raw, rt, ik, count) {
 
   const groups = groupNames();
   const cats = categoryNames();
+  const accts = accountNames();
   const current =
-    row.source.kind === 'group' ? `group:${row.source.group}` : row.source.kind === 'category' ? `category:${row.source.category}` : 'flat';
+    row.source.kind === 'group'
+      ? `group:${row.source.group}`
+      : row.source.kind === 'category'
+        ? `category:${row.source.category}`
+        : row.source.kind === 'account'
+          ? `account:${row.source.account}`
+          : 'flat';
   const catLabel = (code) => (cats.get(code) ? `Category: ${code} ${cats.get(code)}` : `Category: ${code}`);
+  const acctLabel = (code) => (accts.get(code) ? `Account: ${code} ${accts.get(code)}` : `Account: ${code}`);
   const spend = k.selectInput({
     fieldKey: fk('source'),
     value: current,
@@ -1394,6 +1404,8 @@ function creditRow(i, n, row, raw, rt, ik, count) {
       ...withKept(groups, row.source.kind === 'group' ? [row.source.group] : []).map((g) => [`group:${g}`, `Group: ${g}`]),
       // A topsheet category's total with its fringes (decisions.md, entry 57).
       ...withKept([...cats.keys()], row.source.kind === 'category' ? [row.source.category] : []).map((code) => [`category:${code}`, catLabel(code)]),
+      // An account's total with its fringes (decisions.md, entry 61).
+      ...withKept([...accts.keys()], row.source.kind === 'account' ? [row.source.account] : []).map((code) => [`account:${code}`, acctLabel(code)]),
     ],
     onCommit: (v, old) =>
       send(fk('source'), old)(
@@ -1401,7 +1413,9 @@ function creditRow(i, n, row, raw, rt, ik, count) {
           ? { source: { kind: 'flat', amount: '0' } }
           : v.startsWith('category:')
             ? { source: { kind: 'category', category: v.slice(9) } }
-            : { source: { kind: 'group', group: v.slice(6) } },
+            : v.startsWith('account:')
+              ? { source: { kind: 'account', account: v.slice(8) } }
+              : { source: { kind: 'group', group: v.slice(6) } },
       ),
   });
   spend.setAttribute('aria-label', of('Spend'));
@@ -1805,8 +1819,8 @@ function renderSettings(panel) {
       [modeSel],
       mode === 'budget'
         ? {
-            hint: 'Charges don’t apply to it.',
-            tip: 'A budget-wide fringe total sits outside above- and below-the-line, so charges don’t apply to it.',
+            hint: 'Percent charges count it.',
+            tip: 'A budget-wide fringe total sits outside above- and below-the-line. It is in the grand total, and percent charges count it; excluding a line, account or category from a charge takes its fringes off too.',
           }
         : {},
     ),
@@ -2113,8 +2127,9 @@ function changedCount(map) {
 }
 
 // The action strip (Lock current totals, or Lock again… and Clear…), the
-// original, current and change of the grand and net totals as a table, and
-// what has changed since in the footer.
+// original, current and change of the grand and net totals as a table, the
+// freeze switch (while frozen, Lock again… and Clear… are off; decisions.md,
+// entry 61), and what has changed since in the footer.
 function renderBaseline(panel) {
   const b = k.budget();
   const view = k.view() || {};
@@ -2161,12 +2176,20 @@ function renderBaseline(panel) {
       foot.push({ label: '', value: 'Current totals can’t be worked out right now, so there is nothing to compare' });
     }
     if (view.partial) box.append(k.el('p', 'setup-hint tss-note', 'Current totals are partial while the budget has errors.'));
+    const frozen = b.baseline.frozen === true;
+    const frozenKey = k.key('baseline', 'frozen');
+    box.append(
+      checkbox(frozenKey, frozen, 'Freeze the original totals', (on) =>
+        k.run(ik, () => ['set_baseline_frozen', { frozen: on }], { restore: [frozenKey, !on] }),
+      ),
+    );
+    const offWhileFrozen = 'Off while the original totals are frozen';
     const relock = stripButton('Lock again…', k.key('baseline', 'relock'), () => {
       if (!k.isBusy()) confirmBox(ik, relock, 'Replace the original totals with the current ones?', 'Lock again', false, () => ['lock_baseline', {}]);
-    }, { title: 'Replace the original totals with the current ones' });
+    }, { title: frozen ? offWhileFrozen : 'Replace the original totals with the current ones', enabled: !frozen });
     const clear = stripButton('Clear…', k.key('baseline', 'clear'), () => {
       if (!k.isBusy()) confirmBox(ik, clear, 'Clear the original totals? The budget stops showing what changed.', 'Clear', true, () => ['clear_baseline', {}]);
-    }, { title: 'Clear the original totals' });
+    }, { title: frozen ? offWhileFrozen : 'Clear the original totals', enabled: !frozen });
     actions.push(relock, clear);
   } else {
     box.append(

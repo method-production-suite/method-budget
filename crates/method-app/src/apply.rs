@@ -856,7 +856,7 @@ mod tests {
     /// The starter budget with a group, a set, a location, a second fringe
     /// and a currency defined.
     fn budget() -> Budget {
-        let mut b = method_core::starter::budget();
+        let mut b = method_core::starter::budget_with_separator('-');
         edit::set_fringe(
             &mut b,
             "PENSION",

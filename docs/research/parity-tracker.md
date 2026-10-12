@@ -2,7 +2,9 @@
 
 Status: private research notes. Last reconciled 2026-10-11 against engine `main` at 8c1c772,
 then updated for decision 60 (new-budget defaults, cutoff factor, totals currency, topsheet
-order, fringe row, global units, formula entry).
+order, fringe row, global units, formula entry) and for decision 61 with parity run 2 of
+2026-10-12 (new-budget separator, account credit rows, fringe account numbers, the full
+fringe percent, frozen original totals, currency formats).
 
 One row per feature of Movie Magic Budgeting 10 (MMB, 10.35.7) that we track, mapped to where
 Method Budget has it and how we know it matches. It reconciles five sources:
@@ -10,13 +12,15 @@ Method Budget has it and how we know it matches. It reconciles five sources:
 - `docs/research/mmb-feature-inventory.md` (inv): every MMB feature, sections 1 to 24, each
   tagged v1, later or skip. The section tables below follow its numbering.
 - `docs/ROADMAP.md`: our work items (1.x, 2.x, 3.x) and the engine checks (EC n).
-- `docs/decisions.md` (D n): entries 54 to 59 are the parity work.
+- `docs/decisions.md` (D n): entries 54 to 61 are the parity work.
 - The parity run of 2026-10-10 and 2026-10-11 in the real app (gitignored, main checkout only):
   `imports/mmb-parity/2026-10-10/run-log.md` (case by case, every figure read) and
   `parity-report.md` (sections A to E), with raw exports in `exports/ZTESTnn/` and the
   2026-10-11 XML, Excel and tab-delimited exports in `imports/mmb-parity/2026-10-11/exports/`.
   Case ids (LM-14, P-02, F-19, CU-04, G-02, T-01, GR-03, V06-2 and so on) are the run's.
   `crates/method-core/tests/mmb_parity.rs` reproduces every figure the engine was changed for.
+- Parity run 2 of 2026-10-12 (same place): `imports/mmb-parity/2026-10-12/run-log.md`, cases
+  R2-01 to R2-08, cited as "run 2 (2026-10-12) R2-nn".
 - `docs/APP.md`, `docs/CLI.md`, `docs/FORMAT.md` and the code, for what is actually built.
 
 ## How to read it
@@ -57,17 +61,17 @@ Counts of rows per status, per section.
 
 | Section | Verified | Built | Partial | Missing | Skip | Differs by choice | Rows |
 |---|---|---|---|---|---|---|---|
-| 1 Budget hierarchy and structure | 13 | 9 | 1 | 0 | 0 | 0 | 23 |
-| 2 Detail lines: columns and calculation | 21 | 7 | 2 | 2 | 0 | 0 | 32 |
+| 1 Budget hierarchy and structure | 14 | 8 | 1 | 0 | 0 | 0 | 23 |
+| 2 Detail lines: columns and calculation | 22 | 6 | 3 | 1 | 0 | 0 | 32 |
 | 3 Units | 3 | 5 | 0 | 0 | 0 | 1 | 9 |
-| 4 Fringes | 27 | 8 | 1 | 1 | 0 | 1 | 38 |
+| 4 Fringes | 29 | 6 | 1 | 1 | 0 | 1 | 38 |
 | 5 Globals | 9 | 5 | 2 | 0 | 0 | 0 | 16 |
-| 6 Groups | 9 | 6 | 0 | 1 | 0 | 0 | 16 |
+| 6 Groups | 10 | 5 | 0 | 1 | 0 | 0 | 16 |
 | 7 Sets and locations | 2 | 4 | 0 | 0 | 0 | 0 | 6 |
-| 8 Currencies | 7 | 5 | 0 | 1 | 0 | 0 | 13 |
+| 8 Currencies | 7 | 4 | 2 | 0 | 0 | 0 | 13 |
 | 9 Contractual charges | 13 | 4 | 0 | 1 | 1 | 0 | 19 |
-| 10 Applied credits | 11 | 0 | 0 | 2 | 0 | 0 | 13 |
-| 11 Account coding | 0 | 4 | 1 | 0 | 0 | 0 | 5 |
+| 10 Applied credits | 12 | 0 | 0 | 1 | 0 | 0 | 13 |
+| 11 Account coding | 1 | 4 | 0 | 0 | 0 | 0 | 5 |
 | 12 Setup tables, library and templates | 0 | 6 | 1 | 0 | 0 | 0 | 7 |
 | 13 Shortcuts | 0 | 2 | 0 | 2 | 0 | 0 | 4 |
 | 14 Scenario and comparison | 4 | 4 | 1 | 1 | 0 | 1 | 11 |
@@ -77,11 +81,11 @@ Counts of rows per status, per section.
 | 18 Grid editing and keyboard | 0 | 10 | 2 | 0 | 0 | 2 | 14 |
 | 19 Screens and workflow states | 0 | 3 | 0 | 0 | 1 | 0 | 4 |
 | 20 Reports, printing and PDF | 0 | 8 | 2 | 2 | 0 | 0 | 12 |
-| 21 Import and export formats | 0 | 3 | 2 | 2 | 1 | 0 | 8 |
+| 21 Import and export formats | 0 | 5 | 0 | 2 | 1 | 0 | 8 |
 | 22 Rounding and number display | 4 | 2 | 1 | 0 | 0 | 1 | 8 |
 | 24 Competitor features MMB lacks | 0 | 4 | 0 | 4 | 3 | 0 | 11 |
-| F MMB behavior facts | 11 | 8 | 1 | 0 | 0 | 3 | 23 |
-| **Total** | **134** | **118** | **17** | **19** | **10** | **10** | **308** |
+| F MMB behavior facts | 15 | 8 | 3 | 0 | 0 | 3 | 29 |
+| **Total** | **145** | **114** | **19** | **16** | **10** | **10** | **314** |
 
 Section 23 (calculation quirks) has no rows of its own: each quirk is a row in the section it
 belongs to. Section 19 is informational in the inventory; only its concrete screens are listed.
@@ -102,7 +106,7 @@ belongs to. Section 19 is informational in the inventory; only its concrete scre
 | Empty first level (production total at the top) is ATL 0, not skipped | v1 | Verified | D56 | T-04 (V11-3) | none |
 | Summary rows (Total ATL, BTL, ATL+BTL) with a show/hide setting | v1 | Built | 2.18, FORMAT display `summary_rows` | none | MMB adds the three rows itself on the first Insert Production Total; check ours shows them the same way |
 | Total Fringes row(s) placed per posting mode | v1 | Verified | D9, D56 | ZTEST06 V06-1/2/3 | none |
-| Budget-posted Total Fringes row movable (Move Fringe Total, Reset to Default Position) | v1 | Built | D60, FORMAT `fringe_row.position`, Settings > Fringe totals | Unit tests (V06-3 totals unchanged at every place); seen in MMB menus (ZTEST11), PM-POS not tested | PM-POS: check in MMB that moving it changes no ATL/BTL (ours keeps the math unchanged) |
+| Budget-posted Total Fringes row movable (Move Fringe Total, Reset to Default Position) | v1 | Verified | D60, FORMAT `fringe_row.position`, Settings > Fringe totals | run 2 (2026-10-12) R2-01 (PM-POS): moved above 2100 ZPROD, ATL 15,000, BTL 13,400, grand 34,125 unchanged; unit tests (V06-3 at every place) | none |
 | Budget fringe row's own account number and description | v1 | Verified | D60, FORMAT `fringe_row` | Defaults read at C2: no number, "Total Fringes" | none |
 | Contractual charge rows below the last production total, before summary rows | v1 | Verified | D60, `Report::topsheet_lines` | V09-2 (creation order, newest first) | Order matched. Position: ours after the summary rows (brief); ROADMAP decision 13 says MMB puts them before: confirm in the next run |
 | Grand total = levels + posted fringes + charges | v1 | Verified | D9, D56 | ZTEST06 34,125, ZTEST09 41,389.91 | none |
@@ -135,8 +139,8 @@ belongs to. Section 19 is informational in the inventory; only its concrete scre
 | Formulas: + - * /, parentheses, unary minus, precedence | v1 | Verified | D5 | G-04, G-06, G-07 | none |
 | Bad formula, divide by zero, circular or missing global shown as an error | v1 | Partial | D5, D60, APP problem cells | V02-4: divide by zero and circular globals refused at entry (app), as MMB | A typo or unknown global is still kept and flagged (MMB refuses any invalid Amt); D60 keeps that for now |
 | Description keeps leading and repeated spaces | v1 | Built | FORMAT | unit tests only | none |
-| Agg column (effective fringe percent after cutoffs) | v1 | Built | APP column menu "Fringe %" | none | EC 15: value on a suppressed line not checked |
-| Agg Sum column (sum of percent rates before cutoffs) | v1 | Missing | none found | MMB exports carry `dAggSumPercent` (2026-10-11 XML) | Add an optional column |
+| Agg column (effective fringe percent after cutoffs) | v1 | Partial | APP column menu "Fringe %" | run 2 (2026-10-12) R2-05 (EC 15): 0.00 on a suppressed line, as ours earns 0; 2026-10-11 XML `dAggPercent` | Display: ours leaves the cell blank where MMB writes 0.00% (suppressed lines, lines without fringes, adjustment rows): owner call (D61) |
+| Agg Sum column (fringes before cutoffs and ranges over the line total) | v1 | Verified | D61, APP column menu "Full fringe %", `RowTotals::fringe_full_total` | 2026-10-11 XML `dAggSumPercent` (ZTEST04 0.04 line 25%, range line past the cutoff 12.5%; ZTEST10 Grip days with a flat fringe 12.5%); run 2 (2026-10-12) R2-05 (0.00% suppressed) | Same blank-vs-0.00% display as Agg; rounding per fringe before adding (chosen, not checked) |
 | Fringes, Groups, Location, Set columns | v1 | Built | APP column menu, 2.11 short codes | none | none |
 | Unit labels pluralize when value is not 1 | v1 | Built | FORMAT unit `plural` | unit tests only | none |
 | Fraction display as typed vs decimal | later | Missing | none found | MMB shows 1/3 as 0.33333 in Amt (parity report B) | Low priority |
@@ -195,7 +199,7 @@ belongs to. Section 19 is informational in the inventory; only its concrete scre
 | Cutoff ignored on a flat fringe | v1 | Verified | D54 | F-31 | none |
 | Percent base excludes flat fringe dollars | v1 | Verified | D3 | F-32 | none |
 | Flat fringe in doubles (count first, then rate) | v1 | Verified | D55 | F-19 0.00 | none |
-| Flat fringes charged per line, not per range | v1 | Built | D54 | F-33..F-35 skipped | Next parity run: a range with a flat fringe |
+| Flat fringes charged per line, not per range; cutoff ignored | v1 | Verified | D54, D61 | run 2 (2026-10-12) R2-06: ZFDAYR 100/Day, cutoff 500, two 3-Day lines in a range 300 + 300 | none |
 | Flat fringe basis `amount_counts` and `quantity` (opt-in) | ours | Built | D54, FORMAT fringe `basis` | unit tests only | none (ours only) |
 | Most hours a day cap on per-hour fringes | ours | Built | D54 `max_hours_per_day` | MMB has no such field (ZTEST05) | none (ours only) |
 | Posting by budget | v1 | Verified | D9 | V06-3, ZTEST08 | none |
@@ -203,7 +207,7 @@ belongs to. Section 19 is informational in the inventory; only its concrete scre
 | Production-level posting drops trailing-category fringes | v1 | Differs by choice | D56 (A6), `trailing_level_fringes` | V06-2 grand 34,020; follow-up: not a setting in MMB | Ours keeps them by default and warns; `drop` matches MMB |
 | Posting by category, suffix 99 | v1 | Verified | D9, D11 | ZTEST06 main (1199/2199/3199/4199) | none |
 | Changing the suffix renumbers fringe accounts | v1 | Verified | D11 | V06-4 (98) | none |
-| Category fringe account numbering for 3-digit or alphanumeric codes | v1 | Built | `coding.category_fringe_account` | PM-CAT skipped | Next parity run: a 3-digit category |
+| Category fringe account numbering for 3-digit or alphanumeric codes | v1 | Verified | D61, `coding.category_fringe_account` | run 2 (2026-10-12) R2-07: suffix 98, 510 is 5198, 63 is 6398, 7000 is 7098; run 1 1100 is 1199 | Categories whose numbers start alike share one, as in MMB |
 | Posting by account | v1 | Verified | D9 | V06-1 | none |
 | Percentage fringe cutoff factor (1.0 to 3.0) | later | Verified | D60, FORMAT `cutoff_factor`, Settings > Calculation | V04-1/2/3: P-02 416.67/555.55/625.00, P-10 416.67/462.96/462.96, P-01 125.00 | 2.5 not read in MMB; factored cutoff rounded to cents (chosen) |
 | Sub-budget fringe lock | later | Missing | 2.22, `subbudget.rs` | MMB wizard offers "Lock Fringe Values" (ZTEST12) | Not built |
@@ -241,7 +245,7 @@ belongs to. Section 19 is informational in the inventory; only its concrete scre
 | Conflict rule, default exclude | v1 | Verified | D57, EC 9 | GR-03 | none |
 | Conflict rule include | v1 | Verified | D57 `group_rules.conflict` | V07-4 grand 10,450 | none |
 | Non-grouped lines rule (exclude also drops ungrouped adjustment rows) | v1 | Verified | D57 `group_rules.ungrouped_lines` | V07-3 grand 6,100 | none |
-| Fringes in group totals rule | v1 | Built | D57 `group_rules.fringes_in_totals` | Default seen (ZTEST04 header); exclude not tried | Next run: switch to Exclude and read a group total |
+| Fringes in group totals rule | v1 | Verified | D57 `group_rules.fringes_in_totals` | run 2 (2026-10-12) R2-02: Exclude gives ZIN 8,000/5,000, ZIN2 4,600/4,600, ZOFF 5,000/0, grand unchanged | none |
 | Group total = base of every tagged line + fringes actually earned | v1 | Verified | D58 | ZTEST07 ZOFF 5,000/0, ZTEST10 ZCRED 6,500/4,500 | none |
 | Group active total | v1 | Verified | D58 | ZTEST07 ZIN 8,500/5,500 | none |
 | Group color | later | Built | FORMAT group `color` | none | none |
@@ -275,8 +279,8 @@ belongs to. Section 19 is informational in the inventory; only its concrete scre
 | Flat charge in its own currency | v1 | Verified | D9 | ZFLATEUR 3,000.00 | none |
 | Fringes and cutoffs in base currency | v1 | Verified | D10 | CU-07, CU-08, CU-09 | none |
 | Totals shown in another currency | v1 | Verified | D60, `Report::display` | V08-1 EUR 225.92 / 49,253.40, V08-2 GBP 118,731.57 / 549.00 / 119,685.57 | Account-posted and level fringe rows converted per fringe (chosen, not checked) |
-| Symbol after the value, separator pattern (1,000.00 vs 1.000,00) | v1 | Missing | none in FORMAT | none | Add to currency or display settings |
-| Changing the base currency reinterprets blank-currency lines | v1 | Built | 1.18 base rename | V08-3 skipped | Next run: V08-3 |
+| Symbol after the value, separator pattern (1,000.00 vs 1.000,00) | v1 | Partial | D61, FORMAT currency `symbol_after`, `separators`, `Currency::amount_text` | unit tests only (no run read them) | Used where totals show in another currency (topsheet, printed topsheet, `method show`); MMB writes every computed total in the totals currency's format: check in MMB, then decide |
+| Changing the base currency reinterprets blank-currency lines | v1 | Partial | 1.18 base rename, D32, D61 (recorded) | run 2 (2026-10-12) R2-03 (V08-3): rates kept, blank lines become GBP (1,000 is 1,234.57), CAD 123,456.51, Total Fringes 766.40, grand 148,200.71; back to USD restores 147,760.22 | Ours renames the base, amounts don't move: owner call |
 | Deleting a currency puts its lines back on base | v1 | Built | 2.9 | none | none |
 | Bulk apply currency, type-ahead, add on the fly | v1 | Built | 1.2, 1.3, 1.22 | none | none |
 | Currency type-ahead from a world currency list | v1 | Built | 1.2 | none | none |
@@ -319,7 +323,7 @@ belongs to. Section 19 is informational in the inventory; only its concrete scre
 | Excluded fringes apply to category rows too | later | Verified | D57 | 2026-10-11 run: category 1100 gross 4,500, excl 100 | none |
 | Suppressing a credit's group | later | Verified | D4 | V10-2 ZCR1 343.00, net 1,812.87 | none |
 | Gross, excluded, net, credit and cap variance columns | later | Verified | 2.16 | ZTEST10 editor columns | none |
-| Account-type credit rows | later | Missing | D57 (category only) | Not tried in MMB | Check in MMB whether an account row exists, then add |
+| Account-type credit rows | later | Verified | D61, FORMAT credit row `account` | run 2 (2026-10-12) R2-04: account 1101 gross 4,500.00 (4,000 lines + 500 fringes) posting by budget | none |
 | Credit print view and credits setup report | later | Missing | 2.5 (not a section yet) | none | Add a report section |
 | Credit order on the topsheet | later | Verified | D60 | ZTEST10 reverse application order, Sub Total | none |
 
@@ -331,7 +335,7 @@ belongs to. Section 19 is informational in the inventory; only its concrete scre
 | Typed numbers parsed and normalized against the pattern | v1 | Built | D11 | unit tests only | none |
 | Alphanumeric codes, generated fringe accounts too | v1 | Built | D11 | PM-CAT skipped | See section 4 |
 | Renumber on pattern change | v1 | Built | 2.20 | none | none |
-| Default pattern | v1 | Partial | D60, `AccountCoding::new_budget` | MMB default: Category 2, Account 2, Set 3 (ZTEST07); widths matched for new budgets | Separator: ours `-`, MMB exports write `1101` (none?): owner call |
+| Default pattern | v1 | Verified | D60, D61, `AccountCoding::new_budget` | MMB default: Category 2, Account 2, Set 3 (ZTEST07); exports write `1101` (ZTEST00 JSON, 2026-10-11 XML) | none (existing files keep theirs; the starter reads `1001`) |
 
 ## 12. Setup tables, library and templates
 
@@ -360,7 +364,7 @@ belongs to. Section 19 is informational in the inventory; only its concrete scre
 |---|---|---|---|---|---|
 | Original and variance columns (variance = total minus original) | v1 | Verified | 1.13, D12, D27 | ZTEST12 S5b (500), (200), (700) | none |
 | A deleted line's original stays in its account and category | v1 | Verified | D27 | ZTEST12 S5b | none |
-| Lock Original Totals (freeze, refresh disabled) | v1 | Partial | ours: Baseline Lock captures | ZTEST12: MMB lock only freezes; originals start at 0 | Add a freeze switch; ours has no baseline until captured |
+| Lock Original Totals (freeze, refresh disabled) | v1 | Partial | D61, baseline `frozen`, Baseline tab "Freeze the original totals" | ZTEST12: MMB lock only freezes, refresh disabled | Originals start at 0 in MMB; ours exist once locked, so the switch shows only then |
 | Versions copy totals and originals | v1 | Verified | 1.12, D17 | ZTEST12 S7 | none |
 | Versions screen (rename, note, restore, delete) | v1 | Built | 1.12 | none | none |
 | Sub-budget filter by categories, accounts and tags | later | Verified | 2.22, D39 | ZTEST12 S1 grand 1,650 | S2, S3 skipped |
@@ -509,15 +513,21 @@ we stand against each.
 | Charges list in creation order, newest first | v1 | Verified | D60 | V09-2 | none |
 | Credits list in reverse application order with Sub Total and Net total | later | Verified | D60 | ZTEST10 | none |
 | First Insert Production Total adds the summary rows | v1 | Built | 2.18 | ZTEST06, ZTEST11 | Compare ours |
-| Budget fringe row can be moved and reset | v1 | Built | D60, Settings > Fringe totals (place: after the summary rows resets it) | ZTEST11 (menus) | PM-POS not tested |
+| Budget fringe row can be moved and reset | v1 | Verified | D60, Settings > Fringe totals (place: after the summary rows resets it) | ZTEST11 (menus); run 2 (2026-10-12) R2-01 | none |
 | Production-level posting drop is not a setting | v1 | Differs by choice | D56 | V06-2 follow-up | Ours keeps by default |
-| Lock Original Totals only freezes the column; originals start at 0 | v1 | Verified | D27 | ZTEST12 | Freeze switch is Partial (section 14) |
+| Lock Original Totals only freezes the column; originals start at 0 | v1 | Verified | D27, D61 | ZTEST12 | Freeze switch built (D61); originals at 0 differ (section 14) |
 | Versions and sub-budgets inherit originals | v1 | Verified | D17, 2.22 | ZTEST12 S7, S1 | Sub-budget side: check ours |
 | Compare needs cloud budgets | later | Differs by choice | 1.14 | ZTEST12 | Ours is local; cannot be parity-checked |
 | JSON export omits suppressed lines and per-line fringe dollars; charges and credits appear as categories with a blank number | v1 | Built | importer input (1.16) | ZTEST04, ZTEST09 JSON | Importer must not expect them |
 | JSON export rounds a half-cent charge differently from the screen | v1 | Verified | 1.16 note | ZHALF 100.01 on screen, 100 in JSON | Importer reconciles against screen rules, not JSON charge totals |
 | XML Advanced carries evaluated Amt and the names of globals used, not formulas; no fringe cutoffs or global table | v1 | Verified | 1.16 note | 2026-10-11 ZTEST02, ZTEST04 XML | Import must rebuild globals and cutoffs from another source or ask |
 | Exports carry Agg and Agg Sum per line, originals and variances per category and account | v1 | Verified | 1.16 note | 2026-10-10 JSON, 2026-10-11 XML | Use for reconciliation |
+| Ranges and cutoffs never touch a flat fringe | v1 | Verified | D54, D61 | run 2 (2026-10-12) R2-06 | none |
+| A credit row can be an account (its lines plus its own fringes, any posting) | later | Verified | D61 | run 2 (2026-10-12) R2-04 | none |
+| A category's fringe account is its first category-width characters plus the suffix | v1 | Verified | D61 | run 2 (2026-10-12) R2-07 | none |
+| Agg and Agg Sum write 0.00% on suppressed lines, lines without fringes and adjustment rows | v1 | Partial | D61 | run 2 (2026-10-12) R2-05 | Ours blank there: owner call |
+| Changing the base currency keeps rates and reads blank lines as the new base | v1 | Partial | D61 (recorded) | run 2 (2026-10-12) R2-03 | Ours renames the base (D32) |
+| Breadcrumb sibling list is in topsheet order, not numeric | v1 | Built | 1.7 | run 2 (2026-10-12) R2-08 (note; next-account key not driven) | Check ours lists siblings in topsheet order; EC 16 open |
 
 ---
 
@@ -532,33 +542,37 @@ we stand against each.
    defaults (totals keep cents by the owner's call), charge and credit order on the
    topsheet, the budget fringe row's number, description and place, a global's unit
    filling the line's Unit, and refusing divide by zero and circular globals at entry.
-   Left from them: the new-budget account separator (ours `-`, MMB's exports show none),
-   charge position relative to the summary rows (ROADMAP decision 13), PM-POS, and refusing
-   other bad formulas at entry (kept and flagged for now).
-3. **Currency separator pattern and symbol after the value** (8).
-4. **Lock Original Totals as a freeze switch** (14).
-5. **Agg Sum column** (2).
-6. **Underline** text style (1), hiding subtotal rows in reports (1), topsheet report exclusions
+   Left from them: charge position relative to the summary rows (ROADMAP decision 13) and
+   refusing other bad formulas at entry (kept and flagged for now).
+3. **Done in D61** (2026-10-12): new-budget numbering without a separator, account credit
+   rows, the reference's category fringe account numbers, the full fringe percent (Agg
+   Sum), the original totals freeze switch, currency formats for totals shown in another
+   currency, and Import Setup carrying the cutoff factor and fringe row. Left from them:
+   currency formats on every computed total (MMB writes all totals in the totals
+   currency's format; not read in a run), originals at 0 before the first lock, and the
+   blank-vs-0.00% display of Agg and Agg Sum (owner calls).
+4. **Changing the base currency** (8): MMB reinterprets blank lines (R2-03); ours renames.
+   Owner call.
+5. **Underline** text style (1), hiding subtotal rows in reports (1), topsheet report exclusions
    (20).
-7. **New-line defaults**: Amt starting at 1 and one ready line, compare with MMB (2).
+6. **New-line defaults**: Amt starting at 1 and one ready line, compare with MMB (2).
 
 ### 2. Built but not checked in MMB (next parity run candidates)
 
-1. Flat fringe inside a fringe range (F-33..F-35).
-2. Category fringe account numbering for 3-digit and alphanumeric categories (PM-CAT).
-3. Budget fringe row position (PM-POS): ours keeps ATL and BTL unchanged wherever it shows.
-4. Base currency change (V08-3) and deleting a currency.
-5. Fringes in group totals rule set to Exclude.
-6. Agg (fringe %) on a suppressed line (EC 15).
-7. Next account at the end of a category (EC 16).
-8. Account-type credit rows: do they exist in MMB.
-9. Credit caps in base or display currency (inv Q8).
-10. Sub-budget S2 and S3 steps, and whether ours carries originals into a sub-budget.
-11. Flat fee smaller than its exclusions (negative fee).
-12. Flat fringe on an adjustment row.
-13. Separator rows (V06-5) and ZTEST13 (unicode, 200 lines: needs a non-paste path).
-14. Summary rows appearing on the first production total, compared with ours.
-15. Keyboard map (Recording wishlist 1), reports in 2026 (wishlist 2).
+Run 2 (2026-10-12) settled PM-POS, PM-CAT, F-33..F-35 (a flat fringe in a range), the
+fringes-in-group-totals Exclude rule, EC 15 (Agg on a suppressed line), account credit rows
+and V08-3 (recorded, ours differs). Still open:
+
+1. Deleting a currency (its lines back on base).
+2. Next account at the end of a category (EC 16; R2-08 not driven).
+3. Credit caps in base or display currency (inv Q8).
+4. Sub-budget S2 and S3 steps, and whether ours carries originals into a sub-budget.
+5. Flat fee smaller than its exclusions (negative fee).
+6. Flat fringe on an adjustment row.
+7. Separator rows (V06-5) and ZTEST13 (unicode, 200 lines: needs a non-paste path).
+8. Summary rows appearing on the first production total, compared with ours.
+9. Currency symbol and separators: where MMB writes them (every total, reports, exports).
+10. Keyboard map (Recording wishlist 1), reports in 2026 (wishlist 2).
 
 ### 3. Later
 

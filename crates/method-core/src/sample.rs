@@ -139,6 +139,7 @@ pub fn budget(spec: &SampleSpec) -> Budget {
                 description: format!("{code} (sample rate)"),
                 symbol: String::new(),
                 rate: dec(rate),
+                format: Default::default(),
             },
         );
     }

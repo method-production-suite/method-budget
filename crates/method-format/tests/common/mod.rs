@@ -71,6 +71,7 @@ pub fn sample() -> Budget {
             description: "Canadian dollar".into(),
             symbol: "$".into(),
             rate: d("0.73"),
+            format: Default::default(),
         },
     );
     b.globals.insert("SHOOT_DAYS".into(), "30".into());
@@ -365,6 +366,7 @@ pub fn rich() -> Budget {
         categories: [("1000".to_string(), 15_000_000)].into(),
         grand_total: 987_654_321,
         net_total: -1,
+        frozen: true,
     });
     b
 }

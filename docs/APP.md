@@ -93,8 +93,10 @@ The window has three levels, with a breadcrumb above the grid:
    rows and the net total). The budget's fringe row shows its account number and
    description (no number and "Total Fringes" unless Settings > Fringe totals says
    otherwise) and can be placed above any topsheet row instead; it is the same figure
-   wherever it shows and never changes a total (decisions.md, entry 60). The printed
-   topsheet follows the same order.
+   wherever it shows and never changes a total (decisions.md, entry 60). With **Show
+   totals in** set, a last row gives the net total in that currency, written in its own
+   separators and symbol (`49.253,40 €`; the currency's editor sets them; entry 61). The
+   printed topsheet follows the same order.
 2. **Accounts** in one category with each account's fringes and total. When fringes post
    by category, the category's fringe account is a bold row before the category total;
    when they post by account, the Fringes column is part of each account's total.
@@ -197,9 +199,13 @@ Option+Cmd+0; Cmd+= is Insert Subtotal) size the grid's text, rows and columns f
 
 **Detail grid columns.** The button in the grid's top-left corner (Shift+Tab from the
 first cell reaches it) opens the column menu: X, the three unit columns, currency, 4X,
-fringes, fringe percent, fringe dollars, groups, set and location can each be shown or
-hidden, and the choice is remembered for you (in the web view's local storage, not in the
-budget). Fringe % is the line's fringe dollars over its total, blank when the total is 0.
+fringes, fringe percent, full fringe percent, fringe dollars, groups, set and location can
+each be shown or hidden, and the choice is remembered for you (in the web view's local
+storage, not in the budget). Fringe % is the line's fringe dollars over its total, blank
+when the total is 0. **Full fringe %** (hidden until chosen; decisions.md, entry 61) is
+the line's fringes before cutoffs and ranges over its total: each percent fringe on the
+whole total, rounded on its own, plus the flat fringes as earned, so a line past its
+range's cutoff that earns 0.00% still shows its full rate; blank where Fringe % is.
 Columns are sized to the window: when there isn't room for every column at its usual
 width, they all narrow toward a minimum (numbers keep room for their digits; long text is
 cut with an ellipsis, in full on hover) before the grid scrolls sideways, and while it
@@ -514,11 +520,12 @@ out, and the footer has the total left out (each line once). While a percent, a 
 or a left-out amount is being typed, the charge's total in the footer is figured from the
 typed text before Enter commits it (`preview_charge`, about a tenth of a second after the
 last key); a value that isn't a number yet dims the old total. **Credits**: a row's
-**Spend** is an amount typed in, a group's lines or a topsheet category ("Category: 2100
+**Spend** is an amount typed in, a group's lines, a topsheet category ("Category: 2100
 Electric": the category's total with the fringes its lines earn, wherever fringes post;
-decisions.md, entry 57). **Fringes left out of the spend**, under the credit's own fields,
-is one list per credit: it applies to every group and category row (a typed amount has no
-fringes), so changing a row's Spend keeps it. Each row shows its spend, the
+decisions.md, entry 57) or an account ("Account: 1101 Crew": its lines with the fringes
+they earn, wherever fringes post; entry 61). **Fringes left out of the spend**, under the
+credit's own fields, is one list per credit: it applies to every group, category and
+account row (a typed amount has no fringes), so changing a row's Spend keeps it. Each row shows its spend, the
 fringes left out of it, the net spend the percent applies to, the credit (rounded for
 display; its tooltip has the exact figure, since rows add up before rounding), and with a
 cap, how far the row is under or over it (spend for a cap on the spend, credit for a cap on
@@ -618,7 +625,9 @@ at the left and **Close** at the right.
   (description, unit, decimals, folder, show by name) and × to delete it. Units: In use,
   Singular, Plural, Description, Hours, ×. Sets: Name, Description, In use, Total.
   Locations: Name, Description, City, Region, Country, In use, Total. Currency: Code,
-  Description, Symbol, In use, Rate, Total. Every head sorts its column (A to Z, Z to A,
+  Description, Symbol, In use, Rate, Total; its editor also has **Separators** (`1,234.56`
+  or `1.234,56`) and **Symbol after the amount**, how totals shown in that currency are
+  written (decisions.md, entry 61). Every head sorts its column (A to Z, Z to A,
   then the budget's order). A click on a name selects its row (so does a cell getting
   focus); double-click, Enter or F2 on a name opens its editor (the rest of a fringe,
   such as its basis and short code, and its name: renaming everywhere; a global's or
@@ -665,8 +674,10 @@ tables, footer), each with its explanation in its tab's tooltip:
 - **Settings** is its groups of rows (Fringe totals, Calculation, New lines, Numbers on
   screen, Account numbers), under a strip with only Undo and Redo.
 - **Baseline** has **Lock current totals**, or **Lock again…** and **Clear…**, on the
-  strip, the grand and net totals' original, current and change as a table, and what has
-  changed since (lines and accounts) in the footer.
+  strip, the grand and net totals' original, current and change as a table, **Freeze the
+  original totals** (while it is on, Lock again… and Clear… are off and say so; edits
+  still move the variance; decisions.md, entry 61), and what has changed since (lines and
+  accounts) in the footer.
 
 The layout pieces (strip, band, table, footer totals, the rail's own content) are
 `ui/js/setupframe.js`, described at the top of `ui/setup.css`, for any tab to use.
@@ -748,9 +759,13 @@ step each. The cutoff factor is `set_cutoff_factor` (`value`: `1.0`, `1.5`, `2.0
 or `3.0`), and the budget's fringe row `set_fringe_row` (`row`: `{account, description,
 position}`; blank text is none or the default description, `position` `null` or a
 topsheet row from 0 up to the number of rows); each returns the View and is one undo
-step. `set_credit`'s rows take a `source` of `{kind: "category", category}` besides
-`flat` and `group`; the credit itself takes `excluded_fringes` (one list for all its group
-and category rows).
+step. `set_credit`'s rows take a `source` of `{kind: "category", category}` or `{kind:
+"account", account}` besides `flat` and `group`; the credit itself takes
+`excluded_fringes` (one list for all its group, category and account rows).
+`set_currency`'s `currency` also takes `symbol_after` (true or false) and `separators`
+(`comma_point` or `point_comma`); left out, the currency keeps its own (decisions.md,
+entry 61). `set_baseline_frozen` (`frozen`: true or false) freezes or unfreezes the
+original totals; refused when there are none; one undo step.
 
 `delete_unit` and `delete_currency` take `clearLines` (default false): blank the unit on
 the lines that name it, or put the currency's lines back in the base currency, before
@@ -1197,7 +1212,9 @@ sentence (docs/TEMPLATES.md). Then either:
 The review has `token`, `source` (the file's or tab's name), `path`, `notes` and `items`
 (`[{kind, name, status, imported, here, rename_to, needs}]`: kind `global`, `fringe`,
 `group`, `unit`, `set`, `location`, `currency`, `charge`, `credit`, `tag_preset`,
-`line_preset`, `report_preset`, `account_coding`, `fringe_posting` or `new_line_defaults`;
+`line_preset`, `report_preset`, `account_coding`, `fringe_posting`, `fringe_row` (the budget's
+fringe row's number and description; its place stays this budget's), `cutoff_factor` or
+`new_line_defaults`;
 status `new`, `same` or `differs`; `needs` every item it brings, however deep). Only the
 last file picked is kept; `import_setup` is refused, nothing changed, when another file was
 picked since, a pick isn't in that budget, a choice is unknown, or the import would pass a
@@ -1276,7 +1293,7 @@ to **Library**: the name, kind, sort and folders in the rail and the items as a 
   item needs comes along (a fringe's unit and its rate's globals, a global's globals, a
   charge's groups...), each item says **New**, **Same here** or **Different here**, and an
   item that differs keeps this budget's version unless you pick **Use the library's
-  version** or **Add the library's as** a new name. One undo step. The three budget settings
+  version** or **Add the library's as** a new name. One undo step. The budget settings
   are never library items.
 - **Save to Library…** (at the foot of the tab, for any of this budget's setup items, ticked
   in the review, several at once) and **Save to Library…** in a setup list's right-click
@@ -1334,7 +1351,7 @@ From Template… starts a budget from one.
   per folder and per item, and what a ticked item needs (a fringe's globals and unit, a
   charge's groups, a tag preset's tags, however deep) comes along, shown as such. Below,
   the pack's details. **Export Pack…** builds the pack in Rust (the same dependency walk as
-  Import Setup, the source's folders and item sources kept, the three budget settings never
+  Import Setup, the source's folders and item sources kept, the budget settings never
   included), checks the details (a title; the date `YYYY-MM-DD`; links `http://` or
   `https://`) and shows Rust's Save dialog, in your Packs folder at first; the file is
   written through a temporary file, and a budget open in a tab is never written over.

@@ -450,9 +450,9 @@ pub(crate) fn eval_earned(
 /// What `b`'s totals (`r`, from recalculating it) leave out or count in a
 /// way worth a look, in plain words: fringes of categories after the last
 /// production total under production-level posting, which no level holds
-/// (decisions.md, entry 56), and credit rows on a category the budget
-/// doesn't have (entry 57). `method check` and the MCP `validate` tool list
-/// them; they never stop a recalc.
+/// (decisions.md, entry 56), and credit rows on a category or account the
+/// budget doesn't have (entries 57 and 61). `method check` and the MCP
+/// `validate` tool list them; they never stop a recalc.
 pub fn warnings(b: &Budget, r: &Report) -> Vec<String> {
     topsheet::trailing_fringes_warning(b, r)
         .into_iter()

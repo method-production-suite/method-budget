@@ -1372,7 +1372,7 @@ mod tests {
 
     #[test]
     fn the_preview_guesses_and_reviews() {
-        let mut b = starter::budget();
+        let mut b = starter::budget_with_separator('-');
         b.fringe_posting = method_core::FringePosting::Category {
             suffix: "99".into(),
         };
@@ -1448,7 +1448,7 @@ mod tests {
 
     #[test]
     fn importing_is_one_undo_step_and_one_batch() {
-        let mut s = Session::new();
+        let mut s = Session::with_budget(starter::budget_with_separator('-'), None);
         let before = s.budget().clone();
         let msg = import_into(&mut s, &ledger(), "ledger.csv", &guessing(), NOW).unwrap();
         assert_eq!(
@@ -1467,7 +1467,7 @@ mod tests {
 
     #[test]
     fn views_carry_cost_figures_and_cache_the_rollup() {
-        let mut s = Session::new();
+        let mut s = Session::with_budget(starter::budget_with_separator('-'), None);
         assert!(s.view().cost.is_none(), "no actuals, no cost figures");
         import_into(&mut s, &ledger(), "ledger.csv", &guessing(), NOW).unwrap();
         let v = s.view();
@@ -1512,7 +1512,7 @@ mod tests {
 
     #[test]
     fn line_sums_follow_the_account_on_screen() {
-        let mut s = Session::new();
+        let mut s = Session::with_budget(starter::budget_with_separator('-'), None);
         import_into(&mut s, &ledger(), "ledger.csv", &guessing(), NOW).unwrap();
         let line = s.budget().categories().next().unwrap().accounts[0].details[0].id;
         let e = edit_of(&EditInput {
@@ -1545,7 +1545,7 @@ mod tests {
 
     #[test]
     fn lists_filter_and_edits_parse_exactly() {
-        let mut s = Session::new();
+        let mut s = Session::with_budget(starter::budget_with_separator('-'), None);
         import_into(&mut s, &ledger(), "ledger.csv", &guessing(), NOW).unwrap();
         let all = list_dto(s.budget(), &FilterInput::default()).unwrap();
         assert_eq!((all.count, all.all, all.unassigned), (3, 3, 1));
@@ -1610,9 +1610,9 @@ mod tests {
 
     #[test]
     fn no_em_dashes_in_messages() {
-        let pv = preview_dto(&starter::budget(), &ledger(), &guessing()).unwrap();
+        let pv = preview_dto(&starter::budget_with_separator('-'), &ledger(), &guessing()).unwrap();
         assert!(!format!("{pv:?}").contains('\u{2014}'));
-        let mut s = Session::new();
+        let mut s = Session::with_budget(starter::budget_with_separator('-'), None);
         let msg = import_into(&mut s, &ledger(), "ledger.csv", &guessing(), NOW).unwrap();
         assert!(!msg.contains('\u{2014}'));
     }

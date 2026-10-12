@@ -1035,6 +1035,37 @@ fn charges_credits_categories_accounts_and_title() {
         f.tool("set_credit", json!({"path": "film.mthd", "name": "Bad", "rows": [{"source": {"kind": "category", "category": "99"}, "percent": 1}]})),
         "no category",
     );
+    // A row on an account (decisions.md, entry 61).
+    f.tool(
+        "set_credit",
+        json!({"path": "film.mthd", "name": "Camera account", "rows": [
+            {"source": {"kind": "account", "account": "21-01"}, "percent": 10}
+        ]}),
+    )
+    .unwrap();
+    let cr = f
+        .tool("list_charges", json!({"path": "film.mthd"}))
+        .unwrap();
+    let credit = cr["credits"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "Camera account")
+        .unwrap();
+    assert_eq!(
+        credit["rows"][0]["source"],
+        json!({"kind": "account", "account": "21-01"})
+    );
+    assert!(credit["amount_cents"].as_i64().unwrap() > 0);
+    err_contains(
+        f.tool("set_credit", json!({"path": "film.mthd", "name": "Bad", "rows": [{"source": {"kind": "account", "account": "99-99"}, "percent": 1}]})),
+        "no account",
+    );
+    f.tool(
+        "delete_charge",
+        json!({"path": "film.mthd", "type": "credit", "name": "Camera account"}),
+    )
+    .unwrap();
     f.tool(
         "delete_charge",
         json!({"path": "film.mthd", "type": "credit", "name": "Camera credit"}),

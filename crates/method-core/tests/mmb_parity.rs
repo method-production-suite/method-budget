@@ -334,6 +334,7 @@ fn a_foreign_line_converts_before_it_rounds() {
                 description: String::new(),
                 symbol: String::new(),
                 rate: d("3"),
+                format: Default::default(),
             },
         );
         let (_, r) = totals(&b);
@@ -978,6 +979,7 @@ fn ztest09(posting: FringePosting, znochg_on: bool) -> Budget {
             description: String::new(),
             symbol: String::new(),
             rate: d("3"),
+            format: Default::default(),
         },
     );
     let flat = |name: &str, cents: Cents, currency: Option<&str>| Charge {
@@ -1910,6 +1912,7 @@ fn ztest08(arith: Arithmetic) -> Budget {
                 description: String::new(),
                 symbol: String::new(),
                 rate: d(rate),
+                format: Default::default(),
             },
         );
     }
@@ -2207,6 +2210,8 @@ fn new_budgets_start_as_the_reference_product_starts_them() {
             (c.category_width, c.account_width, c.sub_width, c.set_width),
             (2, 2, 0, 3)
         );
+        // No separator: numbers read `1101` (decisions.md, entry 61).
+        assert_eq!(c.separator, None);
         assert_eq!(c.validate(), Ok(()));
         let hours = |u: &str| b.units[u].hours;
         assert_eq!(hours("Day"), Some(d("12")));
@@ -2236,4 +2241,301 @@ fn new_budgets_start_as_the_reference_product_starts_them() {
     b.topsheet = vec![category("11", "Z", vec![account("11-01", "Z", vec![week])])];
     let (_, r) = totals(&b);
     assert_eq!(r.budget_fringes, 12_500);
+}
+
+// ---------------------------------------------------------------------------
+// Parity run 2 (2026-10-12; imports/mmb-parity/2026-10-12/run-log.md, cases
+// R2-01 to R2-08; decisions.md, entry 61)
+
+/// Credit row on account `code`.
+fn on_account(code: &str) -> CreditSource {
+    CreditSource::Account {
+        account: code.into(),
+    }
+}
+
+/// R2-04: an account row's spend is the account's lines with the fringes
+/// they earn, wherever fringes post: 1101 is 4,000.00 + 500.00 = 4,500.00
+/// even posting by budget. Ticked onto ZCR3 it starts at 0%, so the credit
+/// stays 411.52; at 10% it adds 450.00, and the rows round once together.
+#[test]
+fn r2_04_an_account_credit_row_counts_the_account_with_its_fringes() {
+    for arith in Arithmetic::ALL {
+        for posting in postings() {
+            let at = format!("{arith:?} {posting:?}");
+            let mut b = ztest10(arith, posting.clone());
+            b.credits.push(credit(
+                "ZCR3",
+                vec![
+                    credit_row(CreditSource::Flat(123_457), "33.333", CreditCap::None),
+                    credit_row(on_account("1101"), "0", CreditCap::None),
+                ],
+            ));
+            let (_, r) = totals(&b);
+            let row = &r.credits[0].rows[1];
+            assert_eq!(
+                (row.gross, row.excluded_fringes, row.net),
+                (450_000, 0, 450_000),
+                "{at}"
+            );
+            assert_eq!(r.credits[0].amount, 41_152, "{at}");
+            assert_eq!(r.grand_total, 880_000, "{at}");
+
+            b.credits[0].rows[1].percent = d("10");
+            let (_, r) = totals(&b);
+            // 411.51824... + 450.00, rounded once.
+            assert_eq!(r.credits[0].amount, 86_152, "{at}");
+            let text = explained(&b, Target::Credit(0));
+            assert!(
+                text.contains("account 1101 Z crew credit with its fringes"),
+                "{text}"
+            );
+        }
+    }
+}
+
+/// An account row leaves out the credit's excluded fringes (one list per
+/// credit), takes a cap, follows a renumbering, and one on an account the
+/// budget doesn't have is 0 with a warning.
+#[test]
+fn r2_04_an_account_credit_row_excludes_fringes_and_follows_the_chart() {
+    for arith in Arithmetic::ALL {
+        let mut b = ztest10(arith, FringePosting::Budget);
+        b.credits.push(credit_less(
+            "ZACC",
+            &["ZFDAY"],
+            vec![
+                credit_row(on_account("1101"), "10", CreditCap::None),
+                credit_row(on_account("2101"), "10", CreditCap::QualifiedSpend(200_000)),
+            ],
+        ));
+        b.credits.push(credit(
+            "ZMISS",
+            vec![credit_row(on_account("9901"), "10", CreditCap::None)],
+        ));
+        let (_, r) = totals(&b);
+        let rows = &r.credits[0].rows;
+        assert_eq!(
+            (rows[0].gross, rows[0].excluded_fringes, rows[0].net),
+            (450_000, 10_000, 440_000)
+        );
+        // 2101 is 4,000.00 + 300.00, its spend capped at 2,000.00.
+        assert_eq!(rows[1].gross, 430_000);
+        assert_eq!(rows[1].credit, d("200"));
+        assert_eq!(r.credits[0].amount, 64_000, "{arith:?}");
+        assert_eq!(r.credits[1].rows[0].gross, 0);
+        assert_eq!(r.credits[1].amount, 0);
+        assert_eq!(
+            warnings(&b, &r),
+            vec![
+                "credit ZMISS row 1 is on account 9901, which is not in the budget, so its spend is 0"
+                    .to_string()
+            ]
+        );
+        let text = explained(&b, Target::Credit(1));
+        assert!(text.contains("account 9901 is not in the budget"), "{text}");
+
+        let to = method_core::coding::AccountCoding {
+            separator: Some('.'),
+            ..b.account_coding
+        };
+        method_core::renumber::renumber(&mut b, to).unwrap();
+        assert_eq!(b.credits[0].rows[0].source, on_account("11.01"));
+        let (_, again) = totals(&b);
+        assert_eq!(again.credits[0].amount, r.credits[0].amount);
+    }
+}
+
+/// R2-06: a flat fringe ignores ranges and cutoffs. ZFDAYR, 100.00 a Day
+/// with a 500.00 cutoff, on two lines of 3 Days at 100.00 in one range is
+/// 300.00 + 300.00, as without the range.
+#[test]
+fn r2_06_a_flat_fringe_in_a_range_ignores_the_range_and_the_cutoff() {
+    for arith in Arithmetic::ALL {
+        let day_line = |id: u64, desc: &str, range: Option<u32>| Detail {
+            fringes: set(&["ZFDAYR"]),
+            fringe_range: range,
+            ..Detail::line(id, desc, "3", "Day", "100")
+        };
+        let mut b = budget(
+            arith,
+            vec![category(
+                "1200",
+                "ZPERCENT B",
+                vec![
+                    account(
+                        "1205",
+                        "Z flat range",
+                        vec![day_line(1, "A", Some(1)), day_line(2, "B", Some(1))],
+                    ),
+                    account(
+                        "1206",
+                        "Z flat no range",
+                        vec![day_line(3, "A", None), day_line(4, "B", None)],
+                    ),
+                ],
+            )],
+        );
+        b.fringes.insert(
+            "ZFDAYR".into(),
+            Fringe {
+                description: String::new(),
+                short_code: None,
+                rate: "100".into(),
+                kind: FringeKind::Flat {
+                    unit: Some("Day".into()),
+                    basis: FlatBasis::Amount,
+                    max_hours_per_day: None,
+                    cutoff: Some(50_000),
+                },
+            },
+        );
+        let (_, r) = totals(&b);
+        let fringe = |id: u64| row(&r, id).fringe_total;
+        assert_eq!(
+            [fringe(1), fringe(2), fringe(3), fringe(4)],
+            [30_000; 4],
+            "{arith:?}"
+        );
+        assert_eq!(r.categories[0].fringe_total, 120_000);
+        // Before cutoffs the same: a flat fringe has none.
+        assert_eq!(row(&r, 2).fringe_full_total, 30_000);
+    }
+}
+
+/// R2-05: a suppressed line's effective fringe percent and its percent
+/// before cutoffs are both nothing: it earns nothing either way. A line
+/// that earns has both (ZP10N: 10.00%); a line or adjustment row without
+/// a fringe has nothing.
+#[test]
+fn r2_05_fringe_percents_of_a_suppressed_line_are_zero() {
+    for arith in Arithmetic::ALL {
+        let (_, r) = totals(&ztest07(arith));
+        let out = row(&r, 307);
+        assert!(!out.included);
+        assert_eq!((out.fringe_total, out.fringe_full_total), (0, 0));
+        let both = row(&r, 308);
+        assert_eq!((both.fringe_total, both.fringe_full_total), (0, 0));
+        let in_line = row(&r, 306);
+        assert_eq!(
+            (
+                in_line.total,
+                in_line.fringe_total,
+                in_line.fringe_full_total
+            ),
+            (100_000, 10_000, 10_000)
+        );
+        assert_eq!(row(&r, 310).fringe_full_total, 0);
+        assert_eq!(row(&r, 312).fringe_full_total, 0);
+    }
+}
+
+/// The full fringe percent (the reference's Agg Sum in the 2026-10-11
+/// exports): a range's lines past the cutoff earn less, but before cutoffs
+/// each is its own percent (Wrap earns 0.00 and is 12.5% before cutoffs);
+/// a 0.04 line at 12.5% is 0.01 (25%), rounded on its own; a flat fringe
+/// counts as earned (Grip days: 100.00 + 400.00 on 4,000.00 is 12.5%).
+#[test]
+fn the_full_fringe_percent_counts_every_fringe_before_cutoffs() {
+    for arith in Arithmetic::ALL {
+        let prep = fringed(1, "Prep", "1249.36", &["ZP125"], Some(1));
+        let shoot = fringed(2, "Shoot", "5309.78", &["ZP125"], Some(1));
+        let wrap = fringed(3, "Wrap", "624.68", &["ZP125"], Some(1));
+        let tiny = fringed(4, "Tiny", "0.04", &["ZP125"], None);
+        let mut b = budget(
+            arith,
+            vec![category(
+                "1100",
+                "Z",
+                vec![account("1102", "Z range", vec![prep, shoot, wrap, tiny])],
+            )],
+        );
+        b.fringes
+            .insert("ZP125".into(), percent("12.5", Some(222_222)));
+        let (_, r) = totals(&b);
+        let got = |id: u64| (row(&r, id).fringe_total, row(&r, id).fringe_full_total);
+        assert_eq!(got(1), (15_617, 15_617), "{arith:?}");
+        assert_eq!(got(2), (12_161, 66_372), "{arith:?}");
+        let wrap_full = match arith {
+            // 624.68 is 624.67999... as a double, so 78.08.
+            Arithmetic::Mmb => 7_808,
+            Arithmetic::Exact => 7_809,
+        };
+        assert_eq!(got(3), (0, wrap_full), "{arith:?}");
+        assert_eq!(got(4), (1, 1), "{arith:?}");
+
+        let (_, r) = totals(&ztest10(arith, FringePosting::Budget));
+        assert_eq!(row(&r, 399).fringe_full_total, 50_000, "{arith:?}");
+        assert_eq!(row(&r, 400).fringe_full_total, 0, "suppressed");
+    }
+}
+
+/// R2-02: "fringe amounts in group totals" set to Exclude shows the lines
+/// alone: ZIN 8,000.00 / 5,000.00, ZIN2 4,600.00 / 4,600.00, ZOFF 5,000.00 /
+/// 0.00; display only, so the grand total stays 7,150.00.
+#[test]
+fn r2_02_group_totals_without_fringes() {
+    for arith in Arithmetic::ALL {
+        let mut b = ztest07(arith);
+        let (_, before) = totals(&b);
+        b.group_rules.fringes_in_totals = Inclusion::Exclude;
+        let (_, r) = totals(&b);
+        let shown = |name: &str| r.groups[name].shown(&b.group_rules).unwrap();
+        assert_eq!(shown("ZIN"), (800_000, 500_000), "{arith:?}");
+        assert_eq!(shown("ZIN2"), (460_000, 460_000), "{arith:?}");
+        assert_eq!(shown("ZOFF"), (500_000, 0), "{arith:?}");
+        assert_eq!(r.grand_total, 715_000);
+        assert_eq!(r, before, "display only");
+    }
+}
+
+/// R2-07: a category's fringe account under category posting is the
+/// category's first two characters and the suffix (coding 2 + 2, suffix
+/// 98): 510 is 5198, 63 is 6398, 7000 is 7098; 1100 with 99 is 1199.
+#[test]
+fn r2_07_category_fringe_accounts_take_the_category_part() {
+    let one = |code: &str, acct: &str, id: u64| {
+        category(
+            code,
+            "Z",
+            vec![account(
+                acct,
+                "Z",
+                vec![fringed(id, "Pay", "1000", &["ZP10N"], None)],
+            )],
+        )
+    };
+    for arith in Arithmetic::ALL {
+        let mut b = budget(
+            arith,
+            vec![
+                one("510", "511", 1),
+                one("63", "6301", 2),
+                one("7000", "7001", 3),
+            ],
+        );
+        b.account_coding = method_core::coding::AccountCoding {
+            separator: None,
+            ..method_core::coding::AccountCoding::default()
+        };
+        b.fringe_posting = FringePosting::Category {
+            suffix: "98".into(),
+        };
+        b.fringes.insert("ZP10N".into(), percent("10", None));
+        let (_, r) = totals(&b);
+        let numbers: Vec<&str> = r
+            .categories
+            .iter()
+            .map(|c| c.fringe_account.as_ref().unwrap().0.as_str())
+            .collect();
+        assert_eq!(numbers, ["5198", "6398", "7098"], "{arith:?}");
+        assert!(r.categories.iter().all(|c| c.fringe_total == 10_000));
+
+        b.topsheet = vec![one("1100", "1101", 4)];
+        b.fringe_posting = FringePosting::Category {
+            suffix: "99".into(),
+        };
+        let (_, r) = totals(&b);
+        assert_eq!(r.categories[0].fringe_account.as_ref().unwrap().0, "1199");
+    }
 }

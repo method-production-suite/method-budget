@@ -70,6 +70,7 @@ pub fn sample() -> Budget {
             description: "Canadian dollar".into(),
             symbol: "$".into(),
             rate: d("0.73"),
+            format: Default::default(),
         },
     );
     b.globals.insert("SHOOT_DAYS".into(), "30".into());

@@ -45,6 +45,7 @@
     "allow-renumber-accounts",
     "allow-lock-baseline",
     "allow-clear-baseline",
+    "allow-set-baseline-frozen",
     "allow-setup-usage",
     "allow-set-setup-order",
     "allow-move-setup-item",

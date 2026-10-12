@@ -859,6 +859,15 @@ fn category_credit_rows_round_trip() {
                 percent: d("5"),
                 cap: CreditCap::None,
             },
+            // An account row (decisions.md, entry 61).
+            CreditRow {
+                description: "Grips".into(),
+                source: CreditSource::Account {
+                    account: "2101".into(),
+                },
+                percent: d("5"),
+                cap: CreditCap::None,
+            },
         ],
     });
     let text = round_trip(&b);
@@ -874,9 +883,53 @@ fn category_credit_rows_round_trip() {
         serde_json::json!({"kind": "category", "category": "2100"})
     );
     assert_eq!(
+        rows[2]["source"],
+        serde_json::json!({"kind": "account", "account": "2101"})
+    );
+    assert_eq!(
         credits.last().unwrap()["excluded_fringes"],
         serde_json::json!(["P"])
     );
+}
+
+/// A currency's format and a frozen baseline (decisions.md, entry 61) are
+/// written only when not the default, and read back.
+#[test]
+fn currency_formats_and_frozen_baselines_round_trip() {
+    let mut b = rich();
+    let (code, c) = b.currencies.iter_mut().next().unwrap();
+    let code = code.clone();
+    c.format = CurrencyFormat {
+        symbol_after: true,
+        separators: Separators::PointComma,
+    };
+    let text = round_trip(&b);
+    let v: Value = serde_json::from_str(&text).unwrap();
+    let cur = &v["budget"]["currencies"][&code];
+    assert_eq!(cur["symbol_after"], true);
+    assert_eq!(cur["separators"], "point_comma");
+
+    let mut plain = rich();
+    if let Some(base) = plain.baseline.as_mut() {
+        base.frozen = false;
+    }
+    let text = round_trip(&plain);
+    let v: Value = serde_json::from_str(&text).unwrap();
+    assert!(v["budget"]["currencies"][&code].get("separators").is_none());
+    assert!(v["budget"]["currencies"][&code]
+        .get("symbol_after")
+        .is_none());
+    assert!(v["budget"]["baseline"].get("frozen").is_none());
+    let mut frozen = plain;
+    frozen.baseline.get_or_insert_with(Baseline::default).frozen = true;
+    let text = round_trip(&frozen);
+    let v: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(v["budget"]["baseline"]["frozen"], true);
+
+    let bad = text.replacen("\"frozen\": true", "\"frozen\": true, \"melted\": 1", 1);
+    assert!(method_format::from_str(&bad).is_err());
+    let bad = method_format::to_string(&b).replacen("point_comma", "space_comma", 1);
+    assert!(method_format::from_str(&bad).is_err());
 }
 
 /// Older files kept excluded fringes on each group or category row: the

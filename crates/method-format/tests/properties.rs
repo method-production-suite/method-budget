@@ -223,9 +223,12 @@ fn gen_credit(rng: &mut Rng) -> Credit {
         rows: (0..rng.below(4))
             .map(|_| CreditRow {
                 description: rng.text(),
-                source: match rng.below(3) {
+                source: match rng.below(4) {
                     0 => CreditSource::Flat(rng.cents()),
                     1 => CreditSource::Group { group: rng.text() },
+                    2 => CreditSource::Account {
+                        account: rng.text(),
+                    },
                     _ => CreditSource::Category {
                         category: rng.text(),
                     },
@@ -254,6 +257,14 @@ fn gen_content(rng: &mut Rng) -> Budget {
         description: r.text(),
         symbol: r.text(),
         rate: r.dec(),
+        format: method_core::CurrencyFormat {
+            symbol_after: r.chance(50),
+            separators: if r.chance(50) {
+                method_core::Separators::PointComma
+            } else {
+                method_core::Separators::CommaPoint
+            },
+        },
     });
     b.globals = rng.map(Rng::formula);
     // Info for some of the globals (only non-default info is kept in a file).
@@ -406,6 +417,7 @@ fn gen_content(rng: &mut Rng) -> Budget {
             categories: rng.map(Rng::cents),
             grand_total: rng.cents(),
             net_total: rng.cents(),
+            frozen: rng.chance(50),
         });
     }
     b

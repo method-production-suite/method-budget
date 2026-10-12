@@ -21,6 +21,7 @@ use method_core::{
 use method_core::{
     Band, BandField, FontSize, ReportColumn, ReportPreset, ReportSection, ReportSpec,
 };
+use method_core::{CurrencyFormat, Separators};
 use method_core::{LinePreset, SetupItems, TagPreset};
 use method_core::{Provenance, ProvenanceKind};
 use serde::de::{self, Visitor};
@@ -1362,6 +1363,41 @@ struct FileCurrency {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     symbol: String,
     rate: DecStr,
+    /// Version 1, additive (decisions.md, entry 61): left out when false.
+    #[serde(default, skip_serializing_if = "is_false")]
+    symbol_after: bool,
+    /// `comma_point` (`1,234.56`, left out) or `point_comma` (`1.234,56`).
+    #[serde(
+        default,
+        skip_serializing_if = "is_comma_point",
+        with = "separators_name"
+    )]
+    separators: Separators,
+}
+
+fn is_comma_point(s: &Separators) -> bool {
+    *s == Separators::CommaPoint
+}
+
+/// A currency's separators by name (`comma_point`, `point_comma`).
+mod separators_name {
+    use method_core::Separators;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(s: &Separators, ser: S) -> Result<S::Ok, S::Error> {
+        ser.serialize_str(s.name())
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(de: D) -> Result<Separators, D::Error> {
+        let text = String::deserialize(de)?;
+        match text.as_str() {
+            "comma_point" => Ok(Separators::CommaPoint),
+            "point_comma" => Ok(Separators::PointComma),
+            other => Err(serde::de::Error::custom(format!(
+                "unknown separators `{other}` (comma_point or point_comma)"
+            ))),
+        }
+    }
 }
 
 impl From<&Currency> for FileCurrency {
@@ -1370,11 +1406,14 @@ impl From<&Currency> for FileCurrency {
             description,
             symbol,
             rate,
+            format,
         } = c;
         FileCurrency {
             description: description.clone(),
             symbol: symbol.clone(),
             rate: DecStr(*rate),
+            symbol_after: format.symbol_after,
+            separators: format.separators,
         }
     }
 }
@@ -1385,6 +1424,10 @@ impl From<FileCurrency> for Currency {
             description: f.description,
             symbol: f.symbol,
             rate: f.rate.0,
+            format: CurrencyFormat {
+                symbol_after: f.symbol_after,
+                separators: f.separators,
+            },
         }
     }
 }
@@ -2243,7 +2286,7 @@ impl From<FileCredit> for Credit {
         let mut excluded_fringes = f.excluded_fringes;
         for r in &f.rows {
             match &r.source {
-                FileCreditSource::Flat { .. } => {}
+                FileCreditSource::Flat { .. } | FileCreditSource::Account { .. } => {}
                 FileCreditSource::Group {
                     excluded_fringes: old,
                     ..
@@ -2295,6 +2338,11 @@ enum FileCreditSource {
         #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
         excluded_fringes: BTreeSet<String>,
     },
+    /// Version 1, additive (decisions.md, entry 61): never had a list of
+    /// its own.
+    Account {
+        account: String,
+    },
 }
 
 #[derive(Serialize, Deserialize)]
@@ -2324,6 +2372,9 @@ impl From<&CreditRow> for FileCreditRow {
                     category: category.clone(),
                     excluded_fringes: BTreeSet::new(),
                 },
+                CreditSource::Account { account } => FileCreditSource::Account {
+                    account: account.clone(),
+                },
             },
             percent: DecStr(*percent),
             cap: match *cap {
@@ -2343,6 +2394,7 @@ impl From<FileCreditRow> for CreditRow {
                 FileCreditSource::Flat { amount } => CreditSource::Flat(amount),
                 FileCreditSource::Group { group, .. } => CreditSource::Group { group },
                 FileCreditSource::Category { category, .. } => CreditSource::Category { category },
+                FileCreditSource::Account { account } => CreditSource::Account { account },
             },
             percent: f.percent.0,
             cap: match f.cap {
@@ -2369,6 +2421,9 @@ struct FileBaseline {
     categories: BTreeMap<String, Cents>,
     grand_total: Cents,
     net_total: Cents,
+    /// Version 1, additive (decisions.md, entry 61): left out when false.
+    #[serde(default, skip_serializing_if = "is_false")]
+    frozen: bool,
 }
 
 impl From<&Baseline> for FileBaseline {
@@ -2379,6 +2434,7 @@ impl From<&Baseline> for FileBaseline {
             categories,
             grand_total,
             net_total,
+            frozen,
         } = b;
         FileBaseline {
             rows: rows.clone(),
@@ -2386,6 +2442,7 @@ impl From<&Baseline> for FileBaseline {
             categories: categories.clone(),
             grand_total: *grand_total,
             net_total: *net_total,
+            frozen: *frozen,
         }
     }
 }
@@ -2398,6 +2455,7 @@ impl From<FileBaseline> for Baseline {
             categories: f.categories,
             grand_total: f.grand_total,
             net_total: f.net_total,
+            frozen: f.frozen,
         }
     }
 }

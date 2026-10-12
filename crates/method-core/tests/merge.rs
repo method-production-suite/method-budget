@@ -64,6 +64,7 @@ fn gen_budget(rng: &mut Rng) -> Budget {
             description: String::new(),
             symbol: String::new(),
             rate: d("0.73"),
+            format: Default::default(),
         },
     );
     b.globals

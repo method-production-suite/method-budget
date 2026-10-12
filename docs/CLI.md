@@ -38,7 +38,8 @@ production totals, the summary rows, the budget's fringe row (with its number an
 description, where the budget places it), charges newest first, the grand total, credits
 in reverse application order, their Sub Total when there are two or more, and the net
 total. With totals shown in another currency, the last line is the net total in it,
-converted account by account.
+converted account by account and written in that currency's own separators and symbol
+(`49.253,40 €`; decisions.md, entry 61).
 
 ### `method check <file.mthd>`
 
@@ -49,7 +50,7 @@ adds up can still print warnings after the ok line, one per line as `<file>: war
 ...`, without failing: fringes posted by production level that belong to categories
 after the last production total, which no level holds (decisions.md, entry 56; kept in
 the grand total unless `trailing_level_fringes` is `drop`), and credit rows on a
-category the budget doesn't have, which count 0 (entry 57).
+category or account the budget doesn't have, which count 0 (entries 57 and 61).
 
 ### `method fmt <file.mthd>`
 
@@ -64,7 +65,8 @@ accounts (its id or name, any case; `method coa list` names them): its categorie
 and production totals, no lines, titled Untitled (docs/TEMPLATES.md). A new budget, the
 starter or a chart, starts with the new-budget settings (decisions.md, entry 60): fringes
 posted by budget, a Day of 12 hours, a Week of 60 and a Month of 240, a cutoff factor of
-1.0, and (the starter) account numbers of category 2, account 2 and set 3.
+1.0, and (the starter) account numbers of category 2, account 2 and set 3 with no
+separator, so the starter's accounts read `1001` to `5001` (decisions.md, entry 61).
 
 ### `method totals <file.mthd> [--json] [--exclude GROUP]...`
 

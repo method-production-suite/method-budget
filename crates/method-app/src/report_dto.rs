@@ -111,6 +111,9 @@ pub struct RowDto {
     pub subtotal: Option<Cents>,
     pub fringes: BTreeMap<String, Cents>,
     pub fringe_total: Cents,
+    /// The fringes with no cutoff and no range (the full fringe percent's
+    /// dollars; decisions.md, entry 61).
+    pub fringe_full_total: Cents,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -209,6 +212,7 @@ impl From<&RowTotals> for RowDto {
             subtotal: r.subtotal,
             fringes: r.fringes.clone(),
             fringe_total: r.fringe_total,
+            fringe_full_total: r.fringe_full_total,
         }
     }
 }
@@ -458,6 +462,7 @@ mod tests {
                 description: String::new(),
                 symbol: String::new(),
                 rate: "2".parse().unwrap(),
+                format: Default::default(),
             },
         );
         b.totals_currency = Some("EUR".into());

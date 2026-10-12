@@ -347,8 +347,19 @@ pub fn describe_currency(c: &Currency) -> String {
     } else {
         format!("symbol {}", c.symbol.trim())
     };
+    // Its format, when not the usual `$1,234.56` (decisions.md, entry 61).
+    let format = if c.format.is_default() {
+        String::new()
+    } else {
+        format!("written {}", c.amount_text(123_456))
+    };
     words(
-        &[rate.as_str(), symbol.as_str(), c.description.as_str()],
+        &[
+            rate.as_str(),
+            symbol.as_str(),
+            format.as_str(),
+            c.description.as_str(),
+        ],
         "",
     )
 }

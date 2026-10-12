@@ -926,6 +926,7 @@ mod tests {
                 description: String::new(),
                 symbol: "€".into(),
                 rate: "1.1".parse().unwrap(),
+                format: Default::default(),
             },
         );
 

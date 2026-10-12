@@ -62,7 +62,7 @@ impl From<&PackDetails> for PackInfo {
 }
 
 /// Whether kind `w` can go in a pack: every kind Import Setup knows but the
-/// three budget settings, which belong to a production.
+/// budget settings, which belong to a production.
 pub fn pack_kind(w: What) -> bool {
     !w.is_setting()
 }

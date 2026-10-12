@@ -16,7 +16,7 @@ use method_format::import::actuals::{self as ia, CodeChoice, Field, Mapping, Opt
 use method_format::import::{read_file, FileKind};
 
 fn with_actuals() -> Budget {
-    let mut b = starter::budget();
+    let mut b = starter::budget_with_separator('-');
     add_batch(
         &mut b,
         "september.csv",
@@ -89,7 +89,9 @@ fn actuals_round_trip_and_are_written_as_documented() {
     let at = text.find("\"actuals\"").unwrap();
     assert!(text.find("\"charges\"").unwrap() < at);
     // A budget without actuals has no key at all.
-    assert!(!method_format::to_string(&starter::budget()).contains("\"actuals\""));
+    assert!(
+        !method_format::to_string(&starter::budget_with_separator('-')).contains("\"actuals\"")
+    );
 }
 
 #[test]
@@ -133,7 +135,7 @@ fn readers_take_every_method_and_refuse_actuals_in_versions() {
         imported: String::new(),
         rows: 0,
     });
-    let mut b = starter::budget();
+    let mut b = starter::budget_with_separator('-');
     b.actuals = Arc::new(a);
     let text = method_format::to_string(&b);
     assert_eq!(method_format::from_str(&text).unwrap(), b);
@@ -164,7 +166,7 @@ fn csv_files_import_with_a_guessed_mapping() {
     let m = mapping_for(t);
     assert_eq!(m.header_row, Some(2));
     assert_eq!(m.column(Field::Amount), Some(5));
-    let mut b = starter::budget();
+    let mut b = starter::budget_with_separator('-');
     let p = ia::plan(&b, t, &m, &Options::default());
     assert_eq!(p.transactions.len(), 3);
     assert_eq!(p.total, 250_000 - 10_000 + 5_000);
@@ -187,7 +189,12 @@ fn csv_files_import_with_a_guessed_mapping() {
     let book = read_file(tsv.as_bytes(), "ledger.txt").unwrap();
     assert_eq!(book.kind, FileKind::Tsv);
     let t = &book.tables[0];
-    let p = ia::plan(&starter::budget(), t, &mapping_for(t), &Options::default());
+    let p = ia::plan(
+        &starter::budget_with_separator('-'),
+        t,
+        &mapping_for(t),
+        &Options::default(),
+    );
     assert_eq!(p.total, 245_000);
 }
 
@@ -248,7 +255,12 @@ fn workbooks_import_with_serial_dates_and_debits() {
     assert_eq!(m.header_row, Some(0));
     assert_eq!(m.column(Field::Debit), Some(4));
     assert_eq!(m.column(Field::Credit), Some(5));
-    let p = ia::plan(&starter::budget(), t, &m, &Options::default());
+    let p = ia::plan(
+        &starter::budget_with_separator('-'),
+        t,
+        &m,
+        &Options::default(),
+    );
     let got: Vec<(&str, i64)> = p
         .transactions
         .iter()
@@ -321,7 +333,7 @@ fn exports_add_the_cost_report_and_transactions() {
     let back = read_file(&bytes, "Film.xlsx").unwrap();
     assert!(back.tables.iter().any(|t| t.name == "Cost Report"));
     // A budget without actuals exports as before.
-    let plain = starter::budget();
+    let plain = starter::budget_with_separator('-');
     let wb = workbook(&plain, &recalc(&plain, &RecalcOptions::default()).unwrap()).unwrap();
     assert_eq!(wb.sheets.len(), SHEET_NAMES.len());
 }

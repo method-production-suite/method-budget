@@ -99,13 +99,15 @@ pub struct AccountCoding {
 }
 
 impl AccountCoding {
-    /// The pattern a new budget starts with (decisions.md, entry 60), as the
-    /// reference product starts one: category 2, account 2, no
-    /// sub-account, set 3, separator `-`. A file that doesn't say has
-    /// [`AccountCoding::default`], so budgets already saved keep theirs.
+    /// The pattern a new budget starts with (decisions.md, entries 60 and
+    /// 61), as the reference product starts one: category 2, account 2, no
+    /// sub-account, set 3, and no separator, so account numbers read `1101`.
+    /// A file that doesn't say has [`AccountCoding::default`], so budgets
+    /// already saved keep theirs.
     pub fn new_budget() -> AccountCoding {
         AccountCoding {
             set_width: 3,
+            separator: None,
             ..AccountCoding::default()
         }
     }
@@ -447,13 +449,18 @@ impl AccountCoding {
     }
 
     /// The fringe account number of the category numbered `category` (as
-    /// stored) under category posting: [`AccountCoding::fringe_account`]
-    /// when the number names a plain category ([`AccountCoding::category_key`]
-    /// reads it as a category part: `11`, `1100`, `11-00`), else the number
-    /// as written followed by the suffix (`0501` with `99` is `050199`).
-    /// Two categories with different numbers never share a fringe account
-    /// because the pattern cut one short (`0501` and `0502` are not both
-    /// `0599`).
+    /// stored) under category posting, as the reference product numbers it
+    /// (decisions.md, entry 61): the category's part followed by the
+    /// suffix, written with the pattern. The category's part is what the
+    /// pattern reads as one when the number names a plain category
+    /// ([`AccountCoding::category_key`]: `11`, `1100`, `11-00`, and `5` as
+    /// `05`), else the number's first category-width letters and digits:
+    /// with category 2, account 2 and suffix 98, category `510` gives
+    /// `5198`, `63` gives `6398` and `7000` gives `7098`. Two categories
+    /// whose numbers start alike share one (`0501` and `0502` both give
+    /// `0599`), as in the reference. A number with no letter or digit,
+    /// or a pattern with no account part, falls back to the number as
+    /// written followed by the suffix.
     pub fn category_fringe_account(&self, category: &str, suffix: &str) -> String {
         let plain = self.read(category).is_some_and(|c| {
             [&c.account, &c.sub, &c.set]
@@ -462,6 +469,17 @@ impl AccountCoding {
         });
         if plain {
             if let Ok(n) = self.fringe_account(category, suffix) {
+                return n;
+            }
+        }
+        let head: String = category
+            .trim()
+            .chars()
+            .filter(char::is_ascii_alphanumeric)
+            .take(usize::from(self.category_width))
+            .collect();
+        if !head.is_empty() {
+            if let Ok(n) = self.fringe_account(&head, suffix) {
                 return n;
             }
         }
@@ -545,11 +563,29 @@ mod tests {
         assert_eq!(pat(2, 2, 0, 2, None).validate(), Ok(()));
     }
 
-    /// The new-budget pattern (category 2, account 2, set 3): the set is
-    /// the third part, read and written after the account.
+    /// The new-budget pattern (category 2, account 2, set 3, no
+    /// separator): numbers read `1101`, and a typed separator still splits.
+    #[test]
+    fn the_new_budget_pattern() {
+        let p = AccountCoding::new_budget();
+        assert_eq!(p, pat(2, 2, 0, 3, None));
+        assert_eq!(p.validate(), Ok(()));
+        assert_eq!(norm(&p, "11-01"), "1101");
+        assert_eq!(norm(&p, "1101"), "1101");
+        assert_eq!(norm(&p, "11-5"), "1105");
+        assert_eq!(p.parse("11-01-5"), Ok(code("11", "01", "", "005")));
+        assert_eq!(p.format(&code("11", "01", "", "005")), "1101005");
+        assert_eq!(p.fringe_account("11", "99"), Ok("1199".into()));
+    }
+
+    /// The new-budget widths with a separator: the set is the third part,
+    /// read and written after the account.
     #[test]
     fn a_set_after_the_account() {
-        let p = AccountCoding::new_budget();
+        let p = AccountCoding {
+            separator: Some('-'),
+            ..AccountCoding::new_budget()
+        };
         assert_eq!(p, pat(2, 2, 0, 3, Some('-')));
         assert_eq!(p.validate(), Ok(()));
         assert_eq!(p.parse("11-01-5"), Ok(code("11", "01", "", "005")));
@@ -811,17 +847,32 @@ mod tests {
         assert_eq!(narrow.fringe_account("11", "99").unwrap(), "11.9");
     }
 
+    /// The reference product's rule (parity run 2, R2-07): the category's
+    /// first category-width characters, then the suffix.
     #[test]
-    fn category_fringe_accounts_never_cut_a_category_short() {
+    fn category_fringe_accounts_take_the_category_part() {
         let p = pat(2, 2, 0, 0, None);
         assert_eq!(p.category_fringe_account("11", "99"), "1199");
         assert_eq!(p.category_fringe_account("1100", "99"), "1199");
         assert_eq!(p.category_fringe_account("5", "99"), "0599");
-        // Not a plain category under the pattern: the number as written.
-        assert_eq!(p.category_fringe_account("0501", "99"), "050199");
-        assert_eq!(p.category_fringe_account("0502", "99"), "050299");
-        assert_eq!(p.category_fringe_account("5600-100", "99"), "5600-10099");
-        assert_eq!(p.category_fringe_account("4AA.", "99"), "4AA.99");
+        // R2-07, suffix 98: 510 is 5198, 63 is 6398, 7000 is 7098.
+        assert_eq!(p.category_fringe_account("510", "98"), "5198");
+        assert_eq!(p.category_fringe_account("63", "98"), "6398");
+        assert_eq!(p.category_fringe_account("7000", "98"), "7098");
+        // Not a plain category under the pattern: its first two characters.
+        assert_eq!(p.category_fringe_account("0501", "99"), "0599");
+        assert_eq!(p.category_fringe_account("0502", "99"), "0599");
+        assert_eq!(p.category_fringe_account("5600-100", "99"), "5699");
+        assert_eq!(p.category_fringe_account("4AA.", "99"), "4A99");
+        // Written with the pattern's separator, and a wider category part.
+        let d = AccountCoding::default();
+        assert_eq!(d.category_fringe_account("510", "98"), "51-98");
+        assert_eq!(
+            pat(3, 2, 0, 0, None).category_fringe_account("5100", "99"),
+            "51099"
+        );
+        // Nothing to take: as written.
+        assert_eq!(p.category_fringe_account("..", "99"), "..99");
     }
 
     #[test]

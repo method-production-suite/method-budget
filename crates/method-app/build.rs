@@ -61,6 +61,7 @@ const COMMANDS: &[&str] = &[
     "set_totals_currency",
     "lock_baseline",
     "clear_baseline",
+    "set_baseline_frozen",
     // Several cells at once (paste, fill down, cut)
     "set_cells",
     // Row style, group colors (src/rowstyle.rs)

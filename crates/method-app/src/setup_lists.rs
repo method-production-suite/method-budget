@@ -243,6 +243,8 @@ mod tests {
                     description: String::new(),
                     symbol: String::new(),
                     rate: "0.5".into(),
+                    symbol_after: None,
+                    separators: None,
                 },
             )?;
             let mut r = rows(b);
@@ -296,6 +298,8 @@ mod tests {
                     description: String::new(),
                     symbol: String::new(),
                     rate: "0.5".into(),
+                    symbol_after: None,
+                    separators: None,
                 },
             )?;
             rows(b)[0].currency = Some("CAD".into());

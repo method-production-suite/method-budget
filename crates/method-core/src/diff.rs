@@ -756,7 +756,23 @@ pub(crate) fn currency_fields(c: &Currency) -> Vec<Field> {
         text("description", "description", quoted(&c.description)),
         text("symbol", "symbol", quoted(&c.symbol)),
         text("rate", "rate", c.rate.to_string()),
+        text("format", "format", currency_format_text(&c.format)),
     ]
+}
+
+/// A currency's format in words: `1,234.56, symbol before` (decisions.md,
+/// entry 61).
+pub(crate) fn currency_format_text(f: &crate::CurrencyFormat) -> String {
+    let pattern = match f.separators {
+        crate::Separators::CommaPoint => "1,234.56",
+        crate::Separators::PointComma => "1.234,56",
+    };
+    let place = if f.symbol_after {
+        "symbol after"
+    } else {
+        "symbol before"
+    };
+    format!("{pattern}, {place}")
 }
 
 pub(crate) fn set_fields(s: &SetDef) -> Vec<Field> {
@@ -839,6 +855,7 @@ pub(crate) fn credit_rows_text(c: &Credit) -> String {
                 CreditSource::Flat(a) => money(*a),
                 CreditSource::Group { group } => format!("group {group}"),
                 CreditSource::Category { category } => format!("category {category}"),
+                CreditSource::Account { account } => format!("account {account}"),
             };
             let cap = match r.cap {
                 CreditCap::None => String::new(),
@@ -953,6 +970,7 @@ pub(crate) fn defaults_text(d: &NewLineDefaults) -> String {
 pub(crate) fn baseline_text(b: &Option<Baseline>) -> String {
     match b {
         None => "none".into(),
+        Some(b) if b.frozen => format!("locked and frozen, grand total {}", money(b.grand_total)),
         Some(b) => format!("locked, grand total {}", money(b.grand_total)),
     }
 }
@@ -2589,6 +2607,7 @@ mod tests {
                 description: String::new(),
                 symbol: "€".into(),
                 rate: Dec::from_int(1),
+                format: Default::default(),
             },
         );
         let d = diff(&a, &b);

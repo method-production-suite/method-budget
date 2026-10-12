@@ -4,7 +4,7 @@
 
 import { decimal } from './format.js';
 import { tagCellText, notesTitle } from './order.js';
-import { totalText, numberCell, budgetDisplay, hiddenFactors } from './display.js';
+import { totalText, currencyTotalText, numberCell, budgetDisplay, hiddenFactors } from './display.js';
 
 // Totals with the user's choice of decimals (display.js; 2 unless they chose
 // whole amounts). Never changes a value.
@@ -326,7 +326,10 @@ export function topsheetRows(ix, choices = null) {
   if (r.credits.length && disp.net_total) rows.push(staticRow('s-net', 'summary grand', 'Net total', r.net_total, ix.variance ? varianceCells(ix.variance.net_total) : {}));
   if (r.display && disp.net_total) {
     const cur = r.totals_currency;
-    rows.push(staticRow('s-disp', 'summary', `Net total in ${cur}`, r.display.net_total));
+    const row = staticRow('s-disp', 'summary', `Net total in ${cur}`, r.display.net_total);
+    // In that currency's own separators and symbol (decisions.md, entry 61).
+    row.cells.total = { text: currencyTotalText(r.display.net_total, (ix.b.currencies || {})[cur]) };
+    rows.push(row);
   }
   return rows;
 }
@@ -444,6 +447,8 @@ export const DETAIL_COLUMNS = [
   { key: 'unit4', label: '4X unit', title: 'Unit shown next to 4X', width: 72, min: 54, optional: true, on: false },
   { key: 'fringes', label: 'Fringes', title: 'Fringes on this line, separated by commas', width: 140, min: 64, optional: true, on: true },
   { key: 'fringe_pct', label: 'Fringe %', cls: 'num', title: 'Fringe dollars as a percentage of the line total', width: 76, min: 70, optional: true, on: true },
+  // The full fringe percent: every fringe before cutoffs and ranges (decisions.md, entry 61).
+  { key: 'fringe_full_pct', label: 'Full fringe %', name: 'Full fringe % (before cutoffs)', cls: 'num', title: 'The line’s fringes before cutoffs and ranges, as a percentage of the line total', width: 96, min: 84, optional: true, on: false },
   { key: 'fringe_total', label: 'Fringe $', cls: 'num', title: 'Fringe dollars this line earns', width: 104, min: 92, optional: true, on: true },
   { key: 'groups', label: 'Groups', title: 'Groups, separated by commas', width: 130, min: 60, optional: true, on: true },
   { key: 'set', label: 'Set', width: 90, min: 60, optional: true, on: false },
@@ -758,6 +763,11 @@ export function detailRows(ix, entry, ai, full, shown = null) {
     if (rr && (line || kind === 'adjustment') && rr.included && rr.total && (rr.fringe_total || (d.fringes || []).length)) {
       const parts = Object.entries(rr.fringes).map(([n, c]) => `${n}: ${fringePercent(c, rr.total)}`);
       cells.fringe_pct = { text: fringePercent(rr.fringe_total, rr.total), cls: 'muted', title: parts.join('\n') };
+      cells.fringe_full_pct = {
+        text: fringePercent(rr.fringe_full_total || 0, rr.total),
+        cls: 'muted',
+        title: 'Every fringe on the line before cutoffs and ranges',
+      };
     }
 
     return { ...style, cells };

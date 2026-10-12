@@ -16,7 +16,7 @@
 // The pure functions at the top are what levels.js uses to build cells; the
 // commands at the bottom are the View menu's items (main.js wires them).
 
-import { decimal } from './format.js';
+import { decimal, currencyMoney } from './format.js';
 import { readPref, writePref } from './prefs.js';
 
 // ---------------------------------------------------------------------------
@@ -281,6 +281,14 @@ export function setUserDisplay(patch) {
 /** Totals for display with the user's choice of decimals. */
 export function totalText(cents) {
   return moneyAt(cents, user.totalsPlaces);
+}
+
+/**
+ * A total shown in another currency, in that currency's own format and
+ * symbol (decisions.md, entry 61), with or without cents as totals show.
+ */
+export function currencyTotalText(cents, currency) {
+  return currencyMoney(cents, currency, user.totalsPlaces);
 }
 
 // ---------------------------------------------------------------------------

@@ -229,6 +229,9 @@ pub struct Currency {
     pub symbol: String,
     /// Base-currency units per one unit of this currency.
     pub rate: Dec,
+    /// How amounts in it are written: separators and where the symbol
+    /// goes (decisions.md, entry 61). Display only.
+    pub format: crate::currency_format::CurrencyFormat,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1078,11 +1081,18 @@ pub enum CreditSource {
     /// the credit's `excluded_fringes` (decisions.md, entry 57). A category
     /// that isn't in the budget is 0.
     Category { category: String },
+    /// The total of account `account` (its counted lines and adjustment
+    /// rows), plus the fringes they earn wherever fringes post, except the
+    /// credit's `excluded_fringes` (decisions.md, entry 61). An account
+    /// that isn't in the budget is 0; of two with the same number, the
+    /// first.
+    Account { account: String },
 }
 
 impl CreditSource {
     /// Whether the row's spend includes fringes, so the credit's excluded
-    /// fringes apply to it (group and category rows; not a typed amount).
+    /// fringes apply to it (group, category and account rows; not a typed
+    /// amount).
     pub fn has_fringes(&self) -> bool {
         !matches!(self, CreditSource::Flat(_))
     }
@@ -1114,6 +1124,11 @@ pub struct Baseline {
     pub categories: BTreeMap<String, Cents>,
     pub grand_total: Cents,
     pub net_total: Cents,
+    /// Frozen: these original totals can't be captured again or cleared
+    /// until this is turned off, as the reference product's "lock original
+    /// totals" switch keeps them (decisions.md, entry 61). Edits still
+    /// move the current totals and so the variance.
+    pub frozen: bool,
 }
 
 /// What kind of copy a budget with a [`Provenance`] is.

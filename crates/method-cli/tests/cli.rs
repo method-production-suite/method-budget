@@ -147,7 +147,7 @@ fn totals_text_and_json() {
     let cents = net.replace('.', "").trim_start_matches('0').to_string();
     assert!(j.contains(&format!("\"net_total\": {cents},")), "{j}");
     assert!(j.trim_start().starts_with('{') && j.trim_end().ends_with('}'));
-    assert!(j.contains("\"accounts\": [{\"code\": \"10-01\""));
+    assert!(j.contains("\"accounts\": [{\"code\": \"1001\""));
 }
 
 #[test]
@@ -311,7 +311,7 @@ fn set_changes_one_value() {
     let d = Dir::new("set");
     let p = d.starter("a.mthd");
     let before = read(&p);
-    let o = method(&["set", &p, "line.10-01:1.rate", "60000", "--dry-run"]);
+    let o = method(&["set", &p, "line.1001:1.rate", "60000", "--dry-run"]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     assert!(
         out(&o).contains("rate \"50000\" -> \"60000\""),
@@ -322,7 +322,7 @@ fn set_changes_one_value() {
     assert_eq!(read(&p), before);
 
     let grand = total(&p, "grand_total");
-    let o = method(&["set", &p, "line.10-01:1.rate", "60000"]);
+    let o = method(&["set", &p, "line.1001:1.rate", "60000"]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     assert!(out(&o).contains("Grand total"));
     assert_ne!(total(&p, "grand_total"), grand);
@@ -350,11 +350,11 @@ fn set_changes_one_value() {
     let o = method(&["set", &p, "fringe.NOPE.rate", "5"]);
     assert_eq!(code(&o), 3);
     assert!(err(&o).contains("there is no fringe NOPE"), "{}", err(&o));
-    let o = method(&["set", &p, "line.10-01:1.rate", "NO_SUCH_GLOBAL * 2"]);
+    let o = method(&["set", &p, "line.1001:1.rate", "NO_SUCH_GLOBAL * 2"]);
     assert_eq!(code(&o), 3, "{}", err(&o));
     assert!(err(&o).contains("nothing was written"));
     assert_eq!(code(&method(&["set", &p, "nonsense", "1"])), 2);
-    assert_eq!(code(&method(&["set", &p, "line.10-01:1"])), 2);
+    assert_eq!(code(&method(&["set", &p, "line.1001:1"])), 2);
     assert_eq!(read(&p), now);
 }
 
@@ -510,9 +510,9 @@ fn apply_runs_a_script_all_or_nothing() {
          set global SHOOT_DAYS 30\n\
          set fringe PAYROLL rate 18.5\n\
          set fringe PAYROLL cutoff 150,000.00\n\
-         set line 10-01:1 description \"Screenplay (two drafts)\"\n\
+         set line 1001:1 description \"Screenplay (two drafts)\"\n\
          set line #1 bold true\n\
-         remove tag 10-01:* fringe PAYROLL\n\
+         remove tag 1001:* fringe PAYROLL\n\
          add tag #1 fringe PAYROLL\n\
          rename global SHOOT_DAYS DAYS\n\
          remove charge Contingency\n\

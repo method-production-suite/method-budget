@@ -1045,6 +1045,14 @@ pub struct CurrencyInput {
     pub symbol: String,
     /// Base-currency units per one unit of this currency.
     pub rate: String,
+    /// The symbol after the value (`1.234,56 €`). Left out: keep the
+    /// currency's own (before, for a new one; decisions.md, entry 61).
+    #[serde(default)]
+    pub symbol_after: Option<bool>,
+    /// `comma_point` (`1,234.56`) or `point_comma` (`1.234,56`). Left out:
+    /// keep the currency's own (`comma_point` for a new one).
+    #[serde(default)]
+    pub separators: Option<String>,
 }
 
 pub fn set_currency(b: &mut Budget, code: &str, c: &CurrencyInput) -> EditResult {
@@ -1056,12 +1064,30 @@ pub fn set_currency(b: &mut Budget, code: &str, c: &CurrencyInput) -> EditResult
     if rate <= Dec::ZERO {
         return Err("an exchange rate must be more than 0".into());
     }
+    let old = b
+        .currencies
+        .get(&code)
+        .map(|o| o.format)
+        .unwrap_or_default();
+    let separators = match c.separators.as_deref() {
+        None => old.separators,
+        Some(s) => method_core::Separators::parse(s).ok_or_else(|| {
+            format!(
+                "separators should be 1,234.56 or 1.234,56, not `{}`",
+                s.trim()
+            )
+        })?,
+    };
     b.currencies.insert(
         code,
         Currency {
             description: c.description.trim().to_string(),
             symbol: c.symbol.trim().to_string(),
             rate,
+            format: method_core::CurrencyFormat {
+                symbol_after: c.symbol_after.unwrap_or(old.symbol_after),
+                separators,
+            },
         },
     );
     Ok(())
@@ -1367,6 +1393,9 @@ pub enum CreditSourceInput {
     /// A topsheet category's total with its fringes, less the credit's
     /// excluded ones (decisions.md, entry 57).
     Category { category: String },
+    /// An account's total with its fringes, less the credit's excluded
+    /// ones (decisions.md, entry 61).
+    Account { account: String },
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -1445,6 +1474,7 @@ pub fn set_credit(b: &mut Budget, index: Option<usize>, c: &CreditInput) -> Edit
     // Old rows' references stay valid while editing, like charge exclusions.
     let mut old_groups = BTreeSet::new();
     let mut old_categories = BTreeSet::new();
+    let mut old_accounts = BTreeSet::new();
     let old_fringes = old
         .as_ref()
         .map(|o| o.excluded_fringes.clone())
@@ -1457,11 +1487,19 @@ pub fn set_credit(b: &mut Budget, index: Option<usize>, c: &CreditInput) -> Edit
             CreditSource::Category { category } => {
                 old_categories.insert(category.clone());
             }
+            CreditSource::Account { account } => {
+                old_accounts.insert(account.clone());
+            }
             CreditSource::Flat(_) => {}
         }
     }
     let groups: BTreeSet<String> = b.groups.keys().cloned().collect();
     let categories: BTreeSet<String> = b.categories().map(|c| c.code.clone()).collect();
+    let accounts: BTreeSet<String> = b
+        .categories()
+        .flat_map(|c| &c.accounts)
+        .map(|a| a.code.clone())
+        .collect();
     let fringes: BTreeSet<String> = b.fringes.keys().cloned().collect();
     let mut rows = Vec::with_capacity(c.rows.len());
     for (i, r) in c.rows.iter().enumerate() {
@@ -1492,6 +1530,18 @@ pub fn set_credit(b: &mut Budget, index: Option<usize>, c: &CreditInput) -> Edit
                 }
                 CreditSource::Category {
                     category: c.to_string(),
+                }
+            }
+            CreditSourceInput::Account { account } => {
+                let a = account.trim();
+                if a.is_empty() {
+                    return Err(format!("row {n} needs an account"));
+                }
+                if !accounts.contains(a) && !old_accounts.contains(a) {
+                    return Err(format!("there is no account `{a}`"));
+                }
+                CreditSource::Account {
+                    account: a.to_string(),
                 }
             }
         };
@@ -1770,7 +1820,14 @@ pub fn set_totals_currency(b: &mut Budget, code: Option<&str>) -> EditResult {
 /// Freezes the current totals as the baseline (replacing any earlier one).
 /// Refused while the budget has calculation errors, since the totals would be
 /// missing or partial.
+/// Why the original totals can't change: they are frozen (decisions.md,
+/// entry 61).
+const FROZEN: &str = "the original totals are frozen; unfreeze them first";
+
 pub fn lock_baseline(b: &mut Budget) -> EditResult {
+    if b.baseline.as_ref().is_some_and(|x| x.frozen) {
+        return Err(FROZEN.into());
+    }
     let report = recalc(b, &RecalcOptions::default())
         .map_err(|e| format!("fix this first, then lock the totals: {e}"))?;
     let baseline = Baseline::capture(&report).ok_or("the totals are too large to keep")?;
@@ -1779,10 +1836,25 @@ pub fn lock_baseline(b: &mut Budget) -> EditResult {
 }
 
 pub fn clear_baseline(b: &mut Budget) -> EditResult {
+    if b.baseline.as_ref().is_some_and(|x| x.frozen) {
+        return Err(FROZEN.into());
+    }
     b.baseline
         .take()
         .map(|_| ())
         .ok_or_else(|| "there are no original totals to clear".to_string())
+}
+
+/// Freezes the original totals, or unfreezes them: while frozen they can't
+/// be locked again or cleared, as the reference product's "lock original
+/// totals" switch keeps them (decisions.md, entry 61).
+pub fn set_baseline_frozen(b: &mut Budget, frozen: bool) -> EditResult {
+    let base = b
+        .baseline
+        .as_mut()
+        .ok_or("there are no original totals to freeze")?;
+    base.frozen = frozen;
+    Ok(())
 }
 
 #[cfg(test)]

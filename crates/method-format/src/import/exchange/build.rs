@@ -1203,6 +1203,7 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
                 description: String::new(),
                 symbol: String::new(),
                 rate,
+                format: Default::default(),
             },
         );
     }
@@ -1213,6 +1214,7 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
                 description: String::new(),
                 symbol: String::new(),
                 rate: conv_rate_text.parse().unwrap_or(Dec::ONE),
+                format: Default::default(),
             },
         );
         rate_words.push(format!("{conv} {conv_rate_text}"));

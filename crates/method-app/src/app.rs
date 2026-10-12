@@ -1087,6 +1087,23 @@ pub fn lock_baseline<R: Runtime>(
 }
 
 #[tauri::command]
+pub fn set_baseline_frozen<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    frozen: bool,
+) -> CmdResult {
+    let label = if frozen {
+        "Freeze the original totals"
+    } else {
+        "Unfreeze the original totals"
+    };
+    edit_budget(&window, &state, doc, label, |b| {
+        edit::set_baseline_frozen(b, frozen)
+    })
+}
+
+#[tauri::command]
 pub fn clear_baseline<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
@@ -1420,6 +1437,7 @@ pub fn run() {
             set_totals_currency,
             lock_baseline,
             clear_baseline,
+            set_baseline_frozen,
             // Several cells at once
             set_cells,
             // Row style, group colors

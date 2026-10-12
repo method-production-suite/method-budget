@@ -12,14 +12,37 @@ export function money(cents) {
   return neg ? `(${s})` : s;
 }
 
-/** Adds thousands separators to a string of digits. */
-function group(digits) {
+/** Adds thousands separators (`sep`, a comma by default) to a string of digits. */
+function group(digits, sep = ',') {
   let out = '';
   for (let i = 0; i < digits.length; i++) {
-    if (i > 0 && (digits.length - i) % 3 === 0) out += ',';
+    if (i > 0 && (digits.length - i) % 3 === 0) out += sep;
     out += digits[i];
   }
   return out;
+}
+
+/**
+ * Cents written in currency `c`'s own format (decisions.md, entry 61): its
+ * separators (`1,234.56`, or `1.234,56` when `c.separators` is
+ * `point_comma`) and its symbol before the value (`$1,234.56`) or after it
+ * (`1.234,56 €` when `c.symbol_after`); negatives in parentheses. `places`
+ * 0 rounds to whole units, half away from zero. `c` is the budget's
+ * currency entry (missing: the number alone, comma and point).
+ */
+export function currencyMoney(cents, c, places = 2) {
+  if (cents === null || cents === undefined || !Number.isFinite(cents)) return '';
+  const cur = c && typeof c === 'object' ? c : {};
+  const [sep, mark] = cur.separators === 'point_comma' ? ['.', ','] : [',', '.'];
+  const a = Math.abs(cents);
+  const n =
+    places === 0
+      ? group(String(Math.trunc((a + 50) / 100)), sep)
+      : `${group(String(Math.trunc(a / 100)), sep)}${mark}${String(a % 100).padStart(2, '0')}`;
+  const symbol = typeof cur.symbol === 'string' ? cur.symbol.trim() : '';
+  const s = !symbol ? n : cur.symbol_after === true ? `${n} ${symbol}` : `${symbol}${n}`;
+  const neg = cents < 0 && (places !== 0 || Math.trunc((a + 50) / 100) !== 0);
+  return neg ? `(${s})` : s;
 }
 
 /**

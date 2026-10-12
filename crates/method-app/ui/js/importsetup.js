@@ -31,7 +31,7 @@ const GROUPS = [
   ['Line blocks', ['line_preset']],
   ['Report presets', ['report_preset']],
   ['Overtime patterns', ['ot_pattern']],
-  ['Budget settings', ['account_coding', 'fringe_posting', 'new_line_defaults']],
+  ['Budget settings', ['account_coding', 'fringe_posting', 'fringe_row', 'cutoff_factor', 'new_line_defaults']],
 ];
 
 const KIND_LABELS = {
@@ -50,6 +50,8 @@ const KIND_LABELS = {
   ot_pattern: 'Overtime pattern',
   account_coding: 'Account numbering',
   fringe_posting: 'Fringe posting',
+  fringe_row: 'Fringe row',
+  cutoff_factor: 'Percent fringe cutoff factor',
   new_line_defaults: 'New line defaults',
 };
 

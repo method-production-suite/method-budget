@@ -185,20 +185,30 @@ pub(crate) fn trailing_fringes_warning(b: &Budget, r: &Report) -> Option<String>
     ))
 }
 
-/// Credit rows on a category the budget doesn't have, which count as 0
-/// (decisions.md, entry 57): one warning each.
+/// Credit rows on a category or account the budget doesn't have, which
+/// count as 0 (decisions.md, entries 57 and 61): one warning each.
 pub(crate) fn credit_category_warnings(b: &Budget) -> Vec<String> {
     let mut out = Vec::new();
     for c in &b.credits {
         for (i, row) in c.rows.iter().enumerate() {
-            if let CreditSource::Category { category, .. } = &row.source {
-                if !b.categories().any(|cat| cat.code == *category) {
-                    out.push(format!(
-                        "credit {} row {} is on category {category}, which is not in the budget, so its spend is 0",
-                        c.name,
-                        i + 1
-                    ));
+            let missing = match &row.source {
+                CreditSource::Category { category } => {
+                    (!b.categories().any(|cat| cat.code == *category))
+                        .then(|| format!("category {category}"))
                 }
+                CreditSource::Account { account } => (!b
+                    .categories()
+                    .flat_map(|cat| &cat.accounts)
+                    .any(|a| a.code == *account))
+                .then(|| format!("account {account}")),
+                _ => None,
+            };
+            if let Some(what) = missing {
+                out.push(format!(
+                    "credit {} row {} is on {what}, which is not in the budget, so its spend is 0",
+                    c.name,
+                    i + 1
+                ));
             }
         }
     }
@@ -429,6 +439,31 @@ fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals
                 }
                 (gross, ex)
             }
+            CreditSource::Account { account } => {
+                // The account's lines with the fringes they earn, wherever
+                // fringes post, as the reference counts an account row
+                // (decisions.md, entry 61; 4,000.00 of lines and 500.00 of
+                // fringes posted by budget are 4,500.00). One that isn't in
+                // the budget is 0 (`warnings` says so).
+                let mut gross: Cents = 0;
+                let mut ex: Cents = 0;
+                let found = cats
+                    .iter()
+                    .flat_map(|c| &c.accounts)
+                    .find(|a| a.code == *account);
+                if let Some(a) = found {
+                    gross = a
+                        .details_total
+                        .checked_add(a.fringe_total)
+                        .ok_or_else(row_ovf)?;
+                    for (name, amt) in a.rows.iter().flat_map(|r| &r.fringes) {
+                        if c.excluded_fringes.contains(name) {
+                            ex = ex.checked_add(*amt).ok_or_else(row_ovf)?;
+                        }
+                    }
+                }
+                (gross, ex)
+            }
         };
         let net = gross.checked_sub(excluded_fringes).ok_or_else(row_ovf)?;
 
@@ -570,6 +605,7 @@ mod tests {
                 description: "Euro".into(),
                 symbol: "E".into(),
                 rate: d("1.1"),
+                format: Default::default(),
             },
         );
         b.topsheet = vec![
