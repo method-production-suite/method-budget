@@ -21,6 +21,7 @@ pub mod docs;
 pub mod edit;
 pub mod explain;
 pub mod export;
+pub mod export_import;
 pub mod find;
 pub mod history;
 pub mod import_setup;

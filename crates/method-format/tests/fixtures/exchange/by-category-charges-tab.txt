@@ -1,0 +1,25 @@
+1100	Cat Juniper			11500
+		1101	Acct Ivy	10000
+		1102	Acct Hazel	500
+				0
+		1199	Total Fringes	1000
+2100	Cat Larch			9100
+		2101	Acct Fir	8300
+				0
+		2199	Total Fringes	800
+3100	Cat Maple			2000
+		3101	Acct Ginkgo	2000
+				0
+		3199	Total Fringes	0
+				0
+				0
+		99	Total Fringes	0
+	QFLATCAT			8000
+	QPCTACC			663
+	QPCTCAT			270
+	QHALF			100
+	QFLATEUR			3000
+	QOVER			1980
+	QPCTX			2169
+	QPCT5			1130
+	QFLAT			1478

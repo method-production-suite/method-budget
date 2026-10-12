@@ -21,6 +21,8 @@ use super::tools::ToolError;
 pub const BUDGET_EXTS: &[&str] = method_format::EXTENSIONS;
 /// Spreadsheets `import_sheet` reads.
 pub const SHEET_EXTS: &[&str] = &["xlsx", "csv", "tsv", "txt"];
+/// Budget exports `import_budget_export` reads.
+pub const EXPORT_EXTS: &[&str] = &["json", "xml", "xlsx", "txt", "tsv", "tab"];
 
 /// The folders the server works in, each canonical (symlinks resolved).
 #[derive(Clone, Debug)]

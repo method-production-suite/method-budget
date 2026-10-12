@@ -216,6 +216,38 @@ The **mapping file** is JSON; every field may be left out:
 
 Our own Excel export imports back with no mapping at all.
 
+### `method import-export <export> [-o <out.mthd>] [--format F] [--title T] [--report] [--json] [--force]`
+
+Makes a whole budget from another budgeting program's export and checks it against the
+export's own figures (docs/IMPORT.md): budget exchange JSON or XML (basic or advanced), its
+Excel workbook or its tab-delimited topsheet. The layout is found from the content;
+`--format json|xml|xml-advanced|xlsx|tab` reads it as another.
+
+- It prints what came over (categories, accounts, lines, setup), then the notes: what was
+  worked out from the figures and should be checked (`check:`: fringe posting, cutoffs,
+  ranges, exchange rates, unit hours), what couldn't come over (`not imported:`: formulas
+  and globals, production totals, the rules of charges and credits, suppressed lines), and
+  `note:` lines.
+- Then the check against the export's totals: the grand and net totals, how many lines,
+  account totals and fringes, fringe accounts or rows, category totals and fringes, charges
+  and credits were compared and how many differ, and the first 20 differing figures with
+  both values (`--report` lists every one).
+- `-o` writes the budget (refused when it exists, unless `--force`); without it nothing is
+  written. `--title` names the budget (default: the export's title, else the file's name).
+- `--json` prints the same as JSON: `format`, `title`, `counts`, `notes` (`kind`: `check`,
+  `not_imported` or `info`), and `reconciliation` (`currency`, `matches`, `calc_error`, the
+  grand and net totals in cents, `tallies` per kind, `differences` with `export_cents` and
+  `imported_cents`, `differences_not_listed`), plus `written`.
+
+Exit code 0 whenever the file was read (a figure that differs is reported, not an error); 1
+when it can't be read or `-o` exists; 2 for a bad `--format`.
+
+```sh
+method import-export "Pilot budget.json"                 # read and compare only
+method import-export "Pilot budget.json" -o pilot.mthd   # and write the budget
+method import-export pilot.xml --report --json > check.json
+```
+
 ### `method coa import <chart> -o <out.mthd> [--sheet N|NAME] [--mapping M.json] [--title T] [--currency C] [--into B.mthd] [--remove-unlisted] [--force] [--dry-run]`
 
 Reads a chart of accounts (category and account numbers, names and production totals,

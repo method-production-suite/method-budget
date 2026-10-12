@@ -27,6 +27,9 @@ pub mod actuals;
 /// A chart of accounts (numbers, names, levels) from a sheet or a budget.
 pub mod coa;
 pub mod csvread;
+/// A whole budget from another program's open exports (JSON, XML, Excel,
+/// tab-delimited), with a reconciliation against the export's figures.
+pub mod exchange;
 pub mod inflate;
 pub mod mapping;
 /// A column mapping saved as a JSON file (`method import --mapping`).

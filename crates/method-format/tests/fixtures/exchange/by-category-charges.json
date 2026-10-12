@@ -1,0 +1,46 @@
+{"metadata": {"budgetdata": {"BudgetName": "", "BudgetUUID": "00000000-0000-0000-0000-000000000000", "ProjectName": "", "ProjectUUID": "", "Created": "2001-01-01", "Modified": "", "BaseCurrency": "USD", "ConvCurrency": "USD", "CategoryCount": 4, "DetailAccountCount": 8, "DetailLineCount": 13, "FringeCount": 1, "GlobalCount": 0, "UnitCount": 7, "LocationCount": 0, "SetCount": 0, "CurrencyCount": 2}, "defaultfields": {"Title": "", "Production": "", "Season": "", "EpisodeNumber": "", "TotalEpisodes": "", "Status": "", "ProductionBaseCountry": "", "ProductionBaseRegion": "", "ProductionBaseCity": "", "LocationShootDays": "", "StageShootDays": "", "StartProductionDate": "", "EndProductionDate": "", "ProductionYear": ""}, "customfields": []},
+ "categories": [
+  {"cID": 0, "cNumber": "1100", "cDescription": "Cat Juniper", "cFringe": 1000, "cOriginal": 0, "cTotal": 11500, "cVariance": 11500},
+  {"cID": 1, "cNumber": "2100", "cDescription": "Cat Larch", "cFringe": 800, "cOriginal": 0, "cTotal": 9100, "cVariance": 9100},
+  {"cID": 2, "cNumber": "3100", "cDescription": "Cat Maple", "cFringe": 0, "cOriginal": 0, "cTotal": 2000, "cVariance": 2000},
+  {"cID": 3, "cNumber": "", "cDescription": "", "cFringe": 0, "cOriginal": 0, "cTotal": 0, "cVariance": 0},
+  {"cID": 4, "cNumber": "", "cDescription": "QFLATCAT", "cFringe": null, "cOriginal": 0, "cTotal": 8000, "cVariance": 8000},
+  {"cID": 5, "cNumber": "", "cDescription": "QPCTACC", "cFringe": null, "cOriginal": 0, "cTotal": 663, "cVariance": 663},
+  {"cID": 6, "cNumber": "", "cDescription": "QPCTCAT", "cFringe": null, "cOriginal": 0, "cTotal": 270, "cVariance": 270},
+  {"cID": 7, "cNumber": "", "cDescription": "QHALF", "cFringe": null, "cOriginal": 0, "cTotal": 100, "cVariance": 100},
+  {"cID": 8, "cNumber": "", "cDescription": "QFLATEUR", "cFringe": null, "cOriginal": 0, "cTotal": 3000, "cVariance": 3000},
+  {"cID": 9, "cNumber": "", "cDescription": "QOVER", "cFringe": null, "cOriginal": 0, "cTotal": 1980, "cVariance": 1980},
+  {"cID": 10, "cNumber": "", "cDescription": "QPCTX", "cFringe": null, "cOriginal": 0, "cTotal": 2168.9, "cVariance": 2168.9},
+  {"cID": 11, "cNumber": "", "cDescription": "QPCT5", "cFringe": null, "cOriginal": 0, "cTotal": 1130, "cVariance": 1130},
+  {"cID": 12, "cNumber": "", "cDescription": "QFLAT", "cFringe": null, "cOriginal": 0, "cTotal": 1478, "cVariance": 1478}
+ ],
+ "accounts": [
+  {"categoryID": 0, "aID": 0, "aNumber": "1101", "aDescription": "Acct Ivy", "aFringe": 1000, "aOriginal": 0, "aTotal": 10000, "aVariance": 10000},
+  {"categoryID": 0, "aID": 1, "aNumber": "1102", "aDescription": "Acct Hazel", "aFringe": 0, "aOriginal": 0, "aTotal": 500, "aVariance": 500},
+  {"categoryID": 0, "aID": 2, "aNumber": "", "aDescription": "", "aFringe": 0, "aOriginal": 0, "aTotal": 0, "aVariance": 0},
+  {"categoryID": 0, "aID": 3, "aNumber": "1199", "aDescription": "Total Fringes", "aFringe": null, "aOriginal": 0, "aTotal": 1000, "aVariance": 1000, "fringeDetail": [{"type": "pctFringe", "name": "QP10N", "rate": "10", "amount": 10000, "total": 1000}]},
+  {"categoryID": 1, "aID": 4, "aNumber": "2101", "aDescription": "Acct Fir", "aFringe": 800, "aOriginal": 0, "aTotal": 8300, "aVariance": 8300},
+  {"categoryID": 1, "aID": 5, "aNumber": "", "aDescription": "", "aFringe": 0, "aOriginal": 0, "aTotal": 0, "aVariance": 0},
+  {"categoryID": 1, "aID": 6, "aNumber": "2199", "aDescription": "Total Fringes", "aFringe": null, "aOriginal": 0, "aTotal": 800, "aVariance": 800, "fringeDetail": [{"type": "pctFringe", "name": "QP10N", "rate": "10", "amount": 8000, "total": 800}]},
+  {"categoryID": 2, "aID": 7, "aNumber": "3101", "aDescription": "Acct Ginkgo", "aFringe": 0, "aOriginal": 0, "aTotal": 2000, "aVariance": 2000},
+  {"categoryID": 2, "aID": 8, "aNumber": "", "aDescription": "", "aFringe": 0, "aOriginal": 0, "aTotal": 0, "aVariance": 0},
+  {"categoryID": 2, "aID": 9, "aNumber": "3199", "aDescription": "Total Fringes", "aFringe": null, "aOriginal": 0, "aTotal": 0, "aVariance": 0, "fringeDetail": []},
+  {"categoryID": 3, "aID": 10, "aNumber": "", "aDescription": "", "aFringe": 0, "aOriginal": 0, "aTotal": 0, "aVariance": 0},
+  {"categoryID": 3, "aID": 11, "aNumber": "99", "aDescription": "Total Fringes", "aFringe": null, "aOriginal": 0, "aTotal": 0, "aVariance": 0, "fringeDetail": []}
+ ],
+ "details": [
+  {"accountID": 0, "dAggPercent": "10%", "dAggSumPercent": "10%", "dFringes": ["QP10N"], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "Elm line", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 10000, "dUnit3": "", "dUnit4": "", "dSubtotal": 10000, "dFourthMlt": 1},
+  {"accountID": 0, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1},
+  {"accountID": 1, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": ["QNOCHG"], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "Dogwood line", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 500, "dUnit3": "", "dUnit4": "", "dSubtotal": 500, "dFourthMlt": 1},
+  {"accountID": 1, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1},
+  {"accountID": 2, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1},
+  {"accountID": 4, "dAggPercent": "10%", "dAggSumPercent": "10%", "dFringes": ["QP10N"], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "Birch line", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 8000, "dUnit3": "", "dUnit4": "", "dSubtotal": 8000, "dFourthMlt": 1},
+  {"accountID": 4, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": ["QNOCHG", "QX2"], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "Cedar line", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 300, "dUnit3": "", "dUnit4": "", "dSubtotal": 300, "dFourthMlt": 1},
+  {"accountID": 4, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1},
+  {"accountID": 5, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1},
+  {"accountID": 7, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": ["QX2"], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "Alder line", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 2000, "dUnit3": "", "dUnit4": "", "dSubtotal": 2000, "dFourthMlt": 1},
+  {"accountID": 7, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1},
+  {"accountID": 8, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1},
+  {"accountID": 10, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1}
+ ]
+}

@@ -127,6 +127,8 @@ pub const FILE: &[Entry] = &[
     plain("file.import_spreadsheet", "Import Spreadsheet…"),
     // A chart of accounts as a new budget, or applied to this one (src/coa_import.rs).
     plain("file.import_chart", "Import Chart of Accounts…"),
+    // A whole budget from another program's export, reconciled (src/export_import.rs).
+    plain("file.import_budget_export", "Import Budget Export…"),
     // Setup lists from a workbook or CSV files (src/setup_sheets.rs).
     plain("file.import_setup_lists", "Import Setup Lists…"),
     // Actual costs from an accounting export (src/actuals.rs).

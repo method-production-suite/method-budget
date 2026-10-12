@@ -21,6 +21,7 @@ mod cmd {
     pub mod export;
     pub mod fmt;
     pub mod import;
+    pub mod import_export;
     pub mod mcp;
     pub mod merge;
     pub mod merge_driver;
@@ -100,6 +101,11 @@ const COMMANDS: &[Command] = &[
         name: "import",
         usage: cmd::import::USAGE,
         run: cmd::import::run,
+    },
+    Command {
+        name: "import-export",
+        usage: cmd::import_export::USAGE,
+        run: cmd::import_export::run,
     },
     Command {
         name: "coa",

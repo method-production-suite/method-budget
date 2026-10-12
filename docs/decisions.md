@@ -2293,3 +2293,71 @@ to 57); this amends entries 4 and 57.
 - Tests: crates/method-core/tests/mmb_parity.rs reproduces every figure above in both
   arithmetics (ZTEST10 in every posting mode), with filters set and with the fringes rule
   set to Exclude.
+
+## 59. Importing a whole budget from another program's exports (2026-10-11)
+
+Roadmap 1.16, built from the export files of the 2026-10-10 and 2026-10-11 parity runs
+(the reference product's documented, user-facing open exports: JSON, XML basic and
+advanced, Excel, tab-delimited) and nothing else (CLEAN-ROOM.md). The owner approved all
+five. docs/IMPORT.md is the user's account; this is why it works the way it does.
+
+- **One reader of the layout, one builder.** Every layout is made into the tree the JSON
+  export is (the XML element for element, the workbook's four sheets row by row, the
+  tab-delimited topsheet line by line), read into one model
+  (`method_format::import::exchange::model::Export`) and made into a budget by one builder
+  (`exchange::build`). What a layout lacks is flagged on the model (no fringe names on the
+  lines, no fringe figures, whole units, totals only) and the builder works it out or says
+  so. The XML is read with our own tokenizer (no DTDs or external entities), the JSON with a
+  small reader of our own that keeps each number's digits (no float parses a number twice;
+  no new dependency), the workbook with our ZIP and SpreadsheetML readers.
+- **Worked out, never guessed silently.** Exports keep values, not rules. Where the figures
+  decide something the import works it out and lists it under Check: fringe posting (from
+  where the Total Fringes rows and accounts are), the account numbering, adjustment rows (a
+  base-currency row whose rate is the total of the rows above it), exchange rates (the
+  simplest rate that gives every line of the currency), percent fringe cutoffs (solved from
+  what the fringe was charged on against what its lines come to, using the cutoff in line
+  order, entry 56) and fringe ranges (lines that earned less than their rate), hours of
+  added units (from what the flat fringes counted, when one value fits), and for the
+  workbook every fringe's kind and rate from the lines' fringe percentages, its cutoffs
+  refined against the accounts' exact fringe totals by recalculating. What the figures
+  can't decide is listed under Not imported: formulas and globals (lines keep the values
+  and a note naming the globals; no global is created, since no value is unambiguous: a
+  global can sit in any factor or inside an expression), production totals (added only
+  under production-level posting, where the fringe rows show the levels), suppressed lines
+  (the exports omit them), and the rules of charges and credits (they come in as fixed
+  amounts that give the same totals; a charge that is a round percentage of the total
+  before charges is pointed out).
+- **The starter units' hours** are the reference product's (Day 12, Week 60, Hour 1, Month
+  240, entry 54's checks), since the exports carry none and a budget made there starts with
+  them; the note says so.
+- **The reconciliation is the test.** The built budget is recalculated by our engine (its
+  default arithmetic, entry 55) and every figure the export has is compared: lines,
+  accounts and their fringes, fringe accounts or rows, categories and their fringes,
+  charges, credits, the grand total (the topsheet rows added up) and the net total. Layouts
+  in whole units compare in whole units; a budget shown in another currency compares as the
+  export shows it (each line and each fringe's total converted and rounded, then added).
+  Every difference is listed; none stops the import.
+- **Figures read as their digits.** A figure is rounded to cents from its shortest decimal
+  spelling, half away from zero (entry 1), so the workbook's 100.005 charge is 100.01 as the
+  program shows it, though the double is a hair below.
+- **Results on the parity runs** (imports/mmb-parity, not in the repository): all 35 JSON
+  exports and all 13 exports of the other layouts come to their own figures, except
+  ZTEST08 V08-2 (totals shown in pounds: the program works its adjustment row out in pounds,
+  0.01 on the row, 0.03 on the totals). ZTEST10 nets 5,450.47 from the JSON, the advanced
+  XML and the workbook (5,450 from the basic XML, in whole units); ZTEST06 by category comes
+  to 34,125.00; ZTEST09 comes to 41,389.90 from the JSON and the advanced XML (they write the
+  100.005 charge as 100.00) and 41,389.91 from the workbook, as the program shows it. The
+  advanced XML imports identically to the JSON; the workbook too but for a cutoff (2,222.24
+  where the JSON's figures give 2,222.22: any value from 2,222.20 to 2,222.28 gives the same
+  totals) and the unrounded charge; the basic XML loses groups and globals and rounds
+  charges and credits to whole units; the tab-delimited file brings each account's total
+  as one line.
+- **Surfaces.** `method import-export` (docs/CLI.md), the `import_budget_export` MCP tool
+  (docs/MCP.md) and File > Import Budget Export… in the app, whose review follows Import
+  Spreadsheet's and opens the budget in a new unsaved tab (docs/APP.md). User-facing text
+  says "budget exchange JSON/XML" and "budget export", never the other product's name.
+- Tests: crates/method-format/tests/exchange.rs (reduced, renamed copies of the exports in
+  tests/fixtures/exchange, every layout of four budgets kept twins; each comes to its own
+  figures and each layout imports as its JSON twin but for what it lacks; with
+  `METHOD_EXPORT_SAMPLES` pointing at the parity runs' folders, every real export too), the
+  readers' unit tests, `method import-export` end to end, the MCP tool, and the app's review.

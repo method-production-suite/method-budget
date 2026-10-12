@@ -1,0 +1,26 @@
+{"metadata": {"budgetdata": {"BudgetName": "", "BudgetUUID": "00000000-0000-0000-0000-000000000000", "ProjectName": "", "ProjectUUID": "", "Created": "2001-01-01", "Modified": "", "BaseCurrency": "USD", "ConvCurrency": "USD", "CategoryCount": 3, "DetailAccountCount": 5, "DetailLineCount": 12, "FringeCount": 1, "GlobalCount": 0, "UnitCount": 7, "LocationCount": 2, "SetCount": 2, "CurrencyCount": 1}, "defaultfields": {"Title": "", "Production": "", "Season": "", "EpisodeNumber": "", "TotalEpisodes": "", "Status": "", "ProductionBaseCountry": "", "ProductionBaseRegion": "", "ProductionBaseCity": "", "LocationShootDays": "", "StageShootDays": "", "StartProductionDate": "", "EndProductionDate": "", "ProductionYear": ""}, "customfields": []},
+ "categories": [
+  {"cID": 0, "cNumber": "1100", "cDescription": "Cat Alder", "cFringe": 500, "cOriginal": 0, "cTotal": 6050, "cVariance": 6050},
+  {"cID": 1, "cNumber": "1200", "cDescription": "Cat Birch", "cFringe": 0, "cOriginal": 0, "cTotal": 600, "cVariance": 600},
+  {"cID": 2, "cNumber": "", "cDescription": "", "cFringe": 0, "cOriginal": 0, "cTotal": 0, "cVariance": 0},
+  {"cID": 3, "cNumber": "", "cDescription": "Total Fringes", "cFringe": null, "cOriginal": 0, "cTotal": 500, "cVariance": 500, "fringeDetail": [{"type": "pctFringe", "name": "QP10N", "rate": "10", "amount": 5000, "total": 500}]}
+ ],
+ "accounts": [
+  {"categoryID": 0, "aID": 0, "aNumber": "1101", "aDescription": "Acct Cedar", "aFringe": 500, "aOriginal": 0, "aTotal": 6050, "aVariance": 6050},
+  {"categoryID": 0, "aID": 1, "aNumber": "", "aDescription": "", "aFringe": 0, "aOriginal": 0, "aTotal": 0, "aVariance": 0},
+  {"categoryID": 1, "aID": 2, "aNumber": "1201", "aDescription": "Acct Dogwood", "aFringe": 0, "aOriginal": 0, "aTotal": 600, "aVariance": 600},
+  {"categoryID": 1, "aID": 3, "aNumber": "", "aDescription": "", "aFringe": 0, "aOriginal": 0, "aTotal": 0, "aVariance": 0},
+  {"categoryID": 2, "aID": 4, "aNumber": "", "aDescription": "", "aFringe": 0, "aOriginal": 0, "aTotal": 0, "aVariance": 0}
+ ],
+ "details": [
+  {"accountID": 0, "dAggPercent": "10%", "dAggSumPercent": "10%", "dFringes": ["QP10N"], "dGroups": ["QIN"], "dGlobalsUsed": [], "dLocation": "QL1", "dSet": "QS1", "dDescription": "Elm line", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 1000, "dUnit3": "", "dUnit4": "", "dSubtotal": 1000, "dFourthMlt": 1},
+  {"accountID": 0, "dAggPercent": "10%", "dAggSumPercent": "10%", "dFringes": ["QP10N"], "dGroups": ["QIN", "QIN2"], "dGlobalsUsed": [], "dLocation": "", "dSet": "QS1", "dDescription": "Fir line", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 4000, "dUnit3": "", "dUnit4": "", "dSubtotal": 4000, "dFourthMlt": 1},
+  {"accountID": 0, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "QL1", "dSet": "", "dDescription": "Ginkgo line", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 500, "dUnit3": "", "dUnit4": "", "dSubtotal": 500, "dFourthMlt": 1},
+  {"accountID": 0, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 0.1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "USD", "dRate": 5500, "dUnit3": "", "dUnit4": "", "dSubtotal": 550, "dFourthMlt": 1},
+  {"accountID": 0, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1},
+  {"accountID": 1, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1},
+  {"accountID": 2, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": ["QIN2"], "dGlobalsUsed": [], "dLocation": "QL2", "dSet": "", "dDescription": "Hazel line", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 600, "dUnit3": "", "dUnit4": "", "dSubtotal": 600, "dFourthMlt": 1},
+  {"accountID": 3, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1},
+  {"accountID": 4, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1}
+ ]
+}
