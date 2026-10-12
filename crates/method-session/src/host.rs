@@ -35,7 +35,9 @@ use crate::session::Session;
 use crate::view::View;
 
 mod find;
+mod moverows;
 mod quickadd;
+mod renumber;
 mod versions;
 
 /// The command contract's version (see the module's notes).
@@ -125,6 +127,13 @@ pub const COMMANDS: &[&str] = &[
     // Find and replace
     "find",
     "replace",
+    // Moving rows
+    "move_rows",
+    "move_accounts",
+    "move_topsheet_rows",
+    // Renumbering
+    "renumber_preview",
+    "renumber_accounts",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -471,7 +480,13 @@ impl Host {
 type Dispatch = fn(&Call<'_>) -> Option<Result<Value, Error>>;
 
 /// The modules moved in phase 1b, each dispatching its own commands.
-const MODULES: &[Dispatch] = &[versions::dispatch, quickadd::dispatch, find::dispatch];
+const MODULES: &[Dispatch] = &[
+    versions::dispatch,
+    quickadd::dispatch,
+    find::dispatch,
+    moverows::dispatch,
+    renumber::dispatch,
+];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
 fn stamp(text: &str) -> crate::safety::DiskStamp {
