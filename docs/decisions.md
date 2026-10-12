@@ -2478,3 +2478,119 @@ we didn't. The owner's rule is to match it by default, with our extras opt-in (e
   settings); the coding, format, CLI, MCP and app tests cover the rest. The hand-checked
   sample keeps its figures; tests that leaned on the starter posting by category set it
   explicitly.
+
+## 62. The change log under the budget, as built (2026-10-12, the owner's direction)
+
+The owner approved docs/research/collaboration.md ("do it"): a change log of our own under
+the model, shared folders first, iroh later. Phases 1 and 2 are built on the engine side
+(`method_core::log`, `method_format::log`, `method log`, `method sync`); the app, presence,
+permissions and live sessions are not. Entry 61 is another agent's and unrelated.
+
+- **The model** (`crates/method-core/src/log/`). Every entity (category, production total,
+  account, row, note, info field, currency, global, unit, fringe, group, set, location,
+  charge, excluded amount, credit, credit row, version, transaction, import batch, ETC
+  override) has a 128-bit random id drawn by the actor that creates it, held in the log
+  only; the `.mthd` stays format version 1 with no marker (design 4.7). Each field is a
+  last-writer-wins register that keeps every write it ever saw (the blame index and what
+  undo needs); tags (a row's fringes and groups, a charge's exclusions, a credit's excluded
+  fringes, a transaction's tags) are add-wins sets with observed-remove; each listed entity
+  has one move register holding (list, position), with positions from a Fugue tree per
+  list (design 3.6: runs inserted at one spot by two people never interleave); the
+  tombstone is a register too. A change is one undo step: actor, seq (from 1, no gaps),
+  deps (a version vector), a Lamport clock, a wall-clock time for display, a label and
+  the ops. Writes are ordered by `(lamport, actor, seq, index)`; wall clocks decide
+  nothing. Changes are applied in causal order (a log holds the rest as pending); a
+  malformed change is refused whole and the actor's count moves past it; a second change
+  with the same (actor, seq) and other content is a fork and refused.
+- **References bind by id, the file writes names** (design 3.7): a row's unit, currency,
+  set, location, fringes and groups, a charge's excluded groups, categories and accounts,
+  a credit row's group or category, a transaction's account, line and batch, an ETC
+  override's account, and every global in a formula (`{g:<id>}` markers in the stored
+  text, spacing kept). A rename or renumber is one write to the item's name or code, and
+  everything follows; the capture takes hints from the rename and renumber commands
+  (`Hint::rename`, `Hint::Recode`, `Hint::from_plan`) so it is one write and not a
+  delete and an add. Without a hint it is still correct, only noisier.
+- **Capture by diff** (design 3.12): `Log::record(before, after, hints, label, time)`
+  compares the current projection with the edited budget, matching rows by id, accounts
+  and categories by code (then by what they hold, then by hints), production totals by
+  name and place, setup items, charges and credits by name, notes, versions, transactions
+  and batches by id, ETC overrides by account, excluded amounts and credit rows by value.
+  Order changes are the fewest moves (longest common subsequence). A deleted item
+  re-added under its key (a row id, a name) is restored, not recreated. Property, in
+  crates/method-core/tests/log.rs: replaying the captured change gives exactly the edited
+  budget (25 random edits over 60 seeds: cell edits, inserts, deletes, moves within and
+  across accounts, tags, fringe and global adds, deletes and renames, renumbers, account
+  and category adds, deletes and moves, notes, title, versions).
+- **The projection and its repairs** (design 3.10) are a pure function of the state, made
+  on the way out and never written, each listed for review with a sentence: two live
+  rows with one id (the later, by its creating op, shows with an id derived from that op
+  in `[2^32, 2^53)`); two live items of one kind with one name (identical ones unify;
+  otherwise the later shows as "FICA 2"); a deleted item still used by a live one, or a
+  deleted account or category still holding a live row or account, comes back ("use
+  revives"); account numbers that repeat or don't fit the numbering and global cycles are
+  kept as written and flagged. Charge exclusions and credit category rows naming a deleted
+  account or category are weak references (dropped, not reviving: an excluded account
+  that is gone costs nothing). After a merge the log also reports a value two people
+  changed at once (the later `(lamport, actor)` wins; the loser is shown, and the badge
+  goes away when anyone writes the field knowing both), a row moved by two people, and
+  an item deleted by one while another edited it (the delete wins). Convergence property,
+  same test file: 2 to 4 actors making random edits apart for 4 rounds, exchanging changes
+  in random orders per receiver (the pending buffer sorts dependencies), plus a newcomer
+  replaying everything shuffled, all end with the same frontier, the same budget and the
+  same review list, 40 seeds.
+- **Per-person undo** (design 8): `Log::undo` records a new change that puts back my
+  previous values only where mine is still the current one, field by field; a field
+  someone changed after me is skipped and the skip is a sentence. Undoing an add deletes,
+  undoing a delete restores, undoing a move points the entity back at its old position
+  (an existing node); redo is the undo of the undo. Nobody can undo another actor's
+  change. Property: undoing every change of a random run, newest first, gives the adopted
+  budget back.
+- **Choices the design left open, settled by its defaults** (section 12): the keeper is
+  one computer, the owner's by default, and `method sync` acts as keeper on request (1);
+  a department editor may add lines and notes in the categories or accounts granted, apply
+  existing fringes and groups, and nothing else, enforced in phase 3 (2); switching a
+  group in or out of the total is shared like any edit today, a personal overlay is a
+  phase 5 extra (3); links and QR codes over the internet, short codes on the same network
+  only (4); n0's public relays by default, configurable (5); no encryption at rest in the
+  first release (6); history keeps the name each person typed (7); last writer wins with a
+  badge, nothing blocks (8, built); a removed member's late work goes to the owner's
+  rejected list (9); the log is a folder beside the file; committing it to git works
+  (every segment is a new file) but isn't required (10); phases 1 and 2 ran alongside the
+  parity work (11); proposals and (12) the join page (13) wait for their phases; no
+  dependency was added: signatures come in phase 3 with a stable `ed25519-dalek` 2.x
+  reviewed under the cooldown then, iroh in phase 4 (14).
+- **Choices of our own.** Versions are stored materialized (the version's content as one
+  register, as the file stores a version), not as frontiers: a restore or an outside copy
+  can then be a version too, the projection never replays the log, and compaction has
+  nothing to materialize; the frontier form stays a possible optimization. Actuals are
+  records (transactions and batches by id, ETC by account), so two accountants' imports
+  merge. Tools and compound settings (display, report, tag and line presets, overtime
+  patterns, setup order, folders and sources, the baseline, account coding, fringe row,
+  group rules, new-line defaults) are one register each, as the design allows. The engine
+  reads no clock and no randomness for budget content, as before; ids come from a seeded
+  generator (`Ids::from_os` seeds it from the standard library's randomly keyed hasher,
+  `Ids::seeded` for tests), and SHA-256 is written in `method-core` (dependency-free) for
+  derived ids, segment hashes and the budget id. A one-cell edit on a 5,000-row budget
+  captures in about 140 ms and the projection takes about 120 ms in a debug build;
+  caching the projection in the session is app work.
+- **On disk** (`crates/method-format/src/log.rs`; docs/FORMAT.md, "The change log"):
+  `Feature.mthd-log/budget.json` and `actors/<actor>/<from>-<to>.chg`, one folder per
+  computer written by it only, sealed segments (a header line with the actor, range and
+  the SHA-256 of the body; one canonical JSON line per change) written through a `.~`
+  temporary and a rename, never appended to, rolled into one by their owner on request.
+  A half-synced segment fails its hash and is left until whole. `load`, `absorb` (apply
+  what a scan finds new), `flush` (write this actor's unwritten changes), `ingest` (an
+  outside edit to the `.mthd` becomes a change by this actor, design 4.4),
+  `write_snapshot` (the keeper writes the merged budget as the `.mthd`, keeping the file's
+  provenance) and `roll` are the hooks an application polls with; nothing watches files on
+  its own. Unsigned: `sig` is reserved; state checkpoints and the archive (design 4.5)
+  are not built, a newcomer replays every segment.
+- **Command line**: `method log FILE [--init] [--last N] [--json]` and `method sync
+  FILE|FOLDER [--no-write] [--roll]` (docs/CLI.md). The command line's actor id lives in
+  `~/.method/actor` (or `$METHOD_ACTOR_FILE`), 64 hex characters, made on first use and
+  readable by its owner only; in phase 3 it becomes a key pair.
+- **Not built, in order**: the app's Session recording every edit and absorbing the
+  folder (projection caching, random row ids in shared budgets through
+  `log::ids::random_row_id`, hints from its rename and renumber commands); presence
+  heartbeats and the status item; the review panel, badges and Who Changed This
+  (`Log::blame`); signatures, membership and scopes; checkpoints and the archive; iroh.
