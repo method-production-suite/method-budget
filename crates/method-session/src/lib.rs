@@ -22,6 +22,7 @@ pub mod host;
 pub mod report_dto;
 pub mod safety;
 pub mod session;
+pub mod tabs;
 pub mod versions;
 pub mod view;
 

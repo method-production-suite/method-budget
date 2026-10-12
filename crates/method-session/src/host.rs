@@ -34,6 +34,7 @@ use crate::edit::{
 use crate::session::Session;
 use crate::view::View;
 
+mod tabs;
 mod versions;
 
 /// The command contract's version (see the module's notes).
@@ -117,6 +118,18 @@ pub const COMMANDS: &[&str] = &[
     "restore_version",
     "rename_version",
     "delete_version",
+    // Tabs
+    "new_tab",
+    "switch_tab",
+    "move_tab",
+    "close_tab",
+    "list_tabs",
+    "split_view",
+    "close_split",
+    "set_target_pane",
+    "move_tab_in_pane",
+    "move_to_pane",
+    "pane_view",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -463,7 +476,7 @@ impl Host {
 type Dispatch = fn(&Call<'_>) -> Option<Result<Value, Error>>;
 
 /// The modules moved in phase 1b, each dispatching its own commands.
-const MODULES: &[Dispatch] = &[versions::dispatch];
+const MODULES: &[Dispatch] = &[versions::dispatch, tabs::dispatch];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
 fn stamp(text: &str) -> crate::safety::DiskStamp {
@@ -506,13 +519,11 @@ impl Call<'_> {
     }
 
     /// The budget the command names (`None`: the one in front).
-    #[allow(dead_code)] // until the first module needs it
     pub(crate) fn doc(&self) -> Option<DocId> {
         self.doc
     }
 
     /// Every open budget.
-    #[allow(dead_code)] // until the first module needs it
     pub(crate) fn state(&self) -> &AppState {
         &self.host.state
     }

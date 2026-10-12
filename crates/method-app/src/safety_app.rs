@@ -390,7 +390,7 @@ pub fn resolve(
 
 /// A new tab with a fresh starter budget, in front.
 pub fn new_tab(state: &AppState) -> DocId {
-    state.docs().add(Session::new())
+    method_session::tabs::new_tab(&mut state.docs())
 }
 
 /// Opens `next` as a budget in front: in the place of tab `instead` when
@@ -465,20 +465,13 @@ pub fn open_recovery(state: &AppState, safety: &Safety, key: &str) -> Result<Doc
     put_in_front(state, safety, session, instead)
 }
 
-/// What closing a tab came to.
-#[derive(Debug, PartialEq, Eq)]
-pub enum Closed {
-    /// Closed (its recovery copy, if any, went with it).
-    Closed,
-    /// It has unsaved changes: ask, then close it with `discard` (or save).
-    Unsaved,
-    /// The only tab: close the window instead.
-    Last,
-}
+/// What closing a tab came to (method-session's `tabs`).
+pub use method_session::tabs::Closed;
 
-/// Closes budget `id`'s tab. Unsaved changes stop it unless `discard` (the
-/// user chose to throw them away; with Autosave on the caller autosaves
-/// first, so only what can't be autosaved is left).
+/// Closes budget `id`'s tab, as method-session's `tabs::close_doc` does,
+/// and removes its recovery copy. Unsaved changes stop it unless `discard`
+/// (the user chose to throw them away; with Autosave on the caller
+/// autosaves first, so only what can't be autosaved is left).
 pub fn close_doc(
     state: &AppState,
     safety: &Safety,
@@ -486,24 +479,17 @@ pub fn close_doc(
     discard: bool,
 ) -> Result<Closed, String> {
     let _w = lock(&safety.writer);
-    let mut docs = state.docs();
-    let s = docs.get(id).ok_or("That budget has been closed.")?;
-    if docs.len() == 1 {
-        return Ok(Closed::Last);
-    }
-    if s.is_dirty() && !discard {
-        return Ok(Closed::Unsaved);
-    }
-    let gone = docs.remove(id)?;
+    let (closed, gone) = method_session::tabs::close_doc(&mut state.docs(), id, discard)?;
     // Saved, or thrown away on purpose: no recovery copy either way.
-    safety.remove_recovery(gone.recovery_key());
-    Ok(Closed::Closed)
+    if let Some(gone) = gone {
+        safety.remove_recovery(gone.recovery_key());
+    }
+    Ok(closed)
 }
 
-/// Closes the last tab for the start window (decisions.md, entry 64): its
-/// place goes to an untouched Untitled budget, as at launch, which the start
-/// window shows over and gives up to whatever is opened or made next.
-/// Unsaved changes stop it unless `discard`. With other tabs open, it is
+/// Closes the last tab for the start window (decisions.md, entry 64), as
+/// method-session's `tabs::close_last_for_start` does, and removes the
+/// closed budget's recovery copy. With other tabs open, it is
 /// [`close_doc`].
 pub fn close_last_for_start(
     state: &AppState,
@@ -511,21 +497,14 @@ pub fn close_last_for_start(
     id: DocId,
     discard: bool,
 ) -> Result<Closed, String> {
-    {
-        let _w = lock(&safety.writer);
-        let mut docs = state.docs();
-        let s = docs.get(id).ok_or("That budget has been closed.")?;
-        if docs.len() == 1 {
-            if s.is_dirty() && !discard {
-                return Ok(Closed::Unsaved);
-            }
-            let (_, gone) = docs.replace(id, Session::new())?;
-            // Saved, or thrown away on purpose: no recovery copy either way.
-            safety.remove_recovery(gone.recovery_key());
-            return Ok(Closed::Closed);
-        }
+    let _w = lock(&safety.writer);
+    let (closed, gone) =
+        method_session::tabs::close_last_for_start(&mut state.docs(), id, discard)?;
+    // Saved, or thrown away on purpose: no recovery copy either way.
+    if let Some(gone) = gone {
+        safety.remove_recovery(gone.recovery_key());
     }
-    close_doc(state, safety, id, discard)
+    Ok(closed)
 }
 
 /// Reopens the files that were open as tabs when the app last ran, in their
