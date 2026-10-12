@@ -34,17 +34,21 @@ use crate::edit::{
 use crate::session::Session;
 use crate::view::View;
 
+mod actuals;
 mod apply;
 mod b64;
 mod clipboard;
+mod coa_import;
 mod compare;
 mod diffmerge;
 mod explain;
 mod export;
+mod export_import;
 mod find;
 mod import_setup;
 mod moverows;
 mod notes;
+mod open_any;
 mod overtime;
 mod packs;
 mod presets;
@@ -54,7 +58,9 @@ mod renumber;
 mod reports;
 mod rowstyle;
 mod setup_lists;
+mod setup_sheets;
 mod sharing;
+mod sheet_import;
 mod tabs;
 mod templates;
 mod versions;
@@ -250,6 +256,37 @@ pub const COMMANDS: &[&str] = &[
     // Report presets
     "save_report_preset",
     "delete_report_preset",
+    // Import spreadsheet
+    "sheet_import_pick",
+    "sheet_import_preview",
+    "sheet_import",
+    // Import chart of accounts
+    "coa_import_pick",
+    "coa_import_preview",
+    "coa_import",
+    "chart_templates",
+    "chart_template_new",
+    // Import budget export
+    "export_import_pick",
+    "export_import_preview",
+    "export_import",
+    // Open
+    "open_budget",
+    // Setup lists as spreadsheets
+    "setup_sheet_export",
+    "setup_sheet_pick",
+    "setup_sheet_guess",
+    "setup_sheet_review",
+    // Actuals
+    "actuals_pick",
+    "actuals_preview",
+    "actuals_import",
+    "actuals_list",
+    "actuals_update",
+    "actuals_delete",
+    "actuals_remove_batch",
+    "actuals_set_etc",
+    "actuals_lines",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -623,6 +660,12 @@ const MODULES: &[Dispatch] = &[
     diffmerge::dispatch,
     export::dispatch,
     reports::dispatch,
+    sheet_import::dispatch,
+    coa_import::dispatch,
+    export_import::dispatch,
+    open_any::dispatch,
+    setup_sheets::dispatch,
+    actuals::dispatch,
 ];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
@@ -1023,7 +1066,7 @@ mod tests {
             );
         }
         assert!(matches!(
-            h.dispatch("open_budget", json!({})),
+            h.dispatch("open_recent", json!({})),
             Err(Error::UnknownCommand(_))
         ));
         let mut seen = std::collections::BTreeSet::new();

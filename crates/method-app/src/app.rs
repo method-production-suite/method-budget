@@ -71,18 +71,6 @@ pub(crate) fn apply<R: Runtime, T>(
     Ok(finish(window, &mut s, None))
 }
 
-/// Runs a pure budget edit as one undo step, on budget `doc` (`None`: the
-/// one in front). `label` names the step in the History list (src/history.rs).
-pub(crate) fn edit_budget<R: Runtime, T>(
-    window: &WebviewWindow<R>,
-    state: &AppState,
-    doc: Option<DocId>,
-    label: impl Into<String>,
-    f: impl FnOnce(&mut method_core::Budget) -> edit::EditResult<T>,
-) -> CmdResult {
-    apply(window, state, doc, |s| s.edit(label, f))
-}
-
 // ---------------------------------------------------------------------------
 // Views
 
