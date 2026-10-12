@@ -35,6 +35,7 @@ use crate::session::Session;
 use crate::view::View;
 
 mod coa_import;
+mod export_import;
 mod import_setup;
 mod sheet_import;
 mod templates;
@@ -140,6 +141,10 @@ pub const COMMANDS: &[&str] = &[
     "coa_import",
     "chart_templates",
     "chart_template_new",
+    // Import budget export
+    "export_import_pick",
+    "export_import_preview",
+    "export_import",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -491,6 +496,7 @@ const MODULES: &[Dispatch] = &[
     import_setup::dispatch,
     sheet_import::dispatch,
     coa_import::dispatch,
+    export_import::dispatch,
 ];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).

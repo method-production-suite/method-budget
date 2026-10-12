@@ -18,6 +18,7 @@ pub mod diagnose;
 pub mod display;
 pub mod docs;
 pub mod edit;
+pub mod export_import;
 pub mod history;
 pub mod host;
 pub mod import_setup;
