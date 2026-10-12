@@ -40,6 +40,7 @@ mod find;
 mod import_setup;
 mod moverows;
 mod overtime;
+mod packs;
 mod quickadd;
 mod renumber;
 mod setup_lists;
@@ -146,6 +147,11 @@ pub const COMMANDS: &[&str] = &[
     "share_copy_original",
     "share_copy_store",
     "sub_budget_new",
+    // Setup packs (into and out of a budget; the library is the desktop's)
+    "pack_items",
+    "pack_export",
+    "pack_import_pick",
+    "pack_import",
     // Quick entry
     "set_cell_creating",
     "set_new_line_defaults",
@@ -532,6 +538,7 @@ const MODULES: &[Dispatch] = &[
     setup_lists::dispatch,
     explain::dispatch,
     overtime::dispatch,
+    packs::dispatch,
 ];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).

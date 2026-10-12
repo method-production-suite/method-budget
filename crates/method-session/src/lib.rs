@@ -25,6 +25,7 @@ pub mod import_setup;
 pub mod library;
 pub mod moverows;
 pub mod overtime;
+pub mod packs;
 pub mod quickadd;
 pub mod renumber;
 pub mod report_dto;
