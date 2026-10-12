@@ -9,6 +9,7 @@
 //! `wasm32-unknown-unknown`.
 
 pub mod actuals;
+pub mod apply;
 pub mod batch;
 pub mod clipboard;
 pub mod clock;
@@ -21,6 +22,7 @@ pub mod edit;
 pub mod history;
 pub mod host;
 pub mod notes;
+pub mod presets;
 pub mod report_dto;
 pub mod rowstyle;
 pub mod safety;

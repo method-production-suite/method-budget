@@ -34,8 +34,10 @@ use crate::edit::{
 use crate::session::Session;
 use crate::view::View;
 
+mod apply;
 mod clipboard;
 mod notes;
+mod presets;
 mod rowstyle;
 mod versions;
 
@@ -136,6 +138,24 @@ pub const COMMANDS: &[&str] = &[
     "clip_preview",
     "clip_paste",
     "clip_forget",
+    // Presets
+    "save_tag_preset",
+    "tag_preset_from_line",
+    "apply_tag_preset",
+    "save_line_preset",
+    "line_preset_preview",
+    "insert_line_preset",
+    "rename_tool_preset",
+    "delete_tool_preset",
+    "move_tool_preset",
+    // Apply panel
+    "apply_summary",
+    "apply_to_rows",
+    "assign_to_rows",
+    "clear_from_rows",
+    "replace_tags_on_rows",
+    "make_fringe_range",
+    "clear_fringe_range",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -486,6 +506,8 @@ const MODULES: &[Dispatch] = &[
     notes::dispatch,
     rowstyle::dispatch,
     clipboard::dispatch,
+    presets::dispatch,
+    apply::dispatch,
 ];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
