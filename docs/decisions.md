@@ -3086,9 +3086,11 @@ export only).
   round_account_totals true`, and Settings > Calculation's **Round account totals to whole
   units** set it. Import Setup doesn't carry it (it carries none of the calculation
   settings but the cutoff factor; left as is).
-- **New budgets keep it off**, so they keep entry 60's figures (cents). The reference's
-  default is 0, so a new budget there rounds; entry 60's choice to keep cents was made
-  as a display choice. **Open for the owner**: whether new budgets should round.
+- **New budgets round** (the owner, 2026-10-12: "when in doubt stick with the default").
+  The reference's default is 0 decimals in totals, so a new budget there rounds; entry
+  60's choice to keep cents had been made as a display choice. `starter::new_budget_settings`
+  turns it on, so the starter, an empty budget and every bundled chart template start
+  rounded; a file keeps its own setting, and one without the field still reads as off.
 - **The engine**: `calc::arith::whole_units` rounds an account's lines total (an integer
   sum of cents, so exactly): to the nearest whole unit, a half up (toward plus infinity,
   Math.round's rule, as cents are rounded) in binary arithmetic and away from zero in

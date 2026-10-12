@@ -7,7 +7,9 @@
 //! and 61): fringes posted by budget, account numbers of category 2,
 //! account 2 and set 3 with no separator (`1301`), the starter units (a Day of 12 hours, a Week of 60, a Month of
 //! 240, an Hour; Allow and Flat with no hours), a new line copying its
-//! fringes from the line above, and a cutoff factor of 1.0. A budget file
+//! fringes from the line above, a cutoff factor of 1.0, and account totals
+//! rounded to whole units (the reference's default of no decimals in totals,
+//! decisions.md, entry 69). A budget file
 //! keeps its own settings: these are only where a new one starts.
 
 use std::collections::BTreeSet;
@@ -25,6 +27,7 @@ pub fn new_budget_settings(b: &mut Budget) {
     b.units = default_units();
     b.new_line_defaults = NewLineDefaults::default();
     b.cutoff_factor = CutoffFactor::One;
+    b.round_account_totals = true;
 }
 
 /// A new, empty budget titled `title` in `base_currency`, with the
@@ -236,6 +239,7 @@ mod tests {
                 (2, 2, 0, 3)
             );
             assert_eq!(b.cutoff_factor, CutoffFactor::One);
+            assert!(b.round_account_totals);
             let n = b.new_line_defaults;
             assert!(n.fringes && !n.groups && !n.location && !n.set && !n.currency);
             let hours: Vec<(&str, Option<Dec>)> = b
