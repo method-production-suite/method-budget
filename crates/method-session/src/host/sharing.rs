@@ -5,16 +5,16 @@ use method_core::VersionId;
 use serde::Deserialize;
 use serde_json::Value;
 
-use super::{json, Call, Error, FileOut};
+use super::{json, Call, Downloads, Error, FileOut};
 use crate::docs::DocId;
 use crate::sharing::{self as sh, ShareInput, SubBudgetInput};
 
 pub(super) fn dispatch(d: &Call<'_>) -> Option<Result<Value, Error>> {
     Some(match d.command() {
-        // `{doc, version, leaveOut, note, saved}`: the copy as a `FileOut`
+        // `{doc, version, leaveOut, note, saved}`: the copy as a download
         // under its suggested name (`<title> - <version> - <date>.mthd`),
-        // where the desktop shows a Save dialog and writes it (and replies
-        // with the file's name and path). The budget is not changed.
+        // where the desktop shows a Save dialog and writes it
+        // (`Downloads`). The budget is not changed.
         "share_copy_save" => (|| {
             let a: Save = d.args()?;
             let s = d.lock()?;
@@ -25,10 +25,10 @@ pub(super) fn dispatch(d: &Call<'_>) -> Option<Result<Value, Error>> {
                 a.note.as_deref(),
                 &a.saved,
             )?;
-            json(FileOut {
+            json(Downloads::one(FileOut {
                 name: format!("{stem}.{}", method_format::EXTENSION),
                 bytes: method_format::to_string(&copy).into_bytes(),
-            })
+            }))
         })(),
         "share_copy_editable" => (|| {
             let id = sh::open_editable(d.state(), d.doc())?;
@@ -95,7 +95,7 @@ mod tests {
             json!({"leaveOut": {"notes": true}, "note": "For the studio", "saved": AT}),
         );
         assert_eq!(out["name"], "Big Show - 2026-10-09.mthd");
-        let text = String::from_utf8(bytes_of(&out)).unwrap();
+        let text = String::from_utf8(bytes_of(&out["downloads"][0])).unwrap();
         let v = call(
             &h,
             "open_mthd",

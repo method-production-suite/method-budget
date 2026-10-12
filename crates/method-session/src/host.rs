@@ -356,14 +356,46 @@ pub struct FileIn {
 }
 
 /// A file for the person to keep, where the desktop shows a Save dialog
-/// and writes it: the host's command of the same name gives it back, and
-/// the host offers it as a download under `name`. The bytes are one
-/// base64 string in the JSON.
+/// and writes it: the host's command of the same name gives it back in
+/// [`Downloads`], and the host offers it as a download under `name`. The
+/// bytes are one base64 string in the JSON.
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct FileOut {
     pub name: String,
     #[serde(with = "b64")]
     pub bytes: Vec<u8>,
+}
+
+/// The reply of a command that saves files on the desktop: the desktop's
+/// reply as after a save (a file's `path` is its name), and beside it
+/// `downloads`, the files themselves. A host offers the downloads and can
+/// hand the rest to the page as the desktop's reply.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct Downloads<T> {
+    #[serde(flatten)]
+    pub reply: T,
+    pub downloads: Vec<FileOut>,
+}
+
+/// The desktop's reply after saving one file (Save as Template, Save a
+/// Copy for Sharing): its name and its path, here its name too.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct SavedFile {
+    pub name: String,
+    pub path: String,
+}
+
+impl Downloads<SavedFile> {
+    /// One file, saved as the desktop replies.
+    pub fn one(file: FileOut) -> Downloads<SavedFile> {
+        Downloads {
+            reply: SavedFile {
+                name: file.name.clone(),
+                path: file.name.clone(),
+            },
+            downloads: vec![file],
+        }
+    }
 }
 
 /// What `host_info` gives back: which host the page runs in, so it can

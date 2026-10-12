@@ -2,23 +2,13 @@
 
 use std::path::Path;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
 
-use super::{json, Call, Error, FileIn, FileOut};
+use super::{json, Call, Downloads, Error, FileIn, FileOut};
 use crate::import_setup::ImportSources;
-use crate::setup_sheets::{self as ss, SheetChoice, SheetExported};
+use crate::setup_sheets::{self as ss, SheetChoice};
 use crate::sheet_import::SheetSources;
-
-/// What the host's `setup_sheet_export` gives back: the desktop's reply
-/// (`done`, the files' names, the message) and the files themselves.
-#[derive(Serialize)]
-struct ExportOut {
-    #[serde(flatten)]
-    exported: SheetExported,
-    /// One workbook, or a CSV file per kind.
-    downloads: Vec<FileOut>,
-}
 
 pub(super) fn dispatch(d: &Call<'_>) -> Option<Result<Value, Error>> {
     Some(match d.command() {
@@ -43,8 +33,8 @@ pub(super) fn dispatch(d: &Call<'_>) -> Option<Result<Value, Error>> {
                 })
                 .collect();
             let names = downloads.iter().map(|f| f.name.clone()).collect();
-            json(ExportOut {
-                exported: ex.exported(names),
+            json(Downloads {
+                reply: ex.exported(names),
                 downloads,
             })
         })(),

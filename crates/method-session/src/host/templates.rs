@@ -3,7 +3,7 @@
 use serde::Deserialize;
 use serde_json::Value;
 
-use super::{json, Call, Error, FileIn, FileOut};
+use super::{json, Call, Downloads, Error, FileIn, FileOut};
 use crate::templates as t;
 
 pub(super) fn dispatch(d: &Call<'_>) -> Option<Result<Value, Error>> {
@@ -16,17 +16,17 @@ pub(super) fn dispatch(d: &Call<'_>) -> Option<Result<Value, Error>> {
             let id = t::template_new(d.state(), &b, a.keep_lines);
             json(d.state().lock_doc(Some(id))?.finish(None))
         })(),
-        // `{doc, keepLines}`: the template as a `FileOut` named after the
+        // `{doc, keepLines}`: the template as a download named after the
         // budget ("Pilot template.mthd"), where the desktop shows a Save
-        // dialog and writes it. The budget is not changed.
+        // dialog and writes it (`Downloads`). The budget is not changed.
         "template_save" => (|| {
             let a: Save = d.args()?;
             let s = d.lock()?;
             let stem = t::template_name(&s);
-            json(FileOut {
+            json(Downloads::one(FileOut {
                 name: format!("{stem}.{}", method_format::EXTENSION),
                 bytes: t::template_save(&s, a.keep_lines, &stem).into_bytes(),
-            })
+            }))
         })(),
         _ => return None,
     })
@@ -61,7 +61,7 @@ mod tests {
         let v = call(
             &h,
             "template_new",
-            json!({"keepLines": true, "file": file("Pilot template.mthd", &bytes_of(&out))}),
+            json!({"keepLines": true, "file": file("Pilot template.mthd", &bytes_of(&out["downloads"][0]))}),
         );
         assert_eq!(v["budget"]["title"], "Untitled");
         assert_eq!(h.state().docs().len(), 2, "a new tab");

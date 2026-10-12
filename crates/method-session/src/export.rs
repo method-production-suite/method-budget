@@ -11,7 +11,7 @@ use method_format::export::{self, Format, Options, OutFile, Workbook};
 use serde::Serialize;
 
 use crate::docs::{AppState, DocId};
-use crate::host::FileOut;
+use crate::host::{Downloads, FileOut};
 use crate::session::Session;
 
 /// How an export ended.
@@ -160,12 +160,13 @@ pub fn display_name(p: &Path) -> String {
 // Commands
 
 /// Budget `doc` (`None`: the one in front) exported as `format`, under the
-/// names the Save dialog would suggest: one file, or for CSV one per table.
+/// names the Save dialog would suggest: one file, or for CSV one per table,
+/// beside the desktop's reply as after a save.
 pub fn export_budget(
     state: &AppState,
     doc: Option<DocId>,
     format: &str,
-) -> Result<Vec<FileOut>, String> {
+) -> Result<Downloads<ExportOutcome>, String> {
     let format = parse_format(format)?;
     let prepared = {
         let mut s = state.lock_doc(doc)?;
@@ -173,13 +174,20 @@ pub fn export_budget(
     };
     let (_, _, name) = dialog_text(format, &prepared.stem);
     let out = with_extension(PathBuf::from(name), format);
-    Ok(render_files(&prepared.workbook, format, &out)?
+    let downloads: Vec<FileOut> = render_files(&prepared.workbook, format, &out)?
         .into_iter()
         .map(|f| FileOut {
             name: display_name(&f.path),
             bytes: f.bytes,
         })
-        .collect())
+        .collect();
+    Ok(Downloads {
+        reply: ExportOutcome {
+            done: true,
+            files: downloads.iter().map(|f| f.name.clone()).collect(),
+        },
+        downloads,
+    })
 }
 
 #[cfg(test)]
@@ -247,15 +255,16 @@ mod tests {
         let files = h
             .dispatch("export_budget", json!({"format": "csv"}))
             .unwrap();
-        let files = files.as_array().unwrap();
+        assert_eq!(files["done"], true);
+        let files = files["downloads"].as_array().unwrap();
         assert_eq!(files.len(), export::SHEET_NAMES.len());
         let name = files[0]["name"].as_str().unwrap();
         assert!(name.ends_with(" - Topsheet.csv"), "{name}");
         let x = h
             .dispatch("export_budget", json!({"format": "xlsx"}))
             .unwrap();
-        assert_eq!(x.as_array().unwrap().len(), 1);
-        assert!(x[0]["name"].as_str().unwrap().ends_with(".xlsx"));
+        assert_eq!(x["downloads"].as_array().unwrap().len(), 1);
+        assert!(x["files"][0].as_str().unwrap().ends_with(".xlsx"));
         let e = h
             .dispatch("export_budget", json!({"format": "pdf"}))
             .unwrap_err();

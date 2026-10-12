@@ -54,6 +54,6 @@ pub mod versions;
 pub mod view;
 
 pub use docs::{AppState, DocGuard, DocId, Docs};
-pub use host::{Error, Host, HostInfo, COMMANDS, COMMANDS_VERSION};
+pub use host::{Downloads, Error, FileIn, FileOut, Host, HostInfo, COMMANDS, COMMANDS_VERSION};
 pub use session::Session;
 pub use view::View;

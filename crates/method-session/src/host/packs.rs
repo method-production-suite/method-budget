@@ -6,7 +6,7 @@ use method_format::setup::pack::PackDetails;
 use serde::Deserialize;
 use serde_json::Value;
 
-use super::{json, Call, Error, FileIn, FileOut};
+use super::{json, Call, Downloads, Error, FileIn, FileOut};
 use crate::import_setup::{source_label, ImportSources, ItemRef, Resolution};
 use crate::packs::{self as p, PackExported, PackImported};
 use crate::templates::{budget_from_bytes, safe_file_stem};
@@ -24,9 +24,9 @@ pub(super) fn dispatch(d: &Call<'_>) -> Option<Result<Value, Error>> {
             let s = d.lock()?;
             json(p::items_of(s.tab_label(), s.budget()))
         })(),
-        // `{doc, source, picks, details, created}`: `{file, export}`, the
-        // pack as a `FileOut` named after its title where the desktop shows
-        // a Save dialog and writes it, and the desktop's reply.
+        // `{doc, source, picks, details, created}`: the desktop's reply and
+        // the pack as a download named after its title, where the desktop
+        // shows a Save dialog and writes it (`Downloads`).
         "pack_export" => (|| {
             let a: Export = d.args()?;
             budget_only(&a.source)?;
@@ -39,15 +39,15 @@ pub(super) fn dispatch(d: &Call<'_>) -> Option<Result<Value, Error>> {
                 safe_file_stem(&a.details.title),
                 method_format::EXTENSION
             );
-            json(Exported {
-                export: PackExported {
+            json(Downloads {
+                reply: PackExported {
                     message: p::exported_message(&name, items),
                     name: name.clone(),
                 },
-                file: FileOut {
+                downloads: vec![FileOut {
                     name,
                     bytes: method_format::to_string(&built).into_bytes(),
-                },
+                }],
             })
         })(),
         // `{doc, into, file}`: the pack comes in as `file` (the desktop
@@ -88,13 +88,6 @@ fn budget_only(place: &str) -> Result<(), Error> {
         "library" => Err(Error::Refused(NO_LIBRARY.into())),
         other => Err(Error::Refused(format!("unknown pack source `{other}`"))),
     }
-}
-
-#[derive(serde::Serialize)]
-struct Exported {
-    #[serde(flatten)]
-    export: PackExported,
-    file: FileOut,
 }
 
 #[derive(Deserialize)]
@@ -147,8 +140,8 @@ mod tests {
             }),
         );
         assert_eq!(out["name"], "Schedule.mthd");
-        assert_eq!(out["file"]["name"], "Schedule.mthd");
-        let pack = bytes_of(&out["file"]);
+        assert_eq!(out["downloads"][0]["name"], "Schedule.mthd");
+        let pack = bytes_of(&out["downloads"][0]);
 
         // Into a second budget.
         let mut b = method_core::starter::budget();
