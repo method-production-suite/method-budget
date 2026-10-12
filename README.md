@@ -43,6 +43,10 @@ your own disk, works offline, and never needs an account.
 - **Every number explains itself.** Pick any total and trace it down to the lines,
   fringes, cutoffs and rounding steps that make it up. Money is kept in whole cents, so
   the topsheet always adds up.
+- **Bring your budgets with you.** Open budgets exported from Movie Magic Budgeting
+  (JSON, XML, Excel or tab-delimited), department spreadsheets and accounting exports,
+  each checked figure by figure against the totals in the file. See
+  [Importing](#importing).
 - **Scriptable.** The `method` command line runs the same engine with no window, and a
   git merge driver combines two people's edits to one budget.
 - **No subscription.** Free and open source under MIT or Apache-2.0.
@@ -220,6 +224,31 @@ claude mcp add method -- method mcp --root ~/Budgets
 ```
 
 Every tool and the safety model: [docs/MCP.md](docs/MCP.md).
+
+## Importing
+
+Method Budget reads the open files other programs export for their users, never their
+native files ([CLEAN-ROOM.md](CLEAN-ROOM.md)).
+
+| From | Formats | What comes across |
+|---|---|---|
+| Movie Magic Budgeting | JSON (best), XML Advanced, Excel, XML Basic, tab-delimited | Accounts, lines, fringes, globals, groups, charges and credits; Basic XML has no groups or globals, tab-delimited has account totals only |
+| Any spreadsheet | Excel, CSV, tab-delimited | Budget lines, with a column mapping |
+| Accounting systems | Excel, CSV, tab-delimited | Actuals for cost reports, with a column mapping |
+| Another Method budget | `.mthd` | Fringes, globals, charges, credits and other setup |
+
+In the app: **File > Import Budget Export…**. From the terminal:
+
+```sh
+method import-export "Pilot budget.json" -o pilot.mthd
+```
+
+Every import ends with a review that compares each line, account, fringe and total with
+the figures in the file. Suppressed lines are not in the exports, and charge and credit
+rules arrive as the fixed amounts they came to.
+
+Method Budget is independent and not affiliated with or endorsed by Entertainment
+Partners. Movie Magic is a trademark of Entertainment Partners.
 
 ## File format
 

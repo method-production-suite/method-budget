@@ -50,6 +50,7 @@
     <nav class="nav" aria-label="Main">
       <a href="#screenshots">Screenshots</a>
       <a href="#features">Features</a>
+      <a href="#formats">Import</a>
       <a href="#open-files">Open files</a>
       <a href="#keyboard">Keyboard</a>
       <a href="#cli">Command line</a>
@@ -74,7 +75,8 @@
       <p class="lede">A free, open-source desktop app for production budgets: topsheet,
         fringes, globals, charges, versions and cost reports. Your budgets are open files on
         your own computer, the grid is built for the keyboard, and every total can tell you
-        exactly where it came from.</p>
+        exactly where it came from. Already have budgets elsewhere? Open their exports,
+        Movie Magic Budgeting's included.</p>
       <div class="cta">
         <a class="btn primary" href="#download">Get Method Budget</a>
         <a class="btn ghost" href="#features">See what it does</a>
@@ -223,7 +225,55 @@
     </div>
   </section>
 
-  <section class="band" id="features" aria-labelledby="features-title">
+  <section class="band" id="formats" aria-labelledby="formats-title">
+    <div class="wrap">
+      <p class="kicker">Works with what you have</p>
+      <h2 id="formats-title">Bring your budgets with you</h2>
+      <p class="intro">Switching shouldn't mean retyping. Method Budget opens the open files
+        other budgeting apps and spreadsheets export, checks every figure against the totals
+        in the file, and saves everything back out in open formats anyone can read.</p>
+      <div class="fmt-grid">
+        <div class="fmt-card">
+          <h3>Budgets from Movie Magic Budgeting</h3>
+          <p>Export from your own copy (File &gt; Export) and open it here. Every account,
+            line, fringe, global, group, charge and credit comes across, then the review
+            compares each total with the export's own.</p>
+          <ul class="fmt-list">
+            <li><span>JSON</span> Best: everything the export carries</li>
+            <li><span>XML (Advanced)</span> The same as JSON</li>
+            <li><span>Excel</span> Nearly the same</li>
+            <li><span>XML (Basic)</span> No groups or globals, whole units</li>
+            <li><span>Tab-delimited</span> Account totals only</li>
+          </ul>
+        </div>
+        <div class="fmt-card">
+          <h3>Spreadsheets and accounting</h3>
+          <p>Map the columns once and bring in the rest of your world.</p>
+          <ul class="fmt-list">
+            <li><span>Excel, CSV, tab</span> Department sheets become budget lines</li>
+            <li><span>Excel, CSV, tab</span> Accounting exports become actuals for cost reports</li>
+            <li><span>.mthd</span> Fringes, globals and setup from any other budget</li>
+          </ul>
+        </div>
+        <div class="fmt-card">
+          <h3>Out, in open formats</h3>
+          <p>Nothing you make here is locked in.</p>
+          <ul class="fmt-list">
+            <li><span>.mthd</span> Plain, documented JSON with a published spec</li>
+            <li><span>Excel</span> Topsheet, accounts, detail and setup in one workbook</li>
+            <li><span>CSV, tab</span> Account-level files for accounting</li>
+            <li><span>PDF</span> Saved report layouts, ready to send</li>
+          </ul>
+        </div>
+      </div>
+      <p class="fine">Method Budget reads only the open files other apps export for their
+        users, never their native files. It is independent and not affiliated with or
+        endorsed by Entertainment Partners. Movie Magic is a trademark of Entertainment
+        Partners.</p>
+    </div>
+  </section>
+
+  <section class="band alt" id="features" aria-labelledby="features-title">
     <div class="wrap">
       <p class="kicker">Features</p>
       <h2 id="features-title">Everything a production budget needs</h2>
@@ -361,7 +411,7 @@
     </div>
   </section>
 
-  <section class="band alt" id="open-files" aria-labelledby="open-title">
+  <section class="band" id="open-files" aria-labelledby="open-title">
     <div class="wrap split">
       <div>
         <p class="kicker">Why open files</p>
@@ -397,7 +447,7 @@
     </div>
   </section>
 
-  <section class="band" id="keyboard" aria-labelledby="keys-title">
+  <section class="band alt" id="keyboard" aria-labelledby="keys-title">
     <div class="wrap split">
       <div>
         <p class="kicker">Keyboard first</p>
@@ -428,7 +478,7 @@
     </div>
   </section>
 
-  <section class="band alt" id="cli" aria-labelledby="cli-title">
+  <section class="band" id="cli" aria-labelledby="cli-title">
     <div class="wrap">
       <p class="kicker">Command line and coding agents</p>
       <h2 id="cli-title">The same engine, without the window</h2>
@@ -460,7 +510,7 @@
     </div>
   </section>
 
-  <section class="band" id="download" aria-labelledby="download-title">
+  <section class="band alt" id="download" aria-labelledby="download-title">
     <div class="wrap">
       <p class="kicker">Download</p>
       <h2 id="download-title">Get Method Budget</h2>
@@ -487,7 +537,7 @@
     </div>
   </section>
 
-  <section class="band alt" id="faq" aria-labelledby="faq-title">
+  <section class="band" id="faq" aria-labelledby="faq-title">
     <div class="wrap">
       <p class="kicker">FAQ</p>
       <h2 id="faq-title">Questions</h2>
@@ -499,10 +549,11 @@
         </details>
         <details>
           <summary>Can it open budgets from other apps?</summary>
-          <p>It imports the open files other apps export, never their native files.
-            Whole budgets come in from their JSON, XML, Excel and tab-delimited exports, and any
-            spreadsheet comes in with a column mapping, each with a line-by-line check against
-            the totals in the file.</p>
+          <p>Yes, from the open files they export, never their native files. A Movie Magic
+            Budgeting budget comes in from its JSON, XML, Excel or tab-delimited export (JSON
+            carries the most), and any spreadsheet comes in with a column mapping, each with a
+            line-by-line check against the totals in the file. See
+            <a href="#formats">Bring your budgets with you</a>.</p>
         </details>
         <details>
           <summary>Where does my data live?</summary>

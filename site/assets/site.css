@@ -191,11 +191,20 @@ p { margin: 0 0 14px; }
 }
 .code .k { color: var(--accent); }
 .code .c { color: var(--muted); }
+.fmt-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 8px; }
+@media (min-width: 900px) { .fmt-grid { grid-template-columns: 1.2fr 1fr 1fr; } }
+.fmt-card { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 18px 10px; min-width: 0; }
+.fmt-card h3 { font-size: 17px; margin: 0 0 6px; }
+.fmt-card p { margin: 0 0 12px; color: var(--ink-soft); font-size: 14.5px; }
+.fmt-list { list-style: none; margin: 0; padding: 0; }
+.fmt-list li { display: flex; gap: 10px; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--rule); font-size: 14px; color: var(--ink-soft); }
+.fmt-list span { flex: 0 0 auto; min-width: 104px; font-family: var(--mono); font-size: 12.5px; color: var(--accent-strong); }
 .caption { font-size: 14px; color: var(--muted); margin: 10px 0 0; }
 
 /* keyboard */
 .keys { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
 .band.alt .keys { background: var(--bg); }
+.band.alt .group, .band.alt .fmt-card { background: var(--bg); }
 .keys th, .keys td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
 .keys tr:last-child th, .keys tr:last-child td { border-bottom: 0; }
 .keys th { font-weight: 400; white-space: nowrap; width: 1%; }
