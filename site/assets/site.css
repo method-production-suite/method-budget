@@ -233,6 +233,11 @@ kbd {
   display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
   padding: 3px 10px; border-radius: 999px; margin-bottom: 12px; border: 1px solid var(--rule-strong); color: var(--ink-soft);
 }
+.badge.alpha { white-space: nowrap; flex: none; background: var(--note-fill); border-color: var(--note-fill); color: #1C2228; margin: 0; }
+.status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 14.5px; color: var(--muted); margin: 0 0 14px; }
+.alpha-note { display: flex; gap: 14px; align-items: flex-start; margin-top: 18px; padding: 16px 18px; border: 1px dashed var(--note); border-radius: 12px; }
+.alpha-note p { margin: 0; color: var(--ink-soft); }
+@media (max-width: 560px) { .alpha-note { flex-direction: column; gap: 8px; } }
 .badge.now { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
 .card pre { margin: 0 0 14px; background: var(--code-bg); border-radius: 8px; padding: 12px 14px; overflow-x: auto; font-size: 14px; }
 .after-term { margin-top: 18px; }

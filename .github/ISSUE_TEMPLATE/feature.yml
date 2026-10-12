@@ -1,0 +1,28 @@
+name: Feature request
+description: Something you need that Method Budget doesn't do yet.
+labels: ["feature"]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you need
+      description: The job you're trying to get done, and how you do it today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How it could work
+      description: Optional. Describe the behaviour you'd expect, not another program's screens or files.
+  - type: dropdown
+    id: role
+    attributes:
+      label: Your work
+      options:
+        - Line producer or producer
+        - Production accountant
+        - UPM or production manager
+        - Budget or studio finance
+        - Student or teacher
+        - Developer
+        - Other
