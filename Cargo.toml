@@ -6,6 +6,7 @@ members = [
     "crates/method-session",
     "crates/method-cli",
     "crates/method-app",
+    "crates/method-web",
     "crates/method-release",
     "crates/xtask",
 ]
@@ -17,3 +18,11 @@ edition = "2021"
 # anything disagrees. Change it with `cargo xtask bump` (docs/RELEASING.md).
 version = "0.1.0"
 license = "MIT OR Apache-2.0"
+
+# The browser build (`cargo xtask web`, docs/research/web-session.md): small
+# over fast, since the page downloads it. The desktop's profiles are untouched.
+[profile.web-release]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1

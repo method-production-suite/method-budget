@@ -3236,3 +3236,44 @@ host form and what is left.
 - Tests: each moved module's own, a dispatch test per module through JSON as the page sends
   it (files in and out included), the read-only host, base64 round trips; the desktop's
   wiring tests stayed in method-app.
+
+## 72. Phase 2: the page in a browser tab, on method-web (2026-10-12)
+
+The existing page (`crates/method-app/ui`) runs in a browser against method-session
+compiled to WebAssembly (entries 70 and 71; docs/research/web-session.md, "Running it in a
+browser", has the build, the files a partner serves, the JS API and what is left out).
+
+- **A new crate, `method-web`**, wasm32 only (on the desktop it is a name helper and pulls
+  in nothing new): wasm-bindgen exports `new Host()`, `dispatch(command, argsJson)`,
+  `openMthd`, `saveMthd`, `setReadOnly`, `hostInfo` and `commands()`. Errors throw with the
+  page's message. The first Host installs the browser's clock (`Date.now()`, held so it
+  never goes back) and seeds unique names from `crypto.getRandomValues`. wasm-bindgen
+  0.2.128 and js-sys 0.3.105, already in Cargo.lock through Tauri: no new crate versions.
+- **No change to the page's code paths on the desktop.** A classic script,
+  `crates/method-web/js/tauri-shim.js`, defines the part of Tauri the page uses: `invoke`
+  over `dispatch`, an event bus (with `view-changed` after a command as the desktop sends
+  it), the browser's file picker where the desktop shows an Open dialog (`file: {name,
+  bytes}` in base64), downloads for a reply's `downloads` and for Save (a `.mthd` file),
+  Budget Setup as the same page in a frame over the page, and a plain refusal for what only
+  the desktop has ("That is only in the Method Budget app, not in the browser.").
+- **The page asks `host_info`** (`ui/js/host.js`, main window and Budget Setup) and, in a
+  browser only, answers the app's keys itself (no menu bar), shows a File button with the
+  File menu's items a browser can run, makes New a new tab (no start window), and hides
+  Autosave, Share, the update indicator, the tools panel's Pop Out and the setup library.
+  The Budget Setup window's capability now allows `host_info` (read-only; the desktop's
+  answer changes nothing).
+- **`cargo xtask web`** builds it with a `web-release` profile (size over speed; the
+  desktop's profiles are untouched), runs the wasm-bindgen command line of Cargo.lock's
+  version, and fills `target/web/` with the page, the shim and the module, ready to serve
+  as static files. No npm, no bundler. `cargo xtask wasm-check` (CI) also builds
+  method-web for wasm32.
+- **The bundled charts are a `static`.** As a `const`, `charts_bundled.rs` put every chart's
+  text into the module twice; as a `static` once (the module went from 19 MB to 13 MB,
+  and to 11.5 MB as built). `scripts/build-coa-templates.py` writes it so.
+- **Checked in a browser** (the list is in the note): the topsheet, drilling in, editing a
+  rate with totals following, undo and redo, Budget Setup and its updates reaching the
+  page, Save, Open of a budget and of a budget export with its review, export downloads,
+  Compare with a picked file, Versions, read-only, tabs, printing.
+- Open: keeping budgets in the partner's storage is theirs (the Host is reachable from the
+  page, or they build their own page on the JS API); CI doesn't yet run `cargo xtask web`
+  or a headless smoke test, since that needs the wasm-bindgen command line installed there.

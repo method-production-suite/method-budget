@@ -337,6 +337,8 @@ mod tests {
             include_str!("../ui/js/library.js"),
             // The library's Packs section (setup packs, src/packs.rs).
             include_str!("../ui/js/packs.js"),
+            // Which host it runs in (host_info): a browser has no menu bar.
+            include_str!("../ui/js/host.js"),
         ];
         let mut named = std::collections::BTreeSet::new();
         for js in scripts {

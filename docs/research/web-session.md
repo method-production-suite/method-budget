@@ -1,7 +1,9 @@
 # Method Budget in a browser: the window-free session
 
-Status: phases 1 and 1b built (decisions.md, entries 70 and 71). This note is the plan and
-the contract a partner's web app, and later our own website demo, integrate against.
+Status: phases 1, 1b and 2 built (decisions.md, entries 70, 71 and 72): the page runs in a
+browser tab against method-session compiled to WebAssembly. This note is the plan and the
+contract a partner's web app, and later our own website demo, integrate against; "Running
+it in a browser" below is how to build, serve and embed it.
 
 ## The goal
 
@@ -17,7 +19,7 @@ method-core      the engine (no dependencies)                         builds for
 method-format    .mthd and imports/exports on bytes (serde, serde_json) builds for wasm32
 method-session   everything about open budgets that needs no window    builds for wasm32
 method-app       the desktop: Tauri, dialogs, files, windows, menus     native only
-method-web       (phase 2) wasm-bindgen exports + a JS invoke shim       wasm32 only
+method-web       wasm-bindgen exports + the page's invoke shim            wasm32 only
 ```
 
 ### What moved to method-session (phase 1)
@@ -138,8 +140,8 @@ let reply: serde_json::Value = host.dispatch("set_title", json!({"title": "Featu
   b64_encode` and `b64_decode` in Rust). Decided before phase 2 so the shim never sends
   number arrays.
 - **What the host is**: `host_info` returns `{kind, commands_version, read_only}`: `"web"`
-  from `Host`, `"desktop"` from the desktop's command of the same name. The page will use it
-  in phase 2 to hide what only the desktop does; it doesn't yet.
+  from `Host`, `"desktop"` from the desktop's command of the same name. The page asks it at
+  start (`ui/js/host.js`) and, on `"web"`, hides what only the desktop does (below).
 - **Read-only**: `Host::set_read_only(true)` shows every budget read-only, those open and
   any opened later (a partner's viewer). Every edit is refused through
   `Session::check_writable` with "This budget is open read-only here, so it can't be
@@ -250,26 +252,168 @@ Checked with `cargo xtask wasm-check` (`cargo check --locked -p method-core -p m
 2. **Phase 1b (done)**: every command module above, each adding its commands to `COMMANDS`
    (no version change: additions), files in and out as base64, `host_info`, and the
    read-only switch.
-3. **Phase 2, `method-web`**: a crate with `crate-type = ["cdylib"]` and `wasm-bindgen`
-   exports: `new Host()`, `host.dispatch(command, argsJson) -> Promise<replyJson>`,
-   `host.openMthd(name, text)`, `host.saveMthd(doc, name)`, `installClock()` (wiring
-   `Date.now`, `performance.now` and a counter). A small JS shim defines
-   `window.__TAURI__.core.invoke` over `dispatch` (rejecting with `Error::message()`) and a
-   minimal `__TAURI__.event` (the page listens for `view-changed`, `autosaved` and the like;
-   in a browser most never fire), so `ui/` runs unchanged. For a command with a file form
-   the shim shows the browser's file picker and adds `file`, and offers a reply's
-   `downloads` and hands the rest to the page. Desktop-only items (Save, Open Recent, Print
-   to PDF, the updater, pop-out windows, the library's file, folder sharing) are hidden by
-   the page when `host_info` says `web`.
+3. **Phase 2, `method-web` (done)**: the crate, the shim and `cargo xtask web`; the page
+   runs in a browser with a few changes guarded by `host_info` (below, "Running it in a
+   browser"). Differences from this plan: `dispatch` is synchronous (it returns the reply's
+   JSON; the shim's `invoke` is the promise), the clock is installed by the first `new
+   Host()` rather than a separate call, and `saveMthd` names a `.mthd` file itself.
 4. **Phase 3, the website demo**: the page plus `method-web` as static files, a sample
    budget, nothing kept beyond the tab (or local storage).
-5. **CI**: `cargo xtask wasm-check` now; phase 2 adds `wasm-pack build` (or `cargo build
-   --target wasm32-unknown-unknown` with `wasm-bindgen-cli`) and a headless smoke test of the
-   shim.
+5. **CI**: `cargo xtask wasm-check` checks the session crates for wasm32 and builds
+   method-web for it. Not yet in CI: `cargo xtask web` (it needs the wasm-bindgen command
+   line installed there) and a headless smoke test of the shim.
+
+## Running it in a browser (phase 2)
+
+### Building
+
+```
+rustup target add wasm32-unknown-unknown                    # once
+cargo install wasm-bindgen-cli --version 0.2.128 --locked    # once: Cargo.lock's wasm-bindgen
+cargo xtask web                                              # builds target/web/
+python3 -m http.server -d target/web 8000                    # then open http://localhost:8000/
+```
+
+`cargo xtask web` (crates/xtask/src/web.rs) builds `method-web` for wasm32-unknown-unknown
+with the `web-release` profile (the root Cargo.toml: `opt-level = "s"`, LTO, one codegen
+unit; the desktop's profiles are untouched), runs the `wasm-bindgen` command line
+(`--target web`, no TypeScript, name and producers sections removed; it refuses a command
+line whose version isn't Cargo.lock's), and fills `target/web/` (`--out <dir>` for another
+folder) with:
+
+```
+index.html, *.css, js/          the page, copied from crates/method-app/ui; index.html loads
+                                method-web/tauri-shim.js before js/boot.js (the only change)
+method-web/tauri-shim.js        the page's window.__TAURI__ over the Host
+method-web/method_web.js        wasm-bindgen's JS, an ES module
+method-web/method_web_bg.wasm   about 11.5 MB, 2 MB gzipped; the bundled chart templates
+                                are 6.2 MB of it
+```
+
+No npm and no bundler. `cargo build -p method-web --target wasm32-unknown-unknown --release`
+builds it too (larger: about 20 MB before wasm-bindgen). On the desktop the crate is a name
+helper only, so `cargo build` and `cargo test --workspace` are as before.
+
+The bundled charts were in the module twice: `charts_bundled.rs` declared them as a
+`const`, which copies its strings at each use; it is a `static` now (and
+`scripts/build-coa-templates.py` writes it so), which took 6 MB off the module and nothing
+off the desktop's behaviour.
+
+### What a partner serves
+
+Every file in `target/web/`, as static files from one origin, with `.wasm` served as
+`application/wasm` (any current web server does). The page needs nothing else: no server
+calls, no cookies; budgets live in the page until the person saves (downloads) them. Its
+address can say:
+
+- `?open=<url>`: start with the `.mthd` file at that address (same origin, or one that
+  allows it) instead of a new starter budget. The name shown is the URL's last part.
+- `?readonly=1`: every budget read-only (`Host.setReadOnly(true)`).
+
+To keep budgets in the partner's own storage, call the Host from the page
+(`window.__METHOD_WEB__.ready` is a promise of the `Host`) or build their own page around
+the JS API below.
+
+### The JS API (crates/method-web/src/web.rs)
+
+```js
+import init, { Host, commands } from './method-web/method_web.js';
+await init({ module_or_path: './method-web/method_web_bg.wasm' });
+const host = new Host();                        // one untitled starter budget
+const reply = JSON.parse(host.dispatch('set_title', JSON.stringify({ title: 'Pilot' })));
+host.openMthd('Pilot.mthd', text);              // a budget in a new tab in front: its view (JSON)
+const { name, text: saved } = host.saveMthd();  // the budget in front (or saveMthd(doc, name))
+host.setReadOnly(true);                         // a viewer: every edit refused
+JSON.parse(host.hostInfo());                    // {kind: "web", commands_version: 1, read_only}
+commands();                                     // every command dispatch runs (COMMANDS)
+```
+
+- `dispatch(command, argsJson)` is `Host::dispatch`: the desktop's command names and
+  arguments, its reply as JSON. A refusal throws an `Error` whose `message` is the text the
+  page shows (`Error::message()`); nothing changed.
+- `saveMthd(doc?, name?)` returns `{name, text}` and marks the budget saved; `name` is a
+  `.mthd` file name (an opened export or a `.json` budget saves as `.mthd`).
+- The first `new Host()` installs the browser's clock: `Date.now()` for the time of each
+  undo step, held so it never goes back for joining quick repeats, and unique names seeded
+  from `crypto.getRandomValues`. Nothing else in the session needs randomness.
+- A panic in the engine stops the module (WebAssembly traps); the shim then says to reload
+  the page. None is known.
+
+### The shim (crates/method-web/js/tauri-shim.js)
+
+A classic script, loaded before the page's modules, that defines the part of Tauri the page
+uses:
+
+- **`core.invoke(cmd, args)`** runs `dispatch` and resolves with the reply, or rejects with
+  the message, as Tauri does. Where the desktop shows an Open dialog (`open_budget`,
+  `template_new`, `import_setup_pick`, `sheet_import_pick`, `coa_import_pick`,
+  `export_import_pick`, `setup_sheet_pick`, `actuals_pick`, `merge_pick_file`,
+  `pack_import_pick`, `compare_pick_files`) it shows the browser's file picker with the
+  same file types and adds `file` (or `files`) as `{name, bytes}` in base64; cancelling
+  resolves `null`, as the desktop's dialog does. A reply's `downloads` are offered as
+  browser downloads and the rest goes to the page.
+- **`save_budget`** downloads the budget as a `.mthd` file (`saveMthd`), asking a name with
+  the browser's prompt for Save As or a budget never saved, and replies with the view.
+- **Desktop-only commands** are refused with "That is only in the Method Budget app, not in
+  the browser."; the few the page asks at start-up are answered as nothing there
+  (`autosave_setting` false, `open_pending` null, `recovery_list` empty, `whats_new` null),
+  and `print_report` says it isn't supported, so the page prints with the browser's own
+  print dialog.
+- **`event.listen`, `emitTo`, `emit`**: one bus for the page and the Budget Setup window.
+  After a command whose reply is a view with a new `rev`, every other window hears
+  `view-changed`, as the desktop's `tools::changed` does. The page's title follows the
+  budget in front, and leaving the page asks first while a budget has unsaved changes.
+- **Budget Setup** (`setup_window`) shows the same page with `?panel=setup` in a frame over
+  the page; it shares the main page's Host and bus, and `close_setup_window` removes it
+  and tells the page (`setup-closed`). The tools panel has no window of its own in a
+  browser: it docks at the right or the bottom.
+
+### What the page does differently in a browser
+
+All of it behind `host_info` saying `"web"` (`ui/js/host.js`), so the desktop is unchanged:
+
+- No menu bar: the page answers the app's keys itself on macOS too (`pageRunsAppKeys` in
+  `shortcuts.js`; elsewhere it already did), and a **File** button in the toolbar opens
+  the File menu's items a browser can run (Open, Save, imports and exports, Versions,
+  Compare, What Changed, Merge, Print, Keyboard Shortcuts). The other menus' commands are
+  on their keys, the toolbar and the right-click menus. Keys the browser keeps for itself
+  (Cmd or Ctrl with N, T, W in most browsers) don't reach the page.
+- New (button and key) makes a new tab: there is no start window. Closing the last tab
+  leaves a new Untitled budget.
+- Hidden: the Autosave switch, Share (folder sharing), the update indicator, the tools
+  panel's Pop Out button, the setup library (the tools panel's Library tab, the Budget
+  Setup rail's Budget and Library switch, Save to Library in the setup lists' strips).
+- The Budget Setup window may ask `host_info` too (its capability allows it on the
+  desktop, where the answer changes nothing).
+
+### What isn't in the browser
+
+Folder sharing, autosave, recovery copies and backups, Open Recent and files handed over by
+the system, the start window, the updater and release notes, printing to PDF through the
+system (the browser's print dialog can), pop-out windows, the setup library and the Packs
+folder (packs import into and export from a budget), and Load theirs (no file changes
+outside). Save a Copy for Sharing, templates, exports and setup packs download their files.
+Save to Library in the right-click menus still shows and is refused with the plain message.
+
+### Checked in a browser (2026-10-12)
+
+`cargo xtask web`, served with `python3 -m http.server`, driven in a Chromium-based browser:
+the starter budget's topsheet draws; opening a category and an account; editing a rate
+(totals and the footer follow); undo and redo by button and by key (Cmd+Z, Cmd+Shift+Z);
+Budget Setup in its frame, editing a fringe rate there (the page behind updates through
+`view-changed`), closing it by Close and by Escape; Save (a `.mthd` download, the edited
+mark cleared); Open of a `.mthd` (a new tab) and of a budget export fixture
+(`crates/method-format/tests/fixtures/exchange/by-account.json`: the review, then Convert, a
+new tab with the export's totals); Open cancelled (nothing happens); `?open=`; File >
+Export > Excel Workbook (an `.xlsx` download); Compare with an added file; Versions (saved
+with the browser's time); `?readonly=1` (an edit refused with the plain message); a new
+tab and closing both tabs; Print Topsheet (the browser's print). The file picker and the
+downloads were driven by a test harness in the page (a picked file put into the input,
+downloads caught), as a browser automation tool can't use the system's file dialog.
 
 ## What a partner integrates against
 
-- `method_session::Host` (or, in a browser, phase 2's `method-web` exports) with `dispatch`,
+- `method_session::Host` (or, in a browser, `method-web`'s JS API above) with `dispatch`,
   the `COMMANDS` list and `COMMANDS_VERSION`; this note's command table; docs/APP.md for each
   command's reply (the `View`).
 - `.mthd` text in and out (`open_mthd`, `save_mthd`); docs/FORMAT.md for the file. Schedules

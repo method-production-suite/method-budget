@@ -211,8 +211,16 @@ export const SHORTCUTS = [
 /** Groups in the order the shortcut sheet shows them. */
 export const GROUPS = ['File', 'Edit', 'Cells', 'Insert', 'Format', 'Go', 'View', 'Window', 'Help'];
 
-/** On macOS the native menu answers `app` keys; elsewhere main.js does. */
-export const menuRunsAppKeys = isMac;
+/**
+ * On macOS the native menu answers `app` keys; elsewhere main.js does. A
+ * browser has no menu bar, so the page answers them there (host.js).
+ */
+export let menuRunsAppKeys = isMac;
+
+/** No menu bar to answer `app` keys (a browser): the page answers them. */
+export function pageRunsAppKeys() {
+  menuRunsAppKeys = false;
+}
 
 const byId = new Map(SHORTCUTS.map((s) => [s.id, s]));
 

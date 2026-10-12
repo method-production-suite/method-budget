@@ -1,7 +1,8 @@
 //! `cargo xtask wasm-check`: the crates a browser runs build for
 //! WebAssembly (docs/research/web-session.md). method-session is checked
 //! without features, so nothing that only works on a desktop (its
-//! `std-clock` default) sneaks in.
+//! `std-clock` default) sneaks in, and method-web, the browser's own crate,
+//! is built (linked) for the target too.
 
 use std::path::Path;
 use std::process::Command;
@@ -11,6 +12,9 @@ pub const TARGET: &str = "wasm32-unknown-unknown";
 
 /// The crates checked.
 pub const CRATES: &[&str] = &["method-core", "method-format", "method-session"];
+
+/// The crate built, as the browser loads it (`cargo xtask web`).
+pub const WEB_CRATE: &str = "method-web";
 
 /// The `cargo check` arguments for the crates in [`CRATES`].
 pub fn check_args() -> Vec<String> {
@@ -24,8 +28,17 @@ pub fn check_args() -> Vec<String> {
     args
 }
 
-pub fn command(root: &Path) -> Result<String, String> {
-    let installed = Command::new("rustup")
+/// The `cargo build` arguments for [`WEB_CRATE`] (the dev profile: this
+/// checks it links, `cargo xtask web` makes the small one).
+pub fn build_args() -> Vec<String> {
+    ["build", "--locked", "-p", WEB_CRATE, "--target", TARGET]
+        .map(String::from)
+        .to_vec()
+}
+
+/// Whether rustup has [`TARGET`].
+pub fn target_installed(root: &Path) -> bool {
+    Command::new("rustup")
         .args(["target", "list", "--installed"])
         .current_dir(root)
         .output()
@@ -34,14 +47,17 @@ pub fn command(root: &Path) -> Result<String, String> {
                 .lines()
                 .any(|l| l.trim() == TARGET)
         })
-        .unwrap_or(false);
-    if !installed {
+        .unwrap_or(false)
+}
+
+pub fn command(root: &Path) -> Result<String, String> {
+    if !target_installed(root) {
         return Err(format!(
             "the {TARGET} target isn't installed; run `rustup target add {TARGET}` first"
         ));
     }
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
-    let status = Command::new(cargo)
+    let status = Command::new(&cargo)
         .args(check_args())
         .current_dir(root)
         .status()
@@ -49,7 +65,18 @@ pub fn command(root: &Path) -> Result<String, String> {
     if !status.success() {
         return Err(format!("{} don't build for {TARGET}", CRATES.join(", ")));
     }
-    Ok(format!("{} build for {TARGET}\n", CRATES.join(", ")))
+    let status = Command::new(&cargo)
+        .args(build_args())
+        .current_dir(root)
+        .status()
+        .map_err(|e| format!("couldn't run cargo: {e}"))?;
+    if !status.success() {
+        return Err(format!("{WEB_CRATE} doesn't build for {TARGET}"));
+    }
+    Ok(format!(
+        "{} and {WEB_CRATE} build for {TARGET}\n",
+        CRATES.join(", ")
+    ))
 }
 
 #[cfg(test)]
@@ -62,5 +89,12 @@ mod tests {
         assert!(args.windows(2).any(|w| w == ["-p", "method-session"]));
         assert!(args.windows(2).any(|w| w == ["--target", TARGET]));
         assert!(!args.iter().any(|a| a.contains("feature")));
+    }
+
+    #[test]
+    fn the_browser_crate_is_built_for_the_browser() {
+        let args = build_args();
+        assert!(args.windows(2).any(|w| w == ["-p", WEB_CRATE]));
+        assert!(args.windows(2).any(|w| w == ["--target", TARGET]));
     }
 }

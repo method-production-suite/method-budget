@@ -50,7 +50,7 @@ import { isSetupTab } from './setuptabs.js';
 import { openFind, findStep } from './find.js';
 import { printReport } from './report.js';
 import { showReportSetup } from './reportsetup.js';
-import { SHORTCUTS, matchShortcut, menuRunsAppKeys, shortcutById, shortcutText, withShortcut } from './shortcuts.js';
+import { SHORTCUTS, matchShortcut, menuRunsAppKeys, pageRunsAppKeys, shortcutById, shortcutText, withShortcut } from './shortcuts.js';
 import { isHelpOpen, toggleHelp, closeHelp } from './help.js';
 import { openMenu, updateMenu, closeMenu, isMenuOpen, setMenuAnchor, openContextMenu } from './menu.js';
 import { readPref, writePref } from './prefs.js';
@@ -79,6 +79,7 @@ import { displayCommands, userDisplay, withoutZeroRows } from './display.js';
 import { initShare, renderBar as renderShareBar, decorateShare, reportPlace, openShareDialog, whoChangedThis, lookedAt, shareShown } from './share.js';
 import { setExplainTarget, explainTargetAt } from './explain.js';
 import { showStart, closeStart, startMenu, isStartOpen, startAtLaunch, startOnLastClose } from './start.js';
+import { loadHost, isWeb } from './host.js';
 
 // The panes (pane.js): the first is always there, the second once the window
 // has been split. `target` is the pane commands act on; `cur` the pane `state`
@@ -1407,7 +1408,7 @@ async function closeTab(id = state.doc, pane = target) {
   // Split, with the budget in the other pane too: only this tab goes.
   const both = isSplit() && panes.every((p) => paneTabs(p).includes(id));
   const last = state.tabs.length <= 1 && !both;
-  if (last && !startOnLastClose()) {
+  if (last && !isWeb() && !startOnLastClose()) {
     closeWindow();
     return;
   }
@@ -1468,6 +1469,7 @@ async function doNew() {
  * listing already fetched. Resolves once the window shows.
  */
 function openStart(opts = {}) {
+  if (isWeb()) return Promise.resolve(); // no start window in a browser (host.js)
   if (grid.editor) grid.commitEdit(null);
   return showStart({ invoke, apply: (v, cmd) => apply(v, { cmd }), opened, toast, focus: () => grid.focus() }, opts);
 }
@@ -1597,7 +1599,8 @@ function openReportSetup() {
 
 // A function declaration, not a const: `state` reads it before this line runs.
 function positions() {
-  return ['right', 'bottom', 'window'];
+  // A browser has no windows of its own: the panel docks (host.js).
+  return isWeb() ? ['right', 'bottom'] : ['right', 'bottom', 'window'];
 }
 
 function readPosition() {
@@ -3074,7 +3077,7 @@ function wire() {
   wirePanelResizer({ position: () => state.position, focusGrid: () => grid.focus() });
   panes[0].strip = createTabStrip(panes[0].tabbar, stripHandlers(panes[0]));
   wireSplit();
-  $('btn-new').addEventListener('click', () => openStart());
+  $('btn-new').addEventListener('click', () => (isWeb() ? doNew() : openStart()));
   $('btn-open').addEventListener('click', doOpen);
   $('btn-save').addEventListener('click', () => doSave(false));
   $('btn-saveas').addEventListener('click', () => doSave(true));
@@ -3097,6 +3100,85 @@ function wire() {
   listenToEvents();
 }
 
+/**
+ * The page in a browser (method-web; docs/research/web-session.md): no menu
+ * bar (the keys and a File button instead), no autosave, folder sharing,
+ * updater or start window, and the tools panel docks. New makes a new tab;
+ * Save downloads the budget (the shim, tauri-shim.js).
+ */
+function webMode() {
+  pageRunsAppKeys();
+  for (const node of [$('btn-share'), $('update-status'), $('autosave-switch').closest('label')]) {
+    if (node) node.hidden = true;
+  }
+  COMMANDS['file.new'] = () => doNew();
+  $('btn-new').title = withShortcut('New budget, in a new tab', 'file.new_tab');
+  $('btn-save').title = withShortcut('Save: download the budget as a file', 'file.save');
+  $('btn-saveas').title = withShortcut('Save under a new name: download the budget as a file', 'file.save_as');
+  if (state.position === 'window') state.position = 'right';
+  const file = el('button', {
+    class: 'btn',
+    text: 'File',
+    title: 'Open, save, import, export and print',
+    attrs: { type: 'button', id: 'btn-file', 'aria-haspopup': 'menu' },
+  });
+  file.addEventListener('click', () => {
+    const r = file.getBoundingClientRect();
+    openContextMenu({ x: r.left, y: r.bottom + 2 }, { label: 'File', items: webFileMenu(), returnFocus: () => file });
+  });
+  $('btn-new').before(file);
+}
+
+/** The File menu's items a browser can run (src/menu.rs has the desktop's). */
+function webFileMenu() {
+  const item = (id, label) => ({ label, shortcut: shortcutText(id) || undefined, run: () => run(id, 'menu') });
+  const sep = { separator: true };
+  return [
+    item('file.new_tab', 'New Tab'),
+    item('file.open', 'Open…'),
+    item('file.new_from_template', 'New From Template…'),
+    item('file.new_sub_budget', 'New Sub-Budget…'),
+    sep,
+    item('file.save', 'Save'),
+    item('file.save_as', 'Save As…'),
+    item('file.save_as_template', 'Save as Template…'),
+    item('file.save_share_copy', 'Save a Copy for Sharing…'),
+    sep,
+    {
+      label: 'Import',
+      items: [
+        item('file.import_setup', 'Import Setup From…'),
+        item('file.import_setup_pack', 'Import Setup Pack…'),
+        item('file.import_spreadsheet', 'Import Spreadsheet…'),
+        item('file.import_chart', 'Import Chart of Accounts…'),
+        item('file.import_budget_export', 'Import Budget Export…'),
+        item('file.import_setup_lists', 'Import Setup Lists…'),
+        item('file.import_actuals', 'Import Actuals…'),
+      ],
+    },
+    {
+      label: 'Export',
+      items: [
+        item('file.export_xlsx', 'Excel Workbook…'),
+        item('file.export_csv', 'CSV Files…'),
+        item('file.export_tsv', 'Tab-Delimited Detail…'),
+        item('file.export_setup_lists', 'Setup Lists…'),
+        item('file.export_setup_pack', 'Setup Pack…'),
+      ],
+    },
+    sep,
+    item('file.versions', 'Versions…'),
+    item('file.compare', 'Compare Budgets…'),
+    item('file.what_changed', 'What Changed…'),
+    item('file.merge', 'Merge Changes From…'),
+    sep,
+    item('file.print_budget', 'Print…'),
+    item('file.print_topsheet', 'Print Topsheet…'),
+    sep,
+    item('help.shortcuts', 'Keyboard Shortcuts'),
+  ];
+}
+
 async function start() {
   wire();
   if (!connected) {
@@ -3104,6 +3186,8 @@ async function start() {
     $('banner').replaceChildren(el('strong', { text: 'Open this page in the Method Budget app.' }));
     return;
   }
+  // In a browser (method-web), what only the desktop does is hidden.
+  if ((await loadHost(invoke)).kind === 'web') webMode();
   try {
     apply(await invoke('get_view'), { focusKey: 't0', fresh: true });
   } catch (e) {
@@ -3115,7 +3199,7 @@ async function start() {
   await safety.start(); // a file to open, budgets to recover
   // Nothing open but the untouched Untitled budget, and no question asked:
   // the start window (start.js), unless it was turned off there.
-  if (!isModalOpen() && startAtLaunch()) {
+  if (!isWeb() && !isModalOpen() && startAtLaunch()) {
     try {
       const list = await invoke('start_list');
       if (list && list.fresh && !isModalOpen()) await openStart({ list });

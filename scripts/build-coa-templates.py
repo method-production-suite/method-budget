@@ -226,7 +226,7 @@ def bundled_rs(m):
         "// do not edit. A test checks it agrees with the manifest.",
         "",
         "/// The bundled charts, in the manifest's order.",
-        "pub const BUNDLED: &[Bundled] = &[",
+        "pub static BUNDLED: &[Bundled] = &[",
     ]
     for e in m["charts"]:
         if not os.path.exists(os.path.join(CHARTS, f"{e['id']}.mthd")):

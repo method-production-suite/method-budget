@@ -54,6 +54,7 @@ import { renderOvertime } from './overtime.js';
 import { renderActuals } from './actuals.js';
 import { renderReview } from './review.js';
 import { renderActivity } from './activity.js';
+import { isWeb } from './host.js';
 
 const TOOL_TABS = [
   { id: 'fringes', label: 'Fringes' },
@@ -198,7 +199,8 @@ function rerender() {
 
 function header(position) {
   const group = el('div', { class: 'tools-places', attrs: { role: 'group', 'aria-label': 'Tools panel position' } });
-  for (const p of POSITIONS) {
+  // A browser has no windows of its own: no Pop Out there (host.js).
+  for (const p of POSITIONS.filter((x) => x.id !== 'window' || !isWeb())) {
     const b = el(
       'button',
       {
@@ -255,9 +257,14 @@ function panes(view, ctx) {
   return wrap;
 }
 
+/** A tab this host shows: a browser has no setup library (host.js). */
+function shown(id) {
+  return id !== 'library' || !isWeb();
+}
+
 function pane(which, view, ctx) {
-  const ids = layout.panes[which];
-  const active = layout.active[which];
+  const ids = layout.panes[which].filter(shown);
+  const active = shown(layout.active[which]) ? layout.active[which] : ids[0] || null;
   const sec = el('section', {
     class: `tools-pane${ids.length ? '' : ' is-empty'}`,
     attrs: { 'aria-label': paneLabel(which) },

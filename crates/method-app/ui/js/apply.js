@@ -69,6 +69,7 @@ import {
 import { saveItemToLibrary } from './library.js';
 import { mountFrame, actionStrip, stripButton, searchBox, band, bandField, gridTable, setFooterTotals } from './setupframe.js';
 import { currencyBand } from './setupbands.js';
+import { isWeb } from './host.js';
 import { obj, str, plural, errText, sourceText, FLAT_BASES, isHourUnit, flatCountWords } from './util.js';
 
 const LISTS = [
@@ -1372,7 +1373,8 @@ function setupStrip(list) {
       stripButton(`New ${list.what}…`, addKey(list.id), () => addItem(list), { title: `Add a ${list.what} to this budget` }),
       needs('Edit…', `apply:edit:${list.id}`, `Edit ${list.what}`, (n) => editItem(list, n)),
       needs('Delete…', `apply:delete:${list.id}`, `Delete ${list.what}`, (n) => deleteItem(list, n)),
-      needs('Save to Library…', `apply:save:${list.id}`, `Copy to your library, with what it needs: ${list.what}`, (n) => saveItemToLibrary(renameCtx(), list.what, n)),
+      // A browser has no setup library (host.js).
+      isWeb() ? null : needs('Save to Library…', `apply:save:${list.id}`, `Copy to your library, with what it needs: ${list.what}`, (n) => saveItemToLibrary(renameCtx(), list.what, n)),
     ],
     searchBox({
       key: `apply:filter:${list.id}`,

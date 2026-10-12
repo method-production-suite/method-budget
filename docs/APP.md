@@ -2389,6 +2389,13 @@ crates/method-session/   no window, no file system, no threads, no clock of its 
                      the read-only switch
   src/host/*.rs      each moved module's commands as the host dispatches them
 
+crates/method-web/       the page in a browser: Host as WebAssembly (wasm32 only)
+  src/web.rs         the JS API (wasm-bindgen): new Host(), dispatch, openMthd, saveMthd,
+                     setReadOnly, hostInfo, commands(); the browser's clock
+  js/tauri-shim.js   window.__TAURI__ for the page: invoke over dispatch, the events, file
+                     pickers for Open dialogs, downloads for Save dialogs, Budget Setup in
+                     a frame. `cargo xtask web` builds target/web (docs/research/web-session.md)
+
 crates/method-app/
   src/session.rs     the desktop's side of a session: SessionFiles (open, save, a file
                      changed outside, Load theirs, folder sharing) and DocsFiles
@@ -2488,7 +2495,7 @@ account.
 |---|---|---|
 | `focus_account` | `category`, `ti`, `account`, `ai` (all `null`: no account) | View with that account |
 | `get_full_view` | none | everything: the whole budget, every row's totals, every problem |
-| `host_info` | none | `{kind, commands_version, read_only}`: `"desktop"`, the command contract's version (docs/research/web-session.md), `false`; a browser host says `"web"`. The page doesn't call it yet (main window only) |
+| `host_info` | none | `{kind, commands_version, read_only}`: `"desktop"`, the command contract's version (docs/research/web-session.md), `false`; a browser host says `"web"`. The main window and the Budget Setup window ask it at start (`host.js`) and, in a browser, hide what only the desktop does |
 | `new_tab` | none | View of a starter budget in a new tab, in front |
 | `switch_tab` | `doc` | View of that budget, now in front |
 | `move_tab` | `doc`, `to` (its place afterwards) | the tabs |
@@ -2586,7 +2593,7 @@ and `activity.js` are the Review and Activity tabs),
 place, size and tabs), `display.js` with `display.css` (how numbers show: formula values,
 rate and global decimals, totals with or without cents, hidden-factor marks, zero rows,
 zoom and the formula view, and those View menu commands), `display-settings.js` (Budget
-Setup > Settings > Numbers on screen and each global's details) and `sheet.js` (styles worked out at run time, below). `boot.js`
+Setup > Settings > Numbers on screen and each global's details), `sheet.js` (styles worked out at run time, below) and `host.js` (which host the page runs in, from `host_info`: in a browser, method-web, the page has no menu bar and answers the app's keys itself, a File button stands in for the File menu, New makes a new tab, Save downloads the budget, and autosave, Share, the updater, the start window, the tools window and the setup library are hidden; docs/research/web-session.md). `boot.js`
 starts `main.js`, `toolswin.js` in the tools window (the page loaded with `?panel=1`), or
 `setupwin.js` in the Budget Setup window (`?panel=setup`; its tabs are listed in
 `setuptabs.js`, and `setupwin.css` lays it out, matching only `body.setup-window`).

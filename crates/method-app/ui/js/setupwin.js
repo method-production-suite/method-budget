@@ -46,7 +46,8 @@ import { setFindHook, onUsage, sortSelect, showSelect, redrawLists } from './set
 import { renderLibrarySetup, setLibraryKind } from './library.js';
 import { SETUP_TABS, isSetupTab } from './setuptabs.js';
 import { setFrameHooks, footerBar, clearFooterTotals, setRailHost } from './setupframe.js';
-import { matchShortcut, menuRunsAppKeys, shortcutById } from './shortcuts.js';
+import { matchShortcut, menuRunsAppKeys, pageRunsAppKeys, shortcutById } from './shortcuts.js';
+import { loadHost, isWeb } from './host.js';
 import { isModalOpen } from './modal.js';
 import { isMenuOpen, isContextMenuOpen } from './menu.js';
 
@@ -187,9 +188,9 @@ function tabButton(t, i) {
   return b;
 }
 
-/** What tab `t`'s rail shows: 'budget' or 'library'. */
+/** What tab `t`'s rail shows: 'budget' or 'library' (a browser has no library: host.js). */
 function sourceOf(t) {
-  return t.library && state.source[t.id] === 'library' ? 'library' : 'budget';
+  return t.library && !isWeb() && state.source[t.id] === 'library' ? 'library' : 'budget';
 }
 
 /** Shows the budget's items or the library's on tab `id`, with focus on the switch. */
@@ -262,7 +263,7 @@ function render() {
       state.libraryTab = tab.id;
     }
     const railBody = el('div', { class: 'sw-rail-body' });
-    rail = el('aside', { class: 'sw-rail', attrs: { 'aria-label': `${tab.label}: budget or library` } }, sourceSwitch(tab, source), railBody);
+    rail = el('aside', { class: 'sw-rail', attrs: { 'aria-label': `${tab.label}: budget or library` } }, isWeb() ? null : sourceSwitch(tab, source), railBody);
     if (source === 'library') {
       renderLibrarySetup(railBody, main, state.view, c);
     } else {
@@ -462,6 +463,8 @@ async function start() {
     return;
   }
   await listen();
+  // In a browser there is no menu bar: this window answers the app's keys.
+  if ((await loadHost(invoke)).kind === 'web') pageRunsAppKeys();
   try {
     state.view = await invoke('get_view', { doc: null });
   } catch (e) {

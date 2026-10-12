@@ -2,7 +2,7 @@
 // do not edit. A test checks it agrees with the manifest.
 
 /// The bundled charts, in the manifest's order.
-pub const BUNDLED: &[Bundled] = &[
+pub static BUNDLED: &[Bundled] = &[
     Bundled {
         id: "feature",
         name: "Feature film",
