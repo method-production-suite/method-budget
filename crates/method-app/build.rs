@@ -215,6 +215,17 @@ const COMMANDS: &[&str] = &[
     "share_copy_original",
     "share_copy_store",
     "sub_budget_new",
+    // Working together through a shared folder (src/shared_app.rs)
+    "share_status",
+    "share_setup",
+    "share_pick_folder",
+    "share_start",
+    "share_set_me",
+    "share_place",
+    "share_review",
+    "share_activity",
+    "share_blame",
+    "share_use_value",
     // The personal setup library (src/library.rs)
     "library_view",
     "library_create",

@@ -224,6 +224,19 @@ pub fn autosave_doc(
         s.recovery_removed();
         return Autosaved::Removed;
     }
+    if s.is_shared() {
+        // The change log is the truth and its own timer writes it; on the
+        // way out (or losing focus) everything goes now (src/shared.rs).
+        if force && s.is_dirty() {
+            s.share_flush();
+            return if s.is_dirty() {
+                Autosaved::Nothing
+            } else {
+                Autosaved::File
+            };
+        }
+        return Autosaved::Nothing;
+    }
     if !s.is_dirty() || !(force || s.autosave_due(now)) {
         return Autosaved::Nothing;
     }
@@ -400,7 +413,8 @@ pub fn open_path(state: &AppState, safety: &Safety, path: &Path) -> Result<DocId
             id
         }
         None => {
-            let opened = Session::open(path)?;
+            // A budget with a change log beside it is joined (src/shared_app.rs).
+            let opened = crate::shared_app::open_joining(path)?;
             let instead = state.docs().lone_untouched();
             put_in_front(state, safety, opened, instead)?
         }
@@ -482,7 +496,7 @@ pub fn restore_tabs(state: &AppState, safety: &Safety) -> usize {
     let split = lock(&safety.open_tabs).split();
     let mut opened: Vec<(usize, Session)> = Vec::new();
     for (i, p) in files.iter().enumerate() {
-        if let Ok(s) = Session::open(p) {
+        if let Ok(s) = crate::shared_app::open_joining(p) {
             opened.push((i, s));
         }
     }
@@ -579,6 +593,8 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) {
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(1));
         autosave_now(&handle, false);
+        // Shared budgets: changes in and out, the keeper's file, heartbeats.
+        crate::shared_app::tick(&handle);
     });
 }
 

@@ -11,7 +11,7 @@ use method_core::renumber::{self, CodeChange, Conflict, RenumberError, RenumberP
 use serde::Serialize;
 use tauri::{Runtime, State, WebviewWindow};
 
-use crate::app::{edit_budget, AppState, DocId};
+use crate::app::{AppState, DocId};
 use crate::edit::EditResult;
 use crate::view::View;
 
@@ -143,13 +143,16 @@ pub fn renumber_accounts<R: Runtime>(
     separator: Option<String>,
 ) -> Result<View, String> {
     let widths = [category_width, account_width, sub_width, set_width];
-    edit_budget(
-        &window,
-        &state,
-        doc,
-        "Renumber accounts to the new pattern",
-        |b| apply(b, widths, separator.as_deref()),
-    )
+    crate::app::apply(&window, &state, doc, |s| {
+        // A shared budget's change log records each new number as one
+        // write to the account or category (src/shared.rs).
+        let to = coding_from(widths, separator.as_deref())?;
+        let plan = renumber::plan(s.budget(), &to).map_err(|e| e.to_string())?;
+        let hints = method_core::log::Hint::from_plan(&plan);
+        s.edit_with_hints("Renumber accounts to the new pattern", &hints, |b| {
+            apply(b, widths, separator.as_deref())
+        })
+    })
 }
 
 #[cfg(test)]
