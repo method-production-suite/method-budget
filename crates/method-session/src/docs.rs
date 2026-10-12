@@ -9,8 +9,8 @@
 //! document it is drawing, so a command it sends just as the main window
 //! switches tabs still lands where the user meant). Either way the guard
 //! derefs to the [`Session`], so a command reads like it did with one budget.
-//! No Tauri types here: everything is tested without a window. The commands
-//! are in `src/tabs.rs`.
+//! No Tauri types and no file system here: everything is tested without a
+//! window. The tab commands are the desktop app's (method-app's src/tabs.rs).
 //!
 //! Split view (roadmap 2.26): the window can show two panes side by side,
 //! each with its own tabs and its own budget in front. A budget may be in
@@ -575,11 +575,13 @@ impl Docs {
         Ok(doc.session)
     }
 
-    /// The tab whose budget lives in the file at `path`, if one does.
-    pub fn find_file(&self, path: &Path) -> Option<DocId> {
+    /// The tab whose budget lives in the file at `path`, if one does, with
+    /// `same` telling whether two paths name one file (the desktop sees
+    /// through other spellings of a path: method-app's `DocsFiles`).
+    pub fn find_file_by(&self, path: &Path, same: impl Fn(&Path, &Path) -> bool) -> Option<DocId> {
         self.tabs
             .iter()
-            .find(|d| d.session.is_file(path))
+            .find(|d| d.session.path().is_some_and(|p| same(p, path)))
             .map(|d| d.id)
     }
 
@@ -782,31 +784,6 @@ mod tests {
         assert_eq!(d.dirty(), [b]);
     }
 
-    #[test]
-    fn open_files_are_found_and_listed_in_tab_order() {
-        let dir = crate::safety::tests::temp_dir("docs-files");
-        let (p1, p2) = (dir.join("one.mthd"), dir.join("two.mthd"));
-        let mut d = Docs::default();
-        let untitled = d.active();
-        let mut one = Session::new();
-        one.save_to(&p1).unwrap();
-        let mut two = Session::new();
-        two.save_to(&p2).unwrap();
-        let a = d.add(one);
-        let b = d.add(two);
-        assert_eq!(d.find_file(&p1), Some(a));
-        assert_eq!(d.find_file(&dir.join(".").join("two.mthd")), Some(b));
-        assert_eq!(d.find_file(&dir.join("three.mthd")), None);
-        assert_eq!(d.files(), (vec![p1.clone(), p2.clone()], Some(1)));
-        d.switch(untitled).unwrap();
-        assert_eq!(d.files(), (vec![p1, p2], None), "untitled isn't listed");
-        let t = d.tabs();
-        assert_eq!(t[1].label, "one");
-        assert_eq!(t[1].name, "one.mthd");
-        assert!(t[1].path.as_deref().unwrap().ends_with("one.mthd"));
-        std::fs::remove_dir_all(&dir).unwrap();
-    }
-
     /// Split view's panes: what each holds and shows, the target, and every
     /// invariant (each pane non-empty, fronts in their panes, every budget in
     /// a pane, the target's front the active one).
@@ -968,71 +945,6 @@ mod tests {
             (vec![n], vec![n])
         );
         assert_eq!(d.active(), n);
-    }
-
-    #[test]
-    fn split_view_is_kept_by_file() {
-        let dir = crate::safety::tests::temp_dir("docs-split");
-        let files: Vec<PathBuf> = ["one", "two", "three"]
-            .iter()
-            .map(|n| dir.join(format!("{n}.mthd")))
-            .collect();
-        let mut d = Docs::default();
-        let untitled = d.active();
-        let mut ids = Vec::new();
-        for f in &files {
-            let mut s = Session::new();
-            s.save_to(f).unwrap();
-            ids.push(d.add(s));
-        }
-        assert_eq!(d.saved_split(), None, "one pane");
-        d.switch(ids[1]).unwrap();
-        d.split_right().unwrap(); // left [u 0 1 2], right [1]
-        d.move_to_pane(ids[2], 0, None).unwrap(); // left [u 0 1], right [1 2]
-        d.switch_in(0, untitled).unwrap();
-        d.switch_in(0, ids[0]).unwrap();
-        let saved = d.saved_split().unwrap();
-        // By place among the files (the untitled budget isn't kept).
-        assert_eq!(saved.panes, [vec![0, 1], vec![1, 2]]);
-        assert_eq!(saved.fronts, [0, 2]);
-        assert_eq!(saved.target, 0);
-
-        // The next start: the files open again, then the panes.
-        let mut next = Docs::default();
-        let reopened: Vec<Option<DocId>> = files
-            .iter()
-            .map(|f| Some(next.add(Session::open(f).unwrap())))
-            .collect();
-        assert!(next.restore_split(&saved, &reopened));
-        check(&next);
-        let l = next.layout();
-        let first = next.ids()[0];
-        let r = |i: usize| reopened[i].unwrap();
-        assert_eq!(
-            l.panes[0].tabs,
-            [r(0), r(1), first],
-            "the untitled one joins the left"
-        );
-        assert_eq!(l.panes[1].tabs, [r(1), r(2)]);
-        assert_eq!(
-            (l.panes[0].front, l.panes[1].front, l.target),
-            (r(0), r(2), 0)
-        );
-        assert_eq!(next.active(), r(0));
-
-        // A file that couldn't be read leaves its pane short; a pane left
-        // with nothing means one pane.
-        let mut d2 = Docs::default();
-        let only = d2.add(Session::open(&files[0]).unwrap());
-        assert!(!d2.restore_split(&saved, &[Some(only), None, None]));
-        assert!(d2.split().is_none());
-        // A pane of untitled budgets only isn't kept.
-        let mut d3 = Docs::default();
-        d3.add(Session::open(&files[0]).unwrap());
-        d3.switch(d3.ids()[0]).unwrap();
-        d3.split_right().unwrap(); // right: the untitled one
-        assert_eq!(d3.saved_split(), None);
-        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

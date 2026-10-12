@@ -15,3 +15,8 @@ method-core = { path = "../method-core" }
 method-format = { path = "../method-format" }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
+
+[features]
+# The system clock as the default (src/clock.rs): for the desktop, never
+# for a browser build, where std's clock panics.
+std-clock = []

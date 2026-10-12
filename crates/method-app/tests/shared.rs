@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use method_app::edit;
+use method_app::session::SessionFiles;
 use method_app::shared::{Person, SNAPSHOT_QUIET};
 use method_app::Session;
 use method_core::log::{ActorId, Op};

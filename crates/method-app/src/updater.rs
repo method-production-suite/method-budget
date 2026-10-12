@@ -423,7 +423,7 @@ pub struct Flushed {
 /// into its file where Autosave may write them (never over a file changed
 /// outside the app: that budget stays unsaved and the page asks), and the
 /// open tabs and split view are remembered for the restart.
-pub fn flush_for_restart(state: &AppState, safety: &Safety, now: Instant) -> Flushed {
+pub fn flush_for_restart(state: &AppState, safety: &Safety, now: u64) -> Flushed {
     let autosaved = autosave_pass(state, safety, now, true);
     let docs = state.docs();
     safety.remember_tabs(&docs);
@@ -750,7 +750,7 @@ pub fn update_restart<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     let flushed = flush_for_restart(
         &app.state::<AppState>(),
         &app.state::<Safety>(),
-        Instant::now(),
+        method_session::clock::mono_ms(),
     );
     for (id, done) in flushed.autosaved {
         crate::safety_app::tell_autosaved(&app, id, done);
@@ -1044,7 +1044,7 @@ mod tests {
             retitle(&state, ic, "c, mine");
             write_budget(&c, "c, theirs");
 
-            let flushed = flush_for_restart(&state, &safety, Instant::now());
+            let flushed = flush_for_restart(&state, &safety, method_session::clock::mono_ms());
             assert_eq!(
                 flushed.autosaved,
                 [
@@ -1060,7 +1060,7 @@ mod tests {
             assert_eq!(title_on_disk(&c), "c, theirs");
             assert_eq!(flushed.unsaved, [ic]);
             // Nothing to save the second time round.
-            let again = flush_for_restart(&state, &safety, Instant::now());
+            let again = flush_for_restart(&state, &safety, method_session::clock::mono_ms());
             assert!(again
                 .autosaved
                 .iter()
@@ -1109,7 +1109,7 @@ mod tests {
         let untitled = state.docs().active();
         retitle(&state, untitled, "Draft");
         crate::safety_app::discard_all(&state, &safety);
-        let now = Instant::now();
+        let now = method_session::clock::mono_ms();
         assert_eq!(
             autosave_doc(&state, &safety, None, now, true),
             Autosaved::Nothing,
@@ -1151,7 +1151,7 @@ mod tests {
         retitle(&state, untitled, "Draft");
         safety.set_autosave(false);
         retitle(&state, ia, "a, edited");
-        let flushed = flush_for_restart(&state, &safety, Instant::now());
+        let flushed = flush_for_restart(&state, &safety, method_session::clock::mono_ms());
         // Autosave off: the file is untouched and a recovery copy is kept;
         // the untitled budget too. Both wait for Save All / Discard All.
         assert_eq!(title_on_disk(&a), "a");

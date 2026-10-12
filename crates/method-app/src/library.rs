@@ -40,6 +40,7 @@ use crate::import_setup::{
     What,
 };
 use crate::safety::{self, Access};
+use crate::session::DocsFiles;
 use crate::view::View;
 
 /// The file a new library gets, in the folder the user picks.
@@ -772,6 +773,7 @@ mod tests {
     use super::*;
     use crate::safety::tests::temp_dir;
     use crate::session::Session;
+    use crate::session::SessionFiles;
     use method_core::{Dec, Fringe, FringeKind, Group, UnitDef};
 
     fn r(kind: &str, name: &str) -> ItemRef {

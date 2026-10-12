@@ -19,7 +19,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde::Serialize;
 use tauri::menu::{CheckMenuItem, IsMenuItem, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu};
@@ -34,6 +34,7 @@ use crate::safety::{
     BackupEntry, Backups, OpenTabs, RecentFiles, RecoveryEntry, RecoveryStore, Settings, BACKUP_GAP,
 };
 use crate::session::Session;
+use crate::session::{DocsFiles, SessionFiles};
 use crate::view::{FileDto, View};
 
 type CmdResult<T = View> = Result<T, String>;
@@ -199,12 +200,13 @@ pub enum Autosaved {
     Conflict,
 }
 
-/// One autosave pass over every open budget at `now`, in tab order.
+/// One autosave pass over every open budget at `now` (a
+/// `method_session::clock::mono_ms` reading), in tab order.
 /// `force` skips the waiting (the window lost focus, the app is closing).
 pub fn autosave_pass(
     state: &AppState,
     safety: &Safety,
-    now: Instant,
+    now: u64,
     force: bool,
 ) -> Vec<(DocId, Autosaved)> {
     let ids = state.docs().ids();
@@ -219,7 +221,7 @@ pub fn autosave_doc(
     state: &AppState,
     safety: &Safety,
     doc: Option<DocId>,
-    now: Instant,
+    now: u64,
     force: bool,
 ) -> Autosaved {
     let _w = lock(&safety.writer);
@@ -642,7 +644,7 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) {
 pub fn autosave_now<R: Runtime>(app: &AppHandle<R>, force: bool) {
     let state = app.state::<AppState>();
     let safety = app.state::<Safety>();
-    for (id, done) in autosave_pass(&state, &safety, Instant::now(), force) {
+    for (id, done) in autosave_pass(&state, &safety, method_session::clock::mono_ms(), force) {
         tell_autosaved(app, id, done);
     }
 }
@@ -654,7 +656,7 @@ pub fn autosave_one<R: Runtime>(app: &AppHandle<R>, id: DocId) {
         &app.state::<AppState>(),
         &app.state::<Safety>(),
         Some(id),
-        Instant::now(),
+        method_session::clock::mono_ms(),
         true,
     );
     tell_autosaved(app, id, done);
@@ -1188,8 +1190,8 @@ mod tests {
     use crate::safety::tests::temp_dir;
     use crate::safety::AUTOSAVE_QUIET;
 
-    fn later(secs: u64) -> Instant {
-        Instant::now() + Duration::from_secs(secs)
+    fn later(secs: u64) -> u64 {
+        method_session::clock::mono_ms() + secs * 1000
     }
 
     fn retitle(state: &AppState, t: &str) {
@@ -1224,7 +1226,7 @@ mod tests {
         retitle(&state, "One");
         // Not quiet long enough yet.
         assert_eq!(
-            autosave_doc(&state, &safety, None, Instant::now(), false),
+            autosave_doc(&state, &safety, None, later(0), false),
             Autosaved::Nothing
         );
         assert_eq!(
@@ -1290,7 +1292,7 @@ mod tests {
 
         retitle(&state, "Autosaved");
         assert_eq!(
-            autosave_doc(&state, &safety, None, Instant::now(), false),
+            autosave_doc(&state, &safety, None, later(0), false),
             Autosaved::Nothing
         );
         assert_eq!(
@@ -1594,7 +1596,7 @@ mod tests {
             .edit("Test edit", |b| edit::set_title(b, "Other, edited"))
             .unwrap();
         assert_eq!(
-            autosave_doc(&state, &safety, Some(o), Instant::now(), true),
+            autosave_doc(&state, &safety, Some(o), later(0), true),
             Autosaved::File
         );
         assert_eq!(

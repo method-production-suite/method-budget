@@ -42,14 +42,14 @@ use crate::app::{edit_budget, finish, safe_file_stem, with_budget_extension, App
 use crate::docs::Docs;
 use crate::edit::EditResult;
 use crate::safety::{self, Access};
+use crate::session::DocsFiles;
 use crate::session::Session;
 use crate::templates::UNTITLED;
 use crate::versions::{check_created, check_name, check_note};
 use crate::view::View;
 
 /// What an edit to a shared copy is told.
-pub const READ_ONLY: &str =
-    "This is a copy saved for sharing, so it opens read-only. Make an editable copy to change it.";
+pub use method_session::session::READ_ONLY;
 
 /// The application version stamped on copies.
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");

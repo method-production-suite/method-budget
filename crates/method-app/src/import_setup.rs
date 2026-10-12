@@ -30,6 +30,7 @@ use tauri::{Runtime, State, WebviewWindow};
 
 use crate::app::{finish, AppState, DocId};
 use crate::docs::Docs;
+use crate::session::DocsFiles;
 use crate::view::View;
 
 // The review and the import themselves are plain functions on budgets in
@@ -169,6 +170,7 @@ pub fn import_setup<R: Runtime>(
 mod tests {
     use super::*;
     use crate::session::Session;
+    use crate::session::SessionFiles;
     use method_core::{
         starter, Charge, ChargeKind, Credit, CreditCap, CreditSource, Currency, Dec, Fringe,
         FringeKind, FringePosting, Group, ReportPreset, ReportSpec, UnitDef,

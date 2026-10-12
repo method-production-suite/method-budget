@@ -36,7 +36,7 @@ use method_core::{Budget, RowId};
 use method_format::log::{self as flog, LoadReport, Presence, Scan, Shared};
 use serde::{Deserialize, Serialize};
 
-use crate::safety::DiskStamp;
+use crate::safety::{DiskStamp, DiskStampExt};
 
 /// How long typing must pause before this computer's changes are written
 /// to a segment file (a segment per keystroke would be hundreds of files).
@@ -418,6 +418,62 @@ impl std::fmt::Debug for SharedDoc {
 struct SnapshotNote {
     hash: String,
     written: String,
+}
+
+/// How the session (method-session) uses the shared folder's log.
+impl method_session::collab::SharedLog for SharedDoc {
+    fn is_dirty(&self) -> bool {
+        SharedDoc::is_dirty(self)
+    }
+
+    fn can_undo(&self) -> bool {
+        SharedDoc::can_undo(self)
+    }
+
+    fn can_redo(&self) -> bool {
+        SharedDoc::can_redo(self)
+    }
+
+    fn randomize_new_rows(&mut self, before: &Budget, after: &mut Budget) -> HashMap<RowId, RowId> {
+        SharedDoc::randomize_new_rows(self, before, after)
+    }
+
+    fn record(
+        &mut self,
+        after: &Budget,
+        hints: &[Hint],
+        label: &str,
+    ) -> Result<Option<Budget>, String> {
+        SharedDoc::record(self, after, hints, label)
+    }
+
+    fn undo(&mut self) -> Option<(Budget, Option<String>)> {
+        SharedDoc::undo(self)
+    }
+
+    fn redo(&mut self) -> Option<(Budget, Option<String>)> {
+        SharedDoc::redo(self)
+    }
+
+    fn history(&self) -> crate::session::History {
+        SharedDoc::history(self)
+    }
+
+    fn history_len(&self) -> usize {
+        SharedDoc::history_len(self)
+    }
+
+    fn applied_steps(&self) -> usize {
+        SharedDoc::applied_steps(self)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 impl SharedDoc {

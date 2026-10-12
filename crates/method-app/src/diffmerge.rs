@@ -798,6 +798,7 @@ pub async fn merge_pick_file<R: Runtime>(
 mod tests {
     use super::*;
     use crate::session::Session;
+    use crate::session::SessionFiles;
     use method_core::share::{share_copy, ShareOptions};
 
     const AT: &str = "2026-10-09T14:30:00-07:00";

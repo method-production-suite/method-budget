@@ -24,17 +24,17 @@ use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
+pub use method_session::safety::{
+    autosave_due, content_hash, new_recovery_key, path_hash, DiskCheck, DiskStamp,
+    AUTOSAVE_MAX_WAIT, AUTOSAVE_QUIET,
+};
+
 use crate::bookmark::{self, Tracked};
 
-/// Autosave waits for this long without a change...
-pub const AUTOSAVE_QUIET: Duration = Duration::from_secs(3);
-/// ...but never longer than this after the first change it hasn't saved.
-pub const AUTOSAVE_MAX_WAIT: Duration = Duration::from_secs(30);
 /// File > Open Recent shows this many files.
 pub const RECENT_LIMIT: usize = 10;
 /// Backups kept per document.
@@ -43,47 +43,13 @@ pub const BACKUPS_KEPT: usize = 10;
 /// (an explicit Save always does, and so does the first write in a session).
 pub const BACKUP_GAP: Duration = Duration::from_secs(10 * 60);
 
-/// Whether an autosave is due: the budget has been quiet for
-/// [`AUTOSAVE_QUIET`] since `last_change`, or [`AUTOSAVE_MAX_WAIT`] has passed
-/// since `pending_since`, the first change not yet in the recovery file.
-pub fn autosave_due(now: Instant, last_change: Instant, pending_since: Option<Instant>) -> bool {
-    let waited = |t: Instant| now.saturating_duration_since(t);
-    waited(last_change) >= AUTOSAVE_QUIET
-        || pending_since.is_some_and(|t| waited(t) >= AUTOSAVE_MAX_WAIT)
-}
-
 // ---------------------------------------------------------------------------
 // Names
 
-/// A stable 64-bit FNV-1a hash of a path, as 16 hex digits. Stable across
-/// runs and Rust versions (std's hasher is not), so a document's backups
-/// stay in one folder.
-pub fn path_hash(path: &Path) -> String {
-    format!(
-        "{:016x}",
-        content_hash(path.as_os_str().to_string_lossy().as_bytes())
-    )
-}
-
+/// A name nobody else gets (method_session::clock), for temporary files
+/// and owner locks.
 fn unique() -> String {
-    static N: AtomicU64 = AtomicU64::new(0);
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos() as u64)
-        .unwrap_or(0);
-    format!(
-        "{:x}-{nanos:x}-{:x}",
-        std::process::id(),
-        N.fetch_add(1, Ordering::Relaxed)
-    )
-}
-
-/// A fresh recovery key for a budget: unique to this open document, so two
-/// copies of the app (or an old crash's file for the same path) never write
-/// over each other. It starts with the path's hash, or `untitled`.
-pub fn new_recovery_key(path: Option<&Path>) -> String {
-    let base = path.map(path_hash).unwrap_or_else(|| "untitled".into());
-    format!("{base}-{}", unique())
+    method_session::clock::unique()
 }
 
 /// Keys name files in the recovery folder, and the web view hands them back
@@ -280,41 +246,18 @@ fn remove_if_present(path: &Path) -> io::Result<()> {
 // ---------------------------------------------------------------------------
 // Changes made outside the app
 
-/// A 64-bit FNV-1a hash of file content: enough to tell versions apart.
-pub fn content_hash(bytes: &[u8]) -> u64 {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    for b in bytes {
-        h ^= u64::from(*b);
-        h = h.wrapping_mul(0x0100_0000_01b3);
-    }
-    h
-}
-
-/// What a budget file looked like when the app last read or wrote it, to
-/// notice another program (a sync service, another computer, another app)
-/// changing it since.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DiskStamp {
-    pub len: u64,
-    pub modified: Option<SystemTime>,
-    pub hash: u64,
-}
-
-/// How a file on disk compares with its [`DiskStamp`].
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum DiskCheck {
-    /// The content we last read or wrote (`Some`: its time changed, here is
-    /// the stamp to remember instead).
-    Same(Option<DiskStamp>),
-    /// Different content.
-    Changed,
-    /// The file is gone (moved or deleted); a save puts it back.
-    Missing,
-}
-
-impl DiskStamp {
+/// [`DiskStamp`] made and checked against the file system.
+pub trait DiskStampExt {
     /// The stamp of `bytes`, just read from or written to `path`.
-    pub fn of(path: &Path, bytes: &[u8]) -> DiskStamp {
+    fn of(path: &Path, bytes: &[u8]) -> DiskStamp;
+    /// Compares `path` with this stamp. Size and time unchanged means the
+    /// same file without reading it; otherwise the content decides (a sync
+    /// service may touch a file without changing it).
+    fn check(&self, path: &Path) -> DiskCheck;
+}
+
+impl DiskStampExt for DiskStamp {
+    fn of(path: &Path, bytes: &[u8]) -> DiskStamp {
         let meta = fs::metadata(path).ok();
         DiskStamp {
             len: meta.as_ref().map_or(bytes.len() as u64, |m| m.len()),
@@ -323,10 +266,7 @@ impl DiskStamp {
         }
     }
 
-    /// Compares `path` with this stamp. Size and time unchanged means the
-    /// same file without reading it; otherwise the content decides (a sync
-    /// service may touch a file without changing it).
-    pub fn check(&self, path: &Path) -> DiskCheck {
+    fn check(&self, path: &Path) -> DiskCheck {
         let meta = match fs::metadata(path) {
             Ok(m) => m,
             Err(e) if e.kind() == io::ErrorKind::NotFound => return DiskCheck::Missing,
@@ -1049,20 +989,6 @@ pub(crate) mod tests {
             .collect();
         v.sort();
         v
-    }
-
-    #[test]
-    fn autosave_waits_for_quiet_but_not_forever() {
-        let t0 = Instant::now();
-        let s = |n: u64| t0 + Duration::from_secs(n);
-        // Quiet for 3 s after the last change.
-        assert!(!autosave_due(s(2), t0, Some(t0)));
-        assert!(autosave_due(s(3), t0, Some(t0)));
-        // Changes every few seconds: the 30 s cap still saves.
-        assert!(!autosave_due(s(29), s(28), Some(t0)));
-        assert!(autosave_due(s(30), s(29), Some(t0)));
-        // A clock that steps back never panics.
-        assert!(!autosave_due(t0, s(10), Some(s(10))));
     }
 
     #[test]

@@ -26,6 +26,7 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::app::{finish, safe_file_stem, with_budget_extension, AppState, DocId};
 use crate::safety::{self, Access};
+use crate::session::DocsFiles;
 use crate::session::Session;
 use crate::view::View;
 
@@ -179,6 +180,7 @@ pub async fn template_save<R: Runtime>(
 mod tests {
     use super::*;
     use crate::docs::Docs;
+    use crate::session::SessionFiles;
     use method_core::{starter, Baseline, InfoValue};
 
     fn full() -> Budget {

@@ -10,14 +10,12 @@
 pub mod actuals;
 pub mod app;
 pub mod apply;
-pub mod batch;
 pub mod bookmark;
 pub mod clipboard;
 pub mod coa_import;
 pub mod compare;
 pub mod diffmerge;
 pub mod display;
-pub mod docs;
 pub mod explain;
 pub mod export;
 pub mod export_import;
@@ -55,11 +53,10 @@ pub mod templates;
 pub mod tools;
 pub mod updater;
 pub mod versions;
-pub mod view;
 
 // Moved to method-session (docs/research/web-session.md), and re-exported
 // so the rest of the app keeps its `crate::edit` paths.
-pub use method_session::{diagnose, edit, report_dto};
+pub use method_session::{batch, diagnose, docs, edit, report_dto, view};
 
 pub use app::run;
 pub use session::Session;

@@ -18,6 +18,7 @@ use tauri_plugin_dialog::DialogExt;
 use crate::app::{AppState, DocId};
 use crate::docs::Docs;
 use crate::safety::{write_atomically, Access};
+use crate::session::DocsFiles;
 use crate::session::Session;
 
 /// How an export ended.
@@ -210,6 +211,7 @@ pub async fn export_budget<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::session::SessionFiles;
     use method_core::starter;
 
     fn temp_dir(tag: &str) -> PathBuf {

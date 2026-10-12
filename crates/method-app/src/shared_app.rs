@@ -22,6 +22,7 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::app::{finish, AppState, DocId};
 use crate::session::Session;
+use crate::session::{DocsFiles, SessionFiles};
 use crate::shared::{self, ActivityDto, Person, ReviewDto, ShareStatus, ValueDto};
 use crate::view::View;
 

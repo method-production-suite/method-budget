@@ -1218,6 +1218,7 @@ pub fn new_budget_create<R: Runtime>(
 mod tests {
     use super::*;
     use crate::docs::Docs;
+    use crate::session::SessionFiles;
     use method_core::{FringePosting, InfoValue};
 
     fn spec(title: &str) -> NewBudgetSpec {

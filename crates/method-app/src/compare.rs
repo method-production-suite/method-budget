@@ -28,6 +28,7 @@ use tauri_plugin_dialog::DialogExt;
 use crate::app::{AppState, DocId};
 use crate::diagnose::{error_message, lenient_recalc};
 use crate::docs::Docs;
+use crate::session::DocsFiles;
 
 /// Most budgets compared with the base at once.
 pub const MAX_OTHERS: usize = MAX_COMPARED - 1;
@@ -657,6 +658,7 @@ pub async fn compare_pick_files<R: Runtime>(
 mod tests {
     use super::*;
     use crate::session::Session;
+    use crate::session::SessionFiles;
 
     const AT: &str = "2026-10-09T14:30:00-07:00";
 

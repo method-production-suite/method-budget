@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use method_app::edit::{self, CurrencyInput, FringeInput, GroupInput, UnitInput};
+use method_app::session::SessionFiles;
 use method_app::view::Focus;
 use method_app::Session;
 use method_core::{Budget, Inclusion, RowId};

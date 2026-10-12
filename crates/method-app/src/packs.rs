@@ -37,6 +37,7 @@ use crate::docs::Docs;
 use crate::import_setup::{self, ImportPreview, ImportSources, ItemRef, Resolution};
 use crate::library::{self, Library, LibraryKind};
 use crate::safety::{self, Access};
+use crate::session::DocsFiles;
 use crate::view::View;
 
 /// The user's packs folder's name, in the app's local data folder.
@@ -691,6 +692,7 @@ mod tests {
     use super::*;
     use crate::safety::tests::temp_dir;
     use crate::session::Session;
+    use crate::session::SessionFiles;
     use method_core::{starter, Fringe, FringeKind};
 
     fn r(kind: &str, name: &str) -> ItemRef {
