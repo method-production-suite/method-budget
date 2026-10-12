@@ -1275,6 +1275,8 @@ pub fn run() {
         .manage(crate::coa_import::CoaSources::default())
         // The accounting export picked to import actuals from (src/actuals.rs).
         .manage(crate::actuals::ActualsSources::default())
+        // The budget export picked to import (src/export_import.rs).
+        .manage(crate::export_import::ExportSources::default())
         // Which budget change the other window has heard about (src/tools.rs).
         .manage(crate::tools::Broadcast::default());
 
@@ -1521,6 +1523,11 @@ pub fn run() {
             crate::coa_import::coa_import,
             crate::coa_import::chart_templates,
             crate::coa_import::chart_template_new,
+            // A whole budget from another program's export, with the
+            // reconciliation (src/export_import.rs)
+            crate::export_import::export_import_pick,
+            crate::export_import::export_import_preview,
+            crate::export_import::export_import,
             // Actuals and the cost report (src/actuals.rs)
             crate::actuals::actuals_pick,
             crate::actuals::actuals_preview,

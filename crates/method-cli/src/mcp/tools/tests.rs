@@ -1468,3 +1468,54 @@ fn export_and_import() {
         "only works with .xlsx",
     );
 }
+
+#[test]
+fn import_a_budget_export() {
+    let mut f = Fixture::new("exchange", false);
+    let src = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../method-format/tests/fixtures/exchange/by-budget-credits.json");
+    std::fs::copy(src, f.path("export.json")).unwrap();
+    // Only compare: nothing written.
+    let r = f
+        .tool("import_budget_export", json!({"file": "export.json"}))
+        .unwrap();
+    assert_eq!(r["format"], "json");
+    assert_eq!(r["written"], Value::Null);
+    assert_eq!(r["reconciliation"]["matches"], true);
+    assert_eq!(r["reconciliation"]["net_cents"], 545_047);
+    assert!(r["notes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|n| n["kind"] == "not_imported"));
+    let w = f
+        .tool(
+            "import_budget_export",
+            json!({"file": "export.json", "out": "imported.mthd", "title": "Credits"}),
+        )
+        .unwrap();
+    assert_eq!(w["written"], "imported.mthd");
+    let info = f
+        .tool("budget_info", json!({"path": "imported.mthd"}))
+        .unwrap();
+    assert_eq!(info["counts"]["lines"], 3);
+    err_contains(
+        f.tool(
+            "import_budget_export",
+            json!({"file": "export.json", "out": "imported.mthd"}),
+        ),
+        "already exists",
+    );
+    std::fs::write(f.path("notes.txt"), "hello").unwrap();
+    err_contains(
+        f.tool("import_budget_export", json!({"file": "notes.txt"})),
+        "budget export",
+    );
+    err_contains(
+        f.tool(
+            "import_budget_export",
+            json!({"file": "export.json", "format": "pdf"}),
+        ),
+        "",
+    );
+}

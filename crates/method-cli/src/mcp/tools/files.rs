@@ -187,6 +187,61 @@ pub fn tools() -> Vec<Tool> {
             run: import_sheet,
         },
         Tool {
+            name: "import_budget_export",
+            title: "Import a budget export",
+            description: "Makes a whole budget from another budgeting program's budget export \
+                (budget exchange JSON or XML, or its Excel or tab-delimited export; format \
+                json, xml, xml-advanced, xlsx or tab when the file doesn't say) and compares \
+                its totals, worked out by our engine, with the export's own figures: every \
+                line, account, category, fringe row, charge, credit and the grand and net \
+                totals. Returns what came over, notes on what was worked out (fringe posting, \
+                cutoffs, ranges, exchange rates, unit hours: check them) and what couldn't come \
+                over (formulas, globals, production totals, the rules of charges and credits), \
+                then the reconciliation with the first 50 differences (all with \
+                all_differences). Writes out (a new file unless overwrite) when given, unless \
+                dry_run.",
+            mutating: true,
+            destructive: false,
+            schema: || {
+                object(
+                    vec![
+                        (
+                            "file",
+                            s::path("The export file (.json, .xml, .xlsx, .txt)."),
+                        ),
+                        (
+                            "out",
+                            s::path("The budget to write (.mthd); leave out to only check."),
+                        ),
+                        (
+                            "format",
+                            s::one_of(
+                                "The export's layout, when the file doesn't say.",
+                                &["json", "xml", "xml-advanced", "xlsx", "tab"],
+                            ),
+                        ),
+                        (
+                            "title",
+                            s::text(
+                                "The budget's title (default: the export's, else the file name).",
+                            ),
+                        ),
+                        ("overwrite", s::boolean("Replace out if it exists.")),
+                        (
+                            "dry_run",
+                            s::boolean("Only read and compare; write nothing."),
+                        ),
+                        (
+                            "all_differences",
+                            s::boolean("List every difference, not the first 50."),
+                        ),
+                    ],
+                    &["file"],
+                )
+            },
+            run: import_budget_export,
+        },
+        Tool {
             name: "new_budget",
             title: "New budget",
             description: "Writes a new budget: the starter (a small chart of accounts with \
@@ -680,6 +735,77 @@ fn import_sheet(ctx: &mut Ctx, a: &Args) -> ToolResult {
             "totals": headline(&r),
         }),
     })
+}
+
+fn import_budget_export(ctx: &mut Ctx, a: &Args) -> ToolResult {
+    use method_format::import::exchange::{self, ExportFormat};
+    let file = ctx.roots.existing(a.req("file")?, paths::EXPORT_EXTS)?;
+    let shown = ctx.roots.show(&file);
+    let format =
+        match a.str("format") {
+            Some(f) => Some(ExportFormat::parse(f).ok_or_else(|| {
+                ToolError::invalid(format!("format: unknown layout {}", quoted(f)))
+            })?),
+            None => None,
+        };
+    let bytes = read_file(&file, &shown)?;
+    let name = file
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let (mut im, mut rec) = exchange::import(&bytes, &name, format)
+        .map_err(|e| ToolError::invalid(format!("{shown}: {e}")))?;
+    if let Some(t) = a.str("title") {
+        im.budget.title = t.trim().to_string();
+        rec = exchange::reconcile(&im);
+    }
+    let mut written = Value::Null;
+    if let (Some(o), false) = (a.str("out"), a.bool("dry_run")) {
+        let out = ctx.roots.target(o, paths::BUDGET_EXTS)?;
+        let out_shown = ctx.roots.show(&out);
+        ctx.docs.write_new(
+            &out,
+            &out_shown,
+            &format!("Import {name}"),
+            im.budget.clone(),
+            a.bool("overwrite"),
+        )?;
+        written = json!(out_shown);
+    }
+    let limit = if a.bool("all_differences") {
+        None
+    } else {
+        Some(50)
+    };
+    let mut data = crate::cmd::import_export::to_json(&im, &rec, limit);
+    if let Value::Object(m) = &mut data {
+        m.insert("written".into(), written.clone());
+    }
+    let compared = rec.compared();
+    let summary = format!(
+        "Read {shown} ({}): {} categories, {} accounts, {} lines. {}{}",
+        im.format.label(),
+        im.counts.categories,
+        im.counts.accounts,
+        im.counts.lines,
+        match (&rec.calc_error, rec.differences.len()) {
+            (Some(e), _) => format!("The imported budget doesn't recalculate: {e}."),
+            (None, 0) => format!(
+                "All {compared} of the export's figures match (grand total {}).",
+                money(rec.export_grand)
+            ),
+            (None, n) => format!(
+                "{n} of the export's {compared} figures differ (grand total: export {}, imported {}).",
+                money(rec.export_grand),
+                rec.grand.map_or("?".into(), money)
+            ),
+        },
+        match written.as_str() {
+            Some(o) => format!(" Wrote {o}."),
+            None => String::new(),
+        }
+    );
+    Ok(ToolOut { summary, data })
 }
 
 // ---------------------------------------------------------------------------

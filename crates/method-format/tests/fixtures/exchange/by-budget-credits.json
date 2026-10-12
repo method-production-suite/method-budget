@@ -1,0 +1,29 @@
+{"metadata": {"budgetdata": {"BudgetName": "", "BudgetUUID": "00000000-0000-0000-0000-000000000000", "ProjectName": "", "ProjectUUID": "", "Created": "2001-01-01", "Modified": "", "BaseCurrency": "USD", "ConvCurrency": "USD", "CategoryCount": 3, "DetailAccountCount": 5, "DetailLineCount": 7, "FringeCount": 2, "GlobalCount": 0, "UnitCount": 7, "LocationCount": 0, "SetCount": 0, "CurrencyCount": 1}, "defaultfields": {"Title": "", "Production": "", "Season": "", "EpisodeNumber": "", "TotalEpisodes": "", "Status": "", "ProductionBaseCountry": "", "ProductionBaseRegion": "", "ProductionBaseCity": "", "LocationShootDays": "", "StageShootDays": "", "StartProductionDate": "", "EndProductionDate": "", "ProductionYear": ""}, "customfields": []},
+ "categories": [
+  {"cID": 0, "cNumber": "1100", "cDescription": "Cat Fir", "cFringe": 500, "cOriginal": 0, "cTotal": 4000, "cVariance": 4000},
+  {"cID": 1, "cNumber": "2100", "cDescription": "Cat Ginkgo", "cFringe": 300, "cOriginal": 0, "cTotal": 4000, "cVariance": 4000},
+  {"cID": 2, "cNumber": "", "cDescription": "", "cFringe": 0, "cOriginal": 0, "cTotal": 0, "cVariance": 0},
+  {"cID": 3, "cNumber": "", "cDescription": "Total Fringes", "cFringe": null, "cOriginal": 0, "cTotal": 800, "cVariance": 800, "fringeDetail": [{"type": "flatFringe", "name": "QFDAY", "rate": "25", "unit": "Days", "amount": 4, "total": 100}, {"type": "pctFringe", "name": "QP10N", "rate": "10", "amount": 7000, "total": 700}]},
+  {"cID": 4, "cNumber": "", "cDescription": "QCR3", "cFringe": null, "cOriginal": 0, "cTotal": -411.52, "cVariance": -411.52},
+  {"cID": 5, "cNumber": "", "cDescription": "QCR5", "cFringe": null, "cOriginal": 0, "cTotal": -97.6, "cVariance": -97.6},
+  {"cID": 6, "cNumber": "", "cDescription": "QCR6", "cFringe": null, "cOriginal": 0, "cTotal": -810, "cVariance": -810},
+  {"cID": 7, "cNumber": "", "cDescription": "QCR4", "cFringe": null, "cOriginal": 0, "cTotal": -0.01, "cVariance": -0.01},
+  {"cID": 8, "cNumber": "", "cDescription": "QCR2", "cFringe": null, "cOriginal": 0, "cTotal": -825, "cVariance": -825},
+  {"cID": 9, "cNumber": "", "cDescription": "QCR1", "cFringe": null, "cOriginal": 0, "cTotal": -1205.4, "cVariance": -1205.4}
+ ],
+ "accounts": [
+  {"categoryID": 0, "aID": 0, "aNumber": "1101", "aDescription": "Acct Dogwood", "aFringe": 500, "aOriginal": 0, "aTotal": 4000, "aVariance": 4000},
+  {"categoryID": 0, "aID": 1, "aNumber": "", "aDescription": "", "aFringe": 0, "aOriginal": 0, "aTotal": 0, "aVariance": 0},
+  {"categoryID": 1, "aID": 2, "aNumber": "2101", "aDescription": "Acct Elm", "aFringe": 300, "aOriginal": 0, "aTotal": 4000, "aVariance": 4000},
+  {"categoryID": 1, "aID": 3, "aNumber": "", "aDescription": "", "aFringe": 0, "aOriginal": 0, "aTotal": 0, "aVariance": 0},
+  {"categoryID": 2, "aID": 4, "aNumber": "", "aDescription": "", "aFringe": 0, "aOriginal": 0, "aTotal": 0, "aVariance": 0}
+ ],
+ "details": [
+  {"accountID": 0, "dAggPercent": "12.5%", "dAggSumPercent": "12.5%", "dFringes": ["QFDAY", "QP10N"], "dGroups": ["QCRED"], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "Birch line", "dAmount": 4, "dUnit": "Days", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 1000, "dUnit3": "", "dUnit4": "", "dSubtotal": 4000, "dFourthMlt": 1},
+  {"accountID": 1, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1},
+  {"accountID": 2, "dAggPercent": "10%", "dAggSumPercent": "10%", "dFringes": ["QP10N"], "dGroups": ["QCRED2"], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "Alder line", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 3000, "dUnit3": "", "dUnit4": "", "dSubtotal": 3000, "dFourthMlt": 1},
+  {"accountID": 2, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "Cedar line", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 1000, "dUnit3": "", "dUnit4": "", "dSubtotal": 1000, "dFourthMlt": 1},
+  {"accountID": 3, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1},
+  {"accountID": 4, "dAggPercent": "", "dAggSumPercent": "", "dFringes": [], "dGroups": [], "dGlobalsUsed": [], "dLocation": "", "dSet": "", "dDescription": "", "dAmount": 1, "dUnit": "", "dX": 1, "dUnit2": "", "dCurrency": "", "dRate": 0, "dUnit3": "", "dUnit4": "", "dSubtotal": 0, "dFourthMlt": 1}
+ ]
+}

@@ -257,6 +257,7 @@ fn tools_list_schemas_are_valid_and_names_are_unique() {
         "validate",
         "export",
         "import_sheet",
+        "import_budget_export",
         "new_budget",
         "save_as",
         "undo",
@@ -289,6 +290,7 @@ fn read_only_hides_every_tool_that_writes() {
         "merge",
         "undo",
         "import_sheet",
+        "import_budget_export",
     ] {
         assert!(!names.contains(&hidden), "{hidden} listed");
     }

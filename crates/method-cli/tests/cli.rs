@@ -674,3 +674,48 @@ fn import_with_and_without_a_mapping() {
     assert!(err(&o).contains("create_accounts"), "{}", err(&o));
     assert_eq!(code(&method(&["import", &csv])), 2);
 }
+
+#[test]
+fn import_export_checks_and_writes() {
+    let d = Dir::new("import-export");
+    let src = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../method-format/tests/fixtures/exchange/by-level.json");
+    let export = d.path("by-level.json");
+    std::fs::copy(src, &export).unwrap();
+    // Without -o: the report, nothing written.
+    let o = method(&["import-export", &export]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let text = out(&o);
+    assert!(text.contains("by production level"), "{text}");
+    assert!(
+        text.contains("Grand total: export 34,020.00 USD, imported 34,020.00 USD (same)"),
+        "{text}"
+    );
+    assert!(text.contains("nothing written"));
+    // With -o: the budget, which checks.
+    let mthd = d.path("imported.mthd");
+    let o = method(&["import-export", &export, "-o", &mthd, "--title", "Levels"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(out(&o).contains("wrote"));
+    let o = method(&["check", &mthd]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(out(&o).contains("net total 34,020.00"), "{}", out(&o));
+    assert!(read(&mthd).contains("\"title\": \"Levels\""));
+    // An existing -o is refused without --force.
+    let o = method(&["import-export", &export, "-o", &mthd]);
+    assert_eq!(code(&o), 1);
+    assert!(err(&o).contains("--force"));
+    // JSON output.
+    let o = method(&["import-export", &export, "--json"]);
+    let v: method_format::serde_json::Value =
+        method_format::serde_json::from_str(&out(&o)).unwrap();
+    assert_eq!(v["reconciliation"]["grand_cents"], 3_402_000);
+    assert_eq!(v["reconciliation"]["matches"], true);
+    // Bad input.
+    let o = method(&["import-export", &export, "--format", "pdf"]);
+    assert_eq!(code(&o), 2);
+    std::fs::write(d.path("x.txt"), "hello").unwrap();
+    let o = method(&["import-export", &d.path("x.txt")]);
+    assert_eq!(code(&o), 1);
+    assert!(err(&o).contains("budget export"), "{}", err(&o));
+}

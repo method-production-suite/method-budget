@@ -1719,6 +1719,40 @@ the same line totals and grand total (tested).
 | `sheet_import_preview` | `token`, `request` (`{sheet, header_row, mapping: {field: column}, detect_header, guess, create_accounts, create_setup, default_account, target}`, `target` `"new"` for a new tab) | the preview: `{header_row, signature, mapping, columns, raw, lines, line_count, skipped, skipped_count, warnings, warning_count, headings, new_categories, new_accounts, matched_accounts, added, dropped, notes, reconciliation, grand_total_before, grand_total_after, calc_error, truncated}`; changes nothing |
 | `sheet_import` | `token`, `request` | `{view, message}`: into the budget as one undo step, or a new tab in front |
 
+### Importing a budget export
+
+**File > Import Budget Export…** makes a whole budget from another budgeting program's
+export: budget exchange JSON or XML (basic or advanced), its Excel workbook or its
+tab-delimited topsheet (docs/IMPORT.md says what each carries). Rust shows the Open dialog
+(a filter per layout), reads the file, builds the budget and checks it; the review shows,
+before anything changes:
+
+- **Read as**: the layout found from the file's content, changeable (the file is read
+  again).
+- **What comes over**: the budget's title, its categories, accounts and lines (adjustment
+  rows among them), fringes, groups, sets, locations and currencies, charges and credits.
+- **Check against the export's totals**: whether every figure comes out the same (grand
+  total, and net total after credits), a table of what was compared (lines, account
+  totals, account fringes, fringe accounts or Total Fringes rows, category totals and
+  fringes, charges, credits, the grand and net totals) with how many differ, and the
+  differing figures (the first 200) with the export's value, the imported one and the
+  difference.
+- **Notes**: what was worked out from the export's figures and should be checked (fringe
+  posting, account numbering, cutoffs and ranges, exchange rates, unit hours, a charge that
+  is a round percentage), what isn't in the export or wasn't brought over (formulas and
+  globals, production totals, the rules of charges and credits, suppressed lines), and the
+  rest.
+
+**Import as New Budget** opens it in a new tab, unsaved (its first undo step), like Import
+Chart of Accounts' new budget; the toast says what came in. It is disabled when the budget
+doesn't recalculate or has no categories.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `export_import_pick` | none (shows the Open dialog) | the review, or `null` when cancelled: `{token, file, format, format_label, formats, title, categories, accounts, lines, adjustments, fringes, groups, sets, locations, currencies, charges, credits, notes: [{kind, text}], currency, tallies: [{kind, label, compared, different}], differences: [{kind, what, export, imported}], difference_count, export_grand, grand, export_net, net, calc_error, matches}` |
+| `export_import_preview` | `token`, `format` (`null` to detect) | the review, read as that layout; changes nothing |
+| `export_import` | `token`, `format` | `{view, message}`: the budget in a new tab in front |
+
 ### Actuals and the cost report
 
 **File > Import Actuals…** brings in actual costs from an accounting system's export (an
@@ -2025,6 +2059,9 @@ crates/method-app/
                      mapping per sheet, checked row by row, then Import Setup's review
   src/sheet_import.rs  Import Spreadsheet: the picked file kept by token, the mapping
                      dialog's preview and the import (method_format::import does the work)
+  src/export_import.rs  Import Budget Export: the picked export kept by token, the review
+                     (method_format::import::exchange reads, builds and checks) and the
+                     new tab
   src/actuals.rs     Import Actuals, the Actuals tab's commands and the cost figures
                      every view of a budget with actuals carries (method_core::actuals and
                      method_format::import::actuals do the work); the rollup cache
@@ -2483,8 +2520,11 @@ Numbers and CSV files from Excel on Windows (checked here with workbooks written
 with Python's zipfile and our own exports, and the dialog in a browser harness against the
 real Rust preview and import). It reads values, not formulas or styles (a date comes in as
 its serial number, a number formatted with leading zeros loses them), maps one column per
-field, and keeps a saved mapping only in the web view's storage; 1.16 (the reference's own
-exports) will add readers for its layouts on top of it.
+field, and keeps a saved mapping only in the web view's storage.
+Import Budget Export needs a live check: the Open dialog's filters and the review in the
+app (checked here with the parity runs' exports in every layout through `method
+import-export`, and the review in a browser harness with a canned reply, Import calling
+`export_import` with the token and layout).
 Exports need a live check: File > Export's Save dialogs, and the workbook opened in Excel
 and Numbers (checked here by reading it back: ZIP CRCs, every part well-formed with
 `xmllint` and Python's parser, content types and relationships complete, every cell's

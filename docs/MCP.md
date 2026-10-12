@@ -168,7 +168,7 @@ the first time a tool names it, and `budget_open` opens it again on purpose.
 | Setup | `set_global`, `add_setup`, `update_setup`, `rename_setup`, `delete_setup` |
 | Charges and credits | `set_charge`, `set_credit`, `apply_charge`, `delete_charge` |
 | Topsheet | `add_category`, `update_category`, `delete_category`, `add_production_total`, `delete_production_total`, `add_account`, `update_account`, `delete_account`, `set_title` |
-| Files | `new_budget`, `save_as`, `export`, `import_sheet`, `merge`, `undo` |
+| Files | `new_budget`, `save_as`, `export`, `import_sheet`, `import_budget_export`, `merge`, `undo` |
 
 Every tool that works on one budget takes `path`. Tools that read totals take
 `exclude_groups` (a list of group names whose lines are left out, as `method totals
@@ -418,6 +418,21 @@ and warnings (the first 20), the sheet-versus-budget reconciliation and the tota
 {"name": "import_sheet", "arguments": {"sheet": "camera.xlsx", "into": "film.mthd",
   "out": "film.mthd", "mapping": {"columns": {"account_code": "A", "description": "B",
   "amount": "C", "unit": "D", "rate": "E"}}}}
+```
+
+**`import_budget_export`** `{file, out?, format?, title?, overwrite?, dry_run?, all_differences?}`:
+a whole budget from another budgeting program's export (budget exchange JSON or XML, its
+Excel workbook or tab-delimited topsheet; `format` `json`, `xml`, `xml-advanced`, `xlsx` or
+`tab` when the content doesn't say), as `method import-export` (docs/IMPORT.md). Returns
+`counts`, `notes` (`kind` `check`, `not_imported` or `info`: what was worked out from the
+figures and should be checked, and what couldn't come over) and `reconciliation`: the
+imported budget's totals against the export's own (`matches`, the grand and net totals in
+cents, `tallies` per kind of figure, the first 50 `differences`, all with
+`all_differences`). Writes `out` (a new file unless `overwrite`) when given, unless
+`dry_run`; without `out` it only reads and compares.
+
+```json
+{"name": "import_budget_export", "arguments": {"file": "pilot.json", "out": "pilot.mthd"}}
 ```
 
 **`merge`** `{base, ours, theirs, out, prefer?, dry_run?, overwrite?}`: the engine's

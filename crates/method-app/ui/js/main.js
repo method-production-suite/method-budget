@@ -70,6 +70,7 @@ import { showWhatChanged, showMerge } from './diffmerge.js';
 import { importSetup, newFromTemplate, saveAsTemplate } from './importsetup.js';
 import { importSpreadsheet } from './sheetimport.js';
 import { importChart } from './coaimport.js';
+import { importBudgetExport } from './exchangeimport.js';
 import { exportPack, importPack } from './packs.js';
 import { exportSetupLists, importSetupLists } from './setuplists.js';
 import { importActuals } from './actualsimport.js';
@@ -2223,6 +2224,17 @@ Object.assign(COMMANDS, {
     if (grid.editor) grid.commitEdit(null);
     if (!state.view) return;
     importChart({ invoke, apply: (v) => apply(v, { cmd: 'coa_import' }), toast, focus: () => grid.focus() });
+  },
+});
+
+// File > Import Budget Export…: a whole budget from another program's export,
+// reviewed against the export's own totals, as a new tab (exchangeimport.js;
+// src/export_import.rs).
+Object.assign(COMMANDS, {
+  'file.import_budget_export': () => {
+    if (grid.editor) grid.commitEdit(null);
+    if (!state.view) return;
+    importBudgetExport({ invoke, apply: (v) => apply(v, { cmd: 'export_import' }), toast, focus: () => grid.focus() });
   },
 });
 
