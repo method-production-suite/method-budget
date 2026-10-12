@@ -276,7 +276,7 @@ impl fmt::Display for Money {
 
 /// `percent` percent of `c` cents (`12.5` is 12.5%), before rounding. Movie
 /// Magic arithmetic takes the percentage as a fraction first, `c x (percent
-/// / 100)`, as the reference product does (decisions.md, entry 67: 3.05% of
+/// / 100)`, as the reference product does (decisions.md, entry 68: 3.05% of
 /// 5,250.00 is 5,250 x 0.0305 = 160.125 in doubles, so 160.13, where 5,250 x
 /// 3.05 / 100 is 160.12499999999997); exact arithmetic is `c x percent /
 /// 100`, the same either way. `None` on overflow.

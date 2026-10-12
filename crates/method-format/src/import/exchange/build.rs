@@ -24,6 +24,8 @@
 //!   amount.
 //! - **Units**: the usual starter hours (the export has none), custom
 //!   units by their singular and plural.
+//! - **Percent units**: a number in `%` is a percentage when the line's
+//!   total says so; it comes in divided by 100 (`1.5/100`).
 //!
 //! What can't come over: formulas and globals (lines keep the values;
 //! each line that used globals gets a note naming them), production totals

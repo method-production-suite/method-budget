@@ -46,7 +46,13 @@ works it out, and the notes list each one under **Check**:
 - **Fringes**: name, kind and rate from the fringe rows' figures. A percent fringe's
   **cutoff** is worked out from what it was charged on against what its lines come to, and
   **fringe ranges** from the lines that earned less than their rate (a line that earned
-  nothing once the cutoff was used up, or less than its own total allows). The workbook has
+  nothing once the cutoff was used up, or less than its own total allows): such a line
+  joins as few of the lines above it as fit its percentage best, passing over lines that
+  come to nothing (a 0-day premium) and counting what its flat fringes make; cutoffs and
+  ranges are worked out in turn until they settle. Where the lines' two-place percentages
+  can't show a range (a fitting that takes a shoot just over a cutoff), an account whose
+  fringes still come out over gets the join that brings them to the export's figure, and
+  the cutoffs are worked out again. The workbook has
   no fringe rates: they come from each line's fringe percentages, and the cutoffs from the
   lines' percentages and the accounts' fringe totals (any cutoff that gives the export's
   totals exactly; the middle of the range that does). The basic XML doesn't say which
@@ -60,6 +66,17 @@ works it out, and the notes list each one under **Check**:
   budget added gets its hours from what the flat fringes counted when only one value fits.
 - **Percent charges**: a charge that is exactly a round percentage of the total before
   charges is pointed out (it still comes in as a fixed amount).
+- **Charges and credits with account numbers**: a topsheet row with a number but no fringe
+  figure and no accounts (`600-00 Contingency`, `900-01 Tax credit`) is a charge, or a
+  credit when it is negative, posted to that number; an empty category still shows a
+  fringe figure of 0.
+- **Percent units**: a line whose Amount, X, 4X or Rate is in `%` (also `Pct`, `Percent`)
+  holds a percentage: when the line's total in the export is the product over 100, that
+  number comes in divided by 100 (`1.5 %` of 5,500,000 is Amount `1.5/100`, 82,500.00),
+  the unit is dropped and the line has a note.
+- **Account totals in whole units**: when every account total in the export is its lines
+  rounded to a whole unit, the budget rounds its account totals, which this program
+  doesn't; the notes say so, and those cents are the only differences.
 
 ## What can't come over
 
@@ -93,9 +110,9 @@ differs is listed with both values.
 - A budget shown in another currency is compared as the export shows it: each line, and
   each fringe's total, converted and rounded, then added up.
 - A difference is information, not an error: the budget still imports. Usual causes are a
-  cutoff or range the figures didn't decide, unit hours of a unit no fringe counted, and
-  figures the exporting program only shows (an adjustment row converted in the totals
-  currency).
+  cutoff or range the figures didn't decide, unit hours of a unit no fringe counted,
+  account totals the exporting budget rounds to whole units, and figures the exporting
+  program only shows (an adjustment row converted in the totals currency).
 
 The exports of the 2026-10-10 and 2026-10-11 parity runs all come to their own figures, but
 one shown in pounds, which is off by 0.01 to 0.03 there; the JSON writes a 100.005 charge as

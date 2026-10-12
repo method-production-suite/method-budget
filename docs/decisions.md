@@ -2060,7 +2060,8 @@ default, and keep our exact decimals (entries 1 and 2) as a setting per budget.*
     is 1.49. The file always kept formulas as typed; the formula reader now takes more than
     9 places (exact arithmetic still refuses them, with "more than 9 decimal places").
   - A percent fringe is `base x percent / 100` on the base's dollars: 12.5% of a 4,444.44
-    cutoff is 555.55499..., so 555.55 (the cutoff factor case V04-2). A flat fringe's count
+    cutoff is 555.55499..., so 555.55 (the cutoff factor case V04-2). (Amended by entry
+    68: `base x (percent / 100)`, the fraction first, as a real export showed.) A flat fringe's count
     is worked out first (`Amount x line unit hours / fringe unit hours`, left to right),
     then times the rate: 0.06 per 12-hour Day on 1 Hour is 0.06 x 0.08333333333333333 =
     0.004999999999999999, so 0.00 (F-19). A percent charge is the same as a percent fringe
@@ -2074,7 +2075,7 @@ default, and keep our exact decimals (entries 1 and 2) as a setting per budget.*
     rounded cents, so rollups always agree.
 - **Not checked, chosen**: where the order of operations could matter and no figure
   decided it, we multiply left to right as written above (percent: base x percent, then /
-  100; flat: count, then x rate; a capped flat count: Amount x line hours x hours a day /
+  100, since decided otherwise by entry 68; flat: count, then x rate; a capped flat count: Amount x line hours x hours a day /
   Day hours / fringe hours; credits: percent of net, then / 100, then x (100 - discount) /
   100). The most-hours-a-day cap and the `amount_counts` basis are ours, so their order is
   ours too.
@@ -2365,7 +2366,7 @@ five. docs/IMPORT.md is the user's account; this is why it works the way it does
   where the JSON's figures give 2,222.22: any value from 2,222.20 to 2,222.28 gives the same
   totals) and the unrounded charge; the basic XML loses groups and globals and rounds
   charges and credits to whole units; the tab-delimited file brings each account's total
-  as one line.
+  as one line. A real feature budget's JSON export (2026-10-12) found more: entry 68.
 - **Surfaces.** `method import-export` (docs/CLI.md), the `import_budget_export` MCP tool
   (docs/MCP.md) and File > Import Budget Export… in the app, whose review follows Import
   Spreadsheet's and opens the budget in a new unsaved tab (docs/APP.md). User-facing text
@@ -2913,3 +2914,93 @@ where it belongs (src/open_any.rs; docs/APP.md, "Tabs" and "Opening from the sys
 - Tests: src/open_any.rs (a budget saved as `.json` and `.txt`, a `.mthd` by name, JSON,
   XML, workbook and tab-delimited exports from the exchange fixtures, a plain workbook,
   CSV and tab-delimited text, and files Open doesn't read).
+
+## 68. A real budget's export: ranges, percent units, numbered charges, the percent order (2026-10-12)
+
+A feature budget's budget exchange JSON from the reference product (a template the owner
+cleared for reading; not in the repository) imported with 154 of 2,701 figures different:
+export grand total 4,474,880.32, ours 13,508,248.76. Every difference was traced to a cause
+in the export's own figures (CLEAN-ROOM.md: the open export only).
+
+- **A line in `%`** (`1.5 %` x 5,500,000, total 82,500.00) came in as 1.5 x 5,500,000.
+  A line whose Amount, X, 4X or Rate is in a percent unit (`%`, `Pct`, `Percent`,
+  `Percentage`) holds a percentage: when the line's total in the export is the product over
+  100 and not the product, that number comes in as `1.5/100` (our grammar has no `%`), the
+  unit is dropped and the line gets a note. Base-currency lines only, where the total can be
+  checked.
+- **Numbered charges and credits.** `600-00 CONTINGENCY : 10%` and `900-01 KY Tax Credit`
+  have a number, a blank fringe figure (`cFringe: null`) and no accounts; they came in as
+  empty categories. A numbered row with no fringe figure, no accounts and no fringe detail
+  is a charge (a credit when negative) posted to that account number (`account` on the
+  charge or credit); a category, even an empty one, shows a fringe figure of 0. That also
+  settles the posting mode: the one Total Fringes row is after the categories, so fringes
+  post by budget.
+- **Fringe ranges, the ways the old inference broke** (all the account-fringe differences;
+  the cutoffs came out 4,791.61 for FUTA, 8,615.45 for SUI and 3,500.00 for LA SUI, where
+  the figures say 7,000.00, 11,700.00 and 7,000.00):
+  - A 0-day premium line (total 0) between a person's Shoot and Wrap started a new range,
+    so Wrap never joined Prep and Shoot. Lines that come to nothing are passed over.
+  - Lines with a flat fringe were never put in a range. The check now counts what the
+    line's flat fringes make (entry 54's count, through the units' hours) in the
+    percentage it should earn.
+  - A join was for good and took the whole run of fringed lines back (passing name rows
+    with no fringes), so a second person whose shoot earned less only by their own cutoff
+    was pulled into the first's range, and early passes, with cutoffs still far off, made
+    joins later passes couldn't undo. Now each pass works the ranges out afresh from the
+    current cutoffs: a line that earns less than it would alone joins as few lines above it
+    as fit its percentage best (or the range just above), and only when that fits better
+    than alone; cutoffs and ranges alternate until the ranges settle (twelve passes at
+    most).
+  - A range the two-place percentages can't show (a 171.33 fitting before a 6,878.34 shoot
+    goes 49.67 over 7,000.00: 0.30 of 2,419.43, 12.55% either way) is found from the
+    accounts' exact fringe totals: in an account whose fringes come out over by 0.05 or
+    more, the join that brings them nearest is made (recalculating), again while it helps;
+    then the cutoffs are worked out again (twice at most). Layouts with fringe figures, in
+    the base currency.
+- **Percent fringes take the rate as a fraction first** (engine, Movie Magic arithmetic;
+  amends entry 55's "not checked, chosen" order). With the ranges right, 20 accounts were
+  0.01 or 0.02 under: 3.05% of 5,250.00 is 160.13 in the export, and `5,250 x 3.05 / 100`
+  is 160.12499999999997 in doubles (160.12) while `5,250 x (3.05 / 100)` is 160.125
+  (160.13); the 1.45000005% Medicare rate the same. Every account fits the fraction-first
+  order and every earlier check still holds (12.5% of 4,444.44 is still 555.55; 0.4425% of
+  22,600.00 still 100.01). `calc::arith::percent_of` is the one place, so percent charges
+  follow (not separately checked); exact arithmetic is unchanged (the exact product is the
+  same either way). The synthetic -3.335 case in the fringe unit tests became 50% of -0.25
+  (-0.125 still rounds to -0.12).
+- **A flat fringe counts nothing on an Amount of 0** (engine; refines entry 54's "charged
+  once"). Two stand-in name rows (Amount 0, no unit, Rate 0) carry a 0.55 per Mday fringe;
+  the export charges them nothing (1,837.52, not 1,838.62), while lines of 1 Week and 5
+  Weeks at a 0 rate with a 10.00 per Week fringe are charged (account 104-01). A line that
+  would be charged once (no unit, or a unit without hours) counts 0 when its Amount is 0;
+  Explain says "the Amount is 0: nothing counted". The `quantity` basis keeps its old rule.
+- **Account totals in whole units: not matched, pointed out.** Every account total in this
+  export is its lines' total rounded to a whole dollar (all 356; categories add the rounded
+  accounts; fringes, charges, credits and the grand total keep cents), so the exporting
+  budget rounds account totals. We have no such setting; the import says so under Check
+  ("Every account total in the export is its lines rounded to a whole unit: ... 46 accounts
+  ... differ by those cents"). Matching it would be an engine setting for the owner to
+  decide: which setting in the reference product does this, and does it round to the
+  nearest (every account here fits the nearest; no half was seen)?
+- **Unit hours from unit names: not done.** The hypothesis that `$/12Hrs`, `$/Hour`,
+  `Nights` and the like needed hours was checked and is not the cause: no flat fringe here
+  counts a line in those units, and every fringe matches with the starter hours (Mday 12 is
+  worked out as before). Reading hours from names would also be wrong for rate labels:
+  `15 $/Hr` is a rate of 15 written in the Amount, and giving `$/Hr` 1 hour would count it
+  as 15 hours. Hours are still worked out only from what the flat fringes counted.
+- **Nothing dropped.** The metadata says 4,694 detail lines and 32 fringes; the file has
+  1,968 detail rows (1,914 lines and 54 empty entry rows, all read) and 27 fringe figures
+  (plus one fringe named on lines with no figure, added at 0%). Every account's lines add
+  up to its total (to the whole dollar), so no counted line is missing; the counts include
+  what the export leaves out (suppressed lines, unused fringes).
+- **Result:** 1,914 lines, 356 account fringes, 34 category fringes, the Total Fringes row
+  (933,992.34), the charge and the credit all the same; 46 account totals, 14 category
+  totals and the grand (5,874,815.47 against 5,874,821.81) and net (4,474,880.32 against
+  4,474,886.66) totals differ by the accounts' whole-dollar rounding only (6.34 in all), 62
+  differences. Cutoffs FUTA 7,000.00, SUI 11,700.00, LA SUI 7,000.00; 77 ranges. The parity
+  runs' exports (2026-10-10 and 2026-10-11) still all come to their figures.
+- Tests: crates/method-format/tests/exchange.rs `crew_ranges_and_percent_units` (an
+  invented fixture, tests/fixtures/exchange/crew-ranges.json, with each shape above; the
+  previous import got 5 of its 6 accounts' fringes, the `%` line and both numbered rows
+  wrong) and `account_totals_in_whole_units_are_pointed_out` (whole-units.json);
+  crates/method-core/tests/mmb_parity.rs `a_percent_fringe_takes_its_rate_as_a_fraction_first`
+  and `a_flat_fringe_counts_nothing_on_an_amount_of_0`.

@@ -281,7 +281,7 @@ fn a_percent_fringe_at_a_cutoff_rounds_on_the_double() {
     }
 }
 
-/// The percentage is a fraction first (entry 67, read from a real export's
+/// The percentage is a fraction first (entry 68, read from a real export's
 /// account fringes): 3.05% of 5,250.00 is 5,250 x 0.0305 = 160.125 in
 /// doubles, so 160.13, where 5,250 x 3.05 / 100 is 160.12499999999997;
 /// exact arithmetic gives 160.13 too. 1.45000005% of 5,250.00 is 76.13.
@@ -314,7 +314,7 @@ fn a_percent_fringe_takes_its_rate_as_a_fraction_first() {
 }
 
 /// A flat fringe on a line whose unit has no hours is charged once, but
-/// not on a line whose Amount is 0 (entry 67: a stand-in's title line of
+/// not on a line whose Amount is 0 (entry 68: a stand-in's title line of
 /// 0 with a 0.55 per Day fringe comes to nothing).
 #[test]
 fn a_flat_fringe_counts_nothing_on_an_amount_of_0() {

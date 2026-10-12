@@ -522,7 +522,7 @@ fn every_layout_reads_as_its_json_twin() {
 /// fitting that takes a shoot just over the cutoff (invisible in the lines'
 /// two-place percentages), a stand-in line of Amount 0 with a flat fringe,
 /// a line in `%`, and a charge and a credit with account numbers
-/// (decisions.md, entry 67).
+/// (decisions.md, entry 68).
 #[test]
 fn crew_ranges_and_percent_units() {
     let (im, rec) = import("crew-ranges.json");

@@ -320,7 +320,7 @@ pub(crate) enum CountFrom {
     /// The line's unit (blank for none) has no hours (or 0): charged once.
     LineNoHours(String),
     /// It would be charged once, but the line's Amount is 0: nothing is
-    /// counted (decisions.md, entry 67).
+    /// counted (decisions.md, entry 68).
     NoAmount,
     /// The line is in the fringe's own unit: the count is the Amount
     /// (`base`).
