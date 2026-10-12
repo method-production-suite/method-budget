@@ -24,6 +24,10 @@
 //!   the library is read from that tab (its unsaved changes count) and every
 //!   change to it from the Library tab is refused with a message: edit it in
 //!   its tab, or close the tab. That keeps one writer per file.
+//!
+//! The review, the copying and the library's view are method-session's
+//! `library` module (re-exported here); the library's file, which file it
+//! is (library.json) and the Tauri commands are here.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -35,49 +39,16 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::app::{finish, AppState, DocId};
 use crate::docs::Docs;
-use crate::import_setup::{
-    self, all_items, closure, describe, item_ref, ImportPreview, Imported, ItemRef, Resolution,
-    What,
-};
+use crate::import_setup::{Imported, ItemRef, Resolution};
 use crate::safety::{self, Access};
 use crate::session::DocsFiles;
-use crate::view::View;
 
-/// The file a new library gets, in the folder the user picks.
-pub const LIBRARY_FILE_NAME: &str = "My Method Budget Library.mthd";
-/// A new library's title.
-pub const LIBRARY_TITLE: &str = "My Method Budget Library";
+pub use method_session::library::*;
 
 const NO_LIBRARY: &str = "No library yet. Create one or choose a library file first.";
 
-/// A new, empty library: no lines, no units, no setup.
-pub fn new_library(base_currency: &str) -> Budget {
-    let mut b = Budget::new(LIBRARY_TITLE, base_currency);
-    b.units.clear();
-    b
-}
-
-/// Whether kind `w` can be a library item (everything but the settings).
-fn library_kind(w: What) -> bool {
-    !w.is_setting()
-}
-
 // ---------------------------------------------------------------------------
 // Reading and writing the library file
-
-/// What a tab is called, for messages.
-pub(crate) fn tab_name(docs: &Docs, id: DocId) -> String {
-    docs.get(id)
-        .map(|s| s.tab_label())
-        .unwrap_or_else(|| "it".into())
-}
-
-/// The message for a change refused because the library is open as a tab.
-pub(crate) fn in_tab_refusal(name: &str) -> String {
-    format!(
-        "Your library is open as the budget tab \u{201c}{name}\u{201d}. Make the change there, or close that tab and try again."
-    )
-}
 
 /// The library in `path`: from its tab when it is open (unsaved changes
 /// count), else read from the file. Also says which tab, if any.
@@ -129,79 +100,6 @@ pub fn create_in(dir: &Path, base_currency: &str) -> Result<(PathBuf, bool), Str
 // ---------------------------------------------------------------------------
 // What the Library tab shows
 
-/// One item in the library.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-pub struct LibraryItem {
-    pub name: String,
-    /// Its folder, or none (unfiled).
-    pub folder: Option<String>,
-    /// Its definition, in words.
-    pub definition: String,
-    /// Every other library item it needs, however deep: they come along.
-    pub needs: Vec<ItemRef>,
-}
-
-/// One kind of item, with its folders.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-pub struct LibraryKind {
-    /// `global`, `fringe`, `group`, `unit`, `set`, `location`, `currency`,
-    /// `charge`, `credit`, `tag_preset`, `line_preset` or `report_preset`.
-    pub kind: &'static str,
-    /// Folder names, in name order (empty ones too).
-    pub folders: Vec<String>,
-    pub items: Vec<LibraryItem>,
-}
-
-/// The library, for the Library tab.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
-pub struct LibraryView {
-    /// A library file has been picked.
-    pub configured: bool,
-    /// Its file name without its extension.
-    pub name: String,
-    /// The folder it is in.
-    pub location: String,
-    /// Why it couldn't be read (moved, deleted, not a budget).
-    pub problem: Option<String>,
-    /// Open as a budget tab: read from there, and changed only there.
-    pub in_tab: bool,
-    pub kinds: Vec<LibraryKind>,
-}
-
-/// The view of library `lib`.
-pub fn view_of(lib: &Budget) -> Vec<LibraryKind> {
-    let items = all_items(lib);
-    What::ALL
-        .into_iter()
-        .filter(|w| library_kind(*w))
-        .map(|w| {
-            let kind = w.key();
-            let folders = lib.setup_folders.of(kind).map(|(f, _)| f.clone()).collect();
-            let items = items
-                .iter()
-                .filter(|(iw, _)| *iw == w)
-                .map(|(_, name)| {
-                    let key = (w, name.clone());
-                    let mut deps = closure(lib, [key.clone()]);
-                    deps.remove(&key);
-                    LibraryItem {
-                        name: name.clone(),
-                        folder: folders::folder_of(lib, kind, name).map(str::to_string),
-                        definition: describe(lib, w, name),
-                        needs: deps.iter().map(item_ref).collect(),
-                    }
-                })
-                .collect();
-            LibraryKind {
-                kind,
-                folders,
-                items,
-            }
-        })
-        .collect()
-}
-
-/// The Library tab's view of the library in `path` (`None`: none picked).
 pub fn library_view_at(docs: &Docs, path: Option<&Path>) -> LibraryView {
     let Some(path) = path else {
         return LibraryView::default();
@@ -230,165 +128,6 @@ pub fn library_view_at(docs: &Docs, path: Option<&Path>) -> LibraryView {
             problem: Some(e),
             ..base
         },
-    }
-}
-
-// ---------------------------------------------------------------------------
-// The review, both ways
-
-/// A review of copying items between a budget and the library.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-pub struct LibraryPreview {
-    #[serde(flatten)]
-    pub preview: ImportPreview,
-    /// The items to tick at the start (what the user picked to copy).
-    pub picked: Vec<ItemRef>,
-}
-
-/// The review for copying from `src` into `here`, without the budget
-/// settings. With `picks`, only those items and what they need, the picks
-/// ticked; without, every item and none ticked.
-pub fn review(
-    here: &Budget,
-    src: &Budget,
-    token: u64,
-    source: &str,
-    picks: Option<&[ItemRef]>,
-) -> Result<LibraryPreview, String> {
-    let mut p = import_setup::preview(here, src, token, source, "");
-    p.items
-        .retain(|it| What::parse(it.kind).map(library_kind).unwrap_or(false));
-    let Some(picks) = picks else {
-        return Ok(LibraryPreview {
-            preview: p,
-            picked: Vec::new(),
-        });
-    };
-    let mut keep: std::collections::BTreeSet<(String, String)> = Default::default();
-    let mut picked = Vec::new();
-    for pick in picks {
-        let w = What::parse(&pick.kind)?;
-        if !library_kind(w) {
-            return Err(format!(
-                "A {} isn't kept in the library.",
-                w.key().replace('_', " ")
-            ));
-        }
-        let Some(it) = p
-            .items
-            .iter()
-            .find(|it| it.kind == pick.kind && it.name == pick.name)
-        else {
-            continue; // e.g. the base currency there, which never copies
-        };
-        keep.insert((it.kind.to_string(), it.name.clone()));
-        for n in &it.needs {
-            keep.insert((n.kind.clone(), n.name.clone()));
-        }
-        picked.push(pick.clone());
-    }
-    if picked.is_empty() {
-        return Err("Nothing to copy: that item never copies between budgets.".into());
-    }
-    p.items
-        .retain(|it| keep.contains(&(it.kind.to_string(), it.name.clone())));
-    Ok(LibraryPreview { preview: p, picked })
-}
-
-/// The sentence after a copy (`saving`: into the library).
-fn copied_message(c: &Imported, saving: bool) -> String {
-    let (head, nothing, holder) = if saving {
-        (
-            "Saved to the library",
-            "Nothing to save: the library already has what was picked.",
-            "the library",
-        )
-    } else {
-        (
-            "Added from the library",
-            "Nothing to add: this budget already has what was picked.",
-            "this budget",
-        )
-    };
-    if c.added == 0 && c.replaced == 0 {
-        return nothing.to_string();
-    }
-    let n = |k: usize| format!("{k} {}", if k == 1 { "item" } else { "items" });
-    let mut parts = Vec::new();
-    if c.added > 0 {
-        parts.push(format!("{} added", n(c.added)));
-    }
-    if c.replaced > 0 {
-        parts.push(format!("{} replaced", n(c.replaced)));
-    }
-    if c.kept > 0 {
-        parts.push(format!(
-            "{} kept as {holder} had {}",
-            n(c.kept),
-            if c.kept == 1 { "it" } else { "them" }
-        ));
-    }
-    format!("{head}: {}.", parts.join(", "))
-}
-
-/// Refuses picks of the budget settings (Rust checks what the page sends).
-pub(crate) fn check_picks(picks: &[ItemRef]) -> Result<(), String> {
-    for p in picks {
-        if !library_kind(What::parse(&p.kind)?) {
-            return Err(format!(
-                "A {} isn't kept in the library.",
-                p.kind.replace('_', " ")
-            ));
-        }
-    }
-    Ok(())
-}
-
-/// Copies `picks` (and what they need) from library `lib` into budget `b`
-/// as `resolutions` say; what differs keeps the budget's version unless
-/// chosen otherwise.
-pub fn add_from(
-    b: &mut Budget,
-    lib: &Budget,
-    picks: &[ItemRef],
-    resolutions: &[Resolution],
-) -> Result<Imported, String> {
-    check_picks(picks)?;
-    import_setup::import(b, lib, picks, resolutions)
-}
-
-/// Copies `picks` (and what they need) from budget `b` into library `lib`
-/// as `resolutions` say; what differs keeps the library's version unless
-/// chosen otherwise.
-pub fn save_into(
-    lib: &mut Budget,
-    b: &Budget,
-    picks: &[ItemRef],
-    resolutions: &[Resolution],
-) -> Result<Imported, String> {
-    check_picks(picks)?;
-    import_setup::import(lib, b, picks, resolutions)
-}
-
-/// One folder change: `create` (`name`), `rename` (`name` to `to`) or
-/// `delete` (`name`; its items become unfiled).
-pub fn folder_op(
-    lib: &mut Budget,
-    kind: &str,
-    action: &str,
-    name: &str,
-    to: Option<&str>,
-) -> Result<String, String> {
-    match action {
-        "create" => folders::add_folder(lib, kind, name).map(|n| format!("Made the folder {n}.")),
-        "rename" => folders::rename_folder(lib, kind, name, to.unwrap_or(""))
-            .map(|n| format!("Renamed the folder {name} to {n}.")),
-        "delete" => folders::delete_folder(lib, kind, name).map(|n| match n {
-            0 => format!("Deleted the folder {name}."),
-            1 => format!("Deleted the folder {name}; its item is unfiled now."),
-            n => format!("Deleted the folder {name}; its {n} items are unfiled now."),
-        }),
-        other => Err(format!("unknown folder action `{other}`")),
     }
 }
 
@@ -581,13 +320,6 @@ fn change_library(
 // Commands (registered in app.rs, build.rs, capabilities/main.json and
 // capabilities/tools.json: the Library tab works in the tools window too)
 
-/// The library after a change, and a sentence saying what changed.
-#[derive(Debug, Serialize)]
-pub struct LibraryDone {
-    pub library: LibraryView,
-    pub message: String,
-}
-
 /// The Library tab's view of the library.
 #[tauri::command]
 pub fn library_view(state: State<'_, AppState>, library: State<'_, Library>) -> LibraryView {
@@ -667,13 +399,6 @@ pub fn library_add_preview(
     add_review(&library, s.docs(), s.id(), &picks)
 }
 
-/// What `library_add` did: the budget's view and a sentence.
-#[derive(Debug, Serialize)]
-pub struct LibraryAdded {
-    pub view: View,
-    pub message: String,
-}
-
 /// Adds what review `token` showed to budget `doc`, as one undo step.
 #[tauri::command]
 pub fn library_add<R: Runtime>(
@@ -687,12 +412,10 @@ pub fn library_add<R: Runtime>(
 ) -> Result<LibraryAdded, String> {
     let lib = library.reviewed(token)?;
     let mut s = state.lock_doc(doc)?;
-    let counts = s.edit("Add from library", |b| {
-        add_from(b, &lib, &picks, &resolutions)
-    })?;
+    let message = method_session::library::library_add(&mut s, &lib, &picks, &resolutions)?;
     Ok(LibraryAdded {
         view: finish(&window, &mut s, None),
-        message: copied_message(&counts, false),
+        message,
     })
 }
 
