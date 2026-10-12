@@ -36,6 +36,7 @@ use crate::view::View;
 
 mod compare;
 mod diffmerge;
+mod export;
 mod tabs;
 mod versions;
 
@@ -141,6 +142,8 @@ pub const COMMANDS: &[&str] = &[
     "merge_preview",
     "merge_apply",
     "merge_pick_file",
+    // Export
+    "export_budget",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -491,6 +494,7 @@ const MODULES: &[Dispatch] = &[
     tabs::dispatch,
     compare::dispatch,
     diffmerge::dispatch,
+    export::dispatch,
 ];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).

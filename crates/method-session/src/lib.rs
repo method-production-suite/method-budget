@@ -19,6 +19,7 @@ pub mod diffmerge;
 pub mod display;
 pub mod docs;
 pub mod edit;
+pub mod export;
 pub mod history;
 pub mod host;
 pub mod report_dto;

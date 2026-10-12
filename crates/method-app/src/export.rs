@@ -1,17 +1,13 @@
-//! File > Export: the budget as an Excel workbook, CSV files (one per
-//! table) or the detail as tab-delimited text for accounting tools. The
-//! tables and the file formats are `method_format::export`; this is the app's
-//! side: the totals the grid shows, the Save dialog, writing the files.
+//! File > Export: what is exported is method-session's `export` module
+//! (re-exported here); this is the app's side: the Save dialog and writing
+//! the files.
 //!
 //! Security: the page names only the format and the budget (`doc`); the path
 //! comes from the native Save dialog shown here, and the extension is the
 //! format's. Each file is written atomically (`safety::write_atomically`),
 //! and an export never replaces a budget that is open in a tab.
 
-use std::path::{Path, PathBuf};
-
-use method_format::export::{self, Format, Options, OutFile, Workbook};
-use serde::Serialize;
+use method_format::export::OutFile;
 use tauri::{Runtime, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
@@ -19,126 +15,8 @@ use crate::app::{AppState, DocId};
 use crate::docs::Docs;
 use crate::safety::{write_atomically, Access};
 use crate::session::DocsFiles;
-use crate::session::Session;
 
-/// How an export ended.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
-pub struct ExportOutcome {
-    /// False when the Save dialog was cancelled: nothing was written.
-    pub done: bool,
-    /// The names of the files written, in order.
-    pub files: Vec<String>,
-}
-
-/// One budget's export, ready for the dialog: its tables, and the folder and
-/// file name the dialog suggests.
-pub struct Prepared {
-    pub workbook: Workbook,
-    pub dir: Option<PathBuf>,
-    pub stem: String,
-}
-
-/// The tables of the budget in `s`, with the totals its grid shows. Refused
-/// while any cell has a problem: the grid then counts those cells as blank,
-/// and an export must carry the budget's real figures.
-pub fn prepare(s: &mut Session) -> Result<Prepared, String> {
-    let dir = s.path().and_then(Path::parent).map(PathBuf::from);
-    let stem = s
-        .path()
-        .and_then(Path::file_stem)
-        .map(|n| n.to_string_lossy().into_owned());
-    let (budget, outcome) = s.totals();
-    if let Some(e) = &outcome.error {
-        let n = outcome.issues.len().max(1);
-        let (cells, them) = if n == 1 {
-            ("a cell with a problem".to_string(), "it")
-        } else {
-            (format!("{n} cells with problems"), "them")
-        };
-        return Err(format!(
-            "This budget has {cells} ({e}). Fix {them} before exporting, so \
-             the export carries the budget's real totals."
-        ));
-    }
-    let report = outcome
-        .report
-        .as_ref()
-        .ok_or("This budget's totals can't be worked out, so it can't be exported.")?;
-    let workbook = export::workbook(budget, report).map_err(|e| capitalize(&e.to_string()))?;
-    let stem = stem.unwrap_or_else(|| file_stem(&budget.title));
-    Ok(Prepared {
-        workbook,
-        dir,
-        stem,
-    })
-}
-
-fn capitalize(s: &str) -> String {
-    let mut c = s.chars();
-    match c.next() {
-        Some(f) => f.to_uppercase().chain(c).collect::<String>() + ".",
-        None => String::new(),
-    }
-}
-
-/// A file name stem from a budget title: characters file systems refuse
-/// become spaces.
-fn file_stem(title: &str) -> String {
-    let clean: String = title
-        .chars()
-        .map(|c| match c {
-            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => ' ',
-            c if c.is_control() => ' ',
-            c => c,
-        })
-        .collect();
-    let clean = clean.trim().trim_matches('.').trim();
-    let stem: String = clean.chars().take(120).collect();
-    if stem.is_empty() {
-        "Budget".into()
-    } else {
-        stem
-    }
-}
-
-/// The Save dialog's title, filter and suggested file name for `format`.
-pub fn dialog_text(format: Format, stem: &str) -> (&'static str, &'static str, String) {
-    match format {
-        Format::Xlsx => (
-            "Export Excel workbook",
-            "Excel workbook",
-            format!("{stem}.xlsx"),
-        ),
-        Format::Csv => ("Export CSV files", "CSV files", format!("{stem}.csv")),
-        Format::Tsv => (
-            "Export tab-delimited detail",
-            "Tab-delimited text",
-            format!("{stem} Detail.txt"),
-        ),
-    }
-}
-
-/// The extensions the dialog offers for `format` (the first is added when
-/// the chosen name has none of them).
-fn extensions(format: Format) -> &'static [&'static str] {
-    match format {
-        Format::Xlsx => &["xlsx"],
-        Format::Csv => &["csv"],
-        Format::Tsv => &["txt", "tsv"],
-    }
-}
-
-/// `p`, ending in one of `format`'s extensions.
-pub fn with_extension(mut p: PathBuf, format: Format) -> PathBuf {
-    let exts = extensions(format);
-    let has = p
-        .extension()
-        .is_some_and(|e| exts.iter().any(|x| e.eq_ignore_ascii_case(x)));
-    if !has {
-        p.as_mut_os_string().push(format!(".{}", exts[0]));
-    }
-    p
-}
+pub use method_session::export::*;
 
 /// Writes `files`, refusing (before writing any) to replace a budget open in
 /// a tab. Returns the names of the files written.
@@ -160,12 +38,6 @@ pub fn write_files(docs: &Docs, files: &[OutFile]) -> Result<Vec<String>, String
     Ok(names)
 }
 
-fn display_name(p: &Path) -> String {
-    p.file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| p.display().to_string())
-}
-
 /// `format`: `"xlsx"`, `"csv"` or `"tsv"`. Exports budget `doc` (`None`: the
 /// one in front) where a Save dialog says. CSV files start with a byte order
 /// mark so Excel reads accented letters; tab-delimited text doesn't, for
@@ -177,7 +49,7 @@ pub async fn export_budget<R: Runtime>(
     doc: Option<DocId>,
     format: String,
 ) -> Result<ExportOutcome, String> {
-    let format = Format::parse(&format).ok_or("That export format isn't one the app knows.")?;
+    let format = parse_format(&format)?;
     // The tables are taken under the lock; the dialog and the writing happen
     // after it is released, so other commands aren't held up.
     let prepared = {
@@ -199,20 +71,19 @@ pub async fn export_budget<R: Runtime>(
         return Ok(ExportOutcome::default());
     };
     let out = with_extension(picked.into_path().map_err(|e| e.to_string())?, format);
-    let opts = Options {
-        bom: format == Format::Csv,
-    };
-    let files = export::render(&prepared.workbook, format, &out, opts)
-        .map_err(|e| capitalize(&e.to_string()))?;
+    let files = render_files(&prepared.workbook, format, &out)?;
     let files = write_files(&state.docs(), &files)?;
     Ok(ExportOutcome { done: true, files })
 }
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
-    use crate::session::SessionFiles;
+    use crate::session::{Session, SessionFiles};
     use method_core::starter;
+    use method_format::export::{self, Format, Options};
 
     fn temp_dir(tag: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!(
@@ -228,59 +99,6 @@ mod tests {
         use std::sync::atomic::{AtomicU64, Ordering};
         static N: AtomicU64 = AtomicU64::new(0);
         N.fetch_add(1, Ordering::Relaxed)
-    }
-
-    #[test]
-    fn prepares_every_table_named_after_the_file() {
-        let mut s = Session::with_budget(starter::budget(), Some("/films/Pilot v2.mthd".into()));
-        let p = prepare(&mut s).unwrap();
-        assert_eq!(p.stem, "Pilot v2");
-        assert_eq!(p.dir, Some(PathBuf::from("/films")));
-        assert_eq!(p.workbook.sheets.len(), export::SHEET_NAMES.len());
-        // Untitled: named after the title.
-        let mut b = starter::budget();
-        b.title = "My Film: Part 2/3".into();
-        let p = prepare(&mut Session::with_budget(b, None)).unwrap();
-        assert_eq!(p.stem, "My Film  Part 2 3");
-        assert_eq!(p.dir, None);
-    }
-
-    #[test]
-    fn a_budget_with_problems_is_not_exported() {
-        let mut b = starter::budget();
-        let d = &mut b.categories_mut().next().unwrap().accounts[0].details[0];
-        d.rate = "NO_SUCH_GLOBAL * 2".into();
-        let e = prepare(&mut Session::with_budget(b, None))
-            .err()
-            .expect("refused");
-        assert!(e.contains("a cell with a problem"), "{e}");
-        assert!(e.contains("NO_SUCH_GLOBAL"), "{e}");
-        assert!(!e.contains('\u{2014}'), "no em dashes");
-    }
-
-    #[test]
-    fn dialog_names_and_extensions() {
-        assert_eq!(
-            dialog_text(Format::Xlsx, "Pilot"),
-            (
-                "Export Excel workbook",
-                "Excel workbook",
-                "Pilot.xlsx".into()
-            )
-        );
-        assert_eq!(dialog_text(Format::Csv, "Pilot").2, "Pilot.csv");
-        assert_eq!(dialog_text(Format::Tsv, "Pilot").2, "Pilot Detail.txt");
-        let p = |s: &str, f| with_extension(PathBuf::from(s), f);
-        assert_eq!(p("/x/a", Format::Xlsx), PathBuf::from("/x/a.xlsx"));
-        assert_eq!(p("/x/a.XLSX", Format::Xlsx), PathBuf::from("/x/a.XLSX"));
-        assert_eq!(
-            p("/x/a.mthd", Format::Xlsx),
-            PathBuf::from("/x/a.mthd.xlsx")
-        );
-        assert_eq!(p("/x/v1.2", Format::Csv), PathBuf::from("/x/v1.2.csv"));
-        assert_eq!(p("/x/d.tsv", Format::Tsv), PathBuf::from("/x/d.tsv"));
-        assert_eq!(p("/x/d", Format::Tsv), PathBuf::from("/x/d.txt"));
-        assert_eq!(file_stem("  "), "Budget");
     }
 
     #[test]
