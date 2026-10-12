@@ -35,7 +35,14 @@ use crate::session::Session;
 use crate::view::View;
 
 mod b64;
+mod explain;
+mod find;
 mod import_setup;
+mod moverows;
+mod overtime;
+mod quickadd;
+mod renumber;
+mod setup_lists;
 mod sharing;
 mod templates;
 mod versions;
@@ -139,6 +146,31 @@ pub const COMMANDS: &[&str] = &[
     "share_copy_original",
     "share_copy_store",
     "sub_budget_new",
+    // Quick entry
+    "set_cell_creating",
+    "set_new_line_defaults",
+    // Find and replace
+    "find",
+    "replace",
+    // Moving rows
+    "move_rows",
+    "move_accounts",
+    "move_topsheet_rows",
+    // Renumbering
+    "renumber_preview",
+    "renumber_accounts",
+    // Setup lists
+    "setup_usage",
+    "set_setup_order",
+    "move_setup_item",
+    "set_short_code",
+    // Explain This Number
+    "explain_number",
+    // Overtime
+    "ot_calculate",
+    "ot_apply",
+    "ot_save_pattern",
+    "ot_delete_pattern",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -493,6 +525,13 @@ const MODULES: &[Dispatch] = &[
     templates::dispatch,
     import_setup::dispatch,
     sharing::dispatch,
+    quickadd::dispatch,
+    find::dispatch,
+    moverows::dispatch,
+    renumber::dispatch,
+    setup_lists::dispatch,
+    explain::dispatch,
+    overtime::dispatch,
 ];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
