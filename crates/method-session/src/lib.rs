@@ -26,6 +26,7 @@ pub mod open_any;
 pub mod report_dto;
 pub mod safety;
 pub mod session;
+pub mod setup_sheets;
 pub mod sheet_import;
 pub mod templates;
 pub mod versions;

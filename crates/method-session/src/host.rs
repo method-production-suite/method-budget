@@ -38,6 +38,7 @@ mod coa_import;
 mod export_import;
 mod import_setup;
 mod open_any;
+mod setup_sheets;
 mod sheet_import;
 mod templates;
 mod versions;
@@ -148,6 +149,11 @@ pub const COMMANDS: &[&str] = &[
     "export_import",
     // Open
     "open_budget",
+    // Setup lists as spreadsheets
+    "setup_sheet_export",
+    "setup_sheet_pick",
+    "setup_sheet_guess",
+    "setup_sheet_review",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -501,6 +507,7 @@ const MODULES: &[Dispatch] = &[
     coa_import::dispatch,
     export_import::dispatch,
     open_any::dispatch,
+    setup_sheets::dispatch,
 ];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
