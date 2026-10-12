@@ -29,7 +29,7 @@ import { isMac } from './dom.js';
 
 export const SHORTCUTS = [
   // File
-  { id: 'file.new', group: 'File', label: 'New budget (in a new tab)', keys: 'mod+n', scope: 'app' },
+  { id: 'file.new', group: 'File', label: 'New budget, or open a recent one (the start window)', keys: 'mod+n', scope: 'app' },
   { id: 'file.new_tab', group: 'File', label: 'New tab (a new budget)', keys: 'mod+t', scope: 'app' },
   { id: 'file.open', group: 'File', label: 'Open a budget (in a new tab)', keys: 'mod+o', scope: 'app' },
   { id: 'file.save', group: 'File', label: 'Save', keys: 'mod+s', scope: 'app' },

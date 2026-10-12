@@ -1571,6 +1571,14 @@ pub fn run() {
             crate::coa_import::coa_import,
             crate::coa_import::chart_templates,
             crate::coa_import::chart_template_new,
+            // The start window and New Budget (src/start.rs)
+            crate::start::start_list,
+            crate::start::start_open,
+            crate::start::start_pin,
+            crate::start::start_forget,
+            crate::start::start_reveal,
+            crate::start::new_budget_pick_template,
+            crate::start::new_budget_create,
             // A whole budget from another program's export, with the
             // reconciliation (src/export_import.rs)
             crate::export_import::export_import_pick,
@@ -1641,6 +1649,8 @@ pub fn run() {
             // Where setup packs are: the user's Packs folder and the
             // bundled ones (src/packs.rs).
             crate::packs::init(app.handle());
+            // The start window's pinned budgets (src/start.rs).
+            crate::start::init(app.handle());
             // Update checks, What's New and the Help menu's switch
             // (src/updater.rs).
             crate::updater::init(app.handle());

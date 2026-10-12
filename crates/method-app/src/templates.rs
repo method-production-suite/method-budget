@@ -64,7 +64,7 @@ pub fn strip(b: &Budget, keep_lines: bool, title: &str) -> Budget {
 
 /// The budget in `path`: from its tab when it is open (unsaved changes
 /// count), else read from the file.
-fn read(state: &AppState, path: &std::path::Path) -> Result<Budget, String> {
+pub(crate) fn read(state: &AppState, path: &std::path::Path) -> Result<Budget, String> {
     let docs = state.docs();
     if let Some(doc) = docs.find_file(path) {
         let s = docs.get(doc).ok_or("That budget has been closed.")?;
