@@ -78,7 +78,7 @@
         <a class="btn primary" href="#download">Get Method Budget</a>
         <a class="btn ghost" href="#features">See what it does</a>
       </div>
-      <p class="fine">No account, no subscription, no cloud. macOS first; Windows and Linux builds are on the way.</p>
+      <p class="fine">No account, no subscription, no cloud. The Mac app is out; Windows and Linux builds are on the way.</p>
     </div>
   </section>
 
@@ -200,6 +200,7 @@
             <li><strong>Find and replace</strong> Search descriptions, account numbers, fringes, globals, groups, notes and formulas, then replace only in the results you tick, as one undo step.</li>
             <li><strong>Copy rows with everything on them</strong> Rows keep their fringes, groups, notes, style and ranges when copied, even between budgets, with a review of what the paste will change.</li>
             <li><strong>Notes</strong> Dated notes on lines, accounts and categories, and a notes list that works as a review checklist.</li>
+            <li><strong>Signed and notarized Mac app</strong> The Mac app is signed and notarized by Apple, so it opens like any other app with no extra security step.</li>
           </ul>
         </section>
         <section class="group" aria-labelledby="g-versions">
@@ -256,12 +257,14 @@
       <section class="soon" aria-labelledby="g-soon">
         <h3 id="g-soon">On the roadmap</h3>
         <ul class="feats">
-          <li><strong>Signed and notarized Mac app</strong> Install on a Mac without the one-time security step.</li>
           <li><strong>Windows and Linux, tested</strong> Installers for both are built today; printing, keys and file types still need a hands-on check.</li>
           <li><strong>Review files</strong> A reviewer marks up a read-only copy, and their comments come back in a small file you merge.</li>
           <li><strong>Incentive modeling</strong> Qualified spend by location, several programs side by side, caps and what-ifs, from rules you enter yourself.</li>
           <li><strong>Schedule-linked quantities</strong> Read day counts from a schedule's export and let them drive your globals.</li>
           <li><strong>Accessibility and translations</strong> A full accessibility pass and the app in more languages.</li>
+          <li><strong>Work on a budget together</strong> Several people in one budget at once, through a shared Dropbox or iCloud folder or a live link, with who changed what and undo that only takes back your own edits.</li>
+          <li><strong>Rate card lookup</strong> Pick a union classification and fill in the rate from public rate cards, with the source and effective date shown.</li>
+          <li><strong>New project window</strong> Start a budget from one window with its title, chart of accounts, schedule, currency and rate setup, ready to fill in.</li>
         </ul>
       </section>
       <!-- features:end -->
@@ -371,16 +374,16 @@
     <div class="wrap">
       <p class="kicker">Download</p>
       <h2 id="download-title">Get Method Budget</h2>
-      <p class="intro">Ready-made installers are coming soon. Until then, Method Budget builds
-        from source in a few minutes with nothing but Rust.</p>
+      <p class="intro">Download the Mac app, or build it from source in a few minutes with
+        nothing but Rust.</p>
       <div class="cards">
         <div class="card">
-          <span class="badge">Coming soon</span>
-          <h3>Installers</h3>
-          <p>A Mac app for Apple silicon and Intel, signed and notarized so it opens without a
-            security detour, then Windows and Linux installers.</p>
-          <p>Watch the <a href="https://github.com/ssandweiss/method-budget" data-repo="">project on GitHub</a>
-            to hear when the first release is out.</p>
+          <span class="badge now">Available now</span>
+          <h3>Mac app</h3>
+          <p>For Apple silicon and Intel, signed and notarized by Apple so it opens like any
+            other app. It keeps itself up to date. Windows and Linux builds are included but
+            not tested yet.</p>
+          <p><a href="https://github.com/ssandweiss/method-budget/releases/latest">Download the latest release</a></p>
         </div>
         <div class="card">
           <span class="badge now">Available now</span>
@@ -407,9 +410,9 @@
         <details>
           <summary>Can it open budgets from other apps?</summary>
           <p>It imports the open files other apps export, never their native files.
-            Spreadsheet exports (Excel, CSV and tab-delimited) come in today, with a column
-            mapping and a line-by-line check of the totals. Readers for XML and JSON exports
-            are next on the roadmap.</p>
+            Whole budgets come in from their JSON, XML, Excel and tab-delimited exports, and any
+            spreadsheet comes in with a column mapping, each with a line-by-line check against
+            the totals in the file.</p>
         </details>
         <details>
           <summary>Where does my data live?</summary>
