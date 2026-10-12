@@ -37,6 +37,7 @@ export const SHORTCUTS = [
   { id: 'file.new_from_template', group: 'File', label: 'New budget from a template (any budget file): its chart, setup and settings, in a new tab', scope: 'menu' },
   { id: 'file.new_sub_budget', group: 'File', label: 'New sub-budget: a filtered copy by categories, accounts, groups, sets and locations, in a new tab', scope: 'menu' },
   { id: 'file.save_share_copy', group: 'File', label: 'Save a copy for sharing: a snapshot named by title, version and date, optionally without notes or private info, that opens read-only', scope: 'menu' },
+  { id: 'file.share', group: 'File', label: 'Share this budget through a folder: everyone opening it there works in the same budget, with everyone’s changes', scope: 'menu' },
   { id: 'file.save_as_template', group: 'File', label: 'Save a copy of the budget as a template: no lines, info, baseline, versions or notes', scope: 'menu' },
   { id: 'file.import_setup', group: 'File', label: 'Import setup items from another budget file, with what they need', scope: 'menu' },
   { id: 'file.import_setup_pack', group: 'File', label: 'Import a setup pack: its setup items, with what they need, marked with the pack’s title and effective date', scope: 'menu' },
@@ -86,6 +87,7 @@ export const SHORTCUTS = [
   // How a total is worked out (explain.js) and the overtime helper (overtime.js).
   { id: 'edit.explain', group: 'Edit', label: 'Explain the total under the cursor: every step of how it is worked out, in the Explain tab', keys: 'mod+e', scope: 'grid' },
   { id: 'edit.overtime', group: 'Edit', label: 'Overtime helper: work out a day or week of a labor line with overtime, and write it into the line', scope: 'menu' },
+  { id: 'share.blame', group: 'Edit', label: 'Who changed this: every value the cell under the cursor has had since the budget was shared, and who typed it', scope: 'menu' },
   // Find and replace: the Find tab of the tools panel (find.js). Cmd+G is
   // the Globals tab, so the next and previous result are F3 and Shift+F3
   // (and Enter and Shift+Enter in the Find box).

@@ -118,6 +118,8 @@ pub const FILE: &[Entry] = &[
     plain("file.save_as_template", "Save as Template…"),
     // A snapshot for someone else, opened read-only (src/sharing.rs).
     plain("file.save_share_copy", "Save a Copy for Sharing…"),
+    // Working together through a shared folder (src/shared_app.rs).
+    plain("file.share", "Share…"),
     SEP,
     plain("file.import_setup", "Import Setup From…"),
     // Setup packs: setup items to share, with where they came from (src/packs.rs).
@@ -190,6 +192,8 @@ pub const EDIT: &[Entry] = &[
     // ui/js/overtime.js; the tools panel's Explain and Overtime tabs).
     item("edit.explain", "Explain This Number…", "mod+e"),
     plain("edit.overtime", "Overtime Helper…"),
+    // Who changed a cell of a shared budget (src/shared_app.rs).
+    plain("share.blame", "Who Changed This…"),
     SEP,
     // Find and replace: the Find tab of the tools panel (ui/js/find.js).
     item("edit.find", "Find…", "mod+f"),
