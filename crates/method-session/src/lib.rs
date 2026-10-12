@@ -10,6 +10,7 @@
 
 pub mod actuals;
 pub mod batch;
+pub mod clipboard;
 pub mod clock;
 pub mod collab;
 pub mod commands;

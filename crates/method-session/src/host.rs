@@ -34,6 +34,7 @@ use crate::edit::{
 use crate::session::Session;
 use crate::view::View;
 
+mod clipboard;
 mod notes;
 mod rowstyle;
 mod versions;
@@ -129,6 +130,12 @@ pub const COMMANDS: &[&str] = &[
     "set_row_style",
     "set_group_color",
     "update_group",
+    // Clipboard (the app's own, for whole rows)
+    "clip_copy",
+    "clip_cut",
+    "clip_preview",
+    "clip_paste",
+    "clip_forget",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -183,7 +190,6 @@ pub struct Host {
     /// What a module keeps between calls (a picked file by its token, as
     /// the desktop keeps it in Tauri's state): one of each type, made on
     /// first use ([`Call::kept`]).
-    #[allow(dead_code)] // until the first module keeps something
     kept: Mutex<HashMap<TypeId, Arc<dyn Any + Send + Sync>>>,
 }
 
@@ -475,7 +481,12 @@ impl Host {
 type Dispatch = fn(&Call<'_>) -> Option<Result<Value, Error>>;
 
 /// The modules moved in phase 1b, each dispatching its own commands.
-const MODULES: &[Dispatch] = &[versions::dispatch, notes::dispatch, rowstyle::dispatch];
+const MODULES: &[Dispatch] = &[
+    versions::dispatch,
+    notes::dispatch,
+    rowstyle::dispatch,
+    clipboard::dispatch,
+];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
 fn stamp(text: &str) -> crate::safety::DiskStamp {
@@ -518,20 +529,17 @@ impl Call<'_> {
     }
 
     /// The budget the command names (`None`: the one in front).
-    #[allow(dead_code)] // until the first module needs it
     pub(crate) fn doc(&self) -> Option<DocId> {
         self.doc
     }
 
     /// Every open budget.
-    #[allow(dead_code)] // until the first module needs it
     pub(crate) fn state(&self) -> &AppState {
         &self.host.state
     }
 
     /// The host's one `T`, made on first use: what a module keeps between
     /// calls (a picked file by its token).
-    #[allow(dead_code)] // until the first module keeps something
     pub(crate) fn kept<T: Default + Send + Sync + 'static>(&self) -> Arc<T> {
         let mut kept = self.host.kept.lock().unwrap_or_else(|e| e.into_inner());
         let any = kept
