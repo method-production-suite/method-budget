@@ -22,10 +22,6 @@
   margin-top: 6px !important;
 }
 
-.tss-info {
-  grid-template-columns: 96px minmax(0, 1fr);
-}
-
 /* Up / down buttons */
 
 .tss-move {
@@ -269,21 +265,106 @@
   white-space: nowrap;
 }
 
-/* Settings */
+/* Settings: compact rows, a fixed label column and the controls beside it */
 
-.tss-widths {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.ts-settings .tss-group {
+  padding: 6px 0 8px;
 }
 
-.tss-coding-actions {
+.ts-settings .tss-heading {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.ts-row {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  column-gap: 10px;
   align-items: center;
-  justify-content: space-between;
+  min-height: 30px;
+  padding: 2px 0;
+}
+
+.ts-row-label {
+  font-size: 12.5px;
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ts-row-label.ts-has-tip {
+  cursor: help;
+  text-decoration: underline dotted var(--text-muted);
+  text-underline-offset: 3px;
+}
+
+.ts-row-ctl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  min-width: 0;
+}
+
+.ts-row-ctl > .setup-field {
+  gap: 4px;
+}
+
+.ts-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ts-inline-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.ts-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 0;
+}
+
+.ts-row-note {
+  margin: 2px 0 0 230px !important;
+}
+
+.ts-row-ctl > .setup-input.ts-w-xs,
+.ts-inline > .setup-input.ts-w-xs {
+  width: 84px;
+}
+
+.ts-row-ctl > .setup-input.ts-w-s,
+.ts-inline > .setup-input.ts-w-s {
+  width: 110px;
+}
+
+.ts-row-ctl > .setup-input.ts-w-m {
+  width: 180px;
+}
+
+.ts-row-ctl > .setup-input.ts-w-l {
+  width: 280px;
+}
+
+.ts-settings .setup-hint-bad {
+  margin-left: 230px;
+}
+
+.ts-settings .setup-error {
+  margin-top: 2px;
 }
 
 .tss-example {
   font-size: 12.5px;
-  flex: 1 1 auto;
-  min-width: 0;
+  white-space: nowrap;
 }
 
 .tss-example strong {
@@ -291,15 +372,144 @@
   margin-left: 4px;
 }
 
-.tss-example-inline {
-  align-self: end;
-  padding-bottom: 5px;
+@media (max-width: 560px) {
+  .ts-row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 2px;
+  }
+
+  .ts-row-note,
+  .ts-settings .setup-hint-bad {
+    margin-left: 0 !important;
+  }
 }
 
-.tss-actions {
+/* Budget info: one dense table (heads, add row, a row per field) */
+
+.ts-info-table {
+  border-top: 1px solid var(--border);
+}
+
+.ts-info-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) 96px minmax(0, 1.6fr) 40px;
+  column-gap: 6px;
+  align-items: center;
+  min-height: 28px;
+  padding: 2px 2px 2px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ts-info-cols {
+  min-height: 22px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+}
+
+.ts-info-list {
+  margin: 0;
+  border-top: 0;
+}
+
+.ts-info-row > .setup-issue,
+.ts-info-row > .setup-error,
+.ts-info-row > .setup-confirm {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+}
+
+/* The add row reuses the kit's add form, laid out on the table's columns:
+   its labels are read out but not shown (each input has a placeholder). */
+.setup-add.ts-info-add {
+  margin: 0;
+  padding: 2px 2px 2px 6px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.ts-info-add > .setup-add-title {
+  display: none;
+}
+
+.ts-info-add > .setup-fields,
+.ts-info-add > .setup-add-actions {
+  display: contents;
+}
+
+.ts-info-add .setup-field {
+  position: relative;
+}
+
+.ts-info-add .setup-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.ts-info-add .setup-btn {
+  height: 22px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+
+.ts-info-row > .setup-del,
+.ts-info-add .setup-btn {
+  justify-self: center;
+}
+
+/* Baseline: a status and actions strip over a dense table */
+
+.ts-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  margin-bottom: 4px;
+}
+
+.ts-strip-status {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 0;
+}
+
+.ts-strip-status.setup-empty {
+  padding: 0;
+}
+
+.ts-strip-actions {
   display: flex;
   gap: 6px;
-  margin-top: 8px;
+  flex: 0 0 auto;
+}
+
+.ts-strip-actions .setup-btn {
+  height: 22px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.ts-baseline .tss-group {
+  padding-top: 0;
+  border-bottom: 0;
+}
+
+.tss-table.ts-dense th,
+.tss-table.ts-dense td {
+  padding: 2px 6px;
+  height: 24px;
+}
+
+.tss-table.ts-dense thead th {
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
 }
 
 /* Baseline summary */

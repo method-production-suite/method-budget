@@ -27,6 +27,28 @@ function checkbox(k, fieldKey, checked, labelText, onChange) {
   return wrap;
 }
 
+// A Budget > Settings row (the same markup as topsheet-setup.js's rows): a
+// label naming a group of controls, each with its own label.
+function settingsRow(k, labelText, controls) {
+  const row = k.el('div', 'ts-row');
+  const label = k.el('span', 'ts-row-label', labelText);
+  label.id = k.nextId();
+  const ctl = k.el('div', 'ts-row-ctl');
+  ctl.setAttribute('role', 'group');
+  ctl.setAttribute('aria-labelledby', label.id);
+  ctl.append(...controls);
+  row.append(label, ctl);
+  return row;
+}
+
+function inline(k, labelText, control) {
+  const wrap = k.el('span', 'ts-inline');
+  const label = k.el('label', 'ts-inline-label', labelText);
+  label.htmlFor = control.id;
+  wrap.append(label, control);
+  return wrap;
+}
+
 /** Options for a decimals select: `none` first (value ''), then 0 to 8. */
 function placesOptions(none) {
   const out = [['', none]];
@@ -88,27 +110,29 @@ export function displaySettingsGroup(k) {
     options: placesOptions('As typed'),
     onCommit: (v, old) => save({ rate_decimals_above: placesArg(v) }, [aboveKey, old]),
   });
-  const grid = k.el('div', 'setup-fields');
-  grid.append(
-    k.field('Rate cutoff', cutoff),
-    k.field('Rates below the cutoff', below),
-    k.field(now.rate_cutoff === null ? 'Rates' : 'Rates at or above it', above),
-  );
-
-  group.append(
-    k.el('h3', 'tss-heading', 'Numbers on screen'),
-    k.el('p', 'setup-hint tss-note', 'How rates and the topsheet show on screen. Only the display changes: every value and total stays exact.'),
-    grid,
-  );
-  const flags = [
-    ['rate_global_decimals', 'A rate that uses a global with its own decimals shows those'],
-    ['summary_rows', 'Topsheet shows the above- and below-the-line totals'],
-    ['net_total', 'Topsheet shows the net total'],
-  ];
-  for (const [f, label] of flags) {
+  cutoff.classList.add('ts-w-xs');
+  below.classList.add('ts-w-s');
+  above.classList.add('ts-w-s');
+  const flag = (f, label) => {
     const fieldKey = k.key('settings', 'display', f);
-    group.append(checkbox(k, fieldKey, now[f], label, (on) => save({ [f]: on }, [fieldKey, !on])));
-  }
+    return checkbox(k, fieldKey, now[f], label, (on) => save({ [f]: on }, [fieldKey, !on]));
+  };
+  const heading = k.el('h3', 'tss-heading', 'Numbers on screen');
+  heading.title = 'How rates and the topsheet show on screen. Only the display changes: every value and total stays exact.';
+  group.append(
+    heading,
+    settingsRow(k, 'Rate decimals', [
+      inline(k, 'Cutoff', cutoff),
+      inline(k, 'Below', below),
+      inline(k, now.rate_cutoff === null ? 'Rates' : 'At or above', above),
+    ]),
+    settingsRow(k, 'Rates using a global', [flag('rate_global_decimals', 'Show the global’s own decimals')]),
+    settingsRow(k, 'Topsheet shows', [
+      flag('summary_rows', 'Above- and below-the-line totals'),
+      flag('net_total', 'Net total'),
+    ]),
+    k.el('p', 'ts-hint ts-row-note', 'Display only: every value and total stays exact.'),
+  );
   if (k.state().errors.has(gk)) group.append(k.errorLine(k.state().errors.get(gk)));
   return group;
 }

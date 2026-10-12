@@ -1036,40 +1036,53 @@ function infoCheck(kind, value) {
   return null;
 }
 
+// One dense table: column heads, an add row, then a row per field (name,
+// kind, value, delete). Rows stay list items so the kit's delete confirmation
+// and error lines attach to them.
 function renderInfo(panel) {
   const b = k.budget();
-  panel.append(intro('Facts about the production, like the director, shoot days or start date. They are notes only and don’t feed formulas.'));
+  panel.classList.add('ts-info-tab');
+  panel.append(intro('Facts about the production. Notes only; they don’t feed formulas.'));
   const items = k.entries(b.info);
   const names = items.map(([n]) => n);
-  if (!items.length) panel.append(k.emptyNote('No fields yet.'));
+  const cols = k.el('div', 'ts-info-row ts-info-cols');
+  cols.setAttribute('aria-hidden', 'true');
+  cols.append(k.el('span', null, 'Name'), k.el('span', null, 'Kind'), k.el('span', null, 'Value'), k.el('span'));
+  const add = k.addForm('info', {
+    title: 'New field',
+    fields: [
+      k.addInput('info', 'name', { label: 'Label', placeholder: 'New field, like Director' }),
+      k.addSelect('info', 'kind', 'Kind', INFO_KINDS),
+      k.addInput('info', 'value', { label: 'Value', placeholder: 'Value' }),
+    ],
+    validate: (v) => {
+      const name = v.name.trim();
+      if (name === '') return ['name', 'Enter a label.'];
+      if (k.own(b.info, name) !== undefined) return ['name', `There is already a field named ${name}.`];
+      const bad = infoCheck(v.kind, v.value);
+      return bad ? ['value', bad] : null;
+    },
+    build: (v) => ['set_info', { name: v.name.trim(), value: { kind: v.kind, value: v.value.trim() } }],
+  });
+  add.classList.add('ts-info-row', 'ts-info-add');
+  const table = k.el('div', 'ts-info-table');
+  table.append(cols, add);
   const ul = k.list('Budget information');
+  ul.classList.add('ts-info-list');
   items.forEach(([name, v0], i) => {
     const v = obj(v0);
     const kind = ['text', 'number', 'date'].includes(v.kind) ? v.kind : 'text';
     const ik = k.key('info', name);
-    const li = k.itemShell(ik, 'setup-block');
-    const head = k.el('div', 'setup-head');
-    const nameEl = k.el('span', 'setup-name', name);
+    const li = k.itemShell(ik, 'ts-info-row');
+    const nameEl = k.el('span', 'setup-name ts-info-name', name);
     nameEl.title = name;
-    head.append(
-      nameEl,
-      k.el('span', 'setup-figs'),
-      k.deleteButton({
-        itemKey: ik,
-        name,
-        what: 'field',
-        confirmText: `Delete the field ${name}?`,
-        build: () => ['delete_info', { name }],
-        neighborKey: k.neighbor('info', names, i, k.key('add', 'info', 'name')),
-      }),
-    );
-    const grid = k.el('div', 'setup-fields tss-info');
     const valueKey = k.key('info', name, 'value');
     const value = k.textInput({
       fieldKey: valueKey,
       value: k.str(v.value),
       num: kind === 'number',
       placeholder: kind === 'date' ? 'YYYY-MM-DD' : '',
+      label: `${name} value`,
       onCommit: (val, old) => k.run(ik, () => ['set_info', { name, value: { kind, value: val } }], { restore: [valueKey, old] }),
     });
     const kindSel = k.selectInput({
@@ -1081,30 +1094,26 @@ function renderInfo(panel) {
           restore: [k.key('info', name, 'kind'), old],
         }),
     });
-    grid.append(k.field('Kind', kindSel), k.field('Value', value));
-    li.append(head, grid);
+    kindSel.setAttribute('aria-label', `${name} kind`);
+    li.append(
+      nameEl,
+      kindSel,
+      value,
+      k.deleteButton({
+        itemKey: ik,
+        name,
+        what: 'field',
+        confirmText: `Delete the field ${name}?`,
+        build: () => ['delete_info', { name }],
+        neighborKey: k.neighbor('info', names, i, k.key('add', 'info', 'name')),
+      }),
+    );
     k.finishItem(li, ik, [], null);
     ul.append(li);
   });
-  if (items.length) panel.append(ul);
-  panel.append(
-    k.addForm('info', {
-      title: 'New field',
-      fields: [
-        k.addInput('info', 'name', { label: 'Label', placeholder: 'Director' }),
-        k.addSelect('info', 'kind', 'Kind', INFO_KINDS),
-        k.addInput('info', 'value', { label: 'Value', placeholder: '' }),
-      ],
-      validate: (v) => {
-        const name = v.name.trim();
-        if (name === '') return ['name', 'Enter a label.'];
-        if (k.own(b.info, name) !== undefined) return ['name', `There is already a field named ${name}.`];
-        const bad = infoCheck(v.kind, v.value);
-        return bad ? ['value', bad] : null;
-      },
-      build: (v) => ['set_info', { name: v.name.trim(), value: { kind: v.kind, value: v.value.trim() } }],
-    }),
-  );
+  if (items.length) table.append(ul);
+  panel.append(table);
+  if (!items.length) panel.append(k.emptyNote('No fields yet.'));
 }
 
 // ---------------------------------------------------------------------------
@@ -1152,9 +1161,62 @@ function fringeAccountExample(p, suffix) {
   return { cat: first, number: [cat, fit(suffix, p.account_width)].join(p.separator) };
 }
 
+// A settings row: a fixed-width label on the left, its controls on the right.
+// `hint` is one short muted line after the controls; `tip` is the longer
+// explanation, shown as the label's tooltip and read out with the controls.
+// With `group`, the label names several controls (each with its own label).
+function tsRow(labelText, controls, { hint = '', tip = '', group = false } = {}) {
+  const row = k.el('div', 'ts-row');
+  const label = k.el(group ? 'span' : 'label', 'ts-row-label', labelText);
+  label.id = k.nextId();
+  if (!group && controls[0] && controls[0].id) label.htmlFor = controls[0].id;
+  if (tip) {
+    label.title = tip;
+    label.classList.add('ts-has-tip');
+  }
+  const ctl = k.el('div', 'ts-row-ctl');
+  if (group) {
+    ctl.setAttribute('role', 'group');
+    ctl.setAttribute('aria-labelledby', label.id);
+  }
+  ctl.append(...controls);
+  const described = [];
+  if (hint) {
+    const h = k.el('span', 'ts-hint', hint);
+    h.id = k.nextId();
+    if (tip) h.title = tip;
+    ctl.append(h);
+    described.push(h.id);
+  }
+  if (tip) {
+    const t = k.el('span', 'setup-sr', tip);
+    t.id = k.nextId();
+    ctl.append(t);
+    described.push(t.id);
+  }
+  if (described.length) {
+    for (const c of ctl.querySelectorAll('input, select')) {
+      const prior = c.getAttribute('aria-describedby');
+      c.setAttribute('aria-describedby', [prior, ...described].filter(Boolean).join(' '));
+    }
+  }
+  row.append(label, ctl);
+  return row;
+}
+
+// A small control with its own short label, for rows holding several.
+function tsInline(labelText, control) {
+  const wrap = k.el('span', 'ts-inline');
+  const label = k.el('label', 'ts-inline-label', labelText);
+  label.htmlFor = control.id;
+  wrap.append(label, control);
+  return wrap;
+}
+
 function renderSettings(panel) {
   const b = k.budget();
   const base = k.baseCode();
+  panel.classList.add('ts-settings');
   const ik = k.key('settings', 'currency');
 
   // Currency
@@ -1177,12 +1239,15 @@ function renderSettings(panel) {
     onCommit: (v, old) =>
       k.run(ik, () => ['set_totals_currency', { code: v === '' ? null : v }], { restore: [k.key('settings', 'totals'), old] }),
   });
-  const grid = k.el('div', 'setup-fields');
-  grid.append(k.field('Base currency', baseInput), k.field('Show totals in', totals));
+  baseInput.classList.add('ts-w-s');
+  totals.classList.add('ts-w-m');
   cur.append(
     heading('Currency'),
-    grid,
-    k.el('p', 'setup-hint tss-note', 'Everything is worked out in the base currency. Renaming it doesn’t convert any amounts or rates.'),
+    tsRow('Base currency', [baseInput], {
+      hint: 'Renaming doesn’t convert amounts.',
+      tip: 'Everything is worked out in the base currency. Renaming it doesn’t convert any amounts or rates.',
+    }),
+    tsRow('Show totals in', [totals]),
   );
   if (k.state().errors.has(ik)) cur.append(k.errorLine(k.state().errors.get(ik)));
   panel.append(cur);
@@ -1205,8 +1270,20 @@ function renderSettings(panel) {
     ],
     onCommit: (v, old) => k.run(fk, () => ['set_fringe_posting', { mode: v, suffix: null }], { restore: [k.key('settings', 'posting'), old] }),
   });
-  const fgrid = k.el('div', 'setup-fields');
-  fgrid.append(k.field('Fringes show as', modeSel, { wide: true }));
+  modeSel.classList.add('ts-w-l');
+  fr.append(
+    heading('Fringe totals'),
+    tsRow(
+      'Fringes show as',
+      [modeSel],
+      mode === 'budget'
+        ? {
+            hint: 'Charges don’t apply to it.',
+            tip: 'A budget-wide fringe total sits outside above- and below-the-line, so charges don’t apply to it.',
+          }
+        : {},
+    ),
+  );
   if (mode === 'category') {
     const suf = k.textInput({
       fieldKey: k.key('settings', 'suffix'),
@@ -1214,13 +1291,9 @@ function renderSettings(panel) {
       onCommit: (v, old) =>
         k.run(fk, () => ['set_fringe_posting', { mode: 'category', suffix: v.trim() }], { restore: [k.key('settings', 'suffix'), old] }),
     });
-    fgrid.append(k.field('Account number ends in', suf));
+    suf.classList.add('ts-w-s');
     const ex = fringeAccountExample(coding(), suffix);
-    if (ex) fgrid.append(k.el('p', 'setup-hint tss-example-inline', `Category ${ex.cat}: ${ex.number}`));
-  }
-  fr.append(heading('Fringe totals'), fgrid);
-  if (mode === 'budget') {
-    fr.append(k.el('p', 'setup-hint tss-note', 'A budget-wide fringe total sits outside above- and below-the-line, so charges don’t apply to it.'));
+    fr.append(tsRow('Account number ends in', [suf], { hint: ex ? `Category ${ex.cat}: ${ex.number}` : '' }));
   }
   if (k.state().errors.has(fk)) fr.append(k.errorLine(k.state().errors.get(fk)));
   panel.append(fr);
@@ -1261,19 +1334,18 @@ function calculationGroup() {
     onCommit: (v, old) =>
       k.run(ck, () => ['set_trailing_level_fringes', { value: v }], { restore: [k.key('settings', 'trailing'), old] }),
   });
-  const grid = k.el('div', 'setup-fields');
-  grid.append(
-    k.field('Rounding', arithSel, { wide: true }),
-    k.field('Fringes of categories after the last production total', trailingSel, { wide: true }),
-  );
+  arithSel.classList.add('ts-w-m');
+  trailingSel.classList.add('ts-w-s');
   group.append(
     heading('Calculation'),
-    grid,
-    k.el(
-      'p',
-      'setup-hint tss-note',
-      'Spreadsheet rounding works in binary numbers, so 1 x 1.005 is 1.00; exact decimal makes it 1.01. Dropped fringes count in no total; this only applies when fringes post above each production total.',
-    ),
+    tsRow('Rounding', [arithSel], {
+      hint: '1 x 1.005: 1.00 binary, 1.01 exact.',
+      tip: 'Spreadsheet rounding works in binary numbers, so 1 x 1.005 is 1.00; exact decimal makes it 1.01.',
+    }),
+    tsRow('Fringes after the last total', [trailingSel], {
+      hint: 'Only when fringes post above each production total.',
+      tip: 'Fringes of categories after the last production total. Dropped fringes count in no total; this only applies when fringes post above each production total.',
+    }),
   );
   if (k.state().errors.has(ck)) group.append(k.errorLine(k.state().errors.get(ck)));
   return group;
@@ -1302,18 +1374,19 @@ function newLinesGroup() {
   const group = k.el('div', 'tss-group');
   group.dataset.item = nk;
   const now = newLineDefaults();
+  const boxes = NEW_LINE_FIELDS.map(([f, label]) => {
+    const fieldKey = k.key('settings', 'new_lines', f);
+    return checkbox(fieldKey, now[f], label, (on) =>
+      k.run(nk, () => ['set_new_line_defaults', { defaults: { ...newLineDefaults(), [f]: on } }], { restore: [fieldKey, !on] }),
+    );
+  });
   group.append(
     heading('New lines'),
-    k.el('p', 'setup-hint tss-note', 'A line you insert copies these from the line above it (or the line below, when there is none above).'),
+    tsRow('Copy from the line above', boxes, {
+      group: true,
+      tip: 'A line you insert copies these from the line above it (or the line below, when there is none above).',
+    }),
   );
-  for (const [f, label] of NEW_LINE_FIELDS) {
-    const fieldKey = k.key('settings', 'new_lines', f);
-    group.append(
-      checkbox(fieldKey, now[f], label, (on) =>
-        k.run(nk, () => ['set_new_line_defaults', { defaults: { ...newLineDefaults(), [f]: on } }], { restore: [fieldKey, !on] }),
-      ),
-    );
-  }
   if (k.state().errors.has(nk)) group.append(k.errorLine(k.state().errors.get(nk)));
   return group;
 }
@@ -1331,7 +1404,7 @@ function codingForm() {
     ['set_width', 'Set', 0],
   ];
   const sels = {};
-  const grid = k.el('div', 'setup-fields tss-widths');
+  const widthCells = [];
   for (const [f, label, min] of widths) {
     const sel = k.el('select', 'setup-input setup-select');
     sel.id = k.nextId();
@@ -1343,8 +1416,9 @@ function codingForm() {
       sel.append(o);
     }
     sel.value = String(p[f]);
+    sel.classList.add('ts-w-xs');
     sels[f] = sel;
-    grid.append(k.field(label, sel));
+    widthCells.push(tsInline(label, sel));
   }
   const sep = k.el('select', 'setup-input setup-select');
   sep.id = k.nextId();
@@ -1357,9 +1431,9 @@ function codingForm() {
     sep.append(o);
   }
   sep.value = p.separator;
-  grid.append(k.field('Separator', sep, { wide: true }));
+  sep.classList.add('ts-w-m');
 
-  const example = k.el('p', 'tss-example');
+  const example = k.el('span', 'tss-example');
   example.setAttribute('aria-live', 'polite');
   const problem = k.el('p', 'setup-hint setup-hint-bad');
   const read = () => ({
@@ -1415,14 +1489,13 @@ function codingForm() {
       onCancel: reset,
     });
   });
-  const actions = k.el('div', 'setup-add-actions tss-coding-actions');
-  actions.append(example, apply);
+  const tip =
+    'Numbers you type from now on are read and written with this pattern. When numbers already in the budget would change, Apply offers to renumber them.';
   form.append(
     heading('Account numbers'),
-    grid,
-    actions,
+    tsRow('Digits per part', widthCells, { group: true, tip }),
+    tsRow('Separator', [sep, example, apply]),
     problem,
-    k.el('p', 'setup-hint tss-note', 'Numbers you type from now on are read and written with this pattern. When numbers already in the budget would change, Apply offers to renumber them.'),
   );
   if (k.state().errors.has(ck)) form.append(k.errorLine(k.state().errors.get(ck)));
   if (open) form.append(previewBox(k, ck, open, reset));
@@ -1444,16 +1517,19 @@ function renderBaseline(panel) {
   const variance = view.variance && typeof view.variance === 'object' ? view.variance : null;
   const has = b.baseline && typeof b.baseline === 'object';
   const ik = k.key('baseline');
-  panel.append(
-    intro(
-      'Lock the current totals as the original budget. From then on every line, account and category can show its original total and how far it has moved.',
-    ),
-  );
+  panel.classList.add('ts-baseline');
+  panel.append(intro('Lock the current totals as the original budget, so every line, account and category shows how far it has moved.'));
   const box = k.el('div', 'tss-group');
   box.dataset.item = ik;
+  // A compact strip: the status on the left, the actions on the right.
+  const strip = k.el('div', 'ts-strip');
+  const status = k.el('p', 'ts-strip-status');
+  const actions = k.el('div', 'ts-strip-actions');
+  strip.append(status, actions);
+  box.append(strip);
 
   if (has) {
-    const table = k.el('table', 'tss-table');
+    const table = k.el('table', 'tss-table ts-dense');
     const thead = k.el('thead');
     const hr = k.el('tr');
     for (const h of ['', 'Original', 'Current', 'Change']) {
@@ -1488,20 +1564,14 @@ function renderBaseline(panel) {
       // Views list only the rows on screen; the count covers every row.
       const lines = typeof variance.rows_changed === 'number' ? variance.rows_changed : changedCount(variance.rows);
       const accounts = changedCount(variance.accounts);
-      box.append(
-        k.el(
-          'p',
-          'setup-hint tss-note',
-          lines || accounts
-            ? `Changed since locked: ${k.plural(lines, 'line', 'lines')} in ${k.plural(accounts, 'account', 'accounts')}.`
-            : 'Nothing has changed since the totals were locked.',
-        ),
-      );
+      status.textContent =
+        lines || accounts
+          ? `Changed since locked: ${k.plural(lines, 'line', 'lines')} in ${k.plural(accounts, 'account', 'accounts')}.`
+          : 'Nothing has changed since the totals were locked.';
     } else {
-      box.append(k.el('p', 'setup-hint tss-note', 'Current totals can’t be worked out right now, so there is nothing to compare.'));
+      status.textContent = 'Current totals can’t be worked out right now, so there is nothing to compare.';
     }
-    if (view.partial) box.append(k.el('p', 'setup-hint tss-note', 'Current totals are partial while the budget has errors.'));
-    const actions = k.el('div', 'tss-actions');
+    if (view.partial) box.append(k.el('p', 'ts-hint ts-row-note', 'Current totals are partial while the budget has errors.'));
     const relock = button('Lock again', 'setup-btn', k.key('baseline', 'relock'), () =>
       confirmBox(ik, relock, 'Replace the original totals with the current ones?', 'Lock again', false, () => ['lock_baseline', {}]),
     );
@@ -1509,20 +1579,17 @@ function renderBaseline(panel) {
       confirmBox(ik, clear, 'Clear the original totals? The budget stops showing what changed.', 'Clear', true, () => ['clear_baseline', {}]),
     );
     actions.append(relock, clear);
-    box.append(actions);
   } else {
-    box.append(k.el('p', 'setup-empty', 'No original totals locked yet.'));
-    if (view.error) {
-      box.append(k.el('p', 'setup-hint tss-note', 'The budget has a problem to fix before its totals can be locked.'));
-    }
-    const actions = k.el('div', 'tss-actions');
+    status.textContent = view.error
+      ? 'No original totals locked yet. The budget has a problem to fix before its totals can be locked.'
+      : 'No original totals locked yet.';
+    status.classList.add('setup-empty');
     actions.append(
       button('Lock current totals', 'setup-btn setup-btn-primary', k.key('baseline', 'lock'), () => {
         k.setFocusKey(k.key('baseline', 'relock'));
         k.run(ik, () => ['lock_baseline', {}], { onError: () => k.setFocusKey(null) });
       }),
     );
-    box.append(actions);
   }
   if (k.state().errors.has(ik)) box.append(k.errorLine(k.state().errors.get(ik)));
   panel.append(box);
