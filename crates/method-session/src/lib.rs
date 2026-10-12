@@ -23,6 +23,7 @@ pub mod history;
 pub mod host;
 pub mod notes;
 pub mod presets;
+pub mod rename;
 pub mod report_dto;
 pub mod rowstyle;
 pub mod safety;

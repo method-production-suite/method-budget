@@ -38,6 +38,7 @@ mod apply;
 mod clipboard;
 mod notes;
 mod presets;
+mod rename;
 mod rowstyle;
 mod versions;
 
@@ -156,6 +157,8 @@ pub const COMMANDS: &[&str] = &[
     "replace_tags_on_rows",
     "make_fringe_range",
     "clear_fringe_range",
+    // Rename
+    "rename_setup_item",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -508,6 +511,7 @@ const MODULES: &[Dispatch] = &[
     clipboard::dispatch,
     presets::dispatch,
     apply::dispatch,
+    rename::dispatch,
 ];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
