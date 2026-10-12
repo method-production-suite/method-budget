@@ -16,6 +16,10 @@
 //! - **Save as Template** writes the budget in front, stripped, to a new
 //!   file picked in a Save dialog, titled after that file. The budget itself
 //!   is not changed and keeps its own file.
+//!
+//! What they do with the budget is in method-session's `templates` module
+//! (re-exported here); these are the dialogs, the files and the Tauri
+//! commands.
 
 use std::path::PathBuf;
 
@@ -24,44 +28,12 @@ use serde::Serialize;
 use tauri::{Runtime, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
-use crate::app::{finish, safe_file_stem, with_budget_extension, AppState, DocId};
+use crate::app::{finish, with_budget_extension, AppState, DocId};
 use crate::safety::{self, Access};
 use crate::session::DocsFiles;
-use crate::session::Session;
 use crate::view::View;
 
-/// What a budget opened from a template is called until it is saved.
-pub const UNTITLED: &str = "Untitled";
-
-/// `b` as a template titled `title`: chart, setup and settings kept; budget
-/// info, baseline, versions and the notes on categories and accounts
-/// cleared; the detail rows dropped, or with `keep_lines` kept without their
-/// notes.
-pub fn strip(b: &Budget, keep_lines: bool, title: &str) -> Budget {
-    let mut t = b.clone();
-    t.title = title.trim().to_string();
-    t.info.clear();
-    t.baseline = None;
-    t.versions.clear();
-    // Actuals are one production's spending.
-    t.actuals = Default::default();
-    // A template is nobody's copy: a shared copy's stamp would open it read-only.
-    t.provenance = None;
-    for c in t.categories_mut() {
-        c.notes.clear();
-        for a in &mut c.accounts {
-            a.notes.clear();
-            if keep_lines {
-                for d in &mut a.details {
-                    d.notes.clear();
-                }
-            } else {
-                a.details.clear();
-            }
-        }
-    }
-    t
-}
+pub use method_session::templates::*;
 
 /// The budget in `path`: from its tab when it is open (unsaved changes
 /// count), else read from the file.
@@ -73,13 +45,6 @@ pub(crate) fn read(state: &AppState, path: &std::path::Path) -> Result<Budget, S
     }
     drop(docs);
     Ok(crate::session::read_budget(path)?.0)
-}
-
-/// Opens `template` stripped (as [`strip`] says) in a new tab, in front,
-/// with no file; its id.
-pub fn open_new(state: &AppState, template: &Budget, keep_lines: bool) -> DocId {
-    let b = strip(template, keep_lines, UNTITLED);
-    state.docs().add(Session::with_budget(b, None))
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +69,7 @@ pub async fn template_new<R: Runtime>(
         return Ok(None);
     };
     let template = read(&state, &path)?;
-    let id = open_new(&state, &template, keep_lines);
+    let id = method_session::templates::template_new(&state, &template, keep_lines);
     Ok(Some(finish(&window, &mut state.lock_doc(Some(id))?, None)))
 }
 
@@ -129,13 +94,9 @@ pub async fn template_save<R: Runtime>(
 ) -> Result<Option<SavedTemplate>, String> {
     let (id, suggested, dir) = {
         let s = state.lock_doc(doc)?;
-        let stem = match s.path().and_then(|p| p.file_stem()) {
-            Some(stem) => stem.to_string_lossy().into_owned(),
-            None => s.budget().title.trim().to_string(),
-        };
         (
             s.id(),
-            format!("{} template", safe_file_stem(&stem)),
+            template_name(&s),
             s.path().and_then(|p| p.parent()).map(PathBuf::from),
         )
     };
@@ -163,7 +124,7 @@ pub async fn template_save<R: Runtime>(
             .file_stem()
             .map(|t| t.to_string_lossy().into_owned())
             .unwrap_or_default();
-        method_format::to_string(&strip(s.budget(), keep_lines, &title))
+        method_session::templates::template_save(s, keep_lines, &title)
     };
     safety::write_atomically(&path, text.as_bytes(), Access::Document)
         .map_err(|e| format!("Couldn't save {}: {e}", path.display()))?;
@@ -180,89 +141,7 @@ pub async fn template_save<R: Runtime>(
 mod tests {
     use super::*;
     use crate::docs::Docs;
-    use crate::session::SessionFiles;
-    use method_core::{starter, Baseline, InfoValue};
-
-    fn full() -> Budget {
-        let mut b = starter::budget();
-        b.title = "Big Show".into();
-        b.info
-            .insert("Director".into(), InfoValue::Text("Someone".into()));
-        b.baseline = Some(Baseline::default());
-        method_core::save_version(&mut b, "Draft", "2026-10-09T10:00:00Z", None);
-        let c = b.categories_mut().next().unwrap();
-        c.notes = vec![method_core::Note::plain(1, "category note")];
-        c.accounts[0].notes = vec![method_core::Note::plain(1, "account note")];
-        let d = &mut c.accounts[0].details[0];
-        d.notes = vec![method_core::Note::plain(1, "private")];
-        b
-    }
-
-    fn lines(b: &Budget) -> usize {
-        b.categories()
-            .flat_map(|c| &c.accounts)
-            .map(|a| a.details.len())
-            .sum()
-    }
-
-    #[test]
-    fn a_template_keeps_chart_setup_and_settings_only() {
-        let b = full();
-        let t = strip(&b, false, "Feature template");
-        assert_eq!(t.title, "Feature template");
-        assert_eq!(lines(&t), 0, "no detail lines");
-        assert!(t.info.is_empty() && t.baseline.is_none() && t.versions.is_empty());
-        // The chart, setup and settings are as they were.
-        let codes = |b: &Budget| -> Vec<String> {
-            b.categories()
-                .flat_map(|c| &c.accounts)
-                .map(|a| a.code.clone())
-                .collect()
-        };
-        assert_eq!(codes(&t), codes(&b));
-        assert_eq!(t.topsheet.len(), b.topsheet.len());
-        assert_eq!(t.globals, b.globals);
-        assert_eq!(t.fringes, b.fringes);
-        assert_eq!(t.charges, b.charges);
-        assert_eq!(t.units, b.units);
-        assert_eq!(t.account_coding, b.account_coding);
-        assert_eq!(t.fringe_posting, b.fringe_posting);
-        assert_eq!(t.base_currency, b.base_currency);
-        // It recalculates (to its charges' share of nothing).
-        let r = method_core::recalc(&t, &method_core::RecalcOptions::default()).unwrap();
-        assert_eq!(r.grand_total, 0);
-
-        let kept = strip(&b, true, "With lines");
-        assert_eq!(lines(&kept), lines(&b), "keep lines");
-        assert!(kept
-            .categories()
-            .flat_map(|c| &c.accounts)
-            .flat_map(|a| &a.details)
-            .all(|d| d.notes.is_empty()));
-        assert!(kept
-            .categories()
-            .all(|c| c.notes.is_empty() && c.accounts.iter().all(|a| a.notes.is_empty())));
-        // The format round-trips it.
-        let text = method_format::to_string(&t);
-        assert_eq!(method_format::from_str(&text).unwrap(), t);
-    }
-
-    #[test]
-    fn a_template_opens_untitled_in_a_new_tab() {
-        let state = AppState::with(Docs::default());
-        let first = state.docs().active();
-        let id = open_new(&state, &full(), false);
-        let docs = state.docs();
-        assert_ne!(id, first);
-        assert_eq!(docs.len(), 2, "a new tab, the first one kept");
-        assert_eq!(docs.active(), id, "in front");
-        let s = docs.get(id).unwrap();
-        assert!(s.path().is_none(), "no file: the first Save asks where");
-        assert_eq!(s.budget().title, UNTITLED);
-        assert_eq!(s.tab_label(), UNTITLED);
-        assert_eq!(lines(s.budget()), 0);
-        assert!(s.budget().versions.is_empty());
-    }
+    use crate::session::{Session, SessionFiles};
 
     #[test]
     fn templates_are_read_from_their_tab_when_open() {
