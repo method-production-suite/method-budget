@@ -11,7 +11,9 @@
 //!   `cDescription`, `cFringe`, `cOriginal`, `cTotal`, `cVariance`). A row
 //!   with no number is a Total Fringes row when it carries `fringeDetail`,
 //!   a charge when its total is 0 or more, a credit when it is negative,
-//!   and the empty entry row when it has no name and `cFringe` 0.
+//!   and the empty entry row when it has no name and `cFringe` 0. A row
+//!   with a number but a blank `cFringe` and no accounts is a charge or
+//!   credit posted to that account number.
 //! - `accounts` (`categoryID`, `aID`, `aNumber`, `aDescription`,
 //!   `aFringe`, `aOriginal`, `aTotal`, `aVariance`): a category's fringe
 //!   account (fringes posted by category) carries `fringeDetail`.
@@ -519,6 +521,7 @@ pub fn from_tree(root: &J, format: ExportFormat, places: u8) -> Result<Export, R
                 set: text(d, "dSet"),
                 fringe_percent: parse_percent(&text(d, "dAggPercent")),
                 fringe_percent_sum: parse_percent(&text(d, "dAggSumPercent")),
+                notes: Vec::new(),
             },
         ));
     }
@@ -586,7 +589,12 @@ pub fn from_tree(root: &J, format: ExportFormat, places: u8) -> Result<Export, R
             .filter(|(cat, _)| *cat == id)
             .map(|(_, a)| a.clone())
             .collect();
-        let row = if !number.is_empty() {
+        // A numbered row with a blank fringe figure and no accounts is a
+        // charge or credit posted to that account number (a category, even
+        // an empty one, shows its fringes, 0 when none).
+        let figure_only =
+            c.has("cFringe") && fringe.is_none() && accts.is_empty() && !c.has("fringeDetail");
+        let row = if !number.is_empty() && !figure_only {
             TopRow::Category(XCategory {
                 number,
                 name,
@@ -597,6 +605,7 @@ pub fn from_tree(root: &J, format: ExportFormat, places: u8) -> Result<Export, R
             })
         } else if c.has("fringeDetail") {
             TopRow::Fringes(XTotal {
+                number: String::new(),
                 name: name.trim().to_string(),
                 total,
                 original,
@@ -628,6 +637,7 @@ pub fn from_tree(root: &J, format: ExportFormat, places: u8) -> Result<Export, R
             }
         } else {
             let t = XTotal {
+                number,
                 name: name.trim().to_string(),
                 total,
                 original,

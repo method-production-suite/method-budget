@@ -34,7 +34,7 @@ fn import(name: &str) -> (Imported, Reconciliation) {
     exchange::import(&fixture(name), name, None).unwrap_or_else(|e| panic!("{name}: {e}"))
 }
 
-const FIXTURES: [&str; 24] = [
+const FIXTURES: [&str; 25] = [
     "adjustments.json",
     "by-account.json",
     "by-budget-credits.json",
@@ -48,6 +48,7 @@ const FIXTURES: [&str; 24] = [
     "by-category-charges-xmlbasic.xml",
     "by-category-levels.json",
     "by-level.json",
+    "crew-ranges.json",
     "cutoffs-ranges.json",
     "cutoffs-ranges-excel.xlsx",
     "cutoffs-ranges-xmladv.xml",
@@ -512,6 +513,82 @@ fn every_layout_reads_as_its_json_twin() {
             }
         }
     }
+}
+
+/// An invented crew budget with the shapes a real export (a feature's
+/// budget, 2026-10-12) brought in wrong: a 0-day premium inside a person's
+/// lines, people whose lines carry flat fringes, two people in one account
+/// (the second earning less than the full rate on their own cutoff), a
+/// fitting that takes a shoot just over the cutoff (invisible in the lines'
+/// two-place percentages), a stand-in line of Amount 0 with a flat fringe,
+/// a line in `%`, and a charge and a credit with account numbers
+/// (decisions.md, entry 67).
+#[test]
+fn crew_ranges_and_percent_units() {
+    let (im, rec) = import("crew-ranges.json");
+    assert!(rec.matches(), "{:#?}", rec.differences);
+    let b = &im.budget;
+    assert_eq!(cutoff(b, "QFUTA"), Some(700_000));
+    assert_eq!(cutoff(b, "QSUI"), Some(1_170_000));
+    assert_eq!(cutoff(b, "QFICA"), None);
+    let ranges = |acct: &str| -> Vec<Option<u32>> {
+        lines(b, acct).iter().map(|d| d.fringe_range).collect()
+    };
+    let one = |v: &[Option<u32>]| v.iter().all(|r| r.is_some() && *r == v[0]);
+    // The 0-day premium doesn't split the person's lines, with percent
+    // fringes only or flat ones as well.
+    assert!(one(&ranges("2101")), "{:?}", ranges("2101"));
+    assert!(one(&ranges("2102")), "{:?}", ranges("2102"));
+    // Two people: the first's three lines are one range; the second's shoot
+    // earns less only by its own cutoff, so it stands alone.
+    let pair = ranges("2103");
+    assert!(pair[1].is_some() && pair[1] == pair[2] && pair[2] == pair[3]);
+    assert_eq!(pair[5], None);
+    // The fitting and shoot that only the account's fringes tell apart.
+    let fit = ranges("2104");
+    assert!(fit[0].is_some() && fit[0] == fit[1], "{fit:?}");
+    assert_eq!(fit[2..], [None, None]);
+    // 5,250.00 x 3.05% is 160.125 in doubles: 160.13 (the account's
+    // fringes match only so).
+    let r = recalc(b, &RecalcOptions::default()).unwrap();
+    let premium = &r.categories[0].accounts[0].rows[0];
+    assert_eq!(premium.fringes["QWC"], 16_013);
+    // The stand-in line of Amount 0 and no unit counts no flat fringe.
+    let standin = &r.categories[0].accounts[4].rows[0];
+    assert_eq!(standin.fringes.get("QPOST").copied().unwrap_or(0), 0);
+    // 1.5 % of 5,500,000 is 82,500.00.
+    let cover = lines(b, "2201")[0];
+    assert_eq!(cover.amount.0, "1.5/100");
+    assert_eq!(cover.unit, "");
+    assert!(cover.notes.iter().any(|n| n.text.contains("1.5 %")));
+    assert!(has_note(&im, NoteKind::Check, "1 line in a percent unit"));
+    // A numbered row with no fringe figure and no accounts is a charge or
+    // a credit posted to that number, not an empty category.
+    assert_eq!(b.categories().count(), 2);
+    assert_eq!(b.charges[0].account.as_deref(), Some("9800-00"));
+    assert_eq!(b.credits[0].account.as_deref(), Some("9900-01"));
+    assert_eq!(rec.export_net, 18_914_318);
+}
+
+/// An export whose account totals are their lines rounded to whole units:
+/// the import says so, and the cents are the only difference.
+#[test]
+fn account_totals_in_whole_units_are_pointed_out() {
+    let (im, rec) = import("whole-units.json");
+    assert!(has_note(
+        &im,
+        NoteKind::Check,
+        "rounds account totals, which this program doesn't, so 1 account"
+    ));
+    assert_eq!(rec.tallies[&Level::Line].different, 0);
+    assert_eq!(rec.tallies[&Level::AccountFringes].different, 0);
+    assert_eq!(rec.tallies[&Level::Account].different, 1);
+    assert_eq!(
+        rec.differences[0].ours - rec.differences[0].export,
+        25,
+        "{:#?}",
+        rec.differences
+    );
 }
 
 /// The real exports of the parity runs, when the environment points at

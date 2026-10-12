@@ -319,6 +319,9 @@ pub(crate) enum CountFrom {
     FringeNoHours(String),
     /// The line's unit (blank for none) has no hours (or 0): charged once.
     LineNoHours(String),
+    /// It would be charged once, but the line's Amount is 0: nothing is
+    /// counted (decisions.md, entry 67).
+    NoAmount,
     /// The line is in the fringe's own unit: the count is the Amount
     /// (`base`).
     SameUnit,
@@ -583,6 +586,9 @@ pub(crate) fn flat_count(
             vec![a, n(lh)],
             vec![n(fh)],
         ),
+        // Charged once, unless the Amount is 0: the reference product
+        // charges a stand-in line of 0 with no unit nothing.
+        _ if a.is_zero() => (CountFrom::NoAmount, vec![a], Vec::new()),
         _ => (once_from(fu, fh, &d.unit), Vec::new(), Vec::new()),
     };
 
@@ -1113,18 +1119,18 @@ mod tests {
     #[test]
     fn percent_rounds_once_half_away_from_zero() {
         let mut b = budget(vec![
-            line(1, "1", "Flat", "33.35", &["P"], None),
-            line(2, "1", "Flat", "-33.35", &["P"], None),
+            line(1, "1", "Flat", "0.25", &["P"], None),
+            line(2, "1", "Flat", "-0.25", &["P"], None),
         ]);
-        b.fringes.insert("P".into(), pct("10", None));
+        b.fringes.insert("P".into(), pct("50", None));
         b.arithmetic = Arithmetic::Exact;
         let rows = run(&b).unwrap();
-        assert_eq!(amounts(&rows, "P"), [Some(334), Some(-334)]);
-        // Movie Magic rounds a half up, toward plus infinity: -3.335 is
-        // -3.33 (decisions.md, entry 55).
+        assert_eq!(amounts(&rows, "P"), [Some(13), Some(-13)]);
+        // Movie Magic rounds a half up, toward plus infinity: -0.125 is
+        // -0.12 (decisions.md, entry 55).
         b.arithmetic = Arithmetic::Mmb;
         let rows = run(&b).unwrap();
-        assert_eq!(amounts(&rows, "P"), [Some(334), Some(-333)]);
+        assert_eq!(amounts(&rows, "P"), [Some(13), Some(-12)]);
     }
 
     #[test]

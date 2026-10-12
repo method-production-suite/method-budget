@@ -281,6 +281,83 @@ fn a_percent_fringe_at_a_cutoff_rounds_on_the_double() {
     }
 }
 
+/// The percentage is a fraction first (entry 67, read from a real export's
+/// account fringes): 3.05% of 5,250.00 is 5,250 x 0.0305 = 160.125 in
+/// doubles, so 160.13, where 5,250 x 3.05 / 100 is 160.12499999999997;
+/// exact arithmetic gives 160.13 too. 1.45000005% of 5,250.00 is 76.13.
+#[test]
+fn a_percent_fringe_takes_its_rate_as_a_fraction_first() {
+    for arith in Arithmetic::ALL {
+        let mut b = budget(
+            arith,
+            vec![category(
+                "1100",
+                "Z percent",
+                vec![account(
+                    "1101",
+                    "Z crew",
+                    vec![Detail {
+                        fringes: set(&["ZWC", "ZMED"]),
+                        ..Detail::line(1, "Prep", "25", "", "210")
+                    }],
+                )],
+            )],
+        );
+        b.fringes.insert("ZWC".into(), percent("3.05", None));
+        b.fringes.insert("ZMED".into(), percent("1.45000005", None));
+        let (_, r) = totals(&b);
+        let row = &r.categories[0].accounts[0].rows[0];
+        assert_eq!(row.total, 525_000);
+        assert_eq!(row.fringes["ZWC"], 16_013, "{arith:?}");
+        assert_eq!(row.fringes["ZMED"], 7_613, "{arith:?}");
+    }
+}
+
+/// A flat fringe on a line whose unit has no hours is charged once, but
+/// not on a line whose Amount is 0 (entry 67: a stand-in's title line of
+/// 0 with a 0.55 per Day fringe comes to nothing).
+#[test]
+fn a_flat_fringe_counts_nothing_on_an_amount_of_0() {
+    for arith in Arithmetic::ALL {
+        let mut b = budget(
+            arith,
+            vec![category(
+                "1100",
+                "Z flat",
+                vec![account(
+                    "1101",
+                    "Z standins",
+                    vec![
+                        Detail {
+                            fringes: set(&["ZPOST"]),
+                            ..Detail::line(1, "Standin", "0", "", "0")
+                        },
+                        Detail {
+                            fringes: set(&["ZPOST"]),
+                            ..Detail::line(2, "Kit", "2", "Allow", "0")
+                        },
+                    ],
+                )],
+            )],
+        );
+        b.fringes.insert(
+            "ZPOST".into(),
+            Fringe {
+                description: String::new(),
+                short_code: None,
+                rate: "0.55".into(),
+                kind: FringeKind::flat(Some("Day".into())),
+            },
+        );
+        let (_, r) = totals(&b);
+        let rows = &r.categories[0].accounts[0].rows;
+        assert_eq!(rows[0].fringes.get("ZPOST").copied().unwrap_or(0), 0);
+        assert_eq!(rows[1].fringes["ZPOST"], 55, "{arith:?}");
+        let text = explained(&b, Target::LineFringes(1));
+        assert!(text.contains("the Amount is 0: nothing counted"), "{text}");
+    }
+}
+
 /// 0.4425% of 22,600.00 is 100.005 and of 21,800.00 96.465: both land
 /// above the half in doubles, so 100.01 and 96.47, as in exact arithmetic
 /// (ZTEST09 ZHALF).

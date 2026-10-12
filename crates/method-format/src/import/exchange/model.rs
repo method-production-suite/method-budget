@@ -168,6 +168,9 @@ pub enum TopRow {
 /// A topsheet row that is only a figure: a fringe row, charge or credit.
 #[derive(Clone, Debug, PartialEq)]
 pub struct XTotal {
+    /// The account number a charge or credit posts to, when it has one
+    /// (`600-00`, `900-01`); empty otherwise.
+    pub number: String,
     pub name: String,
     pub total: f64,
     pub original: f64,
@@ -241,6 +244,8 @@ pub struct XDetail {
     pub fringe_percent: Option<f64>,
     /// Its fringes' nominal percentages added up.
     pub fringe_percent_sum: Option<f64>,
+    /// Notes the import puts on the line (not read from the file).
+    pub notes: Vec<String>,
 }
 
 impl XDetail {
@@ -266,6 +271,7 @@ impl XDetail {
             set: String::new(),
             fringe_percent: None,
             fringe_percent_sum: None,
+            notes: Vec::new(),
         }
     }
 

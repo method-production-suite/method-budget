@@ -274,10 +274,20 @@ impl fmt::Display for Money {
     }
 }
 
-/// `percent` percent of `c` cents (`12.5` is 12.5%), before rounding:
-/// `c x percent / 100`. `None` on overflow.
+/// `percent` percent of `c` cents (`12.5` is 12.5%), before rounding. Movie
+/// Magic arithmetic takes the percentage as a fraction first, `c x (percent
+/// / 100)`, as the reference product does (decisions.md, entry 67: 3.05% of
+/// 5,250.00 is 5,250 x 0.0305 = 160.125 in doubles, so 160.13, where 5,250 x
+/// 3.05 / 100 is 160.12499999999997); exact arithmetic is `c x percent /
+/// 100`, the same either way. `None` on overflow.
 pub fn percent_of(arith: Arithmetic, c: Cents, percent: Num) -> Option<Money> {
-    Some(Money::cents(arith, c).checked_mul(percent)?.percent())
+    match arith {
+        Arithmetic::Mmb => {
+            let fraction = finite(percent.f64() / 100.0)?;
+            Money::cents(arith, c).checked_mul(Num::F64(fraction))
+        }
+        Arithmetic::Exact => Some(Money::cents(arith, c).checked_mul(percent)?.percent()),
+    }
 }
 
 /// A line converted from its own currency at `rate` (base units per one

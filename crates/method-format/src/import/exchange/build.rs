@@ -268,6 +268,65 @@ pub(super) fn resolve_units(
     (map, added)
 }
 
+/// Whether a unit name says its column is a percentage (`%`, `Pct`,
+/// `Percent`).
+pub(super) fn is_percent_unit(name: &str) -> bool {
+    matches!(
+        name.trim().to_ascii_lowercase().as_str(),
+        "%" | "pct" | "pct." | "percent" | "percentage" | "per cent"
+    )
+}
+
+/// A line whose Amount, X, 4X or Rate is in a percent unit (`1.5 %` of
+/// 5,500,000 is 82,500): that number is a percentage, so it is divided by
+/// 100 (written `1.5/100`) and the unit dropped, when the line's total in
+/// the export says so (it is the product over 100, not the product). Only
+/// lines in the base currency, whose totals can be checked. Returns how
+/// many lines changed; each gets a note.
+fn percent_columns(x: &mut Export) -> usize {
+    let base = x.base_currency.trim().to_string();
+    let mut changed = 0;
+    for r in &mut x.rows {
+        let TopRow::Category(c) = r else { continue };
+        for d in c.accounts.iter_mut().flat_map(|a| a.details.iter_mut()) {
+            let cur = d.currency.trim();
+            if d.fringe_row.is_some() || !(cur.is_empty() || cur == base) {
+                continue;
+            }
+            let v = |n: &Option<Num>, blank: f64| n.as_ref().map_or(blank, |n| n.value);
+            let plain = v(&d.amount, 0.0) * v(&d.x, 1.0) * v(&d.rate, 0.0) * v(&d.x4, 1.0);
+            let shows = |t: f64| ((t * 100.0).round() - (d.subtotal * 100.0).round()).abs() < 0.5;
+            if shows(plain) || !shows(plain / 100.0) {
+                continue;
+            }
+            let (label, num, unit) = if is_percent_unit(&d.unit) {
+                ("Amount", &mut d.amount, &mut d.unit)
+            } else if is_percent_unit(&d.unit2) {
+                ("X", &mut d.x, &mut d.unit2)
+            } else if is_percent_unit(&d.unit4) {
+                ("4X", &mut d.x4, &mut d.unit4)
+            } else if is_percent_unit(&d.unit3) {
+                ("Rate", &mut d.rate, &mut d.unit3)
+            } else {
+                continue;
+            };
+            let Some(n) = num.as_ref() else { continue };
+            let written = n.text.clone();
+            *num = Some(Num {
+                text: format!("{written}/100"),
+                value: n.value / 100.0,
+            });
+            d.notes.push(format!(
+                "Imported: the {label} was {written} {}, a percentage: entered as {written}/100.",
+                unit.trim()
+            ));
+            unit.clear();
+            changed += 1;
+        }
+    }
+    changed
+}
+
 // ---------------------------------------------------------------------------
 // Exchange rates
 
@@ -423,7 +482,10 @@ fn join_back(lines: &[LineInfo], ranges: &mut [Option<u32>], t: usize, next: &mu
         if l.account != lines[t].account {
             break;
         }
-        if !l.any_fringe {
+        // Lines with no fringes, and lines that come to nothing (a 6th-day
+        // premium of 0 days), use none of a cutoff: passed over, so they
+        // don't split the person's lines (they join the range).
+        if !l.any_fringe || (l.total == 0.0 && ranges[j].is_none()) {
             continue;
         }
         if l.percent.is_disjoint(&lines[t].percent) {
@@ -660,6 +722,7 @@ fn is_real_category(c: &XCategory) -> bool {
 pub fn build(given: &Export, o: &BuildOptions) -> Imported {
     // Layouts that leave out part of the fringes: work it out first.
     let mut prepared = given.clone();
+    let percent_lines = percent_columns(&mut prepared);
     let mut pre_notes: Vec<ImportNote> = Vec::new();
     let mut synthetic: Vec<XFringe> = Vec::new();
     let mut pre_note = |kind, text: String| pre_notes.push(ImportNote { kind, text });
@@ -1002,6 +1065,10 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
                                 ),
                             ));
                         }
+                        for n in &d.notes {
+                            let id = det.notes.len() as u64 + 1;
+                            det.notes.push(Note::plain(id, n.clone()));
+                        }
                         fringe_names.extend(d.fringes.iter().cloned());
                         lines.push(LineInfo {
                             account: account_index,
@@ -1074,7 +1141,7 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
                 let amount = cents(t.total);
                 b.charges.push(Charge {
                     name: t.name.clone(),
-                    account: None,
+                    account: (!t.number.is_empty()).then(|| t.number.clone()),
                     applied: true,
                     kind: ChargeKind::Flat {
                         amount,
@@ -1092,7 +1159,7 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
             TopRow::Credit(t) => {
                 b.credits.push(Credit {
                     name: t.name.clone(),
-                    account: None,
+                    account: (!t.number.is_empty()).then(|| t.number.clone()),
                     applied: true,
                     cap: None,
                     discount_percent: Dec::ZERO,
@@ -1260,6 +1327,32 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
         }
     }
 
+    // What a line's flat fringes come to (entry 54: the Amount, converted
+    // through unit hours; once when either unit has none), so a line with
+    // flat fringes can be checked for earning less than its percent rates.
+    let flat_dollars = |l: &LineInfo| -> f64 {
+        let hours = |u: &str| {
+            b.units
+                .get(u)
+                .and_then(|u| u.hours)
+                .map(|h| h.to_f64())
+                .filter(|h| *h > 0.0)
+        };
+        l.names
+            .iter()
+            .filter_map(|n| defs.get(n))
+            .filter(|d| !d.percent)
+            .map(|d| {
+                let rate = d.rate.trim().parse::<f64>().unwrap_or(0.0);
+                let count = match (hours(&unit(&d.unit)), hours(&l.unit)) {
+                    (Some(f), Some(h)) => l.amount * h / f,
+                    _ => 1.0,
+                };
+                (rate * count * 100.0).round() / 100.0
+            })
+            .sum()
+    };
+
     // Ranges and cutoffs, in the export's currency.
     let mut ranges: Vec<Option<u32>> = vec![None; lines.len()];
     let mut next_range = 0u32;
@@ -1303,36 +1396,47 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
             .map(|f| f.amount)
             .sum()
     };
-    {
-        for pass in 0..4 {
-            cutoffs.clear();
-            unsolved.clear();
-            for (name, _) in &percent_defs {
-                let ea = earners(&lines, &ranges, name);
-                let full: f64 = ea.iter().map(|e| capped(e, f64::INFINITY)).sum();
-                let t = target(name);
-                if t.is_nan() {
-                    // No figures to work a cutoff out from.
-                    cutoffs.insert(name.clone(), None);
-                    no_target.insert(name.clone());
-                    continue;
+    // Every percent fringe's cutoff, from the fringe figures, on `ranges`.
+    let solve_cutoffs = |ranges: &[Option<u32>],
+                         cutoffs: &mut BTreeMap<String, Option<Cents>>,
+                         unsolved: &mut Vec<String>,
+                         no_target: &mut BTreeSet<String>| {
+        cutoffs.clear();
+        unsolved.clear();
+        for (name, _) in &percent_defs {
+            let ea = earners(&lines, ranges, name);
+            let full: f64 = ea.iter().map(|e| capped(e, f64::INFINITY)).sum();
+            let t = target(name);
+            if t.is_nan() {
+                // No figures to work a cutoff out from.
+                cutoffs.insert(name.clone(), None);
+                no_target.insert(name.clone());
+                continue;
+            }
+            let slack = slack_of(name);
+            if t >= full - 0.005 - slack {
+                cutoffs.insert(name.clone(), None);
+                continue;
+            }
+            match solve_cutoff(&ea, t, slack) {
+                Some(c) => {
+                    cutoffs.insert(name.clone(), Some(c));
                 }
-                let slack = slack_of(name);
-                if t >= full - 0.005 - slack {
+                None => {
                     cutoffs.insert(name.clone(), None);
-                    continue;
-                }
-                match solve_cutoff(&ea, t, slack) {
-                    Some(c) => {
-                        cutoffs.insert(name.clone(), Some(c));
-                    }
-                    None => {
-                        cutoffs.insert(name.clone(), None);
-                        unsolved.push(name.clone());
-                    }
+                    unsolved.push(name.clone());
                 }
             }
-            if pass == 3 {
+        }
+    };
+    {
+        // Cutoffs and ranges are worked out in turn until the ranges settle
+        // (or a dozen passes: the last cutoffs are worked out on the last
+        // ranges either way).
+        const PASSES: usize = 12;
+        for pass in 0..PASSES {
+            solve_cutoffs(&ranges, &mut cutoffs, &mut unsolved, &mut no_target);
+            if pass + 1 == PASSES {
                 break;
             }
             // Lines that earned less than their rate on their own: in a
@@ -1343,12 +1447,56 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
                     .find(|(k, _)| k == n)
                     .map_or(0.0, |(_, r)| *r)
             };
-            let mut changed = false;
+            // What the lines `f..=t` earn as one range (each line alone when
+            // `f == t`), as percentages of their totals: the worst miss
+            // against the percentages the export shows, less what their
+            // rounding allows (0 or less: they fit), and line `t`'s own.
+            let fit = |f: usize, t: usize| -> (f64, f64) {
+                let mut left: BTreeMap<&str, f64> = BTreeMap::new();
+                let mut worst = f64::MIN;
+                let mut last = 0.0;
+                for (i, l) in lines.iter().enumerate().take(t + 1).skip(f) {
+                    if l.account != lines[t].account || !l.any_fringe || l.total == 0.0 {
+                        continue;
+                    }
+                    let mut dollars = flat_dollars(l);
+                    for n in &l.percent {
+                        let base = match cutoffs.get(n).copied().flatten() {
+                            Some(c) => {
+                                let lf = left.entry(n.as_str()).or_insert(c as f64 / 100.0);
+                                let base = if l.total < 0.0 {
+                                    l.total
+                                } else {
+                                    l.total.min(lf.max(0.0))
+                                };
+                                *lf -= l.total;
+                                base
+                            }
+                            None => l.total,
+                        };
+                        dollars += rate_of(n) * base / 100.0;
+                    }
+                    if l.total < 0.0 {
+                        continue;
+                    }
+                    let expected = dollars / l.total * 100.0;
+                    let tol = 0.006 + 100.0 * 0.0051 * l.names.len() as f64 / l.total;
+                    let miss = (l.earned.unwrap_or(0.0) - expected).abs() - tol;
+                    worst = worst.max(miss);
+                    if i == t {
+                        last = l.earned.unwrap_or(0.0) - expected;
+                    }
+                }
+                (worst, last)
+            };
+            // Ranges again from the lines, with these cutoffs: a line that
+            // earned less than it would alone is in a range with the lines
+            // above, as few of them as fit best.
+            let mut fresh: Vec<Option<u32>> = vec![None; lines.len()];
+            let mut numbered = 0u32;
             for t in 0..lines.len() {
                 let l = &lines[t];
-                if ranges[t].is_some()
-                    || l.flat
-                    || l.percent.is_empty()
+                if l.percent.is_empty()
                     || l.total <= 0.0
                     || l.percent
                         .iter()
@@ -1356,27 +1504,73 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
                 {
                     continue;
                 }
-                let expected: f64 = l
-                    .percent
-                    .iter()
-                    .map(|n| {
-                        let base = match cutoffs.get(n).copied().flatten() {
-                            Some(c) => l.total.min(c as f64 / 100.0),
-                            None => l.total,
-                        };
-                        rate_of(n) * base / l.total
-                    })
-                    .sum();
-                let tol = 0.006 + 100.0 * 0.0051 * l.percent.len() as f64 / l.total;
-                if l.earned.unwrap_or(0.0) < expected - tol
-                    && join_back(&lines, &mut ranges, t, &mut next_range)
-                {
-                    changed = true;
+                let (own, short) = fit(t, t);
+                if own <= 0.0 || short >= 0.0 {
+                    continue;
+                }
+                let mut best: Option<(f64, usize, Option<u32>)> = None;
+                let mut consider = |e: f64, f: usize, r: Option<u32>| {
+                    if best.is_none_or(|b| e < b.0) {
+                        best = Some((e, f, r));
+                    }
+                };
+                let mut j = t;
+                while j > 0 {
+                    j -= 1;
+                    let p = &lines[j];
+                    if p.account != l.account {
+                        break;
+                    }
+                    if let Some(r) = fresh[j] {
+                        let f = fresh.iter().position(|x| *x == Some(r)).unwrap_or(j);
+                        consider(fit(f, t).0, f, Some(r));
+                        break;
+                    }
+                    if !p.any_fringe || p.total == 0.0 {
+                        continue;
+                    }
+                    if p.percent.is_disjoint(&l.percent) {
+                        break;
+                    }
+                    consider(fit(j, t).0, j, None);
+                }
+                if let Some((e, f, r)) = best {
+                    if e < own {
+                        let r = r.unwrap_or_else(|| {
+                            numbered += 1;
+                            numbered
+                        });
+                        for slot in &mut fresh[f..=t] {
+                            *slot = Some(r);
+                        }
+                    }
                 }
             }
-            if !changed {
+            // Lines that earned nothing at all keep the range they were
+            // given at the start when nothing better was found.
+            for t in 0..lines.len() {
+                if fresh[t].is_none()
+                    && ranges[t].is_some()
+                    && lines[t].earned.is_none()
+                    && lines[t].total != 0.0
+                {
+                    let old = ranges[t];
+                    let mut f = t;
+                    while f > 0 && ranges[f - 1] == old && fresh[f - 1].is_none() {
+                        f -= 1;
+                    }
+                    numbered += 1;
+                    let mut i = f;
+                    while i < lines.len() && ranges[i] == old && fresh[i].is_none() {
+                        fresh[i] = Some(numbered);
+                        i += 1;
+                    }
+                }
+            }
+            if fresh == ranges {
                 break;
             }
+            ranges = fresh;
         }
     }
     for (i, l) in lines.iter().enumerate() {
@@ -1386,7 +1580,6 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
             }
         }
     }
-    let range_count = ranges.iter().flatten().collect::<BTreeSet<_>>().len();
 
     // Fringe definitions.
     for (name, d) in &defs {
@@ -1557,6 +1750,7 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
             }
         }
     }
+
     let mut rateless: Vec<String> = Vec::new();
     for n in &fringe_names {
         if !b.fringes.contains_key(n) {
@@ -1599,6 +1793,113 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
     im.counts.groups = b.groups.len();
     im.counts.sets = b.sets.len();
     im.counts.locations = b.locations.len();
+
+    // Ranges the lines' percentages, shown to two places, can't show (a
+    // fitting of 171.33 before a shoot of 6,878.34 goes 49.67 over a
+    // 7,000.00 cutoff: 0.30 of 2,419.43): from the accounts' exact fringe
+    // totals. In an account whose fringes come out over by 0.05 or more,
+    // the join of a line with the lines above that brings them nearest is
+    // made, again while it helps; then the cutoffs are worked out again on
+    // the ranges. Twice at most.
+    if given.fringe_figures && !converted && !percent_defs.is_empty() {
+        let wanted: Vec<Cents> = im.links.accounts.iter().map(|a| cents(a.fringe)).collect();
+        let fringe_of = |b: &Budget, ai: usize| -> Option<Cents> {
+            let r = method_core::recalc(b, &method_core::RecalcOptions::default()).ok()?;
+            let code = &im.links.accounts.get(ai)?.code;
+            r.categories
+                .iter()
+                .flat_map(|c| &c.accounts)
+                .find(|a| a.code == *code)
+                .map(|a| a.fringe_total)
+        };
+        let put = |b: &mut Budget, ranges: &[Option<u32>], idx: &[usize]| {
+            for &i in idx {
+                let l = &lines[i];
+                if let TopsheetRow::Category(c) = &mut b.topsheet[l.at.0] {
+                    c.accounts[l.at.1].details[l.at.2].fringe_range = ranges[i];
+                }
+            }
+        };
+        for _ in 0..2 {
+            let mut joined = false;
+            for (ai, want) in wanted.iter().enumerate() {
+                let idx: Vec<usize> = (0..lines.len())
+                    .filter(|i| lines[*i].account == ai)
+                    .collect();
+                let Some(mut diff) = fringe_of(&b, ai).map(|h| h - want) else {
+                    continue;
+                };
+                if diff.abs() < 5 || idx.is_empty() {
+                    continue;
+                }
+                while diff != 0 {
+                    let mut best: Option<(Cents, Vec<Option<u32>>)> = None;
+                    let next = ranges.iter().flatten().max().copied().unwrap_or(0) + 1;
+                    for &t in &idx {
+                        let l = &lines[t];
+                        if ranges[t].is_some() || l.percent.is_empty() || l.total <= 0.0 {
+                            continue;
+                        }
+                        let mut starts: Vec<(usize, u32)> = Vec::new();
+                        let mut j = t;
+                        while j > 0 {
+                            j -= 1;
+                            let p = &lines[j];
+                            if p.account != ai {
+                                break;
+                            }
+                            if let Some(r) = ranges[j] {
+                                let f = ranges.iter().position(|x| *x == Some(r)).unwrap_or(j);
+                                starts.push((f, r));
+                                break;
+                            }
+                            if !p.any_fringe || p.total == 0.0 {
+                                continue;
+                            }
+                            if p.percent.is_disjoint(&l.percent) {
+                                break;
+                            }
+                            starts.push((j, next));
+                        }
+                        for (f, r) in starts {
+                            let mut trial = ranges.clone();
+                            for slot in &mut trial[f..=t] {
+                                *slot = Some(r);
+                            }
+                            put(&mut b, &trial, &idx);
+                            if let Some(d) = fringe_of(&b, ai).map(|h| h - want) {
+                                if d.abs() < diff.abs()
+                                    && best.as_ref().is_none_or(|(bd, _)| d.abs() < bd.abs())
+                                {
+                                    best = Some((d, trial));
+                                }
+                            }
+                            put(&mut b, &ranges, &idx);
+                        }
+                    }
+                    let Some((d, trial)) = best else { break };
+                    ranges = trial;
+                    put(&mut b, &ranges, &idx);
+                    diff = d;
+                    joined = true;
+                }
+            }
+            if !joined {
+                break;
+            }
+            solve_cutoffs(&ranges, &mut cutoffs, &mut unsolved, &mut no_target);
+            for (name, c) in &cutoffs {
+                if let Some(Fringe {
+                    kind: FringeKind::Percent { cutoff },
+                    ..
+                }) = b.fringes.get_mut(name)
+                {
+                    *cutoff = *c;
+                }
+            }
+        }
+    }
+    let range_count = ranges.iter().flatten().collect::<BTreeSet<_>>().len();
 
     // Originals, as the baseline.
     let any_original = x.rows.iter().any(|r| match r {
@@ -1841,6 +2142,47 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
             NoteKind::Info,
             format!(
                 "The export's figures are in {conv}; the budget's base currency is {base} and it shows its totals in {conv}."
+            ),
+        );
+    }
+    // Account totals in whole units over lines with cents: the exporting
+    // budget rounds its account totals, which ours doesn't.
+    if x.places >= 2 && !x.totals_only {
+        let accts: Vec<(f64, f64)> = cats
+            .iter()
+            .flat_map(|c| &c.accounts)
+            .filter(|a| is_real_account(a))
+            .map(|a| {
+                let lines: f64 = a
+                    .details
+                    .iter()
+                    .filter(|d| d.fringe_row.is_none())
+                    .map(|d| d.subtotal)
+                    .sum();
+                (cents(a.total) as f64 / 100.0, cents(lines) as f64 / 100.0)
+            })
+            .collect();
+        let off = accts.iter().filter(|(t, l)| t != l).count();
+        if off > 0
+            && accts
+                .iter()
+                .all(|(t, l)| t.fract() == 0.0 && *t == l.round())
+        {
+            im.note(
+                NoteKind::Check,
+                format!(
+                    "Every account total in the export is its lines rounded to a whole unit: the budget rounds account totals, which this program doesn't, so {off} account{} (and the categories and totals above them) differ by those cents.",
+                    if off == 1 { "" } else { "s" }
+                ),
+            );
+        }
+    }
+    if percent_lines > 0 {
+        im.note(
+            NoteKind::Check,
+            format!(
+                "{percent_lines} line{} in a percent unit (%): the percentage was divided by 100 (each line has a note).",
+                if percent_lines == 1 { "" } else { "s" }
             ),
         );
     }

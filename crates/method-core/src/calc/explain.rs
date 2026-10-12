@@ -2378,6 +2378,10 @@ fn flat_words(
             paren.push(format!("{} has no hours: charged once", u.trim()));
             (Dec::ONE, true)
         }
+        CountFrom::NoAmount => {
+            paren.push("the Amount is 0: nothing counted".into());
+            (Dec::ZERO, true)
+        }
         CountFrom::SameUnit => {
             paren.push(basis_words(c.basis).into());
             if old_quantity && (!d.x.is_blank() || !d.x4.is_blank()) {
