@@ -192,6 +192,14 @@ const COMMANDS: &[&str] = &[
     "coa_import",
     "chart_templates",
     "chart_template_new",
+    // The start window and New Budget (src/start.rs)
+    "start_list",
+    "start_open",
+    "start_pin",
+    "start_forget",
+    "start_reveal",
+    "new_budget_pick_template",
+    "new_budget_create",
     // A whole budget from another program's export (src/export_import.rs)
     "export_import_pick",
     "export_import_preview",

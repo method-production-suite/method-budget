@@ -157,6 +157,11 @@ impl Safety {
         lock(&self.recent).paths().to_vec()
     }
 
+    /// Takes `path` off the recent list (src/start.rs). Best effort.
+    pub fn forget_recent(&self, path: &Path) {
+        let _ = lock(&self.recent).remove(path);
+    }
+
     /// Remembers the files open as tabs (and which one is in front) for the
     /// next start. Best effort.
     pub fn remember_tabs(&self, docs: &Docs) {
@@ -370,7 +375,7 @@ pub fn new_tab(state: &AppState) -> DocId {
 /// Opens `next` as a budget in front: in the place of tab `instead` when
 /// given (that tab's recovery copy goes: it had nothing worth keeping), else
 /// in a new tab.
-fn put_in_front(
+pub(crate) fn put_in_front(
     state: &AppState,
     safety: &Safety,
     next: Session,

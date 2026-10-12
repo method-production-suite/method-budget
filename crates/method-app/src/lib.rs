@@ -48,6 +48,7 @@ pub mod setup_sheets;
 pub mod setupwin;
 pub mod sharing;
 pub mod sheet_import;
+pub mod start;
 pub mod tabs;
 pub mod templates;
 pub mod tools;

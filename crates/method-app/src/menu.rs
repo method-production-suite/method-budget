@@ -105,7 +105,8 @@ const fn plain(id: &'static str, label: &'static str) -> Entry {
 }
 
 pub const FILE: &[Entry] = &[
-    item("file.new", "New", "mod+n"),
+    // The start window: recent and pinned budgets, New Budget (src/start.rs).
+    item("file.new", "New…", "mod+n"),
     item("file.new_tab", "New Tab", "mod+t"),
     item("file.open", "Open…", "mod+o"),
     // Starting from another budget (src/templates.rs, src/import_setup.rs).

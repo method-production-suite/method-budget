@@ -746,6 +746,14 @@ impl RecentFiles {
         self.save()
     }
 
+    /// Takes `path` off the list (the start window's Remove; the file is
+    /// not touched).
+    pub fn remove(&mut self, path: &Path) -> io::Result<()> {
+        let canonical = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        self.list.retain(|p| *p != canonical && p != path);
+        self.save()
+    }
+
     /// Drops files that no longer exist. True if any were dropped.
     pub fn prune(&mut self) -> bool {
         let before = self.list.len();

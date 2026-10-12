@@ -1,0 +1,232 @@
+/* The start window and New Budget (js/start.js; src/start.rs). Reuses the
+   dialogs' parts (.modal, .modal-field, .modal-input, .modal-actions in
+   styles.css) and the report setup's checkbox (.rs-check). Uses only the
+   app's :root tokens; every class of its own is prefixed with st-. */
+
+/* Below the backdrop's top padding (14vh, styles.css), the lists and the
+   form shrink and scroll before the buttons leave the window. */
+.modal.st-dialog {
+  width: 780px;
+  max-height: calc(86vh - 24px);
+}
+
+.st-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.st-head .modal-title {
+  margin-right: 8px;
+}
+
+.st-search {
+  flex: 1 1 200px;
+  min-width: 160px;
+}
+
+.st-key {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.st-lists {
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow: auto;
+  padding: 2px 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.st-section-title,
+.st-group-title {
+  margin: 8px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.st-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.st-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+}
+
+.st-row:hover,
+.st-row:focus-within {
+  background: var(--row-hover);
+}
+
+.st-open {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 1px 16px;
+  min-width: 0;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.st-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.st-title,
+.st-where {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-title {
+  font-weight: 600;
+}
+
+.st-total {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.st-when {
+  min-width: 88px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.st-where {
+  grid-column: 1 / 3;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.st-note {
+  font-size: 12px;
+  color: var(--accent);
+  text-align: right;
+}
+
+.st-problem {
+  color: var(--danger);
+}
+
+.st-missing .st-title,
+.st-missing .st-open {
+  cursor: default;
+  color: var(--text-muted);
+}
+
+/* A row's own buttons show while it is under the pointer or has the keyboard. */
+.st-actions {
+  display: flex;
+  gap: 2px;
+  visibility: hidden;
+}
+
+.st-row:hover .st-actions,
+.st-row:focus-within .st-actions {
+  visibility: visible;
+}
+
+.st-act {
+  height: 24px;
+  padding: 0 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.st-empty {
+  margin: 16px 12px;
+  color: var(--text-muted);
+}
+
+.st-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.st-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* New Budget */
+
+.st-form-scroll {
+  flex: 0 1 auto;
+  min-height: 120px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.st-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px 12px;
+  align-items: end;
+}
+
+.st-form .st-group-title {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+}
+
+.st-span1 {
+  grid-column: span 1;
+}
+
+.st-span2 {
+  grid-column: span 2;
+}
+
+.st-span3 {
+  grid-column: span 3;
+}
+
+.st-span4 {
+  grid-column: 1 / -1;
+}
+
+.st-aside {
+  align-self: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.st-pick .btn {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .st-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .st-span3 {
+    grid-column: 1 / -1;
+  }
+}

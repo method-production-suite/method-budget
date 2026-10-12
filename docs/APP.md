@@ -44,8 +44,9 @@ full path and whether the file changed outside the app. Click a tab to bring it 
 front: the grid, breadcrumb, tools panel (docked or in its window), formula bar and footer
 all switch to that budget, and each tab comes back where it was left (level, category,
 account, cursor, scroll, and the footer's This session and Last change). Each budget has
-its own undo, autosave, recovery copy and backups; the row clipboard is shared. New
-(Cmd+N) and New Tab (Cmd+T) open a starter budget in a new tab, and so does the **+**
+its own undo, autosave, recovery copy and backups; the row clipboard is shared. New…
+(Cmd+N) and the toolbar's New open the start window (below, "The start window and New
+Budget"); New Tab (Cmd+T) opens a starter budget in a new tab at once, and so does the **+**
 button at the end of the strip. Open, Open Recent, a recovered budget and a `.mthd`
 double-clicked in the Finder open in a new tab; a file that is open already just has its
 tab brought forward, and an untouched Untitled budget alone in the window gives its tab up
@@ -948,7 +949,7 @@ list for your platform. The list lives in one place, `ui/js/shortcuts.js`; the m
 
 | Action | macOS | Windows and Linux |
 |---|---|---|
-| New budget (in a new tab), New tab, Open (in a new tab) | Cmd+N, Cmd+T, Cmd+O | Ctrl+N, Ctrl+T, Ctrl+O |
+| New budget or a recent one (the start window), New tab, Open (in a new tab) | Cmd+N, Cmd+T, Cmd+O | Ctrl+N, Ctrl+T, Ctrl+O |
 | Save, Save As | Cmd+S, Shift+Cmd+S | Ctrl+S, Ctrl+Shift+S |
 | Print (the report setup, with its preview, presets and Save as PDF), Print Topsheet | Cmd+P, Shift+Cmd+P | Ctrl+P, Ctrl+Shift+P |
 | Close the budget's tab (the window, on the last tab), Close the window, Quit | Cmd+W, Shift+Cmd+W, Cmd+Q | Ctrl+W, Ctrl+Shift+W, Ctrl+Q |
@@ -1122,6 +1123,75 @@ from), `items` (`[{kind, name, status, copied, here, rename_to}]`: status `add` 
 different base currency) and `review` (whether to show it). `clip_paste` is refused, with
 nothing changed, when another copy replaced the reviewed one, the target is gone, or a
 choice is unknown.
+
+### The start window and New Budget
+
+**The start window** (roadmap 3.19; decisions.md, entry 63; design and later phases:
+docs/research/new-project-window.md) shows when the app starts with nothing to reopen (no
+tabs from last time, no file handed over by the system, no recovered budgets to offer),
+over the untouched Untitled budget, and any time from **File > New…** (Cmd+N) or the
+toolbar's New. **Pinned** budgets come first, then **Recent** (Open Recent's list, without
+the pinned ones). Each row has the budget's title, its file name and folder (the home
+folder written `~`), its net total in its base currency, when the file last changed, "Open
+in a tab" for a budget that is (its unsaved changes are in the total), and "Can't find this
+file." or why it can't be read. Typing searches both lists (every word must be in the
+title, the file name or the folder). Keys: Down from the search box into the list, Up and
+Down, Home and End move, Enter opens (in the search box, the first match), P pins or
+unpins, Delete or Backspace takes a budget off the list (recent and pinned; the file is
+never touched), any other letter goes back to the search box, Escape clears the search and
+then closes the window. A row's own buttons (Pin or Unpin, Show in Folder, Remove) show
+under the pointer and with the keyboard on the row. **New Budget…** (Cmd+N in the window)
+opens the form; **Open…** (Cmd+O) shows the Open dialog and keeps the window if it is
+cancelled. "Show this window when the app starts" is kept in this window's local storage.
+Opening or making a budget closes the window; one opened and an untouched Untitled budget
+alone in the window gives its tab up to it, as Open does. A budget opened another way
+while the window shows (a file from the system) closes it too. New Tab and the **+** still
+make a starter budget at once.
+
+**New Budget** asks for a title and, all optional: the production type (Feature, TV
+episode, TV season, Commercial, Documentary, Other; a season and an episode number for an
+episode, a season and the number of episodes for a season), the prep start, shoot start,
+shoot end and wrap end dates (`YYYY-MM-DD`), the schedule's length (prep weeks, shoot days,
+wrap weeks), the country, region or state and city, the base currency (blank: USD; the last
+one used is offered next time), what to start from, how fringes post and the arithmetic.
+Start From lists the starter budget (a small sample with placeholder rates), an empty
+budget, and the bundled charts of accounts by group; **Use a Budget File…** picks any
+budget file (read from its tab when it is open) as New From Template uses one. Until Start
+From is changed by hand, the type picks our own chart for it (feature, one-hour TV,
+commercial, documentary). Enter in a text box, or Cmd+Enter anywhere, creates; Escape goes
+back to the lists keeping what was typed. Where things go:
+
+- the title is the budget's title;
+- budget info fields **Production type**, **Season**, **Episode**, **Episodes** (a
+  number), **Prep start**, **Shoot start**, **Shoot end**, **Wrap end** (dates),
+  **Country**, **Region** and **City**, each only when filled in;
+- the schedule's length sets the globals `PREP_WEEKS`, `SHOOT_DAYS` and `WRAP_WEEKS`
+  (the starter's own names, so its formulas and its `SHOOT_WEEKS` follow);
+- the currency becomes the base currency (refused when the budget started from lists it as
+  a foreign currency);
+- fringe posting (one total for the whole budget, the new-budget default; an account at the
+  end of each category; a line at the end of each account; a row above each production
+  total) and the arithmetic (spreadsheet, the default, or exact decimal).
+
+A chart or a budget file starts without lines, info, baseline, versions or notes (as New
+From Template). Every value goes through the setup tabs' own checks, and a refusal is shown
+in the form with nothing made. The budget opens in front with no file (the first Save asks
+where, suggesting the title), as one undo step, so closing it asks to save; a message says
+how many categories, accounts and lines it has.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `start_list` | none | `{pinned, recent, fresh}`: each row `{token, file, title, folder, modified (ms since 1970), net_total (cents), currency, pinned, recent, open, problem}`; `fresh` when only an untouched Untitled budget is open |
+| `start_open` | `token` | View of its tab |
+| `start_pin` | `token`, `pinned` | the lists again |
+| `start_forget` | `token` (off the recent list and unpinned) | the lists again |
+| `start_reveal` | `token` (shown in Finder, Explorer or the file manager) | nothing |
+| `new_budget_pick_template` | none (shows the Open dialog) | `{token, file, title, categories, accounts}`, or `null` when cancelled |
+| `new_budget_create` | `spec` (`{title, kind, season, episode, episodes, prep_start, shoot_start, shoot_end, wrap_end, prep_weeks, shoot_days, wrap_weeks, country, region, city, currency, start, chart, template, fringe_posting, arithmetic}`; `start` is `starter`, `blank`, `chart` with `chart` an id, or `file` with `template` the picked token) | `{view, message}` |
+
+The pinned list (at most 100) is the data folder's `start.json`. A file is read once for
+its row and read again only when its modified time or size changes. A token names a row of
+the last listing only (the picked file: the last one picked).
 
 ### Starting from another budget
 
@@ -1984,7 +2054,8 @@ untouched takes that tab's place.
 **File > Open Recent** lists the last 10 budgets opened or saved (newest first, each once;
 two files with one name show their folder), kept in the data folder's `recent.json`. Files
 that no longer exist drop off when the menu is refreshed (every open and save). Clear Menu
-empties it. macOS's own system-wide recent documents list is not updated.
+empties it; the start window's Remove takes one file off. macOS's own system-wide recent
+documents list is not updated.
 
 **Opening from the system.** Double-clicking a `.mthd` file, Open With, or dropping one on
 the Dock icon opens it in a tab (its own tab, when it is open already): on macOS the app
@@ -2438,7 +2509,11 @@ untrusted (a budget file is data from anywhere).
   only by a token Rust gave out (the last 32 picked are kept); versions by their id. The
   same goes for the budget to import setup from (the last one picked) and for templates:
   New From Template and Save as Template show the native dialogs from Rust and only take
-  "keep the lines" from the page. Import Spreadsheet is the same: Rust shows the Open
+  "keep the lines" from the page. The start window gets each pinned and recent budget's
+  file name and folder to show, and names a row only by a token from the last listing
+  (`start.json` and `recent.json` hold the paths); New Budget's budget file is picked in
+  Rust's Open dialog and named by its token. Show in Folder runs the system's `open -R`,
+  `explorer /select,` or `xdg-open` on a listed file. Import Spreadsheet is the same: Rust shows the Open
   dialog and reads the file; the page gets its name (never its path) and names it by a
   token afterwards (only the last file picked is kept). Import Actuals is the same, with
   its own token (src/actuals.rs). The setup library is picked or

@@ -77,6 +77,7 @@ import { importActuals } from './actualsimport.js';
 import { saveShareCopy, newSubBudget, renderShareBanner, offerReturnedCopy } from './sharing.js';
 import { displayCommands, userDisplay, withoutZeroRows } from './display.js';
 import { setExplainTarget, explainTargetAt } from './explain.js';
+import { showStart, closeStart, startMenu, isStartOpen, startAtLaunch } from './start.js';
 
 // The panes (pane.js): the first is always there, the second once the window
 // has been split. `target` is the pane commands act on; `cur` the pane `state`
@@ -296,6 +297,9 @@ const NOT_EDITS = new Set([
   'open_recovered',
   'template_new',
   'chart_template_new',
+  // The start window (src/start.rs): a budget opened or made in a new tab.
+  'start_open',
+  'new_budget_create',
   // Split view (src/tabs.rs): the panes changed, not the budget.
   'split_view',
   'close_split',
@@ -1342,11 +1346,21 @@ function resetNav() {
   state.selection = null;
 }
 
-/** New (and New Tab): a fresh budget in a new tab. */
+/** New Tab and the tab strip's +: a fresh starter budget in a new tab. */
 async function doNew() {
   if (grid.editor) grid.commitEdit(null);
   await act('new_tab');
   grid.focus();
+}
+
+/**
+ * File > New… and the New button: the start window, with the recent and
+ * pinned budgets and New Budget (start.js; src/start.rs). `opts.list`: a
+ * listing already fetched. Resolves once the window shows.
+ */
+function openStart(opts = {}) {
+  if (grid.editor) grid.commitEdit(null);
+  return showStart({ invoke, apply: (v, cmd) => apply(v, { cmd }), toast, focus: () => grid.focus() }, opts);
 }
 
 /** Open: the chosen file in a new tab (or its own tab, when it is open). */
@@ -1384,6 +1398,8 @@ async function openBy(cmd, args = {}) {
   if (grid.editor) grid.commitEdit(null);
   try {
     const v = await invoke(cmd, args);
+    // A budget opened another way (a file from the system): the start window goes.
+    if (v) closeStart();
     if (v) apply(v, { cmd });
   } catch (e) {
     toast(e);
@@ -1881,7 +1897,7 @@ function selectAll() {
 // Commands: one per shortcut-list id, run from keys and the menu bar alike
 
 const COMMANDS = {
-  'file.new': () => doNew(),
+  'file.new': () => openStart(),
   'file.new_tab': () => doNew(),
   'file.close_tab': () => closeTab(),
   'window.next_tab': () => stepTab(1),
@@ -2363,6 +2379,8 @@ function onMenu(id) {
     return;
   }
   if (typeof id !== 'string' || !COMMANDS[id]) return;
+  // The start window answers New and Open itself (start.js).
+  if (isStartOpen() && startMenu(id)) return;
   if (isHelpOpen() && id !== 'help.shortcuts') closeHelp();
   // A dialog is open: only field commands (undo typing in it) make sense.
   if (isModalOpen() && !FIELD_COMMANDS.has(id)) return;
@@ -2907,7 +2925,7 @@ function wire() {
   wirePanelResizer({ position: () => state.position, focusGrid: () => grid.focus() });
   panes[0].strip = createTabStrip(panes[0].tabbar, stripHandlers(panes[0]));
   wireSplit();
-  $('btn-new').addEventListener('click', doNew);
+  $('btn-new').addEventListener('click', () => openStart());
   $('btn-open').addEventListener('click', doOpen);
   $('btn-save').addEventListener('click', () => doSave(false));
   $('btn-saveas').addEventListener('click', () => doSave(true));
@@ -2915,7 +2933,7 @@ function wire() {
   $('btn-redo').addEventListener('click', doRedo);
   $('btn-panel').addEventListener('click', togglePanel);
   const tips = {
-    'btn-new': ['New budget, in a new tab', 'file.new'],
+    'btn-new': ['New budget, or open a recent one', 'file.new'],
     'btn-open': ['Open a budget, in a new tab', 'file.open'],
     'btn-save': ['Save', 'file.save'],
     'btn-saveas': ['Save as a new file', 'file.save_as'],
@@ -2945,6 +2963,16 @@ async function start() {
   // Popped out last time: the tools window opens where it was.
   if (state.position === 'window' && state.panelOpen) openToolsWindow(true).then(sendToolsState);
   await safety.start(); // a file to open, budgets to recover
+  // Nothing open but the untouched Untitled budget, and no question asked:
+  // the start window (start.js), unless it was turned off there.
+  if (!isModalOpen() && startAtLaunch()) {
+    try {
+      const list = await invoke('start_list');
+      if (list && list.fresh && !isModalOpen()) await openStart({ list });
+    } catch (e) {
+      // The window is a convenience: the budget behind it is ready.
+    }
+  }
   await updates.start(); // where an update is; What's New, once after one
 }
 

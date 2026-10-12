@@ -2705,3 +2705,45 @@ permissions and live sessions are not. Entry 61 is another agent's and unrelated
   `log::ids::random_row_id`, hints from its rename and renumber commands); presence
   heartbeats and the status item; the review panel, badges and Who Changed This
   (`Log::blame`); signatures, membership and scopes; checkpoints and the archive; iroh.
+
+## 63. The start window and New Budget, phase 1 (2026-10-12)
+
+Roadmap 3.19. The owner likes the reference product's home screen minus its cloud parts.
+What it offers was read from its public manual only and is described in our own words in
+docs/research/new-project-window.md (with the pages cited), which also has the later phases
+and the open questions. Phase 1 is built (docs/APP.md, "The start window and New Budget").
+
+- **A budget is a file, a project is a folder.** No database or index that can drift from
+  the disk: the window shows the pinned budgets (the app's own `start.json`, at most 100)
+  and Open Recent's list, each read from its file (title, net total, base currency) and
+  kept until the file's modified time or size changes; a budget open in a tab is summed
+  from the tab. Projects as folders, thumbnails and sorting are phase 2 and later.
+- **When it shows**: at launch when nothing was reopened, no file was handed over and no
+  recovered budget is offered (over the untouched Untitled budget, which gives its tab up
+  to whatever is opened or made, as Open does), and from File > New… (Cmd+N, renamed from
+  New) and the toolbar's New. New Tab (Cmd+T) and the tab strip's **+** keep making a
+  starter budget at once. A box in the window turns the launch showing off (local storage,
+  per user). It is a dialog in the main window, not a second window: the dialog code
+  already keeps the page behind inert and handles Escape and focus, and the menus keep
+  working (New and Open are answered by the window while it shows).
+- **New Budget is one form** where only the title is needed: type, season, episode or
+  episode count, four dates, schedule length, location, currency, start from, fringe
+  posting and arithmetic. Everything goes through the setup tabs' own edit functions
+  (`edit::set_info`, `set_global`, `set_base_currency`, `set_fringe_posting`,
+  `set_arithmetic`), so nothing new can be refused differently there. The details go into
+  budget info under plain names of our own (Production type, Season, Episode, Episodes,
+  Prep start, Shoot start, Shoot end, Wrap end, Country, Region, City); the schedule's
+  length into the starter's globals `PREP_WEEKS`, `SHOOT_DAYS`, `WRAP_WEEKS`. Dates are
+  never turned into day counts (shoot days depend on the week and holidays; a schedule
+  link, roadmap 3.8, will fill them).
+- **Start from** the starter, an empty budget, a bundled chart (decision 51) or a picked
+  budget file, the last two stripped as New From Template strips (decision 29). Until Start
+  From is changed by hand, the type picks our own chart for it.
+- **The new budget opens with no file**, as one undo step ("New budget"), so closing it
+  asks to save and an Open doesn't replace it. Saving into a project folder at creation
+  is phase 2.
+- **Paths stay in Rust**: rows by a token of the last listing, the picked file by its
+  token, as the Packs list and the importers do.
+- **Not built**: projects as folders, thumbnails, Save In at creation, setup library and
+  packs at creation, rates (3.9), the schedule link (3.8), shared-folder badges and
+  presence (3.18), the start window when the last tab closes.
