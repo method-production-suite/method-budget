@@ -22,6 +22,7 @@ mod cmd {
     pub mod fmt;
     pub mod import;
     pub mod import_export;
+    pub mod log;
     pub mod mcp;
     pub mod merge;
     pub mod merge_driver;
@@ -31,6 +32,7 @@ mod cmd {
     pub mod sample;
     pub mod set;
     pub mod show;
+    pub mod sync;
     pub mod totals;
 }
 
@@ -136,6 +138,16 @@ const COMMANDS: &[Command] = &[
         name: "pack",
         usage: cmd::pack::USAGE,
         run: cmd::pack::run,
+    },
+    Command {
+        name: "log",
+        usage: cmd::log::USAGE,
+        run: cmd::log::run,
+    },
+    Command {
+        name: "sync",
+        usage: cmd::sync::USAGE,
+        run: cmd::sync::run,
     },
     Command {
         name: "mcp",
