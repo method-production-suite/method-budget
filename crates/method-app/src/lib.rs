@@ -15,11 +15,9 @@ pub mod bookmark;
 pub mod clipboard;
 pub mod coa_import;
 pub mod compare;
-pub mod diagnose;
 pub mod diffmerge;
 pub mod display;
 pub mod docs;
-pub mod edit;
 pub mod explain;
 pub mod export;
 pub mod export_import;
@@ -39,7 +37,6 @@ pub mod presets;
 pub mod quickadd;
 pub mod rename;
 pub mod renumber;
-pub mod report_dto;
 pub mod reports;
 pub mod rowstyle;
 pub mod safety;
@@ -59,6 +56,10 @@ pub mod tools;
 pub mod updater;
 pub mod versions;
 pub mod view;
+
+// Moved to method-session (docs/research/web-session.md), and re-exported
+// so the rest of the app keeps its `crate::edit` paths.
+pub use method_session::{diagnose, edit, report_dto};
 
 pub use app::run;
 pub use session::Session;

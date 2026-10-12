@@ -1,0 +1,17 @@
+[package]
+name = "method-session"
+description = "Method Budget's open budgets without a window: sessions, undo, edits, views and the command contract"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+# Builds for wasm32-unknown-unknown as well as the desktop: no file system,
+# no threads and no clock of its own (src/clock.rs). `cargo xtask
+# wasm-check` and CI check it (docs/research/web-session.md).
+
+[dependencies]
+method-core = { path = "../method-core" }
+method-format = { path = "../method-format" }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"

@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/method-core",
     "crates/method-format",
+    "crates/method-session",
     "crates/method-cli",
     "crates/method-app",
     "crates/method-release",

@@ -1830,6 +1830,7 @@ dependencies = [
  "method-core",
  "method-format",
  "method-release",
+ "method-session",
  "reqwest",
  "serde",
  "serde_json",
@@ -1863,6 +1864,16 @@ dependencies = [
 [[package]]
 name = "method-release"
 version = "0.1.0"
+
+[[package]]
+name = "method-session"
+version = "0.1.0"
+dependencies = [
+ "method-core",
+ "method-format",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "mime"
