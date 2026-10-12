@@ -1026,6 +1026,9 @@ fn category_credit_rows_and_group_rules() {
 #[test]
 fn round_account_totals_setting() {
     let mut s = session();
+    // A new budget rounds, as the reference's new budgets do (entry 69).
+    assert_eq!(view(&mut s)["budget"]["round_account_totals"], true);
+    one_step(&mut s, |b| edit::set_round_account_totals(b, false));
     assert!(view(&mut s)["budget"].get("round_account_totals").is_none());
     one_step(&mut s, |b| edit::set_round_account_totals(b, true));
     assert_eq!(view(&mut s)["budget"]["round_account_totals"], true);
