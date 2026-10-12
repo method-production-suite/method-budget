@@ -34,6 +34,7 @@ use crate::edit::{
 use crate::session::Session;
 use crate::view::View;
 
+mod actuals;
 mod coa_import;
 mod export_import;
 mod import_setup;
@@ -154,6 +155,16 @@ pub const COMMANDS: &[&str] = &[
     "setup_sheet_pick",
     "setup_sheet_guess",
     "setup_sheet_review",
+    // Actuals
+    "actuals_pick",
+    "actuals_preview",
+    "actuals_import",
+    "actuals_list",
+    "actuals_update",
+    "actuals_delete",
+    "actuals_remove_batch",
+    "actuals_set_etc",
+    "actuals_lines",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -508,6 +519,7 @@ const MODULES: &[Dispatch] = &[
     export_import::dispatch,
     open_any::dispatch,
     setup_sheets::dispatch,
+    actuals::dispatch,
 ];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
