@@ -28,6 +28,12 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Test
         run: cargo test --workspace --locked
+      - name: The browser's crates build for WebAssembly
+        # docs/research/web-session.md: method-session (and the engine and
+        # format under it) must stay free of files, threads and clocks.
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo xtask wasm-check
       - name: Version agrees everywhere and has release notes
         # docs/RELEASING.md: the workspace version, Cargo.lock, tauri.conf.json and
         # docs/releases/<version>.md must agree on every push.

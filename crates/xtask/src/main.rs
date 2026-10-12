@@ -15,6 +15,7 @@ mod repo;
 #[cfg(test)]
 mod testdir;
 mod versions;
+mod wasm;
 
 const USAGE: &str = "\
 cargo xtask <command> [--root <repository>]
@@ -42,6 +43,10 @@ cargo xtask <command> [--root <repository>]
   updater-key [--config <tauri.conf.json>] [--require]
       Print `trusted <KEY ID>` when the app trusts a real updater key, or
       `none` for the placeholder. With --require, the placeholder fails.
+  wasm-check
+      Check that the crates a browser runs (method-core, method-format,
+      method-session) build for wasm32-unknown-unknown. Needs the target:
+      rustup target add wasm32-unknown-unknown.
   update-manifest --dir <artifacts> --version X.Y.Z --out <latest.json>
                   [--config <tauri.conf.json>] [--base-url <url>] [--pub-date <RFC 3339>]
       Write the update manifest the app reads, from the signed updater
@@ -173,6 +178,7 @@ fn run(args: &[String]) -> Result<String, String> {
                 pub_date: a.value("--pub-date").map(str::to_string),
             })
         }
+        "wasm-check" => wasm::command(&root),
         other => Err(format!("unknown command `{other}`\n\n{USAGE}")),
     }
 }
