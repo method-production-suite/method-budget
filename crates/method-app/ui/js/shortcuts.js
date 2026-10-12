@@ -37,6 +37,7 @@ export const SHORTCUTS = [
   { id: 'file.new_from_template', group: 'File', label: 'New budget from a template (any budget file): its chart, setup and settings, in a new tab', scope: 'menu' },
   { id: 'file.new_sub_budget', group: 'File', label: 'New sub-budget: a filtered copy by categories, accounts, groups, sets and locations, in a new tab', scope: 'menu' },
   { id: 'file.save_share_copy', group: 'File', label: 'Save a copy for sharing: a snapshot named by title, version and date, optionally without notes or private info, that opens read-only', scope: 'menu' },
+  { id: 'file.share', group: 'File', label: 'Share this budget through a folder: everyone opening it there works in the same budget, with everyone’s changes', scope: 'menu' },
   { id: 'file.save_as_template', group: 'File', label: 'Save a copy of the budget as a template: no lines, info, baseline, versions or notes', scope: 'menu' },
   { id: 'file.import_setup', group: 'File', label: 'Import setup items from another budget file, with what they need', scope: 'menu' },
   { id: 'file.import_setup_pack', group: 'File', label: 'Import a setup pack: its setup items, with what they need, marked with the pack’s title and effective date', scope: 'menu' },
@@ -86,6 +87,7 @@ export const SHORTCUTS = [
   // How a total is worked out (explain.js) and the overtime helper (overtime.js).
   { id: 'edit.explain', group: 'Edit', label: 'Explain the total under the cursor: every step of how it is worked out, in the Explain tab', keys: 'mod+e', scope: 'grid' },
   { id: 'edit.overtime', group: 'Edit', label: 'Overtime helper: work out a day or week of a labor line with overtime, and write it into the line', scope: 'menu' },
+  { id: 'share.blame', group: 'Edit', label: 'Who changed this: every value the cell under the cursor has had since the budget was shared, and who typed it', scope: 'menu' },
   // Find and replace: the Find tab of the tools panel (find.js). Cmd+G is
   // the Globals tab, so the next and previous result are F3 and Shift+F3
   // (and Enter and Shift+Enter in the Find box).
@@ -186,6 +188,8 @@ export const SHORTCUTS = [
   { id: 'view.tab.history', group: 'View', label: 'Tools: History (every change you can undo; go back to one, or save it as a version)', scope: 'menu' },
   { id: 'view.tab.library', group: 'View', label: 'Tools: Library (your setup library: copy setup items into this budget or save them to it)', scope: 'menu' },
   { id: 'view.tab.actuals', group: 'View', label: 'Tools: Actuals (imported transactions, imports, and each account’s estimate to complete)', scope: 'menu' },
+  { id: 'view.tab.review', group: 'View', label: 'Tools: Review (what needs a person after other people’s changes in a shared budget: values changed by two people and the like)', scope: 'menu' },
+  { id: 'view.tab.activity', group: 'View', label: 'Tools: Activity (everyone’s changes to a shared budget, newest first, with who made them and when)', scope: 'menu' },
   // The tools panel's tab strips (tools.js).
   { id: 'tools.tab_keys', group: 'View', label: 'Tools tabs: the previous or next tab in the pane', keys: ['left', 'right'], scope: 'builtin' },
   { id: 'tools.move_tab', group: 'View', label: 'Tools tabs: move the tab left or right, or to the other pane', keys: ['alt+shift+left', 'alt+shift+right', 'alt+shift+up', 'alt+shift+down'], scope: 'builtin' },

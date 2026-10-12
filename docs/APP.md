@@ -1334,6 +1334,117 @@ are worked out normally: there is no fringe lock yet.
 | `share_copy_store` | `original` (its doc id), `name`, `created` | View of the original (one undo step there) |
 | `sub_budget_new` | `spec` (`{categories, accounts, groups, sets, locations, skip_empty_accounts, drop_fringes, drop_notes}`, each tag kind `{values, include_untagged}`), `saved` | View of the new tab |
 
+### Sharing a budget
+
+**Share…** (File menu, and the Share button at the right of the toolbar; roadmap 3.18,
+decisions.md entries 62 and 64; the design is docs/research/collaboration.md) lets
+several people work in one budget through a folder they already share with a sync
+service. The dialog asks how people get each other's changes (through a shared folder;
+a live link is listed as coming later), where the folder is (the budget's own folder, or
+one chosen in Rust's folder dialog, in which case the file is moved or copied there after
+a confirmation), and this person's name and color, kept for every shared budget beside
+this computer's sharing id (`~/.method/person.json` and `~/.method/actor`, the same id
+the command line's `method log` and `method sync` use, so one computer is one actor
+whatever program edits the budget). Start Sharing makes `Feature.mthd-log/` beside the
+file (docs/FORMAT.md, "The change log") and this computer keeps the file. A budget must be
+saved first; a copy saved for sharing (read-only) can't be shared this way.
+
+**Opening a budget that has a change log beside it joins it**: the merged state of
+everyone's changes replaces what the file held, a notice says what that means (once per
+budget), and from then on every edit is recorded as a change and shared. Nothing is
+sent anywhere: this computer writes its own change files into its own folder under
+`Feature.mthd-log/actors/`, once typing pauses for a second and a half (at least every
+six seconds while it goes on), and reads the others' every second. Changes made offline
+pile up in the folder and go out when the sync service is back. Rows made in a shared
+budget get random ids from a range nobody else can make, so two people adding lines
+apart never clash. Renames and renumbering are recorded as one write (the commands pass
+hints), so everything that names the item follows.
+
+**There is nothing to save.** Everything typed is kept; Save puts this person's changes
+in the folder now, and Autosave leaves a shared budget alone. Only one computer, the
+keeper (the one that started sharing, shown as "keeps the file"), rewrites the `.mthd`
+from the merged state once the budget has been quiet for two seconds, so a sync service
+never sees two writers on one file. The keeper also notices the file changed by another
+program (an older version of the app, `method set`, an agent) and records the
+difference as a change by itself, labeled "Outside edit to Feature.mthd". Save As is
+refused in a shared budget (File > Save a Copy for Sharing makes a copy); the close and
+quit questions never ask about a shared budget whose changes are in the folder.
+
+**The status item** in the toolbar says, in plain words, where things stand: "Synced
+through the folder · 12 s ago", "Sharing 4 changes…" (not yet in the folder), "Waiting
+for 2 changes that haven't arrived" (a change depends on one the sync service hasn't
+brought yet), "Can't reach the shared folder", and an amber "2 to review". Clicking it
+opens a panel: the folder and file, who keeps the file and when it was last written,
+how many of your changes aren't shared yet, each person with where they are and when
+they were last seen, and buttons to the Review and Activity tabs and the Share dialog.
+
+**Presence.** Each computer rewrites a small heartbeat file in its own folder every
+twenty seconds (and when the person moves to another category or account) with its
+name, color and where it is; nobody's keystrokes leave the computer. The toolbar shows
+the other people as initials in their colors (faded when their heartbeat is more than
+two minutes old; hover for where they are and when), and the topsheet and account list
+show initials next to the categories and accounts people are in. Folder mode shows no
+cursors: heartbeats are too slow to be honest about a cell.
+
+**Changes arriving** never move your cursor, selection or scroll. The cells (or rows,
+accounts and categories) someone changed get a brief wash of that person's color and
+an outline, with their name and what they did as the tooltip, and a dot at the start of
+the row until the cursor lands on it; the cell being typed in is never touched, and
+what is typed there wins as a normal later write. With reduce motion on, the wash is a
+plain short highlight.
+
+**Changed by two people.** Last write wins and nothing blocks; the losing value is never
+lost. The cell gets an amber outline and a "!" badge; clicking it shows both values with
+who wrote each and when, and Keep (a write that settles it) or Use the other value (a
+new change, shared like any). The **Review** tab of the tools panel lists everything a
+person should look at after other people's changes arrive, each in a sentence with Go
+there and the actions that settle it: values changed by two people, an item deleted by
+one person while another edited it, a line moved by two people, a deleted item kept
+because something still uses it, two items with one name made apart, account numbers
+that repeat or don't fit the numbering, and globals that refer back to themselves (the
+engine's review list, decisions.md entry 62).
+
+**Who changed this** (right-click a cell, or Edit > Who Changed This…) lists every value
+the cell has had since the budget was shared, newest first, with who typed it, when and
+the step that did it, and puts any of them back as a new change. It works on cells
+people type in (a line's description, amount, unit, X, rate, 4X, currency, fringes,
+groups, set and location; an account's or category's number and name; a production
+total's name), not on totals. The **Activity** tab lists everyone's changes newest
+first, grouped by hour, with the person's initials, what they did and where (Go there),
+and a filter by person.
+
+**Undo in a shared budget takes back only your own changes.** Each is put back field by
+field where your value is still the current one; a field someone changed after you is
+left as they set it, and a message says so ("Undid "Edit rate on 2300 line 2". Line 2 in
+2300's rate was not put back: Jordan Lee changed it after you."). Redo is the undo of the
+undo. The History tab lists your steps only; saving a version from a past step is
+refused while a budget is shared (versions are saved from the budget as it is now).
+
+**Not yet** (later phases of the design): roles and invite links (for now everyone who
+can open the file can edit it), live sessions with cursors, access requests, proposals,
+checkpoints for very long logs, and the service-by-service checks (iCloud, Google Drive,
+LucidLink) the design calls for.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `share_status` | none | The status item's state (`mode`, `folder`, `file`, `me`, `keeper`, `people`, `synced_secs`, `unshared`, `waiting`, `review_count`, `error`, `file_written`, `changes`, `recent`, `conflicts`), or `null` when the budget isn't shared |
+| `share_setup` | none | What the Share dialog starts from: `name`, `color`, `colors`, `file`, `folder`, `blocked` (why it can't be shared yet), `picked` |
+| `share_pick_folder` | none; shows Rust's folder dialog | The folder's path (kept in Rust until `share_start`), or `null` when cancelled |
+| `share_start` | `use_picked`, `move_file`, `me` (`{name, color}`) | View of the budget, now shared |
+| `share_set_me` | `name`, `color` | The person as kept, for every shared budget |
+| `share_place` | `category`, `account` (where this person is) | nothing |
+| `share_review` | none | The review list: `index`, `key`, `sentence`, `place` (`{kind, key, parent, field, text}`), `values` |
+| `share_activity` | `limit` | Recent changes, newest first: `actor`, `name`, `color`, `me`, `time`, `label`, `ops`, `place` |
+| `share_blame` | `kind`, `key`, `field` | Every value the field has had, oldest first: `value`, `actor`, `name`, `color`, `me`, `time`, `label`, `kept`, `index` |
+| `share_use_value` | `kind`, `key`, `field`, `index` | View, with the value put back as one change |
+
+Rust sends `share-status` (`{doc, status}`) whenever the status changes and
+`share-changed` (`{doc, rev, remote: [{actor, name, color, label, time, places}]}`)
+when other people's changes (or an outside edit) were taken in; the page fetches the
+view and flashes the places. Everything else goes through views: a view says `shared`,
+and carries a `notice` once when a command has something to say (an undo that couldn't
+put everything back).
+
 ### Setup library
 
 Your own library of setup items to reuse across budgets (roadmap 2.15, decisions.md entries
@@ -2192,6 +2303,12 @@ crates/method-app/
                      renumbering (method_core::renumber does the work)
   src/sharing.rs     copies for sharing (Save dialog, provenance, read-only, editable
                      copies, returned copies stored as versions) and sub-budgets
+  src/shared.rs      a budget shared through a folder, inside its session: every edit
+                     recorded in the change log, random row ids, the cached projection,
+                     the timer pass (changes in and out, the keeper's file, heartbeats),
+                     per-person undo, the status, review, blame and activity the page shows
+  src/shared_app.rs  its Tauri side: File > Share, the Share dialog's commands, the
+                     folder dialog, joining on open, the timer hook and the events
   src/versions.rs    the Versions dialog's commands: save, restore, rename, delete, each
                      one undo step, with names, notes and times checked
   src/compare.rs     the compare screen's commands: budgets copied out of tabs, versions
@@ -2354,7 +2471,10 @@ setup items, the note editor, the fringe range keys and the formula bar),
 screen's frame),
 `sharing.js` with `sharing.css` (Save a Copy for Sharing, the shared copy's banner and the
 returned-copy question, New Sub-Budget; `sharing.css` also draws `renumber.js`'s preview in
-Budget Setup > Settings > Account numbers),
+Budget Setup > Settings > Account numbers), `share.js` with `shared.css` (sharing a
+budget through a folder: the Share dialog, the status item and its panel, presence,
+the wash on cells other people changed, conflict badges and Who Changed This; `review.js`
+and `activity.js` are the Review and Activity tabs),
 `prefs.js` (per-user display choices in local storage: visible columns, the tools panel's
 place, size and tabs), `display.js` with `display.css` (how numbers show: formula values,
 rate and global decimals, totals with or without cents, hidden-factor marks, zero rows,

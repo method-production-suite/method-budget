@@ -20,6 +20,9 @@ use crate::report_dto::SelectionDto;
 use crate::safety::{self, Access};
 use crate::view::{Focus, FullView, View, ViewState};
 
+/// What Save As is told in a shared budget.
+pub const SHARED_STAYS: &str = "A shared budget stays in its shared folder. To give someone a copy, use File > Save a Copy for Sharing.";
+
 /// Undo steps kept. Each step keeps only what its edit changed (see [`Patch`]).
 pub const UNDO_LIMIT: usize = 200;
 
@@ -292,6 +295,17 @@ pub struct Session {
     /// change, so an edit's view costs one pass over the accounts, not over
     /// every transaction (src/actuals.rs).
     rollups: crate::actuals::RollupCache,
+    /// The budget is shared through a folder (src/shared.rs): every edit is
+    /// recorded in the change log, undo takes back this person's changes
+    /// only, and the timer brings in other people's changes.
+    shared: Option<Box<crate::shared::SharedDoc>>,
+    /// Something to tell the person after the last command (an undo that
+    /// couldn't put everything back); the next view carries it.
+    notice: Option<String>,
+    /// Row ids the last edit gave out and replaced with random ones (a
+    /// shared budget): old -> new, so the row a command made can still be
+    /// found.
+    remap: HashMap<RowId, RowId>,
 }
 
 /// What autosave needs to know about one open budget.
@@ -361,6 +375,9 @@ impl Session {
             merge: None,
             trimmed: false,
             rollups: crate::actuals::RollupCache::default(),
+            shared: None,
+            notice: None,
+            remap: HashMap::new(),
         }
     }
 
@@ -385,16 +402,27 @@ impl Session {
         self.path.as_deref()
     }
 
+    /// Unsaved changes. In a shared budget: changes of this person's not yet
+    /// in the shared folder (or, for the keeper, a file behind the log).
     pub fn is_dirty(&self) -> bool {
-        self.rev != self.saved_rev
+        match &self.shared {
+            Some(sh) => sh.is_dirty(),
+            None => self.rev != self.saved_rev,
+        }
     }
 
     pub fn can_undo(&self) -> bool {
-        !self.undo.is_empty()
+        match &self.shared {
+            Some(sh) => sh.can_undo(),
+            None => !self.undo.is_empty(),
+        }
     }
 
     pub fn can_redo(&self) -> bool {
-        !self.redo.is_empty()
+        match &self.shared {
+            Some(sh) => sh.can_redo(),
+            None => !self.redo.is_empty(),
+        }
     }
 
     /// The file name shown in the title bar.
@@ -438,6 +466,19 @@ impl Session {
     /// so a failed write never leaves half a file), then remembers the path and
     /// marks the budget saved.
     pub fn save_to(&mut self, path: &Path) -> Result<(), String> {
+        if let Some(sh) = self.shared.as_mut() {
+            // A shared budget lives in its shared folder: Save puts this
+            // person's changes there (and the keeper's file is rewritten);
+            // nobody else writes the file (docs/research/collaboration.md, 4.3).
+            if !safety::same_file(path, sh.path()) {
+                return Err(SHARED_STAYS.into());
+            }
+            sh.flush_all();
+            return match sh.status(Instant::now()).error {
+                Some(e) => Err(e),
+                None => Ok(()),
+            };
+        }
         let text = method_format::to_string(&self.budget);
         safety::write_atomically(path, text.as_bytes(), Access::Document)
             .map_err(|e| format!("Couldn't save {}: {e}", path.display()))?;
@@ -457,6 +498,11 @@ impl Session {
     /// file back. Unknown (no file, or not read by this session) is not
     /// either.
     pub fn changed_on_disk(&mut self) -> bool {
+        if self.shared.is_some() {
+            // The keeper takes outside edits in as changes (src/shared.rs);
+            // nobody else writes the file.
+            return false;
+        }
         let (Some(path), Some(stamp)) = (self.path.as_deref(), &self.safety.disk) else {
             return false;
         };
@@ -490,7 +536,7 @@ impl Session {
     pub fn load_from_disk(&mut self) -> Result<(), String> {
         let path = self.path.clone().ok_or("This budget has no file.")?;
         let (theirs, stamp) = read_budget(&path)?;
-        self.edit_unchecked("Load the file's version", |b| {
+        self.edit_unchecked("Load the file's version", &[], |b| {
             *b = theirs;
             Ok(())
         })?;
@@ -608,8 +654,20 @@ impl Session {
         label: impl Into<String>,
         f: impl FnOnce(&mut Budget) -> EditResult<T>,
     ) -> EditResult<T> {
+        self.edit_with_hints(label, &[], f)
+    }
+
+    /// [`Session::edit`] with what the command knows that a diff can't see
+    /// (a rename, a renumbering), so a shared budget's change log records
+    /// one write and not a delete and an add (src/shared.rs).
+    pub fn edit_with_hints<T>(
+        &mut self,
+        label: impl Into<String>,
+        hints: &[method_core::log::Hint],
+        f: impl FnOnce(&mut Budget) -> EditResult<T>,
+    ) -> EditResult<T> {
         self.check_writable()?;
-        self.edit_unchecked(label, f)
+        self.edit_unchecked(label, hints, f)
     }
 
     /// [`Session::edit`] without the read-only check: only for what isn't
@@ -617,19 +675,182 @@ impl Session {
     fn edit_unchecked<T>(
         &mut self,
         label: impl Into<String>,
+        hints: &[method_core::log::Hint],
         f: impl FnOnce(&mut Budget) -> EditResult<T>,
     ) -> EditResult<T> {
         let mut next = self.budget.clone();
         let out = f(&mut next)?;
+        self.remap.clear();
+        if let Some(sh) = self.shared.as_mut() {
+            // Rows made here get ids nobody else can make (decisions.md, 62).
+            self.remap = sh.randomize_new_rows(&self.budget, &mut next);
+        }
+        let label = label.into();
         let old = std::mem::replace(&mut self.budget, next);
         if let Some(patch) = Patch::between(old, &mut self.budget) {
-            self.push_step(patch, self.rev, label.into());
+            if let Some(sh) = self.shared.as_mut() {
+                match sh.record(&self.budget, hints, &label) {
+                    Ok(Some(projected)) => {
+                        if projected != self.budget {
+                            // The log is the truth: what it projects is
+                            // what everyone else will see.
+                            self.budget = projected;
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        // Nothing was recorded: the edit is taken back too.
+                        let _ = patch.apply(&mut self.budget);
+                        return Err(e);
+                    }
+                }
+            }
+            self.push_step(patch, self.rev, label);
             self.redo.clear();
             self.rev = self.next_rev;
             self.next_rev += 1;
             self.changed();
         }
         Ok(out)
+    }
+
+    // Sharing (src/shared.rs)
+
+    /// Whether the budget is shared through a folder.
+    pub fn is_shared(&self) -> bool {
+        self.shared.is_some()
+    }
+
+    pub fn shared(&self) -> Option<&crate::shared::SharedDoc> {
+        self.shared.as_deref()
+    }
+
+    pub fn shared_mut(&mut self) -> Option<&mut crate::shared::SharedDoc> {
+        self.shared.as_deref_mut()
+    }
+
+    /// Starts sharing: the budget must have a file, with no change log
+    /// beside it yet. Unsaved changes go into the file first. This
+    /// computer keeps the file.
+    pub fn start_sharing(
+        &mut self,
+        actor: method_core::log::ActorId,
+        me: crate::shared::Person,
+    ) -> Result<(), String> {
+        if self.shared.is_some() {
+            return Err("This budget is already shared.".into());
+        }
+        if self.is_read_only() {
+            return Err(crate::sharing::READ_ONLY.into());
+        }
+        let path = self
+            .path
+            .clone()
+            .ok_or("Save the budget first, then share it.")?;
+        if self.is_dirty() {
+            self.save_to(&path)?;
+        }
+        let doc = crate::shared::SharedDoc::start(&path, actor, me)?;
+        self.adopt_shared(doc);
+        Ok(())
+    }
+
+    /// Joins the shared budget whose change log is beside its file: the
+    /// merged budget replaces what the file held.
+    pub fn join_shared(
+        &mut self,
+        actor: method_core::log::ActorId,
+        me: crate::shared::Person,
+    ) -> Result<method_format::log::LoadReport, String> {
+        if self.shared.is_some() {
+            return Err("This budget is already shared.".into());
+        }
+        let path = self.path.clone().ok_or("This budget has no file.")?;
+        let (doc, report) = crate::shared::SharedDoc::open(&path, actor, me)?;
+        let merged = doc.budget().clone();
+        self.adopt_shared(doc);
+        if merged != self.budget {
+            let provenance = self.budget.provenance.clone();
+            self.budget = merged;
+            self.budget.provenance = provenance;
+            self.rev = self.next_rev;
+            self.next_rev += 1;
+            self.changed();
+        }
+        Ok(report)
+    }
+
+    fn adopt_shared(&mut self, doc: crate::shared::SharedDoc) {
+        self.shared = Some(Box::new(doc));
+        // Steps made before sharing can't be undone through the log.
+        self.undo.clear();
+        self.redo.clear();
+        self.merge = None;
+        self.saved_rev = self.rev;
+        self.safety.pending_since = None;
+        self.safety.conflict = false;
+    }
+
+    /// One pass of the sharing timer (src/shared_app.rs): what arrived
+    /// from other people, for the page.
+    pub fn share_tick(&mut self, now: Instant) -> Option<crate::shared::TickOut> {
+        let mut sh = self.shared.take()?;
+        let out = sh.tick(now, &mut self.budget);
+        self.shared = Some(sh);
+        if out.budget_changed {
+            self.rev = self.next_rev;
+            self.next_rev += 1;
+            self.changed();
+        }
+        Some(out)
+    }
+
+    /// Everything of this person's into the folder now, and (the keeper)
+    /// the file: before closing, quitting or losing focus.
+    pub fn share_flush(&mut self) {
+        if let Some(sh) = self.shared.as_mut() {
+            sh.flush_all();
+        }
+    }
+
+    /// Adopts the budget a shared command produced (a value put back, an
+    /// undo through the log) as a change with its own revision.
+    fn adopt_projected(&mut self, budget: Budget, label: &str) {
+        if budget != self.budget {
+            let old = std::mem::replace(&mut self.budget, budget);
+            if let Some(patch) = Patch::between(old, &mut self.budget) {
+                self.push_step(patch, self.rev, label.to_string());
+            }
+        }
+        self.rev = self.next_rev;
+        self.next_rev += 1;
+        self.changed();
+    }
+
+    /// Writes value `index` of a field's history back (the review panel
+    /// and Who Changed This).
+    pub fn share_use_value(
+        &mut self,
+        kind: &str,
+        key: &str,
+        field: &str,
+        index: usize,
+    ) -> Result<(), String> {
+        self.check_writable()?;
+        let sh = self.shared.as_mut().ok_or("This budget isn't shared.")?;
+        let budget = sh.use_value(kind, key, field, index)?;
+        self.adopt_projected(budget, "Put back a value");
+        Ok(())
+    }
+
+    /// Something the last command wants the person told, once.
+    pub fn take_notice(&mut self) -> Option<String> {
+        self.notice.take()
+    }
+
+    /// Something to tell the person with the next view.
+    pub fn set_notice(&mut self, text: String) {
+        self.notice = Some(text);
     }
 
     /// A copy saved for sharing opens read-only (src/sharing.rs): its
@@ -680,6 +901,11 @@ impl Session {
         f: impl FnOnce(&mut Budget) -> EditResult<(T, String)>,
     ) -> EditResult<T> {
         self.check_writable()?;
+        if self.shared.is_some() {
+            // Each step is its own change in the log, so none can join.
+            let (out, _) = self.edit(label, f)?;
+            return Ok(out);
+        }
         let now = Instant::now();
         let joins = matches!(&self.merge, Some((k, at, rev))
             if k == key && *rev == self.rev && now.duration_since(*at) < MERGE_WINDOW)
@@ -732,6 +958,9 @@ impl Session {
     }
 
     pub fn undo(&mut self) -> bool {
+        if self.shared.is_some() {
+            return self.shared_step(true);
+        }
         if !self.step_back() {
             return false;
         }
@@ -740,10 +969,28 @@ impl Session {
     }
 
     pub fn redo(&mut self) -> bool {
+        if self.shared.is_some() {
+            return self.shared_step(false);
+        }
         if !self.step_forward() {
             return false;
         }
         self.changed();
+        true
+    }
+
+    /// Undo or redo in a shared budget: this person's own step, through the
+    /// log (src/shared.rs). What couldn't be put back becomes the notice.
+    fn shared_step(&mut self, back: bool) -> bool {
+        let Some(sh) = self.shared.as_mut() else {
+            return false;
+        };
+        let done = if back { sh.undo() } else { sh.redo() };
+        let Some((budget, note)) = done else {
+            return false;
+        };
+        self.notice = note;
+        self.adopt_projected(budget, if back { "Undo" } else { "Redo" });
         true
     }
 
@@ -784,6 +1031,9 @@ impl Session {
 
     /// Every undo and redo step, oldest first, and how many are applied.
     pub fn history(&self) -> History {
+        if let Some(sh) = &self.shared {
+            return sh.history();
+        }
         let steps = self
             .undo
             .iter()
@@ -812,6 +1062,32 @@ impl Session {
     /// of the list). One change, however many steps it passes. Refused
     /// when there is no such position.
     pub fn jump_to(&mut self, pos: usize) -> Result<(), String> {
+        if let Some(sh) = &self.shared {
+            if pos > sh.history_len() {
+                return Err("That step is no longer in the history.".into());
+            }
+            let mut notes = Vec::new();
+            while self
+                .shared
+                .as_ref()
+                .is_some_and(|s| s.applied_steps() > pos)
+                && self.undo()
+            {
+                notes.extend(self.notice.take());
+            }
+            while self
+                .shared
+                .as_ref()
+                .is_some_and(|s| s.applied_steps() < pos)
+                && self.redo()
+            {
+                notes.extend(self.notice.take());
+            }
+            if !notes.is_empty() {
+                self.notice = Some(notes.join(" "));
+            }
+            return Ok(());
+        }
         if pos > self.history_len() {
             return Err("That step is no longer in the history.".into());
         }
@@ -829,6 +1105,11 @@ impl Session {
     /// walked on the budget itself and walked back (a patch applied twice
     /// gives what it started from), so nothing but the copy is made.
     pub fn budget_at(&mut self, pos: usize) -> Result<Budget, String> {
+        if self.shared.is_some() {
+            return Err(
+                "While a budget is shared, versions are saved from the budget as it is now.".into(),
+            );
+        }
         let n = self.history_len();
         if pos > n {
             return Err("That step is no longer in the history.".into());
@@ -905,12 +1186,14 @@ impl Session {
         };
         let mut view = View::build(&mut self.budget, &st, focus, None);
         view.cost = self.cost(focus, false);
+        view.shared = self.shared.is_some();
         view
     }
 
     /// The view, noting a row an edit just created so the UI can select it.
     pub fn view_with(&mut self, created_row: Option<RowId>) -> View {
         self.outcome();
+        let created_row = created_row.map(|id| self.remap.get(&id).copied().unwrap_or(id));
         let focus = self.focused();
         let st = ViewState {
             rev: self.view_rev,
@@ -923,6 +1206,8 @@ impl Session {
         };
         let mut view = View::build(&mut self.budget, &st, focus, created_row);
         view.cost = self.cost(focus, false);
+        view.shared = self.shared.is_some();
+        view.notice = self.notice.take();
         view
     }
 
