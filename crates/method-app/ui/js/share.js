@@ -50,6 +50,7 @@ const st = {
   tickTimer: null,
   flashTimers: [],
   reportedDoc: null,
+  revSeen: null, // the view rev the status was last asked for
 };
 
 /** How long a changed cell keeps the editor's color (design 9.4). */
@@ -104,6 +105,13 @@ export function renderBar(view) {
     return;
   }
   area.hidden = false;
+  // A new revision of the budget (an edit, a value put back, an undo): the
+  // review badges and counts may have changed, so ask now rather than at
+  // the next timer pass.
+  if (view.rev !== st.revSeen) {
+    st.revSeen = view.rev;
+    fetchStatus();
+  }
   const s = current();
   if (!s) {
     // The first status for this budget is on its way (or asked for here).

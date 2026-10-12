@@ -399,3 +399,67 @@ fn renames_are_one_write_and_versions_from_history_are_refused() {
     alex.jump_to(1).unwrap();
     assert!(alex.budget().fringes.contains_key("Payroll Taxes"));
 }
+
+/// A second person for a live check of the built app (ignored: run by
+/// hand). `METHOD_LIVE_BUDGET` names a shared `.mthd`; this joins it as
+/// Jordan Lee, changes the first line's rate (to `METHOD_LIVE_RATE`,
+/// 4321), adds a line (unless `METHOD_LIVE_NO_INSERT` is set), and then
+/// stays for `METHOD_LIVE_SECONDS` (60) writing heartbeats and printing
+/// what arrives, so the app shows presence, flashes and a conflict.
+#[test]
+#[ignore]
+fn live_second_actor() {
+    let Some(path) = std::env::var_os("METHOD_LIVE_BUDGET") else {
+        return;
+    };
+    let secs: u64 = std::env::var("METHOD_LIVE_SECONDS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(60);
+    let path = PathBuf::from(path);
+    let mut jordan = Session::open(&path).unwrap();
+    let report = jordan
+        .join_shared(ActorId([9; 32]), person("Jordan Lee", "blue"))
+        .unwrap();
+    println!("joined: {report:?}");
+    let first = edit::details(jordan.budget())
+        .find(|d| d.kind == method_core::RowKind::Line)
+        .map(|d| d.id)
+        .unwrap();
+    let account = method_app::history::row_place(jordan.budget(), first)
+        .unwrap()
+        .0;
+    let rate = std::env::var("METHOD_LIVE_RATE").unwrap_or_else(|_| "4321".into());
+    jordan.set_detail_field(first, "rate", &rate).unwrap();
+    if std::env::var_os("METHOD_LIVE_NO_INSERT").is_none() {
+        jordan.add_detail(&account, Some(first), "line").unwrap();
+    }
+    jordan.share_flush();
+    println!("edited line {first} in {account} (rate {rate})");
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_secs(secs) {
+        std::thread::sleep(Duration::from_secs(1));
+        if let Some(out) = jordan.share_tick(Instant::now()) {
+            for rc in &out.remote {
+                println!(
+                    "arrived: {} {} ({} places)",
+                    rc.name,
+                    rc.label,
+                    rc.places.len()
+                );
+            }
+        }
+    }
+    let st = jordan.shared().unwrap().status(Instant::now());
+    println!(
+        "people seen: {:?}",
+        st.people
+            .iter()
+            .map(|p| (&p.name, &p.color, p.seen_secs))
+            .collect::<Vec<_>>()
+    );
+    println!("to review: {}", st.review_count);
+    for r in jordan.shared().unwrap().review() {
+        println!("  {}", r.sentence);
+    }
+}

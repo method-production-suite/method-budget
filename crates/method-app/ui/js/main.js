@@ -313,6 +313,8 @@ const NOT_EDITS = new Set([
   'pane_view',
   'share_copy_editable',
   'sub_budget_new',
+  // Other people's changes arriving in a shared budget (share.js).
+  'share-changed',
 ]);
 
 /**
@@ -498,7 +500,7 @@ initShare({
   invoke,
   apply: (v, opts) => apply(v, opts),
   toast,
-  refresh: () => refreshView(),
+  refresh: () => refreshView('share-changed'),
   grid: () => grid,
   level: () => state.level,
   place: () => ({ category: state.level !== 'topsheet' && state.cat ? state.cat.code : null, account: state.level === 'details' && state.acct ? state.acct.code : null }),
@@ -508,13 +510,6 @@ initShare({
   jumpTo: (entry) => jumpTo(entry),
 });
 
-Object.assign(COMMANDS, {
-  'file.share': () => {
-    if (grid.editor) grid.commitEdit(null);
-    openShareDialog();
-  },
-  'share.blame': () => whoChangedCell(grid.cursorRow(), grid.cursorColKey()),
-});
 
 /**
  * Topsheet and account-list rows without the zero-balance ones, when the
@@ -1764,7 +1759,7 @@ function jumpTo(entry) {
 let refreshing = false;
 let refreshAgain = false;
 
-async function refreshView() {
+async function refreshView(cmd = 'view-changed') {
   if (refreshing) {
     refreshAgain = true;
     return;
@@ -1776,8 +1771,9 @@ async function refreshView() {
       try {
         // The budget on screen; the one in front if it has gone meanwhile.
         const v = await invoke('get_view').catch(() => invoke('get_view', { doc: null }));
-        // An edit made in the tools window: it counts in the footer's changes.
-        if (v) apply(v, { cmd: 'view-changed' });
+        // An edit made in the tools window: it counts in the footer's changes
+        // (other people's changes, 'share-changed', don't: share.js).
+        if (v) apply(v, { cmd });
       } catch (e) {
         toast(e);
       }
@@ -2292,6 +2288,15 @@ Object.assign(COMMANDS, {
     if (grid.editor) grid.commitEdit(null);
     if (state.view) newSubBudget(sharingCtx());
   },
+});
+
+// File > Share… and Who Changed This… (share.js; src/shared_app.rs).
+Object.assign(COMMANDS, {
+  'file.share': () => {
+    if (grid.editor) grid.commitEdit(null);
+    openShareDialog();
+  },
+  'share.blame': () => whoChangedCell(grid.cursorRow(), grid.cursorColKey()),
 });
 
 /** What sharing.js needs from the shell. */

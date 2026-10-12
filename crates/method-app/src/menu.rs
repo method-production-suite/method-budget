@@ -298,6 +298,9 @@ pub const TOOLS_PANEL: &[Entry] = &[
     plain("view.tab.library", "Library"),
     plain("view.tab.history", "History"),
     plain("view.tab.actuals", "Actuals"),
+    // A shared budget's review list and everyone's changes (src/shared_app.rs).
+    plain("view.tab.review", "Review"),
+    plain("view.tab.activity", "Activity"),
 ];
 
 /// View > Budget Setup: the Budget Setup window (src/setupwin.rs), and each

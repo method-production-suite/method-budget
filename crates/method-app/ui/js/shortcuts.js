@@ -188,6 +188,8 @@ export const SHORTCUTS = [
   { id: 'view.tab.history', group: 'View', label: 'Tools: History (every change you can undo; go back to one, or save it as a version)', scope: 'menu' },
   { id: 'view.tab.library', group: 'View', label: 'Tools: Library (your setup library: copy setup items into this budget or save them to it)', scope: 'menu' },
   { id: 'view.tab.actuals', group: 'View', label: 'Tools: Actuals (imported transactions, imports, and each account’s estimate to complete)', scope: 'menu' },
+  { id: 'view.tab.review', group: 'View', label: 'Tools: Review (what needs a person after other people’s changes in a shared budget: values changed by two people and the like)', scope: 'menu' },
+  { id: 'view.tab.activity', group: 'View', label: 'Tools: Activity (everyone’s changes to a shared budget, newest first, with who made them and when)', scope: 'menu' },
   // The tools panel's tab strips (tools.js).
   { id: 'tools.tab_keys', group: 'View', label: 'Tools tabs: the previous or next tab in the pane', keys: ['left', 'right'], scope: 'builtin' },
   { id: 'tools.move_tab', group: 'View', label: 'Tools tabs: move the tab left or right, or to the other pane', keys: ['alt+shift+left', 'alt+shift+right', 'alt+shift+up', 'alt+shift+down'], scope: 'builtin' },
