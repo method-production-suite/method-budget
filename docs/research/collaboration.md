@@ -1,10 +1,14 @@
 # Collaboration: many people in one budget, no server
 
-Status: design approved by the owner on 2026-10-12 ("do it"). Phases 1 and 2, engine
-side, are built: `method_core::log` (the change log, capture, projection, repairs, undo),
-`method_format::log` (the folder and segments), `method log` and `method sync`
-(decisions.md, entry 62). Not yet built: app wiring (the Session, presence, the review
-panel and badges, Who Changed This), signatures and roles (phase 3), iroh (phase 4).
+Status: design approved by the owner on 2026-10-12 ("do it"). Phases 1 and 2 are
+built: the engine (`method_core::log`: the change log, capture, projection, repairs,
+undo; `method_format::log`: the folder, segments and heartbeats; `method log` and
+`method sync`; decisions.md, entry 62) and the app's folder mode (decisions.md, entry
+63; docs/APP.md, "Sharing a budget"): the Session records every edit and absorbs the
+folder, File > Share, the status item, presence from heartbeats, flashes, conflict
+badges, the Review and Activity tabs, Who Changed This, per-person undo. Not yet built:
+signatures, roles and invites (phase 3), iroh live sessions (phase 4), the extras (5),
+and the service-by-service checks of section 5 on real sync services.
 Written for the owner's
 direction from a design discussion: a change log under the model, shared-folder sync
 first (Dropbox, iCloud Drive, Google Drive, LucidLink; each person writes their own

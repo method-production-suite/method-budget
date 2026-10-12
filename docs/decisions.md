@@ -2705,3 +2705,77 @@ permissions and live sessions are not. Entry 61 is another agent's and unrelated
   `log::ids::random_row_id`, hints from its rename and renumber commands); presence
   heartbeats and the status item; the review panel, badges and Who Changed This
   (`Log::blame`); signatures, membership and scopes; checkpoints and the archive; iroh.
+
+## 63. Sharing in the app: folder mode end to end (2026-10-12, the owner's direction)
+
+The app side of decision 62's change log, as the design's phase 2 front end
+(docs/research/collaboration.md, section 9) for folder mode. Docs/APP.md, "Sharing a
+budget", says what it does; this records the choices.
+
+- **The Session owns it.** A shared budget keeps a `SharedDoc` (src/shared.rs) inside its
+  `Session`: the log, the folder, a cached projection that matches the budget, this
+  person's name and color, their undo steps. `Session::edit` records every edit
+  (`Log::record` against the cached projection, then re-projects, about 20 ms on a
+  5,000-row budget in a release build) and adopts the projection when it differs from the
+  edit (the log is the truth); a capture that fails takes the edit back. The rename and
+  renumber commands pass `Hint`s through `Session::edit_with_hints`. Rows made in a
+  shared budget get random ids from the shared range before the capture
+  (`randomize_new_rows`); the row a command made is still found by its new id
+  (`created_row` is translated). `edit_merging` joins nothing in a shared budget: each
+  movement is its own change.
+- **One actor per computer, shared with the command line.** The app reads and makes the
+  same `~/.method/actor` as `method log` and `method sync` (`$METHOD_ACTOR_FILE` wins),
+  and keeps the person's name and color beside it in `person.json`. Running `method sync`
+  on a budget the app has open with unwritten changes could fork that actor's sequence;
+  the app writes its changes within a second and a half of a pause, so the window is
+  small, and a fork is refused rather than merged. A per-program actor would avoid it at
+  the cost of two actors per computer; revisit if it bites.
+- **The timer, not a watcher.** The autosave thread's one-second loop runs
+  `shared_app::tick`: flush this computer's changes once typing pauses (1.5 s, or 6 s
+  while it goes on), `absorb` the folder (a directory listing and size and time check;
+  the design's polling, no `notify` dependency), the keeper's work, heartbeats every 20 s
+  and when the person moves, other people's heartbeats every 5 s. Events to the page:
+  `share-changed` with the places that changed (entity kinds, keys, parents and fields,
+  mapped to grid rows by the page) and `share-status` when the status differs from the
+  last one sent.
+- **The keeper is the computer that started sharing** (the genesis change's actor), as the
+  design's default; a handover waits for phase 3 (membership). It rewrites the `.mthd`
+  once the budget is quiet for 2 s, through the atomic write, and remembers the file's
+  hash in its own actor folder (`snapshot.json`) so the next start tells an outside edit
+  (ingested as a change) from a file that is merely behind the log (rewritten). Nobody
+  else ever writes the `.mthd`; Save As is refused in a shared budget; Save flushes.
+  Autosave and recovery copies leave shared budgets alone: the log is written within
+  seconds and is the truth.
+- **Dirty means "not in the folder yet"** (plus, for the keeper, a file behind the log):
+  the tab dot, the title and the close question follow that, and closing or quitting
+  flushes. The design's "no Save" is kept by making Save harmless.
+- **Per-person undo through the log** (`Log::undo`): the session keeps this person's step
+  ids; undo records the inverse and adopts the projection, redo undoes the undo, the
+  History tab lists only these steps, `jump_to` walks them, and `budget_at` (saving a
+  version from a past step) is refused while shared. Skips become a `notice` on the next
+  view, with people's names in place of actor ids.
+- **Putting a value back** is one `Op::Set` recorded by this person (`Log::set_field`, new
+  in core): the conflict popover's Keep and Use, the Review tab's buttons and Who Changed
+  This all use it, by the value's index in the field's history. A write that knows both
+  values settles the conflict, so the badge goes away for everyone.
+- **Names and colors come from heartbeats**, never from the log: a person is "Person 7f3a"
+  until their heartbeat says otherwise; eight named colors in a palette the CSS maps for
+  light and dark, chosen in the dialog, a default spread by actor id. Sentences from the
+  engine's review list have actor ids replaced by names on the way to the page.
+- **No product names in the interface** (the design's section 5 names sync services; the
+  dialog says "a folder you already share through a sync service"), no engineering words
+  (synced, shared, changed by two people, keeps the file), no em dashes.
+- **Verified**: `cargo test --workspace` (the two-session test in
+  crates/method-app/tests/shared.rs: edits cross the folder and converge, conflicts are
+  listed and settled, undo is per person, the keeper writes the file and ingests outside
+  edits, renames are one write), clippy clean, `node --check` on every script, and a live
+  check in the built app on a throwaway copy: File > Share started the log beside the
+  file; a second person (the ignored `live_second_actor` driver in the same test file,
+  run by hand, joined as another actor) edited a rate and added a line, and within a
+  second the app showed the new totals, the person's initials in the toolbar and the
+  account's new line; `method set` on the file was taken in by the keeper as "Outside
+  edit to Feature.mthd", and timed against the second person's write it made a real
+  conflict: the cell got the amber badge, the status item "1 to review", the popover
+  showed both values with names and times, Use put the other value back as a change the
+  second person received, and Undo took it back (the second person saw "Undo: Put back
+  rate"). `method log` read the same log and the same actor as the app.
