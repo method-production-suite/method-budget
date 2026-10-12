@@ -34,6 +34,7 @@ use crate::edit::{
 use crate::session::Session;
 use crate::view::View;
 
+mod import_setup;
 mod templates;
 mod versions;
 
@@ -124,6 +125,9 @@ pub const COMMANDS: &[&str] = &[
     // Templates
     "template_new",
     "template_save",
+    // Import setup
+    "import_setup_pick",
+    "import_setup",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -178,7 +182,6 @@ pub struct Host {
     /// What a module keeps between calls (a picked file by its token, as
     /// the desktop keeps it in Tauri's state): one of each type, made on
     /// first use ([`Call::kept`]).
-    #[allow(dead_code)] // until the first module keeps something
     kept: Mutex<HashMap<TypeId, Arc<dyn Any + Send + Sync>>>,
 }
 
@@ -470,7 +473,11 @@ impl Host {
 type Dispatch = fn(&Call<'_>) -> Option<Result<Value, Error>>;
 
 /// The modules moved in phase 1b, each dispatching its own commands.
-const MODULES: &[Dispatch] = &[versions::dispatch, templates::dispatch];
+const MODULES: &[Dispatch] = &[
+    versions::dispatch,
+    templates::dispatch,
+    import_setup::dispatch,
+];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
 fn stamp(text: &str) -> crate::safety::DiskStamp {
@@ -525,7 +532,6 @@ impl Call<'_> {
 
     /// The host's one `T`, made on first use: what a module keeps between
     /// calls (a picked file by its token).
-    #[allow(dead_code)] // until the first module keeps something
     pub(crate) fn kept<T: Default + Send + Sync + 'static>(&self) -> Arc<T> {
         let mut kept = self.host.kept.lock().unwrap_or_else(|e| e.into_inner());
         let any = kept

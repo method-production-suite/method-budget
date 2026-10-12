@@ -19,6 +19,7 @@ pub mod docs;
 pub mod edit;
 pub mod history;
 pub mod host;
+pub mod import_setup;
 pub mod report_dto;
 pub mod safety;
 pub mod session;
