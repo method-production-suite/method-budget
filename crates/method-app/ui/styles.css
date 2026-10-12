@@ -632,6 +632,33 @@ body.panes-resizing {
   overflow-wrap: anywhere;
 }
 
+/* A budget converted from an export (js/convertbanner.js): a quiet note on
+   its tab until it is closed or first saved. */
+.convert-banner {
+  display: flex;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--level-bg);
+  color: var(--text);
+}
+
+.convert-banner-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.convert-banner-close {
+  flex: none;
+  padding: 0 8px;
+  color: var(--text-muted);
+  font-size: 1.15em;
+  line-height: 1.4;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap; /* a narrow window wraps the buttons rather than cutting them off */

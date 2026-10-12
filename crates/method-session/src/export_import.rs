@@ -296,7 +296,8 @@ pub fn save_path_for(export: &Path) -> PathBuf {
     export.with_file_name(name)
 }
 
-/// What a converted budget's tab says once.
+/// The banner a converted budget's tab shows until it is dismissed or
+/// first saved.
 pub fn converted_notice(file: &str) -> String {
     format!(
         "Converted from {file}. The original file is left as it was. Saving keeps this \
@@ -306,7 +307,8 @@ budget as a Method Budget file (.mthd)."
 
 /// A new session holding the imported budget, as its first undo step (so
 /// it starts unsaved), first saved next to the export. A conversion says
-/// so with its first view; an import has a message for the toast.
+/// so with a banner on its tab (every view until the first Save); an
+/// import has a message for the toast.
 fn new_session(im: Built, from: &Picked) -> Result<(Session, Option<String>), String> {
     let c = im.counts.clone();
     if c.categories == 0 {
@@ -323,7 +325,7 @@ fn new_session(im: Built, from: &Picked) -> Result<(Session, Option<String>), St
     })?;
     s.set_save_hint(from.path.as_deref().map(save_path_for));
     if from.convert {
-        s.set_notice(converted_notice(&from.file));
+        s.set_converted(converted_notice(&from.file));
         return Ok((s, None));
     }
     let msg = format!(
@@ -369,8 +371,8 @@ pub fn export_import_preview(
 }
 
 /// Imports the picked export as a new budget in a new tab, in front. Its
-/// id, and the message for the toast (none for a conversion, whose view
-/// says so).
+/// id, and the message for the toast (none for a conversion, whose tab
+/// shows a banner instead).
 pub fn export_import(
     state: &AppState,
     sources: &ExportSources,
@@ -417,13 +419,15 @@ mod tests {
         assert_eq!(s.budget().charges.len(), 1);
         let msg = msg.unwrap();
         assert!(msg.contains("1 line"), "{msg}");
-        // Imported, not converted: no notice; still saved by the export.
+        // Imported, not converted: no banner; still saved by the export.
         assert_eq!(s.take_notice(), None);
+        assert_eq!(s.converted(), None);
+        assert_eq!(s.view().converted, None);
         assert_eq!(s.save_hint(), Some(Path::new("/films/x.mthd")));
     }
 
     #[test]
-    fn a_converted_export_says_so_once_and_saves_beside_it() {
+    fn a_converted_export_shows_a_banner_until_saved_and_saves_beside_it() {
         let (im, _) = read("x.json", EXPORT.as_bytes(), None).unwrap();
         let from = Picked {
             file: "Pilot budget.json".into(),
@@ -432,23 +436,49 @@ mod tests {
             convert: true,
         };
         let (mut s, msg) = new_session(im, &from).unwrap();
-        assert_eq!(msg, None, "the notice comes with the view instead");
+        assert_eq!(msg, None, "the banner comes with the view instead");
         assert!(s.is_dirty() && s.path().is_none(), "never written anywhere");
         assert_eq!(s.save_hint(), Some(Path::new("/films/Pilot budget.mthd")));
-        let notice = s.take_notice().unwrap();
-        assert_eq!(notice, converted_notice("Pilot budget.json"));
-        assert!(
-            notice.starts_with("Converted from Pilot budget.json."),
-            "{notice}"
-        );
-        assert!(
-            notice.contains("original file is left as it was"),
-            "{notice}"
-        );
-        assert!(notice.contains(".mthd"), "{notice}");
-        assert!(!notice.contains('\u{2014}'), "no em dashes");
-        // Once.
+        // A banner, not a one-time notice.
         assert_eq!(s.take_notice(), None);
+        let notice = s.converted().unwrap().to_string();
+        assert_eq!(notice, converted_notice("Pilot budget.json"));
+        assert_eq!(
+            notice,
+            "Converted from Pilot budget.json. The original file is left as it was. \
+Saving keeps this budget as a Method Budget file (.mthd)."
+        );
+        assert!(!notice.contains('\u{2014}'), "no em dashes");
+        // Every view carries it (a tab switch, an edit), not just the first.
+        assert_eq!(s.view().converted.as_deref(), Some(notice.as_str()));
+        assert_eq!(
+            s.view_with(None).converted.as_deref(),
+            Some(notice.as_str())
+        );
+        s.edit("Rename", |b| {
+            b.title = "Pilot".into();
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(
+            s.view_with(None).converted.as_deref(),
+            Some(notice.as_str())
+        );
+        // Never written into the file.
+        let text = method_format::to_string(s.budget());
+        assert!(!text.contains("Converted from"), "{text}");
+        // The first Save makes it a Method Budget file: the banner goes.
+        let saved = Path::new("/films/Pilot budget.mthd");
+        let stamp = crate::safety::DiskStamp {
+            len: text.len() as u64,
+            modified: None,
+            hash: crate::safety::content_hash(text.as_bytes()),
+        };
+        s.mark_saved(saved, stamp);
+        assert_eq!(s.converted(), None);
+        assert_eq!(s.view().converted, None);
+        let json = serde_json::to_value(s.view()).unwrap();
+        assert!(json.get("converted").is_none(), "left out once saved");
     }
 
     #[test]

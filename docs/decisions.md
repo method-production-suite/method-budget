@@ -2952,6 +2952,17 @@ the user's account.
   notice, shown as a toast): "Converted from <file>. The original file is left as it was.
   Saving keeps this budget as a Method Budget file (.mthd)." An import keeps its toast
   saying what came in instead.
+  - **Amended (2026-10-12): a banner, not a toast.** A six-second toast was easy to miss,
+    so the same text is now a slim banner at the top of the converted tab's budget view,
+    under the breadcrumb, with a close button (Escape on it closes it too). The session
+    keeps the text (`Session::converted`, never written into the file) and every view
+    carries it (`view.converted`) until the first successful Save, which makes the budget
+    a `.mthd` and clears it (`Session::mark_saved`). It belongs to the tab: switching tabs
+    shows or hides it with the tab, each pane of a split shows its own, and closing it is
+    remembered for that tab for the rest of the run (the page keeps the closed tabs,
+    js/convertbanner.js). File > Import Budget Export… keeps its toast: that message says
+    what came in and to check the review's notes, which is news once, not a standing
+    state of the tab.
 - **The first Save beside the export.** A budget from an export (converted or imported)
   remembers where the export is (`Session::save_hint`); while it has no file, Save and Save
   As start the Save dialog in the export's folder with the export's name and `.mthd`
@@ -2959,7 +2970,8 @@ the user's account.
   before replacing a file; paths stay in Rust.
 - **Never written back.** Nothing is saved in the export's layout; the `.mthd` is the
   working file. Writing the other program's layouts is a separate export feature, not this.
-- Tests: src/export_import.rs (the converted tab's notice, once, and its save path; an
+- Tests: src/export_import.rs (the converted tab's banner on every view until the first
+  Save, never in the file, and its save path; an
   import's message and save path; the saved name for several exports), src/app.rs (where
   the Save dialog starts and what it suggests), src/open_any.rs
   (`tauri.macos.conf.json` parses, keeps the `.mthd` association unchanged and first,
