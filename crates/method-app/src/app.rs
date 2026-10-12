@@ -145,26 +145,45 @@ pub fn focus_account<R: Runtime>(
 // ---------------------------------------------------------------------------
 // Files
 
-/// Shows an Open dialog and opens the chosen file in a new tab (or brings its
-/// tab to the front when it is open already; an untouched Untitled budget
-/// gives its tab up to it). `None` if cancelled.
+/// Shows an Open dialog for a budget, a budget export or a spreadsheet and
+/// opens the chosen file the way its content asks (src/open_any.rs): a
+/// budget in a new tab (or its own tab when it is open already; an
+/// untouched Untitled budget gives its tab up to it), an export as Import
+/// Budget Export's review, a spreadsheet as Import Spreadsheet's dialog.
+/// `None` if cancelled.
 #[tauri::command]
 pub async fn open_budget<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
-) -> CmdResult<Option<View>> {
+) -> CmdResult<Option<crate::open_any::Opened>> {
     let start = state
         .lock()
         .path()
         .and_then(|p| p.parent())
         .map(PathBuf::from);
-    let Some(path) = pick_budget(&window, "Open budget", start)? else {
+    let mut dialog = window
+        .dialog()
+        .file()
+        .set_title("Open")
+        .add_filter(
+            crate::open_any::ALL_FILTER,
+            &crate::open_any::open_extensions(),
+        )
+        .add_filter(FILTER_NAME, method_format::EXTENSIONS)
+        .add_filter(
+            "Budget export",
+            method_format::import::exchange::READABLE_EXTENSIONS,
+        )
+        .add_filter("Spreadsheet", crate::open_any::SHEET_EXTENSIONS)
+        .set_parent(&window);
+    if let Some(dir) = start {
+        dialog = dialog.set_directory(dir);
+    }
+    let Some(picked) = dialog.blocking_pick_file() else {
         return Ok(None);
     };
-    // Opens it in a tab and lists it in Open Recent (src/safety_app.rs).
-    let id = crate::safety_app::open_path(&state, &window.state(), &path)?;
-    crate::safety_app::refresh_menu(window.app_handle());
-    Ok(Some(finish(&window, &mut state.lock_doc(Some(id))?, None)))
+    let path = picked.into_path().map_err(|e| e.to_string())?;
+    crate::open_any::open_any(&window, &state, &path).map(Some)
 }
 
 /// Rust's Open dialog for one budget file (`.mthd`),
@@ -1353,6 +1372,13 @@ pub fn run() {
             crate::tools::on_window_event(window, event);
             // The Budget Setup window, likewise (src/setupwin.rs).
             crate::setupwin::on_window_event(window, event);
+            // A file dropped on the main window opens as one from the system
+            // would (Open's routing, src/open_any.rs); the path stays here.
+            if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
+                if window.label() == crate::tools::MAIN {
+                    crate::safety_app::on_opened(window.app_handle(), paths.clone());
+                }
+            }
             // Leaving the app autosaves now rather than in a few seconds.
             // Going from the main window to the tools window (or back) isn't
             // leaving: focus lands on the other window a moment later.

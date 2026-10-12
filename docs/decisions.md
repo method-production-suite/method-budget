@@ -2873,3 +2873,43 @@ open questions:
   read at (at most 200), so the start window reads a file again only when it changed.
 - **Not built** (phase 2 still open): projects as folders, thumbnails, setup library and
   packs at creation, duplicate and new sub-budget from a row.
+
+## 66. Open reads budget exports and spreadsheets too (2026-10-12, the owner's report)
+
+The owner tried File > Open on a budget exchange JSON from another program and couldn't
+pick it: the Open dialog allowed `.mthd` only, and the import was under File > Import
+Budget Export…. Open now takes whatever the app can make a budget from and sends it
+where it belongs (src/open_any.rs; docs/APP.md, "Tabs" and "Opening from the system").
+
+- **The dialog allows** `.mthd`, the budget export layouts' extensions (`.json`, `.xml`,
+  `.xlsx`, `.txt`, `.tab`, `.tsv`: `exchange::READABLE_EXTENSIONS`) and Import
+  Spreadsheet's (`.xlsx`, `.csv`, `.tsv`, `.txt`, with `.tab`), one filter for all of
+  them first and one per kind after.
+- **Content decides, not the name.** A `.mthd` opens as a budget as before. Any other file
+  is read (with the imports' size cap) and: JSON whose `format` is `method-budget` near
+  the start opens as a budget (our format is JSON, so a budget saved or sent as `.json`
+  still opens); a file the exchange reader recognizes by content goes to Import Budget
+  Export…'s review with that file picked, through the same review, token and Import as
+  New Budget (a new unsaved tab), so the line-by-line check is never skipped; a
+  spreadsheet the exchange reader doesn't take (by extension, or any ZIP) goes to Import
+  Spreadsheet's dialog with the file picked, starting on "A new budget tab", since Open
+  shouldn't change the budget in front; anything else says plainly what Open reads. An
+  export or spreadsheet that can't be read gives its reader's message. A `.json` is
+  never read as an export by its name alone here (the importer's own fallback), so a
+  stray JSON file gets the plain message.
+- **The same everywhere a file arrives:** File > Open and the toolbar's Open, the start
+  window's Open…, a file handed over by the system (double-click, Open With, the Dock
+  icon, the command line: `open_pending`), and now a file dropped on the main window
+  (Tauri's drop event, handled in Rust and passed to the same pending-open path). Only a
+  budget is listed in Open Recent; an import isn't a file of ours until it is saved.
+- **Paths stay in Rust.** `open_budget` and `open_pending` return `{kind: "budget",
+  view}`, `{kind: "export", review}` or `{kind: "sheet", picked}`; the review and the
+  sheet dialog name the file by the token their own commands already use. No command or
+  capability was added.
+- **Not changed:** the bundle's file associations still claim `.mthd` only. Declaring
+  `.json`, `.xml`, `.xlsx`, `.csv` and `.txt` would put the app in Finder's Open With
+  list and let the Dock icon take them, but on Windows the installer would register the
+  app for those types system-wide; left for the owner. Open With > Other… already works.
+- Tests: src/open_any.rs (a budget saved as `.json` and `.txt`, a `.mthd` by name, JSON,
+  XML, workbook and tab-delimited exports from the exchange fixtures, a plain workbook,
+  CSV and tab-delimited text, and files Open doesn't read).

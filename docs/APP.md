@@ -50,7 +50,15 @@ Budget"); New Tab (Cmd+T) opens a starter budget in a new tab at once, and so do
 button at the end of the strip. Open, Open Recent, a recovered budget and a `.mthd`
 double-clicked in the Finder open in a new tab; a file that is open already just has its
 tab brought forward, and an untouched Untitled budget alone in the window gives its tab up
-to the file. Close Tab (Cmd+W), the × or a middle-click closes a tab: with Autosave on its
+to the file. **Open also reads budget exports and spreadsheets** (decisions.md, entry 66;
+src/open_any.rs): its dialog allows `.mthd`, `.json`, `.xml`, `.xlsx`, `.csv`, `.tsv`,
+`.txt` and `.tab`, and the file's content decides what happens. A budget (any file in our
+format, `.json` included) opens in a tab; a budget export goes to Import Budget Export…'s
+review with the file picked (below, "Importing a budget export"), so Import as New Budget
+opens it in a new unsaved tab; another spreadsheet goes to Import Spreadsheet's dialog with
+the file picked and "A new budget tab" chosen; anything else gets a message saying what
+Open reads. The start window's Open…, a file from the system and a file dropped on the
+window go the same way. Close Tab (Cmd+W), the × or a middle-click closes a tab: with Autosave on its
 changes go into its file first, and whatever is still unsaved asks **Save**, **Close
 Without Saving** or **Cancel**. Closing the last tab gives its place to an untouched
 Untitled budget and shows the start window over it (below; with the start window's box
@@ -1971,8 +1979,8 @@ the same line totals and grand total (tested).
 
 ### Importing a budget export
 
-**File > Import Budget Export…** makes a whole budget from another budgeting program's
-export: budget exchange JSON or XML (basic or advanced), its Excel workbook or its
+**File > Import Budget Export…** (and File > Open, for a file whose content is an export)
+makes a whole budget from another budgeting program's export: budget exchange JSON or XML (basic or advanced), its Excel workbook or its
 tab-delimited topsheet (docs/IMPORT.md says what each carries). Rust shows the Open dialog
 (a filter per layout), reads the file, builds the budget and checks it; the review shows,
 before anything changes:
@@ -2203,8 +2211,12 @@ empties it; the start window's Remove takes one file off. macOS's own system-wid
 documents list is not updated.
 
 **Opening from the system.** Double-clicking a `.mthd` file, Open With, or dropping one on
-the Dock icon opens it in a tab (its own tab, when it is open already): on macOS the app
-receives an open event, on Windows and Linux the path arrives on the command line. Nothing
+the Dock icon or the window opens it in a tab (its own tab, when it is open already): on
+macOS the app receives an open event, on Windows and Linux the path arrives on the command
+line, and a drop on the window is Tauri's drop event, handled in Rust. A budget export or
+spreadsheet handed over this way goes where Open sends it (above, entry 66); the bundle
+still declares `.mthd` only, so Finder offers the app for other files through Open With >
+Other…. Nothing
 is asked: no budget is replaced. When several files arrive at once, the first one opens. On macOS a
 second double-click goes to the running app. On Windows and Linux there is no
 single-instance handling: a second launch with a path starts a second copy of the app with
@@ -2218,7 +2230,8 @@ The app's data folder is the platform's local app data folder for
 |---|---|---|
 | `autosave_setting`, `set_autosave` | `on` (set) | the setting |
 | `flush_autosave` | `doc` | View (autosaved now, if anything was unsaved) |
-| `open_pending` | none | View of a file the system asked to open (in a tab), or `null` |
+| `open_pending` | none | what Open returns for a file the system asked to open or one dropped on the window (below), or `null` |
+| `open_budget` | none (shows the Open dialog) | `{kind: "budget", view}` (in a tab), `{kind: "export", review}` (`export_import_pick`'s review), `{kind: "sheet", picked}` (`sheet_import_pick`'s result), or `null` when cancelled; anything else is an error saying what Open reads |
 | `open_recent` | `index` (its place in Open Recent) | View (in a tab), or `null` |
 | `recovery_list` | none | `[{ key, path, name, title, saved_at_ms }]`, newest first |
 | `open_recovered`, `discard_recovered` | `key` | View (in a tab); the remaining list |
@@ -2318,6 +2331,8 @@ crates/method-app/
   src/export_import.rs  Import Budget Export: the picked export kept by token, the review
                      (method_format::import::exchange reads, builds and checks) and the
                      new tab
+  src/open_any.rs    Open's routing by content: a budget in a tab, a budget export to
+                     Import Budget Export's review, a spreadsheet to Import Spreadsheet
   src/actuals.rs     Import Actuals, the Actuals tab's commands and the cost figures
                      every view of a budget with actuals carries (method_core::actuals and
                      method_format::import::actuals do the work); the rollup cache

@@ -30,6 +30,7 @@ pub mod library;
 pub mod menu;
 pub mod moverows;
 pub mod notes;
+pub mod open_any;
 pub mod overtime;
 pub mod packs;
 #[cfg(target_os = "macos")]

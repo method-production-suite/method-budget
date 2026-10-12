@@ -55,7 +55,7 @@ impl ExportSources {
         self.inner.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    fn keep(&self, file: String, bytes: Vec<u8>) -> u64 {
+    pub(crate) fn keep(&self, file: String, bytes: Vec<u8>) -> u64 {
         let mut g = self.lock();
         g.0 += 1;
         let token = g.0;

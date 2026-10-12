@@ -169,8 +169,12 @@ export async function importSpreadsheet(ctx) {
   showDialog(ctx, picked);
 }
 
-/** The dialog for a picked file (exported for the browser harness). */
-export function showDialog(ctx, picked) {
+/**
+ * The dialog for a picked file (also Open's, for a spreadsheet; exported
+ * for the browser harness). `opts.target`: where it starts importing to,
+ * `current` (this budget) or `new` (a new tab; Open's).
+ */
+export function showDialog(ctx, picked, opts = {}) {
   const st = {
     token: picked.token,
     sheet: picked.sheet || 0,
@@ -182,7 +186,7 @@ export function showDialog(ctx, picked) {
     // Typed by the user (else it is just the account on screen, which a
     // preset doesn't keep).
     accountTyped: false,
-    target: 'current',
+    target: opts.target === 'new' ? 'new' : 'current',
     preview: null,
     presetName: '',
     presets: loadPresets(),
