@@ -16,7 +16,7 @@ edition = "2021"
 # The one place the version lives: every crate inherits it, the app and
 # `method --version` report it, and `cargo xtask check-version` fails CI if
 # anything disagrees. Change it with `cargo xtask bump` (docs/RELEASING.md).
-version = "0.1.0"
+version = "0.2.0"
 license = "MIT OR Apache-2.0"
 
 # The browser build (`cargo xtask web`, docs/research/web-session.md): small
