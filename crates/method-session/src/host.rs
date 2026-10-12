@@ -465,6 +465,34 @@ impl Host {
         HostInfo::new("web", self.read_only())
     }
 
+    /// The chart templates this host supplies itself (a build without the
+    /// bundled ones, as in a browser): what `chart_templates` lists after
+    /// any bundled ones. A chart's text is handed in with
+    /// [`Host::add_chart`] once it is picked, before `chart_template_new`.
+    pub fn set_charts(&self, list: Vec<crate::coa_import::ChartTemplate>) {
+        self.kept::<crate::coa_import::HostCharts>().set_list(list);
+    }
+
+    /// Chart `id`'s template text (a `.mthd` file), for
+    /// `chart_template_new`. Refused when it isn't a budget file.
+    pub fn add_chart(&self, id: &str, text: &str) -> Result<(), Error> {
+        self.kept::<crate::coa_import::HostCharts>()
+            .add(id, text)
+            .map_err(Error::Refused)
+    }
+
+    /// The host's one `T`, made on first use: what a module keeps between
+    /// calls (a picked file by its token).
+    fn kept<T: Default + Send + Sync + 'static>(&self) -> Arc<T> {
+        let mut kept = self.kept.lock().unwrap_or_else(|e| e.into_inner());
+        let any = kept
+            .entry(TypeId::of::<T>())
+            .or_insert_with(|| Arc::new(T::default()))
+            .clone();
+        any.downcast::<T>()
+            .unwrap_or_else(|_| unreachable!("kept by its own type"))
+    }
+
     /// Opens `.mthd` text as a budget named `name` (a file name, shown in
     /// the title and the tab), in a new tab in front; an untouched
     /// untitled budget gives its tab up to it. Its view.
@@ -753,13 +781,7 @@ impl Call<'_> {
     /// The host's one `T`, made on first use: what a module keeps between
     /// calls (a picked file by its token).
     pub(crate) fn kept<T: Default + Send + Sync + 'static>(&self) -> Arc<T> {
-        let mut kept = self.host.kept.lock().unwrap_or_else(|e| e.into_inner());
-        let any = kept
-            .entry(TypeId::of::<T>())
-            .or_insert_with(|| Arc::new(T::default()))
-            .clone();
-        any.downcast::<T>()
-            .unwrap_or_else(|_| unreachable!("kept by its own type"))
+        self.host.kept()
     }
 
     pub(crate) fn args<A: DeserializeOwned>(&self) -> Result<A, Error> {

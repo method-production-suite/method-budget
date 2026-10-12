@@ -20,8 +20,13 @@
 // budget instead of a new one, and ?readonly=1 to show every budget
 // read-only.
 //
-// A partner embedding the page needs only this file beside the page and
-// method_web.js and method_web_bg.wasm beside this file.
+// The charts of accounts New From Template offers aren't in the module:
+// their list and files are fetched from charts/ beside the page, the list
+// when the dialog first asks and a chart's file when it is picked.
+//
+// A partner embedding the page needs this file beside the page, with
+// tauri-shim.css, method_web.js and method_web_bg.wasm beside this file, and
+// charts/ beside the page (all of it as `cargo xtask web` lays it out).
 
 (function () {
   'use strict';
@@ -165,6 +170,16 @@
       if (cmd === 'save_budget') return save(from, args);
       if (cmd === 'setup_window') return showSetup();
       if (cmd === 'close_setup_window') return closeSetup();
+      // The charts of accounts are files beside the page, fetched when
+      // New From Template lists them and when one is picked.
+      if (cmd === 'chart_templates') await chartList().catch((e) => console.error(e));
+      if (cmd === 'chart_template_new') {
+        try {
+          await loadChart(String(args.id));
+        } catch (e) {
+          throw `Couldn't load that chart: ${message(e)}. Check the connection and try again.`;
+        }
+      }
       const pick = PICKS[cmd];
       if (pick && args.file === undefined && args.files === undefined) {
         const files = await pickFiles(pick);
@@ -226,6 +241,43 @@
     });
 
     // -----------------------------------------------------------------
+    // The charts of accounts: not in the module (they would be 6 MB of
+    // it). `cargo xtask web` puts charts/index.json (each chart's id, name,
+    // group, description and size) and charts/<id>.mthd beside the page;
+    // the list is fetched once, when New From Template first asks, and a
+    // chart's file only when it is picked.
+
+    const chartsAt = new URL('../charts/', here);
+    let listing = null; // a promise of the list
+    const loaded = new Set(); // charts handed to the Host
+
+    function chartList() {
+      if (!listing) {
+        listing = (async () => {
+          const res = await fetch(new URL('index.json', chartsAt));
+          if (!res.ok) throw new Error(`the server answered ${res.status}`);
+          const text = await res.text();
+          host.setCharts(text);
+          return JSON.parse(text);
+        })();
+        listing.catch(() => {
+          listing = null; // asked again next time
+        });
+      }
+      return listing;
+    }
+
+    async function loadChart(id) {
+      if (loaded.has(id)) return;
+      const entry = (await chartList()).find((c) => c && c.id === id);
+      if (!entry) return; // not one of the list: the Host says so
+      const res = await fetch(new URL(`${encodeURIComponent(entry.id)}.mthd`, chartsAt));
+      if (!res.ok) throw new Error(`the server answered ${res.status}`);
+      host.addChart(entry.id, await res.text());
+      loaded.add(entry.id);
+    }
+
+    // -----------------------------------------------------------------
     // Save and Save As: the budget downloads as a .mthd file
 
     function save(from, args) {
@@ -237,7 +289,12 @@
       if (args.saveAs || !v.file.path) {
         const title = v.budget && typeof v.budget.title === 'string' ? v.budget.title.trim() : '';
         const suggested = v.file.path ? v.file.name : `${title || 'Untitled'}.mthd`;
-        const asked = window.prompt('Save the budget as', suggested);
+        let asked;
+        try {
+          asked = window.prompt('Save the budget as', suggested);
+        } catch (e) {
+          asked = suggested; // a browser without prompt(): the suggested name
+        }
         if (asked === null || !asked.trim()) return null;
         name = asked.trim();
       }
@@ -344,17 +401,17 @@
       return null;
     }
 
+    // The frame's styles are a file beside this one (not a <style>
+    // element), so a page whose Content-Security-Policy allows only its own
+    // stylesheets can show it.
     let styled = false;
     function style() {
       if (styled) return;
       styled = true;
-      const s = doc.createElement('style');
-      s.textContent = `
-.mw-setup { position: fixed; inset: 0; z-index: 900; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.25); }
-.mw-setup[hidden] { display: none; }
-.mw-setup-frame { width: min(1180px, calc(100vw - 48px)); height: min(820px, calc(100vh - 48px)); border: 1px solid var(--border, #888); border-radius: 8px; background: var(--surface, #fff); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3); }
-`;
-      doc.head.append(s);
+      const link = doc.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = new URL('tauri-shim.css', here).href;
+      doc.head.append(link);
     }
 
     // -----------------------------------------------------------------

@@ -12,11 +12,16 @@ publish = false
 
 [dependencies]
 method-core = { path = "../method-core" }
-method-format = { path = "../method-format" }
+method-format = { path = "../method-format", default-features = false }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
 
 [features]
+default = ["bundled-charts"]
+# The chart-of-accounts templates compiled in (method-format's feature of
+# the same name): the desktop. The browser build turns it off and hands in
+# a chart when it is picked (src/coa_import.rs, `HostCharts`).
+bundled-charts = ["method-format/bundled-charts"]
 # The system clock as the default (src/clock.rs): for the desktop, never
 # for a browser build, where std's clock panics.
 std-clock = []

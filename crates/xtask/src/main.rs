@@ -48,11 +48,14 @@ cargo xtask <command> [--root <repository>]
       Check that the crates a browser runs (method-core, method-format,
       method-session) build for wasm32-unknown-unknown, and build method-web
       for it. Needs the target: rustup target add wasm32-unknown-unknown.
-  web [--out <dir>]
+  web [--out <dir>] [--demo]
       Build the page for a browser (docs/research/web-session.md): method-web
-      as WebAssembly, the wasm-bindgen command line's JS, the shim and the
-      page, in target/web (or <dir>), ready to serve as static files. Needs
-      the target and the wasm-bindgen command line of Cargo.lock's version.
+      as WebAssembly, the wasm-bindgen command line's JS, the shim, the page
+      and the charts of accounts as files, in target/web (or <dir>), ready to
+      serve as static files. Needs the target and the wasm-bindgen command
+      line of Cargo.lock's version. With --demo, the website's demo
+      (docs/WEBSITE.md): the sample budget, the note about running in the
+      browser and a strict Content-Security-Policy.
   update-manifest --dir <artifacts> --version X.Y.Z --out <latest.json>
                   [--config <tauri.conf.json>] [--base-url <url>] [--pub-date <RFC 3339>]
       Write the update manifest the app reads, from the signed updater
@@ -131,7 +134,7 @@ fn run(args: &[String]) -> Result<String, String> {
         "--base-url",
         "--pub-date",
     ];
-    let a = Args::parse(rest, &values, &["--check", "--json", "--require"])?;
+    let a = Args::parse(rest, &values, &["--check", "--json", "--require", "--demo"])?;
     let root = match a.value("--root") {
         Some(r) => PathBuf::from(r),
         None => repo::find_root()?,
@@ -185,7 +188,7 @@ fn run(args: &[String]) -> Result<String, String> {
             })
         }
         "wasm-check" => wasm::command(&root),
-        "web" => web::command(&root, a.value("--out").map(path)),
+        "web" => web::command(&root, a.value("--out").map(path), a.has("--demo")),
         other => Err(format!("unknown command `{other}`\n\n{USAGE}")),
     }
 }

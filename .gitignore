@@ -36,3 +36,8 @@ id_rsa*
 
 # Raw chart-of-accounts sources used to build templates; not committed.
 /imports/
+
+# The website demo (site/try/): built by `cargo xtask web --demo --out site/try`
+# locally and by the Pages workflow; the page copy, the wasm and its JS are never
+# committed (docs/WEBSITE.md).
+/site/try/

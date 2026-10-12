@@ -1,8 +1,9 @@
 //! `cargo xtask wasm-check`: the crates a browser runs build for
 //! WebAssembly (docs/research/web-session.md). method-session is checked
-//! without features, so nothing that only works on a desktop (its
-//! `std-clock` default) sneaks in, and method-web, the browser's own crate,
-//! is built (linked) for the target too.
+//! with its default features only (the bundled charts), never `std-clock`,
+//! so nothing that only works on a desktop sneaks in, and method-web, the
+//! browser's own crate (no bundled charts), is built (linked) for the target
+//! too.
 
 use std::path::Path;
 use std::process::Command;

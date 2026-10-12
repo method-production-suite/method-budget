@@ -10,3 +10,11 @@ publish = false
 method-core = { path = "../method-core" }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
+
+[features]
+default = ["bundled-charts"]
+# The chart-of-accounts templates (templates/charts/*.mthd, src/charts.rs)
+# compiled in: on for the desktop and the command line. The browser build
+# turns it off and fetches a chart's file only when it is picked
+# (docs/research/web-session.md, "The charts in a browser").
+bundled-charts = []

@@ -11,6 +11,8 @@ docs/features.toml ─┐                       ┌─> README.md               
                     ├─> scripts/site.py ────┼─> site/index.html          (feature list, What's new, repo links)
 docs/releases/*.md ─┘   (--check in CI)     └─> site/releases/index.html (every release note, repo links)
                                                      │
+crates/method-app/ui + method-web ── cargo xtask web --demo ──> site/try/  (built, never committed)
+                                                     │
                                   .github/workflows/pages.yml (off until PAGES_ENABLED)
                                                      │
                                                methodbudget.com
@@ -75,7 +77,9 @@ and the Pages workflow runs it again before deploying.
 Static files, no build step, no JavaScript, no trackers, no cookies. Every page carries
 a Content-Security-Policy that allows only this site's own styles and images
 (`default-src 'none'; style-src 'self'; img-src 'self'`), so no inline style, script or
-third-party request can slip in unnoticed. System fonts only.
+third-party request can slip in unnoticed. System fonts only. The one exception is the
+demo at `/try/` (below, "The demo"): the app itself, so it runs scripts, but only this
+site's own files, under a policy of its own, and it is built rather than committed.
 
 | Path | What it is |
 |---|---|
@@ -88,7 +92,8 @@ third-party request can slip in unnoticed. System fonts only.
 | `assets/shots/` | Screenshots of the app with invented budgets, WebP with PNG fallbacks (Screenshots, below) |
 | `favicon.svg`, `favicon.ico`, `apple-touch-icon.png` | Browser and home-screen icons (`scripts/make-brand.py`) |
 | `og.png`, `og-card.html`, `assets/og-card.css` | The 1200x630 share card and its source; `scripts/make-og.sh` renders it with headless Chrome (a throwaway profile, no window). Re-run after editing the card and commit all three |
-| `robots.txt`, `sitemap.xml` | Crawlers: everything allowed; the sitemap lists `/` and `/releases/`. Add a line to the sitemap when a page is added |
+| `try/` | The demo: the app running in the browser (below, "The demo"). Built by `cargo xtask web --demo --out site/try`, ignored by git, never committed |
+| `robots.txt`, `sitemap.xml` | Crawlers: everything allowed; the sitemap lists `/`, `/releases/` and `/try/`. Add a line to the sitemap when a page is added |
 | `CNAME` | `methodbudget.com`. A deploy from GitHub Actions ignores this file (the custom domain is set in Settings, below); it stays as documentation and for any other host |
 
 Colors are tokens with a `prefers-color-scheme: dark` override, so the site follows the
@@ -136,13 +141,58 @@ methodbudget.com.
 To look at it locally:
 
 ```bash
+cargo xtask web --demo --out site/try     # the demo, if you want /try/ too
 cd site && python3 -m http.server 8000    # then open http://127.0.0.1:8000/
 ```
 
+### The demo: try/
+
+"Try it in your browser" (a button in the hero, a link in the nav and on the release
+notes page) opens `/try/`: the real app's page (`crates/method-app/ui`) running against
+the engine compiled to WebAssembly (docs/research/web-session.md). It starts with an
+invented sample budget, "Lanterns Over Kettle Lake" (the feature from Screenshots,
+`crates/method-web/demo/lanterns-over-kettle-lake.mthd`, made by
+`scripts/make-showcase-budgets.py`; never a real budget). Budgets live in the page:
+Open reads a file the visitor picks, Save and every export download a file, and nothing
+is sent anywhere. Reloading the page starts over.
+
+`cargo xtask web --demo --out site/try` (crates/xtask/src/web.rs) builds it: the page,
+the shim and the module (about 5.2 MB, 1.4 MB gzipped), the charts of accounts as
+separate files in `charts/` (fetched one at a time, only when New From Template lists or
+picks one), and, for the demo only:
+
+- `demo/demo.js`, `demo/demo.css` (from `crates/method-web/demo/`): a slim note at the
+  top of the app saying it runs entirely in the browser, nothing is uploaded, files
+  opened stay on the computer and Save downloads a `.mthd` file, with a link to the Mac
+  app's download and back home. It can be hidden; it is not shown in the Budget Setup
+  frame. Under 760 pixels wide it adds that the app works best on a computer: on a
+  phone the grid and the tools panel do not fit side by side, and the app wants a
+  keyboard.
+- `sample/Lanterns Over Kettle Lake.mthd`, which demo.js opens (`?open=`) unless the
+  address names another budget.
+- A Content-Security-Policy on the page: `default-src 'self'; script-src 'self'
+  'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self';
+  frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'` (and
+  `font-src 'self'`). Everything is this site's own file; `'wasm-unsafe-eval'` is what
+  lets the browser compile the module. No inline script or style, nothing from anyone
+  else, no cookies, no analytics. The page keeps a few preferences (display settings, import mappings) in the
+  browser's local storage, as the app does; no budget is kept there.
+
+The note's words follow the site's rules: plain text, no em dashes, no other product
+named. `site/try/` is in `.gitignore`: the built module, wasm-bindgen's JS and the copy
+of the page never enter git. The demo needs the WebAssembly target and the wasm-bindgen
+command line of Cargo.lock's version (docs/research/web-session.md, "Building").
+
 ## Publishing: .github/workflows/pages.yml
 
-The workflow deploys `site/` to GitHub Pages on a push to main that touches `site/` (or by
-hand from the Actions tab). It is **off** until the repository is public: GitHub Pages on a
+The workflow deploys `site/` to GitHub Pages on a push to main that touches `site/`, or the
+app the demo is built from (`crates/`, `templates/charts/`, `Cargo.lock`, `Cargo.toml`,
+`scripts/web-smoke.mjs`), or by hand from the Actions tab. Before uploading it builds the
+demo into `site/try/` (`rustup target add wasm32-unknown-unknown`, the wasm-bindgen
+command line of Cargo.lock's version, cached with `actions/cache`, then `cargo xtask web
+--demo --out site/try`) and opens it with `node scripts/web-smoke.mjs site/try` in the
+runner's headless Chrome; a demo that doesn't draw its topsheet, update a total after an
+edit or load a chart stops the deploy. It is **off** until the repository is public: GitHub Pages on a
 private repository needs a paid plan, so the deploy job only runs when the repository
 variable `PAGES_ENABLED` is `true`, and skips cleanly otherwise. It uses only first-party
 actions pinned to commit SHAs; only the deploy job gets `pages: write` and `id-token:

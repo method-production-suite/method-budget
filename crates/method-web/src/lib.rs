@@ -15,7 +15,14 @@
 //! host.setReadOnly(true);                      // a viewer
 //! JSON.parse(host.hostInfo());                 // {kind: "web", commands_version, read_only}
 //! commands();                                  // every command dispatch runs
+//! host.setCharts(indexJson);                   // the chart list (charts/index.json)
+//! host.addChart('feature', text);              // a chart's text, once it is picked
 //! ```
+//!
+//! The chart-of-accounts templates aren't compiled in (6 MB): `cargo xtask
+//! web` puts them beside the page as `charts/index.json` and
+//! `charts/<id>.mthd`, and the shim fetches the list when New From Template
+//! asks for it and a chart's file when one is picked.
 //!
 //! `dispatch` and the others throw an `Error` whose `message` is the text the
 //! page shows. The clock is the browser's (`Date.now()`), installed by the

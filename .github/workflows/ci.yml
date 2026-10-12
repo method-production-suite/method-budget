@@ -34,6 +34,33 @@ jobs:
         run: |
           rustup target add wasm32-unknown-unknown
           cargo xtask wasm-check
+      # The wasm-bindgen command line, the version Cargo.lock has (cargo xtask web
+      # refuses any other), built once and cached.
+      - name: wasm-bindgen version
+        id: wasm-bindgen
+        run: |
+          v=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | sed -n 's/^version = "\(.*\)"$/\1/p')
+          test -n "$v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - name: Cache the wasm-bindgen command line
+        id: wasm-bindgen-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/wasm-bindgen
+          key: wasm-bindgen-cli-${{ steps.wasm-bindgen.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
+      - name: Install the wasm-bindgen command line
+        if: steps.wasm-bindgen-cache.outputs.cache-hit != 'true'
+        env:
+          VERSION: ${{ steps.wasm-bindgen.outputs.version }}
+        run: cargo install wasm-bindgen-cli --version "$VERSION" --locked
+      - name: The page in a browser
+        # cargo xtask web builds target/web (the page, the shim, the module and
+        # the charts as files); the smoke test opens it in the runner's headless
+        # Chrome: the topsheet draws, an edit updates the grand total, a chart
+        # is fetched only when picked, and the page logs no errors.
+        run: |
+          cargo xtask web
+          node scripts/web-smoke.mjs target/web
       - name: Version agrees everywhere and has release notes
         # docs/RELEASING.md: the workspace version, Cargo.lock, tauri.conf.json and
         # docs/releases/<version>.md must agree on every push.

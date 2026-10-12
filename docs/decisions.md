@@ -3289,3 +3289,46 @@ browser", has the build, the files a partner serves, the JS API and what is left
 - Open: keeping budgets in the partner's storage is theirs (the Host is reachable from the
   page, or they build their own page on the JS API); CI doesn't yet run `cargo xtask web`
   or a headless smoke test, since that needs the wasm-bindgen command line installed there.
+
+## 73. The charts load when picked; the website's demo; the browser build in CI (2026-10-12, the owner's approval)
+
+The browser build was 11.5 MB (2 MB gzipped), 6.2 MB of it the bundled charts of
+accounts. The owner approved three things (docs/research/web-session.md, phase 3 and
+CI; docs/WEBSITE.md, "The demo"):
+
+- **Charts as files, fetched when picked.** method-format compiles the charts in only with
+  its `bundled-charts` feature, on by default and passed through by method-session's own
+  default feature, so the desktop and the command line are unchanged. method-web turns
+  both off. `cargo xtask web` writes the same charts beside the page (`charts/index.json`
+  with each chart's id, name, group, description and size, and `charts/<id>.mthd`); the
+  shim fetches the list when New From Template first asks and a chart's file only when
+  it is picked, and hands them to the Host (`Host::set_charts`, `Host::add_chart`; JS
+  `setCharts`, `addChart`), which keeps them in `coa_import::HostCharts`.
+  `chart_templates` and `chart_template_new` keep their shapes, bundled charts first, so
+  `COMMANDS_VERSION` stays 1. The module is now 5.2 MB raw and 1.4 MB gzipped.
+- **"Try it in your browser" on methodbudget.com.** `/try/` is built, never committed
+  (`site/try/` is in `.gitignore`): `cargo xtask web --demo --out site/try` adds an
+  invented sample budget ("Lanterns Over Kettle Lake", from
+  scripts/make-showcase-budgets.py, committed as
+  `crates/method-web/demo/lanterns-over-kettle-lake.mthd`) that the page opens with
+  `?open=` unless the address names another, a slim note (runs entirely in the browser,
+  nothing uploaded, files stay on the computer, Save downloads a `.mthd`, a link to the
+  Mac app; at phone width, that it works best on a computer), and a
+  Content-Security-Policy allowing only the site's own files plus compiling the module
+  (`'wasm-unsafe-eval'`). The shim's Budget Setup styles moved from a `<style>` element
+  into `tauri-shim.css` so that policy needs no inline styles. The home page has the
+  button in the hero and the link in the nav; the release notes page and the sitemap
+  link it too. The Pages workflow installs the target and the wasm-bindgen command line
+  (cached with `actions/cache` v6.1.0, pinned by SHA like the others), builds the demo,
+  smoke-tests it and deploys `site/` with it; it now also runs on changes to `crates/`,
+  `templates/charts/`, `Cargo.lock` and `Cargo.toml`, with a 30-minute limit.
+- **The browser build in CI.** The `build` job runs `cargo xtask web` and
+  `node scripts/web-smoke.mjs`: Node's own http server and the runner's headless Chrome
+  driven over `--remote-debugging-pipe` (the DevTools protocol without a WebSocket
+  client, so no npm packages). It checks the topsheet draws, an edit updates the
+  footer's grand total to the engine's, the charts are fetched only when asked for, and
+  the page logs no errors.
+- Also: Save As in the browser falls back to the suggested name when the browser has no
+  `prompt()`, and `cargo xtask web` depends on method-format (for the chart list).
+- Open: on a phone the app is hard to use (the tools panel covers most of the grid), so
+  the demo only says it works best on a computer; a phone layout is separate work.

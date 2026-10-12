@@ -7,6 +7,11 @@
 //!
 //! A template is an ordinary budget file holding a chart (categories,
 //! accounts, production totals) and nothing else.
+//!
+//! The texts are compiled in only with the `bundled-charts` feature (on by
+//! default: the desktop and the command line). Without it, as in the
+//! browser build, [`all`] is empty and a host supplies a chart's text itself
+//! when it is picked (method-session's `coa_import::HostCharts`).
 
 use method_core::Budget;
 
@@ -25,7 +30,17 @@ pub struct Bundled {
     pub text: &'static str,
 }
 
-include!("charts_bundled.rs");
+#[cfg(feature = "bundled-charts")]
+mod bundled {
+    use super::Bundled;
+    include!("charts_bundled.rs");
+}
+#[cfg(feature = "bundled-charts")]
+use bundled::BUNDLED;
+
+/// No charts compiled in (the browser build).
+#[cfg(not(feature = "bundled-charts"))]
+static BUNDLED: &[Bundled] = &[];
 
 /// The groups New From Template shows the charts under, in order.
 pub const GROUPS: [&str; 4] = ["Feature", "Television", "Commercial", "Other"];
@@ -50,7 +65,7 @@ impl Bundled {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "bundled-charts"))]
 mod tests {
     use super::*;
     use std::path::{Path, PathBuf};

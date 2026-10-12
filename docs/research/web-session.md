@@ -1,9 +1,10 @@
 # Method Budget in a browser: the window-free session
 
-Status: phases 1, 1b and 2 built (decisions.md, entries 70, 71 and 72): the page runs in a
-browser tab against method-session compiled to WebAssembly. This note is the plan and the
-contract a partner's web app, and later our own website demo, integrate against; "Running
-it in a browser" below is how to build, serve and embed it.
+Status: phases 1, 1b, 2 and 3 built (decisions.md, entries 70 to 73): the page runs in a
+browser tab against method-session compiled to WebAssembly, the charts of accounts load
+only when picked, and the website has a demo at `/try/` (docs/WEBSITE.md, "The demo").
+This note is the plan and the contract a partner's web app and our own demo integrate
+against; "Running it in a browser" below is how to build, serve and embed it.
 
 ## The goal
 
@@ -257,11 +258,15 @@ Checked with `cargo xtask wasm-check` (`cargo check --locked -p method-core -p m
    browser"). Differences from this plan: `dispatch` is synchronous (it returns the reply's
    JSON; the shim's `invoke` is the promise), the clock is installed by the first `new
    Host()` rather than a separate call, and `saveMthd` names a `.mthd` file itself.
-4. **Phase 3, the website demo**: the page plus `method-web` as static files, a sample
-   budget, nothing kept beyond the tab (or local storage).
-5. **CI**: `cargo xtask wasm-check` checks the session crates for wasm32 and builds
-   method-web for it. Not yet in CI: `cargo xtask web` (it needs the wasm-bindgen command
-   line installed there) and a headless smoke test of the shim.
+4. **Phase 3, the website demo (done)**: the charts of accounts out of the module (below,
+   "The charts in a browser"), and `cargo xtask web --demo`: the page plus `method-web` as
+   static files under `site/try/`, an invented sample budget, a note about running in the
+   browser, a strict Content-Security-Policy; nothing kept beyond the tab (docs/WEBSITE.md,
+   "The demo"; decisions.md, entry 73).
+5. **CI (done)**: `cargo xtask wasm-check` checks the session crates for wasm32 and builds
+   method-web for it; then `cargo xtask web` and `node scripts/web-smoke.mjs` (below,
+   "The smoke test"), with the wasm-bindgen command line cached. The Pages workflow builds
+   the demo the same way and runs the same test before it deploys.
 
 ## Running it in a browser (phase 2)
 
@@ -285,10 +290,17 @@ folder) with:
 index.html, *.css, js/          the page, copied from crates/method-app/ui; index.html loads
                                 method-web/tauri-shim.js before js/boot.js (the only change)
 method-web/tauri-shim.js        the page's window.__TAURI__ over the Host
+method-web/tauri-shim.css       the Budget Setup frame's styles (a file, for a strict CSP)
 method-web/method_web.js        wasm-bindgen's JS, an ES module
-method-web/method_web_bg.wasm   about 11.5 MB, 2 MB gzipped; the bundled chart templates
-                                are 6.2 MB of it
+method-web/method_web_bg.wasm   about 5.2 MB, 1.4 MB gzipped (11.5 MB and 2 MB with the
+                                charts compiled in)
+charts/index.json               the bundled charts of accounts: each one's id, name, group,
+charts/<id>.mthd                description, categories and accounts; 92 files, 6.3 MB,
+                                each fetched only when it is needed
 ```
+
+`--demo` adds the website's demo (docs/WEBSITE.md, "The demo"): `demo/`, `sample/` and a
+Content-Security-Policy in `index.html`.
 
 No npm and no bundler. `cargo build -p method-web --target wasm32-unknown-unknown --release`
 builds it too (larger: about 20 MB before wasm-bindgen). On the desktop the crate is a name
@@ -299,11 +311,40 @@ The bundled charts were in the module twice: `charts_bundled.rs` declared them a
 `scripts/build-coa-templates.py` writes it so), which took 6 MB off the module and nothing
 off the desktop's behaviour.
 
+### The charts in a browser
+
+The bundled chart-of-accounts templates (`templates/charts/`, 6.2 MB of text) are compiled
+in only with method-format's `bundled-charts` feature. It is on by default, and
+method-session's feature of the same name (also on by default) turns it on, so the desktop
+and the command line are unchanged. method-web depends on both with default features off,
+so the module has none (`method_format::charts::all()` is empty there).
+
+Instead `cargo xtask web` writes them beside the page, from the same list the desktop
+compiles in: `charts/index.json` and `charts/<id>.mthd`. The host supplies them to the
+session itself (`method_session::coa_import::HostCharts`, kept by the Host):
+
+- `Host::set_charts(list)` (JS `host.setCharts(json)`): the charts `chart_templates` lists
+  after any bundled ones. The shim fetches `charts/index.json` the first time the page asks
+  for `chart_templates` (New From Template) and hands it over; the list's extra fields
+  (`categories`, `accounts`) are ignored by the Host and there for a fuller list later.
+- `Host::add_chart(id, text)` (JS `host.addChart(id, text)`): one chart's text, refused if
+  it isn't a budget file. The shim fetches `charts/<id>.mthd` when `chart_template_new` is
+  called for a chart in the list, then dispatches it.
+- `chart_template_new` takes a bundled chart first, then the host's; a chart the host lists
+  but hasn't handed over is refused with "<name> hasn't loaded yet. Check the connection
+  and pick it again." A failed fetch is refused with the shim's own message.
+
+No command's shape changed (`COMMANDS_VERSION` stays 1): `chart_templates` replies with
+the same `{id, name, group, description}` objects and `chart_template_new` takes the same
+`{id}`. Nothing else in a browser needs the charts: the start window's New Budget (which
+lists them with their sizes) is the desktop's.
+
 ### What a partner serves
 
 Every file in `target/web/`, as static files from one origin, with `.wasm` served as
-`application/wasm` (any current web server does). The page needs nothing else: no server
-calls, no cookies; budgets live in the page until the person saves (downloads) them. Its
+`application/wasm` (any current web server does), `charts/` included (without it New From
+Template lists no charts). The page needs nothing else: no server calls beyond fetching
+those files, no cookies; budgets live in the page until the person saves (downloads) them. Its
 address can say:
 
 - `?open=<url>`: start with the `.mthd` file at that address (same origin, or one that
@@ -326,6 +367,8 @@ const { name, text: saved } = host.saveMthd();  // the budget in front (or saveM
 host.setReadOnly(true);                         // a viewer: every edit refused
 JSON.parse(host.hostInfo());                    // {kind: "web", commands_version: 1, read_only}
 commands();                                     // every command dispatch runs (COMMANDS)
+host.setCharts(indexJson);                      // the chart list (charts/index.json)
+host.addChart('feature', text);                 // one chart's text, once it is picked
 ```
 
 - `dispatch(command, argsJson)` is `Host::dispatch`: the desktop's command names and
@@ -354,6 +397,9 @@ uses:
   browser downloads and the rest goes to the page.
 - **`save_budget`** downloads the budget as a `.mthd` file (`saveMthd`), asking a name with
   the browser's prompt for Save As or a budget never saved, and replies with the view.
+- **The charts of accounts** are fetched from `charts/` beside the page: the list when
+  `chart_templates` is first asked, a chart's file when `chart_template_new` names it
+  (above, "The charts in a browser").
 - **Desktop-only commands** are refused with "That is only in the Method Budget app, not in
   the browser."; the few the page asks at start-up are answered as nothing there
   (`autosave_setting` false, `open_pending` null, `recovery_list` empty, `whats_new` null),
@@ -410,6 +456,32 @@ with the browser's time); `?readonly=1` (an edit refused with the plain message)
 tab and closing both tabs; Print Topsheet (the browser's print). The file picker and the
 downloads were driven by a test harness in the page (a picked file put into the input,
 downloads caught), as a browser automation tool can't use the system's file dialog.
+
+### Checked in a browser: the demo (2026-10-12)
+
+`cargo xtask web --demo --out site/try`, the whole site served with `python3 -m
+http.server`, in a Chromium-based browser: the home page's new button and nav link open
+`/try/`, which opens the sample budget (`?open=` added by demo.js) under the note;
+drilling into an account and editing a rate (the footer's totals follow); Save and Save As
+download the `.mthd` (Save As falls back to the suggested name where the browser has no
+`prompt`); Open of another `.mthd` (a new tab); New From Template lists the charts after
+fetching only `charts/index.json`, and picking one fetches only that chart's file and
+opens it; Budget Setup in its frame, styled and without the note; hiding the note; dark
+mode; no Content-Security-Policy refusals. At phone width (375 px) the note says the app
+works best on a computer: the grid is mostly covered by the tools panel, and the home
+page has no sideways scroll.
+
+### The smoke test
+
+`node scripts/web-smoke.mjs [dir]` (CI, after `cargo xtask web`; the Pages workflow, after
+`--demo`): no npm packages. It serves the folder with Node's own http server, starts the
+runner's headless Chrome with `--remote-debugging-pipe` and speaks the DevTools protocol
+over that pipe (so it needs no WebSocket client), opens the sample budget with `?open=`,
+and checks that the topsheet draws with its grand total, that an edit (a fringe's rate,
+through the shim's `invoke` as Budget Setup sends it) changes the footer's grand total to
+the engine's, that the chart list and one chart are fetched only when asked for and the
+chart opens as a new budget, and that the page logs no errors (Content-Security-Policy
+refusals included). `CHROME=<path>` picks the browser; it takes about two seconds.
 
 ## What a partner integrates against
 

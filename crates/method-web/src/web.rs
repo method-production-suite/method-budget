@@ -92,6 +92,25 @@ impl WebHost {
         self.host.set_read_only(on);
     }
 
+    /// The chart templates New From Template lists, as JSON: an array of
+    /// `{id, name, group, description}` (other fields are ignored), as
+    /// `charts/index.json` beside the page has them. The browser build
+    /// has none compiled in.
+    #[wasm_bindgen(js_name = setCharts)]
+    pub fn set_charts(&self, list_json: &str) -> Result<(), JsError> {
+        let list = serde_json::from_str(list_json)
+            .map_err(|e| JsError::new(&format!("The chart list can't be read: {e}.")))?;
+        self.host.set_charts(list);
+        Ok(())
+    }
+
+    /// Chart `id`'s template text (`charts/<id>.mthd` beside the page),
+    /// fetched when it is picked, before `chart_template_new`.
+    #[wasm_bindgen(js_name = addChart)]
+    pub fn add_chart(&self, id: &str, text: &str) -> Result<(), JsError> {
+        self.host.add_chart(id, text).map_err(error)
+    }
+
     /// `{kind: "web", commands_version, read_only}`, as JSON.
     #[wasm_bindgen(js_name = hostInfo)]
     pub fn host_info(&self) -> String {

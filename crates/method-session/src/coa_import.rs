@@ -244,12 +244,64 @@ pub struct Imported {
 }
 
 /// One bundled chart template, as New From Template lists it.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChartTemplate {
-    pub id: &'static str,
-    pub name: &'static str,
-    pub group: &'static str,
-    pub description: &'static str,
+    pub id: String,
+    pub name: String,
+    pub group: String,
+    pub description: String,
+}
+
+/// Charts a host supplies itself, for a build without the bundled ones
+/// (the browser's: method-format's `bundled-charts` feature off, which
+/// takes 6 MB off the module). The host hands in the list New From
+/// Template shows ([`HostCharts::set_list`]) and a chart's text once it is
+/// picked ([`HostCharts::add`]); the browser fetches both from static files
+/// beside the page. Bundled charts come first and win on the same id.
+#[derive(Debug, Default)]
+pub struct HostCharts {
+    inner: Mutex<(Vec<ChartTemplate>, BTreeMap<String, Budget>)>,
+}
+
+impl HostCharts {
+    fn lock(&self) -> MutexGuard<'_, (Vec<ChartTemplate>, BTreeMap<String, Budget>)> {
+        self.inner.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// The charts the host can supply, as New From Template lists them.
+    pub fn set_list(&self, list: Vec<ChartTemplate>) {
+        self.lock().0 = list;
+    }
+
+    pub fn list(&self) -> Vec<ChartTemplate> {
+        self.lock().0.clone()
+    }
+
+    /// Chart `id`'s template text (a `.mthd` file), kept for New From
+    /// Template. Refused, and nothing kept, when it isn't a budget file.
+    pub fn add(&self, id: &str, text: &str) -> Result<(), String> {
+        let b = method_format::from_str(text)
+            .map_err(|e| format!("The {id} chart template can't be read: {e}."))?;
+        self.lock().1.insert(id.to_string(), b);
+        Ok(())
+    }
+
+    /// The listed chart whose id or name is `key` (ignoring case), and its
+    /// budget once its text has been added.
+    fn find(&self, key: &str) -> Option<(String, Option<Budget>)> {
+        let key = key.trim();
+        let g = self.lock();
+        let listed =
+            g.0.iter()
+                .find(|c| c.id.eq_ignore_ascii_case(key) || c.name.eq_ignore_ascii_case(key));
+        let id = listed.map_or(key, |c| c.id.as_str());
+        let budget = g.1.get(id).cloned();
+        match (listed, budget) {
+            (Some(c), b) => Some((c.name.clone(), b)),
+            (None, Some(b)) => Some((b.title.clone(), Some(b))),
+            (None, None) => None,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -647,10 +699,10 @@ pub fn templates() -> Vec<ChartTemplate> {
     method_format::charts::all()
         .iter()
         .map(|c| ChartTemplate {
-            id: c.id,
-            name: c.name,
-            group: c.group,
-            description: c.description,
+            id: c.id.into(),
+            name: c.name.into(),
+            group: c.group.into(),
+            description: c.description.into(),
         })
         .collect()
 }
@@ -707,14 +759,46 @@ pub fn chart_templates() -> Vec<ChartTemplate> {
     templates()
 }
 
+/// The bundled chart templates, then those `host` lists that aren't
+/// bundled (a build without the bundled ones lists only the host's).
+pub fn chart_templates_with(host: &HostCharts) -> Vec<ChartTemplate> {
+    let mut list = templates();
+    for c in host.list() {
+        if !list.iter().any(|b| b.id == c.id) {
+            list.push(c);
+        }
+    }
+    list
+}
+
 /// Opens bundled chart `id` as a new budget in a new tab (as New From
 /// Template does with a file: no file, Untitled, no unsaved changes).
 pub fn chart_template_new(state: &AppState, id: &str) -> Result<DocId, String> {
-    let chart = method_format::charts::find(id)
-        .ok_or("That chart template isn't bundled with this version.")?;
-    let b = chart
-        .budget()
-        .map_err(|e| format!("The {} template can't be read: {e}.", chart.name))?;
+    chart_template_new_with(state, &HostCharts::default(), id)
+}
+
+/// As [`chart_template_new`], with the charts `host` supplies after the
+/// bundled ones. A chart the host lists but hasn't handed in yet is
+/// refused with a plain message.
+pub fn chart_template_new_with(
+    state: &AppState,
+    host: &HostCharts,
+    id: &str,
+) -> Result<DocId, String> {
+    let b = match method_format::charts::find(id) {
+        Some(chart) => chart
+            .budget()
+            .map_err(|e| format!("The {} template can't be read: {e}.", chart.name))?,
+        None => match host.find(id) {
+            Some((_, Some(b))) => b,
+            Some((name, None)) => {
+                return Err(format!(
+                    "{name} hasn't loaded yet. Check the connection and pick it again."
+                ))
+            }
+            None => return Err("That chart template isn't bundled with this version.".into()),
+        },
+    };
     Ok(crate::templates::open_new(state, &b, false))
 }
 
@@ -845,10 +929,43 @@ mod tests {
     }
 
     #[test]
+    fn a_host_supplies_charts_that_are_not_bundled() {
+        let host = HostCharts::default();
+        host.set_list(vec![ChartTemplate {
+            id: "own".into(),
+            name: "Our own chart".into(),
+            group: "Other".into(),
+            description: "Supplied by the host".into(),
+        }]);
+        let list = chart_templates_with(&host);
+        assert_eq!(list.len(), templates().len() + 1);
+        assert_eq!(list.last().unwrap().id, "own");
+        let state = AppState::with(crate::docs::Docs::default());
+        let err = chart_template_new_with(&state, &host, "own").unwrap_err();
+        assert!(err.contains("Our own chart hasn't loaded yet"), "{err}");
+        assert!(host.add("own", "not a budget").is_err());
+        let mut b = starter::budget();
+        b.title = "Our own chart".into();
+        host.add("own", &method_format::to_string(&b)).unwrap();
+        let id = chart_template_new_with(&state, &host, "OWN").unwrap();
+        {
+            let docs = state.docs();
+            let s = docs.get(id).unwrap();
+            assert_eq!(s.budget().title, UNTITLED);
+            assert!(!s.is_dirty());
+        }
+        assert!(chart_template_new_with(&state, &host, "nothing").is_err());
+    }
+
+    #[cfg(feature = "bundled-charts")]
+    #[test]
     fn every_bundled_chart_opens_as_a_template() {
         assert!(!templates().is_empty());
         for t in templates() {
-            let b = method_format::charts::find(t.id).unwrap().budget().unwrap();
+            let b = method_format::charts::find(&t.id)
+                .unwrap()
+                .budget()
+                .unwrap();
             let state = AppState::with(crate::docs::Docs::default());
             let id = crate::templates::open_new(&state, &b, false);
             let docs = state.docs();

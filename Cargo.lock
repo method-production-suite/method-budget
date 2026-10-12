@@ -4944,6 +4944,7 @@ dependencies = [
 name = "xtask"
 version = "0.1.0"
 dependencies = [
+ "method-format",
  "method-release",
  "serde_json",
 ]

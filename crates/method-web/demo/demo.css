@@ -1,0 +1,95 @@
+/* The website's demo (methodbudget.com/try/, docs/WEBSITE.md): a slim note
+   above the app saying it runs in the browser. Colors are the app's own
+   tokens (styles.css), so it follows light and dark with the page. */
+
+body.mw-demo-on {
+  display: flex;
+  flex-direction: column;
+}
+
+body.mw-demo-on > .app {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+
+.mw-demo {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 6px 12px;
+  background: var(--selection);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.mw-demo[hidden] {
+  display: none;
+}
+
+.mw-demo-home {
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.mw-demo-text {
+  flex: 1 1 auto;
+  margin: 0;
+  min-width: 0;
+}
+
+.mw-demo-phone {
+  display: none;
+  font-weight: 600;
+}
+
+.mw-demo-get {
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mw-demo-home:hover,
+.mw-demo-get:hover {
+  text-decoration: underline;
+}
+
+.mw-demo-close {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mw-demo-close:hover {
+  background: var(--row-hover);
+  color: var(--text);
+}
+
+/* A phone: the app wants a keyboard and a wide window. */
+@media (max-width: 760px) {
+  .mw-demo {
+    flex-wrap: wrap;
+  }
+
+  .mw-demo-text {
+    flex-basis: 100%;
+    order: 3;
+  }
+
+  .mw-demo-phone {
+    display: inline;
+  }
+}

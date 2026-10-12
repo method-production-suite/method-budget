@@ -15,10 +15,12 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-method-format = { path = "../method-format" }
+# Without the bundled charts: the page fetches a chart's file when it is
+# picked (`cargo xtask web` puts them in charts/ beside the page).
+method-format = { path = "../method-format", default-features = false }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-method-session = { path = "../method-session" }
+method-session = { path = "../method-session", default-features = false }
 serde_json = "=1.0.151"
 # Both already in Cargo.lock through Tauri: no newer version is taken.
 wasm-bindgen = "=0.2.128"

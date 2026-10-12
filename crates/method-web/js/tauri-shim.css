@@ -1,0 +1,25 @@
+/* Method Budget in a browser: the Budget Setup window, a frame over the
+   page (tauri-shim.js adds this file when it first shows it). */
+
+.mw-setup {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.mw-setup[hidden] {
+  display: none;
+}
+
+.mw-setup-frame {
+  width: min(1180px, calc(100vw - 48px));
+  height: min(820px, calc(100vh - 48px));
+  border: 1px solid var(--border, #888);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}

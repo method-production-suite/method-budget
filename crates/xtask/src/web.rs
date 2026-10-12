@@ -8,9 +8,17 @@
 //!   index.html, *.css, js/     the page (crates/method-app/ui), index.html
 //!                              loading the shim before the page's modules
 //!   method-web/tauri-shim.js   the page's `invoke` and events over the Host
+//!   method-web/tauri-shim.css  (and its styles)
 //!   method-web/method_web.js   wasm-bindgen's JS (an ES module)
 //!   method-web/method_web_bg.wasm
+//!   charts/index.json          the bundled charts of accounts, not compiled
+//!   charts/<id>.mthd           into the module: fetched when one is picked
 //! ```
+//!
+//! With `--demo`, the website's demo (docs/WEBSITE.md): `index.html` also
+//! carries a Content-Security-Policy that allows only its own files, the
+//! note about running in the browser and `demo/` (its script and styles),
+//! and `sample/` holds the invented budget the demo starts with.
 //!
 //! No npm and no bundler. The `wasm-bindgen` command line must be the
 //! version in Cargo.lock: `cargo install wasm-bindgen-cli --version <it>
@@ -28,12 +36,33 @@ pub const PROFILE: &str = "web-release";
 /// Where the page's own `invoke` shim lives, and where the built folder
 /// keeps it and wasm-bindgen's output.
 const SHIM: &str = "crates/method-web/js/tauri-shim.js";
+const SHIM_CSS: &str = "crates/method-web/js/tauri-shim.css";
+const DEMO: &str = "crates/method-web/demo";
 const UI: &str = "crates/method-app/ui";
 const SUBDIR: &str = "method-web";
 
 /// The page's entry script, before which the shim is loaded.
 const BOOT: &str = r#"<script type="module" src="js/boot.js"></script>"#;
 const SHIM_TAG: &str = r#"<script src="method-web/tauri-shim.js"></script>"#;
+
+/// The demo's sample budget (invented: crates/method-web/demo/, made by
+/// scripts/make-showcase-budgets.py) and the name it is served under, which
+/// the tab shows. demo.js opens it.
+const SAMPLE: &str = "lanterns-over-kettle-lake.mthd";
+const SAMPLE_NAME: &str = "Lanterns Over Kettle Lake.mthd";
+
+/// The demo page's Content-Security-Policy: its own files only, plus
+/// compiling the WebAssembly module. Nothing from anyone else, no inline
+/// script or style.
+pub const DEMO_CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; \
+style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; \
+frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'";
+
+const CHARSET: &str = r#"<meta charset="utf-8">"#;
+const BODY: &str = "<body>";
+const DEMO_HEAD: &str = r#"<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="demo/demo.css">
+    <script src="demo/demo.js"></script>"#;
 
 /// The version of crate `name` in Cargo.lock's text.
 pub fn locked_version(lock: &str, name: &str) -> Option<String> {
@@ -58,6 +87,83 @@ pub fn patch_index(html: &str) -> Result<String, String> {
     Ok(html.replace(BOOT, &format!("{SHIM_TAG}\n    {BOOT}")))
 }
 
+/// The demo's index.html (after [`patch_index`]): its Content-Security-
+/// Policy, its styles and script (before the shim, which reads the address
+/// demo.js may set), and `banner` at the top of the body.
+pub fn patch_demo(html: &str, banner: &str) -> Result<String, String> {
+    for (what, tag) in [
+        ("the charset", CHARSET),
+        ("the shim", SHIM_TAG),
+        ("<body>", BODY),
+    ] {
+        if html.matches(tag).count() != 1 {
+            return Err(format!("index.html doesn't have {what} once as expected"));
+        }
+    }
+    let csp = format!(r#"<meta http-equiv="Content-Security-Policy" content="{DEMO_CSP}">"#);
+    Ok(html
+        .replace(CHARSET, &format!("{CHARSET}\n    {csp}"))
+        .replace(SHIM_TAG, &format!("{DEMO_HEAD}\n    {SHIM_TAG}"))
+        .replace(BODY, &format!("{BODY}\n    {}", banner.trim_end())))
+}
+
+/// `charts/index.json`: each bundled chart's id, name, group, description
+/// and size, in the manifest's order, as the shim hands it to the Host.
+pub fn chart_index() -> Result<String, String> {
+    let mut list = Vec::new();
+    for c in method_format::charts::all() {
+        let b = c.budget().map_err(|e| format!("chart {}: {e}", c.id))?;
+        list.push(serde_json::json!({
+            "id": c.id,
+            "name": c.name,
+            "group": c.group,
+            "description": c.description,
+            "categories": b.categories().count(),
+            "accounts": b.categories().map(|c| c.accounts.len()).sum::<usize>(),
+        }));
+    }
+    serde_json::to_string_pretty(&list).map_err(|e| e.to_string())
+}
+
+/// Writes the bundled charts into `dir`: `index.json` and `<id>.mthd`.
+/// Their total size.
+fn write_charts(dir: &Path) -> Result<u64, String> {
+    fs::create_dir_all(dir).map_err(|e| format!("couldn't make {}: {e}", dir.display()))?;
+    let write = |name: &str, text: &str| {
+        fs::write(dir.join(name), text).map_err(|e| format!("couldn't write {name}: {e}"))
+    };
+    let index = chart_index()?;
+    write("index.json", &index)?;
+    let mut size = index.len() as u64;
+    for c in method_format::charts::all() {
+        write(&format!("{}.mthd", c.id), c.text)?;
+        size += c.text.len() as u64;
+    }
+    Ok(size)
+}
+
+/// The demo's own files: its script and styles, the patched index.html and
+/// the sample budget.
+fn add_demo(root: &Path, out: &Path) -> Result<(), String> {
+    let demo = root.join(DEMO);
+    let read =
+        |p: &Path| fs::read_to_string(p).map_err(|e| format!("couldn't read {}: {e}", p.display()));
+    let index = out.join("index.html");
+    let html = patch_demo(&read(&index)?, &read(&demo.join("banner.html"))?)?;
+    fs::write(&index, html).map_err(|e| format!("couldn't write index.html: {e}"))?;
+    let copy = |from: &str, to: &Path| {
+        if let Some(dir) = to.parent() {
+            fs::create_dir_all(dir).map_err(|e| format!("couldn't make {}: {e}", dir.display()))?;
+        }
+        fs::copy(demo.join(from), to)
+            .map(|_| ())
+            .map_err(|e| format!("couldn't copy {from}: {e}"))
+    };
+    copy("demo.js", &out.join("demo").join("demo.js"))?;
+    copy("demo.css", &out.join("demo").join("demo.css"))?;
+    copy(SAMPLE, &out.join("sample").join(SAMPLE_NAME))
+}
+
 /// The `cargo build` arguments for the browser build.
 pub fn build_args() -> Vec<String> {
     [
@@ -74,7 +180,7 @@ pub fn build_args() -> Vec<String> {
     .to_vec()
 }
 
-pub fn command(root: &Path, out: Option<PathBuf>) -> Result<String, String> {
+pub fn command(root: &Path, out: Option<PathBuf>, demo: bool) -> Result<String, String> {
     if !target_installed(root) {
         return Err(format!(
             "the {TARGET} target isn't installed; run `rustup target add {TARGET}` first"
@@ -137,15 +243,24 @@ pub fn command(root: &Path, out: Option<PathBuf>) -> Result<String, String> {
     }
     fs::copy(root.join(SHIM), dir.join("tauri-shim.js"))
         .map_err(|e| format!("couldn't copy the shim: {e}"))?;
+    fs::copy(root.join(SHIM_CSS), dir.join("tauri-shim.css"))
+        .map_err(|e| format!("couldn't copy the shim's styles: {e}"))?;
+    let charts = write_charts(&out.join("charts"))?;
+    if demo {
+        add_demo(root, &out)?;
+    }
 
     let size = fs::metadata(dir.join("method_web_bg.wasm"))
         .map(|m| m.len())
         .unwrap_or(0);
     Ok(format!(
-        "the page and method-web are in {} (method_web_bg.wasm: {:.1} MB)\n\
+        "the page and method-web{} are in {} (method_web_bg.wasm: {:.1} MB; \
+         charts/, fetched one at a time: {:.1} MB)\n\
          serve it with: python3 -m http.server -d {} 8000\n",
+        if demo { ", as the website's demo," } else { "" },
         out.display(),
         size as f64 / 1_000_000.0,
+        charts as f64 / 1_000_000.0,
         out.display()
     ))
 }
@@ -220,6 +335,45 @@ mod tests {
             .join("../..")
             .join(SHIM)
             .is_file());
+    }
+
+    #[test]
+    fn the_demo_page_allows_only_its_own_files() {
+        let html = patch_index(include_str!("../../method-app/ui/index.html")).unwrap();
+        let banner = include_str!("../../method-web/demo/banner.html");
+        let out = patch_demo(&html, banner).unwrap();
+        // The policy comes first, so it covers everything the page loads.
+        let csp = out.find("Content-Security-Policy").unwrap();
+        assert!(csp < out.find("<link").unwrap());
+        assert!(!DEMO_CSP.contains("unsafe-inline") && !DEMO_CSP.contains("http"));
+        // demo.js runs before the shim reads the address.
+        assert!(out.find("demo/demo.js").unwrap() < out.find(SHIM_TAG).unwrap());
+        assert!(out.find("id=\"mw-demo\"").unwrap() > out.find(BODY).unwrap());
+        assert!(patch_demo("<html></html>", banner).is_err());
+        // Plain words: no em dashes, nothing but this site.
+        assert!(!banner.contains('\u{2014}') && !banner.contains("http"));
+        let demo = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join(DEMO);
+        for f in ["demo.js", "demo.css", SAMPLE] {
+            assert!(demo.join(f).is_file(), "{f}");
+        }
+        let sample = fs::read_to_string(demo.join(SAMPLE)).unwrap();
+        method_format::from_str(&sample).unwrap();
+        let script = fs::read_to_string(demo.join("demo.js")).unwrap();
+        assert!(script.contains(&SAMPLE_NAME.replace(' ', "%20")));
+    }
+
+    #[test]
+    fn the_chart_index_lists_every_bundled_chart() {
+        let index: serde_json::Value = serde_json::from_str(&chart_index().unwrap()).unwrap();
+        let list = index.as_array().unwrap();
+        assert_eq!(list.len(), method_format::charts::all().len());
+        for (e, c) in list.iter().zip(method_format::charts::all()) {
+            assert_eq!(e["id"], c.id);
+            assert_eq!(e["name"], c.name);
+            assert!(e["accounts"].as_u64().unwrap() > 0, "{}", c.id);
+        }
     }
 
     #[test]
