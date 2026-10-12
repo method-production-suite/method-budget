@@ -1,16 +1,23 @@
 // The Budget Setup window (src/setupwin.rs; decisions.md, entry 42): every
-// setup table's full editor, one tab each (setuptabs.js), with the setup
-// library beside the table when the window is wide enough. It loads the same
+// setup table's full editor, one tab each (setuptabs.js). It loads the same
 // page as the main window with ?panel=setup (boot.js) and calls the same
 // commands on the same budgets in Rust.
 //
+// Laid out for density (setupframe.js; the classes are documented at the
+// top of setup.css): the tab strip, then a narrow left rail and the tab's
+// main area, then a footer with the tab's totals and Close. The rail (tabs
+// with a library kind) switches between the budget's items and the setup
+// library's: in Budget, the list tabs show their sort and Show there and a
+// tab may add its own (setupframe.js railHost); in Library, the rail holds
+// the library's kind, sort and folders and the main area its items
+// (library.js renderLibrarySetup).
+//
 // The tabs reuse the editors the tools panel used to hold: the fringe,
 // group, set, location and currency tables are apply.js's lists drawn as
-// setup tables (ctx.mode 'setup': every column of each item's definition, no
-// selection and nothing to apply), Globals and Units are setup.js's full
-// tables, and Charges, Credits, Info, Settings and Baseline are
-// topsheet-setup.js's (through setup.js). The library is library.js's tab,
-// set to the table's kind.
+// setup tables (ctx.mode 'setup': every column of each item's definition,
+// most of them edited in place, no selection and nothing to apply), Globals
+// and Units are setup.js's full tables, and Charges, Credits, Info, Settings
+// and Baseline are topsheet-setup.js's (through setup.js).
 //
 // It follows the budget in front (the target pane's when the main window is
 // split): it fetches the view with no `doc`, and every command it sends names
@@ -35,9 +42,10 @@ import { invoke, connected, setDefaultArgs } from './api.js';
 import { $, el, isTextField } from './dom.js';
 import { applyView, applyListHost, APPLY_LISTS } from './apply.js';
 import { setupBegin, renderSetupTab, setupEnd } from './setup.js';
-import { setFindHook, onUsage } from './setuplist.js';
-import { renderLibrary, setLibraryKind } from './library.js';
+import { setFindHook, onUsage, sortSelect, showSelect, redrawLists } from './setuplist.js';
+import { renderLibrarySetup, setLibraryKind } from './library.js';
 import { SETUP_TABS, isSetupTab } from './setuptabs.js';
+import { setFrameHooks, footerBar, clearFooterTotals, setRailHost } from './setupframe.js';
 import { matchShortcut, menuRunsAppKeys, shortcutById } from './shortcuts.js';
 import { isModalOpen } from './modal.js';
 import { isMenuOpen, isContextMenuOpen } from './menu.js';
@@ -48,7 +56,35 @@ const state = {
   // The library kind last set for the rail: set again only when the tab
   // changes, so a kind picked in the rail stays while editing.
   libraryTab: null,
+  // Per tab, what the rail shows: 'budget' (the default) or 'library'.
+  source: {},
 };
+
+// The columns the list tabs sort on, for the rail's Sort (setuplist.js).
+const COLUMN_LABELS = {
+  description: 'Description',
+  rate: 'Rate',
+  unit: 'Unit',
+  cutoff: 'Cutoff',
+  uses: 'In use',
+  total: 'Total',
+  active: 'Active total',
+  counted: 'In budget total',
+  color: 'Color',
+  symbol: 'Symbol',
+  city: 'City',
+  region: 'Region',
+  country: 'Country',
+  formula: 'Calculation',
+  units: 'Units',
+  value: 'Value',
+  plural: 'Plural',
+  hours: 'Hours',
+};
+
+// The strip's Undo and Redo go to the main window, as the keys do; the
+// footer's Close closes this window.
+setFrameHooks({ menu: (id) => onMenu(id), close: () => closeWindow(), view: () => state.view });
 
 const NO_SELECTION = { level: 'topsheet', keys: [], cat: null, cursor: null, account: null };
 
@@ -124,6 +160,7 @@ function tabButton(t, i) {
   const b = el('button', {
     class: 'sw-tab',
     text: t.label,
+    title: t.hint || undefined,
     attrs: {
       type: 'button',
       role: 'tab',
@@ -150,36 +187,104 @@ function tabButton(t, i) {
   return b;
 }
 
+/** What tab `t`'s rail shows: 'budget' or 'library'. */
+function sourceOf(t) {
+  return t.library && state.source[t.id] === 'library' ? 'library' : 'budget';
+}
+
+/** Shows the budget's items or the library's on tab `id`, with focus on the switch. */
+function setSource(id, source) {
+  state.source[id] = source;
+  render();
+  focusKey(`setup:source:${source}`);
+}
+
+/** The rail's switch: the budget's items or the library's. */
+function sourceSwitch(t, source) {
+  const b = (id, label, title) => {
+    const on = id === source;
+    const btn = el('button', {
+      class: 'sw-source',
+      text: label,
+      title,
+      attrs: { type: 'button', 'aria-pressed': String(on) },
+      data: { key: `setup:source:${id}`, nobusy: '1' },
+    });
+    btn.addEventListener('click', () => {
+      if (!on) setSource(t.id, id);
+    });
+    return btn;
+  };
+  return el(
+    'div',
+    { class: 'sw-switch', attrs: { role: 'group', 'aria-label': `Show ${t.label.toLowerCase()} from` } },
+    b('budget', 'Budget', `This budget’s ${t.label.toLowerCase()}`),
+    b('library', 'Library', `Your setup library’s ${t.label.toLowerCase()}`),
+  );
+}
+
+/** A list tab's rail in Budget: its sort and the Show choice (setuplist.js). */
+function listRail(t) {
+  const label = (text) => el('span', { class: 'sw-rail-label', text, attrs: { 'aria-hidden': 'true' } });
+  return el(
+    'div',
+    { class: 'sw-rail-section' },
+    el('div', { class: 'sw-rail-field' }, label('Sort'), sortSelect(t.id, redrawLists, `setup:sort:${t.id}`, COLUMN_LABELS)),
+    el('div', { class: 'sw-rail-field' }, label('Show'), showSelect(t.id, redrawLists, `setup:show:${t.id}`)),
+  );
+}
+
+/** Draws tab `t`'s own content into `main`. */
+function drawTab(main, t) {
+  if (APPLY_LISTS.includes(t.id)) main.append(applyListHost(t.id));
+  else renderSetupTab(main, t.id);
+  // A host drawn as a frame (apply.js's lists) fills the area.
+  if (main.querySelector(':scope > .sw-framed')) main.classList.add('sw-main-framed');
+}
+
 function render() {
   const host = $('sw-host');
   if (!host || !state.view) return;
   const c = ctx();
   const focus = setupBegin(host, state.view, c);
   applyView(state.view, c);
+  clearFooterTotals();
+  setRailHost(null);
   const strip = el('div', { class: 'sw-tabs', attrs: { role: 'tablist', 'aria-label': 'Budget setup' } });
   SETUP_TABS.forEach((t, i) => strip.append(tabButton(t, i)));
   const tab = SETUP_TABS.find((t) => t.id === state.tab) || SETUP_TABS[0];
-  const main = el('div', { class: `sw-main sw-main-${tab.id}` });
-  if (APPLY_LISTS.includes(tab.id)) main.append(applyListHost(tab.id));
-  else renderSetupTab(main, tab.id);
-  const body = el(
-    'div',
-    {
-      class: `sw-body${tab.library ? ' has-library' : ''}`,
-      attrs: { role: 'tabpanel', id: 'sw-panel', 'aria-labelledby': `sw-tab-${tab.id}` },
-    },
-    main,
-  );
+  const source = sourceOf(tab);
+  const main = el('div', { class: `sw-main sw-main-${tab.id}${source === 'library' ? ' sw-main-library' : ''}` });
+  let rail = null;
   if (tab.library) {
     if (state.libraryTab !== tab.id) {
       setLibraryKind(tab.library);
       state.libraryTab = tab.id;
     }
-    const lib = el('div', { class: 'library-host' });
-    renderLibrary(lib, state.view, c);
-    body.append(el('aside', { class: 'sw-library', attrs: { 'aria-label': 'Setup library' } }, lib));
+    const railBody = el('div', { class: 'sw-rail-body' });
+    rail = el('aside', { class: 'sw-rail', attrs: { 'aria-label': `${tab.label}: budget or library` } }, sourceSwitch(tab, source), railBody);
+    if (source === 'library') {
+      renderLibrarySetup(railBody, main, state.view, c);
+    } else {
+      if (tab.list) railBody.append(listRail(tab));
+      const slot = el('div', { class: 'sw-rail-slot' });
+      railBody.append(slot);
+      setRailHost(slot);
+      drawTab(main, tab);
+    }
+  } else {
+    drawTab(main, tab);
   }
-  const root = el('div', { class: 'sw setup' }, strip, body);
+  const body = el(
+    'div',
+    {
+      class: `sw-body${rail ? ' has-rail' : ''}`,
+      attrs: { role: 'tabpanel', id: 'sw-panel', 'aria-labelledby': `sw-tab-${tab.id}` },
+    },
+    rail,
+    main,
+  );
+  const root = el('div', { class: 'sw setup' }, strip, body, footerBar());
   setupEnd(host, root, focus);
 }
 
@@ -247,6 +352,8 @@ function onState(p) {
   if (!p || typeof p !== 'object') return;
   const tab = isSetupTab(p.tab) ? p.tab : state.tab;
   const focus = typeof p.focus === 'string' && p.focus ? p.focus : typeof p.item === 'string' ? itemKey(tab, p.item) : null;
+  // An item or a control of the budget's asked for: the budget's items.
+  if (focus) state.source[tab] = 'budget';
   showTab(tab, focus);
 }
 

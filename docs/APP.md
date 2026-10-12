@@ -372,7 +372,8 @@ globals and units show the count only. The tooltip on a count also says when oth
 uses the item (a global used by another global or a fringe rate, a unit by a flat fringe,
 a group by a credit or a charge). **Show** (All, Used or Unused) narrows the list; used
 means lines or other setup name it. The **Name** head cycles the list's sort on each
-click: A to Z, Z to A, then back to the budget's own order. The budget's order is saved in
+click: A to Z, Z to A, then back to the budget's own order (in Budget Setup every column
+head sorts its column that way, and the rail's **Sort** picks the order too). The budget's order is saved in
 the file and followed by the Apply lists, the cell type-ahead and printed setup tables: drag
 an item by the dotted handle at its left, or press Option+Shift+Up or Down on it, to move
 it (quick key presses are one undo step). Moving is off while the list is sorted or
@@ -410,8 +411,9 @@ saves, Escape or Cancel closes it, a refused value keeps it open with the messag
 saving with nothing changed does nothing. Each save is one command, so one undo step (a
 group's three fields go together through `update_group`). The editor's **Delete…** asks
 before deleting, as the Delete key does. The row at the bottom of every list (**New
-fringe…**, **New group…**, and so on) opens the same kind of form for a new item, name
-first; a name already in use, or with a comma, is refused there.
+fringe…**, **New group…**, and so on; in Budget Setup, **New…** on the action strip) opens
+the same kind of form for a new item, name first; a name already in use, or with a comma,
+is refused there.
 
 **Renaming an item everywhere.** The editor's first field is the item's name (a currency's
 code): a new name renames it, and every line, formula and setting that names it follows,
@@ -573,23 +575,57 @@ does while the tools window is in front.
 
 **The Budget Setup window** (decisions.md, entry 42). One window, titled Budget Setup, with
 a tab per table: **Fringes, Groups, Globals, Units, Sets, Locations, Currency, Charges,
-Credits, Info, Settings and Baseline**. Each tab is the full editor: the tag tables list
-every column of an item's definition (a fringe's description, rate, unit and cutoff, a
-group's color and whether it counts in the total, a location's city, region and country, a
-currency's rate and symbol) with its line count (a click shows them in the tools panel's
-Find tab) and its dollars across the budget; double-click, Enter or F2 edits an item in
-its form, Delete deletes it, the row at the bottom adds one, and the right-click menu
-renames it everywhere, sets a short code or saves it to the library. The fringe table ends
-with the budget's percent and flat fringe dollars. The group table ends with the **Group
-rules** (decisions.md, entry 57), each Include or Exclude for the whole budget: **Lines
-with no group** (Exclude leaves out every line and adjustment row that has no group),
-**Lines in a counted and an uncounted group** (Exclude, the default, leaves them out) and
-**Fringes in group totals** (display only: the group dollars in the tables and the
-printed Groups section with or without their fringes). Globals and Units are their full tables
-(a global's details included); Charges, Credits, Info, Settings (renumbering accounts
-included) and Baseline are the forms the tools panel's Budget tab used to hold. When the
-window is at least 860 pixels wide, the setup library sits beside each table, on that
-table's kind.
+Credits, Info, Settings and Baseline** (a tab's tooltip says what it is for). It is laid out
+for density: under the tab strip, a narrow **rail** at the left (on the tabs that have a
+library kind) and the tab's own area, and at the bottom a **footer** with the tab's totals
+at the left and **Close** at the right.
+
+- **The rail** starts with a **Budget** and **Library** switch. In Budget it holds the
+  list tabs' **Sort** (the budget's order, by name, or the column a head sorts on) and
+  **Show** (All, Used or Unused), and whatever a tab adds there. In Library it holds the
+  library's name (with Change… and New…), the kind, the sort and the **folders** (All
+  folders, Unfiled, then each folder, with counts; New Folder…, Rename Folder… and Delete
+  Folder… under them), and the tab's area shows the library's items of that kind (below).
+- **The list tabs** (Fringes, Groups, Globals, Units, Sets, Locations, Currency) are one
+  table each, one item per row with every other row shaded: a drag handle, then the
+  columns, most edited in place (Enter or leaving the cell saves it as one undo step,
+  Escape puts the old value back). Fringes: Name, Description, Rate, Unit (Percent, Flat
+  per line or Flat per a unit with hours), Cutoff (percent fringes; a flat fringe's kept
+  cutoff shows muted), In use, Total. Groups: Name, Description, In budget total, Color,
+  In use, Total, Active total (the dollars that count in the budget total). Globals: In
+  use, Name, Description, Calculation, Units, Value, then **…** for its details
+  (description, unit, decimals, folder, show by name) and × to delete it. Units: In use,
+  Singular, Plural, Description, Hours, ×. Sets: Name, Description, In use, Total.
+  Locations: Name, Description, City, Region, Country, In use, Total. Currency: Code,
+  Description, Symbol, In use, Rate, Total. Every head sorts its column (A to Z, Z to A,
+  then the budget's order). A click on a name selects its row (so does a cell getting
+  focus); double-click, Enter or F2 on a name opens its editor (the rest of a fringe,
+  such as its basis and short code, and its name: renaming everywhere; a global's or
+  unit's name renames it); in the tag tables Delete deletes it and Up and Down move
+  along; the right-click menu renames it everywhere, sets a short code, saves it to the
+  library or deletes it (a global's has Details… too).
+- **The action strip** over each table: **New…**, **Edit…** (the tag tables) or
+  **Details…** (Globals), **Delete…** and **Save to Library…** for the selected row, a
+  **Search** box that takes the rest of the row (Escape clears it), and **Undo** and
+  **Redo** at its right end (sent to the main window, as the keys are).
+- **Tab-wide settings** sit in one thin band over the table: on Groups, the three **Group
+  rules** (decisions.md, entry 57), each Include or Exclude for the whole budget: **Lines
+  with no group** (Exclude leaves out every line and adjustment row that has no group),
+  **Lines in a counted and an uncounted group** (Exclude, the default, leaves them out) and
+  **Fringes in group totals** (display only: the group dollars in the tables and the
+  printed Groups section with or without their fringes); on Currency, the **Base
+  currency** (renaming it renames it everywhere, as in Settings) and **Show totals in**.
+- **The footer** shows how many items the table lists and, on Fringes, the budget's
+  fringe total and its percent and flat parts.
+- **In Library** the tab's area is the library's items of the kind and folder as a table
+  (a tick box, Name, Definition, Folder), with **Add to This Budget…**, **Move To…**
+  and **Save to Library…** and a search over it, the Setup packs section under it, and
+  the count and how many are ticked in the footer.
+
+Charges, Credits, Info, Settings (renumbering accounts included) and Baseline are the
+forms the tools panel's Budget tab used to hold. The layout pieces (strip, band, table,
+footer totals, the rail's own content) are `ui/js/setupframe.js`, described at the top of
+`ui/setup.css`, for any tab to use.
 
 Open it with the toolbar's **Setup** button, View > Budget Setup, or a setup key (Cmd+3
 Fringes, Cmd+4 Groups, Cmd+G Globals, Cmd+5 Locations, Cmd+6 Currency, Cmd+7 Units, Cmd+8
@@ -1183,7 +1219,9 @@ picker (globals, fringes, groups, units, sets, locations, currencies, charges, c
 presets, line blocks, report presets, each with its count), a folder picker (All folders,
 Unfiled, then the kind's folders) and a filter on names and definitions. Each item shows
 its definition in words (its tooltip adds what it brings along), a tick box, and its folder
-when All folders is shown.
+when All folders is shown. Budget Setup shows the same library when a tab's rail is switched
+to **Library**: the name, kind, sort and folders in the rail and the items as a table (see
+"The Budget Setup window" above).
 
 - **Add to This Budget…** copies the ticked items (or the item double-clicked, pressed Enter
   on, or right-clicked) into the budget in front, after Import Setup's review: what each

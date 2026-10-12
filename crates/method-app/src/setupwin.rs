@@ -328,6 +328,8 @@ mod tests {
             include_str!("../ui/js/topsheet-setup.js"),
             include_str!("../ui/js/renumber.js"),
             include_str!("../ui/js/display-settings.js"),
+            // The Currency tab's base and totals currency band.
+            include_str!("../ui/js/setupbands.js"),
             include_str!("../ui/js/setuplist.js"),
             include_str!("../ui/js/rename.js"),
             // The library beside each table, and Save to Library in the
