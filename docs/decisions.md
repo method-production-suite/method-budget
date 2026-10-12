@@ -3146,3 +3146,54 @@ export only).
   tests/fixtures/exchange/whole-units.json and whole-units-cents.json, each reconciling
   only with its own setting) and `percent_charges_come_in_as_percent_charges`, with
   `charge_percent`'s unit test for the rule.
+
+## 70. The window-free session, for a browser (2026-10-12, the owner's direction)
+
+A partner's web app, and later a demo on our website, should host the existing screens
+with the engine and the screens' logic running in the browser as WebAssembly. The owner
+decided we do the split ourselves. The plan, the crate map, the contract and what remains
+are in docs/research/web-session.md.
+
+- **A new crate, `method-session`**, holds what the desktop app ran without a window:
+  `session` (one budget, undo and redo), `docs` (the tabs, split view, `AppState`), `view`,
+  `edit`, `batch`, `diagnose`, `report_dto`, step labels (`history`), the display settings'
+  logic, the cost figures, the autosave rule and recovery key names (`safety`), and new
+  `clock`, `collab`, `commands` and `host` modules. It builds for wasm32-unknown-unknown:
+  no file system, no threads, no clock of its own. method-app re-exports what moved, so
+  its code and tests read as before; the tests moved with their code.
+- **The clock is handed in.** `clock::install` takes a `Clock` (wall time for undo steps,
+  a clock that never goes back for joining quick repeats and autosave, unique names for
+  recovery keys). The desktop turns on the `std-clock` feature, which makes the system
+  clock the default: the same readings as before. Autosave and the joining of quick undo
+  steps now count milliseconds on that clock instead of holding `Instant`s.
+- **Files stay on the desktop.** Opening, saving, noticing a file changed outside, Load
+  theirs and folder sharing are method-app's `SessionFiles` and `DocsFiles` traits; the
+  session takes the results (`mark_saved`, `adopt_file_version`, the file's stamp as data).
+  A shared budget's log reaches the session through `collab::SharedLog`, which the folder's
+  `SharedDoc` implements, so folder sharing isn't in the browser build at all and a server
+  could implement the trait later. Paths and the page's tokens are untouched.
+- **One entry point**: `Host::dispatch(command, args)` runs a command by its desktop name
+  with the page's JSON arguments and gives back the desktop's JSON, so the page can run
+  against it through an `invoke` shim. `COMMANDS` lists what it runs (60 commands in this
+  first version: views, history, structure, rows, setup tables, settings, charges and
+  credits, the baseline, and `open_mthd` and `save_mthd` to bring budgets in and out as
+  `.mthd` text); `COMMANDS_VERSION` (1) goes up on any change a caller would notice. The
+  desktop's Tauri commands for the same set are one call each into
+  `method_session::commands`, so both hosts label undo steps and check input alike.
+- **What isn't moved yet** (phase 1b): the other command modules (apply, notes, find,
+  moving rows, presets, versions, compare, diff and merge, imports and exports, templates,
+  charts, setup library and packs, tabs, the row clipboard, actuals import), because each
+  still shares a file with its Tauri commands. Each is the same mechanical split and adds
+  its commands to `COMMANDS` without a version change.
+- **Checked**: `cargo xtask wasm-check` (method-core, method-format and method-session for
+  wasm32-unknown-unknown, no features) runs in CI. No dependency was added: the session's
+  tree is serde and serde_json, and phase 2's wasm-bindgen and js-sys are already in
+  Cargo.lock.
+- **For the partner** (their answers, 2026-10-12): they keep budgets as `.mthd` files in
+  their storage, so the session only loads and saves `.mthd` text; sharing is their
+  server's (one editor at a time, others read-only), so folder sharing is left out of the
+  browser build; the change log's types and codecs stay usable without file I/O for a
+  later server-carried log. Clean room both ways: nothing of theirs enters this repository.
+- Tests: method-session's own (the moved ones, the clock, dispatch through JSON as the page
+  sends it, refusals changing nothing, `.mthd` in and out); method-app's
+  `dispatched_commands_are_desktop_commands`; xtask's `wasm` test.

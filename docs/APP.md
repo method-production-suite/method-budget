@@ -2314,22 +2314,41 @@ shape. Check for Updates and the automatic switch are answered in Rust (src/upda
 
 ## Architecture
 
+The budget logic that needs no window is its own crate, `method-session`, which also builds
+for WebAssembly so a browser can run the same screens (decisions.md, entry 70;
+docs/research/web-session.md). method-app re-exports what moved, under the same names.
+
 ```
-crates/method-app/
-  src/session.rs     one open budget: Budget, file path, dirty flag, undo/redo patches
-                     (each step labeled and timed), the account on screen, the recalc
-                     cache, autosave and recovery state
+crates/method-session/   no window, no file system, no threads, no clock of its own
+  src/session.rs     one open budget: Budget, where it lives, dirty flag, undo/redo
+                     patches (each step labeled and timed), the account on screen, the
+                     recalc cache, autosave and recovery state (as data)
   src/docs.rs        every open budget (one Session per tab) in tab order, the one in
                      front, split view's panes and target, and the lock the commands go
                      through
-  src/tabs.rs        the tab and split view commands, the Window menu's list of budgets,
-                     remembering the open files (and panes) for the next start
-  src/history.rs     the History tab: step labels, the list, jumps, a step as a version
   src/edit.rs        every edit as a function on &mut Budget (validates, then applies)
+  src/batch.rs       multi-cell edits (paste, fill down) applied as one undo step
   src/diagnose.rs    lenient recalc: flags every bad cell instead of stopping at the first
   src/report_dto.rs  serde shapes for method_core::Report (the engine stays serde-free)
   src/view.rs        what the UI draws after each command (lean), and the full view for printing
-  src/batch.rs       multi-cell edits (paste, fill down) applied as one undo step
+  src/history.rs     step labels for the History list
+  src/display.rs     global display info, numbers-on-screen settings, formula cell values
+  src/actuals.rs     the cost figures every view of a budget with actuals carries, and the
+                     rollup cache
+  src/safety.rs      the autosave rule, recovery key names, the file's stamp (as data)
+  src/clock.rs       the clock the host hands in (the desktop: the `std-clock` feature)
+  src/collab.rs      SharedLog: what a session asks of a shared budget's change log
+  src/commands.rs    the typed function behind each budget command, with its undo label
+  src/host.rs        Host::dispatch(command, args): the commands by name, as JSON, with
+                     COMMANDS and COMMANDS_VERSION
+
+crates/method-app/
+  src/session.rs     the desktop's side of a session: SessionFiles (open, save, a file
+                     changed outside, Load theirs, folder sharing) and DocsFiles
+  src/tabs.rs        the tab and split view commands, the Window menu's list of budgets,
+                     remembering the open files (and panes) for the next start
+  src/history.rs     the History tab: the list, jumps, a step as a version
+  src/display.rs     the display settings' two commands
   src/apply.rs       the apply panel: tag the selected rows, fringe ranges, selection summary
   src/quickadd.rs    quick entry: add a unit, set, location, currency or global from a
                      cell with the edit (one undo step); the new-line defaults setting
@@ -2356,9 +2375,8 @@ crates/method-app/
                      new tab (a conversion's notice, the first Save beside the export)
   src/open_any.rs    Open's routing by content: a budget in a tab, a budget export to
                      Import Budget Export's review, a spreadsheet to Import Spreadsheet
-  src/actuals.rs     Import Actuals, the Actuals tab's commands and the cost figures
-                     every view of a budget with actuals carries (method_core::actuals and
-                     method_format::import::actuals do the work); the rollup cache
+  src/actuals.rs     Import Actuals and the Actuals tab's commands (method_core::actuals and
+                     method_format::import::actuals do the work)
   src/menu.rs        native menu bar, built from the same table as ui/js/shortcuts.js
   src/tools.rs       the tools panel's own window: opening, hiding and placing it, telling
                      the other window when the budget changed, the Notes tab's list
@@ -2402,7 +2420,8 @@ crates/method-app/
   src/updater.rs     in-app updates (the plugin driven from Rust: timed and asked-for
                      checks, background download, Restart to update after saving every
                      budget), What's New once after an update, Help > Release Notes
-  src/app.rs         Tauri glue: commands, file dialogs, the close and quit guard (one
+  src/app.rs         Tauri glue: commands (one call each into method_session::commands
+                     where they are pure), file dialogs, the close and quit guard (one
                      question about every unsaved tab), menu events
   examples/perf.rs   timings on a large sample budget (method_core::sample), and canned
                      replies for a UI harness (perf dump DIR)
@@ -2478,8 +2497,9 @@ the target pane: `set_target_pane` sets it, and the other pane draws its own acc
 `pane_view` (only when it shows the same budget at another account), so the view stays
 lean and an edit costs one more view at most.
 
-Every accepted edit names its undo step (`Session::edit(label, f)`; `edit_budget` and
-`edit_budget_as` in `app.rs` for the commands): the label says what the command did, the
+Every accepted edit names its undo step (`Session::edit(label, f)`; the labels of the
+commands moved so far are in method-session's `src/commands.rs`, the rest use `edit_budget`
+and `edit_budget_as` in `app.rs`): the label says what the command did, the
 way the grid names things, and goes with the step through undo and redo, with the wall
 clock time it was made. `set_cells` takes `action` (`paste`, `fill`, `cut`, `clear`) for
 its label; anything else is an edit. `Session::budget_at` reads the budget at any step
@@ -2765,6 +2785,10 @@ always reads its `.app.tar.gz`). `reqwest` is named
 directly only for the updater's redirect policy; it was already in the build through the
 plugin, at the same version. `method-release` (the workspace's own release plumbing:
 versions, release notes, the updater key's shape) has no dependencies.
+`method-session` depends only on the engine, the format, `serde` and `serde_json`, and must
+keep building for `wasm32-unknown-unknown` (`cargo xtask wasm-check`, in CI); its
+`std-clock` feature, which the app turns on, is the only thing in it that reads the system
+clock.
 
 ## Not yet
 
