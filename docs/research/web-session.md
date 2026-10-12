@@ -1,7 +1,7 @@
 # Method Budget in a browser: the window-free session
 
-Status: phase 1 built (decisions.md, entry 70). This note is the plan and the contract a
-partner's web app, and later our own website demo, integrate against.
+Status: phases 1 and 1b built (decisions.md, entries 70 and 71). This note is the plan and
+the contract a partner's web app, and later our own website demo, integrate against.
 
 ## The goal
 
@@ -43,6 +43,31 @@ method-app re-exports the moved modules under their old names (`crate::edit`, `c
 `session`, `history`, `display`, `actuals` and `safety` modules re-export the moved parts
 beside what stays, so the rest of the app reads as before.
 
+### What moved in phase 1b
+
+Every command module's logic and its tests, module by module (decisions.md, entry 71). Each
+module in method-session has a "Commands" section of typed functions (one per desktop
+command, naming the undo step as the desktop does); its desktop file in method-app keeps a
+re-export (`pub use method_session::<module>::*`), the Tauri commands as one call each, the
+dialogs and the files; and `src/host/<module>.rs` dispatches its commands by name.
+
+| Module | What moved | What stays on the desktop |
+|---|---|---|
+| `versions`, `history` (save a step as a version) | all | nothing |
+| `notes`, `rowstyle`, `presets`, `apply`, `rename` | all | nothing |
+| `quickadd`, `find`, `moverows`, `renumber`, `setup_lists`, `explain`, `overtime` | all | nothing |
+| `clipboard` | all: it is the app's own row clipboard (the page puts text on the system clipboard itself); the host keeps its own `ClipboardState` | nothing |
+| `tabs` | new tab, switch, move, close (the closing rules), the list, split view and its panes | the Window menu, `tabs.json`, autosave and recovery copies on close |
+| `compare`, `diffmerge` | the comparison, What Changed, the merge; picked budgets kept by token | the Open dialog, matching a picked file to an open tab, reading the saved file for What Changed |
+| `export`, `reports` | the workbook and its files as bytes; report presets | the Save dialog and atomic writes; printing (`print_report`, `pdf_mac.rs`) |
+| `templates`, `import_setup`, `coa_import`, `sheet_import`, `export_import`, `open_any`, `setup_sheets`, `actuals` | the reviews, previews and imports on bytes, the bundled charts, every token store (`ImportSources`, `SheetSources`, `CoaSources`, `ExportSources`, `ActualsSources`) | the Open dialog, reading files (and a file open in a tab), Open Recent, a file handed over by the system |
+| `sharing` | the copy for sharing, the editable copy, storing a returned copy, sub-budgets | the Save dialog and the write |
+| `packs` | the review, importing into a budget, the items a pack can be made from, building a pack | the Packs list and folder, the library's side |
+| `library` | the library's view, the review both ways, copying in and out, folder changes | which file is the library (`library.json`), reading and writing it, refusing changes while it is open as a tab |
+
+No module was too tangled to move. No crate had to be gated for wasm32: every import and
+export reads and writes bytes through method-format's own code.
+
 ### What stays in method-app, and why
 
 Desktop only, for good:
@@ -56,24 +81,22 @@ Desktop only, for good:
   `DocsFiles` (a tab by its file). Bring the trait into scope and the calls read as before.
 - `shared.rs` and `shared_app.rs`: sharing through a folder. The browser build has none of it
   (it lives only in method-app), as the partner asked: their server does sharing.
-- The start window's file listing (`start.rs`), the setup library's folder (`library.rs`), the
-  Packs folder (`packs.rs`).
+- The start window (`start.rs`: the folder listing, pins, New Budget into a folder), the
+  setup library's file (`library.rs`), the Packs folder (`packs.rs`).
+- In every moved module: the Open and Save dialogs, reading and writing files, and the
+  wiring tests that read `app.rs`, `build.rs` and the capabilities.
 
-Phase 1b, logic that belongs in method-session but still shares a file with its Tauri
-commands. Each is the same mechanical split as `display.rs`: the logic and its tests move,
-the command becomes one call, and a dispatch arm and a `COMMANDS` entry are added. None was
-moved in phase 1 only to keep each step reviewable (about 23,000 lines in all):
-
-| Module | What has to change first |
-|---|---|
-| `apply`, `quickadd`, `notes`, `find`, `moverows`, `rename`, `renumber`, `rowstyle`, `setup_lists`, `presets`, `explain`, `overtime`, `versions`, `history` (jump and save as version) | nothing: plain edits on a session behind `edit_budget` and `finish` |
-| `tabs` (new tab, switch, close, move, split view) | the Window menu and `tabs.json` stay; the rest is `Docs` already |
-| `clipboard` (rows with their setup) | it is the app's own row clipboard, no OS clipboard: moves as is |
-| `compare`, `diffmerge` | budgets picked from files come in as text with a display name and a token |
-| `templates`, `coa_import`, `import_setup` | the bundled charts are in `method_format::charts_bundled`; picked files come in as bytes |
-| `sheet_import`, `export_import`, `open_any`, `setup_sheets`, `actuals` (import) | already read bytes (`method_format::import`); the token store moves, the Open dialog stays |
-| `export`, `reports`, `sharing` (copies for sharing), `packs` (export) | return bytes and a suggested name; the Save dialog stays; printing stays |
-| `library` | the review and the copying move; the library's own file stays |
+Desktop commands with no host form (55 of the desktop's 226): the windows
+(`tools_window`, `close_tools_window`, `setup_window`, `close_setup_window`), the start window
+(`start_*`, `new_budget_*`), saving and the files (`save_budget`, `open_recent`,
+`open_pending`, `resolve_external_change`), autosave, recovery and backups
+(`autosave_setting`, `set_autosave`, `flush_autosave`, `recovery_list`, `open_recovered`,
+`discard_recovered`, `backup_list`, `restore_backup`, `reveal_backups`), the updater
+(`update_status`, `update_restart`, `whats_new`, `release_notes`), printing
+(`print_report`), folder sharing (`share_*`), the library's file (`library_*`) and the Packs
+folder (`packs_list`, `packs_reveal`, `pack_review`, `pack_import_library`). A browser host
+saves with `save_mthd`, starts a budget with `new_tab` or `chart_template_new`, and keeps
+budgets, a library and packs in its own storage.
 
 ## The command contract
 
@@ -95,9 +118,33 @@ let reply: serde_json::Value = host.dispatch("set_title", json!({"title": "Featu
 - **Errors** (`method_session::Error`): `UnknownCommand`, `BadArguments` (the JSON didn't have
   the command's shape) and `Refused` (the command's own message, which the page shows; the
   budget is unchanged). `Error::message()` is the text a desktop command would reject with.
-- **Typed functions behind it**: `method_session::commands::*` take a `&mut Session` and typed
-  arguments. The desktop's Tauri commands are one call into these (`app.rs`, `display.rs`),
-  so both hosts name undo steps and validate alike.
+- **Typed functions behind it**: `method_session::commands::*` (phase 1) and each moved
+  module's "Commands" section (phase 1b) take a `&mut Session` (or the tabs) and typed
+  arguments. The desktop's Tauri commands are one call into these, so both hosts name undo
+  steps and validate alike.
+- **Files in.** Where the desktop shows an Open dialog (`open_budget`, `template_new`,
+  `import_setup_pick`, `sheet_import_pick`, `coa_import_pick`, `export_import_pick`,
+  `setup_sheet_pick`, `actuals_pick`, `merge_pick_file`, `pack_import_pick`), the host's
+  command of the same name takes the picked file as `file: {name, bytes}` beside the
+  desktop's arguments, and replies as the desktop does (a review with its token, so the
+  page's next calls work unchanged). `compare_pick_files` takes `files: [{name, bytes}]`, as
+  its dialog picks several. The name is only shown; no path ever crosses.
+- **Files out.** Where the desktop shows a Save dialog and writes (`template_save`,
+  `share_copy_save`, `export_budget`, `pack_export`, `setup_sheet_export`), the host's
+  command replies with the desktop's reply as after a save (a file's `path` is its name) and,
+  beside it, `downloads: [{name, bytes}]` for the host to offer (`Downloads`).
+- **Bytes are base64.** In both directions a file's `bytes` is one standard, padded base64
+  string (`btoa`/`atob` or `Uint8Array.fromBase64` in a browser; `method_session::host::
+  b64_encode` and `b64_decode` in Rust). Decided before phase 2 so the shim never sends
+  number arrays.
+- **What the host is**: `host_info` returns `{kind, commands_version, read_only}`: `"web"`
+  from `Host`, `"desktop"` from the desktop's command of the same name. The page will use it
+  in phase 2 to hide what only the desktop does; it doesn't yet.
+- **Read-only**: `Host::set_read_only(true)` shows every budget read-only, those open and
+  any opened later (a partner's viewer). Every edit is refused through
+  `Session::check_writable` with "This budget is open read-only here, so it can't be
+  changed.", and undo, redo and history jumps do nothing; views, `save_mthd` and the review
+  commands still work. `host_info` reports it.
 - **Budgets in and out as `.mthd` text**, the host's own two commands (no desktop command has
   these names): `open_mthd {name, text}` opens a budget in a new tab in front (an untouched
   Untitled gives its tab up) and returns its view; `save_mthd {doc, name?}` returns `{text,
@@ -109,21 +156,40 @@ let reply: serde_json::Value = host.dispatch("set_title", json!({"title": "Featu
   `dispatch` runs; a test checks each is dispatched, and another (in method-app) that each is
   a desktop command of the same name.
 
-Commands in version 1:
+Commands in version 1 (173: 60 from phase 1, 113 from phase 1b):
 
 | Group | Commands |
 |---|---|
 | Views | `get_view`, `get_full_view`, `focus_account`, `selection_totals`, `preview_charge` |
-| History | `undo`, `redo`, `history_list`, `history_jump` |
+| History | `undo`, `redo`, `history_list`, `history_jump`, `history_save_version` |
 | Structure | `set_title`, `add_category`, `add_production_total`, `update_topsheet_row`, `delete_topsheet_row`, `add_account`, `update_account`, `delete_account` |
 | Detail rows | `set_detail_field`, `set_rows_field`, `add_detail`, `delete_details`, `set_cells` |
 | Setup tables | `set_global`, `delete_global`, `set_global_info`, `set_display_prefs`, `set_fringe`, `delete_fringe`, `set_group`, `set_group_rule`, `delete_group`, `set_unit`, `delete_unit`, `set_currency`, `delete_currency` |
 | Settings | `set_arithmetic`, `set_round_account_totals`, `set_cutoff_factor`, `set_fringe_row`, `set_trailing_level_fringes`, `set_fringe_posting`, `set_account_coding`, `set_totals_currency` |
 | Topsheet setup | `set_charge`, `delete_charge`, `move_charge`, `set_credit`, `delete_credit`, `move_credit`, `set_set`, `delete_set`, `set_location`, `delete_location`, `set_info`, `delete_info`, `lock_baseline`, `set_baseline_frozen`, `clear_baseline` |
+| Versions | `save_version`, `restore_version`, `rename_version`, `delete_version` |
+| Tabs and split view | `new_tab`, `switch_tab`, `move_tab`, `close_tab`, `list_tabs`, `split_view`, `close_split`, `set_target_pane`, `move_tab_in_pane`, `move_to_pane`, `pane_view` |
+| Rows | `set_cell_creating`, `set_new_line_defaults`, `move_rows`, `move_accounts`, `move_topsheet_rows`, `set_row_style`, `set_group_color`, `update_group` |
+| Row clipboard | `clip_copy`, `clip_cut`, `clip_preview`, `clip_paste`, `clip_forget` |
+| Apply panel | `apply_summary`, `apply_to_rows`, `assign_to_rows`, `clear_from_rows`, `replace_tags_on_rows`, `make_fringe_range`, `clear_fringe_range` |
+| Presets | `save_tag_preset`, `tag_preset_from_line`, `apply_tag_preset`, `save_line_preset`, `line_preset_preview`, `insert_line_preset`, `rename_tool_preset`, `delete_tool_preset`, `move_tool_preset` |
+| Notes | `add_note`, `update_note`, `delete_note`, `set_note_done`, `notes_list` |
+| Find, rename, renumber | `find`, `replace`, `rename_setup_item`, `renumber_preview`, `renumber_accounts` |
+| Setup lists | `setup_usage`, `set_setup_order`, `move_setup_item`, `set_short_code` |
+| Explain, overtime | `explain_number`, `ot_calculate`, `ot_apply`, `ot_save_pattern`, `ot_delete_pattern` |
+| Compare, What Changed, merge | `compare_budgets`, `compare_detail`, `compare_pick_files`, `what_changed`, `merge_preview`, `merge_apply`, `merge_pick_file` (What Changed against the saved file is refused: the host keeps no file; pick it as a file) |
+| Export, reports | `export_budget`, `save_report_preset`, `delete_report_preset` |
+| Templates, charts | `template_new`, `template_save`, `chart_templates`, `chart_template_new` |
+| Imports | `open_budget`, `import_setup_pick`, `import_setup`, `sheet_import_pick`, `sheet_import_preview`, `sheet_import`, `coa_import_pick`, `coa_import_preview`, `coa_import`, `export_import_pick`, `export_import_preview`, `export_import`, `setup_sheet_export`, `setup_sheet_pick`, `setup_sheet_guess`, `setup_sheet_review` |
+| Actuals | `actuals_pick`, `actuals_preview`, `actuals_import`, `actuals_list`, `actuals_update`, `actuals_delete`, `actuals_remove_batch`, `actuals_set_etc`, `actuals_lines` |
+| Sharing copies | `share_copy_save`, `share_copy_editable`, `share_copy_original`, `share_copy_store`, `sub_budget_new` |
+| Setup packs | `pack_items`, `pack_export`, `pack_import_pick`, `pack_import` (into and out of a budget; `source` or `into` `library` is refused) |
 | The host's own | `open_mthd`, `save_mthd` |
+| The host | `host_info` (the desktop has it too) |
 
 The arguments of each are the desktop command's (docs/APP.md and the `#[tauri::command]`
-functions in method-app). Every phase 1b module adds its commands under their desktop names.
+functions in method-app), with the file forms above. The host's `close_tab` keeps no
+autosave or recovery copy (the host saves with `save_mthd`).
 
 ## The seams
 
@@ -181,17 +247,20 @@ Checked with `cargo xtask wasm-check` (`cargo check --locked -p method-core -p m
 1. **Phase 1 (done)**: method-session with the modules above and their tests, the injected
    clock, `dispatch` for the commands listed, the desktop's commands calling into it, the
    wasm check in CI.
-2. **Phase 1b**: the modules in the table above, one or a few at a time, each adding its
-   commands to `COMMANDS` (no version change: additions).
+2. **Phase 1b (done)**: every command module above, each adding its commands to `COMMANDS`
+   (no version change: additions), files in and out as base64, `host_info`, and the
+   read-only switch.
 3. **Phase 2, `method-web`**: a crate with `crate-type = ["cdylib"]` and `wasm-bindgen`
    exports: `new Host()`, `host.dispatch(command, argsJson) -> Promise<replyJson>`,
    `host.openMthd(name, text)`, `host.saveMthd(doc, name)`, `installClock()` (wiring
    `Date.now`, `performance.now` and a counter). A small JS shim defines
    `window.__TAURI__.core.invoke` over `dispatch` (rejecting with `Error::message()`) and a
    minimal `__TAURI__.event` (the page listens for `view-changed`, `autosaved` and the like;
-   in a browser most never fire), so `ui/` runs unchanged. Desktop-only items (File > Open,
-   Save, Print to PDF, the updater, pop-out windows) are hidden by the page when the shim
-   says it is a browser host.
+   in a browser most never fire), so `ui/` runs unchanged. For a command with a file form
+   the shim shows the browser's file picker and adds `file`, and offers a reply's
+   `downloads` and hands the rest to the page. Desktop-only items (Save, Open Recent, Print
+   to PDF, the updater, pop-out windows, the library's file, folder sharing) are hidden by
+   the page when `host_info` says `web`.
 4. **Phase 3, the website demo**: the page plus `method-web` as static files, a sample
    budget, nothing kept beyond the tab (or local storage).
 5. **CI**: `cargo xtask wasm-check` now; phase 2 adds `wasm-pack build` (or `cargo build
@@ -208,8 +277,10 @@ Checked with `cargo xtask wasm-check` (`cargo check --locked -p method-core -p m
 - `method_session::clock::install` before the first budget, in a browser.
 - Sharing is their server's (one editor at a time, others read-only with updates); nothing
   of our folder sharing is in the browser build. A viewer can open the latest `.mthd` with
-  `open_mthd` again as it changes. Open question: a host-level read-only switch (every edit
-  refused, as for a copy saved for sharing) so the viewer's page can't change its copy; it
-  would be one flag on `Host` checked by `Session::check_writable`.
+  `open_mthd` again as it changes; `Host::set_read_only(true)` keeps the viewer's page from
+  changing its copy.
+- Files in and out as base64 (`file`, `files`, `downloads`; above).
+- Open for later: a setup library and packs kept in the partner's storage (the library is a
+  file on the desktop, so its commands have no host form yet).
 - Clean room both ways: the partner sends no code to this repository, and nothing derived
   from another program's files or code enters it (CLEAN-ROOM.md).

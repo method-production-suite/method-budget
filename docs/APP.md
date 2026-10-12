@@ -2315,14 +2315,16 @@ shape. Check for Updates and the automatic switch are answered in Rust (src/upda
 ## Architecture
 
 The budget logic that needs no window is its own crate, `method-session`, which also builds
-for WebAssembly so a browser can run the same screens (decisions.md, entry 70;
-docs/research/web-session.md). method-app re-exports what moved, under the same names.
+for WebAssembly so a browser can run the same screens (decisions.md, entries 70 and 71;
+docs/research/web-session.md). method-app re-exports what moved, under the same names: each
+of its command modules is the Tauri commands (one call each into method-session), the
+dialogs and the files.
 
 ```
 crates/method-session/   no window, no file system, no threads, no clock of its own
   src/session.rs     one open budget: Budget, where it lives, dirty flag, undo/redo
                      patches (each step labeled and timed), the account on screen, the
-                     recalc cache, autosave and recovery state (as data)
+                     recalc cache, autosave and recovery state (as data), read-only
   src/docs.rs        every open budget (one Session per tab) in tab order, the one in
                      front, split view's panes and target, and the lock the commands go
                      through
@@ -2331,87 +2333,99 @@ crates/method-session/   no window, no file system, no threads, no clock of its 
   src/diagnose.rs    lenient recalc: flags every bad cell instead of stopping at the first
   src/report_dto.rs  serde shapes for method_core::Report (the engine stays serde-free)
   src/view.rs        what the UI draws after each command (lean), and the full view for printing
-  src/history.rs     step labels for the History list
+  src/history.rs     step labels for the History list; a step saved as a version
   src/display.rs     global display info, numbers-on-screen settings, formula cell values
-  src/actuals.rs     the cost figures every view of a budget with actuals carries, and the
-                     rollup cache
+  src/actuals.rs     the cost figures every view of a budget with actuals carries, the
+                     rollup cache, Import Actuals (kept by token) and the Actuals tab
   src/safety.rs      the autosave rule, recovery key names, the file's stamp (as data)
   src/clock.rs       the clock the host hands in (the desktop: the `std-clock` feature)
   src/collab.rs      SharedLog: what a session asks of a shared budget's change log
-  src/commands.rs    the typed function behind each budget command, with its undo label
+  src/commands.rs    the typed function behind each phase 1 budget command, with its
+                     undo label (the other modules have their own Commands sections)
+  src/tabs.rs        new tab, switch, move, close (the closing rules), split view
+  src/versions.rs    the Versions dialog: save, restore, rename, delete, each one undo
+                     step, with names, notes and times checked
+  src/notes.rs       dated notes on lines, accounts and categories, the Notes tab's list
+  src/rowstyle.rs    row styles and group colors
+  src/apply.rs       the apply panel: tag the selected rows, fringe ranges, selection summary
+  src/presets.rs     tag presets and line blocks: saving, applying, inserting, arranging
+  src/clipboard.rs   copy and paste whole rows, accounts and categories with the setup
+                     they use: the app's own row clipboard, the paste review, the paste
+  src/quickadd.rs    quick entry: add a unit, set, location, currency or global from a
+                     cell with the edit (one undo step); the new-line defaults setting
+  src/find.rs        find and replace: typed search, replacing in the checked results
+  src/moverows.rs    moving lines, accounts and topsheet rows one place, keeping fringe
+                     ranges whole; quick presses join one undo step
+  src/rename.rs      renaming a setup item everywhere (method_core::rename does the work)
+  src/renumber.rs    renumbering accounts to a new pattern: preview and the one step
+  src/setup_lists.rs the setup lists' use counts and totals, their order, short codes
+  src/explain.rs     Explain This Number
+  src/overtime.rs    the Overtime tab: preview, writing into a line, saved patterns
+  src/compare.rs     the compare screen: budgets from tabs, versions and picked files
+                     (kept by token)
+  src/diffmerge.rs   What Changed and Merge Changes From (method_core::diff and
+                     method_core::merge do the work); the merge is one undo step
+  src/export.rs      File > Export: the budget's tables as an Excel workbook, CSV files or
+                     tab-delimited detail, as bytes named as the Save dialog suggests
+  src/reports.rs     report presets saved in the budget (one undo step each)
+  src/templates.rs   New From Template and Save as Template: a budget stripped to its
+                     chart, setup and settings; safe file names
+  src/import_setup.rs  Import Setup From: the review of another budget's setup items and
+                     the import as one undo step (the source kept by token)
+  src/coa_import.rs  Import Chart of Accounts (preview, new tab or apply as one undo
+                     step) and the bundled chart templates
+  src/sheet_import.rs  Import Spreadsheet: the picked file kept by token, the mapping
+                     dialog's preview and the import (method_format::import does the work)
+  src/export_import.rs  Import Budget Export: the review and the new tab
+  src/open_any.rs    Open's routing by content: a budget, a budget export, a spreadsheet
+  src/setup_sheets.rs  setup lists as spreadsheets: export by kind, import with a column
+                     mapping per sheet, then Import Setup's review
+  src/sharing.rs     copies for sharing (provenance, read-only, editable copies, returned
+                     copies stored as versions) and sub-budgets
+  src/packs.rs       setup packs: the review, importing into a budget, building one
+  src/library.rs     the setup library's view, the review both ways, copying, folders
   src/host.rs        Host::dispatch(command, args): the commands by name, as JSON, with
-                     COMMANDS and COMMANDS_VERSION
+                     COMMANDS and COMMANDS_VERSION, files in and out (base64), host_info,
+                     the read-only switch
+  src/host/*.rs      each moved module's commands as the host dispatches them
 
 crates/method-app/
   src/session.rs     the desktop's side of a session: SessionFiles (open, save, a file
                      changed outside, Load theirs, folder sharing) and DocsFiles
-  src/tabs.rs        the tab and split view commands, the Window menu's list of budgets,
-                     remembering the open files (and panes) for the next start
-  src/history.rs     the History tab: the list, jumps, a step as a version
-  src/display.rs     the display settings' two commands
-  src/apply.rs       the apply panel: tag the selected rows, fringe ranges, selection summary
-  src/quickadd.rs    quick entry: add a unit, set, location, currency or global from a
-                     cell with the edit (one undo step); the new-line defaults setting
-  src/clipboard.rs   copy and paste whole rows, accounts and categories with the setup
-                     they use: the app's one row clipboard, the paste review, the paste
-  src/import_setup.rs  Import Setup From: the review of another budget's setup items
-                     (status, what each needs), importing the picks as one undo step
-  src/templates.rs   New From Template and Save as Template: a budget stripped to its
-                     chart, setup and settings
-  src/coa_import.rs  Import Chart of Accounts (preview, new tab or apply to the budget as
-                     one undo step) and the bundled chart templates
-  src/library.rs     the personal setup library: which file it is (library.json), its
-                     view, copying items in and out through Import Setup's review, its
-                     folders, atomic writes, refusing changes while it is open as a tab
-  src/packs.rs       setup packs: export from the budget or the library, import into
-                     either through Import Setup's review with the pack's stamp, the
-                     Packs list (the user's Packs folder and the bundled packs)
-  src/setup_sheets.rs  setup lists as spreadsheets: export by kind, import with a column
-                     mapping per sheet, checked row by row, then Import Setup's review
-  src/sheet_import.rs  Import Spreadsheet: the picked file kept by token, the mapping
-                     dialog's preview and the import (method_format::import does the work)
-  src/export_import.rs  Import Budget Export: the picked export kept by token, the review
-                     (method_format::import::exchange reads, builds and checks) and the
-                     new tab (a conversion's notice, the first Save beside the export)
-  src/open_any.rs    Open's routing by content: a budget in a tab, a budget export to
-                     Import Budget Export's review, a spreadsheet to Import Spreadsheet
-  src/actuals.rs     Import Actuals and the Actuals tab's commands (method_core::actuals and
-                     method_format::import::actuals do the work)
+  src/tabs.rs        the tab commands, the Window menu's list of budgets, remembering the
+                     open files (and panes) for the next start
+  src/history.rs, src/display.rs, src/versions.rs, src/notes.rs, src/rowstyle.rs,
+  src/apply.rs, src/presets.rs, src/clipboard.rs, src/quickadd.rs, src/find.rs,
+  src/moverows.rs, src/rename.rs, src/renumber.rs, src/setup_lists.rs, src/explain.rs,
+  src/overtime.rs, src/reports.rs
+                     the Tauri commands, one call each into method-session (printing a
+                     report to the print sheet or a PDF file stays in reports.rs)
+  src/compare.rs, src/diffmerge.rs
+                     the Open dialogs, reading picked files, a picked file open in a tab,
+                     the saved file for What Changed
+  src/export.rs, src/templates.rs, src/sharing.rs, src/setup_sheets.rs
+                     the Save dialogs and atomic writes
+  src/import_setup.rs, src/coa_import.rs, src/sheet_import.rs, src/export_import.rs,
+  src/open_any.rs, src/actuals.rs
+                     the Open dialogs and reading the files (a file open in a tab is read
+                     from the tab)
+  src/library.rs     which file is the library (library.json), reading and writing it
+                     atomically, refusing changes while it is open as a tab
+  src/packs.rs       the Packs list (the user's Packs folder and the bundled packs), the
+                     pack dialogs, importing into the library
   src/menu.rs        native menu bar, built from the same table as ui/js/shortcuts.js
   src/tools.rs       the tools panel's own window: opening, hiding and placing it, telling
                      the other window when the budget changed, the Notes tab's list
   src/setupwin.rs    the Budget Setup window: opening, placing and closing it
-  src/notes.rs       dated notes on lines, accounts and categories, and the budget-wide
-                     list the Notes tab shows as a review checklist
-  src/setup_lists.rs the setup lists' use counts and totals, their order, short codes
-  src/find.rs        find and replace: typed search over a budget, replacing in the
-                     checked results as one undo step
-  src/moverows.rs    moving lines, accounts and topsheet rows one place, keeping fringe
-                     ranges whole; quick presses join one undo step
-  src/rename.rs      renaming a setup item everywhere (method_core::rename does the work)
-  src/renumber.rs    renumbering accounts to a new pattern: the preview and the one-step
-                     renumbering (method_core::renumber does the work)
-  src/sharing.rs     copies for sharing (Save dialog, provenance, read-only, editable
-                     copies, returned copies stored as versions) and sub-budgets
+  src/start.rs       the start window: the folder listing, pins, New Budget into a folder
   src/shared.rs      a budget shared through a folder, inside its session: every edit
                      recorded in the change log, random row ids, the cached projection,
                      the timer pass (changes in and out, the keeper's file, heartbeats),
                      per-person undo, the status, review, blame and activity the page shows
   src/shared_app.rs  its Tauri side: File > Share, the Share dialog's commands, the
                      folder dialog, joining on open, the timer hook and the events
-  src/versions.rs    the Versions dialog's commands: save, restore, rename, delete, each
-                     one undo step, with names, notes and times checked
-  src/compare.rs     the compare screen's commands: budgets copied out of tabs, versions
-                     and picked files, compared after the lock is released
-  src/diffmerge.rs   What Changed and Merge Changes From: budgets copied out, totalled
-                     as their grids do, diffed or merged after the lock (method_core::diff
-                     and method_core::merge do the work); the merge is one undo step
-  src/reports.rs     report presets saved in the budget (one undo step each), and
-                     printing a report to the print sheet or a PDF file
   src/pdf_mac.rs     macOS: AppKit's print operation on the web view, into a PDF file
                      with no panel or through the print sheet (Objective-C runtime calls)
-  src/export.rs      File > Export: the budget's tables (method_format::export) as an Excel
-                     workbook, CSV files or tab-delimited detail, through a Save dialog
   src/safety.rs      saving safety as plain files: atomic writes, recovery copies,
                      backups, settings, the recent list (tested with temporary folders)
   src/safety_app.rs  its Tauri side: autosave timer, recovery and backup commands, Open
@@ -2420,9 +2434,9 @@ crates/method-app/
   src/updater.rs     in-app updates (the plugin driven from Rust: timed and asked-for
                      checks, background download, Restart to update after saving every
                      budget), What's New once after an update, Help > Release Notes
-  src/app.rs         Tauri glue: commands (one call each into method_session::commands
-                     where they are pure), file dialogs, the close and quit guard (one
-                     question about every unsaved tab), menu events
+  src/app.rs         Tauri glue: the phase 1 commands (one call each into
+                     method_session::commands), host_info, file dialogs, the close and
+                     quit guard (one question about every unsaved tab), menu events
   examples/perf.rs   timings on a large sample budget (method_core::sample), and canned
                      replies for a UI harness (perf dump DIR)
   ui/                index.html, styles.css, setup.css, js/*.js (ES modules, no build step)
@@ -2474,6 +2488,7 @@ account.
 |---|---|---|
 | `focus_account` | `category`, `ti`, `account`, `ai` (all `null`: no account) | View with that account |
 | `get_full_view` | none | everything: the whole budget, every row's totals, every problem |
+| `host_info` | none | `{kind, commands_version, read_only}`: `"desktop"`, the command contract's version (docs/research/web-session.md), `false`; a browser host says `"web"`. The page doesn't call it yet (main window only) |
 | `new_tab` | none | View of a starter budget in a new tab, in front |
 | `switch_tab` | `doc` | View of that budget, now in front |
 | `move_tab` | `doc`, `to` (its place afterwards) | the tabs |
@@ -2497,9 +2512,9 @@ the target pane: `set_target_pane` sets it, and the other pane draws its own acc
 `pane_view` (only when it shows the same budget at another account), so the view stays
 lean and an edit costs one more view at most.
 
-Every accepted edit names its undo step (`Session::edit(label, f)`; the labels of the
-commands moved so far are in method-session's `src/commands.rs`, the rest use `edit_budget`
-and `edit_budget_as` in `app.rs`): the label says what the command did, the
+Every accepted edit names its undo step (`Session::edit(label, f)`; the labels are in
+method-session, in `src/commands.rs` and each module's Commands section, so the desktop and
+a browser host name steps alike): the label says what the command did, the
 way the grid names things, and goes with the step through undo and redo, with the wall
 clock time it was made. `set_cells` takes `action` (`paste`, `fill`, `cut`, `clear`) for
 its label; anything else is an edit. `Session::budget_at` reads the budget at any step

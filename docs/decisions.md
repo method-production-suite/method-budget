@@ -3184,7 +3184,7 @@ are in docs/research/web-session.md.
   moving rows, presets, versions, compare, diff and merge, imports and exports, templates,
   charts, setup library and packs, tabs, the row clipboard, actuals import), because each
   still shares a file with its Tauri commands. Each is the same mechanical split and adds
-  its commands to `COMMANDS` without a version change.
+  its commands to `COMMANDS` without a version change. (Done the same day: entry 71.)
 - **Checked**: `cargo xtask wasm-check` (method-core, method-format and method-session for
   wasm32-unknown-unknown, no features) runs in CI. No dependency was added: the session's
   tree is serde and serde_json, and phase 2's wasm-bindgen and js-sys are already in
@@ -3197,3 +3197,42 @@ are in docs/research/web-session.md.
 - Tests: method-session's own (the moved ones, the clock, dispatch through JSON as the page
   sends it, refusals changing nothing, `.mthd` in and out); method-app's
   `dispatched_commands_are_desktop_commands`; xtask's `wasm` test.
+
+## 71. Phase 1b: every command's logic in the session, files as base64, a read-only host (2026-10-12)
+
+Phase 1b of entry 70 is done: the logic of every command module moved from method-app to
+method-session, and the host runs 173 commands (113 more, `COMMANDS_VERSION` still 1, as
+every change is an addition). docs/research/web-session.md has what moved, each command's
+host form and what is left.
+
+- **Module by module.** Each moved module keeps its logic and tests in method-session with a
+  "Commands" section of typed functions (one per desktop command, naming the undo step as
+  before); its method-app file keeps a re-export, the Tauri commands as one call each, the
+  dialogs and the files; `src/host/<module>.rs` dispatches its commands, so `host.rs` only
+  lists them. Moved: versions, history (a step as a version), notes, row style, the row
+  clipboard, presets, apply, rename, quick entry, find, moving rows, renumbering, setup
+  lists, explain, overtime, tabs, compare, What Changed and merge, export, report presets,
+  templates, Import Setup, charts, spreadsheets, budget exports, Open, setup sheets,
+  actuals, copies for sharing, packs and the library's review. Nothing was too tangled to
+  move; nothing needed a cargo feature for wasm32.
+- **What stays on the desktop, by nature**: windows, menus, the updater, printing, the
+  start window, saving, autosave, recovery and backups, Open Recent, folder sharing, the
+  library's file and the Packs folder. Those 55 desktop commands have no host form; a
+  browser saves with `save_mthd` and keeps its own storage.
+- **Files cross as data.** Where the desktop shows an Open dialog, the host's command of the
+  same name takes `file: {name, bytes}` (`compare_pick_files`: `files`) and replies as the
+  desktop does, token included. Where the desktop shows a Save dialog and writes, the host
+  replies with the desktop's reply as after a save and `downloads: [{name, bytes}]`. The
+  page never sees a path either way; the token stores moved and the host keeps its own.
+- **Bytes are base64** in the contract's JSON (one padded standard string), decided before
+  phase 2 so the browser shim passes `btoa`'s output rather than arrays of numbers. A small
+  encoder and decoder in method-session; no dependency.
+- **A read-only host.** `Host::set_read_only` shows every budget read-only, open now or
+  later, for a partner's viewer: `Session::check_writable` refuses every edit with a plain
+  message, and undo, redo and history jumps do nothing.
+- **`host_info`** (`{kind, commands_version, read_only}`) is a host command and a desktop
+  command (main window), so the page can later hide what only the desktop does. The page
+  doesn't call it yet; nothing a desktop user sees changed.
+- Tests: each moved module's own, a dispatch test per module through JSON as the page sends
+  it (files in and out included), the read-only host, base64 round trips; the desktop's
+  wiring tests stayed in method-app.
