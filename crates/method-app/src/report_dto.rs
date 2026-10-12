@@ -331,14 +331,11 @@ impl ReportDto {
             groups: map(&r.groups, |g| g.into()),
             sets: map(&r.sets, |b| b.into()),
             locations: map(&r.locations, |b| b.into()),
-            display: (r.totals_currency != r.base_currency)
-                .then(|| {
-                    Some(DisplayTotalsDto {
-                        grand_total: r.in_totals_currency(r.grand_total)?,
-                        net_total: r.in_totals_currency(r.net_total)?,
-                    })
-                })
-                .flatten(),
+            // Converted account by account (decisions.md, entry 60).
+            display: r.display.as_ref().map(|d| DisplayTotalsDto {
+                grand_total: d.grand_total,
+                net_total: d.net_total,
+            }),
         }
     }
 }
@@ -422,7 +419,10 @@ mod tests {
 
     #[test]
     fn money_is_integers_and_decimals_are_strings() {
-        let b = starter::budget();
+        let mut b = starter::budget();
+        b.fringe_posting = method_core::FringePosting::Category {
+            suffix: "99".into(),
+        };
         let r = recalc(&b, &RecalcOptions::default()).unwrap();
         let v = serde_json::to_value(ReportDto::from(&r)).unwrap();
         assert_eq!(v["grand_total"].as_i64(), Some(r.grand_total));

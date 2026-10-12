@@ -4,7 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use method_core::expr::{quick_value, Expr};
 use method_core::{
-    Breakdown, Budget, Cents, Dec, Formula, FringeKind, GroupTotals, Report, RowKind,
+    Breakdown, Budget, Cents, Charge, Credit, Dec, Formula, FringeKind, GroupTotals, Report,
+    RowKind, TopsheetLine,
 };
 
 use super::{lines_up, Cell, ExportError, Sheet, Workbook};
@@ -80,7 +81,9 @@ fn breakdown_cells(bd: &Breakdown) -> [Cell; 3] {
 }
 
 /// Topsheet: categories by level, posted fringes, production totals, the
-/// above- and below-the-line totals, charges, grand total, credits and net.
+/// above- and below-the-line totals, the budget's fringe row, charges,
+/// grand total, credits and net, in the order [`Report::topsheet_lines`]
+/// lists them.
 fn topsheet(b: &Budget, r: &Report) -> Sheet {
     let mut rows = Vec::new();
     let mut row = |kind: &str, code: &str, label: &str, total: Cell| {
@@ -91,69 +94,88 @@ fn topsheet(b: &Budget, r: &Report) -> Sheet {
             total,
         ]);
     };
-    for level in &r.levels {
-        for cat in r.categories.get(level.start..level.end).unwrap_or_default() {
-            row("Category", &cat.code, &cat.name, Cell::Money(cat.total));
-        }
-        if level.posted_fringes != 0 {
-            row("Fringes", "", "Fringes", Cell::Money(level.posted_fringes));
-        }
-        if !level.name.is_empty() {
-            row(
-                "Production Total",
+    // In the topsheet's order (decisions.md, entry 60): the budget's fringe
+    // row where it is placed, charges newest first, credits in reverse
+    // application order with their subtotal.
+    let charges: Vec<&Charge> = b.charges.iter().filter(|c| c.applied).collect();
+    let credits: Vec<&Credit> = b.credits.iter().filter(|c| c.applied).collect();
+    for l in r.topsheet_lines(b) {
+        match l {
+            TopsheetLine::Category(i) => {
+                let cat = &r.categories[i];
+                row("Category", &cat.code, &cat.name, Cell::Money(cat.total));
+            }
+            TopsheetLine::LevelFringes(i) => {
+                row(
+                    "Fringes",
+                    "",
+                    "Fringes",
+                    Cell::Money(r.levels[i].posted_fringes),
+                );
+            }
+            TopsheetLine::Level(i) => {
+                let level = &r.levels[i];
+                row(
+                    "Production Total",
+                    "",
+                    &level.name,
+                    Cell::Money(level.total),
+                );
+            }
+            TopsheetLine::Atl => row(
+                "Total",
                 "",
-                &level.name,
-                Cell::Money(level.total),
-            );
+                "Total above-the-line",
+                Cell::Money(r.total_atl),
+            ),
+            TopsheetLine::Btl => row(
+                "Total",
+                "",
+                "Total below-the-line",
+                Cell::Money(r.total_btl),
+            ),
+            TopsheetLine::AtlBtl => row(
+                "Total",
+                "",
+                "Total above and below-the-line",
+                Cell::Money(r.atl_btl),
+            ),
+            TopsheetLine::BudgetFringes => row(
+                "Fringes",
+                b.fringe_row.account().unwrap_or(""),
+                b.fringe_row.description(),
+                Cell::Money(r.budget_fringes),
+            ),
+            TopsheetLine::Charge(i) => {
+                let ct = &r.charges[i];
+                let code = charges.get(i).and_then(|c| c.account.as_deref());
+                row(
+                    "Charge",
+                    code.unwrap_or(""),
+                    &ct.name,
+                    Cell::Money(ct.amount),
+                );
+            }
+            TopsheetLine::Grand => row("Total", "", "Grand total", Cell::Money(r.grand_total)),
+            TopsheetLine::Credit(i) => {
+                let ct = &r.credits[i];
+                let code = credits.get(i).and_then(|c| c.account.as_deref());
+                row(
+                    "Credit",
+                    code.unwrap_or(""),
+                    &format!("Less {}", ct.name),
+                    Cell::Money(ct.amount.saturating_neg()),
+                );
+            }
+            TopsheetLine::CreditsSubtotal => row(
+                "Total",
+                "",
+                "Sub Total",
+                Cell::Money(r.credits_total.saturating_neg()),
+            ),
+            TopsheetLine::Net => row("Total", "", "Net total", Cell::Money(r.net_total)),
         }
     }
-    row(
-        "Total",
-        "",
-        "Total above-the-line",
-        Cell::Money(r.total_atl),
-    );
-    row(
-        "Total",
-        "",
-        "Total below-the-line",
-        Cell::Money(r.total_btl),
-    );
-    row(
-        "Total",
-        "",
-        "Total above and below-the-line",
-        Cell::Money(r.atl_btl),
-    );
-    if r.budget_fringes != 0 {
-        row(
-            "Fringes",
-            "",
-            "Total fringes",
-            Cell::Money(r.budget_fringes),
-        );
-    }
-    // The report lists applied charges and credits, in order.
-    let charges = b.charges.iter().filter(|c| c.applied);
-    for (c, ct) in charges.zip(&r.charges) {
-        row(
-            "Charge",
-            c.account.as_deref().unwrap_or(""),
-            &ct.name,
-            Cell::Money(ct.amount),
-        );
-    }
-    row("Total", "", "Grand total", Cell::Money(r.grand_total));
-    let credits = b.credits.iter().filter(|c| c.applied);
-    for (c, ct) in credits.zip(&r.credits) {
-        row(
-            "Credit",
-            c.account.as_deref().unwrap_or(""),
-            &format!("Less {}", ct.name),
-            Cell::Money(ct.amount.saturating_neg()),
-        );
-    }
-    row("Total", "", "Net total", Cell::Money(r.net_total));
     if r.totals_currency != r.base_currency {
         let cur = &r.totals_currency;
         row(
@@ -163,13 +185,13 @@ fn topsheet(b: &Budget, r: &Report) -> Sheet {
                 "Grand total in {cur} (1 {cur} = {} {})",
                 r.totals_rate, r.base_currency
             ),
-            money_or_empty(r.in_totals_currency(r.grand_total)),
+            money_or_empty(r.display.as_ref().map(|d| d.grand_total)),
         );
         row(
             "Total",
             "",
             &format!("Net total in {cur}"),
-            money_or_empty(r.in_totals_currency(r.net_total)),
+            money_or_empty(r.display.as_ref().map(|d| d.net_total)),
         );
     }
     Sheet {

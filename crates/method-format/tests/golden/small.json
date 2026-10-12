@@ -13,14 +13,14 @@
     "units": {
       "Day": {
         "plural": "Days",
-        "hours": "10"
+        "hours": "12"
       },
       "Flat": {
         "plural": "Flat"
       },
       "Week": {
         "plural": "Weeks",
-        "hours": "50"
+        "hours": "60"
       }
     },
     "globals": {

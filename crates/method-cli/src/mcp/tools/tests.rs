@@ -36,7 +36,8 @@ fn reading_tools_describe_the_budget() {
     assert_eq!(open["counts"]["categories"], 10);
     assert_eq!(open["counts"]["lines"], 13);
     assert_eq!(open["read_only"], false);
-    assert_eq!(open["fringe_posting"]["mode"], "category");
+    // A new budget posts fringes by budget (decisions.md, entry 60).
+    assert_eq!(open["fringe_posting"]["mode"], "budget");
     assert_eq!(open["totals"]["net_total_cents"], 57_860_000);
     let info = f.tool("budget_info", json!({"path": "film.mthd"})).unwrap();
     assert_eq!(info["revision"], open["revision"]);
@@ -47,7 +48,8 @@ fn reading_tools_describe_the_budget() {
     let trows = top["rows"].as_array().unwrap();
     assert_eq!(trows.len(), 14);
     assert_eq!(trows[0]["code"], "10");
-    assert_eq!(trows[0]["total_cents"], 5_500_000);
+    // The writing line alone: its fringe posts to the budget's fringe row.
+    assert_eq!(trows[0]["total_cents"], 5_000_000);
     assert_eq!(trows[4]["type"], "production_total");
     assert_eq!(trows[4]["above_the_line"], true);
 
@@ -308,13 +310,14 @@ fn line_tools_add_update_tag_move_and_delete() {
         .unwrap();
     assert_eq!(r["changed"], true);
     assert_eq!(r["added"], json!([{"id": 14, "n": 2}]));
-    // 5 weeks x 2,500.00 plus the 10% fringe it copied from the line above,
+    // 5 weeks x 2,500.00 in category 21; the 10% fringe it copied from the
+    // line above posts to the budget's fringe row. The net total takes both,
     // plus the 10% contingency on both.
     let moved = r["totals"]["categories_moved"].as_array().unwrap();
     assert_eq!(moved[0]["code"], "21");
     assert_eq!(
         moved[0]["after_cents"].as_i64().unwrap() - moved[0]["before_cents"].as_i64().unwrap(),
-        1_375_000
+        1_250_000
     );
     assert_eq!(net(&mut f, "film.mthd") - before, 1_512_500);
     let cam = rows(&mut f, "21-01");

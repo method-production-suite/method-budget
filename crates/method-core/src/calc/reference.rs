@@ -50,6 +50,16 @@ fn apply_fringes(ctx: &Ctx, acct: &Account, rows: &mut [RowTotals]) -> Result<()
             let FringeKind::Percent { cutoff } = f.kind else {
                 continue;
             };
+            // Times the budget's cutoff factor, rounded to cents.
+            let cutoff = match cutoff {
+                Some(c) => Some(
+                    Money::cents(ctx.arith, c)
+                        .checked_mul(Num::of(ctx.arith, ctx.b.cutoff_factor.value()))
+                        .and_then(Money::to_cents)
+                        .ok_or_else(|| overflow("cutoff"))?,
+                ),
+                None => None,
+            };
             let lines: Vec<usize> = earner
                 .iter()
                 .copied()
@@ -166,6 +176,12 @@ pub(crate) fn recalc(b: &Budget, opts: &RecalcOptions) -> Result<Report, CalcErr
     let globals = ctx.shown_globals()?;
     let categories = eval_categories(&ctx)?;
     let ts = topsheet::finish(&ctx, categories)?;
+    let display = b
+        .totals_currency
+        .as_ref()
+        .is_some_and(|c| *c != b.base_currency)
+        .then(|| super::display::display_totals(&ctx, &ts, totals_rate).ok())
+        .flatten();
     let full_ctx = Ctx {
         unfiltered: true,
         ..ctx
@@ -218,6 +234,7 @@ pub(crate) fn recalc(b: &Budget, opts: &RecalcOptions) -> Result<Report, CalcErr
         groups: bd.groups,
         sets: bd.sets,
         locations: bd.locations,
+        display,
     })
 }
 

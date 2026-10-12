@@ -31,9 +31,9 @@ use std::fmt::Write as _;
 use crate::coding::AccountCoding;
 use crate::model::{
     Account, Arithmetic, Baseline, Budget, Charge, ChargeKind, Credit, CreditCap, CreditSource,
-    Currency, Detail, FlatBasis, Fringe, FringeKind, FringePosting, GlobalInfo, Group, GroupRules,
-    Inclusion, InfoValue, Location, NewLineDefaults, Note, RowId, RowKind, SetDef, TopsheetRow,
-    TrailingFringes, UnitDef, Version,
+    Currency, CutoffFactor, Detail, FlatBasis, Fringe, FringeKind, FringePosting, FringeRow,
+    GlobalInfo, Group, GroupRules, Inclusion, InfoValue, Location, NewLineDefaults, Note, RowId,
+    RowKind, SetDef, TopsheetRow, TrailingFringes, UnitDef, Version,
 };
 use crate::report::Report;
 use crate::{recalc, Cents, Dec, RecalcOptions};
@@ -905,6 +905,19 @@ pub(crate) fn arithmetic_text(a: &Arithmetic) -> String {
     }
 }
 
+pub(crate) fn cutoff_factor_text(f: &CutoffFactor) -> String {
+    format!("percent fringe cutoffs x {}", f.name())
+}
+
+pub(crate) fn fringe_row_text(r: &FringeRow) -> String {
+    let number = r.account().map(|a| format!("{a} ")).unwrap_or_default();
+    let place = match r.position {
+        None => "after the summary rows".to_string(),
+        Some(n) => format!("above topsheet row {}", n + 1),
+    };
+    format!("{number}{}, {place}", quoted(r.description()))
+}
+
 pub(crate) fn group_rules_text(r: &GroupRules) -> String {
     let word = |i: Inclusion| match i {
         Inclusion::Include => "included",
@@ -981,6 +994,12 @@ pub(crate) fn setting_fields(b: &Budget) -> Vec<Field> {
             "trailing level fringes",
             trailing_text(&b.trailing_level_fringes),
         ),
+        text(
+            "cutoff_factor",
+            "cutoff factor",
+            cutoff_factor_text(&b.cutoff_factor),
+        ),
+        text("fringe_row", "fringe row", fringe_row_text(&b.fringe_row)),
         text("arithmetic", "arithmetic", arithmetic_text(&b.arithmetic)),
         text(
             "group_rules",

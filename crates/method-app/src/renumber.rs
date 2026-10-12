@@ -178,7 +178,11 @@ mod tests {
 
     #[test]
     fn preview_then_renumber_as_one_undo_step() {
-        let mut s = Session::new();
+        let mut b = method_core::starter::budget();
+        b.fringe_posting = method_core::FringePosting::Category {
+            suffix: "99".into(),
+        };
+        let mut s = Session::with_budget(b, None);
         let before = codes(&s);
         let p = preview(s.budget(), [3, 3, 0, 0], Some(".")).unwrap();
         assert!(p.changes && p.conflicts.is_empty());
@@ -186,7 +190,7 @@ mod tests {
         assert_eq!(p.accounts[0].old, before[0]);
         assert!(
             !p.fringe_accounts.is_empty(),
-            "the starter posts fringes by category"
+            "this budget posts fringes by category"
         );
         // The preview changes nothing.
         assert_eq!(codes(&s), before);
@@ -202,7 +206,7 @@ mod tests {
         assert!(s.can_undo());
         s.undo();
         assert_eq!(codes(&s), before);
-        assert_eq!(s.budget().account_coding, AccountCoding::default());
+        assert_eq!(s.budget().account_coding, AccountCoding::new_budget());
     }
 
     #[test]

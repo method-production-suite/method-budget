@@ -942,3 +942,47 @@ fn per_row_excluded_fringes_become_the_credits_list() {
         .get("excluded_fringes")
         .is_none());
 }
+
+/// `cutoff_factor` and `fringe_row` (decisions.md, entry 60): left out at
+/// their defaults (1.0; no number, "Total Fringes", after the summary
+/// rows), written otherwise, and a version keeps its own. The factor is one
+/// of five, written as text.
+#[test]
+fn cutoff_factor_and_fringe_row_round_trip_and_are_left_out_at_default() {
+    let mut b = rich();
+    let text = round_trip(&b);
+    assert!(!text.contains("\"cutoff_factor\""), "default is left out");
+    assert!(!text.contains("\"fringe_row\""), "default is left out");
+
+    b.cutoff_factor = CutoffFactor::TwoAndAHalf;
+    b.fringe_row = FringeRow {
+        account: Some("9900".into()),
+        description: Some("Fringe benefits".into()),
+        position: Some(2),
+    };
+    let text = round_trip(&b);
+    let v: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(v["budget"]["cutoff_factor"], "2.5");
+    assert_eq!(v["budget"]["fringe_row"]["account"], "9900");
+    assert_eq!(v["budget"]["fringe_row"]["description"], "Fringe benefits");
+    assert_eq!(v["budget"]["fringe_row"]["position"], 2);
+
+    let file = |body: &str| {
+        format!(
+            "{{\"format\": \"method-budget\", \"version\": 1, \"budget\": \
+             {{\"title\": \"T\", \"base_currency\": \"USD\"{body}}}}}"
+        )
+    };
+    let read = |body: &str| method_format::from_str(&file(body));
+    assert_eq!(read("").unwrap().cutoff_factor, CutoffFactor::One);
+    assert_eq!(
+        read(r#", "cutoff_factor": "2""#).unwrap().cutoff_factor,
+        CutoffFactor::Two
+    );
+    assert!(read(r#", "cutoff_factor": "1.75""#).is_err());
+    assert!(read(r#", "cutoff_factor": 1.5"#).is_err());
+    assert!(read(r#", "fringe_row": {"colour": "red"}"#).is_err());
+    // A blank number or description is no number, the default description.
+    let r = read(r#", "fringe_row": {"account": " ", "description": ""}"#).unwrap();
+    assert!(r.fringe_row.is_default());
+}

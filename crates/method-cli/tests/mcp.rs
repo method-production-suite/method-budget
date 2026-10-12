@@ -178,17 +178,20 @@ fn an_agent_builds_a_budget_over_stdio() {
     );
 
     // Writer 10,000.00. Lead 10 days x 800.00 = 8,000.00, FICA 612.00.
-    // ATL 18,612.00. DP 6,000.00, FICA 459.00, package 5,000.00: BTL
-    // 11,459.00. 30,071.00 plus 10% contingency: 33,078.10.
+    // ATL 18,000.00. DP 6,000.00, FICA 459.00, package 5,000.00: BTL
+    // 11,000.00. A blank budget posts fringes by budget (decisions.md,
+    // entry 60): the fringe row is 1,071.00. 30,071.00 plus 10%
+    // contingency: 33,078.10.
     let t = s.ok("totals", json!({"path": p}));
-    assert_eq!(t["total_atl_cents"], 1_861_200, "{t}");
-    assert_eq!(t["total_btl_cents"], 1_145_900);
-    assert_eq!(t["atl_btl_cents"], 3_007_100);
+    assert_eq!(t["total_atl_cents"], 1_800_000, "{t}");
+    assert_eq!(t["total_btl_cents"], 1_100_000);
+    assert_eq!(t["atl_btl_cents"], 2_900_000);
+    assert_eq!(t["budget_fringes_cents"], 107_100);
     assert_eq!(t["charges"][0]["amount_cents"], 300_710);
     assert_eq!(t["grand_total_cents"], 3_307_810);
     assert_eq!(t["net_total_cents"], 3_307_810);
     let ex = s.ok("explain", json!({"path": p, "total": "atl"}));
-    assert_eq!(ex["reported_cents"], 1_861_200);
+    assert_eq!(ex["reported_cents"], 1_800_000);
     let ex = s.ok("explain", json!({"path": p, "total": "fringe:FICA"}));
     assert_eq!(ex["reported_cents"], 107_100);
     assert_eq!(s.ok("validate", json!({"path": p}))["ok"], true);

@@ -1,7 +1,8 @@
 //! Stage 2: fringe dollars per row.
 //!
 //! Included lines and adjustment rows earn fringes (decisions.md, entry 56).
-//! A percent fringe's cutoff applies per earner: a single row, or a fringe
+//! A percent fringe's cutoff, times the budget's cutoff factor
+//! ([`factored_cutoff`]), applies per earner: a single row, or a fringe
 //! range (consecutive rows sharing `fringe_range: Some(n)`; subtotal,
 //! separator and uncounted rows don't break a run). Within an earner the
 //! cutoff is used up in row order, as Movie Magic does: each row carrying
@@ -15,7 +16,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::calc::arith::{mmb_cents, percent_of, Money, Num};
 use crate::calc::{err, overflow, row_at, sum, CalcError, Ctx, ErrorKind};
 use crate::decimal::{Dec, Exact};
-use crate::model::{Account, Arithmetic, Detail, FlatBasis, Fringe, FringeKind, UnitDef};
+use crate::model::{
+    Account, Arithmetic, CutoffFactor, Detail, FlatBasis, Fringe, FringeKind, UnitDef,
+};
 use crate::report::RowTotals;
 use crate::Cents;
 
@@ -90,6 +93,8 @@ pub(crate) fn apply_fringes(
             let FringeKind::Percent { cutoff } = f.kind else {
                 continue;
             };
+            let cutoff = factored_cutoff(ctx.arith, cutoff, ctx.b.cutoff_factor)
+                .ok_or_else(|| overflow(format!("fringe {name}: cutoff")))?;
             lines.clear();
             match single {
                 Some(i) => lines.push(i),
@@ -177,6 +182,24 @@ pub(super) fn earners(details: &[Detail], rows: &[RowTotals]) -> Vec<Vec<usize>>
     }
     out.extend(run.map(|(_, members)| members));
     out
+}
+
+/// A percent fringe's `cutoff` as the budget applies it: times the
+/// budget's cutoff factor (decisions.md, entry 60), rounded to cents by the
+/// budget's arithmetic (2,222.22 x 1.5 is 3,333.33). At 1.0, or with no
+/// cutoff, it is the cutoff as typed. `None` on overflow.
+pub(crate) fn factored_cutoff(
+    arith: Arithmetic,
+    cutoff: Option<Cents>,
+    factor: CutoffFactor,
+) -> Option<Option<Cents>> {
+    match cutoff {
+        Some(c) if factor != CutoffFactor::One => Money::cents(arith, c)
+            .checked_mul(Num::of(arith, factor.value()))?
+            .to_cents()
+            .map(Some),
+        _ => Some(cutoff),
+    }
 }
 
 /// One row of a percent fringe's earner, taken in row order (decisions.md,
@@ -1253,15 +1276,15 @@ mod tests {
                 x: "3".into(),
                 ..line(2, "2", "Week", "1000", &["HW"], None)
             },
-            line(3, "12", "Hour", "50", &["HW"], None),
+            line(3, "18", "Hour", "50", &["HW"], None),
             line(4, "1", "Day", "300", &["HW"], None),
         ]);
         b.fringes.insert("HW".into(), flat("20", Some("Day")));
         let rows = run(&b).unwrap();
-        // 20/day x Amount x line hours / 10; the 3 in X doesn't count.
+        // 20/day x Amount x line hours / 12; the 3 in X doesn't count.
         assert_eq!(
             amounts(&rows, "HW"),
-            [Some(20_000), Some(20_000), Some(2_400), Some(2_000)]
+            [Some(20_000), Some(20_000), Some(3_000), Some(2_000)]
         );
         // Under the full quantity it does, as before decisions.md 54.
         b.fringes.insert(
@@ -1271,7 +1294,7 @@ mod tests {
         let rows = run(&b).unwrap();
         assert_eq!(
             amounts(&rows, "HW"),
-            [Some(20_000), Some(60_000), Some(2_400), Some(2_000)]
+            [Some(20_000), Some(60_000), Some(3_000), Some(2_000)]
         );
     }
 

@@ -92,6 +92,10 @@ each other; they're evaluated in dependency order and cycles are reported with t
 **Amended 2026-10-10 (entry 56):** a global's name may start with digits (`1ZG`), as in
 the reference product: letters, digits and `_` with at least one letter or `_`.
 
+**Amended 2026-10-11 (entry 59):** in the app, a formula that divides by zero or uses a
+global that refers back to itself is refused at entry, and a global that would refer back
+to itself is refused; a circular global from a file shows #ERR and counts as 0 there.
+
 ## 6. No dependencies in the engine yet (2026-10-08)
 
 Property tests use a small seeded generator in `tests/properties.rs` instead of `proptest`.
@@ -131,6 +135,10 @@ from a time, for the bases that read them.)
   (Amended by entry 57: a credit row can also be a topsheet category, its total with its
   own fringes, and excluded fringes are one list per credit, not per row.)
 
+**Amended 2026-10-11 (entry 59):** the topsheet lists charges newest first and credits in
+reverse application order with a Sub Total of two or more, and the budget's fringe row has
+its own number, description and place.
+
 ## 10. Currency direction (2026-10-08)
 
 A currency's `rate` is base-currency units per one unit of that currency. The reference
@@ -146,13 +154,19 @@ always normalizes to the same text, which matters because account numbers are th
 for comparison and import. Category fringe accounts are built through the pattern
 (category `11` + suffix `99` = `11-99`).
 
+**Amended 2026-10-11 (entry 59):** the set may follow the account when there is no
+sub-account, and a new budget starts with category 2, account 2, set 3 (a file without a
+pattern still reads as 2 + 2 with a hyphen).
+
 ## 12. Baseline, display currency, global deletion (2026-10-08)
 
 - **Baseline** ("original" vs current) is a frozen copy of row, account, category, grand and
   net totals stored in the budget. Variance is computed on demand; rows match by id, so
   edited, deleted and added lines all show up correctly.
 - **Totals currency** is display only: the report carries the rate and converts on request,
-  rounding once. The math always runs in the base currency.
+  rounding once. The math always runs in the base currency. (Amended by entry 59: the
+  topsheet in that currency converts each account, fringe, charge and credit on its own and
+  adds them up, as the reference product does.)
 - **Deleting a global** first freezes its current value into every formula that used it, so
   no total changes (property-tested).
 - **Budget info** fields (text, number, date) are plain data for now; they don't feed formulas.
@@ -2361,3 +2375,106 @@ five. docs/IMPORT.md is the user's account; this is why it works the way it does
   figures and each layout imports as its JSON twin but for what it lacks; with
   `METHOD_EXPORT_SAMPLES` pointing at the parity runs' folders, every real export too), the
   readers' unit tests, `method import-export` end to end, the MCP tool, and the app's review.
+
+## 60. New-budget defaults, the cutoff factor, totals in another currency and the topsheet's order, as the reference product has them (2026-10-11, the owner)
+
+The parity run of 2026-10-10 (imports/mmb-parity/2026-10-10, run-log.md: C2, ZTEST02,
+ZTEST04 V04-1 to V04-3, ZTEST05, ZTEST07, ZTEST08 V08-1 and V08-2, ZTEST09 V09-2, ZTEST10,
+ZTEST11) read the reference product's new-budget settings and several things it shows that
+we didn't. The owner's rule is to match it by default, with our extras opt-in (entries 55 to
+58); the owner approved the new-budget defaults below **except totals keep showing cents**
+(the reference shows whole units by default; ours stays a per-user View choice).
+
+- **New budgets start as the reference product starts them.** Fringes post by budget; account
+  numbers are category 2, account 2, no sub-account, set 3; the starter units are Day (12
+  hours), Week (60), Month (240), Hour (1), and Allow and Flat with no hours (ZTEST05; the
+  reference's seventh unit, `%`, marks percent fringes, which is our fringe `kind`); a new
+  line copies its fringes from the line above and nothing else (as before); the cutoff
+  factor is 1.0. `method_core::starter::new_budget_settings` sets them, and every new
+  budget gets them: the starter (`method new`, the app's New, the MCP `new_budget`),
+  `starter::blank` (the MCP's `blank`), and a budget made from a chart (`Chart::to_budget`,
+  so `method coa import`, File > Import Chart of Accounts into a new budget, and the bundled
+  chart templates, rebuilt with `scripts/build-coa-templates.py`; a chart keeps its own
+  account numbering). `default_units` changed, so `Budget::new` has the new hours too.
+  **Existing files keep their own values**: units are always written in a file, and a file
+  without `fringe_posting` or `account_coding` still reads as by category (suffix 99) and 2 +
+  2 with `-`, the file defaults (FORMAT.md). A new budget's file writes both.
+- **A set may follow the account with no sub-account** (amends entry 11). The reference's
+  pattern (set 3, no sub-account) broke our rule that used segments are contiguous, so the
+  rule is now: the sub-account and the set each need the account; the set may skip an
+  unused sub-account. Parsing, formatting, renumbering and the app's coding form follow it
+  (`11-01-5` reads as `11-01-005`). The separator stays `-` for new budgets: the brief
+  named only the widths, though the reference's exports write numbers without one
+  (`1101`). Open for the owner.
+- **The cutoff factor** (EC 5, roadmap 1.17): a budget setting `cutoff_factor`, one of 1.0,
+  1.5, 2.0, 2.5 and 3.0 (FORMAT.md, "Cutoff factor"), written only when it isn't 1.0, that
+  multiplies every percent fringe's cutoff; flat fringes have none to multiply. Checked:
+  ZP125 (12.5%, cutoff 2,222.22) on P-02 (5,000.00) is 416.67, 555.55 and 625.00 at 1.5,
+  2.0 and 3.0, on P-10 (3,703.68) 416.67, 462.96 and 462.96, and on P-01 (1,000.00) 125.00
+  throughout. 4,444.44 x 12.5% is 555.555, 555.55499... in doubles, so 555.55 (exact
+  arithmetic: 555.56). **Chosen, not checked**: the factored cutoff is rounded to cents by
+  the budget's arithmetic before it is used (a cutoff with an odd cent lands on a half cent at 1.5),
+  and 2.5 was not read in the reference. Explain shows the step ("the budget multiplies
+  every percent cutoff by 1.5: 2,222.22 x 1.5 = 3,333.33"). Versions, diff, merge and the
+  recalc cache carry it like the other calculation settings; `method set FILE cutoff_factor
+  1.5`, the script's `set cutoff_factor 1.5`, and Settings > Calculation set it.
+- **Totals in another currency** (amends entry 12): the reference converts each account's
+  total and rounds it, converts a fringe row fringe by fringe, then adds those up. V08-1
+  (EUR at 3): 1100 48,860.81, 1200 166.67, fringes 225.92 (100.00 + 92.59 + 33.33, not
+  677.78 / 3 = 225.93), grand 49,253.40 (not 147,760.22 / 3 = 49,253.41). V08-2 (GBP at
+  1.23457): 118,731.57, 405.00, 549.00 (243.00 + 225.00 + 81.00, not 549.01), grand
+  119,685.57. The run log read V08-1 as line by line, but V08-2 rules that out: line by line,
+  1100 would be 118,731.60 in GBP; the account total divided once gives 118,731.57. So
+  `Report::display` (`DisplayTotals`) converts each account (with its fringe line, when
+  fringes post by account), a category's fringe account as one more account, the budget's
+  and each level's fringe row fringe by fringe, and each charge and credit on its own, each
+  rounded by the budget's arithmetic; categories, levels, ATL, BTL, grand and net are sums
+  of those. **Chosen, not checked**: accounts posting their fringes and production-level
+  fringe rows (V08 posted by budget). Where totals show in the other currency (the app's
+  "Net total in", the printed and exported grand and net totals in it, `method show`,
+  `method totals`, the MCP `totals`), the figures are these. `Report::in_totals_currency`
+  still converts one amount exactly.
+- **The topsheet's order** (amends entry 9; `Report::topsheet_lines`, used by `method show`,
+  the printed report from the command line, the spreadsheet export, and mirrored by the
+  app's grid and printed topsheet): after the summary rows and the budget's fringe row,
+  charges **newest first** (V09-2: creation order, newest first; a budget's charge list is
+  in the order they were made, which changes no figure since charges never stack, so the
+  topsheet lists it in reverse), then the grand total, credits **in reverse application
+  order**, a **Sub Total** of the credits when there are two or more (shown as a negative,
+  like the credit rows), and the net total. ZTEST10: ZCR3, ZCR5, ZCR6, ZCR4, ZCR2, ZCR1, Sub
+  Total 3,349.53, net 5,450.47. Charges stay after the summary rows, where they were; ROADMAP
+  decision 13 notes the reference puts them before the summary rows, which no run has
+  confirmed. Open for the next run.
+- **The budget's fringe row** (fringes posted by budget) has an account number (none by
+  default), a description (`Total Fringes` by default, as C2 read them) and a place: after
+  the summary rows by default, or just above any topsheet row (the reference's Move Fringe
+  Total and Reset Fringe Total to Default Position). A budget setting `fringe_row`
+  (FORMAT.md, "Fringe row"), written only when not the default. **Display only**: moving it
+  changes no total, ATL or BTL (not checked in the reference, PM-POS; kept unchanged). The
+  place is a topsheet index; the app's own topsheet edits (adding, deleting, moving and
+  cutting categories and production totals) keep it above the same row, and an index past
+  the end shows it after the last row. `method set FILE fringe_row.account|description|
+  position`, the script's `set fringe_row ...`, and Settings > Fringe totals (shown when
+  fringes post by budget) set it. Import Setup doesn't carry it (its place belongs to one
+  topsheet).
+- **A global's unit fills the line's Unit** (G-08, EC 13): typing an Amt that is exactly a
+  global's name, when the global has a unit the budget has and the line's Unit is empty,
+  fills the Unit with it (`method_core::edit::unit_from_global`). In the app's cell entry
+  only; the command line, MCP tools and importers set the Unit they are given.
+- **Formulas refused at entry** (V02-4; amends entry 5): in the app, a formula typed into
+  Amt, X, Rate or 4X is refused when it divides by zero (`ZG_A/0`, or `1 / (SHOOT_DAYS -
+  25)`) or uses a global that refers back to itself; a global's formula is refused when it
+  divides by zero, would make globals refer to each other or to itself, or uses one that
+  does (`method_core::edit::refused_formula`, `refused_global`). The cell or global keeps
+  what it had and the message says why. A global that refers back to itself anyway (from a
+  file) shows #ERR in the Globals table and counts as 0, as in the reference; the app's
+  lenient recalc already valued it 0. **Unchanged by choice**: any other problem (a typo, an
+  unknown global) is still kept as typed and flagged, where the reference refuses every
+  invalid expression; the engine, `method check` and `method set` still stop on a
+  circular global with the cycle named.
+- Tests: crates/method-core/tests/mmb_parity.rs reproduces every figure above (V04 at every
+  factor in both arithmetics, V08-1 and V08-2, ZTEST10's credit order and Sub Total, V09-2's
+  charge order, V06-3 with the fringe row at every place, G-08, V02-4, and the new-budget
+  settings); the coding, format, CLI, MCP and app tests cover the rest. The hand-checked
+  sample keeps its figures; tests that leaned on the starter posting by category set it
+  explicitly.

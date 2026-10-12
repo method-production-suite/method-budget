@@ -830,6 +830,8 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         fringes: _,
         fringe_posting: _,
         trailing_level_fringes: _,
+        cutoff_factor: _,
+        fringe_row: _,
         arithmetic: _,
         account_coding: _,
         new_line_defaults: _,
@@ -895,6 +897,18 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
             &t.trailing_level_fringes,
         ),
         crate::diff::trailing_text,
+    );
+    let cutoff_factor = merge_value(
+        cx,
+        &setting_at("cutoff_factor", "Cutoff factor"),
+        (&b.cutoff_factor, &o.cutoff_factor, &t.cutoff_factor),
+        crate::diff::cutoff_factor_text,
+    );
+    let fringe_row = merge_value(
+        cx,
+        &setting_at("fringe_row", "Fringe row"),
+        (&b.fringe_row, &o.fringe_row, &t.fringe_row),
+        crate::diff::fringe_row_text,
     );
     let arithmetic = merge_value(
         cx,
@@ -1293,6 +1307,8 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         fringes,
         fringe_posting,
         trailing_level_fringes,
+        cutoff_factor,
+        fringe_row,
         arithmetic,
         account_coding,
         new_line_defaults,

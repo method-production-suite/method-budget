@@ -946,7 +946,10 @@ fn totals(ctx: &mut Ctx, a: &Args) -> ToolResult {
             "credits",
             json!(r.credits.iter().map(|c| json!({"name": c.name, "amount_cents": c.amount})).collect::<Vec<_>>()),
         ),
-        ("net_total_in_totals_currency_cents", json!(r.in_totals_currency(r.net_total))),
+        (
+            "net_total_in_totals_currency_cents",
+            json!(r.display.as_ref().map_or(r.net_total, |d| d.net_total)),
+        ),
     ]);
     if let Value::Object(h) = headline(&r) {
         data.extend(h);

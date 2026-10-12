@@ -1406,62 +1406,68 @@ fn a_category_credit_row_leaves_out_fringes_and_takes_caps() {
     }
 }
 
+/// ZTEST10's credits ZCR1 to ZCR6 (parity plan 4.10, run log), in the
+/// order they were made.
+fn ztest10_credits() -> Vec<Credit> {
+    let flat = |amount: Cents, percent: &str, cap: CreditCap| {
+        credit_row(CreditSource::Flat(amount), percent, cap)
+    };
+    let zcred = CreditSource::Group {
+        group: "ZCRED".into(),
+    };
+    vec![
+        Credit {
+            cap: Some(124_000),
+            discount_percent: d("2"),
+            ..credit_less(
+                "ZCR1",
+                &["ZFDAY"],
+                vec![
+                    credit_row(zcred, "20", CreditCap::None),
+                    flat(100_000, "10", CreditCap::Credit(5_000)),
+                    flat(300_000, "15", CreditCap::QualifiedSpend(200_000)),
+                ],
+            )
+        },
+        credit(
+            "ZCR2",
+            vec![credit_row(
+                CreditSource::Group {
+                    group: "ZCRED2".into(),
+                },
+                "25",
+                CreditCap::None,
+            )],
+        ),
+        credit("ZCR3", vec![flat(123_457, "33.333", CreditCap::None)]),
+        credit(
+            "ZCR4",
+            vec![
+                flat(5, "10", CreditCap::None),
+                flat(5, "10", CreditCap::None),
+            ],
+        ),
+        Credit {
+            discount_percent: d("2.5"),
+            ..credit("ZCR5", vec![flat(100_100, "10", CreditCap::None)])
+        },
+        Credit {
+            cap: Some(90_000),
+            discount_percent: d("10"),
+            ..credit("ZCR6", vec![flat(1_000_000, "10", CreditCap::None)])
+        },
+    ]
+}
+
 /// ZTEST10 V10-1 (parity plan 4.10, run log): ZCR1 is 1,205.40 and the net
 /// total 5,450.47, with ZFDAY left out of ZCR1 as a credit-wide list.
 /// Switching ZCR1's group row to category 1100 keeps the credit's list: the
 /// row is gross 4,500.00, excluded 100.00, net 4,400.00 either way.
 #[test]
 fn v10_1_credits_and_the_credit_wide_excluded_fringes() {
-    let flat = |amount: Cents, percent: &str, cap: CreditCap| {
-        credit_row(CreditSource::Flat(amount), percent, cap)
-    };
     for arith in Arithmetic::ALL {
         let mut b = ztest10(arith, FringePosting::Budget);
-        let zcred = CreditSource::Group {
-            group: "ZCRED".into(),
-        };
-        b.credits = vec![
-            Credit {
-                cap: Some(124_000),
-                discount_percent: d("2"),
-                ..credit_less(
-                    "ZCR1",
-                    &["ZFDAY"],
-                    vec![
-                        credit_row(zcred, "20", CreditCap::None),
-                        flat(100_000, "10", CreditCap::Credit(5_000)),
-                        flat(300_000, "15", CreditCap::QualifiedSpend(200_000)),
-                    ],
-                )
-            },
-            credit(
-                "ZCR2",
-                vec![credit_row(
-                    CreditSource::Group {
-                        group: "ZCRED2".into(),
-                    },
-                    "25",
-                    CreditCap::None,
-                )],
-            ),
-            credit("ZCR3", vec![flat(123_457, "33.333", CreditCap::None)]),
-            credit(
-                "ZCR4",
-                vec![
-                    flat(5, "10", CreditCap::None),
-                    flat(5, "10", CreditCap::None),
-                ],
-            ),
-            Credit {
-                discount_percent: d("2.5"),
-                ..credit("ZCR5", vec![flat(100_100, "10", CreditCap::None)])
-            },
-            Credit {
-                cap: Some(90_000),
-                discount_percent: d("10"),
-                ..credit("ZCR6", vec![flat(1_000_000, "10", CreditCap::None)])
-            },
-        ];
+        b.credits = ztest10_credits();
         let (_, r) = totals(&b);
         let row = &r.credits[0].rows[0];
         assert_eq!(
@@ -1749,4 +1755,485 @@ fn ztest10_group_totals_count_only_earned_fringes() {
             assert_eq!(group_figures(&r, "ZOFF"), (200_000, 0), "{at}");
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Decisions.md, entry 60: new-budget defaults, the cutoff factor, totals in
+// another currency, the topsheet's order and the budget's fringe row.
+
+/// ZTEST04's single earners P-01 (1,000.00), P-02 (5,000.00) and P-10
+/// (3,703.68), each with ZP125 (12.5%, cutoff 2,222.22), at cutoff factor
+/// `factor`; plus a flat fringe with a stored cutoff, which no factor
+/// touches.
+fn ztest04_factor(arith: Arithmetic, factor: CutoffFactor) -> Budget {
+    let mut flat_line = Detail::line(4, "Flat with a cutoff", "2", "Day", "100");
+    flat_line.fringes = set(&["ZFCUT"]);
+    let mut b = budget(
+        arith,
+        vec![category(
+            "1100",
+            "Z percent",
+            vec![account(
+                "1101",
+                "Z single earners",
+                vec![
+                    fringed(1, "P-01", "1000", &["ZP125"], None),
+                    fringed(2, "P-02", "5000", &["ZP125"], None),
+                    fringed(3, "P-10", "3703.68", &["ZP125"], None),
+                    flat_line,
+                ],
+            )],
+        )],
+    );
+    b.fringes
+        .insert("ZP125".into(), percent("12.5", Some(222_222)));
+    b.fringes.insert(
+        "ZFCUT".into(),
+        Fringe {
+            description: String::new(),
+            short_code: None,
+            rate: "100".into(),
+            kind: FringeKind::Flat {
+                unit: Some("Day".into()),
+                basis: FlatBasis::Amount,
+                max_hours_per_day: None,
+                cutoff: Some(15_000),
+            },
+        },
+    );
+    b.cutoff_factor = factor;
+    b
+}
+
+/// The cutoff factor multiplies every percent fringe's cutoff (V04-1,
+/// V04-2, V04-3): at 1.5, 2.0 and 3.0, P-02 is 416.67, 555.55 and 625.00,
+/// P-10 416.67, 462.96 and 462.96, and P-01 125.00 throughout. 4,444.44 x
+/// 12.5% is 555.555, which doubles hold as 555.55499..., so 555.55 (exact
+/// arithmetic: 555.56). 2.5 was not read in the reference product; it
+/// follows the same rule. A flat fringe's stored cutoff stays unused (F-31:
+/// 2 Days at 100.00 is 200.00 at every factor).
+#[test]
+fn v04_the_cutoff_factor_multiplies_every_percent_cutoff() {
+    use CutoffFactor::*;
+    let cases = [
+        (Arithmetic::Mmb, One, [12_500, 27_778, 27_778]),
+        (Arithmetic::Mmb, OneAndAHalf, [12_500, 41_667, 41_667]),
+        (Arithmetic::Mmb, Two, [12_500, 55_555, 46_296]),
+        (Arithmetic::Mmb, TwoAndAHalf, [12_500, 62_500, 46_296]),
+        (Arithmetic::Mmb, Three, [12_500, 62_500, 46_296]),
+        (Arithmetic::Exact, Two, [12_500, 55_556, 46_296]),
+    ];
+    for (arith, factor, want) in cases {
+        let (_, r) = totals(&ztest04_factor(arith, factor));
+        let f = line_fringes(&r);
+        let got = [f[&1]["ZP125"], f[&2]["ZP125"], f[&3]["ZP125"]];
+        assert_eq!(got, want, "{arith:?} {factor:?}");
+        assert_eq!(f[&4]["ZFCUT"], 20_000, "{arith:?} {factor:?}");
+    }
+    // Explain says where a factored cutoff comes from.
+    let b = ztest04_factor(Arithmetic::Mmb, OneAndAHalf);
+    let text = explained(&b, Target::LineFringe(2, "ZP125".into()));
+    assert!(text.contains("2,222.22 x 1.5 = 3,333.33"), "{text}");
+    // Part of a version; read from text as the five factors only.
+    assert_eq!(b.snapshot().to_budget().cutoff_factor, OneAndAHalf);
+    assert_eq!(CutoffFactor::parse("2"), Some(Two));
+    assert_eq!(CutoffFactor::parse("1.75"), None);
+}
+
+/// ZTEST08 CURRENCIES as the reference product ran it (CU-03 left out, its
+/// 4X column was hidden): base USD; EUR at 3, GBP at 1.23457, JPY at
+/// 0.00667, CAD at 1.234565; fringes ZP10N (10%), ZP125 (12.5%, cutoff
+/// 2,222.22) and ZFDAY (25.00 a Day), posted by budget.
+fn ztest08(arith: Arithmetic) -> Budget {
+    let cur = |id: u64, desc: &str, amount: &str, unit: &str, code: &str, rate: &str| Detail {
+        currency: Some(code.into()),
+        ..Detail::line(id, desc, amount, unit, rate)
+    };
+    let with = |d: Detail, f: &str| Detail {
+        fringes: set(&[f]),
+        ..d
+    };
+    let mut b = budget(
+        arith,
+        vec![
+            category(
+                "1100",
+                "ZCURRENCY",
+                vec![account(
+                    "1101",
+                    "Z foreign lines",
+                    vec![
+                        cur(1, "Euro lens", "5", "", "EUR", "100"),
+                        cur(2, "Pound line", "1", "", "GBP", "100"),
+                        cur(4, "Euro rounding", "1", "", "EUR", "0.335"),
+                        cur(5, "Yen line", "1", "", "JPY", "10000"),
+                        cur(6, "Six place rate", "1", "", "CAD", "100000"),
+                        with(
+                            cur(7, "Euro percent fringe", "1", "", "EUR", "1000"),
+                            "ZP10N",
+                        ),
+                        with(
+                            cur(8, "Euro cutoff fringe", "1", "", "EUR", "1000"),
+                            "ZP125",
+                        ),
+                        with(
+                            cur(9, "Euro flat fringe", "4", "Day", "EUR", "100"),
+                            "ZFDAY",
+                        ),
+                        Detail::adjustment(10, "ZADJ foreign", "0.1"),
+                        Detail::line(11, "Base line", "1", "", "1000"),
+                    ],
+                )],
+            ),
+            level("ZTOTAL ATL"),
+            category(
+                "1200",
+                "ZCURRENCY B",
+                vec![account(
+                    "1201",
+                    "Z base only",
+                    vec![Detail::line(12, "Base line two", "1", "", "500")],
+                )],
+            ),
+            level("ZTOTAL BTL"),
+        ],
+    );
+    for (code, rate) in [
+        ("EUR", "3"),
+        ("GBP", "1.23457"),
+        ("JPY", "0.00667"),
+        ("CAD", "1.234565"),
+    ] {
+        b.currencies.insert(
+            code.into(),
+            Currency {
+                description: String::new(),
+                symbol: String::new(),
+                rate: d(rate),
+            },
+        );
+    }
+    b.fringes.insert("ZP10N".into(), percent("10", None));
+    b.fringes
+        .insert("ZP125".into(), percent("12.5", Some(222_222)));
+    b.fringes.insert(
+        "ZFDAY".into(),
+        Fringe {
+            description: String::new(),
+            short_code: None,
+            rate: "25".into(),
+            kind: FringeKind::flat(Some("Day".into())),
+        },
+    );
+    b.fringe_posting = FringePosting::Budget;
+    b
+}
+
+/// Totals shown in another currency convert each account's total and
+/// round it, convert a fringe row fringe by fringe, then add up (V08-1,
+/// V08-2). In USD: 1100 146,582.44, 1200 500.00, fringes 677.78, grand
+/// 147,760.22. In EUR (3): 48,860.81, 166.67, fringes 225.92 (100.00 +
+/// 92.59 + 33.33, not 677.78 / 3 = 225.93), grand 49,253.40 (not 147,760.22
+/// / 3 = 49,253.41). In GBP (1.23457): 118,731.57 (146,582.44 / 1.23457;
+/// converting line by line would make it 118,731.60), 405.00, fringes
+/// 549.00 (243.00 + 225.00 + 81.00, not 549.01), grand 119,685.57.
+#[test]
+fn v08_totals_in_another_currency_convert_account_by_account() {
+    let b = ztest08(Arithmetic::Mmb);
+    let (rows, r) = totals(&b);
+    assert_eq!(rows[&10], 1_323_477);
+    assert_eq!(
+        (r.categories[0].total, r.categories[1].total),
+        (14_658_244, 50_000)
+    );
+    assert_eq!(r.budget_fringes, 67_778);
+    assert_eq!(r.grand_total, 14_776_022);
+    assert!(r.display.is_none(), "totals in the base currency");
+
+    for (code, cats, fringes, grand) in [
+        ("EUR", [4_886_081, 16_667], 22_592, 4_925_340),
+        ("GBP", [11_873_157, 40_500], 54_900, 11_968_557),
+    ] {
+        let mut b = ztest08(Arithmetic::Mmb);
+        b.totals_currency = Some(code.into());
+        let (_, r) = totals(&b);
+        let shown = r.display.clone().expect("shown in another currency");
+        assert_eq!(shown.categories, cats.to_vec(), "{code}");
+        assert_eq!(shown.budget_fringes, fringes, "{code}");
+        assert_eq!(shown.grand_total, grand, "{code}");
+        assert_eq!(shown.net_total, grand, "{code}");
+        assert_eq!(
+            (shown.total_atl, shown.total_btl, shown.atl_btl),
+            (cats[0], cats[1], cats[0] + cats[1]),
+            "{code}"
+        );
+        if code == "EUR" {
+            // The grand total divided as one amount is a cent off.
+            assert_eq!(r.in_totals_currency(r.grand_total), Some(4_925_341));
+        }
+    }
+}
+
+/// The names the topsheet lists after its production totals, in order.
+fn summary_names(b: &Budget, r: &Report) -> Vec<String> {
+    r.topsheet_lines(b)
+        .into_iter()
+        .filter_map(|l| match l {
+            TopsheetLine::BudgetFringes => Some(b.fringe_row.description().to_string()),
+            TopsheetLine::Charge(i) => Some(r.charges[i].name.clone()),
+            TopsheetLine::Grand => Some("Grand total".into()),
+            TopsheetLine::Credit(i) => Some(r.credits[i].name.clone()),
+            TopsheetLine::CreditsSubtotal => Some("Sub Total".into()),
+            TopsheetLine::Net => Some("Net total".into()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// After the grand total, credits list in reverse application order, then
+/// their Sub Total and the net total (ZTEST10: ZCR3, ZCR5, ZCR6, ZCR4,
+/// ZCR2, ZCR1, Sub Total 3,349.53, net 5,450.47). Applied in the order 1,
+/// 2, 4, 6, 5, 3, as the run showed them.
+#[test]
+fn ztest10_credits_list_in_reverse_application_order() {
+    for arith in Arithmetic::ALL {
+        let mut b = ztest10(arith, FringePosting::Budget);
+        let made = ztest10_credits();
+        b.credits = [0, 1, 3, 5, 4, 2]
+            .iter()
+            .map(|&i| made[i].clone())
+            .collect();
+        let (_, r) = totals(&b);
+        assert_eq!(
+            summary_names(&b, &r),
+            [
+                "Total Fringes",
+                "Grand total",
+                "ZCR3",
+                "ZCR5",
+                "ZCR6",
+                "ZCR4",
+                "ZCR2",
+                "ZCR1",
+                "Sub Total",
+                "Net total"
+            ],
+            "{arith:?}"
+        );
+        assert_eq!(r.credits_total, 334_953, "{arith:?}");
+        assert_eq!(r.net_total, 545_047, "{arith:?}");
+        // One credit has no Sub Total.
+        b.credits.truncate(1);
+        let (_, r) = totals(&b);
+        assert!(!r
+            .topsheet_lines(&b)
+            .contains(&TopsheetLine::CreditsSubtotal));
+    }
+}
+
+/// Charges list newest first, after the summary rows and the budget's
+/// fringe row (V09-2: the topsheet keeps creation order, newest first, and
+/// un-applying one changes no other charge).
+#[test]
+fn ztest09_charges_list_newest_first() {
+    let b = ztest09(FringePosting::Budget, true);
+    let (_, r) = totals(&b);
+    let mut want: Vec<String> = vec!["Total Fringes".into()];
+    want.extend(b.charges.iter().rev().map(|c| c.name.clone()));
+    want.extend(["Grand total".into(), "Net total".into()]);
+    assert_eq!(summary_names(&b, &r), want);
+    let lines = r.topsheet_lines(&b);
+    let at = |l: TopsheetLine| lines.iter().position(|x| *x == l).unwrap();
+    assert!(at(TopsheetLine::AtlBtl) < at(TopsheetLine::BudgetFringes));
+    assert!(at(TopsheetLine::BudgetFringes) < at(TopsheetLine::Charge(r.charges.len() - 1)));
+}
+
+/// The budget's fringe row can carry an account number and its own
+/// description, and move above any topsheet row; moving it changes no
+/// total, ATL or BTL (ZTEST06 V06-3: ATL 15,000.00, BTL 13,400.00, fringes
+/// 3,100.00, ZPCT5 1,625.00, grand 34,125.00 wherever the row shows).
+#[test]
+fn the_budget_fringe_row_moves_without_changing_a_total() {
+    let mut b = ztest06(FringePosting::Budget);
+    let (_, before) = totals(&b);
+    assert_eq!(
+        (before.total_atl, before.total_btl, before.budget_fringes),
+        (1_500_000, 1_340_000, 310_000)
+    );
+    assert_eq!(before.charges[0].amount, 162_500);
+    assert_eq!(before.grand_total, 3_412_500);
+    // Its default: no number, "Total Fringes", after the summary rows.
+    assert_eq!(b.fringe_row.account(), None);
+    assert_eq!(b.fringe_row.description(), "Total Fringes");
+    let lines = before.topsheet_lines(&b);
+    let fr = lines
+        .iter()
+        .position(|l| *l == TopsheetLine::BudgetFringes)
+        .unwrap();
+    assert_eq!(lines[fr - 1], TopsheetLine::AtlBtl);
+
+    for position in 0..=b.topsheet.len() + 1 {
+        b.fringe_row = FringeRow {
+            account: Some("9900".into()),
+            description: Some("Fringe benefits".into()),
+            position: Some(position),
+        };
+        let (_, r) = totals(&b);
+        assert_eq!(r, before, "position {position}");
+        let lines = r.topsheet_lines(&b);
+        let fr = lines
+            .iter()
+            .position(|l| *l == TopsheetLine::BudgetFringes)
+            .unwrap();
+        // Just above topsheet row `position` (after the last one past the end).
+        let rows_before = lines[..fr]
+            .iter()
+            .filter(|l| matches!(l, TopsheetLine::Category(_) | TopsheetLine::Level(_)))
+            .count();
+        assert_eq!(
+            rows_before,
+            position.min(b.topsheet.len()),
+            "position {position}"
+        );
+        assert_eq!(
+            lines
+                .iter()
+                .filter(|l| **l == TopsheetLine::BudgetFringes)
+                .count(),
+            1
+        );
+        assert_eq!(b.fringe_row.account(), Some("9900"));
+        assert_eq!(b.fringe_row.description(), "Fringe benefits");
+    }
+    // Other postings have no budget fringe row to place.
+    let mut c = ztest06(FringePosting::default());
+    c.fringe_row.position = Some(0);
+    let (_, r) = totals(&c);
+    assert!(!r.topsheet_lines(&c).contains(&TopsheetLine::BudgetFringes));
+    // Inserting and removing topsheet rows keeps it above the same row.
+    let mut row = FringeRow {
+        position: Some(2),
+        ..FringeRow::default()
+    };
+    row.row_inserted(0);
+    assert_eq!(row.position, Some(3));
+    row.row_removed(1);
+    assert_eq!(row.position, Some(2));
+    row.rows_reordered(&[2, 0, 1]);
+    assert_eq!(row.position, Some(0));
+}
+
+/// A global's unit fills a line's empty Unit when the line's Amt is that
+/// global (G-08: ZG_W in Weeks, Amt ZG_W x 100 = 200.00, Unit Weeks).
+#[test]
+fn g08_a_global_fills_the_unit_of_a_line_that_names_it() {
+    let mut b = budget(Arithmetic::Mmb, Vec::new());
+    b.globals.insert("ZG_W".into(), "2".into());
+    b.global_info.insert(
+        "ZG_W".into(),
+        GlobalInfo {
+            unit: "Week".into(),
+            ..GlobalInfo::default()
+        },
+    );
+    b.globals.insert("ZG_A".into(), "3".into());
+    assert_eq!(edit::unit_from_global(&b, "ZG_W"), Some("Week"));
+    assert_eq!(edit::unit_from_global(&b, " ZG_W "), Some("Week"));
+    // Only the global alone, and only one with a unit.
+    assert_eq!(edit::unit_from_global(&b, "ZG_W * 2"), None);
+    assert_eq!(edit::unit_from_global(&b, "ZG_A"), None);
+    assert_eq!(edit::unit_from_global(&b, "NOPE"), None);
+    b.topsheet = vec![category(
+        "1100",
+        "ZGLOBALS",
+        vec![account(
+            "1101",
+            "Z globals",
+            vec![Detail::line(1, "G-08", "ZG_W", "Week", "100")],
+        )],
+    )];
+    let (rows, _) = totals(&b);
+    assert_eq!(rows[&1], 20_000);
+}
+
+/// What a formula typed in may not be (V02-4): Amt `ZG_A/0` is refused,
+/// and so is a global that refers back to itself, which shows no value
+/// (counted as 0). Other problems are kept as typed and flagged.
+#[test]
+fn v02_4_dividing_by_zero_and_circular_globals_are_refused_at_entry() {
+    let mut b = budget(Arithmetic::Mmb, Vec::new());
+    b.globals.insert("ZG_A".into(), "3".into());
+    assert!(edit::refused_formula(&b, "ZG_A/0").is_some());
+    assert!(edit::refused_formula(&b, "ZG_A / (ZG_A - 3)").is_some());
+    assert_eq!(edit::refused_formula(&b, "ZG_A / 2"), None);
+    assert_eq!(edit::refused_formula(&b, "NOPE"), None);
+    assert_eq!(edit::refused_formula(&b, "3 +"), None);
+
+    // ZG_X = ZG_Y + 1 and ZG_Y = ZG_X + 1: the second is refused.
+    assert_eq!(edit::refused_global(&b, "ZG_X", "ZG_Y + 1"), None);
+    b.globals.insert("ZG_X".into(), "ZG_Y + 1".into());
+    assert!(edit::refused_global(&b, "ZG_Y", "ZG_X + 1").is_some());
+    assert!(edit::refused_global(&b, "ZG_Y", "ZG_Y * 2").is_some());
+    assert!(edit::refused_global(&b, "ZG_Y", "1 / 0").is_some());
+    assert_eq!(edit::refused_global(&b, "ZG_Y", "4"), None);
+
+    // One from a file: both are circular and can't be used in a cell; the
+    // engine still refuses to total the budget (`method check` says so).
+    b.globals.insert("ZG_Y".into(), "ZG_X + 1".into());
+    assert_eq!(
+        edit::circular_globals(&b),
+        ["ZG_X".to_string(), "ZG_Y".to_string()].into()
+    );
+    assert!(edit::refused_formula(&b, "ZG_X").is_some());
+    assert_eq!(edit::refused_formula(&b, "ZG_A * 2"), None);
+    assert!(matches!(
+        recalc(&b, &RecalcOptions::default()).unwrap_err().kind,
+        ErrorKind::GlobalCycle(_)
+    ));
+}
+
+/// A new budget starts with the reference product's settings (run log C2,
+/// ZTEST05, ZTEST07): fringes posted by budget, account numbers of
+/// category 2, account 2 and set 3, starter units Day 12 hours, Week 60,
+/// Month 240, Hour 1, Allow and Flat with none, Fringe copied from the
+/// line above (Group, Location, Set and Currency not), cutoff factor 1.0.
+/// A file that doesn't say keeps the old defaults.
+#[test]
+fn new_budgets_start_as_the_reference_product_starts_them() {
+    for b in [starter::budget(), starter::blank("New", "USD")] {
+        assert_eq!(b.fringe_posting, FringePosting::Budget);
+        let c = b.account_coding;
+        assert_eq!(
+            (c.category_width, c.account_width, c.sub_width, c.set_width),
+            (2, 2, 0, 3)
+        );
+        assert_eq!(c.validate(), Ok(()));
+        let hours = |u: &str| b.units[u].hours;
+        assert_eq!(hours("Day"), Some(d("12")));
+        assert_eq!(hours("Week"), Some(d("60")));
+        assert_eq!(hours("Month"), Some(d("240")));
+        assert_eq!(hours("Hour"), Some(d("1")));
+        assert_eq!((hours("Allow"), hours("Flat")), (None, None));
+        assert_eq!(b.units.len(), 6);
+        let n = b.new_line_defaults;
+        assert!(n.fringes && !n.groups && !n.location && !n.set && !n.currency);
+        assert_eq!(b.cutoff_factor, CutoffFactor::One);
+        assert!(b.fringe_row.is_default());
+    }
+    // A flat fringe per Day on a Week line counts 5 Days (60 / 12).
+    let mut b = starter::blank("New", "USD");
+    b.fringes.insert(
+        "ZFDAY".into(),
+        Fringe {
+            description: String::new(),
+            short_code: None,
+            rate: "25".into(),
+            kind: FringeKind::flat(Some("Day".into())),
+        },
+    );
+    let mut week = Detail::line(1, "A week", "1", "Week", "1000");
+    week.fringes = set(&["ZFDAY"]);
+    b.topsheet = vec![category("11", "Z", vec![account("11-01", "Z", vec![week])])];
+    let (_, r) = totals(&b);
+    assert_eq!(r.budget_fringes, 12_500);
 }

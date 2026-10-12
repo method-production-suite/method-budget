@@ -728,15 +728,17 @@ function globalValue(name, issues, r, cls = '') {
   const raw = r ? own(r.globals, name) : undefined;
   // Shown with the global's own decimals, when it has them (display.js).
   const gInfo = own(b.global_info, name);
+  // A global with a problem (one that refers back to itself, say) shows
+  // #ERR and counts as 0 (decisions.md, entry 60).
   const value = issues.length
-    ? el('span', `setup-value setup-num setup-value-bad${cls}`, 'Error')
+    ? el('span', `setup-value setup-num setup-value-bad${cls}`, '#ERR')
     : el('span', `setup-value setup-num${cls}`, raw === undefined ? '' : globalValueText(raw, gInfo));
   const shown = raw === undefined ? '' : formatDecimal(raw);
   // Its unit on hover: the plural unless the value is exactly 1.
   const unitDef = gInfo && gInfo.unit ? own(b.units, gInfo.unit) : undefined;
   const unitWord = gInfo && gInfo.unit ? (raw !== '1' && unitDef && unitDef.plural ? unitDef.plural : gInfo.unit) : '';
   const unitName = unitWord ? ` ${unitWord}` : '';
-  value.title = issues.length ? 'This global has a problem' : `${shown}${unitName}`;
+  value.title = issues.length ? 'This global has a problem, so it counts as 0' : `${shown}${unitName}`;
   // Where it came from (a setup pack's stamp), in Budget Setup.
   const from = compact ? '' : sourceText(state.view, 'global', name);
   if (from) value.title = `${value.title}\n${from}`;

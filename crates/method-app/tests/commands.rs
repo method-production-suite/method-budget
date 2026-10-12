@@ -1137,7 +1137,14 @@ fn budget_info_fields_are_typed() {
 #[test]
 fn fringe_posting_coding_and_currencies() {
     let mut s = Session::new();
-    // Default is by category with suffix 99, so the fringe account is 11-99.
+    // A new budget posts fringes by budget (decisions.md, entry 60): one
+    // fringe row, no fringe accounts.
+    let v = view(&mut s);
+    assert_eq!(v["budget"]["fringe_posting"]["kind"], "budget");
+    assert!(v["report"]["categories"][1]["fringe_account"].is_null());
+    assert!(v["report"]["budget_fringes"].as_i64().unwrap() > 0);
+    // By category with suffix 99, the fringe account is 11-99.
+    one_step(&mut s, |b| edit::set_fringe_posting(b, "category", None));
     let v = view(&mut s);
     assert_eq!(
         v["report"]["categories"][1]["fringe_account"]["code"],
@@ -1149,12 +1156,8 @@ fn fringe_posting_coding_and_currencies() {
         one_step(&mut s, |b| edit::set_fringe_posting(b, mode, None));
         let v = view(&mut s);
         assert_eq!(v["budget"]["fringe_posting"]["kind"], mode);
-        if mode == "budget" {
-            // Budget-level fringes sit outside ATL and BTL, so charges skip them.
-            assert!(v["report"]["budget_fringes"].as_i64().unwrap() > 0);
-        } else {
-            assert_eq!(grand(&v), g, "{mode} posting doesn't change the total");
-        }
+        // Charges count fringes wherever they post (decisions.md, entry 56).
+        assert_eq!(grand(&v), g, "{mode} posting doesn't change the total");
     }
     // Back to category: a missing suffix means the default.
     one_step(&mut s, |b| edit::set_fringe_posting(b, "category", None));
@@ -1472,4 +1475,119 @@ fn focus_follows_the_account_code() {
     }));
     assert_eq!(s.focused(), None);
     assert!(serde_json::to_value(s.view()).unwrap()["account"].is_null());
+}
+
+/// The cutoff factor and the budget's fringe row are one command each, one
+/// undo step, and saved only when not the default (decisions.md, entry 60).
+/// Moving the fringe row changes no total, and it stays above the same
+/// topsheet row when rows are added or removed above it.
+#[test]
+fn cutoff_factor_and_fringe_row() {
+    let mut s = Session::new();
+    let v0 = view(&mut s);
+    assert!(v0["budget"].get("cutoff_factor").is_none());
+    assert!(v0["budget"].get("fringe_row").is_none());
+    let g = grand(&v0);
+
+    one_step(&mut s, |b| edit::set_cutoff_factor(b, "1.5"));
+    assert_eq!(view(&mut s)["budget"]["cutoff_factor"], "1.5");
+    refused(&mut s, |b| edit::set_cutoff_factor(b, "4"));
+    one_step(&mut s, |b| edit::set_cutoff_factor(b, "1"));
+    assert!(view(&mut s)["budget"].get("cutoff_factor").is_none());
+
+    let row = |account: &str, description: &str, position: Option<usize>| edit::FringeRowInput {
+        account: Some(account.into()),
+        description: Some(description.into()),
+        position,
+    };
+    one_step(&mut s, |b| {
+        edit::set_fringe_row(b, &row("9900", "Fringe benefits", Some(4)))
+    });
+    let v = view(&mut s);
+    assert_eq!(v["budget"]["fringe_row"]["account"], "9900");
+    assert_eq!(v["budget"]["fringe_row"]["position"], 4);
+    assert_eq!(grand(&v), g, "moving the fringe row changes no total");
+    refused(&mut s, |b| edit::set_fringe_row(b, &row("99#00", "", None)));
+    refused(&mut s, |b| edit::set_fringe_row(b, &row("", "", Some(99))));
+    // A category added above it keeps it above the same row.
+    s.edit("Test edit", |b| {
+        edit::add_category(b, "05", "Development", Some(0))
+    })
+    .unwrap();
+    assert_eq!(s.budget().fringe_row.position, Some(5));
+    s.edit("Test edit", |b| edit::delete_topsheet_row(b, 0))
+        .unwrap();
+    assert_eq!(s.budget().fringe_row.position, Some(4));
+    one_step(&mut s, |b| edit::set_fringe_row(b, &row("", "", None)));
+    assert!(view(&mut s)["budget"].get("fringe_row").is_none());
+}
+
+/// Typed into a line, a formula that divides by zero or uses a global that
+/// refers back to itself is refused; a global that would refer back to
+/// itself is refused; anything else is kept and flagged (decisions.md,
+/// entry 60). An Amt that is exactly a global with a unit fills an empty
+/// Unit.
+#[test]
+fn formula_entry_refusals_and_a_global_unit() {
+    let mut s = Session::new();
+    let id = ids_in(&s, "13-01")[0];
+    let e = refused(&mut s, |b| {
+        edit::set_detail_field(b, id, edit::Field::Amount, "SHOOT_DAYS / 0")
+    });
+    assert!(e.contains("divides by zero"), "{e}");
+    refused(&mut s, |b| {
+        edit::set_rows_field(b, &[id], edit::Field::Rate, "1 / (SHOOT_DAYS - 25)")
+    });
+    // A typo is kept, as before.
+    one_step(&mut s, |b| {
+        edit::set_detail_field(b, id, edit::Field::Rate, "NOPE")
+    });
+
+    one_step(&mut s, |b| edit::set_global(b, "ZG_X", "ZG_Y + 1"));
+    let e = refused(&mut s, |b| edit::set_global(b, "ZG_Y", "ZG_X + 1"));
+    assert!(e.contains("refer back to itself"), "{e}");
+    refused(&mut s, |b| edit::set_global(b, "ZG_Y", "2 / 0"));
+
+    // A global with a unit fills an empty Unit, and only an empty one.
+    s.edit("Test edit", |b| {
+        edit::set_global(b, "ZG_W", "2")?;
+        b.global_info.insert(
+            "ZG_W".into(),
+            method_core::GlobalInfo {
+                unit: "Week".into(),
+                ..Default::default()
+            },
+        );
+        edit::set_detail_field(b, id, edit::Field::Unit, "")
+    })
+    .unwrap();
+    one_step(&mut s, |b| {
+        edit::set_detail_field(b, id, edit::Field::Amount, "ZG_W")
+    });
+    let d = s
+        .budget()
+        .categories()
+        .flat_map(|c| &c.accounts)
+        .flat_map(|a| &a.details)
+        .find(|d| d.id == id)
+        .unwrap()
+        .clone();
+    assert_eq!(d.unit, "Week");
+    s.edit("Test edit", |b| {
+        edit::set_detail_field(b, id, edit::Field::Unit, "Day")
+    })
+    .unwrap();
+    s.edit("Test edit", |b| {
+        edit::set_detail_field(b, id, edit::Field::Amount, "ZG_W")
+    })
+    .unwrap();
+    let d = s
+        .budget()
+        .categories()
+        .flat_map(|c| &c.accounts)
+        .flat_map(|a| &a.details)
+        .find(|d| d.id == id)
+        .unwrap()
+        .clone();
+    assert_eq!(d.unit, "Day", "a Unit already there stays");
 }

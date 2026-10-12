@@ -26,7 +26,7 @@
 
 import { el } from './dom.js';
 import { money, decimal } from './format.js';
-import { rowColor, fringePercent, chargeLabel } from './levels.js';
+import { rowColor, fringePercent, chargeLabel, fringeRowOf, topsheetOrder } from './levels.js';
 import { setRules } from './sheet.js';
 import { orderedNames } from './order.js';
 import { invoke, connected } from './api.js';
@@ -343,16 +343,16 @@ function index(view) {
   const b = (view && view.budget) || {};
   const r = (view && view.report) || null;
   const topsheet = Array.isArray(b.topsheet) ? b.topsheet : [];
-  const items = []; // { kind: 'category'|'level', row, rep, ci?, li? }
+  const items = []; // { kind: 'category'|'level', row, rep, ci?, li?, ti }
   let ci = 0;
   let li = 0;
-  for (const row of topsheet) {
+  for (const [ti, row] of topsheet.entries()) {
     if (!row || typeof row !== 'object') continue;
     if (row.kind === 'production_total') {
-      items.push({ kind: 'level', row, rep: r && r.levels ? r.levels[li] || null : null, li });
+      items.push({ kind: 'level', row, rep: r && r.levels ? r.levels[li] || null : null, li, ti });
       li += 1;
     } else {
-      items.push({ kind: 'category', row, rep: r && r.categories ? r.categories[ci] || null : null, ci });
+      items.push({ kind: 'category', row, rep: r && r.categories ? r.categories[ci] || null : null, ci, ti });
       ci += 1;
     }
   }
@@ -547,7 +547,13 @@ function topsheet(ctx) {
   };
   const baseFor = (code) => (base && base.categories.get(code)) || null;
   const catCodes = [];
+  // The budget's fringe row, where the budget places it (decisions.md, entry 60).
+  const fr = fringeRowOf(ctx.b);
+  const frShown = Boolean(r && r.budget_fringes);
+  const tsLen = Array.isArray(ctx.b.topsheet) ? ctx.b.topsheet.length : 0;
+  const frAt = frShown && fr.position !== null ? Math.min(fr.position, tsLen) : null;
   for (const it of ctx.items) {
+    if (frAt !== null && it.ti === frAt) line('posted', fr.account, fr.description, r.budget_fringes, null, true);
     if (it.kind === 'category') {
       catCodes[it.ci] = it.row.code;
       line('cat', it.row.code || '', it.row.name || '', it.rep ? it.rep.total : null, baseFor(it.row.code), false, { page: it.ci, fringes: it.rep ? it.rep.fringe_total : 0 });
@@ -573,18 +579,23 @@ function topsheet(ctx) {
       line('level', '', it.row.name || '', it.rep ? it.rep.total : null, lvBase, false, { fringes: lvFringes });
     }
   }
+  if (frAt !== null && frAt >= tsLen) line('posted', fr.account, fr.description, r.budget_fringes, null, true);
   // The summary stays together.
   const sum = [];
-  const sline = (cls, label, total, ch) => sum.push([cls, label, total, ch]);
+  const sline = (cls, label, total, ch, code = '') => sum.push([cls, label, total, ch, code]);
   if (r) {
     sline('sum first', 'Total above-the-line', r.total_atl, null);
     sline('sum', 'Total below-the-line', r.total_btl, null);
     sline('sum strong', 'Total above and below-the-line', r.atl_btl, null);
-    if (r.budget_fringes) sline('sum', 'Total fringes', r.budget_fringes, null);
-    (r.charges || []).forEach((c, i) => sline('sum charge', chargeLabel(ctx.b, c, i, money), c.amount, null));
+    if (frShown && frAt === null) sline('sum', fr.description, r.budget_fringes, null, fr.account);
+    // Charges newest first, credits in reverse application order with their
+    // subtotal (decisions.md, entry 60).
+    const charges = r.charges || [];
+    for (const i of topsheetOrder(charges.length)) sline('sum charge', chargeLabel(ctx.b, charges[i], i, money), charges[i].amount, null);
     sline('sum grand', 'Grand total', r.grand_total, base ? base.grand_total : null);
     const credits = r.credits || [];
-    for (const c of credits) sline('sum credit', `Less ${c.name || 'credit'}`, -c.amount, null);
+    for (const i of topsheetOrder(credits.length)) sline('sum credit', `Less ${credits[i].name || 'credit'}`, -credits[i].amount, null);
+    if (credits.length >= 2) sline('sum credit', 'Sub Total', -r.credits_total, null);
     if (credits.length) sline('sum grand', 'Net total', r.net_total, base ? base.net_total : null);
     if (r.display) {
       const cur = r.totals_currency;
@@ -595,7 +606,7 @@ function topsheet(ctx) {
   } else {
     sline('sum first', 'Totals unavailable', null, null);
   }
-  sum.forEach(([cls, label, total, ch], i) => line(cls, '', label, total, ch, i < sum.length - 1));
+  sum.forEach(([cls, label, total, ch, code], i) => line(cls, code, label, total, ch, i < sum.length - 1));
   if (ctx.items.length === 0) rows.unshift(row(el('tr', { class: 'rpt-row empty' }, td('This budget has no categories yet.', 'muted', cols.length))));
   return [{ name: 'Topsheet', cls: `rpt-ts${bc.length ? ' has-baseline' : ''}${pages || fringes ? ' has-extra' : ''}`, cols, head, rows }];
 }

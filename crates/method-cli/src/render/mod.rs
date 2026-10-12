@@ -17,7 +17,7 @@ use std::collections::BTreeSet;
 
 use method_core::{
     Account, Band, BandField, Baseline, Budget, Cents, Dec, FontSize, InfoValue, Note, Report,
-    ReportColumn, ReportSection, ReportSpec, RowKind,
+    ReportColumn, ReportSection, ReportSpec, RowKind, TopsheetLine,
 };
 use method_format::export::{self, Cell, Sheet};
 
@@ -441,92 +441,115 @@ impl Builder<'_> {
             rows.push(Row::new(cells, style));
         };
         let base = self.baseline;
-        for level in &r.levels {
-            let cats = r.categories.get(level.start..level.end).unwrap_or_default();
-            for cat in cats {
-                let orig = base.map(|bl| bl.categories.get(&cat.code).copied().unwrap_or(0));
-                push(
-                    &cat.code,
-                    &cat.name,
-                    Some(cat.fringe_total),
-                    cat.total,
-                    orig,
-                    Style::Normal,
-                );
-            }
-            if level.posted_fringes != 0 {
-                push(
+        let charges: Vec<_> = b.charges.iter().filter(|c| c.applied).collect();
+        let credits: Vec<_> = b.credits.iter().filter(|c| c.applied).collect();
+        // In the topsheet's order (decisions.md, entry 60): the budget's
+        // fringe row where it is placed, charges newest first, credits in
+        // reverse application order with their subtotal.
+        for l in r.topsheet_lines(b) {
+            match l {
+                TopsheetLine::Category(i) => {
+                    let cat = &r.categories[i];
+                    let orig = base.map(|bl| bl.categories.get(&cat.code).copied().unwrap_or(0));
+                    push(
+                        &cat.code,
+                        &cat.name,
+                        Some(cat.fringe_total),
+                        cat.total,
+                        orig,
+                        Style::Normal,
+                    );
+                }
+                TopsheetLine::LevelFringes(i) => push(
                     "",
                     "Fringes",
                     None,
-                    level.posted_fringes,
+                    r.levels[i].posted_fringes,
                     None,
                     Style::Normal,
-                );
+                ),
+                TopsheetLine::Level(i) => {
+                    let level = &r.levels[i];
+                    let cats = r.categories.get(level.start..level.end).unwrap_or_default();
+                    let fr = cats.iter().map(|c| c.fringe_total).sum();
+                    push("", &level.name, Some(fr), level.total, None, Style::Total);
+                }
+                TopsheetLine::Atl if b.display.summary_rows => push(
+                    "",
+                    "Total above-the-line",
+                    None,
+                    r.total_atl,
+                    None,
+                    Style::Total,
+                ),
+                TopsheetLine::Btl if b.display.summary_rows => push(
+                    "",
+                    "Total below-the-line",
+                    None,
+                    r.total_btl,
+                    None,
+                    Style::Total,
+                ),
+                TopsheetLine::AtlBtl if b.display.summary_rows => push(
+                    "",
+                    "Total above and below-the-line",
+                    None,
+                    r.atl_btl,
+                    None,
+                    Style::Total,
+                ),
+                TopsheetLine::Atl | TopsheetLine::Btl | TopsheetLine::AtlBtl => {}
+                TopsheetLine::BudgetFringes => push(
+                    b.fringe_row.account().unwrap_or(""),
+                    b.fringe_row.description(),
+                    None,
+                    r.budget_fringes,
+                    None,
+                    Style::Normal,
+                ),
+                TopsheetLine::Charge(i) => {
+                    let ct = &r.charges[i];
+                    let code = charges.get(i).and_then(|c| c.account.as_deref());
+                    push(
+                        code.unwrap_or(""),
+                        &ct.name,
+                        None,
+                        ct.amount,
+                        None,
+                        Style::Normal,
+                    );
+                }
+                TopsheetLine::Grand => {
+                    let orig = base.map(|bl| bl.grand_total);
+                    push("", "Grand total", None, r.grand_total, orig, Style::Total);
+                }
+                TopsheetLine::Credit(i) => {
+                    let ct = &r.credits[i];
+                    let code = credits.get(i).and_then(|c| c.account.as_deref());
+                    let label = format!("Less {}", ct.name);
+                    push(
+                        code.unwrap_or(""),
+                        &label,
+                        None,
+                        -ct.amount,
+                        None,
+                        Style::Normal,
+                    );
+                }
+                TopsheetLine::CreditsSubtotal => {
+                    push("", "Sub Total", None, -r.credits_total, None, Style::Normal)
+                }
+                TopsheetLine::Net if b.display.net_total => {
+                    let orig = base.map(|bl| bl.net_total);
+                    push("", "Net total", None, r.net_total, orig, Style::Total);
+                }
+                TopsheetLine::Net => {}
             }
-            if !level.name.is_empty() {
-                let fr = cats.iter().map(|c| c.fringe_total).sum();
-                push("", &level.name, Some(fr), level.total, None, Style::Total);
-            }
         }
-        if b.display.summary_rows {
-            push(
-                "",
-                "Total above-the-line",
-                None,
-                r.total_atl,
-                None,
-                Style::Total,
-            );
-            push(
-                "",
-                "Total below-the-line",
-                None,
-                r.total_btl,
-                None,
-                Style::Total,
-            );
-            push(
-                "",
-                "Total above and below-the-line",
-                None,
-                r.atl_btl,
-                None,
-                Style::Total,
-            );
-        }
-        if r.budget_fringes != 0 {
-            push(
-                "",
-                "Total fringes",
-                None,
-                r.budget_fringes,
-                None,
-                Style::Normal,
-            );
-        }
-        let charges = b.charges.iter().filter(|c| c.applied);
-        for (c, ct) in charges.zip(&r.charges) {
-            let code = c.account.as_deref().unwrap_or("");
-            push(code, &ct.name, None, ct.amount, None, Style::Normal);
-        }
-        let orig = base.map(|bl| bl.grand_total);
-        push("", "Grand total", None, r.grand_total, orig, Style::Total);
-        let credits = b.credits.iter().filter(|c| c.applied);
-        for (c, ct) in credits.zip(&r.credits) {
-            let code = c.account.as_deref().unwrap_or("");
-            let label = format!("Less {}", ct.name);
-            push(code, &label, None, -ct.amount, None, Style::Normal);
-        }
-        if b.display.net_total {
-            let orig = base.map(|bl| bl.net_total);
-            push("", "Net total", None, r.net_total, orig, Style::Total);
-        }
-        if r.totals_currency != r.base_currency {
-            if let Some(n) = r.in_totals_currency(r.net_total) {
-                let label = format!("Net total in {}", r.totals_currency);
-                push("", &label, None, n, None, Style::Total);
-            }
+        // Converted account by account (decisions.md, entry 60).
+        if let Some(shown) = &r.display {
+            let label = format!("Net total in {}", r.totals_currency);
+            push("", &label, None, shown.net_total, None, Style::Total);
         }
         Table { columns, rows }
     }

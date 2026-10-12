@@ -162,6 +162,9 @@ fn gen_budget(rng: &mut Rng) -> Budget {
     if rng.chance(30) {
         b.trailing_level_fringes = TrailingFringes::Drop;
     }
+    if rng.chance(30) {
+        b.cutoff_factor = CutoffFactor::ALL[rng.below(5) as usize];
+    }
     b.groups.insert("A".into(), group(true));
     b.groups.insert("B".into(), group(true));
     b.groups.insert("OFF".into(), group(false));

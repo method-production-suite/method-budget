@@ -2,7 +2,7 @@
 
 use std::fmt::Write as _;
 
-use method_core::{recalc, Budget, Cents, Report};
+use method_core::{recalc, Budget, Cents, Report, TopsheetLine};
 
 use crate::cli::{excluding, load, money, CliError, Flags, Outcome};
 
@@ -26,37 +26,45 @@ pub fn topsheet(b: &Budget, r: &Report) -> String {
         let _ = writeln!(out, "{label:<48}{:>18}", money(amount));
     };
 
-    for level in &r.levels {
-        for cat in &r.categories[level.start..level.end] {
-            line(&format!("{:<8}{}", cat.code, cat.name), cat.total);
+    // In the topsheet's order (decisions.md, entry 60): charges newest
+    // first, credits in reverse application order.
+    for l in r.topsheet_lines(b) {
+        match l {
+            TopsheetLine::Category(i) => {
+                let cat = &r.categories[i];
+                line(&format!("{:<8}{}", cat.code, cat.name), cat.total);
+            }
+            TopsheetLine::LevelFringes(i) => line("        Fringes", r.levels[i].posted_fringes),
+            TopsheetLine::Level(i) => {
+                let level = &r.levels[i];
+                line(&format!("        {}", level.name), level.total);
+            }
+            TopsheetLine::Atl => line("Total above-the-line", r.total_atl),
+            TopsheetLine::Btl => line("Total below-the-line", r.total_btl),
+            TopsheetLine::AtlBtl => line("Total above and below-the-line", r.atl_btl),
+            TopsheetLine::BudgetFringes => {
+                let label = match b.fringe_row.account() {
+                    Some(code) => format!("{code:<8}{}", b.fringe_row.description()),
+                    None => b.fringe_row.description().to_string(),
+                };
+                line(&label, r.budget_fringes);
+            }
+            TopsheetLine::Charge(i) => line(&r.charges[i].name, r.charges[i].amount),
+            TopsheetLine::Grand => line("Grand total", r.grand_total),
+            TopsheetLine::Credit(i) => {
+                line(&format!("Less {}", r.credits[i].name), -r.credits[i].amount)
+            }
+            TopsheetLine::CreditsSubtotal => line("Sub Total", -r.credits_total),
+            TopsheetLine::Net if !r.credits.is_empty() => line("Net total", r.net_total),
+            TopsheetLine::Net => {}
         }
-        if level.posted_fringes != 0 {
-            line("        Fringes", level.posted_fringes);
-        }
-        if !level.name.is_empty() {
-            line(&format!("        {}", level.name), level.total);
-        }
     }
-    line("Total above-the-line", r.total_atl);
-    line("Total below-the-line", r.total_btl);
-    line("Total above and below-the-line", r.atl_btl);
-    if r.budget_fringes != 0 {
-        line("Total fringes", r.budget_fringes);
-    }
-    for c in &r.charges {
-        line(&c.name, c.amount);
-    }
-    line("Grand total", r.grand_total);
-    for c in &r.credits {
-        line(&format!("Less {}", c.name), -c.amount);
-    }
-    if !r.credits.is_empty() {
-        line("Net total", r.net_total);
-    }
-    if r.totals_currency != r.base_currency {
-        if let Some(n) = r.in_totals_currency(r.net_total) {
-            line(&format!("Net total in {}", r.totals_currency), n);
-        }
+    // Converted account by account (decisions.md, entry 60).
+    if let Some(shown) = &r.display {
+        line(
+            &format!("Net total in {}", r.totals_currency),
+            shown.net_total,
+        );
     }
     out.push_str(&rule);
     out.push('\n');

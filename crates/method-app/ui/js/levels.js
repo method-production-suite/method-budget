@@ -166,6 +166,31 @@ export function chargeLabel(b, entry, i, fmt) {
   return label;
 }
 
+/**
+ * The budget's one fringe row (fringes posted by budget; decisions.md, entry
+ * 59): its account number ('' for none), description ("Total Fringes" unless
+ * the budget says otherwise) and place: above topsheet row `position`, or
+ * after the summary rows when `position` is null. Display only.
+ */
+export function fringeRowOf(b) {
+  const f = b && b.fringe_row && typeof b.fringe_row === 'object' ? b.fringe_row : {};
+  const text = (v) => (typeof v === 'string' ? v.trim() : '');
+  return {
+    account: text(f.account),
+    description: text(f.description) || 'Total Fringes',
+    position: Number.isInteger(f.position) && f.position >= 0 ? f.position : null,
+  };
+}
+
+/**
+ * Indexes into a list of `n` charges or credits in the order the topsheet
+ * lists them: the reverse of the budget's order (charges newest first,
+ * credits in reverse application order; decisions.md, entry 60).
+ */
+export function topsheetOrder(n) {
+  return Array.from({ length: n }, (_, i) => n - 1 - i);
+}
+
 function staticRow(key, cls, label, total, extra = {}) {
   return {
     key,
@@ -217,7 +242,15 @@ export function topsheetRows(ix, choices = null) {
   const r = ix.r;
   const rows = [];
   const lvCost = (lv) => (ix.cost && lv && ix.cost.levels[lv.li]) || null;
+  // The budget's fringe row: after the summary rows, or above the topsheet
+  // row the budget places it at (Budget Setup > Settings). Display only.
+  const fr = fringeRowOf(ix.b);
+  const frShown = Boolean(r && r.budget_fringes);
+  const frAt = frShown && fr.position !== null ? Math.min(fr.position, ix.topsheet.length) : null;
+  const frCost = ix.cost && ix.cost.budget_fringes ? costCells(ix.cost.budget_fringes.figures) : {};
+  const fringeRow = (cls) => staticRow('s-fr', cls, fr.description, r.budget_fringes, { code: { text: fr.account }, ...frCost });
   for (const [ti, row] of ix.topsheet.entries()) {
+    if (frAt === ti) rows.push(fringeRow('posted'));
     if (row.kind === 'production_total') {
       const lv = ix.levels.find((l) => l.ti === ti);
       const lc = lvCost(lv);
@@ -257,6 +290,7 @@ export function topsheetRows(ix, choices = null) {
       zero: Boolean(c && c.rep) && isZero(c.rep.total, bad, ix.variance && ix.variance.categories[row.code], cc),
     });
   }
+  if (frAt !== null && frAt >= ix.topsheet.length) rows.push(fringeRow('posted'));
   if (!r) return rows;
   const cost = ix.cost;
   const costShown = Boolean(cost) && COST_COLUMNS.some((col) => columnShown(col, choices, { cost: true }));
@@ -269,10 +303,12 @@ export function topsheetRows(ix, choices = null) {
     rows.push(staticRow('s-btl', 'summary', 'Total below-the-line', r.total_btl, cost ? costCells(cost.total_btl) : {}));
     rows.push(staticRow('s-atlbtl', 'summary', 'Total above and below-the-line', r.atl_btl, cost ? costCells(cost.atl_btl) : {}));
   }
-  if (r.budget_fringes) rows.push(staticRow('s-fr', disp.summary_rows ? 'summary' : 'summary first', 'Total fringes', r.budget_fringes, cost && cost.budget_fringes ? costCells(cost.budget_fringes.figures) : {}));
-  r.charges.forEach((c, i) => {
+  if (frShown && frAt === null) rows.push(fringeRow(disp.summary_rows ? 'summary' : 'summary first'));
+  // Charges newest first (the reverse of the budget's list).
+  for (const i of topsheetOrder(r.charges.length)) {
+    const c = r.charges[i];
     rows.push(staticRow(`s-ch${i}`, 'summary charge', chargeLabel(ix.b, c, i, money), c.amount, cost && cost.charges[i] ? costCells(cost.charges[i].figures) : {}));
-  });
+  }
   // Transactions no account in the chart claims: in the actual, never in the budget.
   if (costShown && cost.unassigned && cost.unassigned.count) {
     const row = staticRow('s-unassigned', 'summary cost-unassigned', 'Unassigned actuals', null, costCells(cost.unassigned));
@@ -281,9 +317,12 @@ export function topsheetRows(ix, choices = null) {
     rows.push(row);
   }
   rows.push(staticRow('s-grand', 'summary grand', 'Grand total', r.grand_total, { ...(ix.variance ? varianceCells(ix.variance.grand_total) : {}), ...(cost ? costCells(cost.total) : {}) }));
-  r.credits.forEach((c, i) => {
+  // Credits in reverse application order, then their subtotal with two or more.
+  for (const i of topsheetOrder(r.credits.length)) {
+    const c = r.credits[i];
     rows.push(staticRow(`s-cr${i}`, 'summary credit', `Less ${c.name}`, -c.amount));
-  });
+  }
+  if (r.credits.length >= 2) rows.push(staticRow('s-crsub', 'summary credit', 'Sub Total', -r.credits_total));
   if (r.credits.length && disp.net_total) rows.push(staticRow('s-net', 'summary grand', 'Net total', r.net_total, ix.variance ? varianceCells(ix.variance.net_total) : {}));
   if (r.display && disp.net_total) {
     const cur = r.totals_currency;

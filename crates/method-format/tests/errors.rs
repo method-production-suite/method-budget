@@ -179,11 +179,11 @@ fn float_where_decimal_string_expected_is_rejected() {
     assert!(line >= line_of(&text, "10.5"));
 
     // In a plain (untagged) object the exact field is reported.
-    let text = edit("\"hours\": \"10\"", "\"hours\": 10");
+    let text = edit("\"hours\": \"12\"", "\"hours\": 12");
     let (line, path, message) = invalid(&text);
-    assert_eq!(line, line_of(&text, "\"hours\": 10"));
+    assert_eq!(line, line_of(&text, "\"hours\": 12"));
     assert_eq!(path, "budget.units.Day.hours");
-    assert!(message.contains("integer `10`"), "{message}");
+    assert!(message.contains("integer `12`"), "{message}");
 }
 
 #[test]
@@ -195,7 +195,7 @@ fn bad_decimal_string_is_rejected() {
         ("0.0000000001", "more than 9 decimal places"),
         ("99999999999999999999999999999999999999", "number too large"),
     ] {
-        let text = edit("\"hours\": \"10\"", &format!("\"hours\": \"{bad}\""));
+        let text = edit("\"hours\": \"12\"", &format!("\"hours\": \"{bad}\""));
         let (_, path, message) = invalid(&text);
         assert_eq!(path, "budget.units.Day.hours", "{bad}");
         assert!(

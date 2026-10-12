@@ -362,6 +362,7 @@ pub fn cut(b: &mut Budget, pick: &Pick) -> EditResult {
             for &i in at.iter().rev() {
                 if matches!(b.topsheet.get(i), Some(TopsheetRow::Category(_))) {
                     b.topsheet.remove(i);
+                    b.fringe_row.row_removed(i);
                 }
             }
         }

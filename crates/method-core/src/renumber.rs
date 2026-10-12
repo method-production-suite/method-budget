@@ -218,7 +218,8 @@ fn split(from: &AccountCoding, code: &str) -> Result<Vec<String>, String> {
     }
     let mut rest = code;
     let mut parts = Vec::new();
-    for w in widths(from).into_iter().take_while(|w| *w > 0) {
+    // The used segments in order (a set may follow the account directly).
+    for w in widths(from).into_iter().filter(|w| *w > 0) {
         if rest.is_empty() {
             break;
         }
@@ -263,11 +264,9 @@ fn carry(
 ) -> Result<String, String> {
     let pieces = split(from, code)?;
     let to_widths = widths(to);
-    let room = to_widths
-        .iter()
-        .take_while(|w| **w > 0)
-        .count()
-        .min(max_segments);
+    // The segments the new pattern uses, in order: the pieces fill them.
+    let slots: Vec<usize> = (0..4).filter(|&i| to_widths[i] > 0).collect();
+    let room = slots.len().min(max_segments);
     let mut segs: [String; 4] = Default::default();
     for (i, piece) in pieces.iter().enumerate() {
         if i >= room {
@@ -277,7 +276,7 @@ fn carry(
                 format!("the new pattern has no room for its part {piece}")
             });
         }
-        segs[i] = fit(piece, to_widths[i])?;
+        segs[slots[i]] = fit(piece, to_widths[slots[i]])?;
     }
     let [category, account, sub, set] = segs;
     Ok(to.format(&AccountCode {

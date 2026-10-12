@@ -33,7 +33,12 @@ stderr as `method: <message>`; results go to stdout.
 ### `method show <file.mthd> [--exclude GROUP]...`
 
 Prints the topsheet for a person to read. `--exclude` leaves a group's lines out
-(repeatable).
+(repeatable). Rows come in the topsheet's order (decisions.md, entry 60): categories and
+production totals, the summary rows, the budget's fringe row (with its number and
+description, where the budget places it), charges newest first, the grand total, credits
+in reverse application order, their Sub Total when there are two or more, and the net
+total. With totals shown in another currency, the last line is the net total in it,
+converted account by account.
 
 ### `method check <file.mthd>`
 
@@ -56,7 +61,10 @@ app would save.
 Write a starter budget, or a large invented test budget (5,000 rows). Both refuse to
 replace an existing file. `--template` starts instead from one of the bundled charts of
 accounts (its id or name, any case; `method coa list` names them): its categories, accounts
-and production totals, no lines, titled Untitled (docs/TEMPLATES.md).
+and production totals, no lines, titled Untitled (docs/TEMPLATES.md). A new budget, the
+starter or a chart, starts with the new-budget settings (decisions.md, entry 60): fringes
+posted by budget, a Day of 12 hours, a Week of 60 and a Month of 240, a cutoff factor of
+1.0, and (the starter) account numbers of category 2, account 2 and set 3.
 
 ### `method totals <file.mthd> [--json] [--exclude GROUP]...`
 
@@ -80,7 +88,9 @@ net_total	578600.00
 format stores money: `title`, `base_currency`, `totals_currency`, `categories` (each
 with `code`, `name`, `total`, `fringe_total` and its `accounts`' `code`, `name` and
 `total`), `levels` (production totals), `charges`, `credits`, the headline totals above,
-and `net_total_in_totals_currency` (`null` if it can't be converted).
+and `net_total_in_totals_currency`: the net total in the totals currency, converted
+account by account, fringe by fringe, charge by charge and credit by credit, then added up
+(decisions.md, entry 60); the net total itself when totals show in the base currency.
 
 ```sh
 method totals film.mthd | awk -F'\t' '$1 == "net_total" { print $2 }'
@@ -149,6 +159,10 @@ Changes one value and saves. Paths:
 | `compact_versions` | `true` or `false`: save versions as deltas (docs/FORMAT.md, "Version deltas"). |
 | `arithmetic` | `binary` (the default: totals worked out in binary doubles, as spreadsheets and industry-standard budgeting software work them; `mmb` is still accepted) or `exact` (exact decimals, half away from zero). See decisions.md, entry 55. |
 | `trailing_level_fringes` | `keep` (the default) or `drop`: under production-level posting, keep the fringes of categories after the last production total in the grand total, or drop them from every total. See decisions.md, entry 56. |
+| `cutoff_factor` | `1.0` (the default), `1.5`, `2.0`, `2.5` or `3.0`: what every percent fringe's cutoff is multiplied by. See decisions.md, entry 60. |
+| `fringe_row.account` | The account number on the budget's fringe row (fringes posted by budget), or `none`. Display only. |
+| `fringe_row.description` | What the budget's fringe row says, or `none` for `Total Fringes`. Display only. |
+| `fringe_row.position` | The topsheet row the budget's fringe row shows above, counted from 0 (the number of topsheet rows puts it after the last one), or `none` for after the summary rows (the default). Changes no total. |
 | `group_rules.ungrouped_lines` | `include` (the default) or `exclude`: lines and adjustment rows with no group count, or are left out. See decisions.md, entry 57. |
 | `group_rules.conflict` | `exclude` (the default) or `include`: a line in a group that counts and a group that doesn't is left out, or counts. |
 | `group_rules.fringes_in_totals` | `include` (the default) or `exclude`: group totals shown with or without their fringes. Display only. |
@@ -428,6 +442,8 @@ remove charge Insurance
 | `set compact_versions true\|false` | Save versions as deltas. |
 | `set arithmetic binary\|exact` | How totals are worked out (see `arithmetic` above). |
 | `set trailing_level_fringes keep\|drop` | Fringes after the last production total (see `trailing_level_fringes` above). |
+| `set cutoff_factor 1.0\|1.5\|2.0\|2.5\|3.0` | What every percent fringe's cutoff is multiplied by (see `cutoff_factor` above). |
+| `set fringe_row account\|description\|position VALUE` | One field of the budget's fringe row, `none` to clear it (see `fringe_row.FIELD` above). |
 | `set group_rules RULE include\|exclude` | One group rule: `ungrouped_lines`, `conflict` or `fringes_in_totals` (see `group_rules.RULE` above). |
 | `set global NAME FORMULA` | Sets a global's formula, adding the global when it's new. |
 | `set fringe NAME rate FORMULA` | A fringe's rate. |

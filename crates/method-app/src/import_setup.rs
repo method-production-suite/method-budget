@@ -453,8 +453,9 @@ mod tests {
 
         // Settings: keep by default, or the imported one.
         let mut b = conflicted();
+        let before = b.fringe_posting.clone();
         import(&mut b, &src, &[pick("fringe_posting", "")], &[]).unwrap();
-        assert_eq!(b.fringe_posting, FringePosting::default());
+        assert_eq!(b.fringe_posting, before);
         import(
             &mut b,
             &src,
