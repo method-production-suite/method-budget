@@ -553,6 +553,23 @@ will do it, ship fewer packs rather than stale ones.
 
 ## 9. Open questions for the owner
 
+**Answered 2026-10-12** (the owner took the recommended defaults):
+
+- **1. What ships:** only rows a person verified against the public source.
+- **2. Check-only material:** the cross-checking against the purchased payroll guide and the
+  production-held cards stops; public duplicates are used instead.
+- **3. Delivery:** packs are bundled in app releases only; no separate data channel.
+- **4. The data repository:** stays private; only packs ship.
+- **7. Payroll taxes:** the New project window adds employer payroll tax fringes, for CA, NY,
+  GA, NM, LA and IL first.
+- **11. First wave:** LA, New York and Atlanta crew, plus SAG-AFTRA, DGA and WGA 2026.
+- **12. Who verifies:** the owner or the line producer who shared the library, uncredited.
+
+Still open: 5, 6, 8, 9, 10, 13, 14 and 15 (none blocks phases 0 to 2).
+
+### The questions as first asked
+
+
 1. **Shipping threshold**: only rows a person verified against the public source? (The
    plan assumes yes.) Or also `cross_checked` cards, with a visible badge?
 2. **Check-only material**: keep cross-checking against the purchased payroll guide and the
