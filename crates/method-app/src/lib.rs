@@ -11,6 +11,7 @@ pub mod actuals;
 pub mod app;
 pub mod apply;
 pub mod batch;
+pub mod bookmark;
 pub mod clipboard;
 pub mod coa_import;
 pub mod compare;

@@ -20,16 +20,18 @@
 //!   untouched Untitled budget alone in the window), with no file, as one
 //!   undo step.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::{Mutex, MutexGuard, OnceLock};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use method_core::{starter, Budget, Dec};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Runtime, State, WebviewWindow};
+use tauri_plugin_dialog::DialogExt;
 
-use crate::app::{finish, AppState, DocId};
+use crate::app::{finish, safe_file_stem, AppState, DocId};
+use crate::bookmark::{self, Tracked};
 use crate::edit::{self, InfoInput};
 use crate::safety::{self, Access};
 use crate::safety_app::Safety;
@@ -40,6 +42,11 @@ use crate::view::View;
 pub const PIN_LIMIT: usize = 100;
 /// The pinned list's file, in the app's local data folder.
 pub const START_FILE: &str = "start.json";
+/// The kept summaries (title, net total, currency) of listed files, beside
+/// [`START_FILE`], so a start doesn't read every file again.
+pub const CACHE_FILE: &str = "start-cache.json";
+/// Most summaries kept.
+const CACHE_LIMIT: usize = 200;
 /// Longest title, and longest text field, the form takes.
 const TITLE_MAX: usize = 200;
 const TEXT_MAX: usize = 100;
@@ -51,20 +58,49 @@ const TEXT_MAX: usize = 100;
 struct StartJson {
     #[serde(default)]
     pinned: Vec<String>,
+    /// Each pinned file's bookmark, by path, as hex (src/bookmark.rs).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    bookmarks: BTreeMap<String, String>,
+    /// The folder the last new budget was saved in (New Budget's Save In).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_folder: Option<String>,
 }
 
 /// What a file holds, for its row.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct Summary {
     title: String,
     net_total: Option<i64>,
     currency: String,
 }
 
+/// A file's modified time and size: its summary is read again only when
+/// one of them changes.
+type Stamp = (Option<SystemTime>, u64);
+
 /// A file's summary, with the modified time and size it was read at.
 struct Cached {
-    stamp: (Option<SystemTime>, u64),
+    stamp: Stamp,
     summary: Result<Summary, String>,
+}
+
+/// One kept summary in [`CACHE_FILE`].
+#[derive(Serialize, Deserialize)]
+struct CachedJson {
+    path: String,
+    /// Modified time: seconds and nanoseconds since 1970.
+    modified: Option<(u64, u32)>,
+    size: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    summary: Option<Summary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    problem: Option<String>,
+}
+
+#[derive(Default, Serialize, Deserialize)]
+struct CacheJson {
+    #[serde(default)]
+    files: Vec<CachedJson>,
 }
 
 #[derive(Default)]
@@ -73,15 +109,27 @@ struct Inner {
     /// The last listing: token -> file.
     listed: Vec<(u64, PathBuf)>,
     cache: HashMap<PathBuf, Cached>,
+    /// The cache differs from [`CACHE_FILE`].
+    cache_changed: bool,
     /// The budget file last picked as New Budget's starting point.
     picked: Option<(u64, Budget)>,
+    /// The folder New Budget saves in, as last given to the page.
+    folder: Option<(u64, PathBuf)>,
+}
+
+/// The pinned list and the folder new budgets were last saved in.
+#[derive(Default)]
+struct Kept {
+    pinned: Vec<Tracked>,
+    last_folder: Option<PathBuf>,
 }
 
 /// The start window's state (one per app).
 #[derive(Default)]
 pub struct StartState {
     file: Option<PathBuf>,
-    pinned: Mutex<Vec<PathBuf>>,
+    cache_file: Option<PathBuf>,
+    kept: Mutex<Kept>,
     inner: Mutex<Inner>,
 }
 
@@ -89,64 +137,179 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+fn stamp_json(t: Option<SystemTime>) -> Option<(u64, u32)> {
+    let d = t?.duration_since(UNIX_EPOCH).ok()?;
+    Some((d.as_secs(), d.subsec_nanos()))
+}
+
+fn stamp_time(t: Option<(u64, u32)>) -> Option<SystemTime> {
+    let (s, n) = t?;
+    UNIX_EPOCH.checked_add(Duration::new(s, n.min(999_999_999)))
+}
+
+/// The summaries kept in `file` (none when missing or unreadable).
+fn load_cache(file: Option<&Path>) -> HashMap<PathBuf, Cached> {
+    file.and_then(|f| std::fs::read_to_string(f).ok())
+        .and_then(|t| serde_json::from_str::<CacheJson>(&t).ok())
+        .unwrap_or_default()
+        .files
+        .into_iter()
+        .take(CACHE_LIMIT)
+        .filter_map(|c| {
+            let summary = match (c.summary, c.problem) {
+                (Some(s), _) => Ok(s),
+                (None, Some(p)) => Err(p),
+                (None, None) => return None,
+            };
+            let stamp = (stamp_time(c.modified), c.size);
+            Some((PathBuf::from(c.path), Cached { stamp, summary }))
+        })
+        .collect()
+}
+
 impl StartState {
-    /// The pinned list kept in `file` (none: nothing is kept between runs).
-    /// A missing or unreadable file is an empty list.
+    /// The pinned list kept in `file` (none: nothing is kept between runs),
+    /// and the summaries kept beside it in [`CACHE_FILE`]. A missing or
+    /// unreadable file is an empty list.
     pub fn load(file: Option<PathBuf>) -> StartState {
-        let pinned = file
+        let json = file
             .as_deref()
             .and_then(|f| std::fs::read_to_string(f).ok())
             .and_then(|t| serde_json::from_str::<StartJson>(&t).ok())
-            .unwrap_or_default()
-            .pinned
-            .into_iter()
-            .filter(|s| !s.is_empty())
-            .map(PathBuf::from)
-            .take(PIN_LIMIT)
-            .collect();
+            .unwrap_or_default();
+        let mut pinned = bookmark::load_list(json.pinned, &json.bookmarks);
+        pinned.truncate(PIN_LIMIT);
+        let cache_file = file
+            .as_deref()
+            .and_then(Path::parent)
+            .map(|d| d.join(CACHE_FILE));
+        let cache = load_cache(cache_file.as_deref());
         StartState {
             file,
-            pinned: Mutex::new(pinned),
-            inner: Mutex::default(),
+            cache_file,
+            kept: Mutex::new(Kept {
+                pinned,
+                last_folder: json
+                    .last_folder
+                    .filter(|s| !s.is_empty())
+                    .map(PathBuf::from),
+            }),
+            inner: Mutex::new(Inner {
+                cache,
+                ..Inner::default()
+            }),
         }
     }
 
     pub fn pinned(&self) -> Vec<PathBuf> {
-        lock(&self.pinned).clone()
+        lock(&self.kept)
+            .pinned
+            .iter()
+            .map(|t| t.path.clone())
+            .collect()
     }
 
     /// Pins `path` (at the top) or unpins it.
     pub fn set_pinned(&self, path: &Path, on: bool) -> Result<(), String> {
         let path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-        let mut list = lock(&self.pinned);
-        list.retain(|p| *p != path);
+        let mut kept = lock(&self.kept);
+        let was = kept
+            .pinned
+            .iter()
+            .position(|t| t.path == path)
+            .map(|i| kept.pinned.remove(i));
         if on {
-            if list.len() >= PIN_LIMIT {
+            if kept.pinned.len() >= PIN_LIMIT {
                 return Err(format!(
                     "At most {PIN_LIMIT} budgets can be pinned. Unpin one first."
                 ));
             }
-            list.insert(0, path);
+            let t = was
+                .filter(|t| t.mark.is_some())
+                .unwrap_or_else(|| Tracked::new(path));
+            kept.pinned.insert(0, t);
         }
-        self.save(&list)
+        self.save(&kept)
     }
 
-    fn save(&self, list: &[PathBuf]) -> Result<(), String> {
+    /// Follows pinned files moved or renamed in the Finder since (their
+    /// bookmarks). True if any moved.
+    pub fn follow_pinned(&self) -> bool {
+        let mut kept = lock(&self.kept);
+        let moved = bookmark::follow_all(&mut kept.pinned);
+        if moved {
+            let _ = self.save(&kept);
+        }
+        moved
+    }
+
+    /// The folder the last new budget was saved in.
+    pub fn last_folder(&self) -> Option<PathBuf> {
+        lock(&self.kept).last_folder.clone()
+    }
+
+    fn set_last_folder(&self, dir: &Path) -> Result<(), String> {
+        let mut kept = lock(&self.kept);
+        kept.last_folder = Some(dir.to_path_buf());
+        self.save(&kept)
+    }
+
+    fn save(&self, kept: &Kept) -> Result<(), String> {
         let Some(file) = &self.file else {
             return Ok(());
         };
         if let Some(dir) = file.parent() {
             safety::create_private_dir(dir).map_err(|e| e.to_string())?;
         }
+        let (pinned, bookmarks) = bookmark::save_list(&kept.pinned);
         let json = StartJson {
-            pinned: list
-                .iter()
-                .filter_map(|p| p.to_str().map(str::to_string))
-                .collect(),
+            pinned,
+            bookmarks,
+            last_folder: kept
+                .last_folder
+                .as_deref()
+                .and_then(Path::to_str)
+                .map(str::to_string),
         };
         let bytes = serde_json::to_vec_pretty(&json).map_err(|e| e.to_string())?;
         safety::write_atomically(file, &bytes, Access::Private)
             .map_err(|e| format!("Couldn't keep the pinned list: {e}"))
+    }
+
+    /// Writes the summaries to [`CACHE_FILE`] when they changed. Best
+    /// effort: without it the next start reads the files again.
+    fn save_cache(&self, g: &mut Inner) {
+        let Some(file) = &self.cache_file else {
+            return;
+        };
+        if !g.cache_changed {
+            return;
+        }
+        let mut files: Vec<CachedJson> = g
+            .cache
+            .iter()
+            .filter_map(|(p, c)| {
+                Some(CachedJson {
+                    path: p.to_str()?.to_string(),
+                    modified: stamp_json(c.stamp.0),
+                    size: c.stamp.1,
+                    summary: c.summary.as_ref().ok().cloned(),
+                    problem: c.summary.as_ref().err().cloned(),
+                })
+            })
+            .collect();
+        files.sort_by(|a, b| a.path.cmp(&b.path));
+        let Ok(bytes) = serde_json::to_vec_pretty(&CacheJson { files }) else {
+            return;
+        };
+        if let Some(dir) = file.parent() {
+            if safety::create_private_dir(dir).is_err() {
+                return;
+            }
+        }
+        if safety::write_atomically(file, &bytes, Access::Private).is_ok() {
+            g.cache_changed = false;
+        }
     }
 
     /// The file listed under `token` in the last listing.
@@ -173,6 +336,23 @@ impl StartState {
         match (&g.picked, token) {
             (Some((t, b)), Some(want)) if *t == want => Ok(b.clone()),
             _ => Err("Choose the budget file to start from again.".into()),
+        }
+    }
+
+    /// Keeps `dir` as the folder to save in; its token.
+    fn keep_folder(&self, dir: PathBuf) -> u64 {
+        let mut g = lock(&self.inner);
+        g.token += 1;
+        let t = g.token;
+        g.folder = Some((t, dir));
+        t
+    }
+
+    fn folder(&self, token: u64) -> Result<PathBuf, String> {
+        let g = lock(&self.inner);
+        match &g.folder {
+            Some((t, dir)) if *t == token => Ok(dir.clone()),
+            _ => Err("Choose the folder to save in again.".into()),
         }
     }
 }
@@ -270,9 +450,11 @@ fn read_summary(path: &Path) -> Result<Summary, String> {
 }
 
 /// Lists `pinned` then `recent` (without the pinned ones), giving each a
-/// new token. Open budgets are summed from their tabs; files from the cache
-/// or the disk.
+/// new token. Pinned files moved in the Finder are followed first. Open
+/// budgets are summed from their tabs; files from the kept summaries (by
+/// modified time and size) or the disk.
 fn list(state: &AppState, start: &StartState, recent: &[PathBuf]) -> StartView {
+    start.follow_pinned();
     let pinned = start.pinned();
     let home = home();
     // The budgets open in tabs, by file (their unsaved changes count).
@@ -311,6 +493,7 @@ fn list(state: &AppState, start: &StartState, recent: &[PathBuf]) -> StartView {
                     Some(c) if c.stamp == stamp => c.summary.clone(),
                     _ => {
                         let summary = read_summary(path);
+                        g.cache_changed = true;
                         g.cache.insert(
                             path.to_path_buf(),
                             Cached {
@@ -355,7 +538,10 @@ fn list(state: &AppState, start: &StartState, recent: &[PathBuf]) -> StartView {
         .collect();
     // Summaries of files no longer listed aren't needed again soon.
     let keep: Vec<PathBuf> = g.listed.iter().map(|(_, p)| p.clone()).collect();
+    let before = g.cache.len();
     g.cache.retain(|p, _| keep.contains(p));
+    g.cache_changed |= g.cache.len() != before;
+    start.save_cache(g);
     StartView {
         pinned: pinned_rows,
         recent: recent_rows,
@@ -456,6 +642,11 @@ pub struct NewBudgetSpec {
     pub fringe_posting: String,
     /// `binary` or `exact` (blank: as the starting point has it).
     pub arithmetic: String,
+    /// Save In: the folder's token (from `new_budget_folder` or
+    /// `new_budget_pick_folder`). `None`: the budget opens with no file.
+    pub folder: Option<u64>,
+    /// The file's name, with or without `.mthd` (blank: from the title).
+    pub file_name: String,
 }
 
 fn text(field: &str, value: &str, max: usize) -> Result<String, String> {
@@ -635,16 +826,174 @@ pub fn open_new(state: &AppState, safety: &Safety, b: Budget) -> Result<DocId, S
 }
 
 // ---------------------------------------------------------------------------
+// Charts of accounts to start from
+
+/// A bundled chart of accounts, as New Budget lists it.
+#[derive(Clone, Debug, Serialize)]
+pub struct ChartChoice {
+    pub id: &'static str,
+    pub name: &'static str,
+    /// `Feature`, `Television`, `Commercial` or `Other`.
+    pub group: &'static str,
+    pub description: &'static str,
+    /// Our own chart, not one that follows a studio's or network's
+    /// (those are numbers, names and levels only, decision 51).
+    pub ours: bool,
+    pub categories: usize,
+    pub accounts: usize,
+}
+
+/// Every bundled chart with its size, read once per run.
+pub fn chart_choices() -> &'static [ChartChoice] {
+    static CHOICES: OnceLock<Vec<ChartChoice>> = OnceLock::new();
+    CHOICES.get_or_init(|| {
+        method_format::charts::all()
+            .iter()
+            .map(|c| {
+                let (categories, accounts) = c
+                    .budget()
+                    .map(|b| {
+                        (
+                            b.categories().count(),
+                            b.categories().map(|c| c.accounts.len()).sum(),
+                        )
+                    })
+                    .unwrap_or((0, 0));
+                ChartChoice {
+                    id: c.id,
+                    name: c.name,
+                    group: c.group,
+                    description: c.description,
+                    // Our charts are described as ours by the manifest
+                    // (templates/charts/charts.json); the studios' as
+                    // following one.
+                    ours: c.description.starts_with("Our own"),
+                    categories,
+                    accounts,
+                }
+            })
+            .collect()
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Save In
+
+/// The folder New Budget offers first: the one the last new budget was
+/// saved in, else Documents, else the home folder (each only while it is a
+/// folder).
+fn default_folder(
+    last: Option<PathBuf>,
+    documents: Option<PathBuf>,
+    home: Option<PathBuf>,
+) -> Option<PathBuf> {
+    [last, documents, home]
+        .into_iter()
+        .flatten()
+        .find(|d| d.is_dir())
+}
+
+/// The file name's stem from what was typed (blank: from `title`), without
+/// the budget extension. Refused when it can't be a file's name.
+pub fn file_stem_for(typed: &str, title: &str) -> Result<String, String> {
+    let typed = typed.trim();
+    let ext = format!(".{}", method_format::EXTENSION);
+    let typed = match typed.len().checked_sub(ext.len()) {
+        Some(at) if typed.is_char_boundary(at) && typed[at..].eq_ignore_ascii_case(&ext) => {
+            typed[..at].trim()
+        }
+        _ => typed,
+    };
+    if typed.is_empty() {
+        return Ok(safe_file_stem(title));
+    }
+    if typed.chars().count() > TITLE_MAX {
+        return Err(format!(
+            "The file name is too long: at most {TITLE_MAX} characters."
+        ));
+    }
+    if typed
+        .chars()
+        .any(|c| c.is_control() || "/\\:*?\"<>|".contains(c))
+    {
+        return Err("A file name can't have / \\ : * ? \" < > or |.".into());
+    }
+    if typed.starts_with('.') {
+        return Err("A file name can't start with a dot.".into());
+    }
+    Ok(typed.to_string())
+}
+
+/// `stem` with the budget extension.
+fn file_name(stem: &str) -> String {
+    format!("{stem}.{}", method_format::EXTENSION)
+}
+
+/// The first of "`stem` 2", "`stem` 3"… with no file of that name in `dir`.
+fn free_stem(dir: &Path, stem: &str) -> String {
+    (2..10_000)
+        .map(|n| format!("{stem} {n}"))
+        .find(|s| std::fs::symlink_metadata(dir.join(file_name(s))).is_err())
+        .unwrap_or_else(|| format!("{stem} copy"))
+}
+
+/// What saving a new budget into a folder came to.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Made {
+    /// Written and opened in front, as a saved budget.
+    Opened(DocId, PathBuf),
+    /// A file of that name is there already; nothing was written. A free
+    /// name to offer instead.
+    Taken(String),
+}
+
+/// Writes `b` as `stem`.mthd in `dir`, never over a file that is there, and
+/// opens it in front as a saved budget (in place of an untouched Untitled
+/// budget alone in the window), listed in Open Recent.
+pub fn save_new(
+    state: &AppState,
+    safety: &Safety,
+    b: &Budget,
+    dir: &Path,
+    stem: &str,
+) -> Result<Made, String> {
+    if !dir.is_dir() {
+        return Err("That folder isn't there any more. Choose another one.".into());
+    }
+    let path = dir.join(file_name(stem));
+    let text = method_format::to_string(b);
+    match safety::write_new(&path, text.as_bytes()) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            return Ok(Made::Taken(free_stem(dir, stem)));
+        }
+        Err(e) => {
+            return Err(format!(
+                "Couldn't save in {}: {e}.",
+                folder_text(Some(dir), home().as_deref())
+            ))
+        }
+    }
+    let id = crate::safety_app::open_path(state, safety, &path)?;
+    Ok(Made::Opened(id, path))
+}
+
+// ---------------------------------------------------------------------------
 // Commands (registered in app.rs, build.rs and capabilities/main.json; only
 // the main window may call them)
 
 /// The pinned and recent budgets, each with a token for the other commands.
+/// Files moved or renamed in the Finder are followed first.
 #[tauri::command]
-pub async fn start_list(
+pub async fn start_list<R: Runtime>(
+    app: AppHandle<R>,
     state: State<'_, AppState>,
     safety: State<'_, Safety>,
     start: State<'_, StartState>,
 ) -> Result<StartView, String> {
+    if safety.follow_recent() {
+        crate::safety_app::refresh_menu(&app);
+    }
     Ok(list(&state, &start, &safety.recent_paths()))
 }
 
@@ -745,16 +1094,75 @@ pub async fn new_budget_pick_template<R: Runtime>(
     Ok(Some(PickedTemplate { token, ..picked }))
 }
 
+/// A folder to save a new budget in, as the page sees it.
+#[derive(Debug, Serialize)]
+pub struct FolderChoice {
+    /// Names it to `new_budget_create`.
+    pub token: u64,
+    /// The folder, the home folder written `~`.
+    pub folder: String,
+}
+
+/// The folder New Budget offers to save in: the one the last new budget
+/// went to, else Documents, else the home folder. `None` when none is there.
+#[tauri::command]
+pub fn new_budget_folder<R: Runtime>(
+    app: AppHandle<R>,
+    start: State<'_, StartState>,
+) -> Option<FolderChoice> {
+    let dir = default_folder(start.last_folder(), app.path().document_dir().ok(), home())?;
+    let folder = folder_text(Some(&dir), home().as_deref());
+    let token = start.keep_folder(dir);
+    Some(FolderChoice { token, folder })
+}
+
+/// Shows a folder dialog (from the folder `current` names, when given) for
+/// New Budget's Save In. `None` when cancelled.
+#[tauri::command]
+pub async fn new_budget_pick_folder<R: Runtime>(
+    window: WebviewWindow<R>,
+    start: State<'_, StartState>,
+    current: Option<u64>,
+) -> Result<Option<FolderChoice>, String> {
+    let mut dialog = window
+        .dialog()
+        .file()
+        .set_title("Save the new budget in")
+        .set_parent(&window);
+    if let Some(dir) = current.and_then(|t| start.folder(t).ok()) {
+        dialog = dialog.set_directory(dir);
+    }
+    let Some(picked) = dialog.blocking_pick_folder() else {
+        return Ok(None);
+    };
+    let dir = picked.into_path().map_err(|e| e.to_string())?;
+    let folder = folder_text(Some(&dir), home().as_deref());
+    let token = start.keep_folder(dir);
+    Ok(Some(FolderChoice { token, folder }))
+}
+
+/// Every bundled chart of accounts, with its group, description and size.
+#[tauri::command]
+pub async fn new_budget_charts() -> Result<Vec<ChartChoice>, String> {
+    Ok(chart_choices().to_vec())
+}
+
 /// What `new_budget_create` made.
 #[derive(Debug, Serialize)]
 pub struct Created {
-    pub view: View,
+    /// The new budget in front (`None` when nothing was made: `taken`).
+    pub view: Option<View>,
     pub message: String,
+    /// A file of the name asked for is in the folder already, so nothing was
+    /// made: a free name to offer (its stem, like "Big Show 2").
+    pub taken: Option<String>,
 }
 
 /// Makes the budget New Budget's form describes and opens it in front (in
 /// place of an untouched Untitled budget alone in the window, else in a new
-/// tab), with no file, as one undo step.
+/// tab). With a folder, it is saved there first, never over another file,
+/// and opens as a saved budget listed in Open Recent; without, it opens with
+/// no file, as one undo step.
 #[tauri::command]
 pub fn new_budget_create<R: Runtime>(
     window: WebviewWindow<R>,
@@ -768,12 +1176,42 @@ pub fn new_budget_create<R: Runtime>(
     } else {
         None
     };
+    let folder = spec.folder.map(|t| start.folder(t)).transpose()?;
     let (b, message) = build(&spec, template.as_ref())?;
-    let id = open_new(&state, &safety, b)?;
-    Ok(Created {
-        view: finish(&window, &mut state.lock_doc(Some(id))?, None),
-        message,
-    })
+    let Some(dir) = folder else {
+        let id = open_new(&state, &safety, b)?;
+        return Ok(Created {
+            view: Some(finish(&window, &mut state.lock_doc(Some(id))?, None)),
+            message,
+            taken: None,
+        });
+    };
+    let stem = file_stem_for(&spec.file_name, &b.title)?;
+    let where_ = folder_text(Some(&dir), home().as_deref());
+    match save_new(&state, &safety, &b, &dir, &stem)? {
+        Made::Taken(free) => Ok(Created {
+            view: None,
+            message: format!(
+                "A file named \"{}\" is already in {where_}. Pick another name.",
+                file_name(&stem)
+            ),
+            taken: Some(free),
+        }),
+        Made::Opened(id, _) => {
+            // Best effort: the budget is saved either way.
+            let _ = start.set_last_folder(&dir);
+            crate::safety_app::refresh_menu(window.app_handle());
+            Ok(Created {
+                view: Some(finish(&window, &mut state.lock_doc(Some(id))?, None)),
+                message: format!(
+                    "{}, saved in {where_} as {}.",
+                    message.trim_end_matches('.'),
+                    file_name(&stem)
+                ),
+                taken: None,
+            })
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1122,5 +1560,203 @@ mod tests {
         let newer = start.keep_picked(starter::blank("B", "USD"));
         assert!(start.picked(Some(t)).is_err(), "only the last one is kept");
         assert_eq!(start.picked(Some(newer)).unwrap().title, "B");
+    }
+
+    #[test]
+    fn every_bundled_chart_is_listed_with_its_size() {
+        let charts = chart_choices();
+        assert_eq!(charts.len(), method_format::charts::all().len());
+        assert!(charts.iter().all(|c| c.accounts > 0 && c.categories > 0));
+        assert!(charts
+            .iter()
+            .all(|c| method_format::charts::GROUPS.contains(&c.group)));
+        // The charts each production type starts from are our own.
+        for id in ["feature", "tv-one-hour", "commercial", "documentary"] {
+            let c = charts.iter().find(|c| c.id == id).unwrap();
+            assert!(c.ours, "{id}");
+        }
+        assert!(charts.iter().any(|c| !c.ours), "studio charts too");
+    }
+
+    #[test]
+    fn file_names_come_from_the_title_or_what_was_typed() {
+        assert_eq!(file_stem_for("", "Big Show").unwrap(), "Big Show");
+        assert_eq!(file_stem_for("  ", "A/B: C").unwrap(), "A B  C");
+        assert_eq!(file_stem_for("Pilot v3.MTHD", "X").unwrap(), "Pilot v3");
+        assert_eq!(file_stem_for("Pilot.mthd ", "X").unwrap(), "Pilot");
+        assert!(file_stem_for("a/b", "X")
+            .unwrap_err()
+            .contains("can't have"));
+        assert!(file_stem_for(".hidden", "X").unwrap_err().contains("dot"));
+        assert!(file_stem_for(&"x".repeat(201), "X").is_err());
+    }
+
+    #[test]
+    fn save_in_falls_back_from_the_last_folder_to_documents_to_home() {
+        let dir = safety::tests::temp_dir("start-folder");
+        let gone = dir.join("gone");
+        let docs = dir.join("Documents");
+        std::fs::create_dir(&docs).unwrap();
+        assert_eq!(
+            default_folder(Some(dir.clone()), Some(docs.clone()), None),
+            Some(dir.clone())
+        );
+        assert_eq!(
+            default_folder(Some(gone.clone()), Some(docs.clone()), Some(dir.clone())),
+            Some(docs)
+        );
+        assert_eq!(
+            default_folder(Some(gone.clone()), None, Some(dir.clone())),
+            Some(dir.clone())
+        );
+        assert_eq!(default_folder(Some(gone), None, None), None);
+        // The folder is named by its token, the last one given only.
+        let start = StartState::load(None);
+        let t = start.keep_folder(dir.clone());
+        assert_eq!(start.folder(t).unwrap(), dir);
+        assert!(start.folder(t + 1).is_err());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn create_saves_into_the_folder_and_never_over_a_file() {
+        let dir = std::fs::canonicalize(safety::tests::temp_dir("start-save")).unwrap();
+        let safety = Safety::new(Some(&dir.join("data")));
+        let state = AppState::with(Docs::default());
+        let (b, _) = build(&spec("Big Show"), None).unwrap();
+        let made = save_new(&state, &safety, &b, &dir, "Big Show").unwrap();
+        let path = dir.join("Big Show.mthd");
+        let Made::Opened(id, at) = made else {
+            panic!("not saved: {made:?}")
+        };
+        assert_eq!(at, path);
+        {
+            let docs = state.docs();
+            assert_eq!(docs.len(), 1, "in place of the untouched Untitled");
+            let s = docs.get(id).unwrap();
+            assert_eq!(s.path(), Some(path.as_path()));
+            assert!(!s.is_dirty(), "a saved budget");
+            assert_eq!(s.budget().title, "Big Show");
+        }
+        assert_eq!(safety.recent_paths(), std::slice::from_ref(&path));
+        let text = std::fs::read_to_string(&path).unwrap();
+
+        // The same name again: nothing written, a free name offered.
+        let (other, _) = build(&spec("Other"), None).unwrap();
+        assert_eq!(
+            save_new(&state, &safety, &other, &dir, "Big Show").unwrap(),
+            Made::Taken("Big Show 2".into())
+        );
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), text, "untouched");
+        assert_eq!(state.docs().len(), 1);
+        std::fs::write(dir.join("Big Show 2.mthd"), "x").unwrap();
+        assert_eq!(free_stem(&dir, "Big Show"), "Big Show 3");
+        // No temporary files are left behind.
+        let names: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|n| n.ends_with(".tmp"))
+            .collect();
+        assert!(names.is_empty(), "{names:?}");
+        // A folder that has gone is refused.
+        assert!(save_new(&state, &safety, &other, &dir.join("gone"), "X").is_err());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn summaries_are_kept_between_runs_until_the_file_changes() {
+        let dir = std::fs::canonicalize(safety::tests::temp_dir("start-cache")).unwrap();
+        let a = dir.join("a.mthd");
+        Session::with_budget(starter::blank("Alpha", "USD"), None)
+            .save_to(&a)
+            .unwrap();
+        let state = AppState::with(Docs::default());
+        let start = StartState::load(Some(dir.join(START_FILE)));
+        let v = list(&state, &start, std::slice::from_ref(&a));
+        assert_eq!(v.recent[0].title, "Alpha");
+        assert!(dir.join(CACHE_FILE).is_file(), "kept for the next start");
+
+        // The next run takes the kept summary without reading the file:
+        // a kept title that differs from the file's shows it was not read.
+        let kept = std::fs::read_to_string(dir.join(CACHE_FILE)).unwrap();
+        std::fs::write(
+            dir.join(CACHE_FILE),
+            kept.replace("\"Alpha\"", "\"From the cache\""),
+        )
+        .unwrap();
+        let start = StartState::load(Some(dir.join(START_FILE)));
+        let v = list(&state, &start, std::slice::from_ref(&a));
+        assert_eq!(v.recent[0].title, "From the cache");
+
+        // A changed file (another size) is read again.
+        Session::with_budget(starter::blank("Alpha, longer title", "USD"), None)
+            .save_to(&a)
+            .unwrap();
+        let v = list(&state, &start, std::slice::from_ref(&a));
+        assert_eq!(v.recent[0].title, "Alpha, longer title");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_pinned_file_moved_in_the_finder_is_followed() {
+        let dir = std::fs::canonicalize(safety::tests::temp_dir("start-moved")).unwrap();
+        let a = dir.join("a.mthd");
+        Session::with_budget(starter::blank("Alpha", "USD"), None)
+            .save_to(&a)
+            .unwrap();
+        let start = StartState::load(Some(dir.join(START_FILE)));
+        start.set_pinned(&a, true).unwrap();
+        let b = dir.join("renamed.mthd");
+        std::fs::rename(&a, &b).unwrap();
+        let state = AppState::with(Docs::default());
+        let v = list(&state, &start, &[]);
+        if cfg!(target_os = "macos") {
+            assert_eq!(v.pinned[0].file, "renamed.mthd");
+            assert_eq!(v.pinned[0].title, "Alpha");
+            // The new place is kept.
+            let again = StartState::load(Some(dir.join(START_FILE)));
+            assert_eq!(again.pinned(), [b]);
+        } else {
+            assert_eq!(
+                v.pinned[0].problem.as_deref(),
+                Some("Can't find this file.")
+            );
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn the_last_tab_closes_into_an_untouched_untitled_budget() {
+        let dir = safety::tests::temp_dir("start-last");
+        let safety = Safety::new(Some(&dir));
+        let state = AppState::with(Docs::default());
+        let id = state.docs().active();
+        state
+            .lock_doc(Some(id))
+            .unwrap()
+            .edit("Test edit", |b| edit::set_title(b, "Changed"))
+            .unwrap();
+        use crate::safety_app::{close_last_for_start, Closed};
+        assert_eq!(
+            close_last_for_start(&state, &safety, id, false).unwrap(),
+            Closed::Unsaved
+        );
+        assert_eq!(
+            close_last_for_start(&state, &safety, id, true).unwrap(),
+            Closed::Closed
+        );
+        let docs = state.docs();
+        assert_eq!(docs.len(), 1);
+        assert!(docs.lone_untouched().is_some(), "as at launch");
+        assert!(docs.get(id).is_none(), "the old budget is gone");
+        drop(docs);
+        // With other tabs open, it is an ordinary close.
+        let second = crate::safety_app::new_tab(&state);
+        assert_eq!(
+            close_last_for_start(&state, &safety, second, false).unwrap(),
+            Closed::Closed
+        );
+        assert_eq!(state.docs().len(), 1);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

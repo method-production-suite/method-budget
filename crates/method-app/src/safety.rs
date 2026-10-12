@@ -20,6 +20,7 @@
 //! tabs.json                   the budgets open as tabs, to reopen next time
 //! ```
 
+use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -27,6 +28,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
+
+use crate::bookmark::{self, Tracked};
 
 /// Autosave waits for this long without a change...
 pub const AUTOSAVE_QUIET: Duration = Duration::from_secs(3);
@@ -207,6 +210,51 @@ pub fn write_atomically(path: &Path, bytes: &[u8], access: Access) -> io::Result
     if let Ok(d) = File::open(&dir) {
         // The rename itself reaches the disk. Best effort: some file
         // systems can't sync a folder.
+        let _ = d.sync_all();
+    }
+    Ok(())
+}
+
+/// Writes `bytes` to `path`, a file that must not exist yet: it is never
+/// replaced (the error's kind is `AlreadyExists` then). Written whole to a
+/// temporary file first and linked into place, so `path` never holds half a
+/// file; where the file system has no links, renamed after checking again.
+pub fn write_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let taken = || {
+        io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "a file with that name is there",
+        )
+    };
+    if fs::symlink_metadata(path).is_ok() {
+        return Err(taken());
+    }
+    let dir = match path.parent() {
+        Some(d) if !d.as_os_str().is_empty() => d.to_path_buf(),
+        _ => PathBuf::from("."),
+    };
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "budget".into());
+    let tmp = dir.join(format!(".{name}.{}.tmp", unique()));
+    let result = (|| {
+        let mut f = create_new(&tmp, Access::Document)?;
+        f.write_all(bytes)?;
+        f.sync_all()?;
+        drop(f);
+        match fs::hard_link(&tmp, path) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => Err(e),
+            // No links here (some shares and removable drives).
+            Err(_) if fs::symlink_metadata(path).is_ok() => Err(taken()),
+            Err(_) => fs::rename(&tmp, path),
+        }
+    })();
+    let _ = fs::remove_file(&tmp);
+    result?;
+    #[cfg(unix)]
+    if let Ok(d) = File::open(&dir) {
         let _ = d.sync_all();
     }
     Ok(())
@@ -706,42 +754,51 @@ impl Settings {
 #[derive(Default, Serialize, Deserialize)]
 struct RecentJson {
     files: Vec<String>,
+    /// Each file's bookmark, by path, as hex (src/bookmark.rs): how a file
+    /// moved in the Finder is found again. Older lists have none.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    bookmarks: BTreeMap<String, String>,
 }
 
 /// File > Open Recent: the last [`RECENT_LIMIT`] budgets opened or saved,
-/// newest first, kept in `recent.json` (when there is a file to keep it in).
+/// newest first, kept in `recent.json` (when there is a file to keep it in),
+/// each with a bookmark where the system makes one, so a file moved or
+/// renamed in the Finder stays on the list at its new place.
 #[derive(Debug, Default)]
 pub struct RecentFiles {
     file: Option<PathBuf>,
-    list: Vec<PathBuf>,
+    list: Vec<Tracked>,
 }
 
 impl RecentFiles {
     /// Reads the list from `file`; a missing or unreadable file is an empty list.
     pub fn load(file: Option<PathBuf>) -> RecentFiles {
-        let list = file
+        let json = file
             .as_deref()
             .and_then(|f| fs::read_to_string(f).ok())
             .and_then(|t| serde_json::from_str::<RecentJson>(&t).ok())
-            .unwrap_or_default()
-            .files
-            .into_iter()
-            .filter(|s| !s.is_empty())
-            .map(PathBuf::from)
-            .take(RECENT_LIMIT)
-            .collect();
+            .unwrap_or_default();
+        let mut list = bookmark::load_list(json.files, &json.bookmarks);
+        list.truncate(RECENT_LIMIT);
         RecentFiles { file, list }
     }
 
-    pub fn paths(&self) -> &[PathBuf] {
-        &self.list
+    pub fn paths(&self) -> Vec<PathBuf> {
+        self.list.iter().map(|t| t.path.clone()).collect()
     }
 
     /// Puts `path` at the top (once), keeping at most [`RECENT_LIMIT`].
     pub fn add(&mut self, path: &Path) -> io::Result<()> {
         let path = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-        self.list.retain(|p| *p != path);
-        self.list.insert(0, path);
+        // The bookmark already kept for the file is kept; else one is made.
+        let kept = self
+            .list
+            .iter()
+            .position(|t| t.path == path)
+            .map(|i| self.list.remove(i))
+            .filter(|t| t.mark.is_some());
+        self.list
+            .insert(0, kept.unwrap_or_else(|| Tracked::new(path)));
         self.list.truncate(RECENT_LIMIT);
         self.save()
     }
@@ -750,19 +807,31 @@ impl RecentFiles {
     /// not touched).
     pub fn remove(&mut self, path: &Path) -> io::Result<()> {
         let canonical = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-        self.list.retain(|p| *p != canonical && p != path);
+        self.list.retain(|t| t.path != canonical && t.path != path);
         self.save()
     }
 
-    /// Drops files that no longer exist. True if any were dropped.
-    pub fn prune(&mut self) -> bool {
-        let before = self.list.len();
-        self.list.retain(|p| p.is_file());
-        let changed = self.list.len() != before;
+    /// Follows files moved or renamed since they were listed (their
+    /// bookmarks say where they went). True if any path changed.
+    pub fn follow(&mut self) -> bool {
+        let changed = bookmark::follow_all(&mut self.list);
         if changed {
             let _ = self.save();
         }
         changed
+    }
+
+    /// Follows moved files, then drops files that no longer exist. True if
+    /// any were dropped or moved.
+    pub fn prune(&mut self) -> bool {
+        let moved = self.follow();
+        let before = self.list.len();
+        self.list.retain(|t| t.path.is_file());
+        let changed = self.list.len() != before;
+        if changed {
+            let _ = self.save();
+        }
+        changed || moved
     }
 
     pub fn clear(&mut self) -> io::Result<()> {
@@ -777,13 +846,8 @@ impl RecentFiles {
         if let Some(dir) = file.parent() {
             create_private_dir(dir)?;
         }
-        let json = RecentJson {
-            files: self
-                .list
-                .iter()
-                .filter_map(|p| p.to_str().map(str::to_string))
-                .collect(),
-        };
+        let (files, bookmarks) = bookmark::save_list(&self.list);
+        let json = RecentJson { files, bookmarks };
         let bytes = serde_json::to_vec_pretty(&json).map_err(io::Error::other)?;
         write_atomically(file, &bytes, Access::Private)
     }
@@ -796,11 +860,12 @@ impl RecentFiles {
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_else(|| p.to_string_lossy().into_owned())
         };
-        self.list
+        let paths = self.paths();
+        paths
             .iter()
             .map(|p| {
                 let n = name(p);
-                let shared = self.list.iter().filter(|q| name(q) == n).count() > 1;
+                let shared = paths.iter().filter(|q| name(q) == n).count() > 1;
                 let label = match p.parent().and_then(Path::file_name) {
                     Some(dir) if shared => format!("{n} ({})", dir.to_string_lossy()),
                     _ => n,
@@ -1314,11 +1379,17 @@ pub(crate) mod tests {
     fn recent_labels_tell_same_named_files_apart() {
         let r = RecentFiles {
             file: None,
-            list: vec![
-                PathBuf::from("/films/One/budget.mthd"),
-                PathBuf::from("/films/Two/budget.mthd"),
-                PathBuf::from("/films/Rock & Roll.mthd"),
-            ],
+            list: [
+                "/films/One/budget.mthd",
+                "/films/Two/budget.mthd",
+                "/films/Rock & Roll.mthd",
+            ]
+            .into_iter()
+            .map(|p| Tracked {
+                path: PathBuf::from(p),
+                mark: None,
+            })
+            .collect(),
         };
         assert_eq!(
             r.labels(),

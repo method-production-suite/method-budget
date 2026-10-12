@@ -77,7 +77,7 @@ import { importActuals } from './actualsimport.js';
 import { saveShareCopy, newSubBudget, renderShareBanner, offerReturnedCopy } from './sharing.js';
 import { displayCommands, userDisplay, withoutZeroRows } from './display.js';
 import { setExplainTarget, explainTargetAt } from './explain.js';
-import { showStart, closeStart, startMenu, isStartOpen, startAtLaunch } from './start.js';
+import { showStart, closeStart, startMenu, isStartOpen, startAtLaunch, startOnLastClose } from './start.js';
 
 // The panes (pane.js): the first is always there, the second once the window
 // has been split. `target` is the pane commands act on; `cur` the pane `state`
@@ -1293,18 +1293,21 @@ function unsavedDialog(name) {
 /**
  * Closes budget `id`'s tab (Cmd+W: the one in front). Unsaved changes are
  * autosaved into the file first when Autosave is on; what is still unsaved
- * asks Save, Close Without Saving or Cancel. The last tab closes the window
- * instead, which asks about unsaved changes in Rust.
+ * asks Save, Close Without Saving or Cancel. The last tab gives its place to
+ * an untouched Untitled budget and the start window shows over it (start.js;
+ * decisions.md, entry 65); with the start window's box turned off, the last
+ * tab closes the window instead, which asks about unsaved changes in Rust.
  */
 async function closeTab(id = state.doc, pane = target) {
   // Split, with the budget in the other pane too: only this tab goes.
   const both = isSplit() && panes.every((p) => paneTabs(p).includes(id));
-  if (state.tabs.length <= 1 && !both) {
+  const last = state.tabs.length <= 1 && !both;
+  if (last && !startOnLastClose()) {
     closeWindow();
     return;
   }
   if (grid.editor) grid.commitEdit(null);
-  const where = isSplit() ? { pane: pane.index } : {};
+  const where = { ...(isSplit() ? { pane: pane.index } : {}), ...(last ? { toStart: true } : {}) };
   let r;
   try {
     r = await invoke('close_tab', { doc: id, discard: false, ...where });
@@ -1333,6 +1336,7 @@ async function closeTab(id = state.doc, pane = target) {
   if (r && r.closed && r.view) apply(r.view, { cmd: 'close_tab' });
   pane.tabMemory.delete(id);
   grid.focus();
+  if (last && r && r.closed) await openStart();
 }
 
 // ---------------------------------------------------------------------------

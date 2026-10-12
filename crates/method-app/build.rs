@@ -200,6 +200,9 @@ const COMMANDS: &[&str] = &[
     "start_reveal",
     "new_budget_pick_template",
     "new_budget_create",
+    "new_budget_folder",
+    "new_budget_pick_folder",
+    "new_budget_charts",
     // A whole budget from another program's export (src/export_import.rs)
     "export_import_pick",
     "export_import_preview",

@@ -221,7 +221,131 @@
   width: 100%;
 }
 
+/* Chart of accounts: what to start from, then the bundled charts by group. */
+
+.st-from {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.st-from-choice,
+.st-chart {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0 6px;
+  align-items: baseline;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.st-from-choice:has(input:checked),
+.st-chart:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--row-hover);
+}
+
+.st-from-choice input,
+.st-chart input {
+  margin: 0;
+}
+
+.st-from-name,
+.st-chart-name {
+  font-weight: 600;
+}
+
+.st-from-hint,
+.st-chart-desc {
+  grid-column: 2 / -1;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.st-chart-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.st-chart-pane[hidden],
+.st-file-pane[hidden] {
+  display: none;
+}
+
+.st-chart-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  overflow: auto;
+  padding: 2px 6px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.st-chart {
+  border-color: transparent;
+}
+
+.st-chart-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.st-chart-group {
+  margin: 8px 2px 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.st-chart-sub {
+  margin: 4px 2px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.st-file-pane,
+.st-folder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.st-picked,
+.st-folder-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-folder-text {
+  flex: 1 1 auto;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.st-folder-none {
+  white-space: normal;
+  color: var(--text-muted);
+}
+
+.st-from-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 @media (max-width: 640px) {
+  .st-from {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .st-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

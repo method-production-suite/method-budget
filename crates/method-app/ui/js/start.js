@@ -13,9 +13,18 @@ import { el, hasMod, shortcut } from './dom.js';
 import { customDialog } from './modal.js';
 import { money } from './format.js';
 import { readPref, writePref } from './prefs.js';
-import { groupCharts } from './importsetup.js';
 import { menuRunsAppKeys } from './shortcuts.js';
-import { KINDS, filterEntries, specFrom, startForKind, tvFields, whenText } from './startlist.js';
+import {
+  KINDS,
+  accountsText,
+  chartSections,
+  fileNameFrom,
+  filterEntries,
+  specFrom,
+  startForKind,
+  tvFields,
+  whenText,
+} from './startlist.js';
 
 /** The open start window: { box, close, menu(id) }, or null. */
 let current = null;
@@ -55,6 +64,16 @@ export function startAtLaunch() {
 }
 
 /**
+ * Whether closing the last tab shows the start window (over an untouched
+ * Untitled budget) rather than closing the window. The same box as at
+ * launch governs it: someone who turned the window off doesn't get it here
+ * either (decisions.md, entry 65).
+ */
+export function startOnLastClose() {
+  return startAtLaunch();
+}
+
+/**
  * Shows the start window. `ctx`: { invoke, apply(view, cmd), toast, focus }.
  * `opts.list`: a start_list result already fetched. Already open: just
  * brought back to its lists.
@@ -71,9 +90,10 @@ export async function showStart(ctx, opts = {}) {
     }
   }
   if (live()) return;
+  // The bundled charts with their sizes (src/start.rs, new_budget_charts).
   let charts = [];
   try {
-    charts = (await ctx.invoke('chart_templates')) || [];
+    charts = (await ctx.invoke('new_budget_charts')) || [];
   } catch (_) {
     charts = [];
   }
@@ -301,7 +321,7 @@ function open(ctx, first, charts) {
       el(
         'div',
         { class: 'st-foot' },
-        el('label', { class: 'rs-check', attrs: { for: 'st-at-start' } }, atStart, el('span', { text: 'Show this window when the app starts' })),
+        el('label', { class: 'rs-check', attrs: { for: 'st-at-start' } }, atStart, el('span', { text: 'Show this window when the app starts and when the last tab closes' })),
         closeBtn,
       ),
     ];
@@ -346,7 +366,7 @@ function open(ctx, first, charts) {
       inputs[key] = s;
       return el('label', { class: `modal-field st-span${span}`, attrs: { for: s.id } }, label, s);
     };
-    const heading = (text) => el('h3', { class: 'st-group-title', text });
+    const heading = (text, id) => el('h3', { class: 'st-group-title', text, attrs: { id } });
 
     const title = field('title', 'Title', { span: 4, max: 200, placeholder: 'The production’s name' });
     const kind = select('kind', 'Production type', KINDS, { span: 2, value: 'feature' });
@@ -356,40 +376,158 @@ function open(ctx, first, charts) {
     const date = (key, label) => field(key, label, { placeholder: 'YYYY-MM-DD', max: 10 });
     const num = (key, label) => field(key, label, { max: 12 });
 
-    // Start From: our starting points, the bundled charts by group, a picked file.
-    const startSel = el('select', { class: 'modal-input', attrs: { id: 'st-f-start' } });
-    const ours = el('optgroup', { attrs: { label: 'Starting points' } });
-    ours.append(
-      el('option', { text: 'Starter budget: a small sample with placeholder rates', attrs: { value: 'starter' } }),
-      el('option', { text: 'Empty: no categories yet', attrs: { value: 'blank' } }),
-    );
-    startSel.append(ours);
-    for (const [group, cs] of groupCharts(charts)) {
-      const g = el('optgroup', { attrs: { label: `Charts of accounts: ${group}` } });
-      for (const c of cs) g.append(el('option', { text: c.name, attrs: { value: `chart:${c.id}` } }));
-      startSel.append(g);
-    }
-    const fileGroup = el('optgroup', { attrs: { label: 'A budget file' } });
+    // -----------------------------------------------------------------------
+    // Chart of accounts: a bundled chart (the type's own by default), the
+    // starter budget, an empty budget or a picked budget file.
+
+    let from = charts.length ? 'chart' : 'starter';
+    let chartId = (startForKind('feature', charts) || '').replace(/^chart:/, '') || (charts[0] && charts[0].id) || '';
+    let fromTouched = false; // From or the chart changed by hand: the type no longer picks
     let picked = null;
-    let startTouched = false;
-    startSel.value = startForKind('feature', charts) || 'starter';
-    startSel.addEventListener('change', () => {
-      startTouched = true;
+    let chartQuery = '';
+
+    const fromChoices = [
+      ['chart', 'A chart of accounts', 'Categories and accounts, no lines'],
+      ['starter', 'Starter budget', 'A small sample with placeholder rates'],
+      ['blank', 'Empty', 'No categories yet'],
+      ['file', 'A budget file', 'Its chart and setup, no lines'],
+    ];
+    const fromRadios = {};
+    const fromRow = el('div', { class: 'st-from st-span4', attrs: { role: 'radiogroup', 'aria-labelledby': 'st-from-title' } });
+    for (const [value, label, hint] of fromChoices) {
+      const r = el('input', { attrs: { type: 'radio', name: 'st-from', value, id: `st-from-${value}` } });
+      if (value === 'chart' && !charts.length) r.disabled = true;
+      fromRadios[value] = r;
+      fromRow.append(
+        el(
+          'label',
+          { class: 'st-from-choice', attrs: { for: r.id } },
+          r,
+          el('span', { class: 'st-from-name', text: label }),
+          el('span', { class: 'st-from-hint', text: hint }),
+        ),
+      );
+    }
+
+    const chartSearch = el('input', {
+      class: 'modal-input st-chart-search',
+      attrs: { type: 'search', placeholder: 'Find a chart by name', 'aria-label': 'Find a chart', spellcheck: 'false', autocomplete: 'off' },
     });
-    const pickBtn = el('button', { class: 'btn', text: 'Use a Budget File…', attrs: { type: 'button' } });
-    pickBtn.addEventListener('click', () =>
+    const chartList = el('div', { class: 'st-chart-list', attrs: { role: 'radiogroup', 'aria-label': 'Charts of accounts' } });
+    const chartPane = el('div', { class: 'st-chart-pane st-span4' }, chartSearch, chartList);
+    const pickBtn = el('button', { class: 'btn', text: 'Choose File…', attrs: { type: 'button' } });
+    const pickedText = el('span', { class: 'st-picked' });
+    const filePane = el('div', { class: 'st-file-pane st-span4' }, pickBtn, pickedText);
+    const fromNote = el('p', { class: 'st-from-note st-span4', attrs: { 'aria-live': 'polite' } });
+
+    const chartById = (id) => charts.find((c) => c.id === id) || null;
+
+    const drawCharts = () => {
+      const sections = chartSections(charts, inputs.kind.value, chartQuery);
+      const row = (c) => {
+        const r = el('input', { attrs: { type: 'radio', name: 'st-chart', value: c.id, id: `st-chart-${c.id}` } });
+        r.checked = c.id === chartId;
+        r.addEventListener('change', () => {
+          chartId = c.id;
+          fromTouched = true;
+          drawNote();
+        });
+        return el(
+          'label',
+          { class: 'st-chart', attrs: { for: r.id } },
+          r,
+          el('span', { class: 'st-chart-name', text: c.name }),
+          el('span', { class: 'st-chart-count', text: accountsText(c.accounts) }),
+          el('span', { class: 'st-chart-desc', text: c.description || '' }),
+        );
+      };
+      const parts = [];
+      for (const s of sections) {
+        parts.push(el('h4', { class: 'st-chart-group', text: s.group }));
+        parts.push(...s.ours.map(row));
+        if (s.studio.length) {
+          parts.push(el('p', { class: 'st-chart-sub', text: 'Studio and network charts: numbers, names and levels only' }));
+          parts.push(...s.studio.map(row));
+        }
+      }
+      if (!parts.length) parts.push(el('p', { class: 'st-empty', text: `No chart matches "${chartQuery.trim()}".` }));
+      chartList.replaceChildren(...parts);
+    };
+
+    const drawNote = () => {
+      let text = '';
+      if (from === 'chart') {
+        const c = chartById(chartId);
+        text = c ? `${c.name}: ${accountsText(c.accounts)} in ${c.categories} ${c.categories === 1 ? 'category' : 'categories'}.` : 'Choose a chart.';
+      } else if (from === 'starter') text = 'The starter budget: a few categories with sample lines and placeholder rates.';
+      else if (from === 'blank') text = 'An empty budget: add categories and accounts yourself.';
+      else if (from === 'file') {
+        text = picked
+          ? `${picked.file}: ${accountsText(picked.accounts) || 'no accounts'} in ${picked.categories} ${picked.categories === 1 ? 'category' : 'categories'}.`
+          : 'Choose the budget file to start from.';
+      }
+      fromNote.textContent = text;
+    };
+
+    const showFrom = () => {
+      for (const [v, r] of Object.entries(fromRadios)) r.checked = v === from;
+      chartPane.hidden = from !== 'chart';
+      filePane.hidden = from !== 'file';
+      pickedText.textContent = picked ? (picked.title && picked.title !== picked.file ? `${picked.file} (${picked.title})` : picked.file) : '';
+      drawNote();
+    };
+
+    const pickFile = () =>
       once(async () => {
         const p = await ctx.invoke('new_budget_pick_template');
-        if (!p) return;
-        picked = p;
-        const label = p.title && p.title !== p.file ? `${p.file} (${p.title})` : p.file;
-        fileGroup.replaceChildren(el('option', { text: label, attrs: { value: 'file' } }));
-        if (!fileGroup.parentNode) startSel.append(fileGroup);
-        startSel.value = 'file';
-        startTouched = true;
-        startSel.focus();
-      }),
-    );
+        if (p) {
+          picked = p;
+          from = 'file';
+          fromTouched = true;
+        } else if (!picked && from === 'file') {
+          // Cancelled with nothing picked: back to a chart (or the starter).
+          from = charts.length ? 'chart' : 'starter';
+        }
+        showFrom();
+        fromRadios[from].focus();
+      });
+
+    for (const [v, r] of Object.entries(fromRadios)) {
+      r.addEventListener('change', () => {
+        if (!r.checked) return;
+        from = v;
+        fromTouched = true;
+        showFrom();
+        if (v === 'file' && !picked) pickFile();
+      });
+    }
+    pickBtn.addEventListener('click', pickFile);
+    chartSearch.addEventListener('input', () => {
+      chartQuery = chartSearch.value;
+      drawCharts();
+    });
+    chartSearch.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && chartSearch.value) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        chartSearch.value = '';
+        chartQuery = '';
+        drawCharts();
+      } else if (ev.key === 'ArrowDown' || ev.key === 'Enter') {
+        // Into the list: the chosen chart, else the first shown.
+        ev.preventDefault();
+        ev.stopPropagation();
+        const radios = [...chartList.querySelectorAll('input[type=radio]')];
+        const r = radios.find((x) => x.checked) || radios[0];
+        if (r) {
+          if (!r.checked) {
+            r.checked = true;
+            r.dispatchEvent(new Event('change'));
+          }
+          r.focus();
+        }
+      }
+    });
 
     const tvShown = () => {
       const tv = tvFields(inputs.kind.value);
@@ -399,38 +537,109 @@ function open(ctx, first, charts) {
     };
     inputs.kind.addEventListener('change', () => {
       tvShown();
-      const s = startTouched ? null : startForKind(inputs.kind.value, charts);
-      if (s) startSel.value = s;
+      if (!fromTouched) {
+        const s = startForKind(inputs.kind.value, charts);
+        if (s) {
+          from = 'chart';
+          chartId = s.slice('chart:'.length);
+        }
+      }
+      drawCharts();
+      showFrom();
     });
     tvShown();
+    drawCharts();
+    showFrom();
+
+    // -----------------------------------------------------------------------
+    // Save In: a folder (named by its token; Rust holds the path) and a file
+    // name that follows the title until it is typed by hand.
+
+    let folder = null; // { token, folder }
+    const folderText = el('span', { class: 'st-folder-text', attrs: { id: 'st-folder-text' } });
+    const folderBtn = el('button', { class: 'btn', text: 'Choose Folder…', attrs: { type: 'button', 'aria-describedby': 'st-folder-text' } });
+    const showFolder = () => {
+      folderText.textContent = folder ? folder.folder : 'No folder chosen: the budget opens without a file until you save it.';
+      folderText.classList.toggle('st-folder-none', !folder);
+    };
+    folderBtn.addEventListener('click', () =>
+      once(async () => {
+        const f = await ctx.invoke('new_budget_pick_folder', { current: folder ? folder.token : null });
+        if (f) folder = f;
+        showFolder();
+        folderBtn.focus();
+      }),
+    );
+    showFolder();
+    ctx
+      .invoke('new_budget_folder')
+      .then((f) => {
+        if (f && !folder) folder = f;
+        showFolder();
+      })
+      .catch(() => showFolder());
+
+    const fileName = field('file_name', 'File name', { span: 3, max: 200 });
+    let fileTouched = false;
+    const followTitle = () => {
+      if (!fileTouched) inputs.file_name.value = inputs.title.value.trim() ? fileNameFrom(inputs.title.value) : '';
+      inputs.file_name.placeholder = fileNameFrom(inputs.title.value);
+    };
+    inputs.title.addEventListener('input', followTitle);
+    inputs.file_name.addEventListener('input', () => {
+      fileTouched = inputs.file_name.value.trim() !== '';
+    });
+    followTitle();
 
     const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
     error.hidden = true;
+    const showError = (text, extra = null) => {
+      error.replaceChildren(el('span', { text }), ...(extra ? [' ', extra] : []));
+      error.hidden = false;
+    };
     const back = el('button', { class: 'btn', text: 'Back', attrs: { type: 'button' } });
     back.addEventListener('click', showHome);
     const create = el('button', { class: 'btn btn-primary', attrs: { type: 'button' } }, 'Create Budget', keyHint('mod+enter'));
+
+    const startValue = () => (from === 'chart' ? `chart:${chartId}` : from);
 
     const submit = () =>
       once(async () => {
         const values = {};
         for (const [k, input] of Object.entries(inputs)) values[k] = input.value;
-        const spec = specFrom(values, startSel.value, picked ? picked.token : null);
+        const spec = specFrom(values, startValue(), picked ? picked.token : null, folder ? folder.token : null);
         if (!spec.title) {
-          error.textContent = 'Give the budget a title.';
-          error.hidden = false;
+          showError('Give the budget a title.');
           inputs.title.focus();
+          return;
+        }
+        if (from === 'file' && !picked) {
+          showError('Choose the budget file to start from.');
+          pickBtn.focus();
           return;
         }
         create.disabled = true;
         try {
           const r = await ctx.invoke('new_budget_create', { spec });
+          if (r && r.taken) {
+            // A file of that name is in the folder: nothing was made.
+            const use = el('button', { class: 'btn btn-quiet', text: `Use "${r.taken}.mthd"`, attrs: { type: 'button' } });
+            use.addEventListener('click', () => {
+              inputs.file_name.value = r.taken;
+              fileTouched = true;
+              error.hidden = true;
+              submit();
+            });
+            showError(r.message || 'A file with that name is already there.', use);
+            use.focus();
+            return;
+          }
           if (spec.currency) writePref('newBudget.currency', spec.currency);
           close();
           if (r && r.view) ctx.apply(r.view, 'new_budget_create');
           if (r && r.message) ctx.toast(r.message);
         } catch (e) {
-          error.textContent = String(e);
-          error.hidden = false;
+          showError(String(e));
         } finally {
           create.disabled = false;
         }
@@ -445,6 +654,15 @@ function open(ctx, first, charts) {
       season,
       episode,
       episodes,
+      heading('Chart of accounts', 'st-from-title'),
+      fromRow,
+      chartPane,
+      filePane,
+      fromNote,
+      heading('Save in'),
+      el('div', { class: 'st-folder st-span4' }, folderText, folderBtn),
+      fileName,
+      el('span', { class: 'st-span1 st-aside', text: '.mthd, never over another file' }),
       heading('Dates'),
       date('prep_start', 'Prep start'),
       date('shoot_start', 'Shoot start'),
@@ -460,9 +678,6 @@ function open(ctx, first, charts) {
       field('region', 'Region or state'),
       field('city', 'City'),
       field('currency', 'Base currency', { placeholder: 'USD', max: 10, value: readPref('newBudget.currency', '') || '' }),
-      heading('Start from'),
-      el('label', { class: 'modal-field st-span3', attrs: { for: startSel.id } }, 'Chart of accounts or budget', startSel),
-      el('div', { class: 'st-span1 st-pick' }, pickBtn),
       heading('Settings'),
       select(
         'fringe_posting',
@@ -485,10 +700,11 @@ function open(ctx, first, charts) {
         { span: 2, value: 'binary' },
       ),
     );
-    // Enter in a text box, or Cmd+Enter anywhere, creates the budget.
+    // Enter in a text box, or Cmd+Enter anywhere, creates the budget (not
+    // in the chart search, where Enter goes into the list).
     grid.addEventListener('keydown', (ev) => {
-      if (ev.key !== 'Enter' || ev.isComposing) return;
-      const inText = ev.target instanceof HTMLInputElement;
+      if (ev.key !== 'Enter' || ev.isComposing || ev.defaultPrevented) return;
+      const inText = ev.target instanceof HTMLInputElement && (ev.target.type === 'text' || ev.target.type === 'radio');
       if (hasMod(ev) || (inText && !ev.shiftKey && !ev.altKey)) {
         ev.preventDefault();
         submit();
@@ -498,7 +714,7 @@ function open(ctx, first, charts) {
       el('h2', { class: 'modal-title', text: 'New Budget', attrs: { id: 'st-new-title' } }),
       el('p', {
         class: 'modal-message',
-        text: 'Only the title is needed. The rest goes into the budget info, globals and settings, where it can be changed later.',
+        text: 'Only the title is needed. The budget is saved in the folder below as soon as it is made. The rest goes into the budget info, globals and settings, where it can be changed later.',
       }),
       el('div', { class: 'st-form-scroll' }, grid),
       error,

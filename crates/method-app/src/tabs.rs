@@ -202,7 +202,10 @@ pub struct Closing {
 /// are autosaved into its file first when Autosave is on; what is still
 /// unsaved stops it unless `discard` (the user chose to throw it away, and
 /// its recovery copy goes too). Split, `pane` names the pane whose tab it
-/// is: when the other pane shows the budget too, only this tab goes.
+/// is: when the other pane shows the budget too, only this tab goes. With
+/// `to_start`, the last tab closes too and an untouched Untitled budget takes
+/// its place, for the start window to show over (src/start.rs); without it,
+/// the last tab answers `last`.
 #[tauri::command]
 pub fn close_tab<R: Runtime>(
     window: WebviewWindow<R>,
@@ -211,6 +214,7 @@ pub fn close_tab<R: Runtime>(
     doc: Option<DocId>,
     discard: bool,
     pane: Option<usize>,
+    to_start: Option<bool>,
 ) -> CmdResult<Closing> {
     let id = state.lock_doc(doc)?.id();
     let mut out = Closing {
@@ -227,7 +231,12 @@ pub fn close_tab<R: Runtime>(
     if !discard {
         safety_app::autosave_one(window.app_handle(), id);
     }
-    match safety_app::close_doc(&state, &safety, id, discard)? {
+    let closed = if to_start == Some(true) {
+        safety_app::close_last_for_start(&state, &safety, id, discard)?
+    } else {
+        safety_app::close_doc(&state, &safety, id, discard)?
+    };
+    match closed {
         Closed::Last => out.last = true,
         Closed::Unsaved => out.unsaved = true,
         Closed::Closed => {

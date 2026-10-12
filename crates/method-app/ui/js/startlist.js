@@ -32,6 +32,69 @@ export function startForKind(kind, charts) {
   return `chart:${id}`;
 }
 
+/** The chart groups (src/start.rs, ChartChoice.group), in the order shown. */
+const CHART_GROUPS = ['Feature', 'Television', 'Commercial', 'Other'];
+
+/** The chart group a production type looks in first. */
+const GROUP_FOR_KIND = {
+  feature: 'Feature',
+  tv_episode: 'Television',
+  tv_season: 'Television',
+  commercial: 'Commercial',
+  documentary: 'Other',
+  other: 'Other',
+};
+
+/**
+ * The bundled charts ([{id, name, group, description, ours, accounts}]) to
+ * list for production type `kind`, as [{group, ours: [...], studio: [...]}]:
+ * the type's own group first, then the others in their usual order; in each,
+ * our own charts, then the studios' by name. With `query`, only the charts
+ * whose name or description has every word of it. Empty groups are left out.
+ */
+export function chartSections(charts, kind, query = '') {
+  const list = Array.isArray(charts) ? charts.filter((c) => c && typeof c.id === 'string' && typeof c.name === 'string') : [];
+  const want = words(query);
+  const hit = (c) => {
+    const hay = `${c.name}\n${c.description || ''}`.toLowerCase();
+    return want.every((w) => hay.includes(w));
+  };
+  const first = GROUP_FOR_KIND[kind] || 'Feature';
+  const order = [first, ...CHART_GROUPS.filter((g) => g !== first)];
+  const groupOf = (c) => (CHART_GROUPS.includes(c.group) ? c.group : 'Other');
+  const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  return order
+    .map((group) => {
+      const inGroup = list.filter((c) => groupOf(c) === group && hit(c));
+      return {
+        group,
+        ours: inGroup.filter((c) => c.ours),
+        studio: inGroup.filter((c) => !c.ours).sort(byName),
+      };
+    })
+    .filter((s) => s.ours.length || s.studio.length);
+}
+
+/** "212 accounts", "1 account" (blank when unknown). */
+export function accountsText(n) {
+  if (!Number.isFinite(n) || n <= 0) return '';
+  return `${n} ${n === 1 ? 'account' : 'accounts'}`;
+}
+
+/**
+ * A file name (without `.mthd`) from a budget title, as src/app.rs's
+ * safe_file_stem makes one: characters file systems refuse become spaces,
+ * and dots and spaces at the ends go. Blank: "Untitled".
+ */
+export function fileNameFrom(title) {
+  const cleaned = String(title || '')
+    .replace(/[/\\:*?"<>|\u0000-\u001f\u007f-\u009f]/g, ' ')
+    .trim()
+    .replace(/^\.+|\.+$/g, '')
+    .trim();
+  return cleaned || 'Untitled';
+}
+
 /** Fields shown for a type: the season for TV, the episode number for an episode, the count for a season. */
 export function tvFields(kind) {
   return {
@@ -81,9 +144,10 @@ export function whenText(ms, now = new Date()) {
 /**
  * The New Budget spec (src/start.rs, NewBudgetSpec) from the form's
  * `values` (strings by field name) and its Start From value (`starter`,
- * `blank`, `chart:<id>` or `file`), with the picked file's `token`.
+ * `blank`, `chart:<id>` or `file`), with the picked file's `token` and
+ * Save In's folder token (`folder`; null: no file yet).
  */
-export function specFrom(values, startFrom, token) {
+export function specFrom(values, startFrom, token, folder = null) {
   const v = values && typeof values === 'object' ? values : {};
   const s = (k) => (typeof v[k] === 'string' ? v[k].trim() : '');
   const spec = {
@@ -108,6 +172,8 @@ export function specFrom(values, startFrom, token) {
     template: null,
     fringe_posting: s('fringe_posting'),
     arithmetic: s('arithmetic'),
+    folder: Number.isSafeInteger(folder) ? folder : null,
+    file_name: s('file_name'),
   };
   const tv = tvFields(spec.kind);
   if (tv.season) spec.season = s('season');

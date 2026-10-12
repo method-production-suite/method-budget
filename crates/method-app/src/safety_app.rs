@@ -154,7 +154,13 @@ impl Safety {
     }
 
     pub fn recent_paths(&self) -> Vec<PathBuf> {
-        lock(&self.recent).paths().to_vec()
+        lock(&self.recent).paths()
+    }
+
+    /// Follows recent files moved or renamed in the Finder since (their
+    /// bookmarks, src/bookmark.rs). True if any moved.
+    pub fn follow_recent(&self) -> bool {
+        lock(&self.recent).follow()
     }
 
     /// Takes `path` off the recent list (src/start.rs). Best effort.
@@ -476,6 +482,34 @@ pub fn close_doc(
     // Saved, or thrown away on purpose: no recovery copy either way.
     safety.remove_recovery(gone.recovery_key());
     Ok(Closed::Closed)
+}
+
+/// Closes the last tab for the start window (decisions.md, entry 64): its
+/// place goes to an untouched Untitled budget, as at launch, which the start
+/// window shows over and gives up to whatever is opened or made next.
+/// Unsaved changes stop it unless `discard`. With other tabs open, it is
+/// [`close_doc`].
+pub fn close_last_for_start(
+    state: &AppState,
+    safety: &Safety,
+    id: DocId,
+    discard: bool,
+) -> Result<Closed, String> {
+    {
+        let _w = lock(&safety.writer);
+        let mut docs = state.docs();
+        let s = docs.get(id).ok_or("That budget has been closed.")?;
+        if docs.len() == 1 {
+            if s.is_dirty() && !discard {
+                return Ok(Closed::Unsaved);
+            }
+            let (_, gone) = docs.replace(id, Session::new())?;
+            // Saved, or thrown away on purpose: no recovery copy either way.
+            safety.remove_recovery(gone.recovery_key());
+            return Ok(Closed::Closed);
+        }
+    }
+    close_doc(state, safety, id, discard)
 }
 
 /// Reopens the files that were open as tabs when the app last ran, in their
