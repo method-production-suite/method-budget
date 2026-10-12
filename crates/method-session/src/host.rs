@@ -34,7 +34,11 @@ use crate::edit::{
 use crate::session::Session;
 use crate::view::View;
 
+mod templates;
 mod versions;
+
+#[cfg(test)]
+mod test_files;
 
 /// The command contract's version (see the module's notes).
 pub const COMMANDS_VERSION: u32 = 1;
@@ -117,6 +121,9 @@ pub const COMMANDS: &[&str] = &[
     "restore_version",
     "rename_version",
     "delete_version",
+    // Templates
+    "template_new",
+    "template_save",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -463,7 +470,7 @@ impl Host {
 type Dispatch = fn(&Call<'_>) -> Option<Result<Value, Error>>;
 
 /// The modules moved in phase 1b, each dispatching its own commands.
-const MODULES: &[Dispatch] = &[versions::dispatch];
+const MODULES: &[Dispatch] = &[versions::dispatch, templates::dispatch];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).
 fn stamp(text: &str) -> crate::safety::DiskStamp {
@@ -512,7 +519,6 @@ impl Call<'_> {
     }
 
     /// Every open budget.
-    #[allow(dead_code)] // until the first module needs it
     pub(crate) fn state(&self) -> &AppState {
         &self.host.state
     }
