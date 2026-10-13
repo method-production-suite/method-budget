@@ -41,11 +41,16 @@ p { margin: 0 0 14px; }
 .home { display: inline-flex; align-items: center; padding: 6px 0; }
 .home img { height: 32px; width: auto; }
 .home .wm { height: 26px; }
-.nav { display: flex; flex-wrap: wrap; gap: 2px 18px; width: 100%; }
+.nav { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 18px; width: 100%; }
 .nav a { color: var(--ink-soft); text-decoration: none; font-size: 15px; padding: 6px 0; }
 .nav a:hover { color: var(--ink); text-decoration: underline; }
 .nav a[aria-current="page"] { color: var(--ink); font-weight: 600; }
-@media (min-width: 900px) { .nav { width: auto; margin-left: auto; } }
+.nav a.try { color: var(--accent); font-weight: 600; }
+.nav a.try:hover { color: var(--accent-strong); }
+.nav a.gh { display: inline-flex; align-items: center; padding: 6px 2px; color: var(--ink-soft); }
+.nav a.gh:hover { color: var(--ink); }
+.nav a.gh svg { display: block; }
+@media (min-width: 760px) { .nav { width: auto; margin-left: auto; } }
 
 /* ------------------------------------------------------------------ hero */
 .hero { padding: 48px 0 36px; text-align: left; }
