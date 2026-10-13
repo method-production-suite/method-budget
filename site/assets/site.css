@@ -68,6 +68,8 @@ p { margin: 0 0 14px; }
 .btn.ghost { color: var(--accent); }
 .btn.ghost:hover { color: var(--accent-strong); border-color: var(--accent-strong); }
 .fine { font-size: 14px; color: var(--muted); margin: 16px 0 0; }
+.fine.footnote { font-size: 13px; margin-top: 8px; max-width: 46em; }
+a.fn { text-decoration: none; margin-left: 1px; vertical-align: super; font-size: .7em; }
 @media (min-width: 900px) { .hero { padding: 80px 0 48px; } }
 
 /* ------------------------------------------------------------------ app window */
