@@ -13,7 +13,7 @@ CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 profile="$(mktemp -d)"
 out="$profile/og.png"
 pid=""
-cleanup() { [ -n "$pid" ] && kill "$pid" 2>/dev/null; rm -rf "$profile"; }
+cleanup() { [ -n "$pid" ] && { kill "$pid" 2>/dev/null || true; }; rm -rf "$profile"; }
 trap cleanup EXIT
 # Recent Chrome can write the screenshot and then keep running, so run it in the
 # background, wait for the file, and stop it ourselves (up to 30 seconds).
