@@ -229,22 +229,9 @@ pub fn status<T: PartialEq>(copied: Option<&T>, here: Option<&T>) -> Status {
 // ---------------------------------------------------------------------------
 // Definitions in words
 
+/// `123456` cents as `1,234.56`, negatives with a minus sign.
 pub fn money(c: Cents) -> String {
-    let a = c.unsigned_abs();
-    let digits = (a / 100).to_string();
-    let mut grouped = String::new();
-    for (i, ch) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i).is_multiple_of(3) {
-            grouped.push(',');
-        }
-        grouped.push(ch);
-    }
-    let s = format!("{grouped}.{:02}", a % 100);
-    if c < 0 {
-        format!("-{s}")
-    } else {
-        s
-    }
+    method_core::CurrencyFormat::default().number(c)
 }
 
 /// Parts in words, joined; `fallback` when every part is empty.
@@ -469,5 +456,19 @@ pub fn write(b: &mut Budget, s: &Setup, kind: Kind, from: &str, to: &str, r: &Re
                 b.currencies.insert(to, x.clone());
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn money_in_words() {
+        assert_eq!(money(0), "0.00");
+        assert_eq!(money(5), "0.05");
+        assert_eq!(money(16_860_000), "168,600.00");
+        assert_eq!(money(-100_000), "-1,000.00");
+        assert_eq!(money(i64::MIN), "-92,233,720,368,547,758.08");
     }
 }

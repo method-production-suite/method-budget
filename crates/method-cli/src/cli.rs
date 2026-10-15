@@ -256,20 +256,10 @@ pub fn not_the_input(input: &str, out: &Path, what: &str) -> Result<(), CliError
 
 /// `1234567` cents as `12,345.67`, negatives in parentheses.
 pub fn money(c: Cents) -> String {
-    let a = c.unsigned_abs();
-    let digits = (a / 100).to_string();
-    let mut grouped = String::new();
-    for (i, ch) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i).is_multiple_of(3) {
-            grouped.push(',');
-        }
-        grouped.push(ch);
-    }
-    let s = format!("{grouped}.{:02}", a % 100);
-    if c < 0 {
-        format!("({s})")
-    } else {
-        s
+    let n = method_core::CurrencyFormat::default().number(c);
+    match n.strip_prefix('-') {
+        Some(digits) => format!("({digits})"),
+        None => n,
     }
 }
 
@@ -307,6 +297,8 @@ mod tests {
         assert_eq!(money(123_456_789), "1,234,567.89");
         assert_eq!(money(-100_000), "(1,000.00)");
         assert_eq!(money(99_999), "999.99");
+        assert_eq!(money(-5), "(0.05)");
+        assert_eq!(money(i64::MIN), "(92,233,720,368,547,758.08)");
     }
 
     #[test]

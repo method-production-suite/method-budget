@@ -327,9 +327,7 @@ pub fn explain(b: &Budget, opts: &RecalcOptions, target: &Target) -> R<Explanati
 
 /// `123456` cents as `1,234.56`, negatives with a minus sign.
 pub fn money(c: Cents) -> String {
-    let sign = if c < 0 { "-" } else { "" };
-    let a = c.unsigned_abs();
-    format!("{sign}{}.{:02}", group(&(a / 100).to_string()), a % 100)
+    crate::CurrencyFormat::default().number(c)
 }
 
 /// A decimal amount of money: at least two places, more when it has them.
@@ -2702,6 +2700,8 @@ mod tests {
         assert_eq!(money(0), "0.00");
         assert_eq!(money(-5), "-0.05");
         assert_eq!(money(123_456_789), "1,234,567.89");
+        assert_eq!(money(-100_000), "-1,000.00");
+        assert_eq!(money(i64::MIN), "-92,233,720,368,547,758.08");
         assert_eq!(dmoney("1296.315".parse::<Dec>().unwrap()), "1,296.315");
         assert_eq!(dmoney("-54000".parse::<Dec>().unwrap()), "-54,000.00");
         assert_eq!(dmoney("0.5".parse::<Dec>().unwrap()), "0.50");
