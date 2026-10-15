@@ -787,9 +787,15 @@ fn charges_are_added_edited_moved_and_deleted() {
     let fee: edit::ChargeInput = input(serde_json::json!({
         "name": "Completion bond", "account": "5002", "applied": true,
         "kind": "percent", "percent": "2",
-        "excluded_amounts": [{"description": "Bond deposit", "amount": "(1,000)"}],
+        "excluded_amounts": [{"description": "Bond deposit", "amount": "$1,000"}],
         "excluded_groups": [], "excluded_categories": ["50"], "excluded_accounts": []
     }));
+    // A negative exclusion is refused (owner's decision, 2026-10-15).
+    let mut negative = fee.clone();
+    negative.excluded_amounts[0].amount = "(1,000)".into();
+    assert!(
+        refused(&mut s, |b| edit::set_charge(b, Some(1), &negative)).contains("can't be negative")
+    );
     one_step(&mut s, |b| edit::set_charge(b, Some(1), &fee));
     let c = &s.budget().charges[1];
     assert_eq!(c.name, "Completion bond");
@@ -798,7 +804,7 @@ fn charges_are_added_edited_moved_and_deleted() {
         Some("50-02"),
         "normalized by the coding"
     );
-    assert_eq!(c.excluded_amounts, vec![("Bond deposit".into(), -100_000)]);
+    assert_eq!(c.excluded_amounts, vec![("Bond deposit".into(), 100_000)]);
     let v = view(&mut s);
     assert_eq!(v["budget"]["charges"][1]["excluded_categories"][0], "50");
     assert!(v["report"]["charges"][1]["excluded"].as_i64().unwrap() > 0);

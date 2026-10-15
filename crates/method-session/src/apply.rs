@@ -1041,7 +1041,32 @@ mod tests {
         // can be edited (edit::Field), for every kind of row.
         let mut s = session();
         let rows = mixed(&mut s);
-        let b = s.budget().clone();
+        let mut b = s.budget().clone();
+        // A cell may only name a set, location or currency the budget has.
+        let blank = String::new;
+        edit::set_set(
+            &mut b,
+            "X",
+            &edit::SetInput {
+                description: blank(),
+            },
+        )
+        .unwrap();
+        let place = edit::LocationInput {
+            description: blank(),
+            city: blank(),
+            region: blank(),
+            country: blank(),
+        };
+        edit::set_location(&mut b, "X", &place).unwrap();
+        let rate = edit::CurrencyInput {
+            description: blank(),
+            symbol: blank(),
+            rate: "1".into(),
+            symbol_after: None,
+            separators: None,
+        };
+        edit::set_currency(&mut b, "X", &rate).unwrap();
         for id in rows {
             let d = row(&b, id);
             for (field, takes) in [

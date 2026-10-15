@@ -14,9 +14,22 @@ use method_core::{
 use super::{
     account_code, account_exists, account_mut, amount_currency, category_code, category_exists,
     check_index, check_name, details, insert_at, money_at_least_zero, optional, optional_account,
-    optional_money, parse_dec, parse_money, percent, picked_names, ChargeInput, CreditCapInput,
-    CreditInput, CreditSourceInput, CurrencyInput, EditError,
+    optional_money, parse_dec, percent, picked_names, put_fringe, ChargeInput, CreditCapInput,
+    CreditInput, CreditSourceInput, CurrencyInput, EditError, FringeInput,
 };
+
+/// Adds or replaces a fringe; a flat fringe's unit that isn't one of the
+/// budget's units is not found.
+pub fn set_fringe(b: &mut Budget, name: &str, f: &FringeInput) -> Result<(), EditError> {
+    if f.kind == "flat" {
+        if let Some(u) = f.unit.as_deref().and_then(optional) {
+            if !b.units.contains_key(&u) {
+                return Err(EditError::NotFound(format!("there is no unit {u}")));
+            }
+        }
+    }
+    Ok(put_fringe(b, name, f)?)
+}
 
 pub fn add_category(
     b: &mut Budget,
@@ -390,7 +403,10 @@ pub fn build_charge(
     };
     let mut excluded_amounts = Vec::with_capacity(c.excluded_amounts.len());
     for x in &c.excluded_amounts {
-        excluded_amounts.push((x.description.trim().to_string(), parse_money(&x.amount)?));
+        excluded_amounts.push((
+            x.description.trim().to_string(),
+            money_at_least_zero(&x.amount, "an excluded amount")?,
+        ));
     }
     let groups: BTreeSet<String> = b.groups.keys().cloned().collect();
     let categories: BTreeSet<String> = b.categories().map(|c| c.code.clone()).collect();

@@ -81,8 +81,17 @@ pub fn create_and_set(
     if exists(b, kind, name) {
         return Err(format!("{kind} {name} already exists"));
     }
-    // The row first: a cell that can't take the value adds nothing.
-    edit::set_detail_field(b, id, field, value)?;
+    // The item first, since a cell may only name what exists; on a copy, so
+    // a cell that can't take the value adds nothing.
+    let mut next = b.clone();
+    add_item(&mut next, kind, name, create)?;
+    edit::set_detail_field(&mut next, id, field, value)?;
+    *b = next;
+    Ok(())
+}
+
+/// Adds item `name` of `kind` with what the cell's form gives.
+fn add_item(b: &mut Budget, kind: &str, name: &str, create: &CreateInput) -> EditResult {
     let extra = create.value.as_deref().map(str::trim).unwrap_or("");
     match kind {
         "unit" => edit::set_unit(

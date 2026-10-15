@@ -311,8 +311,28 @@ pub fn apply_field(d: &mut Detail, field: Field, value: &str) -> EditResult {
 }
 
 /// Refuses a formula typed into Amt, X, Rate or 4X that divides by zero or
-/// uses a global that refers back to itself (decisions.md, entry 60).
+/// uses a global that refers back to itself (decisions.md, entry 60), and a
+/// unit, currency, set or location the budget doesn't have (blank clears).
 fn check_entry(b: &Budget, field: Field, value: &str) -> EditResult {
+    let name = value.trim();
+    let known = match field {
+        Field::Unit | Field::Unit2 | Field::Unit3 | Field::Unit4 => {
+            Some(("unit", b.units.contains_key(name)))
+        }
+        Field::Currency => Some((
+            "currency",
+            name == b.base_currency || b.currencies.contains_key(name),
+        )),
+        Field::Set => Some(("set", b.sets.contains_key(name))),
+        Field::Location => Some(("location", b.locations.contains_key(name))),
+        _ => None,
+    };
+    if let Some((what, exists)) = known {
+        if !name.is_empty() && !exists {
+            return Err(format!("there is no {what} {name}"));
+        }
+        return Ok(());
+    }
     if !matches!(field, Field::Amount | Field::X | Field::Rate | Field::X4) {
         return Ok(());
     }
@@ -697,7 +717,14 @@ pub fn set_short_code(
     Ok(())
 }
 
+/// Adds or replaces a fringe. A flat fringe's unit must be one of the
+/// budget's units.
 pub fn set_fringe(b: &mut Budget, name: &str, f: &FringeInput) -> EditResult {
+    Ok(typed::set_fringe(b, name, f)?)
+}
+
+/// [`set_fringe`] once its unit is known to exist.
+fn put_fringe(b: &mut Budget, name: &str, f: &FringeInput) -> EditResult {
     let name = check_name(name, "fringe")?;
     let cutoff = match f.cutoff.as_deref().map(str::trim) {
         None | Some("") => None,
@@ -958,8 +985,9 @@ pub fn delete_unit(b: &mut Budget, name: &str) -> EditResult {
 }
 
 /// Deletes a unit definition; with `clear_lines`, also blanks every unit
-/// column on a row that names it (so nothing is left naming a unit that
-/// isn't there). As one change.
+/// column on a row that names it, and the unit of a flat fringe or a global
+/// that names it (so nothing is left naming a unit that isn't there). As
+/// one change.
 pub fn delete_unit_with(b: &mut Budget, name: &str, clear_lines: bool) -> EditResult {
     if b.units.remove(name).is_none() {
         return Err(format!("unit {name} no longer exists"));
@@ -976,6 +1004,20 @@ pub fn delete_unit_with(b: &mut Budget, name: &str, clear_lines: bool) -> EditRe
                 }
             }
         }
+        // And where settings name it: a flat fringe's unit, a global's.
+        for f in b.fringes.values_mut() {
+            if let FringeKind::Flat { unit, .. } = &mut f.kind {
+                if unit.as_deref() == Some(name) {
+                    *unit = None;
+                }
+            }
+        }
+        for gi in b.global_info.values_mut() {
+            if gi.unit == name {
+                gi.unit.clear();
+            }
+        }
+        b.global_info.retain(|_, gi| !gi.is_default());
     }
     method_core::order::forget(b, method_core::SetupKind::Unit, name);
     Ok(())
@@ -1685,6 +1727,61 @@ mod tests {
         )
         .unwrap();
         assert!(b.charges[at].label_percent && !b.charges[at].label_excluded);
+    }
+
+    #[test]
+    fn names_on_lines_and_fringes_must_exist() {
+        let mut b = method_core::starter::budget();
+        let id = details(&b).next().unwrap().id;
+        for (field, what) in [
+            (Field::Unit, "unit"),
+            (Field::Unit3, "unit"),
+            (Field::Currency, "currency"),
+            (Field::Set, "set"),
+            (Field::Location, "location"),
+        ] {
+            let e = set_detail_field(&mut b, id, field, "Nope").unwrap_err();
+            assert_eq!(e, format!("there is no {what} Nope"));
+        }
+        set_detail_field(&mut b, id, Field::Unit, " Week ").unwrap();
+        set_detail_field(&mut b, id, Field::Unit, "").unwrap();
+        set_detail_field(&mut b, id, Field::Currency, "USD").unwrap();
+        let flat = FringeInput {
+            kind: "flat".into(),
+            description: String::new(),
+            rate: "5".into(),
+            cutoff: None,
+            unit: Some("Fortnight".into()),
+            basis: None,
+            max_hours_per_day: None,
+            short_code: None,
+        };
+        let e = typed::set_fringe(&mut b, "MEAL", &flat).unwrap_err();
+        assert_eq!(e, EditError::NotFound("there is no unit Fortnight".into()));
+    }
+
+    #[test]
+    fn deleting_a_unit_with_its_lines_clears_it_from_settings() {
+        let mut b = method_core::starter::budget();
+        let flat = FringeInput {
+            kind: "flat".into(),
+            description: String::new(),
+            rate: "5".into(),
+            cutoff: None,
+            unit: Some("Day".into()),
+            basis: None,
+            max_hours_per_day: None,
+            short_code: None,
+        };
+        set_fringe(&mut b, "MEAL", &flat).unwrap();
+        let g = b.globals.keys().next().unwrap().clone();
+        b.global_info.entry(g.clone()).or_default().unit = "Day".into();
+        delete_unit_with(&mut b, "Day", true).unwrap();
+        assert!(matches!(
+            &b.fringes["MEAL"].kind,
+            FringeKind::Flat { unit: None, .. }
+        ));
+        assert!(!b.global_info.contains_key(&g));
     }
 
     #[test]
