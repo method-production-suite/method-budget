@@ -35,11 +35,11 @@ use std::str::FromStr;
 
 use method_core::rename::{rename, SetupKind};
 use method_core::{
-    recalc, Arithmetic, Budget, Cents, CutoffFactor, Dec, Detail, FlatBasis, Formula, FringeKind,
-    Inclusion, RecalcOptions, Report, RowId, TrailingFringes,
+    recalc, Arithmetic, Budget, Cents, CutoffFactor, Dec, Detail, FlatBasis, FringeKind, Inclusion,
+    RecalcOptions, Report, RowId, TrailingFringes,
 };
-use method_session::edit::{self, parse_money_as, typed, EditError, FringeRowInput, SubCents};
-use method_session::rowstyle::check_color;
+use method_session::edit::{self, typed, EditError, Field, FringeInput, FringeRowInput};
+use method_session::rowstyle::{self, RowStyleInput};
 
 use crate::cli::{money, CliError, Outcome};
 
@@ -289,10 +289,9 @@ fn need<'a>(w: &'a [Word], n: usize, form: &str) -> Result<&'a [Word], String> {
     }
 }
 
-/// Money as the app reads it, but never rounded: a script says exactly
-/// what it means.
+/// Money as the app reads it, rounded to the cent as the app rounds it.
 fn parse_money(s: &str) -> Result<Cents, String> {
-    parse_money_as(s, SubCents::Refuse)
+    edit::parse_money(s)
 }
 
 /// A trailing level fringes setting by name (`keep` or `drop`).
@@ -489,19 +488,18 @@ fn account<'a>(b: &'a Budget, code: &str) -> Result<&'a method_core::Account, St
         .ok_or_else(|| format!("there is no account {code}"))
 }
 
-/// The row with this id and where it is (`21-01:2`), for messages.
-fn row_mut(b: &mut Budget, id: RowId) -> Option<(String, &mut Detail)> {
-    for c in b.categories_mut() {
-        for a in &mut c.accounts {
-            let code = a.code.clone();
-            for (i, d) in a.details.iter_mut().enumerate() {
-                if d.id == id {
-                    return Some((format!("{code}:{} (#{id})", i + 1), d));
-                }
-            }
+/// Where row `id` is (`21-01:2 (#17)`), for messages.
+fn located(b: &Budget, id: RowId) -> String {
+    for a in b.categories().flat_map(|c| &c.accounts) {
+        if let Some(i) = a.details.iter().position(|d| d.id == id) {
+            return format!("{}:{} (#{id})", a.code, i + 1);
         }
     }
-    None
+    format!("#{id}")
+}
+
+fn detail(b: &Budget, id: RowId) -> Option<&Detail> {
+    edit::details(b).find(|d| d.id == id)
 }
 
 fn shown(s: &str) -> String {
@@ -521,79 +519,87 @@ pub fn flag(w: &Word) -> Result<bool, String> {
     }
 }
 
-/// Sets `field` of row `d` from `v`, checked against the budget's setup
-/// tables (`setup` is the budget before the change). Returns the old and new
-/// values as shown in messages.
-fn set_field(
-    setup: &Budget,
-    d: &mut Detail,
+/// Field `field` of `d` as messages show it.
+fn field_text(d: &Detail, field: &str) -> String {
+    match field {
+        "description" => shown(&d.description),
+        "amount" => shown(&d.amount.0),
+        "x" => shown(&d.x.0),
+        "rate" => shown(&d.rate.0),
+        "x4" => shown(&d.x4.0),
+        "unit" => shown(&d.unit),
+        "unit2" => shown(&d.unit2),
+        "unit3" => shown(&d.unit3),
+        "unit4" => shown(&d.unit4),
+        "currency" => opt_shown(&d.currency),
+        "set" => opt_shown(&d.set),
+        "location" => opt_shown(&d.location),
+        "color" => opt_shown(&d.color),
+        "fringe_range" => d.fringe_range.map_or("none".into(), |n| n.to_string()),
+        "bold" => d.bold.to_string(),
+        "italic" => d.italic.to_string(),
+        _ => d.indent.to_string(),
+    }
+}
+
+/// Sets `field` on rows `ids` from `v` with the app's edits: cells through
+/// `edit::set_detail_field` (formulas trimmed, a formula dividing by zero
+/// refused, a unit, currency, set or location the budget has, an empty
+/// Unit filled from the global an Amt names), styles through
+/// `rowstyle::apply_row_style`. Of several rows, those that don't use the
+/// field are passed over. A line per row, old value to new.
+fn set_line_field(
+    b: &mut Budget,
+    ids: &[RowId],
     field: &str,
     v: &Word,
-) -> Result<(String, String), String> {
-    let text = v.text.clone();
-    let formula = |f: &mut Formula| {
-        let old = shown(&f.0);
-        f.0 = text.clone();
-        (old, shown(&text))
+) -> Result<Vec<String>, String> {
+    let before: Vec<(RowId, String)> = ids
+        .iter()
+        .filter_map(|id| detail(b, *id).map(|d| (*id, field_text(d, field))))
+        .collect();
+    let text = v.text.as_str();
+    let style = |row_ids: &[RowId]| RowStyleInput {
+        row_ids: row_ids.to_vec(),
+        ..RowStyleInput::default()
     };
-    let unit = |u: &mut String| -> Result<(String, String), String> {
-        if !text.is_empty() && !setup.units.contains_key(&text) {
-            return Err(format!("there is no unit {text}"));
-        }
-        let old = shown(u);
-        *u = text.clone();
-        Ok((old, shown(&text)))
-    };
-    let named = |o: &mut Option<String>, exists: bool, what: &str| {
-        let new = if v.is_none() {
-            None
-        } else {
-            Some(text.clone())
-        };
-        if new.is_some() && !exists {
-            return Err(format!("there is no {what} {text}"));
-        }
-        let old = opt_shown(o);
-        *o = new;
-        Ok((old, opt_shown(o)))
-    };
-    Ok(match field {
-        "description" => {
-            let old = shown(&d.description);
-            d.description = text.clone();
-            (old, shown(&text))
-        }
-        "amount" => formula(&mut d.amount),
-        "x" => formula(&mut d.x),
-        "rate" => formula(&mut d.rate),
-        "x4" => formula(&mut d.x4),
-        "unit" => unit(&mut d.unit)?,
-        "unit2" => unit(&mut d.unit2)?,
-        "unit3" => unit(&mut d.unit3)?,
-        "unit4" => unit(&mut d.unit4)?,
-        "currency" => {
-            let exists = text == setup.base_currency || setup.currencies.contains_key(&text);
-            named(&mut d.currency, exists, "currency")?
-        }
-        "set" => named(&mut d.set, setup.sets.contains_key(&text), "set")?,
-        "location" => named(
-            &mut d.location,
-            setup.locations.contains_key(&text),
-            "location",
-        )?,
-        "color" => {
-            let new = if v.is_none() {
-                None
+    let mut used: Vec<RowId> = ids.to_vec();
+    match field {
+        "bold" | "italic" => {
+            let on = Some(flag(v)?);
+            let mut s = style(ids);
+            if field == "bold" {
+                s.bold = on;
             } else {
-                Some(check_color(&text)?)
-            };
-            let old = opt_shown(&d.color);
-            d.color = new;
-            (old, opt_shown(&d.color))
+                s.italic = on;
+            }
+            rowstyle::apply_row_style(b, &s)?;
         }
+        "indent" => {
+            let n: i64 = text
+                .parse()
+                .map_err(|_| format!("`{text}` is not an indent from 0 to 4"))?;
+            rowstyle::apply_row_style(
+                b,
+                &RowStyleInput {
+                    indent: Some(n),
+                    ..style(ids)
+                },
+            )?;
+        }
+        "color" => {
+            let color = (!v.is_none()).then(|| text.to_string());
+            rowstyle::apply_row_style(
+                b,
+                &RowStyleInput {
+                    color: Some(color),
+                    ..style(ids)
+                },
+            )?;
+        }
+        // A row's own fringe range number; the app numbers ranges itself.
         "fringe_range" => {
-            let old = d.fringe_range.map_or("none".into(), |n| n.to_string());
-            d.fringe_range = if v.is_none() {
+            let n = if v.is_none() {
                 None
             } else {
                 Some(
@@ -601,30 +607,66 @@ fn set_field(
                         .map_err(|_| format!("`{text}` is not a fringe range number"))?,
                 )
             };
-            (old, d.fringe_range.map_or("none".into(), |n| n.to_string()))
+            for d in edit::rows_by_id(b, &ids.iter().copied().collect()).into_values() {
+                d.fringe_range = n;
+            }
         }
-        "bold" => {
-            let old = d.bold.to_string();
-            d.bold = flag(v)?;
-            (old, d.bold.to_string())
+        _ => {
+            let f = Field::parse(field)?;
+            // `none` clears a name; elsewhere it is the text.
+            let value = match f {
+                Field::Currency | Field::Set | Field::Location if v.is_none() => "",
+                _ => text,
+            };
+            if let [id] = ids {
+                edit::set_detail_field(b, *id, f, value)?;
+            } else {
+                used.retain(|id| detail(b, *id).is_some_and(|d| edit::check_field(d, f).is_ok()));
+                edit::set_rows_field(b, ids, f, value)?;
+            }
         }
-        "italic" => {
-            let old = d.italic.to_string();
-            d.italic = flag(v)?;
-            (old, d.italic.to_string())
-        }
-        "indent" => {
-            let n: u8 = text
-                .parse()
-                .ok()
-                .filter(|n| *n <= method_core::MAX_INDENT)
-                .ok_or_else(|| format!("`{text}` is not an indent from 0 to 4"))?;
-            let old = d.indent.to_string();
-            d.indent = n;
-            (old, n.to_string())
-        }
-        other => return Err(format!("a line has no field `{other}`")),
-    })
+    }
+    Ok(before
+        .into_iter()
+        .filter(|(id, _)| used.contains(id))
+        .map(|(id, old)| {
+            let new = detail(b, id).map_or_else(String::new, |d| field_text(d, field));
+            format!("{} {field} {old} -> {new}", located(b, id))
+        })
+        .collect())
+}
+
+/// Fringe `name` as the app's edit takes it, to change a field and set it
+/// again with the app's checks.
+fn fringe_input(b: &Budget, name: &str) -> Result<FringeInput, String> {
+    let f = b
+        .fringes
+        .get(name)
+        .ok_or_else(|| format!("there is no fringe {name}"))?;
+    let money_text = |c: Cents| Dec::from_cents(c).to_string();
+    let mut input = FringeInput {
+        kind: "percent".into(),
+        description: f.description.clone(),
+        rate: f.rate.0.clone(),
+        cutoff: f.kind.cutoff().map(money_text),
+        unit: None,
+        basis: None,
+        max_hours_per_day: None,
+        short_code: None,
+    };
+    if let FringeKind::Flat {
+        unit,
+        basis,
+        max_hours_per_day,
+        ..
+    } = &f.kind
+    {
+        input.kind = "flat".into();
+        input.unit.clone_from(unit);
+        input.basis = Some(basis.name().to_string());
+        input.max_hours_per_day = max_hours_per_day.map(|h| h.to_string());
+    }
+    Ok(input)
 }
 
 /// Sets global `name` to `formula` with the app's edit, which refuses a
@@ -653,82 +695,63 @@ pub fn apply(b: &mut Budget, op: &Op) -> Result<Vec<String>, String> {
         }
         Op::Global(name, f) => log.extend(set_global(b, name, f)?),
         Op::FringeRate(name, f) => {
-            let fr = b
-                .fringes
-                .get_mut(name)
-                .ok_or_else(|| format!("there is no fringe {name}"))?;
+            let mut input = fringe_input(b, name)?;
+            let old = shown(&input.rate);
+            input.rate.clone_from(f);
+            edit::set_fringe(b, name, &input)?;
             log.push(format!(
-                "fringe {name} rate {} -> {}",
-                shown(&fr.rate.0),
-                shown(f)
+                "fringe {name} rate {old} -> {}",
+                shown(&b.fringes[name].rate.0)
             ));
-            fr.rate = Formula(f.clone());
         }
         Op::FringeCutoff(name, new) => {
-            let fr = b
-                .fringes
-                .get_mut(name)
-                .ok_or_else(|| format!("there is no fringe {name}"))?;
-            let c = match &mut fr.kind {
-                FringeKind::Percent { cutoff } => cutoff,
-                // A flat fringe may keep one from before (never used): it
-                // can be cleared, not set.
-                FringeKind::Flat { cutoff, .. } if new.is_none() => cutoff,
-                FringeKind::Flat { .. } => {
-                    return Err(format!(
-                        "fringe {name} is flat and has no cutoff: cutoffs apply to percent fringes only"
-                    ))
-                }
-            };
-            let show = |c: &Option<Cents>| c.map_or("none".into(), money);
-            log.push(format!("fringe {name} cutoff {} -> {}", show(c), show(new)));
-            *c = *new;
+            let mut input = fringe_input(b, name)?;
+            // A flat fringe may keep one from before (never used): it can be
+            // cleared, not set.
+            if input.kind == "flat" && new.is_some() {
+                return Err(format!(
+                    "fringe {name} is flat and has no cutoff: cutoffs apply to percent fringes only"
+                ));
+            }
+            let old = b.fringes[name].kind.cutoff();
+            input.cutoff = new.map(|c| Dec::from_cents(c).to_string());
+            edit::set_fringe(b, name, &input)?;
+            let show = |c: Option<Cents>| c.map_or("none".into(), money);
+            log.push(format!(
+                "fringe {name} cutoff {} -> {}",
+                show(old),
+                show(b.fringes[name].kind.cutoff())
+            ));
         }
         Op::FringeBasis(name, new) => {
-            let fr = b
-                .fringes
-                .get_mut(name)
-                .ok_or_else(|| format!("there is no fringe {name}"))?;
-            let FringeKind::Flat { basis, .. } = &mut fr.kind else {
+            let mut input = fringe_input(b, name)?;
+            let Some(old) = input.basis.replace(new.name().to_string()) else {
                 return Err(format!(
                     "fringe {name} is a percent fringe: only a flat fringe has a basis"
                 ));
             };
-            log.push(format!(
-                "fringe {name} basis {} -> {}",
-                basis.name(),
-                new.name()
-            ));
-            *basis = *new;
+            edit::set_fringe(b, name, &input)?;
+            log.push(format!("fringe {name} basis {old} -> {}", new.name()));
         }
         Op::FringeMaxHours(name, new) => {
-            let fr = b
-                .fringes
-                .get_mut(name)
-                .ok_or_else(|| format!("there is no fringe {name}"))?;
-            let FringeKind::Flat {
-                max_hours_per_day, ..
-            } = &mut fr.kind
-            else {
+            let mut input = fringe_input(b, name)?;
+            if input.kind != "flat" {
                 return Err(format!(
                     "fringe {name} is a percent fringe: only a flat fringe has max hours per day"
                 ));
-            };
-            let show = |h: &Option<Dec>| h.map_or("none".into(), |h| h.to_string());
+            }
+            let show = |h: &Option<String>| h.clone().unwrap_or_else(|| "none".into());
+            let old = show(&input.max_hours_per_day);
+            input.max_hours_per_day = new.map(|h| h.to_string());
+            edit::set_fringe(b, name, &input)?;
             log.push(format!(
-                "fringe {name} max_hours_per_day {} -> {}",
-                show(max_hours_per_day),
-                show(new)
+                "fringe {name} max_hours_per_day {old} -> {}",
+                show(&input.max_hours_per_day)
             ));
-            *max_hours_per_day = *new;
         }
         Op::Line(rows, field, value) => {
-            let setup = b.clone();
-            for id in resolve(b, rows)? {
-                let (at, d) = row_mut(b, id).expect("resolved rows exist");
-                let (old, new) = set_field(&setup, d, field, value)?;
-                log.push(format!("{at} {field} {old} -> {new}"));
-            }
+            let ids = resolve(b, rows)?;
+            log.extend(set_line_field(b, &ids, field, value)?);
         }
         Op::Tag {
             add,
@@ -745,7 +768,10 @@ pub fn apply(b: &mut Budget, op: &Op) -> Result<Vec<String>, String> {
                 return Err(format!("there is no {what} {name}"));
             }
             for id in resolve(b, rows)? {
-                let (at, d) = row_mut(b, id).expect("resolved rows exist");
+                let at = located(b, id);
+                let d = edit::rows_by_id(b, &BTreeSet::from([id]))
+                    .remove(&id)
+                    .expect("resolved rows exist");
                 let set: &mut BTreeSet<String> = if *group {
                     &mut d.groups
                 } else {
@@ -1061,7 +1087,6 @@ mod tests {
             ("set global DAYS", "missing a value"),
             ("set global DAYS 3 0", "too many words"),
             ("set fringe FICA kind flat", "no field `kind`"),
-            ("set fringe FICA cutoff 1.005", "two decimal places"),
             ("set fringe MEALS basis hours", "not a basis"),
             ("set fringe PEN max_hours_per_day 0", "more than 0"),
             (
@@ -1086,6 +1111,29 @@ mod tests {
     fn money_values() {
         assert_eq!(parse_money("1,500.25"), Ok(150_025));
         assert_eq!(parse_money("7"), Ok(700));
+        // Rounded as the app rounds (owner's decision, 2026-10-15).
+        assert_eq!(parse_money("1.005"), Ok(101));
         assert!(parse_money("abc").is_err());
+    }
+
+    #[test]
+    fn fringe_and_line_edits_are_the_apps() {
+        let mut b = method_core::starter::budget();
+        let run = |b: &mut Budget, line: &str| apply(b, &parse(line).unwrap().unwrap());
+        let e = run(&mut b, "set fringe PAYROLL cutoff -5").unwrap_err();
+        assert!(e.contains("can't be negative"), "{e}");
+        run(&mut b, "set fringe PAYROLL cutoff 1.005").unwrap();
+        assert_eq!(b.fringes["PAYROLL"].kind.cutoff(), Some(101));
+        let id = edit::details(&b)
+            .find(|d| d.kind == method_core::RowKind::Line)
+            .unwrap()
+            .id;
+        let line = |rest: &str| format!("set line #{id} {rest}");
+        let e = run(&mut b, &line("unit Fortnight")).unwrap_err();
+        assert!(e.contains("there is no unit Fortnight"), "{e}");
+        let e = run(&mut b, &line("rate \"1 / 0\"")).unwrap_err();
+        assert!(e.contains("divides by zero"), "{e}");
+        let log = run(&mut b, &line("rate \" 900 \"")).unwrap();
+        assert!(log[0].ends_with("-> \"900\""), "{log:?}");
     }
 }

@@ -161,10 +161,11 @@ fn optional(s: &str) -> Option<String> {
 /// What typed money does with digits past the cent.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SubCents {
-    /// Rounds half away from zero (`12.345` is 12.35): the app's cells.
+    /// Rounds half away from zero (`12.345` is 12.35): the app, the command
+    /// line and the MCP server alike.
     Round,
-    /// Refuses them (`12.345` is an error): the command line and the MCP
-    /// server, where a value is written once and never seen as a total.
+    /// Refuses them (`12.345` is an error), for a reader that must not
+    /// round.
     Refuse,
 }
 

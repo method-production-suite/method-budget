@@ -18,9 +18,9 @@ use method_core::{
 use method_format::serde_json::{json, Map, Value};
 use method_session::display::{self, GlobalInfoInput};
 use method_session::edit::{
-    self, parse_money_as, typed, ChargeInput, CreditCapInput, CreditInput, CreditRowInput,
-    CreditSourceInput, CurrencyInput, ExcludedAmountInput, FringeInput, GroupInput, LocationInput,
-    SetInput, SubCents, UnitInput,
+    self, typed, ChargeInput, CreditCapInput, CreditInput, CreditRowInput, CreditSourceInput,
+    CurrencyInput, ExcludedAmountInput, FringeInput, GroupInput, LocationInput, SetInput,
+    UnitInput,
 };
 use method_session::rowstyle;
 
@@ -475,31 +475,17 @@ fn setup_schema(update: bool) -> Value {
         required,
     )
 }
+
 // ---------------------------------------------------------------------------
 // Values
 //
 // The edits themselves are the app's (method_session::edit): these read the
 // tool's arguments, fill in what an update leaves out from the item as it
-// is, and hand the whole item over. Money is read exactly (never rounded)
-// here and passed on as text that reads back to the same cents.
-
-fn cents(v: &Value, what: &str) -> Result<Cents, ToolError> {
-    let c = parse_money_as(&formula_text(v), SubCents::Refuse)
-        .map_err(|e| ToolError::invalid(format!("{what}: {e}")))?;
-    if c < 0 {
-        return Err(ToolError::invalid(format!("{what} can't be negative")));
-    }
-    Ok(c)
-}
+// is, and hand the whole item over, money as typed (the app rounds it).
 
 /// An amount in cents as money text the app reads back exactly.
 fn money_text(c: Cents) -> String {
     Dec::from_cents(c).to_string()
-}
-
-/// [`cents`] as money text.
-fn exact(v: &Value, what: &str) -> Result<String, ToolError> {
-    cents(v, what).map(money_text)
 }
 
 fn text(f: &Map<String, Value>, k: &str) -> Option<String> {
@@ -623,12 +609,12 @@ fn put_item(
                     }
                     match f.get("cutoff") {
                         Some(Value::Null) => None,
-                        Some(v) => Some(cents(v, "cutoff")?),
-                        None => old_cutoff,
+                        Some(v) => Some(formula_text(v)),
+                        None => old_cutoff.map(money_text),
                     }
                 } else {
                     match f.get("cutoff") {
-                        None => old_cutoff,
+                        None => old_cutoff.map(money_text),
                         Some(Value::Null) => None,
                         Some(_) => return Err(ToolError::invalid(
                             "a flat fringe has no cutoff: cutoffs apply to percent fringes only",
@@ -645,11 +631,6 @@ fn put_item(
                 _ => (None, FlatBasis::Amount, None),
             };
             let unit = opt_text(f, "unit").unwrap_or(old_unit);
-            if let Some(u) = &unit {
-                if !b.units.contains_key(u) {
-                    return Err(ToolError::not_found(format!("there is no unit {u}")));
-                }
-            }
             let basis = match f.get("basis") {
                 None => Some(old_basis.name().to_string()),
                 Some(v) => v.as_str().map(str::to_string),
@@ -665,13 +646,13 @@ fn put_item(
                     .or_else(|| old.as_ref().map(|o| o.description.clone()))
                     .unwrap_or_default(),
                 rate,
-                cutoff: cutoff.map(money_text),
+                cutoff,
                 unit,
                 basis,
                 max_hours_per_day,
                 short_code: short_code(f),
             };
-            edit::set_fringe(b, name, &input)?;
+            typed::set_fringe(b, name, &input)?;
         }
         SetupKind::Group => {
             let old = b.groups.get(name).cloned();
@@ -934,24 +915,7 @@ fn delete_item(
         SetupKind::Group => typed::delete_group(b, name)?,
         SetupKind::Set => edit::delete_set(b, name)?,
         SetupKind::Location => edit::delete_location(b, name)?,
-        SetupKind::Unit => {
-            edit::delete_unit_with(b, name, true)?;
-            // Also blanked where settings name it, so nothing is left
-            // naming a unit that isn't there (the app's delete leaves them).
-            for f in b.fringes.values_mut() {
-                if let FringeKind::Flat { unit, .. } = &mut f.kind {
-                    if unit.as_deref() == Some(name) {
-                        *unit = None;
-                    }
-                }
-            }
-            for gi in b.global_info.values_mut() {
-                if gi.unit == name {
-                    gi.unit.clear();
-                }
-            }
-            b.global_info.retain(|_, gi| !gi.is_default());
-        }
+        SetupKind::Unit => edit::delete_unit_with(b, name, true)?,
         SetupKind::Currency => typed::delete_currency_with(b, name, true)?,
     }
     Ok((u.lines, u.other))
@@ -1013,7 +977,7 @@ fn set_charge(ctx: &mut Ctx, a: &Args) -> ToolResult {
                         .unwrap_or("")
                         .to_string(),
                     amount: match x.get("amount") {
-                        Some(v) => exact(v, "excluded amount")?,
+                        Some(v) => formula_text(v),
                         None => money_text(0),
                     },
                 });
@@ -1051,7 +1015,7 @@ fn set_charge(ctx: &mut Ctx, a: &Args) -> ToolResult {
                 None => old_percent.map(|p| p.to_string()),
             },
             amount: match a.get("amount") {
-                Some(v) => Some(exact(v, "amount")?),
+                Some(v) => Some(formula_text(v)),
                 None => old_amount.map(money_text),
             },
             currency: opt_arg(&a, "currency").unwrap_or(old_currency),
@@ -1135,22 +1099,17 @@ fn credit_row_arg(r: &Value, n: usize) -> Result<CreditRowInput, ToolError> {
                 ToolError::invalid(format!("row {n}: a flat source needs an amount"))
             })?;
             CreditSourceInput::Flat {
-                amount: exact(amt, &format!("row {n}'s amount"))?,
+                amount: formula_text(amt),
             }
         }
     };
     let cap = match r.get("cap") {
         None => CreditCapInput::None,
         Some(c) => {
-            let amount = || {
-                exact(
-                    c.get("amount").unwrap_or(&Value::Null),
-                    &format!("row {n}'s cap"),
-                )
-            };
+            let amount = formula_text(c.get("amount").unwrap_or(&Value::Null));
             match c.get("kind").and_then(Value::as_str) {
-                Some("qualified_spend") => CreditCapInput::QualifiedSpend { amount: amount()? },
-                Some("credit") => CreditCapInput::Credit { amount: amount()? },
+                Some("qualified_spend") => CreditCapInput::QualifiedSpend { amount },
+                Some("credit") => CreditCapInput::Credit { amount },
                 _ => CreditCapInput::None,
             }
         }
@@ -1199,7 +1158,7 @@ fn set_credit(ctx: &mut Ctx, a: &Args) -> ToolResult {
                 .or(old.as_ref().map(|o| o.applied))
                 .unwrap_or(true),
             cap: if a.has("cap") {
-                a.get("cap").map(|v| exact(v, "cap")).transpose()?
+                a.get("cap").map(formula_text)
             } else {
                 old.as_ref().and_then(|o| o.cap).map(money_text)
             },

@@ -1,8 +1,9 @@
 //! Tools that change detail rows: add, update, delete and move them, and put
 //! fringes and groups on them or take them off. Field values go through the
-//! command line's own edit language (`script::apply`), so a unit, set,
-//! location or currency must exist, a color must be `#rrggbb` and so on,
-//! exactly as `method set` checks them.
+//! command line's edit language (`script::apply`), which sets them with the
+//! app's edits: a unit, set, location or currency must exist, a formula
+//! that divides by zero is refused, a color must be `#rrggbb` and so on,
+//! exactly as the app and `method set` check them.
 
 use std::collections::BTreeSet;
 

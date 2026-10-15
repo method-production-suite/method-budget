@@ -914,9 +914,11 @@ fn charges_credits_categories_accounts_and_title() {
     err_contains(
         f.tool(
             "set_charge",
-            json!({"path": "film.mthd", "name": "New", "charge_kind": "flat", "amount": "1.005"}),
+            json!({"path": "film.mthd", "name": "New", "charge_kind": "flat", "amount": "(1.005)"}),
         ),
-        "two decimal places",
+        // Money rounds as the app's does (1.005 is 1.01); a negative amount
+        // is refused (owner's decision, 2026-10-15).
+        "can't be negative",
     );
     err_contains(
         f.tool(
