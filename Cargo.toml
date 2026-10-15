@@ -19,6 +19,12 @@ edition = "2021"
 version = "0.2.0"
 license = "MIT OR Apache-2.0"
 
+# Release builds keep integer overflow checks: a crafted import should fail
+# loudly with a panic, never wrap into a plausible-looking wrong total. The
+# browser build below inherits this.
+[profile.release]
+overflow-checks = true
+
 # The browser build (`cargo xtask web`, docs/research/web-session.md): small
 # over fast, since the page downloads it. The desktop's profiles are untouched.
 [profile.web-release]
