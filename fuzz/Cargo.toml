@@ -1,0 +1,85 @@
+[package]
+name = "method-fuzz"
+description = "Fuzz targets for Method Budget's hand-written parsers (cargo +nightly fuzz)"
+version = "0.0.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+# Pinned, like the workspace's dependencies, to versions past the 14-day
+# cooldown (scripts/check-crate-ages.py --lock fuzz/Cargo.lock).
+libfuzzer-sys = "=0.4.13"
+method-format = { path = "../crates/method-format", features = ["fuzzing"] }
+serde_json = "=1.0.151"
+
+# Its own workspace, so the main workspace (and its CI) never builds this
+# crate or needs a nightly compiler.
+[workspace]
+members = ["."]
+
+# Fuzz with the checks a debug build has: overflow and debug assertions are
+# bugs here, not wrapping arithmetic.
+[profile.release]
+debug = 1
+debug-assertions = true
+overflow-checks = true
+
+[[bin]]
+name = "inflate"
+path = "fuzz_targets/inflate.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "zip"
+path = "fuzz_targets/zip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "xlsx"
+path = "fuzz_targets/xlsx.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "csv"
+path = "fuzz_targets/csv.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "xml"
+path = "fuzz_targets/xml.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "exchange_json"
+path = "fuzz_targets/exchange_json.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mthd"
+path = "fuzz_targets/mthd.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "delta"
+path = "fuzz_targets/delta.rs"
+test = false
+doc = false
+bench = false

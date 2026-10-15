@@ -18,3 +18,6 @@ default = ["bundled-charts"]
 # turns it off and fetches a chart's file only when it is picked
 # (docs/research/web-session.md, "The charts in a browser").
 bundled-charts = []
+# Hidden entry points for the fuzz targets (fuzz/, not in this workspace):
+# the version-delta patcher, which is otherwise private.
+fuzzing = []

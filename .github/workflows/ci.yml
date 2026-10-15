@@ -93,11 +93,14 @@ jobs:
           else
             base=""
           fi
-          if [ -n "$base" ]; then
-            python3 scripts/check-crate-ages.py --only-changed "$base"
-          else
-            python3 scripts/check-crate-ages.py
-          fi
+          # fuzz/ is its own workspace with its own lock (fuzz/README.md).
+          for lock in Cargo.lock fuzz/Cargo.lock; do
+            if [ -n "$base" ]; then
+              python3 scripts/check-crate-ages.py --lock "$lock" --only-changed "$base"
+            else
+              python3 scripts/check-crate-ages.py --lock "$lock"
+            fi
+          done
   deny:
     # deny.toml: known advisories, licenses compatible with MIT OR Apache-2.0,
     # crates.io as the only source.

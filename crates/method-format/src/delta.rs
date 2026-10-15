@@ -323,6 +323,25 @@ fn apply_one(doc: &mut Value, p: &PatchOp) -> Result<(), String> {
     Ok(())
 }
 
+/// The patcher and differ for the fuzz targets (fuzz/): not part of the API.
+#[cfg(feature = "fuzzing")]
+pub(crate) mod fuzzing {
+    use super::*;
+
+    /// Reads `patch` as a delta's operations and applies them to `doc`.
+    pub fn apply_patch(doc: &mut Value, patch: Value) -> Result<(), String> {
+        let ops: Vec<PatchOp> = serde_json::from_value(patch).map_err(|e| e.to_string())?;
+        apply(doc, &ops)
+    }
+
+    /// The patch [`diff`] writes from `from` to `to`, applied to `from`.
+    pub fn diff_then_apply(from: &Value, to: &Value) -> Result<Value, String> {
+        let mut doc = from.clone();
+        apply(&mut doc, &diff(from, to))?;
+        Ok(doc)
+    }
+}
+
 /// A version's content as the canonical budget object.
 fn canonical(content: &BudgetSnapshot) -> Value {
     serde_json::to_value(FileBudget::from(&content.to_budget()))
