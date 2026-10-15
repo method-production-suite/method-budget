@@ -167,6 +167,19 @@ pub fn write_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
     Ok(())
 }
 
+/// The file `path` names: where a link leads, when `path` is a link (a save
+/// renames over the path it is given, so saving to the link itself would
+/// replace the link with a plain file and leave its target behind). Any
+/// other path, and a link that can't be resolved, as it is.
+pub fn through_link(path: &Path) -> PathBuf {
+    match fs::symlink_metadata(path) {
+        Ok(m) if m.file_type().is_symlink() => {
+            fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+        }
+        _ => path.to_path_buf(),
+    }
+}
+
 /// Whether two paths name the same file: the same path, or the same file
 /// once links and `..` are resolved (only files that exist can be resolved).
 pub fn same_file(a: &Path, b: &Path) -> bool {

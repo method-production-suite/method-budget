@@ -72,6 +72,7 @@ pub trait SessionFiles {
 
 impl SessionFiles for Session {
     fn open(path: &Path) -> Result<Session, String> {
+        let path = &safety::through_link(path);
         let (budget, stamp) = read_budget(path)?;
         let mut s = Session::with_budget(budget, Some(path.to_path_buf()));
         s.set_disk_stamp(Some(stamp));
@@ -79,6 +80,9 @@ impl SessionFiles for Session {
     }
 
     fn save_to(&mut self, path: &Path) -> Result<(), String> {
+        // Save As onto a link writes the file it points to (Save already
+        // has the resolved path from open).
+        let path = &safety::through_link(path);
         if let Some(sh) = self.shared_mut() {
             // A shared budget lives in its shared folder: Save puts this
             // person's changes there (and the keeper's file is rewritten);
@@ -279,6 +283,37 @@ mod tests {
         // Never saved: nothing to confirm, still unsaved.
         let u = Session::recovered(small_sample(7), None, "abc-2".into());
         assert!(u.is_dirty() && !u.needs_overwrite_confirm());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn saving_a_linked_budget_writes_the_file_the_link_points_to() {
+        let dir = safety::tests::temp_dir("session-link");
+        let (target, link) = (dir.join("real.mthd"), dir.join("link.mthd"));
+        Session::new().save_to(&target).unwrap();
+        std::os::unix::fs::symlink("real.mthd", &link).unwrap();
+        let is_link = |p: &Path| {
+            std::fs::symlink_metadata(p)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        };
+
+        // Opened through the link: Save updates the target, the link stays.
+        let mut s = Session::open(&link).unwrap();
+        let saved_to = s.path().unwrap().to_path_buf();
+        assert!(safety::same_file(&saved_to, &target) && !is_link(&saved_to));
+        s.save_to(&saved_to).unwrap();
+        assert!(is_link(&link));
+
+        // Save As onto the link: the same.
+        let mut other = Session::with_budget(small_sample(3), None);
+        other.save_to(&link).unwrap();
+        assert!(is_link(&link));
+        let text = method_format::to_string(other.budget());
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), text);
+        assert!(safety::same_file(other.path().unwrap(), &target));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
