@@ -21,7 +21,7 @@
 //! ```
 
 use std::collections::BTreeMap;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -98,28 +98,9 @@ pub fn utc_stamp(ms: u64) -> String {
 // ---------------------------------------------------------------------------
 // Writing files
 
-/// Who may read a file written by [`write_atomically`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Access {
-    /// Only this user (0600 on Unix): recovery files, backups, the recent list.
-    Private,
-    /// A document: keeps the permissions of the file it replaces (a new file
-    /// gets the usual ones).
-    Document,
-}
-
-fn create_new(path: &Path, access: Access) -> io::Result<File> {
-    let mut o = OpenOptions::new();
-    o.write(true).create_new(true);
-    #[cfg(unix)]
-    if access == Access::Private {
-        use std::os::unix::fs::OpenOptionsExt;
-        o.mode(0o600);
-    }
-    #[cfg(not(unix))]
-    let _ = access;
-    o.open(path)
-}
+// Atomic writes live in method-format (src/fsio.rs), shared with the
+// command line and the change log.
+pub use method_format::fsio::{create_new, write_atomically, Access};
 
 /// Creates a folder only this user can open (0700 on Unix).
 pub fn create_private_dir(dir: &Path) -> io::Result<()> {
@@ -137,46 +118,6 @@ pub fn create_private_dir(dir: &Path) -> io::Result<()> {
         // up too. Only ever called on the app's own folders.
         use std::os::unix::fs::PermissionsExt;
         let _ = fs::set_permissions(dir, fs::Permissions::from_mode(0o700));
-    }
-    Ok(())
-}
-
-/// Writes `bytes` to `path` so that `path` is always either the old file or
-/// the complete new one: write a temporary file in the same folder, flush it
-/// to disk, then rename it over `path` (and flush the folder, on Unix). A
-/// failed write leaves the old file alone and no temporary file behind.
-pub fn write_atomically(path: &Path, bytes: &[u8], access: Access) -> io::Result<()> {
-    let dir = match path.parent() {
-        Some(d) if !d.as_os_str().is_empty() => d.to_path_buf(),
-        _ => PathBuf::from("."),
-    };
-    let name = path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "budget".into());
-    let tmp = dir.join(format!(".{name}.{}.tmp", unique()));
-    let result = (|| {
-        let mut f = create_new(&tmp, access)?;
-        f.write_all(bytes)?;
-        f.sync_all()?;
-        drop(f);
-        if access == Access::Document {
-            if let Ok(meta) = fs::metadata(path) {
-                // Best effort: a file on a share may refuse.
-                let _ = fs::set_permissions(&tmp, meta.permissions());
-            }
-        }
-        fs::rename(&tmp, path)
-    })();
-    if result.is_err() {
-        let _ = fs::remove_file(&tmp);
-        return result;
-    }
-    #[cfg(unix)]
-    if let Ok(d) = File::open(&dir) {
-        // The rename itself reaches the disk. Best effort: some file
-        // systems can't sync a folder.
-        let _ = d.sync_all();
     }
     Ok(())
 }

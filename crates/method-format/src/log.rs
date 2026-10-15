@@ -10,7 +10,6 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
-use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -730,22 +729,11 @@ pub struct LoadReport {
 }
 
 /// Writes `bytes` to `path` through a temporary file in the same folder
-/// (named with the `.~` prefix sync services skip) and a rename.
+/// (named with the `.~` prefix sync services skip) and a rename
+/// ([`crate::fsio::write_atomically`]).
 pub fn write_sealed(path: &Path, bytes: &[u8]) -> Result<(), LogFileError> {
-    let dir = path.parent().unwrap_or_else(|| Path::new("."));
-    let name = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .ok_or_else(|| LogFileError(format!("{}: not a file name", path.display())))?;
-    let tmp = dir.join(format!(".~{name}.{}", std::process::id()));
-    let mut f = fs::File::create(&tmp).map_err(|e| io_err(&tmp, e))?;
-    f.write_all(bytes).map_err(|e| io_err(&tmp, e))?;
-    f.sync_all().map_err(|e| io_err(&tmp, e))?;
-    drop(f);
-    fs::rename(&tmp, path).map_err(|e| {
-        let _ = fs::remove_file(&tmp);
-        io_err(path, e)
-    })
+    crate::fsio::write_atomically_with_prefix(path, bytes, crate::fsio::Access::Document, ".~")
+        .map_err(|e| io_err(path, e))
 }
 
 /// The `Feature.mthd-log/` folder beside a budget.

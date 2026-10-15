@@ -232,32 +232,11 @@ pub fn save(path: &str, b: &Budget) -> Result<(), CliError> {
 /// rename, so a reader never sees half a file and a failed write leaves the
 /// old file as it was. The new file keeps the old one's permissions (a
 /// budget only its owner may read stays that way) and is flushed to disk
-/// before the rename.
+/// before the rename (`method_format::fsio::write_atomically`).
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
-    use std::io::Write as _;
-    let shown = path.display();
-    let name = path
-        .file_name()
-        .ok_or_else(|| CliError::failed(format!("{shown}: not a file name")))?;
-    let tmp = path.with_file_name(format!(
-        ".{}.mthd-tmp-{}",
-        name.to_string_lossy(),
-        std::process::id()
-    ));
-    let write = || -> std::io::Result<()> {
-        let mut file = std::fs::File::create(&tmp)?;
-        file.write_all(bytes)?;
-        if let Ok(old) = std::fs::metadata(path) {
-            file.set_permissions(old.permissions())?;
-        }
-        file.sync_all()
-    };
-    let result = write().and_then(|()| std::fs::rename(&tmp, path));
-    if let Err(e) = result {
-        let _ = std::fs::remove_file(&tmp);
-        return Err(CliError::failed(format!("{shown}: {e}")));
-    }
-    Ok(())
+    use method_format::fsio::{write_atomically, Access};
+    write_atomically(path, bytes, Access::Document)
+        .map_err(|e| CliError::failed(format!("{}: {e}", path.display())))
 }
 
 /// Refuses to write `out` when it is the file `input` (the same file under

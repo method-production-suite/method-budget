@@ -18,6 +18,8 @@ mod dto;
 /// Spreadsheet export (Excel workbook, CSV, tab-delimited). Not the native
 /// format: a one-way copy of the evaluated budget for other tools.
 pub mod export;
+/// Files on disk: atomic replacement (temporary file, flush, rename).
+pub mod fsio;
 /// Spreadsheet import (Excel workbook, CSV, tab-delimited) with a column
 /// mapping. Read by hand: our own inflate, ZIP and XML readers.
 pub mod import;
