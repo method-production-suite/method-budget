@@ -35,6 +35,9 @@ pub mod mapping;
 /// A column mapping saved as a JSON file (`method import --mapping`).
 pub mod mapping_file;
 pub mod merge;
+/// A schedule's day counts from Method Scheduling's budget exchange file
+/// (`method-schedule-days`), for schedule-linked globals.
+pub mod schedule;
 pub mod xlsxread;
 pub mod xml;
 pub mod zipread;

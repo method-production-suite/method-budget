@@ -74,6 +74,11 @@ pub fn read(
             MAX_FILE_BYTES >> 20
         )));
     }
+    if matches!(format, None | Some(ExportFormat::Json)) && super::schedule::looks_like(bytes) {
+        return Err(ReadError::new(
+            "this is a schedule's day counts (a Method Scheduling days file), not a budget export; link it as a schedule instead",
+        ));
+    }
     let format = match format.or_else(|| detect(bytes, file_name)) {
         Some(f) => f,
         None => {

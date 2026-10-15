@@ -1,0 +1,90 @@
+{
+  "format": "method-schedule-days",
+  "version": 0,
+  "schedule": "Harbor Light",
+  "board": "Board 1",
+  "sub_board": "Second Unit",
+  "generated": "2026-10-11",
+  "source_hash": "3f0c2a91d7e45b18",
+  "shoot_days": {
+    "start": "2027-03-01",
+    "end": "2027-03-09",
+    "total": 6,
+    "by_unit": {
+      "SECOND": 6
+    },
+    "by_set": {
+      "BOATYARD": 2,
+      "HARBOR WALL": 3,
+      "NET LOFT": 2
+    },
+    "by_location": {
+      "PIER 9": 4,
+      "STAGE 2": 2
+    },
+    "by_week": {
+      "2027-03-01": 4,
+      "2027-03-08": 2
+    },
+    "prep_start": "2027-01-18",
+    "wrap_end": "2027-03-26"
+  },
+  "elements": [
+    {
+      "id": 7,
+      "category": "Cast",
+      "board_id": "1",
+      "name": "KIT",
+      "first": "2027-03-01",
+      "last": "2027-03-09",
+      "work": 5,
+      "hold": 1,
+      "travel": 1,
+      "fitting": 1,
+      "rehearsal": 1,
+      "holiday": 1,
+      "company_move": 1,
+      "total": 11,
+      "holds": true,
+      "drops": false,
+      "min_drop_gap": 1
+    },
+    {
+      "id": 12,
+      "category": "Cast",
+      "board_id": "2",
+      "name": "MARGO",
+      "first": "2027-03-02",
+      "last": "2027-03-02",
+      "work": 1,
+      "hold": 0,
+      "travel": 0,
+      "fitting": 0,
+      "rehearsal": 0,
+      "holiday": 0,
+      "company_move": 0,
+      "total": 1,
+      "holds": true,
+      "drops": true,
+      "min_drop_gap": 10
+    },
+    {
+      "id": 30,
+      "category": "Vehicles",
+      "name": "TUG BOAT",
+      "first": "2027-03-03",
+      "last": "2027-03-04",
+      "work": 2,
+      "hold": 0,
+      "travel": 0,
+      "fitting": 0,
+      "rehearsal": 0,
+      "holiday": 0,
+      "company_move": 0,
+      "total": 2,
+      "holds": false,
+      "drops": false,
+      "min_drop_gap": 1
+    }
+  ]
+}
