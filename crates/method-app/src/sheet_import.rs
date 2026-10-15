@@ -23,7 +23,6 @@
 //! `sheet_import` module (re-exported here); these are the Open dialog,
 //! reading the file and the Tauri commands.
 
-use std::io::Read;
 use std::path::PathBuf;
 
 use method_format::import::MAX_FILE_BYTES;
@@ -37,10 +36,8 @@ pub use method_session::sheet_import::*;
 /// Reads the file at `path` for import: at most [`MAX_FILE_BYTES`] (Import
 /// Actuals reads its files the same way, src/actuals.rs).
 pub(crate) fn read_capped(path: &std::path::Path) -> Result<Vec<u8>, String> {
-    let f = std::fs::File::open(path).map_err(|e| format!("Couldn't open the file: {e}"))?;
-    let mut bytes = Vec::new();
-    f.take(MAX_FILE_BYTES as u64 + 1)
-        .read_to_end(&mut bytes)
+    // One byte over the limit is read, so check_size words the refusal.
+    let bytes = method_format::fsio::read_capped(path, MAX_FILE_BYTES as u64 + 1)
         .map_err(|e| format!("Couldn't read the file: {e}"))?;
     check_size(bytes.len())?;
     Ok(bytes)

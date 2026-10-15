@@ -219,7 +219,9 @@ pub fn excluding(f: &Flags) -> RecalcOptions {
 
 /// Reads and parses a budget file.
 pub fn load(path: &str) -> Result<Budget, CliError> {
-    let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
+    use method_format::fsio::{read_to_string_capped, MAX_READ_BYTES};
+    let text = read_to_string_capped(Path::new(path), MAX_READ_BYTES)
+        .map_err(|e| format!("{path}: {e}"))?;
     method_format::from_str(&text).map_err(|e| CliError::failed(format!("{path}: {e}")))
 }
 

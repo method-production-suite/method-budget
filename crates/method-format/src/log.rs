@@ -26,6 +26,7 @@ use crate::dto::{
     FileItemSource, FileLinePreset, FileNewLineDefaults, FileOtPattern, FilePosting,
     FileReportPreset, FileSetupOrder, FileSnapshot, FileTagPreset,
 };
+use crate::fsio::{read_capped, read_to_string_capped, MAX_READ_BYTES};
 
 /// The value of `format` in `budget.json`.
 pub const LOG_FORMAT_NAME: &str = "method-budget-log";
@@ -60,6 +61,12 @@ impl From<String> for LogFileError {
 
 fn io_err(path: &Path, e: std::io::Error) -> LogFileError {
     LogFileError(format!("{}: {e}", path.display()))
+}
+
+/// Reads a whole text file from the folder, which collaborators write: at
+/// most [`MAX_READ_BYTES`], so a huge file is refused, not read into memory.
+fn read_text(path: impl AsRef<Path>) -> std::io::Result<String> {
+    read_to_string_capped(path.as_ref(), MAX_READ_BYTES)
 }
 
 // ---------------------------------------------------------------------------
@@ -808,7 +815,7 @@ impl LogDir {
     /// Reads `budget.json`.
     pub fn info(&self) -> Result<BudgetInfo, LogFileError> {
         let path = self.root.join("budget.json");
-        let text = fs::read_to_string(&path).map_err(|e| io_err(&path, e))?;
+        let text = read_text(&path).map_err(|e| io_err(&path, e))?;
         let f: FileBudgetInfo = serde_json::from_str(&text)
             .map_err(|e| LogFileError(format!("{}: {e}", path.display())))?;
         if f.format != LOG_FORMAT_NAME {
@@ -907,7 +914,8 @@ impl LogDir {
 
     /// Reads one segment file.
     pub fn read(&self, segment: &Segment) -> Result<Vec<Change>, LogFileError> {
-        let bytes = fs::read(&segment.path).map_err(|e| io_err(&segment.path, e))?;
+        let bytes =
+            read_capped(&segment.path, MAX_READ_BYTES).map_err(|e| io_err(&segment.path, e))?;
         read_segment(&bytes).map_err(|e| LogFileError(format!("{}: {e}", segment.path.display())))
     }
 
@@ -1040,7 +1048,7 @@ pub fn init(path: &Path, actor: ActorId, ids: Ids, time: &str) -> Result<Shared,
             path.display()
         )));
     }
-    let text = fs::read_to_string(path).map_err(|e| io_err(path, e))?;
+    let text = read_text(path).map_err(|e| io_err(path, e))?;
     let budget =
         crate::from_str(&text).map_err(|e| LogFileError(format!("{}: {e}", path.display())))?;
     let file = path
@@ -1125,7 +1133,7 @@ impl LogDir {
 
     /// `actor`'s heartbeat, if it has written one that reads.
     pub fn read_presence(&self, actor: ActorId) -> Option<Presence> {
-        let text = fs::read_to_string(self.actor_dir(actor).join(PRESENCE_FILE)).ok()?;
+        let text = read_text(self.actor_dir(actor).join(PRESENCE_FILE)).ok()?;
         serde_json::from_str(&text).ok()
     }
 
@@ -1155,7 +1163,7 @@ pub fn actor_id_path() -> Option<PathBuf> {
 /// first time and kept readable by its owner only. The command line and
 /// the application share it, so one computer is one actor.
 pub fn load_or_make_actor(path: &Path, ids: &mut Ids) -> Result<ActorId, LogFileError> {
-    if let Ok(text) = fs::read_to_string(path) {
+    if let Ok(text) = read_text(path) {
         return ActorId::parse(&text)
             .ok_or_else(|| LogFileError(format!("{}: not an actor id", path.display())));
     }
@@ -1178,7 +1186,7 @@ pub fn load_or_make_actor(path: &Path, ids: &mut Ids) -> Result<ActorId, LogFile
 /// change by this actor. Returns the change, or `None` when the file
 /// matches.
 pub fn ingest(shared: &mut Shared, time: &str) -> Result<Option<ChangeId>, LogFileError> {
-    let text = fs::read_to_string(&shared.path).map_err(|e| io_err(&shared.path, e))?;
+    let text = read_text(&shared.path).map_err(|e| io_err(&shared.path, e))?;
     let on_disk = crate::from_str(&text)
         .map_err(|e| LogFileError(format!("{}: {e}", shared.path.display())))?;
     let proj = shared.log.project();
@@ -1195,7 +1203,7 @@ pub fn ingest(shared: &mut Shared, time: &str) -> Result<Option<ChangeId>, LogFi
 pub fn write_snapshot(shared: &Shared) -> Result<Projection, LogFileError> {
     let proj = shared.log.project();
     let mut budget = proj.budget.clone();
-    if let Ok(text) = fs::read_to_string(&shared.path) {
+    if let Ok(text) = read_text(&shared.path) {
         if let Ok(on_disk) = crate::from_str(&text) {
             budget.provenance = on_disk.provenance;
         }

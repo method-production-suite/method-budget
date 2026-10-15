@@ -226,8 +226,10 @@ impl DocsFiles for Docs {
 
 /// Reads and parses a budget file, with the stamp of what was read.
 pub(crate) fn read_budget(path: &Path) -> Result<(Budget, DiskStamp), String> {
-    let bytes =
-        std::fs::read(path).map_err(|e| format!("Couldn't read {}: {e}", path.display()))?;
+    // Capped: a file far larger than any budget is refused before it is
+    // read into memory.
+    let bytes = method_format::fsio::read_capped(path, method_format::fsio::MAX_READ_BYTES)
+        .map_err(|e| format!("Couldn't read {}: {e}", path.display()))?;
     let text = std::str::from_utf8(&bytes).map_err(|_| {
         format!(
             "Couldn't read {}: stream did not contain valid UTF-8",

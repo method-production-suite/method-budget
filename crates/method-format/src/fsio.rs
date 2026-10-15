@@ -1,13 +1,19 @@
-//! Files on disk: atomic replacement, shared by the app, the command line and
-//! the change log (src/log.rs) so they all write the same careful way.
+//! Files on disk: atomic replacement and capped reads, shared by the app, the
+//! command line and the change log (src/log.rs) so they all write the same
+//! careful way.
 //!
 //! Plain `std::fs`, which still builds for WebAssembly (where every call
 //! fails as unsupported); the browser build never calls any of it.
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Write as _};
+use std::io::{self, Read as _, Write as _};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+
+/// The most any whole-file read takes in: a budget, or one collaborator's log
+/// file. Far beyond any real budget; a larger file is refused before it is
+/// read into memory.
+pub const MAX_READ_BYTES: u64 = 256 * 1024 * 1024;
 
 /// Who may read a file written by [`write_atomically`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -107,6 +113,34 @@ pub fn write_atomically_with_prefix(
     Ok(())
 }
 
+/// Reads the whole file at `path`, refusing one larger than `limit` bytes
+/// (the error's kind is `InvalidData` then) without reading it all in.
+pub fn read_capped(path: &Path, limit: u64) -> io::Result<Vec<u8>> {
+    let f = File::open(path)?;
+    let mut bytes = Vec::new();
+    f.take(limit.saturating_add(1)).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > limit {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "the file is larger than {} MB, too large to open",
+                limit / (1024 * 1024)
+            ),
+        ));
+    }
+    Ok(bytes)
+}
+
+/// [`read_capped`], as text.
+pub fn read_to_string_capped(path: &Path, limit: u64) -> io::Result<String> {
+    String::from_utf8(read_capped(path, limit)?).map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "stream did not contain valid UTF-8",
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -150,6 +184,19 @@ mod tests {
         write_atomically(&dir.join("x"), b"new", Access::Private).unwrap();
         assert_eq!(fs::read(&victim).unwrap(), b"keep");
         assert_eq!(fs::read(dir.join("x")).unwrap(), b"new");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn reads_are_capped() {
+        let dir = temp_dir("cap");
+        let p = dir.join("big");
+        fs::write(&p, vec![b'a'; 100]).unwrap();
+        assert_eq!(read_capped(&p, 100).unwrap().len(), 100);
+        let e = read_capped(&p, 99).unwrap_err();
+        assert_eq!(e.kind(), io::ErrorKind::InvalidData);
+        assert!(e.to_string().contains("too large"), "{e}");
+        assert_eq!(read_to_string_capped(&p, 100).unwrap().len(), 100);
         let _ = fs::remove_dir_all(&dir);
     }
 }
