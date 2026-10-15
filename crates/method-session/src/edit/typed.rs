@@ -206,17 +206,7 @@ pub fn delete_group(b: &mut Budget, name: &str) -> Result<(), EditError> {
             "group {name} no longer exists"
         )));
     }
-    let used_by = b.credits.iter().find(|c| {
-        c.rows
-            .iter()
-            .any(|r| matches!(&r.source, CreditSource::Group { group, .. } if group == name))
-    });
-    if let Some(c) = used_by {
-        return Err(EditError::Refused(format!(
-            "group {name} is used by the credit {}; change the credit first",
-            c.name
-        )));
-    }
+    check_group_delete(b, name)?;
     b.groups.remove(name);
     for acct in b.categories_mut().flat_map(|c| &mut c.accounts) {
         for d in &mut acct.details {
@@ -228,6 +218,23 @@ pub fn delete_group(b: &mut Budget, name: &str) -> Result<(), EditError> {
     }
     method_core::order::forget(b, method_core::SetupKind::Group, name);
     Ok(())
+}
+
+/// Why group `name` can't be deleted however few lines use it: a credit is
+/// based on it.
+pub fn check_group_delete(b: &Budget, name: &str) -> Result<(), EditError> {
+    let used_by = b.credits.iter().find(|c| {
+        c.rows
+            .iter()
+            .any(|r| matches!(&r.source, CreditSource::Group { group, .. } if group == name))
+    });
+    match used_by {
+        Some(c) => Err(EditError::Refused(format!(
+            "group {name} is used by the credit {}; change the credit first",
+            c.name
+        ))),
+        None => Ok(()),
+    }
 }
 
 pub fn set_currency(b: &mut Budget, code: &str, c: &CurrencyInput) -> Result<(), EditError> {
@@ -296,21 +303,29 @@ pub fn delete_currency_with(b: &mut Budget, code: &str, move_lines: bool) -> Res
             "{lines} {s} {code}; change them first"
         )));
     }
+    check_currency_delete(b, code)?;
+    b.currencies.remove(code);
+    method_core::order::forget(b, method_core::SetupKind::Currency, code);
+    Ok(())
+}
+
+/// Why currency `code` can't be deleted whatever its lines are in: the
+/// totals are shown in it, or a charge is.
+pub fn check_currency_delete(b: &Budget, code: &str) -> Result<(), EditError> {
     if b.totals_currency.as_deref() == Some(code) {
         return Err(EditError::Refused(format!(
             "totals are shown in {code}; change that first"
         )));
     }
-    let charged = b.charges.iter().any(|c| {
-        matches!(&c.kind, method_core::ChargeKind::Flat { currency: Some(cur), .. } if cur == code)
-    });
+    let charged = b
+        .charges
+        .iter()
+        .any(|c| matches!(&c.kind, ChargeKind::Flat { currency: Some(cur), .. } if cur == code));
     if charged {
         return Err(EditError::Refused(format!(
             "a charge is in {code}; change it first"
         )));
     }
-    b.currencies.remove(code);
-    method_core::order::forget(b, method_core::SetupKind::Currency, code);
     Ok(())
 }
 

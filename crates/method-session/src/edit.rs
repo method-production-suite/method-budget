@@ -1058,7 +1058,7 @@ fn picked_names(
     let mut out = BTreeSet::new();
     for n in names.iter().map(|n| n.trim()).filter(|n| !n.is_empty()) {
         if !known.contains(n) && !kept.is_some_and(|k| k.contains(n)) {
-            return Err(format!("there is no {what} `{n}`"));
+            return Err(format!("there is no {what} {n}"));
         }
         out.insert(n.to_string());
     }

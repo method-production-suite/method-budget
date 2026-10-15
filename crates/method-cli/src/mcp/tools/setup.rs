@@ -3,34 +3,38 @@
 //! categories and accounts, and the title. Renames go through the engine's
 //! rename, which rewrites every reference (decision 32); deletes check how
 //! much an item is used first (`method_core::usage`) and, only when asked to,
-//! take it off what uses it as the app does.
+//! take it off what uses it with the app's own deletes.
+//!
+//! Every change is made by the app's edits (`method_session::edit`), so the
+//! server checks what the app checks and refuses what it refuses.
 
 use std::collections::BTreeSet;
-use std::str::FromStr;
 
 use method_core::rename::{rename, valid_name, SetupKind};
 use method_core::{
-    Account, Budget, Category, Cents, Charge, ChargeKind, Credit, CreditCap, CreditRow,
-    CreditSource, Currency, Dec, FlatBasis, Formula, Fringe, FringeKind, Group, Location, SetDef,
-    TopsheetRow, UnitDef,
+    Budget, Cents, ChargeKind, CreditCap, CreditRow, CreditSource, Dec, FlatBasis, FringeKind,
+    TopsheetRow,
 };
 use method_format::serde_json::{json, Map, Value};
-use method_session::edit::{parse_money_as, SubCents};
+use method_session::display::{self, GlobalInfoInput};
+use method_session::edit::{
+    self, parse_money_as, typed, ChargeInput, CreditCapInput, CreditInput, CreditRowInput,
+    CreditSourceInput, CurrencyInput, ExcludedAmountInput, FringeInput, GroupInput, LocationInput,
+    SetInput, SubCents, UnitInput,
+};
+use method_session::rowstyle;
 
 use super::read::setup_kind;
 use super::{
     budget_path, edited, formula_text, obj, path_prop, Args, Ctx, Tool, ToolError, ToolResult,
 };
 use crate::mcp::schema::{self as s, object};
-use crate::script::{self, Op};
+use crate::script;
 
 const TABLES: &[&str] = &["fringe", "group", "set", "location", "unit", "currency"];
 const TABLES_AND_GLOBAL: &[&str] = &[
     "global", "fringe", "group", "set", "location", "unit", "currency",
 ];
-
-/// Longest short code, in characters (as the app allows).
-const MAX_SHORT_CODE: usize = 16;
 
 pub fn tools() -> Vec<Tool> {
     vec![
@@ -471,15 +475,13 @@ fn setup_schema(update: bool) -> Value {
         required,
     )
 }
-
 // ---------------------------------------------------------------------------
 // Values
-
-fn dec(v: &Value, what: &str) -> Result<Dec, ToolError> {
-    let t = formula_text(v);
-    Dec::from_str(t.trim())
-        .map_err(|_| ToolError::invalid(format!("{what}: `{t}` is not a number")))
-}
+//
+// The edits themselves are the app's (method_session::edit): these read the
+// tool's arguments, fill in what an update leaves out from the item as it
+// is, and hand the whole item over. Money is read exactly (never rounded)
+// here and passed on as text that reads back to the same cents.
 
 fn cents(v: &Value, what: &str) -> Result<Cents, ToolError> {
     let c = parse_money_as(&formula_text(v), SubCents::Refuse)
@@ -488,6 +490,16 @@ fn cents(v: &Value, what: &str) -> Result<Cents, ToolError> {
         return Err(ToolError::invalid(format!("{what} can't be negative")));
     }
     Ok(c)
+}
+
+/// An amount in cents as money text the app reads back exactly.
+fn money_text(c: Cents) -> String {
+    Dec::from_cents(c).to_string()
+}
+
+/// [`cents`] as money text.
+fn exact(v: &Value, what: &str) -> Result<String, ToolError> {
+    cents(v, what).map(money_text)
 }
 
 fn text(f: &Map<String, Value>, k: &str) -> Option<String> {
@@ -506,69 +518,10 @@ fn opt_text(f: &Map<String, Value>, k: &str) -> Option<Option<String>> {
     })
 }
 
-fn color(v: Option<String>) -> Result<Option<String>, ToolError> {
-    match v {
-        None => Ok(None),
-        Some(c) => {
-            let ok =
-                c.len() == 7 && c.starts_with('#') && c[1..].bytes().all(|b| b.is_ascii_hexdigit());
-            if ok {
-                Ok(Some(c.to_ascii_lowercase()))
-            } else {
-                Err(ToolError::invalid(format!(
-                    "`{c}` is not a color: use #rrggbb"
-                )))
-            }
-        }
-    }
-}
-
-/// A short code for item `name` of `kind`, refused when it has a comma, is
-/// too long, or is another item's code (ignoring case) or name.
-fn short_code(
-    b: &Budget,
-    kind: SetupKind,
-    name: &str,
-    typed: Option<String>,
-) -> Result<Option<String>, ToolError> {
-    let Some(code) = typed else { return Ok(None) };
-    if code.contains(',') {
-        return Err(ToolError::invalid("short codes can't contain commas"));
-    }
-    if code.chars().count() > MAX_SHORT_CODE {
-        return Err(ToolError::invalid(format!(
-            "short codes can be at most {MAX_SHORT_CODE} characters"
-        )));
-    }
-    let others: Vec<(&String, Option<&String>)> = match kind {
-        SetupKind::Fringe => b
-            .fringes
-            .iter()
-            .map(|(n, f)| (n, f.short_code.as_ref()))
-            .collect(),
-        _ => b
-            .groups
-            .iter()
-            .map(|(n, g)| (n, g.short_code.as_ref()))
-            .collect(),
-    };
-    for (other, theirs) in others {
-        if other == name {
-            continue;
-        }
-        if theirs.is_some_and(|c| c.to_lowercase() == code.to_lowercase()) {
-            return Err(ToolError::invalid(format!(
-                "{code} is already the short code of {other}"
-            )));
-        }
-        if *other == code {
-            return Err(ToolError::invalid(format!(
-                "{code} is the name of another {}",
-                kind.name()
-            )));
-        }
-    }
-    Ok(Some(code))
+/// A short code field as the app's edits take it: left out keeps the
+/// item's own, blank or null clears it.
+fn short_code(f: &Map<String, Value>) -> Option<String> {
+    opt_text(f, "short_code").map(Option::unwrap_or_default)
 }
 
 /// Refuses fields `kind`'s items don't have.
@@ -644,10 +597,10 @@ fn put_item(
         SetupKind::Fringe => {
             let old = b.fringes.get(name).cloned();
             let rate = match f.get("rate") {
-                Some(v) => Formula(formula_text(v).trim().to_string()),
+                Some(v) => formula_text(v),
                 None => old
                     .as_ref()
-                    .map(|o| o.rate.clone())
+                    .map(|o| o.rate.0.clone())
                     .ok_or_else(|| ToolError::invalid("a new fringe needs a rate"))?,
             };
             let want = f.get("fringe_kind").and_then(Value::as_str);
@@ -658,210 +611,144 @@ fn put_item(
             // The cutoff kept either way: a flat fringe keeps one it had
             // (never used), so switching back to percent brings it back.
             let old_cutoff = old.as_ref().and_then(|o| o.kind.cutoff());
-            let fk = if percent {
-                for k in ["unit", "basis", "max_hours_per_day"] {
-                    if f.get(k).is_some_and(|v| !v.is_null()) {
-                        return Err(ToolError::invalid(format!(
-                            "a percent fringe has no {}",
-                            k.replace('_', " ")
-                        )));
+            let cutoff =
+                if percent {
+                    for k in ["unit", "basis", "max_hours_per_day"] {
+                        if f.get(k).is_some_and(|v| !v.is_null()) {
+                            return Err(ToolError::invalid(format!(
+                                "a percent fringe has no {}",
+                                k.replace('_', " ")
+                            )));
+                        }
                     }
-                }
-                let cutoff = match f.get("cutoff") {
-                    Some(Value::Null) => None,
-                    Some(v) => Some(cents(v, "cutoff")?),
-                    None => old_cutoff,
-                };
-                FringeKind::Percent { cutoff }
-            } else {
-                let cutoff =
+                    match f.get("cutoff") {
+                        Some(Value::Null) => None,
+                        Some(v) => Some(cents(v, "cutoff")?),
+                        None => old_cutoff,
+                    }
+                } else {
                     match f.get("cutoff") {
                         None => old_cutoff,
                         Some(Value::Null) => None,
                         Some(_) => return Err(ToolError::invalid(
                             "a flat fringe has no cutoff: cutoffs apply to percent fringes only",
                         )),
-                    };
-                let (old_unit, old_basis, old_max) = match old.as_ref().map(|o| &o.kind) {
-                    Some(FringeKind::Flat {
-                        unit,
-                        basis,
-                        max_hours_per_day,
-                        ..
-                    }) => (unit.clone(), *basis, *max_hours_per_day),
-                    _ => (None, FlatBasis::Amount, None),
-                };
-                let unit = opt_text(f, "unit").unwrap_or(old_unit);
-                if let Some(u) = &unit {
-                    if !b.units.contains_key(u) {
-                        return Err(ToolError::not_found(format!("there is no unit {u}")));
-                    }
-                }
-                let basis = match f.get("basis") {
-                    None => old_basis,
-                    Some(Value::Null) => FlatBasis::Amount,
-                    Some(v) => v.as_str().and_then(FlatBasis::parse).ok_or_else(|| {
-                        ToolError::invalid("basis: use amount, amount_counts or quantity")
-                    })?,
-                };
-                let max_hours_per_day = match f.get("max_hours_per_day") {
-                    None => old_max,
-                    Some(Value::Null) => None,
-                    Some(v) if formula_text(v).trim().is_empty() => None,
-                    Some(v) => {
-                        let h = dec(v, "max_hours_per_day")?;
-                        if h <= Dec::ZERO {
-                            return Err(ToolError::invalid(
-                                "max_hours_per_day must be more than 0",
-                            ));
-                        }
-                        Some(h)
                     }
                 };
-                FringeKind::Flat {
+            let (old_unit, old_basis, old_max) = match old.as_ref().map(|o| &o.kind) {
+                Some(FringeKind::Flat {
                     unit,
                     basis,
                     max_hours_per_day,
-                    cutoff,
+                    ..
+                }) => (unit.clone(), *basis, *max_hours_per_day),
+                _ => (None, FlatBasis::Amount, None),
+            };
+            let unit = opt_text(f, "unit").unwrap_or(old_unit);
+            if let Some(u) = &unit {
+                if !b.units.contains_key(u) {
+                    return Err(ToolError::not_found(format!("there is no unit {u}")));
                 }
+            }
+            let basis = match f.get("basis") {
+                None => Some(old_basis.name().to_string()),
+                Some(v) => v.as_str().map(str::to_string),
             };
-            let code = match opt_text(f, "short_code") {
-                Some(c) => short_code(b, kind, name, c)?,
-                None => old.as_ref().and_then(|o| o.short_code.clone()),
+            let max_hours_per_day = match f.get("max_hours_per_day") {
+                None => old_max.map(|h| h.to_string()),
+                Some(Value::Null) => None,
+                Some(v) => Some(formula_text(v)),
             };
-            b.fringes.insert(
-                name.to_string(),
-                Fringe {
-                    description: desc
-                        .or_else(|| old.as_ref().map(|o| o.description.clone()))
-                        .unwrap_or_default(),
-                    short_code: code,
-                    rate,
-                    kind: fk,
-                },
-            );
+            let input = FringeInput {
+                kind: if percent { "percent" } else { "flat" }.to_string(),
+                description: desc
+                    .or_else(|| old.as_ref().map(|o| o.description.clone()))
+                    .unwrap_or_default(),
+                rate,
+                cutoff: cutoff.map(money_text),
+                unit,
+                basis,
+                max_hours_per_day,
+                short_code: short_code(f),
+            };
+            edit::set_fringe(b, name, &input)?;
         }
         SetupKind::Group => {
             let old = b.groups.get(name).cloned();
-            let code = match opt_text(f, "short_code") {
-                Some(c) => short_code(b, kind, name, c)?,
-                None => old.as_ref().and_then(|o| o.short_code.clone()),
+            let input = GroupInput {
+                description: desc
+                    .or_else(|| old.as_ref().map(|o| o.description.clone()))
+                    .unwrap_or_default(),
+                in_budget_total: f
+                    .get("in_budget_total")
+                    .and_then(Value::as_bool)
+                    .or_else(|| old.as_ref().map(|o| o.in_budget_total))
+                    .unwrap_or(true),
+                short_code: short_code(f),
             };
-            let color = match opt_text(f, "color") {
-                Some(c) => color(c)?,
-                None => old.as_ref().and_then(|o| o.color.clone()),
-            };
-            b.groups.insert(
-                name.to_string(),
-                Group {
-                    description: desc
-                        .or_else(|| old.as_ref().map(|o| o.description.clone()))
-                        .unwrap_or_default(),
-                    short_code: code,
-                    in_budget_total: f
-                        .get("in_budget_total")
-                        .and_then(Value::as_bool)
-                        .or_else(|| old.as_ref().map(|o| o.in_budget_total))
-                        .unwrap_or(true),
-                    color,
-                },
-            );
+            edit::set_group(b, name, &input)?;
+            if let Some(color) = opt_text(f, "color") {
+                rowstyle::apply_group_color(b, name, color.as_deref())?;
+            }
         }
         SetupKind::Set => {
             let old = b.sets.get(name).cloned().unwrap_or_default();
-            b.sets.insert(
-                name.to_string(),
-                SetDef {
-                    description: desc.unwrap_or(old.description),
-                },
-            );
+            let input = SetInput {
+                description: desc.unwrap_or(old.description),
+            };
+            edit::set_set(b, name, &input)?;
         }
         SetupKind::Location => {
             let old = b.locations.get(name).cloned().unwrap_or_default();
-            b.locations.insert(
-                name.to_string(),
-                Location {
-                    description: desc.unwrap_or(old.description),
-                    city: text(f, "city").unwrap_or(old.city),
-                    region: text(f, "region").unwrap_or(old.region),
-                    country: text(f, "country").unwrap_or(old.country),
-                },
-            );
+            let input = LocationInput {
+                description: desc.unwrap_or(old.description),
+                city: text(f, "city").unwrap_or(old.city),
+                region: text(f, "region").unwrap_or(old.region),
+                country: text(f, "country").unwrap_or(old.country),
+            };
+            edit::set_location(b, name, &input)?;
         }
         SetupKind::Unit => {
             let old = b.units.get(name).cloned();
             let hours = match f.get("hours") {
                 Some(Value::Null) => None,
-                Some(v) => {
-                    let h = dec(v, "hours")?;
-                    if h < Dec::ZERO {
-                        return Err(ToolError::invalid("hours can't be negative"));
-                    }
-                    Some(h)
-                }
-                None => old.as_ref().and_then(|o| o.hours),
+                Some(v) => Some(formula_text(v)),
+                None => old.as_ref().and_then(|o| o.hours).map(|h| h.to_string()),
             };
-            b.units.insert(
-                name.to_string(),
-                UnitDef {
-                    plural: text(f, "plural")
-                        .or_else(|| old.as_ref().map(|o| o.plural.clone()))
-                        .unwrap_or_else(|| name.to_string()),
-                    description: desc
-                        .or_else(|| old.as_ref().map(|o| o.description.clone()))
-                        .unwrap_or_default(),
-                    hours,
-                },
-            );
+            let input = UnitInput {
+                plural: text(f, "plural")
+                    .or_else(|| old.as_ref().map(|o| o.plural.clone()))
+                    .unwrap_or_else(|| name.to_string()),
+                description: desc
+                    .or_else(|| old.as_ref().map(|o| o.description.clone()))
+                    .unwrap_or_default(),
+                hours,
+            };
+            edit::set_unit(b, name, &input)?;
         }
         SetupKind::Currency => {
-            if name == b.base_currency {
-                return Err(ToolError::refused(format!("{name} is the base currency")));
-            }
             let old = b.currencies.get(name).cloned();
-            let rate = match f.get("rate") {
-                Some(v) => dec(v, "rate")?,
-                None => old
-                    .as_ref()
-                    .map(|o| o.rate)
-                    .ok_or_else(|| ToolError::invalid("a new currency needs a rate"))?,
+            let rate = match (f.get("rate"), &old) {
+                (Some(v), _) => formula_text(v),
+                (None, Some(o)) => o.rate.to_string(),
+                // The base currency is refused for being it.
+                (None, None) if name == b.base_currency => String::new(),
+                (None, None) => return Err(ToolError::invalid("a new currency needs a rate")),
             };
-            if rate <= Dec::ZERO {
-                return Err(ToolError::invalid("an exchange rate must be more than 0"));
-            }
-            // How amounts in it are written (decisions.md, entry 61): kept
-            // unless given.
-            let was = old.as_ref().map(|o| o.format).unwrap_or_default();
-            let symbol_after = match f.get("symbol_after") {
-                None => was.symbol_after,
-                Some(v) => v
-                    .as_bool()
-                    .ok_or_else(|| ToolError::invalid("symbol_after should be true or false"))?,
+            let input = CurrencyInput {
+                description: desc
+                    .or_else(|| old.as_ref().map(|o| o.description.clone()))
+                    .unwrap_or_default(),
+                symbol: text(f, "symbol")
+                    .or_else(|| old.as_ref().map(|o| o.symbol.clone()))
+                    .unwrap_or_default(),
+                rate,
+                // How amounts in it are written (decisions.md, entry 61):
+                // kept unless given.
+                symbol_after: f.get("symbol_after").and_then(Value::as_bool),
+                separators: text(f, "separators"),
             };
-            let separators = match text(f, "separators") {
-                None => was.separators,
-                Some(s) => method_core::Separators::parse(&s).ok_or_else(|| {
-                    ToolError::invalid(
-                        "separators should be comma_point (1,234.56) or point_comma (1.234,56)",
-                    )
-                })?,
-            };
-            b.currencies.insert(
-                name.to_string(),
-                Currency {
-                    description: desc
-                        .or_else(|| old.as_ref().map(|o| o.description.clone()))
-                        .unwrap_or_default(),
-                    symbol: text(f, "symbol")
-                        .or_else(|| old.as_ref().map(|o| o.symbol.clone()))
-                        .unwrap_or_default(),
-                    rate,
-                    format: method_core::CurrencyFormat {
-                        symbol_after,
-                        separators,
-                    },
-                },
-            );
+            edit::typed::set_currency(b, name, &input)?;
         }
         SetupKind::Global => return Err(ToolError::invalid("use set_global for globals")),
     }
@@ -875,9 +762,6 @@ fn set_global(ctx: &mut Ctx, a: &Args) -> ToolResult {
     let (path, shown) = budget_path(ctx, a, "path")?;
     let name = a.req("name")?.trim().to_string();
     let formula = a.get("formula").map(formula_text).unwrap_or_default();
-    if formula.trim().is_empty() {
-        return Err(ToolError::invalid(format!("global {name} needs a value")));
-    }
     let description = a.str("description").map(str::to_string);
     let unit = if a.has("unit") {
         Some(a.str("unit").map(str::to_string))
@@ -891,17 +775,17 @@ fn set_global(ctx: &mut Ctx, a: &Args) -> ToolResult {
                 return Err(ToolError::not_found(format!("there is no unit {u}")));
             }
         }
-        let log = script::apply(b, &Op::Global(name.clone(), formula.trim().to_string()))
-            .map_err(ToolError::invalid)?;
-        let info = b.global_info.entry(name.clone()).or_default();
-        if let Some(d) = &description {
-            info.description = d.trim().to_string();
-        }
-        if let Some(u) = &unit {
-            info.unit = u.clone().unwrap_or_default();
-        }
-        if info.is_default() {
-            b.global_info.remove(&name);
+        let log = script::set_global(b, &name, &formula)?;
+        if description.is_some() || unit.is_some() {
+            let info = b.global_info.get(&name).cloned().unwrap_or_default();
+            let input = GlobalInfoInput {
+                description: description.clone().unwrap_or(info.description),
+                unit: unit.clone().map_or(info.unit, Option::unwrap_or_default),
+                decimals: info.decimals,
+                show_by_name: info.show_by_name,
+                folder: info.folder,
+            };
+            display::apply_global_info(b, &name, &input)?;
         }
         Ok(log)
     })?;
@@ -994,14 +878,14 @@ fn delete_setup(ctx: &mut Ctx, a: &Args) -> ToolResult {
     Ok(edited(&shown, &e, &what, extra))
 }
 
-/// Deletes item `name` of `kind`; its use (lines, other) before.
+/// Deletes item `name` of `kind` with the app's delete, once its use
+/// (lines, other) is known and allowed: anything in use needs `force`.
 fn delete_item(
     b: &mut Budget,
     kind: SetupKind,
     name: &str,
     force: bool,
 ) -> Result<(usize, usize), ToolError> {
-    let use_ = method_core::usage::usage(b, kind).get(name).copied();
     let exists = match kind {
         SetupKind::Currency => b.currencies.contains_key(name),
         _ => method_core::rename::exists(b, kind, name),
@@ -1015,35 +899,16 @@ fn delete_item(
             kind.name()
         )));
     }
-    let u = use_.unwrap_or_default();
     // Refusals force doesn't override.
-    if kind == SetupKind::Group {
-        if let Some(c) = b.credits.iter().find(|c| {
-            c.rows
-                .iter()
-                .any(|r| matches!(&r.source, CreditSource::Group { group, .. } if group == name))
-        }) {
-            return Err(ToolError::refused(format!(
-                "group {name} is used by the credit {}; change the credit first",
-                c.name
-            )));
-        }
+    match kind {
+        SetupKind::Group => typed::check_group_delete(b, name)?,
+        SetupKind::Currency => typed::check_currency_delete(b, name)?,
+        _ => {}
     }
-    if kind == SetupKind::Currency {
-        if b.totals_currency.as_deref() == Some(name) {
-            return Err(ToolError::refused(format!(
-                "totals are shown in {name}; change that first"
-            )));
-        }
-        if b.charges
-            .iter()
-            .any(|c| matches!(&c.kind, ChargeKind::Flat { currency: Some(cur), .. } if cur == name))
-        {
-            return Err(ToolError::refused(format!(
-                "a charge is in {name}; change it first"
-            )));
-        }
-    }
+    let u = method_core::usage::usage(b, kind)
+        .get(name)
+        .copied()
+        .unwrap_or_default();
     if u.is_used() && !force {
         let then = match kind {
             SetupKind::Global => {
@@ -1064,55 +929,15 @@ fn delete_item(
         )));
     }
     match kind {
-        SetupKind::Global => {
-            if method_core::delete_global(b, name).is_err() {
-                b.globals.remove(name);
-                b.global_info.remove(name);
-            }
-        }
-        SetupKind::Fringe => {
-            b.fringes.remove(name);
-            for d in details_mut(b) {
-                d.fringes.remove(name);
-            }
-            for c in &mut b.credits {
-                c.excluded_fringes.remove(name);
-            }
-        }
-        SetupKind::Group => {
-            b.groups.remove(name);
-            for d in details_mut(b) {
-                d.groups.remove(name);
-            }
-            for c in &mut b.charges {
-                c.excluded_groups.remove(name);
-            }
-        }
-        SetupKind::Set => {
-            b.sets.remove(name);
-            for d in details_mut(b) {
-                if d.set.as_deref() == Some(name) {
-                    d.set = None;
-                }
-            }
-        }
-        SetupKind::Location => {
-            b.locations.remove(name);
-            for d in details_mut(b) {
-                if d.location.as_deref() == Some(name) {
-                    d.location = None;
-                }
-            }
-        }
+        SetupKind::Global => edit::delete_global(b, name)?,
+        SetupKind::Fringe => edit::delete_fringe(b, name)?,
+        SetupKind::Group => typed::delete_group(b, name)?,
+        SetupKind::Set => edit::delete_set(b, name)?,
+        SetupKind::Location => edit::delete_location(b, name)?,
         SetupKind::Unit => {
-            b.units.remove(name);
-            for d in details_mut(b) {
-                for u in [&mut d.unit, &mut d.unit2, &mut d.unit3, &mut d.unit4] {
-                    if u == name {
-                        u.clear();
-                    }
-                }
-            }
+            edit::delete_unit_with(b, name, true)?;
+            // Also blanked where settings name it, so nothing is left
+            // naming a unit that isn't there (the app's delete leaves them).
             for f in b.fringes.values_mut() {
                 if let FringeKind::Flat { unit, .. } = &mut f.kind {
                     if unit.as_deref() == Some(name) {
@@ -1127,81 +952,32 @@ fn delete_item(
             }
             b.global_info.retain(|_, gi| !gi.is_default());
         }
-        SetupKind::Currency => {
-            for d in details_mut(b) {
-                if d.currency.as_deref() == Some(name) {
-                    d.currency = None;
-                }
-            }
-            b.currencies.remove(name);
-        }
+        SetupKind::Currency => typed::delete_currency_with(b, name, true)?,
     }
-    method_core::order::forget(b, kind, name);
     Ok((u.lines, u.other))
 }
 
-fn details_mut(b: &mut Budget) -> impl Iterator<Item = &mut method_core::Detail> {
-    b.categories_mut()
-        .flat_map(|c| &mut c.accounts)
-        .flat_map(|a| &mut a.details)
-}
-
-/// An account number as the budget writes it: one already in the budget
-/// exactly as typed (a chart's own numbers may not follow the pattern),
-/// else the typed number in the budget's pattern.
-fn account_number(b: &Budget, typed: &str) -> Result<String, ToolError> {
-    let t = typed.trim();
-    if t.is_empty() {
-        return Err(ToolError::invalid("the account number is empty"));
-    }
-    if b.categories()
-        .flat_map(|c| &c.accounts)
-        .any(|a| a.code == t)
-    {
-        return Ok(t.to_string());
-    }
-    if b.account_coding.validate().is_err() {
-        return Ok(t.to_string());
-    }
-    b.account_coding
-        .normalize(t)
-        .map_err(|e| ToolError::invalid(format!("{t}: {e}")))
-}
-
-/// A category number as the budget writes it: one already in the budget
-/// exactly as typed, else the typed number's category part.
-fn category_number(b: &Budget, typed: &str) -> Result<String, ToolError> {
-    let t = typed.trim();
-    if t.is_empty() {
-        return Err(ToolError::invalid("the category number is empty"));
-    }
-    if b.categories().any(|c| c.code == t) {
-        return Ok(t.to_string());
-    }
-    if b.account_coding.validate().is_err() {
-        return Ok(t.to_string());
-    }
-    b.account_coding
-        .parse(t)
-        .map(|c| c.category)
-        .map_err(|e| ToolError::invalid(format!("{t}: {e}")))
-}
-
-/// Names picked for a list: each must be in `known` or already in `kept`.
-fn picked(
-    names: &[String],
-    known: &BTreeSet<String>,
-    kept: Option<&BTreeSet<String>>,
+/// The charges' or credits' index of the one named `name`.
+fn named<T>(
+    list: &[T],
+    name: &str,
+    of: impl Fn(&T) -> &str,
     what: &str,
-) -> Result<BTreeSet<String>, ToolError> {
-    let mut out = BTreeSet::new();
-    for n in names.iter().map(|n| n.trim()).filter(|n| !n.is_empty()) {
-        if !known.contains(n) && !kept.is_some_and(|k| k.contains(n)) {
-            return Err(ToolError::not_found(format!("there is no {what} {n}")));
-        }
-        out.insert(n.to_string());
-    }
-    Ok(out)
+) -> Result<usize, ToolError> {
+    list.iter()
+        .position(|x| of(x) == name)
+        .ok_or_else(|| ToolError::not_found(format!("there is no {what} {name}")))
+}
+
+/// An optional text argument: `Some(None)` when given as null or blank,
+/// `None` when left out (keep it).
+fn opt_arg(a: &Args, key: &str) -> Option<Option<String>> {
+    a.has(key).then(|| {
+        a.str(key)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+    })
 }
 
 fn set_charge(ctx: &mut Ctx, a: &Args) -> ToolResult {
@@ -1213,159 +989,86 @@ fn set_charge(ctx: &mut Ctx, a: &Args) -> ToolResult {
         let a = Args(&args);
         let index = b.charges.iter().position(|c| c.name == name);
         let old = index.map(|i| b.charges[i].clone());
-        let new_name = a
-            .str("new_name")
-            .map(|s| s.trim().to_string())
-            .unwrap_or_else(|| name.clone());
-        if new_name.is_empty() {
-            return Err(ToolError::invalid("the charge's name is empty"));
-        }
-        if b.charges
-            .iter()
-            .enumerate()
-            .any(|(i, c)| Some(i) != index && c.name == new_name)
-        {
-            return Err(ToolError::refused(format!(
-                "there is already a charge named {new_name}"
-            )));
-        }
-        let want_kind = a.str("charge_kind");
-        let old_flat = old.as_ref().and_then(|o| match &o.kind {
-            ChargeKind::Flat { amount, currency } => Some((*amount, currency.clone())),
-            ChargeKind::Percent(_) => None,
-        });
-        let old_percent = old.as_ref().and_then(|o| match &o.kind {
-            ChargeKind::Percent(p) => Some(*p),
-            ChargeKind::Flat { .. } => None,
-        });
-        let flat = match want_kind {
-            Some(k) => k == "flat",
-            None => match &old {
-                Some(_) => old_flat.is_some(),
-                None => {
-                    return Err(ToolError::invalid(
-                        "a new charge needs charge_kind (percent or flat)",
-                    ))
-                }
-            },
-        };
-        let kind = if flat {
-            let amount = match a.get("amount") {
-                Some(v) => cents(v, "amount")?,
-                None => old_flat
-                    .as_ref()
-                    .map(|f| f.0)
-                    .ok_or_else(|| ToolError::invalid("a flat charge needs an amount"))?,
-            };
-            let currency = if a.has("currency") {
-                match a.str("currency").map(str::trim).filter(|c| !c.is_empty()) {
-                    None => None,
-                    Some(c) if c == b.base_currency => None,
-                    Some(c) if b.currencies.contains_key(c) => Some(c.to_string()),
-                    Some(c) => {
-                        return Err(ToolError::not_found(format!("there is no currency {c}")))
-                    }
-                }
-            } else {
-                old_flat.and_then(|f| f.1)
-            };
-            ChargeKind::Flat { amount, currency }
-        } else {
-            let p = match a.get("percent") {
-                Some(v) => dec(v, "percent")?,
-                None => old_percent
-                    .ok_or_else(|| ToolError::invalid("a percent charge needs a percent"))?,
-            };
-            if p < Dec::ZERO {
-                return Err(ToolError::invalid("the percent can't be negative"));
+        let flat = match (a.str("charge_kind"), &old) {
+            (Some(k), _) => k == "flat",
+            (None, Some(o)) => matches!(o.kind, ChargeKind::Flat { .. }),
+            (None, None) => {
+                return Err(ToolError::invalid(
+                    "a new charge needs charge_kind (percent or flat)",
+                ))
             }
-            ChargeKind::Percent(p)
         };
-        let groups: BTreeSet<String> = b.groups.keys().cloned().collect();
-        let categories: BTreeSet<String> = b.categories().map(|c| c.code.clone()).collect();
-        let accounts: BTreeSet<String> = b
-            .categories()
-            .flat_map(|c| &c.accounts)
-            .map(|a| a.code.clone())
-            .collect();
-        let list =
-            |key: &str, known: &BTreeSet<String>, kept: Option<&BTreeSet<String>>, what: &str| {
-                if a.has(key) {
-                    picked(&a.strings(key), known, kept, what)
-                } else {
-                    Ok(kept.cloned().unwrap_or_default())
-                }
-            };
+        let (old_amount, old_currency, old_percent) = match old.as_ref().map(|o| &o.kind) {
+            Some(ChargeKind::Flat { amount, currency }) => (Some(*amount), currency.clone(), None),
+            Some(ChargeKind::Percent(p)) => (None, None, Some(*p)),
+            None => (None, None, None),
+        };
         let excluded_amounts = if a.has("excluded_amounts") {
             let mut v = Vec::new();
             for x in a.list("excluded_amounts") {
-                let desc = x
-                    .get("description")
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .trim()
-                    .to_string();
-                let amt = x
-                    .get("amount")
-                    .map(|v| cents(v, "excluded amount"))
-                    .transpose()?
-                    .unwrap_or(0);
-                v.push((desc, amt));
+                v.push(ExcludedAmountInput {
+                    description: x
+                        .get("description")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string(),
+                    amount: match x.get("amount") {
+                        Some(v) => exact(v, "excluded amount")?,
+                        None => money_text(0),
+                    },
+                });
             }
             v
         } else {
-            old.as_ref()
-                .map(|o| o.excluded_amounts.clone())
-                .unwrap_or_default()
+            old.iter()
+                .flat_map(|o| &o.excluded_amounts)
+                .map(|(description, c)| ExcludedAmountInput {
+                    description: description.clone(),
+                    amount: money_text(*c),
+                })
+                .collect()
         };
-        let account = if a.has("account") {
-            match a.str("account").map(str::trim).filter(|s| !s.is_empty()) {
-                Some(t) => Some(account_number(b, t)?),
-                None => None,
+        let list = |key: &str, kept: Option<&BTreeSet<String>>| {
+            if a.has(key) {
+                a.strings(key)
+            } else {
+                kept.into_iter().flatten().cloned().collect()
             }
-        } else {
-            old.as_ref().and_then(|o| o.account.clone())
         };
-        let charge = Charge {
-            name: new_name.clone(),
-            account,
+        let input = ChargeInput {
+            name: a
+                .str("new_name")
+                .map_or_else(|| name.clone(), str::to_string),
+            account: opt_arg(&a, "account")
+                .unwrap_or_else(|| old.as_ref().and_then(|o| o.account.clone())),
             applied: a
                 .opt_bool("applied")
                 .or(old.as_ref().map(|o| o.applied))
                 .unwrap_or(true),
-            kind,
+            kind: if flat { "flat" } else { "percent" }.to_string(),
+            percent: match a.get("percent") {
+                Some(v) => Some(formula_text(v)),
+                None => old_percent.map(|p| p.to_string()),
+            },
+            amount: match a.get("amount") {
+                Some(v) => Some(exact(v, "amount")?),
+                None => old_amount.map(money_text),
+            },
+            currency: opt_arg(&a, "currency").unwrap_or(old_currency),
             excluded_amounts,
-            excluded_groups: list(
-                "excluded_groups",
-                &groups,
-                old.as_ref().map(|o| &o.excluded_groups),
-                "group",
-            )?,
+            excluded_groups: list("excluded_groups", old.as_ref().map(|o| &o.excluded_groups)),
             excluded_categories: list(
                 "excluded_categories",
-                &categories,
                 old.as_ref().map(|o| &o.excluded_categories),
-                "category",
-            )?,
+            ),
             excluded_accounts: list(
                 "excluded_accounts",
-                &accounts,
                 old.as_ref().map(|o| &o.excluded_accounts),
-                "account",
-            )?,
-            label_percent: a
-                .opt_bool("label_percent")
-                .or(old.as_ref().map(|o| o.label_percent))
-                .unwrap_or(false),
-            label_excluded: a
-                .opt_bool("label_excluded")
-                .or(old.as_ref().map(|o| o.label_excluded))
-                .unwrap_or(false),
+            ),
+            label_percent: a.opt_bool("label_percent"),
+            label_excluded: a.opt_bool("label_excluded"),
         };
-        match index {
-            Some(i) => b.charges[i] = charge,
-            None => b.charges.push(charge),
-        }
+        typed::set_charge(b, index, &input)?;
         Ok(index.is_none())
     })?;
     let what = format!("{} charge {name}", if e.out { "Added" } else { "Changed" });
@@ -1377,6 +1080,93 @@ fn set_charge(ctx: &mut Ctx, a: &Args) -> ToolResult {
     ))
 }
 
+/// A credit row as the app's edit takes it.
+fn credit_row_input(r: &CreditRow) -> CreditRowInput {
+    CreditRowInput {
+        description: r.description.clone(),
+        source: match &r.source {
+            CreditSource::Flat(c) => CreditSourceInput::Flat {
+                amount: money_text(*c),
+            },
+            CreditSource::Group { group } => CreditSourceInput::Group {
+                group: group.clone(),
+            },
+            CreditSource::Category { category } => CreditSourceInput::Category {
+                category: category.clone(),
+            },
+            CreditSource::Account { account } => CreditSourceInput::Account {
+                account: account.clone(),
+            },
+        },
+        percent: r.percent.to_string(),
+        cap: match r.cap {
+            CreditCap::None => CreditCapInput::None,
+            CreditCap::QualifiedSpend(c) => CreditCapInput::QualifiedSpend {
+                amount: money_text(c),
+            },
+            CreditCap::Credit(c) => CreditCapInput::Credit {
+                amount: money_text(c),
+            },
+        },
+    }
+}
+
+/// Credit row `n` (from 1) from the tool's arguments.
+fn credit_row_arg(r: &Value, n: usize) -> Result<CreditRowInput, ToolError> {
+    let src = r.get("source").cloned().unwrap_or(Value::Null);
+    let text = |key: &str| {
+        src.get(key)
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string()
+    };
+    let source = match src.get("kind").and_then(Value::as_str) {
+        Some("group") => CreditSourceInput::Group {
+            group: text("group"),
+        },
+        Some("category") => CreditSourceInput::Category {
+            category: text("category"),
+        },
+        Some("account") => CreditSourceInput::Account {
+            account: text("account"),
+        },
+        _ => {
+            let amt = src.get("amount").ok_or_else(|| {
+                ToolError::invalid(format!("row {n}: a flat source needs an amount"))
+            })?;
+            CreditSourceInput::Flat {
+                amount: exact(amt, &format!("row {n}'s amount"))?,
+            }
+        }
+    };
+    let cap = match r.get("cap") {
+        None => CreditCapInput::None,
+        Some(c) => {
+            let amount = || {
+                exact(
+                    c.get("amount").unwrap_or(&Value::Null),
+                    &format!("row {n}'s cap"),
+                )
+            };
+            match c.get("kind").and_then(Value::as_str) {
+                Some("qualified_spend") => CreditCapInput::QualifiedSpend { amount: amount()? },
+                Some("credit") => CreditCapInput::Credit { amount: amount()? },
+                _ => CreditCapInput::None,
+            }
+        }
+    };
+    Ok(CreditRowInput {
+        description: r
+            .get("description")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        source,
+        percent: formula_text(r.get("percent").unwrap_or(&Value::Null)),
+        cap,
+    })
+}
+
 fn set_credit(ctx: &mut Ctx, a: &Args) -> ToolResult {
     let (path, shown) = budget_path(ctx, a, "path")?;
     let name = a.req("name")?.trim().to_string();
@@ -1386,166 +1176,48 @@ fn set_credit(ctx: &mut Ctx, a: &Args) -> ToolResult {
         let a = Args(&args);
         let index = b.credits.iter().position(|c| c.name == name);
         let old = index.map(|i| b.credits[i].clone());
-        let new_name = a
-            .str("new_name")
-            .map(|s| s.trim().to_string())
-            .unwrap_or_else(|| name.clone());
-        if new_name.is_empty() {
-            return Err(ToolError::invalid("the credit's name is empty"));
-        }
-        if b.credits
-            .iter()
-            .enumerate()
-            .any(|(i, c)| Some(i) != index && c.name == new_name)
-        {
-            return Err(ToolError::refused(format!(
-                "there is already a credit named {new_name}"
-            )));
-        }
-        let discount_percent = match a.get("discount_percent") {
-            Some(v) => {
-                let d = dec(v, "discount_percent")?;
-                if d < Dec::ZERO || d > Dec::from_int(100) {
-                    return Err(ToolError::invalid("the discount is from 0 to 100%"));
-                }
-                d
-            }
-            None => old.as_ref().map_or(Dec::ZERO, |o| o.discount_percent),
-        };
-        let cap = if a.has("cap") {
-            a.get("cap").map(|v| cents(v, "cap")).transpose()?
-        } else {
-            old.as_ref().and_then(|o| o.cap)
-        };
         let rows = if a.has("rows") {
             let mut rows = Vec::new();
             for (i, r) in a.list("rows").iter().enumerate() {
-                let n = i + 1;
-                let src = r.get("source").cloned().unwrap_or(Value::Null);
-                let text = |key: &str| {
-                    src.get(key)
-                        .and_then(Value::as_str)
-                        .unwrap_or("")
-                        .trim()
-                        .to_string()
-                };
-                let source = match src.get("kind").and_then(Value::as_str) {
-                    Some("group") => {
-                        let g = text("group");
-                        if !b.groups.contains_key(&g) {
-                            return Err(ToolError::not_found(format!(
-                                "row {n}: there is no group `{g}`"
-                            )));
-                        }
-                        CreditSource::Group { group: g }
-                    }
-                    Some("category") => {
-                        let c = text("category");
-                        if !b.categories().any(|cat| cat.code == c) {
-                            return Err(ToolError::not_found(format!(
-                                "row {n}: there is no category `{c}`"
-                            )));
-                        }
-                        CreditSource::Category { category: c }
-                    }
-                    Some("account") => {
-                        let acct = text("account");
-                        if !b
-                            .categories()
-                            .flat_map(|cat| &cat.accounts)
-                            .any(|x| x.code == acct)
-                        {
-                            return Err(ToolError::not_found(format!(
-                                "row {n}: there is no account `{acct}`"
-                            )));
-                        }
-                        CreditSource::Account { account: acct }
-                    }
-                    _ => {
-                        let amt = src.get("amount").ok_or_else(|| {
-                            ToolError::invalid(format!("row {n}: a flat source needs an amount"))
-                        })?;
-                        CreditSource::Flat(cents(amt, &format!("row {n}'s amount"))?)
-                    }
-                };
-                let percent = dec(
-                    r.get("percent").unwrap_or(&Value::Null),
-                    &format!("row {n}'s percent"),
-                )?;
-                if percent < Dec::ZERO {
-                    return Err(ToolError::invalid(format!(
-                        "row {n}'s percent can't be negative"
-                    )));
-                }
-                let cap = match r.get("cap") {
-                    None => CreditCap::None,
-                    Some(c) => {
-                        let amount = || -> Result<Cents, ToolError> {
-                            cents(
-                                c.get("amount").unwrap_or(&Value::Null),
-                                &format!("row {n}'s cap"),
-                            )
-                        };
-                        match c.get("kind").and_then(Value::as_str) {
-                            Some("qualified_spend") => CreditCap::QualifiedSpend(amount()?),
-                            Some("credit") => CreditCap::Credit(amount()?),
-                            _ => CreditCap::None,
-                        }
-                    }
-                };
-                rows.push(CreditRow {
-                    description: r
-                        .get("description")
-                        .and_then(Value::as_str)
-                        .unwrap_or("")
-                        .trim()
-                        .to_string(),
-                    source,
-                    percent,
-                    cap,
-                });
+                rows.push(credit_row_arg(r, i + 1)?);
             }
             rows
         } else {
-            old.as_ref().map(|o| o.rows.clone()).unwrap_or_default()
+            old.iter()
+                .flat_map(|o| &o.rows)
+                .map(credit_row_input)
+                .collect()
         };
-        let account = if a.has("account") {
-            match a.str("account").map(str::trim).filter(|s| !s.is_empty()) {
-                Some(t) => Some(account_number(b, t)?),
-                None => None,
-            }
-        } else {
-            old.as_ref().and_then(|o| o.account.clone())
-        };
-        let excluded_fringes = if a.has("excluded_fringes") {
-            let known: BTreeSet<String> = b.fringes.keys().cloned().collect();
-            picked(
-                &a.strings("excluded_fringes"),
-                &known,
-                old.as_ref().map(|o| &o.excluded_fringes),
-                "fringe",
-            )?
-        } else {
-            old.as_ref()
-                .map(|o| o.excluded_fringes.clone())
-                .unwrap_or_default()
-        };
-        let credit = Credit {
-            name: new_name,
-            account,
+        let input = CreditInput {
+            name: a
+                .str("new_name")
+                .map_or_else(|| name.clone(), str::to_string),
+            account: opt_arg(&a, "account")
+                .unwrap_or_else(|| old.as_ref().and_then(|o| o.account.clone())),
             applied: a
                 .opt_bool("applied")
                 .or(old.as_ref().map(|o| o.applied))
                 .unwrap_or(true),
-            cap,
-            discount_percent,
-            excluded_fringes,
+            cap: if a.has("cap") {
+                a.get("cap").map(|v| exact(v, "cap")).transpose()?
+            } else {
+                old.as_ref().and_then(|o| o.cap).map(money_text)
+            },
+            discount_percent: match a.get("discount_percent") {
+                Some(v) => Some(formula_text(v)),
+                None => old.as_ref().map(|o| o.discount_percent.to_string()),
+            },
+            excluded_fringes: if a.has("excluded_fringes") {
+                a.strings("excluded_fringes")
+            } else {
+                old.iter()
+                    .flat_map(|o| &o.excluded_fringes)
+                    .cloned()
+                    .collect()
+            },
             rows,
         };
-        match index {
-            Some(i) => b.credits[i] = credit,
-            None => b.credits.push(credit),
-        }
+        typed::set_credit(b, index, &input)?;
         Ok(index.is_none())
     })?;
     let what = format!("{} credit {name}", if e.out { "Added" } else { "Changed" });
@@ -1564,23 +1236,12 @@ fn delete_charge(ctx: &mut Ctx, a: &Args) -> ToolResult {
     let what = if credit { "credit" } else { "charge" };
     let label = format!("Delete {what} {name}");
     let e = ctx.docs.edit(&path, &shown, &label, |b| {
-        let before = if credit {
-            b.credits.len()
-        } else {
-            b.charges.len()
-        };
         if credit {
-            b.credits.retain(|c| c.name != name);
+            let i = named(&b.credits, &name, |c| c.name.as_str(), what)?;
+            edit::delete_credit(b, i)?;
         } else {
-            b.charges.retain(|c| c.name != name);
-        }
-        let after = if credit {
-            b.credits.len()
-        } else {
-            b.charges.len()
-        };
-        if before == after {
-            return Err(ToolError::not_found(format!("there is no {what} {name}")));
+            let i = named(&b.charges, &name, |c| c.name.as_str(), what)?;
+            edit::delete_charge(b, i)?;
         }
         Ok(())
     })?;
@@ -1602,18 +1263,13 @@ fn apply_charge(ctx: &mut Ctx, a: &Args) -> ToolResult {
     let label = format!("{verb} {what} {name}");
     let e = ctx.docs.edit(&path, &shown, &label, |b| {
         if credit {
-            let c = b
-                .credits
-                .iter_mut()
-                .find(|c| c.name == name)
-                .ok_or_else(|| ToolError::not_found(format!("there is no credit {name}")))?;
-            c.applied = applied;
-            Ok(())
+            let i = named(&b.credits, &name, |c| c.name.as_str(), what)?;
+            b.credits[i].applied = applied;
         } else {
-            script::apply(b, &Op::Charge(name.clone(), applied))
-                .map(|_| ())
-                .map_err(ToolError::not_found)
+            let i = named(&b.charges, &name, |c| c.name.as_str(), what)?;
+            b.charges[i].applied = applied;
         }
+        Ok(())
     })?;
     let state = if applied {
         "applied"
@@ -1628,6 +1284,22 @@ fn apply_charge(ctx: &mut Ctx, a: &Args) -> ToolResult {
     ))
 }
 
+/// The topsheet index of category `code`.
+fn category_at(b: &Budget, code: &str) -> Result<usize, ToolError> {
+    b.topsheet
+        .iter()
+        .position(|r| matches!(r, TopsheetRow::Category(c) if c.code == code))
+        .ok_or_else(|| ToolError::not_found(format!("there is no category {code}")))
+}
+
+/// The topsheet index of production total `name`.
+fn total_at(b: &Budget, name: &str) -> Result<usize, ToolError> {
+    b.topsheet
+        .iter()
+        .position(|r| matches!(r, TopsheetRow::ProductionTotal(p) if p.name == name))
+        .ok_or_else(|| ToolError::not_found(format!("there is no production total {name}")))
+}
+
 fn add_category(ctx: &mut Ctx, a: &Args) -> ToolResult {
     let (path, shown) = budget_path(ctx, a, "path")?;
     let typed = a.req("code")?.to_string();
@@ -1635,51 +1307,30 @@ fn add_category(ctx: &mut Ctx, a: &Args) -> ToolResult {
     let after = a.str("after_category").map(str::to_string);
     let before_total = a.str("before_total").map(str::to_string);
     let at_start = a.bool("at_start");
+    let given =
+        usize::from(after.is_some()) + usize::from(before_total.is_some()) + usize::from(at_start);
+    if given > 1 {
+        return Err(ToolError::invalid(
+            "give one of after_category, before_total and at_start",
+        ));
+    }
     let e = ctx
         .docs
         .edit(&path, &shown, &format!("Add category {typed}"), |b| {
-            let code = category_number(b, &typed)?;
-            if b.categories().any(|c| c.code == code) {
-                return Err(ToolError::refused(format!(
-                    "category {code} already exists"
-                )));
-            }
-            let given = usize::from(after.is_some())
-                + usize::from(before_total.is_some())
-                + usize::from(at_start);
-            if given > 1 {
-                return Err(ToolError::invalid(
-                    "give one of after_category, before_total and at_start",
-                ));
-            }
             let at = if let Some(c) = &after {
-                b.topsheet
-                    .iter()
-                    .position(|r| matches!(r, TopsheetRow::Category(x) if x.code == *c))
-                    .map(|i| i + 1)
-                    .ok_or_else(|| ToolError::not_found(format!("there is no category {c}")))?
+                category_at(b, c)? + 1
             } else if let Some(t) = &before_total {
-                b.topsheet
-                    .iter()
-                    .position(|r| matches!(r, TopsheetRow::ProductionTotal(p) if p.name == *t))
-                    .ok_or_else(|| {
-                        ToolError::not_found(format!("there is no production total {t}"))
-                    })?
+                total_at(b, t)?
             } else if at_start {
                 0
             } else {
                 b.topsheet.len()
             };
-            b.topsheet.insert(
-                at,
-                TopsheetRow::Category(Category {
-                    code: code.clone(),
-                    name: name.clone(),
-                    accounts: Vec::new(),
-                    notes: Vec::new(),
-                }),
-            );
-            Ok(code)
+            let i = edit::typed::add_category(b, &typed, &name, Some(at))?;
+            match &b.topsheet[i] {
+                TopsheetRow::Category(c) => Ok(c.code.clone()),
+                TopsheetRow::ProductionTotal(_) => unreachable!("a category was added"),
+            }
         })?;
     let what = format!("Added category {}", e.out);
     Ok(edited(&shown, &e, &what, obj(vec![("code", json!(e.out))])))
@@ -1694,22 +1345,11 @@ fn add_production_total(ctx: &mut Ctx, a: &Args) -> ToolResult {
         &shown,
         &format!("Add production total {name}"),
         |b| {
-            if name.is_empty() {
-                return Err(ToolError::invalid("the production total's name is empty"));
-            }
             let at = match &after {
-                Some(c) => b
-                    .topsheet
-                    .iter()
-                    .position(|r| matches!(r, TopsheetRow::Category(x) if x.code == *c))
-                    .map(|i| i + 1)
-                    .ok_or_else(|| ToolError::not_found(format!("there is no category {c}")))?,
+                Some(c) => category_at(b, c)? + 1,
                 None => b.topsheet.len(),
             };
-            b.topsheet.insert(
-                at,
-                TopsheetRow::ProductionTotal(method_core::ProductionTotal { name: name.clone() }),
-            );
+            typed::add_production_total(b, &name, Some(at))?;
             Ok(())
         },
     )?;
@@ -1729,14 +1369,8 @@ fn delete_production_total(ctx: &mut Ctx, a: &Args) -> ToolResult {
         &shown,
         &format!("Delete production total {name}"),
         |b| {
-            let i = b
-                .topsheet
-                .iter()
-                .position(|r| matches!(r, TopsheetRow::ProductionTotal(p) if p.name == name))
-                .ok_or_else(|| {
-                    ToolError::not_found(format!("there is no production total {name}"))
-                })?;
-            b.topsheet.remove(i);
+            let i = total_at(b, &name)?;
+            typed::delete_topsheet_row(b, i)?;
             Ok(())
         },
     )?;
@@ -1757,38 +1391,13 @@ fn add_account(ctx: &mut Ctx, a: &Args) -> ToolResult {
     let e = ctx
         .docs
         .edit(&path, &shown, &format!("Add account {typed}"), |b| {
-            let code = account_number(b, &typed)?;
-            if b.categories()
-                .flat_map(|c| &c.accounts)
-                .any(|x| x.code == code)
-            {
-                return Err(ToolError::refused(format!("account {code} already exists")));
-            }
-            let cat = b
-                .categories_mut()
-                .find(|c| c.code == category)
-                .ok_or_else(|| ToolError::not_found(format!("there is no category {category}")))?;
-            let at = match &after {
-                Some(x) => cat
-                    .accounts
-                    .iter()
-                    .position(|acct| acct.code == *x)
-                    .map(|i| i + 1)
-                    .ok_or_else(|| {
-                        ToolError::not_found(format!("account {x} is not in category {category}"))
-                    })?,
-                None => cat.accounts.len(),
-            };
-            cat.accounts.insert(
-                at,
-                Account {
-                    code: code.clone(),
-                    name: name.clone(),
-                    details: Vec::new(),
-                    notes: Vec::new(),
-                },
-            );
-            Ok(code)
+            Ok(edit::typed::add_account(
+                b,
+                &category,
+                &typed,
+                &name,
+                after.as_deref(),
+            )?)
         })?;
     let what = format!("Added account {}", e.out);
     Ok(edited(&shown, &e, &what, obj(vec![("code", json!(e.out))])))
@@ -1802,26 +1411,16 @@ fn update_category(ctx: &mut Ctx, a: &Args) -> ToolResult {
     let e = ctx
         .docs
         .edit(&path, &shown, &format!("Change category {code}"), |b| {
-            let new_code = new_code
-                .as_deref()
-                .map(|t| category_number(b, t))
-                .transpose()?;
-            if let Some(n) = &new_code {
-                if *n != code && b.categories().any(|c| c.code == *n) {
-                    return Err(ToolError::refused(format!("category {n} already exists")));
-                }
+            let i = category_at(b, &code)?;
+            let TopsheetRow::Category(c) = &b.topsheet[i] else {
+                unreachable!("found as a category")
+            };
+            let name = name.clone().unwrap_or_else(|| c.name.clone());
+            typed::update_topsheet_row(b, i, new_code.as_deref(), &name)?;
+            match &b.topsheet[i] {
+                TopsheetRow::Category(c) => Ok(c.code.clone()),
+                TopsheetRow::ProductionTotal(_) => unreachable!("still a category"),
             }
-            let cat = b
-                .categories_mut()
-                .find(|c| c.code == code)
-                .ok_or_else(|| ToolError::not_found(format!("there is no category {code}")))?;
-            if let Some(n) = new_code {
-                cat.code = n;
-            }
-            if let Some(n) = &name {
-                cat.name = n.clone();
-            }
-            Ok(cat.code.clone())
         })?;
     let what = format!("Changed category {code}");
     Ok(edited(&shown, &e, &what, obj(vec![("code", json!(e.out))])))
@@ -1835,31 +1434,14 @@ fn update_account(ctx: &mut Ctx, a: &Args) -> ToolResult {
     let e = ctx
         .docs
         .edit(&path, &shown, &format!("Change account {code}"), |b| {
-            let new_code = new_code
-                .as_deref()
-                .map(|t| account_number(b, t))
-                .transpose()?;
-            if let Some(n) = &new_code {
-                if *n != code
-                    && b.categories()
-                        .flat_map(|c| &c.accounts)
-                        .any(|x| x.code == *n)
-                {
-                    return Err(ToolError::refused(format!("account {n} already exists")));
-                }
-            }
-            let acct = b
-                .categories_mut()
-                .flat_map(|c| &mut c.accounts)
+            let current = b
+                .categories()
+                .flat_map(|c| &c.accounts)
                 .find(|x| x.code == code)
-                .ok_or_else(|| ToolError::not_found(format!("there is no account {code}")))?;
-            if let Some(n) = new_code {
-                acct.code = n;
-            }
-            if let Some(n) = &name {
-                acct.name = n.clone();
-            }
-            Ok(acct.code.clone())
+                .map(|x| x.name.clone());
+            let name = name.clone().or(current).unwrap_or_default();
+            let new_code = new_code.as_deref().unwrap_or(&code);
+            Ok(typed::update_account(b, &code, new_code, &name)?)
         })?;
     let what = format!("Changed account {code}");
     Ok(edited(&shown, &e, &what, obj(vec![("code", json!(e.out))])))
@@ -1872,23 +1454,19 @@ fn delete_category(ctx: &mut Ctx, a: &Args) -> ToolResult {
     let e = ctx
         .docs
         .edit(&path, &shown, &format!("Delete category {code}"), |b| {
-            let i = b
-                .topsheet
-                .iter()
-                .position(|r| matches!(r, TopsheetRow::Category(c) if c.code == code))
-                .ok_or_else(|| ToolError::not_found(format!("there is no category {code}")))?;
+            let i = category_at(b, &code)?;
             let TopsheetRow::Category(c) = &b.topsheet[i] else {
-                unreachable!()
+                unreachable!("found as a category")
             };
             let rows: usize = c.accounts.iter().map(|x| x.details.len()).sum();
             if rows > 0 && !force {
                 return Err(ToolError::refused(format!(
-                "category {code} has {} account(s) with {rows} row(s); nothing was deleted. Pass \
-                 force: true to delete them with it.",
-                c.accounts.len()
-            )));
+                    "category {code} has {} account(s) with {rows} row(s); nothing was deleted. \
+                     Pass force: true to delete them with it.",
+                    c.accounts.len()
+                )));
             }
-            b.topsheet.remove(i);
+            typed::delete_topsheet_row(b, i)?;
             Ok(rows)
         })?;
     let what = format!("Deleted category {code}");
@@ -1907,20 +1485,20 @@ fn delete_account(ctx: &mut Ctx, a: &Args) -> ToolResult {
     let e = ctx
         .docs
         .edit(&path, &shown, &format!("Delete account {code}"), |b| {
-            for cat in b.categories_mut() {
-                if let Some(i) = cat.accounts.iter().position(|x| x.code == code) {
-                    let rows = cat.accounts[i].details.len();
-                    if rows > 0 && !force {
-                        return Err(ToolError::refused(format!(
-                        "account {code} has {rows} row(s); nothing was deleted. Pass force: true \
-                         to delete them with it."
-                    )));
-                    }
-                    cat.accounts.remove(i);
-                    return Ok(rows);
-                }
+            let rows = b
+                .categories()
+                .flat_map(|c| &c.accounts)
+                .find(|x| x.code == code)
+                .map(|x| x.details.len())
+                .ok_or_else(|| ToolError::not_found(format!("there is no account {code}")))?;
+            if rows > 0 && !force {
+                return Err(ToolError::refused(format!(
+                    "account {code} has {rows} row(s); nothing was deleted. Pass force: true to \
+                     delete them with it."
+                )));
             }
-            Err(ToolError::not_found(format!("there is no account {code}")))
+            typed::delete_account(b, &code)?;
+            Ok(rows)
         })?;
     let what = format!("Deleted account {code}");
     Ok(edited(
@@ -1933,9 +1511,9 @@ fn delete_account(ctx: &mut Ctx, a: &Args) -> ToolResult {
 
 fn set_title(ctx: &mut Ctx, a: &Args) -> ToolResult {
     let (path, shown) = budget_path(ctx, a, "path")?;
-    let title = a.req("title")?.trim().to_string();
+    let title = a.req("title")?.to_string();
     let e = ctx.docs.edit(&path, &shown, "Set title", |b| {
-        script::apply(b, &Op::Title(title.clone())).map_err(ToolError::invalid)
+        Ok(edit::set_title(b, &title)?)
     })?;
     Ok(edited(&shown, &e, "Set the title", Map::new()))
 }

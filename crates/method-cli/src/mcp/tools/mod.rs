@@ -11,6 +11,7 @@ use std::path::PathBuf;
 
 use method_core::{recalc, Budget, Cents, RecalcOptions, Report};
 use method_format::serde_json::{json, Map, Value};
+use method_session::edit::EditError;
 
 use super::docs::{Docs, Edited};
 use super::paths::Roots;
@@ -83,6 +84,17 @@ impl ToolError {
 impl From<String> for ToolError {
     fn from(m: String) -> ToolError {
         ToolError::invalid(m)
+    }
+}
+
+/// A session edit's refusal, by its kind.
+impl From<EditError> for ToolError {
+    fn from(e: EditError) -> ToolError {
+        match e {
+            EditError::Invalid(m) => ToolError::invalid(m),
+            EditError::NotFound(m) => ToolError::not_found(m),
+            EditError::Refused(m) => ToolError::refused(m),
+        }
     }
 }
 
