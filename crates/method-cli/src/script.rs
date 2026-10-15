@@ -38,6 +38,7 @@ use method_core::{
     recalc, Arithmetic, Budget, Cents, CutoffFactor, Dec, Detail, FlatBasis, Formula, FringeKind,
     Inclusion, RecalcOptions, Report, RowId, TrailingFringes,
 };
+use method_session::edit::{parse_money_as, SubCents};
 
 use crate::cli::{money, CliError, Outcome};
 
@@ -287,14 +288,10 @@ fn need<'a>(w: &'a [Word], n: usize, form: &str) -> Result<&'a [Word], String> {
     }
 }
 
+/// Money as the app reads it, but never rounded: a script says exactly
+/// what it means.
 fn parse_money(s: &str) -> Result<Cents, String> {
-    let clean: String = s.chars().filter(|c| *c != ',').collect();
-    let d = Dec::from_str(&clean).map_err(|_| format!("`{s}` is not an amount"))?;
-    let c = d.to_cents().ok_or_else(|| format!("`{s}` is too large"))?;
-    if Dec::from_cents(c) != d {
-        return Err(format!("`{s}` has more than two decimal places"));
-    }
-    Ok(c)
+    parse_money_as(s, SubCents::Refuse)
 }
 
 /// A trailing level fringes setting by name (`keep` or `drop`).

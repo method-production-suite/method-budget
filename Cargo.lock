@@ -1846,6 +1846,7 @@ version = "0.2.1"
 dependencies = [
  "method-core",
  "method-format",
+ "method-session",
 ]
 
 [[package]]

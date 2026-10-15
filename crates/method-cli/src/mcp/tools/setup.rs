@@ -15,6 +15,7 @@ use method_core::{
     TopsheetRow, UnitDef,
 };
 use method_format::serde_json::{json, Map, Value};
+use method_session::edit::{parse_money_as, SubCents};
 
 use super::read::setup_kind;
 use super::{
@@ -481,23 +482,8 @@ fn dec(v: &Value, what: &str) -> Result<Dec, ToolError> {
 }
 
 fn cents(v: &Value, what: &str) -> Result<Cents, ToolError> {
-    let t = formula_text(v);
-    let clean: String = t
-        .trim()
-        .trim_start_matches('$')
-        .chars()
-        .filter(|c| *c != ',')
-        .collect();
-    let d = Dec::from_str(&clean)
-        .map_err(|_| ToolError::invalid(format!("{what}: `{t}` is not an amount")))?;
-    let c = d
-        .to_cents()
-        .ok_or_else(|| ToolError::invalid(format!("{what}: `{t}` is too large")))?;
-    if Dec::from_cents(c) != d {
-        return Err(ToolError::invalid(format!(
-            "{what}: `{t}` has more than two decimal places"
-        )));
-    }
+    let c = parse_money_as(&formula_text(v), SubCents::Refuse)
+        .map_err(|e| ToolError::invalid(format!("{what}: {e}")))?;
     if c < 0 {
         return Err(ToolError::invalid(format!("{what} can't be negative")));
     }

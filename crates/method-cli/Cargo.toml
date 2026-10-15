@@ -13,3 +13,4 @@ path = "src/main.rs"
 [dependencies]
 method-core = { path = "../method-core" }
 method-format = { path = "../method-format" }
+method-session = { path = "../method-session" }

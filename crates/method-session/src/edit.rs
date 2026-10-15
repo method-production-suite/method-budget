@@ -109,10 +109,25 @@ fn optional(s: &str) -> Option<String> {
     (!t.is_empty()).then(|| t.to_string())
 }
 
+/// What typed money does with digits past the cent.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SubCents {
+    /// Rounds half away from zero (`12.345` is 12.35): the app's cells.
+    Round,
+    /// Refuses them (`12.345` is an error): the command line and the MCP
+    /// server, where a value is written once and never seen as a total.
+    Refuse,
+}
+
 /// Money typed by a user: digits with optional commas and a decimal point,
 /// rounded half away from zero to cents. A leading `$` is ignored, and a
 /// minus sign or accounting parentheses (`(12.00)`) make it negative.
 pub fn parse_money(s: &str) -> EditResult<i64> {
+    parse_money_as(s, SubCents::Round)
+}
+
+/// [`parse_money`], with digits past the cent rounded or refused.
+pub fn parse_money_as(s: &str, sub: SubCents) -> EditResult<i64> {
     let t = s.trim();
     let not_amount = |why: &str| format!("`{t}` is not an amount: {why}");
     let (paren, inner) = match t.strip_prefix('(').and_then(|r| r.strip_suffix(')')) {
@@ -144,7 +159,11 @@ pub fn parse_money(s: &str) -> EditResult<i64> {
     } else {
         d
     };
-    d.to_cents().ok_or_else(|| format!("`{t}` is too large"))
+    let c = d.to_cents().ok_or_else(|| format!("`{t}` is too large"))?;
+    if sub == SubCents::Refuse && Dec::from_cents(c) != d {
+        return Err(format!("`{t}` has more than two decimal places"));
+    }
+    Ok(c)
 }
 
 fn parse_dec(s: &str, what: &str) -> EditResult<Dec> {
@@ -1894,6 +1913,23 @@ mod tests {
             assert!(parse_money(junk).is_err(), "{junk:?} should be rejected");
         }
         assert!(parse_money("99999999999999999999").is_err());
+    }
+
+    #[test]
+    fn money_parsing_without_rounding() {
+        let exact = |s| parse_money_as(s, SubCents::Refuse);
+        assert_eq!(exact("1,500.25"), Ok(150_025));
+        assert_eq!(exact("7"), Ok(700));
+        assert_eq!(exact("$1,234.50"), Ok(123_450));
+        assert_eq!(exact("(12.10)"), Ok(-1210));
+        assert_eq!(exact("-3"), Ok(-300));
+        assert!(exact("1.005")
+            .unwrap_err()
+            .contains("more than two decimal places"));
+        assert!(exact("abc").unwrap_err().contains("is not an amount"));
+        assert!(exact("99999999999999999999")
+            .unwrap_err()
+            .contains("too large"));
     }
 
     #[test]
