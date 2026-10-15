@@ -3,7 +3,8 @@
 Status: done on the `cli-through-session` branch. method-cli depends on method-session, and
 the MCP server's and `method set` / `method apply`'s edits call the app's edits
 (`method_session::edit`) instead of their own copies of its checks. The MCP tools' JSON and
-error kinds are unchanged; `crates/method-cli/src/mcp/tools/tests.rs` passes as it was.
+error kinds are unchanged. The owner then settled the differences found (2026-10-15,
+"Decisions" below); the tests that changed with those decisions are listed there.
 
 ## How kinds survive
 
@@ -17,10 +18,10 @@ ToolError` keeps the kind.
 
 | CLI | Session function now used | Differences found, and what was done |
 |---|---|---|
-| MCP `add_setup` / `update_setup` | `edit::set_fringe`, `set_group`, `set_set`, `set_location`, `set_unit`, `typed::set_currency`, `rowstyle::apply_group_color` | MCP fills what an update leaves out from the item as it is, then hands the whole item over. Short-code and color messages are now the app's (wording only). MCP keeps its own checks for things the app doesn't check: a flat fringe's unit must exist (Q2), money is exact (Q1). |
-| MCP `delete_setup` | `delete_global`, `delete_fringe`, `typed::delete_group`, `delete_set`, `delete_location`, `delete_unit_with`, `typed::delete_currency_with`; refusals `typed::check_group_delete`, `check_currency_delete` | The "used by the credit", "totals are shown in", "a charge is in" refusals were copies; now one each. The use count and `force` stay MCP-only. Deleting a unit also blanks flat fringes' and globals' units in MCP; the app's delete leaves them (Q3). |
+| MCP `add_setup` / `update_setup` | `typed::set_fringe`, `set_group`, `set_set`, `set_location`, `set_unit`, `typed::set_currency`, `rowstyle::apply_group_color` | MCP fills what an update leaves out from the item as it is, then hands the whole item over. Short-code and color messages are now the app's (wording only). Money is passed as typed and rounded by the app (D1); an unknown flat fringe unit is refused by the app's edit (D2). |
+| MCP `delete_setup` | `delete_global`, `delete_fringe`, `typed::delete_group`, `delete_set`, `delete_location`, `delete_unit_with`, `typed::delete_currency_with`; refusals `typed::check_group_delete`, `check_currency_delete` | The "used by the credit", "totals are shown in", "a charge is in" refusals were copies; now one each. The use count and `force` stay MCP-only. Deleting a unit with its lines blanks it on flat fringes and global info in the app's edit (D3). |
 | MCP `set_global`, script `set global` | `typed::set_global` (+ `display::apply_global_info` for MCP's description and unit) | Script didn't refuse an empty value; neither refused a global that divides by zero or loops (MCP refused it later, as "wouldn't add up", kind `refused`; the app refuses it at entry, now also kind `refused`). A global's description now has the app's length limit. |
-| MCP `set_charge` / `set_credit` | `typed::set_charge` / `typed::set_credit` | Name-addressed partial updates are built into a full `ChargeInput` / `CreditInput`. Messages for an empty name, a bad percent or discount, an unknown currency and an unknown credit source are now the app's. A credit row may keep a group, category or account its old rows used (as charge exclusions already could). Excluded amounts stay non-negative in MCP; the app allows negative ones (Q4). |
+| MCP `set_charge` / `set_credit` | `typed::set_charge` / `typed::set_credit` | Name-addressed partial updates are built into a full `ChargeInput` / `CreditInput`. Messages for an empty name, a bad percent or discount, an unknown currency and an unknown credit source are now the app's. A credit row may keep a group, category or account its old rows used (as charge exclusions already could). Money is passed as typed; the app's edit refuses a negative excluded amount (D4). |
 | MCP `delete_charge`, `apply_charge` | `delete_charge` / `delete_credit` by index | Same behaviour; `apply_charge` no longer goes through the script. |
 | MCP `add_category`, `update_category`, `add_production_total`, `delete_category`, `delete_production_total` | `typed::add_category`, `update_topsheet_row`, `add_production_total`, `delete_topsheet_row` | **Drift bug fixed:** MCP inserted and removed topsheet rows without moving the budget's fringe row, so it could end up above the wrong row. Number messages lose MCP's `21x: ` prefix. |
 | MCP `add_account`, `update_account`, `delete_account` | `typed::add_account`, `update_account`, `delete_account` | "there is no category X" is now the app's "category X no longer exists" (still `not_found`). The row count and `force` stay MCP-only. |
@@ -29,28 +30,44 @@ ToolError` keeps the kind.
 | MCP `delete_lines` | `edit::delete_details` | Same. |
 | script `set fringe_row` | `edit::set_fringe_row` | The script took any account text and any description length; it now has the app's limits. Its own message for a position past the end stays (it says the bounds). |
 | script `set line .. color` | `rowstyle::check_color` | Message wording only. |
-| `parse_money` (script, MCP `cents`) | `edit::parse_money_as(.., SubCents::Refuse)` | One parser with a rounding or exact option. The CLI's strictness (refuses digits past the cent) is kept; it now also reads `$`, parentheses and `+` as the app does. |
+| `parse_money` (script, MCP `cents`) | `edit::parse_money` | One parser, `parse_money_as` with a rounding or exact option. The CLI rounds as the app does (D1) and reads `$`, parentheses and `+` as it does. |
+| script `set line`, MCP `update_lines` / `add_lines` fields | `edit::set_detail_field` / `set_rows_field`, `rowstyle::apply_row_style` | The script's own field code is gone (D5). `fringe_range` stays the script's: the app numbers ranges itself and has no edit that sets one. |
+| script `set fringe .. rate\|cutoff\|basis\|max_hours_per_day` | `typed::set_fringe` | The fringe is rebuilt as the app's input with one field changed, so the app's checks apply (a negative cutoff is refused, D1). |
 | money formatters (`calc/explain.rs`, `setup/copy.rs`, `cli.rs`) | `CurrencyFormat::number` | Same text, tests pin it. The CLI keeps parentheses for negatives. |
 
-Not routed: script and MCP field edits on lines (`set line`, `update_lines`), tags, the
-fringe ops `set fringe .. rate|cutoff|basis|max_hours_per_day`, renames (both already call
-`method_core::rename`), and the settings switches (arithmetic, group rules, cutoff factor),
-which only parse a core enum. Line fields differ on purpose or by drift (Q5).
+Not routed: tags, renames (both already call `method_core::rename`), and the settings
+switches (arithmetic, group rules, cutoff factor), which only parse a core enum. MCP keeps
+its own check that a row's kind uses a field, since it covers the style fields too and says
+which row.
 
-## Open questions for the owner
+## Decisions (owner, 2026-10-15)
 
-1. **Money in the CLI is exact, in the app rounded.** `1.005` is an error in a script or MCP
-   call and $1.01 in the app. Kept as is (`SubCents::Refuse` for the CLI). A script cutoff
-   may still be negative; the app refuses a negative cutoff.
-2. **A flat fringe's unit.** MCP refuses a unit the budget doesn't have; the app's
-   `set_fringe` stores any text. Which should the app do?
-3. **Deleting a unit.** MCP (with `force`) also blanks it on flat fringes and global info;
-   the app's `delete_unit_with(.., true)` only blanks it on lines. Should the app do the same?
-4. **Negative excluded amounts on a charge.** The app takes them, MCP refuses them.
-5. **Line fields.** `set line` and MCP's `update_lines` check that a unit, set, location and
-   currency exist and store formulas as typed; the app's `set_detail_field` doesn't check
-   those names, trims formulas, refuses one that divides by zero and fills an empty Unit from
-   the global an Amt names. Which is meant for the command line?
-6. **The actuals page's money** (`actuals::parse_money`) reads amounts as a sheet import does
-   (`€` and `£` signs, `1.234,56`, `1,23` refused). It is left alone: folding it into
-   `parse_money` would change what that page accepts.
+1. **Money rounds everywhere.** Scripts and MCP round as the app does (`SubCents::Round`):
+   `1.005` is $1.01. A negative cutoff is refused, as the app refuses it.
+2. **A flat fringe's unit must exist**, in the app and MCP alike: `typed::set_fringe`
+   refuses it (`not_found`).
+3. **Deleting a unit with its lines** (`delete_unit_with(.., true)`, MCP's `force`) also blanks
+   it on flat fringes and global info, in the app too.
+4. **A charge's excluded amount can't be negative**, in the app and MCP alike.
+5. **Line fields follow the app.** `set line` and MCP's line tools set fields with
+   `set_detail_field` (formulas trimmed, a formula that divides by zero refused, an empty Unit
+   filled from the global an Amt names) and `apply_row_style`. A unit, currency, set or
+   location a line names must exist, now in the app too. Quick add adds the new item before
+   setting the cell, so the cell can name it.
+6. **The actuals page's money** (`actuals::parse_money`) stays separate: it reads amounts as a
+   sheet import does (`€` and `£` signs, `1.234,56`, `1,23` refused).
+
+Tests changed with these decisions:
+
+- `method-app/tests/commands.rs`, `charges_are_added_edited_moved_and_deleted`: the excluded
+  amount `(1,000)` is now refused (D4); the test uses `$1,000` and checks the refusal.
+- `method-session/src/apply.rs`, `eligibility_matches_the_grid_cells`: the budget gets a set,
+  location and currency named `X` first, since a cell may only name what exists (D5).
+- `method-cli/src/mcp/tools/tests.rs`, charges: `1.005` no longer fails with "two decimal
+  places" (D1); the case is now `(1.005)`, refused as negative.
+- `method-cli/src/script.rs`, `parses_every_command`: `cutoff 1.005` no longer fails to parse
+  (D1); `money_values` checks it rounds.
+
+Tests added: `edit::tests::names_on_lines_and_fringes_must_exist`,
+`deleting_a_unit_with_its_lines_clears_it_from_settings`, and
+`script::tests::fringe_and_line_edits_are_the_apps`.
