@@ -33,12 +33,13 @@ use std::collections::BTreeSet;
 use std::fmt::Write as _;
 use std::str::FromStr;
 
-use method_core::rename::{rename, valid_name, SetupKind};
+use method_core::rename::{rename, SetupKind};
 use method_core::{
     recalc, Arithmetic, Budget, Cents, CutoffFactor, Dec, Detail, FlatBasis, Formula, FringeKind,
     Inclusion, RecalcOptions, Report, RowId, TrailingFringes,
 };
-use method_session::edit::{parse_money_as, SubCents};
+use method_session::edit::{self, parse_money_as, typed, EditError, FringeRowInput, SubCents};
+use method_session::rowstyle::check_color;
 
 use crate::cli::{money, CliError, Outcome};
 
@@ -581,15 +582,13 @@ fn set_field(
             "location",
         )?,
         "color" => {
-            let ok = text.len() == 7
-                && text.starts_with('#')
-                && text[1..].bytes().all(|b| b.is_ascii_hexdigit());
-            if !v.is_none() && !ok {
-                return Err(format!("`{text}` is not a color: use #rrggbb"));
-            }
-            let lower = text.to_ascii_lowercase();
+            let new = if v.is_none() {
+                None
+            } else {
+                Some(check_color(&text)?)
+            };
             let old = opt_shown(&d.color);
-            d.color = (!v.is_none()).then_some(lower);
+            d.color = new;
             (old, opt_shown(&d.color))
         }
         "fringe_range" => {
@@ -628,26 +627,31 @@ fn set_field(
     })
 }
 
+/// Sets global `name` to `formula` with the app's edit, which refuses a
+/// formula that divides by zero or makes globals refer back to themselves
+/// (decisions.md, entry 60). The line for the summary.
+pub fn set_global(b: &mut Budget, name: &str, formula: &str) -> Result<Vec<String>, EditError> {
+    let name = name.trim();
+    let old = b.globals.get(name).map(|f| shown(&f.0));
+    typed::set_global(b, name, formula)?;
+    let new = shown(formula.trim());
+    Ok(vec![match old {
+        Some(old) => format!("global {name} {old} -> {new}"),
+        None => format!("global {name} added as {new}"),
+    }])
+}
+
 /// Applies one command to `b`. Returns a line per change made, for the
 /// summary. On an error `b` may be partly changed; callers work on a copy.
 pub fn apply(b: &mut Budget, op: &Op) -> Result<Vec<String>, String> {
     let mut log = Vec::new();
     match op {
         Op::Title(t) => {
-            log.push(format!("title {} -> {}", shown(&b.title), shown(t)));
-            b.title = t.clone();
+            let old = shown(&b.title);
+            edit::set_title(b, t)?;
+            log.push(format!("title {old} -> {}", shown(&b.title)));
         }
-        Op::Global(name, f) => {
-            if !valid_name(SetupKind::Global, name) {
-                return Err(format!(
-                    "`{name}` can't be a global name: use letters, digits and _, with at least one letter or _"
-                ));
-            }
-            match b.globals.insert(name.clone(), Formula(f.clone())) {
-                Some(old) => log.push(format!("global {name} {} -> {}", shown(&old.0), shown(f))),
-                None => log.push(format!("global {name} added as {}", shown(f))),
-            }
-        }
+        Op::Global(name, f) => log.extend(set_global(b, name, f)?),
         Op::FringeRate(name, f) => {
             let fr = b
                 .fringes
@@ -808,7 +812,12 @@ pub fn apply(b: &mut Budget, op: &Op) -> Result<Vec<String>, String> {
             b.cutoff_factor = *f;
         }
         Op::FringeRow(field, v) => {
-            let r = &mut b.fringe_row;
+            let r = &b.fringe_row;
+            let mut row = FringeRowInput {
+                account: r.account.clone(),
+                description: r.description.clone(),
+                position: r.position,
+            };
             let shown = |v: &Option<String>| v.clone().unwrap_or_else(|| "none".into());
             match *field {
                 "account" => {
@@ -817,7 +826,7 @@ pub fn apply(b: &mut Budget, op: &Op) -> Result<Vec<String>, String> {
                         shown(&r.account),
                         shown(v)
                     ));
-                    r.account = v.clone().filter(|s| !s.is_empty());
+                    row.account = v.clone();
                 }
                 "description" => {
                     log.push(format!(
@@ -825,7 +834,7 @@ pub fn apply(b: &mut Budget, op: &Op) -> Result<Vec<String>, String> {
                         shown(&r.description),
                         shown(v)
                     ));
-                    r.description = v.clone().filter(|s| !s.is_empty());
+                    row.description = v.clone();
                 }
                 _ => {
                     let at = match v {
@@ -835,6 +844,8 @@ pub fn apply(b: &mut Budget, op: &Op) -> Result<Vec<String>, String> {
                         ),
                         None => None,
                     };
+                    // Said with the bounds; the app's own message is for a
+                    // row that went away while its settings were open.
                     if at.is_some_and(|p| p > b.topsheet.len()) {
                         return Err(format!(
                             "the topsheet has {} rows, so the fringe row can be above row 0 to {}",
@@ -845,9 +856,10 @@ pub fn apply(b: &mut Budget, op: &Op) -> Result<Vec<String>, String> {
                     let old = r.position.map_or("none".into(), |p| p.to_string());
                     let new = at.map_or("none".into(), |p| p.to_string());
                     log.push(format!("fringe_row position {old} -> {new}"));
-                    r.position = at;
+                    row.position = at;
                 }
             }
+            edit::set_fringe_row(b, &row)?;
         }
         Op::GroupRule(rule, v) => {
             let slot = group_rule_slot(b, rule);

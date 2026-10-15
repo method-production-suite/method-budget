@@ -6,8 +6,9 @@
 
 use std::collections::BTreeSet;
 
-use method_core::{Budget, Detail, NewLineDefaults, Note, RowId, RowKind};
+use method_core::{Budget, Detail, Note, RowId, RowKind};
 use method_format::serde_json::{json, Map, Value};
+use method_session::edit;
 
 use super::read::{find_account, kind_name};
 use super::{budget_path, edited, obj, path_prop, Args, Ctx, Tool, ToolError, ToolResult};
@@ -323,43 +324,6 @@ fn apply_fields(
     Ok(())
 }
 
-/// Gives a new line the tags `defaults` asks for from the nearest line
-/// above `at` (below, when there is none above), skipping fields `spec`
-/// sets itself. As the app's new-line rule does.
-fn copy_from_neighbor(
-    new: &mut Detail,
-    rows: &[Detail],
-    at: usize,
-    defaults: NewLineDefaults,
-    spec: &Map<String, Value>,
-) {
-    let at = at.min(rows.len());
-    let is_line = |d: &&Detail| d.kind == RowKind::Line;
-    let Some(from) = rows[..at]
-        .iter()
-        .rev()
-        .find(is_line)
-        .or_else(|| rows[at..].iter().find(is_line))
-    else {
-        return;
-    };
-    if defaults.fringes && !spec.contains_key("fringes") {
-        new.fringes = from.fringes.clone();
-    }
-    if defaults.groups && !spec.contains_key("groups") {
-        new.groups = from.groups.clone();
-    }
-    if defaults.set && !spec.contains_key("set") {
-        new.set = from.set.clone();
-    }
-    if defaults.location && !spec.contains_key("location") {
-        new.location = from.location.clone();
-    }
-    if defaults.currency && !spec.contains_key("currency") {
-        new.currency = from.currency.clone();
-    }
-}
-
 fn parse_kind(spec: &Map<String, Value>) -> RowKind {
     match spec.get("kind").and_then(Value::as_str) {
         Some("subtotal") => RowKind::Subtotal,
@@ -427,8 +391,9 @@ fn add_lines(ctx: &mut Ctx, a: &Args) -> ToolResult {
                 RowKind::Separator => Detail::separator(id),
             };
             let acct = &mut b.categories_mut().nth(ci).expect("found").accounts[ai];
+            // The fields the row gives are set over the copied tags below.
             if kind == RowKind::Line && use_defaults {
-                copy_from_neighbor(&mut new, &acct.details, at, defaults, spec);
+                edit::copy_from_neighbor(&mut new, &acct.details, at, defaults);
             }
             acct.details.insert(at, new);
             apply_fields(b, id, spec, &mut log)?;
@@ -508,14 +473,7 @@ fn delete_lines(ctx: &mut Ctx, a: &Args) -> ToolResult {
     let label = format!("Delete {} row(s)", want.len());
     let e = ctx.docs.edit(&path, &shown, &label, |b| {
         check_ids(b, &want)?;
-        let set: BTreeSet<RowId> = want.iter().copied().collect();
-        let mut removed = 0;
-        for acct in b.categories_mut().flat_map(|c| &mut c.accounts) {
-            let before = acct.details.len();
-            acct.details.retain(|d| !set.contains(&d.id));
-            removed += before - acct.details.len();
-        }
-        Ok(removed)
+        Ok(edit::delete_details(b, &want)?)
     })?;
     let what = format!("Deleted {} row(s)", e.out);
     Ok(edited(
