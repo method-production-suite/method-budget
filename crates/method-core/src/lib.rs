@@ -3,6 +3,8 @@
 //! Clean-room: written from how film budgets work and from observed behaviour of
 //! budgeting tools, never from proprietary code or binaries. See CLEAN-ROOM.md.
 
+#![forbid(unsafe_code)]
+
 pub mod actuals;
 pub mod calc;
 pub mod coa;

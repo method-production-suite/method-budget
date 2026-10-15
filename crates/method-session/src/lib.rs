@@ -8,6 +8,8 @@
 //! clock ([`clock`] is handed in by the host), so the crate builds for
 //! `wasm32-unknown-unknown`.
 
+#![forbid(unsafe_code)]
+
 pub mod actuals;
 pub mod apply;
 pub mod batch;

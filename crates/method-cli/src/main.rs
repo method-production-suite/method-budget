@@ -6,6 +6,8 @@
 //! `pub mod` line to `cmd` below and one entry to `COMMANDS`. Keep each
 //! command's entry on its own lines so parallel edits don't collide.
 
+#![forbid(unsafe_code)]
+
 mod cli;
 mod render;
 mod script;

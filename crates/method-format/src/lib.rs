@@ -10,6 +10,8 @@
 //! assert_eq!(method_format::from_str(&text).unwrap(), b);
 //! ```
 
+#![forbid(unsafe_code)]
+
 /// The bundled chart-of-accounts templates (templates/charts, docs/TEMPLATES.md).
 pub mod charts;
 /// Version deltas: versions written as changes (`compact_versions`).
