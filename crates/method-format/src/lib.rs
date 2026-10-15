@@ -124,6 +124,14 @@ pub fn from_str(s: &str) -> Result<Budget, FormatError> {
     Ok(b)
 }
 
+/// Entry points for the fuzz targets (fuzz/), behind the `fuzzing` feature:
+/// not part of the API.
+#[cfg(feature = "fuzzing")]
+#[doc(hidden)]
+pub mod fuzzing {
+    pub use crate::delta::fuzzing::{apply_patch, diff_then_apply};
+}
+
 /// Why a file could not be read.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FormatError {
