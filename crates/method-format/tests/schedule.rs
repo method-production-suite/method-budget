@@ -1,10 +1,12 @@
-//! Reading Method Scheduling's budget exchange file, version 0 (roadmap 3.8;
-//! the spec is that project's docs/EXCHANGE.md). The fixtures in
-//! tests/fixtures/schedule are invented schedules: `lantern-days.json` is
-//! the file the scheduling side sent as its sample, `long-haul-days.json`
-//! is its writer's output for its built-in generated sample (board IDs,
-//! holds, holidays, company moves), and `every-field-days.json` is written
-//! by hand from the spec's example with every optional field.
+//! Reading Method Scheduling's budget exchange file, versions 0 and 1
+//! (roadmap 3.8; the spec is docs/research/schedule-exchange.md, our copy of
+//! that project's docs/EXCHANGE.md). The fixtures in tests/fixtures/schedule
+//! are invented schedules: `lantern-days.json` is the version 1 sample the
+//! scheduling side sent at the freeze, `lantern-v0-days.json` its version 0
+//! sample, `long-haul-days.json` its writer's version 1 output for its
+//! built-in generated sample (board IDs, holds, holidays, company moves),
+//! and `every-field-days.json` is written by hand from the spec's example
+//! with every optional field and its days_hash worked out.
 
 use std::path::PathBuf;
 
@@ -43,13 +45,15 @@ fn refused(bytes: &[u8]) -> String {
 #[test]
 fn the_sample_reads() {
     let d = read("lantern-days.json");
-    assert_eq!(d.version, 0);
+    assert_eq!(d.version, 1);
     assert_eq!(
         (d.schedule.as_str(), d.board.as_str(), d.sub_board.as_str()),
         ("Untitled", "Board 1", "Main")
     );
-    assert_eq!(d.generated.as_deref(), Some("2026-10-12"));
-    assert_eq!(d.source_hash, "302513897fb5f2a5");
+    assert_eq!(d.generated.as_deref(), Some("2026-10-15"));
+    assert_eq!(d.source_hash, "7738d8890247cf4b");
+    // Given and checked: no note says it differs.
+    assert_eq!(d.days_hash.as_deref(), Some("b05ab75006ce9d84"));
     assert!(d.notes.is_empty(), "{:?}", d.notes);
 
     let s = &d.shoot_days;
@@ -59,7 +63,11 @@ fn the_sample_reads() {
     );
     assert_eq!(s.total, 25);
     assert!(s.by_unit.is_empty() && s.by_location.is_empty());
-    assert_eq!(s.by_set.len(), 25);
+    assert_eq!(s.by_set.len(), 24);
+    let dates = s.dates.as_ref().unwrap();
+    assert_eq!(dates.len(), 25);
+    assert_eq!(dates[0], "2027-03-01");
+    assert_eq!(dates.last(), s.end.as_ref());
     assert_eq!(s.by_set[0], ("ROOM 1".to_string(), 1));
     assert_eq!(s.by_week.len(), 5);
     assert_eq!(s.by_week[4], ("2027-03-29".to_string(), 5));
@@ -104,6 +112,85 @@ fn the_sample_reads() {
 }
 
 #[test]
+fn the_version_0_sample_still_reads() {
+    let d = read("lantern-v0-days.json");
+    assert_eq!(d.version, 0);
+    assert!(d.notes.is_empty(), "{:?}", d.notes);
+    assert_eq!((d.days_hash, d.shoot_days.dates), (None, None));
+    assert_eq!(d.shoot_days.total, 25);
+    assert_eq!(d.elements.len(), 6);
+}
+
+#[test]
+fn days_hash_is_checked_and_a_mismatch_is_a_note() {
+    // A count changed by hand (the element's total too, so the file is
+    // still consistent): only the hash notices.
+    let t = text("lantern-days.json")
+        .replacen("\"work\": 3,", "\"work\": 4,", 1)
+        .replacen("\"total\": 3,", "\"total\": 4,", 1);
+    let d = schedule::read(t.as_bytes()).unwrap();
+    assert_eq!((d.elements[0].work, d.elements[0].total), (4, 4));
+    assert_eq!(d.notes.len(), 1, "{:?}", d.notes);
+    assert!(d.notes[0].contains("days_hash"), "{:?}", d.notes);
+    // What the hash leaves out: the title, the stamp, and fields added
+    // after version 1, at any level.
+    let t = text("lantern-days.json")
+        .replacen("\"Untitled\"", "\"Retitled\"", 1)
+        .replacen("\"2026-10-15\"", "\"2026-11-01\"", 1)
+        .replacen(
+            "\"by_unit\"",
+            "\"later\": [1, {\"a\": \"b\"}],\n    \"by_unit\"",
+            1,
+        )
+        .replacen("\"holds\"", "\"later\": true,\n      \"holds\"", 1);
+    let d = schedule::read(t.as_bytes()).unwrap();
+    assert!(d.notes.is_empty(), "{:?}", d.notes);
+    // The hand-written file and the long generated one check out too.
+    assert!(read("every-field-days.json").notes.is_empty());
+    assert!(read("long-haul-days.json").notes.is_empty());
+}
+
+#[test]
+fn shoot_dates_are_checked() {
+    let lantern = "lantern-days.json";
+    let e = refused(&edited(lantern, "\"2027-03-02\",", "\"03/02/2027\","));
+    assert!(e.contains("list of dates"), "{e}");
+    let e = refused(&edited(lantern, "\"dates\": [", "\"dates\": 3, \"x\": ["));
+    assert!(e.contains("list of dates"), "{e}");
+    let short = schedule::read(&edited(lantern, "\"2027-03-02\",", "")).unwrap();
+    assert!(
+        short
+            .notes
+            .iter()
+            .any(|n| n.contains("24 shoot dates for 25")),
+        "{:?}",
+        short.notes
+    );
+    let swapped = edited(
+        lantern,
+        "\"2027-03-02\",\n      \"2027-03-03\"",
+        "\"2027-03-03\",\n      \"2027-03-02\"",
+    );
+    let swapped = schedule::read(&swapped).unwrap();
+    assert!(
+        swapped.notes.iter().any(|n| n.contains("in order")),
+        "{:?}",
+        swapped.notes
+    );
+    let one_end = schedule::read(&edited(
+        "every-field-days.json",
+        "\"last\": \"2027-03-04\",",
+        "",
+    ))
+    .unwrap();
+    assert!(
+        one_end.notes.iter().any(|n| n.contains("only one of")),
+        "{:?}",
+        one_end.notes
+    );
+}
+
+#[test]
 fn every_optional_field_reads() {
     let d = read("every-field-days.json");
     assert!(d.notes.is_empty(), "{:?}", d.notes);
@@ -112,6 +199,7 @@ fn every_optional_field_reads() {
     assert_eq!(s.by_location.len(), 2);
     assert_eq!(s.prep_start.as_deref(), Some("2027-01-18"));
     assert_eq!(s.wrap_end.as_deref(), Some("2027-03-26"));
+    assert_eq!(s.dates.as_ref().map(Vec::len), Some(6));
     let kit = &d.elements[0];
     assert_eq!(kit.board_id.as_deref(), Some("1"));
     assert_eq!(
@@ -130,6 +218,14 @@ fn every_optional_field_reads() {
     assert!(kit.holds && !kit.drops);
     assert_eq!(d.elements[1].min_drop_gap, 10);
     assert_eq!(d.elements[2].board_id, None);
+    // Category may be left out too.
+    let no_category = schedule::read(&edited(
+        "every-field-days.json",
+        "\"category\": \"Vehicles\",",
+        "",
+    ))
+    .unwrap();
+    assert_eq!(no_category.elements[2].category, "");
     let labels: Vec<String> = d
         .budget_fields()
         .iter()
@@ -202,14 +298,14 @@ fn linked_elements_are_found_again() {
 #[test]
 fn later_versions_read_with_a_note_and_unknown_fields_are_ignored() {
     let v1 = schedule::read(&edited(
-        "lantern-days.json",
+        "lantern-v0-days.json",
         "\"version\": 0",
         "\"version\": 1",
     ))
     .unwrap();
     assert_eq!(v1.version, 1);
     assert!(v1.notes.is_empty());
-    let v2 = edited("lantern-days.json", "\"version\": 0", "\"version\": 2");
+    let v2 = edited("lantern-days.json", "\"version\": 1", "\"version\": 2");
     let v2 = String::from_utf8(v2).unwrap().replacen(
         "\"source_hash\"",
         "\"added_later\": {\"x\": [1, 2]},\n  \"source_hash\"",
@@ -267,7 +363,7 @@ fn odd_but_readable_files_say_why() {
 
 #[test]
 fn bad_files_are_refused_in_words() {
-    let lantern = "lantern-days.json";
+    let lantern = "lantern-v0-days.json";
     for (from, to, why) in [
         (
             "\"method-schedule-days\"",

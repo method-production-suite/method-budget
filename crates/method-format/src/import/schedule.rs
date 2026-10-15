@@ -1,8 +1,9 @@
 //! A schedule's day counts, from Method Scheduling's budget exchange file
 //! (`format: "method-schedule-days"`, roadmap 3.8). The spec lives in that
-//! project's docs/EXCHANGE.md: one sub-board's shoot days (in all, by unit,
-//! set, location and week), its dates, and each element's days with every
-//! count kept apart.
+//! project's docs/EXCHANGE.md, frozen at version 1 on 2026-10-15; our copy
+//! is docs/research/schedule-exchange.md. One sub-board's shoot days (in
+//! all, by unit, set, location and week, and every shoot date), its dates,
+//! and each element's days with every count kept apart.
 //!
 //! What lands where in a budget ([`ScheduleDays::budget_fields`]): the shoot
 //! days in the `SHOOT_DAYS` global, the dates in the budget information
@@ -11,10 +12,19 @@
 //! counts. Element days are looked up by identity ([`ScheduleDays::find`])
 //! as agreed with the scheduling side: (category, board ID, name), falling
 //! back to the element's id, asking before relinking when only the id still
-//! matches, and a missing element counting 0.
+//! matches, and a missing element counting 0. Neither key is permanent: the
+//! names are unique within one file only (a rename or a delete frees a name
+//! for another element), and an id is one element only within one line of
+//! a schedule's history (two copies of a file edited apart can give one id
+//! to different elements; a merge renumbers on a clash; a script import
+//! gives new ids). So a budget keeps both, and asks when they disagree.
 //!
-//! Version 0 is read, and version 1, which freezes its shape. A later
-//! version is read too (changes after 1 are additive only), with a note.
+//! Versions 0 and 1 are read; 1 only adds `days_hash` and
+//! `shoot_days.dates`. A later version is read too (changes after 1 are
+//! additive only; a breaking change gets a new format name), with a note.
+//! Fields this build doesn't know are ignored at every level. `days_hash`,
+//! when given, is checked: a mismatch is a note, not an error, since the
+//! counts themselves are each checked on their own.
 //! The file is untrusted input: it goes through the same hand-written JSON
 //! reader as the budget exports, with the same size cap, and every field is
 //! checked; a bad file is an error in words, never a panic.
@@ -50,6 +60,10 @@ pub struct ScheduleDays {
     /// Changes whenever the schedule file does (view settings included), so
     /// a linked budget can say the schedule changed. Compared, never parsed.
     pub source_hash: String,
+    /// Changes only when something this file reports changes: what a
+    /// linked budget compares to know its numbers are out of date. New in
+    /// version 1; compared, never parsed.
+    pub days_hash: Option<String>,
     pub shoot_days: ShootDays,
     pub elements: Vec<ElementDays>,
     /// What looked odd but didn't stop the file being read, in words.
@@ -72,6 +86,9 @@ pub struct ShootDays {
     /// The Monday of each week with shoot days, to its shoot days. These do
     /// add up to `total`.
     pub by_week: Vec<(String, u32)>,
+    /// Every shoot day's date, in order (new in version 1; `None` in a
+    /// version 0 file).
+    pub dates: Option<Vec<String>>,
     pub prep_start: Option<String>,
     pub wrap_end: Option<String>,
 }
@@ -81,6 +98,7 @@ pub struct ShootDays {
 pub struct ElementDays {
     /// The element's stable id in the schedule file.
     pub id: u32,
+    /// Empty when the file leaves it out.
     pub category: String,
     /// Cast number or similar.
     pub board_id: Option<String>,
@@ -273,6 +291,7 @@ pub fn read(bytes: &[u8]) -> Result<ScheduleDays, ReadError> {
         by_set: sd.counts("by_set", false)?,
         by_location: sd.counts("by_location", false)?,
         by_week: sd.counts("by_week", true)?,
+        dates: sd.opt_dates("dates")?,
         prep_start: sd.opt_date("prep_start")?,
         wrap_end: sd.opt_date("wrap_end")?,
     };
@@ -302,12 +321,32 @@ pub fn read(bytes: &[u8]) -> Result<ScheduleDays, ReadError> {
         elements.push(e);
     }
 
+    let days_hash_given = top.opt_text("days_hash")?;
+    if let Some(given) = &days_hash_given {
+        let worked = days_hash(top.need("shoot_days")?, top.need("elements")?);
+        if !given.eq_ignore_ascii_case(&worked) {
+            notes.push(format!(
+                "The file's days_hash ({given}) isn't what its days come to ({worked}): it may have been edited by hand."
+            ));
+        }
+    }
+    for (i, e) in elements.iter().enumerate() {
+        if e.first.is_some() != e.last.is_some() {
+            notes.push(format!(
+                "Element {} ({}) gives only one of its first and last strip days.",
+                i + 1,
+                e.name
+            ));
+        }
+    }
+
     Ok(ScheduleDays {
         version,
         schedule: top.text("schedule")?,
         board: top.text("board")?,
         sub_board: top.text("sub_board")?,
         generated: top.opt_date("generated")?,
+        days_hash: days_hash_given,
         source_hash: top.text("source_hash").and_then(|h| {
             if h.trim().is_empty() {
                 Err(ReadError::new("source_hash is empty"))
@@ -325,7 +364,7 @@ fn element(v: &J, n: usize) -> Result<ElementDays, ReadError> {
     let o = Obj::new(v, &format!("element {n}"))?;
     let e = ElementDays {
         id: o.days("id")?,
-        category: o.text("category")?,
+        category: o.opt_text("category")?.unwrap_or_default(),
         board_id: o.opt_text("board_id")?,
         name: o.text("name")?,
         first: o.opt_date("first")?,
@@ -371,6 +410,122 @@ fn element(v: &J, n: usize) -> Result<ElementDays, ReadError> {
     Ok(e)
 }
 
+/// The `shoot_days` keys `days_hash` covers (its coverage is frozen at
+/// version 1).
+const HASHED_SHOOT_DAYS: [&str; 10] = [
+    "start",
+    "end",
+    "total",
+    "by_unit",
+    "by_set",
+    "by_location",
+    "by_week",
+    "dates",
+    "prep_start",
+    "wrap_end",
+];
+
+/// The element keys `days_hash` covers.
+const HASHED_ELEMENT: [&str; 17] = [
+    "id",
+    "category",
+    "board_id",
+    "name",
+    "first",
+    "last",
+    "work",
+    "hold",
+    "travel",
+    "fitting",
+    "rehearsal",
+    "holiday",
+    "company_move",
+    "total",
+    "holds",
+    "drops",
+    "min_drop_gap",
+];
+
+/// `days_hash` worked out from the file's own `shoot_days` and `elements`:
+/// FNV-1a 64 over `{"shoot_days":…,"elements":[…]}` as compact JSON, keys
+/// and items in the file's order, leaving out keys added after version 1.
+fn days_hash(shoot_days: &J, elements: &J) -> String {
+    let mut out = String::from("{\"shoot_days\":");
+    compact(shoot_days, Some(&HASHED_SHOOT_DAYS), &mut out);
+    out.push_str(",\"elements\":[");
+    for (i, e) in elements.arr().iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        compact(e, Some(&HASHED_ELEMENT), &mut out);
+    }
+    out.push_str("]}");
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in out.bytes() {
+        h ^= u64::from(b);
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{h:016x}")
+}
+
+/// `v` as compact JSON, as the writer's JSON library writes it (numbers as
+/// the file wrote them). An object keeps only the `keep` keys when given.
+fn compact(v: &J, keep: Option<&[&str]>, out: &mut String) {
+    match v {
+        J::Null => out.push_str("null"),
+        J::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
+        J::Num(n) => out.push_str(n),
+        J::Str(s) => quote(s, out),
+        J::Arr(items) => {
+            out.push('[');
+            for (i, x) in items.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                compact(x, None, out);
+            }
+            out.push(']');
+        }
+        J::Obj(fields) => {
+            out.push('{');
+            let mut first = true;
+            for (k, x) in fields {
+                if keep.is_some_and(|keep| !keep.contains(&k.as_str())) {
+                    continue;
+                }
+                if !first {
+                    out.push(',');
+                }
+                first = false;
+                quote(k, out);
+                out.push(':');
+                compact(x, None, out);
+            }
+            out.push('}');
+        }
+    }
+}
+
+/// A JSON string as serde_json writes one: `"` and `\` escaped, control
+/// characters as their short escape or `\u00xx`, everything else as is.
+fn quote(s: &str, out: &mut String) {
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\u{8}' => out.push_str("\\b"),
+            '\u{c}' => out.push_str("\\f"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+}
+
 /// Odd but readable: said in the notes.
 fn check_shoot_days(d: &ShootDays, notes: &mut Vec<String>) {
     match &d.end {
@@ -386,6 +541,21 @@ fn check_shoot_days(d: &ShootDays, notes: &mut Vec<String>) {
             d.start
         )),
         _ => {}
+    }
+    if let Some(dates) = &d.dates {
+        if dates.len() != d.total as usize {
+            notes.push(format!(
+                "The file lists {} shoot dates for {} shoot days.",
+                dates.len(),
+                d.total
+            ));
+        }
+        if dates.windows(2).any(|w| w[0] >= w[1]) {
+            notes.push("The shoot dates aren't in order, one per day.".into());
+        }
+        if dates.first().is_some_and(|f| f < &d.start) || dates.last() != d.end.as_ref() {
+            notes.push("The shoot dates don't run from the start to the last shoot day.".into());
+        }
     }
     let weeks: u64 = d.by_week.iter().map(|(_, n)| u64::from(*n)).sum();
     if weeks != u64::from(d.total) {
@@ -495,6 +665,29 @@ impl<'a> Obj<'a> {
         Ok(self.opt_date(key)?.unwrap_or_default())
     }
 
+    /// A list of dates; left out is `None`.
+    fn opt_dates(&self, key: &str) -> Result<Option<Vec<String>>, ReadError> {
+        let Some(v) = self.get(key) else {
+            return Ok(None);
+        };
+        let J::Arr(items) = v else {
+            return Err(self.bad(key, "a list of dates"));
+        };
+        if items.len() > MAX_COUNTS {
+            return Err(ReadError::new(format!(
+                "{key} has more than {MAX_COUNTS} entries"
+            )));
+        }
+        items
+            .iter()
+            .map(|d| match d {
+                J::Str(s) if method_core::actuals::is_iso_date(s) => Ok(s.clone()),
+                _ => Err(self.bad(key, "a list of dates written YYYY-MM-DD")),
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Some)
+    }
+
     fn whole(&self, key: &str) -> Result<u64, ReadError> {
         whole(self.need(key)?).ok_or_else(|| self.bad(key, "a whole number, 0 or more"))
     }
@@ -583,6 +776,7 @@ mod tests {
             sub_board: String::new(),
             generated: None,
             source_hash: "0".into(),
+            days_hash: None,
             shoot_days: ShootDays {
                 start: "2027-03-01".into(),
                 end: None,
@@ -591,6 +785,7 @@ mod tests {
                 by_set: vec![],
                 by_location: vec![],
                 by_week: vec![],
+                dates: None,
                 prep_start: None,
                 wrap_end: None,
             },

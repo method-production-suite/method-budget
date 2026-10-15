@@ -1,11 +1,12 @@
 {
   "format": "method-schedule-days",
-  "version": 0,
+  "version": 1,
   "schedule": "Harbor Light",
   "board": "Board 1",
   "sub_board": "Second Unit",
   "generated": "2026-10-11",
   "source_hash": "3f0c2a91d7e45b18",
+  "days_hash": "79653537383c87ce",
   "shoot_days": {
     "start": "2027-03-01",
     "end": "2027-03-09",
@@ -26,6 +27,14 @@
       "2027-03-01": 4,
       "2027-03-08": 2
     },
+    "dates": [
+      "2027-03-01",
+      "2027-03-02",
+      "2027-03-03",
+      "2027-03-04",
+      "2027-03-08",
+      "2027-03-09"
+    ],
     "prep_start": "2027-01-18",
     "wrap_end": "2027-03-26"
   },
