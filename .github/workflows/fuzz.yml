@@ -1,0 +1,52 @@
+# Nightly fuzzing of the hand-written parsers (fuzz/README.md). Least privilege;
+# all actions pinned to full commit SHAs (pinact run).
+name: fuzz
+on:
+  schedule:
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [inflate, zip, xlsx, csv, xml, exchange_json, mthd, delta]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Nightly compiler (fuzzing only; the workspace stays pinned)
+        run: rustup toolchain install nightly --profile minimal
+      - name: Cache the cargo-fuzz command line
+        id: cargo-fuzz-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/cargo-fuzz
+          key: cargo-fuzz-0.13.2-${{ runner.os }}-${{ runner.arch }}
+      - name: Install the cargo-fuzz command line
+        if: steps.cargo-fuzz-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-fuzz --version 0.13.2 --locked
+      - name: Seed corpus
+        run: python3 fuzz/seed.py
+      - name: Fuzz for five minutes
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          cargo +nightly fuzz build --fuzz-dir fuzz "$TARGET"
+          cargo +nightly fuzz run --fuzz-dir fuzz "$TARGET" -- \
+            -max_total_time=300 -timeout=10 -rss_limit_mb=2048 -print_final_stats=1
+      - name: Upload the crashing inputs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-artifacts-${{ matrix.target }}
+          path: fuzz/artifacts/${{ matrix.target }}
+          if-no-files-found: ignore
+          retention-days: 30
