@@ -1,0 +1,57 @@
+# cargo deny check: known advisories, licenses and crate sources (the `deny`
+# job in .github/workflows/ci.yml runs it on every push).
+
+[advisories]
+# Every advisory fails, unmaintained and unsound ones included, unless it is
+# listed here with the reason it does not apply.
+ignore = [
+    # Unmaintained, no fix upstream; reached only through Tauri (gtk's macros on
+    # Linux; urlpattern in tauri-utils). Drop each when Tauri moves off it.
+    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error: build-time macro under Tauri's gtk crates" },
+    { id = "RUSTSEC-2025-0075", reason = "unic-char-range: via urlpattern in tauri-utils" },
+    { id = "RUSTSEC-2025-0080", reason = "unic-common: via urlpattern in tauri-utils" },
+    { id = "RUSTSEC-2025-0081", reason = "unic-char-property: via urlpattern in tauri-utils" },
+    { id = "RUSTSEC-2025-0098", reason = "unic-ucd-version: via urlpattern in tauri-utils" },
+    { id = "RUSTSEC-2025-0100", reason = "unic-ucd-ident: via urlpattern in tauri-utils" },
+    # rustls 0.23.45, used only by the updater's HTTPS client (reqwest). The fix,
+    # 0.23.46, was published 2026-10-14 and is still inside the 14-day crate
+    # cooldown (scripts/check-crate-ages.py): `cargo update -p rustls` and remove
+    # these four on or after 2026-10-28.
+    { id = "RUSTSEC-2026-0346", reason = "rustls fix inside the crate cooldown until 2026-10-28" },
+    { id = "RUSTSEC-2026-0347", reason = "rustls fix inside the crate cooldown until 2026-10-28" },
+    { id = "RUSTSEC-2026-0348", reason = "rustls fix inside the crate cooldown until 2026-10-28" },
+    { id = "RUSTSEC-2026-0349", reason = "rustls fix inside the crate cooldown until 2026-10-28" },
+]
+
+[licenses]
+# Everything we ship must be compatible with distributing Method Budget under
+# MIT OR Apache-2.0. This is the list the dependency tree actually needs; a new
+# license fails CI until someone has looked at it.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    # webpki-root-certs: the Mozilla root certificate list as data.
+    "CDLA-Permissive-2.0",
+    # File-level copyleft, unmodified (cssparser, selectors, dtoa-short via
+    # Tauri; option-ext via dirs). Fine to ship alongside MIT/Apache code.
+    "MPL-2.0",
+]
+confidence-threshold = 0.9
+
+[bans]
+# Duplicate versions are common under Tauri; worth seeing, not worth failing.
+multiple-versions = "warn"
+wildcards = "deny"
+# The workspace's own crates depend on each other by path.
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
