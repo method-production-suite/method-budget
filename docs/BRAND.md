@@ -14,8 +14,9 @@ icon, [crates/method-app/icons/source/make_icon.py](../crates/method-app/icons/s
 - The command is `method`, in code style. Budget files are `.mthd` files.
 - The wordmark is set in lowercase (`method budget`). That is artwork, not spelling: in
   text, write Method Budget.
-- Credit "the Method Budget contributors". No personal or company names in public
-  material.
+- Credit "the Method Budget contributors". The copyright line is "Method Production Suite Team and the
+  Method Budget contributors", the same pattern the ArtCraft apps use. No personal or
+  company names in public material.
 
 ## Voice
 
