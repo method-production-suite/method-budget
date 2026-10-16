@@ -1,7 +1,6 @@
 # Secrets: never commit
 .env
 .env.*
-!.env.example
 .mcp.json
 *.pem
 *.key
@@ -41,3 +40,8 @@ id_rsa*
 # locally and by the Pages workflow; the page copy, the wasm and its JS are never
 # committed (docs/WEBSITE.md).
 /site/try/
+
+# Maintainer-local notes: kept on the owner's machine, never published
+HANDOFF.md
+BORN-SECURE.md
+.env.example
