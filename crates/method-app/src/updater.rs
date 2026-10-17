@@ -805,7 +805,7 @@ mod tests {
     use method_release::minisign::{fixture, PLACEHOLDER_PUBLIC_KEY};
 
     const ENDPOINT: &str =
-        "https://github.com/ssandweiss/method-budget/releases/latest/download/latest.json";
+        "https://github.com/method-production-suite/method-budget/releases/latest/download/latest.json";
 
     #[test]
     fn automatic_checks_are_quiet() {

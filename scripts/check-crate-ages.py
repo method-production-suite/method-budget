@@ -19,7 +19,7 @@ import time
 import tomllib
 import urllib.request
 
-UA = "method-budget cooldown check (https://github.com/ssandweiss/method-budget)"
+UA = "method-budget cooldown check (https://github.com/method-production-suite/method-budget)"
 
 
 CRATES_IO = "registry+https://github.com/rust-lang/crates.io-index"
