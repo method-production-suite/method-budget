@@ -1,6 +1,6 @@
 {
   "identifier": "main",
-  "description": "The main window may call the app's own budget commands (every open budget, as tabs) and ask which host it runs in, open, hide and close the tools window and the Budget Setup window, listen for the native menu's events, send events to the tools window and the Budget Setup window, open the print sheet and close itself (which asks about unsaved changes), ask where an update is, restart into a ready one and read this version's release notes (src/updater.rs), and nothing else: no file system, shell, network, updater plugin or dialog access from the web view (dialogs are opened, and updates fetched, by Rust).",
+  "description": "The main window may call the app's own budget commands (every open budget, as tabs) and ask which host it runs in, open, hide and close the tools window and the Budget Setup window, listen for the native menu's events, send events to the tools window and the Budget Setup window, open the print sheet and close itself (which asks about unsaved changes), ask where an update is, restart into a ready one and read this version's release notes (src/updater.rs), read the licences and third-party notices (src/help.rs), and nothing else: no file system, shell, network, updater plugin or dialog access from the web view (dialogs are opened, and updates fetched, by Rust).",
   "windows": [
     "main"
   ],
@@ -231,6 +231,7 @@
     "allow-update-restart",
     "allow-whats-new",
     "allow-release-notes",
+    "allow-licenses",
     "core:event:allow-listen",
     "core:event:allow-emit-to",
     "core:webview:allow-print",

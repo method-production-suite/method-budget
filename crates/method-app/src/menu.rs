@@ -42,6 +42,8 @@ pub const CLOSE_TAB: &str = "file.close_tab";
 pub const WINDOW_MENU: &str = tauri::menu::WINDOW_SUBMENU_ID;
 #[cfg(not(target_os = "macos"))]
 pub const WINDOW_MENU: &str = "window";
+/// The app's licence, for About (the workspace's, `MIT OR Apache-2.0`).
+pub const LICENSE: &str = env!("CARGO_PKG_LICENSE");
 /// The last of the Window menu's own items; the open budgets follow it,
 /// after a separator.
 pub const LAST_WINDOW_ITEM: &str = "window.move_to_other_pane";
@@ -342,9 +344,24 @@ pub const WINDOW: &[Entry] = &[
 
 pub const HELP: &[Entry] = &[
     item("help.shortcuts", "Keyboard Shortcuts", "mod+shift+/"),
+    // docs/APP.md in the browser (src/help.rs).
+    plain(crate::help::USER_GUIDE_ITEM, "User Guide"),
     // This version's notes, in the page (ui/js/updates.js). Check for
-    // Updates and its automatic switch follow (src/updater.rs).
+    // Updates and its automatic switch follow (src/updater.rs), then
+    // HELP_LINKS.
     plain("help.release_notes", "Release Notes"),
+];
+
+/// The end of the Help menu, after Check for Updates (About follows on
+/// Windows and Linux).
+pub const HELP_LINKS: &[Entry] = &[
+    SEP,
+    // A pre-filled GitHub issue in the browser (src/help.rs).
+    plain(crate::help::REPORT_BUG_ITEM, "Report a Bug…"),
+    // The licences and third-party notices, in the page (ui/js/licenses.js).
+    plain(crate::help::LICENSES_ITEM, "Licenses and Notices"),
+    // The suite's website in the browser (src/help.rs).
+    plain(crate::help::SUITE_SITE_ITEM, "methodproduction.com"),
 ];
 
 /// A shortcut-list key spec as a Tauri accelerator: `mod+shift+s` is
@@ -447,7 +464,9 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             // A link on Windows and Linux; macOS shows the credits line.
             website: Some(crate::app::WEBSITE.into()),
             website_label: Some("methodbudget.com".into()),
-            credits: Some("methodbudget.com".into()),
+            // Windows and Linux; macOS shows it in the credits.
+            license: Some(LICENSE.into()),
+            credits: Some(format!("methodbudget.com\nLicensed under {LICENSE}")),
             ..Default::default()
         }),
     )?;
@@ -503,6 +522,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let help = Submenu::with_id(app, HELP_SUBMENU_ID, "&Help", true)?;
     append(app, &help, HELP)?;
     crate::updater::extend_help_menu(app, &help)?;
+    append(app, &help, HELP_LINKS)?;
     if !cfg!(target_os = "macos") {
         help.append(&PredefinedMenuItem::separator(app)?)?;
         help.append(&about)?;
@@ -561,6 +581,7 @@ mod tests {
             SETUP_TABS,
             WINDOW,
             HELP,
+            HELP_LINKS,
         ]
         .iter()
         .flat_map(|m| m.iter().copied())

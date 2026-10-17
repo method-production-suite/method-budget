@@ -57,6 +57,7 @@ import { readPref, writePref } from './prefs.js';
 import { wirePanelResizer, syncResizer, sizePanel, isResizer } from './panelsize.js';
 import { initSafety } from './safety.js';
 import { initUpdates } from './updates.js';
+import { initLicenses } from './licenses.js';
 import { initQuickEntry, editAssist, commitDetailCell, editNote, fringeRange, showFormula } from './quickentry.js';
 import { initRowFormat, toggleStyle, indent, setColor, clearFormatting, PALETTE } from './rowformat.js';
 import { initContextMenu, initContextMenuPresets, watchContextMenu } from './context.js';
@@ -2107,6 +2108,9 @@ Object.assign(COMMANDS, safety.commands);
 // and Help > Release Notes (updates.js, src/updater.rs).
 const updates = initUpdates({ grid, toast });
 Object.assign(COMMANDS, updates.commands);
+// Help > Licenses and Notices (licenses.js). User Guide, Report a Bug and
+// methodproduction.com are answered in Rust (src/help.rs).
+Object.assign(COMMANDS, initLicenses({ toast }).commands);
 // View: formulas in a selection, zero accounts, totals' cents, grid zoom
 // (display.js; per-user choices).
 Object.assign(COMMANDS, displayCommands({ grid, render: () => renderAll(), toast }));

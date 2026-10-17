@@ -1134,10 +1134,12 @@ pub fn run() {
                 confirm_close(app, move || handle.exit(0));
             } else if !crate::safety_app::handle_menu(app, id)
                 && !crate::updater::handle_menu(app, id)
+                && !crate::help::handle_menu(app, id)
             {
                 // Open Recent's Clear Menu and the Autosave check are answered
                 // in src/safety_app.rs, Check for Updates and its automatic
-                // switch in src/updater.rs.
+                // switch in src/updater.rs, the Help menu's links in
+                // src/help.rs.
                 crate::menu::handle(app, id);
             }
         });
@@ -1460,6 +1462,8 @@ pub fn run() {
             crate::updater::update_restart,
             crate::updater::whats_new,
             crate::updater::release_notes,
+            // Help > Licenses and Notices (src/help.rs)
+            crate::help::licenses,
         ])
         .setup(|app| {
             // Autosave, recovery, backups, recent files, and the budgets that
