@@ -462,7 +462,7 @@ belongs to. Section 19 is informational in the inventory; only its concrete scre
 | Our native format `.mthd` (documented JSON) | v1 | Built | D13, FORMAT | none | none |
 | Spreadsheet import with column mapping | v1 | Built | 2.2, D36 | none | Live check with real files |
 | MMB-shaped exports (JSON or XML a downstream tool reads) | later | Missing | interop-formats.md | MMB JSON field names known (ZTEST00) | Allowed (interop decisions); not built |
-| MMB native files (.mmbx, .mbd, templates, zip) | skip | Skip | HANDOFF, CLEAN-ROOM | none | Proprietary; never research the layout |
+| MMB native files (.mmbx, .mbd, templates, zip) | skip | Skip | CLEAN-ROOM | none | Proprietary; never research the layout |
 
 ## 22. Rounding and number display
 

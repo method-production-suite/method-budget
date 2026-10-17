@@ -117,9 +117,8 @@ show a SmartScreen warning: click **More info**, then **Run anyway**.
 
 Signing with a Developer ID and notarizing removes the Gatekeeper step. It needs an Apple
 Developer Program membership. Nothing below is stored in this repository: every secret
-lives in 1Password, in the team 1Password vault, per [BORN-SECURE.md](../BORN-SECURE.md)
-(titled `Thing - What - Where`, tagged `app/method-budget`), and is read at build
-time with `op read` or `op run` and `op://` references.
+lives in the maintainers' password manager (1Password) and is read at build time with
+`op read` or `op run` and `op://` references.
 
 What is needed:
 

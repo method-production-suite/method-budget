@@ -285,4 +285,5 @@ enough. Design choices and their reasons are numbered in
 ## License
 
 Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
-Contributions are accepted under the same terms.
+Copyright (c) 2026 Method Production Suite Team and the Method Budget contributors. Contributions are accepted
+under the same terms.
