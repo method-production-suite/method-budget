@@ -1,0 +1,41 @@
+/* Help > Licenses and Notices (js/licenses.js). */
+
+.licenses-dialog {
+  width: 720px;
+  /* Below the backdrop's 14vh top margin, with room to spare. */
+  height: calc(86vh - 32px);
+  max-height: 760px;
+}
+
+.licenses-intro {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.licenses-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.licenses-picks .btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.licenses-text {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

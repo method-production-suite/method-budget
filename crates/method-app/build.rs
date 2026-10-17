@@ -275,6 +275,8 @@ const COMMANDS: &[&str] = &[
     "update_restart",
     "whats_new",
     "release_notes",
+    // Help > Licenses and Notices (src/help.rs)
+    "licenses",
 ];
 
 /// Copies this version's release notes, `docs/releases/<version>.md`, where

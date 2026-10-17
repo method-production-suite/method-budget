@@ -1072,6 +1072,37 @@ one through its own Save dialog; a cancelled dialog or a failed save stops it an
 closes), **Discard All** (no recovery copies either) and **Cancel**. With one budget it
 reads Save, Discard, Cancel.
 
+### The Help menu
+
+In order: **Keyboard Shortcuts**; **User Guide** (this file on GitHub, in your browser);
+**Release Notes** (this version's notes, below under "Updates"); **Check for Updates…** and
+**Check for Updates Automatically** (also under "Updates"); **Report a Bug…**; **Licenses and
+Notices**; **methodproduction.com** (the suite's website, in your browser). On Windows and
+Linux **About Method Budget** comes last; on macOS it is in the app menu. About shows the
+version, the website (methodbudget.com) and the licence, MIT OR Apache-2.0.
+
+- **Report a Bug…** opens a new issue on the app's GitHub repository in your browser, with
+  a short note on what to write and a last line naming the app's version and your system,
+  for example `Method Budget 0.2.1 · macOS 15.6 (aarch64)`. The system's version comes
+  from `sw_vers` on macOS, `ver` on Windows and `/etc/os-release` on Linux (the system's
+  name alone if that fails). Nothing from a budget is ever put in it, and nothing is sent
+  until you submit the issue yourself on GitHub. The body is form-encoded, kept under
+  about 2,000 characters, and any message passed with it has the home folder and file
+  paths taken out first (src/help.rs, ported from Method Reader).
+- **Licenses and Notices** opens a dialog with the MIT License, the Apache License 2.0 and
+  the third-party notices (`THIRD-PARTY-NOTICES.md`, written by `cargo xtask notices`),
+  one at a time, as plain text you can scroll. The three files are built into the app from
+  the repository's root; the page asks for them (`licenses`, main window only) when the
+  dialog first opens, and draws them with `textContent` (ui/js/licenses.js), never as
+  markup.
+- **Opening links.** User Guide, Report a Bug… and methodproduction.com are answered in
+  Rust (src/help.rs), never by the page, and open only those addresses: the two fixed
+  ones, and the new-issue address followed by a body made of form-encoded characters
+  only. Anything else is refused before a program is started. The link goes as a single
+  argument to the system's opener: `open` on macOS, `rundll32 url.dll,FileProtocolHandler`
+  on Windows (no shell in between) and `xdg-open` on Linux. A link that can't be opened
+  does nothing (a line on standard error).
+
 ### Copy and paste rows
 
 **Whole rows.** When the selection is whole rows (Select All, or Shift+arrows across every
@@ -2445,6 +2476,9 @@ crates/method-app/
   src/updater.rs     in-app updates (the plugin driven from Rust: timed and asked-for
                      checks, background download, Restart to update after saving every
                      budget), What's New once after an update, Help > Release Notes
+  src/help.rs        the Help menu's links (User Guide, Report a Bug, methodproduction.com:
+                     a fixed allowlist, opened with the system's opener) and the texts
+                     for Licenses and Notices
   src/app.rs         Tauri glue: the phase 1 commands (one call each into
                      method_session::commands), host_info, file dialogs, the close and
                      quit guard (one question about every unsaved tab), menu events

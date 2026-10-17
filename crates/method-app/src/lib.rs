@@ -20,6 +20,7 @@ pub mod explain;
 pub mod export;
 pub mod export_import;
 pub mod find;
+pub mod help;
 pub mod history;
 pub mod import_setup;
 pub mod library;
