@@ -249,9 +249,9 @@ Budgets are text with stable ids inside, so git can merge two people's edits. Te
 to use the merge driver:
 
 ```bash
-echo '*.mthd merge=method' >> .gitattributes
-git config merge.method.name "Method Budget merge"
-git config merge.method.driver "method-budget merge-driver %O %A %B %P"
+echo '*.mthd merge=method-budget' >> .gitattributes
+git config merge.method-budget.name "Method Budget merge"
+git config merge.method-budget.driver "method-budget merge-driver %O %A %B %P"
 ```
 
 Edits to different lines merge on their own; real clashes are left for you to settle in
