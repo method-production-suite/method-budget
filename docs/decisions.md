@@ -193,6 +193,8 @@ GUI (Slint, iced, egui) because spreadsheet-grade grid editing is the heart of b
 the web stack's grid tooling is far more mature. Small installers for macOS, Windows and
 Linux. The JS toolchain this adds is held to the same dependency cooldown and lockfile rules.
 
+Reaffirmed 2026-10-16 (entry 75), with the conditions for looking at it again.
+
 ## 15. Row shortcuts follow budgeting habits (2026-10-09, the owner)
 
 Cmd/Ctrl+I inserts a line, Cmd/Ctrl+D deletes rows (undoable), Cmd/Ctrl+= inserts a
@@ -3357,3 +3359,51 @@ executable `method-<noun>-app`. `method` alone would collide across the suite's 
   `/usr/bin/method-budget-app`. The product name, bundle identifier, `.app` name, file
   format name and the git merge driver key (`merge.method-budget`) are unchanged.
 - Release notes already published keep the old name as written.
+
+## 75. The interface stays HTML, CSS and JavaScript in Tauri; when to look again (2026-10-16, the owner)
+
+Asked again whether Method Budget should become pure Rust. Decision 14 stands, and the
+reasons are stronger now than when it was made.
+
+What isn't Rust today (main, 2026-10-16): the page in `crates/method-app/ui/`, about
+34,000 lines of hand-written JavaScript in 68 files and 9,000 lines of CSS, with no npm
+packages. Everything else is Rust (about 154,000 lines across the crates), including the
+logic behind each screen, which moved into method-session for the browser build (decisions
+70 to 73). The page mostly draws and forwards commands.
+
+- **Why not rewrite it (egui, iced, Slint).** It would mean redrawing every screen: the
+  grid, the setup windows, reports, compare and merge, the imports and the tools panel.
+  The web view gives the grid things those toolkits still do less well: screen readers,
+  input methods for other languages, text selection and copy and paste in both
+  directions, printing, and text that looks native. A budget grid uses all of them.
+- **The browser build depends on it.** The demo at methodbudget.com/try/ and a partner's
+  web app host this same page on the WebAssembly session. A canvas-drawn toolkit can also
+  run in a browser, but embeds worse and loses most of the list above.
+- **What a rewrite would buy:** one language, no system web view (so no WebKitGTK or
+  WebView2 differences), and a toolkit shared with Method Reader and Method Storyteller,
+  which use egui. Real, but not worth a full rewrite today.
+
+Rules while it stays this way:
+
+- No npm packages and no JavaScript build step in `ui/`. The page is plain files.
+- New logic goes into method-session as commands, with tests in Rust. The page draws the
+  reply and sends the user's actions; it doesn't decide budget behaviour.
+- Every page change keeps working in the browser build (`host_info`, the shim, the smoke
+  test), as decision 72 set out.
+
+Look again only when one of these is true:
+
+1. The browser build stops mattering: no partner web app and no `/try/` demo.
+2. The web views cost real work: three or more bugs in one release that come from
+   WebKitGTK or WebView2 differences and can't be fixed in the page, or a platform we must
+   support that a web view can't serve.
+3. The owner decides the suite should share one interface toolkit across all four apps
+   (in method-libs) and accepts the cost of redrawing Budget's screens.
+
+If one is true, the first thing to try is a one-week spike, not a rewrite: the topsheet
+and one account's detail grid, keyboard editing included, in Dioxus (Rust components that
+still render as a web page, so the browser build survives), on the desktop and in a
+browser, against method-session's `Host`. It is judged on the list above: screen reader,
+input methods, copy and paste both ways, printing, speed with a 5,000-line budget, and
+whether it runs in the browser build. A pure-Rust toolkit that draws its own widgets
+(egui, iced, Slint) is considered only if trigger 1 holds.
