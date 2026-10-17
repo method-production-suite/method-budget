@@ -215,6 +215,11 @@ a.fn { text-decoration: none; margin-left: 1px; vertical-align: super; font-size
 .keys th, .keys td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
 .keys tr:last-child th, .keys tr:last-child td { border-bottom: 0; }
 .keys th { font-weight: 400; white-space: nowrap; width: 1%; }
+.table-scroll { overflow-x: auto; }
+#help .card .links { margin-top: 16px; }
+.keys.platforms { min-width: 640px; }
+.keys.platforms thead th { width: auto; font-weight: 600; }
+.keys.platforms td { color: var(--ink-soft); }
 .keys td { color: var(--ink-soft); }
 kbd {
   display: inline-block; min-width: 1.9em; padding: 1px 7px; margin: 0 1px; text-align: center;
