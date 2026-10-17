@@ -13,6 +13,7 @@ mod facts;
 mod manifest;
 mod notices;
 mod repo;
+mod screens;
 #[cfg(test)]
 mod testdir;
 mod versions;
@@ -57,6 +58,17 @@ cargo xtask <command> [--root <repository>]
       line of Cargo.lock's version. With --demo, the website's demo
       (docs/WEBSITE.md): the sample budget, the note about running in the
       browser and a strict Content-Security-Policy.
+  capture-screens
+      Retake the README and site pictures from the invented Field Station
+      budget (docs/WEBSITE.md, Screenshots): builds the page for a browser
+      and the command line, drives the page in headless Chrome with Node
+      (scripts/capture-screens.mjs), and writes each picture, light and dark,
+      to assets/screens/ and site/img/, only where its bytes changed. Needs
+      what `web` needs, Node 18 or later and Chrome (CHROME=<path> for
+      another). A release step (docs/RELEASING.md).
+  review-screens --out <page.html>
+      Write one page showing each picture that differs from the last commit,
+      old beside new, and list them. Writes nothing when none changed.
   notices [--check]
       Write THIRD-PARTY-NOTICES.md: the third-party crates the app and the
       command line ship (from `cargo metadata --locked`, normal dependencies
@@ -197,6 +209,8 @@ fn run(args: &[String]) -> Result<String, String> {
         "notices" => notices::command(&root, a.has("--check")),
         "wasm-check" => wasm::command(&root),
         "web" => web::command(&root, a.value("--out").map(path), a.has("--demo")),
+        "capture-screens" => screens::capture_command(&root),
+        "review-screens" => screens::review_command(&root, a.value("--out").map(path)),
         other => Err(format!("unknown command `{other}`\n\n{USAGE}")),
     }
 }

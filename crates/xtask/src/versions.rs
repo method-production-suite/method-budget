@@ -24,14 +24,16 @@ use crate::repo;
 const ROOT_TOML: &str = "Cargo.toml";
 const LOCK: &str = "Cargo.lock";
 
-/// Paths a bump may find changed without refusing: the release's own notes
-/// and what `scripts/site.py` regenerates from them (the release skill
-/// drafts and regenerates before it bumps; docs/RELEASING.md).
+/// Paths a bump may find changed without refusing: the release's own notes,
+/// what `scripts/site.py` regenerates from them, and the pictures
+/// `cargo xtask capture-screens` retakes (the release skill drafts,
+/// regenerates and retakes before it bumps; docs/RELEASING.md).
 fn may_be_dirty(path: &str, notes_rel: &str) -> bool {
     path == notes_rel
         || path == "README.md"
         || path == "docs/features.toml"
         || path.starts_with("site/")
+        || path.starts_with("assets/screens/")
 }
 
 /// The text of `[section]` lines: each line with the section it is in.
@@ -783,7 +785,7 @@ mod tests {
             .contains("isn't ready"));
         r.write("docs/releases/0.1.0.md", &notes_for("0.1.0"));
         assert!(bump_command(r.root(), "sideways", false).is_err());
-        // A dirty tree, except for the release's own notes and the site.
+        // A dirty tree, except for the release's own notes, the site and the pictures.
         r.write("crates/a/src.rs", "// work in progress\n");
         let e = bump_command(r.root(), "patch", false).unwrap_err();
         assert!(e.contains("crates/a/src.rs"), "{e}");
@@ -791,6 +793,7 @@ mod tests {
         std::fs::remove_file(r.root().join("crates/a/src.rs")).unwrap();
         r.write("README.md", "regenerated\n");
         r.write("site/index.html", "regenerated\n");
+        r.write("assets/screens/hero-light.png", "retaken\n");
         // Notes already drafted for the target must be ready.
         r.write(
             "docs/releases/0.1.1.md",

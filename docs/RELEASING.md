@@ -10,6 +10,11 @@ The `/release` skill (`.claude/skills/release/SKILL.md`) runs the same steps wit
 review points. This page is the interface it calls: the commands below are the ones it
 uses, by these names.
 
+Every app in the Method Production Suite releases by one shared checklist,
+[RELEASE-CHECKLIST.md](https://github.com/method-production-suite/.github/blob/main/RELEASE-CHECKLIST.md),
+which lives in the organization's `.github` repository. This page is Method Budget's own
+commands for each of its steps.
+
 ## The version
 
 The version lives in one place: `version` under `[workspace.package]` in the root
@@ -69,6 +74,22 @@ headline nor a bullet), a title that doesn't end with the version, an em dash, a
 `{{placeholder}}`, or a file over 60,000 characters. The release workflow runs the same
 check before it builds anything, so a tag without ready notes builds nothing.
 
+## Pictures
+
+The README and site pictures are retaken for every release, so they show the app as
+released (docs/WEBSITE.md, "Screenshots"):
+
+```bash
+cargo xtask capture-screens                                  # retake them from the invented Field Station budget
+cargo xtask review-screens --out target/screens/review.html  # each changed picture, old beside new
+```
+
+`capture-screens` writes `assets/screens/` and `site/img/`, and only pictures whose bytes
+changed; a release that changes nothing on screen commits no picture. Open the review page
+and check each changed picture shows what it should, light and dark, with nothing real in
+frame. It runs on a Mac with Chrome and Node, and needs what `cargo xtask web` needs. A
+bump accepts the retaken pictures in the tree.
+
 ## Third-party notices
 
 `THIRD-PARTY-NOTICES.md` lists the third-party crates the app and the command line ship,
@@ -96,10 +117,12 @@ cargo xtask notes-facts                     # what went in
 cargo xtask bump minor                      # or patch, or 0.2.0; starts docs/releases/0.2.0.md
 $EDITOR docs/releases/0.2.0.md              # write the notes
 cargo xtask notes-check                     # ready?
+cargo xtask capture-screens                 # retake the pictures
+cargo xtask review-screens --out target/screens/review.html   # and look at what changed
 python3 scripts/site.py                     # the website's "What's new" box follows the notes
 cargo xtask check-version --tag v0.2.0      # what the release workflow checks first
 cargo test --workspace --locked
-git add Cargo.toml Cargo.lock crates/method-app/tauri.conf.json docs/releases/0.2.0.md README.md site/index.html
+git add Cargo.toml Cargo.lock crates/method-app/tauri.conf.json docs/releases/0.2.0.md README.md site/index.html assets/screens site/img
 git commit -m "0.2.0"
 git tag -a v0.2.0 -m "Method Budget 0.2.0"
 git push --atomic origin main v0.2.0

@@ -21,17 +21,34 @@ credits, versions and cost reports. It keeps your budgets as plain, documented f
 your own disk, works offline, and never needs an account. No subscription, and your budget
 is a file you own.
 
-<!-- Pictures: the website's screenshots (site/assets/shots/, made by
-     scripts/make-screenshots.sh from captures of the real app with the invented budgets
-     from scripts/make-showcase-budgets.py). Never a real budget, never another product's
-     screens. -->
+<!-- Pictures: retaken by `cargo xtask capture-screens` from the invented Field Station
+     budget (fixtures/field-station/; docs/WEBSITE.md, "Screenshots"). Never a real
+     budget, never another product's screens. -->
 <p align="center">
-  <img src="site/assets/shots/topsheet.png" width="92%" alt="The topsheet of an invented one-hour episode budget: category numbers, names and totals, with the tools panel listing the fringes on the selected Cast category.">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/screens/hero-dark.png">
+    <img src="assets/screens/hero-light.png" width="92%" alt="The topsheet of Field Station, an invented four-day independent feature: category numbers, names and totals, a grand total of 393,018.91, and the tools panel showing the fringes on the Cast category and the budget's two locations.">
+  </picture>
 </p>
 <p align="center">
-  <img src="site/assets/shots/explain.png" width="92%" alt="The Explain panel tracing one line's total of 19,500.00: 3 weeks at 6,500, then each fringe with its rate and cutoff, including one that stops at its 7,000.00 cutoff.">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/screens/explain-dark.png">
+    <img src="assets/screens/explain-light.png" width="92%" alt="Explain this number on the fringes of one cast line, DELACROIX, 4 days at 2,400: each fringe with its rate and cutoff, the state unemployment fringe stopping at its 7,000.00 cutoff and coming to 238.00.">
+  </picture>
 </p>
-<p align="center"><sub>Screenshots of the Mac app with invented budgets: the titles, the people and every figure are made up.</sub></p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/screens/import-dark.png">
+    <img src="assets/screens/import-light.png" width="92%" alt="Import Spreadsheet reviewing an invented camera department rental list: the import options, the eight lines as they will import, and the check that every line comes to the sheet's own total of 5,310.00.">
+  </picture>
+</p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/screens/file-dark.png">
+    <img src="assets/screens/file-light.png" width="92%" alt="The budget is a file you own: the app beside a terminal running the method-budget totals command on field-station.mthd, printing each category's total and the grand total of 393018.91.">
+  </picture>
+</p>
+<p align="center"><sub>Field Station is an invented production: its title, its people and every figure are made up.</sub></p>
 
 ## Highlights
 

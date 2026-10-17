@@ -23,6 +23,8 @@ so they are written once, for the people who budget films:
   no roadmap numbers.
 - Examples use invented budgets only. Never a real production, a real person or a real
   figure: the notes become a public web page.
+- A visible change has a picture or a short clip. The README and site pictures are
+  retaken for each release (RELEASING.md, "Pictures").
 - Claim only what is built. If `docs/features.toml` or `docs/ROADMAP.md` doesn't back a
   claim, leave it out.
 - Most commits earn no bullet. Refactors, tests, tooling and documentation don't, unless
@@ -36,8 +38,13 @@ The reader in the app understands exactly this shape (anything else is refused b
 1. `# Method Budget <version>`, the title. It ends with the version.
 2. One headline paragraph: one or two sentences on what this release means.
 3. Sections, each `## ` and a heading named for what changed for the reader ("Updates
-   come to you", not "Updater"). Common closing sections: `## Fixed` and
-   `## Good to know` (caveats, changed defaults, anything to do after updating).
+   come to you", not "Updater"), in this order: what's new, then `## Fixed`, then
+   `## Good to know` (known gaps, caveats, changed defaults, anything to do after
+   updating), then `## Who helped`.
+   **Who helped** names everyone who helped make the release, film-knowledge
+   contributors included (people who explained how a department budgets, checked a
+   figure or reported a problem), as they asked to be named. Name a person only with
+   their agreement; nobody who asked not to be listed.
 4. In each section, bullets. A bullet may start with a bold claim, `**Like this.**`,
    followed by a sentence or two. A long bullet wraps onto indented lines.
 
@@ -72,6 +79,10 @@ Every `{{...}}` is a placeholder: `notes-check` refuses the file until none is l
 
 ## Good to know
 
-- {{A caveat, a changed default, or something to do after updating. Delete this section if there is none.}}
+- {{A known gap, a caveat, a changed default, or something to do after updating. Delete this section if there is none.}}
+
+## Who helped
+
+- {{Each person who helped, film-knowledge contributors included, and what they did.}}
 ```
 <!-- skeleton:end -->
