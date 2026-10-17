@@ -35,6 +35,17 @@ use super::{limits, Config};
 pub const MODERN: &str = "2026-07-28";
 /// The legacy revisions it answers `initialize` with, newest first.
 pub const LEGACY: &[&str] = &["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
+
+/// Caching hints on cacheable results in revision 2026-07-28 (its "Caching"
+/// utility: `server/discover` and `tools/list` here). The tool list is fixed
+/// for the life of the process (`listChanged` is false), so an hour. Public: the
+/// list holds no user data and is the same for every caller of this server (the
+/// specification's advice for tool lists). Method Schedule answers the same way.
+pub const CACHE_TTL_MS: u64 = 3_600_000;
+/// See [`CACHE_TTL_MS`].
+pub const CACHE_SCOPE: &str = "public";
+/// The methods whose results carry [`CACHE_TTL_MS`] and [`CACHE_SCOPE`].
+const CACHEABLE: &[&str] = &["server/discover", "tools/list"];
 /// The name the server reports.
 pub const SERVER_NAME: &str = "method-budget";
 
@@ -251,6 +262,10 @@ impl Server {
             let mut result = self.dispatch(method, params, &Era::Modern)?;
             if let Value::Object(r) = &mut result {
                 r.insert("resultType".into(), json!("complete"));
+                if CACHEABLE.contains(&method) {
+                    r.insert("ttlMs".into(), json!(CACHE_TTL_MS));
+                    r.insert("cacheScope".into(), json!(CACHE_SCOPE));
+                }
                 let meta = r
                     .entry("_meta")
                     .or_insert_with(|| Value::Object(Map::new()));
