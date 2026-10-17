@@ -1,12 +1,12 @@
-//! `method new`: write a starter budget.
+//! `method-budget new`: write a starter budget.
 
 use method_core::starter;
 
 use crate::cli::{save, CliError, Flags, Outcome};
 
-pub const USAGE: &str = "  method new <file.mthd> [--template NAME]
+pub const USAGE: &str = "  method-budget new <file.mthd> [--template NAME]
       Write a starter budget, or with --template a new budget with one of the
-      bundled charts of accounts and no lines (`method coa list` names them).
+      bundled charts of accounts and no lines (`method-budget coa list` names them).
 ";
 
 pub fn run(args: &[String]) -> Outcome {

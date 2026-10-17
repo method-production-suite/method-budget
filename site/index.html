@@ -387,9 +387,9 @@
           </summary>
           <ul class="feats">
             <li><strong>Open file format</strong> Budgets are <code>.mthd</code> files: plain, documented JSON that diffs cleanly and that any tool can read.</li>
-            <li><strong>Scriptable command line</strong> <code>method</code> checks budgets, prints totals, draws reports as PDF, HTML or CSV, and exports and imports spreadsheets, with no window and no network.</li>
-            <li><strong>Batch edits</strong> <code>method set</code> and <code>method apply</code> run edit scripts all or nothing, with a dry run that shows what would change.</li>
-            <li><strong>Git merge driver</strong> Keep budgets in git and let <code>method merge-driver</code> merge edits to different lines, flagging only real conflicts.</li>
+            <li><strong>Scriptable command line</strong> <code>method-budget</code> checks budgets, prints totals, draws reports as PDF, HTML or CSV, and exports and imports spreadsheets, with no window and no network.</li>
+            <li><strong>Batch edits</strong> <code>method-budget set</code> and <code>method-budget apply</code> run edit scripts all or nothing, with a dry run that shows what would change.</li>
+            <li><strong>Git merge driver</strong> Keep budgets in git and let <code>method-budget merge-driver</code> merge edits to different lines, flagging only real conflicts.</li>
           </ul>
         </details>
       </div>
@@ -483,12 +483,12 @@
       <h2 id="cli-title">The same engine, without the window</h2>
       <p class="intro">The <code>method</code> command reads and writes budgets with no window
         and no network, so budgets fit into scripts, build steps and automated checks.</p>
-<pre class="term"><code><span class="p">$ </span>method show my-film.mthd                  <span class="c"># the topsheet</span>
-<span class="p">$ </span>method check my-film.mthd                 <span class="c"># recalculate, report problems</span>
-<span class="p">$ </span>method totals my-film.mthd --json         <span class="c"># every total, in cents</span>
-<span class="p">$ </span>method explain my-film.mthd net           <span class="c"># how a total is made up</span>
-<span class="p">$ </span>method diff old.mthd new.mthd             <span class="c"># what changed, in plain words</span>
-<span class="p">$ </span>method report my-film.mthd -o budget.pdf  <span class="c"># a PDF report</span></code></pre>
+<pre class="term"><code><span class="p">$ </span>method-budget show my-film.mthd                  <span class="c"># the topsheet</span>
+<span class="p">$ </span>method-budget check my-film.mthd                 <span class="c"># recalculate, report problems</span>
+<span class="p">$ </span>method-budget totals my-film.mthd --json         <span class="c"># every total, in cents</span>
+<span class="p">$ </span>method-budget explain my-film.mthd net           <span class="c"># how a total is made up</span>
+<span class="p">$ </span>method-budget diff old.mthd new.mthd             <span class="c"># what changed, in plain words</span>
+<span class="p">$ </span>method-budget report my-film.mthd -o budget.pdf  <span class="c"># a PDF report</span></code></pre>
       <div class="cards after-term">
         <div class="card">
           <span class="badge now">Available now</span>

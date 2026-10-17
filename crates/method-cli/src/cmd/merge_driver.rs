@@ -1,5 +1,5 @@
-//! `method merge-driver`: `method merge` as a git merge driver (docs/MERGE.md,
-//! "With git"). git runs it as `method merge-driver %O %A %B %P`: the base,
+//! `method-budget merge-driver`: `method-budget merge` as a git merge driver (docs/MERGE.md,
+//! "With git"). git runs it as `method-budget merge-driver %O %A %B %P`: the base,
 //! ours (which the result replaces) and theirs, all temporary files, and the
 //! file's path in the repository for messages.
 
@@ -8,7 +8,7 @@ use method_core::merge::merge_with;
 use super::merge::{default_side, finish};
 use crate::cli::{load, save, CliError, Flags, Outcome};
 
-pub const USAGE: &str = "  method merge-driver <base> <ours> <theirs> [<path>] [--theirs]
+pub const USAGE: &str = "  method-budget merge-driver <base> <ours> <theirs> [<path>] [--theirs]
       For git (`%O %A %B %P`): merges into <ours> in place, conflicts settled
       for ours (or --theirs) and listed; exit 1 when there were any, so git
       marks the file conflicted. Set up in docs/MERGE.md.

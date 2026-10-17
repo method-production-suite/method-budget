@@ -1,4 +1,4 @@
-//! The `method` binary end to end: every subcommand run as a script would run
+//! The `method-budget` binary end to end: every subcommand run as a script would run
 //! it, checking output, files and exit codes (docs/CLI.md).
 
 use std::io::Write as _;
@@ -6,20 +6,20 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 
 fn method(args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_method"))
+    Command::new(env!("CARGO_BIN_EXE_method-budget"))
         .args(args)
         .output()
-        .expect("method runs")
+        .expect("method-budget runs")
 }
 
 fn method_stdin(args: &[&str], input: &str) -> Output {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_method"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_method-budget"))
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("method runs");
+        .expect("method-budget runs");
     child
         .stdin
         .take()
@@ -75,7 +75,7 @@ fn read(p: &str) -> String {
     std::fs::read_to_string(p).unwrap()
 }
 
-/// `name<TAB>amount` from `method totals`.
+/// `name<TAB>amount` from `method-budget totals`.
 fn total(p: &str, name: &str) -> String {
     let o = method(&["totals", p]);
     assert_eq!(code(&o), 0, "{}", err(&o));
@@ -92,7 +92,7 @@ fn help_and_usage_errors() {
     for c in [
         "show", "check", "export", "report", "totals", "set", "apply", "import",
     ] {
-        assert!(out(&o).contains(&format!("  method {c} ")), "{c}");
+        assert!(out(&o).contains(&format!("  method-budget {c} ")), "{c}");
     }
     assert_eq!(code(&method(&[])), 2);
     let o = method(&["frobnicate"]);
@@ -111,7 +111,10 @@ fn version_flag() {
     assert_eq!(code(&o), 0);
     assert_eq!(
         out(&o),
-        format!("method {} (Method Budget)\n", env!("CARGO_PKG_VERSION"))
+        format!(
+            "method-budget {} (Method Budget)\n",
+            env!("CARGO_PKG_VERSION")
+        )
     );
     assert_eq!(out(&method(&["-V"])), out(&o));
 }
@@ -358,8 +361,8 @@ fn set_changes_one_value() {
     assert_eq!(read(&p), now);
 }
 
-/// Posting by production level, `method check` warns about fringes after
-/// the last production total, and `method set trailing_level_fringes drop`
+/// Posting by production level, `method-budget check` warns about fringes after
+/// the last production total, and `method-budget set trailing_level_fringes drop`
 /// leaves them out as Movie Magic does (decisions.md, entry 56).
 #[test]
 fn check_warns_about_trailing_level_fringes() {

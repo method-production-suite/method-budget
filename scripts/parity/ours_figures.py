@@ -2,9 +2,9 @@
 """Parity test, our side: our engine's figures for every generated budget
 (docs/research/parity-test-plan.md, section 5.1 step 4).
 
-For each `<ours>/<KEY>.mthd` it runs the command line (`method totals --json`,
-`method export --csv`, `method explain <account>/fringes --depth 3`,
-`method explain credit:<NAME> --depth 4`) and writes `<ours>/figures/<KEY>.json` in the
+For each `<ours>/<KEY>.mthd` it runs the command line (`method-budget totals --json`,
+`method-budget export --csv`, `method-budget explain <account>/fringes --depth 3`,
+`method-budget explain credit:<NAME> --depth 4`) and writes `<ours>/figures/<KEY>.json` in the
 same normalized shape the MMB parser must produce (section 5.2), money as integer cents:
 
   {cases: {<case>: {"line.total", "line.fringes", "fringe.<NAME>", "subtotal.shown",
@@ -57,7 +57,7 @@ FRINGE_RE = re.compile(r"^    - ([^:]+): .*  = (\S+)$")
 
 
 def line_fringes(binary, path, account):
-    """{position: {fringe name: cents}} for one account, from `method explain`."""
+    """{position: {fringe name: cents}} for one account, from `method-budget explain`."""
     out = {}
     cur = None
     for raw in run(binary, "explain", path, f"{account}/fringes", "--depth", "3").splitlines():

@@ -1,4 +1,4 @@
-//! `method mcp`: serve budget tools to coding agents over the Model Context
+//! `method-budget mcp`: serve budget tools to coding agents over the Model Context
 //! Protocol on stdin and stdout (src/mcp/, docs/MCP.md).
 
 use std::path::PathBuf;
@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use crate::cli::{CliError, Flags, Outcome};
 use crate::mcp::{serve_stdio, Config};
 
-pub const USAGE: &str = "  method mcp [--root DIR]... [--read-only]
+pub const USAGE: &str = "  method-budget mcp [--root DIR]... [--read-only]
       Serve budget tools to coding agents (Claude Code and other MCP clients)
       over stdio: open, read, edit, check, diff, merge, export and import
       budgets by path. Every path must be inside a --root folder (repeatable;

@@ -11,9 +11,10 @@ name = "method_app"
 path = "src/lib.rs"
 
 # The executable inside the bundles (Method Budget.app/Contents/MacOS/,
-# the Windows and Linux installs).
+# the Windows and Linux installs). Every app in the suite names its desktop
+# binary `method-<noun>-app` and its command line `method-<noun>`.
 [[bin]]
-name = "method-budget"
+name = "method-budget-app"
 path = "src/main.rs"
 
 [build-dependencies]

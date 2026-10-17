@@ -7,7 +7,7 @@ description: Build, read and change film and TV budgets in Method Budget files (
 
 This skill is an example for Claude Code (copy it to `~/.claude/skills/method-budget/SKILL.md`).
 It assumes the `method` MCP server is registered (docs/MCP.md):
-`claude mcp add method -- method mcp --root ~/Budgets`.
+`claude mcp add method -- method-budget mcp --root ~/Budgets`.
 
 ## How a budget is put together
 

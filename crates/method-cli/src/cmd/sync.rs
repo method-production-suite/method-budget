@@ -1,4 +1,4 @@
-//! `method sync`: merge every actor's changes in a shared folder, record
+//! `method-budget sync`: merge every actor's changes in a shared folder, record
 //! outside edits to the `.mthd`, and write the merged budget back as the
 //! keeper does (docs/CLI.md; docs/research/collaboration.md, section 5).
 
@@ -10,7 +10,7 @@ use method_format::log::{self, LogDir};
 use crate::cli::{exit, CliError, Flags, Outcome};
 use crate::cmd::log::{now, open_shared};
 
-pub const USAGE: &str = "  method sync <file.mthd|FOLDER> [--no-write] [--roll]
+pub const USAGE: &str = "  method-budget sync <file.mthd|FOLDER> [--no-write] [--roll]
       Merge every actor's changes in the budget's change log (every
       shared budget in FOLDER), record an outside edit to the .mthd as a
       change, and write the merged budget as the .mthd. --no-write merges

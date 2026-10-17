@@ -1650,7 +1650,7 @@ pub fn build_template(
 }
 
 // ---------------------------------------------------------------------------
-// A mapping file (`method coa import --mapping`)
+// A mapping file (`method-budget coa import --mapping`)
 
 #[derive(Deserialize)]
 #[serde(untagged)]

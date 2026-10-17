@@ -1,4 +1,4 @@
-//! `method log`: start or inspect a budget's change log (docs/CLI.md;
+//! `method-budget log`: start or inspect a budget's change log (docs/CLI.md;
 //! docs/FORMAT.md, "The change log").
 
 use std::fmt::Write as _;
@@ -9,7 +9,7 @@ use method_format::log::{self, LogDir, Shared};
 
 use crate::cli::{json_string, CliError, Flags, Outcome};
 
-pub const USAGE: &str = "  method log <file.mthd> [--init] [--last N] [--json]
+pub const USAGE: &str = "  method-budget log <file.mthd> [--init] [--last N] [--json]
       The budget's change log (<file.mthd>-log/ beside it): who has
       changed it, the last N changes (10), what is waiting or refused,
       and what to review. --init starts the log from the file as it is.

@@ -1,10 +1,10 @@
-//! `method check`: read and recalculate a budget, reporting problems.
+//! `method-budget check`: read and recalculate a budget, reporting problems.
 
 use method_core::{recalc, warnings, RecalcOptions};
 
 use crate::cli::{load, money, CliError, Flags, Outcome};
 
-pub const USAGE: &str = "  method check <file.mthd>
+pub const USAGE: &str = "  method-budget check <file.mthd>
       Read and recalculate; report problems, then any warnings (totals that
       leave something out, such as fringes after the last production total).
 ";

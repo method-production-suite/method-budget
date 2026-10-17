@@ -2258,7 +2258,7 @@ fn v02_4_dividing_by_zero_and_circular_globals_are_refused_at_entry() {
     assert_eq!(edit::refused_global(&b, "ZG_Y", "4"), None);
 
     // One from a file: both are circular and can't be used in a cell; the
-    // engine still refuses to total the budget (`method check` says so).
+    // engine still refuses to total the budget (`method-budget check` says so).
     b.globals.insert("ZG_Y".into(), "ZG_X + 1".into());
     assert_eq!(
         edit::circular_globals(&b),

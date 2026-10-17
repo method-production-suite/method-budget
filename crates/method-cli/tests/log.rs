@@ -1,14 +1,14 @@
-//! `method log` and `method sync` end to end (docs/CLI.md).
+//! `method-budget log` and `method-budget sync` end to end (docs/CLI.md).
 
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
 fn method_as(actor_file: &str, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_method"))
+    Command::new(env!("CARGO_BIN_EXE_method-budget"))
         .env("METHOD_ACTOR_FILE", actor_file)
         .args(args)
         .output()
-        .expect("method runs")
+        .expect("method-budget runs")
 }
 
 fn out(o: &Output) -> String {
@@ -91,7 +91,7 @@ fn log_init_show_and_sync() {
     assert_eq!(j["file"], "Feature.mthd");
     assert_eq!(j["last"].as_array().unwrap().len(), 1);
 
-    // Jordan edits the file with `method set` (an outside edit) and syncs:
+    // Jordan edits the file with `method-budget set` (an outside edit) and syncs:
     // the edit becomes Jordan's change, and the file is rewritten.
     let o = method_as(&jordan, &["set", &file, "title", "Shared Feature"]);
     assert_eq!(code(&o), 0, "{}", err(&o));

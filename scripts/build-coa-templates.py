@@ -3,7 +3,7 @@
 
     python3 scripts/build-coa-templates.py            build every template, update the list
     python3 scripts/build-coa-templates.py --check    change nothing; exit 1 if anything is out of date
-    python3 scripts/build-coa-templates.py --method target/debug/method
+    python3 scripts/build-coa-templates.py --method target/debug/method-budget
                                                        use a method binary already built
 
 Every template is listed in templates/charts/charts.json with its source file:
@@ -13,7 +13,7 @@ Every template is listed in templates/charts/charts.json with its source file:
                                      CLEAN-ROOM.md); the folder is in .gitignore
 
 Each source is turned into templates/charts/<id>.mthd by the importer itself
-(`method coa import <source> -o <id>.mthd --title <name>`), so a template is exactly
+(`method-budget coa import <source> -o <id>.mthd --title <name>`), so a template is exactly
 what importing its source gives, byte for byte, every time.
 
 A file in imports/coa-sources/ that the manifest doesn't list yet is added to it: its id
@@ -24,7 +24,7 @@ templates/charts/SOURCES.md saying where it came from.
 A listed source that isn't on this machine (a studio export someone else has) is skipped
 and its committed template kept as it is.
 
-Last, crates/method-format/src/charts_bundled.rs (the list the app and `method new
+Last, crates/method-format/src/charts_bundled.rs (the list the app and `method-budget new
 --template` bundle) is rewritten from the manifest.
 
 Each template built from a `kind,code,name,parent` CSV is checked against it: the same
@@ -131,7 +131,7 @@ def add_new_sources(m):
 def method_command(args):
     if args.method:
         return [os.path.abspath(args.method)]
-    return ["cargo", "run", "--quiet", "--locked", "-p", "method-cli", "--bin", "method", "--"]
+    return ["cargo", "run", "--quiet", "--locked", "-p", "method-cli", "--bin", "method-budget", "--"]
 
 
 def build(entry, out, method):

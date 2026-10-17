@@ -1,25 +1,25 @@
-# `method mcp`: budgets for coding agents
+# `method-budget mcp`: budgets for coding agents
 
-`method mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server built
+`method-budget mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server built
 into the command line. It lets a coding agent (Claude Code, or any MCP client) open budget
 files, read them, change them and check them with typed tools, the way a person pushes
 buttons in the app: add lines, set a global, add a fringe, apply a charge, look at the
 totals, explain a number, undo.
 
 It works on **files**, not on the running app. Every tool names a budget by its path, reads
-it from disk and, for a change, writes the whole file back atomically, exactly as `method
+it from disk and, for a change, writes the whole file back atomically, exactly as `method-budget
 set` does. Nothing is kept open between calls except what the server needs to notice
 outside changes and to undo its own (see "Files, revisions and conflicts"). A live link to
 an open app window is planned (see "Live app bridge (planned)").
 
-The server is plain Rust inside the `method` binary: no network, no other programs run, no
+The server is plain Rust inside the `method-budget` binary: no network, no other programs run, no
 new dependencies. It reuses the engine, the file format and the command line's own edit
-language, so a value the server writes is checked exactly as `method set` checks it.
+language, so a value the server writes is checked exactly as `method-budget set` checks it.
 
 ## Starting it
 
 ```sh
-method mcp [--root DIR]... [--read-only]
+method-budget mcp [--root DIR]... [--read-only]
 ```
 
 | Flag | Meaning |
@@ -38,18 +38,19 @@ stdin closes.
 
 ```sh
 # Every budget under ~/Budgets, for every project (user scope).
-claude mcp add --scope user method -- method mcp --root ~/Budgets
+claude mcp add --scope user method -- method-budget mcp --root ~/Budgets
 
 # Look but don't touch.
-claude mcp add --scope user method-ro -- method mcp --root ~/Budgets --read-only
+claude mcp add --scope user method-ro -- method-budget mcp --root ~/Budgets --read-only
 
 # Only this project's folder, shared with the team through .mcp.json.
-claude mcp add --scope project method -- method mcp --root .
+claude mcp add --scope project method -- method-budget mcp --root .
 ```
 
-Use the binary's full path (`/usr/local/bin/method`, or `target/release/method` from a
-build) if `method` isn't on the `PATH` Claude Code starts programs with. `claude mcp list`
-shows whether it connected; `/mcp` in a session lists its tools.
+Use the binary's full path (`/usr/local/bin/method-budget`, or
+`target/release/method-budget` from a build) if `method-budget` isn't on the `PATH` Claude
+Code starts programs with. `claude mcp list` shows whether it connected; `/mcp` in a
+session lists its tools.
 
 An example skill that teaches an agent how budgets work and how to use these tools safely
 is in [docs/agents/method-budget-skill.md](agents/method-budget-skill.md). Copy it to
@@ -63,12 +64,17 @@ Most clients take a JSON file in this shape (the key may be `mcpServers` or `ser
 {
   "mcpServers": {
     "method": {
-      "command": "/usr/local/bin/method",
+      "command": "/usr/local/bin/method-budget",
       "args": ["mcp", "--root", "/Users/me/Budgets"]
     }
   }
 }
 ```
+
+The command line used to be called `method`. A registration that still runs `method mcp`
+keeps working: the old name is an alias that says nothing for `mcp` (docs/CLI.md), so
+stdout stays protocol only. Point it at `method-budget` when convenient; the alias will be
+removed in a future release.
 
 ## Protocol
 
@@ -171,7 +177,7 @@ the first time a tool names it, and `budget_open` opens it again on purpose.
 | Files | `new_budget`, `save_as`, `export`, `import_sheet`, `import_budget_export`, `merge`, `undo` |
 
 Every tool that works on one budget takes `path`. Tools that read totals take
-`exclude_groups` (a list of group names whose lines are left out, as `method totals
+`exclude_groups` (a list of group names whose lines are left out, as `method-budget totals
 --exclude` does) where it makes sense.
 
 ### Files and summaries
@@ -240,10 +246,10 @@ and their accounts), `total_atl_cents`, `total_btl_cents`, `atl_btl_cents`,
 `budget_fringes_cents`, `charges_cents` and each charge, `grand_total_cents`, `credits_cents`
 and each credit, `net_total_cents`, `net_total_in_totals_currency_cents` (converted
 account by account, fringe by fringe, charge by charge and credit by credit, then added up;
-decisions.md, entry 60). The summary is the topsheet as `method show` prints it.
+decisions.md, entry 60). The summary is the topsheet as `method-budget show` prints it.
 
 **`explain`** `{path, total, depth?}`: how one total is worked out (the engine's explain, as
-`method explain` and the app's Explain tab show it). `total` is an account (`21-01`,
+`method-budget explain` and the app's Explain tab show it). `total` is an account (`21-01`,
 `21-01/lines`, `21-01/fringes`), a category (`21`, `21/fringes`), a line (`21-01:3` or
 `#14`), `level:NAME`, `charge:NAME`, `credit:NAME`, `fringe:NAME`, or `atl`, `btl`,
 `atl+btl`, `fringes`, `credits`, `grand`, `net`. Returns `title`, `reported_cents` and
@@ -269,7 +275,7 @@ entry 56), and credit rows on a category or account the budget doesn't have, whi
 0 (entries 57 and 61).
 
 **`diff`** `{path, against?, since?}`: what changed, in plain words, with the money that
-moved per account, category and topsheet line (the engine's diff, as `method diff`).
+moved per account, category and topsheet line (the engine's diff, as `method-budget diff`).
 `against` compares another budget (the older one) with `path`. Without it, `since:
 "session"` (the default) shows what changed since the server opened the file (its own
 changes, and any outside save it has since re-opened), and `since: "disk"` shows what someone
@@ -410,13 +416,13 @@ Template). The starter and a blank budget start with the new-budget settings
 **`export`** `{path, format, out, preset?, sections?, date?, bom?, overwrite?}`: `xlsx` (one
 workbook), `csv` (one file per table, `<stem> - <Table>.csv` beside `out`), `tsv` (the detail
 as tab-delimited text, `.txt` or `.tsv`), or a report from a saved preset (or the topsheet
-and detail) as `html`, `txt`, `pdf` or `report_csv`, exactly as `method export` and `method
+and detail) as `html`, `txt`, `pdf` or `report_csv`, exactly as `method-budget export` and `method-budget
 report` make them. `out` must have the format's extension; files that exist are replaced
 only with `overwrite`. `date` fixes the printed date for output that must not change.
 
 **`import_sheet`** `{sheet, out, into?, mapping?, title?, currency?, overwrite?, dry_run?}`:
 a spreadsheet's rows as detail lines, with the app's importer and limits (decision 36), as
-`method import`. `mapping` is the same object as `method import --mapping` (`sheet`,
+`method-budget import`. `mapping` is the same object as `method-budget import --mapping` (`sheet`,
 `header_row`, `columns`, `create_accounts`, `create_setup`, `default_account`). With
 `into`, the lines go into a copy of that budget, or into the budget itself (as an undoable
 change) when `out` is the same file. Returns the lines added, what was created, skipped rows
@@ -431,7 +437,7 @@ and warnings (the first 20), the sheet-versus-budget reconciliation and the tota
 **`import_budget_export`** `{file, out?, format?, title?, overwrite?, dry_run?, all_differences?}`:
 a whole budget from another budgeting program's export (budget exchange JSON or XML, its
 Excel workbook or tab-delimited topsheet; `format` `json`, `xml`, `xml-advanced`, `xlsx` or
-`tab` when the content doesn't say), as `method import-export` (docs/IMPORT.md). Returns
+`tab` when the content doesn't say), as `method-budget import-export` (docs/IMPORT.md). Returns
 `counts`, `notes` (`kind` `check`, `not_imported` or `info`: what was worked out from the
 figures and should be checked, and what couldn't come over) and `reconciliation`: the
 imported budget's totals against the export's own (`matches`, the grand and net totals in
@@ -516,7 +522,7 @@ switch, approval and status look in the app is still to be designed (open questi
 - **Local only.** The app listens on a Unix domain socket in its own data folder (mode 0600,
   in a 0700 folder) on macOS and Linux, and on a named pipe whose security descriptor admits
   only the current user on Windows. No TCP port, nothing on the network.
-- **Approved tokens.** `method mcp --app` connects to the socket and asks for access with a
+- **Approved tokens.** `method-budget mcp --app` connects to the socket and asks for access with a
   name ("Claude Code in ~/Budgets") and a short code it prints. The app asks the user to
   approve it, showing the same name and code; approving issues a random 256-bit token, kept
   by the command line in the user's keychain (or a 0600 file) and by the app as a hash, with

@@ -1,10 +1,10 @@
-//! `method apply`: run an edit script against a budget (docs/CLI.md, "Edit
+//! `method-budget apply`: run an edit script against a budget (docs/CLI.md, "Edit
 //! scripts").
 
 use crate::cli::{CliError, Flags, Outcome};
 use crate::script;
 
-pub const USAGE: &str = "  method apply <file.mthd> <script.txt> [--dry-run]
+pub const USAGE: &str = "  method-budget apply <file.mthd> <script.txt> [--dry-run]
       Run an edit script (one command per line; `-` reads stdin) and save
       atomically. Every line must succeed and the result must recalculate, or
       nothing is written (exit 3). --dry-run prints each change and the totals

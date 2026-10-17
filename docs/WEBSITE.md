@@ -116,7 +116,7 @@ To make them again:
    writes the invented budgets into `target/showcase/` (`--force` to replace them): an
    independent feature in two drafts (draft 3 keeps draft 2 as a version and carries
    invented actuals), one episode of a one-hour series, and a 30-second commercial. They
-   are built from bundled charts of accounts through `method mcp`, the same tools a coding
+   are built from bundled charts of accounts through `method-budget mcp`, the same tools a coding
    agent uses.
 2. Build the app (`cd crates/method-app && cargo tauri build --bundles app`), copy the
    budgets somewhere disposable, open them in it, set the window to 1440x900 points and

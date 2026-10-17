@@ -5,7 +5,7 @@
 //! merged state written as the `.mthd` itself.
 //!
 //! Nothing here watches or polls on its own: [`LogDir::scan`] and
-//! [`absorb`] are the hooks an application or `method sync` drives.
+//! [`absorb`] are the hooks an application or `method-budget sync` drives.
 
 use std::collections::BTreeMap;
 use std::fmt;

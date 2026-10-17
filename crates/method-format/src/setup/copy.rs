@@ -3,7 +3,7 @@
 //! item names, and definitions in words. Shared by pasting rows, Import
 //! Setup, the setup library and setup packs (the application's
 //! src/clipboard.rs and src/import_setup.rs; decisions.md, entries 23, 29,
-//! 37 and 50), and by the command line's `method pack`.
+//! 37 and 50), and by the command line's `method-budget pack`.
 
 use std::collections::{BTreeMap, BTreeSet};
 

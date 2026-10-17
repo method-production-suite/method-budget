@@ -1,4 +1,4 @@
-//! The starter budget for new files (`method new` and the app's New): our own small
+//! The starter budget for new files (`method-budget new` and the app's New): our own small
 //! chart of accounts with placeholder rates to replace. Not derived from any
 //! vendor template.
 //!

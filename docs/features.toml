@@ -395,21 +395,21 @@ ref = "D13"
 [[feature]]
 group = "cli"
 title = "Scriptable command line"
-text = "`method` checks budgets, prints totals, draws reports as PDF, HTML or CSV, and exports and imports spreadsheets, with no window and no network."
+text = "`method-budget` checks budgets, prints totals, draws reports as PDF, HTML or CSV, and exports and imports spreadsheets, with no window and no network."
 status = "have"
 ref = ["3.12", "D41"]
 
 [[feature]]
 group = "cli"
 title = "Batch edits"
-text = "`method set` and `method apply` run edit scripts all or nothing, with a dry run that shows what would change."
+text = "`method-budget set` and `method-budget apply` run edit scripts all or nothing, with a dry run that shows what would change."
 status = "have"
 ref = ["3.12", "D41"]
 
 [[feature]]
 group = "cli"
 title = "Git merge driver"
-text = "Keep budgets in git and let `method merge-driver` merge edits to different lines, flagging only real conflicts."
+text = "Keep budgets in git and let `method-budget merge-driver` merge edits to different lines, flagging only real conflicts."
 status = "have"
 ref = ["3.2", "D44"]
 

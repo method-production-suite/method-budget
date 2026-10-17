@@ -219,7 +219,7 @@ impl Server {
         // is handled by the read loop before requests run; anything else is
         // ignored, as notifications are.
         if method != "notifications/initialized" && method != "notifications/cancelled" {
-            eprintln!("method mcp: ignored notification {method}");
+            eprintln!("method-budget mcp: ignored notification {method}");
         }
     }
 
@@ -377,7 +377,7 @@ impl Server {
             }
         };
         eprintln!(
-            "method mcp: {name} {} ({} ms)",
+            "method-budget mcp: {name} {} ({} ms)",
             match &outcome {
                 Ok(_) => "ok".to_string(),
                 Err(e) => format!("refused: {}", e.kind),
@@ -545,7 +545,7 @@ pub fn spawn_reader(input: impl Read + Send + 'static) -> mpsc::Receiver<Incomin
                     }
                 }
                 Err(e) => {
-                    eprintln!("method mcp: stdin: {e}");
+                    eprintln!("method-budget mcp: stdin: {e}");
                     break;
                 }
             }

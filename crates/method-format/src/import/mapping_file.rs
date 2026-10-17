@@ -1,5 +1,5 @@
 //! A saved column mapping as a small JSON file, for importing without the
-//! app (`method import --mapping`, docs/CLI.md). The app keeps its own saved
+//! app (`method-budget import --mapping`, docs/CLI.md). The app keeps its own saved
 //! mappings in the page's storage; this is the same choices written down.
 //!
 //! ```json

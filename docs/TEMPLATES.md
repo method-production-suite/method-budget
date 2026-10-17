@@ -1,13 +1,13 @@
 # Chart-of-accounts templates
 
 Method Budget ships charts of accounts as templates: New From Template lists them under
-**Charts of accounts** (grouped Feature, Television, Commercial, Other), and `method new
-<file> --template <id>` starts from one (`method coa list` names them). A template is an
+**Charts of accounts** (grouped Feature, Television, Commercial, Other), and `method-budget new
+<file> --template <id>` starts from one (`method-budget coa list` names them). A template is an
 ordinary budget file holding categories, accounts and production totals, and nothing else:
 no lines, fringes, globals, rates or charges.
 
 Any chart can also be brought in by hand: **File > Import Chart of Accounts…** in the app,
-or `method coa import` on the command line (docs/CLI.md), from a spreadsheet, a CSV file or
+or `method-budget coa import` on the command line (docs/CLI.md), from a spreadsheet, a CSV file or
 another budget. It makes a new budget with that chart, or applies the chart to the budget
 in front (adds what is missing, renames by number, never removes an account with lines).
 
@@ -130,13 +130,13 @@ Both can't keep the same number because everything that matches accounts by numb
 treat them as one: transactions coded `10950` would all land on the first, a comparison
 would add the two together, and imports and lookups by number would find only the first.
 The new numbers are listed in the import: under **Renumbered** (and in a sentence at the
-top) in the app's preview, and as `check:` lines from `method coa import`. Rename them to
+top) in the app's preview, and as `check:` lines from `method-budget coa import`. Rename them to
 whatever the production uses; renumbering to another pattern refuses them until then,
 since they don't follow the pattern. Decision 53 in docs/decisions.md has the reasoning.
 
 ## Other spreadsheet shapes
 
-File > Import Chart of Accounts and `method coa import` read most charts as studios and
+File > Import Chart of Accounts and `method-budget coa import` read most charts as studios and
 accounting systems print them, without the layout above: a flat list of accounts, an
 outline of category rows and account rows (in one number column, or indented one column),
 category and account columns side by side (merged category cells read as blanks below

@@ -15,7 +15,7 @@ decision 59). Five layouts are read:
 The layout is found from the file's content; `--format` (or the dialog's **Read as**) reads
 it as another. Prefer the JSON or the advanced XML: they carry the most.
 
-- **Command line**: `method import-export <file> [-o out.mthd] [--report] [--json]`
+- **Command line**: `method-budget import-export <file> [-o out.mthd] [--report] [--json]`
   (docs/CLI.md). Without `-o` it only reads and compares.
 - **App**: File > Import Budget Export… shows the review (what came over, the check against
   the export's totals, the notes) and opens the budget in a new tab, unsaved (docs/APP.md).

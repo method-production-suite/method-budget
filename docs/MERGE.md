@@ -130,21 +130,21 @@ tools are the copy's, as a copy carries the original's tools from when it was sa
 ## Command line
 
 ```
-method diff <old.mthd> <new.mthd> [--json] [--exit-code]
-method merge <base.mthd> <ours.mthd> <theirs.mthd> -o <out.mthd> [--ours|--theirs]
-method merge-driver <base> <ours> <theirs> [<path>] [--theirs]
+method-budget diff <old.mthd> <new.mthd> [--json] [--exit-code]
+method-budget merge <base.mthd> <ours.mthd> <theirs.mthd> -o <out.mthd> [--ours|--theirs]
+method-budget merge-driver <base> <ours> <theirs> [<path>] [--theirs]
 ```
 
-- `method diff` prints the changes grouped under their headings, then the topsheet,
+- `method-budget diff` prints the changes grouped under their headings, then the topsheet,
   category and account money. `--json` prints one object: `changes` (each with `kind`,
   `group`, `place`, `subject`, `text`, `money` in cents and `fields` with `before` and
   `after`), `accounts`, `categories` and `totals` (each `label`, `before`, `after`,
   `delta` in cents) and `money_known`. Exit 0; with `--exit-code`, 1 when anything changed.
-- `method merge` writes the merged budget to `-o` (atomically) and prints what it did and
+- `method-budget merge` writes the merged budget to `-o` (atomically) and prints what it did and
   every conflict with the side it took. Exit 0 with no conflicts; **exit 1 when conflicts
   were settled** by the default side (the merged file is written either way, so it can be
   opened and checked); 2 for a usage error.
-- `method merge-driver` is the same merge for git: it writes the result over `<ours>`.
+- `method-budget merge-driver` is the same merge for git: it writes the result over `<ours>`.
 
 ### With git
 
@@ -158,14 +158,14 @@ and what the driver is, once per repository (or with `--global`):
 
 ```
 git config merge.method-budget.name "Method Budget merge"
-git config merge.method-budget.driver "method merge-driver %O %A %B %P"
+git config merge.method-budget.driver "method-budget merge-driver %O %A %B %P"
 ```
 
 `%O` is the common base, `%A` ours (which the result replaces), `%B` theirs and `%P` the
 file's path, for messages. A clean merge is committed as usual. When conflicts remain the
 driver still writes a valid budget, every conflict settled for ours, lists them and exits
 1, so git marks the file conflicted (`UU`) without writing conflict markers into it: open
-it in the app (or run `method merge ... --theirs`) to settle them, then `git add` it. When
+it in the app (or run `method-budget merge ... --theirs`) to settle them, then `git add` it. When
 both branches added the same file there is no base (git passes an empty one); the driver
 says so and leaves ours. Use `--theirs` in the driver line to settle conflicts for theirs
 instead.

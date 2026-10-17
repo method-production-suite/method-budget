@@ -5,10 +5,24 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish = false
+# `cargo run -p method-cli` runs the command line, not the alias.
+default-run = "method-budget"
 
+[lib]
+name = "method_cli"
+path = "src/lib.rs"
+
+# The command line. Every app in the suite names its CLI `method-<noun>` and
+# its desktop binary `method-<noun>-app`.
+[[bin]]
+name = "method-budget"
+path = "src/main.rs"
+
+# The old name, kept as an alias: the same code plus a one-line note on
+# stderr (none for `mcp` and `merge-driver`). To be removed in a future release.
 [[bin]]
 name = "method"
-path = "src/main.rs"
+path = "src/bin/method.rs"
 
 [dependencies]
 method-core = { path = "../method-core" }

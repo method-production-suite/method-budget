@@ -1,9 +1,9 @@
-//! `method set`: change one value in a budget from the command line.
+//! `method-budget set`: change one value in a budget from the command line.
 
 use crate::cli::{CliError, Flags, Outcome};
 use crate::script::{self, Op, RowRef, Word, LINE_FIELDS};
 
-pub const USAGE: &str = "  method set <file.mthd> <path> <value> [--dry-run]
+pub const USAGE: &str = "  method-budget set <file.mthd> <path> <value> [--dry-run]
       Change one value and save atomically. Paths: title, compact_versions,
       arithmetic (binary or exact), round_account_totals (true or false),
       trailing_level_fringes (keep or drop),
@@ -90,7 +90,11 @@ pub fn op_for(path: &str, value: &str) -> Result<Op, CliError> {
             (_, other) => return Err(bad(format!("a charge has no field `{other}`"))),
         },
         "group_rules" if !rest.is_empty() => script::group_rule(rest, value).map_err(bad)?,
-        _ => return Err(bad(format!("`{path}` is not a path `method set` knows"))),
+        _ => {
+            return Err(bad(format!(
+                "`{path}` is not a path `method-budget set` knows"
+            )))
+        }
     })
 }
 
