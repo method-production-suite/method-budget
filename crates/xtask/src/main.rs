@@ -11,6 +11,7 @@ use std::process::ExitCode;
 
 mod facts;
 mod manifest;
+mod notices;
 mod repo;
 #[cfg(test)]
 mod testdir;
@@ -56,6 +57,12 @@ cargo xtask <command> [--root <repository>]
       line of Cargo.lock's version. With --demo, the website's demo
       (docs/WEBSITE.md): the sample budget, the note about running in the
       browser and a strict Content-Security-Policy.
+  notices [--check]
+      Write THIRD-PARTY-NOTICES.md: the third-party crates the app and the
+      command line ship (from `cargo metadata --locked`, normal dependencies
+      on macOS, Windows and Linux), each with its licence and the licence and
+      notice files it comes with. --check writes nothing and fails when the
+      file is out of date. Needs the crates downloaded (`cargo fetch`).
   update-manifest --dir <artifacts> --version X.Y.Z --out <latest.json>
                   [--config <tauri.conf.json>] [--base-url <url>] [--pub-date <RFC 3339>]
       Write the update manifest the app reads, from the signed updater
@@ -187,6 +194,7 @@ fn run(args: &[String]) -> Result<String, String> {
                 pub_date: a.value("--pub-date").map(str::to_string),
             })
         }
+        "notices" => notices::command(&root, a.has("--check")),
         "wasm-check" => wasm::command(&root),
         "web" => web::command(&root, a.value("--out").map(path), a.has("--demo")),
         other => Err(format!("unknown command `{other}`\n\n{USAGE}")),

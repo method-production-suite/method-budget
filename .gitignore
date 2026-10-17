@@ -37,8 +37,7 @@ id_rsa*
 /imports/
 
 # The website demo (site/try/): built by `cargo xtask web --demo --out site/try`
-# locally and by the Pages workflow; the page copy, the wasm and its JS are never
-# committed (docs/WEBSITE.md).
+# locally; the page copy, the wasm and its JS are never committed (docs/WEBSITE.md).
 /site/try/
 
 # Maintainer-local notes: kept on the owner's machine, never published

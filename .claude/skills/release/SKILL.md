@@ -44,7 +44,7 @@ authentication check either.
 Once `v<version>` exists on origin it is permanent: people have downloaded from it and the
 release workflow has built from it. If something is wrong, ship the next patch version.
 Never force-push a tag, never delete one from origin, never re-point one. Nothing in this
-flow pushes, publishes a GitHub Release, or changes repository settings (Pages, DNS,
+flow pushes, publishes a GitHub Release, or changes repository settings (DNS,
 variables) without the user's explicit yes to that exact command.
 
 ## Step 0: read the argument and the tooling
@@ -225,8 +225,9 @@ publish by hand.
 ```
 
 Use the push command from `docs/RELEASING.md` instead if it documents a different one
-(account switching, for example). If the commit changed `site/`, add one line: the push
-also redeploys the website, but only once Pages is turned on (docs/WEBSITE.md).
+(account switching, for example). If the commit changed `site/`, add one line: the suite
+website (method-production-suite/website) publishes `site/` from main at its next sync
+(docs/WEBSITE.md).
 
 On yes, run exactly that command, and never append `exit` to it. If declined:
 
