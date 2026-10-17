@@ -18,38 +18,65 @@
 Method Budget is a free, open-source desktop app for building and running production
 budgets: topsheet, accounts and detail lines, fringes, globals, groups, charges and
 credits, versions and cost reports. It keeps your budgets as plain, documented files on
-your own disk, works offline, and never needs an account.
+your own disk, works offline, and never needs an account. No subscription, and your budget
+is a file you own.
 
-<!-- Screenshots go here once we have our own captures of the app (an invented sample
-     budget, never a real one, and never another product's screens). Planned markup:
+<!-- Pictures: the website's screenshots (site/assets/shots/, made by
+     scripts/make-screenshots.sh from captures of the real app with the invented budgets
+     from scripts/make-showcase-budgets.py). Never a real budget, never another product's
+     screens. -->
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/budget-dark.png">
-    <img src="docs/assets/screens/budget-light.png" alt="Method Budget showing an invented sample budget" width="92%">
-  </picture>
+  <img src="site/assets/shots/topsheet.png" width="92%" alt="The topsheet of an invented one-hour episode budget: category numbers, names and totals, with the tools panel listing the fringes on the selected Cast category.">
 </p>
--->
+<p align="center">
+  <img src="site/assets/shots/explain.png" width="92%" alt="The Explain panel tracing one line's total of 19,500.00: 3 weeks at 6,500, then each fringe with its rate and cutoff, including one that stops at its 7,000.00 cutoff.">
+</p>
+<p align="center"><sub>Screenshots of the Mac app with invented budgets: the titles, the people and every figure are made up.</sub></p>
 
 ## Highlights
 
-- **Your budget is an open file.** Budgets are `.mthd` files: plain, documented JSON
-  ([docs/FORMAT.md](docs/FORMAT.md)). Any tool can read them, they diff cleanly, and you
-  are never locked in.
-- **Local first.** Everything lives on your disk and works offline. No account, no cloud,
-  no telemetry. The app goes online only to check for its own updates, and you can turn
-  that off.
-- **Keyboard first.** Drill into an account, climb back to the topsheet, step between
-  accounts, fill down and move rows without reaching for the mouse.
 - **Every number explains itself.** Pick any total and trace it down to the lines,
   fringes, cutoffs and rounding steps that make it up. Money is kept in whole cents, so
   the topsheet always adds up.
-- **Bring your budgets with you.** Open budgets exported from Movie Magic Budgeting
-  (JSON, XML, Excel or tab-delimited), department spreadsheets and accounting exports,
-  each checked figure by figure against the totals in the file. See
+- **Bring your budgets with you.** Open the budget exports other budgeting tools write
+  (JSON, XML, Excel or tab-delimited), department spreadsheets and accounting exports.
+  Each import is checked figure by figure against the totals in the file. See
   [Importing](#importing).
-- **Scriptable.** The `method-budget` command line runs the same engine with no window, and a
-  git merge driver combines two people's edits to one budget.
-- **No subscription.** Free and open source under MIT or Apache-2.0.
+- **Your budget is an open file.** Budgets are `.mthd` files: plain, documented JSON
+  ([docs/FORMAT.md](docs/FORMAT.md)). Any tool can read them, they diff cleanly, and you
+  are never locked in.
+- **Keyboard first.** Drill into an account, climb back to the topsheet, step between
+  accounts, fill down and move rows without reaching for the mouse.
+- **Scriptable.** The `method-budget` command line runs the same engine with no window,
+  and a git merge driver combines two people's edits to one budget.
+
+## Yours to keep
+
+- **Free, for good.** Open source under MIT or Apache-2.0. No subscription, no account.
+- **Your file, on your disk.** Budgets are `.mthd` files with a published
+  [specification](docs/FORMAT.md), so you can open them in twenty years, whatever happens
+  to any vendor or to this project.
+- **Works offline.** Nothing is uploaded. The app goes online only to check for its own
+  updates, and you can turn that off.
+- **Nothing invents your numbers.** There is no generative AI in the app: every figure
+  comes from what you typed and the rules you set.
+
+## Status, honestly
+
+Alpha, ready for testing. It's tested against thousands of figures, but you will find
+rough edges: keep a copy of budgets that matter, and check numbers before they leave the
+room.
+
+| Platform | Built | Signed | Tested by hand | Updates itself |
+|---|---|---|---|---|
+| macOS, Apple silicon | Yes | Yes, notarized by Apple | Yes | Yes |
+| macOS, Intel | Up to 0.2; later releases are Apple silicon only | Yes | Not checked | Stays on its version |
+| Windows (x64) | Yes | Not yet | Not yet | Not yet |
+| Linux (x64, `.deb` and AppImage) | Yes | Not applicable | Not yet | Not yet |
+
+Not there yet: tested Windows and Linux builds, updates in place on those two, and starter
+templates with charts of accounts (being written now). The [roadmap](docs/ROADMAP.md) has
+the rest. Windows and Linux: help us get there.
 
 ## Features
 
@@ -146,9 +173,11 @@ this section.
 ## Install
 
 Method Budget is a desktop app for macOS, with Windows and Linux builds that have not been
-tested by hand yet. **Ready-made downloads are not public yet.** Until they are, build it
-from source. [docs/INSTALL.md](docs/INSTALL.md) covers building, installing on a Mac, the
-one-time security step for builds that are not notarized, and what signed releases need.
+tested by hand yet. Download the Mac app from the
+[latest release](https://github.com/method-production-suite/method-budget/releases/latest),
+or build it from source. [docs/INSTALL.md](docs/INSTALL.md) covers building, installing on a
+Mac, the one-time security step for builds that are not notarized, and what signed releases
+need.
 
 ### Build from source
 
@@ -272,15 +301,37 @@ their respective owners. It uses no other vendor's code, templates, help text, i
 data, and reads budgets from other tools only through the open files they export. The
 rules every contribution follows are in [CLEAN-ROOM.md](CLEAN-ROOM.md).
 
-## Contributing
+## Help build it
 
-Bug reports and patches are welcome. Read [CLEAN-ROOM.md](CLEAN-ROOM.md) first: it is
-short, and it is the one hard rule. Please never attach a real budget to an issue; an
-invented one that shows the problem (`method-budget sample` makes a large test budget) is always
-enough. Design choices and their reasons are numbered in
-[docs/decisions.md](docs/decisions.md), what comes next is in
-[docs/ROADMAP.md](docs/ROADMAP.md), and how the project looks and sounds is in
-[docs/BRAND.md](docs/BRAND.md).
+**If you make films.** The most useful help needs no code:
+
+- Import an old budget's export and tell us about any figure that comes out different.
+- Check the fringes and rate setups for your region and union, and tell us what's wrong
+  or missing.
+- Contribute a chart-of-accounts template or an invented sample budget.
+
+Open an [issue](https://github.com/method-production-suite/method-budget/issues), or use
+**Help > Report a Bug…** in the app, which fills in the version for you. Please never attach
+a real budget, schedule or call sheet: an invented one that shows the problem
+(`method-budget sample` makes a large test budget) is always enough.
+
+**If you write code.** Start with an issue labelled
+[good first issue](https://github.com/method-production-suite/method-budget/labels/good%20first%20issue).
+Before you open a pull request, run the checks CI runs:
+
+```bash
+cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
+```
+
+Read [CLEAN-ROOM.md](CLEAN-ROOM.md) first: it is short, and it is the one hard rule.
+Design choices and their reasons are numbered in [docs/decisions.md](docs/decisions.md),
+what comes next is in [docs/ROADMAP.md](docs/ROADMAP.md), and how the project looks and
+sounds is in [docs/BRAND.md](docs/BRAND.md).
+
+## Part of the Method Production Suite
+
+Method Budget is one of the [Method Production Suite](https://methodproduction.com)'s free,
+open-source tools for film and TV production.
 
 ## License
 
