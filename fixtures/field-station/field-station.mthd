@@ -1,0 +1,1748 @@
+{
+  "format": "method-budget",
+  "version": 1,
+  "budget": {
+    "title": "Field Station",
+    "base_currency": "USD",
+    "fringe_posting": {
+      "kind": "budget"
+    },
+    "arithmetic": "exact",
+    "round_account_totals": true,
+    "info": {
+      "Prep start": {
+        "kind": "date",
+        "value": "2027-04-19"
+      },
+      "Shoot end": {
+        "kind": "date",
+        "value": "2027-05-06"
+      },
+      "Shoot start": {
+        "kind": "date",
+        "value": "2027-05-03"
+      },
+      "Wrap end": {
+        "kind": "date",
+        "value": "2027-05-14"
+      }
+    },
+    "units": {
+      "Allow": {
+        "plural": "Allow"
+      },
+      "Day": {
+        "plural": "Days",
+        "hours": "12"
+      },
+      "Flat": {
+        "plural": "Flat"
+      },
+      "Hour": {
+        "plural": "Hours",
+        "hours": "1"
+      },
+      "Month": {
+        "plural": "Months",
+        "hours": "240"
+      },
+      "Week": {
+        "plural": "Weeks",
+        "hours": "60"
+      }
+    },
+    "globals": {
+      "CREW_MEALS": "30",
+      "PREP_WKS": "2",
+      "RIDGE_DAYS": "2",
+      "SHOOT_DAYS": "4",
+      "SHOOT_WKS": "SHOOT_DAYS / 5",
+      "STATION_DAYS": "4",
+      "WRAP_WKS": "1"
+    },
+    "global_info": {
+      "CREW_MEALS": {
+        "description": "People fed each shooting day"
+      },
+      "PREP_WKS": {
+        "description": "Weeks of prep"
+      },
+      "RIDGE_DAYS": {
+        "description": "Shoot days on the fire road"
+      },
+      "SHOOT_DAYS": {
+        "description": "Shooting days, from the schedule"
+      },
+      "SHOOT_WKS": {
+        "description": "Shooting weeks, five-day weeks"
+      },
+      "STATION_DAYS": {
+        "description": "Shoot days at the field station"
+      },
+      "WRAP_WKS": {
+        "description": "Weeks of wrap"
+      }
+    },
+    "fringes": {
+      "CAST_PH": {
+        "kind": "percent",
+        "description": "Performers' pension and health",
+        "rate": "17.5",
+        "cutoff": 22500000
+      },
+      "CREW_HW": {
+        "kind": "flat",
+        "description": "Crew health, per hour worked",
+        "rate": "9.85",
+        "unit": "Hour",
+        "basis": "amount_counts",
+        "max_hours_per_day": "12"
+      },
+      "FICA": {
+        "kind": "percent",
+        "description": "Social security and medicare",
+        "rate": "7.65",
+        "cutoff": 17610000
+      },
+      "SUI": {
+        "kind": "percent",
+        "description": "State unemployment",
+        "rate": "3.4",
+        "cutoff": 700000
+      },
+      "WC": {
+        "kind": "percent",
+        "description": "Workers' compensation",
+        "rate": "2.85"
+      }
+    },
+    "locations": {
+      "Cold Spring field station": {
+        "description": "Interior and exterior, the station and its yard"
+      },
+      "Hollins Ridge fire road": {
+        "description": "Exterior, the ridge road and the radio mast"
+      }
+    },
+    "topsheet": [
+      {
+        "kind": "category",
+        "code": "10",
+        "name": "Story and screenplay",
+        "accounts": [
+          {
+            "code": "10-01",
+            "name": "Rights",
+            "details": [
+              {
+                "id": 1,
+                "description": "Story rights, original screenplay",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "1",
+                "rate": "5000"
+              }
+            ]
+          },
+          {
+            "code": "10-02",
+            "name": "Screenwriter",
+            "details": [
+              {
+                "id": 2,
+                "description": "Screenplay fee",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "1",
+                "rate": "15000",
+                "fringes": [
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "10-03",
+            "name": "Script expenses",
+            "details": [
+              {
+                "id": 3,
+                "description": "Script printing and table read",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "450"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "11",
+        "name": "Producers",
+        "accounts": [
+          {
+            "code": "11-01",
+            "name": "Producers",
+            "details": [
+              {
+                "id": 4,
+                "description": "Producer fee",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "1",
+                "rate": "12000"
+              }
+            ]
+          },
+          {
+            "code": "11-02",
+            "name": "Associate producers",
+            "details": [
+              {
+                "id": 5,
+                "description": "Associate producer",
+                "amount": "PREP_WKS + SHOOT_WKS + WRAP_WKS",
+                "unit": "Week",
+                "x": "1",
+                "rate": "900",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "11-03",
+            "name": "Producers' expenses"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "12",
+        "name": "Director",
+        "accounts": [
+          {
+            "code": "12-01",
+            "name": "Director",
+            "details": [
+              {
+                "id": 6,
+                "description": "Director fee",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "1",
+                "rate": "15000",
+                "fringes": [
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "12-02",
+            "name": "Director's expenses"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "13",
+        "name": "Cast",
+        "accounts": [
+          {
+            "code": "13-01",
+            "name": "Principal cast",
+            "details": [
+              {
+                "id": 7,
+                "description": "DELACROIX",
+                "amount": "4",
+                "unit": "Day",
+                "x": "1",
+                "rate": "2400",
+                "fringes": [
+                  "CAST_PH",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              },
+              {
+                "id": 8,
+                "description": "MARA",
+                "amount": "3",
+                "unit": "Day",
+                "x": "1",
+                "rate": "2400",
+                "fringes": [
+                  "CAST_PH",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              },
+              {
+                "id": 9,
+                "description": "TEO",
+                "amount": "4",
+                "unit": "Day",
+                "x": "1",
+                "rate": "1800",
+                "fringes": [
+                  "CAST_PH",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              },
+              {
+                "id": 10,
+                "description": "Rehearsal day, three leads",
+                "amount": "1",
+                "unit": "Day",
+                "x": "3",
+                "rate": "600",
+                "fringes": [
+                  "CAST_PH",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "13-02",
+            "name": "Supporting cast and day players",
+            "details": [
+              {
+                "id": 11,
+                "description": "IVERSEN, radio voice",
+                "amount": "1",
+                "unit": "Day",
+                "x": "1",
+                "rate": "1100",
+                "fringes": [
+                  "CAST_PH",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              },
+              {
+                "id": 12,
+                "description": "Overtime and adjustments",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "1500",
+                "fringes": [
+                  "CAST_PH",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "13-03",
+            "name": "Casting",
+            "details": [
+              {
+                "id": 13,
+                "description": "Casting director, package",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "1",
+                "rate": "6500"
+              }
+            ]
+          },
+          {
+            "code": "13-04",
+            "name": "Cast expenses",
+            "details": [
+              {
+                "id": 14,
+                "description": "Cast travel and lodging, Cold Spring",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "2400"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total above-the-line"
+      },
+      {
+        "kind": "category",
+        "code": "20",
+        "name": "Production staff",
+        "accounts": [
+          {
+            "code": "20-01",
+            "name": "Line producer",
+            "details": [
+              {
+                "id": 15,
+                "description": "Line producer",
+                "amount": "PREP_WKS + SHOOT_WKS + WRAP_WKS",
+                "unit": "Week",
+                "x": "1",
+                "rate": "1800",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "20-02",
+            "name": "First assistant director",
+            "details": [
+              {
+                "id": 16,
+                "description": "First assistant director",
+                "amount": "1 + SHOOT_WKS",
+                "unit": "Week",
+                "x": "1",
+                "rate": "1900",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "20-03",
+            "name": "Second assistant director",
+            "details": [
+              {
+                "id": 17,
+                "description": "Second assistant director",
+                "amount": "SHOOT_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "350",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "20-04",
+            "name": "Production coordinator",
+            "details": [
+              {
+                "id": 18,
+                "description": "Production coordinator",
+                "amount": "PREP_WKS + SHOOT_WKS",
+                "unit": "Week",
+                "x": "1",
+                "rate": "1100",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "20-05",
+            "name": "Script supervisor",
+            "details": [
+              {
+                "id": 19,
+                "description": "Script supervisor",
+                "amount": "SHOOT_DAYS + 1",
+                "unit": "Day",
+                "x": "1",
+                "rate": "450",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "20-06",
+            "name": "Production assistants",
+            "details": [
+              {
+                "id": 20,
+                "description": "Production assistants",
+                "amount": "SHOOT_DAYS",
+                "unit": "Day",
+                "x": "3",
+                "rate": "200",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "20-07",
+            "name": "Production accountant",
+            "details": [
+              {
+                "id": 21,
+                "description": "Production accountant",
+                "amount": "3",
+                "unit": "Week",
+                "x": "1",
+                "rate": "950",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "21",
+        "name": "Camera",
+        "accounts": [
+          {
+            "code": "21-01",
+            "name": "Director of photography",
+            "details": [
+              {
+                "id": 22,
+                "description": "Director of photography",
+                "amount": "SHOOT_DAYS + 3",
+                "unit": "Day",
+                "x": "1",
+                "rate": "850",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "21-02",
+            "name": "Camera assistants",
+            "details": [
+              {
+                "id": 23,
+                "description": "First assistant camera",
+                "amount": "SHOOT_DAYS + 1",
+                "unit": "Day",
+                "x": "1",
+                "rate": "550",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              },
+              {
+                "id": 24,
+                "description": "Second assistant camera",
+                "amount": "SHOOT_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "450",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "21-03",
+            "name": "Digital imaging technician",
+            "details": [
+              {
+                "id": 25,
+                "description": "Digital imaging technician",
+                "amount": "SHOOT_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "500",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "21-04",
+            "name": "Camera package",
+            "details": [
+              {
+                "id": 26,
+                "description": "Camera package, rental house estimate",
+                "amount": "SHOOT_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "1250"
+              }
+            ]
+          },
+          {
+            "code": "21-05",
+            "name": "Camera supplies",
+            "details": [
+              {
+                "id": 27,
+                "description": "Expendables and batteries",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "600"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "22",
+        "name": "Grip and electric",
+        "accounts": [
+          {
+            "code": "22-01",
+            "name": "Gaffer",
+            "details": [
+              {
+                "id": 28,
+                "description": "Gaffer",
+                "amount": "SHOOT_DAYS + 1",
+                "unit": "Day",
+                "x": "1",
+                "rate": "600",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "22-02",
+            "name": "Key grip",
+            "details": [
+              {
+                "id": 29,
+                "description": "Key grip",
+                "amount": "SHOOT_DAYS + 1",
+                "unit": "Day",
+                "x": "1",
+                "rate": "600",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "22-03",
+            "name": "Grip and electric crew",
+            "details": [
+              {
+                "id": 30,
+                "description": "Grip and electric crew",
+                "amount": "SHOOT_DAYS",
+                "unit": "Day",
+                "x": "3",
+                "rate": "450",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "22-04",
+            "name": "Lighting and grip package",
+            "details": [
+              {
+                "id": 31,
+                "description": "Lighting and grip package",
+                "amount": "SHOOT_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "1400"
+              }
+            ]
+          },
+          {
+            "code": "22-05",
+            "name": "Expendables",
+            "details": [
+              {
+                "id": 32,
+                "description": "Expendables",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "900"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "23",
+        "name": "Production sound",
+        "accounts": [
+          {
+            "code": "23-01",
+            "name": "Sound mixer",
+            "details": [
+              {
+                "id": 33,
+                "description": "Production sound mixer",
+                "amount": "SHOOT_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "650",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "23-02",
+            "name": "Boom operator",
+            "details": [
+              {
+                "id": 34,
+                "description": "Boom operator",
+                "amount": "SHOOT_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "450",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "23-03",
+            "name": "Sound package",
+            "details": [
+              {
+                "id": 35,
+                "description": "Sound package",
+                "amount": "SHOOT_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "350"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "24",
+        "name": "Art department",
+        "accounts": [
+          {
+            "code": "24-01",
+            "name": "Production designer",
+            "details": [
+              {
+                "id": 36,
+                "description": "Production designer",
+                "amount": "PREP_WKS + SHOOT_WKS",
+                "unit": "Week",
+                "x": "1",
+                "rate": "1500",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "24-02",
+            "name": "Art department crew",
+            "details": [
+              {
+                "id": 37,
+                "description": "Art department assistant",
+                "amount": "PREP_WKS + SHOOT_WKS",
+                "unit": "Week",
+                "x": "1",
+                "rate": "900",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "24-03",
+            "name": "Set dressing and props",
+            "details": [
+              {
+                "id": 38,
+                "description": "Station radio set, rental",
+                "amount": "2",
+                "unit": "Day",
+                "x": "1",
+                "rate": "95"
+              },
+              {
+                "id": 39,
+                "description": "Generator, non-working prop",
+                "amount": "2",
+                "unit": "Day",
+                "x": "1",
+                "rate": "60"
+              },
+              {
+                "id": 40,
+                "description": "Mast ladder, rental",
+                "amount": "1",
+                "unit": "Day",
+                "x": "1",
+                "rate": "140"
+              },
+              {
+                "id": 41,
+                "description": "Camp stove",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "1",
+                "rate": "85"
+              },
+              {
+                "id": 42,
+                "description": "Hand radios, pair",
+                "amount": "3",
+                "unit": "Day",
+                "x": "2",
+                "rate": "35"
+              },
+              {
+                "id": 43,
+                "description": "Paper maps, aged, with doubles",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "4",
+                "rate": "30"
+              },
+              {
+                "id": 44,
+                "description": "Field packs",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "2",
+                "rate": "120"
+              },
+              {
+                "id": 45,
+                "description": "Headlamps and torch",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "1",
+                "rate": "140"
+              },
+              {
+                "id": 46,
+                "description": "Tea mugs, notebook and key ring",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "110"
+              }
+            ]
+          },
+          {
+            "code": "24-04",
+            "name": "Construction",
+            "details": [
+              {
+                "id": 47,
+                "description": "Station interior, dress and strike",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "3500"
+              }
+            ]
+          },
+          {
+            "code": "24-05",
+            "name": "Practical effects",
+            "details": [
+              {
+                "id": 48,
+                "description": "Rain, towers and water truck",
+                "amount": "1",
+                "unit": "Day",
+                "x": "1",
+                "rate": "1800"
+              },
+              {
+                "id": 49,
+                "description": "Wind, fans and operator",
+                "amount": "3",
+                "unit": "Day",
+                "x": "1",
+                "rate": "650"
+              },
+              {
+                "id": 50,
+                "description": "Effects technician",
+                "amount": "3",
+                "unit": "Day",
+                "x": "1",
+                "rate": "550",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "25",
+        "name": "Wardrobe makeup and hair",
+        "accounts": [
+          {
+            "code": "25-01",
+            "name": "Costume designer",
+            "details": [
+              {
+                "id": 51,
+                "description": "Costume designer",
+                "amount": "PREP_WKS + SHOOT_WKS",
+                "unit": "Week",
+                "x": "1",
+                "rate": "1200",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "25-02",
+            "name": "Wardrobe assistant",
+            "details": [
+              {
+                "id": 52,
+                "description": "Wardrobe assistant",
+                "amount": "SHOOT_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "300",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "25-03",
+            "name": "Wardrobe purchases and rentals",
+            "details": [
+              {
+                "id": 53,
+                "description": "Weather coats, three, with doubles",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "6",
+                "rate": "180"
+              },
+              {
+                "id": 54,
+                "description": "Weather coats, cleaning on wet days",
+                "amount": "2",
+                "unit": "Day",
+                "x": "1",
+                "rate": "45"
+              },
+              {
+                "id": 55,
+                "description": "Wardrobe rentals and alterations",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "1400"
+              }
+            ]
+          },
+          {
+            "code": "25-04",
+            "name": "Makeup and hair artists",
+            "details": [
+              {
+                "id": 56,
+                "description": "Makeup and hair artist",
+                "amount": "SHOOT_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "450",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "25-05",
+            "name": "Makeup and hair supplies",
+            "details": [
+              {
+                "id": 57,
+                "description": "Makeup and hair supplies",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "500"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "26",
+        "name": "Locations",
+        "accounts": [
+          {
+            "code": "26-01",
+            "name": "Location manager",
+            "details": [
+              {
+                "id": 58,
+                "description": "Location manager",
+                "amount": "PREP_WKS + SHOOT_WKS",
+                "unit": "Week",
+                "x": "1",
+                "rate": "1300",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "26-02",
+            "name": "Site fees",
+            "details": [
+              {
+                "id": 59,
+                "description": "Site fee, Cold Spring field station",
+                "amount": "STATION_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "1500",
+                "location": "Cold Spring field station"
+              },
+              {
+                "id": 60,
+                "description": "Site fee, Hollins Ridge fire road",
+                "amount": "RIDGE_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "400",
+                "location": "Hollins Ridge fire road"
+              }
+            ]
+          },
+          {
+            "code": "26-03",
+            "name": "Permits and insurance certificates",
+            "details": [
+              {
+                "id": 61,
+                "description": "Permits and certificates",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "1200"
+              }
+            ]
+          },
+          {
+            "code": "26-04",
+            "name": "Location expenses",
+            "details": [
+              {
+                "id": 62,
+                "description": "Heaters, tents and toilets",
+                "amount": "SHOOT_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "350",
+                "location": "Cold Spring field station"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "27",
+        "name": "Transportation",
+        "accounts": [
+          {
+            "code": "27-01",
+            "name": "Vehicles",
+            "details": [
+              {
+                "id": 63,
+                "description": "Production vans",
+                "amount": "SHOOT_DAYS + 2",
+                "unit": "Day",
+                "x": "2",
+                "rate": "165"
+              },
+              {
+                "id": 64,
+                "description": "Fire road shuttle, four-wheel drive",
+                "amount": "RIDGE_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "240",
+                "location": "Hollins Ridge fire road"
+              }
+            ]
+          },
+          {
+            "code": "27-02",
+            "name": "Fuel and parking",
+            "details": [
+              {
+                "id": 65,
+                "description": "Fuel and parking",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "900"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "28",
+        "name": "Catering",
+        "accounts": [
+          {
+            "code": "28-01",
+            "name": "Meals",
+            "details": [
+              {
+                "id": 66,
+                "description": "Catering",
+                "amount": "SHOOT_DAYS",
+                "unit": "Day",
+                "x": "CREW_MEALS",
+                "rate": "32"
+              }
+            ]
+          },
+          {
+            "code": "28-02",
+            "name": "Craft service",
+            "details": [
+              {
+                "id": 67,
+                "description": "Craft service",
+                "amount": "SHOOT_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "220"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "29",
+        "name": "Production office",
+        "accounts": [
+          {
+            "code": "29-01",
+            "name": "Office and supplies",
+            "details": [
+              {
+                "id": 68,
+                "description": "Production office and supplies",
+                "amount": "1",
+                "unit": "Month",
+                "x": "1",
+                "rate": "1100"
+              }
+            ]
+          },
+          {
+            "code": "29-02",
+            "name": "Communications",
+            "details": [
+              {
+                "id": 69,
+                "description": "Walkie-talkie rental",
+                "amount": "SHOOT_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "120"
+              }
+            ]
+          },
+          {
+            "code": "29-03",
+            "name": "Shipping"
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "30",
+        "name": "Media and data",
+        "accounts": [
+          {
+            "code": "30-01",
+            "name": "Drives and media",
+            "details": [
+              {
+                "id": 70,
+                "description": "Drives and media",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "1500"
+              }
+            ]
+          },
+          {
+            "code": "30-02",
+            "name": "Backup and storage",
+            "details": [
+              {
+                "id": 71,
+                "description": "Backup storage, six months",
+                "amount": "6",
+                "unit": "Month",
+                "x": "1",
+                "rate": "60"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total production"
+      },
+      {
+        "kind": "category",
+        "code": "40",
+        "name": "Editorial",
+        "accounts": [
+          {
+            "code": "40-01",
+            "name": "Editor",
+            "details": [
+              {
+                "id": 72,
+                "description": "Editor",
+                "amount": "10",
+                "unit": "Week",
+                "x": "1",
+                "rate": "1600",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "40-02",
+            "name": "Assistant editor",
+            "details": [
+              {
+                "id": 73,
+                "description": "Assistant editor",
+                "amount": "6",
+                "unit": "Week",
+                "x": "1",
+                "rate": "900",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              }
+            ]
+          },
+          {
+            "code": "40-03",
+            "name": "Edit system",
+            "details": [
+              {
+                "id": 74,
+                "description": "Edit system",
+                "amount": "3",
+                "unit": "Month",
+                "x": "1",
+                "rate": "450"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "41",
+        "name": "Post sound",
+        "accounts": [
+          {
+            "code": "41-01",
+            "name": "Sound design and editing",
+            "details": [
+              {
+                "id": 75,
+                "description": "Sound design and editing",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "1",
+                "rate": "9000"
+              }
+            ]
+          },
+          {
+            "code": "41-02",
+            "name": "Mix",
+            "details": [
+              {
+                "id": 76,
+                "description": "Mix",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "1",
+                "rate": "6000"
+              }
+            ]
+          },
+          {
+            "code": "41-03",
+            "name": "ADR and foley",
+            "details": [
+              {
+                "id": 77,
+                "description": "ADR and foley",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "2500"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "42",
+        "name": "Music",
+        "accounts": [
+          {
+            "code": "42-01",
+            "name": "Composer",
+            "details": [
+              {
+                "id": 78,
+                "description": "Composer, package",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "1",
+                "rate": "8000"
+              }
+            ]
+          },
+          {
+            "code": "42-02",
+            "name": "Music licensing",
+            "details": [
+              {
+                "id": 79,
+                "description": "Music licensing",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "3000"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "43",
+        "name": "Visual effects and titles",
+        "accounts": [
+          {
+            "code": "43-01",
+            "name": "Visual effects",
+            "details": [
+              {
+                "id": 80,
+                "description": "Visual effects, cleanup and sky",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "4500"
+              }
+            ]
+          },
+          {
+            "code": "43-02",
+            "name": "Titles and graphics",
+            "details": [
+              {
+                "id": 81,
+                "description": "Titles and graphics",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "1",
+                "rate": "1500"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "44",
+        "name": "Color and finishing",
+        "accounts": [
+          {
+            "code": "44-01",
+            "name": "Color grading",
+            "details": [
+              {
+                "id": 82,
+                "description": "Color grading",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "1",
+                "rate": "6500"
+              }
+            ]
+          },
+          {
+            "code": "44-02",
+            "name": "Conform and online",
+            "details": [
+              {
+                "id": 83,
+                "description": "Conform and online",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "1",
+                "rate": "1500"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "45",
+        "name": "Deliverables",
+        "accounts": [
+          {
+            "code": "45-01",
+            "name": "Masters",
+            "details": [
+              {
+                "id": 84,
+                "description": "Masters",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "2000"
+              }
+            ]
+          },
+          {
+            "code": "45-02",
+            "name": "Digital cinema package",
+            "details": [
+              {
+                "id": 85,
+                "description": "Digital cinema package",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "1",
+                "rate": "1200"
+              }
+            ]
+          },
+          {
+            "code": "45-03",
+            "name": "Closed captions and subtitles",
+            "details": [
+              {
+                "id": 86,
+                "description": "Closed captions and subtitles",
+                "amount": "1",
+                "unit": "Flat",
+                "x": "1",
+                "rate": "900"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total post"
+      },
+      {
+        "kind": "category",
+        "code": "50",
+        "name": "Insurance",
+        "accounts": [
+          {
+            "code": "50-01",
+            "name": "Production insurance",
+            "details": [
+              {
+                "id": 87,
+                "description": "Production insurance",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "6500"
+              }
+            ]
+          },
+          {
+            "code": "50-02",
+            "name": "Errors and omissions",
+            "details": [
+              {
+                "id": 88,
+                "description": "Errors and omissions",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "4000"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "51",
+        "name": "Legal and accounting",
+        "accounts": [
+          {
+            "code": "51-01",
+            "name": "Legal",
+            "details": [
+              {
+                "id": 89,
+                "description": "Production legal",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "7500"
+              }
+            ]
+          },
+          {
+            "code": "51-02",
+            "name": "Accounting and payroll fees",
+            "details": [
+              {
+                "id": 90,
+                "description": "Payroll service fees",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "2200"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "52",
+        "name": "Festivals and marketing",
+        "accounts": [
+          {
+            "code": "52-01",
+            "name": "Festival fees",
+            "details": [
+              {
+                "id": 91,
+                "description": "Festival entry fees",
+                "amount": "12",
+                "unit": "Flat",
+                "x": "1",
+                "rate": "75"
+              }
+            ]
+          },
+          {
+            "code": "52-02",
+            "name": "Marketing materials",
+            "details": [
+              {
+                "id": 92,
+                "description": "Poster, trailer and press kit",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "2500"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "category",
+        "code": "53",
+        "name": "General expenses",
+        "accounts": [
+          {
+            "code": "53-01",
+            "name": "Bank fees",
+            "details": [
+              {
+                "id": 93,
+                "description": "Bank fees",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "250"
+              }
+            ]
+          },
+          {
+            "code": "53-02",
+            "name": "Miscellaneous",
+            "details": [
+              {
+                "id": 94,
+                "description": "Miscellaneous",
+                "amount": "1",
+                "unit": "Allow",
+                "x": "1",
+                "rate": "1000"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "production_total",
+        "name": "Total other"
+      }
+    ],
+    "charges": [
+      {
+        "kind": "percent",
+        "name": "Contingency",
+        "percent": "10"
+      }
+    ]
+  }
+}

@@ -28,6 +28,12 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Test
         run: cargo test --workspace --locked
+      - name: The Field Station budget is reproducible
+        # fixtures/field-station/: made again from the schedule file through the
+        # command line and its MCP server, every byte the same.
+        run: |
+          cargo build --locked -p method-cli
+          METHOD=target/debug/method-budget python3 scripts/make-field-station.py --check
       - name: Third-party notices are up to date
         # THIRD-PARTY-NOTICES.md lists the crates the app and the command line ship,
         # from Cargo.lock; regenerate it with `cargo xtask notices` (docs/RELEASING.md).

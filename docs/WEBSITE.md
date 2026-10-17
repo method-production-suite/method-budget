@@ -90,7 +90,8 @@ site's own files, under a policy of its own, and it is built rather than committ
 | `assets/tokens.css` | Brand colors and type, light and dark ([BRAND.md](BRAND.md)) |
 | `assets/site.css` | Layout and components; names no colors of its own |
 | `assets/brand/` | Mark and wordmark SVGs, light and dark (`scripts/make-brand.py`) |
-| `assets/shots/` | Screenshots of the app with invented budgets, WebP with PNG fallbacks (Screenshots, below) |
+| `img/` | The Field Station pictures, light and dark, retaken by `cargo xtask capture-screens` (Screenshots, below) |
+| `assets/shots/` | Earlier screenshots of the app with invented budgets, WebP with PNG fallbacks (Screenshots, below) |
 | `favicon.svg`, `favicon.ico`, `apple-touch-icon.png` | Browser and home-screen icons (`scripts/make-brand.py`) |
 | `og.png`, `og-card.html`, `assets/og-card.css` | The 1200x630 share card and its source; `scripts/make-og.sh` renders it with headless Chrome (a throwaway profile, no window). Re-run after editing the card and commit all three |
 | `try/` | The demo: the app running in the browser (below, "The demo"). Built by `cargo xtask web --demo --out site/try`, ignored by git, never committed |
@@ -104,34 +105,81 @@ landmarks (header, nav, main, footer), a skip link and visible focus outlines.
 
 ### Screenshots
 
-The home page's Screenshots section shows six captures of the real Mac app, below the
-HTML illustration in the hero: topsheet, detail lines with fringes, Explain this number,
-Budget Setup's fringes, Compare, and the cost report. Every budget in them is invented
-(titles, people, figures), never a real one and never another product's screens. The
-README still has a commented placeholder for them.
+The README and the home page's Screenshots section open with four pictures of Field
+Station, the invented production every app in the suite shows (SUITE-STANDARDS.md,
+section 7), in the suite's order:
 
-To make them again:
+| Name | What it shows |
+|---|---|
+| `hero` | The topsheet, with the tools panel on the Cast category's fringes and the budget's locations |
+| `explain` | Explain this number on one cast line's fringes, one of them stopping at its cutoff |
+| `import` | File > Import Spreadsheet reviewing the camera department's sheet, every line checked against its total |
+| `file` | The file you own: the window beside a terminal with the real output of `method-budget totals field-station.mthd` |
+
+Each is taken light and dark and written twice: `assets/screens/<name>-light.png` and
+`-dark.png` for the README, and the same files in `site/img/` for the site (the website
+publishes `site/` alone, and a page never references a file outside it). Both use
+`<picture>` with a `<source media="(prefers-color-scheme: dark)">` and descriptive alt text.
+Every name and figure in them is invented.
+
+They retake themselves, as a release step (RELEASING.md):
+
+```bash
+cargo xtask capture-screens                                  # retake all eight
+cargo xtask review-screens --out target/screens/review.html  # old beside new
+```
+
+`capture-screens` (crates/xtask/src/screens.rs) builds the browser build into
+`target/screens/web` (as `cargo xtask web` does) and the command line, runs the command
+line's totals on the budget for the terminal picture, then runs
+`scripts/capture-screens.mjs`. That serves the build on 127.0.0.1, opens the budget in
+headless Chrome (over the DevTools pipe, `scripts/chrome-pipe.mjs`, no npm) in a 1280 by
+772 page at 2x under a drawn 28-pixel title bar (a 1280 by 800 window), steps into each
+state as a person would (clicks on the grid, the menu commands the menu bar sends), waits
+for the page to reach it, and fails naming the step if it doesn't. A second pass draws the
+Mac window around each capture (rounded corners, shadow, traffic lights, the title Method
+Budget) on a transparent background. A picture is copied only when its bytes differ, so a
+run that changes nothing changes no file; `review-screens` writes one self-contained page
+with each changed picture old beside new and lists them. It needs what `cargo xtask web`
+needs, Node 18 or later and Chrome (`CHROME=<path>` for another); it runs on a Mac and is
+not run in CI.
+
+**Capture mode is in the driver only.** Nothing of it ships in the desktop app or changes
+the demo at `/try/`: before the page's own scripts run, the driver wraps the browser
+build's `invoke` so that `host_info` answers as the desktop does (the page then lays itself
+out as the Mac app: no File button, no browser-only notes), the few desktop-only commands
+the page asks at start-up get the desktop's "nothing to show" answers, and Import
+Spreadsheet is handed the invented sheet instead of a file picker. Any other command the
+browser build can't answer fails the capture, naming it. Preferences a person would have
+saved (the tools panel's width, its tabs in one pane for the Explain picture) are set in the
+page's storage before it opens.
+
+**Same pixels every run.** The driver hides what changes on its own (the text cursor's
+blink, animations and transitions, scrollbars), rests the pointer on the footer, starts
+each picture from a fresh page with fresh storage, and takes a capture only once two in a
+row are the same. Fonts are the Mac's own. Two runs on one Mac give identical files. Honest
+limits: it is Chrome drawing the page, not the Mac's own web view, and the frame is drawn,
+not captured.
+
+The budget is `fixtures/field-station/field-station.mthd`, made by
+`python3 scripts/make-field-station.py` from Method Schedule's schedule days file for the
+same production (fixtures/field-station/README.md); the sheet is `camera-department.csv`
+beside it.
+
+The six earlier screenshots in the gallery (`site/assets/shots/`: topsheet, detail lines
+with fringes, Explain this number, Budget Setup's fringes, Compare, and the cost report)
+follow the Field Station set. They are captures of the real Mac app with the invented
+budgets from `scripts/make-showcase-budgets.py`, taken by hand:
 
 1. `cargo build --release -p method-cli`, then `python3 scripts/make-showcase-budgets.py`
-   writes the invented budgets into `target/showcase/` (`--force` to replace them): an
-   independent feature in two drafts (draft 3 keeps draft 2 as a version and carries
-   invented actuals), one episode of a one-hour series, and a 30-second commercial. They
-   are built from bundled charts of accounts through `method-budget mcp`, the same tools a coding
-   agent uses.
-2. Build the app (`cd crates/method-app && cargo tauri build --bundles app`), copy the
-   budgets somewhere disposable, open them in it, set the window to 1440x900 points and
-   capture each window at 2x without its shadow (`screencapture -x -o -l <window id>
-   <name>.png`). Budget Setup is captured as its own window at 1160x460. The file names
-   are the gallery's: `topsheet`, `detail`, `explain`, `setup`, `compare`, `cost-report`.
+   writes the invented budgets into `target/showcase/` (`--force` to replace them).
+2. Build the app (`cd crates/method-app && cargo tauri build --bundles app`), open the
+   budgets in it, set the window to 1440x900 points and capture each window at 2x without
+   its shadow (`screencapture -x -o -l <window id> <name>.png`). Budget Setup is captured
+   as its own window at 1160x460.
 3. `scripts/make-screenshots.sh <folder of captures>` writes `site/assets/shots/<name>.webp`
    and a 256-color `<name>.png` fallback at half the capture's size (needs `cwebp` and
-   `ffmpeg`). The twelve files come to about 1.2 MB; a visitor's browser loads only the
-   WebP ones (about 400 KB), and only as they scroll near them (`loading="lazy"`).
-
-The screenshots are light only: the app follows the system's light or dark setting, so a
-dark set means capturing with the Mac in dark mode. If one is made, add it as
-`<name>-dark.webp` and a `<source media="(prefers-color-scheme: dark)">` in each
-`<picture>`.
+   `ffmpeg`).
 
 Links inside the pages are relative (except 404.html), so the site works at
 `https://methodbudget.com/`, in a local preview, and under the suite website's

@@ -138,13 +138,16 @@ a.fn { text-decoration: none; margin-left: 1px; vertical-align: super; font-size
 .band.alt { background: var(--surface); }
 .kicker { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
 .intro { color: var(--ink-soft); font-size: 18px; max-width: 40em; margin: 0 0 32px; }
-/* Screenshots: real captures of the app (site/assets/shots/, scripts/make-screenshots.sh),
+/* Screenshots: Field Station (site/img/, cargo xtask capture-screens) and captures of the app (site/assets/shots/),
    one column on phones and two from tablet width. Each opens full size on click. */
 .gallery { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; align-items: start; }
 @media (min-width: 760px) { .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px 28px; } }
 .snap { margin: 0; min-width: 0; }
 .snap a { display: block; border: 1px solid var(--rule-strong); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); background: var(--surface); }
 .snap img { width: 100%; height: auto; }
+/* Field Station pictures (site/img/, cargo xtask capture-screens) carry their own window
+   frame and shadow on a transparent background. */
+.snap.framed a { border: 0; border-radius: 0; box-shadow: none; background: none; }
 .snap figcaption { margin-top: 12px; font-size: 15px; color: var(--ink-soft); }
 .snap figcaption strong { color: var(--ink); }
 

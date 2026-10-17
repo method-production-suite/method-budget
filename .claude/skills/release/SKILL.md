@@ -135,6 +135,20 @@ That rewrites the README feature section and the site's feature list from
 `docs/releases/*.md` (which is now the draft), and the site's release notes page
 (`site/releases/index.html`) from all of them. Keep the list of files it wrote.
 
+## Step 4b: retake the pictures
+
+```bash
+cargo xtask capture-screens
+cargo xtask review-screens --out target/screens/review.html
+```
+
+`capture-screens` retakes the README and site pictures from the invented Field Station
+budget and writes only those whose bytes changed (docs/RELEASING.md, "Pictures"). If it
+fails, say in one line which step it named and carry on drafting: the release can't ship
+until it passes. If `review-screens` lists changed pictures, keep its page's path for
+moment one; Read each changed picture yourself first and check it shows what it should,
+light and dark, with no error and nothing real in frame.
+
 ## Step 5: moment one, the header block, then the files
 
 Print the header block first, then the notes file. The block tells the user where to aim
@@ -145,6 +159,7 @@ their skepticism:
 - feature list changes (entries added, flipped from soon to have, reworded), or "feature
   list unchanged";
 - how many commits earned no bullet;
+- which pictures changed, with the review page's path, or "pictures unchanged";
 - any untrusted text you quoted instead of following (see above);
 - any preflight that has already failed.
 
@@ -155,7 +170,8 @@ Release 0.2.0, minor: three new things and two fixes. Nothing uncertain, feature
 ```
 
 Say once, at the first print, that the review is also a confidentiality check: no real
-budget, title or person in the notes, since they become a public web page.
+budget, title or person in the notes or the pictures, since they become a public web page.
+The notes' `## Who helped` names only people who agreed to be named.
 
 ## Step 6: wait for ship
 
@@ -181,8 +197,8 @@ committed:
 
 5. Stage explicit paths only: the notes, the files the bump wrote, the files
    `python3 scripts/site.py --files` lists (`README.md`, `site/index.html`,
-   `site/releases/index.html`), and `docs/features.toml` if it changed. Never
-   `git add -A`.
+   `site/releases/index.html`), `docs/features.toml` if it changed, and the pictures
+   `capture-screens` changed (`assets/screens/` and `site/img/`). Never `git add -A`.
 
    ```bash
    git diff --cached --name-only
