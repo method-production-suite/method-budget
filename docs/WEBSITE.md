@@ -13,7 +13,7 @@ docs/releases/*.md ─┘   (--check in CI)     └─> site/releases/index.html
                                                      │
 crates/method-app/ui + method-web ── cargo xtask web --demo ──> site/try/  (built, never committed)
                                                      │
-                                  .github/workflows/pages.yml (off until PAGES_ENABLED)
+                          site/ on main, copied by the suite website (method-production-suite/website)
                                                      │
                                                methodbudget.com
 ```
@@ -70,7 +70,8 @@ Exit codes: 0 done or up to date, 1 out of date (`--check`), 2 the input is wron
 message names the entry and the problem; nothing was written).
 
 CI runs `python3 scripts/site.py --check` in the `site` job of `.github/workflows/ci.yml`,
-and the Pages workflow runs it again before deploying.
+so main never carries a site that is out of date (the suite website copies it from main;
+below, "Publishing").
 
 ## The site: site/
 
@@ -85,7 +86,7 @@ site's own files, under a policy of its own, and it is built rather than committ
 |---|---|
 | `index.html` | The home page: hero with the wordmark, an illustration of the app window drawn in HTML, Screenshots, What's new, Features, Why open files, Keyboard first, Command line and coding agents, Download, FAQ |
 | `releases/index.html` | Every release note (generated block inside a hand-written page) |
-| `404.html` | Served by GitHub Pages for any address with no page. Its links start at the site root, so it is right on methodbudget.com (at the `github.io/method-budget/` preview address its styles do not load) |
+| `404.html` | Served for any address with no page. Its links start at the site root, so it is right on methodbudget.com (in a local preview served from a subfolder its styles do not load) |
 | `assets/tokens.css` | Brand colors and type, light and dark ([BRAND.md](BRAND.md)) |
 | `assets/site.css` | Layout and components; names no colors of its own |
 | `assets/brand/` | Mark and wordmark SVGs, light and dark (`scripts/make-brand.py`) |
@@ -94,7 +95,6 @@ site's own files, under a policy of its own, and it is built rather than committ
 | `og.png`, `og-card.html`, `assets/og-card.css` | The 1200x630 share card and its source; `scripts/make-og.sh` renders it with headless Chrome (a throwaway profile, no window). Re-run after editing the card and commit all three |
 | `try/` | The demo: the app running in the browser (below, "The demo"). Built by `cargo xtask web --demo --out site/try`, ignored by git, never committed |
 | `robots.txt`, `sitemap.xml` | Crawlers: everything allowed; the sitemap lists `/`, `/releases/` and `/try/`. Add a line to the sitemap when a page is added |
-| `CNAME` | `methodbudget.com`. A deploy from GitHub Actions ignores this file (the custom domain is set in Settings, below); it stays as documentation and for any other host |
 
 Colors are tokens with a `prefers-color-scheme: dark` override, so the site follows the
 visitor's system setting; every text pairing meets WCAG AA in both schemes (the table is
@@ -133,10 +133,9 @@ dark set means capturing with the Mac in dark mode. If one is made, add it as
 `<name>-dark.webp` and a `<source media="(prefers-color-scheme: dark)">` in each
 `<picture>`.
 
-Links inside the pages are relative (except 404.html), so the site works both at
-`https://ssandweiss.github.io/method-budget/` (Pages' default address for this
-repository) and at `https://methodbudget.com/`. The canonical and share-card URLs name
-methodbudget.com.
+Links inside the pages are relative (except 404.html), so the site works at
+`https://methodbudget.com/`, in a local preview, and under the suite website's
+`/<slug>/` local build. The canonical and share-card URLs name methodbudget.com.
 
 To look at it locally:
 
@@ -183,72 +182,28 @@ named. `site/try/` is in `.gitignore`: the built module, wasm-bindgen's JS and t
 of the page never enter git. The demo needs the WebAssembly target and the wasm-bindgen
 command line of Cargo.lock's version (docs/research/web-session.md, "Building").
 
-## Publishing: .github/workflows/pages.yml
+## Publishing: the suite website
 
-The workflow deploys `site/` to GitHub Pages on a push to main that touches `site/`, or the
-app the demo is built from (`crates/`, `templates/charts/`, `Cargo.lock`, `Cargo.toml`,
-`scripts/web-smoke.mjs`), or by hand from the Actions tab. Before uploading it builds the
-demo into `site/try/` (`rustup target add wasm32-unknown-unknown`, the wasm-bindgen
-command line of Cargo.lock's version, cached with `actions/cache`, then `cargo xtask web
---demo --out site/try`) and opens it with `node scripts/web-smoke.mjs site/try` in the
-runner's headless Chrome; a demo that doesn't draw its topsheet, update a total after an
-edit or load a chart stops the deploy. It is **off** until the repository is public: GitHub Pages on a
-private repository needs a paid plan, so the deploy job only runs when the repository
-variable `PAGES_ENABLED` is `true`, and skips cleanly otherwise. It uses only first-party
-actions pinned to commit SHAs; only the deploy job gets `pages: write` and `id-token:
-write`.
+methodbudget.com is served by the suite website, the repository
+`method-production-suite/website` (Cloudflare Pages project `method-website`), which
+serves every Method app's site on its own domain. That repository copies this one's
+`site/` from `main` (its `tools/sync.py` reads the pushed `origin/main`, never a local
+working tree), adds the suite bar and band, and publishes. So:
 
-Turning it on, once the repository is public (all by hand, in GitHub and at the domain
-registrar). The order matters: GitHub asks for the custom domain to be added to Pages
-**before** the DNS records point at it, so nobody else can claim the domain in between,
-and recommends verifying the domain first. Checked against GitHub's Pages documentation
-in October 2026.
+- What is on `main` in `site/` is what goes live at the website's next sync. Keep it
+  correct there: CI's `site` job runs `python3 scripts/site.py --check` and
+  `python3 scripts/make-brand.py --check` on every push.
+- The custom domain, its DNS and HTTPS are set on the Cloudflare Pages project, not
+  here. There is no `CNAME` file and no Pages workflow in this repository (GitHub Pages
+  was retired in October 2026).
+- Only committed files are copied. The demo at `/try/` is built, not committed
+  (`site/try/` is in `.gitignore`), so it goes live only if the suite website builds it
+  with `cargo xtask web --demo`; CI still builds the page with `cargo xtask web` and
+  smoke-tests it in headless Chrome on every push (`ci.yml`, "The page in a browser").
 
-1. **Verify the domain** (prevents takeovers). Profile picture > **Settings** >
-   **Pages** (under "Code, planning, and automation") > **Add a domain** > enter
-   `methodbudget.com` > **Add domain**. Add the TXT record GitHub shows at the registrar
-   (named `_github-pages-challenge-<owner>.methodbudget.com`), wait for it to appear
-   (`dig _github-pages-challenge-<owner>.methodbudget.com +nostats +nocomments +nocmd TXT`),
-   then **Verify**. Keep the TXT record afterwards; removing it un-verifies the domain.
-   For an organization, the same lives under the organization's **Settings** > **Pages**.
-2. **Repository Settings > Pages > Build and deployment > Source: GitHub Actions.**
-3. **Repository Settings > Secrets and variables > Actions > Variables:** add
-   `PAGES_ENABLED` with the value `true`.
-4. Run the `pages` workflow (Actions > pages > Run workflow). The site appears at
-   `https://ssandweiss.github.io/method-budget/`.
-5. **Repository Settings > Pages > Custom domain:** `methodbudget.com`, **Save**. With
-   the Actions source no CNAME file is committed or needed.
-6. **DNS at the registrar**, for the apex domain and www:
-
-   | Name | Type | Value |
-   |---|---|---|
-   | `@` | A | `185.199.108.153` |
-   | `@` | A | `185.199.109.153` |
-   | `@` | A | `185.199.110.153` |
-   | `@` | A | `185.199.111.153` |
-   | `@` | AAAA | `2606:50c0:8000::153` |
-   | `@` | AAAA | `2606:50c0:8001::153` |
-   | `@` | AAAA | `2606:50c0:8002::153` |
-   | `@` | AAAA | `2606:50c0:8003::153` |
-   | `www` | CNAME | `ssandweiss.github.io` |
-
-   The CNAME target is the Pages host of the account that owns the repository
-   (`<owner>.github.io`, without the repository name). If the repository moves to an
-   organization, it becomes `<org>.github.io`. Remove any other A, AAAA or ALIAS records
-   on `@` first (a registrar's parking page, for example), and never add a wildcard
-   record (`*.methodbudget.com`): GitHub warns it invites takeovers even on a verified
-   domain. If the domain has CAA records, one must allow `letsencrypt.org`, which issues
-   the Pages certificate. With both the apex and `www` set up, GitHub redirects
-   `www.methodbudget.com` to `methodbudget.com` on its own.
-7. Check the records (`dig methodbudget.com +noall +answer -t A`, the same with
-   `-t AAAA`, and `dig www.methodbudget.com +nostats +nocomments +nocmd`). DNS changes can
-   take up to a day to spread.
-8. **Enforce HTTPS** on the Pages settings page once GitHub has issued the certificate
-   (the box is greyed out until then, up to a day). If it stays stuck, **Remove** the
-   custom domain and **Save** it again to restart the certificate.
-
-Nothing here has been turned on. Until step 3, a push that changes `site/` runs the
-workflow, which skips the job and succeeds.
+To change the site: edit `site/` here (or the feature file and release notes, then
+`python3 scripts/site.py`), push to `main`, then sync and publish from the website
+repository (its README has the commands).
 
 ## The skills: .claude/skills/
 

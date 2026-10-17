@@ -30,7 +30,8 @@ Exit codes: 0 done (or up to date), 1 a block is out of date (--check only),
 2 the feature file, a release note or a marker is wrong; nothing was written.
 
 Python 3.11 or later (tomllib), standard library only. How the pieces fit together:
-docs/WEBSITE.md.
+docs/WEBSITE.md. This repository does not deploy the site: the suite website
+(method-production-suite/website) publishes site/ from main.
 """
 
 from __future__ import annotations

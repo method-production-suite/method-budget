@@ -69,6 +69,23 @@ headline nor a bullet), a title that doesn't end with the version, an em dash, a
 `{{placeholder}}`, or a file over 60,000 characters. The release workflow runs the same
 check before it builds anything, so a tag without ready notes builds nothing.
 
+## Third-party notices
+
+`THIRD-PARTY-NOTICES.md` lists the third-party crates the app and the command line ship,
+with each one's licence and the licence and notice files it comes with. It is generated
+from Cargo.lock, so regenerate it whenever dependencies change, and commit it with the
+change:
+
+```bash
+cargo xtask notices                         # rewrite THIRD-PARTY-NOTICES.md
+cargo xtask notices --check                 # change nothing; fail if it is out of date (CI, every push)
+```
+
+It reads `cargo metadata --locked` for macOS, Windows and Linux and needs the crates
+downloaded (`cargo fetch`; no network after that). Non-Rust material that ships in the app
+(scripts, styles, fonts or images that are not the project's own) is listed by hand in
+`OTHER` in `crates/xtask/src/notices.rs`; there is none today.
+
 ## Cutting a release
 
 From an up-to-date `main` with a clean tree (`0.2.0` stands for the new version):
@@ -246,4 +263,7 @@ at the same release (`releases/download/v<version>/...`), worked out from the en
   endpoint's host over https (plus GitHub's two download hosts when the endpoint is on
   github.com), so the archives must be served from that same host.
 
-The website is separate: [WEBSITE.md](WEBSITE.md).
+The website is separate: [WEBSITE.md](WEBSITE.md). The suite website
+(`method-production-suite/website`) publishes `site/` from `main`, so a release's "What's
+new" box goes live when that repository next syncs and publishes, not when the tag is
+pushed.
