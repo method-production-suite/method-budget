@@ -189,24 +189,24 @@ them from a terminal signed in to GitHub (`gh auth login`); each command asks fo
 or reads it from standard input:
 
 ```bash
-gh secret set DEVELOPER_ID_CERT_P12_BASE64 -R ssandweiss/method-budget
-gh secret set CERT_PASSWORD -R ssandweiss/method-budget
-gh secret set KEYCHAIN_PASSWORD -R ssandweiss/method-budget
-gh secret set AC_API_KEY_ID -R ssandweiss/method-budget
-gh secret set AC_API_ISSUER_ID -R ssandweiss/method-budget
-gh secret set AC_API_KEY_P8_BASE64 -R ssandweiss/method-budget
-gh secret set TAURI_SIGNING_PRIVATE_KEY -R ssandweiss/method-budget
-gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD -R ssandweiss/method-budget
+gh secret set DEVELOPER_ID_CERT_P12_BASE64 -R method-production-suite/method-budget
+gh secret set CERT_PASSWORD -R method-production-suite/method-budget
+gh secret set KEYCHAIN_PASSWORD -R method-production-suite/method-budget
+gh secret set AC_API_KEY_ID -R method-production-suite/method-budget
+gh secret set AC_API_ISSUER_ID -R method-production-suite/method-budget
+gh secret set AC_API_KEY_P8_BASE64 -R method-production-suite/method-budget
+gh secret set TAURI_SIGNING_PRIVATE_KEY -R method-production-suite/method-budget
+gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD -R method-production-suite/method-budget
 ```
 
 | Secret | Value | Turns on |
 |---|---|---|
-| `DEVELOPER_ID_CERT_P12_BASE64` | the Developer ID Application certificate with its private key, exported from Keychain Access as a `.p12`, base64-encoded: `base64 -i DeveloperID.p12 \| gh secret set DEVELOPER_ID_CERT_P12_BASE64 -R ssandweiss/method-budget` | signing the Mac app and disk image (with the next two) |
+| `DEVELOPER_ID_CERT_P12_BASE64` | the Developer ID Application certificate with its private key, exported from Keychain Access as a `.p12`, base64-encoded: `base64 -i DeveloperID.p12 \| gh secret set DEVELOPER_ID_CERT_P12_BASE64 -R method-production-suite/method-budget` | signing the Mac app and disk image (with the next two) |
 | `CERT_PASSWORD` | the password the `.p12` was exported with | |
-| `KEYCHAIN_PASSWORD` | any long random string (it only locks the throwaway keychain on the build machine): `openssl rand -base64 32 \| gh secret set KEYCHAIN_PASSWORD -R ssandweiss/method-budget` | |
+| `KEYCHAIN_PASSWORD` | any long random string (it only locks the throwaway keychain on the build machine): `openssl rand -base64 32 \| gh secret set KEYCHAIN_PASSWORD -R method-production-suite/method-budget` | |
 | `AC_API_KEY_ID` | the App Store Connect API key's ID (App Store Connect > Users and Access > Integrations > Team Keys; role Developer) | notarizing and stapling (with the next two, and signing) |
 | `AC_API_ISSUER_ID` | that page's Issuer ID | |
-| `AC_API_KEY_P8_BASE64` | the key's `.p8` file (downloadable once), base64-encoded: `base64 -i AuthKey_<ID>.p8 \| gh secret set AC_API_KEY_P8_BASE64 -R ssandweiss/method-budget` | |
+| `AC_API_KEY_P8_BASE64` | the key's `.p8` file (downloadable once), base64-encoded: `base64 -i AuthKey_<ID>.p8 \| gh secret set AC_API_KEY_P8_BASE64 -R method-production-suite/method-budget` | |
 | `TAURI_SIGNING_PRIVATE_KEY` | the updater private key: the whole content of the key file (below) | the updater archive and `latest.json` (when the app trusts a real key) |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | that key's password | |
 
@@ -237,8 +237,8 @@ public key to the same name with `.pub`. Then:
 1. Store both files' contents and the password in the team 1Password vault, in one item
    (for example `Method Budget - Updater signing key - GitHub Actions`).
 2. Set the two secrets from it:
-   `gh secret set TAURI_SIGNING_PRIVATE_KEY -R ssandweiss/method-budget < "$HOME/.tauri/method-budget-updater.key"`
-   and `gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD -R ssandweiss/method-budget`.
+   `gh secret set TAURI_SIGNING_PRIVATE_KEY -R method-production-suite/method-budget < "$HOME/.tauri/method-budget-updater.key"`
+   and `gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD -R method-production-suite/method-budget`.
 3. Put the public key (the `.pub` file's single line) into `crates/method-app/tauri.conf.json`
    as `plugins.updater.pubkey`, in place of the placeholder. `cargo xtask updater-key
    --require` should print `trusted <KEY ID>`. Commit that change.
@@ -266,7 +266,7 @@ Updates are served from GitHub Releases. The endpoint is written in one place,
 `plugins.updater.endpoints` in `crates/method-app/tauri.conf.json`:
 
 ```
-https://github.com/ssandweiss/method-budget/releases/latest/download/latest.json
+https://github.com/method-production-suite/method-budget/releases/latest/download/latest.json
 ```
 
 `releases/latest` is the newest published release that isn't a draft or a prerelease, so
