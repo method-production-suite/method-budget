@@ -510,3 +510,53 @@ fn older_revisions_get_text_only_results() {
     assert!(r["result"].get("structuredContent").is_none());
     assert_eq!(r["result"]["content"].as_array().unwrap().len(), 2);
 }
+
+/// The shape of `tools/list` and `server/discover` in each era: revision
+/// 2026-07-28 requires `resultType` and the caching hints `ttlMs` (an integer,
+/// at least 0) and `cacheScope` ("public" or "private") on the result itself,
+/// not on each tool; the older revisions have none of them.
+#[test]
+fn cacheable_results_carry_caching_hints() {
+    let dir = std::env::temp_dir().join(format!("method-mcp-cache-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let config = |read_only| Config {
+        roots: vec![dir.clone()],
+        read_only,
+    };
+    let meta = json!({"io.modelcontextprotocol/protocolVersion": MODERN, "io.modelcontextprotocol/clientCapabilities": {}});
+    for read_only in [false, true] {
+        let mut s = Server::new(&config(read_only)).unwrap();
+        for (id, method) in ["server/discover", "tools/list"].iter().enumerate() {
+            let r = s
+                .handle(json!({"jsonrpc": "2.0", "id": id, "method": method, "params": {"_meta": meta}}))
+                .unwrap();
+            let res = r["result"].as_object().unwrap();
+            assert_eq!(res["resultType"], "complete", "{method}");
+            assert_eq!(res["ttlMs"], json!(3_600_000), "{method}");
+            assert!(
+                res["ttlMs"].is_u64(),
+                "{method}: ttlMs must be a non-negative integer"
+            );
+            assert_eq!(res["cacheScope"], "public", "{method}");
+            if *method == "tools/list" {
+                for tool in res["tools"].as_array().unwrap() {
+                    assert!(tool.get("ttlMs").is_none() && tool.get("cacheScope").is_none());
+                }
+            }
+        }
+        // Calls aren't cacheable: no hints.
+        let r = s
+            .handle(json!({"jsonrpc": "2.0", "id": 9, "method": "ping", "params": {"_meta": meta}}))
+            .unwrap();
+        assert!(r["result"].get("ttlMs").is_none());
+    }
+    // The legacy handshake's revisions know nothing of them.
+    let mut s = Server::new(&config(false)).unwrap();
+    s.handle(json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-11-25", "capabilities": {}}}))
+        .unwrap();
+    let r = s
+        .handle(json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}))
+        .unwrap();
+    assert!(r["result"].get("ttlMs").is_none() && r["result"].get("cacheScope").is_none());
+    let _ = std::fs::remove_dir_all(&dir);
+}
