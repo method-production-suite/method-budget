@@ -17,7 +17,7 @@ The version lives in one place: `version` under `[workspace.package]` in the roo
 
 | Where | What it is for |
 |---|---|
-| every crate's `Cargo.toml` (`version.workspace = true`) | `method --version`, the app's own `CARGO_PKG_VERSION` |
+| every crate's `Cargo.toml` (`version.workspace = true`) | `method-budget --version`, the app's own `CARGO_PKG_VERSION` |
 | `Cargo.lock` (the workspace's own crates) | CI builds with `--locked` |
 | `crates/method-app/tauri.conf.json` (`version`) | the bundles' version, the About box, and what the updater compares |
 | `docs/releases/<version>.md` | the release notes: What's New in the app, the GitHub release, the website |

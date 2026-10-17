@@ -5,7 +5,7 @@
 //! `pub const USAGE: &str` (its lines of the help text) and
 //! `pub fn run(args: &[String]) -> Outcome`, where `args` are the words after
 //! the subcommand's name. What `run` returns in `Ok` is printed to stdout as
-//! is; an `Err` prints `method: <message>` to stderr and exits with its code.
+//! is; an `Err` prints `method-budget: <message>` to stderr and exits with its code.
 
 use std::fmt;
 use std::path::Path;
@@ -25,7 +25,7 @@ pub mod exit {
     /// The command line itself is wrong: unknown command or flag, missing
     /// argument.
     pub const USAGE: u8 = 2;
-    /// An edit (`method set`, `method apply`) was refused: a bad script line, a name
+    /// An edit (`method-budget set`, `method-budget apply`) was refused: a bad script line, a name
     /// that doesn't exist, or a result that doesn't recalculate. Nothing was
     /// written.
     pub const REJECTED: u8 = 3;
@@ -92,7 +92,7 @@ impl fmt::Display for CliError {
 /// one to ask for. A value follows as the next word or after `=`
 /// (`--out=x`). `--` ends the flags. A word that looks like a negative number
 /// (`-5`, `-0.25`) is a positional argument, not a flag, so values such as
-/// `method set f.mthd global X -5` need no quoting.
+/// `method-budget set f.mthd global X -5` need no quoting.
 #[derive(Clone, Debug, Default)]
 pub struct Flags {
     positional: Vec<String>,

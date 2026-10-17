@@ -1,4 +1,4 @@
-//! `method show`: print the topsheet.
+//! `method-budget show`: print the topsheet.
 
 use std::fmt::Write as _;
 
@@ -6,7 +6,7 @@ use method_core::{recalc, Budget, Cents, Report, TopsheetLine};
 
 use crate::cli::{excluding, load, money, CliError, Flags, Outcome};
 
-pub const USAGE: &str = "  method show <file.mthd> [--exclude GROUP]...
+pub const USAGE: &str = "  method-budget show <file.mthd> [--exclude GROUP]...
       Print the topsheet. --exclude leaves a group's lines out (repeatable).
 ";
 

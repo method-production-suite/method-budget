@@ -1,5 +1,5 @@
 //! The budget exchange JSON reader (import/exchange/json.rs), then the
-//! budget built from it and the reconciliation, as `method import` does.
+//! budget built from it and the reconciliation, as `method-budget import` does.
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;

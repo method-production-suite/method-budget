@@ -1,4 +1,4 @@
-//! `method import-export`: a whole budget from another budgeting program's
+//! `method-budget import-export`: a whole budget from another budgeting program's
 //! open export (budget exchange JSON or XML, its Excel or tab-delimited
 //! export), checked against the export's own figures (roadmap 1.16).
 
@@ -13,7 +13,7 @@ use method_format::serde_json::{json, Value};
 use crate::cli::{save, CliError, Flags, Outcome};
 
 pub const USAGE: &str =
-    "  method import-export <export-file> [-o <out.mthd>] [--format F] [--title TEXT]
+    "  method-budget import-export <export-file> [-o <out.mthd>] [--format F] [--title TEXT]
                 [--report] [--json] [--force]
       Make a budget from another program's budget export (budget exchange
       JSON or XML, or its Excel or tab-delimited export; --format json, xml,

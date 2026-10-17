@@ -1,5 +1,5 @@
-//! `method merge`: three-way merge of budgets (`method_core::merge`;
-//! docs/MERGE.md). `method merge-driver` (src/cmd/merge_driver.rs) is the same
+//! `method-budget merge`: three-way merge of budgets (`method_core::merge`;
+//! docs/MERGE.md). `method-budget merge-driver` (src/cmd/merge_driver.rs) is the same
 //! merge for git.
 
 use std::fmt::Write as _;
@@ -10,7 +10,7 @@ use method_core::merge::{merge_with, Merged, Side};
 use crate::cli::{exit, load, not_the_input, save, CliError, Flags, Outcome};
 
 pub const USAGE: &str =
-    "  method merge <base.mthd> <ours.mthd> <theirs.mthd> -o <out.mthd> [--ours|--theirs]
+    "  method-budget merge <base.mthd> <ours.mthd> <theirs.mthd> -o <out.mthd> [--ours|--theirs]
       Three-way merge: both budgets' changes since their common base.
       Changes to different rows, fields and setup items merge on their own;
       the same field changed both ways, or something deleted on one side and

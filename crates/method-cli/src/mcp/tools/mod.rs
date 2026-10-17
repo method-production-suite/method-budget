@@ -337,7 +337,7 @@ pub fn exclude_prop() -> (&'static str, Value) {
     (
         "exclude_groups",
         super::schema::array(
-            "Leave out lines tagged with any of these groups (as method totals --exclude does).",
+            "Leave out lines tagged with any of these groups (as method-budget totals --exclude does).",
             super::schema::name("A group name."),
             100,
         ),

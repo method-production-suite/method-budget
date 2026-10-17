@@ -5,7 +5,7 @@
 Please report security problems privately, through GitHub's private vulnerability
 reporting on this repository (the **Security** tab, **Report a vulnerability**), not in a
 public issue. Say what you found, how to reproduce it, and which version (Help > About, or
-`method --version`). Fixes ship in the next release; the latest release is the supported
+`method-budget --version`). Fixes ship in the next release; the latest release is the supported
 one.
 
 ## What the app does with your data and the network

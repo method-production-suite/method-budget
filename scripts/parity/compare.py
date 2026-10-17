@@ -15,7 +15,7 @@ PASS, FAIL (with the plan's meaning when MMB's figure is one the plan lists), DI
 (MMB shows whole dollars that equal ours rounded), NEEDS-CENTS (the same, on a case that
 is about cents), UNKNOWN-RECORDED (our engine can't express the case; MMB's figure kept).
 
-With --method <binary>, every FAIL also gets our `method explain` tree (depth 3) for
+With --method <binary>, every FAIL also gets our `method-budget explain` tree (depth 3) for
 that figure, so the step where the two programs part ways shows without rerunning.
 
 Usage: python3 -I scripts/parity/compare.py <run-dir> [--missing BLOCKED|NOT RUN]
@@ -121,7 +121,7 @@ def meaning(if_differs, mmb):
 
 
 def explain_target(ids, case, field):
-    """The `method explain` total for a figure."""
+    """The `method-budget explain` total for a figure."""
     if field == "line.total" or field == "subtotal.shown":
         return f"#{ids[case]['id']}" if case in ids else None
     if field.startswith("fringe.") and field.count(".") == 1 or field == "line.fringes":
@@ -273,7 +273,7 @@ def main():
                 continue
             res = subprocess.run([opt["--method"], "explain", os.path.join(ours, key + ".mthd"), target,
                                   "--depth", "3"], capture_output=True, text=True)
-            lines += [f"{cid} {field} (`method explain {key}.mthd {target}`):", "", "```text",
+            lines += [f"{cid} {field} (`method-budget explain {key}.mthd {target}`):", "", "```text",
                       (res.stdout or res.stderr).rstrip(), "```", ""]
 
     unk = [x for x in results if x[7] == "UNKNOWN-RECORDED"]

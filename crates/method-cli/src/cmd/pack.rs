@@ -1,4 +1,4 @@
-//! `method pack`: setup packs from the command line (docs/CLI.md, "Setup
+//! `method-budget pack`: setup packs from the command line (docs/CLI.md, "Setup
 //! packs"; decisions.md, entry 50). `export` writes a pack of a budget's
 //! picked setup items and everything they need; `import` brings a pack's
 //! items into a budget with Import Setup's rules (the budget keeps its own
@@ -13,7 +13,7 @@ use method_format::setup::pack::{self, PackDetails};
 use crate::cli::{load, not_the_input, save, write_atomic, CliError, Flags, Outcome};
 
 pub const USAGE: &str =
-    "  method pack export <budget.mthd> -o <pack.mthd> [--kinds fringes,globals]
+    "  method-budget pack export <budget.mthd> -o <pack.mthd> [--kinds fringes,globals]
         [--items NAME,NAME] [--item NAME] [--title T] [--description D] [--author A]
         [--pack-version V] [--effective YYYY-MM-DD] [--region R] [--notes N]
         [--url URL]... [--created DATE]
@@ -21,14 +21,14 @@ pub const USAGE: &str =
       left out), or just --items (`kind:Name` names the kind), with everything
       they need (a fringe's globals and unit, a charge's groups, a tag
       preset's tags). The title defaults to the budget's.
-  method pack import <pack.mthd> <budget.mthd> [--ours | --theirs]
+  method-budget pack import <pack.mthd> <budget.mthd> [--ours | --theirs]
         [--kinds K,K] [--items NAME,NAME] [--item NAME] [--dry-run]
       Import a pack's items (all, or the picked ones) and what they need into
       the budget, and save it atomically. Where the budget has an item of the
       same name set up differently it keeps its own (--ours, the default), or
       takes the pack's (--theirs). Imported items are stamped with the pack's
       title, version and effective date. --dry-run lists what would happen.
-  method pack show <pack.mthd>
+  method-budget pack show <pack.mthd>
       Print a pack's details, its items and where each came from.
 ";
 

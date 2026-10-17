@@ -4,7 +4,7 @@
 Turns the section 4 inputs tables into `.mthd` budgets, one per budget and per
 variation our format can express, plus `cases.json`: for every budget key, every case
 id with its account code, row position (1-based, counting every row of the account,
-subtotal and adjustment rows included, as `method explain 1101:3` counts), row id,
+subtotal and adjustment rows included, as `method-budget explain 1101:3` counts), row id,
 kind and description. The comparison matches MMB's rows by account and position and
 checks the description.
 

@@ -10,8 +10,9 @@ icon, [crates/method-app/icons/source/make_icon.py](../crates/method-app/icons/s
 - Always **Method Budget**, two words, both capitalized, in running text.
 - Never shorten it to initials: they are ambiguous, and a name exists so the product is
   not mistaken for anything else. On second mention "the app" or "it" is fine; plain
-  "method" is only the command.
-- The command is `method`, in code style. Budget files are `.mthd` files.
+  "method-budget" is only the command.
+- The command is `method-budget`, in code style (the desktop app's executable is
+  `method-budget-app`; every app in the suite follows that pattern). Budget files are `.mthd` files.
 - The wordmark is set in lowercase (`method budget`). That is artwork, not spelling: in
   text, write Method Budget.
 - Credit "the Method Budget contributors". The copyright line is "Method Production Suite Team and the
@@ -150,6 +151,6 @@ on 1.6 line height. The wordmark is artwork, so it needs no font.
 - No stock photos and no other product's screens, logos or text.
 - The home page's app picture is HTML drawn from the app's own layout with an invented
   budget. Real screenshots replace it later: captures of an invented budget
-  (`method sample`), never a real one.
+  (`method-budget sample`), never a real one.
 - The share card (`site/og.png`, 1200 by 630) is drawn from `site/og-card.html` by
   `scripts/make-og.sh`.

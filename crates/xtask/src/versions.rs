@@ -661,7 +661,7 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let (v, problems) = problems(&root).unwrap();
         assert!(problems.is_empty(), "{problems:#?}");
-        // The app and `method --version` report the same version.
+        // The app and `method-budget --version` report the same version.
         assert_eq!(v.to_string(), env!("CARGO_PKG_VERSION"));
     }
 

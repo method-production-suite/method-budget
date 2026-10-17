@@ -1,4 +1,4 @@
-//! `method mcp` end to end: the binary spawned as an MCP client would spawn
+//! `method-budget mcp` end to end: the binary spawned as an MCP client would spawn
 //! it, driven over stdin and stdout one JSON-RPC message per line, building
 //! a small budget from nothing and checking its totals to the cent
 //! (docs/MCP.md).
@@ -18,7 +18,7 @@ struct Session {
 
 impl Session {
     fn start(root: &Path, extra: &[&str]) -> Session {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_method"))
+        let mut child = Command::new(env!("CARGO_BIN_EXE_method-budget"))
             .arg("mcp")
             .arg("--root")
             .arg(root)
@@ -27,7 +27,7 @@ impl Session {
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
-            .expect("method mcp starts");
+            .expect("method-budget mcp starts");
         let stdin = child.stdin.take();
         let stdout = BufReader::new(child.stdout.take().unwrap());
         Session {

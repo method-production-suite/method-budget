@@ -129,7 +129,7 @@ pub fn tools() -> Vec<Tool> {
             description: "Adds a spreadsheet's rows (.xlsx, .csv, tab-delimited .txt/.tsv) to a \
                 budget as detail lines, with the app's importer: into a copy of the into budget \
                 (its chart and setup give the lines their meaning), or a new empty one. mapping \
-                is the same JSON as method import --mapping: {sheet, header_row, columns: {field: \
+                is the same JSON as method-budget import --mapping: {sheet, header_row, columns: {field: \
                 column letter or number}, create_accounts, create_setup, default_account}; \
                 without it the header row is found and columns guessed. Writes out (a new file \
                 unless overwrite, or the into budget itself as an undoable change) unless dry_run.",

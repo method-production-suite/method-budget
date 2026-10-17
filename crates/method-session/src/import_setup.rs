@@ -32,7 +32,7 @@ use crate::session::Session;
 use crate::view::View;
 
 // The review and the import themselves are plain functions on budgets in
-// method_format::setup::import, shared with the command line (`method pack`).
+// method_format::setup::import, shared with the command line (`method-budget pack`).
 pub use method_format::setup::import::{
     all_items, closure, count, describe, import, item_ref, preview, ImportItem, ImportPreview,
     Imported, ItemRef, Resolution, What,

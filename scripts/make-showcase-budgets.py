@@ -17,13 +17,13 @@ Writes, into OUT_DIR (refusing to overwrite unless --force):
 
 Everything here is made up: titles, character names, rates and vendors. No real
 production, person or company. Each budget starts from a bundled chart of accounts
-(`method new --template`) and is filled through the command line's own MCP server
-(`method mcp`), the same typed tools a coding agent uses, so the files are exactly what
+(`method-budget new --template`) and is filled through the command line's own MCP server
+(`method-budget mcp`), the same typed tools a coding agent uses, so the files are exactly what
 the engine writes. The two things neither tool writes, a saved version and actuals, are
 added to the JSON by this script in the shape docs/FORMAT.md documents, then the file is
-checked and rewritten in canonical form with `method fmt`.
+checked and rewritten in canonical form with `method-budget fmt`.
 
-Uses target/release/method (set METHOD=... to use another). Python 3.9+, standard
+Uses target/release/method-budget (set METHOD=... to use another). Python 3.9+, standard
 library only.
 """
 
@@ -34,7 +34,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-METHOD = os.environ.get("METHOD", str(REPO / "target" / "release" / "method"))
+METHOD = os.environ.get("METHOD", str(REPO / "target" / "release" / "method-budget"))
 
 # ---------------------------------------------------------------------------
 # The MCP client: one server per output folder, newline-delimited JSON-RPC.
@@ -84,7 +84,7 @@ class Mcp:
 def method(*args):
     r = subprocess.run([METHOD, *args], capture_output=True, text=True)
     if r.returncode != 0:
-        sys.exit(f"make-showcase-budgets: method {' '.join(args)}: {r.stderr or r.stdout}")
+        sys.exit(f"make-showcase-budgets: method-budget {' '.join(args)}: {r.stderr or r.stdout}")
     return r.stdout
 
 

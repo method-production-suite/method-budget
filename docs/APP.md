@@ -14,7 +14,7 @@ There is no JavaScript toolchain: no npm, no bundler, no packages.
 
 ```bash
 cargo run -p method-app                     # run a debug build
-cargo tauri build --debug --no-bundle       # debug binary in target/debug/method-budget
+cargo tauri build --debug --no-bundle       # debug binary in target/debug/method-budget-app
 cargo tauri build                           # release installers (.app/.dmg, .msi, .deb/.AppImage)
 cargo test -p method-app                    # command-layer tests, no window needed
 cargo build --release -p method-app --example perf && target/release/examples/perf
@@ -151,7 +151,7 @@ as you commit them, with a message, and nothing changes (decisions.md, entry
 59): one that divides by zero (`SHOOT_DAYS / 0`), and one that uses a global that refers
 back to itself through other globals. A global's formula is refused the same way when it
 divides by zero or would make globals refer to each other. A global that does anyway (from
-a file) shows #ERR in the Globals table and counts as 0; `method check` still names it.
+a file) shows #ERR in the Globals table and counts as 0; `method-budget check` still names it.
 When the Amt typed is exactly a global with a unit (Budget Setup > Globals, its details)
 and the line's Unit is empty, the Unit fills with that unit.
 
@@ -870,7 +870,7 @@ charge's base) are fetched when opened, so a grand total of thousands of lines s
 dozen steps. The explanation is worked out on demand only (never on an edit), from the
 budget the totals on screen came from, and asked for again when the budget changes,
 keeping what was open. With cells that have problems it says the totals, and it, count
-them as blank. From a terminal, `method explain file.mthd <total>` prints the same tree (see
+them as blank. From a terminal, `method-budget explain file.mthd <total>` prints the same tree (see
 docs/CLI.md).
 
 ### Overtime helper
@@ -1387,7 +1387,7 @@ a live link is listed as coming later), where the folder is (the budget's own fo
 one chosen in Rust's folder dialog, in which case the file is moved or copied there after
 a confirmation), and this person's name and color, kept for every shared budget beside
 this computer's sharing id (`~/.method/person.json` and `~/.method/actor`, the same id
-the command line's `method log` and `method sync` use, so one computer is one actor
+the command line's `method-budget log` and `method-budget sync` use, so one computer is one actor
 whatever program edits the budget). Start Sharing makes `Feature.mthd-log/` beside the
 file (docs/FORMAT.md, "The change log") and this computer keeps the file. A budget must be
 saved first; a copy saved for sharing (read-only) can't be shared this way.
@@ -1408,7 +1408,7 @@ in the folder now, and Autosave leaves a shared budget alone. Only one computer,
 keeper (the one that started sharing, shown as "keeps the file"), rewrites the `.mthd`
 from the merged state once the budget has been quiet for two seconds, so a sync service
 never sees two writers on one file. The keeper also notices the file changed by another
-program (an older version of the app, `method set`, an agent) and records the
+program (an older version of the app, `method-budget set`, an agent) and records the
 difference as a change by itself, labeled "Outside edit to Feature.mthd". Save As is
 refused in a shared budget (File > Save a Copy for Sharing makes a copy); the close and
 quit questions never ask about a shared budget whose changes are in the folder.
@@ -1893,7 +1893,7 @@ A budget with a cell the engine can't evaluate is not exported (the message name
 first problem): the grid counts such cells as blank, and an export must carry the real
 figures. Each file is written atomically, and an export never replaces a budget that is
 open in a tab. The same tables come from the command line:
-`method export <file.mthd> --format xlsx|csv|tsv --out <path> [--bom]`.
+`method-budget export <file.mthd> --format xlsx|csv|tsv --out <path> [--bom]`.
 
 | Command | Arguments | Returns |
 |---|---|---|
@@ -2555,7 +2555,7 @@ it was before these optimizations). On this Mac, a one-cell edit in a 5,000-row 
 costs about 5 ms in Rust from command to JSON.
 
 **Calculation errors never lose an edit.** The engine stops at the first problem, which is
-right for `method check` but not for an editor. `diagnose::lenient_recalc` runs the engine;
+right for `method-budget check` but not for an editor. `diagnose::lenient_recalc` runs the engine;
 if it fails, it checks every global, fringe rate and detail cell with the engine's own
 rules, flags each bad one (`issues`, by row id and field), and recalculates a copy with
 those cells blank. The UI shows the engine's message in a banner, outlines the bad cells,
@@ -2856,7 +2856,7 @@ and Budget Setup windows (their logic is tested in Rust, the dialogs in a browse
 harness). Not yet: editing an item's source notes in the app (a pack's maker sets them
 through a spreadsheet's Source columns or by editing the pack), clearing an item's stamp
 when its figure is edited by hand, and showing an item's source in the setup tables (the
-review, the spreadsheet export and `method pack show` show it).
+review, the spreadsheet export and `method-budget pack show` show it).
 Reports need a live check in the app: Print… and Save as PDF… through the native print
 operation (checked here only in a hidden test web view: each page box is one sheet,
 portrait and landscape, with backgrounds and colors), the print sheet's orientation, and
@@ -2882,7 +2882,7 @@ real Rust preview and import). It reads values, not formulas or styles (a date c
 its serial number, a number formatted with leading zeros loses them), maps one column per
 field, and keeps a saved mapping only in the web view's storage.
 Import Budget Export needs a live check: the Open dialog's filters and the review in the
-app (checked here with the parity runs' exports in every layout through `method
+app (checked here with the parity runs' exports in every layout through `method-budget
 import-export`, and the review in a browser harness with a canned reply, Import calling
 `export_import` with the token and layout).
 Exports need a live check: File > Export's Save dialogs, and the workbook opened in Excel

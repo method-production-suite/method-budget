@@ -1,7 +1,7 @@
-//! `method coa`: charts of accounts. `method coa import` reads a chart from
+//! `method-budget coa`: charts of accounts. `method-budget coa import` reads a chart from
 //! a spreadsheet or another budget file and writes it as a new template (or
-//! applies it to a copy of a budget); `method coa list` lists the bundled
-//! chart templates (`method new --template` starts from one).
+//! applies it to a copy of a budget); `method-budget coa list` lists the bundled
+//! chart templates (`method-budget new --template` starts from one).
 
 use std::fmt::Write as _;
 use std::path::Path;
@@ -12,7 +12,7 @@ use method_format::import::coa::{build_template, read_source, CoaMappingFile};
 use crate::cli::{load, save, CliError, Flags, Outcome};
 
 pub const USAGE: &str =
-    "  method coa import <chart.xlsx|.csv|.txt|.mthd> -o <out.mthd> [--sheet N|NAME]
+    "  method-budget coa import <chart.xlsx|.csv|.txt|.mthd> -o <out.mthd> [--sheet N|NAME]
                 [--mapping <mapping.json>] [--title TEXT] [--currency CODE]
                 [--into <budget.mthd>] [--remove-unlisted] [--force] [--dry-run]
       Read a chart of accounts (category and account numbers, names and
@@ -22,7 +22,7 @@ pub const USAGE: &str =
       budget instead: missing categories and accounts are added and existing
       ones renamed by number; --remove-unlisted also removes accounts the
       chart doesn't list when they are empty (never one with lines).
-  method coa list
+  method-budget coa list
       List the bundled chart-of-accounts templates.
 ";
 

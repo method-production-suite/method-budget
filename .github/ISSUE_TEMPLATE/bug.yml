@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting. Please never attach a real budget: an invented one that shows the problem is always enough (`method sample` or the app's sample budgets are a good start).
+        Thanks for reporting. Please never attach a real budget: an invented one that shows the problem is always enough (`method-budget sample` or the app's sample budgets are a good start).
   - type: textarea
     id: what
     attributes:
@@ -25,7 +25,7 @@ body:
     id: version
     attributes:
       label: Version
-      description: Help > About Method Budget, or `method --version`.
+      description: Help > About Method Budget, or `method-budget --version`.
       placeholder: "0.1.0"
     validations:
       required: true

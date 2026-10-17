@@ -47,7 +47,7 @@ your own disk, works offline, and never needs an account.
   (JSON, XML, Excel or tab-delimited), department spreadsheets and accounting exports,
   each checked figure by figure against the totals in the file. See
   [Importing](#importing).
-- **Scriptable.** The `method` command line runs the same engine with no window, and a
+- **Scriptable.** The `method-budget` command line runs the same engine with no window, and a
   git merge driver combines two people's edits to one budget.
 - **No subscription.** Free and open source under MIT or Apache-2.0.
 
@@ -126,9 +126,9 @@ this section.
 ### Command line and git
 
 - **Open file format.** Budgets are `.mthd` files: plain, documented JSON that diffs cleanly and that any tool can read.
-- **Scriptable command line.** `method` checks budgets, prints totals, draws reports as PDF, HTML or CSV, and exports and imports spreadsheets, with no window and no network.
-- **Batch edits.** `method set` and `method apply` run edit scripts all or nothing, with a dry run that shows what would change.
-- **Git merge driver.** Keep budgets in git and let `method merge-driver` merge edits to different lines, flagging only real conflicts.
+- **Scriptable command line.** `method-budget` checks budgets, prints totals, draws reports as PDF, HTML or CSV, and exports and imports spreadsheets, with no window and no network.
+- **Batch edits.** `method-budget set` and `method-budget apply` run edit scripts all or nothing, with a dry run that shows what would change.
+- **Git merge driver.** Keep budgets in git and let `method-budget merge-driver` merge edits to different lines, flagging only real conflicts.
 
 ### On the roadmap
 
@@ -174,7 +174,7 @@ Tauri CLI, as [docs/INSTALL.md](docs/INSTALL.md) describes.
 
 ## Command line quickstart
 
-The `method` command reads and writes budgets without the app: same engine, no window, no
+The `method-budget` command reads and writes budgets without the app: same engine, no window, no
 network. Install it from a checkout:
 
 ```bash
@@ -184,14 +184,14 @@ cargo install --path crates/method-cli --locked
 Then:
 
 ```bash
-method new my-film.mthd                      # a starter budget
-method show my-film.mthd                     # the topsheet
-method check my-film.mthd                    # recalculate and report problems
-method totals my-film.mthd --json            # every total, in cents, for scripts
-method explain my-film.mthd net              # how a total is made up
-method report my-film.mthd --sections topsheet -o topsheet.pdf
-method export my-film.mthd --xlsx my-film.xlsx
-method diff old.mthd new.mthd                # what changed, in plain words
+method-budget new my-film.mthd                      # a starter budget
+method-budget show my-film.mthd                     # the topsheet
+method-budget check my-film.mthd                    # recalculate and report problems
+method-budget totals my-film.mthd --json            # every total, in cents, for scripts
+method-budget explain my-film.mthd net              # how a total is made up
+method-budget report my-film.mthd --sections topsheet -o topsheet.pdf
+method-budget export my-film.mthd --xlsx my-film.xlsx
+method-budget diff old.mthd new.mthd                # what changed, in plain words
 ```
 
 Every command, flag and exit code is in
@@ -205,7 +205,7 @@ to use the merge driver:
 ```bash
 echo '*.mthd merge=method' >> .gitattributes
 git config merge.method.name "Method Budget merge"
-git config merge.method.driver "method merge-driver %O %A %B %P"
+git config merge.method.driver "method-budget merge-driver %O %A %B %P"
 ```
 
 Edits to different lines merge on their own; real clashes are left for you to settle in
@@ -213,14 +213,14 @@ the app. Details: [docs/MERGE.md](docs/MERGE.md).
 
 ## Coding agents
 
-`method mcp` is an MCP server, so Claude Code and other MCP clients can open, read and edit
+`method-budget mcp` is an MCP server, so Claude Code and other MCP clients can open, read and edit
 budgets with typed tools: lines, globals, fringes, charges, totals, explain, export, import and
 undo, all through the same engine and the same exact arithmetic as the app. It only touches
 files inside the folders you give it, writes atomically, won't overwrite a file someone else
 just saved, and has a read-only mode. Nothing is sent anywhere.
 
 ```bash
-claude mcp add method -- method mcp --root ~/Budgets
+claude mcp add method -- method-budget mcp --root ~/Budgets
 ```
 
 Every tool and the safety model: [docs/MCP.md](docs/MCP.md).
@@ -240,7 +240,7 @@ native files ([CLEAN-ROOM.md](CLEAN-ROOM.md)).
 In the app: **File > Import Budget Export…**. From the terminal:
 
 ```sh
-method import-export "Pilot budget.json" -o pilot.mthd
+method-budget import-export "Pilot budget.json" -o pilot.mthd
 ```
 
 Every import ends with a review that compares each line, account, fringe and total with
@@ -276,7 +276,7 @@ rules every contribution follows are in [CLEAN-ROOM.md](CLEAN-ROOM.md).
 
 Bug reports and patches are welcome. Read [CLEAN-ROOM.md](CLEAN-ROOM.md) first: it is
 short, and it is the one hard rule. Please never attach a real budget to an issue; an
-invented one that shows the problem (`method sample` makes a large test budget) is always
+invented one that shows the problem (`method-budget sample` makes a large test budget) is always
 enough. Design choices and their reasons are numbered in
 [docs/decisions.md](docs/decisions.md), what comes next is in
 [docs/ROADMAP.md](docs/ROADMAP.md), and how the project looks and sounds is in

@@ -376,7 +376,7 @@ impl Default for FringePosting {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TrailingFringes {
     /// Posted in a fringe row of their own, in the unnamed level after the
-    /// last production total, so they stay in the grand total (`method
+    /// last production total, so they stay in the grand total (`method-budget
     /// check` warns that they are in no level). The default.
     #[default]
     Keep,

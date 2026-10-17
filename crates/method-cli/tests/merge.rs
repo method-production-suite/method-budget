@@ -1,14 +1,14 @@
-//! `method diff`, `method merge` and `method merge-driver` end to end
+//! `method-budget diff`, `method-budget merge` and `method-budget merge-driver` end to end
 //! (docs/MERGE.md).
 
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
 fn method(args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_method"))
+    Command::new(env!("CARGO_BIN_EXE_method-budget"))
         .args(args)
         .output()
-        .expect("method runs")
+        .expect("method-budget runs")
 }
 
 fn out(o: &Output) -> String {
@@ -184,7 +184,7 @@ fn merge_driver_under_git() {
     ok(git(&["init", "--quiet", "--initial-branch=main"]));
     let driver = format!(
         "\"{}\" merge-driver %O %A %B %P",
-        env!("CARGO_BIN_EXE_method")
+        env!("CARGO_BIN_EXE_method-budget")
     );
     ok(git(&["config", "merge.method-budget.driver", &driver]));
     std::fs::write(d.0.join(".gitattributes"), "*.mthd merge=method-budget\n").unwrap();

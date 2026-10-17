@@ -1,13 +1,13 @@
-//! `method coa` and `method new --template` end to end.
+//! `method-budget coa` and `method-budget new --template` end to end.
 
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
 fn method(args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_method"))
+    Command::new(env!("CARGO_BIN_EXE_method-budget"))
         .args(args)
         .output()
-        .expect("method runs")
+        .expect("method-budget runs")
 }
 
 fn out(o: &Output) -> String {

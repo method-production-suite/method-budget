@@ -168,7 +168,7 @@ pub fn tools() -> Vec<Tool> {
             description: "Every total in cents: production levels with their categories, \
                 above-the-line, below-the-line, fringes, each charge, the grand total, each \
                 credit and the net total (and the net in the totals currency). The summary is the \
-                topsheet as method show prints it.",
+                topsheet as method-budget show prints it.",
             mutating: false,
             destructive: false,
             schema: || object(vec![path_prop(), exclude_prop()], &["path"]),

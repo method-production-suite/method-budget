@@ -25,7 +25,7 @@ pack's title, version and effective date, so you can always see where a rate
 came from.
 
 Make one with File > Export Setup Pack… (or the Library tab, or
-`method pack export` on the command line, docs/CLI.md).
+`method-budget pack export` on the command line, docs/CLI.md).
 
 ## Why there are no rate packs here
 

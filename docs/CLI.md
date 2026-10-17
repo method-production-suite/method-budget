@@ -1,14 +1,22 @@
-# The `method` command line
+# The `method-budget` command line
 
-`method` reads and writes Method Budget files (`.mthd`: docs/FORMAT.md) without the app: check a budget, print its totals, draw a report, export a spreadsheet, import one,
+`method-budget` reads and writes Method Budget files (`.mthd`: docs/FORMAT.md) without the app: check a budget, print its totals, draw a report, export a spreadsheet, import one,
 and make scripted edits. It is plain Rust with no network and no GUI, so it runs the same
 on a laptop, a server or in CI. Build it with `cargo build --release -p method-cli`; the
-binary is `target/release/method`.
+binary is `target/release/method-budget`.
+
+**Renamed.** The command used to be `method`. That name still works for now: it is a
+second binary built from the same code (`cargo install` puts both on the `PATH`), and it
+prints one line to stderr, ``note: `method` is now `method-budget`; the old name will be
+removed in a future release.``, before running as usual. It prints nothing extra for
+`mcp` and `merge-driver`, so MCP client configs and git config that still say `method`
+keep working quietly; update them when convenient. Every app in the suite names its
+command line `method-<noun>` and its desktop executable `method-<noun>-app`.
 
 Every command takes the budget file first, then flags. Flags take their value as the next
 word or after `=` (`--out=x.pdf`); `-o` is short for `--out`; `--` ends the flags. A word
-that looks like a negative number (`-5`) is a value, not a flag. `method help` lists every
-command. `method --version` (or `-V`) prints the version, the same one the app's About box
+that looks like a negative number (`-5`) is a value, not a flag. `method-budget help` lists every
+command. `method-budget --version` (or `-V`) prints the version, the same one the app's About box
 shows (docs/RELEASING.md).
 
 Commands that write a file write it **atomically**: to a temporary file in the same
@@ -26,11 +34,11 @@ from unless that is its job (`fmt`, `set`, `apply`).
 | 3 | An edit was refused (`set`, `apply`): a bad script line, a name that doesn't exist, or a result that doesn't recalculate. **Nothing was written.** |
 
 Commands added later may define further codes in their own sections. Errors go to
-stderr as `method: <message>`; results go to stdout.
+stderr as `method-budget: <message>`; results go to stdout.
 
 ## Commands
 
-### `method show <file.mthd> [--exclude GROUP]...`
+### `method-budget show <file.mthd> [--exclude GROUP]...`
 
 Prints the topsheet for a person to read. `--exclude` leaves a group's lines out
 (repeatable). Rows come in the topsheet's order (decisions.md, entry 60): categories and
@@ -41,7 +49,7 @@ total. With totals shown in another currency, the last line is the net total in 
 converted account by account and written in that currency's own separators and symbol
 (`49.253,40 €`; decisions.md, entry 61).
 
-### `method check <file.mthd>`
+### `method-budget check <file.mthd>`
 
 Reads and recalculates the budget. Prints `<file>: ok, net total 1,234.56`, or fails
 (exit 1) with the reader's or the engine's message, such as
@@ -52,23 +60,23 @@ after the last production total, which no level holds (decisions.md, entry 56; k
 the grand total unless `trailing_level_fringes` is `drop`), and credit rows on a
 category or account the budget doesn't have, which count 0 (entries 57 and 61).
 
-### `method fmt <file.mthd>`
+### `method-budget fmt <file.mthd>`
 
 Rewrites the file in canonical form (key order, decimals, indentation), the bytes the
 app would save.
 
-### `method new <file.mthd> [--template NAME]` and `method sample <file.mthd>`
+### `method-budget new <file.mthd> [--template NAME]` and `method-budget sample <file.mthd>`
 
 Write a starter budget, or a large invented test budget (5,000 rows). Both refuse to
 replace an existing file. `--template` starts instead from one of the bundled charts of
-accounts (its id or name, any case; `method coa list` names them): its categories, accounts
+accounts (its id or name, any case; `method-budget coa list` names them): its categories, accounts
 and production totals, no lines, titled Untitled (docs/TEMPLATES.md). A new budget, the
 starter or a chart, starts with the new-budget settings (decisions.md, entry 60): fringes
 posted by budget, a Day of 12 hours, a Week of 60 and a Month of 240, a cutoff factor of
 1.0, and (the starter) account numbers of category 2, account 2 and set 3 with no
 separator, so the starter's accounts read `1001` to `5001` (decisions.md, entry 61).
 
-### `method totals <file.mthd> [--json] [--exclude GROUP]...`
+### `method-budget totals <file.mthd> [--json] [--exclude GROUP]...`
 
 The totals, for pipelines. Plain output is one tab-separated line per total, exact
 decimals with no thousands separators:
@@ -95,10 +103,10 @@ account by account, fringe by fringe, charge by charge and credit by credit, the
 (decisions.md, entry 60); the net total itself when totals show in the base currency.
 
 ```sh
-method totals film.mthd | awk -F'\t' '$1 == "net_total" { print $2 }'
+method-budget totals film.mthd | awk -F'\t' '$1 == "net_total" { print $2 }'
 ```
 
-### `method export <file.mthd> --xlsx|--csv|--tsv <path> [--bom]`
+### `method-budget export <file.mthd> --xlsx|--csv|--tsv <path> [--bom]`
 
 Also `--format xlsx|csv|tsv --out <path>`. The evaluated budget as an Excel workbook
 (Topsheet, Accounts, Detail and the setup tables), as one CSV file per table (named
@@ -107,7 +115,7 @@ accounting tools (decision 30). A folder as the path names the file after the bu
 `--bom` starts CSV and TSV with a UTF-8 byte order mark, which Excel needs for accented
 letters.
 
-### `method report <file.mthd> [--preset NAME] [--sections LIST] [--format F] [-o PATH] [--date TEXT] [--bom]`
+### `method-budget report <file.mthd> [--preset NAME] [--sections LIST] [--format F] [-o PATH] [--date TEXT] [--bom]`
 
 Draws a report from one of the budget's saved report presets (docs/FORMAT.md, "Report
 preset"): its sections in order, category and account exclusions, skipped accounts and
@@ -125,7 +133,7 @@ vertical rules, collapsed detail, the topsheet fringes column, header and footer
 - `--date "2026-10-09 14:30"` sets the printed date and time (the header's standard
   right slot); without it the clock is read, in UTC. Use it when the output must be the
   same on every run.
-- `method report <file.mthd> --list-presets` lists the presets, the default marked `*`.
+- `method-budget report <file.mthd> --list-presets` lists the presets, the default marked `*`.
 
 Like the app's reports, a filter never changes a total: leaving accounts or lines out
 prints the budget's own totals with a note, and the topsheet always lists every
@@ -151,7 +159,7 @@ The formats:
   pipelines, not the app's typeset PDF (decision 28), which needs the Mac app's web view.
   Shading, colors and the topsheet page column are on-screen and app-PDF features only.
 
-### `method set <file.mthd> <path> <value> [--dry-run]`
+### `method-budget set <file.mthd> <path> <value> [--dry-run]`
 
 Changes one value and saves. Paths:
 
@@ -179,15 +187,15 @@ Changes one value and saves. Paths:
 
 A name or account code may contain dots: the path splits at its first and last dots.
 `none` (or an empty `""`) clears an optional value. The command prints each change and
-the totals that moved; `--dry-run` prints the changes and a full `method diff`-style
+the totals that moved; `--dry-run` prints the changes and a full `method-budget diff`-style
 summary and writes nothing. A refused edit exits 3 and writes nothing.
 
 ```sh
-method set film.mthd line.21-01:2.rate 900
-method set film.mthd fringe.FICA.cutoff 168,600.00 --dry-run
+method-budget set film.mthd line.21-01:2.rate 900
+method-budget set film.mthd fringe.FICA.cutoff 168,600.00 --dry-run
 ```
 
-### `method apply <file.mthd> <script.txt> [--dry-run]`
+### `method-budget apply <file.mthd> <script.txt> [--dry-run]`
 
 Runs an edit script (below) and saves. `-` reads the script from stdin. Every line must
 succeed and the result must recalculate, or nothing is written and the command exits 3
@@ -195,7 +203,7 @@ naming the line (`edit.txt line 4: there is no fringe FICA`). The output lists e
 change, then the totals before and after; `--dry-run` shows the changes and a full
 diff summary and writes nothing.
 
-### `method import <sheet> -o <out.mthd> [--mapping M.json] [--into B.mthd] [--title T] [--currency C] [--force] [--dry-run]`
+### `method-budget import <sheet> -o <out.mthd> [--mapping M.json] [--into B.mthd] [--title T] [--currency C] [--force] [--dry-run]`
 
 Adds a sheet's rows to a budget as detail lines, with the app's own importer (decision
 36): `.xlsx` workbooks, CSV and tab-delimited text, with the same limits, account
@@ -233,7 +241,7 @@ The **mapping file** is JSON; every field may be left out:
 
 Our own Excel export imports back with no mapping at all.
 
-### `method import-export <export> [-o <out.mthd>] [--format F] [--title T] [--report] [--json] [--force]`
+### `method-budget import-export <export> [-o <out.mthd>] [--format F] [--title T] [--report] [--json] [--force]`
 
 Makes a whole budget from another budgeting program's export and checks it against the
 export's own figures (docs/IMPORT.md): budget exchange JSON or XML (basic or advanced), its
@@ -260,12 +268,12 @@ Exit code 0 whenever the file was read (a figure that differs is reported, not a
 when it can't be read or `-o` exists; 2 for a bad `--format`.
 
 ```sh
-method import-export "Pilot budget.json"                 # read and compare only
-method import-export "Pilot budget.json" -o pilot.mthd   # and write the budget
-method import-export pilot.xml --report --json > check.json
+method-budget import-export "Pilot budget.json"                 # read and compare only
+method-budget import-export "Pilot budget.json" -o pilot.mthd   # and write the budget
+method-budget import-export pilot.xml --report --json > check.json
 ```
 
-### `method coa import <chart> -o <out.mthd> [--sheet N|NAME] [--mapping M.json] [--title T] [--currency C] [--into B.mthd] [--remove-unlisted] [--force] [--dry-run]`
+### `method-budget coa import <chart> -o <out.mthd> [--sheet N|NAME] [--mapping M.json] [--title T] [--currency C] [--into B.mthd] [--remove-unlisted] [--force] [--dry-run]`
 
 Reads a chart of accounts (category and account numbers, names and production totals,
 nothing else) from an Excel workbook, a CSV or tab-delimited file, or another budget file,
@@ -310,11 +318,11 @@ A chart mapping file:
 | `sub_accounts` | Keep sub-accounts as accounts of their own (else left out). The `kind,code,name,parent` layout always keeps them. |
 | `default_levels` | Add our production totals by category number when the file names none (default true). |
 
-### `method coa list`
+### `method-budget coa list`
 
 Lists the bundled chart-of-accounts templates by group, with their ids.
 
-### `method explain <file.mthd> <total> [--depth N] [--exclude GROUP]...`
+### `method-budget explain <file.mthd> <total> [--depth N] [--exclude GROUP]...`
 
 Prints how one total is worked out, as an indented tree whose leaves add up to it exactly
 (roadmap 3.5, decision 43; the app's Explain tab shows the same steps). Each step is
@@ -338,7 +346,7 @@ rounds to 1.00`). `<total>` is one of:
 
 A total that isn't in the budget is a usage error (exit 2).
 
-### `method diff <old.mthd> <new.mthd> [--json] [--exit-code]`
+### `method-budget diff <old.mthd> <new.mthd> [--json] [--exit-code]`
 
 What changed from the first budget to the second (roadmap 3.1; docs/MERGE.md): every
 change in plain words (`21-01 line 3: rate 1,200.00 -> 1,350.00 (+1,500.00 to 21-01)`),
@@ -348,7 +356,7 @@ change). Rows match by id, accounts and categories by number (a renumbered one i
 what it holds). `--json` prints one object, money in integer cents. Exit 0; with
 `--exit-code`, 1 when anything changed.
 
-### `method merge <base.mthd> <ours.mthd> <theirs.mthd> -o <out.mthd> [--ours|--theirs]`
+### `method-budget merge <base.mthd> <ours.mthd> <theirs.mthd> -o <out.mthd> [--ours|--theirs]`
 
 Three-way merge (roadmap 3.2; docs/MERGE.md): both budgets' changes since their common
 base. Different rows, fields and setup items merge on their own; the same field changed
@@ -358,20 +366,20 @@ merged budget is written either way, never over one of the three budgets (that i
 `merge-driver`'s job). **Exit 1 when conflicts were settled** that way,
 0 when there were none.
 
-### `method merge-driver <base> <ours> <theirs> [<path>] [--theirs]`
+### `method-budget merge-driver <base> <ours> <theirs> [<path>] [--theirs]`
 
-`method merge` for git, writing the result over `<ours>`; exit 1 when conflicts remain, so
+`method-budget merge` for git, writing the result over `<ours>`; exit 1 when conflicts remain, so
 git marks the file conflicted (it stays a valid budget, conflicts settled for ours). Set
 up with `*.mthd merge=method-budget` in `.gitattributes`
-and `git config merge.method-budget.driver "method merge-driver %O %A %B %P"` (docs/MERGE.md,
+and `git config merge.method-budget.driver "method-budget merge-driver %O %A %B %P"` (docs/MERGE.md,
 "With git").
 
-### Setup packs: `method pack export`, `import` and `show`
+### Setup packs: `method-budget pack export`, `import` and `show`
 
 A setup pack is a budget file with setup items and no lines, stamped with the pack's
 details (docs/FORMAT.md, "Setup packs"; docs/APP.md, "Setup packs").
 
-`method pack export <budget.mthd> -o <pack.mthd> [--kinds K,K] [--items NAME,NAME] [--item NAME] [--title T] [--description D] [--author A] [--pack-version V] [--effective YYYY-MM-DD] [--region R] [--notes N] [--url URL]... [--created DATE]`
+`method-budget pack export <budget.mthd> -o <pack.mthd> [--kinds K,K] [--items NAME,NAME] [--item NAME] [--title T] [--description D] [--author A] [--pack-version V] [--effective YYYY-MM-DD] [--region R] [--notes N] [--url URL]... [--created DATE]`
 writes a pack of the budget's setup items of `--kinds` (`globals`, `fringes`, `groups`,
 `units`, `sets`, `locations`, `currencies`, `charges`, `credits`, `tag-presets`,
 `line-blocks`, `report-presets`, `ot-patterns`; every kind when left out), or only the
@@ -382,7 +390,7 @@ The budget settings never go in a pack. The title defaults to the budget's; `--c
 defaults to today (UTC). The details are checked (a date `YYYY-MM-DD`, links `http://` or
 `https://`); a refusal is exit 3. The pack is written atomically, never over the budget.
 
-`method pack import <pack.mthd> <budget.mthd> [--ours | --theirs] [--kinds K,K] [--items NAME,NAME] [--item NAME] [--dry-run]`
+`method-budget pack import <pack.mthd> <budget.mthd> [--ours | --theirs] [--kinds K,K] [--items NAME,NAME] [--item NAME] [--dry-run]`
 imports the pack's items (or the picked ones, with what they need) into the budget and
 saves it atomically: items the budget lacks are added; where it has an item of the same
 name set up differently it keeps its own (`--ours`, the default) or takes the pack's
@@ -391,17 +399,17 @@ effective date (`setup_sources`). Any budget file can be imported from (nothing 
 stamped then). `--dry-run` lists each item as add, same, keep (ours) or replace (theirs)
 and writes nothing.
 
-`method pack show <pack.mthd>` prints the pack's details, its items with their
+`method-budget pack show <pack.mthd>` prints the pack's details, its items with their
 definitions, and where each came from.
 
 ```sh
-method pack export show.mthd -o "Crew Rates.mthd" --kinds fringes,globals \
+method-budget pack export show.mthd -o "Crew Rates.mthd" --kinds fringes,globals \
   --title "Crew Rates" --pack-version 2026.1 --effective 2026-01-01 --region "Example"
-method pack import "Crew Rates.mthd" new-show.mthd --dry-run
-method pack import "Crew Rates.mthd" new-show.mthd --theirs
+method-budget pack import "Crew Rates.mthd" new-show.mthd --dry-run
+method-budget pack import "Crew Rates.mthd" new-show.mthd --theirs
 ```
 
-### `method mcp [--root DIR]... [--read-only]`
+### `method-budget mcp [--root DIR]... [--read-only]`
 
 A Model Context Protocol server on stdin and stdout, so coding agents (Claude Code and
 other MCP clients) can open, read, edit, check, diff, merge, export and import budgets with
@@ -409,10 +417,10 @@ typed tools instead of shell commands. Every path must be inside a `--root` fold
 (repeatable; default: the current folder); `--read-only` hides every tool that writes.
 Changes are written atomically, refused when the file changed on disk since the server read
 it, and undoable within the session. It runs until stdin closes; logs go to stderr. Register
-it with `claude mcp add method -- method mcp --root ~/Budgets`. The tools, the safety model
+it with `claude mcp add method -- method-budget mcp --root ~/Budgets`. The tools, the safety model
 and the limits are in docs/MCP.md.
 
-### `method log <file.mthd> [--init] [--last N] [--json]`
+### `method-budget log <file.mthd> [--init] [--last N] [--json]`
 
 The budget's change log, the folder `<file.mthd>-log/` beside it (docs/FORMAT.md, "The
 change log"; decisions.md, entry 62): the budget id, every actor (computer) with how many
@@ -423,10 +431,10 @@ time, label and operations. `--init` starts the log: the file as it is becomes t
 change, by this computer. `--json` prints one JSON object. This computer's actor id lives
 in `~/.method/actor` (or `$METHOD_ACTOR_FILE`), made on first use.
 
-### `method sync <file.mthd|FOLDER> [--no-write] [--roll]`
+### `method-budget sync <file.mthd|FOLDER> [--no-write] [--roll]`
 
 Merges a shared budget: reads every actor's segments, records an outside edit to the
-`.mthd` (a save by a program that doesn't write the log, such as `method set`) as a change
+`.mthd` (a save by a program that doesn't write the log, such as `method-budget set`) as a change
 by this computer, writes this computer's unwritten changes as a sealed segment, and writes
 the merged budget back as the `.mthd`, which is the keeper's job (collaboration design,
 4.3). With a folder, every `.mthd` in it that has a log beside it. `--no-write` merges and
@@ -435,7 +443,7 @@ one. Prints what it did and what to review; exit 1 when a budget could not be me
 
 ## Edit scripts
 
-`method apply` reads one command per line (UTF-8; a byte order mark at the start is
+`method-budget apply` reads one command per line (UTF-8; a byte order mark at the start is
 ignored). Blank lines and lines starting with `#` are skipped. Words are separated by spaces; put a value with spaces in double quotes, with
 `\"` for a quote and `\\` for a backslash. A command with too many words is refused
 rather than guessed at.
@@ -502,15 +510,15 @@ that doesn't work) refuses the script.
 ```sh
 # Nightly: check every budget in a folder and keep a PDF and a workbook of each.
 for f in budgets/*.mthd; do
-  method check "$f" || exit 1
-  method report "$f" --preset "Studio pack" -o "out/$(basename "$f" .mthd).pdf"
-  method export "$f" --xlsx "out/$(basename "$f" .mthd).xlsx"
+  method-budget check "$f" || exit 1
+  method-budget report "$f" --preset "Studio pack" -o "out/$(basename "$f" .mthd).pdf"
+  method-budget export "$f" --xlsx "out/$(basename "$f" .mthd).xlsx"
 done
 
 # Try a rate change, then make it.
-method set film.mthd line.21-01:2.rate 950 --dry-run
-method set film.mthd line.21-01:2.rate 950
+method-budget set film.mthd line.21-01:2.rate 950 --dry-run
+method-budget set film.mthd line.21-01:2.rate 950
 
 # A department's sheet into a copy of the budget.
-method import camera.xlsx --mapping camera.json --into film.mthd -o film-with-camera.mthd
+method-budget import camera.xlsx --mapping camera.json --into film.mthd -o film-with-camera.mthd
 ```

@@ -32,7 +32,7 @@ pub mod csvread;
 pub mod exchange;
 pub mod inflate;
 pub mod mapping;
-/// A column mapping saved as a JSON file (`method import --mapping`).
+/// A column mapping saved as a JSON file (`method-budget import --mapping`).
 pub mod mapping_file;
 pub mod merge;
 /// A schedule's day counts from Method Scheduling's budget exchange file

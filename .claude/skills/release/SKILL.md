@@ -116,7 +116,7 @@ Before showing anything, check the draft:
 - `grep -n "$(printf '\342\200\224')" docs/releases/<version>.md` prints nothing (no em
   dashes).
 - No real production titles, real people, real figures or real budgets: examples use
-  invented budgets only (`method sample` makes one).
+  invented budgets only (`method-budget sample` makes one).
 - Nothing is claimed that `docs/features.toml` or `docs/ROADMAP.md` does not back.
 - The bump command's check mode accepts the notes, if `docs/RELEASING.md` documents one.
 

@@ -34,7 +34,7 @@ pub mod log;
 pub mod setup;
 
 /// The JSON library the format is read and written with, for the
-/// workspace's tools that speak JSON (the `method mcp` server in
+/// workspace's tools that speak JSON (the `method-budget mcp` server in
 /// `method-cli`), so they share this copy instead of adding a dependency.
 pub use serde_json;
 

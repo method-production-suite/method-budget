@@ -158,7 +158,7 @@ fn trailing_start(b: &Budget) -> usize {
 
 /// Why the fringes of categories after the last production total aren't in
 /// any level, when fringes post by production level and some are earned
-/// there (decisions.md, entry 56): `method check` and the MCP `validate`
+/// there (decisions.md, entry 56): `method-budget check` and the MCP `validate`
 /// tool show it. `None` otherwise.
 pub(crate) fn trailing_fringes_warning(b: &Budget, r: &Report) -> Option<String> {
     if b.fringe_posting != FringePosting::ProductionLevel {

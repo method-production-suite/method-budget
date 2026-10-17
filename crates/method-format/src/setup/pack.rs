@@ -209,7 +209,7 @@ pub fn picks_for(src: &Budget, kinds: &[What], names: &[String]) -> Result<Vec<I
     Ok(out)
 }
 
-/// What a pack says about itself, for a review or `method pack import`.
+/// What a pack says about itself, for a review or `method-budget pack import`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct PackSummary {
     /// It is a setup pack (else an ordinary budget used as one).

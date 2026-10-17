@@ -1,4 +1,4 @@
-//! `method report`: a printed report without the app, from a saved report
+//! `method-budget report`: a printed report without the app, from a saved report
 //! preset (or the default setup), as HTML, plain text, CSV or PDF.
 
 use std::fmt::Write as _;
@@ -10,7 +10,7 @@ use crate::cli::{load, not_the_input, write_atomic, CliError, Flags, Outcome};
 use crate::render::{self, Context};
 
 pub const USAGE: &str =
-    "  method report <file.mthd> [--preset NAME] [--sections LIST] [--format html|txt|csv|pdf]
+    "  method-budget report <file.mthd> [--preset NAME] [--sections LIST] [--format html|txt|csv|pdf]
                 [-o <path>] [--date TEXT] [--bom]
       Draw a report from a saved preset (default: the budget's default preset,
       else the topsheet and the detail). --sections replaces the preset's
@@ -19,7 +19,7 @@ pub const USAGE: &str =
       comes from --format, else the extension of -o, else txt. Without -o (or
       with -o -) the report goes to stdout (not pdf). --date sets the printed
       date and time instead of the clock. --bom starts CSV with a byte order mark.
-  method report <file.mthd> --list-presets
+  method-budget report <file.mthd> --list-presets
       List the budget's report presets, the default marked with *.
 ";
 

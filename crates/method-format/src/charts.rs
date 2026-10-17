@@ -18,7 +18,7 @@ use method_core::Budget;
 /// One bundled chart template.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Bundled {
-    /// Short name used by `method new --template` (`feature`, `tv-one-hour`).
+    /// Short name used by `method-budget new --template` (`feature`, `tv-one-hour`).
     pub id: &'static str,
     /// The name shown in New From Template.
     pub name: &'static str,

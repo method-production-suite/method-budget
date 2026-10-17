@@ -1608,6 +1608,9 @@ file extension of ours resembles `.mbd` or `.mmbx`. What it covers:
   (not `.app`: Tauri warns against identifiers ending in `.app` on macOS, where it is the
   bundle extension). The local data folder follows the identifier.
 
+**Amended 2026-10-16 (entry 74):** the command line is now `method-budget` (with `method`
+kept for a while as an alias) and the app's executable `method-budget-app`.
+
 ## 47. One feature file for the README and the website; versioned skills (2026-10-09)
 
 - **Single source.** The public feature list lives in `docs/features.toml` (TOML, read
@@ -3332,3 +3335,25 @@ CI; docs/WEBSITE.md, "The demo"):
   `prompt()`, and `cargo xtask web` depends on method-format (for the chart list).
 - Open: on a phone the app is hard to use (the tools panel covers most of the grid), so
   the demo only says it works best on a computer; a phone layout is separate work.
+
+## 74. The command line is `method-budget`, the app's executable `method-budget-app` (2026-10-16, the owner)
+
+A rule for every app in the suite: its command line is `method-<noun>` and its desktop
+executable `method-<noun>-app`. `method` alone would collide across the suite's apps.
+
+- **The command line** (`crates/method-cli`) builds `method-budget`. Help, usage lines,
+  `--version` and the `method-budget: <message>` error prefix use the new name; the
+  crate keeps its name.
+- **The old name is an alias**: a second binary, `method`, built from the same code (the
+  crate's small library, `main(Invocation)`, which both binaries call; the binary that ran
+  decides, not `argv[0]`). It prints one line to stderr, "note: `method` is now
+  `method-budget`; the old name will be removed in a future release.", then runs as usual.
+  For `mcp` and `merge-driver` it prints nothing extra: MCP client configs and git config
+  run those, an MCP client reads stdout as protocol, and noise there does harm. stdout is
+  never touched. `tests/alias.rs` checks both cases against `method-budget` byte for byte.
+- **The app's executable** (`crates/method-app`) is `method-budget-app`. Tauri names the
+  bundled executable after the cargo binary (no `mainBinaryName`), so the bundles carry
+  `Method Budget.app/Contents/MacOS/method-budget-app`, `method-budget-app.exe` and
+  `/usr/bin/method-budget-app`. The product name, bundle identifier, `.app` name, file
+  format name and the git merge driver key (`merge.method-budget`) are unchanged.
+- Release notes already published keep the old name as written.

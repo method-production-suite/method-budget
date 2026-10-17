@@ -1,4 +1,4 @@
-//! `method mcp`: a Model Context Protocol server over stdio, so coding agents
+//! `method-budget mcp`: a Model Context Protocol server over stdio, so coding agents
 //! can read and edit budget files with typed tools instead of shell commands
 //! (docs/MCP.md).
 //!
@@ -85,7 +85,7 @@ pub mod limits {
 pub fn serve_stdio(config: Config) -> Result<(), String> {
     let server = protocol::Server::new(&config)?;
     eprintln!(
-        "method mcp: serving {} tool(s) over stdio{}; roots: {}",
+        "method-budget mcp: serving {} tool(s) over stdio{}; roots: {}",
         server.tool_count(),
         if config.read_only { " (read-only)" } else { "" },
         server

@@ -28,7 +28,7 @@ treat it as `application/json`.
   silently ignored.
 - Detail rows keep their `id` through every edit and move, and accounts and setup items
   keep their numbers and names, so two budgets can be compared and merged by identity
-  rather than by position (`method diff`, `method merge` and a git merge driver: docs/MERGE.md).
+  rather than by position (`method-budget diff`, `method-budget merge` and a git merge driver: docs/MERGE.md).
 
 ## Top level
 
@@ -196,7 +196,7 @@ own. It changes nothing under the other posting modes.
 
 | Value    | Meaning |
 |----------|---------|
-| `"keep"` | The default, also for files without the field. They post in a fringe row of the unnamed level after the last production total, so they are in the grand total and in a percent charge's base, though in neither above- nor below-the-line. `method check` warns about them. |
+| `"keep"` | The default, also for files without the field. They post in a fringe row of the unnamed level after the last production total, so they are in the grand total and in a percent charge's base, though in neither above- nor below-the-line. `method-budget check` warns about them. |
 | `"drop"` | They post nowhere, so they are in no total (lines still earn them, and fringe, group, set and location totals and credits still count them). |
 
 ### Cutoff factor
@@ -539,8 +539,8 @@ catch it).
 |---------|--------|---------|
 | `flat`  | `amount` cents, **required** | A gross amount typed in directly. |
 | `group` | `group` text, **required** | Lines tagged with the group, plus their fringes except the credit's `excluded_fringes`. |
-| `category` | `category` text, **required** | The topsheet category with that code: its total (lines and adjustment rows that count) plus the fringes they earn, wherever fringes post, except the credit's `excluded_fringes` (`docs/decisions.md`, entry 57). A code that names no category counts 0, and `method check` warns. |
-| `account` | `account` text, **required** | The account with that number (the first, if two share it): its lines and adjustment rows that count plus the fringes they earn, wherever fringes post, except the credit's `excluded_fringes` (`docs/decisions.md`, entry 61). A number that names no account counts 0, and `method check` warns. |
+| `category` | `category` text, **required** | The topsheet category with that code: its total (lines and adjustment rows that count) plus the fringes they earn, wherever fringes post, except the credit's `excluded_fringes` (`docs/decisions.md`, entry 57). A code that names no category counts 0, and `method-budget check` warns. |
+| `account` | `account` text, **required** | The account with that number (the first, if two share it): its lines and adjustment rows that count plus the fringes they earn, wherever fringes post, except the credit's `excluded_fringes` (`docs/decisions.md`, entry 61). A number that names no account counts 0, and `method-budget check` warns. |
 
 Older files put an `excluded_fringes` name set on each `group` and `category` source. A
 reader still accepts it there and gives the credit the union of its rows' lists; a writer

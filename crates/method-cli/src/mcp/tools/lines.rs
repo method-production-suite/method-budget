@@ -3,7 +3,7 @@
 //! command line's edit language (`script::apply`), which sets them with the
 //! app's edits: a unit, set, location or currency must exist, a formula
 //! that divides by zero is refused, a color must be `#rrggbb` and so on,
-//! exactly as the app and `method set` check them.
+//! exactly as the app and `method-budget set` check them.
 
 use std::collections::BTreeSet;
 
