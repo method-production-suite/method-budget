@@ -2322,7 +2322,10 @@ The app keeps itself up to date (decisions.md, entry 48; how releases are made:
   toolbar shows **Update ready: Restart to update**. An automatic check that finds nothing
   or can't reach the endpoint says nothing at all; only Help > Check for Updates answers, in
   the same place for a few seconds ("Method Budget is up to date." or "Couldn't check for
-  updates"). Nothing appears as a dialog while you work.
+  updates"). Releases are for Apple silicon Macs only: on an Intel Mac (or anywhere the
+  manifest has no build for the computer, the updater plugin's `TargetsNotFound`) the answer
+  is "Updates are for Apple silicon Macs. This version stays as it is." and the installed
+  version keeps working. Nothing appears as a dialog while you work.
 - **Restart to update** saves first: every open budget's unsaved changes go into its file
   by Autosave's own rules (so a file changed outside the app is never written over: that
   budget's question comes up instead), the open tabs and split view are remembered, and any
@@ -2343,7 +2346,7 @@ The app keeps itself up to date (decisions.md, entry 48; how releases are made:
 The page's side (main window only): `update_status` (the indicator's state:
 `{ phase, version, manual, said, automatic }`, `phase` being idle, checking, downloading,
 ready or installing; `manual` when the user asked; `said` a one-time answer: `current`,
-`failed` or `install-failed`), `update_restart`, `whats_new` (the notes once after an
+`failed`, `no-build` or `install-failed`), `update_restart`, `whats_new` (the notes once after an
 update, else null) and `release_notes`. Rust sends `update-status` events with the same
 shape. Check for Updates and the automatic switch are answered in Rust (src/updater.rs).
 

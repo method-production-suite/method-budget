@@ -11,9 +11,14 @@ builds every platform and drafts a GitHub Release with the files attached:
 
 | Platform | Files | Status |
 |---|---|---|
-| macOS 11 or later (Apple silicon and Intel) | `.dmg`, and the `.app` as a `.zip` | signed and notarized once the release secrets are set (until then ad-hoc signed) |
-| Windows 10/11 (x64) | `.msi` and the NSIS `-setup.exe` | unsigned, untested |
-| Linux (x64) | `.deb` and `.AppImage` | untested |
+| macOS 11 or later, Apple silicon | `Method-Budget-macOS.dmg`, and the `.app` as `Method-Budget-macOS.app.zip` | signed and notarized once the release secrets are set (until then ad-hoc signed) |
+| Windows 10/11 (x64) | `Method-Budget-windows-x64.msi` and the NSIS `Method-Budget-windows-x64-setup.exe` | unsigned, untested |
+| Linux (x64) | `Method-Budget-linux-amd64.deb` and `Method-Budget-linux-x86_64.AppImage` | untested |
+
+Releases after 0.2.1 are for Apple silicon Macs only. An Intel Mac keeps the version it
+has installed: it goes on working, and Help > Check for Updates there says "Updates are for
+Apple silicon Macs. This version stays as it is." An Intel Mac can still build the app from
+source (below) for its own use.
 
 The draft is published by hand once it has been checked ([RELEASING.md](RELEASING.md)).
 Until the macOS build is signed with a Developer ID and notarized, the first launch needs
@@ -39,13 +44,13 @@ The app lands in `target/release/bundle/macos/Method Budget.app` (at the reposit
 root, not inside `crates/method-app`), and the disk image in `target/release/bundle/dmg/`.
 Making the `.dmg` briefly opens and arranges a Finder window; that is normal.
 
-That build runs on your Mac's own architecture. For one app that runs on both Apple silicon
-and Intel:
+That build runs on your Mac's own architecture. Releases are built for Apple silicon only,
+the way the release workflow does it:
 
 ```bash
-rustup target add aarch64-apple-darwin x86_64-apple-darwin
-cargo tauri build --bundles app --target universal-apple-darwin
-# lands in target/universal-apple-darwin/release/bundle/macos/
+rustup target add aarch64-apple-darwin
+cargo tauri build --bundles app,dmg --target aarch64-apple-darwin
+# lands in target/aarch64-apple-darwin/release/bundle/
 ```
 
 To check a built bundle without opening it (architecture, minimum macOS, the `.mthd`
@@ -144,7 +149,7 @@ export APPLE_API_KEY="$(op read 'op://<team vault>/<item>/key id')"
 export APPLE_API_ISSUER="$(op read 'op://<team vault>/<item>/issuer id')"
 op read --out-file "$TMPDIR/AuthKey.p8" 'op://<team vault>/<item>/AuthKey.p8'
 export APPLE_API_KEY_PATH="$TMPDIR/AuthKey.p8"
-cargo tauri build --bundles app,dmg --target universal-apple-darwin
+cargo tauri build --bundles app,dmg --target aarch64-apple-darwin
 rm -f "$TMPDIR/AuthKey.p8"
 ```
 

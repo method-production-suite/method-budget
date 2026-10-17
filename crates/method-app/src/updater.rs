@@ -17,7 +17,10 @@
 //!   Then the page shows a quiet "Update ready: Restart to update".
 //! - Nothing interrupts: an automatic check that fails says nothing. Only a
 //!   check the user asked for (Help > Check for Updates) answers, in the same
-//!   quiet place: up to date, or "Couldn't check for updates".
+//!   quiet place: up to date, or "Couldn't check for updates". A manifest
+//!   with no build for this computer (an Intel Mac: releases are Apple
+//!   silicon only) answers "Updates are for Apple silicon Macs. This version
+//!   stays as it is." instead.
 //! - Restart to update saves first: every open budget's changes go into its
 //!   file (Autosave's own rules, so a file changed outside the app is never
 //!   written over), the open tabs and split view are remembered, and what
@@ -117,8 +120,34 @@ pub enum Said {
     Current,
     /// A check (or its download) the user asked for didn't work.
     Failed,
+    /// A check the user asked for found a manifest with no build for this
+    /// computer (an Intel Mac, since releases are Apple silicon only): this
+    /// version stays as it is.
+    NoBuild,
     /// Restart to update couldn't install; the update is still ready.
     InstallFailed,
+}
+
+/// Why a check didn't work.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CheckFailed {
+    /// No network, no manifest, a bad answer: worth trying again later.
+    Failed,
+    /// The manifest has no entry for this platform.
+    NoBuild,
+}
+
+/// What an updater error means for the user. The plugin returns
+/// `TargetsNotFound` when the manifest has neither `{os}-{arch}-{installer}`
+/// nor `{os}-{arch}` (an Intel Mac reading an Apple-silicon-only manifest),
+/// and `TargetNotFound` when a fixed target is set and missing; both mean
+/// there is no build here. Anything else is a failed check.
+pub fn check_failure(e: &tauri_plugin_updater::Error) -> CheckFailed {
+    use tauri_plugin_updater::Error;
+    match e {
+        Error::TargetsNotFound(_) | Error::TargetNotFound(_) => CheckFailed::NoBuild,
+        _ => CheckFailed::Failed,
+    }
 }
 
 /// What a check asks for next.
@@ -161,9 +190,9 @@ impl Machine {
     }
 
     /// The check finished: `Ok(Some(v))` found version `v`, `Ok(None)` found
-    /// nothing newer, `Err` didn't work. True when `v` should be downloaded;
-    /// and what to tell a user who asked.
-    pub fn checked(&mut self, found: Result<Option<String>, ()>) -> (bool, Option<Said>) {
+    /// nothing newer, `Err` didn't work (and why). True when `v` should be
+    /// downloaded; and what to tell a user who asked.
+    pub fn checked(&mut self, found: Result<Option<String>, CheckFailed>) -> (bool, Option<Said>) {
         let Phase::Checking { manual } = self.phase else {
             return (false, None);
         };
@@ -176,9 +205,13 @@ impl Machine {
                 self.phase = Phase::Idle;
                 (false, manual.then_some(Said::Current))
             }
-            Err(()) => {
+            Err(why) => {
                 self.phase = Phase::Idle;
-                (false, manual.then_some(Said::Failed))
+                let said = match why {
+                    CheckFailed::Failed => Said::Failed,
+                    CheckFailed::NoBuild => Said::NoBuild,
+                };
+                (false, manual.then_some(said))
             }
         }
     }
@@ -581,7 +614,7 @@ fn redirect_policy(hosts: Vec<String>) -> reqwest::redirect::Policy {
 async fn fetch<R: Runtime>(
     app: &AppHandle<R>,
     hosts: Vec<String>,
-) -> Result<Option<Update>, String> {
+) -> Result<Option<Update>, CheckFailed> {
     let client_hosts = hosts.clone();
     let updater = app
         .updater_builder()
@@ -591,14 +624,13 @@ async fn fetch<R: Runtime>(
                 .redirect(redirect_policy(client_hosts.clone()))
         })
         .build()
-        .map_err(|e| e.to_string())?;
-    let update = updater.check().await.map_err(|e| e.to_string())?;
+        .map_err(|_| CheckFailed::Failed)?;
+    let update = updater.check().await.map_err(|e| check_failure(&e))?;
     if let Some(u) = &update {
+        // The update is on a host the updater doesn't use.
         let url = &u.download_url;
         if !allowed(url.scheme(), url.host_str(), &hosts) {
-            return Err(format!(
-                "the update is on a host the updater doesn't use ({url})"
-            ));
+            return Err(CheckFailed::Failed);
         }
     }
     Ok(update)
@@ -623,7 +655,7 @@ pub fn check_now<R: Runtime>(app: &AppHandle<R>, manual: bool) {
     let version = match &found {
         Ok(Some(u)) => Ok(Some(u.version.clone())),
         Ok(None) => Ok(None),
-        Err(_) => Err(()),
+        Err(why) => Err(*why),
     };
     let (download, said) = lock(&updates.machine).checked(version);
     tell(app, said);
@@ -805,7 +837,7 @@ mod tests {
     use method_release::minisign::{fixture, PLACEHOLDER_PUBLIC_KEY};
 
     const ENDPOINT: &str =
-        "https://github.com/ssandweiss/method-budget/releases/latest/download/latest.json";
+        "https://github.com/method-production-suite/method-budget/releases/latest/download/latest.json";
 
     #[test]
     fn automatic_checks_are_quiet() {
@@ -817,7 +849,9 @@ mod tests {
         assert_eq!(m.checked(Ok(None)), (false, None));
         assert_eq!(m.phase, Phase::Idle);
         m.start_check(false);
-        assert_eq!(m.checked(Err(())), (false, None));
+        assert_eq!(m.checked(Err(CheckFailed::Failed)), (false, None));
+        m.start_check(false);
+        assert_eq!(m.checked(Err(CheckFailed::NoBuild)), (false, None));
         assert_eq!(m.phase, Phase::Idle);
         // Found: downloads quietly, then it's ready.
         m.start_check(false);
@@ -844,7 +878,10 @@ mod tests {
         assert!(m.status(true, None).manual);
         assert_eq!(m.checked(Ok(None)), (false, Some(Said::Current)));
         m.start_check(true);
-        assert_eq!(m.checked(Err(())), (false, Some(Said::Failed)));
+        assert_eq!(
+            m.checked(Err(CheckFailed::Failed)),
+            (false, Some(Said::Failed))
+        );
         m.start_check(true);
         m.checked(Ok(Some("0.3.0".into())));
         assert!(
@@ -865,6 +902,42 @@ mod tests {
         m.downloaded(true);
         assert_eq!(m.start_check(true), Start::Ready);
         assert_eq!(m.status(false, None).phase, "ready");
+    }
+
+    #[test]
+    fn a_mac_with_no_build_in_the_manifest_is_told_so() {
+        use tauri_plugin_updater::Error;
+        // An Intel Mac reading an Apple-silicon-only manifest.
+        let missing =
+            Error::TargetsNotFound(vec!["darwin-x86_64-app".into(), "darwin-x86_64".into()]);
+        assert_eq!(check_failure(&missing), CheckFailed::NoBuild);
+        assert_eq!(
+            check_failure(&Error::TargetNotFound("darwin-x86_64".into())),
+            CheckFailed::NoBuild
+        );
+        for other in [
+            Error::ReleaseNotFound,
+            Error::EmptyEndpoints,
+            Error::Network("offline".into()),
+            Error::UnsupportedArch,
+        ] {
+            assert_eq!(check_failure(&other), CheckFailed::Failed, "{other}");
+        }
+        // Asked for: the page says so. Automatic: nothing.
+        let mut m = Machine::default();
+        m.start_check(true);
+        assert_eq!(
+            m.checked(Err(check_failure(&missing))),
+            (false, Some(Said::NoBuild))
+        );
+        assert_eq!(m.phase, Phase::Idle);
+        m.start_check(false);
+        assert_eq!(m.checked(Err(check_failure(&missing))), (false, None));
+        // The page's key for it (ui/js/updates.js, TEXT).
+        assert_eq!(
+            serde_json::to_value(Said::NoBuild).ok(),
+            Some(serde_json::json!("no-build"))
+        );
     }
 
     #[test]

@@ -25,9 +25,12 @@ use crate::versions;
 /// the name, and the platform keys each one serves. The updater looks for
 /// `{os}-{arch}-{installer}` and then `{os}-{arch}`. Anything else in the
 /// folder is refused.
+///
+/// The Mac build is Apple silicon only (the Method suite standard, 2026-10-16), so
+/// the release workflow ships `aarch64.app.tar.gz`. A universal archive is
+/// refused on purpose: it would offer the update to Intel Macs, which keep
+/// the version they have (the app says so when asked: src/updater.rs).
 const PLATFORMS: &[(&str, &[&str])] = &[
-    // A universal macOS build serves both kinds of Mac.
-    ("universal.app.tar.gz", &["darwin-aarch64", "darwin-x86_64"]),
     ("aarch64.app.tar.gz", &["darwin-aarch64"]),
     ("x64.app.tar.gz", &["darwin-x86_64"]),
     ("x64-setup.exe", &["windows-x86_64", "windows-x86_64-nsis"]),
@@ -416,9 +419,10 @@ mod tests {
     #[test]
     fn a_good_manifest() {
         let r = repo(&fixture::public_key(KEY));
-        artifact(&r, "Method-Budget_0.2.0_universal.app.tar.gz", KEY);
+        artifact(&r, "Method-Budget_0.2.0_aarch64.app.tar.gz", KEY);
         let out = command(opts(&r)).unwrap();
-        assert!(out.contains("darwin-aarch64, darwin-x86_64"), "{out}");
+        assert!(out.contains("darwin-aarch64"), "{out}");
+        assert!(!out.contains("darwin-x86_64"), "{out}");
         let m: Value = serde_json::from_str(&r.read("latest.json")).unwrap();
         assert_eq!(m["version"], "0.2.0");
         assert_eq!(m["pub_date"], "2026-10-10T12:00:00Z");
@@ -426,41 +430,40 @@ mod tests {
             .as_str()
             .unwrap()
             .starts_with("Updates arrive in the app."));
-        let url = "https://github.com/example/method-budget/releases/download/v0.2.0/Method-Budget_0.2.0_universal.app.tar.gz";
-        for key in ["darwin-aarch64", "darwin-x86_64"] {
-            assert_eq!(m["platforms"][key]["url"], url);
-            assert_eq!(
-                m["platforms"][key]["signature"],
-                fixture::signature(KEY, "Method Budget.app.tar.gz")
-            );
-        }
-        assert_eq!(m["platforms"].as_object().unwrap().len(), 2);
+        let url = "https://github.com/example/method-budget/releases/download/v0.2.0/Method-Budget_0.2.0_aarch64.app.tar.gz";
+        assert_eq!(m["platforms"]["darwin-aarch64"]["url"], url);
+        assert_eq!(
+            m["platforms"]["darwin-aarch64"]["signature"],
+            fixture::signature(KEY, "Method Budget.app.tar.gz")
+        );
+        // Intel Macs find no entry and keep the version they have.
+        assert_eq!(m["platforms"].as_object().unwrap().len(), 1);
         assert!(!r.read_dir("").iter().any(|n| n.ends_with(".tmp")));
     }
 
     #[test]
     fn malformed_signatures_are_refused() {
         let r = repo(&fixture::public_key(KEY));
-        r.write("dist/Method-Budget_0.2.0_universal.app.tar.gz", "bytes");
+        r.write("dist/Method-Budget_0.2.0_aarch64.app.tar.gz", "bytes");
         r.write(
-            "dist/Method-Budget_0.2.0_universal.app.tar.gz.sig",
+            "dist/Method-Budget_0.2.0_aarch64.app.tar.gz.sig",
             "not a signature at all",
         );
         let e = command(opts(&r)).unwrap_err();
         assert!(
-            e.contains("universal.app.tar.gz.sig: signature: not base64"),
+            e.contains("aarch64.app.tar.gz.sig: signature: not base64"),
             "{e}"
         );
         // A public key where a signature belongs.
         r.write(
-            "dist/Method-Budget_0.2.0_universal.app.tar.gz.sig",
+            "dist/Method-Budget_0.2.0_aarch64.app.tar.gz.sig",
             &fixture::public_key(KEY),
         );
         assert!(command(opts(&r))
             .unwrap_err()
             .contains("expected four lines"));
         // A real-looking signature from another key.
-        artifact(&r, "Method-Budget_0.2.0_universal.app.tar.gz", 42);
+        artifact(&r, "Method-Budget_0.2.0_aarch64.app.tar.gz", 42);
         let e = command(opts(&r)).unwrap_err();
         assert!(
             e.contains("signed with key 2A, but the app trusts E4D0668D54F6EB34"),
@@ -472,7 +475,7 @@ mod tests {
     #[test]
     fn unknown_platforms_and_strays_are_refused() {
         let r = repo(&fixture::public_key(KEY));
-        artifact(&r, "Method-Budget_0.2.0_universal.app.tar.gz", KEY);
+        artifact(&r, "Method-Budget_0.2.0_aarch64.app.tar.gz", KEY);
         artifact(&r, "Method-Budget_0.2.0_riscv64.app.tar.gz", KEY);
         let e = command(opts(&r)).unwrap_err();
         assert!(
@@ -481,24 +484,24 @@ mod tests {
         );
 
         let r = repo(&fixture::public_key(KEY));
-        artifact(&r, "Method-Budget_0.1.0_universal.app.tar.gz", KEY);
+        artifact(&r, "Method-Budget_0.1.0_aarch64.app.tar.gz", KEY);
         assert!(command(opts(&r))
             .unwrap_err()
             .contains("doesn't carry the version"));
 
         let r = repo(&fixture::public_key(KEY));
-        artifact(&r, "Method Budget_0.2.0_universal.app.tar.gz", KEY);
+        artifact(&r, "Method Budget_0.2.0_aarch64.app.tar.gz", KEY);
         assert!(command(opts(&r)).unwrap_err().contains("only have letters"));
 
         let r = repo(&fixture::public_key(KEY));
-        r.write("dist/Method-Budget_0.2.0_universal.app.tar.gz", "bytes");
+        r.write("dist/Method-Budget_0.2.0_aarch64.app.tar.gz", "bytes");
         r.write(
             "dist/Method-Budget_0.2.0_x64-setup.exe.sig",
             &fixture::signature(KEY, "x"),
         );
         let e = command(opts(&r)).unwrap_err();
         assert!(
-            e.contains("no Method-Budget_0.2.0_universal.app.tar.gz.sig"),
+            e.contains("no Method-Budget_0.2.0_aarch64.app.tar.gz.sig"),
             "{e}"
         );
         assert!(
@@ -507,11 +510,13 @@ mod tests {
         );
 
         let r = repo(&fixture::public_key(KEY));
-        artifact(&r, "Method-Budget_0.2.0_universal.app.tar.gz", KEY);
         artifact(&r, "Method-Budget_0.2.0_aarch64.app.tar.gz", KEY);
-        assert!(command(opts(&r))
-            .unwrap_err()
-            .contains("a second artifact for darwin-aarch64"));
+        artifact(&r, "Method-Budget_0.2.0_universal.app.tar.gz", KEY);
+        let e = command(opts(&r)).unwrap_err();
+        assert!(
+            e.contains("an unknown platform (universal.app.tar.gz)"),
+            "a universal archive would update Intel Macs: {e}"
+        );
 
         let r = repo(&fixture::public_key(KEY));
         std::fs::create_dir_all(r.root().join("dist")).unwrap();
@@ -524,7 +529,8 @@ mod tests {
     fn every_known_platform() {
         let r = repo(&fixture::public_key(KEY));
         for n in [
-            "Method-Budget_0.2.0_universal.app.tar.gz",
+            "Method-Budget_0.2.0_aarch64.app.tar.gz",
+            "Method-Budget_0.2.0_x64.app.tar.gz",
             "Method-Budget_0.2.0_x64-setup.exe",
             "Method-Budget_0.2.0_x64_en-US.msi",
             "Method-Budget_0.2.0_amd64.AppImage",
@@ -550,7 +556,7 @@ mod tests {
     #[test]
     fn no_manifest_without_a_real_key_ready_notes_and_the_right_version() {
         let r = repo(PLACEHOLDER_PUBLIC_KEY);
-        artifact(&r, "Method-Budget_0.2.0_universal.app.tar.gz", KEY);
+        artifact(&r, "Method-Budget_0.2.0_aarch64.app.tar.gz", KEY);
         assert!(command(opts(&r))
             .unwrap_err()
             .contains("placeholder updater key"));
@@ -568,7 +574,7 @@ mod tests {
             key_command(&r.root().join("conf.json"), true).unwrap(),
             "trusted E4D0668D54F6EB34\n"
         );
-        artifact(&r, "Method-Budget_0.2.0_universal.app.tar.gz", KEY);
+        artifact(&r, "Method-Budget_0.2.0_aarch64.app.tar.gz", KEY);
         r.write(
             "docs/releases/0.2.0.md",
             "# Method Budget 0.2.0\n\n{{Headline.}}\n\n## S\n\n- x\n",
@@ -576,7 +582,7 @@ mod tests {
         assert!(command(opts(&r)).unwrap_err().contains("isn't ready"));
 
         let r = repo(&fixture::public_key(KEY));
-        artifact(&r, "Method-Budget_0.3.0_universal.app.tar.gz", KEY);
+        artifact(&r, "Method-Budget_0.3.0_aarch64.app.tar.gz", KEY);
         let mut o = opts(&r);
         o.version = "0.3.0".into();
         assert!(command(o)
@@ -584,7 +590,7 @@ mod tests {
             .contains("isn't the workspace version"));
 
         let r = repo(&fixture::public_key(KEY));
-        artifact(&r, "Method-Budget_0.2.0_universal.app.tar.gz", KEY);
+        artifact(&r, "Method-Budget_0.2.0_aarch64.app.tar.gz", KEY);
         let mut o = opts(&r);
         o.pub_date = Some("yesterday".into());
         assert!(command(o).is_err());

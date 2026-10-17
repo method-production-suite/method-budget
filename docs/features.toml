@@ -28,7 +28,7 @@
 # Inline `code` is allowed; nothing else is markup.
 
 [project]
-repo = "https://github.com/ssandweiss/method-budget"
+repo = "https://github.com/method-production-suite/method-budget"
 
 [[group]]
 id = "engine"
