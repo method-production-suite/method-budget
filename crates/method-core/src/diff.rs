@@ -609,6 +609,7 @@ pub(crate) fn row_fields(d: &Detail) -> Vec<Field> {
             "fringe range",
             d.fringe_range.map_or("none".into(), |n| n.to_string()),
         ),
+        text("person", "person", opt_text(&d.person)),
         names("fringes", "fringes", &d.fringes),
         names("groups", "groups", &d.groups),
         text("set", "set", opt_text(&d.set)),

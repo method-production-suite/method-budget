@@ -941,6 +941,12 @@ pub struct Detail {
     /// Consecutive lines with the same `Some(n)` form one fringe range: percent
     /// fringe cutoffs apply to their combined subtotal, as one earner.
     pub fringe_range: Option<u32>,
+    /// The person this row pays (decisions.md, entry 79), opt-in. Every
+    /// counted line and adjustment row with the same person, in any
+    /// account, shares each percent fringe's cutoff as one earner; a row
+    /// with a person leaves its fringe range for percent fringes. `None`
+    /// (the default) changes nothing. See [`Detail::person_name`].
+    pub person: Option<String>,
     /// Text style. Display only: never affects totals.
     pub bold: bool,
     pub italic: bool,
@@ -972,12 +978,22 @@ impl Detail {
             location: None,
             set: None,
             fringe_range: None,
+            person: None,
             bold: false,
             italic: false,
             indent: 0,
             color: None,
             notes: Vec::new(),
         }
+    }
+
+    /// The row's person as the engine reads it: trimmed, `None` when unset
+    /// or blank.
+    pub fn person_name(&self) -> Option<&str> {
+        self.person
+            .as_deref()
+            .map(str::trim)
+            .filter(|p| !p.is_empty())
     }
 
     /// A costed line: `amount` `unit` at `rate`, with blank X and 4X.

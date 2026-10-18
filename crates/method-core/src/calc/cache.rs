@@ -7,8 +7,10 @@
 //! options). An edit usually changes one account, so
 //! [`RecalcCache`] keeps every account's evaluated rows, and the next recalc
 //! evaluates again only the accounts whose rows changed (all of them when one
-//! of those tables changed). Stages 3 and 4 run in full every time. The
-//! result is exactly [`recalc`](super::recalc)'s.
+//! of those tables changed). The cache keeps rows as stage 2 leaves them,
+//! before the person pass (decisions.md, entry 79): a person's cutoff
+//! reaches across accounts, so that pass, like stages 3 and 4, runs in full
+//! every time. The result is exactly [`recalc`](super::recalc)'s.
 
 use std::collections::BTreeMap;
 
@@ -219,7 +221,7 @@ mod tests {
         let k = rng.below(n) as usize;
         let fringes: Vec<String> = b.fringes.keys().cloned().collect();
         let groups: Vec<String> = b.groups.keys().cloned().collect();
-        match rng.below(15) {
+        match rng.below(17) {
             0..=3 => details_mut(b)[k].rate = format!("{}", rng.below(9_000)).into(),
             4 => details_mut(b)[k].amount = "SHOOT_DAYS / 2".into(),
             5 => details_mut(b)[k].amount = "NOPE".into(),
@@ -271,6 +273,11 @@ mod tests {
                     r.conflict = flip(r.conflict);
                 }
             }
+            14 | 15 => {
+                // A person: their cutoff reaches into other accounts.
+                let p = [Some("Dana Reyes"), Some("Lee Park"), None][rng.below(3) as usize];
+                details_mut(b)[k].person = p.map(String::from);
+            }
             _ => {
                 // Move a category: every position after it changes.
                 if let Some(TopsheetRow::Category(_)) = b.topsheet.first() {
@@ -298,6 +305,9 @@ mod tests {
             });
             if seed % 2 == 0 {
                 b.fringe_posting = FringePosting::Account;
+            }
+            if seed > 3 {
+                sample::persons(&mut b, seed);
             }
             let mut cache = RecalcCache::new();
             let mut rng = Rng(seed * 104_729 + 7);

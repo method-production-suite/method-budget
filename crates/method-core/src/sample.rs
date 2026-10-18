@@ -471,6 +471,26 @@ pub fn budget(spec: &SampleSpec) -> Budget {
     b
 }
 
+/// Invented people for [`persons`].
+pub const PERSONS: [&str; 4] = ["Dana Reyes", "Lee Park", "Ari Moss", "Jo Quinn"];
+
+/// Gives about a fifth of `b`'s lines and adjustment rows a person from
+/// [`PERSONS`] (decisions.md, entry 79), so each person is paid in rows of
+/// several accounts, some of them in fringe ranges. For tests of person
+/// cutoffs; nothing else changes.
+pub fn persons(b: &mut Budget, seed: u64) {
+    let mut rng = Rng::new(seed ^ 0x5eed_9e75);
+    for c in b.categories_mut() {
+        for a in &mut c.accounts {
+            for d in &mut a.details {
+                if d.kind.is_costed() && rng.chance(20) {
+                    d.person = Some((*rng.pick(&PERSONS)).into());
+                }
+            }
+        }
+    }
+}
+
 /// Rewrites the numbers of `b` (from [`budget`]) with up to nine decimal
 /// places, many of them on a rounding edge: products a hair under, at or over
 /// half a cent, such as 0.5 x 0.009999999. Lines, fringe rates, unit hours,

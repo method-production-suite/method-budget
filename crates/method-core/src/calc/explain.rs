@@ -9,7 +9,8 @@
 //! or half up on the binary double as Movie Magic rounds, saying what the
 //! double holds; decisions.md, entry 55), each fringe on each line
 //! (percent or flat, the cutoff and how much of it the lines above in a
-//! range left, decisions.md, entry 56), where fringes post, what a group or a
+//! range left, decisions.md, entry 56; a person's one cutoff across
+//! accounts and each line's share of it, entry 79), where fringes post, what a group or a
 //! report filter left out and why, a charge's base and exclusions, a credit's
 //! gross, excluded, net and caps.
 //!
@@ -29,6 +30,7 @@ use super::arith::{converted, float_digits, float_text, percent_of, Money, Num, 
 use super::fringes::{
     earners, factored_cutoff, flat_count, percent_step, CountFrom, Factor, Factors, FlatCount,
 };
+use super::persons::{self, person_shares, Split};
 use super::topsheet::{credit_cap, credit_keep, credit_row, dropped_from};
 use super::{recalc, CalcError, Ctx, RecalcOptions};
 use crate::decimal::{Dec, Exact};
@@ -446,6 +448,9 @@ impl<'a> Explainer<'a> {
                 list.push(account_calc(&ctx, ci, ai, &acct.code, &acct.details)?);
             }
             accounts.push(list);
+        }
+        if persons::any(b) {
+            persons_calc(&ctx, &mut accounts)?;
         }
         Ok(Explainer {
             b,
@@ -2332,6 +2337,241 @@ fn fringes_calc(
         }
         rows[i].fringe_total = total;
         rows[i].fringes = map.into_iter().collect();
+    }
+    Ok(())
+}
+
+/// "2100", "2100 and 2200", "2100, 2200 and 3100".
+fn and_list(items: &[String]) -> String {
+    match items {
+        [] => String::new(),
+        [one] => one.clone(),
+        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+    }
+}
+
+/// Percent fringe steps for every row with a person (the engine's person
+/// pass, decisions.md, entry 79, worked out again with its working shown),
+/// across every account, with the rows' and accounts' fringe totals added
+/// up again.
+fn persons_calc(ctx: &Ctx, accounts: &mut [Vec<AccountCalc>]) -> R<()> {
+    // Each person's earning rows, as (ci, ai, row), in budget order.
+    let mut people: BTreeMap<&str, Vec<(usize, usize, usize)>> = BTreeMap::new();
+    for (ci, cat) in ctx.b.categories().enumerate() {
+        for (ai, acct) in cat.accounts.iter().enumerate() {
+            for (i, d) in acct.details.iter().enumerate() {
+                let earns = accounts[ci][ai].rows.get(i).is_some_and(|r| r.included);
+                if let (true, true, Some(p)) = (d.kind.is_costed(), earns, d.person_name()) {
+                    people.entry(p).or_default().push((ci, ai, i));
+                }
+            }
+        }
+    }
+    let blank_at = || String::new();
+    let mut found: BTreeMap<(usize, usize, usize), BTreeMap<String, Step>> = BTreeMap::new();
+    let detail = |ci: usize, ai: usize, i: usize| -> R<&Detail> {
+        ctx.b
+            .categories()
+            .nth(ci)
+            .and_then(|c| c.accounts.get(ai))
+            .and_then(|a| a.details.get(i))
+            .ok_or_else(|| gone("row"))
+    };
+    let code = |ci: usize, ai: usize| -> String {
+        ctx.b
+            .categories()
+            .nth(ci)
+            .and_then(|c| c.accounts.get(ai))
+            .map(|a| a.code.clone())
+            .unwrap_or_default()
+    };
+    for (person, at) in &people {
+        let mut names: BTreeSet<&str> = BTreeSet::new();
+        for &(ci, ai, i) in at {
+            names.extend(detail(ci, ai, i)?.fringes.iter().map(String::as_str));
+        }
+        for name in names {
+            let Some(f) = ctx.b.fringes.get(name) else {
+                continue;
+            };
+            let FringeKind::Percent { cutoff: typed } = f.kind else {
+                continue;
+            };
+            let cutoff = factored_cutoff(ctx.arith, typed, ctx.b.cutoff_factor).ok_or_else(ovf)?;
+            let rate = ctx.eval(&f.rate, Dec::ZERO, &blank_at)?;
+            let mut lines = Vec::new();
+            for &(ci, ai, i) in at {
+                let d = detail(ci, ai, i)?;
+                if d.fringes.contains(name) {
+                    lines.push((ci, ai, i, d.id, accounts[ci][ai].rows[i].total));
+                }
+            }
+            let input: Vec<(RowId, Cents)> = lines.iter().map(|l| (l.3, l.4)).collect();
+            let (split, shares) = person_shares(ctx.arith, rate, cutoff, &input).ok_or_else(ovf)?;
+            let mut codes: Vec<String> = Vec::new();
+            for l in &lines {
+                let c = code(l.0, l.1);
+                if !codes.contains(&c) {
+                    codes.push(c);
+                }
+            }
+            let shared = match cutoff {
+                Some(_) => ", so they share one cutoff".to_string(),
+                None => format!("; {name} has no cutoff, so each line earns its own percent"),
+            };
+            let who = format!(
+                "{person} is paid on {} {} in {} {}{shared}",
+                lines.len(),
+                if lines.len() == 1 { "line" } else { "lines" },
+                if codes.len() == 1 {
+                    "account"
+                } else {
+                    "accounts"
+                },
+                and_list(&codes)
+            );
+            let rate_words = if f.rate.0.trim().parse::<Dec>().is_ok() {
+                String::new()
+            } else {
+                format!(" (rate {})", formula_words(ctx, &f.rate, rate))
+            };
+            for (l, share) in lines.iter().zip(&shares) {
+                let (ci, ai, i, id, total) = *l;
+                let mut notes = vec![
+                    Step::note("Person", who.clone()),
+                    Step::note_amount("Earnings", "this line's total", total),
+                ];
+                if let (Some(t), Some(c)) = (typed, cutoff) {
+                    if ctx.b.cutoff_factor != CutoffFactor::One {
+                        notes.push(Step::note(
+                            "Cutoff factor",
+                            format!(
+                                "the budget multiplies every percent cutoff by {}: {} x {} = {}",
+                                ctx.b.cutoff_factor.name(),
+                                money(t),
+                                ctx.b.cutoff_factor.name(),
+                                money(c)
+                            ),
+                        ));
+                    }
+                }
+                let pay: Cents = input
+                    .iter()
+                    .try_fold(0, |a: Cents, r| a.checked_add(r.1))
+                    .ok_or_else(ovf)?;
+                match split {
+                    Split::Own => {
+                        if let Some(c) = cutoff {
+                            notes.push(Step::note_amount(
+                                "Cutoff",
+                                format!(
+                                    "{} per person, not reached: {person} is paid {} with {name}, so each line earns its own percent",
+                                    money(c),
+                                    money(pay)
+                                ),
+                                pay,
+                            ));
+                        }
+                        let exact = percent_of(ctx.arith, total, rate).ok_or_else(ovf)?;
+                        notes.push(Step::note(
+                            "Fringe",
+                            format!(
+                                "{}% of {} = {}{rate_words}",
+                                nwords(rate),
+                                money(total),
+                                dmoney(exact)
+                            ),
+                        ));
+                        notes.extend(rounding(exact, share.amount));
+                    }
+                    Split::Nothing => {
+                        let c = cutoff.unwrap_or(0);
+                        notes.push(Step::note_amount(
+                            "Cutoff used up",
+                            format!(
+                                "{name} stops at {} per person, so nothing is earned",
+                                money(c)
+                            ),
+                            0,
+                        ));
+                    }
+                    Split::Shared {
+                        pay,
+                        cutoff: c,
+                        exact,
+                        amount,
+                    } => {
+                        notes.push(Step::note_amount(
+                            "Cutoff reached",
+                            format!(
+                                "{person} is paid {} with {name}, past the {} cutoff, so {person} earns {}% of {} = {}{rate_words}",
+                                money(pay),
+                                money(c),
+                                nwords(rate),
+                                money(c),
+                                dmoney(exact)
+                            ),
+                            amount,
+                        ));
+                        notes.extend(rounding(exact, amount));
+                        let floor = if share.extra_cent {
+                            share.amount.checked_sub(1).ok_or_else(ovf)?
+                        } else {
+                            share.amount
+                        };
+                        let extra = if share.extra_cent {
+                            ", plus one of the cents left over (shares rounded down; the left-over cents go to the largest remainders, then the lowest row id)"
+                        } else {
+                            ""
+                        };
+                        notes.push(Step::note(
+                            "Share",
+                            format!(
+                                "this line's part of {person}'s {}, by pay: {} x {} / {}, {} rounded down{extra}",
+                                money(amount),
+                                money(amount),
+                                money(total),
+                                money(pay),
+                                money(floor)
+                            ),
+                        ));
+                    }
+                }
+                let kind_text = match cutoff {
+                    Some(c) => format!("{}% with a {} cutoff per person", nwords(rate), money(c)),
+                    None => format!("{}%", nwords(rate)),
+                };
+                let s = Step::value(name, kind_text, share.amount)
+                    .with(notes)
+                    .with_link(Link::Row { ci, ai, row: id })
+                    .with_expand(Target::LineFringe(id, name.to_string()));
+                found
+                    .entry((ci, ai, i))
+                    .or_default()
+                    .insert(name.to_string(), s);
+            }
+        }
+    }
+    for ((ci, ai, i), steps) in found {
+        let row = &mut accounts[ci][ai].rows[i];
+        let mut map: BTreeMap<String, Step> =
+            std::mem::take(&mut row.fringes).into_iter().collect();
+        map.extend(steps);
+        let mut total: Cents = 0;
+        for s in map.values() {
+            total = total.checked_add(s.amount.unwrap_or(0)).ok_or_else(ovf)?;
+        }
+        row.fringe_total = total;
+        row.fringes = map.into_iter().collect();
+    }
+    for list in accounts.iter_mut() {
+        for a in list.iter_mut() {
+            a.fringe_total = a
+                .rows
+                .iter()
+                .try_fold(0, |t: Cents, r| t.checked_add(r.fringe_total))
+                .ok_or_else(ovf)?;
+        }
     }
     Ok(())
 }

@@ -1917,6 +1917,8 @@ struct FileDetail {
     currency: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     fringe_range: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    person: Option<String>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     fringes: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
@@ -1961,6 +1963,7 @@ impl From<&Detail> for FileDetail {
             location,
             set,
             fringe_range,
+            person,
             bold,
             italic,
             indent,
@@ -1986,6 +1989,7 @@ impl From<&Detail> for FileDetail {
             unit4: unit4.clone(),
             currency: currency.clone(),
             fringe_range: *fringe_range,
+            person: person.clone(),
             fringes: fringes.clone(),
             groups: groups.clone(),
             set: set.clone(),
@@ -2025,6 +2029,7 @@ impl From<FileDetail> for Detail {
             location: f.location,
             set: f.set,
             fringe_range: f.fringe_range,
+            person: f.person,
             bold: f.bold,
             italic: f.italic,
             indent: f.indent,
@@ -3133,6 +3138,8 @@ struct FileBlockRow {
     currency: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     fringe_range: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    person: Option<String>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     fringes: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
@@ -3172,6 +3179,7 @@ impl From<&Detail> for FileBlockRow {
             unit4,
             currency,
             fringe_range,
+            person,
             fringes,
             groups,
             set,
@@ -3196,6 +3204,7 @@ impl From<&Detail> for FileBlockRow {
             unit4,
             currency,
             fringe_range,
+            person,
             fringes,
             groups,
             set,
@@ -3226,6 +3235,7 @@ impl From<FileBlockRow> for Detail {
             unit4,
             currency,
             fringe_range,
+            person,
             fringes,
             groups,
             set,
@@ -3251,6 +3261,7 @@ impl From<FileBlockRow> for Detail {
             unit4,
             currency,
             fringe_range,
+            person,
             fringes,
             groups,
             set,

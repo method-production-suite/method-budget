@@ -137,6 +137,7 @@ fn gen_detail(rng: &mut Rng, id: RowId) -> Detail {
             1 => Some(u32::MAX),
             _ => None,
         },
+        person: rng.opt_text(),
         bold: rng.chance(30),
         italic: rng.chance(30),
         indent: match rng.below(4) {

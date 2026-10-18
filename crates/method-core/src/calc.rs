@@ -9,7 +9,9 @@
 //! Stages, each in its own module:
 //! 1. [`lines`]: evaluate every row of every account (formulas, currency,
 //!    suppression, subtotal and adjustment rows).
-//! 2. [`fringes`]: fringe dollars per row (cutoffs, ranges, unit conversion).
+//! 2. [`fringes`]: fringe dollars per row (cutoffs, ranges, unit conversion),
+//!    then [`persons`]: percent fringes of rows with a person, whose cutoff
+//!    applies once across accounts (opt-in; skipped when no row has one).
 //! 3. [`topsheet`]: fringe posting, production levels, ATL/BTL, charges, credits.
 //! 4. [`breakdown`]: per-fringe, group, set and location totals.
 
@@ -30,6 +32,7 @@ pub(crate) mod display;
 pub mod explain;
 pub(crate) mod fringes;
 pub(crate) mod lines;
+pub mod persons;
 #[cfg(test)]
 mod reference;
 pub(crate) mod topsheet;
@@ -377,7 +380,31 @@ fn eval_categories_with(
             total: details_total,
         });
     }
+    if persons::any(ctx.b) {
+        apply_persons(ctx, &mut categories)?;
+    }
     Ok(categories)
+}
+
+/// The person pass ([`persons::apply`]) over every account of
+/// `categories`, with the account and category fringe totals added up
+/// again.
+pub(crate) fn apply_persons(ctx: &Ctx, categories: &mut [CategoryTotals]) -> Result<(), CalcError> {
+    let ovf = || overflow("budget totals");
+    let accts: Vec<&crate::model::Account> = ctx.b.categories().flat_map(|c| &c.accounts).collect();
+    let mut rows: Vec<&mut [RowTotals]> = categories
+        .iter_mut()
+        .flat_map(|c| c.accounts.iter_mut())
+        .map(|a| a.rows.as_mut_slice())
+        .collect();
+    persons::apply(ctx, &accts, &mut rows)?;
+    for c in categories.iter_mut() {
+        for a in c.accounts.iter_mut() {
+            a.fringe_total = sum(a.rows.iter().map(|r| r.fringe_total)).ok_or_else(ovf)?;
+        }
+        c.fringe_total = sum(c.accounts.iter().map(|a| a.fringe_total)).ok_or_else(ovf)?;
+    }
+    Ok(())
 }
 
 /// Per category, per account: the account's unfiltered rows, or `None` when
@@ -433,7 +460,32 @@ fn eval_full(
         sum(fringe_totals).ok_or_else(ovf)?;
         out.push(accounts);
     }
+    if persons::any(ctx.b) {
+        full_persons(ctx, active, &mut out)?;
+    }
     Ok(out)
+}
+
+/// The person pass over unfiltered (or earned) rows: a person's rows in an
+/// account whose rows all count still share the cutoff with rows elsewhere
+/// that count only here, so every account with a person row gets rows of
+/// its own (the counted ones, whose person fringes the pass replaces), and
+/// the pass runs over them all.
+fn full_persons(ctx: &Ctx, active: &[CategoryTotals], out: &mut FullRows) -> Result<(), CalcError> {
+    let mut accts: Vec<&crate::model::Account> = Vec::new();
+    let mut rows: Vec<&mut [RowTotals]> = Vec::new();
+    for ((cat, ac), list) in ctx.b.categories().zip(active).zip(out.iter_mut()) {
+        for ((acct, aa), slot) in cat.accounts.iter().zip(&ac.accounts).zip(list.iter_mut()) {
+            if slot.is_none() && acct.details.iter().any(persons::is_person_row) {
+                *slot = Some(aa.rows.clone());
+            }
+            if let Some(r) = slot {
+                accts.push(acct);
+                rows.push(r.as_mut_slice());
+            }
+        }
+    }
+    persons::apply(ctx, &accts, &mut rows)
 }
 
 /// The rows a group's total takes its fringes from (decisions.md, entry 58):
