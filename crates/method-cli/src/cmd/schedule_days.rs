@@ -20,8 +20,11 @@ pub const USAGE: &str =
       go to SHOOT_DAYS; any other figure only when picked: --pick KEY, KEY as
       listed (total, unit:NAME, set:NAME, location:NAME, week:YYYY-MM-DD,
       element:ID), =GLOBAL to name the global (else its default name).
-      Globals an earlier import set are picked again; --skip KEY leaves one
-      out. Prep and wrap are never touched. Nothing is written unless --apply,
+      The default is never a global the budget already has (it gets _2);
+      name one with =GLOBAL to update it. Globals an earlier import set are
+      picked again; --skip KEY leaves one out. A global set from a figure the
+      file no longer has is listed as linked:GLOBAL at 0 days, unpicked: only
+      --pick linked:GLOBAL sets it to 0. Prep and wrap are never touched. Nothing is written unless --apply,
       which saves the budget atomically. --json prints the review as JSON.
       Exit 3 when a pick is refused.
 ";
@@ -164,6 +167,9 @@ pub fn describe(r: &Review) -> String {
                 f.label,
                 f.key
             );
+            if let Some(n) = &f.note {
+                let _ = writeln!(s, "      {n}");
+            }
         }
     }
     let rest: Vec<&FigureRow> = r.figures.iter().filter(|f| !f.picked).collect();
@@ -183,6 +189,9 @@ pub fn describe(r: &Review) -> String {
                     None => String::new(),
                 }
             );
+            if let Some(n) = &f.note {
+                let _ = writeln!(s, "      {n}");
+            }
         }
     }
     let _ = writeln!(

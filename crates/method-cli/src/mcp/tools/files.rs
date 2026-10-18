@@ -886,31 +886,59 @@ fn schedule_days(ctx: &mut Ctx, a: &Args) -> ToolResult {
         m.insert("applied".into(), json!(message.is_some()));
         m.insert("message".into(), json!(message));
     }
-    let summary = format!(
-        "{file_shown}: {} ({}, {}), {} shoot days. {}{}",
-        review.schedule,
-        review.board,
-        review.sub_board,
-        review.shoot_days,
-        match &message {
-            Some(m) => m.clone(),
-            None if !review.can_apply =>
-                "The picked globals already match; nothing to change.".into(),
-            None => format!(
-                "Would set {} new and {} changed globals ({} already match).",
-                review.adds, review.updates, review.same
-            ),
-        },
-        if review.changed.is_empty() {
-            String::new()
-        } else {
-            format!(
-                " The schedule changed since these were set from it: {}.",
-                review.changed.join(", ")
-            )
-        }
-    );
+    let summary = schedule_summary(&file_shown, &review, message.as_deref(), dry);
     Ok(ToolOut { summary, data })
+}
+
+/// The `schedule_days` tool's sentence: what happened, never more.
+pub(crate) fn schedule_summary(
+    file: &str,
+    review: &method_session::schedule_days::Review,
+    message: Option<&str>,
+    dry_run: bool,
+) -> String {
+    let picked = review.figures.iter().filter(|f| f.picked).count();
+    let what = match message {
+        Some(m) => m.to_string(),
+        None if picked == 0 => "Nothing is picked; nothing changed.".into(),
+        None if !review.problems.is_empty() => format!("Refused: {}", review.problems.join(" ")),
+        None if !review.can_apply => format!(
+            "The {} already set from this schedule; nothing changed.",
+            count_words(picked, "picked global is", "picked globals are")
+        ),
+        None if dry_run => format!(
+            "Dry run: would set {} new and {} changed globals ({} already match); nothing changed.",
+            review.adds, review.updates, review.same
+        ),
+        None => "Nothing changed.".into(),
+    };
+    let gone = review
+        .figures
+        .iter()
+        .filter(|f| f.kind == "missing" && !f.picked)
+        .count();
+    let mut s = format!(
+        "{file}: {} ({}, {}), {} shoot days. {what}",
+        review.schedule, review.board, review.sub_board, review.shoot_days
+    );
+    if !review.changed.is_empty() {
+        s.push_str(&format!(
+            " The schedule changed since these were set from it: {}.",
+            review.changed.join(", ")
+        ));
+    }
+    if gone > 0 {
+        s.push_str(&format!(
+            " {} set from figures no longer in the file, left as they are (pick linked:GLOBAL to set one to 0).",
+            count_words(gone, "global was", "globals were")
+        ));
+    }
+    s
+}
+
+/// "1 global" or "3 globals".
+fn count_words(n: usize, one: &str, many: &str) -> String {
+    format!("{n} {}", if n == 1 { one } else { many })
 }
 
 // ---------------------------------------------------------------------------

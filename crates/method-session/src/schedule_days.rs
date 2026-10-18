@@ -11,22 +11,24 @@
 //! - **The rule** (decisions.md, entry 76). The shoot days in all always go
 //!   to `SHOOT_DAYS`. Any other figure goes to a global only when picked:
 //!   the person picks it and may name the global (an existing one to update
-//!   it, such as `STATION_DAYS`, or a new one); its default name is the
-//!   figure's name in capitals with `_DAYS` (`COLD_SPRING_FIELD_STATION_DAYS`).
-//!   A figure is picked to start with only when an earlier import set a
-//!   global from it (the global's setup source says so). A global that only
-//!   happens to have a figure's default name is not picked for it: the
-//!   Field Station budget's `RIDGE_DAYS` is the fire road location's, not
-//!   the RIDGE set's. Prep and wrap are never counted: those globals are the
-//!   budget's own assumptions and are left alone.
+//!   it, such as `STATION_DAYS`, or a new one). Its default name is the
+//!   figure's name in capitals with `_DAYS` (`COLD_SPRING_FIELD_STATION_DAYS`),
+//!   never a global the budget already has: that gets `_2`, `_3`... (the
+//!   Field Station budget's `RIDGE_DAYS` is the fire road location's, so the
+//!   RIDGE set defaults to `RIDGE_DAYS_2`). A figure is picked to start with
+//!   only when an earlier import set a global from it. Prep and wrap are
+//!   never counted: those globals are the budget's own assumptions.
 //! - **The link** is the global's setup source (`setup_sources`, already in
 //!   the file format): its notes say which figure of which schedule set it,
-//!   in words ("Shoot days at location X, from the schedule T (board, sub
-//!   board)"). A later import of the same schedule finds the globals it set
-//!   by those notes, picks them again, and says which ones the schedule
-//!   changed. A global linked to a figure the file no longer has (a location
-//!   dropped, an element cut) is offered at 0 days, as the spec asks, rather
-//!   than kept at an old number. Remembering the file's `days_hash` would
+//!   in words, then its key ("Shoot days at location X, from the schedule T
+//!   (board, sub board) [key: location:X]"; an element's key is its id,
+//!   category, board ID and name). A later import finds the figure again by
+//!   that key (an element through the reader's identity rules: renamed or
+//!   renumbered is the same element, both changed asks first), falling back
+//!   to the words for a note without a key and saying so. It picks linked
+//!   globals again and says which ones the schedule changed. A linked figure
+//!   the file no longer has is offered at 0 days but starts unticked, so it
+//!   is set to 0 only when picked. Remembering the file's `days_hash` would
 //!   need a new field in the budget file; that is proposed in the roadmap's
 //!   3.8 notes and not done here.
 //! - **The review** lists every figure with its global, the global's value
@@ -116,6 +118,9 @@ pub struct Figure {
     pub name: String,
     /// An element's category.
     pub category: String,
+    /// An element's id and board ID in the schedule file.
+    pub id: Option<u32>,
+    pub board_id: Option<String>,
     pub days: u32,
     /// What it is, in words: "Shoot days at location Cold Spring field
     /// station".
@@ -131,6 +136,8 @@ pub fn figures(days: &ScheduleDays) -> Vec<Figure> {
         kind: "total",
         name: String::new(),
         category: String::new(),
+        id: None,
+        board_id: None,
         days: d.total,
         label: "Shoot days in all".into(),
     }];
@@ -146,6 +153,8 @@ pub fn figures(days: &ScheduleDays) -> Vec<Figure> {
                 kind,
                 name: name.clone(),
                 category: String::new(),
+                id: None,
+                board_id: None,
                 days: *n,
                 label: format!("{words} {name}"),
             });
@@ -167,6 +176,8 @@ pub fn figures(days: &ScheduleDays) -> Vec<Figure> {
             kind: "element",
             name: e.name.clone(),
             category: e.category.clone(),
+            id: Some(e.id),
+            board_id: e.board_id.clone(),
             days: e.total,
             label: format!("Days of {who}"),
         });
@@ -175,9 +186,37 @@ pub fn figures(days: &ScheduleDays) -> Vec<Figure> {
 }
 
 /// What a global's setup source says when this file set it: the figure,
-/// then the schedule.
-fn source_note(days: &ScheduleDays, label: &str) -> String {
-    format!("{label}{}", source_tail(days))
+/// the schedule, then the figure's key, so a later import finds the figure
+/// again by the most stable thing the file has (an element's id, category,
+/// board ID and name; a unit's, set's, location's or week's name), not by
+/// its words.
+fn source_note(days: &ScheduleDays, f: &Figure) -> String {
+    format!("{}{}{KEY_OPEN}{}]", f.label, source_tail(days), key_spec(f))
+}
+
+/// Where a source note's key starts.
+const KEY_OPEN: &str = " [key: ";
+/// Between an element's key parts.
+const KEY_SEP: &str = " | ";
+
+/// A key part as written in a note: `|` and `]` would end it early.
+fn key_part(s: &str) -> String {
+    s.trim().replace('|', "/").replace(']', ")")
+}
+
+/// The key a figure is found again by: `location:NAME`..., and for an
+/// element `element:ID | category | board ID | name`.
+fn key_spec(f: &Figure) -> String {
+    match (f.kind, f.id) {
+        ("element", Some(id)) => [
+            format!("element:{id}"),
+            key_part(&f.category),
+            key_part(f.board_id.as_deref().unwrap_or("")),
+            key_part(&f.name),
+        ]
+        .join(KEY_SEP),
+        _ => key_part(&f.key),
+    }
 }
 
 /// The part of a source note naming the schedule and sub-board.
@@ -188,6 +227,119 @@ fn source_tail(days: &ScheduleDays) -> String {
         days.board.trim(),
         days.sub_board.trim()
     )
+}
+
+/// A global an earlier import of this schedule's sub-board set, as its
+/// source note records it.
+struct Recorded {
+    global: String,
+    label: String,
+    /// `None` for a note written before keys were recorded.
+    key: Option<String>,
+}
+
+/// Every global whose source note says this file's schedule and sub-board
+/// set it.
+fn recorded(b: &Budget, days: &ScheduleDays) -> Vec<Recorded> {
+    let tail = source_tail(days);
+    let Some(by_name) = b.setup_sources.0.get(GLOBAL_KIND) else {
+        return Vec::new();
+    };
+    by_name
+        .iter()
+        .filter(|(name, _)| b.globals.contains_key(*name))
+        .filter_map(|(name, src)| {
+            let note = src.notes.trim();
+            let (head, key) = match note.strip_suffix(']').and_then(|n| n.rsplit_once(KEY_OPEN)) {
+                Some((h, k)) => (h, Some(k.to_string())),
+                None => (note, None),
+            };
+            let label = head.strip_suffix(&tail)?;
+            (!label.is_empty()).then(|| Recorded {
+                global: name.clone(),
+                label: label.to_string(),
+                key,
+            })
+        })
+        .collect()
+}
+
+/// Where a recorded global's figure is in this file.
+enum Found {
+    /// The same figure; with a note when it was found by its words only.
+    Same(usize, Option<String>),
+    /// Only the element's id still matches: ask before relinking.
+    Doubt(usize, String),
+    /// Not in the file (or not one figure): why.
+    Gone(String),
+}
+
+/// Finds a recorded global's figure in `figs`: by its key, else (an older
+/// note) by its words.
+fn find_recorded(days: &ScheduleDays, figs: &[Figure], r: &Recorded) -> Found {
+    let at = |key: &str| figs.iter().position(|f| f.key == key);
+    let gone = || Found::Gone("Not in this schedule file any more.".to_string());
+    let Some(key) = &r.key else {
+        return match figs.iter().position(|f| f.label == r.label) {
+            Some(i) => Found::Same(
+                i,
+                Some("Found by its description only (set before keys were recorded); setting it again records its key.".into()),
+            ),
+            None => gone(),
+        };
+    };
+    if !key.starts_with("element:") {
+        return match figs.iter().position(|f| key_part(&f.key) == *key) {
+            Some(i) => Found::Same(i, None),
+            None => gone(),
+        };
+    }
+    let parts: Vec<&str> = key.split(KEY_SEP).collect();
+    let id = parts
+        .first()
+        .and_then(|p| p.strip_prefix("element:"))
+        .and_then(|n| n.parse::<u32>().ok());
+    let part = |i: usize| parts.get(i).map(|s| s.to_string()).unwrap_or_default();
+    let board_id = Some(part(2)).filter(|s| !s.is_empty());
+    let k = schedule::ElementKey {
+        category: part(1),
+        board_id: board_id.clone(),
+        name: part(3),
+        id,
+    };
+    let index = |e: &schedule::ElementDays| at(&format!("element:{}", e.id));
+    match days.find(&k) {
+        schedule::Found::Same(e) => index(e).map_or_else(gone, |i| Found::Same(i, None)),
+        // No board ID on either side: only the name changed, so it is the
+        // same element renamed.
+        schedule::Found::IdOnly(e)
+            if board_id.is_none()
+                && e.board_id.is_none()
+                && e.category.trim().eq_ignore_ascii_case(k.category.trim()) =>
+        {
+            index(e).map_or_else(gone, |i| Found::Same(i, None))
+        }
+        schedule::Found::IdOnly(e) => match index(e) {
+            Some(i) => Found::Doubt(
+                i,
+                format!(
+                    "Set from {} {} before; the schedule's element with that id is now named and numbered differently. Tick it to keep the link.",
+                    k.category.trim(),
+                    [k.board_id.as_deref().unwrap_or(""), k.name.trim()]
+                        .iter()
+                        .filter(|s| !s.is_empty())
+                        .copied()
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                ),
+            ),
+            None => gone(),
+        },
+        schedule::Found::Ambiguous(_) => Found::Gone(
+            "Several elements in this file match it; tick the right one by hand.".into(),
+        ),
+        schedule::Found::Missing => gone(),
+    }
 }
 
 /// A figure's name as part of a global's name: capitals, digits and `_`.
@@ -222,32 +374,6 @@ fn default_name(f: &Figure) -> String {
             }
         }
     }
-}
-
-/// The global whose setup source says `note` exactly, if one does.
-fn linked_global<'a>(b: &'a Budget, note: &str) -> Option<&'a str> {
-    let by_name = b.setup_sources.0.get(GLOBAL_KIND)?;
-    by_name
-        .iter()
-        .find(|(name, src)| src.notes.trim() == note && b.globals.contains_key(*name))
-        .map(|(name, _)| name.as_str())
-}
-
-/// Globals linked to this schedule's sub-board whose figure isn't in the
-/// file any more: (global, the figure's label).
-fn orphans(b: &Budget, days: &ScheduleDays, known: &BTreeSet<String>) -> Vec<(String, String)> {
-    let tail = source_tail(days);
-    let Some(by_name) = b.setup_sources.0.get(GLOBAL_KIND) else {
-        return Vec::new();
-    };
-    by_name
-        .iter()
-        .filter(|(name, _)| b.globals.contains_key(*name))
-        .filter_map(|(name, src)| {
-            let label = src.notes.trim().strip_suffix(&tail)?;
-            (!label.is_empty() && !known.contains(label)).then(|| (name.clone(), label.to_string()))
-        })
-        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -287,6 +413,9 @@ pub struct FigureRow {
     pub action: &'static str,
     /// Why the picked figure can't be set as asked.
     pub problem: Option<String>,
+    /// What to know about its link: found by its words only, an element
+    /// that only matches by id, why a linked figure is gone.
+    pub note: Option<String>,
     /// An earlier import set this global and the schedule has changed it
     /// since.
     pub changed: bool,
@@ -327,43 +456,61 @@ pub struct Review {
 /// defaults). Changes nothing.
 pub fn review(b: &Budget, days: &ScheduleDays, picks: Option<&[Pick]>) -> Review {
     let mut figs = figures(days);
-    let known: BTreeSet<String> = figs.iter().map(|f| f.label.clone()).collect();
-    let orphaned = orphans(b, days, &known);
-    for (global, label) in &orphaned {
+    // Each figure's linked global (and whether to ask first), and a note.
+    let mut linked: Vec<Option<String>> = vec![None; figs.len()];
+    let mut doubt: Vec<Option<String>> = vec![None; figs.len()];
+    let mut notes: Vec<Option<String>> = vec![None; figs.len()];
+    let mut gone = Vec::new();
+    for r in recorded(b, days) {
+        match find_recorded(days, &figs, &r) {
+            Found::Same(i, note) if linked[i].is_none() && doubt[i].is_none() => {
+                linked[i] = Some(r.global);
+                notes[i] = note;
+            }
+            Found::Doubt(i, note) if linked[i].is_none() && doubt[i].is_none() => {
+                doubt[i] = Some(r.global);
+                notes[i] = Some(note);
+            }
+            Found::Same(..) | Found::Doubt(..) => {}
+            Found::Gone(why) => gone.push((r, why)),
+        }
+    }
+    for (r, why) in gone {
         figs.push(Figure {
-            key: format!("linked:{global}"),
+            key: format!("linked:{}", r.global),
             kind: "missing",
-            name: global.clone(),
+            name: r.global.clone(),
             category: String::new(),
+            id: None,
+            board_id: None,
             days: 0,
-            label: label.clone(),
+            label: r.label,
         });
+        linked.push(Some(r.global));
+        doubt.push(None);
+        notes.push(Some(format!("{why} Tick it to set the global to 0.")));
     }
     let values = recalc(b, &RecalcOptions::default())
         .ok()
         .map(|r| r.globals)
         .unwrap_or_default();
 
-    // Each figure's linked global, then its default, kept apart from the
-    // names other figures are linked to.
-    let linked: Vec<Option<String>> = figs
-        .iter()
-        .map(|f| match f.kind {
-            "missing" => Some(f.name.clone()),
-            _ => linked_global(b, &source_note(days, &f.label)).map(str::to_string),
-        })
-        .collect();
-    let mut taken: BTreeSet<String> = linked.iter().flatten().cloned().collect();
+    // Each figure's default global: its linked one, the one it may be
+    // linked to, else a free name. A default is never a global the budget
+    // already has (decisions.md, entry 76: `set:RIDGE` must not land on the
+    // fire road's `RIDGE_DAYS`); naming one in the row updates it.
+    let mut taken: BTreeSet<String> = b.globals.keys().cloned().collect();
     let defaults: Vec<String> = figs
         .iter()
-        .zip(&linked)
-        .map(|(f, l)| match l {
+        .zip(linked.iter().zip(&doubt))
+        .map(|(f, (l, d))| match l.as_ref().or(d.as_ref()) {
             Some(g) => g.clone(),
+            None if f.kind == "total" => default_name(f),
             None => {
                 let base = default_name(f);
                 let mut name = base.clone();
                 let mut n = 2;
-                while taken.contains(&name) && f.kind != "total" {
+                while taken.contains(&name) {
                     name = format!("{base}_{n}");
                     n += 1;
                 }
@@ -381,7 +528,9 @@ pub fn review(b: &Budget, days: &ScheduleDays, picks: Option<&[Pick]>) -> Review
         None => figs
             .iter()
             .zip(&linked)
-            .filter(|(f, l)| f.kind == "total" || l.is_some())
+            // A figure gone from the file starts unticked: setting a global
+            // to 0 is never done unasked.
+            .filter(|(f, l)| f.kind == "total" || (l.is_some() && f.kind != "missing"))
             .map(|(f, _)| (f.key.as_str(), ""))
             .collect(),
     };
@@ -394,7 +543,7 @@ pub fn review(b: &Budget, days: &ScheduleDays, picks: Option<&[Pick]>) -> Review
     }
     let mut rows = Vec::with_capacity(figs.len());
     let mut used: BTreeMap<String, String> = BTreeMap::new();
-    for ((f, l), d) in figs.iter().zip(&linked).zip(&defaults) {
+    for (((f, l), d), note) in figs.iter().zip(&linked).zip(&defaults).zip(notes) {
         let pick = chosen.get(f.key.as_str());
         let global = match pick {
             Some(g) if !g.is_empty() => g.to_string(),
@@ -442,6 +591,7 @@ pub fn review(b: &Budget, days: &ScheduleDays, picks: Option<&[Pick]>) -> Review
             new,
             action,
             problem,
+            note,
         });
     }
     let picked = || rows.iter().filter(|r| r.picked);
@@ -571,6 +721,7 @@ pub fn apply(
     }
     let mut next = b.clone();
     let mut done = Applied::default();
+    let figs = figures(days);
     for row in r.figures.iter().filter(|r| r.picked) {
         if row.action != "same" {
             crate::edit::set_global(&mut next, &row.global, &row.new)
@@ -588,7 +739,15 @@ pub fn apply(
             .get(GLOBAL_KIND, &row.global)
             .cloned()
             .unwrap_or_default();
-        src.notes = source_note(days, &row.label);
+        src.notes = match figs.iter().find(|f| f.key == row.key) {
+            Some(f) => source_note(days, f),
+            // A gone figure keeps the words it was set by.
+            None => next
+                .setup_sources
+                .get(GLOBAL_KIND, &row.global)
+                .map(|s| s.notes.clone())
+                .unwrap_or_default(),
+        };
         // A figure from a schedule isn't a pack's: what a pack said about
         // this global no longer holds.
         src.pack.clear();
@@ -770,7 +929,8 @@ mod tests {
                 "SHOOT_DAYS",
                 "BOATHOUSE_DAYS",
                 "DOCK_DAYS",
-                "NORTH_SHORE_DAYS",
+                // NORTH_SHORE_DAYS is the budget's own: never a default.
+                "NORTH_SHORE_DAYS_2",
                 "PINE_HOLLOW_CAMP_DAYS",
                 "WEEK_2027_03_01_DAYS",
                 "WREN_DAYS",
@@ -804,8 +964,13 @@ mod tests {
         );
         let north = row(&r, "location:North shore");
         assert_eq!(
-            (north.action, north.days, north.picked),
-            ("update", 3, false)
+            (
+                north.global.as_str(),
+                north.action,
+                north.days,
+                north.picked
+            ),
+            ("NORTH_SHORE_DAYS_2", "add", 3, false)
         );
         // Prep and wrap are never touched.
         assert!(r.figures.iter().all(|f| !f.global.starts_with("PREP")));
@@ -874,7 +1039,13 @@ mod tests {
         assert_eq!(info.unit, "Day");
         assert_eq!(
             b.setup_sources.get("global", "CAMP_DAYS").unwrap().notes,
-            "Shoot days at location Pine Hollow camp, from the schedule Kettle Lake (Board 1, Main)"
+            "Shoot days at location Pine Hollow camp, from the schedule Kettle Lake (Board 1, Main) [key: location:Pine Hollow camp]"
+        );
+        let picks = [pick("total", ""), pick("element:7", "")];
+        apply(&mut b, &days(), Some(&picks)).unwrap();
+        assert_eq!(
+            b.setup_sources.get("global", "WREN_DAYS").unwrap().notes,
+            "Days of Cast 1 WREN, from the schedule Kettle Lake (Board 1, Main) [key: element:7 | Cast | 1 | WREN]"
         );
         // An existing global keeps its description.
         assert!(!b
@@ -911,12 +1082,22 @@ mod tests {
     }
 
     #[test]
-    fn a_linked_figure_gone_from_the_file_is_offered_at_zero() {
+    fn a_figure_gone_from_the_file_starts_unticked() {
         let mut b = budget();
-        let picks = [pick("total", ""), pick("element:9", "")];
+        let picks = [
+            pick("total", ""),
+            pick("element:9", ""),
+            pick("location:Pine Hollow camp", "CAMP_DAYS"),
+        ];
         apply(&mut b, &days(), Some(&picks)).unwrap();
         assert_eq!(b.globals["CANOE_DAYS"].0, "2");
-        let cut = DAYS.replace("\"name\": \"CANOE\"", "\"name\": \"KAYAK\"");
+        // The canoe is cut (another id and name) and the camp dropped.
+        let cut = DAYS
+            .replace(
+                "\"id\": 9, \"category\": \"Props\", \"name\": \"CANOE\"",
+                "\"id\": 12, \"category\": \"Props\", \"name\": \"KAYAK\"",
+            )
+            .replace("\"Pine Hollow camp\": 2", "\"South shore\": 2");
         let d2 = read("kettle.json", cut.as_bytes()).unwrap();
         let r = review(&b, &d2, None);
         let gone = row(&r, "linked:CANOE_DAYS");
@@ -928,17 +1109,112 @@ mod tests {
                 gone.action,
                 gone.label.as_str()
             ),
-            ("missing", 0, true, "update", "Days of Props CANOE")
+            ("missing", 0, false, "update", "Days of Props CANOE")
         );
-        assert_eq!(row(&r, "element:9").global, "KAYAK_DAYS");
-        assert!(!row(&r, "element:9").picked);
+        assert!(gone
+            .note
+            .as_deref()
+            .unwrap()
+            .contains("Not in this schedule file"));
+        assert!(!row(&r, "linked:CAMP_DAYS").picked);
+        // Applying unattended leaves both alone.
         apply(&mut b, &d2, None).unwrap();
+        assert_eq!(b.globals["CANOE_DAYS"].0, "2");
+        assert_eq!(b.globals["CAMP_DAYS"].0, "2");
+        // Only an explicit pick sets one to 0.
+        let p = picks_with(&b, &d2, &[("linked:CANOE_DAYS".into(), None)], &[]).unwrap();
+        apply(&mut b, &d2, Some(&p)).unwrap();
         assert_eq!(b.globals["CANOE_DAYS"].0, "0");
+        assert_eq!(b.globals["CAMP_DAYS"].0, "2");
         // Another sub-board's links are not this file's to clear.
         let other = DAYS.replace("\"Main\"", "\"Second unit\"");
         let d3 = read("kettle-2.json", other.as_bytes()).unwrap();
         let r = review(&b, &d3, None);
         assert!(r.figures.iter().all(|f| f.kind != "missing"));
+    }
+
+    #[test]
+    fn a_renamed_or_renumbered_element_keeps_its_link() {
+        let mut b = budget();
+        let picks = [
+            pick("total", ""),
+            pick("element:7", "WREN_DAYS"),
+            pick("element:9", ""),
+        ];
+        apply(&mut b, &days(), Some(&picks)).unwrap();
+        let linked = |text: &str| {
+            let d = read("kettle.json", text.as_bytes()).unwrap();
+            let r = review(&b, &d, None);
+            assert!(r.figures.iter().all(|f| f.kind != "missing"), "{text}");
+            let w = row(&r, "element:7").clone();
+            let c = row(&r, "element:9").clone();
+            (w.global, w.picked, w.linked, c.global, c.picked, w.note)
+        };
+        // Renamed (cast and a prop without a board ID), and renumbered.
+        let renamed = DAYS
+            .replace("\"WREN\"", "\"WRENNA\"")
+            .replace("\"CANOE\"", "\"KAYAK\"");
+        assert_eq!(
+            linked(&renamed),
+            (
+                "WREN_DAYS".into(),
+                true,
+                true,
+                "CANOE_DAYS".into(),
+                true,
+                None
+            )
+        );
+        let renumbered = DAYS.replace("\"board_id\": \"1\"", "\"board_id\": \"4\"");
+        assert_eq!(linked(&renumbered).0, "WREN_DAYS");
+        assert!(linked(&renumbered).1);
+        // Both changed: the id alone, so ask (unticked, with a note).
+        let both = renumbered.replace("\"WREN\"", "\"HERON\"");
+        let (global, picked, is_linked, _, _, note) = linked(&both);
+        assert_eq!(
+            (global.as_str(), picked, is_linked),
+            ("WREN_DAYS", false, false)
+        );
+        assert!(note.unwrap().contains("Tick it to keep the link"));
+        // A renamed set has no id: its link goes, and it starts unticked.
+        let set = DAYS.replace("\"DOCK\": 2", "\"JETTY\": 2");
+        let picks = [pick("total", ""), pick("set:DOCK", "")];
+        let mut b2 = budget();
+        apply(&mut b2, &days(), Some(&picks)).unwrap();
+        let r = review(&b2, &read("k.json", set.as_bytes()).unwrap(), None);
+        assert!(!row(&r, "linked:DOCK_DAYS").picked);
+    }
+
+    #[test]
+    fn a_link_recorded_by_its_words_only_is_found_and_said() {
+        let mut b = budget();
+        b.globals.insert("CAMP".into(), Formula("1".into()));
+        b.setup_sources.set(
+            "global",
+            "CAMP",
+            method_core::pack::ItemSource {
+                notes: "Shoot days at location Pine Hollow camp, from the schedule Kettle Lake (Board 1, Main)".into(),
+                ..Default::default()
+            },
+        );
+        let r = review(&b, &days(), None);
+        let camp = row(&r, "location:Pine Hollow camp");
+        assert_eq!(
+            (camp.global.as_str(), camp.picked, camp.linked),
+            ("CAMP", true, true)
+        );
+        assert!(camp.note.as_deref().unwrap().contains("description only"));
+        // Setting it again records its key.
+        apply(&mut b, &days(), None).unwrap();
+        assert!(b
+            .setup_sources
+            .get("global", "CAMP")
+            .unwrap()
+            .notes
+            .ends_with("[key: location:Pine Hollow camp]"));
+        assert!(row(&review(&b, &days(), None), "location:Pine Hollow camp")
+            .note
+            .is_none());
     }
 
     #[test]
@@ -954,8 +1230,9 @@ mod tests {
         let clash = DAYS.replace("\"DOCK\": 2", "\"North shore\": 2");
         let d = read("kettle.json", clash.as_bytes()).unwrap();
         let r = review(&budget(), &d, None);
-        assert_eq!(row(&r, "set:North shore").global, "NORTH_SHORE_DAYS");
-        assert_eq!(row(&r, "location:North shore").global, "NORTH_SHORE_DAYS_2");
+        // NORTH_SHORE_DAYS is the budget's own, so both get free names.
+        assert_eq!(row(&r, "set:North shore").global, "NORTH_SHORE_DAYS_2");
+        assert_eq!(row(&r, "location:North shore").global, "NORTH_SHORE_DAYS_3");
     }
 
     #[test]
@@ -1070,5 +1347,41 @@ mod tests {
             .collect();
         assert_eq!(picked, ["SHOOT_DAYS", "STATION_DAYS", "RIDGE_DAYS"]);
         assert!(!again.can_apply);
+    }
+
+    #[test]
+    fn default_names_never_land_on_an_existing_global() {
+        // Field Station: RIDGE_DAYS is the fire road location's 2 days. The
+        // RIDGE set's default name would be RIDGE_DAYS too; it gets a free
+        // one, and ticking the set leaves the fire road's global alone.
+        let d = read(
+            "field-station.budget.json",
+            include_bytes!("../../../fixtures/field-station/field-station.budget.json"),
+        )
+        .unwrap();
+        let mut b = method_format::from_str(include_str!(
+            "../../../fixtures/field-station/field-station.mthd"
+        ))
+        .unwrap();
+        let r = review(&b, &d, None);
+        let ridge = row(&r, "set:RIDGE");
+        assert_eq!(
+            (ridge.global.as_str(), ridge.action),
+            ("RIDGE_DAYS_2", "add")
+        );
+        let p = picks_with(&b, &d, &[("set:RIDGE".into(), None)], &[]).unwrap();
+        apply(&mut b, &d, Some(&p)).unwrap();
+        assert_eq!(b.globals["RIDGE_DAYS"].0, "2");
+        assert_eq!(b.globals["RIDGE_DAYS_2"].0, "1");
+        // Naming the existing global in the row is what updates it.
+        let p = picks_with(
+            &b,
+            &d,
+            &[("set:RIDGE ROAD".into(), Some("RIDGE_DAYS".into()))],
+            &[],
+        )
+        .unwrap();
+        let r = review(&b, &d, Some(&p));
+        assert_eq!(row(&r, "set:RIDGE ROAD").action, "update");
     }
 }

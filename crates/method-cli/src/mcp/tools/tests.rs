@@ -1604,6 +1604,56 @@ fn globals_from_a_schedules_days() {
         ),
         "no figure",
     );
+    // Nothing picked: the summary says so, and nothing changes.
+    let days = method_session::schedule_days::read(
+        "days.json",
+        &std::fs::read(f.path("days.json")).unwrap(),
+    )
+    .unwrap();
+    let b = method_core::starter::budget();
+    let none = method_session::schedule_days::review(&b, &days, Some(&[]));
+    let said = crate::mcp::tools::files::schedule_summary("days.json", &none, None, false);
+    assert!(
+        said.contains("Nothing is picked; nothing changed."),
+        "{said}"
+    );
+    assert!(!said.contains("already"), "{said}");
+    let r = f
+        .tool(
+            "schedule_days",
+            json!({"path": "film.mthd", "file": "days.json", "skip": ["total"]}),
+        )
+        .unwrap();
+    assert_eq!(r["applied"], false);
+    assert_eq!(net(&mut f, "film.mthd"), before);
+    // A linked figure gone from the file is not set to 0 unattended.
+    f.tool(
+        "schedule_days",
+        json!({"path": "film.mthd", "file": "days.json",
+               "pick": [{"key": "location:Cold Spring field station", "global": "STATION_DAYS"}]}),
+    )
+    .unwrap();
+    let moved = std::fs::read_to_string(f.path("days.json"))
+        .unwrap()
+        .replace("Cold Spring field station", "Cold Spring annex");
+    std::fs::write(f.path("moved.json"), moved).unwrap();
+    let r = f
+        .tool(
+            "schedule_days",
+            json!({"path": "film.mthd", "file": "moved.json"}),
+        )
+        .unwrap();
+    let gone = r["figures"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["key"] == "linked:STATION_DAYS")
+        .unwrap()
+        .clone();
+    assert_eq!(gone["picked"], false);
+    assert_eq!(r["applied"], false);
+    let text = std::fs::read_to_string(f.path("film.mthd")).unwrap();
+    assert!(text.contains("\"STATION_DAYS\": \"4\""), "{text}");
     std::fs::write(f.path("notes.json"), "{}").unwrap();
     err_contains(
         f.tool(

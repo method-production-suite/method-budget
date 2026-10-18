@@ -21,7 +21,7 @@ import { plural } from './util.js';
 /** The groups the figures are listed under, in order. */
 const GROUPS = [
   ['total', 'Shoot days'],
-  ['missing', 'Set from this schedule before, no longer in it'],
+  ['missing', 'Set from this schedule before, no longer in it (tick to set to 0)'],
   ['unit', 'Shoot days by unit'],
   ['set', 'Shoot days by set'],
   ['location', 'Shoot days by location'],
@@ -158,7 +158,9 @@ export function showScheduleDays(ctx, first) {
       el('td', {}, name),
       el('td', { class: 'num', text: now }),
       el('td', { class: 'num', text: f.new }),
-      el('td', { class: f.problem ? 'si-bad' : f.changed ? 'si-bad' : '', text: f.picked ? rowStatus(f) : '' }),
+      // The link's note (found by words only, an id that only half
+      // matches, a figure gone) shows ticked or not.
+      el('td', { class: f.problem || f.changed ? 'si-bad' : '', text: [f.picked ? rowStatus(f) : '', f.note || ''].filter(Boolean).join(' ') }),
     );
   };
 

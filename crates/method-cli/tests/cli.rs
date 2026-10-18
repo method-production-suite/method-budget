@@ -807,6 +807,34 @@ fn schedule_days_set_globals_from_a_schedule() {
     assert_eq!(code(&o), 3, "{}", err(&o));
     assert!(err(&o).contains("can't be a global name"), "{}", err(&o));
     assert_eq!(read(&b), after);
+    // The fire road leaves the schedule: --apply leaves RIDGE_DAYS alone
+    // and lists it; only an explicit pick sets it to 0.
+    let moved = d.path("moved.json");
+    std::fs::write(
+        &moved,
+        read(&days).replace("Hollins Ridge fire road", "Hollins Ridge lookout"),
+    )
+    .unwrap();
+    let o = method(&["schedule-days", &b, &moved, "--apply"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(
+        out(&o).contains(
+            "  linked:RIDGE_DAYS  Shoot days at location Hollins Ridge fire road: 0 days"
+        ),
+        "{}",
+        out(&o)
+    );
+    assert!(read(&b).contains("\"RIDGE_DAYS\": \"2\""));
+    let o = method(&[
+        "schedule-days",
+        &b,
+        &moved,
+        "--pick",
+        "linked:RIDGE_DAYS",
+        "--apply",
+    ]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(read(&b).contains("\"RIDGE_DAYS\": \"0\""));
     // Not a days file.
     let o = method(&["schedule-days", &b, &b]);
     assert_eq!(code(&o), 1);
