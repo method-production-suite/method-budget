@@ -50,7 +50,7 @@ pub struct Options {
 
 /// The updater settings `tauri.conf.json` carries: the public key as
 /// written, and the endpoints.
-fn updater_config(config: &Path) -> Result<(String, Vec<String>), String> {
+pub(crate) fn updater_config(config: &Path) -> Result<(String, Vec<String>), String> {
     let text = std::fs::read_to_string(config)
         .map_err(|e| format!("can't read {}: {e}", config.display()))?;
     let v: Value =
@@ -302,6 +302,16 @@ pub fn build(o: &Options) -> Result<Value, String> {
                 ));
                 continue;
             }
+            // The app's updater (method-update) refuses a signature that
+            // doesn't name the version the manifest announces.
+            Ok(s) if s.version.as_deref() != Some(v.as_str()) => {
+                problems.push(format!(
+                    "{sig_name}: signed for {}, not version {v}; sign it with `cargo xtask sign-update`",
+                    s.version
+                        .map_or_else(|| "no version".to_string(), |s| format!("version {s}"))
+                ));
+                continue;
+            }
             Ok(_) => {}
         }
         for key in keys {
@@ -412,7 +422,7 @@ mod tests {
         r.write(&format!("dist/{name}"), "bytes");
         r.write(
             &format!("dist/{name}.sig"),
-            &fixture::signature(key, "Method Budget.app.tar.gz"),
+            &fixture::signature_for_version(key, name, "0.2.0"),
         );
     }
 
@@ -434,7 +444,7 @@ mod tests {
         assert_eq!(m["platforms"]["darwin-aarch64"]["url"], url);
         assert_eq!(
             m["platforms"]["darwin-aarch64"]["signature"],
-            fixture::signature(KEY, "Method Budget.app.tar.gz")
+            fixture::signature_for_version(KEY, "Method-Budget_0.2.0_aarch64.app.tar.gz", "0.2.0")
         );
         // Intel Macs find no entry and keep the version they have.
         assert_eq!(m["platforms"].as_object().unwrap().len(), 1);
@@ -470,6 +480,35 @@ mod tests {
             "{e}"
         );
         assert!(!r.root().join("latest.json").exists());
+    }
+
+    /// The app refuses a signature that doesn't name the manifest's version,
+    /// so the manifest is never written with one (a Tauri CLI signature,
+    /// not yet re-signed, or one for another release).
+    #[test]
+    fn a_signature_must_name_the_version() {
+        let r = repo(&fixture::public_key(KEY));
+        let name = "Method-Budget_0.2.0_aarch64.app.tar.gz";
+        r.write(&format!("dist/{name}"), "bytes");
+        r.write(&format!("dist/{name}.sig"), &fixture::signature(KEY, name));
+        let e = command(opts(&r)).unwrap_err();
+        assert!(
+            e.contains("signed for no version, not version 0.2.0"),
+            "{e}"
+        );
+        assert!(e.contains("cargo xtask sign-update"), "{e}");
+        r.write(
+            &format!("dist/{name}.sig"),
+            &fixture::signature_for_version(KEY, name, "0.1.9"),
+        );
+        let e = command(opts(&r)).unwrap_err();
+        assert!(
+            e.contains("signed for version 0.1.9, not version 0.2.0"),
+            "{e}"
+        );
+        assert!(!r.root().join("latest.json").exists());
+        artifact(&r, name, KEY);
+        assert!(command(opts(&r)).is_ok());
     }
 
     #[test]

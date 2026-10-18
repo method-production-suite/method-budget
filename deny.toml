@@ -13,7 +13,8 @@ ignore = [
     { id = "RUSTSEC-2025-0081", reason = "unic-char-property: via urlpattern in tauri-utils" },
     { id = "RUSTSEC-2025-0098", reason = "unic-ucd-version: via urlpattern in tauri-utils" },
     { id = "RUSTSEC-2025-0100", reason = "unic-ucd-ident: via urlpattern in tauri-utils" },
-    # rustls 0.23.45, used only by the updater's HTTPS client (reqwest). The fix,
+    # rustls 0.23.45, used only by the updater's HTTPS client (ureq, in
+    # method-update; the same ignores method-libs carries). The fix,
     # 0.23.46, was published 2026-10-14 and is still inside the 14-day crate
     # cooldown (scripts/check-crate-ages.py): `cargo update -p rustls` and remove
     # these four on or after 2026-10-28.
@@ -35,7 +36,8 @@ allow = [
     "ISC",
     "Zlib",
     "Unicode-3.0",
-    # webpki-root-certs: the Mozilla root certificate list as data.
+    # webpki-roots: the Mozilla root certificate list as data (the updater's
+    # HTTPS client trusts it).
     "CDLA-Permissive-2.0",
     # File-level copyleft, unmodified (cssparser, selectors, dtoa-short via
     # Tauri; option-ext via dirs). Fine to ship alongside MIT/Apache code.

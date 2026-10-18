@@ -11,3 +11,13 @@ method-release = { path = "../method-release" }
 # The bundled charts, written beside the browser build's page (`web`).
 method-format = { path = "../method-format" }
 serde_json = "=1.0.151"
+# Signs the updater archive with the version in its trusted comment
+# (`sign-update`), the way the Tauri CLI signs it otherwise: the same key
+# format and the same crate the CLI uses. The app requires that version
+# (method-update; docs/RELEASING.md, "The updater key").
+minisign = "=0.7.3"
+
+[dev-dependencies]
+# The app's updater, so the tests can check that what `sign-update` writes
+# is what the app accepts (the same pinned commit as crates/method-app).
+method-update = { git = "https://github.com/method-production-suite/method-libs", rev = "ddb1bb1e74c6862a2c67812e2dda7456da613837" }
