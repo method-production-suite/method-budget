@@ -327,7 +327,15 @@ impl<'a> Capture<'a> {
                 });
             }
         }
-        for (f, members) in &after.sets {
+        // A set the record leaves out is empty (a credit's `locations`
+        // is left out when empty, decisions.md, entry 80).
+        let none = BTreeSet::new();
+        let left_out = before
+            .sets
+            .keys()
+            .filter(|f| !after.sets.contains_key(f))
+            .map(|f| (f, &none));
+        for (f, members) in after.sets.iter().chain(left_out) {
             let was = before.sets.get(f);
             for m in members {
                 if !was.is_some_and(|w| w.contains(m)) {

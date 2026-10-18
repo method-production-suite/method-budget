@@ -147,6 +147,9 @@ pub struct CreditRowDto {
 /// Spend by location and every credit's estimate (decisions.md, entry 80).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct IncentivesDto {
+    /// Worked out from a cleaned copy of a budget with problems, which
+    /// counts the cells with problems as blank: every figure may be short.
+    pub partial: bool,
     pub locations: Vec<LocationSpendDto>,
     pub programs: Vec<ProgramDto>,
 }
@@ -169,7 +172,8 @@ pub struct ProgramDto {
     pub locations: Vec<String>,
     pub cap: Option<Cents>,
     pub discount_percent: String,
-    /// The estimate; `null` when it can't be worked out (`problem`).
+    /// The estimate; `null` when it can't be worked out (`problem`). With
+    /// both, the estimate is from a cleaned copy and may be short.
     pub amount: Option<Cents>,
     pub problem: Option<String>,
     pub qualified: Cents,
@@ -190,6 +194,7 @@ pub struct ProgramSpendDto {
 impl From<&method_core::incentives::Incentives> for IncentivesDto {
     fn from(i: &method_core::incentives::Incentives) -> IncentivesDto {
         IncentivesDto {
+            partial: false,
             locations: i
                 .locations
                 .iter()

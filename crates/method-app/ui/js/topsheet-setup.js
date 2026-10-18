@@ -1192,7 +1192,11 @@ function creditFoot(i) {
     const p = estimateOf(i);
     if (p && !isNone(p.amount)) {
       out.push({ label: 'Qualified', value: k.formatCents(p.qualified), title: 'The rows’ net spend added up' });
-      out.push({ label: 'Estimate', value: k.formatCents(p.amount), title: 'What this credit would take off the grand total if applied' });
+      out.push({
+        label: isNone(p.problem) ? 'Estimate' : 'Estimate (may be short)',
+        value: k.formatCents(p.amount),
+        title: isNone(p.problem) ? 'What this credit would take off the grand total if applied' : k.str(p.problem),
+      });
     } else {
       out.push({ label: 'Net credit', value: 'Not applied' });
     }
@@ -1345,6 +1349,10 @@ function showEstimates() {
       }
     }
     if (picked.credits < programs.length) setFooterTotals(creditFoot(picked.credits));
+    // From a cleaned copy of a budget with problems: say the figures may be short.
+    if (got.partial === true) {
+      box.append(k.el('p', 'tss-note', 'Some cells have problems; these figures count them as blank, so an estimate may be short.'));
+    }
     if (programs.length) box.append(programsTable(programs));
     const spend = arr(got.locations).map(obj);
     if (spend.length) box.append(locationsTable(spend));
@@ -1372,9 +1380,12 @@ function programsTable(programs) {
       textCell(k.formatCents(p.qualified), { num: true, title: spend ? `Net spend by location: ${spend}` : '' }),
       textCell(isNone(p.amount) ? '' : k.formatCents(p.amount), {
         num: true,
-        title: isNone(p.amount) ? k.str(p.problem) : p.capped ? 'Held down by the credit’s cap' : '',
+        title: !isNone(p.problem) ? k.str(p.problem) : p.capped ? 'Held down by the credit’s cap' : '',
       }),
-      textCell(isNone(p.amount) ? 'Problem' : p.applied ? 'Applied' : 'Estimate', { muted: !p.applied }),
+      textCell(isNone(p.amount) ? 'Problem' : !isNone(p.problem) ? 'May be short' : p.applied ? 'Applied' : 'Estimate', {
+        muted: !p.applied,
+        title: isNone(p.problem) ? '' : k.str(p.problem),
+      }),
     );
     ul.append(li);
   }
@@ -1408,7 +1419,11 @@ function locationsTable(spend) {
     head('Location'),
     head('Lines', { num: true }),
     head('Fringes', { num: true, title: 'The fringes the lines earn, wherever fringes post' }),
-    head('Spend', { num: true }),
+    head('Spend', {
+      num: true,
+      title:
+        'Each line with the fringes it earns, as the lines work out. It can differ from the topsheet when account totals are rounded to whole units or when fringes after the last production total are dropped.',
+    }),
   ], ul);
 }
 

@@ -748,8 +748,12 @@ pub fn encode_credit(c: &Credit, b: &dyn Binder) -> Record {
         .tags(
             Field::ExcludedFringes,
             members(b, Kind::Fringe, &c.excluded_fringes),
-        )
-        .tags(Field::Locations, members(b, Kind::Location, &c.locations));
+        );
+    // Left out when empty, so a log whose credits have no locations stays
+    // readable by versions before them (decisions.md, entry 80).
+    if !c.locations.is_empty() {
+        r.tags(Field::Locations, members(b, Kind::Location, &c.locations));
+    }
     r
 }
 

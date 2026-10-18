@@ -101,3 +101,49 @@ fn set_credit_refuses_a_location_the_budget_doesnt_have() {
     let e = edit::set_credit(&mut b, None, &bad).unwrap_err();
     assert!(e.contains("Harbor"), "{e}");
 }
+
+/// A budget with problems is figured from a cleaned copy, which counts a
+/// credit row on a missing group as 0: the reply says the figures are
+/// partial and names the program's problem, so a short estimate is never
+/// shown as if it were whole.
+#[test]
+fn estimates_from_a_cleaned_copy_say_so() {
+    let mut s = session();
+    let clean = serde_json::to_value(incentives_in(&mut s).unwrap()).unwrap();
+    assert_eq!(clean["partial"], false);
+    assert!(clean["programs"][0]["problem"].is_null());
+
+    let mut b = s.budget().clone();
+    let c = b.credits.last_mut().unwrap();
+    let mut gone = c.rows[0].clone();
+    gone.source = method_core::CreditSource::Group {
+        group: "Gone".into(),
+    };
+    c.rows.push(gone);
+
+    // Not applied, the totals don't need it: the engine says it can't be
+    // worked out and gives no figure.
+    let mut s = Session::with_budget(b.clone(), None);
+    let got = serde_json::to_value(incentives_in(&mut s).unwrap()).unwrap();
+    assert_eq!(got["partial"], false);
+    let p = &got["programs"][0];
+    assert!(p["amount"].is_null());
+    assert!(p["problem"].as_str().unwrap_or("").contains("Gone"));
+
+    // Applied, the totals come from the cleaned copy.
+    b.credits.last_mut().unwrap().applied = true;
+    let mut s = Session::with_budget(b, None);
+    let got = serde_json::to_value(incentives_in(&mut s).unwrap()).unwrap();
+    assert_eq!(got["partial"], true);
+    let p = got["programs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["name"] == "Ridge program")
+        .unwrap();
+    let problem = p["problem"].as_str().unwrap_or("");
+    assert!(problem.contains("Gone"), "{problem}");
+    assert!(problem.contains("short"), "{problem}");
+    // The figure from the cleaned copy is still there, flagged.
+    assert_eq!(p["amount"], 18_000);
+}

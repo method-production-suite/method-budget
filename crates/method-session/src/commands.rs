@@ -106,7 +106,26 @@ pub fn incentives(s: &mut Session) -> Result<IncentivesDto, String> {
         .ok_or("the totals can't be worked out until the budget's problems are fixed")?;
     let figured = outcome.sanitized.as_ref().unwrap_or(budget);
     let i = method_core::incentives::incentives(figured, report).map_err(|e| e.to_string())?;
-    Ok(IncentivesDto::from(&i))
+    let mut dto = IncentivesDto::from(&i);
+    // A cleaned copy counts what has a problem as blank (a credit row on a
+    // missing group as 0): say so, and name each program's own problems,
+    // so a short estimate never shows as a whole one.
+    dto.partial = outcome.sanitized.is_some();
+    for p in &mut dto.programs {
+        let own: Vec<&str> = outcome
+            .issues
+            .iter()
+            .filter(|x| x.target == crate::diagnose::Target::Credit { index: p.index })
+            .map(|x| x.message.as_str())
+            .collect();
+        if !own.is_empty() && p.problem.is_none() {
+            p.problem = Some(format!(
+                "{}; counted as 0 here, so the estimate may be short",
+                own.join("; ")
+            ));
+        }
+    }
+    Ok(dto)
 }
 
 // ---------------------------------------------------------------------------

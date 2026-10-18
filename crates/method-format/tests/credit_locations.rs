@@ -114,3 +114,39 @@ fn field_station_reads_and_writes_byte_identical() {
     back.credits.pop();
     assert_eq!(to_string(&back), text);
 }
+
+/// The change log on disk writes no `locations` for a credit without them,
+/// so shared logs that don't use them stay readable by older versions.
+#[test]
+fn the_change_log_writes_no_locations_for_a_credit_without_them() {
+    let b = rich();
+    assert!(!b.credits.is_empty() && b.credits.iter().all(|c| c.locations.is_empty()));
+    let log = method_core::log::Log::adopt(
+        method_core::log::ActorId([1; 32]),
+        method_core::log::Ids::seeded(1),
+        &b,
+        "Adopted",
+        "2026-10-18T09:00:00Z",
+    );
+    let text: String = log
+        .changes()
+        .map(method_format::log::change_to_json)
+        .collect();
+    assert!(text.contains("excluded_fringes"), "credits are in the log");
+    assert!(!text.contains("\"locations\""), "{text}");
+
+    let mut with = rich();
+    with.credits.push(program(&["Ridge"]));
+    let log = method_core::log::Log::adopt(
+        method_core::log::ActorId([1; 32]),
+        method_core::log::Ids::seeded(1),
+        &with,
+        "Adopted",
+        "2026-10-18T09:00:00Z",
+    );
+    let text: String = log
+        .changes()
+        .map(method_format::log::change_to_json)
+        .collect();
+    assert!(text.contains("\"locations\""));
+}

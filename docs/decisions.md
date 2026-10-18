@@ -3570,6 +3570,13 @@ requests.
   merged name by name), setup import brings the locations a credit names along, setup
   sheets have a Locations column, the change log has a `locations` set on a credit (field
   added at the end of the list), and the MCP's `set_credit` and `list_charges` carry it.
+- **In a shared budget, a weak reference left out when empty** (review of the pull
+  request). A credit's locations don't keep a deleted location alive, unlike a line's
+  fringes: the location stays deleted on every replica and the credit keeps its name, as
+  the bullet on deletes above says (the projection reads the name from the deleted
+  location). The log writes the set only when it has a name, so a log whose credits have
+  none stays readable by 0.3.0, and recording an edit counts a set a record leaves out as
+  empty, so clearing the list takes every name off.
 - **The view: the Credits tab, no new window.** The editor gains a "Spend at these
   locations" chip list; an unapplied credit shows "Est." and its figure in the rail and its
   qualified spend and estimate in the footer; under the editor, "Programs side by side"
@@ -3577,6 +3584,14 @@ requests.
   per budget revision). Read access: `method-budget incentives [--json]` and the MCP
   `incentives` tool. Checked offscreen in the browser build in headless Chrome; the app
   itself needs a live check.
+- **Short figures are said to be short.** A budget with problems is totalled from a
+  cleaned copy that counts them as blank (a credit row on a missing group as 0). The
+  `incentives` reply then says `partial`, and a program with its own problem keeps its
+  figure with the problem named; the tab shows a note and "May be short". Working out the
+  estimate from the full budget instead isn't possible when the totals themselves need the
+  cleaned copy, and leaving the figure out would hide what is known. Spend by location
+  is each line with its fringes, so it can differ from the topsheet when account totals
+  are rounded or trailing fringes dropped; its tooltip says so.
 - **No program data.** Every rate, cap and qualifying rule is typed by the user from the
   program's public rules. Nothing about any real program ships (CLEAN-ROOM.md;
   docs/research/rate-data-plan.md, section 3.5).

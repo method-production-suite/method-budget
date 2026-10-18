@@ -559,7 +559,12 @@ topsheet leaves it out. Under the editor, **Programs side by side** lists every 
 where its spend has to be, its qualified spend (the tooltip has it by location), the
 credit after its caps and discount, and whether it is applied, an estimate or has a
 problem; **Spend by location** lists each location's lines, fringes and total, then lines
-with no location. Both come from `incentives`, fetched once per budget revision. Applying
+with no location (the Spend head's tooltip says it can differ from the topsheet when
+account totals are rounded to whole units or fringes after the last production total are
+dropped). Both come from `incentives`, fetched once per budget revision. When the budget
+has problems, the figures come from the cleaned copy that counts them as blank: a note
+above the tables says so, and a program with a problem of its own says "May be short",
+with the problem in its tooltip and in the footer. Applying
 an estimated credit takes off exactly the estimate. Renaming a location renames it in the
 credits; deleting one leaves its name in a credit, which then counts nothing there
 (`method-budget check` and the MCP `validate` tool warn about it).
@@ -567,7 +572,7 @@ credits; deleting one leaves its name in a credit, which then counts nothing the
 | Command | Arguments | Returns |
 |---|---|---|
 | `preview_charge` | `index` (`null` for a new charge), `charge` (as `set_charge`) | `{name, base, excluded, amount}`, figured on the current totals; nothing changes |
-| `incentives` | none | `{locations: [{location, known, lines, fringes, total}], programs: [{index, name, applied, locations, cap, discount_percent, amount, problem, qualified, by_location: [{location, net}], rows_total, capped, figures}]}`: spend by location (`location` `null` for lines with none) and every credit as an estimate, applied or not; figured on the current totals; nothing changes |
+| `incentives` | none | `{partial, locations: [{location, known, lines, fringes, total}], programs: [{index, name, applied, locations, cap, discount_percent, amount, problem, qualified, by_location: [{location, net}], rows_total, capped, figures}]}`: spend by location (`location` `null` for lines with none) and every credit as an estimate, applied or not; figured on the current totals; `partial` when those come from the cleaned copy of a budget with problems, and then a program's own problems are in its `problem` with its (possibly short) `amount`; nothing changes |
 | `clear_from_rows` | `rowIds`, `field` (`fringes` or `groups`) | View |
 | `replace_tags_on_rows` | `rowIds`, `tags` (`{fringes, groups, set, location, currency}`: names the budget defines; `null` values and empty lists clear; the base currency is none) | View |
 

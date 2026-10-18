@@ -168,7 +168,10 @@ fn strong_refs(e: &Entity) -> Vec<Uid> {
             reg(Field::Currency);
             sets(&[Field::ExcludedGroups], &mut out);
         }
-        Kind::Credit => sets(&[Field::ExcludedFringes, Field::Locations], &mut out),
+        // A credit's locations are weak (decisions.md, entry 80): deleting a
+        // location keeps its name in the credit, which then counts nothing
+        // there, and the location stays deleted.
+        Kind::Credit => sets(&[Field::ExcludedFringes], &mut out),
         Kind::CreditRow => reg(Field::Group),
         _ => {}
     }
@@ -557,6 +560,22 @@ pub fn project(state: &State) -> Projection {
     for uid in list(ListKey::root(ListName::Credits)) {
         let e = state.entity(*uid).expect("shown");
         let mut c = schema::decode_credit(e, r);
+        // A deleted location keeps its name in the credit (a weak
+        // reference, decisions.md, entry 80): the credit then counts
+        // nothing there instead of counting every location.
+        for m in e.set_members(Field::Locations) {
+            if let Member::Ref(u) = m {
+                if r.name(*u).is_none() {
+                    let name = state
+                        .entity(*u)
+                        .and_then(|x| x.get(Field::Name))
+                        .and_then(Value::as_text);
+                    if let Some(n) = name {
+                        c.locations.insert(n.to_string());
+                    }
+                }
+            }
+        }
         for ruid in list(ListKey::new(*uid, ListName::CreditRows)) {
             c.rows.push(schema::decode_credit_row(
                 state.entity(*ruid).expect("shown"),
