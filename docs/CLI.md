@@ -293,8 +293,8 @@ docs/research/schedule-exchange.md).
 - Each global set records where its figure came from (its setup source), with the
   figure's key; for an element, its id, category, board ID and name. Running again with
   the same schedule finds each global's figure by that key (a renamed or renumbered cast
-  member keeps its link; one whose name and number both changed is listed unpicked with a
-  note), picks those globals again and says which ones the schedule has changed. A global
+  member keeps its link; one whose name and number both changed, or that now matches
+  several elements, is listed unpicked with a note asking which, never at 0), picks those globals again and says which ones the schedule has changed. A global
   set from a figure the file no longer has (a location dropped or renamed, an element cut)
   is listed under the key `linked:GLOBAL` at 0 days, unpicked: `--apply` leaves it alone,
   and only `--pick linked:GLOBAL` sets it to 0. `--skip KEY` leaves a picked figure out.

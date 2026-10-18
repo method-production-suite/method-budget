@@ -2103,7 +2103,10 @@ Spring field station, from the schedule Field Station (Shooting Order, Main) [ke
 location:Cold Spring field station]"; an element's key is its id, category, board ID and
 name. The next import of the same schedule and sub-board finds each global's figure by its
 key (a renamed or renumbered cast member keeps its link; one whose name and number both
-changed is shown unticked with a note asking to confirm; an older note without a key is
+changed is shown unticked with a note asking to confirm; one that now matches several
+elements is shown on each of them, unticked, with a note asking which, and is never
+offered at 0; when two globals were set from one figure, the row says so and only the
+first is offered; an older note without a key is
 matched by its words, and the row says so), ticks those globals again under their own
 names, and says which ones the schedule has changed since ("The schedule changed since
 these globals were set from it: STATION_DAYS"). A global whose figure is no longer in the

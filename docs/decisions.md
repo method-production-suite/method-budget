@@ -3450,7 +3450,10 @@ system), so every host reviews and applies alike.
   DELACROIX]`). A later import of the same schedule and sub-board finds each global's
   figure by that key, not by the words: an element through the reader's identity rules, so
   a renamed or renumbered cast member keeps its link, and one whose name and number both
-  changed while the id still matches is offered unticked with a note asking to confirm. A
+  changed while the id still matches is offered unticked with a note asking to confirm.
+  One whose key now matches several elements (none by its id) is offered on each of them,
+  unticked, with a note asking which; it is never treated as gone or offered at 0. When
+  two globals were set from one figure, the review says so and offers only the first. A
   note without a key (written before keys were recorded) is matched by its words and the
   review says so; setting it again records the key. Linked globals are picked again (under
   their own names, so `STATION_DAYS` stays `STATION_DAYS`), and the ones whose value the

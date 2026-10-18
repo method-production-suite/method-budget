@@ -270,6 +270,9 @@ enum Found {
     Same(usize, Option<String>),
     /// Only the element's id still matches: ask before relinking.
     Doubt(usize, String),
+    /// Several figures match it and none by its id: ask which. Never gone,
+    /// so never offered at 0.
+    Ambiguous(Vec<usize>),
     /// Not in the file (or not one figure): why.
     Gone(String),
 }
@@ -335,9 +338,14 @@ fn find_recorded(days: &ScheduleDays, figs: &[Figure], r: &Recorded) -> Found {
             ),
             None => gone(),
         },
-        schedule::Found::Ambiguous(_) => Found::Gone(
-            "Several elements in this file match it; tick the right one by hand.".into(),
-        ),
+        schedule::Found::Ambiguous(list) => {
+            let at: Vec<usize> = list.into_iter().filter_map(index).collect();
+            if at.is_empty() {
+                gone()
+            } else {
+                Found::Ambiguous(at)
+            }
+        }
         schedule::Found::Missing => gone(),
     }
 }
@@ -461,18 +469,65 @@ pub fn review(b: &Budget, days: &ScheduleDays, picks: Option<&[Pick]>) -> Review
     let mut doubt: Vec<Option<String>> = vec![None; figs.len()];
     let mut notes: Vec<Option<String>> = vec![None; figs.len()];
     let mut gone = Vec::new();
+    // Every global recorded for each figure, to say when there are two.
+    let mut claims: Vec<Vec<String>> = vec![Vec::new(); figs.len()];
+    let add_note = |notes: &mut Vec<Option<String>>, i: usize, n: String| {
+        notes[i] = Some(match notes[i].take() {
+            Some(old) => format!("{old} {n}"),
+            None => n,
+        });
+    };
     for r in recorded(b, days) {
         match find_recorded(days, &figs, &r) {
-            Found::Same(i, note) if linked[i].is_none() && doubt[i].is_none() => {
-                linked[i] = Some(r.global);
-                notes[i] = note;
+            Found::Same(i, note) => {
+                claims[i].push(r.global.clone());
+                if linked[i].is_none() && doubt[i].is_none() {
+                    linked[i] = Some(r.global);
+                    if let Some(n) = note {
+                        add_note(&mut notes, i, n);
+                    }
+                }
             }
-            Found::Doubt(i, note) if linked[i].is_none() && doubt[i].is_none() => {
-                doubt[i] = Some(r.global);
-                notes[i] = Some(note);
+            Found::Doubt(i, note) => {
+                claims[i].push(r.global.clone());
+                if linked[i].is_none() && doubt[i].is_none() {
+                    doubt[i] = Some(r.global);
+                    add_note(&mut notes, i, note);
+                }
             }
-            Found::Same(..) | Found::Doubt(..) => {}
+            Found::Ambiguous(at) => {
+                let keys: Vec<&str> = at.iter().map(|&i| figs[i].key.as_str()).collect();
+                let note = format!(
+                    "{} was set from a figure that now matches more than one figure in this file ({}): pick the right one to keep it linked.",
+                    r.global,
+                    keys.join(", ")
+                );
+                for &i in &at {
+                    claims[i].push(r.global.clone());
+                    if linked[i].is_none() && doubt[i].is_none() {
+                        doubt[i] = Some(r.global.clone());
+                    }
+                    add_note(&mut notes, i, note.clone());
+                }
+            }
             Found::Gone(why) => gone.push((r, why)),
+        }
+    }
+    for (i, globals) in claims.iter().enumerate() {
+        if globals.len() > 1 {
+            let kept = linked[i]
+                .as_ref()
+                .or(doubt[i].as_ref())
+                .cloned()
+                .unwrap_or_default();
+            add_note(
+                &mut notes,
+                i,
+                format!(
+                    "{} were all set from this figure before; only {kept} is offered here, the others are left as they are.",
+                    globals.join(", ")
+                ),
+            );
         }
     }
     for (r, why) in gone {
@@ -1383,5 +1438,68 @@ mod tests {
         .unwrap();
         let r = review(&b, &d, Some(&p));
         assert_eq!(row(&r, "set:RIDGE ROAD").action, "update");
+    }
+
+    #[test]
+    fn a_link_matching_several_elements_asks_and_is_never_offered_at_zero() {
+        let mut b = budget();
+        apply(
+            &mut b,
+            &days(),
+            Some(&[pick("total", ""), pick("element:9", "")]),
+        )
+        .unwrap();
+        // The canoe's id is gone and two props are now named CANOE.
+        let two = DAYS.replace("\"id\": 9,", "\"id\": 12,").replace(
+            "\n  ]\n}",
+            ",\n    {\"id\": 13, \"category\": \"Props\", \"name\": \"CANOE\",\n     \"work\": 1, \"hold\": 0, \"travel\": 0, \"fitting\": 0, \"rehearsal\": 0, \"holiday\": 0,\n     \"company_move\": 0, \"total\": 1, \"holds\": false, \"drops\": false, \"min_drop_gap\": 1}\n  ]\n}",
+        );
+        let d = read("kettle.json", two.as_bytes()).unwrap();
+        let r = review(&b, &d, None);
+        assert!(r.figures.iter().all(|f| f.kind != "missing"));
+        for key in ["element:12", "element:13"] {
+            let f = row(&r, key);
+            assert_eq!(
+                (f.global.as_str(), f.picked, f.linked),
+                ("CANOE_DAYS", false, false),
+                "{key}"
+            );
+            let note = f.note.as_deref().unwrap();
+            assert!(note.contains("more than one figure"), "{note}");
+            assert!(note.contains("pick"), "{note}");
+            assert!(!note.contains(" 0"), "{note}");
+        }
+        // Applying unattended leaves it; picking one relinks it.
+        apply(&mut b, &d, None).unwrap();
+        assert_eq!(b.globals["CANOE_DAYS"].0, "2");
+        let p = picks_with(&b, &d, &[("element:13".into(), None)], &[]).unwrap();
+        apply(&mut b, &d, Some(&p)).unwrap();
+        assert_eq!(b.globals["CANOE_DAYS"].0, "1");
+        let r = review(&b, &d, None);
+        assert!(row(&r, "element:13").linked && row(&r, "element:13").note.is_none());
+    }
+
+    #[test]
+    fn two_globals_linked_to_one_figure_are_noted() {
+        let mut b = budget();
+        apply(
+            &mut b,
+            &days(),
+            Some(&[pick("total", ""), pick("element:9", "")]),
+        )
+        .unwrap();
+        let src = b.setup_sources.get("global", "CANOE_DAYS").unwrap().clone();
+        b.globals.insert("BOATS".into(), Formula("2".into()));
+        b.setup_sources.set("global", "BOATS", src);
+        let r = review(&b, &days(), None);
+        let canoe = row(&r, "element:9");
+        let note = canoe.note.as_deref().unwrap();
+        assert!(
+            note.contains("BOATS") && note.contains("CANOE_DAYS"),
+            "{note}"
+        );
+        // One global is ticked for it; the other is left as it is.
+        assert!(canoe.picked);
+        assert!(r.figures.iter().all(|f| f.kind != "missing"));
     }
 }

@@ -457,7 +457,8 @@ has a key: `total`, `unit:NAME`, `set:NAME`, `location:NAME`, `week:YYYY-MM-DD`,
 (`pick`: `[{key, global?}]`, `global` an existing global to update or a new name, else the
 figure's default name, never a global the budget already has). Globals an earlier import
 set are picked again (their setup source records the figure's key; an element's id,
-category, board ID and name, so a renamed or renumbered one keeps its link); `skip` leaves a
+category, board ID and name, so a renamed or renumbered one keeps its link, and one that
+now matches several elements is offered unpicked on each, with a `note`); `skip` leaves a
 figure out. A global set from a figure no longer in the file is listed as `linked:GLOBAL`
 at 0 days but never picked unless named in `pick`, so a call without `dry_run` never sets a
 global to 0 unasked. Prep and wrap globals are never touched. The summary says what
