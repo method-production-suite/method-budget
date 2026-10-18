@@ -145,6 +145,7 @@ this section.
 - **What changed.** A plain-words diff of two budgets or versions: every changed line, field and setup item, with the money it moved.
 - **Three-way merge.** Two copies that changed apart merge on their own where they touched different things; real clashes are listed for you to pick.
 - **Share-ready copies.** Save a dated snapshot, optionally without notes or private info, that opens read-only and compares back against the original.
+- **Review files.** A reviewer comments on lines, accounts and categories of a budget they can't change; the comments come back in a small file beside it, and you merge each one in as a dated note or set it aside.
 - **Small version history.** Versions can be stored as compact patches, so ten versions of a large budget take about the space of one.
 
 ### Actuals and cost reports
@@ -180,7 +181,6 @@ this section.
 ### On the roadmap
 
 - **Windows and Linux, tested.** Installers for both are built today; printing, keys and file types still need a hands-on check.
-- **Review files.** A reviewer marks up a read-only copy, and their comments come back in a small file you merge.
 - **Incentive what-ifs.** Move lines between locations and see what each incentive program gains or loses, with minimum spends and shared caps.
 - **Accessibility and translations.** A full accessibility pass and the app in more languages.
 - **Work on a budget together.** Several people in one budget at once, through a shared Dropbox or iCloud folder or a live link, with who changed what and undo that only takes back your own edits.

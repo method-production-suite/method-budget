@@ -295,6 +295,13 @@ ref = ["2.21", "D39"]
 
 [[feature]]
 group = "versions"
+title = "Review files"
+text = "A reviewer comments on lines, accounts and categories of a budget they can't change; the comments come back in a small file beside it, and you merge each one in as a dated note or set it aside."
+status = "have"
+ref = ["3.3", "D81"]
+
+[[feature]]
+group = "versions"
 title = "Small version history"
 text = "Versions can be stored as compact patches, so ten versions of a large budget take about the space of one."
 status = "have"
@@ -443,13 +450,6 @@ title = "Windows and Linux, tested"
 text = "Installers for both are built today; printing, keys and file types still need a hands-on check."
 status = "soon"
 ref = "2.25"
-
-[[feature]]
-group = "versions"
-title = "Review files"
-text = "A reviewer marks up a read-only copy, and their comments come back in a small file you merge."
-status = "soon"
-ref = "3.3"
 
 [[feature]]
 group = "engine"

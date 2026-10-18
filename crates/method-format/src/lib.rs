@@ -29,6 +29,9 @@ pub mod import;
 /// The change log on disk beside a shared budget (docs/FORMAT.md, "The
 /// change log").
 pub mod log;
+/// Review files: a reviewer's comments beside a budget (docs/FORMAT.md,
+/// "Review files").
+pub mod review;
 /// Setup items between budgets (dependency walk, conflict review, import),
 /// setup packs, and setup lists as spreadsheets.
 pub mod setup;

@@ -149,6 +149,10 @@ pub const FILE: &[Entry] = &[
     // (src/diffmerge.rs).
     plain("file.what_changed", "What Changed…"),
     plain("file.merge", "Merge Changes From…"),
+    // Review files: comments beside a budget, merged back as notes
+    // (src/review.rs).
+    plain("file.open_for_review", "Open for Review…"),
+    plain("file.open_review_comments", "Open Review Comments…"),
     SEP,
     item("file.print_budget", "Print…", "mod+p"),
     item("file.print_topsheet", "Print Topsheet…", "mod+shift+p"),
@@ -306,6 +310,8 @@ pub const TOOLS_PANEL: &[Entry] = &[
     // A shared budget's review list and everyone's changes (src/shared_app.rs).
     plain("view.tab.review", "Review"),
     plain("view.tab.activity", "Activity"),
+    // A review file's comments (src/review.rs).
+    plain("view.tab.comments", "Comments"),
 ];
 
 /// View > Budget Setup: the Budget Setup window (src/setupwin.rs), and each

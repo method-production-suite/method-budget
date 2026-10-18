@@ -173,11 +173,11 @@ the first time a tool names it, and `budget_open` opens it again on purpose.
 
 ## Tools
 
-45 tools; `--read-only` keeps the 14 marked read.
+47 tools; `--read-only` keeps the 16 marked read.
 
 | Group | Tools |
 |---|---|
-| Files and summaries (read) | `list_budgets`, `budget_open`, `budget_info` |
+| Files and summaries (read) | `list_budgets`, `budget_open`, `review_comments`, `budget_info` |
 | Reading (read) | `list_topsheet`, `list_accounts`, `get_account`, `list_globals`, `list_setup`, `list_charges`, `incentives`, `totals`, `explain`, `find`, `validate`, `diff` |
 | Lines | `add_lines`, `update_lines`, `delete_lines`, `move_lines`, `tag_lines` |
 | Setup | `set_global`, `add_setup`, `update_setup`, `rename_setup`, `delete_setup` |
@@ -493,6 +493,20 @@ change (`undo` takes it all back).
 ```json
 {"name": "schedule_days", "arguments": {"path": "film.mthd", "file": "days.json",
   "pick": [{"key": "location:Cold Spring field station", "global": "STATION_DAYS"}]}}
+```
+
+**`review_comments`** `{path, file?}`: reads a review file (`format:
+"method-budget-review"`, a reviewer's comments kept beside the budget as
+`<budget>.review.json`; docs/FORMAT.md, "Review files") and lists every comment at its
+place in the budget, as `method-budget review --json` (docs/CLI.md): `file`, `budget`,
+`title`, `matches` (the review was written on this budget's title), `comments`,
+`to_settle` and `entries` (each with `on`, `text`, `author`, `created`, `status` `open`,
+`resolved`, `merged` or `dismissed`, `found`, `place`, `written_at`, `can_merge` and
+`why_not`). `file` defaults to the one beside the budget. Changes nothing: merging comments
+is the app's or `method-budget review --merge`'s.
+
+```json
+{"name": "review_comments", "arguments": {"path": "film.mthd"}}
 ```
 
 **`merge`** `{base, ours, theirs, out, prefer?, dry_run?, overwrite?}`: the engine's
