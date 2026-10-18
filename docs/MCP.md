@@ -164,7 +164,7 @@ the first time a tool names it, and `budget_open` opens it again on purpose.
 
 ## Tools
 
-43 tools; `--read-only` keeps the 14 marked read.
+45 tools; `--read-only` keeps the 14 marked read.
 
 | Group | Tools |
 |---|---|
@@ -174,7 +174,7 @@ the first time a tool names it, and `budget_open` opens it again on purpose.
 | Setup | `set_global`, `add_setup`, `update_setup`, `rename_setup`, `delete_setup` |
 | Charges and credits | `set_charge`, `set_credit`, `apply_charge`, `delete_charge` |
 | Topsheet | `add_category`, `update_category`, `delete_category`, `add_production_total`, `delete_production_total`, `add_account`, `update_account`, `delete_account`, `set_title` |
-| Files | `new_budget`, `save_as`, `export`, `import_sheet`, `import_budget_export`, `merge`, `undo` |
+| Files | `new_budget`, `save_as`, `export`, `import_sheet`, `import_budget_export`, `schedule_days`, `merge`, `undo` |
 
 Every tool that works on one budget takes `path`. Tools that read totals take
 `exclude_groups` (a list of group names whose lines are left out, as `method-budget totals
@@ -449,6 +449,31 @@ cents, `tallies` per kind of figure, the first 50 `differences`, all with
 
 ```json
 {"name": "import_budget_export", "arguments": {"file": "pilot.json", "out": "pilot.mthd"}}
+```
+
+**`schedule_days`** `{path, file, pick?, skip?, dry_run?}`: sets the budget's globals from
+a schedule's days file (`format: "method-schedule-days"`, the file Method Schedule writes
+for a budget), as `method-budget schedule-days` (docs/CLI.md). Every figure the file counts
+has a key: `total`, `unit:NAME`, `set:NAME`, `location:NAME`, `week:YYYY-MM-DD`,
+`element:ID`. The shoot days in all go to `SHOOT_DAYS`; any other figure only when picked
+(`pick`: `[{key, global?}]`, `global` an existing global to update or a new name, else the
+figure's default name, never a global the budget already has). Globals an earlier import
+set are picked again (their setup source records the figure's key; an element's id,
+category, board ID and name, so a renamed or renumbered one keeps its link, and one that
+now matches several elements is offered unpicked on each, with a `note`); `skip` leaves a
+figure out. A global set from a figure no longer in the file is listed as `linked:GLOBAL`
+at 0 days but never picked unless named in `pick`, so a call without `dry_run` never sets a
+global to 0 unasked. Prep and wrap globals are never touched. The summary says what
+happened: the globals set, "Nothing is picked; nothing changed.", or that the picked
+globals are already set from the schedule.
+Returns the review (`figures`, each with `global`, `current`, `new`, `action` `add`,
+`update` or `same`, `linked`, `changed`, `note`; `adds`, `updates`, `same`, `changed`, `notes`,
+`days_hash`) plus `applied` and `message`. Unless `dry_run`, applies it as one undoable
+change (`undo` takes it all back).
+
+```json
+{"name": "schedule_days", "arguments": {"path": "film.mthd", "file": "days.json",
+  "pick": [{"key": "location:Cold Spring field station", "global": "STATION_DAYS"}]}}
 ```
 
 **`merge`** `{base, ours, theirs, out, prefer?, dry_run?, overwrite?}`: the engine's

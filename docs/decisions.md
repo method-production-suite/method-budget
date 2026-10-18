@@ -3412,6 +3412,76 @@ input methods, copy and paste both ways, printing, speed with a 5,000-line budge
 whether it runs in the browser build. A pure-Rust toolkit that draws its own widgets
 (egui, iced, Slint) is considered only if trigger 1 holds.
 
+## 76. Schedule days drive globals: which figure goes where, and the link without a format change (2026-10-18)
+
+Roadmap 3.8. A schedule's days file (`method-schedule-days`, Method Schedule's export for a
+budget; the reader is `method_format::import::schedule`) now sets globals: File > Import
+Schedule Days… in the app and the browser build, `method-budget schedule-days` and the
+`schedule_days` MCP tool. The logic is method-session's `schedule_days` (bytes in, no file
+system), so every host reviews and applies alike.
+
+- **The figures.** Everything the file counts that a global could hold: the shoot days in
+  all (key `total`), by unit, set, location and week (`unit:NAME`, `set:NAME`,
+  `location:NAME`, `week:YYYY-MM-DD`), and each element's days (`element:ID`), which are the
+  day out of days total as agreed with the scheduling side (holds, travel and the other
+  counts included; offering them apart is later).
+- **The rule.** The shoot days in all always go to `SHOOT_DAYS`, the name the starter, New
+  Budget and the Field Station budget use. Any other figure goes to a global only when the
+  person picks it, to a global they name (an existing one to update it) or to its default,
+  the figure's name in capitals with `_DAYS` (`COLD_SPRING_FIELD_STATION_DAYS`,
+  `WEEK_2027_05_03_DAYS`, `DELACROIX_DAYS`). A default is never a global the budget
+  already has, unless an earlier import recorded it as that figure's link: it gets `_2`,
+  `_3`... instead, and an existing global is updated only when its name is typed. In the
+  Field Station budget `RIDGE_DAYS` is the fire road location's two days, and the `RIDGE`
+  set's default name would also be `RIDGE_DAYS`, so ticking the set would have set it to 1;
+  the set now defaults to `RIDGE_DAYS_2` (amended after review, the same day). Matching a location to a
+  global by its description was rejected for the same reason (the budget's own names and
+  words are free). Prep and wrap globals are never touched: the file doesn't count them,
+  and they are the budget's assumptions (the spec says so too).
+- **The review** lists every figure, grouped, with its global, that global's formula now
+  (and what it comes to when it isn't a plain number), the new value and what changes (a new
+  global, a new value, the same value). A name that can't be a global, or two figures in one
+  global, is refused with the reason and nothing changes. **Applying** is one undo step
+  ("Set globals from the schedule Field Station"). A new global gets the figure as its
+  description and the Day unit when the budget has one; an existing one keeps its
+  description.
+- **The link, with no format change.** Each global set records its figure in its setup
+  source (`setup_sources`, already in the format for where an item's figure comes from):
+  "Shoot days at location Cold Spring field station, from the schedule Field Station
+  (Shooting Order, Main) [key: location:Cold Spring field station]". The key is the most
+  stable thing the file has for the figure: the name of a unit, set, location or week, and
+  for an element its id, category, board ID and name (`[key: element:40 | Cast | 1 |
+  DELACROIX]`). A later import of the same schedule and sub-board finds each global's
+  figure by that key, not by the words: an element through the reader's identity rules, so
+  a renamed or renumbered cast member keeps its link, and one whose name and number both
+  changed while the id still matches is offered unticked with a note asking to confirm.
+  One whose key now matches several elements (none by its id) is offered on each of them,
+  unticked, with a note asking which; it is never treated as gone or offered at 0. When
+  two globals were set from one figure, the review says so and offers only the first. A
+  note without a key (written before keys were recorded) is matched by its words and the
+  review says so; setting it again records the key. Linked globals are picked again (under
+  their own names, so `STATION_DAYS` stays `STATION_DAYS`), and the ones whose value the
+  schedule changed are marked. A global whose figure is gone from the file (a location
+  dropped or renamed, an element cut) is offered at 0 days, as the spec asks, but starts
+  unticked everywhere (the app, `--apply`, the MCP tool), so it is set to 0 only when picked
+  (`--pick linked:GLOBAL`); nothing sets a global to 0 unasked (amended after review). A
+  pack's source on a global set from a schedule is replaced, since the figure now comes
+  from the schedule.
+- **What isn't stored: `days_hash`.** Remembering the file's hashes, and an element's
+  (category, board ID, name) with its id as agreed, needs a new optional budget field; the
+  format takes additive fields, but an older reader refuses a file that has one, so it is a
+  format change. It is proposed in the roadmap's 3.8 row (a `schedule_link` object) and not
+  done here. Until then "the schedule changed" comes from comparing each linked global's
+  value with the file's figure, which is what the person needs to act on. A renamed unit,
+  set or location has no id in the file, so its link goes and it is picked again by hand.
+- Tests: method-session's `schedule_days` tests (the figures and default names, the rule,
+  picks and refusals, sources and their keys, a later import, a figure gone starting
+  unticked, a renamed or renumbered element keeping its link, a link recorded by words
+  only, defaults never landing on an existing global with the Field Station `RIDGE` case,
+  the Field Station budget agreeing with its schedule, one undo step through the kept file)
+  and its host test;
+  method-cli's `schedule_days_set_globals_from_a_schedule` and the MCP tool's test.
+
 ## 77. New Budget brings in the setup library and setup packs (2026-10-18)
 
 Roadmap 3.19, phase 2 (design: docs/research/new-project-window.md, section 6, "Setup";

@@ -45,6 +45,7 @@ export const SHORTCUTS = [
   { id: 'file.import_spreadsheet', group: 'File', label: 'Import lines from an Excel workbook, CSV or tab-delimited file, mapping its columns to budget fields', scope: 'menu' },
   { id: 'file.import_chart', group: 'File', label: 'Import a chart of accounts from a spreadsheet or another budget: as a new budget with no lines, or applied to this one', scope: 'menu' },
   { id: 'file.import_budget_export', group: 'File', label: 'Import a whole budget from another program’s budget export, as a new tab, with its totals checked against the export’s own', scope: 'menu' },
+  { id: 'file.import_schedule_days', group: 'File', label: 'Import schedule days: a schedule’s shoot days, and days by location, set, week or element, set the budget’s globals', scope: 'menu' },
   { id: 'file.import_setup_lists', group: 'File', label: 'Import setup lists (fringes, globals, groups and more) from an Excel workbook or CSV files, checked row by row', scope: 'menu' },
   { id: 'file.import_actuals', group: 'File', label: 'Import actual costs from an accounting export (Excel, CSV or tab-delimited), matched to accounts, for the cost report', scope: 'menu' },
   { id: 'file.versions', group: 'File', label: 'Versions: save, restore, rename and compare named copies of the budget', scope: 'menu' },

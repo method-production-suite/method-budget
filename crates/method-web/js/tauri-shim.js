@@ -144,6 +144,7 @@
       setup_sheet_pick: { accept: SHEET },
       coa_import_pick: { accept: `${SHEET},.mthd` },
       export_import_pick: { accept: '.json,.xml,.xlsx,.txt,.tab,.tsv' },
+      schedule_days_pick: { accept: '.json' },
     };
 
     // Desktop commands the page asks at start-up: answered as "nothing

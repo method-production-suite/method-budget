@@ -57,6 +57,7 @@ mod rename;
 mod renumber;
 mod reports;
 mod rowstyle;
+mod schedule_days;
 mod setup_lists;
 mod setup_sheets;
 mod sharing;
@@ -287,6 +288,10 @@ pub const COMMANDS: &[&str] = &[
     "actuals_remove_batch",
     "actuals_set_etc",
     "actuals_lines",
+    // Schedule days into globals
+    "schedule_days_pick",
+    "schedule_days_review",
+    "schedule_days_apply",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -726,6 +731,7 @@ const MODULES: &[Dispatch] = &[
     open_any::dispatch,
     setup_sheets::dispatch,
     actuals::dispatch,
+    schedule_days::dispatch,
 ];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).

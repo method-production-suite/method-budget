@@ -243,3 +243,14 @@
   font-style: italic;
   color: var(--text-muted);
 }
+
+/* File > Import Schedule Days… (js/scheduledays.js): the figures' tables. */
+.sd-table .sd-global {
+  width: 14em;
+  padding: 1px 4px;
+  font-size: 12px;
+}
+
+.sd-table tr.sd-off td {
+  color: var(--text-muted);
+}
