@@ -19,6 +19,10 @@
 // - Conflicts (a value changed by two people): a badge on the cell with a
 //   popover to keep or put back either value. Who Changed This… on a cell
 //   lists every value it has had and who typed it.
+// - Roles (decisions.md, entry 78): the Share dialog lists what each person
+//   may change; the owner and admins set it there. A chip in the toolbar
+//   says when this person may change less than everything. Rust refuses
+//   an edit beyond the role with a sentence the page shows as a toast.
 //
 // Everything is drawn with el() and textContent; names and labels come
 // from other people's files and are never read as HTML. No inline styles
@@ -202,7 +206,24 @@ function renderPeople(s) {
     nodes.push(el('span', { class: 'share-avatar share-more', text: `+${s.people.length - shown.length}`, title: `${s.people.length} people have opened this budget` }));
   }
   if (!s.people.length) nodes.push(el('span', { class: 'share-alone', text: 'Only you so far', title: 'Nobody else has opened this budget from the shared folder yet' }));
+  const chip = roleChip(s.me);
+  if (chip) nodes.unshift(chip);
   host.replaceChildren(...nodes);
+}
+
+/** Roles that change everything need no chip; the others say what this person may change. */
+const FULL_ROLES = ['owner', 'co_owner', 'admin', 'editor'];
+
+const CHIP_TEXT = { department: 'Some categories', actuals: 'Actuals', comment: 'Notes only', read_only: 'Read only' };
+
+function roleChip(me) {
+  if (!me || !me.role || FULL_ROLES.includes(me.role)) return null;
+  return el('span', {
+    class: `share-role-chip ${me.role === 'read_only' ? 'is-read-only' : ''}`,
+    text: CHIP_TEXT[me.role] || 'Limited',
+    title: `What you may change here: ${me.role_text}`,
+    attrs: { 'aria-label': `What you may change here: ${me.role_text}` },
+  });
 }
 
 async function fetchStatus() {
@@ -284,6 +305,7 @@ function drawPanel() {
   rows.push(line('Keeps the file', s.keeper ? 'This computer' : (s.people.find((p) => p.keeper) || {}).name || 'Another computer'));
   if (s.file_written) rows.push(line('File last written', localTime(s.file_written)));
   if (s.error) rows.push(el('p', { class: 'share-problem', text: s.error, attrs: { role: 'alert' } }));
+  if (s.notice) rows.push(el('p', { class: 'share-notice', text: s.notice, attrs: { role: 'status' } }));
   rows.push(line('Your changes not yet shared', String(s.unshared), s.unshared ? 'is-busy' : ''));
   if (s.waiting) rows.push(line('Changes waiting for ones that haven’t arrived', String(s.waiting), 'is-warn'));
   if (typeof s.synced_secs === 'number') rows.push(line('Folder last read', ago(s.synced_secs + extra)));
@@ -292,6 +314,8 @@ function drawPanel() {
   people.append(personRow(s.me));
   for (const p of s.people) people.append(personRow(p));
   rows.push(el('h4', { class: 'share-panel-sub', text: 'People' }), people);
+  const refused = refusedList(s);
+  if (refused) rows.push(...refused);
   const actions = el('div', { class: 'share-panel-actions' });
   if (s.review_count > 0) {
     actions.append(el('button', { class: 'btn btn-primary', text: s.review_count === 1 ? 'Review 1 item' : `Review ${s.review_count} items`, attrs: { type: 'button' }, on: { click: () => { closeStatusPanel(); ctx.showTab('review'); } } }));
@@ -300,6 +324,25 @@ function drawPanel() {
   actions.append(el('button', { class: 'btn', text: 'Share settings…', attrs: { type: 'button' }, on: { click: () => { closeStatusPanel(); openShareDialog(); } } }));
   rows.push(actions);
   panel.replaceChildren(...rows);
+}
+
+/** Changes left out on this computer: who, when, what and why (decisions.md, entry 78). */
+function refusedList(s) {
+  const list = s.refused_changes || [];
+  if (!list.length) return null;
+  const title = s.refused === 1 ? '1 change left out' : `${s.refused} changes left out`;
+  const items = el('ul', { class: 'share-refused' });
+  for (const r of [...list].reverse()) {
+    items.append(el(
+      'li',
+      {},
+      el('span', { class: 'share-person-name', text: r.name }),
+      el('span', { class: 'share-person-when', text: ` · ${localTime(r.time)} · ` }),
+      el('span', { text: r.label }),
+      el('div', { class: 'share-muted', text: r.why }),
+    ));
+  }
+  return [el('h4', { class: 'share-panel-sub', text: title }), items];
 }
 
 function personRow(p) {
@@ -311,6 +354,7 @@ function personRow(p) {
     el('span', { class: 'share-person-name', text: p.name, title: p.name }),
     el('span', { class: 'share-person-where', text: p.keeper ? `${whereText(p)} · keeps the file` : whereText(p) }),
     el('span', { class: 'share-person-when', text: when }),
+    p.role_text ? el('span', { class: 'share-person-role', text: p.role_text, title: p.role_text }) : null,
   );
 }
 
@@ -747,7 +791,11 @@ function sharedDialog(title, setup) {
       const colors = colorPicker(me.color, (c) => { me.color = c; });
       const people = el('div', { class: 'share-people-list share-people-dialog' });
       if (s.me) people.append(personRow({ ...s.me, name: `${s.me.name} (you)` }));
-      for (const p of s.people) people.append(personRow(p));
+      for (const p of s.people) {
+        people.append(personRow(p));
+        const picker = s.can_set_roles ? rolePicker(p, s, setup, error) : null;
+        if (picker) people.append(picker);
+      }
       if (!s.people.length) people.append(el('p', { class: 'share-muted', text: 'Nobody else has opened this budget from the shared folder yet. When they do, they join by opening it; their name and color show here.' }));
       const save = el('button', { class: 'btn', text: 'Save Name and Color', attrs: { type: 'button' } });
       save.addEventListener('click', async () => {
@@ -772,7 +820,8 @@ function sharedDialog(title, setup) {
         line('File', s.file || setup.file || ''),
         el('h4', { class: 'share-panel-sub', text: 'People' }),
         people,
-        el('p', { class: 'share-muted', text: 'To invite someone, give them access to the folder; opening the budget there joins them. Roles and invite links come later: for now everyone who can open the file can edit it.' }),
+        el('p', { class: 'share-muted', text: rolesNote(s) }),
+        s.can_set_roles ? el('p', { class: 'share-muted', text: UNSIGNED_NOTE }) : null,
         el('div', { class: 'share-me' }, el('label', { class: 'modal-field', attrs: { for: 'share-name' } }, el('span', { text: 'Your name' }), name), el('div', { class: 'modal-field' }, el('span', { text: 'Your color' }), colors), save),
         error,
         el('div', { class: 'modal-actions' }, done),
@@ -780,6 +829,147 @@ function sharedDialog(title, setup) {
     },
     { onClose: () => ctx.focus() },
   );
+}
+
+/** Roles are checked by the app, not yet signed (decisions.md, entry 78). */
+const UNSIGNED_NOTE = 'Roles stop people changing what they shouldn’t by accident. They don’t stop someone who edits the shared folder’s files directly; signed changes come later.';
+
+/** An app older than this one can't read a change file that holds a role. */
+const OLDER_APPS_NOTE = 'Once roles are set, everyone sharing this budget needs this version of Method Budget or later. An older version won’t join it: it says the shared changes are newer than it reads and opens the file on its own, and what is changed there isn’t shared.';
+
+/** The owner is one computer: an admin (or co-owner) is the way back if it is lost. */
+const ADMIN_NOTE = 'Only you, co-owners and admins can set roles, so if this computer is lost, they are the only way to change them. Name someone you trust as an admin now; you can make them a co-owner later, who can also make admins.';
+
+/** A scope only goes with Edits some categories (Rust refuses it too). */
+const SCOPE_NOTE = 'Only Edits some categories names categories. Untick them, or pick Edits some categories.';
+
+function rolesNote(s) {
+  const invite = 'To invite someone, give them access to the folder; opening the budget there joins them.';
+  if (!s.roles_started) {
+    return s.can_set_roles
+      ? `${invite} Everyone who opens it edits everything until you set what someone may change. From then on, people without a role read only.`
+      : `${invite} Everyone who opens it edits everything until the owner sets what people may change.`;
+  }
+  return `${invite} People without a role read only until ${s.can_set_roles ? 'you give them one' : 'the owner or an admin gives them one'}.`;
+}
+
+/** The roles a person can be given, in the words the picker shows. */
+const ROLE_CHOICES = [
+  ['editor', 'Edits everything'],
+  ['department', 'Edits some categories'],
+  ['actuals', 'Actuals and notes'],
+  ['comment', 'Notes only'],
+  ['read_only', 'Read only'],
+];
+
+/**
+ * The owner's or an admin's picker for one person's role: a menu, the
+ * category checklist for "Edits some categories", and a Set button. Only
+ * the owner makes admins or changes an admin's role (Rust checks it too).
+ */
+function rolePicker(p, s, setup, error) {
+  if (p.role === 'owner') return null;
+  const mine = s.me ? s.me.role : '';
+  const owner = mine === 'owner';
+  // Only the owner changes a co-owner; the owner and co-owners change admins.
+  if (p.role === 'co_owner' && !owner) return null;
+  if (p.role === 'admin' && !owner && mine !== 'co_owner') return null;
+  const choices = [
+    ...(owner ? [['co_owner', 'Co-owner: sets roles, admins included']] : []),
+    ...(owner || mine === 'co_owner' ? [['admin', 'Edits everything and sets roles']] : []),
+    ...ROLE_CHOICES,
+  ];
+  const id = `share-role-${p.actor.slice(0, 12)}`;
+  const select = el('select', { class: 'modal-input share-role-select', attrs: { id, 'aria-label': `What ${p.name} may change` } });
+  for (const [key, label] of choices) {
+    const o = el('option', { text: label, attrs: { value: key } });
+    if (key === p.role) o.selected = true;
+    select.append(o);
+  }
+  const picked = new Set(p.scope || []);
+  const cats = el('div', { class: 'share-role-cats', attrs: { role: 'group', 'aria-label': `Categories ${p.name} edits` } });
+  for (const c of setup.categories || []) {
+    const box = el('input', { attrs: { type: 'checkbox' } });
+    box.checked = picked.has(c.code);
+    box.addEventListener('change', () => {
+      if (box.checked) picked.add(c.code);
+      else picked.delete(c.code);
+      drawCats();
+    });
+    cats.append(el('label', { class: 'share-radio' }, box, el('span', { text: `${c.code} ${c.name}` })));
+  }
+  // Ticked categories stay in view with another role, so they can be unticked.
+  const drawCats = () => { cats.hidden = select.value !== 'department' && picked.size === 0; };
+  select.addEventListener('change', drawCats);
+  drawCats();
+  const set = el('button', { class: 'btn', text: 'Set', attrs: { type: 'button' } });
+  // The first role: the question, in place (a second dialog would hide this
+  // one), with a choice of admin to name at the same time.
+  const first = el('div', { class: 'share-first-role', attrs: { role: 'group', 'aria-label': 'Before the first role' } });
+  first.hidden = true;
+  const apply = async (adminActor) => {
+    set.disabled = true;
+    try {
+      let status = await ctx.invoke('share_set_role', {
+        doc: ctx.doc(),
+        actor: p.actor,
+        role: select.value,
+        scope: [...picked],
+      });
+      if (adminActor) {
+        status = await ctx.invoke('share_set_role', { doc: ctx.doc(), actor: adminActor, role: 'admin', scope: [] });
+      }
+      if (status) statusArrived({ doc: ctx.doc(), status });
+      ctx.toast(`Saved. ${p.name} sees it once it reaches them through the folder.`);
+      Object.assign(s, status || {});
+      first.hidden = true;
+    } catch (e) {
+      error.textContent = String(e);
+      error.hidden = false;
+    }
+    set.disabled = false;
+  };
+  const askFirst = () => {
+    const others = s.people.filter((x) => x.actor !== p.actor && x.role !== 'owner');
+    const names = others.map((x) => x.name);
+    const adminId = `share-first-admin-${p.actor.slice(0, 12)}`;
+    const admin = el('select', { class: 'modal-input share-role-select', attrs: { id: adminId } });
+    admin.append(el('option', { text: 'Not now', attrs: { value: '' } }));
+    const candidates = select.value === 'admin' || select.value === 'co_owner' ? others : [p, ...others];
+    for (const x of candidates) admin.append(el('option', { text: `Make ${x.name} an admin`, attrs: { value: x.actor } }));
+    const go = el('button', { class: 'btn btn-primary', text: 'Set Role', attrs: { type: 'button' } });
+    const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
+    go.addEventListener('click', () => {
+      const chosen = admin.value;
+      // Naming the person being set as the admin makes them one instead.
+      if (chosen === p.actor) select.value = 'admin';
+      apply(chosen && chosen !== p.actor ? chosen : null);
+    });
+    cancel.addEventListener('click', () => { first.hidden = true; set.focus(); });
+    first.replaceChildren(
+      el('p', { class: 'modal-message', text: `From now on, people without a role can only read this budget.${names.length ? ` ${names.join(', ')} will read only until you give them a role too.` : ''}` }),
+      el('p', { class: 'modal-message', text: OLDER_APPS_NOTE }),
+      el('p', { class: 'modal-message', text: ADMIN_NOTE }),
+      el('label', { class: 'modal-field', attrs: { for: adminId } }, el('span', { text: 'An admin' }), admin),
+      el('div', { class: 'modal-actions' }, cancel, go),
+    );
+    first.hidden = false;
+    admin.focus();
+  };
+  set.addEventListener('click', () => {
+    error.hidden = true;
+    if (select.value !== 'department' && picked.size > 0) {
+      error.textContent = SCOPE_NOTE;
+      error.hidden = false;
+      return;
+    }
+    if (!s.roles_started && owner) {
+      askFirst();
+      return;
+    }
+    apply(null);
+  });
+  return el('div', { class: 'share-role-row' }, el('label', { class: 'share-line-label', text: 'May change', attrs: { for: id } }), select, set, cats, first);
 }
 
 /** Once per budget: what sharing means for saving (design 9.2). */

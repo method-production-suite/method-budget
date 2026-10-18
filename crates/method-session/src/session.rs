@@ -815,14 +815,18 @@ impl Session {
         self.held = on;
     }
 
-    /// Refused while the host shows budgets read-only ([`HELD_READ_ONLY`])
-    /// and for a copy saved for sharing ([`READ_ONLY`]).
+    /// Refused while the host shows budgets read-only ([`HELD_READ_ONLY`]),
+    /// for a copy saved for sharing ([`READ_ONLY`]) and in a shared budget
+    /// this person may only read ([`SharedLog::refusal`]).
     pub fn check_writable(&self) -> EditResult {
         if self.held {
             return Err(HELD_READ_ONLY.into());
         }
         if self.is_read_only() {
             return Err(READ_ONLY.into());
+        }
+        if let Some(why) = self.shared.as_ref().and_then(|sh| sh.refusal()) {
+            return Err(why);
         }
         Ok(())
     }

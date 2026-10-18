@@ -225,8 +225,16 @@ pub fn load(path: &str) -> Result<Budget, CliError> {
     method_format::from_str(&text).map_err(|e| CliError::failed(format!("{path}: {e}")))
 }
 
-/// Writes `b` to `path` in the native format, atomically.
+/// What a command that rewrites a whole file is told about a budget shared
+/// through a folder: only its change log changes it (decisions.md, entry 78).
+pub const SHARED_FILE: &str = "is shared through a folder, so it changes only through its change log: use method-budget set or apply (which record the change as this computer's person), or Method Budget. Nothing was written.";
+
+/// Writes `b` to `path` in the native format, atomically. Refused for a
+/// budget shared through a folder ([`SHARED_FILE`]).
 pub fn save(path: &str, b: &Budget) -> Result<(), CliError> {
+    if method_format::log::is_shared(Path::new(path)) {
+        return Err(CliError::rejected(format!("{path} {SHARED_FILE}")));
+    }
     write_atomic(Path::new(path), method_format::to_string(b).as_bytes())
 }
 
