@@ -130,12 +130,13 @@ this page goes ahead without waiting.
       docs/APP.md, "Not yet".
 - [ ] **A screen reader in the app** (3.14; D82): with VoiceOver on (Cmd+F5), open the
       Field Station sample (`method-budget sample` writes it); click into the topsheet
-      grid and arrow through it (each cell should say its value, column and row, "read
-      only" on totals); Shift+arrow to select (it should say selected); drill into an
-      account and edit a rate (after a moment it should say "Net total ..., up ...");
-      Cmd+I to add a line; open Rename Budget and press Escape (it should say the dialog's
-      name, then come back to the button). Note anything said twice, missed or confusing.
-      Narrator or NVDA on Windows if one is to hand.
+      grid and arrow through it (each move should be spoken, with the cell's value, column
+      and row, "read only" on totals and never "selected"); Shift+arrow to select (it
+      should say selected); drill into an account and edit a rate (after a moment it
+      should say "Net total ..., up ..."); Cmd+I to add a line; open Rename Budget and
+      press Escape (it should say the dialog's name, then come back to the button). Note
+      anything said twice, missed or confusing. Narrator or NVDA on Windows if one is to
+      hand.
 - [ ] **An update through method-update** (D83; needs two signed releases and an Apple
       silicon Mac): install the first release that has method-update, publish the next
       one, then in the installed app: Help > Check for Updates finds and downloads it and

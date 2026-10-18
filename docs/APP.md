@@ -1123,8 +1123,11 @@ The keys above are the same with a screen reader on; nothing here changes them (
   `aria-activedescendant` points at the cursor cell, so a screen reader follows the
   cursor as it moves. Each cell says what it shows (or "blank"), its column (the full
   name for a short label: "X (multiplier)") and the row's description ("45.00, Rate,
-  Gaffer"), and a problem in it. Totals and other computed cells are read only; the
-  cursor cell and the cells of a selected range are selected. Rows and cells give their
+  Gaffer"), and a problem in it. Totals and other computed cells are read only; every
+  cell of a selectable row says whether it is selected (the cells of a selected range
+  or of picked rows are; the cursor on its own isn't). Each cell's id comes from its row
+  and column, so the cursor keeps pointing at the same cell when the grid redraws or
+  scrolls. Rows and cells give their
   place (row 212 of 400), also in a long grid that draws only the rows near the visible
   ones. The description column is the row header. The cell editor is named by its
   column and row.
