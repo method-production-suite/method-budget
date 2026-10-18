@@ -168,7 +168,7 @@ fn strong_refs(e: &Entity) -> Vec<Uid> {
             reg(Field::Currency);
             sets(&[Field::ExcludedGroups], &mut out);
         }
-        Kind::Credit => sets(&[Field::ExcludedFringes], &mut out),
+        Kind::Credit => sets(&[Field::ExcludedFringes, Field::Locations], &mut out),
         Kind::CreditRow => reg(Field::Group),
         _ => {}
     }

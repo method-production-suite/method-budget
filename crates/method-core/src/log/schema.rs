@@ -748,7 +748,8 @@ pub fn encode_credit(c: &Credit, b: &dyn Binder) -> Record {
         .tags(
             Field::ExcludedFringes,
             members(b, Kind::Fringe, &c.excluded_fringes),
-        );
+        )
+        .tags(Field::Locations, members(b, Kind::Location, &c.locations));
     r
 }
 
@@ -761,6 +762,7 @@ pub fn decode_credit(e: &Entity, r: &dyn Resolver) -> Credit {
         cap: opt_int(g(Field::Cap)),
         discount_percent: dec(g(Field::DiscountPercent)),
         excluded_fringes: names(r, e, Field::ExcludedFringes),
+        locations: names(r, e, Field::Locations),
         rows: Vec::new(),
     }
 }

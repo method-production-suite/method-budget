@@ -224,6 +224,7 @@ pub fn tools() -> Vec<Tool> {
                         ("cap", s::nullable(money_schema("Ceiling on the sum of the rows' credits, or null."))),
                         ("discount_percent", s::formula("Taken off after the cap (5 means 5%).")),
                         ("excluded_fringes", s::array("Fringes left out of the spend of every group, category and account row (replaces the list).", s::name("A fringe."), 100)),
+                        ("locations", s::array("Only lines at these locations count toward every group, category and account row, with their fringes; empty counts every line (replaces the list).", s::name("A location."), 100)),
                         ("rows", s::array("The credit's rows (replaces them all).", row, 200)),
                     ],
                     &["path", "name"],
@@ -1173,6 +1174,11 @@ fn set_credit(ctx: &mut Ctx, a: &Args) -> ToolResult {
                     .flat_map(|o| &o.excluded_fringes)
                     .cloned()
                     .collect()
+            },
+            locations: if a.has("locations") {
+                a.strings("locations")
+            } else {
+                old.iter().flat_map(|o| &o.locations).cloned().collect()
             },
             rows,
         };

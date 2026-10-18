@@ -518,6 +518,11 @@ pub fn set_credit(
         .map(|a| a.code.clone())
         .collect();
     let fringes: BTreeSet<String> = b.fringes.keys().cloned().collect();
+    let locations: BTreeSet<String> = b.locations.keys().cloned().collect();
+    let old_locations = old
+        .as_ref()
+        .map(|o| o.locations.clone())
+        .unwrap_or_default();
     let mut rows = Vec::with_capacity(c.rows.len());
     for (i, r) in c.rows.iter().enumerate() {
         let n = i + 1;
@@ -585,6 +590,8 @@ pub fn set_credit(
         cap: optional_money(c.cap.as_deref(), "the cap")?,
         discount_percent,
         excluded_fringes: picked_names(&c.excluded_fringes, &fringes, Some(&old_fringes), "fringe")
+            .map_err(EditError::NotFound)?,
+        locations: picked_names(&c.locations, &locations, Some(&old_locations), "location")
             .map_err(EditError::NotFound)?,
         rows,
     };

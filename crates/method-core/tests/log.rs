@@ -373,6 +373,7 @@ fn account_credit_rows_currency_formats_and_frozen_baselines_project_back() {
         cap: None,
         discount_percent: Dec::ZERO,
         excluded_fringes: BTreeSet::new(),
+        locations: BTreeSet::new(),
         rows: vec![CreditRow {
             description: "Crew".into(),
             source: CreditSource::Account {

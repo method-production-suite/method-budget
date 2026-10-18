@@ -1062,6 +1062,12 @@ pub struct Credit {
     /// this credit (typed-amount rows have no fringes). One list per
     /// credit, not per row (decisions.md, entry 57).
     pub excluded_fringes: BTreeSet<String>,
+    /// Where the spend has to be (decisions.md, entry 80): when not empty,
+    /// every group, category and account row counts only the lines and
+    /// adjustment rows whose location is one of these, with their fringes.
+    /// A typed amount is unaffected. Empty (the default) counts every line,
+    /// wherever it is.
+    pub locations: BTreeSet<String>,
     pub rows: Vec<CreditRow>,
 }
 

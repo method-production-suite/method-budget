@@ -903,6 +903,7 @@ fn list_charges(ctx: &mut Ctx, a: &Args) -> ToolResult {
                 "cap_cents": c.cap,
                 "discount_percent": c.discount_percent.to_string(),
                 "excluded_fringes": c.excluded_fringes,
+                "locations": c.locations,
                 "rows": rows,
                 "amount_cents": computed.map(|t| t.amount),
             })

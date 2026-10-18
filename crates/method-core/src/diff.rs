@@ -883,6 +883,7 @@ pub(crate) fn credit_fields(c: &Credit) -> Vec<Field> {
             format!("{}%", c.discount_percent),
         ),
         names("excluded_fringes", "excluded fringes", &c.excluded_fringes),
+        names("locations", "locations", &c.locations),
         text("rows", "rows", credit_rows_text(c)),
     ]
 }

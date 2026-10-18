@@ -29,7 +29,7 @@ use super::arith::{converted, float_digits, float_text, percent_of, Money, Num, 
 use super::fringes::{
     earners, factored_cutoff, flat_count, percent_step, CountFrom, Factor, Factors, FlatCount,
 };
-use super::topsheet::{credit_cap, credit_keep, credit_row, dropped_from};
+use super::topsheet::{counts_at, credit_cap, credit_keep, credit_row, dropped_from};
 use super::{recalc, CalcError, Ctx, RecalcOptions};
 use crate::decimal::{Dec, Exact};
 use crate::expr::Expr;
@@ -1439,7 +1439,19 @@ impl<'a> Explainer<'a> {
         let arith = self.b.arithmetic;
         let mut notes = Vec::new();
         let excluded_fringes = &c.excluded_fringes;
+        // Only lines at the credit's locations count (decisions.md, entry 80).
+        let here = |d: &Detail| counts_at(&c.locations, d.location.as_deref());
         let mut total = Money::cents(arith, 0);
+        if !c.locations.is_empty() {
+            let names = c.locations.iter().cloned().collect::<Vec<_>>();
+            notes.push(Step::note(
+                "Locations",
+                format!(
+                    "only lines at {} count, with their fringes",
+                    names.join(", ")
+                ),
+            ));
+        }
         for (k, cr) in c.rows.iter().enumerate() {
             let mut row_notes = Vec::new();
             let (gross, excluded) = match &cr.source {
@@ -1452,7 +1464,7 @@ impl<'a> Explainer<'a> {
                     let mut ex: Cents = 0;
                     let mut per_account: BTreeMap<(usize, usize), (Cents, Cents)> = BTreeMap::new();
                     for (ci, ai, _, _, d, r) in self.costed() {
-                        if !r.included || !d.groups.contains(group) {
+                        if !r.included || !d.groups.contains(group) || !here(d) {
                             continue;
                         }
                         let v = r.total.checked_add(r.fringe_total).ok_or_else(ovf)?;
@@ -1497,11 +1509,14 @@ impl<'a> Explainer<'a> {
                     let mut gross: Cents = 0;
                     let mut ex: Cents = 0;
                     let mut found = None;
-                    for (ci, _, cat, _, _, r) in self.costed() {
+                    for (ci, _, cat, _, d, r) in self.costed() {
                         if cat != category {
                             continue;
                         }
                         found = Some(ci);
+                        if !here(d) {
+                            continue;
+                        }
                         let v = r.total.checked_add(r.fringe_total).ok_or_else(ovf)?;
                         gross = gross.checked_add(v).ok_or_else(ovf)?;
                         for (name, s) in &r.fringes {
@@ -1548,8 +1563,8 @@ impl<'a> Explainer<'a> {
                     let mut gross: Cents = 0;
                     let mut ex: Cents = 0;
                     if let Some(at) = found {
-                        for (ci, ai, _, _, _, r) in self.costed() {
-                            if (ci, ai) != at {
+                        for (ci, ai, _, _, d, r) in self.costed() {
+                            if (ci, ai) != at || !here(d) {
                                 continue;
                             }
                             let v = r.total.checked_add(r.fringe_total).ok_or_else(ovf)?;
