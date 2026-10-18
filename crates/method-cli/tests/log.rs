@@ -91,19 +91,32 @@ fn log_init_show_and_sync() {
     assert_eq!(j["file"], "Feature.mthd");
     assert_eq!(j["last"].as_array().unwrap().len(), 1);
 
-    // Jordan edits the file with `method-budget set` (an outside edit) and syncs:
-    // the edit becomes Jordan's change, and the file is rewritten.
+    // Jordan changes the shared budget with `method-budget set`: the edit is
+    // recorded as Jordan's change in the log; the file is Alex's to write.
     let o = method_as(&jordan, &["set", &file, "title", "Shared Feature"]);
     assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(out(&o).contains("recorded as one change"), "{}", out(&o));
     let o = method_as(&jordan, &["sync", &file]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     let text = out(&o);
-    assert!(text.contains("recorded an outside edit"), "{text}");
+    assert!(!text.contains("recorded an outside edit"), "{text}");
     assert!(text.contains("wrote the merged budget"), "{text}");
     let o = method_as(&alex, &["log", &file]);
     let text = out(&o);
     assert!(text.contains("2 changes by 2 actors"), "{text}");
-    assert!(text.contains("Outside edit to Feature.mthd"), "{text}");
+    assert!(text.contains("Command line: set title"), "{text}");
+
+    // A program that doesn't know the log edits the file: sync takes the
+    // edit in as this computer's change.
+    let mut b = method_format::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    b.title = "Edited by hand".into();
+    std::fs::write(&file, method_format::to_string(&b)).unwrap();
+    let o = method_as(&jordan, &["sync", &file]);
+    assert!(out(&o).contains("recorded an outside edit"), "{}", out(&o));
+    let o = method_as(&jordan, &["set", &file, "title", "Shared Feature"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let o = method_as(&alex, &["sync", &file]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
 
     // Syncing the folder finds the budget; nothing new to record.
     let o = method_as(&alex, &["sync", &d.path(""), "--no-write"]);
@@ -119,7 +132,7 @@ fn log_init_show_and_sync() {
     assert_eq!(code(&o), 0, "{}", err(&o));
     assert!(out(&o).contains("rolled"), "{}", out(&o));
     let o = method_as(&jordan, &["log", &file]);
-    assert!(out(&o).contains("3 changes by 2 actors"), "{}", out(&o));
+    assert!(out(&o).contains("5 changes by 2 actors"), "{}", out(&o));
 
     // A folder with no shared budget.
     let empty = d.path("empty");
@@ -127,4 +140,78 @@ fn log_init_show_and_sync() {
     let o = method_as(&alex, &["sync", &empty]);
     assert_eq!(code(&o), 1);
     assert!(err(&o).contains("no shared budget"), "{}", err(&o));
+}
+
+/// Gives `who` (the actor in `who_file`) a role, as the owner in
+/// `owner_file`, through the library the app uses.
+fn grant(file: &str, owner_file: &str, who_file: &str, role: method_core::log::Role) {
+    use method_format::log;
+    let owner =
+        method_core::log::ActorId::parse(&std::fs::read_to_string(owner_file).unwrap()).unwrap();
+    let who =
+        method_core::log::ActorId::parse(&std::fs::read_to_string(who_file).unwrap()).unwrap();
+    let path = std::path::Path::new(file);
+    let (mut shared, _) = log::open(path, owner, method_core::log::Ids::seeded(1)).unwrap();
+    shared
+        .log
+        .grant(who, role, "role", "2026-10-18T00:00:00Z")
+        .unwrap();
+    log::flush(&shared.log, &shared.dir).unwrap();
+}
+
+/// `set`, `apply` and the commands that rewrite a whole file, on a budget
+/// shared through a folder whose owner has set roles (decisions.md, entry
+/// 78).
+#[test]
+fn command_line_writes_to_a_shared_budget_follow_roles() {
+    let d = Dir::new("roles");
+    let file = d.path("Feature.mthd");
+    let alex = d.actor("alex");
+    let jordan = d.actor("jordan");
+    assert_eq!(code(&method_as(&alex, &["log", &file, "--init"])), 0);
+    // Jordan joins (the actor file is made) and edits before any role.
+    let o = method_as(&jordan, &["set", &file, "title", "Before roles"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    grant(&file, &alex, &jordan, method_core::log::Role::ReadOnly);
+
+    // Now Jordan reads only: set and apply are refused, nothing written.
+    let o = method_as(&jordan, &["set", &file, "title", "Jordan's"]);
+    assert_ne!(code(&o), 0);
+    assert!(err(&o).contains("role"), "{}", err(&o));
+    let script = d.path("edits.txt");
+    std::fs::write(&script, "set title \"Jordan again\"\n").unwrap();
+    let o = method_as(&jordan, &["apply", &file, &script]);
+    assert_ne!(code(&o), 0);
+    assert!(err(&o).contains("role"), "{}", err(&o));
+    // A computer with no person in the budget is refused too.
+    let o = method_as(&d.actor("nobody"), &["set", &file, "title", "Nobody's"]);
+    assert_ne!(code(&o), 0);
+    assert!(err(&o).contains("no person"), "{}", err(&o));
+    assert!(!std::path::Path::new(&d.actor("nobody")).exists());
+    // Commands that rewrite the whole file leave a shared budget alone.
+    let o = method_as(&alex, &["fmt", &file]);
+    assert_ne!(code(&o), 0);
+    assert!(err(&o).contains("shared through a folder"), "{}", err(&o));
+
+    // The owner's change goes through, and the owner keeps the file.
+    let o = method_as(&alex, &["set", &file, "title", "Alex's"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let b = method_format::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    assert_eq!(b.title, "Alex's");
+
+    // A hand edit to the file after roles is kept aside, not taken in.
+    let mut b = b;
+    b.title = "Edited by hand".into();
+    std::fs::write(&file, method_format::to_string(&b)).unwrap();
+    let o = method_as(&alex, &["sync", &file]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(out(&o).contains("isn't taken in"), "{}", out(&o));
+    let b = method_format::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    assert_eq!(b.title, "Alex's");
+    let kept = std::fs::read_dir(&d.0)
+        .unwrap()
+        .flatten()
+        .filter(|e| e.file_name().to_string_lossy().contains("(outside edit"))
+        .count();
+    assert_eq!(kept, 1);
 }

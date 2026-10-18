@@ -87,7 +87,26 @@ fn sync_one(path: &Path, no_write: bool, roll: bool) -> Result<String, CliError>
         );
     }
     let time = now();
-    if let Some(id) = log::ingest(&mut shared, &time).map_err(|e| CliError::failed(e.0))? {
+    if shared.log.roles_started() {
+        // Roles are set: nobody can say whose edit the file holds, so it
+        // isn't taken in as this computer's (decisions.md, entry 78).
+        if no_write {
+            if log::has_outside_edit(&shared, &time).map_err(|e| CliError::failed(e.0))? {
+                let _ = writeln!(
+                    s,
+                    "  the file holds an edit made outside the change log; roles are set, so it isn't taken in"
+                );
+            }
+        } else if let Some(kept) =
+            log::set_aside(&shared, &time).map_err(|e| CliError::failed(e.0))?
+        {
+            let _ = writeln!(
+                s,
+                "  kept an edit made outside the change log as {}; roles are set, so it isn't taken in",
+                kept.display()
+            );
+        }
+    } else if let Some(id) = log::ingest(&mut shared, &time).map_err(|e| CliError::failed(e.0))? {
         let n = shared.log.change(id).map(|c| c.ops.len()).unwrap_or(0);
         let _ = writeln!(s, "  recorded an outside edit to the file ({n} ops)");
     }

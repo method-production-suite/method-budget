@@ -964,7 +964,21 @@ pub fn totals_summary(before: &Report, after: &Report) -> String {
 /// when a command fails or the result doesn't recalculate; nothing is
 /// written then.
 pub fn run(path: &str, ops: &[(String, Op)], dry_run: bool) -> Outcome {
-    let before = crate::cli::load(path)?;
+    // A budget shared through a folder is changed through its change log,
+    // as this computer's person and within their role (decisions.md, entry
+    // 78): read as everyone's changes make it, and recorded as one change.
+    let mut shared = if method_format::log::is_shared(std::path::Path::new(path)) {
+        Some(
+            method_format::log::SharedEdit::open(std::path::Path::new(path), None)
+                .map_err(|e| CliError::rejected(format!("{path}: {}", e.0)))?,
+        )
+    } else {
+        None
+    };
+    let before = match &shared {
+        Some(e) => e.budget(),
+        None => crate::cli::load(path)?,
+    };
     let mut after = before.clone();
     let mut log = Vec::new();
     for (label, op) in ops {
@@ -999,8 +1013,24 @@ pub fn run(path: &str, ops: &[(String, Op)], dry_run: bool) -> Outcome {
     if dry_run {
         out.push_str("dry run: nothing written\n");
     } else if changed {
-        crate::cli::save(path, &after)?;
-        let _ = writeln!(out, "wrote {path}");
+        match shared.as_mut() {
+            Some(e) => {
+                let label = match ops {
+                    [(one, _)] => format!("Command line: {one}"),
+                    many => format!("Command line: {} edits", many.len()),
+                };
+                e.record(&after, &label, &crate::cmd::log::now())
+                    .map_err(|err| CliError::rejected(format!("{path}: {}", err.0)))?;
+                let _ = writeln!(
+                    out,
+                    "shared {path}: recorded as one change by this computer"
+                );
+            }
+            None => {
+                crate::cli::save(path, &after)?;
+                let _ = writeln!(out, "wrote {path}");
+            }
+        }
     }
     Ok(out)
 }
