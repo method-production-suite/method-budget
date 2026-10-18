@@ -3568,6 +3568,44 @@ Docs/APP.md, "Sharing a budget", says what a person sees; this records the choic
      (app), `roles_round_trip_through_json` (format).
   3. *Command line and agents*: act as this computer's person within their role. Built as
      above.
+- **Final review (MReview, pull request #27), two fixes and two small ones:**
+  - *The app and a command line or agent never write as one actor.* Before, both wrote as
+    this computer's actor: with an app edit not yet in the folder, the two took the same
+    place in its sequence, the app's edit was lost and replicas disagreed. Two ways out were
+    weighed: a lock on the sequence across processes, or an actor per program. A lock is
+    not enough on its own: the app keeps edits in memory for up to six seconds before
+    writing them, so the lock would have to cover every edit until it is written, or the
+    app write a file per keystroke; and a lock left by a stopped program must be noticed.
+    An actor per program needs nothing shared between processes: each sequence has one
+    writer, so a fork can't happen and nothing waits. Programs take a tool actor from a
+    pool per person beside the actor file (`tools/<person>/tool-k`), held with the
+    system's file lock (`File::try_lock`, let go if the program stops), so one tool actor is
+    used by one program at a time and the pool stays small. Once roles are set, a tool actor
+    says whose it is with a new op, `acts_for {person}` (once, and only for itself), in the
+    same segment as its first edit, and has that person's role; the app shows its changes
+    under the person's name and doesn't list it as a person. Before roles it needs no
+    `acts_for` (everyone edits everything), so budgets without roles stay at format 1. The
+    owner's own programs still rewrite the `.mthd`, as the owner's app does; `method-budget
+    sync` writes as a tool actor too. Tests: `the_app_and_a_command_line_on_one_computer_never_share_a_sequence`
+    (format: an unwritten app edit and two programs at once; it fails with one shared
+    actor), `a_tool_actor_has_its_persons_role` (core), `a_program_writing_for_a_person_shows_with_their_name`
+    (app), and the command line's `log_init_show_and_sync`, updated.
+  - *Grants made apart are settled by rank.* Each grant keeps how its granter ranked when
+    giving it and what they had seen (`GrantWrite`). A grant made after seeing another
+    replaces it; among grants none of which saw the others, owner beats co-owner beats
+    admin, then the later stamp. So a co-owner who hadn't seen "make Jordan a co-owner"
+    can't undo it, nor an admin a concurrent "make Kim an admin". Test:
+    `concurrent_grants_go_to_the_higher_ranked_granter`.
+  - *A file put back to an older version* (it matches a hash the log wrote, but not what
+    the log holds now) is written again by the keeper, and the status panel says so,
+    instead of being left as it is. Test: `an_older_copy_of_the_file_is_written_again`.
+  - *`written.json`*: the hash is noted before the file is written, so no program mistakes
+    a file the log wrote for an outside edit. Its read, change and write needs no lock now:
+    each actor folder has one writing program (the app as the person, every other program
+    as a tool actor it holds alone).
+  - Known, for the record: a 0.3.0 session already open when the first role is set never
+    reads `budget.json` again, so it keeps editing what it has, with no notice, until it
+    reopens; anything it saves is an outside edit, kept aside.
 - Tests: core (above, and a department editor in and out of scope, refusals by every
   peer, a role not yet seen, a move apart, who sets roles), format (grant round trip,
   roles through the folder with a forged change refused by a newcomer), session (a

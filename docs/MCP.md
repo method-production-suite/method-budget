@@ -161,8 +161,10 @@ the first time a tool names it, and `budget_open` opens it again on purpose.
   editable copy.
 - **Budgets shared through a folder follow roles** (decisions.md, entry 78). A budget with
   a change log beside it is read as everyone's changes make it, and every change (undo
-  included) is recorded in the log as one change by this computer's person (labeled
-  "Agent: ..."), checked against their role as the app checks an edit; the `.mthd` is
+  included) is recorded in the log as one change for this computer's person (labeled
+  "Agent: ..."), through an actor of the server's own that writes for that person, so it
+  never shares a sequence of changes with the app (docs/CLI.md), checked against their
+  role as the app checks an edit; the `.mthd` is
   written only on the computer that started sharing. A change the role doesn't allow is
   `refused` with nothing written, and so is any change from a computer with no actor id
   yet once the owner has set roles.

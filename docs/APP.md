@@ -1551,7 +1551,10 @@ way, as this computer's person and within their role (docs/CLI.md, docs/MCP.md).
 are set, an edit to the `.mthd` made by another program can't be said to be anyone's, so
 the computer that keeps the file doesn't take it in: it keeps the edited file beside it as
 "Feature (outside edit 2026-10-18 140322).mthd", writes the file again from everyone's
-changes, and the status panel says so.
+changes, and the status panel says so. A file put back to an older version of the budget
+(a sync service's history, a backup) is behind the log, not an outside edit: it is written
+again and the panel says so. Changes made by a person's command line or agent show under
+their name, as "Jordan Lee (command line or agent)", and aren't listed as another person.
 
 **Not yet** (later phases of the design): handing ownership itself on (the owner is one
 computer's id; a co-owner can do everything else), invite links, signed changes and removing a

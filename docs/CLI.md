@@ -26,10 +26,14 @@ from unless that is its job (`fmt`, `set`, `apply`).
 
 **A budget shared through a folder** (a `<file.mthd>-log/` folder beside it; decisions.md,
 entries 62 and 78) changes only through its change log. `set` and `apply` read it as
-everyone's changes make it and record the edit as one change by this computer's person
+everyone's changes make it and record the edit as one change for this computer's person
 (the actor id in `~/.method/actor` or `$METHOD_ACTOR_FILE`), labeled "Command line: set
 title" and so on, checked against that person's role like an edit in the app; the `.mthd`
-is rewritten only on the computer that started sharing. An edit the role doesn't allow is
+is rewritten only by the person who started sharing. They write as an actor of their own
+(`tools/<person>/tool-0`, `tool-1`... beside the actor file, each held by one program at a
+time through a file lock the system lets go if the program stops), which says once roles
+are set that it writes for the person (the `acts_for` op), so the app and these commands
+never take the same place in one sequence of changes. `sync` writes the same way. An edit the role doesn't allow is
 refused (exit 3) with nothing written, and so is any edit from a computer with no actor
 id yet once the owner has set roles. Every other command that would rewrite the whole
 file (`fmt`, `pack apply`, a merge or import into it) is refused for a shared budget.
