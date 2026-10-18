@@ -1846,7 +1846,7 @@ dependencies = [
 [[package]]
 name = "method-update"
 version = "0.1.0"
-source = "git+https://github.com/method-production-suite/method-libs?rev=ddb1bb1e74c6862a2c67812e2dda7456da613837#ddb1bb1e74c6862a2c67812e2dda7456da613837"
+source = "git+https://github.com/method-production-suite/method-libs?rev=37a9c8b9801bfcdedb9d79565a62f84fcdfb9a4a#37a9c8b9801bfcdedb9d79565a62f84fcdfb9a4a"
 dependencies = [
  "base64 0.23.1",
  "flate2",

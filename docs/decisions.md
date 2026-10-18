@@ -4054,7 +4054,7 @@ and contrast"; the audit and what is left: docs/research/accessibility-audit.md)
 - **The work underneath moves; the app looks and behaves the same.** `tauri-plugin-updater`
   and the policy code in src/updater.rs give way to `method-update` from
   method-production-suite/method-libs (the suite's shared updater, SUITE-STANDARDS.md
-  section 1), pinned to the full commit `ddb1bb1e74c6862a2c67812e2dda7456da613837`, the
+  section 1), pinned to the full commit `37a9c8b9801bfcdedb9d79565a62f84fcdfb9a4a`, the
   newest on its `main` (the caret-range dependencies, so Budget's own lock and checks pick
   the versions). From it: `policy::Settings` (the same `updates.json`, `automatic` and
   `seen`, so a choice already made carries over), the schedule (two minutes, then every six
