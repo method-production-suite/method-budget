@@ -118,6 +118,16 @@ pub struct ShareSetup {
     pub blocked: Option<String>,
     /// The folder picked in Rust's dialog, if one was.
     pub picked: Option<String>,
+    /// The topsheet's categories, for "Edits some categories" (only
+    /// when the budget is shared and this person sets roles).
+    pub categories: Vec<CategoryChoice>,
+}
+
+/// One category a department editor can be given.
+#[derive(Clone, Debug, Serialize)]
+pub struct CategoryChoice {
+    pub code: String,
+    pub name: String,
 }
 
 #[tauri::command]
@@ -160,6 +170,17 @@ pub fn share_setup(
         picked: lock(&share.picked)
             .as_ref()
             .map(|p| p.display().to_string()),
+        categories: match s.shared() {
+            Some(sh) if sh.role().sets_roles() => s
+                .budget()
+                .categories()
+                .map(|c| CategoryChoice {
+                    code: c.code.clone(),
+                    name: c.name.clone(),
+                })
+                .collect(),
+            _ => Vec::new(),
+        },
     })
 }
 
@@ -281,6 +302,24 @@ pub fn share_set_me(
         }
     }
     Ok(me)
+}
+
+/// Sets what person `actor` may change in budget `doc` (decisions.md,
+/// entry 78): `role` is "co_owner", "admin", "editor", "department", "actuals",
+/// "comment" or "read_only"; `scope` a department editor's category
+/// numbers. Returns the status with the new role.
+#[tauri::command]
+pub fn share_set_role(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    actor: String,
+    role: String,
+    scope: Option<Vec<String>>,
+) -> Result<ShareStatus, String> {
+    let mut s = state.lock_doc(doc)?;
+    let sh = s.shared_mut().ok_or("This budget isn't shared.")?;
+    sh.set_role(&actor, &role, &scope.unwrap_or_default())?;
+    Ok(sh.status(Instant::now()))
 }
 
 /// Where this person is in budget `doc` (the category and account on
@@ -440,6 +479,7 @@ mod tests {
             "share_activity",
             "share_blame",
             "share_use_value",
+            "share_set_role",
         ] {
             assert!(APP_RS.contains(&format!("crate::shared_app::{c},")), "{c}");
         }

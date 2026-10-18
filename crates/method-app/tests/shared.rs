@@ -401,6 +401,383 @@ fn renames_are_one_write_and_versions_from_history_are_refused() {
     assert!(alex.budget().fringes.contains_key("Payroll Taxes"));
 }
 
+/// The category an account is in, and a line in an account of another
+/// category.
+fn category_of(s: &Session, account: &str) -> String {
+    s.budget()
+        .categories()
+        .find(|c| c.accounts.iter().any(|a| a.code == account))
+        .unwrap()
+        .code
+        .clone()
+}
+
+fn line_outside(s: &Session, category: &str) -> RowId {
+    s.budget()
+        .categories()
+        .filter(|c| c.code != category)
+        .flat_map(|c| &c.accounts)
+        .flat_map(|a| &a.details)
+        .find(|d| d.kind == method_core::RowKind::Line)
+        .unwrap()
+        .id
+}
+
+#[test]
+fn roles_limit_what_each_person_changes() {
+    let (path, mut alex, mut jordan) = two_sessions();
+    exchange(&mut alex, &mut jordan);
+    let cat = category_of(&alex, "50-01");
+    let inside = ids_in(&alex, "50-01")[0];
+    let outside = line_outside(&alex, &cat);
+
+    // Before any role, Jordan edits everything and nobody reads only.
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert!(st.can_set_roles);
+    assert!(!st.roles_started);
+    assert_eq!(st.me.role, "owner");
+
+    // Alex lets Jordan edit one category.
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "department", std::slice::from_ref(&cat))
+        .unwrap();
+    assert!(alex.is_dirty(), "the role is a change to share");
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert!(st.roles_started);
+    let j = st.people.iter().find(|p| p.actor == JORDAN.hex()).unwrap();
+    assert_eq!(j.role, "department");
+    assert_eq!(j.scope, vec![cat.clone()]);
+    assert!(j.role_text.contains(&cat), "{}", j.role_text);
+    exchange(&mut alex, &mut jordan);
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert_eq!(st.me.role, "department");
+    assert!(!st.can_set_roles);
+
+    // Inside the category: fine. Outside: refused in plain words, and
+    // nothing changes.
+    jordan.set_detail_field(inside, "rate", "77").unwrap();
+    let before = jordan.budget().clone();
+    let err = jordan.set_detail_field(outside, "rate", "88").unwrap_err();
+    assert!(
+        err.starts_with("You can change lines and notes in"),
+        "{err}"
+    );
+    assert!(err.contains("Alex Kim"), "{err}");
+    assert_eq!(jordan.budget(), &before);
+    // Jordan sets nobody's role.
+    assert!(jordan
+        .shared_mut()
+        .unwrap()
+        .set_role(&ALEX.hex(), "read_only", &[])
+        .is_err());
+    assert!(jordan
+        .shared_mut()
+        .unwrap()
+        .set_role(&ActorId([3; 32]).hex(), "editor", &[])
+        .is_err());
+
+    // Apart: Alex makes Jordan read only while Jordan changes the rate
+    // again. Jordan hadn't seen it, so that change is kept everywhere.
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "read_only", &[])
+        .unwrap();
+    jordan.set_detail_field(inside, "rate", "79").unwrap();
+    exchange(&mut alex, &mut jordan);
+    assert_eq!(rate_of(&alex, inside), "79");
+    assert_eq!(alex.budget(), jordan.budget());
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert_eq!(st.refused, 0);
+
+    // Now every edit of Jordan's is refused before it is made.
+    let err = jordan.set_detail_field(inside, "rate", "80").unwrap_err();
+    assert!(
+        err.starts_with("You can read this budget but not change it."),
+        "{err}"
+    );
+    assert!(jordan.check_writable().is_err());
+    assert_eq!(rate_of(&jordan, inside), "79");
+
+    // The role is in the folder: Jordan opening the budget again reads only.
+    alex.share_flush();
+    let mut again = Session::open(&path).unwrap();
+    again
+        .join_shared(JORDAN, person("Jordan Lee", "blue"))
+        .unwrap();
+    assert!(again.check_writable().is_err());
+    assert_eq!(again.budget(), alex.budget());
+}
+
+/// Setting a role checks what is asked for before anything is written.
+#[test]
+fn setting_a_role_checks_what_is_asked() {
+    let (_path, mut alex, _jordan) = two_sessions();
+    let sh = alex.shared_mut().unwrap();
+    for (who, role, scope, why) in [
+        (JORDAN.hex(), "producer", vec![], "role"),
+        (JORDAN.hex(), "department", vec![], "Pick"),
+        (
+            JORDAN.hex(),
+            "department",
+            vec!["99-99".to_string()],
+            "99-99",
+        ),
+        ("not an id".to_string(), "editor", vec![], "person"),
+        (ALEX.hex(), "read_only", vec![], "owner"),
+        (JORDAN.hex(), "owner", vec![], "owner"),
+        (
+            JORDAN.hex(),
+            "editor",
+            vec!["50".to_string()],
+            "Edits some categories",
+        ),
+        (
+            JORDAN.hex(),
+            "read_only",
+            vec!["50".to_string()],
+            "Edits some categories",
+        ),
+    ] {
+        let err = sh.set_role(&who, role, &scope).unwrap_err();
+        assert!(err.contains(why), "{role}: {err}");
+    }
+    assert_eq!(sh.unshared(), 0, "nothing was written");
+}
+
+/// After roles are set, an edit to the `.mthd` by a program that doesn't
+/// write the log isn't taken in as the keeper's: it is kept beside the file,
+/// the file is written again, and the status says so in words.
+#[test]
+fn an_outside_edit_after_roles_is_kept_aside_by_the_keeper() {
+    let (path, mut alex, mut jordan) = two_sessions();
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "editor", &[])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    alex.share_tick(Instant::now() + SNAPSHOT_QUIET + Duration::from_secs(3));
+    let changes = alex.shared().unwrap().log().len();
+    let title = alex.budget().title.clone();
+
+    let mut edited = method_format::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    edited.title = "Edited by hand".into();
+    std::fs::write(&path, method_format::to_string(&edited)).unwrap();
+    alex.share_tick(later());
+
+    assert_eq!(alex.budget().title, title);
+    assert_eq!(
+        alex.shared().unwrap().log().len(),
+        changes,
+        "nothing taken in"
+    );
+    let on_disk = method_format::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(on_disk.title, title);
+    let st = alex.shared().unwrap().status(Instant::now());
+    let notice = st.notice.unwrap();
+    assert!(notice.contains("(outside edit"), "{notice}");
+    assert!(notice.contains("Feature.mthd"), "{notice}");
+    let kept = std::fs::read_dir(path.parent().unwrap())
+        .unwrap()
+        .flatten()
+        .filter(|e| e.file_name().to_string_lossy().contains("(outside edit"))
+        .count();
+    assert_eq!(kept, 1);
+}
+
+/// A change left out because its author's role didn't allow it is listed
+/// in the status: who, when, what, and why, in plain words.
+#[test]
+fn refused_changes_are_shown_with_who_when_and_what() {
+    let (_path, mut alex, mut jordan) = two_sessions();
+    exchange(&mut alex, &mut jordan);
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "read_only", &[])
+        .unwrap();
+    alex.share_flush();
+    // Another program writes a change in Jordan's name anyway.
+    let sh = alex.shared().unwrap();
+    let forged = method_core::log::Change {
+        actor: JORDAN,
+        seq: sh.log().frontier().get(&JORDAN) + 1,
+        deps: sh.log().frontier().clone(),
+        lamport: sh.log().lamport() + 1,
+        time: "2026-10-18T14:03:00Z".into(),
+        label: "Edit title".into(),
+        ops: vec![Op::Set {
+            entity: method_core::log::Uid::ROOT,
+            field: method_core::log::Field::Title,
+            value: method_core::log::Value::text("Forged"),
+        }],
+    };
+    method_format::log::LogDir::at(sh.folder())
+        .write_segment(&[forged])
+        .unwrap();
+    alex.share_tick(later());
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert_eq!(st.refused, 1);
+    let r = &st.refused_changes[0];
+    assert_eq!(r.name, "Jordan Lee");
+    assert_eq!(r.label, "Edit title");
+    assert_eq!(r.time, "2026-10-18T14:03:00Z");
+    assert!(
+        r.why.starts_with("Their role doesn\u{2019}t allow it"),
+        "{}",
+        r.why
+    );
+    assert_ne!(alex.budget().title, "Forged");
+}
+
+/// The owner makes someone a co-owner, who then sets roles, admins
+/// included, from their own computer (decisions.md, entry 78; the owner's
+/// answer of 2026-10-18).
+#[test]
+fn a_co_owner_sets_roles_from_their_own_computer() {
+    let (_path, mut alex, mut jordan) = two_sessions();
+    let sam = ActorId([3; 32]);
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "co_owner", &[])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert_eq!(st.me.role, "co_owner");
+    assert!(st.can_set_roles);
+    assert!(
+        st.me.role_text.starts_with("Co-owner"),
+        "{}",
+        st.me.role_text
+    );
+    // Jordan makes Sam an admin, and the owner sees it.
+    jordan
+        .shared_mut()
+        .unwrap()
+        .set_role(&sam.hex(), "admin", &[])
+        .unwrap();
+    // But makes no co-owners and leaves the owner alone.
+    let err = jordan
+        .shared_mut()
+        .unwrap()
+        .set_role(&sam.hex(), "co_owner", &[])
+        .unwrap_err();
+    assert!(err.contains("Only the owner makes co-owners"), "{err}");
+    assert!(jordan
+        .shared_mut()
+        .unwrap()
+        .set_role(&ALEX.hex(), "read_only", &[])
+        .is_err());
+    exchange(&mut alex, &mut jordan);
+    let st = alex.shared().unwrap().status(Instant::now());
+    let s = st.people.iter().find(|p| p.actor == sam.hex()).unwrap();
+    assert_eq!(s.role, "admin");
+    assert_eq!(st.refused, 0);
+}
+
+/// A command line or agent on Jordan's computer writes as an actor of its
+/// own that writes for Jordan: its changes arrive under Jordan's name, and
+/// it isn't listed as another person.
+#[test]
+fn a_program_writing_for_a_person_shows_with_their_name() {
+    let (path, mut alex, mut jordan) = two_sessions();
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "editor", &[])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    let dir = path.parent().unwrap().to_path_buf();
+    let jordan_file = dir.join("jordan-actor");
+    std::fs::write(&jordan_file, JORDAN.hex()).unwrap();
+    let mut e = method_format::log::SharedEdit::open(&path, Some(&jordan_file)).unwrap();
+    let mut b = e.budget();
+    b.title = "From Jordan's command line".into();
+    e.record(&b, "Command line: set title", "2026-10-18T14:00:00Z")
+        .unwrap();
+    drop(e);
+    let out = alex.share_tick(later()).unwrap();
+    assert_eq!(alex.budget().title, "From Jordan's command line");
+    let names: Vec<&str> = out.remote.iter().map(|r| r.name.as_str()).collect();
+    assert!(
+        names.contains(&"Jordan Lee (command line or agent)"),
+        "{names:?}"
+    );
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert_eq!(st.people.len(), 1, "{:?}", st.people);
+    assert_eq!(st.refused, 0);
+}
+
+/// A file put back to an older version of the budget (a sync service's
+/// history, a backup) is behind the log, not an outside edit: the keeper
+/// writes it again and says so.
+#[test]
+fn an_older_copy_of_the_file_is_written_again() {
+    let (path, mut alex, _jordan) = two_sessions();
+    let id = ids_in(&alex, "50-01")[0];
+    alex.set_detail_field(id, "rate", "111").unwrap();
+    alex.share_tick(Instant::now() + SNAPSHOT_QUIET + Duration::from_secs(3));
+    let older = std::fs::read(&path).unwrap();
+    alex.set_detail_field(id, "rate", "222").unwrap();
+    alex.share_tick(Instant::now() + SNAPSHOT_QUIET + Duration::from_secs(3));
+    let newer = std::fs::read(&path).unwrap();
+    assert_ne!(older, newer);
+    std::fs::write(&path, &older).unwrap();
+    alex.share_tick(later());
+    assert_eq!(std::fs::read(&path).unwrap(), newer);
+    assert_eq!(rate_of(&alex, id), "222");
+    let notice = alex
+        .shared()
+        .unwrap()
+        .status(Instant::now())
+        .notice
+        .unwrap();
+    assert!(notice.contains("older version"), "{notice}");
+}
+
+/// Before roles, a program's actor doesn't say whose it is in the log.
+/// This computer knows its own person's programs from its tool pool and
+/// shows them as that person; another computer's program shows as a
+/// program whose person isn't known yet, never as a new person.
+#[test]
+fn programs_before_roles_are_never_listed_as_people() {
+    let (path, mut alex, mut jordan) = two_sessions();
+    exchange(&mut alex, &mut jordan);
+    let dir = path.parent().unwrap().to_path_buf();
+    let jordan_file = dir.join("jordan-actor");
+    std::fs::write(&jordan_file, JORDAN.hex()).unwrap();
+    let mut e = method_format::log::SharedEdit::open(&path, Some(&jordan_file)).unwrap();
+    let tool = e.actor();
+    let mut b = e.budget();
+    b.title = "From Jordan's command line".into();
+    e.record(&b, "Command line: set title", "2026-10-18T14:00:00Z")
+        .unwrap();
+    drop(e);
+
+    // On Jordan's computer: Jordan's own program.
+    jordan
+        .shared_mut()
+        .unwrap()
+        .set_tools_root(method_format::log::tools_root(&jordan_file));
+    let out = jordan.share_tick(later()).unwrap();
+    assert_eq!(jordan.budget().title, "From Jordan's command line");
+    assert_eq!(out.remote[0].name, "Jordan Lee (command line or agent)");
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert!(
+        st.people.iter().all(|p| p.actor != tool.hex()),
+        "{:?}",
+        st.people
+    );
+
+    // On Alex's computer: a program, whose isn't known yet.
+    let out = alex.share_tick(later()).unwrap();
+    assert_eq!(
+        out.remote[0].name,
+        "A command line or agent (whose isn\u{2019}t known yet)"
+    );
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert_eq!(st.people.len(), 1, "{:?}", st.people);
+    assert_eq!(st.people[0].actor, JORDAN.hex());
+}
+
 /// A second person for a live check of the built app (ignored: run by
 /// hand). `METHOD_LIVE_BUDGET` names a shared `.mthd`; this joins it as
 /// Jordan Lee, changes the first line's rate (to `METHOD_LIVE_RATE`,

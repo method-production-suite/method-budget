@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use method_format::log::{self, LogDir};
 
 use crate::cli::{exit, CliError, Flags, Outcome};
-use crate::cmd::log::{now, open_shared};
+use crate::cmd::log::now;
 
 pub const USAGE: &str = "  method-budget sync <file.mthd|FOLDER> [--no-write] [--roll]
       Merge every actor's changes in the budget's change log (every
@@ -64,7 +64,9 @@ fn shared_budgets(dir: &Path) -> Result<Vec<PathBuf>, CliError> {
 }
 
 fn sync_one(path: &Path, no_write: bool, roll: bool) -> Result<String, CliError> {
-    let (mut shared, report) = open_shared(path)?;
+    // Written as a program of this computer's person, never as the person,
+    // so it can run while the app has the budget open.
+    let (mut shared, report, _lock) = crate::cmd::log::open_shared_as_tool(path)?;
     let mut s = String::new();
     let _ = writeln!(
         s,
@@ -87,7 +89,26 @@ fn sync_one(path: &Path, no_write: bool, roll: bool) -> Result<String, CliError>
         );
     }
     let time = now();
-    if let Some(id) = log::ingest(&mut shared, &time).map_err(|e| CliError::failed(e.0))? {
+    if shared.log.roles_started() {
+        // Roles are set: nobody can say whose edit the file holds, so it
+        // isn't taken in as this computer's (decisions.md, entry 78).
+        if no_write {
+            if log::has_outside_edit(&shared, &time).map_err(|e| CliError::failed(e.0))? {
+                let _ = writeln!(
+                    s,
+                    "  the file holds an edit made outside the change log; roles are set, so it isn't taken in"
+                );
+            }
+        } else if let Some(kept) =
+            log::set_aside(&shared, &time).map_err(|e| CliError::failed(e.0))?
+        {
+            let _ = writeln!(
+                s,
+                "  kept an edit made outside the change log as {}; roles are set, so it isn't taken in",
+                kept.display()
+            );
+        }
+    } else if let Some(id) = log::ingest(&mut shared, &time).map_err(|e| CliError::failed(e.0))? {
         let n = shared.log.change(id).map(|c| c.ops.len()).unwrap_or(0);
         let _ = writeln!(s, "  recorded an outside edit to the file ({n} ops)");
     }

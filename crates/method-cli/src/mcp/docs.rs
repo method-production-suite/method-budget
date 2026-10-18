@@ -9,6 +9,11 @@
 //! refused, with nothing written, when the file on disk is no longer what
 //! the server last read or wrote: the caller re-opens it (`budget_open`),
 //! looks at what changed and decides again.
+//!
+//! A budget shared through a folder (a change log beside it) is read as
+//! everyone's changes make it, and a change to it is recorded in the log as
+//! one change by this computer's person, checked against their role, never
+//! written over the `.mthd` (decisions.md, entry 78).
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -82,8 +87,14 @@ pub fn revision(bytes: &[u8]) -> String {
     format!("{h:016x}")
 }
 
-/// Reads a file whole, refusing one over [`limits::MAX_FILE_BYTES`].
+/// Reads a file whole, refusing one over [`limits::MAX_FILE_BYTES`]. A
+/// budget shared through a folder reads as everyone's changes make it.
 pub fn read_file(path: &Path, shown: &str) -> Result<Vec<u8>, ToolError> {
+    if method_format::log::is_shared(path) {
+        let b = method_format::log::read_shared(path)
+            .map_err(|e| ToolError::io(format!("{shown}: {}", e.0)))?;
+        return Ok(method_format::to_string(&b).into_bytes());
+    }
     let len = std::fs::metadata(path)
         .map_err(|e| ToolError::io(format!("{shown}: {e}")))?
         .len();
@@ -113,11 +124,21 @@ pub fn is_shared_copy(b: &Budget) -> bool {
 pub struct Docs {
     open: BTreeMap<PathBuf, Doc>,
     clock: u64,
+    /// Where this computer's actor id is kept, for changes to shared
+    /// budgets (`None`: the usual place, `method_format::log::actor_id_path`).
+    actor_file: Option<PathBuf>,
 }
 
 impl Docs {
     pub fn new() -> Docs {
         Docs::default()
+    }
+
+    /// Keeps this computer's actor id in `file` instead of the usual place
+    /// (tests; the server uses the usual place, as the app does).
+    #[cfg(test)]
+    pub fn set_actor_file(&mut self, file: PathBuf) {
+        self.actor_file = Some(file);
     }
 
     /// The open file at `path`, if any.
@@ -274,7 +295,15 @@ impl Docs {
             )));
         }
         let bytes = method_format::to_string(&after).into_bytes();
-        write(doc, path, shown, label, bytes, after)?;
+        write(
+            doc,
+            path,
+            shown,
+            label,
+            bytes,
+            after,
+            self.actor_file.as_deref(),
+        )?;
         Ok(Edited {
             changed: true,
             out,
@@ -316,12 +345,21 @@ impl Docs {
                     ))
                 })?;
             }
+            let actor_file = self.actor_file.clone();
             let doc = self.open.get_mut(path).expect("open");
             doc.used = used;
             if doc.base != disk {
                 return Err(conflict(shown));
             }
-            write(doc, path, shown, label, bytes, budget)?;
+            write(
+                doc,
+                path,
+                shown,
+                label,
+                bytes,
+                budget,
+                actor_file.as_deref(),
+            )?;
             return Ok(revision(&doc.base));
         }
         check_size(&bytes, shown)?;
@@ -354,10 +392,18 @@ impl Docs {
             .ok_or_else(|| nothing_to_undo(shown))?;
         let restored = parse(&step.bytes, shown)?;
         check_size(&step.bytes, shown)?;
-        crate::cli::write_atomic(path, &step.bytes).map_err(|e| ToolError::io(e.message))?;
+        let label = format!("Undo: {}", step.label);
+        let base = store(
+            path,
+            shown,
+            &label,
+            &step.bytes,
+            &restored,
+            self.actor_file.as_deref(),
+        )?;
         doc.history.pop();
         let was = std::mem::replace(&mut doc.budget, restored.clone());
-        doc.base = step.bytes;
+        doc.base = base;
         Ok((step.label, was, restored))
     }
 }
@@ -374,6 +420,29 @@ fn check_size(bytes: &[u8], shown: &str) -> Result<(), ToolError> {
 
 /// Writes `bytes` (the budget `after`) over the open file and records the
 /// undo step.
+/// Writes `budget` (as `bytes`) to the budget at `path` and returns what
+/// the file now reads as: the file itself, or for a budget shared through a
+/// folder, one change by this computer's person recorded in the log (refused
+/// when their role doesn't allow it) and the budget as the log now makes it.
+fn store(
+    path: &Path,
+    shown: &str,
+    label: &str,
+    bytes: &[u8],
+    budget: &Budget,
+    actor_file: Option<&Path>,
+) -> Result<Vec<u8>, ToolError> {
+    if method_format::log::is_shared(path) {
+        let mut e = method_format::log::SharedEdit::open(path, actor_file)
+            .map_err(|e| ToolError::refused(format!("{shown}: {}", e.0)))?;
+        e.record(budget, &format!("Agent: {label}"), &crate::cmd::log::now())
+            .map_err(|e| ToolError::refused(format!("{shown}: {}", e.0)))?;
+        return Ok(method_format::to_string(&e.budget()).into_bytes());
+    }
+    crate::cli::write_atomic(path, bytes).map_err(|e| ToolError::io(e.message))?;
+    Ok(bytes.to_vec())
+}
+
 fn write(
     doc: &mut Doc,
     path: &Path,
@@ -381,11 +450,13 @@ fn write(
     label: &str,
     bytes: Vec<u8>,
     after: Budget,
+    actor_file: Option<&Path>,
 ) -> Result<(), ToolError> {
     check_size(&bytes, shown)?;
-    crate::cli::write_atomic(path, &bytes).map_err(|e| ToolError::io(e.message))?;
+    let bytes = store(path, shown, label, &bytes, &after, actor_file)?;
+    // What the file reads as now (for a shared budget, the log's view).
+    doc.budget = parse(&bytes, shown).unwrap_or(after);
     let old = std::mem::replace(&mut doc.base, bytes);
-    doc.budget = after;
     doc.history.push(Step {
         label: label.to_string(),
         bytes: old,
@@ -423,6 +494,71 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d
+    }
+
+    /// A budget shared through a folder: changes go into the log as this
+    /// computer's person, within their role, and undo does the same
+    /// (decisions.md, entry 78).
+    #[test]
+    fn shared_budgets_are_changed_through_the_log_within_a_role() {
+        use method_core::log::{ActorId, Ids, Role};
+        use method_format::log as flog;
+
+        let dir = temp("roles");
+        let p = dir.join("Film.mthd");
+        crate::cli::save(p.to_str().unwrap(), &method_core::starter::budget()).unwrap();
+        let owner = ActorId([1; 32]);
+        let mut shared = flog::init(&p, owner, Ids::seeded(1), "2026-10-18T00:00:00Z").unwrap();
+        let reader = ActorId([2; 32]);
+        let editor = ActorId([3; 32]);
+        for (who, role) in [(reader, Role::ReadOnly), (editor, Role::Editor)] {
+            shared
+                .log
+                .grant(who, role, "role", "2026-10-18T00:00:00Z")
+                .unwrap();
+        }
+        flog::flush(&shared.log, &shared.dir).unwrap();
+        let file_for = |a: ActorId, n: &str| {
+            let f = dir.join(n);
+            std::fs::write(&f, a.hex()).unwrap();
+            f
+        };
+        let set_title = |docs: &mut Docs, t: &str| {
+            let t = t.to_string();
+            docs.edit(&p, "Film.mthd", "Set title", move |b| {
+                b.title = t;
+                Ok(())
+            })
+        };
+
+        // The reader's agent is refused; nothing is written anywhere.
+        let mut docs = Docs::new();
+        docs.set_actor_file(file_for(reader, "reader"));
+        let file_before = std::fs::read(&p).unwrap();
+        let e = set_title(&mut docs, "Reader's").unwrap_err();
+        assert_eq!(e.kind, "refused");
+        assert!(e.message.contains("role"), "{}", e.message);
+        assert_eq!(std::fs::read(&p).unwrap(), file_before);
+        assert!(flog::LogDir::for_budget(&p).segments(reader).is_empty());
+
+        // The editor's agent changes it through the log; the file is the
+        // owner's to write, so it stays; reads see the change.
+        let mut docs = Docs::new();
+        docs.set_actor_file(file_for(editor, "editor"));
+        assert!(set_title(&mut docs, "Editor's").unwrap().changed);
+        assert_eq!(std::fs::read(&p).unwrap(), file_before);
+        assert_eq!(flog::read_shared(&p).unwrap().title, "Editor's");
+        let v = docs.view(&p, "Film.mthd").unwrap();
+        assert!(!v.changed_on_disk);
+        assert_eq!(v.budget.title, "Editor's");
+        // A second change builds on the first, and undo goes through the
+        // log too.
+        assert!(set_title(&mut docs, "Editor's 2").unwrap().changed);
+        let (label, _, restored) = docs.undo(&p, "Film.mthd").unwrap();
+        assert_eq!(label, "Set title");
+        assert_eq!(restored.title, "Editor's");
+        assert_eq!(flog::read_shared(&p).unwrap().title, "Editor's");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

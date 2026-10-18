@@ -18,6 +18,7 @@
 //! No networking and no files here: the on-disk log lives in
 //! `method-format` (`method_format::log`), transports come later.
 
+pub mod access;
 pub mod capture;
 pub mod clock;
 pub mod formula;
@@ -34,6 +35,7 @@ pub mod undo;
 use std::collections::BTreeMap;
 use std::fmt;
 
+pub use access::{Refusal, Role};
 pub use capture::Hint;
 pub use clock::{ChangeId, Frontier, Stamp};
 pub use ids::{ActorId, Ids, Uid};
@@ -41,7 +43,7 @@ pub use op::{Change, Field, Kind, ListKey, ListName, Member, Op, Placement, Valu
 pub use project::{project, Binding, Projection};
 pub use review::{Review, ReviewItem};
 pub use seq::{Node, PosId, SeqTree, Side};
-pub use state::{Entity, Malformed, OrSet, Place, Register, State};
+pub use state::{Entity, GrantWrite, Malformed, OrSet, Place, Register, State};
 pub use undo::Inverse;
 
 use crate::model::Budget;
@@ -71,6 +73,9 @@ pub enum LogError {
     Fork { id: ChangeId },
     /// Not one of this actor's own changes, or not applied.
     NotMine { id: ChangeId },
+    /// The change goes beyond its author's role (decisions.md, entry 78).
+    /// Refused by every app, so it is listed and skipped.
+    NotAllowed { id: ChangeId, refusal: Refusal },
 }
 
 impl fmt::Display for LogError {
@@ -81,6 +86,9 @@ impl fmt::Display for LogError {
                 write!(f, "change {id} differs from the one already applied")
             }
             LogError::NotMine { id } => write!(f, "change {id} is not one of this actor's"),
+            LogError::NotAllowed { id, refusal } => {
+                write!(f, "change {id} is not allowed: {}", refusal.reason)
+            }
         }
     }
 }
@@ -139,6 +147,14 @@ impl Log {
 
     pub fn actor(&self) -> ActorId {
         self.actor
+    }
+
+    /// Names the budget's first change before anything is applied (the
+    /// log folder's `budget.json` records it): its actor owns the budget,
+    /// and a change that hasn't seen it is refused, whatever order the
+    /// changes arrive in (decisions.md, entry 78).
+    pub fn set_genesis(&mut self, genesis: ChangeId) {
+        self.state.set_genesis(genesis);
     }
 
     pub fn state(&self) -> &State {
@@ -220,7 +236,7 @@ impl Log {
         hints: &[Hint],
         label: &str,
         time: &str,
-    ) -> Result<Option<ChangeId>, Malformed> {
+    ) -> Result<Option<ChangeId>, LogError> {
         let seq = self.own_seq() + 1;
         let lamport = self.state.lamport() + 1;
         let ops = capture::capture(
@@ -245,16 +261,28 @@ impl Log {
             label: label.to_string(),
             ops,
         };
-        self.state.check(&change)?;
+        self.check_own(&change)?;
         let id = change.id();
         // Checked just above, so this cannot refuse it.
         let _ = self.apply_now(change);
         Ok(Some(id))
     }
 
+    /// Checks one of this actor's own changes before it is applied: it
+    /// must fit the state and this person's role. Nothing is recorded
+    /// when it doesn't.
+    fn check_own(&self, change: &Change) -> Result<(), LogError> {
+        let id = change.id();
+        self.state.check(change).map_err(|m| LogError::Malformed {
+            id,
+            reason: m.to_string(),
+        })?;
+        access::check(&self.state, change).map_err(|refusal| LogError::NotAllowed { id, refusal })
+    }
+
     /// Records a change made of `ops` by this actor (an undo, a change
     /// built by a tool).
-    fn record_ops(&mut self, ops: Vec<Op>, label: &str, time: &str) -> Result<ChangeId, Malformed> {
+    fn record_ops(&mut self, ops: Vec<Op>, label: &str, time: &str) -> Result<ChangeId, LogError> {
         let change = Change {
             actor: self.actor,
             seq: self.own_seq() + 1,
@@ -264,7 +292,7 @@ impl Log {
             label: label.to_string(),
             ops,
         };
-        self.state.check(&change)?;
+        self.check_own(&change)?;
         let id = change.id();
         let _ = self.apply_now(change);
         Ok(id)
@@ -302,19 +330,20 @@ impl Log {
     fn apply_now(&mut self, change: Change) -> Result<(), LogError> {
         let id = change.id();
         self.frontier.advance(change.actor, change.seq);
-        match self.state.check(&change) {
-            Ok(()) => {
-                self.state.apply(&change);
-                self.order.push(id);
-                self.changes.insert(id, change);
-                Ok(())
-            }
-            Err(m) => {
-                let reason = m.to_string();
-                self.rejected.push((change, reason.clone()));
-                Err(LogError::Malformed { id, reason })
-            }
+        if let Err(m) = self.state.check(&change) {
+            let reason = m.to_string();
+            self.rejected.push((change, reason.clone()));
+            return Err(LogError::Malformed { id, reason });
         }
+        if let Err(refusal) = access::check(&self.state, &change) {
+            self.rejected
+                .push((change, format!("not allowed: {}", refusal.reason)));
+            return Err(LogError::NotAllowed { id, refusal });
+        }
+        self.state.apply(&change);
+        self.order.push(id);
+        self.changes.insert(id, change);
+        Ok(())
     }
 
     fn drain_pending(&mut self) -> usize {
@@ -362,12 +391,7 @@ impl Log {
                 .map(|c| c.label.as_str())
                 .unwrap_or("")
         );
-        let new = self
-            .record_ops(inv.ops.clone(), &label, time)
-            .map_err(|m| LogError::Malformed {
-                id,
-                reason: m.to_string(),
-            })?;
+        let new = self.record_ops(inv.ops.clone(), &label, time)?;
         Ok((Some(new), inv))
     }
 
@@ -382,7 +406,7 @@ impl Log {
         value: Value,
         label: &str,
         time: &str,
-    ) -> Result<Option<ChangeId>, Malformed> {
+    ) -> Result<Option<ChangeId>, LogError> {
         if self.state.entity(entity).is_none() {
             return Ok(None);
         }
@@ -392,6 +416,62 @@ impl Log {
             value,
         }];
         self.record_ops(ops, label, time).map(Some)
+    }
+
+    // Roles (decisions.md, entry 78)
+
+    /// Gives `actor` a role, as a change by this actor. Refused unless
+    /// this actor sets roles and may give this one.
+    pub fn grant(
+        &mut self,
+        actor: ActorId,
+        role: Role,
+        label: &str,
+        time: &str,
+    ) -> Result<ChangeId, LogError> {
+        self.record_ops(vec![Op::Grant { actor, role }], label, time)
+    }
+
+    /// Who started sharing.
+    pub fn owner(&self) -> Option<ActorId> {
+        self.state.owner()
+    }
+
+    /// `actor`'s role now, as this log knows it.
+    pub fn role_of(&self, actor: ActorId) -> Role {
+        access::role_at(&self.state, actor, &self.frontier)
+    }
+
+    /// Whether the owner has given anyone a role: from then on, someone
+    /// without one reads only.
+    pub fn roles_started(&self) -> bool {
+        access::started_at(self.state.grants(), &self.frontier)
+    }
+
+    /// Everyone given a role, with the current one.
+    pub fn members(&self) -> Vec<(ActorId, Role)> {
+        self.state
+            .grants()
+            .keys()
+            .map(|a| (*a, self.role_of(*a)))
+            .collect()
+    }
+
+    /// Says, as a change by this actor, that it writes for `person` (a
+    /// command line or agent with an actor of its own; decisions.md, entry
+    /// 78). Refused once this actor writes for someone.
+    pub fn acts_for(
+        &mut self,
+        person: ActorId,
+        label: &str,
+        time: &str,
+    ) -> Result<ChangeId, LogError> {
+        self.record_ops(vec![Op::ActsFor { person }], label, time)
+    }
+
+    /// The person `actor` writes for, or `actor` itself.
+    pub fn person_of(&self, actor: ActorId) -> ActorId {
+        access::person_at(&self.state, actor, &self.frontier)
     }
 
     /// The applied changes from the `from`th one on, in applied order

@@ -12,8 +12,8 @@ use std::sync::Arc;
 
 use common::*;
 use method_core::log::{
-    ActorId, Applied, Change, Field, Hint, Ids, Kind, Log, LogError, Op, Projection, Review, Uid,
-    Value,
+    ActorId, Applied, Change, ChangeId, Field, Hint, Ids, Kind, Log, LogError, Op, Projection,
+    Review, Role, Uid, Value,
 };
 use method_core::rename::SetupKind;
 use method_core::*;
@@ -1328,6 +1328,735 @@ fn a_big_budget_adopts_edits_and_merges() {
         normalized(&logs[1].project().budget)
     );
     eprintln!("5,000 rows: adopt {adopted:?}, project {projected:?}, one-cell edit {recorded:?}");
+}
+
+// ---------------------------------------------------------------------------
+// Roles: who may change what (docs/research/collaboration.md, section 7;
+// decisions.md, entry 78)
+
+fn category_uid(log: &Log, code: &str) -> Uid {
+    log.project().binding.categories[code]
+}
+
+fn scope(log: &Log, codes: &[&str]) -> Role {
+    Role::Department(codes.iter().map(|c| category_uid(log, c)).collect())
+}
+
+/// Records an edit made by `f` on the log's projection.
+fn try_edit(log: &mut Log, f: impl FnOnce(&mut Budget)) -> Result<Option<ChangeId>, LogError> {
+    let p = log.project();
+    let mut after = p.budget.clone();
+    f(&mut after);
+    log.record(&p, &after, &[], "edit", T)
+}
+
+/// Hands `to` every change of `from` it hasn't seen; refusals are kept in
+/// `to`'s rejected list.
+fn send(from: &Log, to: &mut Log) {
+    let missing: Vec<Change> = from.since(to.frontier()).into_iter().cloned().collect();
+    for c in missing {
+        let _ = to.apply(c);
+    }
+}
+
+fn rejected_ids(log: &Log) -> BTreeSet<ChangeId> {
+    log.rejected().iter().map(|(c, _)| c.id()).collect()
+}
+
+/// A change by `who` that claims to have seen everything in `seen`: what a
+/// changed or old app could write, never this one.
+fn forged(who: ActorId, seq: u64, seen: &Log, ops: Vec<Op>) -> Change {
+    Change {
+        actor: who,
+        seq,
+        deps: seen.frontier().clone(),
+        lamport: seen.lamport() + 1,
+        time: T.into(),
+        label: "forged".into(),
+        ops,
+    }
+}
+
+fn title_op(t: &str) -> Op {
+    Op::Set {
+        entity: Uid::ROOT,
+        field: Field::Title,
+        value: Value::text(t),
+    }
+}
+
+#[test]
+fn without_roles_everyone_edits_everything() {
+    let a = adopt(1, &sample());
+    let mut b = follower(2, &a);
+    assert_eq!(a.owner(), Some(actor(1)));
+    assert_eq!(a.role_of(actor(1)), Role::Owner);
+    assert_eq!(a.role_of(actor(2)), Role::Editor);
+    assert!(!a.roles_started());
+    try_edit(&mut b, |b| b.title = "Mine".into()).unwrap();
+    assert!(b.rejected().is_empty());
+}
+
+#[test]
+fn a_department_editor_changes_only_lines_and_notes_in_scope() {
+    let mut a = adopt(1, &sample());
+    let role = scope(&a, &["2000"]);
+    a.grant(actor(2), role.clone(), "Jordan edits 2000", T)
+        .unwrap();
+    assert!(a.roles_started());
+    let mut b = follower(2, &a);
+    assert_eq!(b.role_of(actor(2)), role);
+    // Someone never given a role reads only, once roles have started.
+    assert_eq!(a.role_of(actor(3)), Role::ReadOnly);
+
+    // In 2000 Production: a rate, a new line, a note on the account, a
+    // fringe applied, a line deleted.
+    try_edit(&mut b, |b| row_mut(b, 2).unwrap().rate = 500.into())
+        .unwrap()
+        .unwrap();
+    try_edit(&mut b, |b| {
+        account_mut(b, "2100").unwrap().details.push(Detail::line(
+            900,
+            "Dolly grip",
+            10,
+            "Day",
+            400,
+        ));
+    })
+    .unwrap()
+    .unwrap();
+    try_edit(&mut b, |b| {
+        account_mut(b, "2100").unwrap().notes.push(Note {
+            id: 1,
+            text: "Check the dolly rate".into(),
+            created: T.into(),
+            ..Note::default()
+        });
+    })
+    .unwrap()
+    .unwrap();
+    try_edit(&mut b, |b| {
+        row_mut(b, 5).unwrap().fringes.insert("FICA".into());
+    })
+    .unwrap()
+    .unwrap();
+    try_edit(&mut b, |b| {
+        take_row(b, 7);
+    })
+    .unwrap()
+    .unwrap();
+    let mine = b.len();
+
+    // Outside it: a line in 1000, the title, a fringe's rate, a new account.
+    let refused = [
+        try_edit(&mut b, |b| row_mut(b, 1).unwrap().rate = 1.into()),
+        try_edit(&mut b, |b| b.title = "Mine".into()),
+        try_edit(&mut b, |b| {
+            b.fringes.get_mut("FICA").unwrap().rate = "8".into()
+        }),
+        try_edit(&mut b, |b| {
+            b.categories_mut()
+                .find(|c| c.code == "2000")
+                .unwrap()
+                .accounts
+                .push(account("2200", "Camera", vec![]));
+        }),
+    ];
+    for r in refused {
+        assert!(matches!(r, Err(LogError::NotAllowed { .. })), "{r:?}");
+    }
+    // A refused edit leaves nothing behind.
+    assert_eq!(b.len(), mine);
+    assert!(b.rejected().is_empty());
+
+    // Everyone else takes in what was allowed.
+    send(&b, &mut a);
+    assert!(a.rejected().is_empty(), "{:?}", a.rejected());
+    assert_eq!(
+        normalized(&a.project().budget),
+        normalized(&b.project().budget)
+    );
+}
+
+#[test]
+fn changes_outside_a_role_are_refused_by_every_peer() {
+    let mut a = adopt(1, &sample());
+    a.grant(actor(2), Role::Comment, "Jordan comments", T)
+        .unwrap();
+    let mut c = follower(3, &a);
+    let bad = forged(actor(2), 1, &a, vec![title_op("Forged")]);
+    let id = bad.id();
+    assert!(matches!(
+        a.apply(bad.clone()),
+        Err(LogError::NotAllowed { .. })
+    ));
+    assert!(matches!(c.apply(bad), Err(LogError::NotAllowed { .. })));
+    assert_eq!(rejected_ids(&a), BTreeSet::from([id]));
+    assert_eq!(rejected_ids(&c), BTreeSet::from([id]));
+    assert_eq!(a.project().budget.title, "Sample Feature");
+    // A note is within a commenter's role.
+    let mut b = follower(2, &a);
+    try_edit(&mut b, |b| {
+        row_mut(b, 2).unwrap().notes.push(Note {
+            id: 1,
+            text: "Is this the weekly rate?".into(),
+            created: T.into(),
+            ..Note::default()
+        });
+    })
+    .unwrap()
+    .unwrap();
+    assert!(matches!(
+        try_edit(&mut b, |b| row_mut(b, 2).unwrap().rate = 1.into()),
+        Err(LogError::NotAllowed { .. })
+    ));
+}
+
+#[test]
+fn a_change_made_before_seeing_a_role_is_judged_by_what_its_author_had_seen() {
+    let mut a = adopt(1, &sample());
+    let mut b = follower(2, &a);
+    // Apart: the owner makes Jordan read only; Jordan, not knowing yet,
+    // changes the title.
+    a.grant(actor(2), Role::ReadOnly, "Jordan reads", T)
+        .unwrap();
+    try_edit(&mut b, |b| b.title = "Jordan's title".into())
+        .unwrap()
+        .unwrap();
+    // In either order, everyone keeps Jordan's change.
+    let mut c = follower(3, &a);
+    let mut d = Log::new(actor(4), Ids::seeded(4));
+    for ch in a.changes().take(1) {
+        d.apply(ch.clone()).unwrap();
+    }
+    send(&b, &mut d);
+    send(&a, &mut d);
+    send(&b, &mut c);
+    send(&b, &mut a);
+    send(&a, &mut b);
+    for log in [&a, &b, &c, &d] {
+        assert!(log.rejected().is_empty(), "{:?}", log.rejected());
+        assert_eq!(log.project().budget.title, "Jordan's title");
+    }
+    // Now Jordan has seen it: the next edit is refused at once.
+    assert!(matches!(
+        try_edit(&mut b, |b| b.title = "Again".into()),
+        Err(LogError::NotAllowed { .. })
+    ));
+}
+
+#[test]
+fn scope_is_judged_where_the_line_was_when_it_was_edited() {
+    let mut a = adopt(1, &sample());
+    let role = scope(&a, &["2000"]);
+    a.grant(actor(2), role, "Jordan edits 2000", T).unwrap();
+    let mut b = follower(2, &a);
+    let base = follower(3, &a);
+    // Apart: the owner moves line 2 out to 1100; Jordan changes its rate.
+    try_edit(&mut a, |b| {
+        let d = take_row(b, 2).unwrap();
+        account_mut(b, "1100").unwrap().details.push(d);
+    })
+    .unwrap()
+    .unwrap();
+    try_edit(&mut b, |b| row_mut(b, 2).unwrap().rate = 500.into())
+        .unwrap()
+        .unwrap();
+    // Two peers, the changes in opposite orders: both keep Jordan's rate.
+    let mut first_move = base.clone();
+    send(&a, &mut first_move);
+    send(&b, &mut first_move);
+    let mut first_rate = base.clone();
+    send(&b, &mut first_rate);
+    send(&a, &mut first_rate);
+    for log in [&first_move, &first_rate] {
+        assert!(log.rejected().is_empty(), "{:?}", log.rejected());
+    }
+    assert_eq!(first_move.frontier(), first_rate.frontier());
+    assert_eq!(
+        normalized(&first_move.project().budget),
+        normalized(&first_rate.project().budget)
+    );
+    // Once Jordan sees the move, line 2 is out of reach.
+    send(&a, &mut b);
+    assert!(matches!(
+        try_edit(&mut b, |b| row_mut(b, 2).unwrap().rate = 600.into()),
+        Err(LogError::NotAllowed { .. })
+    ));
+}
+
+#[test]
+fn only_the_owner_and_admins_change_roles() {
+    let mut a = adopt(1, &sample());
+    a.grant(actor(2), Role::Admin, "Priya is an admin", T)
+        .unwrap();
+    a.grant(actor(3), Role::Editor, "Jordan edits", T).unwrap();
+    let mut admin = follower(2, &a);
+    let mut editor = follower(3, &a);
+    // An admin sets other people's roles, but makes no admins and leaves
+    // the owner alone.
+    admin
+        .grant(actor(4), Role::Actuals, "Sam does actuals", T)
+        .unwrap();
+    for (who, role) in [
+        (actor(4), Role::Admin),
+        (actor(1), Role::ReadOnly),
+        (actor(2), Role::Editor),
+    ] {
+        assert!(matches!(
+            admin.grant(who, role, "no", T),
+            Err(LogError::NotAllowed { .. })
+        ));
+    }
+    // An editor sets nobody's role.
+    assert!(matches!(
+        editor.grant(actor(4), Role::Comment, "no", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    // Nobody hands out ownership, and the owner's role is fixed.
+    assert!(a.grant(actor(3), Role::Owner, "no", T).is_err());
+    assert!(a.grant(actor(1), Role::ReadOnly, "no", T).is_err());
+    // An editor changes the budget but doesn't lock the originals.
+    try_edit(&mut editor, |b| b.title = "Edited".into())
+        .unwrap()
+        .unwrap();
+    // The owner's grants, the admin's grant and the editor's edit reach
+    // everyone.
+    send(&admin, &mut a);
+    send(&editor, &mut a);
+    assert!(a.rejected().is_empty(), "{:?}", a.rejected());
+    assert_eq!(a.role_of(actor(4)), Role::Actuals);
+    let members = a.members();
+    assert_eq!(members.len(), 3, "{members:?}");
+}
+
+/// Lenient exchange: every log gets every change it lacks, in a random
+/// order; refusals stay in each log's rejected list.
+fn exchange_all(rng: &mut Rng, logs: &mut [Log], extra: &[Change]) {
+    let all: Vec<Change> = logs
+        .iter()
+        .flat_map(|l| l.changes().cloned().collect::<Vec<_>>())
+        .chain(extra.iter().cloned())
+        .collect();
+    for log in logs.iter_mut() {
+        let mut missing: Vec<Change> = all
+            .iter()
+            .filter(|c| !log.frontier().includes(c.id()))
+            .cloned()
+            .collect();
+        missing.sort_by_key(|c| (c.actor, c.seq));
+        missing.dedup_by_key(|c| c.id());
+        rng.shuffle(&mut missing);
+        for c in missing {
+            match log.apply(c) {
+                Ok(_) | Err(LogError::NotAllowed { .. }) => {}
+                Err(e) => panic!("{e}"),
+            }
+        }
+        assert!(log.pending().is_empty());
+    }
+}
+
+#[test]
+fn roles_converge_with_random_edits_in_any_order() {
+    // (taken, refused at once) over every seed, for the department editor.
+    let mut department = (0, 0);
+    for seed in 0..24u64 {
+        let mut rng = Rng::new(seed);
+        let mut owner = adopt(1, &sample());
+        let dept = scope(&owner, &["2000"]);
+        owner.grant(actor(2), dept, "Department", T).unwrap();
+        owner.grant(actor(3), Role::Editor, "Editor", T).unwrap();
+        let mut logs = vec![owner.clone(), follower(2, &owner), follower(3, &owner)];
+        let mut forged_seq = 0;
+        let mut extra = Vec::new();
+        for _round in 0..4 {
+            for (i, log) in logs.iter_mut().enumerate() {
+                for _ in 0..3 {
+                    let p = log.project();
+                    let mut after = p.budget.clone();
+                    let (label, hints) = random_edit(&mut rng, &mut after, i as u8 + 1);
+                    match log.record(&p, &after, &hints, &label, T) {
+                        Ok(Some(_)) if i == 1 => department.0 += 1,
+                        Err(LogError::NotAllowed { .. }) if i == 1 => department.1 += 1,
+                        Ok(_) | Err(LogError::NotAllowed { .. }) => {}
+                        Err(e) => panic!("seed {seed}: {label}: {e}"),
+                    }
+                }
+                // The owner now and then changes the others' roles.
+                if i == 0 && rng.chance(40) {
+                    let codes: Vec<&str> = ["1000", "2000", "5000"]
+                        .into_iter()
+                        .filter(|_| rng.chance(50))
+                        .collect();
+                    let role = match rng.below(4) {
+                        0 => Role::ReadOnly,
+                        1 => Role::Editor,
+                        2 => Role::Comment,
+                        _ => Role::Department(
+                            codes
+                                .iter()
+                                .filter_map(|c| log.project().binding.categories.get(*c).copied())
+                                .collect(),
+                        ),
+                    };
+                    let who = actor(*rng.pick(&[2u8, 3]));
+                    log.grant(who, role, "Role", T).unwrap();
+                }
+            }
+            // Someone outside the budget writes a change that claims to
+            // have seen the roles.
+            if rng.chance(50) {
+                forged_seq += 1;
+                extra.push(forged(
+                    actor(9),
+                    forged_seq,
+                    &logs[0],
+                    vec![title_op(&format!("Forged {forged_seq}"))],
+                ));
+            }
+            exchange_all(&mut rng, &mut logs, &extra);
+        }
+        let first = &logs[0];
+        for log in &logs[1..] {
+            assert_eq!(log.frontier(), first.frontier(), "seed {seed}");
+            assert_eq!(
+                normalized(&log.project().budget),
+                normalized(&first.project().budget),
+                "seed {seed}"
+            );
+            assert_eq!(rejected_ids(log), rejected_ids(first), "seed {seed}");
+            assert_eq!(log.members(), first.members(), "seed {seed}");
+        }
+        assert_eq!(
+            rejected_ids(first).len(),
+            forged_seq as usize,
+            "seed {seed}"
+        );
+    }
+    assert!(
+        department.0 > 20 && department.1 > 20,
+        "department editor: {department:?}"
+    );
+}
+
+/// Every order of `items`.
+fn orders<T: Clone>(items: &[T]) -> Vec<Vec<T>> {
+    if items.len() <= 1 {
+        return vec![items.to_vec()];
+    }
+    let mut out = Vec::new();
+    for i in 0..items.len() {
+        let mut rest = items.to_vec();
+        let first = rest.remove(i);
+        for mut tail in orders(&rest) {
+            tail.insert(0, first.clone());
+            out.push(tail);
+        }
+    }
+    out
+}
+
+#[test]
+fn a_forged_first_change_never_takes_the_budget() {
+    // Actor 5 starts sharing and gives actor 2 a role.
+    let mut a = adopt(5, &sample());
+    let genesis = a.changes().next().unwrap().id();
+    a.grant(actor(2), Role::Editor, "Jordan edits", T).unwrap();
+    // Actor 1 (sorting before 5) writes a first change of its own, made
+    // without the budget's first change: a forged one, and a second
+    // computer starting to share the same file before the folder synced.
+    let forged = Change {
+        actor: actor(1),
+        seq: 1,
+        deps: Default::default(),
+        lamport: 1,
+        time: T.into(),
+        label: "forged".into(),
+        ops: vec![Op::Grant {
+            actor: actor(3),
+            role: Role::Admin,
+        }],
+    };
+    let second_start = adopt(0, &sample()).changes().next().unwrap().clone();
+    let mut all: Vec<Change> = a.changes().cloned().collect();
+    all.push(forged.clone());
+    all.push(second_start.clone());
+    for (n, order) in orders(&all).into_iter().enumerate() {
+        let mut fresh = Log::new(actor(9), Ids::seeded(n as u64));
+        fresh.set_genesis(genesis);
+        for c in order {
+            let _ = fresh.apply(c);
+        }
+        assert_eq!(fresh.owner(), Some(actor(5)), "order {n}");
+        assert_eq!(
+            rejected_ids(&fresh),
+            BTreeSet::from([forged.id(), second_start.id()]),
+            "order {n}"
+        );
+        assert_eq!(fresh.role_of(actor(3)), Role::ReadOnly, "order {n}");
+        assert_eq!(fresh.role_of(actor(2)), Role::Editor, "order {n}");
+        assert_eq!(fresh.frontier(), &{
+            let mut f = a.frontier().clone();
+            f.advance(actor(1), 1);
+            f.advance(actor(0), 1);
+            f
+        });
+        assert_eq!(
+            normalized(&fresh.project().budget),
+            normalized(&a.project().budget),
+            "order {n}"
+        );
+    }
+    // The log that started sharing refuses both too.
+    assert!(a.apply(forged).is_err());
+    assert!(a.apply(second_start).is_err());
+    assert_eq!(a.owner(), Some(actor(5)));
+}
+
+#[test]
+fn a_co_owner_sets_roles_admins_included() {
+    let mut a = adopt(1, &sample());
+    a.grant(actor(2), Role::CoOwner, "Priya co-owns", T)
+        .unwrap();
+    let mut co = follower(2, &a);
+    assert!(co.role_of(actor(2)).sets_roles());
+    // A co-owner makes and changes admins, as the owner does.
+    co.grant(actor(3), Role::Admin, "Sam is an admin", T)
+        .unwrap();
+    co.grant(actor(3), Role::Editor, "Sam edits", T).unwrap();
+    co.grant(actor(3), Role::Admin, "Sam is an admin again", T)
+        .unwrap();
+    // Only the owner makes co-owners or changes one, and nobody changes
+    // the owner.
+    for (who, role) in [(actor(4), Role::CoOwner), (actor(1), Role::ReadOnly)] {
+        assert!(matches!(
+            co.grant(who, role, "no", T),
+            Err(LogError::NotAllowed { .. })
+        ));
+    }
+    let mut admin = follower(3, &co);
+    assert!(matches!(
+        admin.grant(actor(2), Role::Editor, "no", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    assert!(matches!(
+        admin.grant(actor(4), Role::CoOwner, "no", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    // The owner can still change the co-owner.
+    send(&co, &mut a);
+    assert!(a.rejected().is_empty(), "{:?}", a.rejected());
+    assert_eq!(a.role_of(actor(3)), Role::Admin);
+    a.grant(actor(2), Role::Admin, "Priya is an admin", T)
+        .unwrap();
+    // Now an admin, Priya no longer changes admins.
+    send(&a, &mut co);
+    assert!(matches!(
+        co.grant(actor(3), Role::Editor, "no", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+}
+
+/// Two grants for one person made apart: the higher-ranked granter wins
+/// (owner over co-owner over admin), whatever the clocks say; a grant made
+/// after seeing another replaces it as before.
+#[test]
+fn concurrent_grants_go_to_the_higher_ranked_granter() {
+    let mut owner = adopt(1, &sample());
+    owner
+        .grant(actor(2), Role::CoOwner, "Priya co-owns", T)
+        .unwrap();
+    owner.grant(actor(3), Role::Admin, "Sam admin", T).unwrap();
+    let mut co = follower(2, &owner);
+    let mut admin = follower(3, &owner);
+    // Apart: the owner makes Jordan a co-owner and Kim an admin; the
+    // co-owner, not knowing, makes Jordan read only (with a later clock);
+    // the admin, not knowing, makes Kim an editor.
+    owner
+        .grant(actor(4), Role::CoOwner, "Jordan co-owns", T)
+        .unwrap();
+    owner.grant(actor(5), Role::Admin, "Kim admin", T).unwrap();
+    for _ in 0..3 {
+        try_edit(&mut co, |b| b.title.push('!')).unwrap();
+    }
+    co.grant(actor(4), Role::ReadOnly, "Jordan reads", T)
+        .unwrap();
+    admin.grant(actor(5), Role::Editor, "Kim edits", T).unwrap();
+    let all: Vec<Change> = [&owner, &co, &admin]
+        .iter()
+        .flat_map(|l| l.changes().cloned().collect::<Vec<_>>())
+        .collect();
+    let mut rng = Rng::new(7);
+    for n in 0..6 {
+        let mut fresh = Log::new(actor(9), Ids::seeded(n));
+        fresh.set_genesis(owner.changes().next().unwrap().id());
+        let mut cs = all.clone();
+        cs.sort_by_key(|c| c.id());
+        cs.dedup_by_key(|c| c.id());
+        rng.shuffle(&mut cs);
+        for c in cs {
+            let _ = fresh.apply(c);
+        }
+        assert!(fresh.rejected().is_empty(), "{:?}", fresh.rejected());
+        assert_eq!(fresh.role_of(actor(4)), Role::CoOwner, "run {n}");
+        assert_eq!(fresh.role_of(actor(5)), Role::Admin, "run {n}");
+    }
+    // Once the co-owner has seen the owner's grant, a later one of theirs
+    // for someone they may change replaces it as usual.
+    send(&owner, &mut co);
+    send(&admin, &mut co);
+    co.grant(actor(5), Role::Editor, "Kim edits", T).unwrap();
+    assert_eq!(co.role_of(actor(5)), Role::Editor);
+}
+
+/// A command line or agent writes as an actor of its own, which says
+/// whose it is; it has that person's role, so two programs on one computer
+/// never share a sequence of changes (decisions.md, entry 78).
+#[test]
+fn a_tool_actor_has_its_persons_role() {
+    let mut owner = adopt(1, &sample());
+    owner
+        .grant(actor(2), Role::Comment, "Jordan comments", T)
+        .unwrap();
+    owner.grant(actor(3), Role::Editor, "Sam edits", T).unwrap();
+    // Jordan's command line (actor 12) and Sam's (actor 13).
+    let mut jt = follower(12, &owner);
+    jt.acts_for(actor(2), "Command line for Jordan", T).unwrap();
+    assert_eq!(jt.role_of(actor(12)), Role::Comment);
+    assert!(matches!(
+        try_edit(&mut jt, |b| b.title = "Jordan's".into()),
+        Err(LogError::NotAllowed { .. })
+    ));
+    let mut st = follower(13, &owner);
+    st.acts_for(actor(3), "Command line for Sam", T).unwrap();
+    try_edit(&mut st, |b| b.title = "Sam's".into())
+        .unwrap()
+        .unwrap();
+    // Without saying whose it is, a new actor reads only once roles exist.
+    let mut stray = follower(14, &owner);
+    assert_eq!(stray.role_of(actor(14)), Role::ReadOnly);
+    assert!(try_edit(&mut stray, |b| b.title = "x".into()).is_err());
+    // An actor speaks for one person only, once, and never for itself.
+    assert!(st.acts_for(actor(2), "again", T).is_err());
+    let mut me = follower(15, &owner);
+    assert!(me.acts_for(actor(15), "myself", T).is_err());
+    // Everyone else agrees.
+    send(&jt, &mut owner);
+    send(&st, &mut owner);
+    assert!(owner.rejected().is_empty(), "{:?}", owner.rejected());
+    assert_eq!(owner.role_of(actor(13)), Role::Editor);
+    assert_eq!(owner.person_of(actor(13)), actor(3));
+    assert_eq!(owner.person_of(actor(3)), actor(3));
+    assert_eq!(owner.project().budget.title, "Sam's");
+    // The person's role changes, and their tool's with it.
+    owner
+        .grant(actor(3), Role::ReadOnly, "Sam reads", T)
+        .unwrap();
+    assert_eq!(owner.role_of(actor(13)), Role::ReadOnly);
+}
+
+/// `acts_for` can't raise anyone: a member's own actor, the owner's, an
+/// actor already judged under roles, a claim made before roles, and a
+/// claim for someone who isn't the owner or a member are all refused, on
+/// every computer in any order (MReview, pull request #27).
+#[test]
+fn acts_for_never_raises_a_member() {
+    let mut owner = adopt(1, &sample());
+    let genesis = owner.changes().next().unwrap().id();
+    // A computer that will claim the owner before any role exists.
+    let mut early = follower(7, &owner);
+    owner
+        .grant(actor(2), Role::ReadOnly, "Jordan reads", T)
+        .unwrap();
+    owner.grant(actor(3), Role::Editor, "Sam edits", T).unwrap();
+    let mut jordan = follower(2, &owner);
+    let mut sam = follower(3, &owner);
+    let mut stranger = follower(8, &owner);
+    let title = |t: &str| Op::Set {
+        entity: Uid::ROOT,
+        field: Field::Title,
+        value: Value::text(t),
+    };
+    // Each refused at once by its own log.
+    assert!(matches!(
+        jordan.acts_for(actor(1), "Jordan as owner", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    assert!(matches!(
+        owner.acts_for(actor(3), "Owner as Sam", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    assert!(matches!(
+        stranger.acts_for(actor(6), "For nobody", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    assert!(matches!(
+        early.acts_for(actor(1), "Early claim", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    // Sam edits as an editor (judged under roles), then claims the owner.
+    try_edit(&mut sam, |b| b.title = "Sam's".into())
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        sam.acts_for(actor(1), "Sam as owner", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    // Forged versions of each, written anyway, with an edit only the owner
+    // could make riding along.
+    let forge = |who: u8, seq: u64, seen: &Log, person: u8| Change {
+        actor: actor(who),
+        seq,
+        deps: seen.frontier().clone(),
+        lamport: seen.lamport() + 1,
+        time: T.into(),
+        label: "claim".into(),
+        ops: vec![
+            Op::ActsFor {
+                person: actor(person),
+            },
+            title("Taken"),
+            Op::Grant {
+                actor: actor(who),
+                role: Role::Admin,
+            },
+        ],
+    };
+    let bad = vec![
+        forge(2, 1, &owner, 1),
+        forge(1, owner.own_seq() + 1, &owner, 3),
+        forge(8, 1, &owner, 6),
+        forge(3, sam.own_seq() + 1, &sam, 1),
+        Change {
+            deps: {
+                let mut f = method_core::log::Frontier::new();
+                f.advance(actor(1), 1);
+                f
+            },
+            ..forge(7, 1, &owner, 1)
+        },
+    ];
+    let mut honest: Vec<Change> = owner.changes().cloned().collect();
+    honest.extend(sam.changes().filter(|c| c.actor == actor(3)).cloned());
+    let mut rng = Rng::new(11);
+    for n in 0..8 {
+        let mut fresh = Log::new(actor(20), Ids::seeded(n));
+        fresh.set_genesis(genesis);
+        let mut all: Vec<Change> = honest.iter().chain(&bad).cloned().collect();
+        rng.shuffle(&mut all);
+        for c in all {
+            let _ = fresh.apply(c);
+        }
+        let refused = rejected_ids(&fresh);
+        for c in &bad {
+            assert!(refused.contains(&c.id()), "run {n}: {:?} kept", c.id());
+        }
+        assert_eq!(fresh.project().budget.title, "Sam's", "run {n}");
+        assert_eq!(fresh.role_of(actor(2)), Role::ReadOnly, "run {n}");
+        assert_eq!(fresh.role_of(actor(7)), Role::ReadOnly, "run {n}");
+        assert_eq!(fresh.role_of(actor(8)), Role::ReadOnly, "run {n}");
+    }
 }
 
 /// A program limited to `locations`, on the first account (decisions.md,

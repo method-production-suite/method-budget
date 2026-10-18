@@ -206,6 +206,7 @@
     "allow-share-activity",
     "allow-share-blame",
     "allow-share-use-value",
+    "allow-share-set-role",
     "allow-library-view",
     "allow-library-create",
     "allow-library-choose",
