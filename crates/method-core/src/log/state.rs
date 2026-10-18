@@ -10,8 +10,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use super::access::Role;
-use super::clock::{ChangeId, Stamp};
+use super::access::{self, Role};
+use super::clock::{ChangeId, Frontier, Stamp};
 use super::ids::{ActorId, Uid};
 use super::op::{Change, Field, Kind, ListKey, Member, Op, Placement, Value};
 use super::seq::{PosId, SeqTree};
@@ -177,6 +177,16 @@ impl Entity {
     }
 }
 
+/// One grant as the state keeps it: the role, how its granter ranked when
+/// they gave it (owner 3, co-owner 2, admin 1), and what they had seen.
+/// Grants made apart are settled by rank (`access::grant_at`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GrantWrite {
+    pub role: Role,
+    pub rank: u8,
+    pub deps: Frontier,
+}
+
 /// Why a change cannot be applied: it names something that doesn't
 /// exist, or would put an entity where its kind can't go. A change that
 /// fails is skipped whole.
@@ -205,7 +215,9 @@ pub struct State {
     /// applied ([`State::set_genesis`]), or else the first change applied.
     genesis: Option<ChangeId>,
     /// Each person's role, every grant kept (decisions.md, entry 78).
-    grants: BTreeMap<ActorId, Register<Role>>,
+    grants: BTreeMap<ActorId, Register<GrantWrite>>,
+    /// Actors that write for a person (`Op::ActsFor`), by actor.
+    links: BTreeMap<ActorId, Register<ActorId>>,
 }
 
 impl Default for State {
@@ -225,6 +237,7 @@ impl State {
             lamport: 0,
             genesis: None,
             grants: BTreeMap::new(),
+            links: BTreeMap::new(),
         }
     }
 
@@ -247,8 +260,13 @@ impl State {
     }
 
     /// Every role given, with every earlier one.
-    pub fn grants(&self) -> &BTreeMap<ActorId, Register<Role>> {
+    pub fn grants(&self) -> &BTreeMap<ActorId, Register<GrantWrite>> {
         &self.grants
+    }
+
+    /// Actors that write for a person, with every such write.
+    pub fn links(&self) -> &BTreeMap<ActorId, Register<ActorId>> {
+        &self.links
     }
 
     pub fn entity(&self, uid: Uid) -> Option<&Entity> {
@@ -420,6 +438,11 @@ impl State {
                     }
                 }
                 Op::Grant { .. } => {}
+                Op::ActsFor { person } => {
+                    if *person == change.actor {
+                        return Err(bad(index, "an actor can't write for itself".into()));
+                    }
+                }
             }
         }
         Ok(())
@@ -523,11 +546,24 @@ impl State {
                         e.sets.entry(*field).or_default().remove(member, seen);
                     }
                 }
-                Op::Grant { actor, role } => match self.grants.get_mut(actor) {
-                    Some(r) => r.write(stamp, role.clone()),
+                Op::Grant { actor, role } => {
+                    let w = GrantWrite {
+                        role: role.clone(),
+                        rank: access::rank(&access::role_at(self, change.actor, &change.deps)),
+                        deps: change.deps.clone(),
+                    };
+                    match self.grants.get_mut(actor) {
+                        Some(r) => r.write(stamp, w),
+                        None => {
+                            self.grants.insert(*actor, Register::new(stamp, w));
+                        }
+                    }
+                }
+                Op::ActsFor { person } => match self.links.get_mut(&change.actor) {
+                    Some(r) => r.write(stamp, *person),
                     None => {
-                        self.grants
-                            .insert(*actor, Register::new(stamp, role.clone()));
+                        self.links
+                            .insert(change.actor, Register::new(stamp, *person));
                     }
                 },
             }

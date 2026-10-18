@@ -25,7 +25,7 @@ use std::fmt;
 use super::clock::Frontier;
 use super::ids::{ActorId, Uid};
 use super::op::{Change, Field, Kind, Op};
-use super::state::{Register, State};
+use super::state::{GrantWrite, Register, State};
 
 /// What one person may do in a shared budget.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -134,20 +134,63 @@ where
         .map(|(_, v)| v)
 }
 
+/// How a granter ranks when grants made apart meet: owner over co-owner
+/// over admin (nobody else gives roles).
+pub fn rank(role: &Role) -> u8 {
+    match role {
+        Role::Owner => 3,
+        Role::CoOwner => 2,
+        Role::Admin => 1,
+        _ => 0,
+    }
+}
+
 /// Whether any role had been given by `deps`.
-pub fn started_at(grants: &BTreeMap<ActorId, Register<Role>>, deps: &Frontier) -> bool {
+pub fn started_at(grants: &BTreeMap<ActorId, Register<GrantWrite>>, deps: &Frontier) -> bool {
     grants.values().any(|r| visible(r, deps).is_some())
 }
 
-/// `actor`'s role as someone who had seen `deps` knew it.
+/// A person's role from their grants as someone who had seen `deps` knew
+/// them. A grant made after seeing another replaces it; among grants none
+/// of which saw the others, the higher-ranked granter wins, then the later
+/// stamp, so every computer settles them alike.
+pub fn grant_at<'a>(reg: &'a Register<GrantWrite>, deps: &Frontier) -> Option<&'a Role> {
+    let seen: Vec<&(super::clock::Stamp, GrantWrite)> = reg
+        .history()
+        .iter()
+        .filter(|(s, _)| deps.includes(s.change()))
+        .collect();
+    seen.iter()
+        .filter(|(s, _)| {
+            !seen
+                .iter()
+                .any(|(o, w)| o.change() != s.change() && w.deps.includes(s.change()))
+        })
+        .max_by_key(|(s, w)| (w.rank, *s))
+        .map(|(_, w)| &w.role)
+}
+
+/// The person `actor` writes for at `deps` (`Op::ActsFor`), or itself.
+pub fn person_at(state: &State, actor: ActorId, deps: &Frontier) -> ActorId {
+    state
+        .links()
+        .get(&actor)
+        .and_then(|r| visible(r, deps))
+        .copied()
+        .unwrap_or(actor)
+}
+
+/// `actor`'s role as someone who had seen `deps` knew it. An actor that
+/// writes for a person has the person's role.
 pub fn role_at(state: &State, actor: ActorId, deps: &Frontier) -> Role {
+    let actor = person_at(state, actor, deps);
     match state.owner() {
         None => return Role::Owner,
         Some(o) if o == actor => return Role::Owner,
         Some(_) => {}
     }
     let grants = state.grants();
-    if let Some(r) = grants.get(&actor).and_then(|r| visible(r, deps)) {
+    if let Some(r) = grants.get(&actor).and_then(|r| grant_at(r, deps)) {
         return r.clone();
     }
     if started_at(grants, deps) {
@@ -206,6 +249,7 @@ pub fn check(state: &State, change: &Change) -> Result<(), Refusal> {
     let deps = &change.deps;
     let role = role_at(state, change.actor, deps);
     let mut made = Made::new();
+    let mut made_links = false;
     for (index, op) in change.ops.iter().enumerate() {
         let refuse = |reason: String| Refusal {
             index,
@@ -220,6 +264,24 @@ pub fn check(state: &State, change: &Change) -> Result<(), Refusal> {
         } = op
         {
             made.insert(*entity, (*kind, place.map(|p| p.list.parent)));
+        }
+        if let Op::ActsFor { person } = op {
+            // Once per actor, and never for an actor that itself writes for
+            // someone.
+            let linked = |a: ActorId| {
+                state
+                    .links()
+                    .get(&a)
+                    .is_some_and(|r| visible(r, deps).is_some())
+            };
+            if linked(change.actor) || made_links {
+                return Err(refuse("this actor already writes for someone".into()));
+            }
+            if linked(*person) {
+                return Err(refuse("that actor itself writes for someone".into()));
+            }
+            made_links = true;
+            continue;
         }
         if let Op::Grant { actor, role: given } = op {
             if !role.sets_roles() {

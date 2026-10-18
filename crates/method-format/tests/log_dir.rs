@@ -376,7 +376,9 @@ fn a_program_without_a_window_changes_a_shared_budget_as_its_person() {
     after.title = "Jordan's".into();
     let err = e.record(&after, "Command line: set title", T).unwrap_err();
     assert!(err.0.contains("role"), "{}", err.0);
+    assert!(LogDir::for_budget(&path).segments(e.actor()).is_empty());
     assert!(LogDir::for_budget(&path).segments(actor(2)).is_empty());
+    drop(e);
 
     // An editor's change goes into their own folder; the file is the
     // keeper's to write, so it stays as it was.
@@ -386,7 +388,12 @@ fn a_program_without_a_window_changes_a_shared_budget_as_its_person() {
     after.title = "Sam's".into();
     assert!(e.record(&after, "Command line: set title", T).unwrap());
     assert!(!e.record(&after, "again", T).unwrap(), "nothing new");
-    assert_eq!(LogDir::for_budget(&path).segments(actor(3)).len(), 1);
+    // In the program's own folder, as Sam's.
+    assert_ne!(e.actor(), actor(3));
+    assert_eq!(e.person(), actor(3));
+    assert_eq!(LogDir::for_budget(&path).segments(e.actor()).len(), 1);
+    assert!(LogDir::for_budget(&path).segments(actor(3)).is_empty());
+    drop(e);
     assert_eq!(fs::read(&path).unwrap(), file_before);
     let mut scan = Scan::default();
     log::absorb(&mut alex.log, &alex.dir, &mut scan);
@@ -483,5 +490,58 @@ fn a_file_behind_the_log_is_not_an_outside_edit() {
     write_budget(&path, &b);
     assert!(log::has_outside_edit(&jordan, T).unwrap());
     assert!(log::ingest(&mut jordan, T).unwrap().is_some());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// The app and a command line on one computer write at the same moment:
+/// the app has an edit not yet in the folder when the command line records
+/// one. Each has its own actor, so neither takes the other's place in a
+/// sequence: both edits reach everyone, nothing is refused, and every
+/// computer ends the same (MReview, pull request #27).
+#[test]
+fn the_app_and_a_command_line_on_one_computer_never_share_a_sequence() {
+    use method_core::log::Role;
+    use method_format::log::SharedEdit;
+
+    let dir = temp_dir("same-computer");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    let mut app = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+    app.log
+        .grant(actor(2), Role::Editor, "Jordan edits", T)
+        .unwrap();
+    log::flush(&app.log, &app.dir).unwrap();
+    let alex_file = actor_file(&dir, 1);
+
+    // The app records a rate, not yet written to the folder.
+    let p = app.log.project();
+    let mut after = p.budget.clone();
+    row_rate(&mut after, 0, 4321);
+    app.log.record(&p, &after, &[], "Edit rate", T).unwrap();
+    // Meanwhile a command line (and a second one, as an agent would be)
+    // changes the title as the same person.
+    let mut cli = SharedEdit::open(&path, Some(&alex_file)).unwrap();
+    let agent = SharedEdit::open(&path, Some(&alex_file)).unwrap();
+    assert_ne!(cli.actor(), app.log.actor());
+    assert_ne!(cli.actor(), agent.actor());
+    let mut b = cli.budget();
+    b.title = "From the command line".into();
+    assert!(cli.record(&b, "Command line: set title", T).unwrap());
+    drop(agent);
+    drop(cli);
+    // The app writes its edit afterwards and reads the folder.
+    log::flush(&app.log, &app.dir).unwrap();
+    let mut scan = Scan::default();
+    let r = log::absorb(&mut app.log, &app.dir, &mut scan);
+    assert!(r.rejected.is_empty(), "{r:?}");
+    let budget = app.log.project().budget;
+    assert_eq!(budget.title, "From the command line");
+    // Everyone opening the folder agrees, the edit of the app included.
+    for n in [5, 6] {
+        let (fresh, report) = log::open(&path, actor(n), Ids::seeded(n as u64)).unwrap();
+        assert!(report.rejected.is_empty(), "{report:?}");
+        assert_eq!(fresh.log.frontier(), app.log.frontier());
+        assert_eq!(fresh.log.project().budget, budget);
+    }
     let _ = fs::remove_dir_all(&dir);
 }

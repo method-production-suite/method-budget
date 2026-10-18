@@ -41,10 +41,11 @@ pub const LOG_FORMAT_ROLES: u64 = 2;
 
 /// The format a segment holding `changes` is written at.
 fn format_for(changes: &[Change]) -> u64 {
-    if changes
-        .iter()
-        .any(|c| c.ops.iter().any(|op| matches!(op, Op::Grant { .. })))
-    {
+    if changes.iter().any(|c| {
+        c.ops
+            .iter()
+            .any(|op| matches!(op, Op::Grant { .. } | Op::ActsFor { .. }))
+    }) {
         LOG_FORMAT_ROLES
     } else {
         LOG_FORMAT_BASE
@@ -250,6 +251,11 @@ enum FileOp {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         scope: Vec<String>,
     },
+    /// The change's actor writes for `person` (a command line or agent).
+    #[serde(rename = "acts_for")]
+    ActsFor {
+        person: String,
+    },
 }
 
 fn parse_field(s: &str) -> Result<Field, String> {
@@ -321,6 +327,9 @@ impl From<&Op> for FileOp {
                 field: field.name().into(),
                 member: FileMember::from(member),
                 seen: seen.iter().map(stamp_text).collect(),
+            },
+            Op::ActsFor { person } => FileOp::ActsFor {
+                person: person.hex(),
             },
             Op::Grant { actor, role } => FileOp::Grant {
                 actor: actor.hex(),
@@ -406,6 +415,9 @@ impl TryFrom<FileOp> for Op {
                     .iter()
                     .map(|s| parse_stamp(s))
                     .collect::<Result<_, String>>()?,
+            },
+            FileOp::ActsFor { person } => Op::ActsFor {
+                person: ActorId::parse(&person).ok_or_else(|| format!("bad actor {person:?}"))?,
             },
             FileOp::Grant { actor, role, scope } => {
                 let scope = scope
@@ -1193,6 +1205,9 @@ impl LogDir {
     pub fn note_written(&self, actor: ActorId, bytes: &[u8]) -> Result<(), LogFileError> {
         let dir = self.actor_dir(actor);
         fs::create_dir_all(&dir).map_err(|e| io_err(&dir, e))?;
+        // One program writes each actor folder (the app as the person, every
+        // other program as a tool actor it holds alone), so this read,
+        // change and write never races another.
         let path = dir.join(WRITTEN_FILE);
         let mut w: Written = read_text(&path)
             .ok()
@@ -1326,22 +1341,24 @@ pub fn ingest(shared: &mut Shared, time: &str) -> Result<Option<ChangeId>, LogFi
         .map_err(|m: LogError| LogFileError(format!("could not record the outside edit: {m}")))
 }
 
+/// The `.mthd` text the keeper would write for `proj` now: the merged
+/// budget with the file's provenance.
+pub fn snapshot_text(shared: &Shared, proj: &Projection) -> String {
+    crate::to_string(&with_file_provenance(proj.budget.clone(), &shared.path))
+}
+
 /// Writes the merged state as the `.mthd` (the keeper's job) and returns
 /// the projection it wrote. The file's provenance, which the log doesn't
 /// carry, is kept.
 pub fn write_snapshot(shared: &Shared) -> Result<Projection, LogFileError> {
     let proj = shared.log.project();
-    let mut budget = proj.budget.clone();
-    if let Ok(text) = read_text(&shared.path) {
-        if let Ok(on_disk) = crate::from_str(&text) {
-            budget.provenance = on_disk.provenance;
-        }
-    }
-    let bytes = crate::to_string(&budget);
-    write_sealed(&shared.path, bytes.as_bytes())?;
+    let bytes = snapshot_text(shared, &proj);
+    // The hash is noted before the file is written, so no reader ever sees
+    // this file without knowing it came from the log.
     shared
         .dir
         .note_written(shared.log.actor(), bytes.as_bytes())?;
+    write_sealed(&shared.path, bytes.as_bytes())?;
     Ok(proj)
 }
 
@@ -1379,10 +1396,85 @@ pub fn read_shared(path: &Path) -> Result<Budget, LogFileError> {
 /// shared budget whose owner has set roles.
 pub const NO_PERSON: &str = "This computer has no person in this shared budget, and its owner has set who may change what, so nothing was written. Open the budget in Method Budget to join it; the owner can then give you a role.";
 
-/// A shared budget opened to change it as this computer's person.
+/// How many tool actors one computer keeps (one per program changing a
+/// shared budget at the same moment).
+const TOOL_ACTORS: usize = 32;
+
+/// Takes a tool actor from `dir` (`tool-0`, `tool-1`...): the first whose
+/// file this process can lock, made when new. The lock is held until the
+/// returned file closes and is let go by the system if the program stops,
+/// so no two programs ever write as one tool actor.
+fn take_tool_actor(dir: &Path) -> Result<(ActorId, fs::File), LogFileError> {
+    use std::io::{Read, Seek, Write};
+    fs::create_dir_all(dir).map_err(|e| io_err(dir, e))?;
+    for k in 0..TOOL_ACTORS {
+        let path = dir.join(format!("tool-{k}"));
+        let mut file = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&path)
+            .map_err(|e| io_err(&path, e))?;
+        if file.try_lock().is_err() {
+            continue;
+        }
+        let mut text = String::new();
+        file.read_to_string(&mut text)
+            .map_err(|e| io_err(&path, e))?;
+        if let Some(actor) = ActorId::parse(&text) {
+            return Ok((actor, file));
+        }
+        let actor = ActorId::random(&mut Ids::from_os());
+        file.set_len(0).map_err(|e| io_err(&path, e))?;
+        file.rewind().map_err(|e| io_err(&path, e))?;
+        file.write_all(format!("{}\n", actor.hex()).as_bytes())
+            .map_err(|e| io_err(&path, e))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
+        }
+        return Ok((actor, file));
+    }
+    Err(LogFileError(
+        "Too many programs are changing shared budgets on this computer at once. Try again in a moment."
+            .into(),
+    ))
+}
+
+/// A program's hold on its tool actor: let go when dropped.
+pub struct ToolLock(fs::File);
+
+/// Opens the shared budget at `path` as a tool actor of `person` (whose
+/// actor id is kept in `person_file`): one this program holds alone, from
+/// the person's pool beside that file. What `method-budget sync` and
+/// [`SharedEdit`] write with, so they never share a sequence of changes
+/// with the app (decisions.md, entry 78).
+pub fn open_as_tool(
+    path: &Path,
+    person_file: &Path,
+    person: ActorId,
+) -> Result<(Shared, LoadReport, ToolLock), LogFileError> {
+    let tools = person_file
+        .parent()
+        .map_or_else(|| PathBuf::from("tools"), |p| p.join("tools"))
+        .join(person.hex());
+    let (tool, lock) = take_tool_actor(&tools)?;
+    let (shared, report) = open(path, tool, Ids::from_os())?;
+    Ok((shared, report, ToolLock(lock)))
+}
+
+/// A shared budget opened to change it as this computer's person, through
+/// an actor of the program's own (a tool actor) that writes for that
+/// person, so it never shares a sequence of changes with the app or with
+/// another program on the same computer (decisions.md, entry 78).
 pub struct SharedEdit {
     shared: Shared,
     proj: Projection,
+    person: ActorId,
+    /// Holds the tool actor for this program while it is open.
+    _lock: fs::File,
 }
 
 impl SharedEdit {
@@ -1395,30 +1487,40 @@ impl SharedEdit {
             Some(f) => Some(f.to_path_buf()),
             None => actor_id_path(),
         };
-        let actor = match file.as_deref() {
-            Some(f) if f.is_file() => load_or_make_actor(f, &mut Ids::from_os())?,
+        let (person, file) = match file {
+            Some(f) if f.is_file() => (load_or_make_actor(&f, &mut Ids::from_os())?, f),
             _ => {
                 let (probe, _) = open(path, ActorId::NONE, Ids::seeded(0))?;
                 if probe.log.roles_started() {
                     return Err(LogFileError(NO_PERSON.into()));
                 }
                 let f = file.ok_or_else(|| LogFileError(NO_PERSON.into()))?;
-                load_or_make_actor(&f, &mut Ids::from_os())?
+                (load_or_make_actor(&f, &mut Ids::from_os())?, f)
             }
         };
-        let (shared, _) = open(path, actor, Ids::from_os())?;
+        let (shared, _, lock) = open_as_tool(path, &file, person)?;
         let proj = shared.log.project();
-        Ok(SharedEdit { shared, proj })
+        Ok(SharedEdit {
+            shared,
+            proj,
+            person,
+            _lock: lock.0,
+        })
     }
 
-    /// This computer's person.
+    /// The program's own actor (the tool actor).
     pub fn actor(&self) -> ActorId {
         self.shared.log.actor()
     }
 
+    /// The person it writes for: this computer's actor.
+    pub fn person(&self) -> ActorId {
+        self.person
+    }
+
     /// What this person may change.
     pub fn role(&self) -> Role {
-        self.shared.log.role_of(self.actor())
+        self.shared.log.role_of(self.person)
     }
 
     /// The budget as everyone's changes make it, with the file's provenance.
@@ -1437,6 +1539,17 @@ impl SharedEdit {
         label: &str,
         time: &str,
     ) -> Result<bool, LogFileError> {
+        // Once roles are set, the tool actor says whose it is first, so it
+        // has its person's role; the two go into the folder together, or
+        // neither does.
+        if self.shared.log.roles_started()
+            && self.shared.log.person_of(self.actor()) == self.actor()
+        {
+            self.shared
+                .log
+                .acts_for(self.person, "Writes for this computer's person", time)
+                .map_err(|e| LogFileError(format!("This change couldn't be shared: {e}")))?;
+        }
         let recorded = self
             .shared
             .log
@@ -1452,7 +1565,8 @@ impl SharedEdit {
             return Ok(false);
         }
         flush(&self.shared.log, &self.shared.dir)?;
-        if self.actor() == self.shared.info.genesis.actor {
+        // The owner's own program keeps the file, as the owner's app does.
+        if self.person == self.shared.info.genesis.actor {
             write_snapshot(&self.shared)?;
         }
         self.proj = self.shared.log.project();
@@ -1582,11 +1696,13 @@ mod tests {
                     actor: actor(2),
                     role: role.clone(),
                 })
+                .chain([Op::ActsFor { person: actor(3) }])
                 .collect(),
         };
         let line = change_to_json(&change);
         assert!(line.contains(r#""op":"grant""#), "{line}");
         assert!(line.contains(r#""role":"read_only""#), "{line}");
+        assert!(line.contains(r#""op":"acts_for""#), "{line}");
         let back = change_from_json(&line).unwrap();
         assert_eq!(back, change);
         assert_eq!(change_to_json(&back), line);

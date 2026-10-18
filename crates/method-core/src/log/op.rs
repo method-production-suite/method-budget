@@ -793,6 +793,11 @@ pub enum Op {
     /// person, judged at each change's causal point
     /// ([`super::access`]). About the budget, so its entity is the root.
     Grant { actor: ActorId, role: Role },
+    /// Says that the change's actor writes for `person` (a command line or
+    /// an agent on that person's computer, which has an actor of its own so
+    /// it never shares a sequence of changes with the app): it has that
+    /// person's role. Once per actor, never for itself.
+    ActsFor { person: ActorId },
 }
 
 impl Op {
@@ -806,7 +811,7 @@ impl Op {
             | Op::Restore { entity }
             | Op::Add { entity, .. }
             | Op::Remove { entity, .. } => *entity,
-            Op::Grant { .. } => Uid::ROOT,
+            Op::Grant { .. } | Op::ActsFor { .. } => Uid::ROOT,
         }
     }
 
@@ -821,6 +826,7 @@ impl Op {
             Op::Add { .. } => "add",
             Op::Remove { .. } => "remove",
             Op::Grant { .. } => "grant",
+            Op::ActsFor { .. } => "acts_for",
         }
     }
 }

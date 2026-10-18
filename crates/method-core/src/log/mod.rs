@@ -43,7 +43,7 @@ pub use op::{Change, Field, Kind, ListKey, ListName, Member, Op, Placement, Valu
 pub use project::{project, Binding, Projection};
 pub use review::{Review, ReviewItem};
 pub use seq::{Node, PosId, SeqTree, Side};
-pub use state::{Entity, Malformed, OrSet, Place, Register, State};
+pub use state::{Entity, GrantWrite, Malformed, OrSet, Place, Register, State};
 pub use undo::Inverse;
 
 use crate::model::Budget;
@@ -452,9 +452,26 @@ impl Log {
     pub fn members(&self) -> Vec<(ActorId, Role)> {
         self.state
             .grants()
-            .iter()
-            .map(|(a, r)| (*a, r.value().clone()))
+            .keys()
+            .map(|a| (*a, self.role_of(*a)))
             .collect()
+    }
+
+    /// Says, as a change by this actor, that it writes for `person` (a
+    /// command line or agent with an actor of its own; decisions.md, entry
+    /// 78). Refused once this actor writes for someone.
+    pub fn acts_for(
+        &mut self,
+        person: ActorId,
+        label: &str,
+        time: &str,
+    ) -> Result<ChangeId, LogError> {
+        self.record_ops(vec![Op::ActsFor { person }], label, time)
+    }
+
+    /// The person `actor` writes for, or `actor` itself.
+    pub fn person_of(&self, actor: ActorId) -> ActorId {
+        access::person_at(&self.state, actor, &self.frontier)
     }
 
     /// The applied changes from the `from`th one on, in applied order

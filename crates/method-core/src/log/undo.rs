@@ -119,7 +119,7 @@ pub fn inverse(state: &State, change: &Change, describe: &dyn Fn(Uid) -> String)
                 }
             }
             // A role is set again in the Share dialog, never undone.
-            Op::Grant { .. } => {}
+            Op::Grant { .. } | Op::ActsFor { .. } => {}
         }
     }
     out

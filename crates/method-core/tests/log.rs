@@ -1856,3 +1856,101 @@ fn a_co_owner_sets_roles_admins_included() {
         Err(LogError::NotAllowed { .. })
     ));
 }
+
+/// Two grants for one person made apart: the higher-ranked granter wins
+/// (owner over co-owner over admin), whatever the clocks say; a grant made
+/// after seeing another replaces it as before.
+#[test]
+fn concurrent_grants_go_to_the_higher_ranked_granter() {
+    let mut owner = adopt(1, &sample());
+    owner
+        .grant(actor(2), Role::CoOwner, "Priya co-owns", T)
+        .unwrap();
+    owner.grant(actor(3), Role::Admin, "Sam admin", T).unwrap();
+    let mut co = follower(2, &owner);
+    let mut admin = follower(3, &owner);
+    // Apart: the owner makes Jordan a co-owner and Kim an admin; the
+    // co-owner, not knowing, makes Jordan read only (with a later clock);
+    // the admin, not knowing, makes Kim an editor.
+    owner
+        .grant(actor(4), Role::CoOwner, "Jordan co-owns", T)
+        .unwrap();
+    owner.grant(actor(5), Role::Admin, "Kim admin", T).unwrap();
+    for _ in 0..3 {
+        try_edit(&mut co, |b| b.title.push('!')).unwrap();
+    }
+    co.grant(actor(4), Role::ReadOnly, "Jordan reads", T)
+        .unwrap();
+    admin.grant(actor(5), Role::Editor, "Kim edits", T).unwrap();
+    let all: Vec<Change> = [&owner, &co, &admin]
+        .iter()
+        .flat_map(|l| l.changes().cloned().collect::<Vec<_>>())
+        .collect();
+    let mut rng = Rng::new(7);
+    for n in 0..6 {
+        let mut fresh = Log::new(actor(9), Ids::seeded(n));
+        fresh.set_genesis(owner.changes().next().unwrap().id());
+        let mut cs = all.clone();
+        cs.sort_by_key(|c| c.id());
+        cs.dedup_by_key(|c| c.id());
+        rng.shuffle(&mut cs);
+        for c in cs {
+            let _ = fresh.apply(c);
+        }
+        assert!(fresh.rejected().is_empty(), "{:?}", fresh.rejected());
+        assert_eq!(fresh.role_of(actor(4)), Role::CoOwner, "run {n}");
+        assert_eq!(fresh.role_of(actor(5)), Role::Admin, "run {n}");
+    }
+    // Once the co-owner has seen the owner's grant, a later one of theirs
+    // for someone they may change replaces it as usual.
+    send(&owner, &mut co);
+    send(&admin, &mut co);
+    co.grant(actor(5), Role::Editor, "Kim edits", T).unwrap();
+    assert_eq!(co.role_of(actor(5)), Role::Editor);
+}
+
+/// A command line or agent writes as an actor of its own, which says
+/// whose it is; it has that person's role, so two programs on one computer
+/// never share a sequence of changes (decisions.md, entry 78).
+#[test]
+fn a_tool_actor_has_its_persons_role() {
+    let mut owner = adopt(1, &sample());
+    owner
+        .grant(actor(2), Role::Comment, "Jordan comments", T)
+        .unwrap();
+    owner.grant(actor(3), Role::Editor, "Sam edits", T).unwrap();
+    // Jordan's command line (actor 12) and Sam's (actor 13).
+    let mut jt = follower(12, &owner);
+    jt.acts_for(actor(2), "Command line for Jordan", T).unwrap();
+    assert_eq!(jt.role_of(actor(12)), Role::Comment);
+    assert!(matches!(
+        try_edit(&mut jt, |b| b.title = "Jordan's".into()),
+        Err(LogError::NotAllowed { .. })
+    ));
+    let mut st = follower(13, &owner);
+    st.acts_for(actor(3), "Command line for Sam", T).unwrap();
+    try_edit(&mut st, |b| b.title = "Sam's".into())
+        .unwrap()
+        .unwrap();
+    // Without saying whose it is, a new actor reads only once roles exist.
+    let mut stray = follower(14, &owner);
+    assert_eq!(stray.role_of(actor(14)), Role::ReadOnly);
+    assert!(try_edit(&mut stray, |b| b.title = "x".into()).is_err());
+    // An actor speaks for one person only, once, and never for itself.
+    assert!(st.acts_for(actor(2), "again", T).is_err());
+    let mut me = follower(15, &owner);
+    assert!(me.acts_for(actor(15), "myself", T).is_err());
+    // Everyone else agrees.
+    send(&jt, &mut owner);
+    send(&st, &mut owner);
+    assert!(owner.rejected().is_empty(), "{:?}", owner.rejected());
+    assert_eq!(owner.role_of(actor(13)), Role::Editor);
+    assert_eq!(owner.person_of(actor(13)), actor(3));
+    assert_eq!(owner.person_of(actor(3)), actor(3));
+    assert_eq!(owner.project().budget.title, "Sam's");
+    // The person's role changes, and their tool's with it.
+    owner
+        .grant(actor(3), Role::ReadOnly, "Sam reads", T)
+        .unwrap();
+    assert_eq!(owner.role_of(actor(13)), Role::ReadOnly);
+}
