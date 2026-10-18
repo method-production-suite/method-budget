@@ -113,6 +113,16 @@ export function assistConfig(colKey) {
   if (colKey === 'location') {
     return { mode: 'whole', candidates: described('locations'), addKind: 'location', addLabel: 'location', label: 'Locations', ordered: ordered('locations') };
   }
+  // The people lines already pay (decisions.md, entry 79); a new name is just typed.
+  if (colKey === 'person') {
+    const v = ctx.view();
+    const people = (v && v.persons) || {};
+    const candidates = Object.keys(people).map((name) => {
+      const n = people[name].lines;
+      return { name, hint: `${n} ${n === 1 ? 'line' : 'lines'}` };
+    });
+    return { mode: 'whole', candidates, label: 'People' };
+  }
   if (colKey === 'fringes') return { mode: 'list', candidates: described('fringes'), label: 'Fringes', ordered: ordered('fringes') };
   if (colKey === 'groups') return { mode: 'list', candidates: described('groups'), label: 'Groups', ordered: ordered('groups') };
   return null;

@@ -174,6 +174,7 @@ pub const LINE_FIELDS: &[&str] = &[
     "set",
     "location",
     "fringe_range",
+    "person",
     "bold",
     "italic",
     "indent",
@@ -534,6 +535,7 @@ fn field_text(d: &Detail, field: &str) -> String {
         "currency" => opt_shown(&d.currency),
         "set" => opt_shown(&d.set),
         "location" => opt_shown(&d.location),
+        "person" => opt_shown(&d.person),
         "color" => opt_shown(&d.color),
         "fringe_range" => d.fringe_range.map_or("none".into(), |n| n.to_string()),
         "bold" => d.bold.to_string(),
@@ -615,7 +617,7 @@ fn set_line_field(
             let f = Field::parse(field)?;
             // `none` clears a name; elsewhere it is the text.
             let value = match f {
-                Field::Currency | Field::Set | Field::Location if v.is_none() => "",
+                Field::Currency | Field::Set | Field::Location | Field::Person if v.is_none() => "",
                 _ => text,
             };
             if let [id] = ids {

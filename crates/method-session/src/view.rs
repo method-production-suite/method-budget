@@ -82,6 +82,71 @@ pub struct View {
     /// entry 67).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub converted: Option<String>,
+    /// Each person a row pays (decisions.md, entry 79), by name: what they
+    /// are paid across accounts and each percent fringe's pay against its
+    /// cutoff, for the Person column. Left out when no row has a person (or
+    /// there are no totals), so other budgets' views are unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub persons: Option<BTreeMap<String, PersonDto>>,
+}
+
+/// A person's running totals, as [`method_core::calc::persons::person_totals`]
+/// works them out.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct PersonDto {
+    /// How many lines and adjustment rows have the person.
+    pub lines: usize,
+    /// The accounts they are in, in budget order.
+    pub accounts: Vec<String>,
+    /// What the counted rows come to.
+    pub pay: Cents,
+    pub fringe_total: Cents,
+    pub fringes: Vec<PersonFringeDto>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct PersonFringeDto {
+    pub fringe: String,
+    /// As applied (times the cutoff factor); `None` for no cutoff.
+    pub cutoff: Option<Cents>,
+    /// Pay on the counted rows carrying the fringe.
+    pub pay: Cents,
+    pub amount: Cents,
+    /// The pay is past the cutoff.
+    pub reached: bool,
+}
+
+/// Every person of `b` from `report`, or `None` when there are none.
+pub fn persons(b: &Budget, report: Option<&Report>) -> Option<BTreeMap<String, PersonDto>> {
+    let report = report?;
+    if !method_core::calc::persons::any(b) {
+        return None;
+    }
+    let all = method_core::calc::persons::person_totals(b, report)?;
+    let out: BTreeMap<String, PersonDto> = all
+        .into_iter()
+        .map(|(name, p)| {
+            let dto = PersonDto {
+                lines: p.rows.len(),
+                accounts: p.accounts,
+                pay: p.pay,
+                fringe_total: p.fringe_total,
+                fringes: p
+                    .fringes
+                    .into_iter()
+                    .map(|f| PersonFringeDto {
+                        fringe: f.fringe,
+                        cutoff: f.cutoff,
+                        pay: f.pay,
+                        amount: f.amount,
+                        reached: f.reached,
+                    })
+                    .collect(),
+            };
+            (name, dto)
+        })
+        .collect();
+    (!out.is_empty()).then_some(out)
 }
 
 /// One account in full: its rows in file-format JSON and their totals.
@@ -493,6 +558,7 @@ impl View {
             shared: false,
             notice: None,
             converted: None,
+            persons: persons(b, report),
         }
     }
 }

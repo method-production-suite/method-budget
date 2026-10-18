@@ -88,6 +88,9 @@ pub enum Field {
     Groups,
     Set,
     Location,
+    /// The person the row pays, whose percent fringe cutoffs apply once
+    /// across accounts (decisions.md, entry 79). Free text; blank clears.
+    Person,
 }
 
 impl Field {
@@ -107,6 +110,7 @@ impl Field {
             "groups" => Field::Groups,
             "set" => Field::Set,
             "location" => Field::Location,
+            "person" => Field::Person,
             other => return Err(format!("unknown field `{other}`")),
         })
     }
@@ -307,6 +311,7 @@ pub fn apply_field(d: &mut Detail, field: Field, value: &str) -> EditResult {
         Field::Groups => d.groups = name_list(value),
         Field::Set => d.set = optional(value),
         Field::Location => d.location = optional(value),
+        Field::Person => d.person = optional(value),
     }
     Ok(())
 }
@@ -1728,6 +1733,40 @@ mod tests {
         )
         .unwrap();
         assert!(b.charges[at].label_percent && !b.charges[at].label_excluded);
+    }
+
+    /// A row's person (decisions.md, entry 79) is free text: trimmed,
+    /// blank clears it, on lines and adjustment rows but not subtotals; the
+    /// view lists people only once a row has one.
+    #[test]
+    fn a_person_is_typed_trimmed_and_cleared() {
+        let mut b = method_core::starter::budget();
+        let ids: Vec<RowId> = details(&b)
+            .filter(|d| d.kind == RowKind::Line)
+            .map(|d| d.id)
+            .take(2)
+            .collect();
+        let mut s = crate::session::Session::with_budget(b.clone(), None);
+        assert!(s.view().persons.is_none());
+        set_detail_field(
+            &mut b,
+            ids[0],
+            Field::parse("person").unwrap(),
+            "  Dana Reyes ",
+        )
+        .unwrap();
+        set_rows_field(&mut b, &ids, Field::Person, "Dana Reyes").unwrap();
+        assert!(details(&b)
+            .filter(|d| ids.contains(&d.id))
+            .all(|d| d.person.as_deref() == Some("Dana Reyes")));
+        let mut s = crate::session::Session::with_budget(b.clone(), None);
+        let people = s.view().persons.unwrap();
+        assert_eq!(people["Dana Reyes"].lines, 2);
+        set_detail_field(&mut b, ids[0], Field::Person, "   ").unwrap();
+        assert_eq!(details(&b).find(|d| d.id == ids[0]).unwrap().person, None);
+        let sub = method_core::Detail::subtotal(9_999, "Sub");
+        let mut d = sub.clone();
+        assert!(apply_field(&mut d, Field::Person, "Dana Reyes").is_err());
     }
 
     #[test]
