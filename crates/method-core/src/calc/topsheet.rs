@@ -1,5 +1,7 @@
 //! Stage 3: fringe posting, production levels, ATL/BTL, charges and credits.
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use crate::calc::arith::{percent_of, Money, Num};
 use crate::calc::{err, overflow, sum, CalcError, Ctx, ErrorKind};
 use crate::coding::AccountCoding;
@@ -211,6 +213,14 @@ pub(crate) fn credit_category_warnings(b: &Budget) -> Vec<String> {
                 ));
             }
         }
+        // A location the budget doesn't list (decisions.md, entry 80):
+        // lines can still name it, so it counts, but it is likely a typo.
+        for l in c.locations.iter().filter(|l| !b.locations.contains_key(*l)) {
+            out.push(format!(
+                "credit {} counts spend at location {l}, which is not in the budget's locations",
+                c.name
+            ));
+        }
     }
     out
 }
@@ -386,82 +396,129 @@ fn charge(
 }
 
 fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals, CalcError> {
+    credit_figures(ctx.b, cats, c).map(|(t, _)| t)
+}
+
+/// Net spend by the location of the lines it came from (`None`: lines
+/// with no location), over a credit's group, category and account rows.
+pub(crate) type SpendByLocation = BTreeMap<Option<String>, Cents>;
+
+/// The costed rows a credit row's source covers, with their figures: the
+/// lines tagged with a group, the first category or account with a code.
+/// A typed amount covers none.
+fn source_rows<'a>(
+    b: &'a Budget,
+    cats: &'a [CategoryTotals],
+    source: &CreditSource,
+) -> Vec<(&'a Detail, &'a RowTotals)> {
+    match source {
+        CreditSource::Flat(_) => Vec::new(),
+        CreditSource::Group { group } => lines(b, cats)
+            .filter(|l| l.row.included && l.detail.groups.contains(group))
+            .map(|l| (l.detail, l.row))
+            .collect(),
+        CreditSource::Category { category } => {
+            // The first category with the code, as the engine always took it.
+            let found = b
+                .categories()
+                .zip(cats)
+                .find(|(_, ct)| ct.code == *category);
+            found
+                .into_iter()
+                .flat_map(|(cat, ct)| cat.accounts.iter().zip(&ct.accounts))
+                .flat_map(|(a, at)| a.details.iter().zip(&at.rows))
+                .filter(|(d, _)| d.kind.is_costed())
+                .collect()
+        }
+        CreditSource::Account { account } => {
+            let found = b
+                .categories()
+                .zip(cats)
+                .flat_map(|(cat, ct)| cat.accounts.iter().zip(&ct.accounts))
+                .find(|(_, at)| at.code == *account);
+            found
+                .into_iter()
+                .flat_map(|(a, at)| a.details.iter().zip(&at.rows))
+                .filter(|(d, _)| d.kind.is_costed())
+                .collect()
+        }
+    }
+}
+
+/// Lines, fringes and total of the costed rows at each location (`None`:
+/// rows with no location). `None` on overflow.
+pub(crate) fn location_spend(
+    b: &Budget,
+    cats: &[CategoryTotals],
+) -> Option<BTreeMap<Option<String>, (Cents, Cents, Cents)>> {
+    let mut out: BTreeMap<Option<String>, (Cents, Cents, Cents)> = BTreeMap::new();
+    for l in lines(b, cats) {
+        let slot = out.entry(l.detail.location.clone()).or_insert((0, 0, 0));
+        slot.0 = slot.0.checked_add(l.row.total)?;
+        slot.1 = slot.1.checked_add(l.row.fringe_total)?;
+        slot.2 = slot
+            .2
+            .checked_add(l.row.total)?
+            .checked_add(l.row.fringe_total)?;
+    }
+    Some(out)
+}
+
+/// Whether a line at `location` counts toward a credit limited to
+/// `locations` (decisions.md, entry 80): every line when the list is empty,
+/// else only lines at one of them.
+pub(crate) fn counts_at(locations: &BTreeSet<String>, location: Option<&str>) -> bool {
+    locations.is_empty() || location.is_some_and(|l| locations.contains(l))
+}
+
+/// Credit `c` worked out on `cats`, applied or not, and its net spend by
+/// location. Every figure is a sum over lines, so neither the order of the
+/// lines nor the order of the credits changes it.
+pub(crate) fn credit_figures(
+    b: &Budget,
+    cats: &[CategoryTotals],
+    c: &Credit,
+) -> Result<(CreditTotals, SpendByLocation), CalcError> {
     let ovf = || overflow(format!("credit {}", c.name));
-    let arith = ctx.arith;
+    let arith = b.arithmetic;
 
     let mut rows = Vec::with_capacity(c.rows.len());
+    let mut by_location = SpendByLocation::new();
     let mut total = Money::cents(arith, 0);
     for (i, cr) in c.rows.iter().enumerate() {
         let at = || format!("credit {} row {} ({})", c.name, i + 1, cr.description);
         let row_ovf = || overflow(at());
 
+        if let CreditSource::Group { group } = &cr.source {
+            if !b.groups.contains_key(group) {
+                return Err(err(at(), ErrorKind::UnknownGroup(group.clone())));
+            }
+        }
+        // Group, category and account rows: the lines they cover, at the
+        // credit's locations, with the fringes they earn wherever fringes
+        // post (decisions.md, entries 57, 61 and 80). A category or account
+        // that isn't in the budget covers none (`warnings` says so).
         let (gross, excluded_fringes) = match &cr.source {
             CreditSource::Flat(g) => (*g, 0),
-            CreditSource::Group { group } => {
-                if !ctx.b.groups.contains_key(group) {
-                    return Err(err(at(), ErrorKind::UnknownGroup(group.clone())));
-                }
+            source => {
                 let mut gross: Cents = 0;
                 let mut ex: Cents = 0;
-                let tagged = lines(ctx.b, cats)
-                    .filter(|l| l.row.included && l.detail.groups.contains(group));
-                for l in tagged {
-                    gross = gross
-                        .checked_add(l.row.total)
-                        .and_then(|g| g.checked_add(l.row.fringe_total))
-                        .ok_or_else(row_ovf)?;
-                    for (name, amt) in &l.row.fringes {
+                for (d, r) in source_rows(b, cats, source) {
+                    if !counts_at(&c.locations, d.location.as_deref()) {
+                        continue;
+                    }
+                    let v = r.total.checked_add(r.fringe_total).ok_or_else(row_ovf)?;
+                    let mut e: Cents = 0;
+                    for (name, amt) in &r.fringes {
                         if c.excluded_fringes.contains(name) {
-                            ex = ex.checked_add(*amt).ok_or_else(row_ovf)?;
+                            e = e.checked_add(*amt).ok_or_else(row_ovf)?;
                         }
                     }
-                }
-                (gross, ex)
-            }
-            CreditSource::Category { category } => {
-                // The category's total with its own fringes, wherever
-                // fringes post, as Movie Magic counts a category row
-                // (decisions.md, entry 57). One that isn't in the budget
-                // is 0 (`warnings` says so).
-                let mut gross: Cents = 0;
-                let mut ex: Cents = 0;
-                if let Some(cat) = cats.iter().find(|c| c.code == *category) {
-                    // Its lines as they are, not rounded to whole units
-                    // (decisions.md, entry 69).
-                    let lines = sum(cat.accounts.iter().flat_map(|a| &a.rows).map(|r| r.total));
-                    gross = lines
-                        .and_then(|l| l.checked_add(cat.fringe_total))
-                        .ok_or_else(row_ovf)?;
-                    let rows = cat.accounts.iter().flat_map(|a| &a.rows);
-                    for (name, amt) in rows.flat_map(|r| &r.fringes) {
-                        if c.excluded_fringes.contains(name) {
-                            ex = ex.checked_add(*amt).ok_or_else(row_ovf)?;
-                        }
-                    }
-                }
-                (gross, ex)
-            }
-            CreditSource::Account { account } => {
-                // The account's lines with the fringes they earn, wherever
-                // fringes post, as the reference counts an account row
-                // (decisions.md, entry 61; 4,000.00 of lines and 500.00 of
-                // fringes posted by budget are 4,500.00). One that isn't in
-                // the budget is 0 (`warnings` says so).
-                let mut gross: Cents = 0;
-                let mut ex: Cents = 0;
-                let found = cats
-                    .iter()
-                    .flat_map(|c| &c.accounts)
-                    .find(|a| a.code == *account);
-                if let Some(a) = found {
-                    gross = sum(a.rows.iter().map(|r| r.total))
-                        .and_then(|l| l.checked_add(a.fringe_total))
-                        .ok_or_else(row_ovf)?;
-                    for (name, amt) in a.rows.iter().flat_map(|r| &r.fringes) {
-                        if c.excluded_fringes.contains(name) {
-                            ex = ex.checked_add(*amt).ok_or_else(row_ovf)?;
-                        }
-                    }
+                    gross = gross.checked_add(v).ok_or_else(row_ovf)?;
+                    ex = ex.checked_add(e).ok_or_else(row_ovf)?;
+                    let net = v.checked_sub(e).ok_or_else(row_ovf)?;
+                    let slot = by_location.entry(d.location.clone()).or_insert(0);
+                    *slot = slot.checked_add(net).ok_or_else(row_ovf)?;
                 }
                 (gross, ex)
             }
@@ -489,12 +546,13 @@ fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals
         .checked_mul_money(credit_keep(arith, c.discount_percent).ok_or_else(ovf)?)
         .and_then(Money::to_cents)
         .ok_or_else(ovf)?;
-    Ok(CreditTotals {
+    let totals = CreditTotals {
         name: c.name.clone(),
         rows,
         capped: capped.to_dec().ok_or_else(ovf)?,
         amount,
-    })
+    };
+    Ok((totals, by_location))
 }
 
 /// One credit row, unrounded: `percent` of `net` (or of the capped spend,
@@ -726,6 +784,7 @@ mod tests {
             cap: None,
             discount_percent: Dec::ZERO,
             excluded_fringes: BTreeSet::new(),
+            locations: BTreeSet::new(),
             rows,
         }
     }

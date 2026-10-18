@@ -289,6 +289,10 @@ fn needs(b: &Budget, w: What, name: &str) -> BTreeSet<Key> {
                 for f in &c.excluded_fringes {
                     add(What::Fringe, f);
                 }
+                // The locations a program is limited to (decisions.md, entry 80).
+                for l in &c.locations {
+                    add(What::Location, l);
+                }
             }
         }
         What::ReportPreset => {
@@ -1082,6 +1086,11 @@ pub fn import(
                     .excluded_fringes
                     .iter()
                     .map(|f| clipboard::renamed(&renames.fringes, f))
+                    .collect();
+                c.locations = c
+                    .locations
+                    .iter()
+                    .map(|l| clipboard::renamed(&renames.locations, l))
                     .collect();
                 match b.credits.iter().position(|x| x.name == to) {
                     Some(i) => b.credits[i] = c,

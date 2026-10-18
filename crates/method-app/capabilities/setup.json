@@ -32,6 +32,7 @@
     "allow-set-credit",
     "allow-delete-credit",
     "allow-move-credit",
+    "allow-incentives",
     "allow-set-info",
     "allow-delete-info",
     "allow-set-fringe-posting",

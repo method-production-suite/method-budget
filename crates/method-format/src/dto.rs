@@ -2259,6 +2259,10 @@ struct FileCredit {
     /// Fringes left out of every group and category row's spend.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     excluded_fringes: BTreeSet<String>,
+    /// Locations the spend has to be at (decisions.md, entry 80). Left out
+    /// when empty, so a credit without them is written as before.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    locations: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     rows: Vec<FileCreditRow>,
 }
@@ -2276,6 +2280,7 @@ impl From<&Credit> for FileCredit {
             cap,
             discount_percent,
             excluded_fringes,
+            locations,
             rows,
         } = c;
         FileCredit {
@@ -2285,6 +2290,7 @@ impl From<&Credit> for FileCredit {
             cap: *cap,
             discount_percent: DecStr(*discount_percent),
             excluded_fringes: excluded_fringes.clone(),
+            locations: locations.clone(),
             rows: rows.iter().map(FileCreditRow::from).collect(),
         }
     }
@@ -2315,6 +2321,7 @@ impl From<FileCredit> for Credit {
             cap: f.cap,
             discount_percent: f.discount_percent.0,
             excluded_fringes,
+            locations: f.locations,
             rows: f.rows.into_iter().map(CreditRow::from).collect(),
         }
     }

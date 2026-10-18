@@ -229,6 +229,7 @@ mod tests {
             cap: None,
             discount_percent: Dec::ZERO,
             excluded_fringes: ["KIT".to_string()].into(),
+            locations: BTreeSet::new(),
             rows: vec![method_core::CreditRow {
                 description: "Labor".into(),
                 source: CreditSource::Group { group: "OT".into() },

@@ -47,6 +47,7 @@ const COMMANDS: &[&str] = &[
     "set_credit",
     "delete_credit",
     "move_credit",
+    "incentives",
     "set_set",
     "delete_set",
     "set_location",

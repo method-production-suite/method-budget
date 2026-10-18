@@ -1170,6 +1170,7 @@ pub fn build(given: &Export, o: &BuildOptions) -> Imported {
                     cap: None,
                     discount_percent: Dec::ZERO,
                     excluded_fringes: BTreeSet::new(),
+                    locations: BTreeSet::new(),
                     rows: vec![CreditRow {
                         description: t.name.clone(),
                         // Filled in base currency below, once rates are known.

@@ -373,6 +373,7 @@ fn account_credit_rows_currency_formats_and_frozen_baselines_project_back() {
         cap: None,
         discount_percent: Dec::ZERO,
         excluded_fringes: BTreeSet::new(),
+        locations: BTreeSet::new(),
         rows: vec![CreditRow {
             description: "Crew".into(),
             source: CreditSource::Account {
@@ -2056,4 +2057,96 @@ fn acts_for_never_raises_a_member() {
         assert_eq!(fresh.role_of(actor(7)), Role::ReadOnly, "run {n}");
         assert_eq!(fresh.role_of(actor(8)), Role::ReadOnly, "run {n}");
     }
+}
+
+/// A program limited to `locations`, on the first account (decisions.md,
+/// entry 80).
+fn program_at(locations: &[&str]) -> Credit {
+    Credit {
+        name: "Ridge program".into(),
+        account: None,
+        applied: false,
+        cap: None,
+        discount_percent: Dec::ZERO,
+        excluded_fringes: BTreeSet::new(),
+        locations: set(locations),
+        rows: vec![CreditRow {
+            description: "Spend".into(),
+            source: CreditSource::Flat(100_000),
+            percent: "25".parse().unwrap(),
+            cap: CreditCap::None,
+        }],
+    }
+}
+
+/// Deleting a location on one replica keeps its name in a credit limited to
+/// it on every replica, and the location stays deleted: a credit's
+/// locations are a weak reference (decisions.md, entry 80).
+#[test]
+fn deleting_a_location_keeps_its_name_in_a_credit_without_reviving_it() {
+    let mut start = sample();
+    start.locations.insert("Ridge".into(), Location::default());
+    start.credits.push(program_at(&["Ridge"]));
+    let first = rows(&start)[0];
+    row_mut(&mut start, first).unwrap().location = Some("Ridge".into());
+
+    let mut a = adopt(1, &start);
+    let mut b = follower(2, &a);
+    let p = a.project();
+    assert_eq!(normalized(&p.budget), normalized(&start));
+    let mut after = p.budget.clone();
+    after.locations.remove("Ridge");
+    row_mut(&mut after, first).unwrap().location = None;
+    record(&mut a, &p, &after, &[], "Delete location Ridge");
+
+    // B edits something else meanwhile.
+    let p = b.project();
+    let mut other = p.budget.clone();
+    other.title = "Elsewhere".into();
+    record(&mut b, &p, &other, &[], "Title");
+
+    let mut logs = vec![a, b];
+    exchange(&mut Rng::new(7), &mut logs);
+    for log in &logs {
+        let p = log.project();
+        assert!(!p.budget.locations.contains_key("Ridge"), "revived");
+        let c = p.budget.credits.last().unwrap();
+        assert_eq!(c.locations, set(&["Ridge"]));
+        assert!(!review_keys(&p).contains(&"revived"), "{:?}", p.review);
+    }
+}
+
+/// A credit without locations writes no `locations` in the change log, so
+/// logs that don't use them stay readable by older versions.
+#[test]
+fn a_credit_without_locations_logs_no_locations() {
+    let mut start = sample();
+    start.credits.push(program_at(&[]));
+    let log = adopt(1, &start);
+    let none = log
+        .changes()
+        .flat_map(|c| &c.ops)
+        .any(|op| format!("{op:?}").contains("Locations"));
+    assert!(!none, "a Locations op was written");
+
+    // With one, it is written and projects back.
+    let mut with = sample();
+    with.locations.insert("Ridge".into(), Location::default());
+    with.credits.push(program_at(&["Ridge"]));
+    let log = adopt(1, &with);
+    assert!(log
+        .changes()
+        .flat_map(|c| &c.ops)
+        .any(|op| format!("{op:?}").contains("Locations")));
+    assert_eq!(normalized(&log.project().budget), normalized(&with));
+
+    // Clearing them takes every name off, though the record leaves the set out.
+    let mut log = log;
+    let p = log.project();
+    let mut cleared = p.budget.clone();
+    cleared.credits.last_mut().unwrap().locations.clear();
+    record(&mut log, &p, &cleared, &[], "Spend anywhere");
+    let p = log.project();
+    assert!(p.budget.credits.last().unwrap().locations.is_empty());
+    assert_eq!(normalized(&p.budget), normalized(&cleared));
 }

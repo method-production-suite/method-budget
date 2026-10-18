@@ -185,6 +185,19 @@ pub fn tools() -> Vec<Tool> {
             run: list_charges,
         },
         Tool {
+            name: "incentives",
+            title: "Incentive estimates",
+            description: "Spend at each location (lines, fringes, total; location null for lines \
+                with none), then every credit as an incentive program, applied or not: the \
+                locations its spend has to be at, its qualified spend (and by location), the \
+                credit after its caps and discount, whether its cap holds it down, and any \
+                problem. Nothing changes.",
+            mutating: false,
+            destructive: false,
+            schema: || object(vec![path_prop()], &["path"]),
+            run: incentives,
+        },
+        Tool {
             name: "totals",
             title: "Totals",
             description: "Every total in cents: production levels with their categories, \
@@ -990,6 +1003,7 @@ fn list_charges(ctx: &mut Ctx, a: &Args) -> ToolResult {
                 "cap_cents": c.cap,
                 "discount_percent": c.discount_percent.to_string(),
                 "excluded_fringes": c.excluded_fringes,
+                "locations": c.locations,
                 "rows": rows,
                 "amount_cents": computed.map(|t| t.amount),
             })
@@ -1002,6 +1016,29 @@ fn list_charges(ctx: &mut Ctx, a: &Args) -> ToolResult {
             credits.len()
         ),
         data: json!({"path": shown, "charges": charges, "credits": credits, "changed_on_disk": v.changed_on_disk}),
+    })
+}
+
+fn incentives(ctx: &mut Ctx, a: &Args) -> ToolResult {
+    let (b, r, shown, changed) = load(ctx, a)?;
+    let got = method_core::incentives::incentives(&b, &r)
+        .map_err(|e| ToolError::refused(format!("{shown} doesn't add up: {e}")))?;
+    let dto = method_session::report_dto::IncentivesDto::from(&got);
+    let mut data = obj(vec![("path", json!(shown))]);
+    let v = method_format::serde_json::to_value(&dto)
+        .map_err(|e| ToolError::refused(format!("{shown}: {e}")))?;
+    if let Value::Object(m) = v {
+        data.extend(m);
+    }
+    note_changed(&mut data, changed);
+    Ok(ToolOut {
+        summary: format!(
+            "{shown}: {} location(s), {} program(s).\n{}",
+            got.locations.len(),
+            got.programs.len(),
+            crate::cmd::incentives::text(&got)
+        ),
+        data: Value::Object(data),
     })
 }
 

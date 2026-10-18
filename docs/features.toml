@@ -165,6 +165,13 @@ ref = ["2.16", "D38"]
 
 [[feature]]
 group = "fringes"
+title = "Incentive estimates by location"
+text = "Limit a credit to the locations where the money is spent and see every program's estimate side by side, applied or not, from rates and caps you enter yourself."
+status = "have"
+ref = "D80"
+
+[[feature]]
+group = "fringes"
 title = "Apply panel"
 text = "Select lines, then tick fringes, groups, sets and locations on or off, with live totals for the selection."
 status = "have"
@@ -446,8 +453,8 @@ ref = "2.25"
 
 [[feature]]
 group = "engine"
-title = "Incentive modeling"
-text = "Qualified spend by location, several programs side by side, caps and what-ifs, from rules you enter yourself."
+title = "Incentive what-ifs"
+text = "Move lines between locations and see what each incentive program gains or loses, with minimum spends and shared caps."
 status = "soon"
 ref = "3.6"
 

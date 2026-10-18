@@ -1,4 +1,5 @@
-//! JSON shapes for [`method_core::Report`] and [`method_core::SelectionTotals`].
+//! JSON shapes for [`method_core::Report`], [`method_core::SelectionTotals`]
+//! and [`method_core::incentives::Incentives`].
 //!
 //! The engine stays serde-free, so the app mirrors its report here. Field names
 //! match the engine's. Money is integer cents (JSON integers), every [`Dec`] is
@@ -141,6 +142,98 @@ pub struct CreditRowDto {
     /// Under the row's cap (positive) or over it (negative), unrounded, in
     /// currency units like `credit`; `None` with no cap.
     pub cap_variance: Option<String>,
+}
+
+/// Spend by location and every credit's estimate (decisions.md, entry 80).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct IncentivesDto {
+    /// Worked out from a cleaned copy of a budget with problems, which
+    /// counts the cells with problems as blank: every figure may be short.
+    pub partial: bool,
+    pub locations: Vec<LocationSpendDto>,
+    pub programs: Vec<ProgramDto>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct LocationSpendDto {
+    /// `null`: lines with no location.
+    pub location: Option<String>,
+    pub known: bool,
+    pub lines: Cents,
+    pub fringes: Cents,
+    pub total: Cents,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct ProgramDto {
+    pub index: usize,
+    pub name: String,
+    pub applied: bool,
+    pub locations: Vec<String>,
+    pub cap: Option<Cents>,
+    pub discount_percent: String,
+    /// The estimate; `null` when it can't be worked out (`problem`). With
+    /// both, the estimate is from a cleaned copy and may be short.
+    pub amount: Option<Cents>,
+    pub problem: Option<String>,
+    pub qualified: Cents,
+    pub by_location: Vec<ProgramSpendDto>,
+    pub rows_total: String,
+    pub capped: bool,
+    /// The credit's figures as the topsheet would list it; `null` with a
+    /// problem.
+    pub figures: Option<CreditDto>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct ProgramSpendDto {
+    pub location: Option<String>,
+    pub net: Cents,
+}
+
+impl From<&method_core::incentives::Incentives> for IncentivesDto {
+    fn from(i: &method_core::incentives::Incentives) -> IncentivesDto {
+        IncentivesDto {
+            partial: false,
+            locations: i
+                .locations
+                .iter()
+                .map(|l| LocationSpendDto {
+                    location: l.location.clone(),
+                    known: l.known,
+                    lines: l.lines,
+                    fringes: l.fringes,
+                    total: l.total,
+                })
+                .collect(),
+            programs: i
+                .programs
+                .iter()
+                .map(|p| ProgramDto {
+                    index: p.index,
+                    name: p.name.clone(),
+                    applied: p.applied,
+                    locations: p.locations.iter().cloned().collect(),
+                    cap: p.cap,
+                    discount_percent: dec(p.discount_percent),
+                    amount: p.amount(),
+                    problem: p.problem.clone(),
+                    qualified: p.qualified,
+                    by_location: p
+                        .by_location
+                        .iter()
+                        .map(|(location, net)| ProgramSpendDto {
+                            location: location.clone(),
+                            net: *net,
+                        })
+                        .collect(),
+                    rows_total: dec(p.rows_total),
+                    capped: p.capped,
+                    figures: p.figures.as_ref().map(CreditDto::from),
+                })
+                .collect(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]

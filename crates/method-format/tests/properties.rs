@@ -221,6 +221,7 @@ fn gen_credit(rng: &mut Rng) -> Credit {
         cap: rng.chance(50).then(|| rng.cents()),
         discount_percent: rng.dec(),
         excluded_fringes: rng.texts(),
+        locations: rng.texts(),
         rows: (0..rng.below(4))
             .map(|_| CreditRow {
                 description: rng.text(),

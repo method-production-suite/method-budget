@@ -173,12 +173,12 @@ the first time a tool names it, and `budget_open` opens it again on purpose.
 
 ## Tools
 
-46 tools; `--read-only` keeps the 15 marked read.
+47 tools; `--read-only` keeps the 16 marked read.
 
 | Group | Tools |
 |---|---|
 | Files and summaries (read) | `list_budgets`, `budget_open`, `review_comments`, `budget_info` |
-| Reading (read) | `list_topsheet`, `list_accounts`, `get_account`, `list_globals`, `list_setup`, `list_charges`, `totals`, `explain`, `find`, `validate`, `diff` |
+| Reading (read) | `list_topsheet`, `list_accounts`, `get_account`, `list_globals`, `list_setup`, `list_charges`, `incentives`, `totals`, `explain`, `find`, `validate`, `diff` |
 | Lines | `add_lines`, `update_lines`, `delete_lines`, `move_lines`, `tag_lines` |
 | Setup | `set_global`, `add_setup`, `update_setup`, `rename_setup`, `delete_setup` |
 | Charges and credits | `set_charge`, `set_credit`, `apply_charge`, `delete_charge` |
@@ -248,7 +248,14 @@ cutoff it never uses. The base currency is listed first with `base: true`; the o
 **`list_charges`** `{path}`: charges (`charge_kind`, `percent` or `flat_amount_cents` and
 `currency`, `applied`, `account`, the exclusions, and `base_cents`, `excluded_cents`,
 `amount_cents` when applied) and credits (`rows` with their `source`, `percent` and `cap`,
-`cap_cents`, `discount_percent`, `amount_cents`).
+`cap_cents`, `discount_percent`, `locations`, `amount_cents`).
+
+**`incentives`** `{path}`: spend at each location (`locations`: `location`, `null` for
+lines with none, `known`, `lines`, `fringes`, `total`) and every credit as an incentive
+program, applied or not (`programs`: `name`, `applied`, `locations`, `cap`,
+`discount_percent`, `qualified` and `by_location`, `amount` after the caps and discount,
+`capped`, `problem`, `figures`), money in integer cents (decisions.md, entry 80). Nothing
+changes.
 
 **`totals`** `{path, exclude_groups?}`: `levels` (each production total with its categories
 and their accounts), `total_atl_cents`, `total_btl_cents`, `atl_btl_cents`,
@@ -384,7 +391,10 @@ below-the-line) or flat `amount`, and is applied unless `applied` is false.
 ```
 
 **`set_credit`** `{path, name, new_name?, account?, applied?, cap?, discount_percent?,
-excluded_fringes?, rows?}`: adds a credit or changes it; `rows` replaces every row.
+excluded_fringes?, locations?, rows?}`: adds a credit or changes it; `rows` replaces every row.
+`locations` limits every group, category and account row to lines at those locations,
+with their fringes (decisions.md, entry 80); empty counts every line, left out keeps it,
+and a location the budget doesn't have is refused.
 `excluded_fringes` is the credit's one list of fringes left out of every group, category
 and account row's spend (decisions.md, entries 57 and 61); left out keeps it, and changing
 the rows never changes it. Each row: `source` (`{"kind": "flat", "amount": "250000"}`,
@@ -394,7 +404,7 @@ topsheet category's total with the fringes its lines earn, wherever fringes post
 wherever fringes post), `percent`, `cap` (`{"kind": "none" | "qualified_spend" |
 "credit", "amount"}`), `description`. A group, category, account or fringe the budget
 doesn't have is refused. `list_charges` shows each credit's
-`excluded_fringes`.
+`excluded_fringes` and `locations`.
 
 **`apply_charge`** `{path, type, name, applied}`: makes a charge or credit count or stop
 counting. **`delete_charge`** `{path, type, name}` removes it.

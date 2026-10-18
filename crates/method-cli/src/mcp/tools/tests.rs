@@ -1701,6 +1701,61 @@ fn globals_from_a_schedules_days() {
     );
 }
 
+/// A credit limited to a location, and every program's estimate side by
+/// side (roadmap 3.6; decisions.md, entry 80).
+#[test]
+fn incentives_estimate_programs_by_location() {
+    let mut f = Fixture::new("incentives", false);
+    f.tool(
+        "add_setup",
+        json!({"path": "film.mthd", "type": "location", "name": "Ridge", "fields": {}}),
+    )
+    .unwrap();
+    f.tool(
+        "update_lines",
+        json!({"path": "film.mthd", "rows": [{"id": 8, "location": "Ridge"}]}),
+    )
+    .unwrap();
+    let net_before = net(&mut f, "film.mthd");
+    f.tool(
+        "set_credit",
+        json!({"path": "film.mthd", "name": "Ridge program", "applied": false,
+               "locations": ["Ridge"],
+               "rows": [{"source": {"kind": "account", "account": "21-01"}, "percent": 25}]}),
+    )
+    .unwrap();
+    // Not applied: the net total is as it was.
+    assert_eq!(net(&mut f, "film.mthd"), net_before);
+    let got = f.tool("incentives", json!({"path": "film.mthd"})).unwrap();
+    let p = &got["programs"][0];
+    assert_eq!(p["name"], "Ridge program");
+    assert_eq!(p["applied"], false);
+    assert_eq!(p["locations"], json!(["Ridge"]));
+    let q = p["qualified"].as_i64().unwrap();
+    assert!(q > 0);
+    assert_eq!(p["by_location"], json!([{"location": "Ridge", "net": q}]));
+    assert_eq!(p["amount"].as_i64().unwrap(), q / 4);
+    let ridge = got["locations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|l| l["location"] == "Ridge")
+        .unwrap();
+    assert_eq!(ridge["total"].as_i64().unwrap(), q);
+
+    let cr = f
+        .tool("list_charges", json!({"path": "film.mthd"}))
+        .unwrap();
+    assert_eq!(cr["credits"][0]["locations"], json!(["Ridge"]));
+    err_contains(
+        f.tool(
+            "set_credit",
+            json!({"path": "film.mthd", "name": "Harbor", "locations": ["Harbor"]}),
+        ),
+        "no location Harbor",
+    );
+}
+
 #[test]
 fn review_comments_are_listed_at_their_places() {
     use method_session::review as rv;
