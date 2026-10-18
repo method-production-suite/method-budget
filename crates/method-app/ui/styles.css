@@ -9,7 +9,7 @@
   --border: #dde1e6;
   --border-soft: #eceef1;
   --text: #1c2228;
-  --text-muted: #69727d;
+  --text-muted: #59626d; /* 4.5:1 or better on every surface, the selection included (BRAND.md) */
   --accent: #0e7468;
   --accent-text: #ffffff;
   --formula: #0b5f8a;
@@ -19,7 +19,7 @@
   --row-hover: #f2f5f7;
   --level-bg: #f3f5f8;
   --subtotal-bg: #f6f8f4;
-  --note: #d29a12;
+  --note: #8a5a00; /* pencil amber, 5.9:1 on the surface (BRAND.md) */
   --shadow: 0 12px 40px rgba(16, 24, 32, 0.22);
   --backdrop: rgba(16, 22, 28, 0.36);
   --radius: 6px;
@@ -37,7 +37,7 @@
     --border: #313840;
     --border-soft: #262c33;
     --text: #e4e8ec;
-    --text-muted: #8d97a2;
+    --text-muted: #9aa3ad;
     --accent: #2cc7b2;
     --accent-text: #08201d;
     --formula: #7cc4ef;
@@ -1131,6 +1131,19 @@ table.grid {
 }
 
 /* ------------------------------------------------------------------------ */
+/* Read by screen readers, not shown (the live region in index.html). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Dialogs and toast */
 
 .modal-backdrop {
@@ -1407,7 +1420,8 @@ body.panel-resizing {
 }
 
 .popup-item:focus {
-  outline: none;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
   background: var(--selection);
 }
 

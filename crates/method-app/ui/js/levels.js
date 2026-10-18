@@ -235,7 +235,7 @@ function isZero(total, bad, change, cost = null) {
 // row, double-click opens the category (grid.js editOnDoubleClick).
 export const TOPSHEET_COLUMNS = [
   { key: 'code', label: 'Acct #', editOnDoubleClick: true },
-  { key: 'name', label: 'Description', editOnDoubleClick: true },
+  { key: 'name', label: 'Description', editOnDoubleClick: true, rowHeader: true },
   { key: 'total', label: 'Total', cls: 'num' },
 ];
 
@@ -353,7 +353,7 @@ export function topsheetRows(ix, choices = null) {
 
 export const ACCOUNT_COLUMNS = [
   { key: 'code', label: 'Acct #', editOnDoubleClick: true },
-  { key: 'name', label: 'Description', editOnDoubleClick: true },
+  { key: 'name', label: 'Description', editOnDoubleClick: true, rowHeader: true },
   { key: 'fringe_total', label: 'Fringes', cls: 'num' },
   { key: 'total', label: 'Total', cls: 'num' },
 ];
@@ -449,7 +449,7 @@ export function accountRows(ix, entry) {
 // whether they show until the user chooses.
 export const DETAIL_COLUMNS = [
   { key: 'num', label: '#', cls: 'num', width: 44, min: 44, pin: 'left' },
-  { key: 'description', label: 'Description', width: 240, min: 130, pin: 'left', grow: true },
+  { key: 'description', label: 'Description', width: 240, min: 130, pin: 'left', grow: true, rowHeader: true },
   { key: 'amount', label: 'Amount', cls: 'num', width: 110, min: 70 },
   { key: 'unit', label: 'Unit', width: 72, min: 50 },
   { key: 'x', label: 'X', name: 'X (multiplier)', cls: 'num', title: 'Multiplier (blank counts as 1)', width: 52, min: 40, optional: true, on: true },

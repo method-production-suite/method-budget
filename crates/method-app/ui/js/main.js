@@ -80,7 +80,8 @@ import { exportPack, importPack } from './packs.js';
 import { exportSetupLists, importSetupLists } from './setuplists.js';
 import { importActuals } from './actualsimport.js';
 import { saveShareCopy, newSubBudget, renderShareBanner, offerReturnedCopy } from './sharing.js';
-import { displayCommands, userDisplay, withoutZeroRows } from './display.js';
+import { displayCommands, userDisplay, withoutZeroRows, totalText } from './display.js';
+import { announce } from './announce.js';
 import { initShare, renderBar as renderShareBar, decorateShare, reportPlace, openShareDialog, whoChangedThis, lookedAt, shareShown } from './share.js';
 import { setExplainTarget, explainTargetAt } from './explain.js';
 import { showStart, closeStart, startMenu, isStartOpen, startAtLaunch, startOnLastClose } from './start.js';
@@ -345,7 +346,12 @@ function trackChanges(view, opts) {
     c.prev = net;
     return;
   }
-  if (!NOT_EDITS.has(opts.cmd)) c.last = net - c.prev;
+  if (!NOT_EDITS.has(opts.cmd)) {
+    c.last = net - c.prev;
+    // Screen readers hear where the net total went (decision 82); an edit
+    // that moves no money says nothing.
+    if (c.last !== 0) announce(`Net total ${totalText(net)}, ${c.last > 0 ? 'up' : 'down'} ${totalText(Math.abs(c.last))}`);
+  }
   c.prev = net;
 }
 

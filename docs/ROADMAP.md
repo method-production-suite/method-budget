@@ -36,6 +36,14 @@ this page goes ahead without waiting.
 
 ### Open decisions
 
+- **Which languages first** (3.14; D82): nothing is translated yet and no translation
+  framework is started. The words live inline in the page scripts, the menu bar and the
+  engine's messages; docs/research/accessibility-audit.md, "Localization", lists where
+  and what a localization slice needs (a string table and lookup with no new
+  dependency, then moving strings area by area). **Recommend: pick one or two languages
+  where the users are before that slice starts**, so the work is checked against real
+  translations rather than a placeholder. Not built: waiting on the choice.
+
 - **Charge rows on the topsheet** (decision 13 below; D60): the reference may put charges
   after the last production total, before the summary rows; ours puts them after. No
   parity run has confirmed the reference's place. **Recommend: match it once a run
@@ -120,6 +128,14 @@ this page goes ahead without waiting.
       methodproduction.com opens; About shows "Licensed under MIT OR Apache-2.0".
 - [ ] **The app's live checks**: the dialogs, keys and tools-window checks listed in
       docs/APP.md, "Not yet".
+- [ ] **A screen reader in the app** (3.14; D82): with VoiceOver on (Cmd+F5), open the
+      Field Station sample (`method-budget sample` writes it); click into the topsheet
+      grid and arrow through it (each cell should say its value, column and row, "read
+      only" on totals); Shift+arrow to select (it should say selected); drill into an
+      account and edit a rate (after a moment it should say "Net total ..., up ...");
+      Cmd+I to add a line; open Rename Budget and press Escape (it should say the dialog's
+      name, then come back to the button). Note anything said twice, missed or confusing.
+      Narrator or NVDA on Windows if one is to hand.
 - [ ] **Recording wishlist** (below): short clips from the reference product, most useful
       first: 1 (real keystrokes), 2 (reports), 8 (saving and opening), 6 (find and
       replace), 4 (versions and history).
@@ -147,8 +163,8 @@ color and dated notes, copying rows with their tags and the paste review, find a
 replace, versions, compare and the History list, report choices with a live preview and
 PDF, imports from spreadsheets and from the reference product's exports, and a signed,
 notarized Mac build with updates inside the app (decision 48). Twelve of Phase 3's nineteen
-items are built; sharing through a folder (3.18), the start window (3.19) and incentive
-modeling (3.6) are partway. Around the app: the command line is `method-budget` (decision 74; `method`
+items are built; sharing through a folder (3.18), the start window (3.19), incentive
+modeling (3.6) and accessibility (3.14) are partway. Around the app: the command line is `method-budget` (decision 74; `method`
 still runs as an alias for now); an MCP server lets coding agents work on budget files
 (3.17); a browser build runs the same page on the engine compiled to WebAssembly, for the
 website's demo (decisions 70 to 73); the Help menu has the User Guide, Report a Bug,
@@ -277,7 +293,7 @@ Where competitors and the pain points (inv "Gaps and pain points", inv 24) say w
 | 3.11 | **Person-level cutoffs across accounts**, opt-in, for one person paid in several accounts. Built (decision 79): a line or adjustment row's optional `person` (free text; FORMAT.md, additive, left out when unset) makes every counted row with that person, in any account, one earner for each percent fringe: within the cutoff each row earns its own percent; past it the person earns the percent of the cutoff once, split over the rows by pay in whole cents (largest remainder, ties to the lower row id), so the order of lines and accounts never matters; a person row leaves its fringe range. Budgets without a person are unchanged (tested). Explain shows the person, the cutoff and each line's share; the lines' optional Person column (shown once a line has one) has type-ahead and the person's pay against each cutoff as its tooltip; `set line ROW person NAME` and the MCP `update_lines` set it. Property-tested (no double counting, order-independent, excluding equals deleting). Needs a live check of the column in the app | inv 23 quirk | [have] | M | engine check 1 |
 | 3.12 | **Scriptable command line**: batch edits, headless PDF and spreadsheet output for pipelines. Built (decision 41, docs/CLI.md): `method-budget report` (a saved preset as HTML, text, CSV or a plain Courier PDF from our own small writer), `method-budget export --xlsx/--csv/--tsv`, `method-budget totals [--json]`, `method-budget set` and `method-budget apply` (a line-oriented edit script: globals, fringe rates and cutoffs, line fields by row id or account and line, tags, renames, charges; atomic, all or nothing, `--dry-run` with a diff), `method-budget import` with a JSON column mapping; documented exit codes. The app's typeset PDF stays Mac-app only | open format advantage | [have] | M | 2.1, 1.15 |
 | 3.13 | **Commercial bid layouts** (industry bid form style) | competitor feature; check the legal line on form layouts | [missing] | L | 2.4 |
-| 3.14 | **Localization and accessibility pass** | reference is English only | [missing] | M | none |
+| 3.14 | **Localization and accessibility pass**. Accessibility, first slice built (decision 82; audit and what is left: docs/research/accessibility-audit.md; docs/APP.md, "Screen readers and contrast"): the budget grid is an ARIA grid that follows the cursor with `aria-activedescendant`, with row and column places, read-only and selected cells, and a cursor cell named by its value, column and row; an edit that moves the net total is announced politely; every small dialog is a labelled modal dialog; secondary text, the note amber and the popup menu's focus pass contrast in light and dark. The browser build's smoke test checks it headless through Chrome's accessibility tree. Left: a run with real screen readers, the footer's other totals, focus going back to a redrawn opener, an empty grid's focus, forced colors and reduced motion, and the whole of localization (no framework yet; where the words live and what a slice needs are in the audit) | reference is English only | [partial] | M | none |
 | 3.15 | **Setup packs**: import and export sets of setup items (globals, groups, fringes, units, sets, locations, currencies, charges, credits, tag presets, overtime patterns) as shareable packs with their sources, and setup lists as spreadsheets. Built (decision 50): a pack is a `.mthd` with setup and no lines, provenance `setup_pack` with a title, description, author, version, effective date, region, notes and links; File > Export Setup Pack… and the Library tab's Setup packs section pick items by kind and folder with their dependencies; File > Import Setup Pack… and the listed packs (your Packs folder and the bundled `packs/`, empty but for a README) run Import Setup's review into a budget (one undo step) or the library, stamping what comes in (`setup_sources`); File > Export > Setup Lists… and Import Setup Lists… (a sheet per kind, checked row by row); `method-budget pack export`, `import` and `show`. Rate packs come from a separate data project after review. Needs a live check of the dialogs and the bundled folder | shareable setup, 2026-10-10; 3.9 | [have] | L | 1.20, 2.15 |
 | 3.16 | **Charts of accounts**: bundled chart templates and importing any chart. Built (decision 51; docs/TEMPLATES.md): File > Import Chart of Accounts… and `method-budget coa import` read a chart from any sheet of a workbook, CSV, tab-delimited text or another budget (flat lists, outlines, side-by-side columns, number and name in one cell, separators or none, lost leading zeros, header, total and level rows, the `kind,code,name,parent` layout), infer the numbering pattern (changeable) and preview with duplicates and gaps; into a new budget with no lines, or applied to this one (adds, renames by number, never removes an account with lines, one undo step). Seven charts written by us and the studio charts built from the owner's exports ship in New From Template under Charts of accounts and in `method-budget new --template`; the sources sit in `imports/coa-sources/` (never committed) and are built by `scripts/build-coa-templates.py`. Needs a live check of the dialogs in the app | top request: start from the studio's chart | [have] | L | 2.2, 1.20 |
 | 3.17 | **Agents can work on budgets**: a Model Context Protocol server so Claude Code and other coding agents open, read, edit, check and report on budgets with typed tools. Built (decision 52; docs/MCP.md): `method-budget mcp [--root DIR]... [--read-only]` over stdio, both protocol eras (the `initialize` handshake from 2024-11-05 to 2025-11-25, and 2026-07-28 per-request metadata); 43 tools: open and summarize, topsheet, accounts, lines with what they work out to, globals, setup tables, charges and credits, totals, explain, find, validate, diff, merge, add, update, delete, move and tag lines, setup add, change, rename everywhere and delete with a use check, charges and credits, categories, production totals and accounts, export and reports, spreadsheet import, new budgets from the starter or a template, copies and undo; every path inside a root (symlinks out, hidden folders and wrong extensions refused), atomic writes, a change refused when the file changed on disk since the server read it, shared copies read-only, input limits; an example agent skill in docs/agents/. A live bridge to the running app (edits through the session, in History and undo) is designed in docs/MCP.md, not built | agents should push the buttons too | [have] | L | 3.12 |
