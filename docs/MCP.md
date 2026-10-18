@@ -455,10 +455,16 @@ for a budget), as `method-budget schedule-days` (docs/CLI.md). Every figure the 
 has a key: `total`, `unit:NAME`, `set:NAME`, `location:NAME`, `week:YYYY-MM-DD`,
 `element:ID`. The shoot days in all go to `SHOOT_DAYS`; any other figure only when picked
 (`pick`: `[{key, global?}]`, `global` an existing global to update or a new name, else the
-figure's default name). Globals an earlier import set are picked again (their setup source
-names the figure); `skip` leaves a figure out. Prep and wrap globals are never touched.
+figure's default name, never a global the budget already has). Globals an earlier import
+set are picked again (their setup source records the figure's key; an element's id,
+category, board ID and name, so a renamed or renumbered one keeps its link); `skip` leaves a
+figure out. A global set from a figure no longer in the file is listed as `linked:GLOBAL`
+at 0 days but never picked unless named in `pick`, so a call without `dry_run` never sets a
+global to 0 unasked. Prep and wrap globals are never touched. The summary says what
+happened: the globals set, "Nothing is picked; nothing changed.", or that the picked
+globals are already set from the schedule.
 Returns the review (`figures`, each with `global`, `current`, `new`, `action` `add`,
-`update` or `same`, `linked`, `changed`; `adds`, `updates`, `same`, `changed`, `notes`,
+`update` or `same`, `linked`, `changed`, `note`; `adds`, `updates`, `same`, `changed`, `notes`,
 `days_hash`) plus `applied` and `message`. Unless `dry_run`, applies it as one undoable
 change (`undo` takes it all back).
 

@@ -287,12 +287,17 @@ docs/research/schedule-exchange.md).
   default global (the name in capitals with `_DAYS`: `location:Cold Spring field station`
   is `COLD_SPRING_FIELD_STATION_DAYS`) or to the one named after the last `=`
   (`--pick "location:Cold Spring field station=STATION_DAYS"`, an existing global to
-  update it). A global that only has a figure's default name is not picked for it.
-- Each global set records where its figure came from (its setup source). Running again
-  with the same schedule picks those globals again and says which ones the schedule has
-  changed; a global set from a figure the file no longer has (a location dropped, an
-  element cut) is offered at 0 days, under the key `linked:GLOBAL`. `--skip KEY` leaves a
-  picked figure out.
+  update it). A default is never a global the budget already has: that gets `_2`, `_3`...
+  (in the Field Station budget `set:RIDGE` defaults to `RIDGE_DAYS_2`, since `RIDGE_DAYS` is
+  the fire road location's); name the existing global with `=GLOBAL` to update it.
+- Each global set records where its figure came from (its setup source), with the
+  figure's key; for an element, its id, category, board ID and name. Running again with
+  the same schedule finds each global's figure by that key (a renamed or renumbered cast
+  member keeps its link; one whose name and number both changed is listed unpicked with a
+  note), picks those globals again and says which ones the schedule has changed. A global
+  set from a figure the file no longer has (a location dropped or renamed, an element cut)
+  is listed under the key `linked:GLOBAL` at 0 days, unpicked: `--apply` leaves it alone,
+  and only `--pick linked:GLOBAL` sets it to 0. `--skip KEY` leaves a picked figure out.
 - Prep and wrap globals are never touched: they are the budget's own assumptions.
 - It prints the schedule, the globals it would set (each with its new value, the old one
   and the figure's key), every figure not picked with its key and default global, and how
@@ -302,7 +307,7 @@ docs/research/schedule-exchange.md).
 - `--json` prints the review: `schedule`, `board`, `sub_board`, `version`, `days_hash`,
   `shoot_days`, `start`, `end`, `notes`, `figures` (each with `key`, `kind`, `label`,
   `days`, `global`, `picked`, `linked`, `current`, `current_value`, `new`, `action`: `add`,
-  `update` or `same`, `changed`, `problem`), `adds`, `updates`, `same`, `changed`,
+  `update` or `same`, `changed`, `problem`, `note`), `adds`, `updates`, `same`, `changed`,
   `problems`, `can_apply`, `written` and `message`.
 
 Exit code 0 when the file was read (and, with `--apply`, the budget written); 1 when a file

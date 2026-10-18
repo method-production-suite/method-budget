@@ -3425,10 +3425,12 @@ system), so every host reviews and applies alike.
   Budget and the Field Station budget use. Any other figure goes to a global only when the
   person picks it, to a global they name (an existing one to update it) or to its default,
   the figure's name in capitals with `_DAYS` (`COLD_SPRING_FIELD_STATION_DAYS`,
-  `WEEK_2027_05_03_DAYS`, `DELACROIX_DAYS`; a clash gets `_2`). A global that only happens
-  to have a figure's default name is not picked for it: in the Field Station budget
-  `RIDGE_DAYS` is the fire road location's two days, and the `RIDGE` set's default name is
-  also `RIDGE_DAYS`, so guessing by name would have set it to 1. Matching a location to a
+  `WEEK_2027_05_03_DAYS`, `DELACROIX_DAYS`). A default is never a global the budget
+  already has, unless an earlier import recorded it as that figure's link: it gets `_2`,
+  `_3`... instead, and an existing global is updated only when its name is typed. In the
+  Field Station budget `RIDGE_DAYS` is the fire road location's two days, and the `RIDGE`
+  set's default name would also be `RIDGE_DAYS`, so ticking the set would have set it to 1;
+  the set now defaults to `RIDGE_DAYS_2` (amended after review, the same day). Matching a location to a
   global by its description was rejected for the same reason (the budget's own names and
   words are free). Prep and wrap globals are never touched: the file doesn't count them,
   and they are the budget's assumptions (the spec says so too).
@@ -3442,20 +3444,33 @@ system), so every host reviews and applies alike.
 - **The link, with no format change.** Each global set records its figure in its setup
   source (`setup_sources`, already in the format for where an item's figure comes from):
   "Shoot days at location Cold Spring field station, from the schedule Field Station
-  (Shooting Order, Main)". A later import of the same schedule and sub-board finds those
-  globals, picks them again (under their own names, so `STATION_DAYS` stays `STATION_DAYS`),
-  marks the ones whose value the schedule changed, and offers a global whose figure is gone
-  from the file (a location dropped, an element cut) at 0 days, as the spec asks, instead of
-  keeping an old number. A pack's source on such a global is replaced, since the figure now
-  comes from the schedule.
+  (Shooting Order, Main) [key: location:Cold Spring field station]". The key is the most
+  stable thing the file has for the figure: the name of a unit, set, location or week, and
+  for an element its id, category, board ID and name (`[key: element:40 | Cast | 1 |
+  DELACROIX]`). A later import of the same schedule and sub-board finds each global's
+  figure by that key, not by the words: an element through the reader's identity rules, so
+  a renamed or renumbered cast member keeps its link, and one whose name and number both
+  changed while the id still matches is offered unticked with a note asking to confirm. A
+  note without a key (written before keys were recorded) is matched by its words and the
+  review says so; setting it again records the key. Linked globals are picked again (under
+  their own names, so `STATION_DAYS` stays `STATION_DAYS`), and the ones whose value the
+  schedule changed are marked. A global whose figure is gone from the file (a location
+  dropped or renamed, an element cut) is offered at 0 days, as the spec asks, but starts
+  unticked everywhere (the app, `--apply`, the MCP tool), so it is set to 0 only when picked
+  (`--pick linked:GLOBAL`); nothing sets a global to 0 unasked (amended after review). A
+  pack's source on a global set from a schedule is replaced, since the figure now comes
+  from the schedule.
 - **What isn't stored: `days_hash`.** Remembering the file's hashes, and an element's
   (category, board ID, name) with its id as agreed, needs a new optional budget field; the
   format takes additive fields, but an older reader refuses a file that has one, so it is a
   format change. It is proposed in the roadmap's 3.8 row (a `schedule_link` object) and not
   done here. Until then "the schedule changed" comes from comparing each linked global's
-  value with the file's figure, which is what the person needs to act on; a renamed element
-  or location is found again only when picked again by hand.
+  value with the file's figure, which is what the person needs to act on. A renamed unit,
+  set or location has no id in the file, so its link goes and it is picked again by hand.
 - Tests: method-session's `schedule_days` tests (the figures and default names, the rule,
-  picks and refusals, sources, a later import, a figure gone, the Field Station budget
-  agreeing with its schedule, one undo step through the kept file) and its host test;
+  picks and refusals, sources and their keys, a later import, a figure gone starting
+  unticked, a renamed or renumbered element keeping its link, a link recorded by words
+  only, defaults never landing on an existing global with the Field Station `RIDGE` case,
+  the Field Station budget agreeing with its schedule, one undo step through the kept file)
+  and its host test;
   method-cli's `schedule_days_set_globals_from_a_schedule` and the MCP tool's test.

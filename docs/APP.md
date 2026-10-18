@@ -2085,9 +2085,10 @@ anything changes:
 - **The rule**: shoot days in all go to `SHOOT_DAYS`, ticked to start. Any other figure is
   set only when ticked, to the global named in its row: by default the figure's name in
   capitals with `_DAYS` (`COLD_SPRING_FIELD_STATION_DAYS`), or any name typed there, an
-  existing global to update it (`STATION_DAYS`). Typing a name ticks the row. A global that
-  only has a figure's default name is not ticked for it (in the Field Station budget
-  `RIDGE_DAYS` is the fire road location's days, not the RIDGE set's). An element's days
+  existing global to update it (`STATION_DAYS`). Typing a name ticks the row. A default is
+  never a global the budget already has: it gets `_2`, `_3`... (in the Field Station budget
+  `RIDGE_DAYS` is the fire road location's days, so the RIDGE set defaults to
+  `RIDGE_DAYS_2`). An element's days
   are its day out of days total. Prep and wrap globals are never touched.
 - **What Set Globals does**: how many globals are new, change or already match, and
   anything refused (a name that can't be a global, two figures in one global), which keeps
@@ -2097,13 +2098,17 @@ anything changes:
 Station"); the toast says how many globals were set. A new global gets the figure as its
 description ("Shoot days at location Cold Spring field station") and the Day unit when the
 budget has one. Each global set records its figure in its source (the setup source packs
-use, so the file format is unchanged): "Shoot days at location Cold Spring field station,
-from the schedule Field Station (Shooting Order, Main)". The next import of the same
-schedule and sub-board ticks those globals again under their own names, says which ones
-the schedule has changed since ("The schedule changed since these globals were set from
-it: STATION_DAYS"), and lists a global whose figure is no longer in the file (a location
-dropped, an element cut) under "Set from this schedule before, no longer in it" at 0 days,
-ticked, rather than keeping an old number. A global already at its value can still be set,
+use, so the file format is unchanged), with the figure's key: "Shoot days at location Cold
+Spring field station, from the schedule Field Station (Shooting Order, Main) [key:
+location:Cold Spring field station]"; an element's key is its id, category, board ID and
+name. The next import of the same schedule and sub-board finds each global's figure by its
+key (a renamed or renumbered cast member keeps its link; one whose name and number both
+changed is shown unticked with a note asking to confirm; an older note without a key is
+matched by its words, and the row says so), ticks those globals again under their own
+names, and says which ones the schedule has changed since ("The schedule changed since
+these globals were set from it: STATION_DAYS"). A global whose figure is no longer in the
+file (a location dropped or renamed, an element cut) is listed under "Set from this
+schedule before, no longer in it" at 0 days, unticked: it is set to 0 only when ticked. A global already at its value can still be set,
 which only records the link. The file's `days_hash` is not stored in the budget (that would
 be a format change; the roadmap's 3.8 row has the proposal).
 
@@ -2114,7 +2119,7 @@ picker takes the file.
 
 | Command | Arguments | Returns |
 |---|---|---|
-| `schedule_days_pick` | none (shows the Open dialog) | the review, or `null` when cancelled: `{token, file, schedule, board, sub_board, generated, version, source_hash, days_hash, shoot_days, start, end, notes, figures: [{key, kind, name, category, label, days, global, picked, linked, current, current_value, new, action, problem, changed}], adds, updates, same, changed, problems, can_apply}`; `kind` is `total`, `unit`, `set`, `location`, `week`, `element` or `missing`, `action` `add`, `update` or `same` |
+| `schedule_days_pick` | none (shows the Open dialog) | the review, or `null` when cancelled: `{token, file, schedule, board, sub_board, generated, version, source_hash, days_hash, shoot_days, start, end, notes, figures: [{key, kind, name, category, label, days, global, picked, linked, current, current_value, new, action, problem, note, changed}], adds, updates, same, changed, problems, can_apply}`; `kind` is `total`, `unit`, `set`, `location`, `week`, `element` or `missing`, `action` `add`, `update` or `same` |
 | `schedule_days_review` | `token`, `picks` (`[{key, global}]`, `global` empty for the default; `null` for the review's own) | the review with those picks; changes nothing |
 | `schedule_days_apply` | `token`, `picks` | `{view, message}`: the globals set as one undo step |
 
