@@ -799,6 +799,7 @@ function sharedDialog(title, setup) {
         el('h4', { class: 'share-panel-sub', text: 'People' }),
         people,
         el('p', { class: 'share-muted', text: rolesNote(s) }),
+        s.can_set_roles ? el('p', { class: 'share-muted', text: UNSIGNED_NOTE }) : null,
         el('div', { class: 'share-me' }, el('label', { class: 'modal-field', attrs: { for: 'share-name' } }, el('span', { text: 'Your name' }), name), el('div', { class: 'modal-field' }, el('span', { text: 'Your color' }), colors), save),
         error,
         el('div', { class: 'modal-actions' }, done),
@@ -807,6 +808,12 @@ function sharedDialog(title, setup) {
     { onClose: () => ctx.focus() },
   );
 }
+
+/** Roles are checked by the app, not yet signed (decisions.md, entry 78). */
+const UNSIGNED_NOTE = 'Roles stop people changing what they shouldn’t by accident. They don’t stop someone who edits the shared folder’s files directly; signed changes come later.';
+
+/** An app older than this one can't read a change file that holds a role. */
+const OLDER_APPS_NOTE = 'Once roles are set, everyone sharing this budget needs this version of Method Budget or later, because an older one can’t open the shared changes.';
 
 function rolesNote(s) {
   const invite = 'To invite someone, give them access to the folder; opening the budget there joins them.';
@@ -862,7 +869,7 @@ function rolePicker(p, s, setup, error) {
       const others = s.people.filter((x) => x.actor !== p.actor && x.role !== 'owner').map((x) => x.name);
       const yes = await confirmDialog({
         title: 'Set what people may change',
-        message: `From now on, people without a role can only read this budget.${others.length ? ` ${others.join(', ')} will read only until you give them a role too.` : ''}`,
+        message: `From now on, people without a role can only read this budget.${others.length ? ` ${others.join(', ')} will read only until you give them a role too.` : ''} ${OLDER_APPS_NOTE}`,
         confirmText: 'Set Role',
       });
       if (!yes) return;

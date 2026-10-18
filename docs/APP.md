@@ -1503,7 +1503,10 @@ admin; only the owner makes or changes admins), Edits everything, Edits some cat
 deletes lines and notes there and applies existing fringes and groups, and changes nothing
 else), Actuals and notes, Notes only, or Read only. Set saves it as a change shared like
 any other. The first role set asks first, because from then on someone without a role
-reads only; the dialog names who that would be. A person given a role before they ever
+reads only; the dialog names who that would be, and says that everyone sharing the budget
+then needs this version or later, because an older one can't open the shared changes.
+Under the people the dialog also says plainly that roles stop changes by accident, not
+someone who edits the shared folder's files directly, and that signed changes come later. A person given a role before they ever
 opened the budget is listed too. The People list shows each person's role in words; a
 person who may change less than everything sees a chip in the toolbar ("Some categories",
 "Actuals", "Notes only", "Read only") with the details on hover. An edit beyond the role
