@@ -1403,6 +1403,7 @@ Feature.mthd-log/
     <actor>/                       one folder per computer, written by it only
       000001-000140.chg            a sealed segment: changes 1 to 140 of this actor
       000141-000163.chg
+      written.json                 hashes of the .mthd files it wrote from the log
     <actor>/
       ...
 ```
@@ -1415,7 +1416,12 @@ Feature.mthd-log/
   computer may roll its own small segments into one bigger one, writing the new file
   before removing the old ones.
 - **Temporary and foreign files are ignored**: anything that is not `<from>-<to>.chg` in
-  an actor folder named by 64 hex characters.
+  an actor folder named by 64 hex characters (besides the heartbeat and `written.json`).
+- **Files written from the log.** `written.json` (`{"hashes": [...]}`, the SHA-256 of
+  each, newest last, the last 20 kept) lists every `.mthd` this computer wrote from the
+  log, and the one it started sharing from. A `.mthd` whose hash any computer lists is
+  merely behind the log, never an outside edit, so it is never taken in (doing so would
+  undo the changes it lacks).
 
 ### `budget.json`
 
@@ -1431,6 +1437,17 @@ Feature.mthd-log/
 
 `budget_id` is the SHA-256 of the genesis change's line (below). `file` is the budget's
 file name, never a path. Readers reject another `format` and a newer `version`.
+`genesis` names the first change: its actor started sharing and owns the budget, and a
+reader names it before reading any segment, so the owner never depends on the order
+segments are read in. Every other change must have the genesis within its `deps`; one that
+doesn't (another computer that started sharing the same file before the folder synced, or
+a forged one) is refused by every reader.
+
+`version` is 1 until someone is given a role, and 2 from the first `grant` on (decisions.md,
+entry 78): the computer writing the first `grant` raises it before writing the segment,
+and every segment holding a `grant` has `format` 2. A program that reads only version 1
+refuses the folder as newer than it reads (Method Budget 0.3.0 then opens the `.mthd` on
+its own, unshared, and says why) rather than skipping the roles and editing a stale budget.
 
 ### Segment files
 
@@ -1496,8 +1513,15 @@ everyone but the owner and admins; `editor` everything but roles and the root's
 scope only (a move must start and end there); `actuals` transactions, batches, `etc`
 entries and notes; `comment` notes only; `read_only` nothing. Only the owner gives
 `admin` or changes an admin's role; nobody changes the owner's. Until changes are signed
-this holds against honest applications only. A reader older than the `grant` op can't
-read a segment that holds one.
+this holds against honest applications only. A `grant` whose `scope` is not empty is
+malformed unless its role is `department`. A program writing a shared budget without a
+window (the command line, the MCP server) records its edit as a change by this computer's
+actor, checked like any other, and never rewrites the `.mthd` unless that actor started
+sharing; with no actor yet, it is refused once roles are set. Once roles are set, an edit
+to the `.mthd` by a program that doesn't write the log can't be attributed, so it is never
+taken in: the keeper keeps the edited file beside it as `Feature (outside edit
+2026-10-18 140322).mthd` (never over another file) and writes the `.mthd` again from the
+log.
 
 A **stamp** is written `"<lamport>/<actor hex>/<seq>/<index>"`: the change's clock and
 actor, its seq, and the op's index in it.

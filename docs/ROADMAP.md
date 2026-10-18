@@ -63,6 +63,21 @@ this page goes ahead without waiting.
   someone without a role reads only (the design's 9.1); an editor changes everything but
   roles and locking the originals; a department editor changes only lines and notes in
   its categories. **Recommend: keep all four**; any can be reversed from the digest.
+- **What an older app does with a budget that has roles** (3.18; D78): the first role
+  raises the change log's format to 2, so Method Budget 0.3.0 refuses the log as newer than
+  it reads and opens the file on its own with that notice; anything saved there is kept
+  aside by the computer that keeps the file, not taken in. **Recommend: as built.** Built
+  on the recommendation.
+- **The owner is one computer** (3.18; D78): ownership can't be handed on, and only the
+  owner's computer and admins set roles, so a lost computer with no admin leaves roles as
+  they are for good. **Recommend:** when the first role is set, suggest making someone an
+  admin (built: the first-role question says so, and can be skipped), and let the owner
+  make an admin a co-owner who also makes admins (not built; waits for this answer).
+- **Command line and MCP writes to a shared budget** (3.18; D78): they act as this
+  computer's person and follow roles, recording through the change log; with no person on
+  the computer they are refused once roles are set; other commands that rewrite a shared
+  file whole are refused; an outside edit after roles is kept aside. **Recommend: as
+  built.** Built on the recommendation.
 
 ### Tests that need the owner's hands or hardware
 

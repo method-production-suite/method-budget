@@ -3462,14 +3462,58 @@ Docs/APP.md, "Sharing a budget", says what a person sees; this records the choic
   writing in the folder) can write a change in anyone's name; the folder's own sharing is
   what stops a reader writing at all. Revocation by cutoff (the design's "last seq of
   theirs accepted") needs signatures to mean anything and comes with them; until then a
-  removed person's offline work is judged by what they had seen. An app older than this
-  can't read a segment with a `grant` op (`deny_unknown_fields`), so it stops at the first
-  one; everyone sharing a budget needs this version once roles are used.
+  removed person's offline work is judged by what they had seen. Anyone can still write
+  a change whose `deps` hold only the genesis, judged as from before roles existed; the
+  cutoff has to close that too.
 - **Interface** (share.js, shared.css): a role menu and Set button under each person in
   the Share dialog for the owner and admins, a category checklist for Edits some
   categories, each person's role in words in the People lists, a chip in the toolbar for
   a person who may change less than everything. No muted cells or locks yet (design 9.7),
   no access requests.
+- **After review (MReview on pull request #27), five fixes:**
+  - *The owner is the genesis, not the first change read.* The log folder's `budget.json`
+    names the genesis, and `Log::set_genesis` is called before any segment is read, so the
+    owner never depends on read order. Every change but the genesis must have it within its
+    `deps`, or `State::check` refuses it as made outside this budget's history: a forged
+    first change, or a second computer that started sharing the same file before the
+    folder synced, is refused by every reader alike. Tests: `a_forged_first_change_never_takes_the_budget`
+    (core, every order of the genesis, a grant, a forged first change and a second start),
+    `a_forged_first_change_in_the_folder_never_takes_the_budget` (format, three fresh opens).
+  - *Every write path follows roles.* `method_format::log::SharedEdit` opens a shared budget
+    as this computer's person (the actor file the app and `method-budget log` use), reads it
+    as the log makes it and records an edit as one change checked against the role; only
+    the computer that started sharing rewrites the `.mthd`. The command line's `set` and
+    `apply` and the MCP server's every change and undo go through it; any other command
+    that would rewrite a shared `.mthd` whole is refused. Without an actor id, a write is
+    refused once roles are set (`NO_PERSON`); before that one is made, as `method-budget log`
+    does. Once roles are set an edit to the `.mthd` by another program has no author, so
+    neither the app's keeper nor `method-budget sync` takes it in: `log::set_aside` keeps it
+    beside the file as "Feature (outside edit <date> <time>).mthd", never over another file,
+    and the file is written again. Each actor's `written.json` lists the hashes of the files
+    it wrote from the log (and started from), so a file that is only behind the log is
+    never mistaken for an outside edit and taken in, which would undo the changes it lacks
+    (the command line made that easy to reach: a person who doesn't keep the file changes
+    the log and not the file). Tests: `a_program_without_a_window_changes_a_shared_budget_as_its_person`,
+    `an_outside_edit_after_roles_is_kept_aside`, `a_file_behind_the_log_is_not_an_outside_edit`
+    (format), `command_line_writes_to_a_shared_budget_follow_roles` and the updated
+    `log_init_show_and_sync` (command line), `shared_budgets_are_changed_through_the_log_within_a_role`
+    (MCP), `an_outside_edit_after_roles_is_kept_aside_by_the_keeper` (app).
+  - *Older apps refuse cleanly.* `budget.json`'s `version` and the `format` of every segment
+    holding a `grant` are 2 from the first role on (raised before the role's segment is
+    written); before it, 1 as always. 0.3.0 then refuses the change log as newer than it
+    reads and opens the file on its own with that notice, instead of skipping the role's
+    segment and editing a stale budget; what it saves there is an outside edit, kept aside
+    as above. Test: `the_first_role_raises_the_log_format`.
+  - *Refused changes are shown.* The status panel lists the latest 20 changes left out,
+    with who, when, the step's label and why in a sentence. Test:
+    `refused_changes_are_shown_with_who_when_and_what`.
+  - *A scope on any role but department is refused*, not dropped: `Role::parse` refuses it
+    (a malformed line in a file), `set_role` refuses it in words, and the dialog keeps
+    ticked categories in view with another role and refuses to set it until they are
+    unticked. Tests: `roles_round_trip_through_json`, `setting_a_role_checks_what_is_asked`.
+  - The first-role question also suggests making someone trusted an admin, since the
+    owner is one computer's id and only it and admins set roles (co-owners wait for the
+    owner's answer, docs/ROADMAP.md, "Waiting on the owner").
 - Tests: core (above, and a department editor in and out of scope, refusals by every
   peer, a role not yet seen, a move apart, who sets roles), format (grant round trip,
   roles through the folder with a forged change refused by a newcomer), session (a

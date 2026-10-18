@@ -1503,8 +1503,12 @@ admin; only the owner makes or changes admins), Edits everything, Edits some cat
 deletes lines and notes there and applies existing fringes and groups, and changes nothing
 else), Actuals and notes, Notes only, or Read only. Set saves it as a change shared like
 any other. The first role set asks first, because from then on someone without a role
-reads only; the dialog names who that would be, and says that everyone sharing the budget
-then needs this version or later, because an older one can't open the shared changes.
+reads only; the dialog names who that would be, says that everyone sharing the budget then
+needs this version or later (an older version won't join it: it says the shared changes are
+newer than it reads and opens the file on its own, and what is changed there isn't shared),
+and suggests making someone trusted an admin, since only the owner's computer and admins
+can set roles. Categories ticked for any role other than Edits some categories are refused
+with a sentence, in the dialog and in Rust.
 Under the people the dialog also says plainly that roles stop changes by accident, not
 someone who edits the shared folder's files directly, and that signed changes come later. A person given a role before they ever
 opened the budget is listed too. The People list shows each person's role in words; a
@@ -1514,17 +1518,23 @@ is refused before anything changes, with a sentence that says what the role allo
 who sets roles ("You can change lines and notes in 2000 Production only. Alex Kim sets
 who may change what."); a read-only person's every edit, undo and redo is refused that
 way. Every computer also checks everyone else's changes as they arrive and leaves out one
-its author's role didn't allow; the status panel counts what was left out. Each change is
+its author's role didn't allow; the status panel lists what was left out (the latest 20),
+each with who, when, what it was and why in a sentence. Each change is
 judged by the roles its author had seen when making it, so a change made before someone
 saw their new role is kept everywhere, and a line moved out of a person's categories
 while they edited it keeps their edit; every computer keeps and leaves out the same
 changes. Roles are checked by the app, not yet secured: changes aren't signed, so another
 program that can write in the shared folder can still write a change in someone's name,
-and the folder's own sharing settings are what keeps a reader from writing at all. A
-copy of the app older than this one can't read a change file that holds a role, so
-everyone sharing a budget needs this version once roles are used.
+and the folder's own sharing settings are what keeps a reader from writing at all.
+The command line's `set` and `apply` and the MCP server change a shared budget the same
+way, as this computer's person and within their role (docs/CLI.md, docs/MCP.md). Once roles
+are set, an edit to the `.mthd` made by another program can't be said to be anyone's, so
+the computer that keeps the file doesn't take it in: it keeps the edited file beside it as
+"Feature (outside edit 2026-10-18 140322).mthd", writes the file again from everyone's
+changes, and the status panel says so.
 
-**Not yet** (later phases of the design): invite links, signed changes and removing a
+**Not yet** (later phases of the design): handing ownership on or a co-owner who also
+makes admins (the owner is one computer's id), invite links, signed changes and removing a
 person's later changes (a removed member's work is judged by what they had seen, as
 above), picking single accounts (not only whole categories) in the dialog, muted cells and
 locks on what a person can't change, access requests, live sessions with cursors,
