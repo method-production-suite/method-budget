@@ -1663,3 +1663,77 @@ fn globals_from_a_schedules_days() {
         "isn't a schedule days file",
     );
 }
+
+#[test]
+fn review_comments_are_listed_at_their_places() {
+    use method_session::review as rv;
+    let mut f = Fixture::new("review", false);
+    err_contains(
+        f.tool("review_comments", json!({"path": "film.mthd"})),
+        "no review file beside it",
+    );
+    // A reviewer's file beside the budget: a line, then a line deleted.
+    let text = std::fs::read_to_string(f.path("film.mthd")).unwrap();
+    let mut s = method_session::Session::with_budget(method_format::from_str(&text).unwrap(), None);
+    rv::start_reviewing(&mut s, None, "film.review.json".into(), None).unwrap();
+    rv::add(
+        &mut s,
+        rv::Anchor::Row(1),
+        "Option price?",
+        "2027-01-05T10:00:00Z",
+        Some("Jordan"),
+    )
+    .unwrap();
+    rv::add(
+        &mut s,
+        rv::Anchor::Budget,
+        "Overall fine",
+        "2027-01-05T10:01:00Z",
+        None,
+    )
+    .unwrap();
+    let mut review = rv::read("x", rv::text(&s).unwrap().as_bytes()).unwrap();
+    review.comments.push(rv::Comment {
+        id: 3,
+        on: rv::Anchor::Row(999_999),
+        place: "1001 Writing, line 9: Rewrites".into(),
+        text: "Cut this?".into(),
+        author: String::new(),
+        created: String::new(),
+        edited: None,
+        resolved: false,
+        outcome: None,
+    });
+    std::fs::write(
+        f.path("film.review.json"),
+        method_format::review::write(&review),
+    )
+    .unwrap();
+    let before = std::fs::read_to_string(f.path("film.mthd")).unwrap();
+    let r = f
+        .tool("review_comments", json!({"path": "film.mthd"}))
+        .unwrap();
+    assert_eq!(r["comments"], 3);
+    assert_eq!(r["to_settle"], 3);
+    let entries = r["entries"].as_array().unwrap();
+    assert!(entries[1]["place"]
+        .as_str()
+        .unwrap()
+        .ends_with("Writing, line 1: Screenplay"));
+    assert_eq!(entries[1]["can_merge"], true);
+    assert_eq!(entries[2]["found"], false);
+    assert_eq!(entries[2]["place"], "1001 Writing, line 9: Rewrites");
+    assert_eq!(
+        std::fs::read_to_string(f.path("film.mthd")).unwrap(),
+        before,
+        "nothing changed"
+    );
+    std::fs::write(f.path("other.json"), "{}").unwrap();
+    err_contains(
+        f.tool(
+            "review_comments",
+            json!({"path": "film.mthd", "file": "other.json"}),
+        ),
+        "isn't a review file",
+    );
+}

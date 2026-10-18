@@ -51,6 +51,28 @@ pub fn tools() -> Vec<Tool> {
             run: budget_open,
         },
         Tool {
+            name: "review_comments",
+            title: "Review comments",
+            description: "Reads a review file (format method-budget-review: a reviewer's comments \
+                on a budget, kept beside it as <budget>.review.json) and lists every comment at \
+                its place in the budget: a line by row id, an account, a category, a setup item \
+                or the whole budget, with its author, time and text, whether it is open, \
+                resolved, merged as a note or dismissed, and whether it can become a note (with \
+                the reason when it can't, such as a line deleted since). Changes nothing.",
+            mutating: false,
+            destructive: false,
+            schema: || {
+                object(
+                    vec![
+                        path_prop(),
+                        ("file", s::path("The review file (.json; default: <budget>.review.json beside the budget).")),
+                    ],
+                    &["path"],
+                )
+            },
+            run: review_comments,
+        },
+        Tool {
             name: "budget_info",
             title: "Budget summary",
             description: "Title, currencies, account numbering, fringe posting, counts (categories, \
@@ -527,6 +549,67 @@ fn budget_open(ctx: &mut Ctx, a: &Args) -> ToolResult {
         ));
     }
     Ok(out)
+}
+
+fn review_comments(ctx: &mut Ctx, a: &Args) -> ToolResult {
+    use method_session::review as rv;
+    let (path, shown) = budget_path(ctx, a, "path")?;
+    let file = match a.str("file") {
+        Some(f) => ctx.roots.existing(f, &["json"])?,
+        None => {
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let beside = path.with_file_name(rv::file_name_for(&name));
+            if !beside.is_file() {
+                return Err(ToolError::not_found(format!(
+                    "{shown} has no review file beside it ({}); name one with file.",
+                    rv::file_name_for(&name)
+                )));
+            }
+            beside
+        }
+    };
+    let file_shown = ctx.roots.show(&file);
+    let bytes = crate::mcp::docs::read_file(&file, &file_shown)?;
+    let review = rv::read(&file_shown, &bytes).map_err(ToolError::invalid)?;
+    let b = ctx.docs.view(&path, &shown)?.budget.into_owned();
+    let state = rv::ReviewState::new(review, rv::Mode::Reading, file_shown.clone(), None);
+    let list = rv::list_of(&b, &state);
+    let gone = list.entries.iter().filter(|e| !e.found).count();
+    let mut summary = format!(
+        "{file_shown}: {} on {}, {} to settle.",
+        count(list.brief.comments, "comment", "comments"),
+        quoted(&list.budget.title),
+        list.brief.to_settle
+    );
+    if gone > 0 {
+        summary.push_str(&format!(
+            " {} on a place no longer in the budget.",
+            count(gone, "is", "are")
+        ));
+    }
+    if !list.brief.matches {
+        summary.push_str(&format!(
+            " It was written on a budget titled {}, not this one's.",
+            quoted(&list.budget.title)
+        ));
+    }
+    let mut data =
+        method_format::serde_json::to_value(&list).map_err(|e| ToolError::io(e.to_string()))?;
+    if let Value::Object(m) = &mut data {
+        for k in ["rev", "unsaved", "mode", "rows", "accounts", "categories"] {
+            m.remove(k);
+        }
+        m.insert("file".into(), json!(file_shown));
+    }
+    Ok(ToolOut { summary, data })
+}
+
+/// "1 comment" or "3 comments".
+fn count(n: usize, one: &str, many: &str) -> String {
+    format!("{n} {}", if n == 1 { one } else { many })
 }
 
 fn budget_info(ctx: &mut Ctx, a: &Args) -> ToolResult {

@@ -262,6 +262,7 @@ fn tools_list_schemas_are_valid_and_names_are_unique() {
         "import_sheet",
         "import_budget_export",
         "schedule_days",
+        "review_comments",
         "new_budget",
         "save_as",
         "undo",

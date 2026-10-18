@@ -844,3 +844,100 @@ fn schedule_days_set_globals_from_a_schedule() {
         err(&o)
     );
 }
+
+#[test]
+fn review_comments_are_written_listed_and_merged_back() {
+    let d = Dir::new("review");
+    let b = d.starter("film.mthd");
+    let before = read(&b);
+    let add = |on: &str, text: &str| {
+        method(&[
+            "review",
+            &b,
+            "--add",
+            on,
+            "--text",
+            text,
+            "--author",
+            "Jordan",
+            "--at",
+            "2027-01-05T10:00:00Z",
+        ])
+    };
+    let o = add("row:1", "Is the option price right?");
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(out(&o).contains("added comment 1"), "{}", out(&o));
+    assert_eq!(code(&add("1001", "Account looks high")), 0);
+    assert_eq!(code(&add("budget", "Overall fine")), 0);
+    let o = add("row:99999", "x");
+    assert_eq!(code(&o), 3);
+    assert!(err(&o).contains("isn't in the budget"), "{}", err(&o));
+    // The budget itself never changed; the review file sits beside it.
+    assert_eq!(read(&b), before);
+    let review = d.path("film.review.json");
+    assert!(read(&review).contains("\"format\": \"method-budget-review\""));
+
+    let o = method(&["review", &b]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let text = out(&o);
+    assert!(
+        text.contains(
+            "1. 1001 Writing, line 1: Screenplay  [open]  (Jordan, 2027-01-05T10:00:00Z)"
+        ),
+        "{text}"
+    );
+    assert!(text.contains("stays in the review file"), "{text}");
+    assert!(text.contains("3 to settle"), "{text}");
+
+    // A dry run, then applied: two notes, one dismissal.
+    let o = method(&[
+        "review",
+        &b,
+        "--merge",
+        "all",
+        "--dismiss",
+        "3",
+        "--by",
+        "Sky",
+    ]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(
+        out(&o).contains("Merged 2 comments as notes and dismissed 1 comment."),
+        "{}",
+        out(&o)
+    );
+    assert!(out(&o).contains("dry run"));
+    assert_eq!(read(&b), before);
+    let o = method(&[
+        "review",
+        &b,
+        "--merge",
+        "all",
+        "--dismiss",
+        "3",
+        "--by",
+        "Sky",
+        "--apply",
+        "--json",
+    ]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let v: method_format::serde_json::Value =
+        method_format::serde_json::from_str(&out(&o)).unwrap();
+    assert_eq!(v["to_settle"], 0);
+    let budget = read(&b);
+    assert!(
+        budget.contains("\"text\": \"Is the option price right?\""),
+        "{budget}"
+    );
+    assert!(budget.contains("\"author\": \"Jordan\""));
+    assert_eq!(code(&method(&["check", &b])), 0);
+    assert!(read(&review).contains("\"action\": \"dismissed\""));
+    // Merging again adds nothing.
+    let o = method(&["review", &b, "--merge", "1", "--apply"]);
+    assert!(
+        out(&o).contains("1 was in the budget already."),
+        "{}",
+        out(&o)
+    );
+    assert_eq!(read(&b), budget);
+}
