@@ -878,6 +878,18 @@ table.grid {
   border-color: var(--note) transparent transparent transparent;
 }
 
+/* A person past a fringe cutoff (decisions.md, entry 79): an accent mark on
+   the Person cell; the running totals are its tooltip. */
+.grid td.person-reached::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  border-style: solid;
+  border-width: 0 7px 7px 0;
+  border-color: transparent var(--accent) transparent transparent;
+}
+
 /* A fringe range: a bracket in the # column spanning its lines. */
 .grid tr.fr td.c-num::before {
   content: "";

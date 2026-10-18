@@ -97,7 +97,7 @@ pub fn tools() -> Vec<Tool> {
             title: "Account detail",
             description: "One account's rows with every field (id, position n, kind, description, \
                 amount, unit, x, unit2, rate, unit3, x4, unit4, currency, fringes, groups, set, \
-                location, fringe_range, style, notes) and what each works out to (quantity, \
+                location, fringe_range, person when set, style, notes) and what each works out to (quantity, \
                 total_cents, fringes_cents, subtotal). Row ids are stable: use them with the \
                 editing tools. Long accounts come in pages (offset, limit).",
             mutating: false,
@@ -446,6 +446,10 @@ pub fn row_json(d: &Detail, n: usize, rt: Option<&RowTotals>) -> Value {
         "color": d.color,
         "notes": notes,
     });
+    // Only when set, so budgets without persons read as before.
+    if let Some(p) = &d.person {
+        v["person"] = json!(p);
+    }
     if let Some(r) = rt {
         v["included"] = json!(r.included);
         v["quantity"] = json!(r.quantity.to_string());
