@@ -53,7 +53,10 @@ export function applyLine(r) {
   if (r.updates) parts.push(plural(r.updates, 'global changes', 'globals change'));
   if (r.same) parts.push(plural(r.same, 'global already matches', 'globals already match'));
   if (!parts.length) return 'Nothing is picked.';
-  return `${parts.join(', ')}.`;
+  let s = `${parts.join(', ')}.`;
+  const unlinked = r.figures.filter((f) => f.picked && !f.linked).length;
+  if (unlinked && r.can_apply) s += ` Set Globals marks ${unlinked === 1 ? 'it' : 'them'} as set from this schedule, so the next import finds ${unlinked === 1 ? 'it' : 'them'} again.`;
+  return s;
 }
 
 /**
@@ -82,6 +85,8 @@ export function showScheduleDays(ctx, first) {
     review: first,
     picks: first.figures.filter((f) => f.picked).map((f) => ({ key: f.key, global: f.global })),
     failed: false,
+    // Groups opened or closed by hand, by name: kept as the rows redraw.
+    open: new Map(),
   };
   let seq = 0;
   let busy = false;
@@ -132,12 +137,13 @@ export function showScheduleDays(ctx, first) {
   };
 
   const figureRow = (f) => {
-    const cb = el('input', { attrs: { type: 'checkbox', 'aria-label': `Set a global from ${f.label}` } });
+    const cb = el('input', { attrs: { type: 'checkbox', 'aria-label': `Set a global from ${f.label}` }, data: { key: f.key, role: 'use' } });
     cb.checked = f.picked;
     cb.addEventListener('change', () => setPick(f, cb.checked, f.global));
     const name = el('input', {
       class: 'modal-input sd-global',
       attrs: { type: 'text', list: 'sd-globals', spellcheck: 'false', autocomplete: 'off', 'aria-label': `Global for ${f.label}` },
+      data: { key: f.key, role: 'global' },
     });
     name.value = f.global;
     name.addEventListener('change', () => setPick(f, true, name.value.trim()));
@@ -197,23 +203,35 @@ export function showScheduleDays(ctx, first) {
     ui.top.replaceChildren(...parts);
   };
 
+  const group = (name, open, rows) => {
+    const d = el('details', { class: 'si-details', attrs: { open: st.open.has(name) ? st.open.get(name) : open } }, el('summary', { text: `${name} (${rows.length})` }), table(rows));
+    d.addEventListener('toggle', () => st.open.set(name, d.open));
+    return d;
+  };
+
   const renderFigures = () => {
     const r = st.review;
+    // The control with the focus, found again after the rows are redrawn.
+    const a = document.activeElement;
+    const focused = a && a.dataset && a.dataset.key ? [a.dataset.key, a.dataset.role] : null;
     const parts = [];
     for (const [kind, label] of GROUPS) {
       const rows = r.figures.filter((f) => f.kind === kind);
       if (!rows.length) continue;
       const open = kind === 'total' || kind === 'missing' || kind === 'location' || rows.some((f) => f.picked);
-      parts.push(el('details', { class: 'si-details', attrs: { open } }, el('summary', { text: `${label} (${rows.length})` }), table(rows)));
+      parts.push(group(label, open, rows));
     }
     const elements = r.figures.filter((f) => f.kind === 'element');
     const categories = [...new Set(elements.map((f) => f.category || 'Other'))];
     for (const c of categories) {
       const rows = elements.filter((f) => (f.category || 'Other') === c);
-      const open = rows.some((f) => f.picked);
-      parts.push(el('details', { class: 'si-details', attrs: { open } }, el('summary', { text: `${c} days (${rows.length})` }), table(rows)));
+      parts.push(group(`${c} days`, rows.some((f) => f.picked), rows));
     }
     ui.figures.replaceChildren(...parts);
+    if (focused) {
+      const again = [...ui.figures.querySelectorAll('[data-key]')].find((n) => n.dataset.key === focused[0] && n.dataset.role === focused[1]);
+      if (again) again.focus({ preventScroll: true });
+    }
   };
 
   const renderSummary = () => {
