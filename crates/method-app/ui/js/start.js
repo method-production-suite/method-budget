@@ -20,6 +20,7 @@ import {
   chartSections,
   fileNameFrom,
   filterEntries,
+  packText,
   specFrom,
   startForKind,
   tvFields,
@@ -593,6 +594,74 @@ function open(ctx, first, charts) {
     });
     followTitle();
 
+    // -----------------------------------------------------------------------
+    // Setup: everything in the setup library and any setup packs, brought in
+    // before the details below (src/start.rs, new_budget_setup; decision 77).
+    // Packs are named by the Packs list's tokens; ticks are kept by file
+    // when the list is read again.
+
+    let setupData = { library: null, packs: [] };
+    let libraryTicked = false;
+    const packsTicked = new Set(); // `${place}/${file}`
+    const packKey = (p) => `${p.place}/${p.file}`;
+    const setupList = el('div', { class: 'st-setup st-span4', attrs: { role: 'group', 'aria-labelledby': 'st-setup-title' } });
+    const tickRow = (id, checked, disabled, name, detail, onChange) => {
+      const box = el('input', { attrs: { type: 'checkbox', id } });
+      box.checked = checked && !disabled;
+      box.disabled = disabled;
+      box.addEventListener('change', () => onChange(box.checked));
+      return el(
+        'label',
+        { class: 'st-setup-choice', attrs: { for: id } },
+        box,
+        el('span', { class: 'st-setup-name', text: name }),
+        el('span', { class: 'st-setup-detail', text: detail }),
+      );
+    };
+    const drawSetup = () => {
+      const rows = [];
+      const lib = setupData.library;
+      if (lib) {
+        const empty = !lib.problem && !lib.items;
+        const detail = lib.problem || (empty ? 'Nothing in it yet' : `${lib.items} ${lib.items === 1 ? 'item' : 'items'}`);
+        rows.push(
+          tickRow('st-setup-library', libraryTicked, !!lib.problem || empty, `Everything in my setup library (${lib.name})`, detail, (on) => {
+            libraryTicked = on;
+          }),
+        );
+      }
+      (setupData.packs || []).forEach((p, i) => {
+        const t = packText(p);
+        const unusable = !p.items;
+        rows.push(
+          tickRow(`st-setup-pack-${i}`, packsTicked.has(packKey(p)), unusable, t.name, p.problem && unusable ? p.problem : t.detail, (on) => {
+            if (on) packsTicked.add(packKey(p));
+            else packsTicked.delete(packKey(p));
+          }),
+        );
+      });
+      if (!rows.length) {
+        rows.push(el('p', { class: 'st-aside', text: 'No setup library or packs yet. Make them in the Library tab of the tools panel, then they show here.' }));
+      } else {
+        rows.push(el('p', { class: 'st-aside', text: 'What you tick takes the place of the starting point\u2019s items of the same name. The budget settings come from this form.' }));
+      }
+      setupList.replaceChildren(...rows);
+    };
+    const readSetup = () =>
+      ctx
+        .invoke('new_budget_setup')
+        .then((d) => {
+          setupData = d && typeof d === 'object' ? { library: d.library || null, packs: Array.isArray(d.packs) ? d.packs : [] } : { library: null, packs: [] };
+          drawSetup();
+        })
+        .catch(() => drawSetup());
+    const setupTicks = () => ({
+      library: libraryTicked && !!setupData.library,
+      packs: (setupData.packs || []).filter((p) => packsTicked.has(packKey(p))).map((p) => p.token),
+    });
+    drawSetup();
+    readSetup();
+
     const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
     error.hidden = true;
     const showError = (text, extra = null) => {
@@ -609,7 +678,7 @@ function open(ctx, first, charts) {
       once(async () => {
         const values = {};
         for (const [k, input] of Object.entries(inputs)) values[k] = input.value;
-        const spec = specFrom(values, startValue(), picked ? picked.token : null, folder ? folder.token : null);
+        const spec = specFrom(values, startValue(), picked ? picked.token : null, folder ? folder.token : null, setupTicks());
         if (!spec.title) {
           showError('Give the budget a title.');
           inputs.title.focus();
@@ -642,6 +711,9 @@ function open(ctx, first, charts) {
           if (r && r.message) ctx.toast(r.message);
         } catch (e) {
           showError(String(e));
+          // The Packs list may have been read again elsewhere: read it
+          // again here too (ticks are kept by file).
+          readSetup();
         } finally {
           create.disabled = false;
         }
@@ -661,6 +733,8 @@ function open(ctx, first, charts) {
       chartPane,
       filePane,
       fromNote,
+      heading('Setup to bring in', 'st-setup-title'),
+      setupList,
       heading('Save in'),
       el('div', { class: 'st-folder st-span4' }, folderText, folderBtn),
       fileName,
