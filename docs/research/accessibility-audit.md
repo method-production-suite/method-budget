@@ -20,8 +20,12 @@ Key: **built** (there before this slice), **fixed here**, **left** (not done yet
 - [x] Fixed here: places for long grids. `aria-rowcount` and `aria-colcount` on the grid,
   `aria-rowindex` on each row and `aria-colindex` on each cell, so a grid drawing only the
   rows near the visible ones (over 150 rows) still says "row 212 of 400".
-- [x] Fixed here: states. Totals and other computed cells are `aria-readonly`; the cursor
-  cell and every cell in a selected range are `aria-selected`.
+- [x] Fixed here: states. Totals and other computed cells are `aria-readonly`; every cell
+  of a selectable row is `aria-selected` true or false: true in a selected range or a
+  picked row, false otherwise, the cursor on its own included (review follow-up).
+- [x] Review follow-up: each cell has its own id from its row key and column key, so
+  `aria-activedescendant` changes on every move and keeps naming the same cell across a
+  redraw or a scroll.
 - [x] Fixed here: the cursor cell's name is what it shows, its column (the full name when
   the label is short: "X (multiplier)", "Currency") and the row's description:
   "45.00, Rate, Gaffer". A blank cell says "blank"; a cell with a problem adds it. The cell
