@@ -122,8 +122,9 @@ pub fn clear_fringe_range<R: Runtime>(
 mod tests {
 
     /// The new commands are registered, listed and allowed where they are
-    /// used: the apply edits in the tools window too, the charge preview in
-    /// the Budget Setup window (its Charges tab, src/setupwin.rs).
+    /// used: the apply edits in the tools window too, the charge preview and
+    /// the incentive estimates in the Budget Setup window (its Charges and
+    /// Credits tabs, src/setupwin.rs).
     #[test]
     fn apply_and_charge_preview_commands_are_wired() {
         const APP_RS: &str = include_str!("app.rs");
@@ -138,6 +139,7 @@ mod tests {
                 "replace_tags_on_rows",
             ),
             ("            preview_charge,", "preview_charge"),
+            ("            incentives,", "incentives"),
         ] {
             assert!(APP_RS.contains(handler), "{c} not in generate_handler!");
             assert!(
@@ -146,7 +148,7 @@ mod tests {
             );
             let allow = format!("\"allow-{}\"", c.replace('_', "-"));
             assert!(MAIN.contains(&allow), "{c} not allowed for the main window");
-            let (window, caps) = if c == "preview_charge" {
+            let (window, caps) = if c == "preview_charge" || c == "incentives" {
                 ("Budget Setup", SETUP)
             } else {
                 ("tools", TOOLS)

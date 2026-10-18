@@ -247,6 +247,10 @@ function fringeNames() {
   return k.entries(k.budget().fringes).map(([n]) => n);
 }
 
+function locationNames() {
+  return k.entries(k.budget().locations).map(([n]) => n);
+}
+
 function categoryCodes() {
   return arr(k.budget().topsheet)
     .filter((r) => obj(r).kind === 'category')
@@ -409,9 +413,9 @@ const pickNew = { charges: null, credits: null };
  * `library` is the library kind (Save to Library…); `move` the reorder
  * command; `deleteText(i)` and `deleteBuild(i)` the delete question and
  * command; `foot(i)` the footer's totals with item i picked; `onShow(i)`
- * runs when item i's editor shows.
+ * runs when item i's editor shows; `extra` are more nodes after the editors.
  */
-function pickEditor(panel, { tab, what, label, library, items, add, empty, move, deleteText, deleteBuild, foot, onShow }) {
+function pickEditor(panel, { tab, what, label, library, items, add, empty, move, deleteText, deleteBuild, foot, onShow, extra = [] }) {
   const count = items.length;
   if (pickNew[tab] !== null && pickNew[tab] < count) {
     picked[tab] = pickNew[tab];
@@ -607,7 +611,7 @@ function pickEditor(panel, { tab, what, label, library, items, add, empty, move,
   mountFrame(panel, {
     strip: actionStrip(label, [neu, up, down, del, save]),
     // No rail (it shows the library): the list and the add form go first.
-    body: rail ? [editors] : [list, add, editors],
+    body: rail ? [editors, ...extra] : [list, add, editors, ...extra],
   });
   sync();
   if (count && onShow) onShow(at);
@@ -1157,6 +1161,8 @@ function creditInput(c0) {
     // One list per credit, for all its group, category and account rows
     // (decisions.md, entries 57 and 61), so changing a row's spend keeps it.
     excluded_fringes: arr(c.excluded_fringes).map(k.str),
+    // Where the spend has to be (decisions.md, entry 80); none: anywhere.
+    locations: arr(c.locations).map(k.str),
     rows: arr(c.rows).map(creditRowInput),
   };
 }
@@ -1182,7 +1188,14 @@ function creditFoot(i) {
   const f = creditFeet[i];
   if (!f) return out;
   if (!f.applied) {
-    out.push({ label: 'Net credit', value: 'Not applied' });
+    // Not taken off the grand total: its estimate, once it has come.
+    const p = estimateOf(i);
+    if (p && !isNone(p.amount)) {
+      out.push({ label: 'Qualified', value: k.formatCents(p.qualified), title: 'The rows’ net spend added up' });
+      out.push({ label: 'Estimate', value: k.formatCents(p.amount), title: 'What this credit would take off the grand total if applied' });
+    } else {
+      out.push({ label: 'Net credit', value: 'Not applied' });
+    }
     return out;
   }
   if (f.rows.length) {
@@ -1255,7 +1268,7 @@ function renderCredits(panel) {
       pickNew.credits = arr(k.budget().credits).length;
       return [
         'set_credit',
-        { index: null, credit: { name: v.name.trim(), account: null, applied: true, cap: null, discount_percent: '0', excluded_fringes: [], rows: [] } },
+        { index: null, credit: { name: v.name.trim(), account: null, applied: true, cap: null, discount_percent: '0', excluded_fringes: [], locations: [], rows: [] } },
       ];
     },
   });
@@ -1272,11 +1285,136 @@ function renderCredits(panel) {
     deleteText: (i) => `Delete credit ${items[i].name} and its ${k.plural(arr(obj(credits[i]).rows).length, 'row', 'rows')}?`,
     deleteBuild: (i) => ['delete_credit', { index: i }],
     foot: (i) => creditFoot(i),
+    extra: [programsBox()],
+  });
+  showEstimates();
+}
+
+// ---------------------------------------------------------------------------
+// Incentive programs side by side (roadmap 3.6; decisions.md, entry 80)
+
+// Every credit's estimate, applied or not, and spend by location, from the
+// read-only `incentives` command: fetched once per budget revision, the last
+// one kept for the footer until the new one comes.
+const estimates = { stamp: '', p: null, last: null };
+
+function loadEstimates() {
+  const v = obj(k.view());
+  const stamp = `${v.doc}:${v.rev}`;
+  if (estimates.stamp !== stamp || !estimates.p) {
+    estimates.stamp = stamp;
+    estimates.p = invoke('incentives', {}).then(
+      (got) => {
+        if (estimates.stamp === stamp) estimates.last = obj(got);
+        return obj(got);
+      },
+      () => null,
+    );
+  }
+  return estimates.p;
+}
+
+function estimateOf(i) {
+  const got = estimates.last;
+  return got ? arr(got.programs).map(obj).find((p) => p.index === i) || null : null;
+}
+
+// The Credits tab's box under the editors: the programs side by side and
+// the spend at each location, filled once the estimates come.
+function programsBox() {
+  const box = k.el('section', 'tss-programs');
+  box.setAttribute('aria-label', 'Programs side by side');
+  box.dataset.key = 'credits-programs';
+  return box;
+}
+
+function showEstimates() {
+  loadEstimates().then((got) => {
+    const box = k.findByData('key', 'credits-programs');
+    if (!box || !got) return;
+    box.replaceChildren();
+    const programs = arr(got.programs).map(obj);
+    // Unapplied credits show their estimate in the list too.
+    for (const p of programs) {
+      if (p.applied || isNone(p.amount)) continue;
+      const b = k.findByData('key', k.key('credits', 'pick', p.index));
+      const fig = b && b.querySelector('.sw-tree-count');
+      if (fig) {
+        fig.textContent = `Est. ${k.formatCents(p.amount)}`;
+        b.title = `${p.name}\nNot applied: estimated, not taken off the grand total`;
+      }
+    }
+    if (picked.credits < programs.length) setFooterTotals(creditFoot(picked.credits));
+    if (programs.length) box.append(programsTable(programs));
+    const spend = arr(got.locations).map(obj);
+    if (spend.length) box.append(locationsTable(spend));
   });
 }
 
+function where(list) {
+  const names = arr(list).map(k.str);
+  return names.length ? names.join(', ') : 'Anywhere';
+}
+
+function programsTable(programs) {
+  const ul = k.el('ul');
+  ul.setAttribute('aria-label', 'Programs side by side');
+  for (const p of programs) {
+    const li = gridRow();
+    const spend = arr(p.by_location)
+      .map(obj)
+      .map((s) => `${isNone(s.location) ? 'No location' : k.str(s.location)} ${k.formatCents(s.net)}`)
+      .join('; ');
+    li.append(
+      lead(),
+      textCell(k.str(p.name)),
+      textCell(where(p.locations), { muted: !arr(p.locations).length }),
+      textCell(k.formatCents(p.qualified), { num: true, title: spend ? `Net spend by location: ${spend}` : '' }),
+      textCell(isNone(p.amount) ? '' : k.formatCents(p.amount), {
+        num: true,
+        title: isNone(p.amount) ? k.str(p.problem) : p.capped ? 'Held down by the credit’s cap' : '',
+      }),
+      textCell(isNone(p.amount) ? 'Problem' : p.applied ? 'Applied' : 'Estimate', { muted: !p.applied }),
+    );
+    ul.append(li);
+  }
+  return gridTable('programs', [
+    lead(),
+    head('Program'),
+    head('Spend at'),
+    head('Qualified', { num: true, title: 'The rows’ net spend added up' }),
+    head('Credit', { num: true, title: 'After the caps and the discount, rounded once' }),
+    head(''),
+  ], ul);
+}
+
+function locationsTable(spend) {
+  const ul = k.el('ul');
+  ul.setAttribute('aria-label', 'Spend by location');
+  for (const l of spend) {
+    const li = gridRow();
+    const name = isNone(l.location) ? 'No location' : k.str(l.location);
+    li.append(
+      lead(),
+      textCell(name, { muted: isNone(l.location), title: l.known === false ? 'Not in the budget’s locations' : '' }),
+      textCell(k.formatCents(l.lines), { num: true }),
+      textCell(k.formatCents(l.fringes), { num: true }),
+      textCell(k.formatCents(l.total), { num: true }),
+    );
+    ul.append(li);
+  }
+  return gridTable('location-spend', [
+    lead(),
+    head('Location'),
+    head('Lines', { num: true }),
+    head('Fringes', { num: true, title: 'The fringes the lines earn, wherever fringes post' }),
+    head('Spend', { num: true }),
+  ], ul);
+}
+
 // Credit `i`'s editor: a band with its name, Applied, cap, discount and
-// account; one with the fringes left out of its spend; one with Add row;
+// account; one with the fringes left out of its spend; one with the
+// locations its spend has to be at; one with Add row;
 // then its rows as one table. Its figures are the footer's.
 function creditEditor(i, c0, c, entry, issues) {
   const raw = obj(c0);
@@ -1329,6 +1467,22 @@ function creditEditor(i, c0, c, entry, issues) {
         selected: c.excluded_fringes,
         options: withKept(fringeNames(), c.excluded_fringes),
         onChange: (list) => k.run(ik, () => creditArgs(i, { excluded_fringes: list })),
+      }),
+    ),
+  );
+
+  // Only lines at these locations count toward its group, category and
+  // account rows (decisions.md, entry 80); none picked: every line.
+  ed.append(
+    band(
+      'Spend at these locations',
+      chips({
+        fieldKey: fk('locations'),
+        label: 'Spend at these locations',
+        selected: c.locations,
+        options: withKept(locationNames(), c.locations),
+        emptyText: 'Anywhere',
+        onChange: (list) => k.run(ik, () => creditArgs(i, { locations: list })),
       }),
     ),
   );

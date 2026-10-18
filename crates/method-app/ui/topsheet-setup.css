@@ -21,6 +21,21 @@
     minmax(88px, 1fr) 56px minmax(92px, 1fr) minmax(88px, 1fr) 32px;
 }
 
+/* The Credits tab's programs side by side and spend by location. */
+.sw-cols-programs .sw-grid-head,
+.sw-cols-programs .sw-grid-row {
+  grid-template-columns: 14px minmax(140px, 1.4fr) minmax(140px, 1.6fr) minmax(100px, 1fr) minmax(100px, 1fr) 80px;
+}
+
+.sw-cols-location-spend .sw-grid-head,
+.sw-cols-location-spend .sw-grid-row {
+  grid-template-columns: 14px minmax(160px, 1.6fr) minmax(100px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr);
+}
+
+.tss-programs > .sw-table {
+  margin-top: 10px;
+}
+
 .sw-cols-info .sw-grid-head,
 .sw-cols-info .sw-grid-row {
   grid-template-columns: 14px minmax(140px, 1fr) 112px minmax(200px, 2.5fr) 32px;

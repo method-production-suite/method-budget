@@ -14,7 +14,7 @@ use crate::edit::{
     self, ChargeInput, CreditInput, CurrencyInput, EditResult, FringeInput, FringeRowInput,
     GroupInput, InfoInput, LocationInput, SetInput, UnitInput,
 };
-use crate::report_dto::ChargeDto;
+use crate::report_dto::{ChargeDto, IncentivesDto};
 use crate::session::Session;
 use crate::view::Focus;
 
@@ -93,6 +93,20 @@ pub fn preview_charge(
     let figured = outcome.sanitized.as_ref().unwrap_or(budget);
     let t = method_core::charge_preview(figured, report, &c).map_err(|e| e.to_string())?;
     Ok(ChargeDto::from(&t))
+}
+
+/// Spend by location and an estimate for every credit, applied or not
+/// (roadmap 3.6; decisions.md, entry 80): the Credits tab's programs side
+/// by side. Figured on the current totals; nothing changes.
+pub fn incentives(s: &mut Session) -> Result<IncentivesDto, String> {
+    let (budget, outcome) = s.totals();
+    let report = outcome
+        .report
+        .as_ref()
+        .ok_or("the totals can't be worked out until the budget's problems are fixed")?;
+    let figured = outcome.sanitized.as_ref().unwrap_or(budget);
+    let i = method_core::incentives::incentives(figured, report).map_err(|e| e.to_string())?;
+    Ok(IncentivesDto::from(&i))
 }
 
 // ---------------------------------------------------------------------------

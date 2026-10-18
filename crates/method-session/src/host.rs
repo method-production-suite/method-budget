@@ -85,6 +85,7 @@ pub const COMMANDS: &[&str] = &[
     "focus_account",
     "selection_totals",
     "preview_charge",
+    "incentives",
     // History
     "undo",
     "redo",
@@ -556,6 +557,7 @@ impl Host {
                     &a.charge,
                 )?)
             }
+            "incentives" => json(cmd::incentives(&mut *self.state.lock_doc(doc)?)?),
             "undo" => d.view(|s| {
                 s.undo();
                 Ok(())
