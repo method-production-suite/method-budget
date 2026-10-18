@@ -3,7 +3,8 @@
 Status: design, 2026-10-12. Phase 1 (section 9) is built: decisions.md, entry 63; docs/APP.md,
 "The start window". Part of phase 2 is built with the owner's answers to questions 1, 2, 4
 and 5 (decisions.md, entry 65): the start window when the last tab closes, a chart picker,
-Save In at creation, and pinned and recent following moved files.
+Save In at creation, and pinned and recent following moved files. Setup library and packs
+at creation are built (decisions.md, entry 77).
 
 The owner likes the reference product's home screen, the one shown before a budget is
 open, minus its cloud parts. This note says what that screen offers, from the reference's

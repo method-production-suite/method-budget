@@ -144,10 +144,11 @@ export function whenText(ms, now = new Date()) {
 /**
  * The New Budget spec (src/start.rs, NewBudgetSpec) from the form's
  * `values` (strings by field name) and its Start From value (`starter`,
- * `blank`, `chart:<id>` or `file`), with the picked file's `token` and
- * Save In's folder token (`folder`; null: no file yet).
+ * `blank`, `chart:<id>` or `file`), with the picked file's `token`, Save
+ * In's folder token (`folder`; null: no file yet) and the setup step's
+ * ticks (`setup`: { library: bool, packs: [token] }).
  */
-export function specFrom(values, startFrom, token, folder = null) {
+export function specFrom(values, startFrom, token, folder = null, setup = null) {
   const v = values && typeof values === 'object' ? values : {};
   const s = (k) => (typeof v[k] === 'string' ? v[k].trim() : '');
   const spec = {
@@ -174,6 +175,8 @@ export function specFrom(values, startFrom, token, folder = null) {
     arithmetic: s('arithmetic'),
     folder: Number.isSafeInteger(folder) ? folder : null,
     file_name: s('file_name'),
+    library: !!(setup && setup.library === true),
+    packs: setup && Array.isArray(setup.packs) ? [...new Set(setup.packs.filter(Number.isSafeInteger))] : [],
   };
   const tv = tvFields(spec.kind);
   if (tv.season) spec.season = s('season');
@@ -190,4 +193,22 @@ export function specFrom(values, startFrom, token, folder = null) {
     spec.start = 'blank';
   }
   return spec;
+}
+
+/**
+ * A listed pack's words in New Budget's setup step (src/packs.rs,
+ * ListedPack): its title (else its file's name), then its version,
+ * effective date, region and item count, and whether it ships with the app.
+ */
+export function packText(p) {
+  if (!p || typeof p !== 'object') return { name: '', detail: '' };
+  const name = String(p.title || p.file || '').trim();
+  const bits = [];
+  if (p.version) bits.push(`version ${p.version}`);
+  if (p.effective) bits.push(`from ${p.effective}`);
+  if (p.region) bits.push(String(p.region));
+  const n = Number.isFinite(p.items) ? p.items : 0;
+  bits.push(`${n} ${n === 1 ? 'item' : 'items'}`);
+  if (p.place === 'bundled') bits.push('comes with the app');
+  return { name, detail: bits.join(', ') };
 }

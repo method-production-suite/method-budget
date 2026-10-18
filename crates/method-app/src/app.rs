@@ -1391,6 +1391,7 @@ pub fn run() {
             crate::start::new_budget_folder,
             crate::start::new_budget_pick_folder,
             crate::start::new_budget_charts,
+            crate::start::new_budget_setup,
             // A whole budget from another program's export, with the
             // reconciliation (src/export_import.rs)
             crate::export_import::export_import_pick,
