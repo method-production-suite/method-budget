@@ -518,12 +518,13 @@ export class Grid {
 
   /**
    * A cell's id: the grid's, the row key's and the column key's, so it stays
-   * the same for the same cell whatever is drawn where. Characters outside
-   * [A-Za-z0-9-] are written as _ and their code, so different keys never
-   * meet.
+   * the same for the same cell whatever is drawn where. Every character
+   * outside [A-Za-z0-9] (the hyphen and underscore too) is written as _ and
+   * its code, so a key never holds a bare "-" and the "--" between row and
+   * column can't be mistaken: different cells never share an id.
    */
   cellId(rowKey, colKey) {
-    const safe = (v) => String(v).replace(/[^A-Za-z0-9-]/g, (ch) => `_${ch.codePointAt(0).toString(16)}_`);
+    const safe = (v) => String(v).replace(/[^A-Za-z0-9]/g, (ch) => `_${ch.codePointAt(0).toString(16)}_`);
     return `${this.uid}-${safe(rowKey)}--${safe(colKey)}`;
   }
 
@@ -895,9 +896,13 @@ export class Grid {
     if (!this.marked) return;
     for (const tr of this.marked) {
       tr.classList.remove('sel');
+      // Only a selectable row's cells say "not selected" (as buildRow sets them).
+      const r = this.rows[Number(tr.dataset.row)];
+      const selectable = Boolean(r) && r.selectable !== false;
       for (const td of tr.cells) {
         td.classList.remove('cursor', 'in-range');
-        td.setAttribute('aria-selected', 'false');
+        if (selectable) td.setAttribute('aria-selected', 'false');
+        else td.removeAttribute('aria-selected');
         if (td.classList.contains('alt-shown')) this.showAlt(tr, td, false);
       }
     }

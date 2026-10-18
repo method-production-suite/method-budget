@@ -190,8 +190,15 @@ async function main() {
     if (!nodes.some((n) => n.role.value === 'gridcell' && prop(n, 'selected') === false && n !== active)) fail('no unselected cell reports not-selected');
     const unmarked = await evaluate(`document.querySelectorAll('#grid-host tr[role="row"]:not(.static) > [role="gridcell"]:not([aria-selected]), #grid-host tr[role="row"]:not(.static) > [role="rowheader"]:not([aria-selected])').length`);
     if (unmarked) fail(`${unmarked} selectable cells have no aria-selected`);
+    const staticMarked = await evaluate(`document.querySelectorAll('#grid-host tr.static > [aria-selected]').length`);
+    if (staticMarked) fail(`${staticMarked} cells of rows that can't be selected carry aria-selected`);
     // Each cell has its own id, from its row and column, not its drawn place.
     if (/-active$/.test(firstId) || !/--code$/.test(firstId)) fail(`the cursor cell's id isn't its own: ${firstId}`);
+    const clash = await evaluate(`import('./js/grid.js').then(({ Grid }) => {
+      const id = (r, c) => Grid.prototype.cellId.call({ uid: 'g' }, r, c);
+      return [id('a-', 'b'), id('a', '-b'), id('a_2d_', 'b'), id('a--b', 'c'), id('a', 'b--c')];
+    })`);
+    if (new Set(clash).size !== clash.length) fail(`different cells share an id: ${clash.join(', ')}`);
     const key = (k) => `document.getElementById('grid-host').dispatchEvent(new KeyboardEvent('keydown', { key: '${k}', bubbles: true, cancelable: true }))`;
     await evaluate(key('ArrowDown'));
     const downId = await activeId();
