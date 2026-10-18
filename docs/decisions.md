@@ -3407,3 +3407,43 @@ browser, against method-session's `Host`. It is judged on the list above: screen
 input methods, copy and paste both ways, printing, speed with a 5,000-line budget, and
 whether it runs in the browser build. A pure-Rust toolkit that draws its own widgets
 (egui, iced, Slint) is considered only if trigger 1 holds.
+
+## 77. New Budget brings in the setup library and setup packs (2026-10-18)
+
+Roadmap 3.19, phase 2 (design: docs/research/new-project-window.md, section 6, "Setup";
+behavior: docs/APP.md, "The start window and New Budget"). Phases so far: entries 63 and 65.
+
+- **A setup step in the form**, under the chart of accounts: a box for everything in the
+  setup library (entry 37) and one per pack in the Packs list (entry 50), each with its
+  item count. Not single items: the Library tab and the Packs list already pick item by
+  item after the budget exists, and the design asked for "everything in my setup library"
+  and whole packs here.
+- **Import Setup's import, every item, the settings never.** Each ticked source brings
+  every setup item and what each needs (`method_format::setup`), so a pack's items are
+  stamped with the pack and an item's source comes along, exactly as the Packs list does.
+  The budget settings come from the form, never from a library or a pack.
+- **Built on the recommendation: what is ticked wins over the starting point.** Import
+  Setup keeps the budget's own version of an item that differs (decision 12), but a new
+  budget's items are the starter's or a chart's defaults that nobody chose for this
+  production, while the ticked setup was chosen for it. So an item of the same name is
+  replaced by the ticked version, and the sentence after Create counts what was
+  replaced. Reversible: keeping the starting point's version is one choice in
+  `method_session::new_budget::bring_in`.
+- **Two ticked sources that disagree are refused**, naming the item and both sources, and
+  nothing is made. Letting the later one win would decide quietly by list order; the
+  review in the Library tab or the Packs list is where a person chooses item by item.
+- **Before the form's details.** The setup comes in after the starting point and the base
+  currency and before the info, the schedule-length globals and the settings, so what is
+  typed in the form wins (a library's `SHOOT_DAYS` gives way to the Shoot days typed). A
+  ticked source's currency equal to the base currency never copies, as in Import Setup.
+- **All or nothing, logic in the session.** The import runs on a copy and the budget
+  changes only when every source came in (`method_session::new_budget`, which needs no
+  window and builds for the browser). The desktop reads the library (from its tab when it
+  is open) and the listed packs by token (`new_budget_setup`, `new_budget_create` in
+  src/start.rs). The browser build has no start window (entry 72), so nothing changes
+  there.
+- **No rate data.** This brings in only what the user's library and packs hold. The Packs
+  folder that ships with the app is still empty (CLEAN-ROOM.md; docs/research/rate-data-plan.md).
+- **Not built** (3.19 still open): projects as folders, thumbnails, duplicate and new
+  sub-budget from a row, rates at creation (waits on 3.9), the schedule link (3.8),
+  shared-folder badges and presence (3.18), sorting and created dates (phase 4).
