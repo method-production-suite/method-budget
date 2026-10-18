@@ -54,6 +54,11 @@ pub(crate) fn finish<R: Runtime>(
             let _ = main.set_title(&window_title(s));
         }
     }
+    // A review file open on the budget follows an undo or redo that took
+    // back or brought back a merge (src/review.rs).
+    if method_session::review::needs_write(s) {
+        crate::review::write_back(s);
+    }
     let view = s.finish(created);
     crate::tools::changed(window, view.doc, view.rev);
     crate::tabs::after_command(window.app_handle(), s.docs());
@@ -1420,6 +1425,19 @@ pub fn run() {
             crate::schedule_days::schedule_days_pick,
             crate::schedule_days::schedule_days_review,
             crate::schedule_days::schedule_days_apply,
+            // Review files: comments beside a budget (src/review.rs)
+            crate::review::review_open_budget,
+            crate::review::review_start,
+            crate::review::review_open,
+            crate::review::review_close,
+            crate::review::review_list,
+            crate::review::review_add,
+            crate::review::review_update,
+            crate::review::review_resolve,
+            crate::review::review_delete,
+            crate::review::review_restore,
+            crate::review::review_settle,
+            crate::review::review_save,
             // Actuals and the cost report (src/actuals.rs)
             crate::actuals::actuals_pick,
             crate::actuals::actuals_preview,

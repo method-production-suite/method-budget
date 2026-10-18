@@ -7,12 +7,13 @@
 // Chromium with the demo's invented sample budget (?open=), and checks that
 // the topsheet draws with its totals, that an edit updates the footer's grand
 // total, that the chart list and one chart are fetched only when asked for,
-// and that the page logs no errors (a Content-Security-Policy refusal among
-// them). It also reads the page the way a screen reader does (Chrome's
-// accessibility tree, decision 82): every control has a name, the budget
-// grid is an ARIA grid whose cursor cell says its column and row, an edit
-// is announced politely, and a dialog is a named modal dialog that gives
-// focus back when it closes.
+// that comments written while reviewing and not downloaded yet make closing
+// the page and Stop Reviewing ask first, and that the page logs no errors (a
+// Content-Security-Policy refusal among them). It also reads the page the way
+// a screen reader does (Chrome's accessibility tree, decision 82): every
+// control has a name, the budget grid is an ARIA grid whose cursor cell says
+// its column and row, an edit is announced politely, and a dialog is a named
+// modal dialog that gives focus back when it closes.
 //
 // No npm packages: Node's own http server and Chrome's DevTools protocol over
 // a pipe (scripts/chrome-pipe.mjs, which also finds Chrome; CHROME= names
@@ -228,7 +229,49 @@ async function main() {
     if (!requests.includes(`/charts/${first}.mthd`)) fail(`chart ${first} wasn't fetched`);
     console.log(`web-smoke: ${charts.length} charts listed; ${first} fetched when picked and opened`);
 
-    // 4. Nothing went wrong on the way.
+    // 4. Review comments not downloaded yet: closing the page and Stop
+    // Reviewing ask first (comments.js, tauri-shim.js; decisions.md, entry 81).
+    await browser.send('Browser.setDownloadBehavior', { behavior: 'deny' });
+    // Every budget saved, so only the review can make the page ask.
+    await evaluate(`(async () => {
+      const web = window.__METHOD_WEB__;
+      for (const t of await web.invoke('smoke', 'list_tabs', {})) await web.invoke('smoke', 'save_mthd', { doc: t.id });
+    })()`);
+    // The sample in front again in the Host, as the page still shows it (the
+    // chart opened above went to the front there).
+    await evaluate(`window.__METHOD_WEB__.invoke('smoke', 'list_tabs', {}).then((tabs) => window.__METHOD_WEB__.invoke('smoke', 'switch_tab', { doc: tabs.find((t) => t.name === 'smoke-sample.mthd').id }))`);
+    const asksToLeave = `(() => { const e = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; })()`;
+    if (await evaluate(asksToLeave)) fail('the page asks before closing with nothing unsaved');
+    await evaluate(`(async () => {
+      document.getElementById('btn-file').click();
+      await new Promise((r) => setTimeout(r, 100));
+      const it = [...document.querySelectorAll('[role=menuitem]')].find((e) => e.textContent.includes('Open for Review'));
+      it.click();
+    })()`);
+    await until('the review banner', `!document.getElementById('review-banner').hidden`);
+    await until('the Comments tab', `!!document.querySelector('.comments-host textarea')`);
+    await evaluate(`(() => {
+      const a = document.querySelector('.comments-host textarea');
+      a.value = 'Smoke comment';
+      a.dispatchEvent(new Event('input'));
+      [...document.querySelectorAll('.comments-host button')].find((b) => b.textContent.trim() === 'Add').click();
+    })()`);
+    await until('the comment listed', `document.querySelector('.comments-host').textContent.includes('Smoke comment')`);
+    if (!(await evaluate(asksToLeave))) fail('closing the page with comments not downloaded doesn\'t ask');
+    const clickBanner = (label) => evaluate(`[...document.querySelectorAll('#review-banner button')].find((b) => b.textContent === ${JSON.stringify(label)}).click()`);
+    await clickBanner('Stop Reviewing');
+    await until('the close question', `!!document.querySelector('.modal-backdrop .modal') && document.querySelector('.modal').textContent.includes('not downloaded')`);
+    await evaluate(`[...document.querySelectorAll('.modal button')].find((b) => b.textContent === 'Cancel').click()`);
+    await new Promise((r) => setTimeout(r, 200));
+    if (await evaluate(`document.getElementById('review-banner').hidden`)) fail('Cancel closed the review anyway');
+    await evaluate(`[...document.querySelectorAll('.comments-host button')].find((b) => b.textContent === 'Download Review File').click()`);
+    await until('the review downloaded', `!document.querySelector('.comments-host').textContent.includes('not written yet')`);
+    if (await evaluate(asksToLeave)) fail('the page still asks after the review was downloaded');
+    await clickBanner('Stop Reviewing');
+    await until('the review closed without a question', `document.getElementById('review-banner').hidden`);
+    console.log('web-smoke: unsaved review comments make closing ask first');
+
+    // 5. Nothing went wrong on the way.
     await new Promise((r) => setTimeout(r, 300));
     if (problems.length) fail(`the page reported problems:\n  ${problems.join('\n  ')}`);
     console.log('web-smoke: ok');

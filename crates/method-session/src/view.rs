@@ -82,6 +82,10 @@ pub struct View {
     /// entry 67).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub converted: Option<String>,
+    /// A review file open on this budget (src/review.rs): whether it is
+    /// being written or read, and which places have comments to settle.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review: Option<crate::review::ReviewBrief>,
     /// Each person a row pays (decisions.md, entry 79), by the matching
     /// form of the name (`method_core::person_key`): what they
     /// are paid across accounts and each percent fringe's pay against its
@@ -569,6 +573,7 @@ impl View {
             shared: false,
             notice: None,
             converted: None,
+            review: None,
             persons: persons(b, report),
             has_persons: method_core::calc::persons::any(b),
         }

@@ -389,6 +389,15 @@ body.tools-dragging .tools-tab {
   font-size: 11.5px;
 }
 
+/* The Comments tab's head (comments.js): its buttons wrap, never their words. */
+.comments-head .notes-actions {
+  flex-wrap: wrap;
+}
+
+.comments-head .notes-actions .setup-btn {
+  white-space: nowrap;
+}
+
 .notes-actions .setup-btn[aria-disabled="true"] {
   cursor: default;
 }

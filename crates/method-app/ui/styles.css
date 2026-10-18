@@ -878,6 +878,11 @@ table.grid {
   border-color: var(--note) transparent transparent transparent;
 }
 
+/* Review comments to settle (comments.js): a bar inside the number cell. */
+.grid td.has-comment {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
 /* A person past a fringe cutoff (decisions.md, entry 79): an accent mark on
    the Person cell; the running totals are its tooltip. */
 .grid td.person-reached::after {

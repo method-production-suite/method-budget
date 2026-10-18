@@ -2263,6 +2263,91 @@ picker takes the file.
 | `schedule_days_review` | `token`, `picks` (`[{key, global}]`, `global` empty for the default; `null` for the review's own) | the review with those picks; changes nothing |
 | `schedule_days_apply` | `token`, `picks` | `{view, message}`: the globals set as one undo step |
 
+### Review files
+
+A reviewer marks up a budget they can't change, and the author merges the comments back
+(roadmap 3.3; decisions.md, entry 81). The comments live in a small file beside the
+budget, `<budget>.review.json` (docs/FORMAT.md, "Review files"); the budget file itself
+never changes during a review. It is the local stand-in for shared comments: the file
+travels with the copy (a copy saved for sharing, an email, a shared folder) and comes back.
+
+**File > Open for Review…** opens a budget (Rust's Open dialog; one already open just comes
+to the front) for review. It is read-only while reviewed: every edit, undo and redo is
+refused with one message. A banner under the breadcrumb says so, with **Show Comments** and
+**Stop Reviewing**. A review file already beside the budget is read, so a review can go on
+over several sittings; otherwise a new one is started, and it is written beside the budget
+after every change (atomically). If the file there changed since it was read (someone else
+wrote it), it is not written over: the app says so once, the Comments tab keeps the
+comments and offers **Save Review File As…** (beside it) or **Replace the File**. Stop
+Reviewing writes the file first and stays open, with the reason, when it can't. A budget
+never saved has no place for one and is refused, and so is a budget shared through a
+folder.
+
+**The Comments tab** (bottom tools pane, also in the tools window) while reviewing: **Comment
+on** offers what the grid's cursor is on (the line, its account and category; on the
+account list the account and its category; on the topsheet the category) and **The whole
+budget**; the box adds the comment (Add, or Cmd+Enter), signed with the name set in the
+Notes tab and dated by this computer's clock. Below, **All comments** lists every comment
+in the budget's order (the whole budget's, then categories, accounts and lines as the
+topsheet runs, then setup items, then any whose place is gone), each with its place (a
+click goes there: the line's account with the line selected, the account list, the
+topsheet, or Budget Setup on a setup item), when and by whom it was written, its status,
+and **Edit** (saving empty text deletes it), **Resolve** (or **Reopen**) and **Delete**
+(asks first). **To settle only** hides the merged and dismissed ones. **Save Review File
+As…** writes it somewhere else (when its folder can't be written, the next view says so).
+Lines, accounts and categories with comments to settle get a bar inside their number cell,
+whose tooltip points to the Comments tab. Comments on setup items can be written with
+`method-budget review --add` for now (below); the tab shows them and goes to them.
+
+**File > Open Review Comments…** opens a reviewer's file on the budget in front (Rust's Open
+dialog, starting beside the budget). The budget stays editable. The banner and the
+Comments tab say how many comments are left to settle; when the review was written on a
+budget of another title (the reviewed copy's own title or the title of the budget it was
+copied from), the tab warns before anything is merged. Each comment shows at its place as
+above, with:
+
+- **Merge as Note**: the comment becomes a dated note on its line, account or category
+  (decisions.md, entry 35): its text, author and time, and ticked off as reviewed when the
+  reviewer resolved it. **Merge All** merges every comment that can be, at once.
+- **Dismiss** sets it aside: marked in the review file, the budget untouched; **Restore**
+  takes that back.
+
+Merging is one undo step ("Merge 3 review comments as notes"); the toast says what was
+merged and dismissed and what stayed open. A comment on a setup item or on the whole budget
+can't become a note (those have no notes) and a comment whose place is gone (a line deleted,
+an account renumbered, a fringe renamed) can't either: each says why, stays listed with
+where it was, and can be dismissed. A merged comment is known by its note, so merging twice
+adds nothing and Undo shows it open again. What was done goes back into the review file
+(each comment's outcome, with when and by whom), so the reviewer can see it; a comment the
+file marks as merged stays merged even when its note was edited or deleted since, so Merge
+All never adds it twice.
+
+The command line does the same with `method-budget review` (docs/CLI.md), and agents read
+a review file with the `review_comments` MCP tool (docs/MCP.md). In the browser build Open
+for Review reviews the budget in front, the page's file picker takes the review file, and
+**Download Review File** saves it. Comments live only in the page until downloaded, so
+while some aren't, closing or reloading the page asks first, and Stop Reviewing or Close
+Review File asks before dropping them.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `review_open_budget` | none (shows the Open dialog) | View of the budget, now open for review, or `null` when cancelled (desktop only) |
+| `review_start` | none | View, the budget open for review (the review file beside it read when there is one) |
+| `review_open` | none (shows the Open dialog) | View with the review file open on the budget, or `null` when cancelled |
+| `review_close` | none | View, the review file closed (the budget editable again); on the desktop written first, and refused (still open) when it can't be |
+| `review_list` | none | `{mode, file, rev, unsaved, conflict, to_settle, comments, title, matches, rows, accounts, categories, budget, entries: [{id, on, text, author, created, edited, resolved, outcome, status, found, place, written_at, can_merge, why_not, ti, ai, row_id, line, category, account}]}`; `status` is `open`, `resolved`, `merged` or `dismissed` |
+| `review_add` | `on` (`{row}`, `{account}`, `{category}`, `{setup: {kind, name}}` or `"budget"`), `text`, `created`, `author` | View |
+| `review_update` | `id`, `text`, `edited` | View (empty text deletes the comment) |
+| `review_resolve` | `id`, `resolved` | View |
+| `review_delete` | `id` | View |
+| `review_restore` | `id` | View (a dismissed comment open again) |
+| `review_settle` | `picks` (`[{id, action}]`, `action` `merge` or `dismiss`), `at`, `by` | `{view, message}`: the merges as one undo step |
+| `review_save` | `save_as` (show the Save dialog), `force` (write over a file that changed on disk: Replace the File) | View, or `null` when cancelled |
+
+Every view carries `review` while a review file is open: `{mode, file, rev, unsaved,
+conflict, to_settle, comments, title, matches, rows, accounts, categories}` (`mode` is `reviewing` or
+`reading`; `rows`, `accounts` and `categories` are the places with comments to settle).
+
 ### Actuals and the cost report
 
 **File > Import Actuals…** brings in actual costs from an accounting system's export (an
@@ -2616,6 +2701,8 @@ crates/method-session/   no window, no file system, no threads, no clock of its 
   src/export_import.rs  Import Budget Export: the review and the new tab
   src/schedule_days.rs  Import Schedule Days: a schedule's figures, the global each sets,
                      the review and applying it as one undo step (the file kept by token)
+  src/review.rs      review files: reviewing (the budget read-only), the comments, where
+                     each one is, merging them as notes in one undo step, dismissing
   src/open_any.rs    Open's routing by content: a budget, a budget export, a spreadsheet
   src/setup_sheets.rs  setup lists as spreadsheets: export by kind, import with a column
                      mapping per sheet, then Import Setup's review
@@ -2655,6 +2742,8 @@ crates/method-app/
   src/open_any.rs, src/actuals.rs, src/schedule_days.rs
                      the Open dialogs and reading the files (a file open in a tab is read
                      from the tab)
+  src/review.rs      review files: Open for Review, Open Review Comments, the review file
+                     read from and written beside the budget after every change
   src/library.rs     which file is the library (library.json), reading and writing it
                      atomically, refusing changes while it is open as a tab
   src/packs.rs       the Packs list (the user's Packs folder and the bundled packs), the
@@ -3179,3 +3268,9 @@ browser harness against the real Rust session: every tab, editing there and the 
 windows refreshing, following a new tab, the keys and Escape, Create charge and Create
 credit, the Setup buttons and right-click item, the renumber preview, and the panel's
 compact tabs and saved-layout migration).
+Review files need a live check in the app: File > Open for Review… and Open Review
+Comments… with their Open dialogs, the review banner, the Comments tab docked and in the
+tools window (adding on the cursor's line, account and category, editing, resolving,
+Merge All and its undo step, Dismiss and Restore), the number-cell bars, Save Review File
+As…, and a review file written beside a budget in a folder that can't be written (logic
+tested in Rust, the file round trip through `method-budget review`).
