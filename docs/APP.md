@@ -2478,40 +2478,52 @@ changed outside the app; the page brings its tab forward and shows the dialog ab
 
 ## Updates
 
-The app keeps itself up to date (decisions.md, entry 48; how releases are made:
-[RELEASING.md](RELEASING.md)).
+The app keeps itself up to date (decisions.md, entries 48 and 83; how releases are made:
+[RELEASING.md](RELEASING.md)). The work underneath is the suite's shared updater,
+`method-update` from method-production-suite/method-libs, pinned to a full commit in
+`crates/method-app/Cargo.toml`; src/updater.rs keeps Method Budget's menu items, commands
+and page.
 
 - **Checking.** About two minutes after the app starts, then every six hours, it asks the
   update endpoint (`plugins.updater.endpoints` in `tauri.conf.json`, the one place the
-  address is written) whether a newer version exists. Help > Check for Updates Automatically
-  (a check item, on unless turned off, kept in `updates.json` in the app's data folder)
-  stops the timed checks; Help > Check for Updates… checks at once.
-- **Quietly.** A newer version downloads in the background. The updater plugin checks the
-  download's signature against the public key the app was built with
-  (`plugins.updater.pubkey`) before it is kept; anything else is thrown away. Then the
-  toolbar shows **Update ready: Restart to update**. An automatic check that finds nothing
-  or can't reach the endpoint says nothing at all; only Help > Check for Updates answers, in
-  the same place for a few seconds ("Method Budget is up to date." or "Couldn't check for
-  updates"). Releases are for Apple silicon Macs only: on an Intel Mac (or anywhere the
-  manifest has no build for the computer, the updater plugin's `TargetsNotFound`) the answer
-  is "Updates are for Apple silicon Macs. This version stays as it is." and the installed
-  version keeps working. Nothing appears as a dialog while you work.
+  address is written; build.rs bakes it into the app) whether a newer version exists. Help >
+  Check for Updates Automatically (a check item, on unless turned off, kept in
+  `updates.json` in the app's data folder, `{ "automatic": ..., "seen": ... }`) stops the
+  timed checks; Help > Check for Updates… checks at once. A check gives up after 30
+  seconds, a download after 20 minutes.
+- **Quietly.** A newer version downloads in the background. Its signature is checked
+  against the public key the app was built with (`plugins.updater.pubkey`, baked in the
+  same way) before it is kept, and the signature must name the version the manifest
+  announces; anything else is thrown away. Then the toolbar shows **Update ready: Restart
+  to update**. An automatic check that finds nothing or can't reach the endpoint says
+  nothing at all; only Help > Check for Updates answers, in the same place for a few
+  seconds ("Method Budget is up to date." or "Couldn't check for updates"). Releases are
+  for Apple silicon Macs only: on an Intel Mac (or anywhere the manifest has no build for
+  the computer: method-update's `UpdateError::Platform`) the answer is "Updates are for
+  Apple silicon Macs. This version stays as it is." and the installed version keeps
+  working. Nothing appears as a dialog while you work.
+- **Only the update's hosts.** Every request and every redirect goes over https to the
+  endpoint's host, or to GitHub's two download hosts when the endpoint is on github.com
+  (`transport::host_allowed`); a manifest that points the download anywhere else fails the
+  check.
 - **Restart to update** saves first: every open budget's unsaved changes go into its file
   by Autosave's own rules (so a file changed outside the app is never written over: that
   budget's question comes up instead), the open tabs and split view are remembered, and any
   budget that still can't be saved (untitled, Autosave off, a file changed outside the app)
   gets the same Save All, Discard All or Cancel question as quitting. Cancel leaves the
-  update ready. Then the update is installed and the app starts again with its tabs, split
-  view and tools panel as they were (the files reopen as at any start: src/tabs.rs).
+  update ready. Then `Method Budget.app` is swapped for the update in place (staged and
+  backed up beside it, on the same volume; an /Applications the user can't write asks for
+  an administrator through the system's own prompt), and the app starts again with its
+  tabs, split view and tools panel as they were (the files reopen as at any start:
+  src/tabs.rs). A failed install leaves the update ready and the app running. At the next
+  start, a bundle an interrupted swap left hidden is put back.
 - **What's New** for the new version opens once after an update, after any start-up
   question (recovered budgets, a file to open). Help > Release Notes shows this version's
   notes at any time. The notes are `docs/releases/<version>.md`, copied into the app when it
   is built (build.rs), read by `method_release::notes` into plain text pieces, and drawn with
   DOM calls and `textContent` (ui/js/updates.js), never as markup.
-- **No key, no checks.** Until the release key exists, `tauri.conf.json` has a placeholder
-  public key; a build with it never checks (no timer, no network), and Help > Check for
-  Updates says "Couldn't check for updates". While the repository is private the endpoint
-  answers "not found", which is a failed check like any other.
+- **No key, no checks.** With the placeholder public key, a build never checks (no timer,
+  no network), and Help > Check for Updates says "Couldn't check for updates".
 
 The page's side (main window only): `update_status` (the indicator's state:
 `{ phase, version, manual, said, automatic }`, `phase` being idle, checking, downloading,
@@ -2519,6 +2531,8 @@ ready or installing; `manual` when the user asked; `said` a one-time answer: `cu
 `failed`, `no-build` or `install-failed`), `update_restart`, `whats_new` (the notes once after an
 update, else null) and `release_notes`. Rust sends `update-status` events with the same
 shape. Check for Updates and the automatic switch are answered in Rust (src/updater.rs).
+method-update's own `failed` and `read-only` phases never reach the page: a failure is said
+once and the indicator goes back to idle, as it always has.
 
 ## Architecture
 
@@ -3018,12 +3032,14 @@ untrusted (a budget file is data from anywhere).
 Tauri crates are pinned to exact versions and, like every crate in `Cargo.lock`, must be at
 least 14 days old when added (`python3 scripts/check-crate-ages.py --only-changed HEAD`).
 `tauri` uses `default-features = false` with only `wry`, `common-controls-v6`, `x11` and
-`dbus` (no asset compression, no runtime ACL changes). `tauri-plugin-updater` uses
-`default-features = false` with only `rustls-tls`: no native TLS, no system proxy lookup,
-and no readers for the older archive formats (the Windows zip and the Linux tar; macOS
-always reads its `.app.tar.gz`). `reqwest` is named
-directly only for the updater's redirect policy; it was already in the build through the
-plugin, at the same version. `method-release` (the workspace's own release plumbing:
+`dbus` (no asset compression, no runtime ACL changes). The updater is `method-update`, from
+the suite's method-libs repository, pinned to a full commit (`rev = "<40 hex>"`): the
+crate-age check passes it only because that repository is on
+`scripts/crate-age-git-allow.txt` and the pin is a full commit, and `cargo deny` allows it as
+a git source. It brings HTTPS through ureq and rustls with the webpki root list (no native
+TLS, no system proxy lookup, no async runtime), minisign-verify, and the gzip and tar
+readers for the `.app.tar.gz`. The release tooling (crates/xtask) adds `minisign`, the crate
+the Tauri CLI signs with, for `sign-update`; it never ships in the app. `method-release` (the workspace's own release plumbing:
 versions, release notes, the updater key's shape) has no dependencies.
 `method-session` depends only on the engine, the format, `serde` and `serde_json`, and must
 keep building for `wasm32-unknown-unknown` (`cargo xtask wasm-check`, in CI); its

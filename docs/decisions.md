@@ -3901,3 +3901,48 @@ docs/FORMAT.md, "Credit"; command line: docs/CLI.md, `method-budget incentives`;
   as a flat amount, uplifts as anything but more rows, several programs sharing one cap,
   an unapplied credit's row figures in its rows table, and a per-location view in the
   printed reports.
+
+## 83. Updates through the suite's method-update crate, not the Tauri updater plugin (2026-10-18)
+
+- **The work underneath moves; the app looks and behaves the same.** `tauri-plugin-updater`
+  and the policy code in src/updater.rs give way to `method-update` from
+  method-production-suite/method-libs (the suite's shared updater, SUITE-STANDARDS.md
+  section 1), pinned to the full commit `ddb1bb1e74c6862a2c67812e2dda7456da613837`, the
+  newest on its `main` (the caret-range dependencies, so Budget's own lock and checks pick
+  the versions). From it: `policy::Settings` (the same `updates.json`, `automatic` and
+  `seen`, so a choice already made carries over), the schedule (two minutes, then every six
+  hours), the state machine, What's New once after an update, `AppConfig`, the check and
+  the download with the host rule (`transport::host_allowed`), the minisign check and the
+  Mac bundle swap. Kept in Budget: the Help menu items, the four commands, the
+  `update-status` event, the page and every sentence on it, the 30-second check and
+  20-minute download limits, and the save-first Restart to update (the restart is still
+  Tauri's own, after the app's exit work, since the bundle is swapped in place).
+- **The page hears what it always heard.** method-update's status adds `message`,
+  `available` and two phases (`failed`, `read-only`) that ui/js/updates.js would drop, so
+  Budget maps it to the same five fields and five phases: a failure is said once and the
+  indicator goes back to idle. method-update has no "no build" answer; Budget keeps its
+  own, from `UpdateError::Platform` (an Intel Mac, or a manifest without this computer),
+  so the Intel message stays word for word. The read-only check (an app run from its disk
+  image) is not turned on: it would be a new message, and is a separate change.
+- **One place for the endpoint and the key.** They stay in `tauri.conf.json`
+  (`plugins.updater`), where the release tooling and the Tauri CLI's updater signing read
+  them; build.rs bakes them into the app. Nothing else writes the key.
+- **Signatures name their version.** method-update requires the signature's trusted
+  comment to name the version the manifest announces; the pinned Tauri CLI doesn't write
+  it. So the release workflow signs the archive again with `cargo xtask sign-update` (the
+  same key, the `minisign` crate the CLI uses, checked against the app's public key), and
+  `update-manifest` refuses a signature without the version. Copies from before this entry
+  accept these signatures too. This replaces entry 48's "`requireSignedVersion` stays off".
+- **Dependencies.** The crate-age check passes a git package only from a repository on
+  `scripts/crate-age-git-allow.txt`, pinned to a full commit (Method Reader's rule,
+  SUITE-STANDARDS.md section 6); method-libs is its one entry, and `cargo deny` allows the
+  same repository. The app gains method-update, ureq 3.4.2, ureq-proto 0.6.4 (0.6.5 was a
+  day old; 0.6.4 is what method-libs passed with), utf8-zero 0.8.1 and webpki-roots 1.0.9;
+  the release tooling gains minisign 0.7.3 and its key-file crates (scrypt, salsa20,
+  pbkdf2, hmac, cipher, inout, rpassword, rtoolbox). Gone: the plugin and the reqwest TLS
+  stack it brought (hyper-rustls, tokio-rustls, the platform certificate verifier and its
+  macOS, Windows and Android pieces, webpki-root-certs, osakit, tempfile, xattr, rustix and
+  others): 22 crates out, 14 in, 9 of those in the release tooling only.
+- **Not verifiable here.** An update between two signed releases (download, signature,
+  swap, admin prompt, restart, What's New) needs two real releases and a Mac; it is on the
+  owner's list.
