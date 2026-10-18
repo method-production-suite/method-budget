@@ -3448,3 +3448,70 @@ behavior: docs/APP.md, "The start window and New Budget"). Phases so far: entrie
 - **Not built** (3.19 still open): projects as folders, thumbnails, duplicate and new
   sub-budget from a row, rates at creation (waits on 3.9), the schedule link (3.8),
   shared-folder badges and presence (3.18), sorting and created dates (phase 4).
+
+## 80. Incentive programs: a credit's locations and an estimate for every credit (2026-10-18)
+
+Roadmap 3.6, first slice (behavior: docs/APP.md, "Incentive programs"; file:
+docs/FORMAT.md, "Credit"; command line: docs/CLI.md, `method-budget incentives`; MCP:
+`incentives`, `set_credit`'s `locations`). Entries 76, 78 and 79 are taken by open pull
+requests.
+
+- **The slice: per-location qualified spend, with programs side by side.** Of the row's
+  pieces (per-location spend, several programs, caps and broker discounts, what-if by
+  moving lines), credits already had programs' rows, rates, caps on spend and on the
+  credit, the program's own cap and a discount taken off after it (entries 9, 57, 61).
+  What was missing was where the spend is and a figure for a program before it is taken
+  off the net total. Those two give the most for the least change to the file, so they
+  come first.
+- **A program is a credit; no new kind of item.** A credit is already a user-made program
+  (rows of qualifying groups, categories, accounts or typed amounts, each a percent with
+  an optional cap; a cap and a discount on the whole). A second item type would duplicate
+  its editor, diff, merge, rename, library, packs and sheets for no new figure. Moving to
+  a separate type later stays possible: the file would gain a list and these credits would
+  convert one for one.
+- **`locations` on the credit, not on each row.** A program belongs to a place; its rows
+  are what qualifies there (labor at one percent, everything else at another). One name
+  set per credit, like `excluded_fringes` (entry 57), applies to every group, category and
+  account row: a row counts only lines and adjustment rows whose location is in the set,
+  with the fringes they earn, wherever fringes post. A typed amount has no lines, so the
+  set doesn't touch it. Empty means every line, so every existing credit keeps its figure.
+  The field is optional and left out when empty: Field Station and every other file read
+  and write byte for byte as before (tested).
+- **An estimate for every credit, applied or not.** `method_core::incentives` works every
+  credit out with the topsheet's own code (`credit_figures`, the same rounding once per
+  credit after the caps and the discount), so applying an estimated credit takes off
+  exactly the estimate. It also gives each program's net spend by location and the spend
+  at each location (lines, fringes, total; lines with no location apart). A credit that
+  can't be worked out (a group that isn't there) reports its problem and leaves the
+  others' estimates alone. Nothing here changes a total: with no credits nothing changes,
+  and an unapplied credit changes no figure (property-tested, with caps never exceeded,
+  any order of the credits giving each the same figures, and a program's spend adding up
+  location by location).
+- **Explain follows.** Explaining an applied credit with locations names them and counts
+  only their lines, still adding up to the credit exactly.
+- **Renames follow, deletes don't widen.** Renaming a location renames it in every credit.
+  Deleting a location clears it from lines but leaves the name in a credit, so the credit
+  counts nothing there, and `method-budget check` warns about a credit naming a location
+  the budget doesn't have. Taking the name off instead would turn "only at Ridge" into
+  "anywhere": a silent jump in the estimate. **Built on the recommendation** (the owner
+  can reverse it from the digest): an unapplied credit is the estimate, and deleting a
+  location keeps its name in credits.
+- **Everywhere a credit goes.** Diff and merge treat `locations` as a credit field (a set,
+  merged name by name), setup import brings the locations a credit names along, setup
+  sheets have a Locations column, the change log has a `locations` set on a credit (field
+  added at the end of the list), and the MCP's `set_credit` and `list_charges` carry it.
+- **The view: the Credits tab, no new window.** The editor gains a "Spend at these
+  locations" chip list; an unapplied credit shows "Est." and its figure in the rail and its
+  qualified spend and estimate in the footer; under the editor, "Programs side by side"
+  and "Spend by location" tables, from the read-only `incentives` command (fetched once
+  per budget revision). Read access: `method-budget incentives [--json]` and the MCP
+  `incentives` tool. Checked offscreen in the browser build in headless Chrome; the app
+  itself needs a live check.
+- **No program data.** Every rate, cap and qualifying rule is typed by the user from the
+  program's public rules. Nothing about any real program ships (CLEAN-ROOM.md;
+  docs/research/rate-data-plan.md, section 3.5).
+- **Not built** (3.6 stays partial): a what-if that moves lines between locations and
+  shows the change in each program, a minimum spend before a program pays, a broker's fee
+  as a flat amount, uplifts as anything but more rows, several programs sharing one cap,
+  an unapplied credit's row figures in its rows table, and a per-location view in the
+  printed reports.

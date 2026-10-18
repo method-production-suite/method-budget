@@ -163,7 +163,7 @@ Commands in version 1 (173: 60 from phase 1, 113 from phase 1b):
 
 | Group | Commands |
 |---|---|
-| Views | `get_view`, `get_full_view`, `focus_account`, `selection_totals`, `preview_charge` |
+| Views | `get_view`, `get_full_view`, `focus_account`, `selection_totals`, `preview_charge`, `incentives` |
 | History | `undo`, `redo`, `history_list`, `history_jump`, `history_save_version` |
 | Structure | `set_title`, `add_category`, `add_production_total`, `update_topsheet_row`, `delete_topsheet_row`, `add_account`, `update_account`, `delete_account` |
 | Detail rows | `set_detail_field`, `set_rows_field`, `add_detail`, `delete_details`, `set_cells` |

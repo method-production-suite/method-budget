@@ -106,6 +106,28 @@ account by account, fringe by fringe, charge by charge and credit by credit, the
 method-budget totals film.mthd | awk -F'\t' '$1 == "net_total" { print $2 }'
 ```
 
+### `method-budget incentives <file.mthd> [--json]`
+
+Incentive estimates (roadmap 3.6; decisions.md, entry 80). Plain output is one
+tab-separated line each, exact decimals: the spend at each location (its lines, the
+fringes they earn, the total; `(none)` for lines with no location), then every credit as
+a program, applied or not (`applied` or `estimate`, the qualified spend, the credit after
+its caps and discount, and the locations its spend has to be at). A credit that can't be
+worked out says `problem` and why. Every program and rate is the user's; nothing about a
+real program is built in.
+
+```text
+location	Cold Spring field station	7400.00	0.00	7400.00
+location	Hollins Ridge fire road	1280.00	0.00	1280.00
+location	(none)	288695.00	59914.92	348609.92
+program	Station program	estimate	7400.00	1850.00	Cold Spring field station
+```
+
+`--json` prints `locations` (`location`, `known`, `lines`, `fringes`, `total`) and
+`programs` (`index`, `name`, `applied`, `locations`, `cap`, `discount_percent`, `amount`,
+`problem`, `qualified`, `by_location`, `rows_total`, `capped`, `figures`), money in
+integer cents, as the app's `incentives` command returns it (docs/APP.md).
+
 ### `method-budget export <file.mthd> --xlsx|--csv|--tsv <path> [--bom]`
 
 Also `--format xlsx|csv|tsv --out <path>`. The evaluated budget as an Excel workbook
