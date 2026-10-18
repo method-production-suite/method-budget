@@ -82,7 +82,9 @@ jobs:
       HAS_NOTARY_KEY: ${{ secrets.AC_API_KEY_ID != '' && secrets.AC_API_ISSUER_ID != '' && secrets.AC_API_KEY_P8_BASE64 != '' }}
       HAS_UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
       # The certificate the macOS build is signed with (decisions.md, entry 48).
-      SIGNING_IDENTITY: "Developer ID Application: Clockwork Post Production, LLC (XSRB3D643J)"
+      # The Apple team the macOS build is signed for (decisions.md, entry 48). The identity
+      # itself is read from the imported certificate, so no name sits in this file.
+      SIGNING_TEAM_ID: XSRB3D643J
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -177,11 +179,15 @@ jobs:
           existing="$(security list-keychains -d user | tr -d '"' | xargs)"
           # shellcheck disable=SC2086 # one keychain path per word
           security list-keychains -d user -s "$keychain" $existing
-          if ! security find-identity -v -p codesigning "$keychain" | grep -qF "\"$SIGNING_IDENTITY\""; then
-            echo "::error::The imported certificate is not \"$SIGNING_IDENTITY\"."
+          # The identity is the Developer ID Application the .p12 holds, for our team; its
+          # name stays out of the repository.
+          identity="$(security find-identity -v -p codesigning "$keychain" | sed -n 's/.*"\(Developer ID Application: [^"]* ('"$SIGNING_TEAM_ID"')\)".*/\1/p' | head -n 1)"
+          if [ -z "$identity" ]; then
+            echo "::error::The imported certificate holds no Developer ID Application identity for team $SIGNING_TEAM_ID."
             exit 1
           fi
-          echo "APPLE_SIGNING_IDENTITY=$SIGNING_IDENTITY" >> "$GITHUB_ENV"
+          echo "::add-mask::$identity"
+          echo "APPLE_SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
           echo "SIGNING_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
 
       - name: Prepare the notarization key (macOS)
@@ -261,7 +267,7 @@ jobs:
               fi
             done
             if [ "${MACOS_SIGN:-no}" = yes ]; then
-              codesign -dv --verbose=2 "$app" 2>&1 | grep -F "Authority=$SIGNING_IDENTITY"
+              codesign -dv --verbose=2 "$app" 2>&1 | grep -F "Authority=$APPLE_SIGNING_IDENTITY"
             fi
             if [ "${MACOS_NOTARIZE:-no}" = yes ]; then
               xcrun stapler validate "$app"
