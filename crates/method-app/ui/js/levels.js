@@ -59,7 +59,16 @@ export function indexView(view) {
   // with the report's categories and levels (src/actuals.rs).
   const cost = view.cost && typeof view.cost === 'object' && Array.isArray(view.cost.categories) ? view.cost : null;
 
-  return { b, r, topsheet, cats, levels, cellIssues, accountHasIssue, categoryHasIssue, variance, cost };
+  // Lines, accounts and categories with review comments to settle
+  // (comments.js): a mark on their number.
+  const rv = view.review && typeof view.review === 'object' ? view.review : null;
+  const commented = {
+    rows: new Set(rv && Array.isArray(rv.rows) ? rv.rows : []),
+    accounts: new Set(rv && Array.isArray(rv.accounts) ? rv.accounts : []),
+    categories: new Set(rv && Array.isArray(rv.categories) ? rv.categories : []),
+  };
+
+  return { b, r, topsheet, cats, levels, cellIssues, accountHasIssue, categoryHasIssue, variance, cost, commented };
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +290,7 @@ export function topsheetRows(ix, choices = null) {
       kind: 'category',
       activatable: true,
       cells: {
-        code: { text: row.code, edit: row.code },
+        code: commentedCell({ text: row.code, edit: row.code }, ix.commented.categories.has(row.code)),
         name: noted({ text: row.name, edit: row.name }, row.notes),
         total: c && c.rep ? moneyCell(c.rep.total, bad ? { error: PROBLEM } : {}) : NA,
         ...(ix.variance ? varianceCells(ix.variance.categories[row.code]) : {}),
@@ -384,7 +393,7 @@ export function accountRows(ix, entry) {
       cls: 'account',
       activatable: true,
       cells: {
-        code: { text: a.code, edit: a.code },
+        code: commentedCell({ text: a.code, edit: a.code }, ix.commented.accounts.has(a.code)),
         name: noted({ text: a.name, edit: a.name }, a.notes),
         fringe_total: ar ? { text: ar.fringe_total ? money(ar.fringe_total) : '', cls: frCls } : NA,
         total: ar ? moneyCell(ar.total, bad ? { error: PROBLEM } : {}) : NA,
@@ -507,6 +516,14 @@ export function detailColumns(choices, ctx = {}) {
  */
 function formulaCell(f, issue, ctx = {}) {
   return numberCell(f, { ...ctx, value: ctx.values ? ctx.values[ctx.field] : undefined, issue });
+}
+
+const COMMENTED = 'Review comments to settle: see the Comments tab';
+
+/** A number cell marked when its row has review comments to settle. */
+function commentedCell(cell, on) {
+  if (!on) return cell;
+  return { ...cell, cls: cell.cls ? `${cell.cls} has-comment` : 'has-comment', title: cell.title ? `${COMMENTED}\n${cell.title}` : COMMENTED };
 }
 
 /** A cell with a note mark and the notes as its tooltip, when there are notes. */
@@ -696,6 +713,7 @@ export function detailRows(ix, entry, ai, full, shown = null) {
       const what = `A hidden column changes this line's total: ${hidden.join(', ')}`;
       num.title = num.title ? `${what}\n${num.title}` : what;
     }
+    if (ix.commented.rows.has(d.id)) Object.assign(num, commentedCell(num, true));
     const cellCtx = (field) => ({ ...numCtx, field, values: values[i] });
 
     // A separator is a drawn rule: nothing to edit or total, but it can be

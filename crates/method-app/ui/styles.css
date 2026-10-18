@@ -878,6 +878,11 @@ table.grid {
   border-color: var(--note) transparent transparent transparent;
 }
 
+/* Review comments to settle (comments.js): a bar inside the number cell. */
+.grid td.has-comment {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
 /* A fringe range: a bracket in the # column spanning its lines. */
 .grid tr.fr td.c-num::before {
   content: "";

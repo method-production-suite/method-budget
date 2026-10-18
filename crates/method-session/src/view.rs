@@ -82,6 +82,10 @@ pub struct View {
     /// entry 67).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub converted: Option<String>,
+    /// A review file open on this budget (src/review.rs): whether it is
+    /// being written or read, and which places have comments to settle.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review: Option<crate::review::ReviewBrief>,
 }
 
 /// One account in full: its rows in file-format JSON and their totals.
@@ -493,6 +497,7 @@ impl View {
             shared: false,
             notice: None,
             converted: None,
+            review: None,
         }
     }
 }

@@ -56,6 +56,7 @@ mod quickadd;
 mod rename;
 mod renumber;
 mod reports;
+mod review;
 mod rowstyle;
 mod schedule_days;
 mod setup_lists;
@@ -292,6 +293,18 @@ pub const COMMANDS: &[&str] = &[
     "schedule_days_pick",
     "schedule_days_review",
     "schedule_days_apply",
+    // Review files: comments beside a budget, merged back as notes
+    "review_start",
+    "review_open",
+    "review_close",
+    "review_list",
+    "review_add",
+    "review_update",
+    "review_resolve",
+    "review_delete",
+    "review_restore",
+    "review_settle",
+    "review_save",
     // The host's own (no desktop command of these names)
     "open_mthd",
     "save_mthd",
@@ -732,6 +745,7 @@ const MODULES: &[Dispatch] = &[
     setup_sheets::dispatch,
     actuals::dispatch,
     schedule_days::dispatch,
+    review::dispatch,
 ];
 
 /// The stamp a budget saved as `text` gets (no file, so no time).

@@ -38,6 +38,10 @@ pub const READ_ONLY: &str =
 /// (`Host::set_read_only`).
 pub const HELD_READ_ONLY: &str = "This budget is open read-only here, so it can't be changed.";
 
+/// What an edit is told while the budget is open for review
+/// (src/review.rs).
+pub const REVIEWING: &str = "This budget is open for review, so it can't be changed. Comments go in the review file beside it.";
+
 /// Undo steps kept. Each step keeps only what its edit changed (see [`Patch`]).
 pub const UNDO_LIMIT: usize = 200;
 
@@ -326,6 +330,10 @@ pub struct Session {
     /// <file>..."; decisions.md, entry 67): every view carries it until the
     /// first Save. Never written into the file.
     converted: Option<String>,
+    /// A review file open on this budget (src/review.rs): a reviewer's
+    /// comments, being written (the budget is then read-only) or read by
+    /// the author to merge back.
+    review: Option<Box<crate::review::ReviewState>>,
 }
 
 /// What autosave needs to know about one open budget.
@@ -401,6 +409,7 @@ impl Session {
             save_hint: None,
             held: false,
             converted: None,
+            review: None,
         }
     }
 
@@ -821,10 +830,37 @@ impl Session {
         if self.held {
             return Err(HELD_READ_ONLY.into());
         }
+        if self.is_reviewing() {
+            return Err(REVIEWING.into());
+        }
         if self.is_read_only() {
             return Err(READ_ONLY.into());
         }
         Ok(())
+    }
+
+    // Review files (src/review.rs)
+
+    /// The review file open on this budget, if any.
+    pub fn review(&self) -> Option<&crate::review::ReviewState> {
+        self.review.as_deref()
+    }
+
+    pub fn review_mut(&mut self) -> Option<&mut crate::review::ReviewState> {
+        self.review.as_deref_mut()
+    }
+
+    /// Opens a review file on this budget, or closes it (`None`).
+    pub fn set_review(&mut self, review: Option<crate::review::ReviewState>) {
+        self.review = review.map(Box::new);
+    }
+
+    /// The budget is open for review: comments only, every edit, undo and
+    /// redo refused ([`REVIEWING`]).
+    pub fn is_reviewing(&self) -> bool {
+        self.review
+            .as_ref()
+            .is_some_and(|r| r.mode == crate::review::Mode::Reviewing)
     }
 
     /// Puts a step on the undo stack (dropping the oldest past the limit).
@@ -916,7 +952,7 @@ impl Session {
     }
 
     pub fn undo(&mut self) -> bool {
-        if self.held {
+        if self.held || self.is_reviewing() {
             return false;
         }
         if self.shared.is_some() {
@@ -930,7 +966,7 @@ impl Session {
     }
 
     pub fn redo(&mut self) -> bool {
-        if self.held {
+        if self.held || self.is_reviewing() {
             return false;
         }
         if self.shared.is_some() {
@@ -1028,6 +1064,9 @@ impl Session {
     pub fn jump_to(&mut self, pos: usize) -> Result<(), String> {
         if self.held {
             return Err(HELD_READ_ONLY.into());
+        }
+        if self.is_reviewing() {
+            return Err(REVIEWING.into());
         }
         if let Some(sh) = &self.shared {
             if pos > sh.history_len() {
@@ -1155,6 +1194,7 @@ impl Session {
         view.cost = self.cost(focus, false);
         view.shared = self.shared.is_some();
         view.converted = self.converted.clone();
+        view.review = crate::review::brief(self);
         view
     }
 
@@ -1177,6 +1217,7 @@ impl Session {
         view.shared = self.shared.is_some();
         view.notice = self.notice.take();
         view.converted = self.converted.clone();
+        view.review = crate::review::brief(self);
         view
     }
 

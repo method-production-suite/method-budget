@@ -37,6 +37,7 @@ pub mod quickadd;
 pub mod rename;
 pub mod renumber;
 pub mod reports;
+pub mod review;
 pub mod rowstyle;
 pub mod safety;
 pub mod safety_app;
