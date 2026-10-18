@@ -218,6 +218,9 @@ pub struct State {
     grants: BTreeMap<ActorId, Register<GrantWrite>>,
     /// Actors that write for a person (`Op::ActsFor`), by actor.
     links: BTreeMap<ActorId, Register<ActorId>>,
+    /// Actors with a change applied that was made once roles were set
+    /// (judged under roles): they can no longer say whose they are.
+    judged: std::collections::BTreeSet<ActorId>,
 }
 
 impl Default for State {
@@ -238,6 +241,7 @@ impl State {
             genesis: None,
             grants: BTreeMap::new(),
             links: BTreeMap::new(),
+            judged: std::collections::BTreeSet::new(),
         }
     }
 
@@ -262,6 +266,12 @@ impl State {
     /// Every role given, with every earlier one.
     pub fn grants(&self) -> &BTreeMap<ActorId, Register<GrantWrite>> {
         &self.grants
+    }
+
+    /// Whether `actor` has a change applied that was made once roles were
+    /// set.
+    pub fn judged(&self, actor: ActorId) -> bool {
+        self.judged.contains(&actor)
     }
 
     /// Actors that write for a person, with every such write.
@@ -456,6 +466,9 @@ impl State {
         }
         if self.genesis.is_none() {
             self.genesis = Some(change.id());
+        }
+        if access::started_at(&self.grants, &change.deps) {
+            self.judged.insert(change.actor);
         }
         for (index, op) in change.ops.iter().enumerate() {
             let stamp = change.stamp(index);

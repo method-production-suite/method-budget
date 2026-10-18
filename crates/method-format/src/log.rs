@@ -1443,6 +1443,35 @@ fn take_tool_actor(dir: &Path) -> Result<(ActorId, fs::File), LogFileError> {
     ))
 }
 
+/// What a program is told when this computer's person has no role in a
+/// shared budget whose owner has set roles.
+pub const NO_ROLE: &str = "This computer's person has no role in this shared budget, and its owner has set who may change what, so nothing was written. The owner can give you a role in the Share dialog.";
+
+/// Where the tool actor pools sit: `tools/` beside the person's actor file,
+/// one folder per person inside.
+pub fn tools_root(person_file: &Path) -> PathBuf {
+    person_file
+        .parent()
+        .map_or_else(|| PathBuf::from("tools"), |p| p.join("tools"))
+}
+
+/// The tool actors of `person` on this computer (read without taking
+/// them): what lets the app show this person's own programs as theirs
+/// before they say so in the log.
+pub fn tool_actors(tools_root: &Path, person: ActorId) -> Vec<ActorId> {
+    let Ok(entries) = fs::read_dir(tools_root.join(person.hex())) else {
+        return Vec::new();
+    };
+    let mut out: Vec<ActorId> = entries
+        .flatten()
+        .filter(|e| e.file_name().to_string_lossy().starts_with("tool-"))
+        .filter_map(|e| read_text(e.path()).ok())
+        .filter_map(|t| ActorId::parse(&t))
+        .collect();
+    out.sort();
+    out
+}
+
 /// A program's hold on its tool actor: let go when dropped.
 pub struct ToolLock(fs::File);
 
@@ -1456,10 +1485,7 @@ pub fn open_as_tool(
     person_file: &Path,
     person: ActorId,
 ) -> Result<(Shared, LoadReport, ToolLock), LogFileError> {
-    let tools = person_file
-        .parent()
-        .map_or_else(|| PathBuf::from("tools"), |p| p.join("tools"))
-        .join(person.hex());
+    let tools = tools_root(person_file).join(person.hex());
     let (tool, lock) = take_tool_actor(&tools)?;
     let (shared, report) = open(path, tool, Ids::from_os())?;
     Ok((shared, report, ToolLock(lock)))
@@ -1545,6 +1571,16 @@ impl SharedEdit {
         if self.shared.log.roles_started()
             && self.shared.log.person_of(self.actor()) == self.actor()
         {
+            let member = self.shared.log.owner() == Some(self.person)
+                || self
+                    .shared
+                    .log
+                    .members()
+                    .iter()
+                    .any(|(a, _)| *a == self.person);
+            if !member {
+                return Err(LogFileError(NO_ROLE.into()));
+            }
             self.shared
                 .log
                 .acts_for(self.person, "Writes for this computer's person", time)

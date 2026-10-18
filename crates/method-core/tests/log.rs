@@ -1954,3 +1954,106 @@ fn a_tool_actor_has_its_persons_role() {
         .unwrap();
     assert_eq!(owner.role_of(actor(13)), Role::ReadOnly);
 }
+
+/// `acts_for` can't raise anyone: a member's own actor, the owner's, an
+/// actor already judged under roles, a claim made before roles, and a
+/// claim for someone who isn't the owner or a member are all refused, on
+/// every computer in any order (MReview, pull request #27).
+#[test]
+fn acts_for_never_raises_a_member() {
+    let mut owner = adopt(1, &sample());
+    let genesis = owner.changes().next().unwrap().id();
+    // A computer that will claim the owner before any role exists.
+    let mut early = follower(7, &owner);
+    owner
+        .grant(actor(2), Role::ReadOnly, "Jordan reads", T)
+        .unwrap();
+    owner.grant(actor(3), Role::Editor, "Sam edits", T).unwrap();
+    let mut jordan = follower(2, &owner);
+    let mut sam = follower(3, &owner);
+    let mut stranger = follower(8, &owner);
+    let title = |t: &str| Op::Set {
+        entity: Uid::ROOT,
+        field: Field::Title,
+        value: Value::text(t),
+    };
+    // Each refused at once by its own log.
+    assert!(matches!(
+        jordan.acts_for(actor(1), "Jordan as owner", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    assert!(matches!(
+        owner.acts_for(actor(3), "Owner as Sam", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    assert!(matches!(
+        stranger.acts_for(actor(6), "For nobody", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    assert!(matches!(
+        early.acts_for(actor(1), "Early claim", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    // Sam edits as an editor (judged under roles), then claims the owner.
+    try_edit(&mut sam, |b| b.title = "Sam's".into())
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        sam.acts_for(actor(1), "Sam as owner", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    // Forged versions of each, written anyway, with an edit only the owner
+    // could make riding along.
+    let forge = |who: u8, seq: u64, seen: &Log, person: u8| Change {
+        actor: actor(who),
+        seq,
+        deps: seen.frontier().clone(),
+        lamport: seen.lamport() + 1,
+        time: T.into(),
+        label: "claim".into(),
+        ops: vec![
+            Op::ActsFor {
+                person: actor(person),
+            },
+            title("Taken"),
+            Op::Grant {
+                actor: actor(who),
+                role: Role::Admin,
+            },
+        ],
+    };
+    let bad = vec![
+        forge(2, 1, &owner, 1),
+        forge(1, owner.own_seq() + 1, &owner, 3),
+        forge(8, 1, &owner, 6),
+        forge(3, sam.own_seq() + 1, &sam, 1),
+        Change {
+            deps: {
+                let mut f = method_core::log::Frontier::new();
+                f.advance(actor(1), 1);
+                f
+            },
+            ..forge(7, 1, &owner, 1)
+        },
+    ];
+    let mut honest: Vec<Change> = owner.changes().cloned().collect();
+    honest.extend(sam.changes().filter(|c| c.actor == actor(3)).cloned());
+    let mut rng = Rng::new(11);
+    for n in 0..8 {
+        let mut fresh = Log::new(actor(20), Ids::seeded(n));
+        fresh.set_genesis(genesis);
+        let mut all: Vec<Change> = honest.iter().chain(&bad).cloned().collect();
+        rng.shuffle(&mut all);
+        for c in all {
+            let _ = fresh.apply(c);
+        }
+        let refused = rejected_ids(&fresh);
+        for c in &bad {
+            assert!(refused.contains(&c.id()), "run {n}: {:?} kept", c.id());
+        }
+        assert_eq!(fresh.project().budget.title, "Sam's", "run {n}");
+        assert_eq!(fresh.role_of(actor(2)), Role::ReadOnly, "run {n}");
+        assert_eq!(fresh.role_of(actor(7)), Role::ReadOnly, "run {n}");
+        assert_eq!(fresh.role_of(actor(8)), Role::ReadOnly, "run {n}");
+    }
+}

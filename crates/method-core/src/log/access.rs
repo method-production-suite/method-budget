@@ -280,6 +280,39 @@ pub fn check(state: &State, change: &Change) -> Result<(), Refusal> {
             if linked(*person) {
                 return Err(refuse("that actor itself writes for someone".into()));
             }
+            // Only a new program's actor says whose it is, once roles exist,
+            // and only for the owner or a member: never the owner's own
+            // actor, a member's own (which has a role of its own), or one
+            // whose changes were already judged under roles.
+            let grants = state.grants();
+            if !started_at(grants, deps) {
+                return Err(refuse(
+                    "an actor says whose it is only once roles are set".into(),
+                ));
+            }
+            if state.owner() == Some(change.actor)
+                || grants
+                    .get(&change.actor)
+                    .is_some_and(|r| grant_at(r, deps).is_some())
+            {
+                return Err(refuse(
+                    "a person's own actor doesn't write for someone else".into(),
+                ));
+            }
+            if state.judged(change.actor) {
+                return Err(refuse(
+                    "this actor's changes were already judged under roles".into(),
+                ));
+            }
+            let member = state.owner() == Some(*person)
+                || grants
+                    .get(person)
+                    .is_some_and(|r| grant_at(r, deps).is_some());
+            if !member {
+                return Err(refuse(
+                    "an actor writes only for the owner or someone with a role".into(),
+                ));
+            }
             made_links = true;
             continue;
         }

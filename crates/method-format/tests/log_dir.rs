@@ -409,6 +409,16 @@ fn a_program_without_a_window_changes_a_shared_budget_as_its_person() {
     let on_disk = method_format::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
     assert_eq!(on_disk.title, "Alex's");
 
+    // A person with no role is refused, with nothing written.
+    let kim_file = actor_file(&dir, 4);
+    let mut e = SharedEdit::open(&path, Some(&kim_file)).unwrap();
+    let mut after = e.budget();
+    after.title = "Kim's".into();
+    let err = e.record(&after, "Command line: set title", T).unwrap_err();
+    assert_eq!(err.0, log::NO_ROLE);
+    assert!(LogDir::for_budget(&path).segments(e.actor()).is_empty());
+    drop(e);
+
     // Once roles are set, a computer with no person is refused.
     let none = dir.join("nobody").join("actor");
     let err = SharedEdit::open(&path, Some(&none)).err().unwrap();
