@@ -401,6 +401,138 @@ fn renames_are_one_write_and_versions_from_history_are_refused() {
     assert!(alex.budget().fringes.contains_key("Payroll Taxes"));
 }
 
+/// The category an account is in, and a line in an account of another
+/// category.
+fn category_of(s: &Session, account: &str) -> String {
+    s.budget()
+        .categories()
+        .find(|c| c.accounts.iter().any(|a| a.code == account))
+        .unwrap()
+        .code
+        .clone()
+}
+
+fn line_outside(s: &Session, category: &str) -> RowId {
+    s.budget()
+        .categories()
+        .filter(|c| c.code != category)
+        .flat_map(|c| &c.accounts)
+        .flat_map(|a| &a.details)
+        .find(|d| d.kind == method_core::RowKind::Line)
+        .unwrap()
+        .id
+}
+
+#[test]
+fn roles_limit_what_each_person_changes() {
+    let (path, mut alex, mut jordan) = two_sessions();
+    exchange(&mut alex, &mut jordan);
+    let cat = category_of(&alex, "50-01");
+    let inside = ids_in(&alex, "50-01")[0];
+    let outside = line_outside(&alex, &cat);
+
+    // Before any role, Jordan edits everything and nobody reads only.
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert!(st.can_set_roles);
+    assert!(!st.roles_started);
+    assert_eq!(st.me.role, "owner");
+
+    // Alex lets Jordan edit one category.
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "department", std::slice::from_ref(&cat))
+        .unwrap();
+    assert!(alex.is_dirty(), "the role is a change to share");
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert!(st.roles_started);
+    let j = st.people.iter().find(|p| p.actor == JORDAN.hex()).unwrap();
+    assert_eq!(j.role, "department");
+    assert_eq!(j.scope, vec![cat.clone()]);
+    assert!(j.role_text.contains(&cat), "{}", j.role_text);
+    exchange(&mut alex, &mut jordan);
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert_eq!(st.me.role, "department");
+    assert!(!st.can_set_roles);
+
+    // Inside the category: fine. Outside: refused in plain words, and
+    // nothing changes.
+    jordan.set_detail_field(inside, "rate", "77").unwrap();
+    let before = jordan.budget().clone();
+    let err = jordan.set_detail_field(outside, "rate", "88").unwrap_err();
+    assert!(
+        err.starts_with("You can change lines and notes in"),
+        "{err}"
+    );
+    assert!(err.contains("Alex Kim"), "{err}");
+    assert_eq!(jordan.budget(), &before);
+    // Jordan sets nobody's role.
+    assert!(jordan
+        .shared_mut()
+        .unwrap()
+        .set_role(&ALEX.hex(), "read_only", &[])
+        .is_err());
+    assert!(jordan
+        .shared_mut()
+        .unwrap()
+        .set_role(&ActorId([3; 32]).hex(), "editor", &[])
+        .is_err());
+
+    // Apart: Alex makes Jordan read only while Jordan changes the rate
+    // again. Jordan hadn't seen it, so that change is kept everywhere.
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "read_only", &[])
+        .unwrap();
+    jordan.set_detail_field(inside, "rate", "79").unwrap();
+    exchange(&mut alex, &mut jordan);
+    assert_eq!(rate_of(&alex, inside), "79");
+    assert_eq!(alex.budget(), jordan.budget());
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert_eq!(st.refused, 0);
+
+    // Now every edit of Jordan's is refused before it is made.
+    let err = jordan.set_detail_field(inside, "rate", "80").unwrap_err();
+    assert!(
+        err.starts_with("You can read this budget but not change it."),
+        "{err}"
+    );
+    assert!(jordan.check_writable().is_err());
+    assert_eq!(rate_of(&jordan, inside), "79");
+
+    // The role is in the folder: Jordan opening the budget again reads only.
+    alex.share_flush();
+    let mut again = Session::open(&path).unwrap();
+    again
+        .join_shared(JORDAN, person("Jordan Lee", "blue"))
+        .unwrap();
+    assert!(again.check_writable().is_err());
+    assert_eq!(again.budget(), alex.budget());
+}
+
+/// Setting a role checks what is asked for before anything is written.
+#[test]
+fn setting_a_role_checks_what_is_asked() {
+    let (_path, mut alex, _jordan) = two_sessions();
+    let sh = alex.shared_mut().unwrap();
+    for (who, role, scope, why) in [
+        (JORDAN.hex(), "producer", vec![], "role"),
+        (JORDAN.hex(), "department", vec![], "Pick"),
+        (
+            JORDAN.hex(),
+            "department",
+            vec!["99-99".to_string()],
+            "99-99",
+        ),
+        ("not an id".to_string(), "editor", vec![], "person"),
+        (ALEX.hex(), "read_only", vec![], "owner"),
+        (JORDAN.hex(), "owner", vec![], "owner"),
+    ] {
+        let err = sh.set_role(&who, role, &scope).unwrap_err();
+        assert!(err.contains(why), "{role}: {err}");
+    }
+    assert_eq!(sh.unshared(), 0, "nothing was written");
+}
+
 /// A second person for a live check of the built app (ignored: run by
 /// hand). `METHOD_LIVE_BUDGET` names a shared `.mthd`; this joins it as
 /// Jordan Lee, changes the first line's rate (to `METHOD_LIVE_RATE`,

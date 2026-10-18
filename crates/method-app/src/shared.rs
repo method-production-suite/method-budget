@@ -20,6 +20,10 @@
 //!   heartbeat file says who is where;
 //! - Undo takes back only this person's changes ([`SharedDoc::undo`]),
 //!   and says what couldn't be put back because someone changed it since.
+//! - The owner (who started sharing) and admins set what each person may
+//!   change ([`SharedDoc::set_role`]; decisions.md, entry 78); an edit
+//!   beyond this person's role is refused in plain words before anything
+//!   is written, and someone else's is refused when it arrives.
 //!
 //! The words for the interface: changes are "shared", never synced; a
 //! conflict is "changed by two people"; there are no actors, logs or
@@ -30,7 +34,8 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use method_core::log::{
-    ActorId, ChangeId, Field, Hint, Ids, Kind, Projection, Review, Stamp, Uid, Value,
+    ActorId, ChangeId, Field, Hint, Ids, Kind, LogError, Projection, Review, Role, Stamp, Uid,
+    Value,
 };
 use method_core::{Budget, RowId};
 use method_format::log::{self as flog, LoadReport, Presence, Scan, Shared};
@@ -283,6 +288,13 @@ pub struct PersonDto {
     pub account: Option<String>,
     /// How many changes of theirs this computer has.
     pub changes: u64,
+    /// What they may change: "owner", "admin", "editor", "department",
+    /// "actuals", "comment" or "read_only".
+    pub role: String,
+    /// The role in words: "Edits everything", "Edits 2000 Production".
+    pub role_text: String,
+    /// A department editor's categories and accounts, by number.
+    pub scope: Vec<String>,
 }
 
 /// The status item and its panel.
@@ -312,6 +324,13 @@ pub struct ShareStatus {
     /// The review items that are about a cell on screen: the page marks
     /// them with a badge.
     pub conflicts: Vec<ReviewDto>,
+    /// This person sets other people's roles (the owner and admins).
+    pub can_set_roles: bool,
+    /// Someone has been given a role, so people without one read only.
+    pub roles_started: bool,
+    /// Changes in the folder this computer didn't take in: beyond their
+    /// author's role, or unreadable.
+    pub refused: usize,
 }
 
 /// One thing to review (design, 9.5).
@@ -465,6 +484,10 @@ impl method_session::collab::SharedLog for SharedDoc {
 
     fn applied_steps(&self) -> usize {
         SharedDoc::applied_steps(self)
+    }
+
+    fn refusal(&self) -> Option<String> {
+        SharedDoc::refusal(self)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -660,7 +683,7 @@ impl SharedDoc {
             .shared
             .log
             .record(&self.proj, after, hints, label, &iso_now())
-            .map_err(|m| format!("This change couldn't be shared: {m}"))?;
+            .map_err(|e| self.refused_text(&e))?;
         let Some(id) = id else {
             return Ok(None);
         };
@@ -712,6 +735,9 @@ impl SharedDoc {
         let what = if undoing { "Undid" } else { "Redid" };
         let (new, inv) = match self.shared.log.undo(step.id, &iso_now()) {
             Ok(r) => r,
+            Err(e @ LogError::NotAllowed { .. }) => {
+                return (self.proj.budget.clone(), Some(self.refused_text(&e)))
+            }
             Err(e) => {
                 return (
                     self.proj.budget.clone(),
@@ -1062,6 +1088,7 @@ impl SharedDoc {
     }
 
     fn person_dto(&self, actor: ActorId, now: Instant) -> PersonDto {
+        let role = self.shared.log.role_of(actor);
         let name = self.name_of(actor);
         let me = actor == self.actor();
         let presence = self.people.get(&actor);
@@ -1096,6 +1123,12 @@ impl SharedDoc {
                 presence.and_then(|p| p.account.clone())
             },
             changes: self.shared.log.frontier().get(&actor),
+            role: role.key().to_string(),
+            role_text: self.role_text(&role),
+            scope: role
+                .scope()
+                .map(|s| self.scope_codes(s))
+                .unwrap_or_default(),
         }
     }
 
@@ -1104,6 +1137,8 @@ impl SharedDoc {
         let me = self.actor();
         let mut actors: BTreeSet<ActorId> = self.shared.log.frontier().0.keys().copied().collect();
         actors.extend(self.people.keys().copied());
+        // People given a role before they ever opened the budget.
+        actors.extend(self.shared.log.members().into_iter().map(|(a, _)| a));
         actors.insert(me);
         let people: Vec<PersonDto> = actors
             .iter()
@@ -1137,6 +1172,9 @@ impl SharedDoc {
                 .into_iter()
                 .filter(|r| r.place.as_ref().is_some_and(|p| p.field.is_some()))
                 .collect(),
+            can_set_roles: self.role().sets_roles(),
+            roles_started: self.shared.log.roles_started(),
+            refused: self.shared.log.rejected().len(),
         }
     }
 
@@ -1314,6 +1352,183 @@ impl SharedDoc {
             .collect())
     }
 
+    // Roles (decisions.md, entry 78)
+
+    /// This person's role.
+    pub fn role(&self) -> Role {
+        self.shared.log.role_of(self.actor())
+    }
+
+    /// The owner's name, for "ask them" sentences.
+    fn owner_name(&self) -> String {
+        self.shared
+            .log
+            .owner()
+            .map_or_else(|| "The owner".into(), |o| self.name_of(o))
+    }
+
+    /// Why this person can't change anything, when their role reads only.
+    pub fn refusal(&self) -> Option<String> {
+        self.role().reads_only().then(|| {
+            format!(
+                "You can read this budget but not change it. {} sets who may change what.",
+                self.owner_name()
+            )
+        })
+    }
+
+    /// A refused change in the words the page shows: what this person's
+    /// role allows, and who to ask.
+    fn refused_text(&self, e: &LogError) -> String {
+        if !matches!(e, LogError::NotAllowed { .. }) {
+            return format!("This change couldn't be shared: {e}");
+        }
+        let ask = format!("{} sets who may change what.", self.owner_name());
+        match self.role() {
+            Role::Department(scope) => format!(
+                "You can change lines and notes in {} only. {ask}",
+                self.scope_words(&scope)
+            ),
+            Role::Actuals => format!("You can change actuals and notes only. {ask}"),
+            Role::Comment => format!("You can add and change notes only. {ask}"),
+            Role::ReadOnly => self.refusal().unwrap_or(ask),
+            Role::Editor => {
+                "Only the owner and admins lock the originals or set what people may change.".into()
+            }
+            Role::Admin => "Only the owner makes admins or changes an admin's role.".into(),
+            Role::Owner => format!("This change couldn't be shared: {e}"),
+        }
+    }
+
+    /// A department editor's categories and accounts, by number, in
+    /// budget order.
+    fn scope_codes(&self, scope: &std::collections::BTreeSet<Uid>) -> Vec<String> {
+        let b = &self.proj.budget;
+        let mut out = Vec::new();
+        for c in b.categories() {
+            if self
+                .proj
+                .binding
+                .categories
+                .get(&c.code)
+                .is_some_and(|u| scope.contains(u))
+            {
+                out.push(c.code.clone());
+            }
+            for a in &c.accounts {
+                if self
+                    .proj
+                    .binding
+                    .accounts
+                    .get(&a.code)
+                    .is_some_and(|u| scope.contains(u))
+                {
+                    out.push(a.code.clone());
+                }
+            }
+        }
+        out
+    }
+
+    /// "2000 Production and 5000 Post".
+    fn scope_words(&self, scope: &std::collections::BTreeSet<Uid>) -> String {
+        let b = &self.proj.budget;
+        let names: Vec<String> = self
+            .scope_codes(scope)
+            .into_iter()
+            .map(|code| {
+                let name = b
+                    .categories()
+                    .find(|c| c.code == code)
+                    .map(|c| c.name.clone())
+                    .or_else(|| {
+                        b.categories()
+                            .flat_map(|c| &c.accounts)
+                            .find(|a| a.code == code)
+                            .map(|a| a.name.clone())
+                    })
+                    .unwrap_or_default();
+                if name.is_empty() {
+                    code
+                } else {
+                    format!("{code} {name}")
+                }
+            })
+            .collect();
+        match names.as_slice() {
+            [] => "no categories".into(),
+            [one] => one.clone(),
+            [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+        }
+    }
+
+    /// A role in words, as the People list shows it.
+    pub fn role_text(&self, role: &Role) -> String {
+        match role {
+            Role::Owner => "Owner: edits everything and sets what people may change".into(),
+            Role::Admin => "Edits everything and sets what people may change".into(),
+            Role::Editor => "Edits everything".into(),
+            Role::Department(scope) => format!("Edits {}", self.scope_words(scope)),
+            Role::Actuals => "Actuals and notes".into(),
+            Role::Comment => "Notes only".into(),
+            Role::ReadOnly => "Read only".into(),
+        }
+    }
+
+    /// Sets what the person `actor` (64 hex characters) may change:
+    /// `role` is "admin", "editor", "department", "actuals", "comment" or
+    /// "read_only"; `scope` lists a department editor's categories or
+    /// accounts by number. One change by this person, shared like any
+    /// edit; not an undo step (set the role again to change it back).
+    pub fn set_role(&mut self, actor: &str, role: &str, scope: &[String]) -> Result<(), String> {
+        let who = ActorId::parse(actor).ok_or("Couldn't tell which person that is.")?;
+        if Some(who) == self.shared.log.owner() || role == "owner" {
+            return Err(
+                "There is one owner, the person who started sharing, and that doesn't change."
+                    .into(),
+            );
+        }
+        let mut uids = std::collections::BTreeSet::new();
+        for code in scope {
+            let code = code.trim();
+            let uid = self
+                .proj
+                .binding
+                .categories
+                .get(code)
+                .or_else(|| self.proj.binding.accounts.get(code))
+                .ok_or_else(|| format!("There is no category or account {code}."))?;
+            uids.insert(*uid);
+        }
+        let role = Role::parse(role, uids).ok_or("That isn't a role a person can have.")?;
+        if role.scope().is_some_and(|s| s.is_empty()) {
+            return Err("Pick at least one category for this person to edit.".into());
+        }
+        if role.scope().is_none() && !scope.is_empty() {
+            return Err("Only a department editor's role names categories.".into());
+        }
+        let label = format!("{}: {}", self.name_of(who), self.role_text(&role));
+        let me = self.role();
+        self.shared
+            .log
+            .grant(who, role, &label, &iso_now())
+            .map_err(|e| match me {
+                Role::Admin => {
+                    "Only the owner makes admins or changes an admin's role.".to_string()
+                }
+                Role::Owner => format!("This role couldn't be set: {e}"),
+                _ => format!(
+                    "Only the owner and admins set what people may change. {} can.",
+                    self.owner_name()
+                ),
+            })?;
+        let now = Instant::now();
+        self.last_edit = Some(now);
+        self.unwritten_since.get_or_insert(now);
+        self.last_change = now;
+        Ok(())
+    }
+
     /// Writes value `index` of a field's history back as this person's
     /// change. Returns the budget to adopt.
     pub fn use_value(
@@ -1341,7 +1556,7 @@ impl SharedDoc {
             .shared
             .log
             .set_field(uid, f, value.clone(), &label, &iso_now())
-            .map_err(|m| m.to_string())?
+            .map_err(|e| self.refused_text(&e))?
             .ok_or("That isn't in the shared budget any more.")?;
         self.reproject();
         let now = Instant::now();
