@@ -674,6 +674,65 @@ fn a_co_owner_sets_roles_from_their_own_computer() {
     assert_eq!(st.refused, 0);
 }
 
+/// A command line or agent on Jordan's computer writes as an actor of its
+/// own that writes for Jordan: its changes arrive under Jordan's name, and
+/// it isn't listed as another person.
+#[test]
+fn a_program_writing_for_a_person_shows_with_their_name() {
+    let (path, mut alex, mut jordan) = two_sessions();
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "editor", &[])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    let dir = path.parent().unwrap().to_path_buf();
+    let jordan_file = dir.join("jordan-actor");
+    std::fs::write(&jordan_file, JORDAN.hex()).unwrap();
+    let mut e = method_format::log::SharedEdit::open(&path, Some(&jordan_file)).unwrap();
+    let mut b = e.budget();
+    b.title = "From Jordan's command line".into();
+    e.record(&b, "Command line: set title", "2026-10-18T14:00:00Z")
+        .unwrap();
+    drop(e);
+    let out = alex.share_tick(later()).unwrap();
+    assert_eq!(alex.budget().title, "From Jordan's command line");
+    let names: Vec<&str> = out.remote.iter().map(|r| r.name.as_str()).collect();
+    assert!(
+        names.contains(&"Jordan Lee (command line or agent)"),
+        "{names:?}"
+    );
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert_eq!(st.people.len(), 1, "{:?}", st.people);
+    assert_eq!(st.refused, 0);
+}
+
+/// A file put back to an older version of the budget (a sync service's
+/// history, a backup) is behind the log, not an outside edit: the keeper
+/// writes it again and says so.
+#[test]
+fn an_older_copy_of_the_file_is_written_again() {
+    let (path, mut alex, _jordan) = two_sessions();
+    let id = ids_in(&alex, "50-01")[0];
+    alex.set_detail_field(id, "rate", "111").unwrap();
+    alex.share_tick(Instant::now() + SNAPSHOT_QUIET + Duration::from_secs(3));
+    let older = std::fs::read(&path).unwrap();
+    alex.set_detail_field(id, "rate", "222").unwrap();
+    alex.share_tick(Instant::now() + SNAPSHOT_QUIET + Duration::from_secs(3));
+    let newer = std::fs::read(&path).unwrap();
+    assert_ne!(older, newer);
+    std::fs::write(&path, &older).unwrap();
+    alex.share_tick(later());
+    assert_eq!(std::fs::read(&path).unwrap(), newer);
+    assert_eq!(rate_of(&alex, id), "222");
+    let notice = alex
+        .shared()
+        .unwrap()
+        .status(Instant::now())
+        .notice
+        .unwrap();
+    assert!(notice.contains("older version"), "{notice}");
+}
+
 /// A second person for a live check of the built app (ignored: run by
 /// hand). `METHOD_LIVE_BUDGET` names a shared `.mthd`; this joins it as
 /// Jordan Lee, changes the first line's rate (to `METHOD_LIVE_RATE`,

@@ -125,14 +125,22 @@ fn log_init_show_and_sync() {
     let budget = method_format::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
     assert_eq!(budget.title, "Shared Feature");
 
-    // Rolling Alex's segments after a second edit of Alex's own.
-    let o = method_as(&alex, &["set", &file, "title", "Shared Feature 2"]);
-    assert_eq!(code(&o), 0);
+    // Rolling the segments of Alex's command line after two hand edits it
+    // took in (`set` and `sync` write as a program's own actor, never as
+    // the person the app writes as).
+    for title in ["Shared Feature 2", "Shared Feature 3"] {
+        let mut b = method_format::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+        b.title = title.into();
+        std::fs::write(&file, method_format::to_string(&b)).unwrap();
+        let o = method_as(&alex, &["sync", &file]);
+        assert!(out(&o).contains("recorded an outside edit"), "{}", out(&o));
+    }
     let o = method_as(&alex, &["sync", &file, "--roll"]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     assert!(out(&o).contains("rolled"), "{}", out(&o));
+    // Alex, Jordan's command line and Alex's.
     let o = method_as(&jordan, &["log", &file]);
-    assert!(out(&o).contains("5 changes by 2 actors"), "{}", out(&o));
+    assert!(out(&o).contains("6 changes by 3 actors"), "{}", out(&o));
 
     // A folder with no shared budget.
     let empty = d.path("empty");

@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use method_format::log::{self, LogDir};
 
 use crate::cli::{exit, CliError, Flags, Outcome};
-use crate::cmd::log::{now, open_shared};
+use crate::cmd::log::now;
 
 pub const USAGE: &str = "  method-budget sync <file.mthd|FOLDER> [--no-write] [--roll]
       Merge every actor's changes in the budget's change log (every
@@ -64,7 +64,9 @@ fn shared_budgets(dir: &Path) -> Result<Vec<PathBuf>, CliError> {
 }
 
 fn sync_one(path: &Path, no_write: bool, roll: bool) -> Result<String, CliError> {
-    let (mut shared, report) = open_shared(path)?;
+    // Written as a program of this computer's person, never as the person,
+    // so it can run while the app has the budget open.
+    let (mut shared, report, _lock) = crate::cmd::log::open_shared_as_tool(path)?;
     let mut s = String::new();
     let _ = writeln!(
         s,

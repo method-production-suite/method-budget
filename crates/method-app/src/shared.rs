@@ -952,6 +952,26 @@ impl SharedDoc {
     fn keep_file(&mut self, now: Instant, budget: &mut Budget) -> bool {
         let path = self.shared.path.clone();
         let mut changed = false;
+        if self.disk.is_some() && !self.file_matches(&path) {
+            if let Ok(bytes) = std::fs::read(&path) {
+                if bytes == flog::snapshot_text(&self.shared, &self.proj).as_bytes() {
+                    // Another program of this person's wrote what the log
+                    // holds (the owner's command line): nothing to do.
+                    self.snapshot_len = self.shared.log.len();
+                    self.disk = Some(DiskStamp::of(&path, &bytes));
+                } else if self.shared.dir.is_written(&bytes) {
+                    // An older version of the budget put back (a sync
+                    // service's history, a backup): behind the log, so it
+                    // is written again rather than taken in.
+                    self.write_file(&path);
+                    self.outside = Some(format!(
+                        "{} was put back to an older version of the budget, so it was written again from everyone\u{2019}s changes. Nothing was lost.",
+                        self.shared.info.file
+                    ));
+                    return changed;
+                }
+            }
+        }
         if self.disk.is_some() && !self.file_matches(&path) && self.shared.log.roles_started() {
             // Roles are set: nobody can say whose edit the file holds, so it
             // isn't taken in as the keeper's (decisions.md, entry 78). It is
@@ -1104,6 +1124,11 @@ impl SharedDoc {
 
     /// The name a person shows with: their own, or "Person 7f3a".
     pub fn name_of(&self, actor: ActorId) -> String {
+        // A command line or agent writing for someone shows as them.
+        let person = self.shared.log.person_of(actor);
+        if person != actor {
+            return format!("{} (command line or agent)", self.name_of(person));
+        }
         if actor == self.actor() {
             if !self.me.name.is_empty() {
                 return self.me.name.clone();
@@ -1119,6 +1144,10 @@ impl SharedDoc {
     }
 
     pub fn color_of(&self, actor: ActorId) -> String {
+        let person = self.shared.log.person_of(actor);
+        if person != actor {
+            return self.color_of(person);
+        }
         if actor == self.actor() {
             return self.me.color.clone();
         }
@@ -1183,7 +1212,7 @@ impl SharedDoc {
         actors.insert(me);
         let people: Vec<PersonDto> = actors
             .iter()
-            .filter(|a| **a != me)
+            .filter(|a| **a != me && self.shared.log.person_of(**a) == **a)
             .map(|a| self.person_dto(*a, now))
             .collect();
         let review = self.review();
