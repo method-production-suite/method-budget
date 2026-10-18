@@ -261,6 +261,7 @@ fn tools_list_schemas_are_valid_and_names_are_unique() {
         "export",
         "import_sheet",
         "import_budget_export",
+        "schedule_days",
         "new_budget",
         "save_as",
         "undo",
@@ -294,6 +295,7 @@ fn read_only_hides_every_tool_that_writes() {
         "undo",
         "import_sheet",
         "import_budget_export",
+        "schedule_days",
     ] {
         assert!(!names.contains(&hidden), "{hidden} listed");
     }
