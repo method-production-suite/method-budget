@@ -1014,6 +1014,25 @@ impl Session {
         true
     }
 
+    /// The budget's revision: every change gets a new one, and undo and
+    /// redo bring the old ones back.
+    pub fn state_rev(&self) -> u64 {
+        self.rev
+    }
+
+    /// Whether the change that left revision `rev` has been taken back:
+    /// it is neither the current state nor one Undo can return to, while
+    /// the applied line of changes passes below it (undone, or undone and
+    /// then replaced by another edit). A revision older than every step
+    /// still kept counts as applied.
+    pub fn rev_is_undone(&self, rev: u64) -> bool {
+        if self.rev == rev || self.undo.iter().any(|s| s.rev == rev) {
+            return false;
+        }
+        let oldest = self.undo.first().map_or(self.rev, |s| s.rev);
+        self.redo.iter().any(|s| s.rev == rev) || oldest < rev
+    }
+
     /// Redoes one step without telling anyone.
     fn step_forward(&mut self) -> bool {
         let Some(s) = self.redo.pop() else {

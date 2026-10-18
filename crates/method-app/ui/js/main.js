@@ -27,6 +27,8 @@
 
 import { invoke, connected, setDefaultArgs } from './api.js';
 import { el, $, isTextField } from './dom.js';
+// A review file's close question (comments.js).
+import { confirmCloseReview } from './comments.js';
 import { Grid, parseTSV } from './grid.js';
 import {
   indexView,
@@ -1647,7 +1649,9 @@ function renderReviewBanner(view) {
   const show = el('button', { class: 'btn btn-quiet', text: 'Show Comments', attrs: { type: 'button' } });
   show.addEventListener('click', () => showTab('comments'));
   const close = el('button', { class: 'btn btn-quiet', text: reviewing ? 'Stop Reviewing' : 'Close Review File', attrs: { type: 'button' } });
-  close.addEventListener('click', () => act('review_close', { doc: view.doc }));
+  close.addEventListener('click', async () => {
+    if (await confirmCloseReview(r)) act('review_close', { doc: view.doc });
+  });
   const n = Number(r.to_settle) || 0;
   host.replaceChildren(
     el('strong', { text: reviewing ? 'Open for review: read-only.' : 'Review comments.' }),

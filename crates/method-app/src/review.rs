@@ -15,7 +15,7 @@ use tauri::{Manager, Runtime, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::app::{finish, AppState, DocId};
-use crate::safety::{self, Access};
+use crate::safety::{self, Access, DiskCheck, DiskStamp, DiskStampExt};
 use crate::safety_app::Safety;
 use crate::session::Session;
 use crate::sheet_import::read_capped;
@@ -29,26 +29,97 @@ fn beside(budget: &Path) -> Option<PathBuf> {
     Some(budget.with_file_name(file_name_for(&name)))
 }
 
-/// Writes the review file open on `s` to its place, when it has one and
-/// has changes. A write that fails is told once with the next view, and
-/// the review stays unsaved (Save Review File As… picks another place).
-fn write_back(s: &mut Session) {
-    let Some(path) = s
-        .review()
-        .filter(|r| r.unsaved)
-        .and_then(|r| r.path.clone())
-    else {
-        return;
+/// What the person is told when the review file changed on disk since it
+/// was read: it is left alone.
+pub const CHANGED_ON_DISK: &str = "The review file changed on disk since it was read (someone else may have written it), so it wasn't written over. Your comments are kept here: in the Comments tab, Save Review File As… keeps them beside it, or Replace the File writes yours over it.";
+
+/// Writes the review file open on `s` to its place, unless the file there
+/// changed since it was read or written (its [`DiskStamp`], as the budget's
+/// own saves check): then nothing is written, the review is marked in
+/// conflict and the person is told. With `force` it is written anyway.
+/// `Ok(false)` when there was nothing to write (no place, no changes).
+fn write_to_place(s: &mut Session, force: bool) -> Result<bool, String> {
+    let Some(st) = s.review() else {
+        return Ok(false);
     };
-    let Ok(text) = method_session::review::text(s) else {
-        return;
+    let Some(path) = st.path.clone() else {
+        return Ok(false);
     };
-    match safety::write_atomically(&path, text.as_bytes(), Access::Document) {
-        Ok(()) => method_session::review::mark_saved(s, None, None),
-        Err(e) => s.set_notice(format!(
-            "The review file couldn't be written ({e}). Use Save Review File As… in the Comments tab to keep the comments somewhere else."
-        )),
+    if !force && !method_session::review::needs_write(s) {
+        return Ok(false);
     }
+    if !force {
+        let changed = match &st.stamp {
+            _ if st.conflict => true,
+            Some(stamp) => matches!(stamp.check(&path), DiskCheck::Changed),
+            // Nothing was read: a file that appeared meanwhile is someone else's.
+            None => path.exists(),
+        };
+        if changed {
+            if let Some(st) = s.review_mut() {
+                st.conflict = true;
+            }
+            return Err(CHANGED_ON_DISK.into());
+        }
+    }
+    let text = method_session::review::text(s)?;
+    safety::write_atomically(&path, text.as_bytes(), Access::Document)
+        .map_err(|e| format!("The review file couldn't be written ({e}). Use Save Review File As… in the Comments tab to keep the comments somewhere else."))?;
+    let stamp = DiskStamp::of(&path, text.as_bytes());
+    method_session::review::mark_saved(s, None, None);
+    if let Some(st) = s.review_mut() {
+        st.stamp = Some(stamp);
+        st.conflict = false;
+    }
+    Ok(true)
+}
+
+/// Writes the review file back after a change, when it needs it. A write
+/// refused or failed is told once with the next view, and the comments stay
+/// here, unsaved. A conflict already told isn't told again.
+pub(crate) fn write_back(s: &mut Session) {
+    let told = s.review().is_some_and(|r| r.conflict);
+    if let Err(e) = write_to_place(s, false) {
+        if !(told && e == CHANGED_ON_DISK) {
+            s.set_notice(e);
+        }
+    }
+}
+
+/// Closes the review file, writing it first: a write refused or failed
+/// keeps it open, with the reason, so no comment is lost.
+fn close_writing(s: &mut Session) -> Result<(), String> {
+    write_to_place(s, false).map_err(|e| format!("The review file stays open: {e}"))?;
+    if s.review().is_some_and(|r| r.path.is_none()) && method_session::review::needs_write(s) {
+        return Err("The review file stays open: it has comments not saved anywhere yet. Use Save Review File As… first.".into());
+    }
+    close(s);
+    Ok(())
+}
+
+/// Writes the review file to `path` (its own place, or another), written
+/// over even when it changed on disk only with `force` or when it is
+/// another file the person picked in the Save dialog.
+fn save_at(s: &mut Session, path: PathBuf, force: bool) -> Result<(), String> {
+    let same = s.review().and_then(|r| r.path.as_ref()) == Some(&path);
+    if !same {
+        let name = path.file_name().map(|n| n.to_string_lossy().into_owned());
+        if let Some(st) = s.review_mut() {
+            st.path = Some(path);
+            st.stamp = None;
+            st.conflict = false;
+            if let Some(n) = name {
+                st.file = n;
+            }
+        }
+        return write_to_place(s, true).map(|_| ());
+    }
+    write_to_place(s, force).map(|_| ())
+}
+
+/// The stamp of the file at `path` just read as `bytes`.
+fn read_stamp(path: &Path, bytes: &[u8]) -> DiskStamp {
+    DiskStamp::of(path, bytes)
 }
 
 /// Runs `f` on budget `doc`, writes the review file back and replies with
@@ -75,12 +146,21 @@ fn start(s: &mut Session) -> Result<(), String> {
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let existing = if path.is_file() {
-        Some(method_session::review::read(&file, &read_capped(&path)?)?)
+    let (existing, stamp) = if path.is_file() {
+        let bytes = read_capped(&path)?;
+        let stamp = read_stamp(&path, &bytes);
+        (
+            Some(method_session::review::read(&file, &bytes)?),
+            Some(stamp),
+        )
     } else {
-        None
+        (None, None)
     };
-    start_reviewing(s, existing, file, Some(path))
+    start_reviewing(s, existing, file, Some(path))?;
+    if let Some(st) = s.review_mut() {
+        st.stamp = stamp;
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -151,9 +231,15 @@ pub async fn review_open<R: Runtime>(
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let review = method_session::review::read(&file, &read_capped(&path)?)?;
+    let bytes = read_capped(&path)?;
+    let review = method_session::review::read(&file, &bytes)?;
+    let stamp = read_stamp(&path, &bytes);
     change(&window, &state, doc, |s| {
-        open_for_author(s, review, file, Some(path))
+        open_for_author(s, review, file, Some(path))?;
+        if let Some(st) = s.review_mut() {
+            st.stamp = Some(stamp);
+        }
+        Ok(())
     })
     .map(Some)
 }
@@ -165,10 +251,9 @@ pub fn review_close<R: Runtime>(
     state: State<'_, AppState>,
     doc: Option<DocId>,
 ) -> Result<View, String> {
-    change(&window, &state, doc, |s| {
-        close(s);
-        Ok(())
-    })
+    let mut s = state.lock_doc(doc)?;
+    close_writing(&mut s)?;
+    Ok(finish(&window, &mut s, None))
 }
 
 /// The Comments tab's list.
@@ -259,13 +344,16 @@ pub fn review_settle<R: Runtime>(
 }
 
 /// Writes the review file to its place, or (with `save_as`, or with no
-/// place yet) where a Save dialog says. `None` when cancelled.
+/// place yet) where a Save dialog says. Its own place is written over when
+/// it changed on disk only with `force` (Replace the File); a file picked
+/// in the Save dialog always is (the dialog asked). `None` when cancelled.
 #[tauri::command]
 pub async fn review_save<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
     doc: Option<DocId>,
     save_as: Option<bool>,
+    force: Option<bool>,
 ) -> Result<Option<View>, String> {
     let (current, file, dir) = {
         let s = state.lock_doc(doc)?;
@@ -276,8 +364,8 @@ pub async fn review_save<R: Runtime>(
             s.path().and_then(|p| p.parent()).map(PathBuf::from),
         )
     };
-    let path = match current {
-        Some(p) if !save_as.unwrap_or(false) => p,
+    let (path, force) = match current {
+        Some(p) if !save_as.unwrap_or(false) => (p, force.unwrap_or(false)),
         _ => {
             let mut dialog = window
                 .dialog()
@@ -292,15 +380,11 @@ pub async fn review_save<R: Runtime>(
             let Some(picked) = dialog.blocking_save_file() else {
                 return Ok(None);
             };
-            picked.into_path().map_err(|e| e.to_string())?
+            (picked.into_path().map_err(|e| e.to_string())?, true)
         }
     };
     let mut s = state.lock_doc(doc)?;
-    let text = method_session::review::text(&s)?;
-    safety::write_atomically(&path, text.as_bytes(), Access::Document)
-        .map_err(|e| format!("The review file couldn't be written: {e}"))?;
-    let name = path.file_name().map(|n| n.to_string_lossy().into_owned());
-    method_session::review::mark_saved(&mut s, Some(path), name);
+    save_at(&mut s, path, force)?;
     Ok(Some(finish(&window, &mut s, None)))
 }
 
@@ -316,9 +400,11 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_reviewer_s_comments_are_written_beside_the_budget_after_each_change() {
-        let dir = std::env::temp_dir().join(format!("method-review-{}", std::process::id()));
+    /// A saved starter budget in a fresh folder named `name`, open for
+    /// review: the session, the folder and the review file's path.
+    fn reviewing_in(name: &str) -> (Session, PathBuf, PathBuf) {
+        let dir = std::env::temp_dir().join(format!("method-review-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let budget = dir.join("Field Station.mthd");
         let mut s = Session::new();
@@ -332,17 +418,94 @@ mod tests {
             },
         );
         start(&mut s).unwrap();
+        (s, dir.clone(), dir.join("Field Station.review.json"))
+    }
+
+    fn comment(s: &mut Session, text: &str) {
         let code = s.budget().categories().next().unwrap().code.clone();
-        add(&mut s, Anchor::Category(code), "Check", "2027-01-05", None).unwrap();
+        add(s, Anchor::Category(code), text, "2027-01-05", None).unwrap();
+    }
+
+    fn comments_in(file: &Path) -> Vec<String> {
+        method_session::review::read("x", &std::fs::read(file).unwrap())
+            .unwrap()
+            .comments
+            .into_iter()
+            .map(|c| c.text)
+            .collect()
+    }
+
+    #[test]
+    fn a_reviewer_s_comments_are_written_beside_the_budget_after_each_change() {
+        let (mut s, dir, file) = reviewing_in("written");
+        comment(&mut s, "Check");
         write_back(&mut s);
-        let file = dir.join("Field Station.review.json");
-        let back = method_session::review::read("x", &std::fs::read(&file).unwrap()).unwrap();
-        assert_eq!(back.comments.len(), 1);
+        assert_eq!(comments_in(&file), ["Check"]);
         assert!(!s.review().unwrap().unsaved);
+        // Another change: the file is ours (its stamp matches), so it is
+        // written again.
+        comment(&mut s, "And this");
+        write_back(&mut s);
+        assert_eq!(comments_in(&file), ["Check", "And this"]);
         // Opening for review again reads it back.
-        close(&mut s);
+        close_writing(&mut s).unwrap();
         start(&mut s).unwrap();
-        assert_eq!(list(&s).unwrap().entries.len(), 1);
+        assert_eq!(list(&s).unwrap().entries.len(), 2);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_review_file_changed_on_disk_is_not_written_over() {
+        let (mut s, dir, file) = reviewing_in("conflict");
+        comment(&mut s, "Mine 1");
+        write_back(&mut s);
+        // Someone else writes the file meanwhile.
+        let mut theirs = method_session::review::read("x", &std::fs::read(&file).unwrap()).unwrap();
+        theirs.comments[0].text = "Theirs".into();
+        std::fs::write(&file, method_format::review::write(&theirs)).unwrap();
+        comment(&mut s, "Mine 2");
+        write_back(&mut s);
+        assert_eq!(comments_in(&file), ["Theirs"], "not written over");
+        assert_eq!(s.take_notice().as_deref(), Some(CHANGED_ON_DISK));
+        let st = s.review().unwrap();
+        assert!(st.conflict && st.unsaved);
+        assert!(brief(&s).unwrap().conflict);
+        // Told once: another change doesn't say it again.
+        comment(&mut s, "Mine 3");
+        write_back(&mut s);
+        assert_eq!(s.take_notice(), None);
+        // Closing would lose them: refused, still open.
+        assert!(close_writing(&mut s).unwrap_err().contains("stays open"));
+        assert!(s.review().is_some());
+        // Saving to its own place needs Replace the File.
+        assert!(save_at(&mut s, file.clone(), false).is_err());
+        assert_eq!(comments_in(&file), ["Theirs"]);
+        // Saved beside it, ours go there and the other file is left alone.
+        let beside_it = dir.join("Field Station (mine).review.json");
+        save_at(&mut s, beside_it.clone(), false).unwrap();
+        assert_eq!(comments_in(&beside_it), ["Mine 1", "Mine 2", "Mine 3"]);
+        assert_eq!(comments_in(&file), ["Theirs"]);
+        assert!(!s.review().unwrap().conflict);
+        assert_eq!(s.review().unwrap().file, "Field Station (mine).review.json");
+        // Or replaced on purpose.
+        save_at(&mut s, file.clone(), true).unwrap();
+        assert_eq!(comments_in(&file), ["Mine 1", "Mine 2", "Mine 3"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_failed_write_keeps_the_review_open() {
+        let (mut s, dir, file) = reviewing_in("failed");
+        // The folder goes away, so the file can't be written.
+        std::fs::remove_dir_all(&dir).unwrap();
+        comment(&mut s, "Keep me");
+        write_back(&mut s);
+        assert!(s.take_notice().unwrap().contains("couldn't be written"));
+        let err = close_writing(&mut s).unwrap_err();
+        assert!(err.contains("stays open"), "{err}");
+        let st = s.review().unwrap();
+        assert!(st.unsaved);
+        assert_eq!(st.review.comments.len(), 1);
+        assert!(!file.exists());
     }
 }

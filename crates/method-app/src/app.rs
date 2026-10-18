@@ -54,6 +54,11 @@ pub(crate) fn finish<R: Runtime>(
             let _ = main.set_title(&window_title(s));
         }
     }
+    // A review file open on the budget follows an undo or redo that took
+    // back or brought back a merge (src/review.rs).
+    if method_session::review::needs_write(s) {
+        crate::review::write_back(s);
+    }
     let view = s.finish(created);
     crate::tools::changed(window, view.doc, view.rev);
     crate::tabs::after_command(window.app_handle(), s.docs());

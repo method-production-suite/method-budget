@@ -51,7 +51,7 @@ export const SHORTCUTS = [
   { id: 'file.versions', group: 'File', label: 'Versions: save, restore, rename and compare named copies of the budget', scope: 'menu' },
   { id: 'file.compare', group: 'File', label: 'Compare the budget with open budgets, its versions or other files', scope: 'menu' },
   { id: 'file.what_changed', group: 'File', label: 'What changed: every change since a version, the saved file, an open budget or another file, in plain words, with the money it moved', scope: 'menu' },
-  { id: 'file.open_for_review', group: 'File', label: 'Open for review: a budget opened read-only, with comments on lines, accounts, categories and setup items kept in a review file beside it', scope: 'menu' },
+  { id: 'file.open_for_review', group: 'File', label: 'Open for review: a budget opened read-only, with comments on lines, accounts, categories and the whole budget kept in a review file beside it', scope: 'menu' },
   { id: 'file.open_review_comments', group: 'File', label: 'Open review comments: a reviewer’s file shown on this budget, each comment merged in as a dated note or dismissed', scope: 'menu' },
   { id: 'file.merge', group: 'File', label: 'Merge changes from a returned copy: both sides’ changes since the version it was shared from; pick a side where they clash', scope: 'menu' },
   { id: 'file.print_budget', group: 'File', label: 'Print: choose sections and layout, preview, save as PDF', keys: 'mod+p', scope: 'app' },

@@ -3926,18 +3926,32 @@ docs/FORMAT.md, "Review files"; the command line: docs/CLI.md, `method-budget re
   never dropped, and never guessed onto another place.
 - **Reviewing is read-only in the session.** A session with a review file open for writing
   refuses every edit, undo, redo and history jump in `check_writable` (one message, as for
-  shared copies), whatever sends it. The desktop writes the file beside the budget after
-  every comment change (atomically); a write that fails is said once and the comments stay
-  in memory until Save Review File As…. A budget never saved has no place beside it and is
+  shared copies), whatever sends it. A budget never saved has no place beside it and is
   refused; a budget shared through a folder too (its change log is the shared way).
+- **No comment is lost on the way to disk** (amended after review, the same day). The
+  desktop writes the file beside the budget after every change, atomically, and only when
+  the file there is still the one it read or wrote last: the file's stamp (size, time and
+  content hash, the model the budget's own saves use). When someone else wrote it meanwhile
+  (the reviewer and the author at once, or a synced folder on two computers) it is left
+  alone, the person is told once, and the Comments tab offers Save Review File As… (beside
+  it) or Replace the File. A write that fails is said once and the comments stay. Closing a
+  review writes first and stays open, with the reason, when it can't. The browser build
+  keeps comments only until downloaded, so while some aren't, closing or reloading the page
+  asks first (as for unsaved budgets) and Stop Reviewing or Close Review File asks before
+  dropping them. The command line reads a review file under the format's 8 MB cap, without
+  reading a larger one in.
 - **Merging makes notes** on the line, account or category: the comment's text, author,
   `created` and `edited`, and ticked off as reviewed when the reviewer resolved it. The
   merges of one action are one undo step ("Merge 3 review comments as notes").
-- **A merged comment is known by its note**, not by the file: a note on its place with the
-  same text, time and author. Merging twice adds nothing, and undoing the merge shows the
-  comment open again with no bookkeeping. The file's `outcome` records what the author did
-  (merged or dismissed, when, by whom) for the reviewer to see; only "dismissed" is read
-  back as a state.
+- **A merged comment is known by the file first** (amended after review, the same day):
+  its `outcome` "merged" is the source of truth, so a note the author edited or deleted
+  since is never merged a second time; a note on its place with the same text, time and
+  author counts too, for a file that doesn't say (written elsewhere, or before the outcome
+  was saved). Undo still opens the comment again: the session remembers the budget
+  revision each merge left, and while that change is taken back (undone, or undone and
+  replaced by another edit) the comment's "merged" is set aside on screen and in the file
+  written, which an undo or redo rewrites. The first version matched only by the note, so
+  Merge All after an edit added the note again.
 - **Built on the recommendation: dismissing is not an undo step.** It changes only the
   review file (the budget doesn't change), so Undo can't take it back; Restore does. The
   alternative, the session's undo stack carrying review state, would make the history mix
@@ -3970,7 +3984,10 @@ docs/FORMAT.md, "Review files"; the command line: docs/CLI.md, `method-budget re
   command, the list's order and places, merging as one undo step, merging twice, undo,
   dismiss and restore, gone places listed not dropped, another budget's review, a shared
   copy's provenance, command-line anchors, merging into a shared budget through the role
-  check) and its host test (a review out as a download and
+  check, an edited or deleted merged note never merged again, an undone merge opening the
+  comment and the file following) and its host test (a review out as a download and
   back as notes), method-app's (the file written beside the budget after each change and
-  read back), method-cli's `review_comments_are_written_listed_and_merged_back` and the MCP
-  tool's test.
+  read back, a file changed on disk not written over, a failed write keeping the review
+  open), method-cli's `review_comments_are_written_listed_and_merged_back` and
+  `review_files_over_the_size_cap_are_refused_unread`, the MCP tool's test, and
+  scripts/web-smoke.mjs (unsaved comments make closing the page and Stop Reviewing ask).

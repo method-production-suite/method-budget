@@ -377,8 +377,11 @@ app's Comments tab works with them (docs/APP.md, "Review files"). The review fil
   account or category (`all`: every one to settle that can be); `--dismiss ID` sets one
   aside; `--by NAME` says who. A comment whose place is gone, or on a setup item or the
   whole budget, stays open and is counted. Nothing is written unless `--apply`, which
-  saves the budget and the review file (with each comment's outcome) atomically. Merging
-  a comment already in the budget adds nothing.
+  saves the budget and then the review file (with each comment's outcome): two writes,
+  each atomic (a temporary file renamed into place), so either file is whole but a failure
+  between them can leave the budget saved and the review file as it was. A comment the
+  review file already marks as merged is never merged again, even when its note was
+  edited or deleted since; a file that doesn't say is matched by the note itself.
 - `--at` is the time written into a comment or an outcome (ISO 8601); by default the time
   now, in UTC.
 - `--json` prints the list: `file`, `budget` (the reviewed budget's title and, for a copy
@@ -387,8 +390,10 @@ app's Comments tab works with them (docs/APP.md, "Review files"). The review fil
   `outcome`, `status`, `found`, `place`, `written_at`, `can_merge`, `why_not` and where it
   is: `ti`, `ai`, `row_id`, `line`, `category`, `account`) and `message`.
 
+A review file over 8 MB (the format's cap) is refused without being read in.
+
 Exit code 0 when the files were read (and written, with `--add` or `--apply`); 1 when a
-file can't be read or isn't a review file; 3 when a comment is refused (its place isn't in
+file can't be read, is too large or isn't a review file; 3 when a comment is refused (its place isn't in
 the budget, blank text, an id the review doesn't have), with nothing written.
 
 ```sh

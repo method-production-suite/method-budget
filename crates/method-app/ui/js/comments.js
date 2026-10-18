@@ -19,7 +19,7 @@
 
 import { invoke } from './api.js';
 import { el, isMac } from './dom.js';
-import { anchoredForm } from './modal.js';
+import { anchoredForm, confirmDialog } from './modal.js';
 import { readPref } from './prefs.js';
 import { isWeb } from './host.js';
 import { obj, str, errText, plural } from './util.js';
@@ -131,6 +131,21 @@ function modSave(e) {
   return e.key === 'Enter' && (isMac ? e.metaKey : e.ctrlKey) && !e.isComposing;
 }
 
+/**
+ * Before closing review `r`: in a browser, comments not downloaded yet are
+ * lost when the review closes, so ask first. True to go ahead. (The desktop
+ * writes the file before closing and refuses when it can't.)
+ */
+export async function confirmCloseReview(r) {
+  if (!r || !r.unsaved || !isWeb()) return true;
+  return confirmDialog({
+    title: r.mode === 'reviewing' ? 'Stop reviewing without your comments?' : 'Close without saving the review file?',
+    message: `${r.file} has changes not downloaded yet, and closing it here loses them. Cancel, then Download Review File to keep them.`,
+    confirmText: 'Close Without Saving',
+    danger: true,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Drawing
 
@@ -170,15 +185,28 @@ function head(r) {
   if (!r.matches && !reviewing) {
     sec.append(el('p', { class: 'setup-error', text: `This review was written on a budget titled “${str(r.title)}”. Check it is about this budget before merging.` }));
   }
-  if (r.unsaved) sec.append(el('p', { class: 'apply-hint', text: 'The review file has changes not written yet.' }));
+  if (r.conflict) {
+    sec.append(
+      el('p', {
+        class: 'setup-error',
+        attrs: { role: 'alert' },
+        text: `${str(r.file)} changed on disk since it was read, so it isn’t written over. Save Review File As… keeps your comments beside it; Replace the File writes them over it.`,
+      }),
+    );
+  } else if (r.unsaved) sec.append(el('p', { class: 'apply-hint', text: 'The review file has changes not written yet.' }));
   const actions = el('div', { class: 'notes-actions' });
   const mergeable = st.list ? st.list.entries.some((e) => e.can_merge && (e.status === 'open' || e.status === 'resolved')) : r.to_settle > 0;
   if (!reviewing && mergeable) {
     actions.append(button('Merge All', 'setup-btn setup-btn-primary', mergeAll, { title: 'Merge every comment that can become a note, as one undo step' }));
   }
+  if (r.conflict && !isWeb()) {
+    actions.append(button('Replace the File', 'setup-btn setup-btn-quiet', () => run('review_save', { force: true }), { title: 'Write your comments over the file that changed on disk' }));
+  }
   actions.append(
     button(isWeb() ? 'Download Review File' : 'Save Review File As…', 'setup-btn setup-btn-quiet', () => run('review_save', { save_as: true })),
-    button(reviewing ? 'Stop Reviewing' : 'Close Review File', 'setup-btn setup-btn-quiet', () => run('review_close', {})),
+    button(reviewing ? 'Stop Reviewing' : 'Close Review File', 'setup-btn setup-btn-quiet', async () => {
+      if (await confirmCloseReview(r)) run('review_close', {});
+    }),
   );
   sec.append(actions);
   return sec;

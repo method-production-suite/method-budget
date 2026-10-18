@@ -979,3 +979,21 @@ fn review_comments_are_written_listed_and_merged_back() {
     );
     assert_eq!(read(&b), budget);
 }
+
+#[test]
+fn review_files_over_the_size_cap_are_refused_unread() {
+    let d = Dir::new("review-cap");
+    let b = d.starter("film.mthd");
+    let review = d.path("film.review.json");
+    // 9 MB of spaces: past the format's 8 MB cap.
+    std::fs::write(&review, vec![b' '; 9 * 1024 * 1024]).unwrap();
+    for args in [
+        vec!["review", &b],
+        vec!["review", &b, "--add", "budget", "--text", "x"],
+    ] {
+        let o = method(&args);
+        assert_eq!(code(&o), 1, "{}", err(&o));
+        assert!(err(&o).contains("larger than 8 MB"), "{}", err(&o));
+    }
+    assert_eq!(std::fs::metadata(&review).unwrap().len(), 9 * 1024 * 1024);
+}

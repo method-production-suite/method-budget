@@ -24,9 +24,11 @@ pub const USAGE: &str = "  method-budget review <budget.mthd> [<review.json>] [-
       currency, charge, credit) or budget; the review file is made when there
       is none. --merge puts comments into the budget as dated notes (all: every
       one that can be) and --dismiss sets them aside; nothing is written unless
-      --apply, which saves the budget and the review file atomically. A comment
-      whose place is gone, or on a setup item or the whole budget, stays open.
-      --at is the time written (default: now, UTC). Exit 3 when refused.
+      --apply, which saves the budget, then the review file: two writes, each
+      atomic (a temporary file renamed into place). A comment whose place is
+      gone, or on a setup item or the whole budget, stays open. --at is the
+      time written (default: now, UTC). Review files over 8 MB are refused
+      unread. Exit 3 when refused.
 ";
 
 pub fn run(args: &[String]) -> Outcome {
@@ -158,9 +160,12 @@ pub fn run(args: &[String]) -> Outcome {
     Ok(out)
 }
 
+/// Reads a review file, refusing one past the format's size cap
+/// (8 MB) without reading it all in.
 fn read(path: &Path, name: &str) -> Result<method_session::review::Review, CliError> {
-    let bytes =
-        std::fs::read(path).map_err(|e| CliError::failed(format!("{}: {e}", path.display())))?;
+    let cap = method_format::review::MAX_FILE_BYTES as u64;
+    let bytes = method_format::fsio::read_capped(path, cap)
+        .map_err(|e| CliError::failed(format!("{}: {e}", path.display())))?;
     rv::read(name, &bytes).map_err(CliError::failed)
 }
 

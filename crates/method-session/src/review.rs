@@ -63,6 +63,19 @@ pub struct ReviewState {
     pub unsaved: bool,
     /// Changes with every change to the comments.
     pub rev: u64,
+    /// Comments merged in this session, each with the budget revision its
+    /// merge left ([`Session::state_rev`]), so an undone merge opens the
+    /// comment again even though the file says "merged".
+    pub merged_steps: HashMap<CommentId, u64>,
+    /// The merges that were undone when the file was last written: when
+    /// that changes (an undo or redo), the file needs writing again.
+    pub written_undone: Vec<CommentId>,
+    /// What the file on disk looked like when last read or written (the
+    /// desktop's; `None` in a browser or for a file not on disk yet).
+    pub stamp: Option<crate::safety::DiskStamp>,
+    /// The file changed on disk since then (someone else wrote it): it is
+    /// not written over until the person replaces it or saves elsewhere.
+    pub conflict: bool,
 }
 
 static NEXT_REV: AtomicU64 = AtomicU64::new(1);
@@ -80,6 +93,10 @@ impl ReviewState {
             path,
             unsaved: false,
             rev: next_rev(),
+            merged_steps: HashMap::new(),
+            written_undone: Vec::new(),
+            stamp: None,
+            conflict: false,
         }
     }
 
@@ -263,10 +280,16 @@ fn is_its_note(n: &Note, c: &Comment) -> bool {
         && n.author.as_deref().unwrap_or("") == c.author.trim()
 }
 
+/// Merged when the file says so (the author may have edited or deleted the
+/// note since), or, for a file that doesn't say, when its note is there.
 fn status_of(c: &Comment, found: Option<&Found>) -> Status {
-    let merged = found
-        .and_then(|f| f.notes.as_ref())
-        .is_some_and(|ns| ns.iter().any(|n| is_its_note(n, c)));
+    let merged = c
+        .outcome
+        .as_ref()
+        .is_some_and(|o| o.action == Action::Merged)
+        || found
+            .and_then(|f| f.notes.as_ref())
+            .is_some_and(|ns| ns.iter().any(|n| is_its_note(n, c)));
     if merged {
         Status::Merged
     } else if c
@@ -320,6 +343,9 @@ pub struct ReviewBrief {
     pub rev: u64,
     /// Changed since it was last written.
     pub unsaved: bool,
+    /// The file changed on disk since it was read: not written over until
+    /// replaced or saved elsewhere.
+    pub conflict: bool,
     /// Comments still to settle (open or resolved).
     pub to_settle: usize,
     pub comments: usize,
@@ -479,6 +505,7 @@ fn brief_of(b: &Budget, st: &ReviewState, list: &[CommentEntry]) -> ReviewBrief 
         file: st.file.clone(),
         rev: st.rev,
         unsaved: st.unsaved,
+        conflict: st.conflict,
         to_settle: list.iter().filter(|e| e.status.to_settle()).count(),
         comments: list.len(),
         title: st.review.budget.title.clone(),
@@ -489,11 +516,50 @@ fn brief_of(b: &Budget, st: &ReviewState, list: &[CommentEntry]) -> ReviewBrief 
     }
 }
 
+/// Merges made in this session that are undone now, in id order.
+fn undone_merges(s: &Session, st: &ReviewState) -> Vec<CommentId> {
+    let mut ids: Vec<CommentId> = st
+        .merged_steps
+        .iter()
+        .filter(|(_, rev)| s.rev_is_undone(**rev))
+        .map(|(id, _)| *id)
+        .collect();
+    ids.sort_unstable();
+    ids
+}
+
+/// The review as it stands with the budget: a merge taken back by Undo is
+/// no longer "merged".
+fn effective(s: &Session, st: &ReviewState) -> Review {
+    let undone = undone_merges(s, st);
+    let mut review = st.review.clone();
+    for c in &mut review.comments {
+        if undone.contains(&c.id)
+            && c.outcome
+                .as_ref()
+                .is_some_and(|o| o.action == Action::Merged)
+        {
+            c.outcome = None;
+        }
+    }
+    review
+}
+
+/// Whether the review file needs writing: a comment changed, or an undo or
+/// redo changed which merges stand.
+pub fn needs_write(s: &Session) -> bool {
+    s.review()
+        .is_some_and(|st| st.unsaved || undone_merges(s, st) != st.written_undone)
+}
+
 /// What a view carries about the review file open on the session.
 pub fn brief(s: &Session) -> Option<ReviewBrief> {
     let st = s.review()?;
-    let list = entries(s.budget(), &st.review);
-    Some(brief_of(s.budget(), st, &list))
+    let review = effective(s, st);
+    let list = entries(s.budget(), &review);
+    let mut brief = brief_of(s.budget(), st, &list);
+    brief.unsaved = needs_write(s);
+    Some(brief)
 }
 
 /// The list for the review file open on budget `b`.
@@ -509,7 +575,15 @@ pub fn list_of(b: &Budget, st: &ReviewState) -> ReviewList {
 /// The list for the session's review file.
 pub fn list(s: &Session) -> EditResult<ReviewList> {
     let st = s.review().ok_or(NO_REVIEW)?;
-    Ok(list_of(s.budget(), st))
+    let review = effective(s, st);
+    let entries = entries(s.budget(), &review);
+    let mut brief = brief_of(s.budget(), st, &entries);
+    brief.unsaved = needs_write(s);
+    Ok(ReviewList {
+        brief,
+        budget: review.budget.clone(),
+        entries,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -586,13 +660,18 @@ pub fn close(s: &mut Session) {
 /// The review file's text as it would be written now.
 pub fn text(s: &Session) -> EditResult<String> {
     let st = s.review().ok_or(NO_REVIEW)?;
-    Ok(fmt::write(&st.review))
+    Ok(fmt::write(&effective(s, st)))
 }
 
 /// The review file was written (to `path`, when the host knows it).
 pub fn mark_saved(s: &mut Session, path: Option<PathBuf>, file: Option<String>) {
+    let undone = s
+        .review()
+        .map(|st| undone_merges(s, st))
+        .unwrap_or_default();
     if let Some(st) = s.review_mut() {
         st.unsaved = false;
+        st.written_undone = undone;
         if let Some(p) = path {
             st.path = Some(p);
         }
@@ -763,7 +842,7 @@ pub fn settle(s: &mut Session, picks: &[Pick], at: &str, by: Option<&str>) -> Ed
     let at = at.trim().to_string();
     fmt::check_stamp(&at)?;
     let by = clean_author(by)?;
-    let review = reading(s)?.review.clone();
+    let review = effective(s, reading(s)?);
     for p in picks {
         if review.get(p.id).is_none() {
             return Err(format!("Comment {} isn't in this review.", p.id));
@@ -823,7 +902,11 @@ pub fn settle(s: &mut Session, picks: &[Pick], at: &str, by: Option<&str>) -> Ed
     }
     done.dismissed = dismiss.len();
     let merged_ids: Vec<CommentId> = merge.iter().map(|c| c.id).collect();
+    let rev = s.state_rev();
     if let Some(st) = s.review_mut() {
+        for id in &merged_ids {
+            st.merged_steps.insert(*id, rev);
+        }
         let mut changed = false;
         for c in &mut st.review.comments {
             let action = if merged_ids.contains(&c.id) {
@@ -1369,6 +1452,132 @@ mod tests {
             None,
         );
         assert!(start_reviewing(&mut s, None, "x".into(), None).is_err());
+    }
+
+    #[test]
+    fn an_edited_or_deleted_merged_note_is_never_merged_again() {
+        let (mut s, review, row, _) = authored();
+        open_for_author(&mut s, review, "r.review.json".into(), None).unwrap();
+        let all = |s: &Session| -> Vec<Pick> {
+            list(s)
+                .unwrap()
+                .entries
+                .iter()
+                .filter(|e| e.can_merge)
+                .map(|e| Pick {
+                    id: e.id,
+                    action: PickAction::Merge,
+                })
+                .collect()
+        };
+        let first = all(&s);
+        assert_eq!(settle(&mut s, &first, "t1", Some("Sky")).unwrap().merged, 3);
+        let notes_after_merge = budget_notes(s.budget()).len();
+        // The author rewrites the line's note and deletes the account's.
+        let owner = NoteOwner::Row(row);
+        let id = budget_notes(s.budget())
+            .into_iter()
+            .find(|n| n.owner == owner)
+            .unwrap()
+            .id;
+        crate::notes::update_note(
+            &mut s,
+            &owner,
+            id,
+            "Ten weeks: agreed with the director",
+            "t2",
+        )
+        .unwrap();
+        let acct = budget_notes(s.budget())
+            .into_iter()
+            .find(|n| n.kind == "account")
+            .unwrap();
+        crate::notes::delete_note(&mut s, &acct.owner, acct.id).unwrap();
+        // Still merged, so Merge All has nothing to do.
+        let l = list(&s).unwrap();
+        assert!(l
+            .entries
+            .iter()
+            .filter(|e| e.id <= 3)
+            .all(|e| e.status == Status::Merged));
+        assert!(all(&s).is_empty());
+        let picks: Vec<Pick> = (1..=3)
+            .map(|id| Pick {
+                id,
+                action: PickAction::Merge,
+            })
+            .collect();
+        let again = settle(&mut s, &picks, "t3", None).unwrap();
+        assert_eq!((again.merged, again.already), (0, 3));
+        assert_eq!(budget_notes(s.budget()).len(), notes_after_merge - 1);
+    }
+
+    #[test]
+    fn undoing_a_merge_opens_the_comments_and_the_file_follows() {
+        let (mut s, review, ..) = authored();
+        open_for_author(&mut s, review, "r.review.json".into(), None).unwrap();
+        settle(
+            &mut s,
+            &[Pick {
+                id: 1,
+                action: PickAction::Merge,
+            }],
+            "t",
+            None,
+        )
+        .unwrap();
+        mark_saved(&mut s, None, None);
+        assert!(!needs_write(&s));
+        let merged = |s: &Session| text(s).unwrap().contains("\"merged\"");
+        assert!(merged(&s));
+        assert!(s.undo());
+        // Open again, the file to write says so, and it needs writing.
+        assert_eq!(
+            list(&s)
+                .unwrap()
+                .entries
+                .iter()
+                .find(|e| e.id == 1)
+                .unwrap()
+                .status,
+            Status::Open
+        );
+        assert!(!merged(&s));
+        assert!(needs_write(&s));
+        assert!(brief(&s).unwrap().unsaved);
+        assert!(s.redo());
+        assert!(merged(&s));
+        assert!(!needs_write(&s));
+        // Undone and then replaced by another edit: still open, and it can
+        // be merged again.
+        assert!(s.undo());
+        s.edit("Test edit", |b| {
+            b.title = "Retitled".into();
+            Ok(())
+        })
+        .unwrap();
+        let e = list(&s)
+            .unwrap()
+            .entries
+            .into_iter()
+            .find(|e| e.id == 1)
+            .unwrap();
+        assert_eq!(e.status, Status::Open);
+        assert!(e.can_merge);
+        assert_eq!(
+            settle(
+                &mut s,
+                &[Pick {
+                    id: 1,
+                    action: PickAction::Merge
+                }],
+                "t",
+                None
+            )
+            .unwrap()
+            .merged,
+            1
+        );
     }
 
     #[test]

@@ -2247,8 +2247,12 @@ to the front) for review. It is read-only while reviewed: every edit, undo and r
 refused with one message. A banner under the breadcrumb says so, with **Show Comments** and
 **Stop Reviewing**. A review file already beside the budget is read, so a review can go on
 over several sittings; otherwise a new one is started, and it is written beside the budget
-after every change (atomically). A budget never saved has no place for one and is refused,
-and so is a budget shared through a folder.
+after every change (atomically). If the file there changed since it was read (someone else
+wrote it), it is not written over: the app says so once, the Comments tab keeps the
+comments and offers **Save Review File As…** (beside it) or **Replace the File**. Stop
+Reviewing writes the file first and stays open, with the reason, when it can't. A budget
+never saved has no place for one and is refused, and so is a budget shared through a
+folder.
 
 **The Comments tab** (bottom tools pane, also in the tools window) while reviewing: **Comment
 on** offers what the grid's cursor is on (the line, its account and category; on the
@@ -2285,30 +2289,34 @@ can't become a note (those have no notes) and a comment whose place is gone (a l
 an account renumbered, a fringe renamed) can't either: each says why, stays listed with
 where it was, and can be dismissed. A merged comment is known by its note, so merging twice
 adds nothing and Undo shows it open again. What was done goes back into the review file
-(each comment's outcome, with when and by whom), so the reviewer can see it.
+(each comment's outcome, with when and by whom), so the reviewer can see it; a comment the
+file marks as merged stays merged even when its note was edited or deleted since, so Merge
+All never adds it twice.
 
 The command line does the same with `method-budget review` (docs/CLI.md), and agents read
 a review file with the `review_comments` MCP tool (docs/MCP.md). In the browser build Open
 for Review reviews the budget in front, the page's file picker takes the review file, and
-**Download Review File** saves it.
+**Download Review File** saves it. Comments live only in the page until downloaded, so
+while some aren't, closing or reloading the page asks first, and Stop Reviewing or Close
+Review File asks before dropping them.
 
 | Command | Arguments | Returns |
 |---|---|---|
 | `review_open_budget` | none (shows the Open dialog) | View of the budget, now open for review, or `null` when cancelled (desktop only) |
 | `review_start` | none | View, the budget open for review (the review file beside it read when there is one) |
 | `review_open` | none (shows the Open dialog) | View with the review file open on the budget, or `null` when cancelled |
-| `review_close` | none | View, the review file closed (the budget editable again) |
-| `review_list` | none | `{mode, file, rev, unsaved, to_settle, comments, title, matches, rows, accounts, categories, budget, entries: [{id, on, text, author, created, edited, resolved, outcome, status, found, place, written_at, can_merge, why_not, ti, ai, row_id, line, category, account}]}`; `status` is `open`, `resolved`, `merged` or `dismissed` |
+| `review_close` | none | View, the review file closed (the budget editable again); on the desktop written first, and refused (still open) when it can't be |
+| `review_list` | none | `{mode, file, rev, unsaved, conflict, to_settle, comments, title, matches, rows, accounts, categories, budget, entries: [{id, on, text, author, created, edited, resolved, outcome, status, found, place, written_at, can_merge, why_not, ti, ai, row_id, line, category, account}]}`; `status` is `open`, `resolved`, `merged` or `dismissed` |
 | `review_add` | `on` (`{row}`, `{account}`, `{category}`, `{setup: {kind, name}}` or `"budget"`), `text`, `created`, `author` | View |
 | `review_update` | `id`, `text`, `edited` | View (empty text deletes the comment) |
 | `review_resolve` | `id`, `resolved` | View |
 | `review_delete` | `id` | View |
 | `review_restore` | `id` | View (a dismissed comment open again) |
 | `review_settle` | `picks` (`[{id, action}]`, `action` `merge` or `dismiss`), `at`, `by` | `{view, message}`: the merges as one undo step |
-| `review_save` | `save_as` (show the Save dialog) | View, or `null` when cancelled |
+| `review_save` | `save_as` (show the Save dialog), `force` (write over a file that changed on disk: Replace the File) | View, or `null` when cancelled |
 
 Every view carries `review` while a review file is open: `{mode, file, rev, unsaved,
-to_settle, comments, title, matches, rows, accounts, categories}` (`mode` is `reviewing` or
+conflict, to_settle, comments, title, matches, rows, accounts, categories}` (`mode` is `reviewing` or
 `reading`; `rows`, `accounts` and `categories` are the places with comments to settle).
 
 ### Actuals and the cost report

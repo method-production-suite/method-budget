@@ -1733,10 +1733,14 @@ Rules for a program reading one on a budget:
    above) with the comment's `text`, `author`, `created` and `edited`, and `done` set to
    `resolved`. Setup items and the whole budget have no notes, so comments on them stay
    in the review file.
-3. **A merged comment is recognized by its note**: a note on its place with the same
-   text, time and author. So merging twice adds nothing, and a merge taken back (Undo)
-   shows the comment as open again whatever `outcome` says. `outcome` with
-   `"dismissed"` is what marks a dismissed comment.
+3. **`outcome` says what was done.** `"merged"` means merged, even when the note was
+   edited or deleted since: never merge it again. A comment with no outcome whose note
+   (same text, time and author on its place) is there counts as merged too. `"dismissed"`
+   marks a dismissed comment. A program that can take a merge back (Undo) sets the
+   comment's `"merged"` aside while that change is undone, and writes the file so.
+4. **Writers check before writing.** A program writes the file over only when it is still
+   the file it read or last wrote; otherwise it leaves it and offers to save elsewhere or
+   replace it on purpose.
 
 ### Versioning
 
