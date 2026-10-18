@@ -136,6 +136,25 @@ jobs:
             echo "UPDATER=$updater"
           } >> "$GITHUB_ENV"
 
+      - name: Compile the app (no signing secrets in reach)
+        # Build before secrets (SUITE-STANDARDS.md, section 3): every dependency's build
+        # script and proc macro runs here, before the keychain, the App Store Connect key or
+        # the updater key exist on this machine. The bundle step below only packages, signs
+        # and notarizes what this step compiled, and never compiles.
+        shell: bash
+        working-directory: crates/method-app
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          args=(build --no-bundle)
+          if [ -n "$TARGET" ]; then args+=(--target "$TARGET"); fi
+          # The same configuration the bundle step uses, so the build it packages is this one.
+          if [ "${UPDATER:-no}" = yes ]; then
+            args+=(--config '{"bundle":{"createUpdaterArtifacts":true}}')
+          fi
+          cargo tauri "${args[@]}" -- --locked
+
       - name: Import the Developer ID certificate (macOS)
         if: runner.os == 'macOS' && env.MACOS_SIGN == 'yes'
         shell: bash
@@ -176,7 +195,7 @@ jobs:
           printf '%s' "$AC_API_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
           echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
 
-      - name: Build bundles
+      - name: Bundle, sign and notarize (compiled above)
         shell: bash
         working-directory: crates/method-app
         env:
@@ -189,7 +208,9 @@ jobs:
           UPDATER_PRIVATE_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
         run: |
           set -euo pipefail
-          args=(build --bundles "$BUNDLES")
+          # Packaging only: `bundle` takes the build the step above compiled and never runs
+          # cargo, so no third-party code runs while the secrets below are in reach.
+          args=(bundle --bundles "$BUNDLES")
           if [ -n "$TARGET" ]; then args+=(--target "$TARGET"); fi
           # Notarizing (the Tauri CLI notarizes and staples the app when these are set,
           # and only signs with a real identity when APPLE_SIGNING_IDENTITY is set).
@@ -203,7 +224,7 @@ jobs:
             args+=(--config '{"bundle":{"createUpdaterArtifacts":true}}')
           fi
           unset NOTARY_KEY_ID NOTARY_ISSUER UPDATER_PRIVATE_KEY UPDATER_PRIVATE_KEY_PASSWORD
-          cargo tauri "${args[@]}" -- --locked
+          cargo tauri "${args[@]}"
 
       - name: Sign, notarize and staple the disk image (macOS)
         if: runner.os == 'macOS' && env.MACOS_NOTARIZE == 'yes'
