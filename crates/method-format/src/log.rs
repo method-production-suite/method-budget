@@ -15,8 +15,8 @@ use std::sync::Arc;
 
 use method_core::log::hash::sha256_hex;
 use method_core::log::{
-    ActorId, Change, ChangeId, Field, Frontier, Ids, Kind, ListKey, ListName, Log, Malformed,
-    Member, Node, Op, Placement, Projection, Side, Stamp, Uid, Value,
+    ActorId, Change, ChangeId, Field, Frontier, Ids, Kind, ListKey, ListName, Log, LogError,
+    Member, Node, Op, Placement, Projection, Role, Side, Stamp, Uid, Value,
 };
 use method_core::Budget;
 use serde::{Deserialize, Serialize};
@@ -224,6 +224,14 @@ enum FileOp {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         seen: Vec<String>,
     },
+    /// A person's role (decisions.md, entry 78): `scope` lists a
+    /// department editor's categories and accounts.
+    Grant {
+        actor: String,
+        role: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        scope: Vec<String>,
+    },
 }
 
 fn parse_field(s: &str) -> Result<Field, String> {
@@ -295,6 +303,14 @@ impl From<&Op> for FileOp {
                 field: field.name().into(),
                 member: FileMember::from(member),
                 seen: seen.iter().map(stamp_text).collect(),
+            },
+            Op::Grant { actor, role } => FileOp::Grant {
+                actor: actor.hex(),
+                role: role.key().into(),
+                scope: role
+                    .scope()
+                    .map(|s| s.iter().map(Uid::hex).collect())
+                    .unwrap_or_default(),
             },
         }
     }
@@ -373,6 +389,17 @@ impl TryFrom<FileOp> for Op {
                     .map(|s| parse_stamp(s))
                     .collect::<Result<_, String>>()?,
             },
+            FileOp::Grant { actor, role, scope } => {
+                let scope = scope
+                    .iter()
+                    .map(|u| parse_uid(u))
+                    .collect::<Result<_, String>>()?;
+                Op::Grant {
+                    actor: ActorId::parse(&actor).ok_or_else(|| format!("bad actor {actor:?}"))?,
+                    role: Role::parse(&role, scope)
+                        .ok_or_else(|| format!("unknown role {role:?}"))?,
+                }
+            }
         })
     }
 }
@@ -1194,7 +1221,7 @@ pub fn ingest(shared: &mut Shared, time: &str) -> Result<Option<ChangeId>, LogFi
     shared
         .log
         .record(&proj, &on_disk, &[], &label, time)
-        .map_err(|m: Malformed| LogFileError(format!("could not record the outside edit: {m}")))
+        .map_err(|m: LogError| LogFileError(format!("could not record the outside edit: {m}")))
 }
 
 /// Writes the merged state as the `.mthd` (the keeper's job) and returns
@@ -1248,6 +1275,43 @@ mod tests {
         // The budget id is stable.
         assert_eq!(budget_id(genesis), budget_id(&back));
         assert_eq!(budget_id(genesis).len(), 64);
+    }
+
+    #[test]
+    fn roles_round_trip_through_json() {
+        let roles = [
+            Role::Admin,
+            Role::Editor,
+            Role::Department([Uid(7), Uid(9)].into_iter().collect()),
+            Role::Department(Default::default()),
+            Role::Actuals,
+            Role::Comment,
+            Role::ReadOnly,
+        ];
+        let change = Change {
+            actor: actor(1),
+            seq: 2,
+            deps: Frontier::new(),
+            lamport: 3,
+            time: "2026-10-18T00:00:00Z".into(),
+            label: "Roles".into(),
+            ops: roles
+                .iter()
+                .map(|role| Op::Grant {
+                    actor: actor(2),
+                    role: role.clone(),
+                })
+                .collect(),
+        };
+        let line = change_to_json(&change);
+        assert!(line.contains(r#""op":"grant""#), "{line}");
+        assert!(line.contains(r#""role":"read_only""#), "{line}");
+        let back = change_from_json(&line).unwrap();
+        assert_eq!(back, change);
+        assert_eq!(change_to_json(&back), line);
+        // An unknown role is a malformed line, never a guess.
+        let bad = line.replace(r#""role":"comment""#, r#""role":"producer""#);
+        assert!(change_from_json(&bad).is_err());
     }
 
     #[test]

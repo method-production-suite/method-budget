@@ -173,3 +173,64 @@ fn init_refuses_a_second_log_and_open_needs_one() {
     assert!(log::init(&path, actor(1), Ids::seeded(1), T).is_err());
     fs::remove_dir_all(&dir).unwrap();
 }
+
+/// Roles travel through the folder like any change, survive reopening,
+/// and a change beyond its author's role is refused by everyone who reads
+/// the folder, a newcomer included (decisions.md, entry 78).
+#[test]
+fn roles_travel_through_the_folder() {
+    use method_core::log::{Change, LogError, Op, Role, Uid, Value};
+
+    let dir = temp_dir("roles");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    let mut alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+    let (mut jordan, _) = log::open(&path, actor(2), Ids::seeded(2)).unwrap();
+
+    alex.log
+        .grant(actor(2), Role::ReadOnly, "Jordan reads", T)
+        .unwrap();
+    log::flush(&alex.log, &alex.dir).unwrap().unwrap();
+    let mut j_scan = Scan::default();
+    log::absorb(&mut jordan.log, &jordan.dir, &mut j_scan);
+    assert_eq!(jordan.log.role_of(actor(2)), Role::ReadOnly);
+    let p = jordan.log.project();
+    let mut after = p.budget.clone();
+    row_rate(&mut after, 0, 999);
+    assert!(matches!(
+        jordan.log.record(&p, &after, &[], "Jordan edits", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    assert!(log::flush(&jordan.log, &jordan.dir).unwrap().is_none());
+
+    // Another program writes a change in Jordan's name anyway.
+    let forged = Change {
+        actor: actor(2),
+        seq: 1,
+        deps: alex.log.frontier().clone(),
+        lamport: alex.log.lamport() + 1,
+        time: T.into(),
+        label: "Forged".into(),
+        ops: vec![Op::Set {
+            entity: Uid::ROOT,
+            field: method_core::log::Field::Title,
+            value: Value::text("Forged"),
+        }],
+    };
+    jordan.dir.write_segment(&[forged]).unwrap();
+    let mut a_scan = Scan::default();
+    let r = log::absorb(&mut alex.log, &alex.dir, &mut a_scan);
+    assert_eq!(r.rejected.len(), 1, "{:?}", r.rejected);
+    assert!(r.rejected[0].1.contains("not allowed"), "{:?}", r.rejected);
+    assert_ne!(alex.log.project().budget.title, "Forged");
+
+    // Someone opening the folder afresh reads the same roles and refuses
+    // the same change.
+    let (newcomer, report) = log::open(&path, actor(3), Ids::seeded(3)).unwrap();
+    assert_eq!(report.rejected.len(), 1);
+    assert_eq!(newcomer.log.role_of(actor(2)), Role::ReadOnly);
+    assert_eq!(newcomer.log.role_of(actor(3)), Role::ReadOnly);
+    assert_eq!(newcomer.log.owner(), Some(actor(1)));
+    assert_eq!(newcomer.log.project().budget, alex.log.project().budget);
+    let _ = fs::remove_dir_all(&dir);
+}

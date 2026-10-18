@@ -5,6 +5,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
+use super::access::Role;
 use super::clock::{ChangeId, Frontier, Stamp};
 use super::ids::{ActorId, Uid};
 use super::seq::{Node, PosId};
@@ -788,6 +789,10 @@ pub enum Op {
         member: Member,
         seen: Vec<Stamp>,
     },
+    /// Gives `actor` a role (decisions.md, entry 78): last writer wins per
+    /// person, judged at each change's causal point
+    /// ([`super::access`]). About the budget, so its entity is the root.
+    Grant { actor: ActorId, role: Role },
 }
 
 impl Op {
@@ -801,6 +806,7 @@ impl Op {
             | Op::Restore { entity }
             | Op::Add { entity, .. }
             | Op::Remove { entity, .. } => *entity,
+            Op::Grant { .. } => Uid::ROOT,
         }
     }
 
@@ -814,6 +820,7 @@ impl Op {
             Op::Restore { .. } => "restore",
             Op::Add { .. } => "add",
             Op::Remove { .. } => "remove",
+            Op::Grant { .. } => "grant",
         }
     }
 }

@@ -10,8 +10,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+use super::access::Role;
 use super::clock::Stamp;
-use super::ids::Uid;
+use super::ids::{ActorId, Uid};
 use super::op::{Change, Field, Kind, ListKey, Member, Op, Placement, Value};
 use super::seq::{PosId, SeqTree};
 
@@ -198,6 +199,11 @@ pub struct State {
     lists: BTreeMap<ListKey, SeqTree>,
     /// The highest Lamport clock applied.
     lamport: u64,
+    /// Who started sharing: the actor of the first change applied (the
+    /// genesis, which every other change depends on).
+    owner: Option<ActorId>,
+    /// Each person's role, every grant kept (decisions.md, entry 78).
+    grants: BTreeMap<ActorId, Register<Role>>,
 }
 
 impl Default for State {
@@ -215,7 +221,19 @@ impl State {
             entities,
             lists: BTreeMap::new(),
             lamport: 0,
+            owner: None,
+            grants: BTreeMap::new(),
         }
+    }
+
+    /// Who started sharing, once anything is applied.
+    pub fn owner(&self) -> Option<ActorId> {
+        self.owner
+    }
+
+    /// Every role given, with every earlier one.
+    pub fn grants(&self) -> &BTreeMap<ActorId, Register<Role>> {
+        &self.grants
     }
 
     pub fn entity(&self, uid: Uid) -> Option<&Entity> {
@@ -374,6 +392,7 @@ impl State {
                         ));
                     }
                 }
+                Op::Grant { .. } => {}
             }
         }
         Ok(())
@@ -384,6 +403,9 @@ impl State {
     pub fn apply(&mut self, change: &Change) {
         if change.lamport > self.lamport {
             self.lamport = change.lamport;
+        }
+        if self.owner.is_none() {
+            self.owner = Some(change.actor);
         }
         for (index, op) in change.ops.iter().enumerate() {
             let stamp = change.stamp(index);
@@ -474,6 +496,13 @@ impl State {
                         e.sets.entry(*field).or_default().remove(member, seen);
                     }
                 }
+                Op::Grant { actor, role } => match self.grants.get_mut(actor) {
+                    Some(r) => r.write(stamp, role.clone()),
+                    None => {
+                        self.grants
+                            .insert(*actor, Register::new(stamp, role.clone()));
+                    }
+                },
             }
         }
     }
