@@ -181,6 +181,7 @@ pub fn sample() -> Budget {
         cap: None,
         discount_percent: d("10"),
         excluded_fringes: BTreeSet::new(),
+        locations: BTreeSet::new(),
         rows: vec![
             CreditRow {
                 description: "Qualified labor".into(),

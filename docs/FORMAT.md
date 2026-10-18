@@ -547,7 +547,12 @@ catch it).
 | `cap`              | optional cents | Ceiling on the sum of the row credits. |
 | `discount_percent` | decimal, default `"0"` | Taken off after the cap (`"5"` is 5%). |
 | `excluded_fringes` | name set, default empty | Fringes left out of the spend of every `group`, `category` and `account` row (one list per credit; `docs/decisions.md`, entries 57 and 61). A typed `flat` amount has no fringes, so it is unaffected. |
+| `locations`        | name set, default empty | Location names. When not empty, every `group`, `category` and `account` row counts only the lines and adjustment rows whose `location` is one of these, with the fringes they earn; a typed `flat` amount is unaffected. Empty counts every line, wherever it is, as before (`docs/decisions.md`, entry 80). A name the budget's `locations` don't have is kept, and `method-budget check` warns. |
 | `rows`             | list of [credit rows](#credit-row) | |
+
+A credit is also how an incentive program is modeled (roadmap 3.6): every rate, cap and
+qualifying group, category or account is the user's, and with `applied` off the credit is
+an estimate the topsheet leaves out.
 
 ### Credit row
 
@@ -1280,6 +1285,14 @@ valid. Loading and saving it in Method Budget normalizes it.
   left out when unset, so files that don't use it read and write byte for byte as before.
   An older reader refuses a file that uses it. The change log's rows carry `person` only
   when set, so a log of a budget that never uses it is one an older reader reads.
+- Version 1, additive (2026-10): credit [`locations`](#credit) (the locations a credit's
+  group, category and account rows count spend at; decisions.md, entry 80), written
+  between `excluded_fringes` and `rows` and left out when empty, which is what a file
+  without it means, so existing files are unchanged byte for byte. The change log's credit
+  gains a `locations` set (its field name added at the end of the list), also left out
+  when empty, so a log whose credits have none stays readable by 0.3.0; a set a record
+  leaves out counts as empty when the log records an edit. It is a weak reference: deleting
+  a location never brings it back, and the credit keeps its name.
 
 ## Complete example
 
@@ -1588,7 +1601,8 @@ and so on). The differences: every named item (setup items, info fields, charges
 has a `name` field, since its id is not its name; a row's `unit`, `currency`, `set` and
 `location` are references when the item exists and text otherwise; a row's `fringes` and
 `groups`, a charge's `excluded_groups`, `excluded_categories` and `excluded_accounts`, a
-credit's `excluded_fringes` and a transaction's `tags` are sets; a fringe's `kind` is
+credit's `excluded_fringes` and `locations` (references when the location exists; left
+out when empty; a deleted location's name stays) and a transaction's `tags` are sets; a fringe's `kind` is
 `"percent"` or `"flat"` with `cutoff`, `unit`, `basis` and `max_hours_per_day` as
 separate fields; a charge's `kind` is `"percent"` (with `percent`) or `"flat"` (with
 `amount` and `currency`); a currency's `symbol_after` and `separators` are always

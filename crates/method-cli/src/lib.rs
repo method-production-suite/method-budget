@@ -28,6 +28,7 @@ mod cmd {
     pub mod fmt;
     pub mod import;
     pub mod import_export;
+    pub mod incentives;
     pub mod log;
     pub mod mcp;
     pub mod merge;
@@ -95,6 +96,11 @@ const COMMANDS: &[Command] = &[
         name: "totals",
         usage: cmd::totals::USAGE,
         run: cmd::totals::run,
+    },
+    Command {
+        name: "incentives",
+        usage: cmd::incentives::USAGE,
+        run: cmd::incentives::run,
     },
     Command {
         name: "set",

@@ -767,6 +767,22 @@ pub fn move_charge<R: Runtime>(
     })
 }
 
+/// Spend by location and an estimate for every credit, applied or not
+/// (roadmap 3.6): the Credits tab's programs side by side. Nothing changes.
+#[tauri::command]
+pub fn incentives(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+) -> CmdResult<crate::report_dto::IncentivesDto> {
+    let mut s = state.lock_doc(doc)?;
+    incentives_in(&mut s)
+}
+
+/// [`incentives`] on session `s`.
+pub fn incentives_in(s: &mut Session) -> CmdResult<crate::report_dto::IncentivesDto> {
+    commands::incentives(s)
+}
+
 #[tauri::command]
 pub fn set_credit<R: Runtime>(
     window: WebviewWindow<R>,
@@ -1232,6 +1248,7 @@ pub fn run() {
             set_credit,
             delete_credit,
             move_credit,
+            incentives,
             set_set,
             delete_set,
             set_location,

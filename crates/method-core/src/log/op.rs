@@ -393,10 +393,12 @@ pub enum Field {
     RoundAccountTotals,
     // Added by entry 79 (a row's person), at the end for the same reason.
     Person,
+    // Added by entry 80 (a credit's locations), after entry 79's.
+    Locations,
 }
 
 impl Field {
-    pub const ALL: [Field; 96] = [
+    pub const ALL: [Field; 97] = [
         Field::Name,
         Field::Code,
         Field::Description,
@@ -493,6 +495,7 @@ impl Field {
         Field::Separators,
         Field::RoundAccountTotals,
         Field::Person,
+        Field::Locations,
     ];
 
     /// The name files use.
@@ -594,6 +597,7 @@ impl Field {
             Field::Separators => "separators",
             Field::RoundAccountTotals => "round_account_totals",
             Field::Person => "person",
+            Field::Locations => "locations",
         }
     }
 
@@ -611,6 +615,7 @@ impl Field {
                 | Field::ExcludedCategories
                 | Field::ExcludedAccounts
                 | Field::ExcludedFringes
+                | Field::Locations
                 | Field::Tags
         )
     }

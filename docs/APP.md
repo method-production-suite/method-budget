@@ -567,14 +567,37 @@ cap, how far the row is under or over it (spend for a cap on the spend, credit f
 the credit). The footer adds the rows up (gross, fringes out, net, credit) and shows the
 discount and the net credit taken off the grand total.
 
+**Incentive programs** (roadmap 3.6; decisions.md, entry 80): a credit is also how an
+incentive program is modeled, with every rate, cap and qualifying category, account or
+group typed by the user (nothing about any real program ships). **Spend at these
+locations**, under Fringes left out of the spend, limits the credit's group, category and
+account rows to lines at the picked locations, with the fringes they earn; none picked
+counts every line, as before. A credit that is not applied is an estimate: the rail shows
+"Est." and its figure, and its footer the qualified spend and the estimate, while the
+topsheet leaves it out. Under the editor, **Programs side by side** lists every credit with
+where its spend has to be, its qualified spend (the tooltip has it by location), the
+credit after its caps and discount, and whether it is applied, an estimate or has a
+problem; **Spend by location** lists each location's lines, fringes and total, then lines
+with no location (the Spend head's tooltip says it can differ from the topsheet when
+account totals are rounded to whole units or fringes after the last production total are
+dropped). Both come from `incentives`, fetched once per budget revision. When the budget
+has problems, the figures come from the cleaned copy that counts them as blank: a note
+above the tables says so, and a program with a problem of its own says "May be short",
+with the problem in its tooltip and in the footer. Applying
+an estimated credit takes off exactly the estimate. Renaming a location renames it in the
+credits; deleting one leaves its name in a credit, which then counts nothing there
+(`method-budget check` and the MCP `validate` tool warn about it).
+
 | Command | Arguments | Returns |
 |---|---|---|
 | `preview_charge` | `index` (`null` for a new charge), `charge` (as `set_charge`) | `{name, base, excluded, amount}`, figured on the current totals; nothing changes |
+| `incentives` | none | `{partial, locations: [{location, known, lines, fringes, total}], programs: [{index, name, applied, locations, cap, discount_percent, amount, problem, qualified, by_location: [{location, net}], rows_total, capped, figures}]}`: spend by location (`location` `null` for lines with none) and every credit as an estimate, applied or not; figured on the current totals; `partial` when those come from the cleaned copy of a budget with problems, and then a program's own problems are in its `problem` with its (possibly short) `amount`; nothing changes |
 | `clear_from_rows` | `rowIds`, `field` (`fringes` or `groups`) | View |
 | `replace_tags_on_rows` | `rowIds`, `tags` (`{fringes, groups, set, location, currency}`: names the budget defines; `null` values and empty lists clear; the base currency is none) | View |
 
 `set_charge` takes `label_percent` and `label_excluded` (left out: the charge keeps its own
-setting). A credit row's report entry has `cap_variance` (unrounded currency units like
+setting). `set_credit` takes `locations` (location names the budget has, or ones the
+credit already names; empty: every line). A credit row's report entry has `cap_variance` (unrounded currency units like
 `credit`; positive under the cap, negative over it, `null` with no cap). **Numbers on screen** (saved in the budget, one undo step per change): the rate
 cutoff and decimals below and at or above it, whether a rate's global decimals win, and
 whether the topsheet shows the above- and below-the-line summary rows and the net total.
@@ -3063,6 +3086,13 @@ review in the tools window included; the logic is tested in Rust and the tab, fo
 review and menus in a browser harness). Presets follow a rename of a setup item, but
 deleting a fringe, group, set or location leaves its name in tag presets (applying one
 then says what is missing). Line blocks are reordered from the keyboard only.
+Incentive programs need a live check in the app: the Spend at these locations chips, the
+estimate in the rail and footer, and the Programs side by side and Spend by location
+tables (checked here offscreen in the browser build in headless Chrome, against the real
+engine). Not yet: an unapplied credit's rows grid shows its row figures (the footer and
+the tables have them), a what-if that moves lines between locations, several applied
+programs that share a cap, a broker's fee as a flat amount, and a preset of program
+fields to fill in.
 Import Actuals and the Actuals tab need a live check: the Open dialog, real exports from
 accounting systems (checked here with synthetic CSV, tab-delimited and workbook files and
 the dialog, tab, grid columns and Cost report preview in a browser harness against the

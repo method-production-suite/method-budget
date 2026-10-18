@@ -167,7 +167,7 @@ const CHARGE: [Column; 9] = [
         &["excludeaccounts"],
     ),
 ];
-const CREDIT: [Column; 14] = [
+const CREDIT: [Column; 15] = [
     col("name", "Credit", &["name", "incentive"]),
     col("account", "Account", &["acct"]),
     col("applied", "Applied", &["on", "active"]),
@@ -186,6 +186,7 @@ const CREDIT: [Column; 14] = [
     col("row_cap_on", "Row Cap On", &["capon", "capkind"]),
     col("row_cap", "Row Cap", &[]),
     col("excluded_fringes", "Excluded Fringes", &["excludefringes"]),
+    col("locations", "Locations", &["location"]),
 ];
 const TAG_PRESET: [Column; 6] = [
     col("name", "Name", &["preset", "tagpreset"]),
@@ -492,6 +493,7 @@ pub fn sheet(b: &Budget, w: What) -> Sheet {
                     head(&mut cells);
                     cells.extend(std::iter::repeat_n(Cell::Empty, 8));
                     cells.push(list(&c.excluded_fringes));
+                    cells.push(list(&c.locations));
                     push(&c.name, cells);
                 }
                 for r in &c.rows {
@@ -537,6 +539,7 @@ pub fn sheet(b: &Budget, w: What) -> Sheet {
                         on,
                         cap,
                         excluded,
+                        list(&c.locations),
                     ]);
                     push(&c.name, cells);
                 }
@@ -1110,6 +1113,7 @@ pub fn read(
                                     .number("discount", "the discount")?
                                     .unwrap_or(Dec::ZERO),
                                 excluded_fringes: BTreeSet::new(),
+                                locations: BTreeSet::new(),
                                 rows: Vec::new(),
                             });
                             into.credits.len() - 1
@@ -1119,6 +1123,7 @@ pub fn read(
                     into.credits[i]
                         .excluded_fringes
                         .extend(row.names("excluded_fringes"));
+                    into.credits[i].locations.extend(row.names("locations"));
                     if has_row {
                         let group = row.opt("group");
                         let category = row.opt("category");
@@ -1372,6 +1377,7 @@ mod tests {
             cap: Some(100_000_000),
             discount_percent: Dec::from_int(5),
             excluded_fringes: ["KIT".to_string()].into(),
+            locations: ["Stage 4".to_string()].into(),
             rows: vec![
                 CreditRow {
                     description: "Labor".into(),
@@ -1410,6 +1416,7 @@ mod tests {
             cap: None,
             discount_percent: Dec::ZERO,
             excluded_fringes: BTreeSet::new(),
+            locations: BTreeSet::new(),
             rows: Vec::new(),
         });
         b.tag_presets.push(TagPreset {

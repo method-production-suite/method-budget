@@ -46,6 +46,7 @@
     "allow-set-credit",
     "allow-delete-credit",
     "allow-move-credit",
+    "allow-incentives",
     "allow-set-set",
     "allow-delete-set",
     "allow-set-location",

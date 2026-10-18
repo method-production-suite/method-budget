@@ -1307,6 +1307,10 @@ pub struct CreditInput {
     /// per credit (decisions.md, entry 57).
     #[serde(default)]
     pub excluded_fringes: Vec<String>,
+    /// Where the spend has to be (decisions.md, entry 80): the budget's
+    /// location names. Empty counts every line, wherever it is.
+    #[serde(default)]
+    pub locations: Vec<String>,
     #[serde(default)]
     pub rows: Vec<CreditRowInput>,
 }

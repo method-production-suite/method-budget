@@ -98,6 +98,11 @@ fn gen_detail(rng: &mut Rng, id: RowId, range: Option<u32>) -> Detail {
     if rng.chance(30) {
         det.set = Some(rng.pick(&["S1", "S2"]).into());
     }
+    // Where it is shot (decisions.md, entry 80): L3 is not in the
+    // budget's locations.
+    if rng.chance(50) {
+        det.location = Some(rng.pick(&["L1", "L2", "L3"]).into());
+    }
     // Display-only styling, on any kind of row.
     det.bold = rng.chance(20);
     det.italic = rng.chance(20);
@@ -166,6 +171,9 @@ fn gen_budget(rng: &mut Rng) -> Budget {
     if rng.chance(30) {
         b.cutoff_factor = CutoffFactor::ALL[rng.below(5) as usize];
     }
+    for l in ["L1", "L2"] {
+        b.locations.insert(l.into(), Location::default());
+    }
     b.groups.insert("A".into(), group(true));
     b.groups.insert("B".into(), group(true));
     b.groups.insert("OFF".into(), group(false));
@@ -216,12 +224,27 @@ fn gen_budget(rng: &mut Rng) -> Budget {
         cap: Some(rng.below(2_000_000) as i64),
         discount_percent: d("5"),
         excluded_fringes: set(&["FLAT"]),
-        rows: vec![CreditRow {
-            description: String::new(),
-            source: CreditSource::Group { group: "A".into() },
-            percent: d("25"),
-            cap: CreditCap::QualifiedSpend(rng.below(5_000_000) as i64),
-        }],
+        locations: match rng.below(3) {
+            0 => set(&["L1"]),
+            1 => set(&["L1", "L2"]),
+            _ => Default::default(),
+        },
+        rows: vec![
+            CreditRow {
+                description: String::new(),
+                source: CreditSource::Group { group: "A".into() },
+                percent: d("25"),
+                cap: CreditCap::QualifiedSpend(rng.below(5_000_000) as i64),
+            },
+            CreditRow {
+                description: String::new(),
+                source: CreditSource::Category {
+                    category: "0000".into(),
+                },
+                percent: d("10"),
+                cap: CreditCap::Credit(rng.below(1_000_000) as i64),
+            },
+        ],
     });
     // Both arithmetics, so every property holds in each.
     if rng.below(2) == 0 {
@@ -610,6 +633,16 @@ fn comparing_a_budget_with_itself_shows_no_differences() {
                 *codes = codes.iter().map(|c| coding.normalize(c).unwrap()).collect();
             }
         }
+        // So do credit rows on a category or an account.
+        for r in spelled.credits.iter_mut().flat_map(|c| &mut c.rows) {
+            match &mut r.source {
+                CreditSource::Category { category: code }
+                | CreditSource::Account { account: code } => {
+                    *code = coding.normalize(code).unwrap();
+                }
+                _ => {}
+            }
+        }
         let c = compare(&[("a".to_string(), &b), ("b".to_string(), &spelled)])
             .unwrap_or_else(|e| panic!("seed {seed}: {e}"));
         let r = recalc(&b, &RecalcOptions::default()).unwrap();
@@ -792,6 +825,7 @@ fn renaming_any_setup_item_keeps_every_total_and_renaming_back_undoes_it() {
         (SetupKind::Group, "OFF", "Cut"),
         (SetupKind::Unit, "Day", "Shoot day"),
         (SetupKind::Set, "S1", "Set one"),
+        (SetupKind::Location, "L1", "Ridge"),
         (SetupKind::Currency, "GBP", "UKP"),
         (SetupKind::Currency, "USD", "US$"),
     ];
@@ -858,6 +892,251 @@ fn renaming_any_setup_item_keeps_every_total_and_renaming_back_undoes_it() {
                 "seed {seed} {kind:?}"
             );
             assert_eq!(e, b, "seed {seed} {kind:?} back");
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Incentive programs (roadmap 3.6; decisions.md, entry 80)
+
+/// A random program: rows on groups, categories, accounts and typed
+/// amounts, random caps and a discount from 0 to 100%, maybe locations.
+fn gen_program(rng: &mut Rng, b: &Budget, name: &str) -> Credit {
+    let cats: Vec<String> = b.categories().map(|c| c.code.clone()).collect();
+    let accts: Vec<String> = b
+        .categories()
+        .flat_map(|c| &c.accounts)
+        .map(|a| a.code.clone())
+        .collect();
+    let rows = (0..=rng.below(3))
+        .map(|_| CreditRow {
+            description: String::new(),
+            source: match rng.below(4) {
+                0 => CreditSource::Flat(rng.below(3_000_000) as i64),
+                1 => CreditSource::Group {
+                    group: rng.pick(&["A", "B", "OFF"]).into(),
+                },
+                2 => CreditSource::Category {
+                    category: cats[rng.below(cats.len() as u64) as usize].clone(),
+                },
+                _ => CreditSource::Account {
+                    account: accts[rng.below(accts.len() as u64) as usize].clone(),
+                },
+            },
+            percent: d(&format!("{}.{}", rng.below(40), rng.below(10))),
+            cap: match rng.below(3) {
+                0 => CreditCap::None,
+                1 => CreditCap::QualifiedSpend(rng.below(4_000_000) as i64),
+                _ => CreditCap::Credit(rng.below(800_000) as i64),
+            },
+        })
+        .collect();
+    Credit {
+        name: name.into(),
+        account: None,
+        applied: rng.chance(50),
+        cap: rng.chance(60).then(|| rng.below(1_500_000) as i64),
+        discount_percent: d(&format!("{}.{}", rng.below(101), rng.below(10)))
+            .min(Dec::from_int(100)),
+        excluded_fringes: if rng.chance(30) {
+            set(&["PCT"])
+        } else {
+            Default::default()
+        },
+        locations: match rng.below(4) {
+            0 => set(&["L1"]),
+            1 => set(&["L2", "L3"]),
+            2 => set(&["L1", "L2", "L3"]),
+            _ => Default::default(),
+        },
+        rows,
+    }
+}
+
+fn estimates(b: &Budget, seed: u64) -> incentives::Incentives {
+    let r = recalc(b, &RecalcOptions::default()).unwrap_or_else(|e| panic!("seed {seed}: {e}"));
+    incentives::incentives(b, &r).unwrap_or_else(|e| panic!("seed {seed}: {e}"))
+}
+
+/// With no programs nothing changes: no credit, net equals grand, no
+/// estimate. Programs that aren't applied change no figure either, and a
+/// program's estimate is the same applied or not.
+#[test]
+fn no_programs_means_no_change() {
+    for seed in 1..=CASES {
+        let mut rng = Rng(seed);
+        let mut b = gen_budget(&mut rng);
+        let mut none = b.clone();
+        none.credits.clear();
+        let r0 = recalc(&none, &RecalcOptions::default()).unwrap();
+        assert_eq!(r0.credits_total, 0, "seed {seed}");
+        assert_eq!(r0.net_total, r0.grand_total, "seed {seed}");
+        assert!(estimates(&none, seed).programs.is_empty(), "seed {seed}");
+
+        for i in 0..3 {
+            let p = gen_program(&mut rng, &b, &format!("P{i}"));
+            b.credits.push(p);
+        }
+        let mut off = b.clone();
+        for c in &mut off.credits {
+            c.applied = false;
+        }
+        let r_off = recalc(&off, &RecalcOptions::default()).unwrap();
+        assert_eq!(r_off, r0, "seed {seed}: unapplied programs change nothing");
+
+        let on = estimates(&b, seed);
+        let unapplied = estimates(&off, seed);
+        assert_eq!(on.locations, unapplied.locations, "seed {seed}");
+        for (a, u) in on.programs.iter().zip(&unapplied.programs) {
+            assert_eq!(a.figures, u.figures, "seed {seed} {}", a.name);
+        }
+        // An applied program's estimate is what the topsheet takes off.
+        let r = recalc(&b, &RecalcOptions::default()).unwrap();
+        let applied: Vec<Cents> = on
+            .programs
+            .iter()
+            .filter(|p| p.applied)
+            .map(|p| p.amount().unwrap_or(-1))
+            .collect();
+        let taken: Vec<Cents> = r.credits.iter().map(|c| c.amount).collect();
+        assert_eq!(applied, taken, "seed {seed}");
+    }
+}
+
+/// No row's credit is over its cap on the credit, no row is a percent of
+/// more than its cap on the spend, no program is over its own cap, and the
+/// estimate (after the discount) is never more than the program's cap.
+#[test]
+fn caps_are_never_exceeded() {
+    for seed in 1..=CASES {
+        let mut rng = Rng(seed);
+        let mut b = gen_budget(&mut rng);
+        b.credits.clear();
+        for i in 0..4 {
+            let p = gen_program(&mut rng, &b, &format!("P{i}"));
+            b.credits.push(p);
+        }
+        let got = estimates(&b, seed);
+        for (c, p) in b.credits.iter().zip(&got.programs) {
+            let f = p
+                .figures
+                .as_ref()
+                .unwrap_or_else(|| panic!("seed {seed}: {:?}", p.problem));
+            for (row, t) in c.rows.iter().zip(&f.rows) {
+                match row.cap {
+                    CreditCap::None => {}
+                    CreditCap::Credit(cap) => {
+                        assert!(
+                            t.credit <= Dec::from_cents(cap),
+                            "seed {seed}: row credit over its cap"
+                        );
+                    }
+                    CreditCap::QualifiedSpend(cap) => {
+                        let most = Dec::from_cents(cap)
+                            .checked_mul(row.percent)
+                            .and_then(|v| v.checked_div(Dec::from_int(100)))
+                            .unwrap();
+                        // Spend is never negative here, so the credit is at
+                        // most the percent of the cap (to the 9th place).
+                        assert!(
+                            t.credit <= most.checked_add("0.000000001".parse().unwrap()).unwrap(),
+                            "seed {seed}: row counts more spend than its cap"
+                        );
+                    }
+                }
+            }
+            if let Some(cap) = c.cap {
+                assert!(
+                    f.capped <= Dec::from_cents(cap),
+                    "seed {seed}: over the program cap"
+                );
+                assert!(
+                    f.amount <= cap,
+                    "seed {seed}: estimate over the program cap"
+                );
+            }
+            assert!(f.capped <= p.rows_total, "seed {seed}");
+            assert_eq!(p.capped, f.capped < p.rows_total, "seed {seed}");
+            assert!(f.amount >= 0, "seed {seed}");
+        }
+    }
+}
+
+/// Every figure is a sum over lines: the order of the programs changes no
+/// program's estimate; a program at two locations counts what it counts at
+/// each of them; and its spend by location adds up to its rows' spend.
+#[test]
+fn programs_are_order_independent_and_add_up_by_location() {
+    for seed in 1..=CASES {
+        let mut rng = Rng(seed);
+        let mut b = gen_budget(&mut rng);
+        b.credits.clear();
+        for i in 0..4 {
+            let p = gen_program(&mut rng, &b, &format!("P{i}"));
+            b.credits.push(p);
+        }
+        let got = estimates(&b, seed);
+        let mut reversed = b.clone();
+        reversed.credits.reverse();
+        let back = estimates(&reversed, seed);
+        for p in &got.programs {
+            let q = back.programs.iter().find(|q| q.name == p.name).unwrap();
+            assert_eq!(p.figures, q.figures, "seed {seed} {}", p.name);
+            assert_eq!(p.by_location, q.by_location, "seed {seed} {}", p.name);
+        }
+
+        for (c, p) in b.credits.iter().zip(&got.programs) {
+            let f = p.figures.as_ref().unwrap();
+            let typed: Cents = c
+                .rows
+                .iter()
+                .zip(&f.rows)
+                .filter(|(r, _)| !r.source.has_fringes())
+                .map(|(_, t)| t.net)
+                .sum();
+            let located: Cents = p.by_location.iter().map(|(_, v)| v).sum();
+            assert_eq!(located + typed, p.qualified, "seed {seed} {}", p.name);
+            if !c.locations.is_empty() {
+                assert!(
+                    p.by_location
+                        .iter()
+                        .all(|(l, _)| l.as_ref().is_some_and(|l| c.locations.contains(l))),
+                    "seed {seed} {}",
+                    p.name
+                );
+            }
+
+            // Split by location, row by row.
+            let mut split = b.clone();
+            split.credits = vec![c.clone(), c.clone()];
+            split.credits[0].locations = set(&["L1"]);
+            split.credits[1].locations = set(&["L2", "L3"]);
+            let mut all = c.clone();
+            all.locations = set(&["L1", "L2", "L3"]);
+            split.credits.push(all);
+            let s = estimates(&split, seed);
+            let rows = |i: usize| s.programs[i].figures.clone().unwrap().rows;
+            for ((a, z), w) in rows(0).iter().zip(rows(1)).zip(rows(2)) {
+                if c.rows.iter().any(|r| !r.source.has_fringes()) {
+                    continue;
+                }
+                assert_eq!(a.gross + z.gross, w.gross, "seed {seed}");
+                assert_eq!(a.net + z.net, w.net, "seed {seed}");
+            }
+        }
+    }
+}
+
+/// An applied program at its locations explains to exactly its amount.
+#[test]
+fn explaining_a_program_at_its_locations_adds_up() {
+    for seed in 1..=CASES / 4 {
+        let b = gen_budget(&mut Rng(seed));
+        let r = recalc(&b, &RecalcOptions::default()).unwrap();
+        for (i, c) in r.credits.iter().enumerate() {
+            let e = explain::explain(&b, &RecalcOptions::default(), &explain::Target::Credit(i))
+                .unwrap_or_else(|e| panic!("seed {seed}: {e}"));
+            assert_eq!(e.root.amount, Some(c.amount), "seed {seed}");
         }
     }
 }

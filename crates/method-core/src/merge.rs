@@ -1208,6 +1208,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
                 |v| format!("{v}%"),
             ),
             excluded_fringes: th.names(|c| &c.excluded_fringes),
+            locations: th.names(|c| &c.locations),
             rows: th.field(
                 cx,
                 at,
@@ -1222,6 +1223,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
                         cap: None,
                         discount_percent: crate::Dec::ZERO,
                         excluded_fringes: BTreeSet::new(),
+                        locations: BTreeSet::new(),
                         rows: rows.clone(),
                     })
                 },

@@ -14,7 +14,8 @@ pub struct ItemUse {
     pub lines: usize,
     /// Other setup that names it: globals' formulas and fringe rates (a
     /// global), flat fringes and globals' units (a unit), credit rows (a
-    /// fringe or group), charges (a group or currency), the totals currency.
+    /// fringe or group), charges (a group or currency), the totals currency,
+    /// credits limited to a location.
     pub other: usize,
 }
 
@@ -144,7 +145,12 @@ pub fn usage(b: &Budget, kind: SetupKind) -> BTreeMap<String, ItemUse> {
                 bump(t, false);
             }
         }
-        SetupKind::Set | SetupKind::Location => {}
+        SetupKind::Location => {
+            for l in b.credits.iter().flat_map(|c| &c.locations) {
+                bump(l, false);
+            }
+        }
+        SetupKind::Set => {}
     }
     out
 }

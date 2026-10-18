@@ -14,7 +14,8 @@
 //!   other settings go with it);
 //! - a **unit**: rows' four unit columns, flat fringes' unit, and globals'
 //!   display unit ([`crate::model::GlobalInfo`]);
-//! - a **set** or a **location**: rows' set or location;
+//! - a **set**: rows' set; a **location**: rows' location and the locations
+//!   a credit is limited to;
 //! - a **currency**: rows' currency, flat charges' currency and the totals
 //!   currency. The base currency can be renamed too (the budget's base code
 //!   changes with it).
@@ -242,7 +243,13 @@ pub fn references(b: &Budget, kind: SetupKind, name: &str) -> usize {
                 .count()
                 + b.global_info.values().filter(|g| g.unit == name).count()
         }
-        SetupKind::Set | SetupKind::Location => 0,
+        SetupKind::Set => 0,
+        // A credit limited to the location (decisions.md, entry 80).
+        SetupKind::Location => b
+            .credits
+            .iter()
+            .filter(|c| c.locations.contains(name))
+            .count(),
         SetupKind::Currency => {
             b.charges
                 .iter()
@@ -551,7 +558,12 @@ fn rewrite(b: &mut Budget, kind: SetupKind, from: &str, to: &str) -> usize {
             }
         }
         SetupKind::Set => rekey(&mut b.sets, from, to),
-        SetupKind::Location => rekey(&mut b.locations, from, to),
+        SetupKind::Location => {
+            rekey(&mut b.locations, from, to);
+            for c in &mut b.credits {
+                count(swap_in(&mut c.locations, from, to));
+            }
+        }
         SetupKind::Currency => {
             if b.base_currency == from {
                 b.base_currency = to.to_string();
@@ -670,6 +682,7 @@ mod tests {
             cap: None,
             discount_percent: Dec::ZERO,
             excluded_fringes: ["PEN".to_string()].into(),
+            locations: BTreeSet::new(),
             rows: vec![CreditRow {
                 description: String::new(),
                 source: CreditSource::Group {

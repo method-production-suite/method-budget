@@ -121,6 +121,7 @@ this section.
 - **Globals with details.** Give a global a description, a unit and decimals, show it by name in cells, and see the formulas behind a selection.
 - **Contractual charges.** Percent and flat charges with exclusions, a live preview while you type, and the percent shown on the topsheet if you want it.
 - **Credits.** Credit rows show gross, excluded fringes, net and how far you are from a cap.
+- **Incentive estimates by location.** Limit a credit to the locations where the money is spent and see every program's estimate side by side, applied or not, from rates and caps you enter yourself.
 - **Apply panel.** Select lines, then tick fringes, groups, sets and locations on or off, with live totals for the selection.
 - **In-use counts.** Every setup list shows how many lines use each item and what they cost, warns before you delete one in use, and finds them in a click.
 
@@ -180,7 +181,7 @@ this section.
 
 - **Windows and Linux, tested.** Installers for both are built today; printing, keys and file types still need a hands-on check.
 - **Review files.** A reviewer marks up a read-only copy, and their comments come back in a small file you merge.
-- **Incentive modeling.** Qualified spend by location, several programs side by side, caps and what-ifs, from rules you enter yourself.
+- **Incentive what-ifs.** Move lines between locations and see what each incentive program gains or loses, with minimum spends and shared caps.
 - **Accessibility and translations.** A full accessibility pass and the app in more languages.
 - **Work on a budget together.** Several people in one budget at once, through a shared Dropbox or iCloud folder or a live link, with who changed what and undo that only takes back your own edits.
 - **Rate card lookup.** Pick a union classification and fill in the rate from public rate cards, with the source and effective date shown.
