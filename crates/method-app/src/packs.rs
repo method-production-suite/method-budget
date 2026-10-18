@@ -80,7 +80,7 @@ impl Packs {
         self.inner.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    fn listed(&self, token: u64) -> Result<PathBuf, String> {
+    pub(crate) fn listed(&self, token: u64) -> Result<PathBuf, String> {
         self.lock()
             .listed
             .iter()

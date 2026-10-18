@@ -184,7 +184,7 @@ this section.
 - **Accessibility and translations.** A full accessibility pass and the app in more languages.
 - **Work on a budget together.** Several people in one budget at once, through a shared Dropbox or iCloud folder or a live link, with who changed what and undo that only takes back your own edits.
 - **Rate card lookup.** Pick a union classification and fill in the rate from public rate cards, with the source and effective date shown.
-- **New project window.** Start a budget from one window with its title, chart of accounts, schedule, currency and rate setup, ready to fill in.
+- **New project window.** Start a budget from one window with its title, chart of accounts, schedule, currency, your setup library and setup packs, and later rate setup, ready to fill in.
 
 <!-- features:end -->
 

@@ -1235,6 +1235,22 @@ it, arrows move). Until something is picked by hand, the type picks our own char
 (feature, one-hour TV, commercial, documentary). A line under the choice says how many
 accounts and categories it has.
 
+**Setup to bring in** (decision 77), under the chart: a box for **Everything in my setup
+library** (with its item count, or why it can't be read; not shown until a library is
+picked in the Library tab) and one for each setup pack in the Packs list (the user's Packs
+folder, then the packs that come with the app), with its version, effective date, region
+and item count. Each ticked source brings every setup item it has, with what each needs,
+through Import Setup's import, the library first and then the packs in the list's order;
+a pack's items are stamped with the pack as the Packs list stamps them. The budget
+settings never come from them: they come from the form. What is ticked replaces the
+starting point's items of the same name (the starter's or a chart's defaults); two ticked
+sources that define the same item differently are refused with a sentence naming the item
+and both, and nothing is made. The setup comes in before the details typed in the form, so
+a typed Shoot days wins over a library's `SHOOT_DAYS`. The sentence after Create ends with
+what came in ("Setup from your library and Union Basics: 12 items added, 1 item
+replaced."). Nothing in a pack or a library is bundled rate data: packs ship empty
+(decision 50) and a library holds only what the user put in it.
+
 **Save in**: the folder the last new budget was saved in, else Documents, else the home
 folder; **Choose Folder…** changes it. The file name follows the title (characters a file
 name can't have become spaces) until it is typed by hand; `.mthd` is added. Enter in a text
@@ -1272,9 +1288,10 @@ as one undo step, so closing it asks to save.
 | `start_reveal` | `token` (shown in Finder, Explorer or the file manager) | nothing |
 | `new_budget_pick_template` | none (shows the Open dialog) | `{token, file, title, categories, accounts}`, or `null` when cancelled |
 | `new_budget_charts` | none | every bundled chart: `[{id, name, group, description, ours, categories, accounts}]` |
+| `new_budget_setup` | none | `{library, packs}`: `library` `{name, items, problem}` or `null` when none is picked; `packs` the Packs list's rows (`{token, file, place, title, version, effective, region, items, problem}`), listed again (tokens from an older listing are refused) |
 | `new_budget_folder` | none | Save In's first folder: `{token, folder}` (`folder` to show, `~` for home), or `null` |
 | `new_budget_pick_folder` | `current` (a folder token, or `null`; shows the folder dialog from there) | `{token, folder}`, or `null` when cancelled |
-| `new_budget_create` | `spec` (`{title, kind, season, episode, episodes, prep_start, shoot_start, shoot_end, wrap_end, prep_weeks, shoot_days, wrap_weeks, country, region, city, currency, start, chart, template, fringe_posting, arithmetic, folder, file_name}`; `start` is `starter`, `blank`, `chart` with `chart` an id, or `file` with `template` the picked token; `folder` a folder token or `null` for no file; `file_name` blank for the title) | `{view, message, taken}`: `taken` (a free file name, without `.mthd`) when a file of that name is there, and then nothing was made (`view` is `null`) |
+| `new_budget_create` | `spec` (`{title, kind, season, episode, episodes, prep_start, shoot_start, shoot_end, wrap_end, prep_weeks, shoot_days, wrap_weeks, country, region, city, currency, start, chart, template, fringe_posting, arithmetic, folder, file_name, library, packs}`; `start` is `starter`, `blank`, `chart` with `chart` an id, or `file` with `template` the picked token; `folder` a folder token or `null` for no file; `file_name` blank for the title; `library` true to bring in the setup library, `packs` the tokens of packs from `new_budget_setup`) | `{view, message, taken}`: `taken` (a free file name, without `.mthd`) when a file of that name is there, and then nothing was made (`view` is `null`) |
 
 The pinned list (at most 100), each file's bookmark and the last Save In folder are the
 data folder's `start.json`. A file is read once for its row and read again only when its
