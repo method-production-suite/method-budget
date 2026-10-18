@@ -3407,3 +3407,72 @@ browser, against method-session's `Host`. It is judged on the list above: screen
 input methods, copy and paste both ways, printing, speed with a 5,000-line budget, and
 whether it runs in the browser build. A pure-Rust toolkit that draws its own widgets
 (egui, iced, Slint) is considered only if trigger 1 holds.
+
+## 78. Who may change what in a shared budget: roles in the change log (2026-10-18)
+
+Roadmap 3.18's next step after folder mode (entries 62 and 64): roles, the first half of
+the design's phase 3 (docs/research/collaboration.md, sections 7 and 9.7). Invites, key
+pairs and signatures are the other half and wait for a dependency (`ed25519-dalek`, open
+question 14), so roles are built first, unsigned, the way `sig` was reserved in entry 62.
+Docs/APP.md, "Sharing a budget", says what a person sees; this records the choices.
+
+- **A role is a change.** A new op, `grant {actor, role, scope}` (docs/FORMAT.md, "The
+  change log"), gives one person a role: admin, editor, department editor with a scope of
+  categories or accounts by entity id, actuals, comment or read only. Grants are a
+  last-writer-wins register per person in the `State`, every write kept, like any field.
+  The owner is the actor of the first change applied (the genesis, which every other
+  change depends on, so every computer agrees), and is never given or taken a role.
+- **Judged where each change was made.** `log::access::check` runs on every change, this
+  computer's own before it is recorded and everyone else's as it is applied, and judges
+  it by its author's role as of the change's own `deps`: the last grant write whose change
+  is within them, and, for a department editor, where each line or note was within them
+  (the move register's history, or this change's own creates). Nothing in the check reads
+  the receiver's newer state, so every computer keeps and refuses the same changes in any
+  order. That also settles the concurrent cases without a rule of their own: a change made
+  before its author saw a new role keeps the old role's rights, and a line moved out of a
+  department editor's categories while they edited it keeps their edit. A refused change
+  is skipped whole and listed with the reason (`Log::rejected`), its seq still counted,
+  exactly as a malformed one (entry 62); `LogError::NotAllowed` says why. Property test
+  (crates/method-core/tests/log.rs): an owner, a department editor and an editor making
+  random edits for 4 rounds while the owner changes their roles, plus changes forged in
+  the name of someone without a role, exchanged in random orders: every log ends with the
+  same frontier, budget, roles and refused set, 24 seeds.
+- **Before any role, everyone edits everything; after the first, no role reads only**
+  (design 9.1: "someone who opens it without a role gets read only"). Budgets shared
+  before this version keep working unchanged until their owner sets a role, and the
+  Share dialog asks before the first one, naming who would read only.
+- **What each role may do**, from the design's table and entry 62's settled defaults:
+  admin everything and other people's roles, but only the owner makes admins or changes an
+  admin's role; editor everything but roles and the root's `baseline` (locking the
+  originals, design 9.9); department editor creates, changes, moves (within the scope at
+  both ends) and deletes lines and notes in its categories or accounts, which covers
+  applying existing fringes and groups, and nothing else (no setup items, so a unit typed
+  that doesn't exist yet is refused); actuals transactions, imports, estimates to complete
+  and notes; comment notes only; read only nothing. The dialog offers categories; the
+  engine and `share_set_role` take account numbers as well.
+- **Not undoable.** A role is set again in the dialog; it never enters the person's undo
+  steps, and `Log::undo` passes over a grant.
+- **The session asks before editing.** `SharedLog::refusal` (method-session, default none)
+  gives the sentence for a read-only person, and `Session::check_writable` returns it, so
+  every edit, value put back and undo is refused before anything is made. Narrower roles
+  are refused by the log when the edit is recorded; `SharedDoc` turns `NotAllowed` into a
+  sentence about what the role allows and who sets roles, and the session takes the edit
+  back as it does any failed capture.
+- **Limits, said in APP.md**: unsigned, so an app that doesn't check (or another program
+  writing in the folder) can write a change in anyone's name; the folder's own sharing is
+  what stops a reader writing at all. Revocation by cutoff (the design's "last seq of
+  theirs accepted") needs signatures to mean anything and comes with them; until then a
+  removed person's offline work is judged by what they had seen. An app older than this
+  can't read a segment with a `grant` op (`deny_unknown_fields`), so it stops at the first
+  one; everyone sharing a budget needs this version once roles are used.
+- **Interface** (share.js, shared.css): a role menu and Set button under each person in
+  the Share dialog for the owner and admins, a category checklist for Edits some
+  categories, each person's role in words in the People lists, a chip in the toolbar for
+  a person who may change less than everything. No muted cells or locks yet (design 9.7),
+  no access requests.
+- Tests: core (above, and a department editor in and out of scope, refusals by every
+  peer, a role not yet seen, a move apart, who sets roles), format (grant round trip,
+  roles through the folder with a forged change refused by a newcomer), session (a
+  read-only role refuses before recording), app (two sessions on one folder: a department
+  role, a refusal in words, a downgrade made apart keeping the edit, read only after
+  reopening; `set_role`'s checks). No dependency was added.
