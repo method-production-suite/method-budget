@@ -1,13 +1,18 @@
 # Least privilege by default. Pin all actions to full commit SHAs (pinact run).
 name: ci
+# Pushes to main, and pull requests: a feature branch runs once (as its pull request), not
+# twice. The org's Actions plan runs 20 jobs at a time across every repo (SUITE-STANDARDS.md,
+# section 6).
 on:
   push:
+    branches: [main]
   pull_request:
 permissions:
   contents: read
+# A newer push to a pull request cancels its older run; main always finishes.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   build:
     runs-on: ubuntu-latest
