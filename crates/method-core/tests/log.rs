@@ -1812,3 +1812,47 @@ fn a_forged_first_change_never_takes_the_budget() {
     assert!(a.apply(second_start).is_err());
     assert_eq!(a.owner(), Some(actor(5)));
 }
+
+#[test]
+fn a_co_owner_sets_roles_admins_included() {
+    let mut a = adopt(1, &sample());
+    a.grant(actor(2), Role::CoOwner, "Priya co-owns", T)
+        .unwrap();
+    let mut co = follower(2, &a);
+    assert!(co.role_of(actor(2)).sets_roles());
+    // A co-owner makes and changes admins, as the owner does.
+    co.grant(actor(3), Role::Admin, "Sam is an admin", T)
+        .unwrap();
+    co.grant(actor(3), Role::Editor, "Sam edits", T).unwrap();
+    co.grant(actor(3), Role::Admin, "Sam is an admin again", T)
+        .unwrap();
+    // Only the owner makes co-owners or changes one, and nobody changes
+    // the owner.
+    for (who, role) in [(actor(4), Role::CoOwner), (actor(1), Role::ReadOnly)] {
+        assert!(matches!(
+            co.grant(who, role, "no", T),
+            Err(LogError::NotAllowed { .. })
+        ));
+    }
+    let mut admin = follower(3, &co);
+    assert!(matches!(
+        admin.grant(actor(2), Role::Editor, "no", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    assert!(matches!(
+        admin.grant(actor(4), Role::CoOwner, "no", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    // The owner can still change the co-owner.
+    send(&co, &mut a);
+    assert!(a.rejected().is_empty(), "{:?}", a.rejected());
+    assert_eq!(a.role_of(actor(3)), Role::Admin);
+    a.grant(actor(2), Role::Admin, "Priya is an admin", T)
+        .unwrap();
+    // Now an admin, Priya no longer changes admins.
+    send(&a, &mut co);
+    assert!(matches!(
+        co.grant(actor(3), Role::Editor, "no", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+}

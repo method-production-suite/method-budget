@@ -1560,6 +1560,7 @@ mod tests {
     #[test]
     fn roles_round_trip_through_json() {
         let roles = [
+            Role::CoOwner,
             Role::Admin,
             Role::Editor,
             Role::Department([Uid(7), Uid(9)].into_iter().collect()),

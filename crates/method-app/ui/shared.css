@@ -731,3 +731,10 @@
   border: 1px solid var(--border);
   border-radius: 6px;
 }
+
+.share-first-role {
+  flex-basis: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}

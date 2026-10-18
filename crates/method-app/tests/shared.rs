@@ -629,6 +629,51 @@ fn refused_changes_are_shown_with_who_when_and_what() {
     assert_ne!(alex.budget().title, "Forged");
 }
 
+/// The owner makes someone a co-owner, who then sets roles, admins
+/// included, from their own computer (decisions.md, entry 78; the owner's
+/// answer of 2026-10-18).
+#[test]
+fn a_co_owner_sets_roles_from_their_own_computer() {
+    let (_path, mut alex, mut jordan) = two_sessions();
+    let sam = ActorId([3; 32]);
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "co_owner", &[])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert_eq!(st.me.role, "co_owner");
+    assert!(st.can_set_roles);
+    assert!(
+        st.me.role_text.starts_with("Co-owner"),
+        "{}",
+        st.me.role_text
+    );
+    // Jordan makes Sam an admin, and the owner sees it.
+    jordan
+        .shared_mut()
+        .unwrap()
+        .set_role(&sam.hex(), "admin", &[])
+        .unwrap();
+    // But makes no co-owners and leaves the owner alone.
+    let err = jordan
+        .shared_mut()
+        .unwrap()
+        .set_role(&sam.hex(), "co_owner", &[])
+        .unwrap_err();
+    assert!(err.contains("Only the owner makes co-owners"), "{err}");
+    assert!(jordan
+        .shared_mut()
+        .unwrap()
+        .set_role(&ALEX.hex(), "read_only", &[])
+        .is_err());
+    exchange(&mut alex, &mut jordan);
+    let st = alex.shared().unwrap().status(Instant::now());
+    let s = st.people.iter().find(|p| p.actor == sam.hex()).unwrap();
+    assert_eq!(s.role, "admin");
+    assert_eq!(st.refused, 0);
+}
+
 /// A second person for a live check of the built app (ignored: run by
 /// hand). `METHOD_LIVE_BUDGET` names a shared `.mthd`; this joins it as
 /// Jordan Lee, changes the first line's rate (to `METHOD_LIVE_RATE`,

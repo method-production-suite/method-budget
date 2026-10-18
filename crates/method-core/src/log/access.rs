@@ -32,6 +32,10 @@ use super::state::{Register, State};
 pub enum Role {
     /// Started sharing: everything, and sets everyone's role. Never given.
     Owner,
+    /// Everything the owner does but changing the owner, making co-owners
+    /// or changing one: the owner's way to make sure roles can still be
+    /// set if the owner's computer is lost. Only the owner gives it.
+    CoOwner,
     /// Everything, and sets the roles of everyone but the owner and admins.
     Admin,
     /// Everything but roles and locking the originals.
@@ -52,6 +56,7 @@ impl Role {
     pub fn key(&self) -> &'static str {
         match self {
             Role::Owner => "owner",
+            Role::CoOwner => "co_owner",
             Role::Admin => "admin",
             Role::Editor => "editor",
             Role::Department(_) => "department",
@@ -70,6 +75,7 @@ impl Role {
         }
         Some(match key {
             "owner" => Role::Owner,
+            "co_owner" => Role::CoOwner,
             "admin" => Role::Admin,
             "editor" => Role::Editor,
             "department" => Role::Department(scope),
@@ -90,7 +96,7 @@ impl Role {
 
     /// Sets other people's roles.
     pub fn sets_roles(&self) -> bool {
-        matches!(self, Role::Owner | Role::Admin)
+        matches!(self, Role::Owner | Role::CoOwner | Role::Admin)
     }
 
     /// Can change nothing at all.
@@ -225,11 +231,17 @@ pub fn check(state: &State, change: &Change) -> Result<(), Refusal> {
             if state.owner() == Some(*actor) {
                 return Err(refuse("the owner's role doesn't change".into()));
             }
-            if role == Role::Admin
-                && (*given == Role::Admin || role_at(state, *actor, deps) == Role::Admin)
-            {
+            let target = role_at(state, *actor, deps);
+            let co_owners = |r: &Role| *r == Role::CoOwner;
+            let admins = |r: &Role| matches!(r, Role::Admin | Role::CoOwner);
+            if role == Role::CoOwner && (co_owners(given) || co_owners(&target)) {
                 return Err(refuse(
-                    "only the owner makes admins or changes an admin's role".into(),
+                    "only the owner makes co-owners or changes a co-owner's role".into(),
+                ));
+            }
+            if role == Role::Admin && (admins(given) || admins(&target)) {
+                return Err(refuse(
+                    "only the owner and co-owners make admins or change an admin's role".into(),
                 ));
             }
             continue;
@@ -237,7 +249,7 @@ pub fn check(state: &State, change: &Change) -> Result<(), Refusal> {
         let entity = op.entity();
         let kind = kind_of(state, &made, entity);
         match &role {
-            Role::Owner | Role::Admin => {}
+            Role::Owner | Role::CoOwner | Role::Admin => {}
             Role::Editor => {
                 if let Op::Set {
                     field: Field::Baseline,

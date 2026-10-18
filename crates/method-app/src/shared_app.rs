@@ -305,7 +305,7 @@ pub fn share_set_me(
 }
 
 /// Sets what person `actor` may change in budget `doc` (decisions.md,
-/// entry 78): `role` is "admin", "editor", "department", "actuals",
+/// entry 78): `role` is "co_owner", "admin", "editor", "department", "actuals",
 /// "comment" or "read_only"; `scope` a department editor's category
 /// numbers. Returns the status with the new role.
 #[tauri::command]

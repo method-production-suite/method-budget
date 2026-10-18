@@ -288,7 +288,7 @@ pub struct PersonDto {
     pub account: Option<String>,
     /// How many changes of theirs this computer has.
     pub changes: u64,
-    /// What they may change: "owner", "admin", "editor", "department",
+    /// What they may change: "owner", "co_owner", "admin", "editor", "department",
     /// "actuals", "comment" or "read_only".
     pub role: String,
     /// The role in words: "Edits everything", "Edits 2000 Production".
@@ -1460,7 +1460,10 @@ impl SharedDoc {
             Role::Editor => {
                 "Only the owner and admins lock the originals or set what people may change.".into()
             }
-            Role::Admin => "Only the owner makes admins or changes an admin's role.".into(),
+            Role::Admin => {
+                "Only the owner and co-owners make admins or change an admin's role.".into()
+            }
+            Role::CoOwner => "Only the owner makes co-owners or changes a co-owner's role.".into(),
             Role::Owner => format!("This change couldn't be shared: {e}"),
         }
     }
@@ -1531,6 +1534,9 @@ impl SharedDoc {
     pub fn role_text(&self, role: &Role) -> String {
         match role {
             Role::Owner => "Owner: edits everything and sets what people may change".into(),
+            Role::CoOwner => {
+                "Co-owner: edits everything and sets what people may change, admins included".into()
+            }
             Role::Admin => "Edits everything and sets what people may change".into(),
             Role::Editor => "Edits everything".into(),
             Role::Department(scope) => format!("Edits {}", self.scope_words(scope)),
@@ -1541,7 +1547,7 @@ impl SharedDoc {
     }
 
     /// Sets what the person `actor` (64 hex characters) may change:
-    /// `role` is "admin", "editor", "department", "actuals", "comment" or
+    /// `role` is "co_owner", "admin", "editor", "department", "actuals", "comment" or
     /// "read_only"; `scope` lists a department editor's categories or
     /// accounts by number. One change by this person, shared like any
     /// edit; not an undo step (set the role again to change it back).
@@ -1582,7 +1588,11 @@ impl SharedDoc {
             .grant(who, role, &label, &iso_now())
             .map_err(|e| match me {
                 Role::Admin => {
-                    "Only the owner makes admins or changes an admin's role.".to_string()
+                    "Only the owner and co-owners make admins or change an admin's role."
+                        .to_string()
+                }
+                Role::CoOwner => {
+                    "Only the owner makes co-owners or changes a co-owner's role.".to_string()
                 }
                 Role::Owner => format!("This role couldn't be set: {e}"),
                 _ => format!(

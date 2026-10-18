@@ -212,7 +212,7 @@ function renderPeople(s) {
 }
 
 /** Roles that change everything need no chip; the others say what this person may change. */
-const FULL_ROLES = ['owner', 'admin', 'editor'];
+const FULL_ROLES = ['owner', 'co_owner', 'admin', 'editor'];
 
 const CHIP_TEXT = { department: 'Some categories', actuals: 'Actuals', comment: 'Notes only', read_only: 'Read only' };
 
@@ -837,8 +837,8 @@ const UNSIGNED_NOTE = 'Roles stop people changing what they shouldn’t by accid
 /** An app older than this one can't read a change file that holds a role. */
 const OLDER_APPS_NOTE = 'Once roles are set, everyone sharing this budget needs this version of Method Budget or later. An older version won’t join it: it says the shared changes are newer than it reads and opens the file on its own, and what is changed there isn’t shared.';
 
-/** The owner is one computer: an admin is the way back if it is lost. */
-const ADMIN_NOTE = 'Only you and admins can set roles, so if this computer is lost, an admin is the only way to change them. Think about making someone you trust an admin.';
+/** The owner is one computer: an admin (or co-owner) is the way back if it is lost. */
+const ADMIN_NOTE = 'Only you, co-owners and admins can set roles, so if this computer is lost, they are the only way to change them. Name someone you trust as an admin now; you can make them a co-owner later, who can also make admins.';
 
 /** A scope only goes with Edits some categories (Rust refuses it too). */
 const SCOPE_NOTE = 'Only Edits some categories names categories. Untick them, or pick Edits some categories.';
@@ -869,9 +869,16 @@ const ROLE_CHOICES = [
  */
 function rolePicker(p, s, setup, error) {
   if (p.role === 'owner') return null;
-  const owner = s.me && s.me.role === 'owner';
-  if (p.role === 'admin' && !owner) return null;
-  const choices = owner ? [['admin', 'Edits everything and sets roles'], ...ROLE_CHOICES] : ROLE_CHOICES;
+  const mine = s.me ? s.me.role : '';
+  const owner = mine === 'owner';
+  // Only the owner changes a co-owner; the owner and co-owners change admins.
+  if (p.role === 'co_owner' && !owner) return null;
+  if (p.role === 'admin' && !owner && mine !== 'co_owner') return null;
+  const choices = [
+    ...(owner ? [['co_owner', 'Co-owner: sets roles, admins included']] : []),
+    ...(owner || mine === 'co_owner' ? [['admin', 'Edits everything and sets roles']] : []),
+    ...ROLE_CHOICES,
+  ];
   const id = `share-role-${p.actor.slice(0, 12)}`;
   const select = el('select', { class: 'modal-input share-role-select', attrs: { id, 'aria-label': `What ${p.name} may change` } });
   for (const [key, label] of choices) {
@@ -896,40 +903,73 @@ function rolePicker(p, s, setup, error) {
   select.addEventListener('change', drawCats);
   drawCats();
   const set = el('button', { class: 'btn', text: 'Set', attrs: { type: 'button' } });
-  set.addEventListener('click', async () => {
+  // The first role: the question, in place (a second dialog would hide this
+  // one), with a choice of admin to name at the same time.
+  const first = el('div', { class: 'share-first-role', attrs: { role: 'group', 'aria-label': 'Before the first role' } });
+  first.hidden = true;
+  const apply = async (adminActor) => {
+    set.disabled = true;
+    try {
+      let status = await ctx.invoke('share_set_role', {
+        doc: ctx.doc(),
+        actor: p.actor,
+        role: select.value,
+        scope: [...picked],
+      });
+      if (adminActor) {
+        status = await ctx.invoke('share_set_role', { doc: ctx.doc(), actor: adminActor, role: 'admin', scope: [] });
+      }
+      if (status) statusArrived({ doc: ctx.doc(), status });
+      ctx.toast(`Saved. ${p.name} sees it once it reaches them through the folder.`);
+      Object.assign(s, status || {});
+      first.hidden = true;
+    } catch (e) {
+      error.textContent = String(e);
+      error.hidden = false;
+    }
+    set.disabled = false;
+  };
+  const askFirst = () => {
+    const others = s.people.filter((x) => x.actor !== p.actor && x.role !== 'owner');
+    const names = others.map((x) => x.name);
+    const adminId = `share-first-admin-${p.actor.slice(0, 12)}`;
+    const admin = el('select', { class: 'modal-input share-role-select', attrs: { id: adminId } });
+    admin.append(el('option', { text: 'Not now', attrs: { value: '' } }));
+    const candidates = select.value === 'admin' || select.value === 'co_owner' ? others : [p, ...others];
+    for (const x of candidates) admin.append(el('option', { text: `Make ${x.name} an admin`, attrs: { value: x.actor } }));
+    const go = el('button', { class: 'btn btn-primary', text: 'Set Role', attrs: { type: 'button' } });
+    const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
+    go.addEventListener('click', () => {
+      const chosen = admin.value;
+      // Naming the person being set as the admin makes them one instead.
+      if (chosen === p.actor) select.value = 'admin';
+      apply(chosen && chosen !== p.actor ? chosen : null);
+    });
+    cancel.addEventListener('click', () => { first.hidden = true; set.focus(); });
+    first.replaceChildren(
+      el('p', { class: 'modal-message', text: `From now on, people without a role can only read this budget.${names.length ? ` ${names.join(', ')} will read only until you give them a role too.` : ''}` }),
+      el('p', { class: 'modal-message', text: OLDER_APPS_NOTE }),
+      el('p', { class: 'modal-message', text: ADMIN_NOTE }),
+      el('label', { class: 'modal-field', attrs: { for: adminId } }, el('span', { text: 'An admin' }), admin),
+      el('div', { class: 'modal-actions' }, cancel, go),
+    );
+    first.hidden = false;
+    admin.focus();
+  };
+  set.addEventListener('click', () => {
     error.hidden = true;
     if (select.value !== 'department' && picked.size > 0) {
       error.textContent = SCOPE_NOTE;
       error.hidden = false;
       return;
     }
-    if (!s.roles_started) {
-      const others = s.people.filter((x) => x.actor !== p.actor && x.role !== 'owner').map((x) => x.name);
-      const yes = await confirmDialog({
-        title: 'Set what people may change',
-        message: `From now on, people without a role can only read this budget.${others.length ? ` ${others.join(', ')} will read only until you give them a role too.` : ''} ${OLDER_APPS_NOTE} ${ADMIN_NOTE}`,
-        confirmText: 'Set Role',
-      });
-      if (!yes) return;
+    if (!s.roles_started && owner) {
+      askFirst();
+      return;
     }
-    set.disabled = true;
-    try {
-      const status = await ctx.invoke('share_set_role', {
-        doc: ctx.doc(),
-        actor: p.actor,
-        role: select.value,
-        scope: [...picked],
-      });
-      if (status) statusArrived({ doc: ctx.doc(), status });
-      ctx.toast(`Saved. ${p.name} sees it once it reaches them through the folder.`);
-      Object.assign(s, status || {});
-    } catch (e) {
-      error.textContent = String(e);
-      error.hidden = false;
-    }
-    set.disabled = false;
+    apply(null);
   });
-  return el('div', { class: 'share-role-row' }, el('label', { class: 'share-line-label', text: 'May change', attrs: { for: id } }), select, set, cats);
+  return el('div', { class: 'share-role-row' }, el('label', { class: 'share-line-label', text: 'May change', attrs: { for: id } }), select, set, cats, first);
 }
 
 /** Once per budget: what sharing means for saving (design 9.2). */
