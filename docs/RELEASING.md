@@ -218,9 +218,11 @@ gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD -R method-production-suite/meth
 | `TAURI_SIGNING_PRIVATE_KEY` | the updater private key: the whole content of the key file (below) | the updater archive and `latest.json` (when the app trusts a real key) |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | that key's password | |
 
-The Mac build is signed as the Developer ID named in the workflow
-(`SIGNING_IDENTITY` in `release.yml`; decisions.md, entry 48); the workflow stops if the
-imported certificate is a different one. To check what a secret is set to, there is no
+The Mac build is signed with the Developer ID Application identity the imported
+certificate holds, for the Apple team named in the workflow (`SIGNING_TEAM_ID` in
+`release.yml`; decisions.md, entry 48). The workflow reads the identity from the
+certificate, so no name sits in the repository, and stops if the certificate holds no
+Developer ID Application identity for that team. To check what a secret is set to, there is no
 reading it back: set it again.
 
 ## The updater key
