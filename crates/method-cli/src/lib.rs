@@ -36,6 +36,7 @@ mod cmd {
     pub mod new;
     pub mod pack;
     pub mod report;
+    pub mod review;
     pub mod sample;
     pub mod schedule_days;
     pub mod set;
@@ -126,6 +127,11 @@ const COMMANDS: &[Command] = &[
         name: "schedule-days",
         usage: cmd::schedule_days::USAGE,
         run: cmd::schedule_days::run,
+    },
+    Command {
+        name: "review",
+        usage: cmd::review::USAGE,
+        run: cmd::review::run,
     },
     Command {
         name: "coa",

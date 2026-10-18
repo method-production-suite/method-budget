@@ -145,6 +145,7 @@
       coa_import_pick: { accept: `${SHEET},.mthd` },
       export_import_pick: { accept: '.json,.xml,.xlsx,.txt,.tab,.tsv' },
       schedule_days_pick: { accept: '.json' },
+      review_open: { accept: '.json' },
     };
 
     // Desktop commands the page asks at start-up: answered as "nothing
@@ -163,6 +164,9 @@
 
     let lastRev = null;
     let tabs = [];
+    // Budgets whose review file has comments not downloaded yet (from each
+    // view's `review.unsaved`): closing the page asks first, as for budgets.
+    const unsavedReviews = new Set();
     let host = null;
 
     async function invoke(from, cmd, args) {
@@ -221,6 +225,10 @@
       const view = viewIn(reply);
       if (!view) return;
       if (Array.isArray(view.tabs)) tabs = view.tabs;
+      if (view.review && view.review.unsaved) unsavedReviews.add(view.doc);
+      else unsavedReviews.delete(view.doc);
+      // A closed tab takes its review with it.
+      for (const d of [...unsavedReviews]) if (tabs.length && !tabs.some((t) => t.id === d)) unsavedReviews.delete(d);
       if (view.rev !== lastRev) {
         lastRev = view.rev;
         emit(null, 'view-changed', { doc: view.doc, rev: view.rev }, from);
@@ -236,7 +244,7 @@
     }
 
     window.addEventListener('beforeunload', (e) => {
-      if (!tabs.some((t) => t.dirty)) return;
+      if (!tabs.some((t) => t.dirty) && !unsavedReviews.size) return;
       e.preventDefault();
       e.returnValue = '';
     });

@@ -64,7 +64,16 @@ export function indexView(view) {
   // Some line has a person even when the totals failed: the Person column stays.
   const hasPersons = Boolean(view.has_persons) || Boolean(persons);
 
-  return { b, r, topsheet, cats, levels, cellIssues, accountHasIssue, categoryHasIssue, variance, cost, persons, hasPersons };
+  // Lines, accounts and categories with review comments to settle
+  // (comments.js): a mark on their number.
+  const rv = view.review && typeof view.review === 'object' ? view.review : null;
+  const commented = {
+    rows: new Set(rv && Array.isArray(rv.rows) ? rv.rows : []),
+    accounts: new Set(rv && Array.isArray(rv.accounts) ? rv.accounts : []),
+    categories: new Set(rv && Array.isArray(rv.categories) ? rv.categories : []),
+  };
+
+  return { b, r, topsheet, cats, levels, cellIssues, accountHasIssue, categoryHasIssue, variance, cost, persons, hasPersons, commented };
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +235,7 @@ function isZero(total, bad, change, cost = null) {
 // row, double-click opens the category (grid.js editOnDoubleClick).
 export const TOPSHEET_COLUMNS = [
   { key: 'code', label: 'Acct #', editOnDoubleClick: true },
-  { key: 'name', label: 'Description', editOnDoubleClick: true },
+  { key: 'name', label: 'Description', editOnDoubleClick: true, rowHeader: true },
   { key: 'total', label: 'Total', cls: 'num' },
 ];
 
@@ -286,7 +295,7 @@ export function topsheetRows(ix, choices = null) {
       kind: 'category',
       activatable: true,
       cells: {
-        code: { text: row.code, edit: row.code },
+        code: commentedCell({ text: row.code, edit: row.code }, ix.commented.categories.has(row.code)),
         name: noted({ text: row.name, edit: row.name }, row.notes),
         total: c && c.rep ? moneyCell(c.rep.total, bad ? { error: PROBLEM } : {}) : NA,
         ...(ix.variance ? varianceCells(ix.variance.categories[row.code]) : {}),
@@ -344,7 +353,7 @@ export function topsheetRows(ix, choices = null) {
 
 export const ACCOUNT_COLUMNS = [
   { key: 'code', label: 'Acct #', editOnDoubleClick: true },
-  { key: 'name', label: 'Description', editOnDoubleClick: true },
+  { key: 'name', label: 'Description', editOnDoubleClick: true, rowHeader: true },
   { key: 'fringe_total', label: 'Fringes', cls: 'num' },
   { key: 'total', label: 'Total', cls: 'num' },
 ];
@@ -389,7 +398,7 @@ export function accountRows(ix, entry) {
       cls: 'account',
       activatable: true,
       cells: {
-        code: { text: a.code, edit: a.code },
+        code: commentedCell({ text: a.code, edit: a.code }, ix.commented.accounts.has(a.code)),
         name: noted({ text: a.name, edit: a.name }, a.notes),
         fringe_total: ar ? { text: ar.fringe_total ? money(ar.fringe_total) : '', cls: frCls } : NA,
         total: ar ? moneyCell(ar.total, bad ? { error: PROBLEM } : {}) : NA,
@@ -440,7 +449,7 @@ export function accountRows(ix, entry) {
 // whether they show until the user chooses.
 export const DETAIL_COLUMNS = [
   { key: 'num', label: '#', cls: 'num', width: 44, min: 44, pin: 'left' },
-  { key: 'description', label: 'Description', width: 240, min: 130, pin: 'left', grow: true },
+  { key: 'description', label: 'Description', width: 240, min: 130, pin: 'left', grow: true, rowHeader: true },
   { key: 'amount', label: 'Amount', cls: 'num', width: 110, min: 70 },
   { key: 'unit', label: 'Unit', width: 72, min: 50 },
   { key: 'x', label: 'X', name: 'X (multiplier)', cls: 'num', title: 'Multiplier (blank counts as 1)', width: 52, min: 40, optional: true, on: true },
@@ -515,6 +524,14 @@ export function detailColumns(choices, ctx = {}) {
  */
 function formulaCell(f, issue, ctx = {}) {
   return numberCell(f, { ...ctx, value: ctx.values ? ctx.values[ctx.field] : undefined, issue });
+}
+
+const COMMENTED = 'Review comments to settle: see the Comments tab';
+
+/** A number cell marked when its row has review comments to settle. */
+function commentedCell(cell, on) {
+  if (!on) return cell;
+  return { ...cell, cls: cell.cls ? `${cell.cls} has-comment` : 'has-comment', title: cell.title ? `${COMMENTED}\n${cell.title}` : COMMENTED };
 }
 
 /** A cell with a note mark and the notes as its tooltip, when there are notes. */
@@ -741,6 +758,7 @@ export function detailRows(ix, entry, ai, full, shown = null) {
       const what = `A hidden column changes this line's total: ${hidden.join(', ')}`;
       num.title = num.title ? `${what}\n${num.title}` : what;
     }
+    if (ix.commented.rows.has(d.id)) Object.assign(num, commentedCell(num, true));
     const cellCtx = (field) => ({ ...numCtx, field, values: values[i] });
 
     // A separator is a drawn rule: nothing to edit or total, but it can be

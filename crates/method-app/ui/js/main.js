@@ -27,6 +27,8 @@
 
 import { invoke, connected, setDefaultArgs } from './api.js';
 import { el, $, isTextField } from './dom.js';
+// A review file's close question (comments.js).
+import { confirmCloseReview } from './comments.js';
 import { Grid, parseTSV } from './grid.js';
 import {
   indexView,
@@ -78,7 +80,8 @@ import { exportPack, importPack } from './packs.js';
 import { exportSetupLists, importSetupLists } from './setuplists.js';
 import { importActuals } from './actualsimport.js';
 import { saveShareCopy, newSubBudget, renderShareBanner, offerReturnedCopy } from './sharing.js';
-import { displayCommands, userDisplay, withoutZeroRows } from './display.js';
+import { displayCommands, userDisplay, withoutZeroRows, totalText } from './display.js';
+import { announce } from './announce.js';
 import { initShare, renderBar as renderShareBar, decorateShare, reportPlace, openShareDialog, whoChangedThis, lookedAt, shareShown } from './share.js';
 import { setExplainTarget, explainTargetAt } from './explain.js';
 import { showStart, closeStart, startMenu, isStartOpen, startAtLaunch, startOnLastClose } from './start.js';
@@ -343,7 +346,12 @@ function trackChanges(view, opts) {
     c.prev = net;
     return;
   }
-  if (!NOT_EDITS.has(opts.cmd)) c.last = net - c.prev;
+  if (!NOT_EDITS.has(opts.cmd)) {
+    c.last = net - c.prev;
+    // Screen readers hear where the net total went (decision 82); an edit
+    // that moves no money says nothing.
+    if (c.last !== 0) announce(`Net total ${totalText(net)}, ${c.last > 0 ? 'up' : 'down'} ${totalText(Math.abs(c.last))}`);
+  }
   c.prev = net;
 }
 
@@ -401,6 +409,8 @@ function render(opts = {}) {
   // A copy saved for sharing: read-only, and where it came from (sharing.js);
   // the target pane's budget, split.
   if (cur === target) renderShareBanner(v, sharingCtx());
+  // A review file open on the budget (comments.js).
+  if (cur === target) renderReviewBanner(v);
   renderActions();
 
   const ix = state.ix;
@@ -1631,6 +1641,35 @@ function togglePanel() {
 let toolsFocus = null;
 
 /** Opens the tools panel on a tab and puts focus on the tab. */
+/** The review banner under the breadcrumb, while a review file is open (comments.js). */
+function renderReviewBanner(view) {
+  const host = $('review-banner');
+  if (!host) return;
+  const r = view && view.review;
+  if (!r || typeof r !== 'object') {
+    host.hidden = true;
+    host.replaceChildren();
+    return;
+  }
+  const reviewing = r.mode === 'reviewing';
+  const show = el('button', { class: 'btn btn-quiet', text: 'Show Comments', attrs: { type: 'button' } });
+  show.addEventListener('click', () => showTab('comments'));
+  const close = el('button', { class: 'btn btn-quiet', text: reviewing ? 'Stop Reviewing' : 'Close Review File', attrs: { type: 'button' } });
+  close.addEventListener('click', async () => {
+    if (await confirmCloseReview(r)) act('review_close', { doc: view.doc });
+  });
+  const n = Number(r.to_settle) || 0;
+  host.replaceChildren(
+    el('strong', { text: reviewing ? 'Open for review: read-only.' : 'Review comments.' }),
+    el('span', {
+      class: 'share-banner-detail',
+      text: reviewing ? `Comments go in ${r.file}.` : `${n} ${n === 1 ? 'comment' : 'comments'} from ${r.file} to merge or dismiss.`,
+    }),
+    el('span', { class: 'share-banner-actions' }, show, close),
+  );
+  host.hidden = false;
+}
+
 function showTab(tab, focus = null) {
   const key = selectToolsTab(tab);
   // `focus`: a control in the tab to focus instead of the tab itself.
@@ -2414,6 +2453,23 @@ Object.assign(COMMANDS, {
   },
 });
 
+// File > Open for Review… and Open Review Comments…: a review file's
+// comments beside a budget, shown in the Comments tab (comments.js;
+// src/review.rs). In a browser, Open for Review reviews the budget in front.
+Object.assign(COMMANDS, {
+  'file.open_for_review': async () => {
+    if (grid.editor) grid.commitEdit(null);
+    const v = await act(isWeb() ? 'review_start' : 'review_open_budget', isWeb() ? { doc: state.doc } : {});
+    if (v) showTab('comments');
+  },
+  'file.open_review_comments': async () => {
+    if (grid.editor) grid.commitEdit(null);
+    if (!state.view) return;
+    const v = await act('review_open', { doc: state.doc });
+    if (v) showTab('comments');
+  },
+});
+
 // File > Import Schedule Days…: a schedule's day counts set globals, after a
 // review, as one undo step (scheduledays.js; src/schedule_days.rs).
 Object.assign(COMMANDS, {
@@ -2886,6 +2942,7 @@ function setTarget(p) {
     renderTitle(state.view);
     // The one share banner follows the target's budget, as the title does.
     renderShareBanner(state.view, sharingCtx());
+    renderReviewBanner(state.view);
     renderPanel();
     showFormula(grid.cursorCell());
     document.dispatchEvent(new CustomEvent('method:selection'));
@@ -3196,6 +3253,8 @@ function webFileMenu() {
     item('file.compare', 'Compare Budgets…'),
     item('file.what_changed', 'What Changed…'),
     item('file.merge', 'Merge Changes From…'),
+    item('file.open_for_review', 'Open for Review…'),
+    item('file.open_review_comments', 'Open Review Comments…'),
     sep,
     item('file.print_budget', 'Print…'),
     item('file.print_topsheet', 'Print Topsheet…'),

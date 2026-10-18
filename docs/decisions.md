@@ -3902,6 +3902,144 @@ docs/FORMAT.md, "Credit"; command line: docs/CLI.md, `method-budget incentives`;
   an unapplied credit's row figures in its rows table, and a per-location view in the
   printed reports.
 
+## 81. Review files: comments beside a budget, merged back as notes (2026-10-18)
+
+Roadmap 3.3, first slice: a reviewer marks up a budget they can't change, the comments land
+in a small file beside it, and the author merges them back. The local stand-in for shared
+comments (decision 14: no accounts, no cloud), built on the copies for sharing of entry 39
+and the dated notes of entry 35. Behavior: docs/APP.md, "Review files"; the file:
+docs/FORMAT.md, "Review files"; the command line: docs/CLI.md, `method-budget review`.
+
+- **A sidecar of its own, no `.mthd` change.** Comments go in `<budget>.review.json`
+  (`format: "method-budget-review"`, version 1), never in the budget: a reviewer works on
+  a copy they may not be allowed to change, a review should not make the budget dirty, and
+  the format stays at version 1 with nothing for older readers to refuse. The file is
+  strict like the `.mthd` (unknown fields refused, so a version number means a shape),
+  deterministic, at most 8 MB and 10,000 comments, and names no path. Its `budget` block
+  carries the reviewed title and, for a copy saved for sharing, the provenance's source
+  title, version and time, so the author's app can say "this review was written on another
+  budget" (matched by title as returned copies are, entry 39).
+- **Anchors by identity**, as diff and merge match (entry 44): a line by row id, an account
+  by number, a category by code, a setup item by kind and name, or the whole budget. Each
+  comment also keeps `where`, its place in words when written, so one whose place has gone
+  (a line deleted, an account renumbered, a fringe renamed) is listed with where it was,
+  never dropped, and never guessed onto another place.
+- **Reviewing is read-only in the session.** A session with a review file open for writing
+  refuses every edit, undo, redo and history jump in `check_writable` (one message, as for
+  shared copies), whatever sends it. A budget never saved has no place beside it and is
+  refused; a budget shared through a folder too (its change log is the shared way).
+- **No comment is lost on the way to disk** (amended after review, the same day). The
+  desktop writes the file beside the budget after every change, atomically, and only when
+  the file there is still the one it read or wrote last: the file's stamp (size, time and
+  content hash, the model the budget's own saves use). When someone else wrote it meanwhile
+  (the reviewer and the author at once, or a synced folder on two computers) it is left
+  alone, the person is told once, and the Comments tab offers Save Review File As… (beside
+  it) or Replace the File. A write that fails is said once and the comments stay. Closing a
+  review writes first and stays open, with the reason, when it can't. The browser build
+  keeps comments only until downloaded, so while some aren't, closing or reloading the page
+  asks first (as for unsaved budgets) and Stop Reviewing or Close Review File asks before
+  dropping them. The command line reads a review file under the format's 8 MB cap, without
+  reading a larger one in.
+- **Merging makes notes** on the line, account or category: the comment's text, author,
+  `created` and `edited`, and ticked off as reviewed when the reviewer resolved it. The
+  merges of one action are one undo step ("Merge 3 review comments as notes").
+- **A merged comment is known by the file first** (amended after review, the same day):
+  its `outcome` "merged" is the source of truth, so a note the author edited or deleted
+  since is never merged a second time; a note on its place with the same text, time and
+  author counts too, for a file that doesn't say (written elsewhere, or before the outcome
+  was saved). Undo still opens the comment again: the session remembers the budget
+  revision each merge left, and while that change is taken back (undone, or undone and
+  replaced by another edit) the comment's "merged" is set aside on screen and in the file
+  written, which an undo or redo rewrites. The first version matched only by the note, so
+  Merge All after an edit added the note again.
+- **Built on the recommendation: dismissing is not an undo step.** It changes only the
+  review file (the budget doesn't change), so Undo can't take it back; Restore does. The
+  alternative, the session's undo stack carrying review state, would make the history mix
+  budget changes and file changes. Reversible.
+- **Built on the recommendation: comments on setup items and the whole budget stay in the
+  file.** Setup items and the budget have no notes, so they can't be merged without a
+  format change (a `notes` list on setup items, or budget-level notes; additive, but an
+  older reader refuses a file that has one). They are listed with the reason, can be
+  dismissed, and the reviewer can see them answered by the outcome. Reversible: adding
+  notes there later turns them into merges.
+- **Roles (entry 78) apply to merging like any edit.** Merging goes through the session's
+  edit, so a person whose role only reads is refused before anything is made, and a note
+  their role doesn't allow (a department editor outside its categories) is refused by the
+  change log; either way nothing is merged and no outcome is marked. Dismissing changes
+  only the review file and is allowed. Reviewing a budget shared through a folder is
+  refused: its change log is the shared way to talk about it.
+- **The author's outcomes go back into the reviewer's file** (written where it was opened
+  from), so the file is the conversation's record; the budget never points at it.
+- **Logic in method-session** (`review`: no file system, no clock, builds for the browser;
+  the format in method-format's `review`), so the desktop, the browser build (eleven host
+  commands; the page's picker takes the file and Download Review File gives it back), the
+  command line and the MCP server read alike.
+- **Not built** (3.3 still open): writing comments on setup items from the app (the command
+  line can), replies and threads, more than one reviewer's file at once (each is opened in
+  turn; ids are per file), showing a comment's text in the grid's tooltip, an Open for Review
+  that continues an existing file in the browser build, the returned-copy question offering
+  the review file, and notes on setup items.
+- Tests: method-format's `review` tests (round trip to the same bytes, a hand-written file,
+  every refusal), method-session's `review` tests (reviewing read-only, every comment
+  command, the list's order and places, merging as one undo step, merging twice, undo,
+  dismiss and restore, gone places listed not dropped, another budget's review, a shared
+  copy's provenance, command-line anchors, merging into a shared budget through the role
+  check, an edited or deleted merged note never merged again, an undone merge opening the
+  comment and the file following) and its host test (a review out as a download and
+  back as notes), method-app's (the file written beside the budget after each change and
+  read back, a file changed on disk not written over, a failed write keeping the review
+  open), method-cli's `review_comments_are_written_listed_and_merged_back` and
+  `review_files_over_the_size_cap_are_refused_unread`, the MCP tool's test, and
+  scripts/web-smoke.mjs (unsaved comments make closing the page and Stop Reviewing ask).
+
+## 82. Accessibility, first slice: an ARIA grid, polite totals, modal dialogs, contrast (2026-10-18)
+
+Roadmap 3.14, the accessibility half, first slice (behavior: docs/APP.md, "Screen readers
+and contrast"; the audit and what is left: docs/research/accessibility-audit.md).
+
+- **The grid keeps focus; the cursor is an active descendant.** The grid already keeps
+  focus on its host and moves a cursor cell, and every key in docs/APP.md depends on
+  that. Moving focus into cells (a roving tab index) would touch every key path and
+  every redraw. So the host is the `role="grid"` element with `aria-activedescendant` on
+  the cursor cell, and the table under it is presentation, its rows and cells carrying
+  their roles themselves. Keyboard behavior is unchanged.
+- **Places, states and a name for the cursor cell.** `aria-rowcount`, `aria-rowindex` and
+  `aria-colindex` are there because long grids draw only some rows. Computed cells are
+  `aria-readonly`; the cursor cell and the cells of a selected range are `aria-selected`
+  (only those get the attribute, so a move touches a few cells, as the marks do). The
+  cursor cell alone gets an `aria-label`: what it shows, its column and the row's
+  description, value first so moving along a row starts with what changed. A column
+  marks itself `rowHeader` (the Description column at each level) to be the row's name
+  and its cells `rowheader`.
+- **Totals are announced after an edit, politely and once.** The sentence is the net
+  total and how far the edit moved it, the same figure as the footer's Last change, so
+  it costs no new command. It waits 700 ms after the last edit, so typing down a column
+  is one sentence at the end, not one per cell. An edit that moves no money, opening,
+  switching tabs and other people's changes say nothing (the same list as the footer's
+  counters). The live region sits outside the app so an open dialog, which makes the app
+  inert, doesn't silence it.
+- **Every dialog is a modal dialog to a screen reader.** The common form, confirm and
+  popover dialogs gain `role="dialog"` and `aria-modal`; `customDialog` adds them when a
+  builder left them out. The trap was already there (the page behind goes inert) and
+  focus already went back.
+- **Contrast follows BRAND.md.** The app's secondary text and note amber were lighter
+  than the brand tokens and fell under 4.5:1 on table heads and selected rows; they now
+  use the brand's muted and pencil amber. A popup menu's focused item gains the accent
+  ring, since its tint alone was 1.1:1.
+- **Tested headless, through the accessibility tree.** The repository tests UI scripts
+  through the browser build, so `scripts/web-smoke.mjs` reads Chrome's accessibility tree
+  (the DevTools protocol's Accessibility domain, no new dependency) and fails if a control
+  lacks a name, the grid's roles or the cursor cell's name are missing, an edit isn't
+  announced, or a dialog isn't a named modal that holds focus and gives it back. Written
+  first; it failed on the code before this change. A real screen reader still needs the
+  owner's hands (docs/ROADMAP.md, "Waiting on the owner").
+- **No localization framework yet.** The audit lists where the words live and what a
+  slice would need; which languages come first is the owner's call.
+- **Not built** (3.14 stays partial): a check with real screen readers, announcing the
+  footer's other totals, focus going back to a redrawn opener, an empty grid's focus,
+  forced colors and reduced motion, dialog semantics for the browser build's Budget Setup
+  frame, and localization.
+
 ## 83. Updates through the suite's method-update crate, not the Tauri updater plugin (2026-10-18)
 
 - **The work underneath moves; the app looks and behaves the same.** `tauri-plugin-updater`

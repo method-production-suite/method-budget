@@ -44,6 +44,7 @@ pub mod rename;
 pub mod renumber;
 pub mod report_dto;
 pub mod reports;
+pub mod review;
 pub mod rowstyle;
 pub mod safety;
 pub mod schedule_days;
