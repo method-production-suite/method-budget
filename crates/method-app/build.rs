@@ -209,6 +209,10 @@ const COMMANDS: &[&str] = &[
     "export_import_pick",
     "export_import_preview",
     "export_import",
+    // A schedule's day counts into globals (src/schedule_days.rs)
+    "schedule_days_pick",
+    "schedule_days_review",
+    "schedule_days_apply",
     // Actuals and the cost report (src/actuals.rs)
     "actuals_pick",
     "actuals_preview",

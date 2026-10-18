@@ -1118,6 +1118,8 @@ pub fn run() {
         .manage(crate::actuals::ActualsSources::default())
         // The budget export picked to import (src/export_import.rs).
         .manage(crate::export_import::ExportSources::default())
+        // The schedule days file picked to set globals from (src/schedule_days.rs).
+        .manage(crate::schedule_days::ScheduleSources::default())
         // Which budget change the other window has heard about (src/tools.rs).
         .manage(crate::tools::Broadcast::default())
         // The folder picked for sharing and the last status sent (src/shared_app.rs).
@@ -1396,6 +1398,10 @@ pub fn run() {
             crate::export_import::export_import_pick,
             crate::export_import::export_import_preview,
             crate::export_import::export_import,
+            // A schedule's day counts into globals (src/schedule_days.rs)
+            crate::schedule_days::schedule_days_pick,
+            crate::schedule_days::schedule_days_review,
+            crate::schedule_days::schedule_days_apply,
             // Actuals and the cost report (src/actuals.rs)
             crate::actuals::actuals_pick,
             crate::actuals::actuals_preview,
