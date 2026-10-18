@@ -262,7 +262,15 @@ pub fn actor_id() -> Result<ActorId, CliError> {
 }
 
 /// Opens the log of `path` as this computer, for commands that change it.
-pub fn open_shared(path: &Path) -> Result<(Shared, log::LoadReport), CliError> {
-    let actor = actor_id()?;
-    log::open(path, actor, Ids::from_os()).map_err(|e| CliError::failed(e.0))
+/// Opens a shared budget to write to it as a program of this computer's
+/// person: an actor of its own, held while the returned lock lives, so the
+/// app and other programs never share its sequence of changes.
+pub fn open_shared_as_tool(
+    path: &Path,
+) -> Result<(Shared, log::LoadReport, log::ToolLock), CliError> {
+    let person = actor_id()?;
+    let file = log::actor_id_path().ok_or_else(|| {
+        CliError::failed("no home folder to keep the actor id in (set METHOD_ACTOR_FILE)")
+    })?;
+    log::open_as_tool(path, &file, person).map_err(|e| CliError::failed(e.0))
 }

@@ -3518,3 +3518,194 @@ behavior: docs/APP.md, "The start window and New Budget"). Phases so far: entrie
 - **Not built** (3.19 still open): projects as folders, thumbnails, duplicate and new
   sub-budget from a row, rates at creation (waits on 3.9), the schedule link (3.8),
   shared-folder badges and presence (3.18), sorting and created dates (phase 4).
+
+## 78. Who may change what in a shared budget: roles in the change log (2026-10-18)
+
+Roadmap 3.18's next step after folder mode (entries 62 and 64): roles, the first half of
+the design's phase 3 (docs/research/collaboration.md, sections 7 and 9.7). Invites, key
+pairs and signatures are the other half and wait for a dependency (`ed25519-dalek`, open
+question 14), so roles are built first, unsigned, the way `sig` was reserved in entry 62.
+Docs/APP.md, "Sharing a budget", says what a person sees; this records the choices.
+
+- **A role is a change.** A new op, `grant {actor, role, scope}` (docs/FORMAT.md, "The
+  change log"), gives one person a role: admin, editor, department editor with a scope of
+  categories or accounts by entity id, actuals, comment or read only. Grants are a
+  last-writer-wins register per person in the `State`, every write kept, like any field.
+  The owner is the actor of the first change applied (the genesis, which every other
+  change depends on, so every computer agrees), and is never given or taken a role.
+- **Judged where each change was made.** `log::access::check` runs on every change, this
+  computer's own before it is recorded and everyone else's as it is applied, and judges
+  it by its author's role as of the change's own `deps`: the last grant write whose change
+  is within them, and, for a department editor, where each line or note was within them
+  (the move register's history, or this change's own creates). Nothing in the check reads
+  the receiver's newer state, so every computer keeps and refuses the same changes in any
+  order. That also settles the concurrent cases without a rule of their own: a change made
+  before its author saw a new role keeps the old role's rights, and a line moved out of a
+  department editor's categories while they edited it keeps their edit. A refused change
+  is skipped whole and listed with the reason (`Log::rejected`), its seq still counted,
+  exactly as a malformed one (entry 62); `LogError::NotAllowed` says why. Property test
+  (crates/method-core/tests/log.rs): an owner, a department editor and an editor making
+  random edits for 4 rounds while the owner changes their roles, plus changes forged in
+  the name of someone without a role, exchanged in random orders: every log ends with the
+  same frontier, budget, roles and refused set, 24 seeds.
+- **Before any role, everyone edits everything; after the first, no role reads only**
+  (design 9.1: "someone who opens it without a role gets read only"). Budgets shared
+  before this version keep working unchanged until their owner sets a role, and the
+  Share dialog asks before the first one, naming who would read only.
+- **What each role may do**, from the design's table and entry 62's settled defaults:
+  co-owner (added after review, below) everything and every role but the owner's and
+  co-owners'; admin everything and other people's roles, but only the owner and co-owners
+  make admins or change an admin's role; editor everything but roles and the root's `baseline` (locking the
+  originals, design 9.9); department editor creates, changes, moves (within the scope at
+  both ends) and deletes lines and notes in its categories or accounts, which covers
+  applying existing fringes and groups, and nothing else (no setup items, so a unit typed
+  that doesn't exist yet is refused); actuals transactions, imports, estimates to complete
+  and notes; comment notes only; read only nothing. The dialog offers categories; the
+  engine and `share_set_role` take account numbers as well.
+- **Not undoable.** A role is set again in the dialog; it never enters the person's undo
+  steps, and `Log::undo` passes over a grant.
+- **The session asks before editing.** `SharedLog::refusal` (method-session, default none)
+  gives the sentence for a read-only person, and `Session::check_writable` returns it, so
+  every edit, value put back and undo is refused before anything is made. Narrower roles
+  are refused by the log when the edit is recorded; `SharedDoc` turns `NotAllowed` into a
+  sentence about what the role allows and who sets roles, and the session takes the edit
+  back as it does any failed capture.
+- **Limits, said in APP.md**: unsigned, so an app that doesn't check (or another program
+  writing in the folder) can write a change in anyone's name; the folder's own sharing is
+  what stops a reader writing at all. Revocation by cutoff (the design's "last seq of
+  theirs accepted") needs signatures to mean anything and comes with them; until then a
+  removed person's offline work is judged by what they had seen. Anyone can still write
+  a change whose `deps` hold only the genesis, judged as from before roles existed; the
+  cutoff has to close that too.
+- **Interface** (share.js, shared.css): a role menu and Set button under each person in
+  the Share dialog for the owner and admins, a category checklist for Edits some
+  categories, each person's role in words in the People lists, a chip in the toolbar for
+  a person who may change less than everything. No muted cells or locks yet (design 9.7),
+  no access requests.
+- **After review (MReview on pull request #27), five fixes:**
+  - *The owner is the genesis, not the first change read.* The log folder's `budget.json`
+    names the genesis, and `Log::set_genesis` is called before any segment is read, so the
+    owner never depends on read order. Every change but the genesis must have it within its
+    `deps`, or `State::check` refuses it as made outside this budget's history: a forged
+    first change, or a second computer that started sharing the same file before the
+    folder synced, is refused by every reader alike. Tests: `a_forged_first_change_never_takes_the_budget`
+    (core, every order of the genesis, a grant, a forged first change and a second start),
+    `a_forged_first_change_in_the_folder_never_takes_the_budget` (format, three fresh opens).
+  - *Every write path follows roles.* `method_format::log::SharedEdit` opens a shared budget
+    as this computer's person (the actor file the app and `method-budget log` use), reads it
+    as the log makes it and records an edit as one change checked against the role; only
+    the computer that started sharing rewrites the `.mthd`. The command line's `set` and
+    `apply` and the MCP server's every change and undo go through it; any other command
+    that would rewrite a shared `.mthd` whole is refused. Without an actor id, a write is
+    refused once roles are set (`NO_PERSON`); before that one is made, as `method-budget log`
+    does. Once roles are set an edit to the `.mthd` by another program has no author, so
+    neither the app's keeper nor `method-budget sync` takes it in: `log::set_aside` keeps it
+    beside the file as "Feature (outside edit <date> <time>).mthd", never over another file,
+    and the file is written again. Each actor's `written.json` lists the hashes of the files
+    it wrote from the log (and started from), so a file that is only behind the log is
+    never mistaken for an outside edit and taken in, which would undo the changes it lacks
+    (the command line made that easy to reach: a person who doesn't keep the file changes
+    the log and not the file). Tests: `a_program_without_a_window_changes_a_shared_budget_as_its_person`,
+    `an_outside_edit_after_roles_is_kept_aside`, `a_file_behind_the_log_is_not_an_outside_edit`
+    (format), `command_line_writes_to_a_shared_budget_follow_roles` and the updated
+    `log_init_show_and_sync` (command line), `shared_budgets_are_changed_through_the_log_within_a_role`
+    (MCP), `an_outside_edit_after_roles_is_kept_aside_by_the_keeper` (app).
+  - *Older apps refuse cleanly.* `budget.json`'s `version` and the `format` of every segment
+    holding a `grant` are 2 from the first role on (raised before the role's segment is
+    written); before it, 1 as always. 0.3.0 then refuses the change log as newer than it
+    reads and opens the file on its own with that notice, instead of skipping the role's
+    segment and editing a stale budget; what it saves there is an outside edit, kept aside
+    as above. Test: `the_first_role_raises_the_log_format`.
+  - *Refused changes are shown.* The status panel lists the latest 20 changes left out,
+    with who, when, the step's label and why in a sentence. Test:
+    `refused_changes_are_shown_with_who_when_and_what`.
+  - *A scope on any role but department is refused*, not dropped: `Role::parse` refuses it
+    (a malformed line in a file), `set_role` refuses it in words, and the dialog keeps
+    ticked categories in view with another role and refuses to set it until they are
+    unticked. Tests: `roles_round_trip_through_json`, `setting_a_role_checks_what_is_asked`.
+- **Decided by the owner (2026-10-18)**, the three questions the review raised, each as
+  recommended:
+  1. *Older apps*: the format bump at the first role, so they refuse the budget, with the
+     warning in the first-role question. Built as above.
+  2. *Owner lockout*: the owner names an admin at the first role, and can make someone a
+     co-owner. Built: a `co_owner` role (`Role::CoOwner`), given only by the owner, may do
+     everything the owner does except change the owner or make or change co-owners; it
+     makes and changes admins. Admins now set the roles of everyone but the owner,
+     co-owners and admins. The first-role question, shown in place in the Share dialog (a
+     second dialog would hide the first), warns what roles mean, warns about older
+     versions and offers "Make <name> an admin" for each person, or Not now. Tests:
+     `a_co_owner_sets_roles_admins_included` (core), `a_co_owner_sets_roles_from_their_own_computer`
+     (app), `roles_round_trip_through_json` (format).
+  3. *Command line and agents*: act as this computer's person within their role. Built as
+     above.
+- **Final review (MReview, pull request #27), two fixes and two small ones:**
+  - *The app and a command line or agent never write as one actor.* Before, both wrote as
+    this computer's actor: with an app edit not yet in the folder, the two took the same
+    place in its sequence, the app's edit was lost and replicas disagreed. Two ways out were
+    weighed: a lock on the sequence across processes, or an actor per program. A lock is
+    not enough on its own: the app keeps edits in memory for up to six seconds before
+    writing them, so the lock would have to cover every edit until it is written, or the
+    app write a file per keystroke; and a lock left by a stopped program must be noticed.
+    An actor per program needs nothing shared between processes: each sequence has one
+    writer, so a fork can't happen and nothing waits. Programs take a tool actor from a
+    pool per person beside the actor file (`tools/<person>/tool-k`), held with the
+    system's file lock (`File::try_lock`, let go if the program stops), so one tool actor is
+    used by one program at a time and the pool stays small. Once roles are set, a tool actor
+    says whose it is with a new op, `acts_for {person}` (once, and only for itself), in the
+    same segment as its first edit, and has that person's role; the app shows its changes
+    under the person's name and doesn't list it as a person. Before roles it needs no
+    `acts_for` (everyone edits everything), so budgets without roles stay at format 1. The
+    owner's own programs still rewrite the `.mthd`, as the owner's app does; `method-budget
+    sync` writes as a tool actor too. Tests: `the_app_and_a_command_line_on_one_computer_never_share_a_sequence`
+    (format: an unwritten app edit and two programs at once; it fails with one shared
+    actor), `a_tool_actor_has_its_persons_role` (core), `a_program_writing_for_a_person_shows_with_their_name`
+    (app), and the command line's `log_init_show_and_sync`, updated.
+  - *Grants made apart are settled by rank.* Each grant keeps how its granter ranked when
+    giving it and what they had seen (`GrantWrite`). A grant made after seeing another
+    replaces it; among grants none of which saw the others, owner beats co-owner beats
+    admin, then the later stamp. So a co-owner who hadn't seen "make Jordan a co-owner"
+    can't undo it, nor an admin a concurrent "make Kim an admin". Test:
+    `concurrent_grants_go_to_the_higher_ranked_granter`.
+  - *A file put back to an older version* (it matches a hash the log wrote, but not what
+    the log holds now) is written again by the keeper, and the status panel says so,
+    instead of being left as it is. Test: `an_older_copy_of_the_file_is_written_again`.
+  - *`written.json`*: the hash is noted before the file is written, so no program mistakes
+    a file the log wrote for an outside edit. Its read, change and write needs no lock now:
+    each actor folder has one writing program (the app as the person, every other program
+    as a tool actor it holds alone).
+  - *`acts_for` can't raise anyone* (MReview, after a098bdb). As first built it was taken at
+    its word, so a read-only member's own actor could say it wrote for the owner and get
+    the owner's rights. Now it is refused, the same on every computer: before roles are
+    set; for the owner's own actor; for an actor with a role of its own; for an actor with a
+    change already kept that was made once roles were set (`State::judged`), so it can only
+    be a new program's first word; when the person named isn't the owner or someone with a
+    role; and when either side already writes for someone. A program for a person with no
+    role is refused in words before it writes (`NO_ROLE`). Test:
+    `acts_for_never_raises_a_member` (core: a read-only member, the owner, an editor already
+    judged, a claim before roles and a claim for nobody, each refused by its own log and,
+    forged with an owner's edit and a self-grant riding along, by fresh logs in eight
+    orders), and the format test `a_program_without_a_window_changes_a_shared_budget_as_its_person`
+    (a person with no role). **What remains possible without signatures:** a brand-new
+    actor can still say it writes for any member, the owner included, and get that member's
+    rights. That is the limit already stated above (anyone who can write in the folder can
+    write a change in someone's name); signed changes, where a program's key is signed by
+    its person's, close it.
+  - *Programs before roles are never listed as people.* Before roles a program's actor
+    doesn't say whose it is (that would raise the format for budgets without roles). This
+    computer knows its own person's programs from the tool pool (`tools/<person>/`, read by
+    `log::tool_actors`) and shows them as that person ("Jordan Lee (command line or
+    agent)"), leaving them out of People, the role menu and the first-role question. Other
+    computers can't see that pool, so the honest thing there is not to guess: an actor that
+    made changes but never wrote a heartbeat (every app writes one), has no role and didn't
+    start sharing shows as "A command line or agent (whose isn't known yet)", in grey, and
+    is left out of People too, until its `acts_for` arrives. Test:
+    `programs_before_roles_are_never_listed_as_people` (app, from both computers).
+  - Known, for the record: a 0.3.0 session already open when the first role is set never
+    reads `budget.json` again, so it keeps editing what it has, with no notice, until it
+    reopens; anything it saves is an outside edit, kept aside.
+- Tests: core (above, and a department editor in and out of scope, refusals by every
+  peer, a role not yet seen, a move apart, who sets roles), format (grant round trip,
+  roles through the folder with a forged change refused by a newcomer), session (a
+  read-only role refuses before recording), app (two sessions on one folder: a department
+  role, a refusal in words, a downgrade made apart keeping the edit, read only after
+  reopening; `set_role`'s checks). No dependency was added.

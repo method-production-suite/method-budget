@@ -1403,6 +1403,7 @@ Feature.mthd-log/
     <actor>/                       one folder per computer, written by it only
       000001-000140.chg            a sealed segment: changes 1 to 140 of this actor
       000141-000163.chg
+      written.json                 hashes of the .mthd files it wrote from the log
     <actor>/
       ...
 ```
@@ -1415,7 +1416,12 @@ Feature.mthd-log/
   computer may roll its own small segments into one bigger one, writing the new file
   before removing the old ones.
 - **Temporary and foreign files are ignored**: anything that is not `<from>-<to>.chg` in
-  an actor folder named by 64 hex characters.
+  an actor folder named by 64 hex characters (besides the heartbeat and `written.json`).
+- **Files written from the log.** `written.json` (`{"hashes": [...]}`, the SHA-256 of
+  each, newest last, the last 20 kept) lists every `.mthd` this computer wrote from the
+  log, and the one it started sharing from. A `.mthd` whose hash any computer lists is
+  merely behind the log, never an outside edit, so it is never taken in (doing so would
+  undo the changes it lacks).
 
 ### `budget.json`
 
@@ -1431,6 +1437,17 @@ Feature.mthd-log/
 
 `budget_id` is the SHA-256 of the genesis change's line (below). `file` is the budget's
 file name, never a path. Readers reject another `format` and a newer `version`.
+`genesis` names the first change: its actor started sharing and owns the budget, and a
+reader names it before reading any segment, so the owner never depends on the order
+segments are read in. Every other change must have the genesis within its `deps`; one that
+doesn't (another computer that started sharing the same file before the folder synced, or
+a forged one) is refused by every reader.
+
+`version` is 1 until someone is given a role, and 2 from the first `grant` on (decisions.md,
+entry 78): the computer writing the first `grant` raises it before writing the segment,
+and every segment holding a `grant` has `format` 2. A program that reads only version 1
+refuses the folder as newer than it reads (Method Budget 0.3.0 then opens the `.mthd` on
+its own, unshared, and says why) rather than skipping the roles and editing a stale budget.
 
 ### Segment files
 
@@ -1483,6 +1500,30 @@ the `.mthd`). Entity kinds: `category`, `production_total`, `account`, `row`, `n
 | `delete`, `restore` | `entity` | The tombstone, last writer wins. |
 | `add` | `entity`, `field`, `member` | Adds to a tag set; an add wins over a concurrent remove. |
 | `remove` | `entity`, `field`, `member`, `seen` | Removes the adds the remover had seen (`seen` lists their stamps). |
+| `acts_for` | `person` | The change's actor writes for `person`: a command line or agent on that person's computer, which writes as an actor of its own so it never shares a sequence of changes with the app (decisions.md, entry 78). It has the person's role. Refused (judged at the change's `deps`) unless roles are already set; unless `person` is the owner or has a role; when the actor is the owner's, has a role of its own, writes for someone already, or has a change kept that was made once roles were set; and when `person` itself writes for someone. So it is a new program's first word, and never raises a person's own actor. A segment holding one has `format` 2 like a `grant`. |
+| `grant` | `actor`, `role`, `scope` | Gives a person a role (decisions.md, entry 78): `role` is `co_owner`, `admin`, `editor`, `department`, `actuals`, `comment` or `read_only`; `scope` (only for `department`, left out when empty) lists the categories and accounts by entity id. A grant made after seeing another for the same person replaces it; among grants made apart (none saw the others), the one whose granter ranked higher when giving it wins (owner, then co-owner, then admin), then the later stamp. |
+
+**Roles.** The actor of the first change (the genesis) owns the budget. Until a `grant`
+appears, every actor may write anything. Once one has, an actor without a role reads only.
+A reader checks every change against its author's role as of the change's own `deps` (the
+roles, and where each line and note was, as its author had seen them) and skips one that
+goes beyond it, listing it as refused; so every reader keeps and skips the same changes,
+whatever order they arrive in. The roles: `co_owner` everything, and sets every role
+but the owner's and co-owners' (only the owner gives or changes `co_owner`); `admin`
+everything, and sets the roles of everyone but the owner, co-owners and admins; `editor` everything but roles and the root's
+`baseline`; `department` creates, changes, moves and deletes rows and notes within its
+scope only (a move must start and end there); `actuals` transactions, batches, `etc`
+entries and notes; `comment` notes only; `read_only` nothing. Only the owner and
+co-owners give `admin` or change an admin's role; nobody changes the owner's. Until changes are signed
+this holds against honest applications only. A `grant` whose `scope` is not empty is
+malformed unless its role is `department`. A program writing a shared budget without a
+window (the command line, the MCP server) records its edit as a change by this computer's
+actor, checked like any other, and never rewrites the `.mthd` unless that actor started
+sharing; with no actor yet, it is refused once roles are set. Once roles are set, an edit
+to the `.mthd` by a program that doesn't write the log can't be attributed, so it is never
+taken in: the keeper keeps the edited file beside it as `Feature (outside edit
+2026-10-18 140322).mthd` (never over another file) and writes the `.mthd` again from the
+log.
 
 A **stamp** is written `"<lamport>/<actor hex>/<seq>/<index>"`: the change's clock and
 actor, its seq, and the op's index in it.
