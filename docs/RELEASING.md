@@ -139,15 +139,23 @@ Never move, delete or force-push a public tag: fix a problem with the next patch
 
 ## After the workflow
 
-The workflow's draft release has the notes as its description and these files:
+The workflow's draft release has the notes as its description and these files. The
+installers have version-free names, so the website links each one as
+`https://github.com/method-production-suite/method-budget/releases/latest/download/<file>`
+and the link never goes stale; the workflow's Collect bundles step stops if a build
+produced none or several of one, and the release job stops if any is missing. Renaming
+one means changing the workflow, this table and the site's links together.
 
 | File | What it is |
 |---|---|
-| `Method Budget_<version>_universal.dmg` | the Mac installer (Apple silicon and Intel) |
-| `Method Budget_v<version>_universal.app.zip` | the Mac app on its own |
-| `Method-Budget_<version>_universal.app.tar.gz` and `.sig` | the Mac updater archive and its signature |
+| `Method-Budget-macOS.dmg` | the Mac installer (Apple silicon only) |
+| `Method-Budget-macOS.app.zip` | the Mac app on its own |
+| `Method-Budget-windows-x64-setup.exe` | the Windows installer (NSIS; untested, not updated in place yet) |
+| `Method-Budget-windows-x64.msi` | the Windows installer (MSI; untested, not updated in place yet) |
+| `Method-Budget-linux-amd64.deb` | the Linux package for Debian and Ubuntu (untested, not updated in place yet) |
+| `Method-Budget-linux-x86_64.AppImage` | the Linux AppImage (untested, not updated in place yet) |
+| `Method-Budget_<version>_aarch64.app.tar.gz` and `.sig` | the Mac updater archive and its signature (versioned: `latest.json` names it) |
 | `latest.json` | the update manifest installed apps read |
-| `.msi`, `-setup.exe`, `.deb`, `.AppImage` | Windows and Linux (untested; not updated in place yet) |
 
 Before publishing, download the `.dmg`, open it on a Mac and run the app once. With the
 Apple secrets set, `scripts/check-macos-bundle.sh` on the downloaded app shows a
@@ -165,7 +173,7 @@ signed and the draft's description says the first launch needs the one-time step
 | Job | Permissions | What it does |
 |---|---|---|
 | `check` | contents: read | `cargo xtask check-version --tag "$GITHUB_REF_NAME"` |
-| `build` (macOS universal, Windows, Linux) | contents: read | builds the bundles; on macOS signs, notarizes, staples and verifies, and writes the updater archive, each only when its secrets are there |
+| `build` (macOS Apple silicon, Windows, Linux) | contents: read | builds the bundles; on macOS signs, notarizes, staples and verifies, and writes the updater archive, each only when its secrets are there |
 | `release` | contents: write (the only job with it: it creates the draft and uploads the files) | `cargo xtask update-manifest`, then `gh release create --draft` with the notes |
 
 Only first-party actions are used, each pinned to a full commit SHA. Each secret is given

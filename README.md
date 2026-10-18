@@ -189,8 +189,8 @@ this section.
 
 ## Install
 
-Method Budget is a desktop app for macOS, with Windows and Linux builds that have not been
-tested by hand yet. Download the Mac app from the
+Method Budget is a desktop app for macOS on Apple silicon, with Windows and Linux builds
+that have not been tested by hand yet. Download the Mac app from the
 [latest release](https://github.com/method-production-suite/method-budget/releases/latest),
 or build it from source. [docs/INSTALL.md](docs/INSTALL.md) covers building, installing on a
 Mac, the one-time security step for builds that are not notarized, and what signed releases

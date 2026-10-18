@@ -4,7 +4,8 @@
 #
 # - check: the tag names the workspace version, every place the version lives agrees,
 #   and docs/releases/<version>.md is ready to publish (cargo xtask check-version --tag).
-# - build: macOS universal (.app zip, .dmg and the updater archive), Windows and Linux.
+# - build: macOS Apple silicon (.app zip, .dmg and the updater archive), Windows and Linux.
+#   Intel Macs are not built: they keep the version they have installed.
 #   The macOS job signs with the Developer ID, notarizes, staples and verifies when the
 #   Apple secrets are set; it writes the updater archive and its signature when the
 #   updater key is set and the app trusts a real key. Each of those steps skips cleanly
@@ -57,10 +58,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: macos-universal
+          - name: macos-arm64
             os: macos-latest
-            rust_targets: aarch64-apple-darwin x86_64-apple-darwin
-            target: universal-apple-darwin
+            rust_targets: aarch64-apple-darwin
+            target: aarch64-apple-darwin
             bundles: app,dmg
           - name: windows-x64
             os: windows-latest
@@ -229,7 +230,15 @@ jobs:
           root="target/$TARGET/release/bundle"
           for app in "$root"/macos/*.app; do
             codesign --verify --deep --strict --verbose=2 "$app"
-            lipo -archs "$app/Contents/MacOS/"* || true
+            # Apple silicon only: every executable in the app is arm64 and nothing else.
+            for exe in "$app/Contents/MacOS/"*; do
+              archs="$(lipo -archs "$exe")"
+              echo "$(basename "$exe"): $archs"
+              if [ "$archs" != arm64 ]; then
+                echo "::error::$exe is built for \"$archs\", expected arm64 only."
+                exit 1
+              fi
+            done
             if [ "${MACOS_SIGN:-no}" = yes ]; then
               codesign -dv --verbose=2 "$app" 2>&1 | grep -F "Authority=$SIGNING_IDENTITY"
             fi
@@ -254,37 +263,62 @@ jobs:
           rm -f "$RUNNER_TEMP/AuthKey.p8"
 
       - name: Collect bundles
+        # Installers get version-free names so the website can link
+        # releases/latest/download/<file> (docs/RELEASING.md). The updater archive keeps
+        # the versioned name latest.json expects.
         shell: bash
         env:
           TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
+          shopt -s nullglob
           if [ -n "$TARGET" ]; then root="target/$TARGET/release/bundle"; else root="target/release/bundle"; fi
           version="${GITHUB_REF_NAME#v}"
           mkdir -p dist updater meta
+          # one <what> <files...>: prints the single file, or stops the job when the
+          # pattern matched none or several (the bundle changed shape: look before shipping).
+          one() {
+            local what="$1"
+            shift
+            if [ "$#" -ne 1 ]; then
+              echo "::error::Expected exactly one $what, found $#: ${*:-none}" >&2
+              exit 1
+            fi
+            printf '%s\n' "$1"
+          }
           case "$RUNNER_OS" in
             macOS)
+              app="$(one "macOS .app" "$root"/macos/*.app)"
               # A .app is a folder: zip it with ditto so permissions and the signature survive.
-              for app in "$root"/macos/*.app; do
-                ditto -c -k --keepParent "$app" "dist/$(basename "$app" .app)_${GITHUB_REF_NAME}_universal.app.zip"
-              done
-              cp "$root"/dmg/*.dmg dist/
+              ditto -c -k --keepParent "$app" dist/Method-Budget-macOS.app.zip
+              dmg="$(one "macOS .dmg" "$root"/dmg/*.dmg)"
+              cp "$dmg" dist/Method-Budget-macOS.dmg
               # The updater archive and its signature, named as latest.json expects
               # (no spaces: the name is the download URL).
               if [ "${UPDATER:-no}" = yes ]; then
-                for tgz in "$root"/macos/*.app.tar.gz; do
-                  name="Method-Budget_${version}_universal.app.tar.gz"
-                  cp "$tgz" "updater/$name"
-                  cp "$tgz.sig" "updater/$name.sig"
-                done
+                tgz="$(one "updater archive" "$root"/macos/*.app.tar.gz)"
+                sig="$tgz.sig"
+                if [ ! -f "$sig" ]; then
+                  echo "::error::The updater archive has no signature ($sig)."
+                  exit 1
+                fi
+                name="Method-Budget_${version}_aarch64.app.tar.gz"
+                cp "$tgz" "updater/$name"
+                cp "$sig" "updater/$name.sig"
               fi
               if [ "${MACOS_NOTARIZE:-no}" = yes ]; then echo yes > meta/macos-notarized; else echo no > meta/macos-notarized; fi
               ;;
             Windows)
-              cp "$root"/msi/*.msi "$root"/nsis/*.exe dist/
+              exe="$(one "NSIS installer" "$root"/nsis/*-setup.exe)"
+              msi="$(one "MSI installer" "$root"/msi/*.msi)"
+              cp "$exe" dist/Method-Budget-windows-x64-setup.exe
+              cp "$msi" dist/Method-Budget-windows-x64.msi
               ;;
             Linux)
-              cp "$root"/deb/*.deb "$root"/appimage/*.AppImage dist/
+              deb="$(one "Debian package" "$root"/deb/*.deb)"
+              appimage="$(one "AppImage" "$root"/appimage/*.AppImage)"
+              cp "$deb" dist/Method-Budget-linux-amd64.deb
+              cp "$appimage" dist/Method-Budget-linux-x86_64.AppImage
               ;;
           esac
           ls -l dist updater meta
@@ -363,6 +397,16 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           notes="$RUNNER_TEMP/notes.md"
           cp "docs/releases/$version.md" "$notes"
+          # The installers the website links as releases/latest/download/<file>
+          # (docs/RELEASING.md): every one must be here under exactly this name.
+          for f in Method-Budget-macOS.dmg Method-Budget-macOS.app.zip \
+            Method-Budget-windows-x64-setup.exe Method-Budget-windows-x64.msi \
+            Method-Budget-linux-amd64.deb Method-Budget-linux-x86_64.AppImage; do
+            if [ ! -f "dist/$f" ]; then
+              echo "::error::dist/$f is missing; the website links releases/latest/download/$f."
+              exit 1
+            fi
+          done
           if [ "$(cat meta/macos-notarized 2>/dev/null || echo no)" != yes ]; then
             printf '\n---\n\nThis macOS build is not notarized: the first launch needs the one-time Open Anyway step in docs/INSTALL.md.\n' >> "$notes"
           fi
