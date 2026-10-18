@@ -234,3 +234,254 @@ fn roles_travel_through_the_folder() {
     assert_eq!(newcomer.log.project().budget, alex.log.project().budget);
     let _ = fs::remove_dir_all(&dir);
 }
+
+/// A first change that didn't come from this budget's shared history (a
+/// forged one, or a second computer that started sharing before the folder
+/// synced) never takes the budget over: the owner is the one `budget.json`
+/// names, and everyone opening the folder agrees (decisions.md, entry 78).
+#[test]
+fn a_forged_first_change_in_the_folder_never_takes_the_budget() {
+    use method_core::log::{Change, Frontier, Op, Role};
+
+    let dir = temp_dir("forged-genesis");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    // Actor 5 starts sharing; actor 1 sorts before it.
+    let mut alex = log::init(&path, actor(5), Ids::seeded(5), T).unwrap();
+    alex.log
+        .grant(actor(2), Role::Editor, "Jordan edits", T)
+        .unwrap();
+    log::flush(&alex.log, &alex.dir).unwrap();
+    let forged = Change {
+        actor: actor(1),
+        seq: 1,
+        deps: Frontier::new(),
+        lamport: 1,
+        time: T.into(),
+        label: "Forged".into(),
+        ops: vec![Op::Grant {
+            actor: actor(3),
+            role: Role::Admin,
+        }],
+    };
+    alex.dir.write_segment(&[forged]).unwrap();
+
+    let mut a_scan = Scan::default();
+    let r = log::absorb(&mut alex.log, &alex.dir, &mut a_scan);
+    assert_eq!(r.rejected.len(), 1, "{r:?}");
+    for n in [7, 8, 9] {
+        let (fresh, report) = log::open(&path, actor(n), Ids::seeded(n as u64)).unwrap();
+        assert_eq!(report.rejected.len(), 1, "{report:?}");
+        assert_eq!(fresh.log.owner(), Some(actor(5)));
+        assert_eq!(fresh.log.role_of(actor(3)), Role::ReadOnly);
+        assert_eq!(fresh.log.role_of(actor(2)), Role::Editor);
+        assert_eq!(fresh.log.frontier(), alex.log.frontier());
+        assert_eq!(fresh.log.project().budget, alex.log.project().budget);
+    }
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// The first role raises the log's format, so an app too old to read a
+/// role refuses the folder (its "newer than this program reads") instead
+/// of skipping the role's file and editing a stale budget.
+#[test]
+fn the_first_role_raises_the_log_format() {
+    use method_core::log::Role;
+
+    let dir = temp_dir("format");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    let mut alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+    let info_path = alex.dir.root().join("budget.json");
+    let version = || {
+        let text = fs::read_to_string(&info_path).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+        v["version"].as_u64().unwrap()
+    };
+    let header_format = |seg: &std::path::Path| {
+        let text = fs::read_to_string(seg).unwrap();
+        let first = text.lines().next().unwrap().to_string();
+        let v: serde_json::Value = serde_json::from_str(&first).unwrap();
+        v["segment"]["format"].as_u64().unwrap()
+    };
+    assert_eq!(version(), 1);
+    let p = alex.log.project();
+    let mut after = p.budget.clone();
+    row_rate(&mut after, 0, 111);
+    alex.log.record(&p, &after, &[], "Alex edits", T).unwrap();
+    let seg = log::flush(&alex.log, &alex.dir).unwrap().unwrap();
+    assert_eq!(version(), 1, "edits alone keep the format");
+    assert_eq!(header_format(&seg), 1);
+
+    alex.log
+        .grant(actor(2), Role::ReadOnly, "Jordan reads", T)
+        .unwrap();
+    let seg = log::flush(&alex.log, &alex.dir).unwrap().unwrap();
+    assert_eq!(version(), 2);
+    assert_eq!(header_format(&seg), 2);
+    // This version reads it back, roles and all.
+    let (jordan, _) = log::open(&path, actor(2), Ids::seeded(2)).unwrap();
+    assert_eq!(jordan.log.role_of(actor(2)), Role::ReadOnly);
+    // A folder newer than this program reads is refused in words.
+    let text = fs::read_to_string(&info_path)
+        .unwrap()
+        .replace("\"version\": 2", "\"version\": 99");
+    fs::write(&info_path, text).unwrap();
+    let err = log::open(&path, actor(2), Ids::seeded(2)).err().unwrap();
+    assert!(err.0.contains("newer than this program reads"), "{}", err.0);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+fn actor_file(dir: &std::path::Path, n: u8) -> PathBuf {
+    let f = dir.join(format!("actor-{n}"));
+    fs::write(&f, format!("{}\n", actor(n).hex())).unwrap();
+    f
+}
+
+/// The command line and the MCP server change a shared budget as this
+/// computer's person, through the log and within their role; they never
+/// write the `.mthd` unless they keep it (decisions.md, entry 78).
+#[test]
+fn a_program_without_a_window_changes_a_shared_budget_as_its_person() {
+    use method_core::log::Role;
+    use method_format::log::SharedEdit;
+
+    let dir = temp_dir("shared-edit");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    let mut alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+
+    // Before any role, a computer with no person yet gets one and edits.
+    let fresh = dir.join("new-person").join("actor");
+    let mut e = SharedEdit::open(&path, Some(&fresh)).unwrap();
+    assert!(fresh.is_file());
+    let mut after = e.budget();
+    after.title = "From the command line".into();
+    assert!(e.record(&after, "Command line: set title", T).unwrap());
+    let file_before = fs::read(&path).unwrap();
+
+    alex.log
+        .grant(actor(2), Role::ReadOnly, "Jordan reads", T)
+        .unwrap();
+    alex.log
+        .grant(actor(3), Role::Editor, "Sam edits", T)
+        .unwrap();
+    log::flush(&alex.log, &alex.dir).unwrap();
+
+    // A reader is refused, with nothing written.
+    let jordan_file = actor_file(&dir, 2);
+    let mut e = SharedEdit::open(&path, Some(&jordan_file)).unwrap();
+    assert_eq!(e.role(), Role::ReadOnly);
+    let mut after = e.budget();
+    after.title = "Jordan's".into();
+    let err = e.record(&after, "Command line: set title", T).unwrap_err();
+    assert!(err.0.contains("role"), "{}", err.0);
+    assert!(LogDir::for_budget(&path).segments(actor(2)).is_empty());
+
+    // An editor's change goes into their own folder; the file is the
+    // keeper's to write, so it stays as it was.
+    let sam_file = actor_file(&dir, 3);
+    let mut e = SharedEdit::open(&path, Some(&sam_file)).unwrap();
+    let mut after = e.budget();
+    after.title = "Sam's".into();
+    assert!(e.record(&after, "Command line: set title", T).unwrap());
+    assert!(!e.record(&after, "again", T).unwrap(), "nothing new");
+    assert_eq!(LogDir::for_budget(&path).segments(actor(3)).len(), 1);
+    assert_eq!(fs::read(&path).unwrap(), file_before);
+    let mut scan = Scan::default();
+    log::absorb(&mut alex.log, &alex.dir, &mut scan);
+    assert_eq!(alex.log.project().budget.title, "Sam's");
+    assert_eq!(log::read_shared(&path).unwrap().title, "Sam's");
+
+    // The keeper's own change rewrites the file too.
+    let alex_file = actor_file(&dir, 1);
+    let mut e = SharedEdit::open(&path, Some(&alex_file)).unwrap();
+    let mut after = e.budget();
+    after.title = "Alex's".into();
+    assert!(e.record(&after, "Command line: set title", T).unwrap());
+    let on_disk = method_format::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(on_disk.title, "Alex's");
+
+    // Once roles are set, a computer with no person is refused.
+    let none = dir.join("nobody").join("actor");
+    let err = SharedEdit::open(&path, Some(&none)).err().unwrap();
+    assert_eq!(err.0, log::NO_PERSON);
+    assert!(!none.exists());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// After roles are set, an edit to the `.mthd` by a program that doesn't
+/// write the log is nobody's to take in: it is kept beside the file and
+/// the file is written again from everyone's changes.
+#[test]
+fn an_outside_edit_after_roles_is_kept_aside() {
+    use method_core::log::Role;
+
+    let dir = temp_dir("set-aside");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    let mut alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+    alex.log
+        .grant(actor(2), Role::ReadOnly, "Jordan reads", T)
+        .unwrap();
+    log::flush(&alex.log, &alex.dir).unwrap();
+    log::write_snapshot(&alex).unwrap();
+    assert_eq!(log::set_aside(&alex, T).unwrap(), None, "file matches");
+
+    let mut edited = method_format::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    edited.title = "Edited elsewhere".into();
+    write_budget(&path, &edited);
+    let changes = alex.log.len();
+    let kept = log::set_aside(&alex, T).unwrap().unwrap();
+    assert_eq!(
+        kept.file_name().unwrap().to_string_lossy(),
+        "Feature (outside edit 2026-10-12 140322).mthd"
+    );
+    let kept_budget = method_format::from_str(&fs::read_to_string(&kept).unwrap()).unwrap();
+    assert_eq!(kept_budget.title, "Edited elsewhere");
+    let on_disk = method_format::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(on_disk.title, alex.log.project().budget.title);
+    assert_eq!(alex.log.len(), changes, "nothing taken in");
+    // A second outside edit never overwrites the first kept copy.
+    write_budget(&path, &edited);
+    let second = log::set_aside(&alex, T).unwrap().unwrap();
+    assert_ne!(second, kept);
+    assert!(kept.exists() && second.exists());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// A file that is only behind the log (the keeper hasn't written it since
+/// someone else's change) is not an outside edit: taking it in would undo
+/// that change. Every file the log wrote, or started from, is known by its
+/// hash.
+#[test]
+fn a_file_behind_the_log_is_not_an_outside_edit() {
+    use method_format::log::SharedEdit;
+
+    let dir = temp_dir("behind");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    let alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+    drop(alex);
+    let jordan_file = actor_file(&dir, 2);
+    let mut e = SharedEdit::open(&path, Some(&jordan_file)).unwrap();
+    let mut after = e.budget();
+    after.title = "Jordan's".into();
+    e.record(&after, "Command line: set title", T).unwrap();
+
+    // Jordan syncs while the file is still the one Alex started from.
+    let (mut jordan, _) = log::open(&path, actor(2), Ids::seeded(2)).unwrap();
+    assert!(!log::has_outside_edit(&jordan, T).unwrap());
+    assert_eq!(log::ingest(&mut jordan, T).unwrap(), None);
+    assert_eq!(jordan.log.project().budget.title, "Jordan's");
+    // The file as a snapshot wrote it is known too.
+    log::write_snapshot(&jordan).unwrap();
+    assert!(!log::has_outside_edit(&jordan, T).unwrap());
+    // A real edit is still seen.
+    let mut b = method_format::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    b.title = "By hand".into();
+    write_budget(&path, &b);
+    assert!(log::has_outside_edit(&jordan, T).unwrap());
+    assert!(log::ingest(&mut jordan, T).unwrap().is_some());
+    let _ = fs::remove_dir_all(&dir);
+}

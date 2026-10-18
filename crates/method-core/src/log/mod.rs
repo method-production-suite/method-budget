@@ -149,6 +149,14 @@ impl Log {
         self.actor
     }
 
+    /// Names the budget's first change before anything is applied (the
+    /// log folder's `budget.json` records it): its actor owns the budget,
+    /// and a change that hasn't seen it is refused, whatever order the
+    /// changes arrive in (decisions.md, entry 78).
+    pub fn set_genesis(&mut self, genesis: ChangeId) {
+        self.state.set_genesis(genesis);
+    }
+
     pub fn state(&self) -> &State {
         &self.state
     }

@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use super::access::Role;
-use super::clock::Stamp;
+use super::clock::{ChangeId, Stamp};
 use super::ids::{ActorId, Uid};
 use super::op::{Change, Field, Kind, ListKey, Member, Op, Placement, Value};
 use super::seq::{PosId, SeqTree};
@@ -199,9 +199,11 @@ pub struct State {
     lists: BTreeMap<ListKey, SeqTree>,
     /// The highest Lamport clock applied.
     lamport: u64,
-    /// Who started sharing: the actor of the first change applied (the
-    /// genesis, which every other change depends on).
-    owner: Option<ActorId>,
+    /// The budget's first change (the genesis): whoever made it started
+    /// sharing and owns the budget, and every other change must have seen
+    /// it. Set from the log folder's `budget.json` before anything is
+    /// applied ([`State::set_genesis`]), or else the first change applied.
+    genesis: Option<ChangeId>,
     /// Each person's role, every grant kept (decisions.md, entry 78).
     grants: BTreeMap<ActorId, Register<Role>>,
 }
@@ -221,14 +223,27 @@ impl State {
             entities,
             lists: BTreeMap::new(),
             lamport: 0,
-            owner: None,
+            genesis: None,
             grants: BTreeMap::new(),
         }
     }
 
-    /// Who started sharing, once anything is applied.
+    /// Who started sharing: the genesis change's actor.
     pub fn owner(&self) -> Option<ActorId> {
-        self.owner
+        self.genesis.map(|g| g.actor)
+    }
+
+    /// The budget's first change, once known.
+    pub fn genesis(&self) -> Option<ChangeId> {
+        self.genesis
+    }
+
+    /// Names the budget's first change (from the log folder's record of
+    /// it), before anything is applied. Ignored once one is known.
+    pub fn set_genesis(&mut self, genesis: ChangeId) {
+        if self.genesis.is_none() {
+            self.genesis = Some(genesis);
+        }
     }
 
     /// Every role given, with every earlier one.
@@ -265,6 +280,18 @@ impl State {
     /// the change itself creates counted as present), without applying
     /// anything.
     pub fn check(&self, change: &Change) -> Result<(), Malformed> {
+        // Every change but the first was made from the shared history, so
+        // it has seen the first. One that hasn't (a second computer that
+        // started sharing the same file, or a forged one) belongs to
+        // another history and is refused everywhere alike.
+        if let Some(g) = self.genesis {
+            if change.id() != g && !change.deps.includes(g) {
+                return Err(Malformed {
+                    index: 0,
+                    reason: "made without this budget's first change".into(),
+                });
+            }
+        }
         let mut made: BTreeMap<Uid, Kind> = BTreeMap::new();
         let mut positions: BTreeSet<(ListKey, PosId)> = BTreeSet::new();
         let kind_of = |made: &BTreeMap<Uid, Kind>, uid: Uid| -> Option<Kind> {
@@ -404,8 +431,8 @@ impl State {
         if change.lamport > self.lamport {
             self.lamport = change.lamport;
         }
-        if self.owner.is_none() {
-            self.owner = Some(change.actor);
+        if self.genesis.is_none() {
+            self.genesis = Some(change.id());
         }
         for (index, op) in change.ops.iter().enumerate() {
             let stamp = change.stamp(index);

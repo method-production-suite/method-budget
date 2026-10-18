@@ -30,8 +30,26 @@ use crate::fsio::{read_capped, read_to_string_capped, MAX_READ_BYTES};
 
 /// The value of `format` in `budget.json`.
 pub const LOG_FORMAT_NAME: &str = "method-budget-log";
-/// The log format version this build writes and reads.
-pub const LOG_FORMAT_VERSION: u64 = 1;
+/// The highest log format version this build reads.
+pub const LOG_FORMAT_VERSION: u64 = 2;
+/// The version a log is written at until someone is given a role.
+pub const LOG_FORMAT_BASE: u64 = 1;
+/// The version from the first role on (decisions.md, entry 78): `budget.json`
+/// and every segment holding a `grant` say 2, so a program that reads only 1
+/// refuses the folder as newer than it reads rather than skipping the roles.
+pub const LOG_FORMAT_ROLES: u64 = 2;
+
+/// The format a segment holding `changes` is written at.
+fn format_for(changes: &[Change]) -> u64 {
+    if changes
+        .iter()
+        .any(|c| c.ops.iter().any(|op| matches!(op, Op::Grant { .. })))
+    {
+        LOG_FORMAT_ROLES
+    } else {
+        LOG_FORMAT_BASE
+    }
+}
 /// The suffix after the budget's file name: `Feature.mthd` has
 /// `Feature.mthd-log/`.
 pub const LOG_DIR_SUFFIX: &str = "-log";
@@ -396,8 +414,13 @@ impl TryFrom<FileOp> for Op {
                     .collect::<Result<_, String>>()?;
                 Op::Grant {
                     actor: ActorId::parse(&actor).ok_or_else(|| format!("bad actor {actor:?}"))?,
-                    role: Role::parse(&role, scope)
-                        .ok_or_else(|| format!("unknown role {role:?}"))?,
+                    role: Role::parse(&role, scope).ok_or_else(|| {
+                        if Role::parse(&role, Default::default()).is_some() {
+                            format!("a scope on role {role:?}, which takes none")
+                        } else {
+                            format!("unknown role {role:?}")
+                        }
+                    })?,
                 }
             }
         })
@@ -655,7 +678,7 @@ pub fn segment_bytes(changes: &[Change]) -> Result<Vec<u8>, String> {
     }
     let header = SegmentLine {
         segment: SegmentHeader {
-            format: LOG_FORMAT_VERSION,
+            format: format_for(changes),
             actor: actor.hex(),
             from: first.seq,
             to: first.seq + changes.len() as u64 - 1,
@@ -824,7 +847,7 @@ impl LogDir {
         fs::create_dir_all(self.actors_dir()).map_err(|e| io_err(&self.root, e))?;
         let info = FileBudgetInfo {
             format: LOG_FORMAT_NAME.into(),
-            version: LOG_FORMAT_VERSION,
+            version: LOG_FORMAT_BASE,
             budget_id: budget_id(genesis),
             file: file.into(),
             genesis: FileGenesis {
@@ -837,6 +860,24 @@ impl LogDir {
         write_sealed(&self.root.join("budget.json"), text.as_bytes())?;
         self.write_segment(std::slice::from_ref(genesis))?;
         self.info()
+    }
+
+    /// Raises `budget.json`'s version to `version` (never lowers it),
+    /// through a temporary file and a rename. Every writer writes the same
+    /// bytes, so two raising it at once agree.
+    pub fn raise_version(&self, version: u64) -> Result<(), LogFileError> {
+        let path = self.root.join("budget.json");
+        let text = read_text(&path).map_err(|e| io_err(&path, e))?;
+        let mut f: FileBudgetInfo = serde_json::from_str(&text)
+            .map_err(|e| LogFileError(format!("{}: {e}", path.display())))?;
+        if f.version >= version {
+            return Ok(());
+        }
+        f.version = version;
+        let mut text = serde_json::to_string_pretty(&f)
+            .map_err(|e| LogFileError(format!("{}: {e}", path.display())))?;
+        text.push('\n');
+        write_sealed(&path, text.as_bytes())
     }
 
     /// Reads `budget.json`.
@@ -1053,6 +1094,12 @@ pub fn flush(log: &Log, dir: &LogDir) -> Result<Option<PathBuf>, LogFileError> {
     if own.is_empty() {
         return Ok(None);
     }
+    // The first role raises the folder's format before the role is
+    // written, so no program too old to read it ever sees it half.
+    let format = format_for(&own);
+    if format > LOG_FORMAT_BASE {
+        dir.raise_version(format)?;
+    }
     dir.write_segment(&own).map(Some)
 }
 
@@ -1090,6 +1137,7 @@ pub fn init(path: &Path, actor: ActorId, ids: Ids, time: &str) -> Result<Shared,
         .expect("adopt makes one change")
         .clone();
     let info = dir.create(&genesis, &file)?;
+    dir.note_written(actor, text.as_bytes())?;
     Ok(Shared {
         log,
         dir,
@@ -1103,6 +1151,9 @@ pub fn open(path: &Path, actor: ActorId, ids: Ids) -> Result<(Shared, LoadReport
     let dir = LogDir::for_budget(path);
     let info = dir.info()?;
     let mut log = Log::new(actor, ids);
+    // The owner is whoever started sharing, as `budget.json` records,
+    // whatever order the segments are read in.
+    log.set_genesis(info.genesis);
     let report = load(&mut log, &dir);
     if log.is_empty() {
         return Err(LogFileError(format!(
@@ -1124,6 +1175,53 @@ pub fn open(path: &Path, actor: ActorId, ids: Ids) -> Result<(Shared, LoadReport
 // ---------------------------------------------------------------------------
 // Presence (docs/research/collaboration.md, section 5): each actor rewrites
 // its own `presence.json` every few seconds while the budget is open.
+
+/// The file in an actor's folder listing the hashes of the `.mthd` files
+/// it wrote from the log (or started sharing from), newest last.
+pub const WRITTEN_FILE: &str = "written.json";
+/// How many of those hashes are kept.
+const WRITTEN_KEPT: usize = 20;
+
+#[derive(Default, Serialize, Deserialize)]
+#[serde(default)]
+struct Written {
+    hashes: Vec<String>,
+}
+
+impl LogDir {
+    /// Notes that `actor` wrote (or started from) a `.mthd` holding `bytes`.
+    pub fn note_written(&self, actor: ActorId, bytes: &[u8]) -> Result<(), LogFileError> {
+        let dir = self.actor_dir(actor);
+        fs::create_dir_all(&dir).map_err(|e| io_err(&dir, e))?;
+        let path = dir.join(WRITTEN_FILE);
+        let mut w: Written = read_text(&path)
+            .ok()
+            .and_then(|t| serde_json::from_str(&t).ok())
+            .unwrap_or_default();
+        let hash = sha256_hex(bytes);
+        w.hashes.retain(|h| *h != hash);
+        w.hashes.push(hash);
+        if w.hashes.len() > WRITTEN_KEPT {
+            let cut = w.hashes.len() - WRITTEN_KEPT;
+            w.hashes.drain(..cut);
+        }
+        let text = serde_json::to_string(&w)
+            .map_err(|e| LogFileError(format!("{}: {e}", path.display())))?;
+        write_sealed(&path, text.as_bytes())
+    }
+
+    /// Whether some actor wrote (or started from) a `.mthd` holding exactly
+    /// `bytes`: a file that is behind the log, not edited outside it.
+    pub fn is_written(&self, bytes: &[u8]) -> bool {
+        let hash = sha256_hex(bytes);
+        self.actors().into_iter().any(|a| {
+            read_text(self.actor_dir(a).join(WRITTEN_FILE))
+                .ok()
+                .and_then(|t| serde_json::from_str::<Written>(&t).ok())
+                .is_some_and(|w| w.hashes.contains(&hash))
+        })
+    }
+}
 
 /// The name of the heartbeat file in an actor's folder.
 pub const PRESENCE_FILE: &str = "presence.json";
@@ -1214,6 +1312,10 @@ pub fn load_or_make_actor(path: &Path, ids: &mut Ids) -> Result<ActorId, LogFile
 /// matches.
 pub fn ingest(shared: &mut Shared, time: &str) -> Result<Option<ChangeId>, LogFileError> {
     let text = read_text(&shared.path).map_err(|e| io_err(&shared.path, e))?;
+    // Only behind the log, not edited: taking it in would undo changes.
+    if shared.dir.is_written(text.as_bytes()) {
+        return Ok(None);
+    }
     let on_disk = crate::from_str(&text)
         .map_err(|e| LogFileError(format!("{}: {e}", shared.path.display())))?;
     let proj = shared.log.project();
@@ -1235,8 +1337,186 @@ pub fn write_snapshot(shared: &Shared) -> Result<Projection, LogFileError> {
             budget.provenance = on_disk.provenance;
         }
     }
-    write_sealed(&shared.path, crate::to_string(&budget).as_bytes())?;
+    let bytes = crate::to_string(&budget);
+    write_sealed(&shared.path, bytes.as_bytes())?;
+    shared
+        .dir
+        .note_written(shared.log.actor(), bytes.as_bytes())?;
     Ok(proj)
+}
+
+// ---------------------------------------------------------------------------
+// Changing a shared budget from a program without a window (the command
+// line, the MCP server; decisions.md, entry 78). Such a program reads the
+// budget as everyone's changes make it and records its edit as one change
+// by this computer's person, checked against their role like any other,
+// instead of writing the `.mthd` (which only the keeper writes).
+
+/// Whether the budget at `path` is shared through a folder: a change log
+/// is beside it.
+pub fn is_shared(path: &Path) -> bool {
+    LogDir::for_budget(path).exists()
+}
+
+/// `budget` with the provenance of the file at `path` (the log doesn't
+/// carry it).
+fn with_file_provenance(mut budget: Budget, path: &Path) -> Budget {
+    if let Ok(text) = read_text(path) {
+        if let Ok(on_disk) = crate::from_str(&text) {
+            budget.provenance = on_disk.provenance;
+        }
+    }
+    budget
+}
+
+/// The shared budget at `path` as everyone's changes make it, for reading.
+pub fn read_shared(path: &Path) -> Result<Budget, LogFileError> {
+    let (shared, _) = open(path, ActorId::NONE, Ids::seeded(0))?;
+    Ok(with_file_provenance(shared.log.project().budget, path))
+}
+
+/// What a program without a window is told when it has no person in a
+/// shared budget whose owner has set roles.
+pub const NO_PERSON: &str = "This computer has no person in this shared budget, and its owner has set who may change what, so nothing was written. Open the budget in Method Budget to join it; the owner can then give you a role.";
+
+/// A shared budget opened to change it as this computer's person.
+pub struct SharedEdit {
+    shared: Shared,
+    proj: Projection,
+}
+
+impl SharedEdit {
+    /// Opens the shared budget at `path` as the person whose actor id is
+    /// kept in `actor_file` (by default [`actor_id_path`]). When there is
+    /// none yet, one is made, unless the owner has set roles: then a new
+    /// person could only read, and the edit is refused ([`NO_PERSON`]).
+    pub fn open(path: &Path, actor_file: Option<&Path>) -> Result<SharedEdit, LogFileError> {
+        let file = match actor_file {
+            Some(f) => Some(f.to_path_buf()),
+            None => actor_id_path(),
+        };
+        let actor = match file.as_deref() {
+            Some(f) if f.is_file() => load_or_make_actor(f, &mut Ids::from_os())?,
+            _ => {
+                let (probe, _) = open(path, ActorId::NONE, Ids::seeded(0))?;
+                if probe.log.roles_started() {
+                    return Err(LogFileError(NO_PERSON.into()));
+                }
+                let f = file.ok_or_else(|| LogFileError(NO_PERSON.into()))?;
+                load_or_make_actor(&f, &mut Ids::from_os())?
+            }
+        };
+        let (shared, _) = open(path, actor, Ids::from_os())?;
+        let proj = shared.log.project();
+        Ok(SharedEdit { shared, proj })
+    }
+
+    /// This computer's person.
+    pub fn actor(&self) -> ActorId {
+        self.shared.log.actor()
+    }
+
+    /// What this person may change.
+    pub fn role(&self) -> Role {
+        self.shared.log.role_of(self.actor())
+    }
+
+    /// The budget as everyone's changes make it, with the file's provenance.
+    pub fn budget(&self) -> Budget {
+        with_file_provenance(self.proj.budget.clone(), &self.shared.path)
+    }
+
+    /// Records the edit that made `after` from [`SharedEdit::budget`] as one
+    /// change by this person, checked against their role, and writes it to
+    /// this person's own folder; the keeper (who started sharing) also
+    /// rewrites the `.mthd`. `Ok(false)` when nothing changed. Refused,
+    /// with nothing written, when the role doesn't allow it.
+    pub fn record(
+        &mut self,
+        after: &Budget,
+        label: &str,
+        time: &str,
+    ) -> Result<bool, LogFileError> {
+        let recorded = self
+            .shared
+            .log
+            .record(&self.proj, after, &[], label, time)
+            .map_err(|e| match e {
+                LogError::NotAllowed { refusal, .. } => LogFileError(format!(
+                    "Your role in this shared budget doesn't allow this change ({}), so nothing was written. The owner sets who may change what.",
+                    refusal.reason
+                )),
+                other => LogFileError(format!("This change couldn't be shared: {other}")),
+            })?;
+        if recorded.is_none() {
+            return Ok(false);
+        }
+        flush(&self.shared.log, &self.shared.dir)?;
+        if self.actor() == self.shared.info.genesis.actor {
+            write_snapshot(&self.shared)?;
+        }
+        self.proj = self.shared.log.project();
+        Ok(true)
+    }
+}
+
+/// Whether the `.mthd` holds something the log doesn't (an edit by a
+/// program that doesn't write the log). Nothing is recorded.
+pub fn has_outside_edit(shared: &Shared, time: &str) -> Result<bool, LogFileError> {
+    let text = read_text(&shared.path).map_err(|e| io_err(&shared.path, e))?;
+    if shared.dir.is_written(text.as_bytes()) {
+        return Ok(false);
+    }
+    let on_disk = crate::from_str(&text)
+        .map_err(|e| LogFileError(format!("{}: {e}", shared.path.display())))?;
+    let mut probe = shared.log.clone();
+    let proj = probe.project();
+    // Nothing to record is `Ok(None)` before any role is checked, so a
+    // refusal still means the file differs.
+    Ok(!matches!(
+        probe.record(&proj, &on_disk, &[], "probe", time),
+        Ok(None)
+    ))
+}
+
+/// When someone changed the `.mthd` with a program that doesn't write the
+/// log, and roles are set, nobody can say whose change it was, so it isn't
+/// taken in as the keeper's: the file as edited is kept beside it as
+/// "Feature (outside edit 2026-10-18 140322).mthd" (never over another
+/// file) and the keeper writes the budget again from everyone's changes.
+/// Returns the kept copy's path, or `None` when the file matches the log.
+pub fn set_aside(shared: &Shared, time: &str) -> Result<Option<PathBuf>, LogFileError> {
+    if !has_outside_edit(shared, time)? {
+        return Ok(None);
+    }
+    let text = read_text(&shared.path).map_err(|e| io_err(&shared.path, e))?;
+    let stem = shared
+        .path
+        .file_stem()
+        .and_then(|n| n.to_str())
+        .unwrap_or("budget");
+    let when: String = time
+        .chars()
+        .filter(|c| c.is_ascii_digit() || *c == '-' || *c == 'T')
+        .collect::<String>()
+        .replacen('T', " ", 1);
+    let when = when.chars().take(17).collect::<String>();
+    let mut n = 1;
+    let kept = loop {
+        let name = if n == 1 {
+            format!("{stem} (outside edit {when}).mthd")
+        } else {
+            format!("{stem} (outside edit {when} {n}).mthd")
+        };
+        let candidate = shared.path.with_file_name(name);
+        if !candidate.exists() {
+            break candidate;
+        }
+        n += 1;
+    };
+    write_sealed(&kept, text.as_bytes())?;
+    write_snapshot(shared)?;
+    Ok(Some(kept))
 }
 
 #[cfg(test)]
@@ -1312,6 +1592,14 @@ mod tests {
         // An unknown role is a malformed line, never a guess.
         let bad = line.replace(r#""role":"comment""#, r#""role":"producer""#);
         assert!(change_from_json(&bad).is_err());
+        // So is a scope on a role that has none: refused, not dropped.
+        let scoped = line.replace(
+            r#""role":"comment"}"#,
+            &format!(r#""role":"comment","scope":["{}"]}}"#, Uid(7).hex()),
+        );
+        assert_ne!(scoped, line);
+        let err = change_from_json(&scoped).unwrap_err();
+        assert!(err.contains("scope"), "{err}");
     }
 
     #[test]

@@ -1738,3 +1738,77 @@ fn roles_converge_with_random_edits_in_any_order() {
         "department editor: {department:?}"
     );
 }
+
+/// Every order of `items`.
+fn orders<T: Clone>(items: &[T]) -> Vec<Vec<T>> {
+    if items.len() <= 1 {
+        return vec![items.to_vec()];
+    }
+    let mut out = Vec::new();
+    for i in 0..items.len() {
+        let mut rest = items.to_vec();
+        let first = rest.remove(i);
+        for mut tail in orders(&rest) {
+            tail.insert(0, first.clone());
+            out.push(tail);
+        }
+    }
+    out
+}
+
+#[test]
+fn a_forged_first_change_never_takes_the_budget() {
+    // Actor 5 starts sharing and gives actor 2 a role.
+    let mut a = adopt(5, &sample());
+    let genesis = a.changes().next().unwrap().id();
+    a.grant(actor(2), Role::Editor, "Jordan edits", T).unwrap();
+    // Actor 1 (sorting before 5) writes a first change of its own, made
+    // without the budget's first change: a forged one, and a second
+    // computer starting to share the same file before the folder synced.
+    let forged = Change {
+        actor: actor(1),
+        seq: 1,
+        deps: Default::default(),
+        lamport: 1,
+        time: T.into(),
+        label: "forged".into(),
+        ops: vec![Op::Grant {
+            actor: actor(3),
+            role: Role::Admin,
+        }],
+    };
+    let second_start = adopt(0, &sample()).changes().next().unwrap().clone();
+    let mut all: Vec<Change> = a.changes().cloned().collect();
+    all.push(forged.clone());
+    all.push(second_start.clone());
+    for (n, order) in orders(&all).into_iter().enumerate() {
+        let mut fresh = Log::new(actor(9), Ids::seeded(n as u64));
+        fresh.set_genesis(genesis);
+        for c in order {
+            let _ = fresh.apply(c);
+        }
+        assert_eq!(fresh.owner(), Some(actor(5)), "order {n}");
+        assert_eq!(
+            rejected_ids(&fresh),
+            BTreeSet::from([forged.id(), second_start.id()]),
+            "order {n}"
+        );
+        assert_eq!(fresh.role_of(actor(3)), Role::ReadOnly, "order {n}");
+        assert_eq!(fresh.role_of(actor(2)), Role::Editor, "order {n}");
+        assert_eq!(fresh.frontier(), &{
+            let mut f = a.frontier().clone();
+            f.advance(actor(1), 1);
+            f.advance(actor(0), 1);
+            f
+        });
+        assert_eq!(
+            normalized(&fresh.project().budget),
+            normalized(&a.project().budget),
+            "order {n}"
+        );
+    }
+    // The log that started sharing refuses both too.
+    assert!(a.apply(forged).is_err());
+    assert!(a.apply(second_start).is_err());
+    assert_eq!(a.owner(), Some(actor(5)));
+}

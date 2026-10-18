@@ -61,8 +61,13 @@ impl Role {
         }
     }
 
-    /// The role named `key`, with `scope` for a department editor.
+    /// The role named `key`, with `scope` for a department editor. `None`
+    /// for an unknown name, and for a scope given with any other role (it
+    /// would mean nothing, so it is refused rather than dropped).
     pub fn parse(key: &str, scope: BTreeSet<Uid>) -> Option<Role> {
+        if key != "department" && !scope.is_empty() {
+            return None;
+        }
         Some(match key {
             "owner" => Role::Owner,
             "admin" => Role::Admin,
