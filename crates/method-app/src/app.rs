@@ -1118,9 +1118,6 @@ pub fn run() {
 
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        // In-app updates, driven from Rust only (src/updater.rs): no window
-        // is granted the plugin's own commands.
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(nav_guard)
         .manage(AppState::default())
         // The Window menu's list of budgets (src/tabs.rs).

@@ -1,57 +1,63 @@
 //! In-app updates, this version's release notes, and What's New
-//! (docs/APP.md, "Updates"; how releases are made: docs/RELEASING.md).
+//! (docs/APP.md, "Updates"; how releases are made: docs/RELEASING.md;
+//! why the work moved to the suite's crate: docs/decisions.md, entry 83).
 //!
-//! The updater plugin (`tauri-plugin-updater`) is driven from here only. No
-//! window is granted the plugin's own commands: the page has four narrow
-//! commands of ours (`update_status`, `update_restart`, `whats_new`,
-//! `release_notes`) and hears `update-status` events; Help > Check for
-//! Updates and the Check for Updates Automatically switch are answered here.
+//! The work underneath is the suite's shared updater, `method-update`
+//! (method-production-suite/method-libs): the manifest, the download and its
+//! minisign signature, the host rule, the Mac bundle swap, the settings file
+//! and the state machine. This file keeps Method Budget's window side: the
+//! page has four narrow commands of ours (`update_status`, `update_restart`,
+//! `whats_new`, `release_notes`) and hears `update-status` events; Help >
+//! Check for Updates and the Check for Updates Automatically switch are
+//! answered here.
 //!
 //! What happens:
 //!
-//! - A while after launch, then every few hours (unless turned off), the app
-//!   fetches the manifest from the endpoint in `tauri.conf.json`
-//!   (`plugins.updater.endpoints`, the one place it is written). A newer
-//!   version downloads in the background; the plugin checks its signature
-//!   against the public key the app was built with before anything is kept.
-//!   Then the page shows a quiet "Update ready: Restart to update".
+//! - Two minutes after launch, then every six hours (unless turned off), the
+//!   app fetches the manifest from the endpoint in `tauri.conf.json`
+//!   (`plugins.updater.endpoints`, the one place it is written, baked in by
+//!   build.rs). A newer version downloads in the background, and its
+//!   signature is checked against the public key the app was built with
+//!   (`plugins.updater.pubkey`, the same way) before anything is kept. The
+//!   signature must name the version the manifest announces. Then the page
+//!   shows a quiet "Update ready: Restart to update".
 //! - Nothing interrupts: an automatic check that fails says nothing. Only a
 //!   check the user asked for (Help > Check for Updates) answers, in the same
-//!   quiet place: up to date, or "Couldn't check for updates". A manifest
-//!   with no build for this computer (an Intel Mac: releases are Apple
+//!   quiet place: up to date, or "Couldn't check for updates". A computer
+//!   the manifest has no build for (an Intel Mac: releases are Apple
 //!   silicon only) answers "Updates are for Apple silicon Macs. This version
 //!   stays as it is." instead.
 //! - Restart to update saves first: every open budget's changes go into its
 //!   file (Autosave's own rules, so a file changed outside the app is never
 //!   written over), the open tabs and split view are remembered, and what
 //!   still can't be saved gets the same Save All / Discard All / Cancel
-//!   question as quitting. Then the update is installed and the app starts
-//!   again with its tabs, as after any restart (src/tabs.rs).
+//!   question as quitting. Then the app bundle is swapped for the update in
+//!   place and the app starts again with its tabs, as after any restart
+//!   (src/tabs.rs).
 //! - After an update, What's New for the new version is shown once
 //!   (`whats_new`); Help > Release Notes shows it again (`release_notes`).
 //!   The notes are `docs/releases/<version>.md`, embedded at build time
 //!   (build.rs) and handed to the page as plain text pieces.
 //!
-//! Until the release key exists, `tauri.conf.json` carries a placeholder
-//! public key: the app then never checks (no network at all) and a manual
-//! check answers "Couldn't check for updates". The only hosts the updater
-//! may reach are the endpoint's (and, for GitHub, its two download hosts),
-//! over https, redirects included.
+//! A build with the placeholder public key never checks (no network at all),
+//! and a manual check answers "Couldn't check for updates". The only hosts
+//! the updater may reach are the endpoint's (and, for GitHub, its two
+//! download hosts), over https, redirects included.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use method_release::minisign;
 use method_release::notes;
-use method_release::version::Version;
-use serde::{Deserialize, Serialize};
+use method_update::install::{self, InstallError};
+use method_update::policy::{self, Phase, Settings, Updater, TICK};
+use method_update::target::Installer;
+use method_update::{transport, AppConfig, Baked, Update, UpdateError};
+use serde::Serialize;
 use tauri::menu::{CheckMenuItem, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Manager, Runtime, State};
-use tauri_plugin_updater::{Update, UpdaterExt};
 
 use crate::app::{AppState, DocId};
-use crate::safety::{write_atomically, Access};
 use crate::safety_app::{autosave_pass, Autosaved, Safety};
 
 /// Help > Check for Updates…, answered here.
@@ -61,23 +67,21 @@ pub const AUTO_ITEM: &str = "help.auto_updates";
 /// The event the main window hears; the payload is a [`Status`].
 pub const STATUS_EVENT: &str = "update-status";
 
-/// The first automatic check, after the app starts.
-pub const FIRST_CHECK: Duration = Duration::from_secs(2 * 60);
+/// The first automatic check, after the app starts (the suite's schedule).
+pub const FIRST_CHECK: Duration = policy::FIRST_CHECK;
 /// Then one every this long, while the app runs.
-pub const CHECK_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
-/// How often the timer looks at the clock (and at the setting).
-const TICK: Duration = Duration::from_secs(30);
+pub const CHECK_EVERY: Duration = policy::CHECK_EVERY;
 /// A check that takes longer gives up.
 const CHECK_TIMEOUT: Duration = Duration::from_secs(30);
 /// A download that takes longer gives up (and is tried again next time).
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(20 * 60);
 
-/// GitHub serves a release's files from these, after a redirect from
-/// github.com.
-const GITHUB_DOWNLOAD_HOSTS: &[&str] = &[
-    "objects.githubusercontent.com",
-    "release-assets.githubusercontent.com",
-];
+/// The bundle every Mac build is (`productName` in tauri.conf.json).
+pub const BUNDLE_NAME: &str = "Method Budget.app";
+
+// ENDPOINT and PUBKEY: `plugins.updater` in tauri.conf.json, copied by
+// build.rs, so the key is written in one place only.
+include!(concat!(env!("OUT_DIR"), "/updater-config.rs"));
 
 /// This version's release notes, `docs/releases/<version>.md`, copied in by
 /// build.rs (empty if there were none).
@@ -87,32 +91,21 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-// ---------------------------------------------------------------------------
-// The core, without Tauri (tested below)
-
-/// Where an update is.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Phase {
-    Idle,
-    /// `manual`: the user asked (Help > Check for Updates), so the page says
-    /// what is happening and how it ended.
-    Checking {
-        manual: bool,
-    },
-    Downloading {
-        version: String,
-        manual: bool,
-    },
-    /// Downloaded and its signature checked: Restart to update installs it.
-    Ready {
-        version: String,
-    },
-    Installing {
-        version: String,
-    },
+/// What Method Budget tells the updater about itself.
+pub fn update_config() -> AppConfig {
+    AppConfig::new(
+        "Method Budget",
+        BUNDLE_NAME,
+        concat!("method-budget-update/", env!("CARGO_PKG_VERSION")),
+        Baked::release(ENDPOINT, PUBKEY),
+    )
 }
 
-/// A one-time answer the page shows in its quiet place, then lets go.
+// ---------------------------------------------------------------------------
+// The page's side of the policy, without Tauri (tested below)
+
+/// A one-time answer the page shows in its quiet place, then lets go
+/// (ui/js/updates.js, `TEXT`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Said {
@@ -120,8 +113,8 @@ pub enum Said {
     Current,
     /// A check (or its download) the user asked for didn't work.
     Failed,
-    /// A check the user asked for found a manifest with no build for this
-    /// computer (an Intel Mac, since releases are Apple silicon only): this
+    /// A check the user asked for, on a computer the manifest has no build
+    /// for (an Intel Mac, since releases are Apple silicon only): this
     /// version stays as it is.
     NoBuild,
     /// Restart to update couldn't install; the update is still ready.
@@ -133,153 +126,25 @@ pub enum Said {
 pub enum CheckFailed {
     /// No network, no manifest, a bad answer: worth trying again later.
     Failed,
-    /// The manifest has no entry for this platform.
+    /// No build for this computer.
     NoBuild,
 }
 
-/// What an updater error means for the user. The plugin returns
-/// `TargetsNotFound` when the manifest has neither `{os}-{arch}-{installer}`
-/// nor `{os}-{arch}` (an Intel Mac reading an Apple-silicon-only manifest),
-/// and `TargetNotFound` when a fixed target is set and missing; both mean
-/// there is no build here. Anything else is a failed check.
-pub fn check_failure(e: &tauri_plugin_updater::Error) -> CheckFailed {
-    use tauri_plugin_updater::Error;
+/// What an updater error means for the user. `Platform` is this computer
+/// having no build: an Intel Mac (or Windows, or Linux) is refused before
+/// anything is fetched, and a manifest without a row for this computer is
+/// refused the same way. Anything else is a failed check.
+pub fn check_failure(e: &UpdateError) -> CheckFailed {
     match e {
-        Error::TargetsNotFound(_) | Error::TargetNotFound(_) => CheckFailed::NoBuild,
+        UpdateError::Platform(_) => CheckFailed::NoBuild,
         _ => CheckFailed::Failed,
     }
 }
 
-/// What a check asks for next.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Start {
-    /// Go ahead and check.
-    Check,
-    /// A check or download is already under way (now counted as asked for,
-    /// if this one was).
-    Busy,
-    /// An update is ready or installing already.
-    Ready,
-}
-
-/// The state machine of an update. Every change goes through here.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Machine {
-    pub phase: Phase,
-}
-
-impl Default for Machine {
-    fn default() -> Self {
-        Machine { phase: Phase::Idle }
-    }
-}
-
-impl Machine {
-    pub fn start_check(&mut self, manual: bool) -> Start {
-        match &mut self.phase {
-            Phase::Idle => {
-                self.phase = Phase::Checking { manual };
-                Start::Check
-            }
-            Phase::Checking { manual: m } | Phase::Downloading { manual: m, .. } => {
-                *m |= manual;
-                Start::Busy
-            }
-            Phase::Ready { .. } | Phase::Installing { .. } => Start::Ready,
-        }
-    }
-
-    /// The check finished: `Ok(Some(v))` found version `v`, `Ok(None)` found
-    /// nothing newer, `Err` didn't work (and why). True when `v` should be
-    /// downloaded; and what to tell a user who asked.
-    pub fn checked(&mut self, found: Result<Option<String>, CheckFailed>) -> (bool, Option<Said>) {
-        let Phase::Checking { manual } = self.phase else {
-            return (false, None);
-        };
-        match found {
-            Ok(Some(version)) => {
-                self.phase = Phase::Downloading { version, manual };
-                (true, None)
-            }
-            Ok(None) => {
-                self.phase = Phase::Idle;
-                (false, manual.then_some(Said::Current))
-            }
-            Err(why) => {
-                self.phase = Phase::Idle;
-                let said = match why {
-                    CheckFailed::Failed => Said::Failed,
-                    CheckFailed::NoBuild => Said::NoBuild,
-                };
-                (false, manual.then_some(said))
-            }
-        }
-    }
-
-    /// The download finished (`ok`: downloaded and its signature checked).
-    pub fn downloaded(&mut self, ok: bool) -> Option<Said> {
-        let Phase::Downloading { version, manual } = &self.phase else {
-            return None;
-        };
-        let manual = *manual;
-        if ok {
-            self.phase = Phase::Ready {
-                version: version.clone(),
-            };
-            None
-        } else {
-            self.phase = Phase::Idle;
-            manual.then_some(Said::Failed)
-        }
-    }
-
-    /// Restart to update was chosen and nothing unsaved stands in the way:
-    /// the version to install, if one is ready.
-    pub fn start_install(&mut self) -> Option<String> {
-        let Phase::Ready { version } = &self.phase else {
-            return None;
-        };
-        let v = version.clone();
-        self.phase = Phase::Installing { version: v.clone() };
-        Some(v)
-    }
-
-    /// Installing failed: the update stays ready for another try.
-    pub fn install_failed(&mut self) -> Said {
-        if let Phase::Installing { version } = &self.phase {
-            self.phase = Phase::Ready {
-                version: version.clone(),
-            };
-        }
-        Said::InstallFailed
-    }
-
-    pub fn is_ready(&self) -> bool {
-        matches!(self.phase, Phase::Ready { .. })
-    }
-
-    /// What the page is told.
-    pub fn status(&self, automatic: bool, said: Option<Said>) -> Status {
-        let (phase, version, manual) = match &self.phase {
-            Phase::Idle => ("idle", None, false),
-            Phase::Checking { manual } => ("checking", None, *manual),
-            Phase::Downloading { version, manual } => {
-                ("downloading", Some(version.clone()), *manual)
-            }
-            Phase::Ready { version } => ("ready", Some(version.clone()), false),
-            Phase::Installing { version } => ("installing", Some(version.clone()), false),
-        };
-        Status {
-            phase,
-            version,
-            manual,
-            said,
-            automatic,
-        }
-    }
-}
-
-/// What the page hears (`update-status`, `update_status`).
+/// What the page hears (`update-status`, `update_status`): the same five
+/// fields and five phases as always. The suite's own `failed` and
+/// `read-only` phases are not the page's: a failure is said once and the
+/// indicator goes back to idle.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Status {
     /// "idle", "checking", "downloading", "ready" or "installing".
@@ -294,102 +159,139 @@ pub struct Status {
     pub automatic: bool,
 }
 
-/// Why this copy can't update itself, from its updater settings: `None` when
-/// it can. The placeholder key (or any key that isn't one) and a missing or
-/// non-https endpoint all mean no checks at all.
-pub fn unavailable_reason(pubkey: &str, endpoints: &[String]) -> Option<String> {
-    if let Err(e) = minisign::parse_public_key_box(pubkey) {
-        return Some(format!("no updater key ({e})"));
-    }
-    if endpoints.is_empty() {
-        return Some("no update endpoint".into());
-    }
-    if endpoints.iter().any(|e| !e.starts_with("https://")) {
-        return Some("an update endpoint isn't https".into());
-    }
-    None
-}
-
-/// The hosts the updater may reach: each endpoint's, plus GitHub's download
-/// hosts when an endpoint is on github.com.
-pub fn allowed_hosts(endpoints: &[String]) -> Vec<String> {
-    let mut hosts: Vec<String> = Vec::new();
-    for e in endpoints {
-        let Ok(url) = tauri::Url::parse(e) else {
-            continue;
-        };
-        if let Some(h) = url.host_str() {
-            if !hosts.iter().any(|x| x == h) {
-                hosts.push(h.to_string());
-            }
-            if h == "github.com" {
-                for g in GITHUB_DOWNLOAD_HOSTS {
-                    if !hosts.iter().any(|x| x == g) {
-                        hosts.push((*g).to_string());
-                    }
-                }
-            }
+/// The suite's status in the page's words, with this answer.
+pub fn page_status(s: &policy::Status, said: Option<Said>) -> Status {
+    let (phase, version, manual) = match s.phase {
+        p @ ("checking" | "downloading" | "ready" | "installing") => {
+            (p, s.version.clone(), s.manual)
         }
-    }
-    hosts
-}
-
-/// True when a request to `scheme://host` is one the updater may make.
-pub fn allowed(scheme: &str, host: Option<&str>, hosts: &[String]) -> bool {
-    scheme == "https" && host.is_some_and(|h| hosts.iter().any(|a| a == h))
-}
-
-/// The updater's settings, in `updates.json` in the app's data folder.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct UpdateSettings {
-    /// Check now and then without being asked. On unless turned off.
-    pub automatic: bool,
-    /// The version whose What's New was shown last (or that ran first).
-    pub seen: Option<String>,
-}
-
-impl Default for UpdateSettings {
-    fn default() -> Self {
-        UpdateSettings {
-            automatic: true,
-            seen: None,
-        }
-    }
-}
-
-impl UpdateSettings {
-    /// Reads `file`; missing or unreadable means the defaults.
-    pub fn load(file: &Path) -> UpdateSettings {
-        std::fs::read_to_string(file)
-            .ok()
-            .and_then(|t| serde_json::from_str(&t).ok())
-            .unwrap_or_default()
-    }
-
-    pub fn save(&self, file: &Path) -> std::io::Result<()> {
-        if let Some(dir) = file.parent() {
-            crate::safety::create_private_dir(dir)?;
-        }
-        let bytes = serde_json::to_vec_pretty(self).map_err(std::io::Error::other)?;
-        write_atomically(file, &bytes, Access::Private)
-    }
-}
-
-/// Whether What's New is due for `current`, given the version last `seen`:
-/// (show it, the version to remember now). A first run shows nothing (it
-/// isn't an update); a newer version shows it (and is remembered once
-/// shown); going back to an older one shows nothing.
-pub fn whats_new_due(seen: Option<&str>, current: &str) -> (bool, Option<String>) {
-    let Ok(now) = Version::parse(current) else {
-        return (false, None);
+        _ => ("idle", None, false),
     };
-    match seen.map(Version::parse) {
-        None | Some(Err(_)) => (false, Some(current.to_string())),
-        Some(Ok(before)) if before < now => (true, None),
-        Some(Ok(before)) if before == now => (false, None),
-        Some(Ok(_)) => (false, Some(current.to_string())),
+    Status {
+        phase,
+        version,
+        manual,
+        said,
+        automatic: s.automatic,
     }
+}
+
+/// The suite's one-time answer in the page's words: a failure for want of a
+/// build for this computer is said as such.
+pub fn page_said(said: Option<policy::Said>, failed: Option<CheckFailed>) -> Option<Said> {
+    Some(match said? {
+        policy::Said::Current => Said::Current,
+        policy::Said::Failed if failed == Some(CheckFailed::NoBuild) => Said::NoBuild,
+        policy::Said::Failed | policy::Said::ReadOnly => Said::Failed,
+        policy::Said::InstallFailed => Said::InstallFailed,
+    })
+}
+
+/// The updater for the app's life: the suite's policy, and why the last
+/// check failed (for the page's no-build answer).
+pub struct Updates {
+    pub updater: Updater,
+    last_failure: Mutex<Option<CheckFailed>>,
+}
+
+impl Updates {
+    /// The updater for `config`, running `current`, keeping its settings in
+    /// `settings_file`. A first run (or a version older than the one last
+    /// seen) remembers this version at once, as Method Budget always has,
+    /// so What's New knows a later version is an update.
+    pub fn new(config: AppConfig, current: &str, settings_file: Option<PathBuf>) -> Self {
+        if let Some(f) = &settings_file {
+            remember_first_run(f, current);
+        }
+        Updates {
+            updater: Updater::new(config, current, settings_file, Instant::now()),
+            last_failure: Mutex::new(None),
+        }
+    }
+
+    pub fn automatic(&self) -> bool {
+        self.updater.automatic()
+    }
+
+    /// What the page is told, with this answer.
+    pub fn status(&self, said: Option<Said>) -> Status {
+        page_status(&self.updater.status(None), said)
+    }
+
+    /// One check, then the download if it found something; `check` and
+    /// `download` are the network, `tell` hears every step. Blocks: run it
+    /// on a thread of its own. `manual`: the user asked. Returns the
+    /// one-time answer, which `tell` has also heard.
+    pub fn check_with(
+        &self,
+        manual: bool,
+        check: impl FnOnce() -> Result<Option<Update>, UpdateError>,
+        download: impl FnOnce(&Update) -> Result<Vec<u8>, UpdateError>,
+        tell: impl Fn(Status),
+    ) -> Option<Said> {
+        let failed = |e: UpdateError| {
+            *lock(&self.last_failure) = Some(check_failure(&e));
+            e.to_string()
+        };
+        let said = self.updater.check_with(
+            manual,
+            || {
+                // The check has started: the page shows it (when asked for).
+                *lock(&self.last_failure) = None;
+                tell(self.status(None));
+                check().map_err(failed)
+            },
+            |update| {
+                tell(self.status(None));
+                download(update).map_err(failed)
+            },
+        );
+        let said = page_said(said, *lock(&self.last_failure));
+        // A failure is said once; the indicator goes back to idle.
+        self.updater.dismiss();
+        tell(self.status(said));
+        said
+    }
+}
+
+/// A first run, or a version older than the one last seen: remember this
+/// version now (What's New is for a later version). A settings file this
+/// build can't read is left alone.
+pub fn remember_first_run(file: &Path, current: &str) {
+    let Ok(read) = Settings::read(file) else {
+        return;
+    };
+    let mut s = read.unwrap_or_default();
+    if let (_, Some(v)) = policy::whats_new_due(s.seen.as_deref(), current) {
+        s.seen = Some(v);
+        if let Some(dir) = file.parent() {
+            let _ = crate::safety::create_private_dir(dir);
+        }
+        let _ = s.save(file);
+    }
+}
+
+/// The real network: this app's endpoint and key, a short timeout for the
+/// check and a long one for the download, and the download's host checked
+/// before it is fetched.
+fn check_over_network(config: &AppConfig, current: &str) -> Result<Option<Update>, UpdateError> {
+    let mut c = config.transport(Some(Installer::App));
+    c.timeout = Some(CHECK_TIMEOUT);
+    let version = method_update::manifest::parse_version(current).map_err(UpdateError::Manifest)?;
+    let found = transport::check(&c, &version)?;
+    if let Some(u) = &found {
+        // The update is on a host the updater doesn't use.
+        if !transport::host_allowed(&u.download_url, &c.allowed_hosts, c.allow_insecure) {
+            return Err(UpdateError::Host(u.download_url.clone()));
+        }
+    }
+    Ok(found)
+}
+
+fn download_over_network(config: &AppConfig, update: &Update) -> Result<Vec<u8>, UpdateError> {
+    let mut c = config.transport(Some(Installer::App));
+    c.timeout = Some(DOWNLOAD_TIMEOUT);
+    transport::download(&c, update, |_, _| {}, || {})
 }
 
 /// Release notes as the page draws them: plain text pieces, never markup.
@@ -466,241 +368,104 @@ pub fn flush_for_restart(state: &AppState, safety: &Safety, now: u64) -> Flushed
     }
 }
 
-/// Installing failed: the update stays ready for another try, and a Discard
-/// All chosen on the way to the restart is taken back. The app goes on
-/// running with those budgets open, so autosave and recovery copies take up
-/// again (otherwise nothing would be kept for the rest of the run).
-pub fn install_failed(machine: &mut Machine, safety: Option<&Safety>) -> Said {
+/// Installing failed (the update itself stays ready for another try): a
+/// Discard All chosen on the way to the restart is taken back. The app goes
+/// on running with those budgets open, so autosave and recovery copies take
+/// up again (otherwise nothing would be kept for the rest of the run).
+pub fn install_failed(safety: Option<&Safety>) -> Said {
     if let Some(s) = safety {
         crate::safety_app::discard_cancelled(s);
     }
-    machine.install_failed()
+    Said::InstallFailed
 }
 
 // ---------------------------------------------------------------------------
 // Tauri wiring
 
-/// The updater's state for the app's life.
-pub struct Updates {
-    machine: Mutex<Machine>,
-    /// The downloaded update, ready to install.
-    pending: Mutex<Option<(Update, Vec<u8>)>>,
-    settings: Mutex<UpdateSettings>,
-    settings_file: Option<PathBuf>,
-    /// Why this copy can't update itself (`None`: it can).
-    unavailable: Option<String>,
-    hosts: Vec<String>,
-    /// What's New is to be shown once (decided at the start).
-    whats_new_due: Mutex<bool>,
-    current: String,
+fn tell<R: Runtime>(app: &AppHandle<R>, status: Status) {
+    let _ = app.emit_to(crate::tools::MAIN, STATUS_EVENT, status);
 }
 
-impl Updates {
-    pub fn automatic(&self) -> bool {
-        lock(&self.settings).automatic
-    }
-
-    fn set_automatic(&self, on: bool) {
-        let mut s = lock(&self.settings);
-        s.automatic = on;
-        if let Some(f) = &self.settings_file {
-            let _ = s.save(f);
-        }
-    }
-
-    fn status(&self, said: Option<Said>) -> Status {
-        lock(&self.machine).status(self.automatic(), said)
-    }
-}
-
-/// The updater settings `tauri.conf.json` carries: the public key and the
-/// endpoints.
-fn configured<R: Runtime>(app: &AppHandle<R>) -> (String, Vec<String>) {
-    let conf = app
-        .config()
-        .plugins
-        .0
-        .get("updater")
-        .cloned()
-        .unwrap_or_default();
-    let key = conf["pubkey"].as_str().unwrap_or_default().to_string();
-    let endpoints = conf["endpoints"]
-        .as_array()
-        .map(|a| {
-            a.iter()
-                .filter_map(|e| e.as_str().map(str::to_string))
-                .collect()
-        })
-        .unwrap_or_default();
-    (key, endpoints)
-}
-
-fn tell<R: Runtime>(app: &AppHandle<R>, said: Option<Said>) {
-    if let Some(u) = app.try_state::<Updates>() {
-        let _ = app.emit_to(crate::tools::MAIN, STATUS_EVENT, u.status(said));
-    }
-}
-
-/// Sets everything up when the app starts: the settings, whether What's New
-/// is due, the menu's check, and the timer for automatic checks.
+/// Sets everything up when the app starts: puts back a bundle an
+/// interrupted update left hidden, reads the settings, decides whether
+/// What's New is due, ticks the menu's switch, and starts the timer for
+/// automatic checks.
 pub fn init<R: Runtime>(app: &AppHandle<R>) {
-    let current = app.package_info().version.to_string();
+    let config = update_config();
+    if let Ok(exe) = std::env::current_exe() {
+        // Leftovers of a swap that was cut short; nothing to say about it.
+        let _ = install::sweep_at_startup(&exe, &config.bundle);
+    }
     let settings_file = app
         .path()
         .app_local_data_dir()
         .ok()
         .map(|d| d.join("updates.json"));
-    let mut settings = settings_file
-        .as_deref()
-        .map(UpdateSettings::load)
-        .unwrap_or_default();
-    let (due, remember) = whats_new_due(settings.seen.as_deref(), &current);
-    if let Some(v) = remember {
-        settings.seen = Some(v);
-        if let Some(f) = &settings_file {
-            let _ = settings.save(f);
-        }
-    }
-    let (key, endpoints) = configured(app);
-    let unavailable = unavailable_reason(&key, &endpoints);
-    app.manage(Updates {
-        machine: Mutex::new(Machine::default()),
-        pending: Mutex::new(None),
-        settings: Mutex::new(settings),
-        settings_file,
-        hosts: allowed_hosts(&endpoints),
-        unavailable,
-        whats_new_due: Mutex::new(due),
-        current,
-    });
+    let current = app.package_info().version.to_string();
+    app.manage(Updates::new(config, &current, settings_file));
     refresh_menu(app);
-    if app.state::<Updates>().unavailable.is_some() {
+    if app.state::<Updates>().updater.unavailable().is_some() {
         // Never checks: no timer, no network.
         return;
     }
     let handle = app.clone();
-    std::thread::spawn(move || {
-        let mut next = Instant::now() + FIRST_CHECK;
-        loop {
-            std::thread::sleep(TICK);
-            if Instant::now() < next {
-                continue;
-            }
-            next = Instant::now() + CHECK_EVERY;
-            if handle.state::<Updates>().automatic() {
-                check_now(&handle, false);
-            }
+    std::thread::spawn(move || loop {
+        std::thread::sleep(TICK);
+        if handle.state::<Updates>().updater.due(Instant::now()) {
+            check_now(&handle, false);
         }
     });
-}
-
-/// The redirect rule for the updater's requests: https, to the allowed
-/// hosts only, at most ten hops.
-fn redirect_policy(hosts: Vec<String>) -> reqwest::redirect::Policy {
-    reqwest::redirect::Policy::custom(move |attempt| {
-        if attempt.previous().len() >= 10 {
-            return attempt.error("too many redirects");
-        }
-        let ok = allowed(attempt.url().scheme(), attempt.url().host_str(), &hosts);
-        if ok {
-            attempt.follow()
-        } else {
-            attempt.error("a redirect to a host the updater doesn't use")
-        }
-    })
-}
-
-/// Asks the endpoint for a newer version.
-async fn fetch<R: Runtime>(
-    app: &AppHandle<R>,
-    hosts: Vec<String>,
-) -> Result<Option<Update>, CheckFailed> {
-    let client_hosts = hosts.clone();
-    let updater = app
-        .updater_builder()
-        .timeout(CHECK_TIMEOUT)
-        .configure_client(move |b| {
-            b.https_only(true)
-                .redirect(redirect_policy(client_hosts.clone()))
-        })
-        .build()
-        .map_err(|_| CheckFailed::Failed)?;
-    let update = updater.check().await.map_err(|e| check_failure(&e))?;
-    if let Some(u) = &update {
-        // The update is on a host the updater doesn't use.
-        let url = &u.download_url;
-        if !allowed(url.scheme(), url.host_str(), &hosts) {
-            return Err(CheckFailed::Failed);
-        }
-    }
-    Ok(update)
 }
 
 /// One check, then the download if it found something. Blocks: run it on a
 /// thread of its own. `manual`: the user asked (Help > Check for Updates).
 pub fn check_now<R: Runtime>(app: &AppHandle<R>, manual: bool) {
     let updates = app.state::<Updates>();
-    if updates.unavailable.is_some() {
-        if manual {
-            tell(app, Some(Said::Failed));
-        }
-        return;
-    }
-    let start = lock(&updates.machine).start_check(manual);
-    tell(app, None);
-    if start != Start::Check {
-        return;
-    }
-    let found = tauri::async_runtime::block_on(fetch(app, updates.hosts.clone()));
-    let version = match &found {
-        Ok(Some(u)) => Ok(Some(u.version.clone())),
-        Ok(None) => Ok(None),
-        Err(why) => Err(*why),
-    };
-    let (download, said) = lock(&updates.machine).checked(version);
-    tell(app, said);
-    let (true, Ok(Some(mut update))) = (download, found) else {
-        return;
-    };
-    update.timeout = Some(DOWNLOAD_TIMEOUT);
-    // The plugin checks the signature against the app's public key before
-    // it hands the bytes over; a bad one is an error here.
-    let bytes = tauri::async_runtime::block_on(update.download(|_, _| {}, || {}));
-    let said = match bytes {
-        Ok(bytes) => {
-            *lock(&updates.pending) = Some((update, bytes));
-            lock(&updates.machine).downloaded(true)
-        }
-        Err(_) => lock(&updates.machine).downloaded(false),
-    };
-    tell(app, said);
+    let config = updates.updater.app().clone();
+    let current = app.package_info().version.to_string();
+    updates.check_with(
+        manual,
+        || check_over_network(&config, &current),
+        |update| download_over_network(&config, update),
+        |status| tell(app, status),
+    );
 }
 
 /// Installs the ready update and starts the app again. Runs on a thread of
-/// its own (installing on macOS may need the main thread to ask for an
-/// administrator's password).
+/// its own (an /Applications the user can't write asks for an
+/// administrator, through the system's own prompt).
 fn install_and_restart<R: Runtime>(app: &AppHandle<R>) {
     let updates = app.state::<Updates>();
-    if lock(&updates.machine).start_install().is_none() {
+    if !matches!(updates.updater.phase(), Phase::Ready { .. }) {
         return;
     }
-    tell(app, None);
+    let mut installing = updates.status(None);
+    installing.phase = "installing";
+    tell(app, installing);
     // The tabs as they are now (Save All may have given a budget its file).
     if let Some(safety) = app.try_state::<Safety>() {
         safety.remember_tabs(&app.state::<AppState>().docs());
     }
-    let pending = lock(&updates.pending).take();
-    let result = match &pending {
-        Some((update, bytes)) => update.install(bytes).map_err(|e| e.to_string()),
-        None => Err("the update is gone".to_string()),
+    let names = updates.updater.app().bundle.clone();
+    let result = match std::env::current_exe()
+        .ok()
+        .as_deref()
+        .and_then(install::bundle_of_exe)
+    {
+        Some(bundle) => updates
+            .updater
+            .install_ready(&bundle, &|b, new| install::admin_swap(b, new, &names)),
+        None => Err(InstallError::Io("not running from an app bundle".into())),
     };
     match result {
-        Ok(()) => app.restart(),
+        // The bundle was swapped in place (Method Budget has never been
+        // renamed), so Tauri's own restart starts the new version, after
+        // the app's exit work, as before.
+        Ok(_) => app.restart(),
         Err(_) => {
-            *lock(&updates.pending) = pending;
             let safety = app.try_state::<Safety>();
-            let said = install_failed(&mut lock(&updates.machine), safety.as_deref());
-            tell(app, Some(said));
+            let said = install_failed(safety.as_deref());
+            tell(app, updates.status(Some(said)));
         }
     }
 }
@@ -752,10 +517,10 @@ pub fn handle_menu<R: Runtime>(app: &AppHandle<R>, id: &str) -> bool {
         AUTO_ITEM => {
             if let Some(u) = app.try_state::<Updates>() {
                 let on = !u.automatic();
-                u.set_automatic(on);
+                let _ = u.updater.set_automatic(on);
+                tell(app, u.status(None));
             }
             refresh_menu(app);
-            tell(app, None);
             true
         }
         _ => false,
@@ -776,7 +541,7 @@ pub fn update_status(updates: State<'_, Updates>) -> Status {
 /// quitting does), then installs the ready update and starts again.
 #[tauri::command]
 pub fn update_restart<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
-    if !lock(&app.state::<Updates>().machine).is_ready() {
+    if !matches!(app.state::<Updates>().updater.phase(), Phase::Ready { .. }) {
         return Err("No update is ready to install.".into());
     }
     let flushed = flush_for_restart(
@@ -805,19 +570,8 @@ pub fn update_restart<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
 /// from then on).
 #[tauri::command]
 pub fn whats_new(updates: State<'_, Updates>) -> Option<NotesDto> {
-    {
-        let mut due = lock(&updates.whats_new_due);
-        if !*due {
-            return None;
-        }
-        *due = false;
-    }
-    {
-        let mut s = lock(&updates.settings);
-        s.seen = Some(updates.current.clone());
-        if let Some(f) = &updates.settings_file {
-            let _ = s.save(f);
-        }
+    if !updates.updater.take_whats_new() {
+        return None;
     }
     embedded_notes()
 }
@@ -835,169 +589,476 @@ mod tests {
     use crate::safety_app::{autosave_doc, open_path};
     use crate::session::Session;
     use method_release::minisign::{fixture, PLACEHOLDER_PUBLIC_KEY};
+    use method_update::policy::{Machine, Start};
+    use std::cell::RefCell;
 
-    const ENDPOINT: &str =
+    const ENDPOINT_HERE: &str =
         "https://github.com/method-production-suite/method-budget/releases/latest/download/latest.json";
 
+    fn leak(s: &str) -> &'static str {
+        Box::leak(s.to_string().into_boxed_str())
+    }
+
+    /// Method Budget's config with a key of the right shape (no network is
+    /// ever used with it here).
+    fn config_with(endpoint: &str, pubkey: &str) -> AppConfig {
+        AppConfig::new(
+            "Method Budget",
+            BUNDLE_NAME,
+            "method-budget-update/test",
+            Baked::release(leak(endpoint), leak(pubkey)),
+        )
+    }
+
+    fn updates(file: Option<PathBuf>) -> Updates {
+        Updates::new(
+            config_with(ENDPOINT_HERE, &fixture::public_key(7)),
+            "0.3.0",
+            file,
+        )
+    }
+
+    fn update(v: &str) -> Update {
+        Update {
+            current_version: "0.3.0".into(),
+            version: v.into(),
+            body: None,
+            date: None,
+            target: "darwin-aarch64".into(),
+            download_url: "https://github.com/x".into(),
+            signature: "s".into(),
+            raw_json: serde_json::Value::Null,
+        }
+    }
+
+    fn offline() -> UpdateError {
+        UpdateError::Network("offline".into())
+    }
+
+    fn intel() -> UpdateError {
+        UpdateError::Platform("Updates are for Apple silicon Macs only (`darwin-aarch64`).".into())
+    }
+
+    /// Runs one check through the page's side, recording what the page
+    /// hears.
+    fn run(
+        u: &Updates,
+        manual: bool,
+        check: impl FnOnce() -> Result<Option<Update>, UpdateError>,
+        download: impl FnOnce(&Update) -> Result<Vec<u8>, UpdateError>,
+    ) -> (Option<Said>, Vec<Status>) {
+        let heard = RefCell::new(Vec::new());
+        let said = u.check_with(manual, check, download, |s| heard.borrow_mut().push(s));
+        (said, heard.into_inner())
+    }
+
+    fn phases(heard: &[Status]) -> Vec<(&'static str, bool, Option<Said>)> {
+        heard.iter().map(|s| (s.phase, s.manual, s.said)).collect()
+    }
+
+    // The state machine (now method_update::policy's), pinned as Method
+    // Budget has always used it.
+
     #[test]
-    fn automatic_checks_are_quiet() {
+    fn the_state_machine_keeps_automatic_checks_quiet() {
         let mut m = Machine::default();
         assert_eq!(m.start_check(false), Start::Check);
-        assert_eq!(m.status(true, None).phase, "checking");
-        assert!(!m.status(true, None).manual);
         // Nothing newer, or no network: back to idle, nothing said.
         assert_eq!(m.checked(Ok(None)), (false, None));
         assert_eq!(m.phase, Phase::Idle);
         m.start_check(false);
-        assert_eq!(m.checked(Err(CheckFailed::Failed)), (false, None));
-        m.start_check(false);
-        assert_eq!(m.checked(Err(CheckFailed::NoBuild)), (false, None));
+        assert_eq!(m.checked(Err("offline".into())), (false, None));
         assert_eq!(m.phase, Phase::Idle);
         // Found: downloads quietly, then it's ready.
         m.start_check(false);
-        assert_eq!(m.checked(Ok(Some("0.2.0".into()))), (true, None));
-        let s = m.status(true, None);
-        assert_eq!(
-            (s.phase, s.version.as_deref(), s.manual),
-            ("downloading", Some("0.2.0"), false)
-        );
-        assert_eq!(m.downloaded(true), None);
-        assert_eq!(m.status(true, None).phase, "ready");
+        assert_eq!(m.checked(Ok(Some("0.4.0".into()))), (true, None));
+        assert_eq!(m.downloaded(Ok(())), None);
+        assert!(m.is_ready());
         // A failed download says nothing either, and is tried again later.
         let mut m = Machine::default();
         m.start_check(false);
-        m.checked(Ok(Some("0.2.0".into())));
-        assert_eq!(m.downloaded(false), None);
+        m.checked(Ok(Some("0.4.0".into())));
+        assert_eq!(m.downloaded(Err("bad signature".into())), None);
         assert_eq!(m.phase, Phase::Idle);
     }
 
     #[test]
-    fn a_check_the_user_asked_for_answers() {
+    fn the_state_machine_answers_a_check_the_user_asked_for() {
         let mut m = Machine::default();
         assert_eq!(m.start_check(true), Start::Check);
-        assert!(m.status(true, None).manual);
-        assert_eq!(m.checked(Ok(None)), (false, Some(Said::Current)));
+        assert_eq!(m.checked(Ok(None)), (false, Some(policy::Said::Current)));
         m.start_check(true);
         assert_eq!(
-            m.checked(Err(CheckFailed::Failed)),
-            (false, Some(Said::Failed))
+            m.checked(Err("offline".into())),
+            (false, Some(policy::Said::Failed))
         );
         m.start_check(true);
-        m.checked(Ok(Some("0.3.0".into())));
-        assert!(
-            m.status(true, None).manual,
-            "the download shows its progress"
-        );
-        assert_eq!(m.downloaded(false), Some(Said::Failed));
-
+        m.checked(Ok(Some("0.4.0".into())));
+        assert_eq!(m.downloaded(Err("x".into())), Some(policy::Said::Failed));
         // Asking while an automatic check runs makes it the user's.
         let mut m = Machine::default();
         m.start_check(false);
         assert_eq!(m.start_check(true), Start::Busy);
-        assert_eq!(m.checked(Ok(None)), (false, Some(Said::Current)));
+        assert_eq!(m.checked(Ok(None)), (false, Some(policy::Said::Current)));
         // Asking once an update is ready changes nothing.
         let mut m = Machine::default();
         m.start_check(false);
-        m.checked(Ok(Some("0.3.0".into())));
-        m.downloaded(true);
+        m.checked(Ok(Some("0.4.0".into())));
+        m.downloaded(Ok(()));
         assert_eq!(m.start_check(true), Start::Ready);
-        assert_eq!(m.status(false, None).phase, "ready");
+        // Installing, once; a failed install leaves it ready for another try.
+        assert_eq!(m.start_install().as_deref(), Some("0.4.0"));
+        assert_eq!(m.start_install(), None, "only once");
+        assert_eq!(m.install_failed(), policy::Said::InstallFailed);
+        assert!(m.is_ready());
+    }
+
+    // What the page hears, through Method Budget's side.
+
+    #[test]
+    fn automatic_checks_are_quiet() {
+        let u = updates(None);
+        // No network: the page hears "checking" without manual, then idle,
+        // and nothing is said.
+        let (said, heard) = run(&u, false, || Err(offline()), |_| unreachable!());
+        assert_eq!(said, None);
+        assert_eq!(
+            phases(&heard),
+            [("checking", false, None), ("idle", false, None)]
+        );
+        // Nothing newer, and no build for this computer: silent too.
+        assert_eq!(run(&u, false, || Ok(None), |_| unreachable!()).0, None);
+        assert_eq!(run(&u, false, || Err(intel()), |_| unreachable!()).0, None);
+        // A download that doesn't verify: silent, back to idle.
+        let (said, heard) = run(
+            &u,
+            false,
+            || Ok(Some(update("0.4.0"))),
+            |_| Err(UpdateError::Download("bad".into())),
+        );
+        assert_eq!(said, None);
+        assert_eq!(heard.last().map(|s| s.phase), Some("idle"));
+        // Found and downloaded: ready, quietly.
+        let (said, heard) = run(&u, false, || Ok(Some(update("0.4.0"))), |_| Ok(vec![1, 2]));
+        assert_eq!(said, None);
+        assert_eq!(
+            phases(&heard),
+            [
+                ("checking", false, None),
+                ("downloading", false, None),
+                ("ready", false, None)
+            ]
+        );
+        assert_eq!(heard[1].version.as_deref(), Some("0.4.0"));
+    }
+
+    #[test]
+    fn a_check_the_user_asked_for_answers() {
+        let u = updates(None);
+        let (said, heard) = run(&u, true, || Ok(None), |_| unreachable!());
+        assert_eq!(said, Some(Said::Current));
+        assert_eq!(
+            phases(&heard),
+            [
+                ("checking", true, None),
+                ("idle", false, Some(Said::Current))
+            ]
+        );
+        // A failure is said once and the indicator goes back to idle (the
+        // suite's "failed" phase is not the page's).
+        let (said, heard) = run(&u, true, || Err(offline()), |_| unreachable!());
+        assert_eq!(said, Some(Said::Failed));
+        assert_eq!(heard.last().unwrap().phase, "idle");
+        assert_eq!(u.status(None).phase, "idle");
+        // The download shows its progress, and its failure is said.
+        let (said, heard) = run(
+            &u,
+            true,
+            || Ok(Some(update("0.4.0"))),
+            |_| Err(UpdateError::Download("x".into())),
+        );
+        assert_eq!(said, Some(Said::Failed));
+        assert_eq!(heard[1].phase, "downloading");
+        assert!(heard[1].manual, "the download shows its progress");
+        // Once an update is ready, asking changes nothing and fetches nothing.
+        run(&u, false, || Ok(Some(update("0.4.0"))), |_| Ok(vec![1]));
+        let (said, heard) = run(&u, true, || unreachable!(), |_| unreachable!());
+        assert_eq!(said, None);
+        assert_eq!(phases(&heard), [("ready", false, None)]);
     }
 
     #[test]
     fn a_mac_with_no_build_in_the_manifest_is_told_so() {
-        use tauri_plugin_updater::Error;
-        // An Intel Mac reading an Apple-silicon-only manifest.
-        let missing =
-            Error::TargetsNotFound(vec!["darwin-x86_64-app".into(), "darwin-x86_64".into()]);
-        assert_eq!(check_failure(&missing), CheckFailed::NoBuild);
-        assert_eq!(
-            check_failure(&Error::TargetNotFound("darwin-x86_64".into())),
-            CheckFailed::NoBuild
-        );
+        assert_eq!(check_failure(&intel()), CheckFailed::NoBuild);
         for other in [
-            Error::ReleaseNotFound,
-            Error::EmptyEndpoints,
-            Error::Network("offline".into()),
-            Error::UnsupportedArch,
+            offline(),
+            UpdateError::ReleaseNotFound,
+            UpdateError::EmptyEndpoints,
+            UpdateError::Insecure,
+            UpdateError::Host("https://example.com/x".into()),
+            UpdateError::Manifest("bad".into()),
+            UpdateError::Download("x".into()),
         ] {
             assert_eq!(check_failure(&other), CheckFailed::Failed, "{other}");
         }
         // Asked for: the page says so. Automatic: nothing.
-        let mut m = Machine::default();
-        m.start_check(true);
+        let u = updates(None);
+        let (said, heard) = run(&u, true, || Err(intel()), |_| unreachable!());
+        assert_eq!(said, Some(Said::NoBuild));
+        assert_eq!(heard.last().unwrap().phase, "idle");
+        assert_eq!(run(&u, false, || Err(intel()), |_| unreachable!()).0, None);
+        // And the next failure is an ordinary one again.
         assert_eq!(
-            m.checked(Err(check_failure(&missing))),
-            (false, Some(Said::NoBuild))
+            run(&u, true, || Err(offline()), |_| unreachable!()).0,
+            Some(Said::Failed)
         );
-        assert_eq!(m.phase, Phase::Idle);
-        m.start_check(false);
-        assert_eq!(m.checked(Err(check_failure(&missing))), (false, None));
-        // The page's key for it (ui/js/updates.js, TEXT).
+        // The page's key for it (ui/js/updates.js, TEXT), and its words.
         assert_eq!(
             serde_json::to_value(Said::NoBuild).ok(),
             Some(serde_json::json!("no-build"))
+        );
+        assert!(UPDATES_JS.contains(
+            "'no-build': 'Updates are for Apple silicon Macs. This version stays as it is.',"
+        ));
+    }
+
+    /// The real check against a manifest served here: an Intel Mac (asked
+    /// for its own keys) is refused with `Platform`, which the page says as
+    /// "no build"; an Apple silicon Mac gets the update from the same file.
+    #[test]
+    fn an_intel_mac_reading_a_real_manifest_has_no_build() {
+        use method_update::target::TargetSet;
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let manifest = serde_json::json!({
+            "version": "0.4.0",
+            "notes": "Notes",
+            "pub_date": "2026-10-01T00:00:00Z",
+            "platforms": {
+                "darwin-aarch64": {
+                    "signature": fixture::signature(7, "Method-Budget_0.4.0_aarch64.app.tar.gz"),
+                    "url": format!("http://127.0.0.1:{port}/Method-Budget_0.4.0_aarch64.app.tar.gz")
+                }
+            }
+        })
+        .to_string();
+        let server = std::thread::spawn(move || {
+            for _ in 0..2 {
+                let (mut s, _) = listener.accept().unwrap();
+                let mut buf = [0u8; 4096];
+                let _ = s.read(&mut buf);
+                let reply = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{manifest}",
+                    manifest.len()
+                );
+                s.write_all(reply.as_bytes()).unwrap();
+            }
+        });
+        let config = AppConfig::new(
+            "Method Budget",
+            BUNDLE_NAME,
+            "method-budget-update/test",
+            Baked {
+                endpoint: leak(&format!("http://127.0.0.1:{port}/latest.json")),
+                pubkey: leak(&fixture::public_key(7)),
+                insecure: true,
+                rehearsal: true,
+            },
+        );
+        let version = method_update::manifest::parse_version("0.3.0").unwrap();
+        let mut c = config.transport(Some(Installer::App));
+        c.targets = Some(TargetSet::new("darwin", "x86_64", Some(Installer::App)));
+        let err = transport::check(&c, &version).unwrap_err();
+        assert_eq!(check_failure(&err), CheckFailed::NoBuild, "{err}");
+        c.targets = Some(TargetSet::new("darwin", "aarch64", Some(Installer::App)));
+        let found = transport::check(&c, &version).unwrap().unwrap();
+        assert_eq!(found.version, "0.4.0");
+        assert_eq!(found.target, "darwin-aarch64");
+        server.join().unwrap();
+        // Through the page's side: said as no build.
+        let u = updates(None);
+        assert_eq!(
+            run(&u, true, || Err(err), |_| unreachable!()).0,
+            Some(Said::NoBuild)
         );
     }
 
     #[test]
     fn installing() {
-        let mut m = Machine::default();
-        assert_eq!(m.start_install(), None, "nothing is ready");
-        m.start_check(false);
-        m.checked(Ok(Some("0.2.0".into())));
-        m.downloaded(true);
-        assert_eq!(m.start_install().as_deref(), Some("0.2.0"));
-        assert_eq!(m.status(true, None).phase, "installing");
-        assert_eq!(m.start_install(), None, "only once");
-        assert_eq!(m.start_check(true), Start::Ready);
-        // A failed install leaves it ready for another try.
-        assert_eq!(m.install_failed(), Said::InstallFailed);
-        assert!(m.is_ready());
-        let s = serde_json::to_value(m.status(false, Some(Said::InstallFailed))).unwrap();
+        let u = updates(None);
+        assert!(!matches!(u.updater.phase(), Phase::Ready { .. }));
+        run(
+            &u,
+            false,
+            || Ok(Some(update("0.4.0"))),
+            |_| Ok(b"not gzip".to_vec()),
+        );
+        assert!(matches!(u.updater.phase(), Phase::Ready { .. }));
+        // An install that fails (here: not an archive) leaves it ready, and
+        // the old bundle untouched.
+        let apps = temp_dir("updates-install");
+        let bundle = apps.join(BUNDLE_NAME);
+        std::fs::create_dir_all(bundle.join("Contents")).unwrap();
+        let no_admin = |_: &Path, _: &Path| -> Result<(), InstallError> { unreachable!() };
+        assert!(u.updater.install_ready(&bundle, &no_admin).is_err());
+        assert!(matches!(u.updater.phase(), Phase::Ready { .. }));
+        assert!(bundle.join("Contents").is_dir());
+        // What the page hears then: the same five fields as always.
+        let s = serde_json::to_value(u.status(Some(install_failed(None)))).unwrap();
         assert_eq!(
             s,
-            serde_json::json!({ "phase": "ready", "version": "0.2.0", "manual": false, "said": "install-failed", "automatic": false })
+            serde_json::json!({ "phase": "ready", "version": "0.4.0", "manual": false, "said": "install-failed", "automatic": true })
         );
+        std::fs::remove_dir_all(&apps).unwrap();
+    }
+
+    #[test]
+    fn the_page_hears_only_its_own_phases_and_answers() {
+        let base = policy::Status {
+            phase: "idle",
+            version: None,
+            manual: false,
+            message: None,
+            said: None,
+            automatic: true,
+            available: true,
+        };
+        for (suite, page) in [
+            ("idle", "idle"),
+            ("checking", "checking"),
+            ("downloading", "downloading"),
+            ("ready", "ready"),
+            ("installing", "installing"),
+            ("failed", "idle"),
+            ("read-only", "idle"),
+        ] {
+            let s = policy::Status {
+                phase: suite,
+                ..base.clone()
+            };
+            assert_eq!(page_status(&s, None).phase, page, "{suite}");
+        }
+        // Every phase and answer the page can be told is one it knows
+        // (ui/js/updates.js, PHASES and TEXT).
+        for p in ["idle", "checking", "downloading", "ready", "installing"] {
+            assert!(UPDATES_JS.contains(&format!("'{p}'")), "{p}");
+        }
+        for (said, failed, page) in [
+            (policy::Said::Current, None, Said::Current),
+            (policy::Said::Failed, None, Said::Failed),
+            (
+                policy::Said::Failed,
+                Some(CheckFailed::Failed),
+                Said::Failed,
+            ),
+            (
+                policy::Said::Failed,
+                Some(CheckFailed::NoBuild),
+                Said::NoBuild,
+            ),
+            (policy::Said::InstallFailed, None, Said::InstallFailed),
+            (policy::Said::ReadOnly, None, Said::Failed),
+        ] {
+            assert_eq!(page_said(Some(said), failed), Some(page));
+            let key = serde_json::to_value(page).unwrap();
+            let key = key.as_str().unwrap();
+            assert!(
+                UPDATES_JS.contains(&format!("  {key}: "))
+                    || UPDATES_JS.contains(&format!("'{key}': ")),
+                "{key} has no words in updates.js"
+            );
+        }
+        assert_eq!(page_said(None, Some(CheckFailed::NoBuild)), None);
+    }
+
+    #[test]
+    fn the_quiet_check_comes_two_minutes_after_launch_then_every_six_hours() {
+        assert_eq!(FIRST_CHECK, Duration::from_secs(120));
+        assert_eq!(CHECK_EVERY, Duration::from_secs(6 * 60 * 60));
+        assert!(TICK < FIRST_CHECK);
+        let u = updates(None);
+        let t0 = Instant::now();
+        assert!(!u.updater.due(t0), "not at launch");
+        assert!(u.updater.due(t0 + FIRST_CHECK + Duration::from_secs(1)));
+        assert!(!u.updater.due(t0 + FIRST_CHECK + Duration::from_secs(60)));
+        assert!(u
+            .updater
+            .due(t0 + FIRST_CHECK + CHECK_EVERY + Duration::from_secs(2)));
+        // Turned off: never due.
+        let off = updates(None);
+        off.updater.set_automatic(false).unwrap();
+        assert!(!off.updater.due(t0 + FIRST_CHECK + Duration::from_secs(1)));
     }
 
     #[test]
     fn no_real_key_means_no_checks() {
-        let endpoints = vec![ENDPOINT.to_string()];
-        assert!(unavailable_reason(PLACEHOLDER_PUBLIC_KEY, &endpoints).is_some());
-        assert!(unavailable_reason("", &endpoints).is_some());
-        assert!(unavailable_reason("garbage", &endpoints).is_some());
+        let reason = |key: &str, endpoint: &str| config_with(endpoint, key).unavailable_reason();
+        assert!(reason(PLACEHOLDER_PUBLIC_KEY, ENDPOINT_HERE).is_some());
+        assert!(reason("", ENDPOINT_HERE).is_some());
+        assert!(reason("garbage", ENDPOINT_HERE).is_some());
         let key = fixture::public_key(7);
-        assert_eq!(unavailable_reason(&key, &endpoints), None);
-        assert!(unavailable_reason(&key, &[]).is_some());
-        assert!(unavailable_reason(&key, &["http://github.com/x".to_string()]).is_some());
+        assert_eq!(reason(&key, ENDPOINT_HERE), None);
+        assert!(reason(&key, "").is_some());
+        assert!(reason(&key, "http://github.com/x").is_some());
+        // A build that can't update never checks, and a manual check says
+        // it couldn't.
+        let u = Updates::new(
+            config_with(ENDPOINT_HERE, PLACEHOLDER_PUBLIC_KEY),
+            "0.3.0",
+            None,
+        );
+        assert!(!u
+            .updater
+            .due(Instant::now() + FIRST_CHECK + Duration::from_secs(1)));
+        assert_eq!(
+            run(&u, false, || unreachable!(), |_| unreachable!()).0,
+            None
+        );
+        let (said, heard) = run(&u, true, || unreachable!(), |_| unreachable!());
+        assert_eq!(said, Some(Said::Failed));
+        assert_eq!(phases(&heard), [("idle", false, Some(Said::Failed))]);
 
-        // This repository ships the placeholder until the release key exists
-        // (docs/RELEASING.md), so a build from it never checks; once the key
-        // is in, it must be a real one.
+        // The endpoint and key the app is built with are tauri.conf.json's,
+        // copied by build.rs: written in one place. Once the key is real, it
+        // must be a key.
         let conf: serde_json::Value = serde_json::from_str(CONF).unwrap();
-        let u = &conf["plugins"]["updater"];
-        let pubkey = u["pubkey"].as_str().unwrap();
-        let endpoints: Vec<String> = u["endpoints"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|e| e.as_str().unwrap().to_string())
-            .collect();
-        assert_eq!(endpoints, [ENDPOINT]);
+        let up = &conf["plugins"]["updater"];
+        let pubkey = up["pubkey"].as_str().unwrap();
+        assert_eq!(up["endpoints"], serde_json::json!([ENDPOINT_HERE]));
+        let app = update_config();
+        assert_eq!(app.endpoint, ENDPOINT_HERE);
+        assert_eq!(app.pubkey, pubkey);
+        assert_eq!((ENDPOINT, PUBKEY), (ENDPOINT_HERE, pubkey));
         if pubkey != PLACEHOLDER_PUBLIC_KEY {
-            assert_eq!(unavailable_reason(pubkey, &endpoints), None);
+            assert_eq!(app.unavailable_reason(), None);
         }
+        assert!(!app.allow_insecure);
+        assert_eq!(app.bundle.current, "Method Budget.app");
+        assert_eq!(app.bundle.legacy, None);
+        assert_eq!(
+            format!("{}.app", conf["productName"].as_str().unwrap()),
+            BUNDLE_NAME
+        );
+        // Signatures must name the version the manifest announces.
+        assert!(app.transport(Some(Installer::App)).require_signed_version);
         // Never loosened.
-        assert!(u.get("dangerousInsecureTransportProtocol").is_none());
-        assert!(u.get("dangerousAcceptInvalidCerts").is_none());
-        assert!(u.get("dangerousAcceptInvalidHostnames").is_none());
-        assert!(u.get("allowDowngrades").is_none());
+        for k in [
+            "dangerousInsecureTransportProtocol",
+            "dangerousAcceptInvalidCerts",
+            "dangerousAcceptInvalidHostnames",
+            "allowDowngrades",
+        ] {
+            assert!(up.get(k).is_none(), "{k}");
+        }
+        // The key is written once: nowhere in the source but tauri.conf.json.
+        assert!(!include_str!("updater.rs").contains(&pubkey[..40]));
     }
 
     #[test]
     fn only_the_endpoint_hosts_over_https() {
-        let hosts = allowed_hosts(&[ENDPOINT.to_string()]);
+        let app = config_with(ENDPOINT_HERE, &fixture::public_key(7));
+        let hosts = app.allowed_hosts();
         assert_eq!(
             hosts,
             [
@@ -1006,22 +1067,30 @@ mod tests {
                 "release-assets.githubusercontent.com"
             ]
         );
-        assert!(allowed("https", Some("github.com"), &hosts));
-        assert!(allowed(
-            "https",
-            Some("release-assets.githubusercontent.com"),
-            &hosts
+        let ok = |url: &str| transport::host_allowed(url, &hosts, false);
+        assert!(ok("https://github.com/x"));
+        assert!(ok("https://release-assets.githubusercontent.com/x"));
+        assert!(!ok("http://github.com/x"));
+        assert!(!ok("https://example.com/x"));
+        assert!(!ok("https://github.com.example.com/x"));
+        assert!(!ok("not a url"));
+        let other = config_with("https://updates.example.org/latest.json", "k");
+        assert_eq!(other.allowed_hosts(), ["updates.example.org"]);
+        // A manifest pointing the download anywhere else fails the check
+        // before anything is fetched.
+        let u = updates(None);
+        let mut elsewhere = update("0.4.0");
+        elsewhere.download_url = "https://example.com/evil.tar.gz".into();
+        assert!(!transport::host_allowed(
+            &elsewhere.download_url,
+            &u.updater.app().allowed_hosts(),
+            false
         ));
-        assert!(!allowed("http", Some("github.com"), &hosts));
-        assert!(!allowed("https", Some("example.com"), &hosts));
-        assert!(!allowed("https", Some("github.com.example.com"), &hosts));
-        assert!(!allowed("https", None, &hosts));
-        let other = allowed_hosts(&["https://updates.example.org/latest.json".to_string()]);
-        assert_eq!(other, ["updates.example.org"]);
     }
 
     #[test]
     fn whats_new_once_after_an_update() {
+        use policy::whats_new_due;
         // First run: nothing to show; this version is remembered.
         assert_eq!(whats_new_due(None, "0.1.0"), (false, Some("0.1.0".into())));
         // An update: shown (and remembered when it is).
@@ -1038,27 +1107,66 @@ mod tests {
             whats_new_due(Some("junk"), "0.2.0"),
             (false, Some("0.2.0".into()))
         );
+
+        // Through the app: a first run writes this version down at once; the
+        // next version shows What's New once.
+        let dir = temp_dir("updates-whats-new");
+        let file = dir.join("updates.json");
+        let config = || config_with(ENDPOINT_HERE, &fixture::public_key(7));
+        let first = Updates::new(config(), "0.3.0", Some(file.clone()));
+        assert!(
+            !first.updater.take_whats_new(),
+            "a first run is not an update"
+        );
+        assert_eq!(Settings::load(&file).seen.as_deref(), Some("0.3.0"));
+        let next = Updates::new(config(), "0.4.0", Some(file.clone()));
+        assert!(next.updater.take_whats_new());
+        assert!(!next.updater.take_whats_new(), "once");
+        assert_eq!(Settings::load(&file).seen.as_deref(), Some("0.4.0"));
+        let again = Updates::new(config(), "0.4.0", Some(file.clone()));
+        assert!(!again.updater.take_whats_new());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
     fn settings_are_kept() {
         let dir = temp_dir("updates-settings");
         let file = dir.join("updates.json");
-        assert_eq!(UpdateSettings::load(&file), UpdateSettings::default());
-        assert!(UpdateSettings::default().automatic, "on by default");
-        let s = UpdateSettings {
-            automatic: false,
-            seen: Some("0.1.0".into()),
-        };
+        assert_eq!(Settings::load(&file), Settings::default());
+        assert!(Settings::default().automatic, "on by default");
+        // The file Method Budget has always written reads the same.
+        std::fs::write(
+            &file,
+            "{\n  \"automatic\": false,\n  \"seen\": \"0.1.0\"\n}",
+        )
+        .unwrap();
+        let s = Settings::load(&file);
+        assert_eq!(
+            s,
+            Settings {
+                automatic: false,
+                seen: Some("0.1.0".into())
+            }
+        );
         s.save(&file).unwrap();
-        assert_eq!(UpdateSettings::load(&file), s);
-        std::fs::write(&file, "{ not json").unwrap();
-        assert_eq!(UpdateSettings::load(&file), UpdateSettings::default());
+        assert_eq!(Settings::load(&file), s);
         std::fs::write(&file, "{\"seen\": \"0.1.0\"}").unwrap();
         assert!(
-            UpdateSettings::load(&file).automatic,
+            Settings::load(&file).automatic,
             "a missing field is its default"
         );
+        // The switch, through the app, is kept across launches.
+        std::fs::remove_file(&file).unwrap();
+        let u = updates(Some(file.clone()));
+        assert!(u.automatic(), "on by default");
+        u.updater.set_automatic(false).unwrap();
+        assert!(!updates(Some(file.clone())).automatic());
+        // A file this build can't read is never written over on its own.
+        std::fs::write(&file, "{ not json").unwrap();
+        let u = updates(Some(file.clone()));
+        assert!(u.automatic(), "the default, for this run");
+        run(&u, false, || Ok(None), |_| unreachable!());
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "{ not json");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -1188,13 +1296,22 @@ mod tests {
             Autosaved::Nothing,
             "thrown away on the way out"
         );
-        let mut m = Machine::default();
-        m.start_check(false);
-        m.checked(Ok(Some("0.2.0".into())));
-        m.downloaded(true);
-        m.start_install();
-        assert_eq!(install_failed(&mut m, Some(&safety)), Said::InstallFailed);
-        assert!(m.is_ready(), "ready for another try");
+        let u = updates(None);
+        run(
+            &u,
+            false,
+            || Ok(Some(update("0.4.0"))),
+            |_| Ok(b"not gzip".to_vec()),
+        );
+        let bundle = dir.join(BUNDLE_NAME);
+        std::fs::create_dir_all(bundle.join("Contents")).unwrap();
+        let no_admin = |_: &Path, _: &Path| -> Result<(), InstallError> { unreachable!() };
+        assert!(u.updater.install_ready(&bundle, &no_admin).is_err());
+        assert_eq!(install_failed(Some(&safety)), Said::InstallFailed);
+        assert!(
+            matches!(u.updater.phase(), Phase::Ready { .. }),
+            "ready for another try"
+        );
         assert_eq!(
             autosave_doc(&state, &safety, None, now, true),
             Autosaved::Recovery
@@ -1239,6 +1356,7 @@ mod tests {
 
     const APP_RS: &str = include_str!("app.rs");
     const BUILD_RS: &str = include_str!("../build.rs");
+    const CARGO_TOML: &str = include_str!("../Cargo.toml");
     const MAIN_CAPS: &str = include_str!("../capabilities/main.json");
     const TOOLS_CAPS: &str = include_str!("../capabilities/tools.json");
     const SETUP_CAPS: &str = include_str!("../capabilities/setup.json");
@@ -1275,14 +1393,32 @@ mod tests {
                 "{c} allowed for the setup window"
             );
         }
-        // No window gets the plugin's own commands.
+        // No updater plugin at all: no window can be granted its commands.
         for caps in [MAIN_CAPS, TOOLS_CAPS, SETUP_CAPS] {
             assert!(
                 !caps.contains("updater:"),
                 "a window is granted updater commands"
             );
         }
-        assert!(APP_RS.contains("tauri_plugin_updater::Builder::new().build()"));
+        assert!(!APP_RS.contains("tauri_plugin_updater"));
+        assert!(!CARGO_TOML.contains("tauri-plugin-updater"));
+        // method-update is pinned to a full commit (the crate-age check and
+        // cargo deny allow method-libs only that way).
+        let line = CARGO_TOML
+            .lines()
+            .find(|l| l.starts_with("method-update"))
+            .unwrap();
+        let rev = line
+            .split("rev = \"")
+            .nth(1)
+            .unwrap()
+            .split('"')
+            .next()
+            .unwrap();
+        assert!(
+            rev.len() == 40 && rev.bytes().all(|b| b.is_ascii_hexdigit()),
+            "{line}"
+        );
     }
 
     #[test]

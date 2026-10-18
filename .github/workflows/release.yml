@@ -13,7 +13,8 @@
 #   steps that use a secret are given it.
 # - release: the only job with write access. Builds latest.json from the signed updater
 #   archive (cargo xtask update-manifest, which refuses malformed signatures, unknown
-#   platforms and a key the app doesn't trust) and drafts the release. Publishing the
+#   platforms, a key the app doesn't trust and a signature that doesn't name the
+#   version) and drafts the release. Publishing the
 #   draft is left to a person; until then nothing is served at releases/latest.
 #
 # Only first-party actions, pinned to full commit SHAs. No caches (release builds start
@@ -349,6 +350,22 @@ jobs:
               ;;
           esac
           ls -l dist updater meta
+
+      - name: Sign the updater archive for its version (macOS)
+        # The app's updater (method-update, docs/decisions.md entry 83) requires the
+        # signature to name the version latest.json announces; the Tauri CLI's doesn't, so
+        # sign again with the same key (cargo xtask sign-update, docs/RELEASING.md). This runs
+        # the release tooling "Decide what gets signed" compiled before any secret was in
+        # reach, never cargo, so no build script runs while the key is here.
+        if: runner.os == 'macOS' && env.UPDATER == 'yes'
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -x target/debug/xtask
+          target/debug/xtask sign-update --dir updater --version "${GITHUB_REF_NAME#v}"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

@@ -137,6 +137,15 @@ this page goes ahead without waiting.
       press Escape (it should say the dialog's name, then come back to the button). Note
       anything said twice, missed or confusing. Narrator or NVDA on Windows if one is to
       hand.
+- [ ] **An update through method-update** (D83; needs two signed releases and an Apple
+      silicon Mac): install the first release that has method-update, publish the next
+      one, then in the installed app: Help > Check for Updates finds and downloads it and
+      "Update ready: Restart to update" appears; Restart to update saves, swaps the app in
+      /Applications (and asks for an administrator when the folder isn't writable), starts
+      the new version with its tabs back, and What's New shows once. Also: the release
+      workflow's log shows "signed ... for X.Y.Z" and `latest.json` was written; Help >
+      Check for Updates Automatically stays as it was set before the update; an older
+      copy (0.3.0, the plugin) updates to the first method-update release.
 - [ ] **Recording wishlist** (below): short clips from the reference product, most useful
       first: 1 (real keystrokes), 2 (reports), 8 (saving and opening), 6 (find and
       replace), 4 (versions and history).

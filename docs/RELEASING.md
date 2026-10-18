@@ -173,7 +173,7 @@ signed and the draft's description says the first launch needs the one-time step
 | Job | Permissions | What it does |
 |---|---|---|
 | `check` | contents: read | `cargo xtask check-version --tag "$GITHUB_REF_NAME"` |
-| `build` (macOS Apple silicon, Windows, Linux) | contents: read | builds the bundles; on macOS signs, notarizes, staples and verifies, and writes the updater archive, each only when its secrets are there |
+| `build` (macOS Apple silicon, Windows, Linux) | contents: read | builds the bundles; on macOS signs, notarizes, staples and verifies, and writes the updater archive and signs it for its version (`cargo xtask sign-update`), each only when its secrets are there |
 | `release` | contents: write (the only job with it: it creates the draft and uploads the files) | `cargo xtask update-manifest`, then `gh release create --draft` with the notes |
 
 Only first-party actions are used, each pinned to a full commit SHA. Each secret is given
@@ -181,10 +181,20 @@ only to the steps that use it, never to the Windows and Linux builds. Every sign
 notarizing and updater-signing step is skipped cleanly when its secrets are absent; the
 job log says what was skipped.
 
+`cargo xtask sign-update --dir <artifacts> --version X.Y.Z` signs each updater archive in a
+folder again, with the version in the signature's trusted comment
+(`timestamp:<t>\tfile:<name>\tversion:<version>`), and writes its `.sig` over the one the
+Tauri CLI wrote. The key is `TAURI_SIGNING_PRIVATE_KEY` and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, read from the environment; it refuses (and writes
+nothing) when the key isn't the one `tauri.conf.json`'s public key belongs to, the password
+is wrong, or a file doesn't carry the version in its name. The workflow runs the binary the
+"Decide what gets signed" step compiled, before any secret was in reach, never cargo.
+
 `cargo xtask update-manifest --dir <artifacts> --version X.Y.Z --out latest.json` writes the
 manifest from the updater archives in a folder, each beside its `.sig`. It refuses (and
 writes nothing) when a signature isn't a minisign signature, when it was made with a key
-other than the one in `tauri.conf.json`, when a file is for a platform it doesn't know or
+other than the one in `tauri.conf.json`, when a signature doesn't name version X.Y.Z (the
+app would refuse it), when a file is for a platform it doesn't know or
 doesn't carry the version in its name, when a signature has no archive or an archive no
 signature, when the app still has the placeholder key, or when the notes aren't ready.
 `cargo xtask updater-key` prints `trusted <KEY ID>` or `none` (the placeholder).
@@ -266,9 +276,13 @@ have to download the next version by hand. Keep it in 1Password. **Replacing the
 (it leaked, or a scheduled rotation): ship one release signed with the old key that carries
 the new public key; releases after it are signed with the new one.
 
-`requireSignedVersion` stays off for now: the pinned Tauri CLI doesn't record the version
-inside the signature yet. Turn it on (`plugins.updater.requireSignedVersion: true`) once the
-CLI does, so a manifest can't pair a new version number with an older signed archive.
+**Signed for its version.** The app (method-update since decisions.md entry 83) installs an
+update only when its signature's trusted comment names the version the manifest announces,
+so a manifest can't pair a new version number with an older signed archive. The pinned
+Tauri CLI doesn't write the version, so the release workflow signs the archive again with
+`cargo xtask sign-update`, same key, and `update-manifest` refuses any signature without
+it. Copies from before entry 83 (the Tauri updater plugin) accept these signatures too: the
+plugin checks the version when the signature names one.
 
 ## Hosting
 

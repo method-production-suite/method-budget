@@ -8,11 +8,19 @@ crates.io's crawler policy) and lists any younger than the cooldown. A package f
 anywhere else (a git repository, another registry) has no publish date to check, so it
 fails the check too: fail closed. With --only-changed REF, only packages added or bumped
 since that git ref are checked. Stdlib only, so it runs anywhere Python 3 does.
+
+One exception, the suite's (SUITE-STANDARDS.md section 6, from Method Reader's copy): a
+package from a git repository listed in scripts/crate-age-git-allow.txt passes when
+Cargo.toml pins it with rev = the full 40-character commit (and the lock agrees), because a
+pinned commit cannot change under us and the repository was reviewed when it was added to
+that list. Anything else from git still fails.
 """
 
 import argparse
 import datetime as dt
 import json
+import pathlib
+import re
 import subprocess
 import sys
 import time
@@ -23,6 +31,20 @@ UA = "method-budget cooldown check (https://github.com/method-production-suite/m
 
 
 CRATES_IO = "registry+https://github.com/rust-lang/crates.io-index"
+GIT_ALLOW = pathlib.Path(__file__).with_name("crate-age-git-allow.txt")
+# The manifest's own pin, not only the lock's: the lock writes the full commit
+# after "#" whatever Cargo.toml asked for (a branch, a tag), so require the query
+# to be rev=<that same 40-character commit>.
+PINNED = re.compile(r"^git\+(https://[^?#]+)\?rev=([0-9a-f]{40})#\2$")
+
+
+def git_allowed(source, allow_file=GIT_ALLOW):
+    """True for a git source from an allowlisted repository, pinned to a full commit."""
+    m = PINNED.match(source)
+    if not m or not allow_file.exists():
+        return False
+    allowed = {line.split("#", 1)[0].strip() for line in allow_file.read_text().splitlines()} - {""}
+    return m.group(1) in allowed
 
 
 def external_packages(lock_text):
@@ -60,6 +82,9 @@ def main():
 
     bad = []
     for name, version, source in sorted(p for p in pkgs if p[2] != CRATES_IO):
+        if git_allowed(source):
+            print(f"{name:40} {version:16}  pinned git commit, allowlisted repository")
+            continue
         print(f"{name:40} {version:16}  NOT FROM CRATES.IO ({source}): no publish date to check")
         bad.append(f"{name} {version} ({source})")
     pkgs = {(name, version) for name, version, source in pkgs if source == CRATES_IO}

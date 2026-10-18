@@ -19,6 +19,9 @@ path = "src/main.rs"
 
 [build-dependencies]
 tauri-build = { version = "=2.6.3", features = [] }
+# build.rs reads the updater's endpoint and key from tauri.conf.json (already
+# in the build through Tauri; nothing new).
+serde_json = "=1.0.151"
 
 [dependencies]
 method-core = { path = "../method-core" }
@@ -30,17 +33,10 @@ serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
 tauri = { version = "=2.11.6", default-features = false, features = ["wry", "common-controls-v6", "x11", "dbus"] }
 tauri-plugin-dialog = "=2.7.3"
-# In-app updates (src/updater.rs): fetch latest.json, verify its minisign
-# signature against the public key in tauri.conf.json, download, install.
-# Driven from Rust only; no window is granted the plugin's own commands.
-# No default features: rustls for TLS, and none of the v1-format archive
-# readers (zip, and tar on Linux) or system proxy lookup. 2.12.0 is the
-# newest release at least 14 days old (scripts/check-crate-ages.py).
-tauri-plugin-updater = { version = "=2.12.0", default-features = false, features = ["rustls-tls"] }
+# The suite's shared updater (method-production-suite/method-libs), pinned to a
+# full commit: the check, the download and its minisign signature, the Mac
+# bundle swap and restart, and the update policy (src/updater.rs).
+method-update = { git = "https://github.com/method-production-suite/method-libs", rev = "37a9c8b9801bfcdedb9d79565a62f84fcdfb9a4a" }
 # Release plumbing shared with the release tooling: versions, release notes
 # (What's New), the updater key's shape. No dependencies of its own.
 method-release = { path = "../method-release" }
-# Already in the build through the updater plugin (same version, nothing
-# new): its redirect policy keeps the updater's requests on https and on
-# the update endpoint's hosts (src/updater.rs).
-reqwest = { version = "=0.13.5", default-features = false }

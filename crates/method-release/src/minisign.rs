@@ -44,6 +44,10 @@ pub struct SignatureBox {
     pub key_id: String,
     /// The `file:` field of the trusted comment, when the CLI wrote one.
     pub file_name: Option<String>,
+    /// The `version:` field of the trusted comment: the version the archive
+    /// was signed for (`cargo xtask sign-update` writes it; the app's
+    /// updater requires it to match the manifest's version).
+    pub version: Option<String>,
 }
 
 /// What a public key says about itself.
@@ -140,13 +144,16 @@ pub fn parse_signature_box(encoded: &str) -> Result<SignatureBox, String> {
             global.len()
         ));
     }
-    let file_name = trusted
-        .split('\t')
-        .find_map(|f| f.strip_prefix("file:"))
-        .map(str::to_string);
+    let field = |name: &str| {
+        trusted
+            .split('\t')
+            .find_map(|f| f.strip_prefix(name))
+            .map(str::to_string)
+    };
     Ok(SignatureBox {
         key_id: key_id_of(&sig),
-        file_name,
+        file_name: field("file:"),
+        version: field("version:"),
     })
 }
 
@@ -224,13 +231,26 @@ pub mod fixture {
         encode_base64(text.as_bytes())
     }
 
-    /// A `.sig` file's content for `file`, signed (in shape) by `key_id`.
+    /// A `.sig` file's content for `file`, signed (in shape) by `key_id`,
+    /// with no version in its trusted comment (as the Tauri CLI signs).
     pub fn signature(key_id: u64, file: &str) -> String {
+        signature_with(key_id, &format!("timestamp:1760000000\tfile:{file}"))
+    }
+
+    /// The same, signed for `version` (as `cargo xtask sign-update` signs).
+    pub fn signature_for_version(key_id: u64, file: &str, version: &str) -> String {
+        signature_with(
+            key_id,
+            &format!("timestamp:1760000000\tfile:{file}\tversion:{version}"),
+        )
+    }
+
+    fn signature_with(key_id: u64, trusted: &str) -> String {
         let mut sig = vec![b'E', b'D'];
         sig.extend_from_slice(&id_bytes(key_id));
         sig.extend_from_slice(&[9u8; 64]);
         let text = format!(
-            "untrusted comment: signature from tauri secret key\n{}\ntrusted comment: timestamp:1760000000\tfile:{file}\n{}\n",
+            "untrusted comment: signature from tauri secret key\n{}\ntrusted comment: {trusted}\n{}\n",
             encode_base64(&sig),
             encode_base64(&[3u8; 64])
         );
@@ -274,6 +294,11 @@ mod tests {
             parsed.file_name.as_deref(),
             Some("Method-Budget.app.tar.gz")
         );
+        assert_eq!(parsed.version, None, "the Tauri CLI names no version");
+        let signed = fixture::signature_for_version(1, "a.app.tar.gz", "0.4.0");
+        let parsed = parse_signature_box(&signed).unwrap();
+        assert_eq!(parsed.version.as_deref(), Some("0.4.0"));
+        assert_eq!(parsed.file_name.as_deref(), Some("a.app.tar.gz"));
     }
 
     #[test]

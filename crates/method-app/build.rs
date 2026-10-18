@@ -316,8 +316,47 @@ fn embed_release_notes() {
     std::fs::write(out.join("release-notes.md"), text).expect("failed to write the release notes");
 }
 
+/// The update endpoint and public key, from `tauri.conf.json`
+/// (`plugins.updater`, the one place they are written; the release tooling
+/// and the Tauri CLI's updater signing read them there too), written where
+/// src/updater.rs bakes them into the build. No endpoint or key builds
+/// fine and gives a copy that never checks; more than one endpoint is
+/// refused, since the updater asks exactly one.
+fn bake_updater_config() {
+    let dir =
+        std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
+    let conf = dir.join("tauri.conf.json");
+    println!("cargo:rerun-if-changed={}", conf.display());
+    let text = std::fs::read_to_string(&conf).expect("failed to read tauri.conf.json");
+    let v: serde_json::Value = serde_json::from_str(&text).expect("tauri.conf.json is not JSON");
+    let u = &v["plugins"]["updater"];
+    let pubkey = u["pubkey"].as_str().unwrap_or_default();
+    let endpoints: Vec<&str> = u["endpoints"]
+        .as_array()
+        .map(|a| a.iter().filter_map(|e| e.as_str()).collect())
+        .unwrap_or_default();
+    assert!(
+        endpoints.len() <= 1,
+        "tauri.conf.json: plugins.updater.endpoints has {} entries; the updater asks exactly one",
+        endpoints.len()
+    );
+    let endpoint = endpoints.first().copied().unwrap_or_default();
+    let out = std::path::PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
+    std::fs::write(
+        out.join("updater-config.rs"),
+        format!(
+            "/// `plugins.updater.endpoints` in tauri.conf.json (build.rs).\n\
+             pub const ENDPOINT: &str = {endpoint:?};\n\
+             /// `plugins.updater.pubkey` in tauri.conf.json (build.rs).\n\
+             pub const PUBKEY: &str = {pubkey:?};\n"
+        ),
+    )
+    .expect("failed to write the updater settings");
+}
+
 fn main() {
     embed_release_notes();
+    bake_updater_config();
     tauri_build::try_build(
         tauri_build::Attributes::new()
             .app_manifest(tauri_build::AppManifest::new().commands(COMMANDS)),

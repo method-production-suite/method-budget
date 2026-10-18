@@ -2,7 +2,8 @@
 //! alias is in `.cargo/config.toml`). Every command and the release flow
 //! that uses them: docs/RELEASING.md.
 //!
-//! Plain Rust with no dependencies beyond the workspace's own: the logic a
+//! Plain Rust with no dependencies beyond the workspace's own and the
+//! minisign crate the Tauri CLI signs with (`sign-update`): the logic a
 //! release depends on lives here, with tests, rather than in workflow YAML
 //! that can only be exercised by cutting a release.
 
@@ -14,6 +15,7 @@ mod manifest;
 mod notices;
 mod repo;
 mod screens;
+mod sign;
 #[cfg(test)]
 mod testdir;
 mod versions;
@@ -78,7 +80,12 @@ cargo xtask <command> [--root <repository>]
   update-manifest --dir <artifacts> --version X.Y.Z --out <latest.json>
                   [--config <tauri.conf.json>] [--base-url <url>] [--pub-date <RFC 3339>]
       Write the update manifest the app reads, from the signed updater
-      artifacts in <artifacts> (each beside its .sig).
+      artifacts in <artifacts> (each beside its .sig, signed for X.Y.Z).
+  sign-update --dir <artifacts> --version X.Y.Z [--config <tauri.conf.json>]
+      Sign each updater archive in <artifacts> for X.Y.Z (the version goes in
+      the signature's trusted comment), writing <archive>.sig. The key is
+      TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD; it
+      must be the one tauri.conf.json's public key belongs to.
 ";
 
 fn main() -> ExitCode {
@@ -205,6 +212,24 @@ fn run(args: &[String]) -> Result<String, String> {
                 base_url: a.value("--base-url").map(str::to_string),
                 pub_date: a.value("--pub-date").map(str::to_string),
             })
+        }
+        "sign-update" => {
+            let need = |k: &str| a.value(k).ok_or_else(|| format!("sign-update needs {k}"));
+            let config = a
+                .value("--config")
+                .map(path)
+                .unwrap_or_else(|| repo::tauri_conf(&root));
+            let (pubkey, _) = manifest::updater_config(&config)?;
+            let key = std::env::var("TAURI_SIGNING_PRIVATE_KEY")
+                .map_err(|_| "sign-update needs TAURI_SIGNING_PRIVATE_KEY".to_string())?;
+            let password = std::env::var("TAURI_SIGNING_PRIVATE_KEY_PASSWORD").unwrap_or_default();
+            sign::command(
+                &path(need("--dir")?),
+                need("--version")?,
+                &pubkey,
+                &key,
+                &password,
+            )
         }
         "notices" => notices::command(&root, a.has("--check")),
         "wasm-check" => wasm::command(&root),
