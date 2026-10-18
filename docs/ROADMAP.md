@@ -15,103 +15,127 @@ missing pieces), **[missing]** not started. Size: **S** a day or two, **M** abou
 
 ---
 
+## Waiting on the owner
+
+Updated 2026-10-18. Only what needs the owner's answer, hands or yes; everything else on
+this page goes ahead without waiting.
+
+### Release go-aheads
+
+- **0.3.0**: pull request #21 (the version bump, the notes, the site's What's new) is open.
+  After it merges, the tag `v0.3.0`, already made locally on that commit, is pushed only on
+  the owner's yes; the push starts the release workflow, which drafts the GitHub release
+  for the owner to publish. The pull request touches `site/`, so MOrg syncs the website
+  after the merge.
+- **rustls update, on or after 2026-10-28**: the fix (0.23.46) leaves the 14-day crate
+  cooldown then. `cargo update -p rustls` and the four RUSTSEC-2026-0346 to 0349 ignores
+  taken out of `deny.toml` go in as one pull request; it needs only the usual merge label.
+- **The 0.2.1 draft release** on GitHub was never published (the `v0.2.1` tag is public).
+  0.3.0's notes cover its fixes. Delete the draft or leave it. **Recommend: delete it**, so
+  the releases page shows 0.2.0 then 0.3.0; the tag stays as it is.
+
+### Open decisions
+
+- **Charge rows on the topsheet** (decision 13 below; D60): the reference may put charges
+  after the last production total, before the summary rows; ours puts them after. No
+  parity run has confirmed the reference's place. **Recommend: match it once a run
+  confirms it.** Not built: ours is unchanged.
+- **Fringe % on a line that earns none** (D61): ours leaves the cell blank on a suppressed
+  line, a line without fringes and an adjustment row without fringes; the reference writes
+  0.00%. Display only. **Recommend: match it (0.00%)**, by the match-by-default rule. Not
+  built.
+- **Changing the base currency** (D61, parity run R2-03): the reference keeps every rate
+  as typed and reads blank-currency lines as the new base, so amounts move; ours renames
+  the base, so nothing moves. **Recommend: keep ours** (matching it changes figures
+  without an edit); the reference's way could be an option later. Built on the
+  recommendation.
+- **Separator with a label** (decision 6 below): **Recommend: a bare rule**; bold title
+  lines do the labeling. Built on the recommendation (today's separator).
+- **Built on the recommendation, never confirmed by the owner** (any can be reversed from
+  the digest): renames rewrite every reference (decision 7; D32), new-line defaults match
+  the reference as per-budget switches (decision 10; 1.4, D60), dated notes on lines,
+  accounts and categories (decision 11; D35), the paste review with the target winning
+  (decision 12; D23; the review doesn't show the total change yet), tag presets in the
+  budget, Import Setup and a library file (decision 15; D29, D31, D37), and in New Budget a
+  ticked library or pack item replaces the starting point's item of the same name (D77;
+  Import Setup elsewhere keeps the budget's own).
+
+### Tests that need the owner's hands or hardware
+
+- [ ] **Engine checks in the reference product** (1.17; needs a licensed copy): run what is
+      still open in "Engine checks to run" below (16, and the rest of 14: Amt starting at
+      1 and one ready line), the charge position above, and the "built but not checked"
+      list in docs/research/parity-tracker.md, section 2. The export test plan
+      (docs/research/export-test-plan.md) has the steps; exports go in `imports/`, never
+      committed.
+- [ ] **Windows and Linux live check** (2.25): install from the release's installers;
+      print the topsheet and detail; menu keys (Alt+Up and Alt+Down, Ctrl+F, the setup
+      keys); double-click a `.mthd` to open it; on Windows, install 0.3.0 over 0.2.x and
+      check the install folder doesn't keep an old `method-budget.exe` beside
+      `method-budget-app.exe` (D74).
+- [ ] **Help menu on a Mac**: User Guide opens docs/APP.md; Report a Bug opens a new issue
+      with the version and system filled in; Licenses and Notices opens and scrolls;
+      methodproduction.com opens; About shows "Licensed under MIT OR Apache-2.0".
+- [ ] **The app's live checks**: the dialogs, keys and tools-window checks listed in
+      docs/APP.md, "Not yet".
+- [ ] **Recording wishlist** (below): short clips from the reference product, most useful
+      first: 1 (real keystrokes), 2 (reports), 8 (saving and opening), 6 (find and
+      replace), 4 (versions and history).
+
+### Legal line before building
+
+- **3.9 Rate tables**: before any rate data ships, a yes on which public union rate
+  sources may be shipped and under what licence (docs/research/rate-data-plan.md, section
+  4, "The ethical and legal line"); until then only user-kept tables.
+- **3.13 Commercial bid layouts**: check whether the industry bid form's layout may be
+  reproduced before building it.
+
+---
+
 ## Where we are
 
-The engine is done for the v1 calculation model: three levels (topsheet, accounts, detail
-lines), 4-factor lines with globals and formulas, per-line currency, percent and flat
-fringes with per-earner cutoffs and fringe ranges, four posting modes, groups with
-suppression, ATL/BTL production levels, contractual charges, credits, baseline and variance,
-account coding, plus named versions and a 2-to-16-budget compare, all in integer cents with
-property tests. Budgets save as our own documented, diff-friendly `.mthd` JSON, and a small
-`method-budget` command line can show, check, tidy, create and export them (Excel, CSV, tab-delimited). The Mac desktop app (Tauri, no
-npm) edits a budget at all three levels with breadcrumb jumps, account stepping, a column
-menu, cell copy and paste as tab-separated text, fill down, multi-row selection, 200-step
-undo, a setup panel for every table (globals, fringes, groups, units, currencies, sets,
-locations, charges, credits, info, settings, baseline), the selection-driven Apply panel
-(tags, dollars, fringe ranges), footer totals with session and last-change counters, and
-printing of the topsheet and detail through the system print dialog. It stays fast at 5,000
-lines. Not there yet: autosave, recent files and opening a `.mthd` from Finder, any way to
-set bold, italic, indent, color or a note from the app (the commands exist, the UI only
-shows them), versions and compare screens, find and replace, copying rows with their tags,
-a right-click menu, split view (budgets now open as tabs), report choices beyond "topsheet" or "all",
-and signed installers. Import from the reference product's own exports is built in every
-layout it writes (1.16).
+As of 2026-10-18. The engine covers the v1 calculation model and works figures out as the
+reference product does by default (decisions 55 to 61 and 69; exact decimals are a
+per-budget setting), property-tested. Budgets save as our own documented, diff-friendly
+`.mthd` JSON. The Mac app has all of Phase 1 and Phase 2 but two items: the engine checks
+that need the reference product (1.17) and the Windows and Linux live check (2.25). That
+includes autosave with recovery copies and backups, recent files and opening a `.mthd`
+from the Finder, budget tabs and split view, right-click menus, bold, italic, indent,
+color and dated notes, copying rows with their tags and the paste review, find and
+replace, versions, compare and the History list, report choices with a live preview and
+PDF, imports from spreadsheets and from the reference product's exports, and a signed,
+notarized Mac build with updates inside the app (decision 48). Ten of Phase 3's nineteen
+items are built; sharing through a folder (3.18), the start window (3.19) and
+schedule-linked globals (3.8) are partway. Around the app: the command line is `method-budget` (decision 74; `method`
+still runs as an alias for now); an MCP server lets coding agents work on budget files
+(3.17); a browser build runs the same page on the engine compiled to WebAssembly, for the
+website's demo (decisions 70 to 73); the Help menu has the User Guide, Report a Bug,
+Licenses and Notices and the suite's site; the README and site pictures come from Field
+Station, an invented budget. Release 0.3.0 is in preparation. Many built items still need a
+live check in the app (docs/APP.md, "Not yet").
 
 ---
 
 ## Decisions needed from the owner
 
-**Decided 2026-10-09 (the owner):** 1 compare math: **both** (each budget vs base, plus optional
-Sum/Average/Variance columns); 2 setup keys: **adopt the reference's**, shortcut sheet moves to
-Shift+Cmd+/; 8 more than one budget: **tabs in one window** (with split view later), not one
-window per budget; 9 autosave: **always save into the file** (on by default, with a toggle),
-recovery copies for untitled budgets and rolling backups. The rest below are still open; the
-recommendation stands as the default until the owner says otherwise.
+**Decided or built** (history in docs/decisions.md): 1 compare math, both (D19; built D27,
+D33); 2 setup keys, the reference's, shortcut sheet on Shift+Cmd+/ (D19; built 1.7);
+3 group rules, matched as three budget settings (D57); 4 group full total (D58); 5
+suppressed lines in subtotal rows, the reference drops them as ours does (parity run
+ZTEST07, D57); 8 more than one budget, tabs in one window (D19; built D25, split view
+D40); 9 autosave into the file, on by default (D19; built D20); 14 who signs, the
+organization's Developer ID (D48). Built on the recommendation, open to reversal: 7
+renames (D32), 10 new-line defaults (1.4, D60), 11 notes (D35), 12 paste review (D23),
+15 presets and library (D29, D31, D37). Still open: 6 and 13 below, and the two D61
+items under Waiting on the owner.
 
-1. **Compare math.** The reference shows each linked budget, their sum and average, then
-   "variance" = sum of the others minus this budget and "%" = variance over the average (21).
-   Ours shows each budget's own difference from the base and percent of the base (D17).
-   Options: ours only; the reference's only; ours plus optional Sum and Average columns.
-   **Recommend: ours plus optional Sum and Average**, and the reference's variance only if
-   a 2026 check shows it actually gets read.
-2. **Keys that clash.** The reference's setup keys are Cmd+3 fringes, Cmd+4 groups, Cmd+5
-   locations, Cmd+6 currency, Cmd+7 units, Cmd+8 sets, Cmd+9 preferences, Cmd+G globals,
-   Cmd+\ credits, Cmd+/ charges (09, 14, 17). Ours: Cmd+1 to Cmd+9 in our own order and Cmd+/
-   for the shortcut sheet. Also wanted: Cmd+Left/Right sibling steps (03), Cmd+R and
-   Shift+Cmd+R ranges, Cmd+minus adjustment, Shift+Cmd+Space note (02), Cmd+B bold (20).
-   Options: keep ours; adopt theirs; adopt theirs with ours as aliases. **Recommend: adopt
-   theirs** (same reasoning as D15), move the shortcut sheet to Shift+Cmd+/ (Cmd+?), keep
-   Cmd+[ and Cmd+] as aliases. Confirm the 2026 keys first (see Recording wishlist 1).
-3. **Budget-wide group rules.** The reference lets each budget choose: do ungrouped lines
-   count, does a line with one "out" and one "in" group count, do group totals include
-   fringes (14, 24). We hardcode the reference's defaults. Options: keep hardcoded; add the
-   three settings. **Recommend: keep hardcoded** until an imported budget turns up with a
-   non-default setting; the format can take it later without breaking files.
-4. **Group "full" total.** **Decided 2026-10-11 (D58)**: matched to the reference, every
-   tagged line at its base plus only the fringes earned (a suppressed line adds its base
-   alone).
-5. **Suppressed lines in detail subtotal rows.** Ours count them as 0 everywhere. One
-   tutorial frame suggests the reference's detail subtotal and total rows still showed them
-   (14, unverified). **Recommend: keep ours** unless the 2026 check (Engine check 2) shows
-   otherwise; if it does, match it on screen only, never in rollups.
 6. **Separator with a label.** Today a separator is a bare rule with nothing to edit (D16).
    Options: bare rule; rule with optional centered text. **Recommend: bare rule**; bold
    title lines already do the labeling job. Cheap to add later.
-7. **Renaming setup items.** We reference globals, fringes, groups, units and so on by name
-   (readable diffs); the reference uses hidden ids (09). Options: rename rewrites every
-   reference as one undo step; switch the file to ids. **Recommend: rename rewrites
-   references** (token-exact for formulas), keep names in the file.
-8. **More than one budget open.** Options: tabs in one window with split screen (04); one
-   window per budget. **Recommend: one window per budget**, each with its own undo; side by
-   side comes free from the OS, and a shared clipboard handles copying between them.
-9. **Autosave.** The reference autosaves by default (07, inv 15). Options: save to the file
-   on every edit; keep a recovery copy beside it and save to the file only on Cmd+S; a
-   setting. **Recommend: always keep a recovery copy (debounced, crash-safe) and offer
-   "save to the file automatically" as a per-user setting, off by default**, so a `.mthd`
-   in git or a shared folder only changes when someone means it to.
-10. **New-line defaults.** The reference copies fringes from the line above (groups, set,
-    location, currency off) and starts Amt at 1 (02, 17). Options: match; copy everything;
-    copy nothing. **Recommend: match, as per-budget switches saved in the file**, and an
-    empty account shows one ready line (03).
-11. **Notes model.** One plain note per line today (D16); the reference keeps several dated
-    notes per line or account, with author (19). **Recommend: a list of dated notes per
-    line, account and category, author from a local name setting, no replies.**
-12. **Paste conflicts between budgets.** The reference keeps the target's same-named fringe
-    or global, which can change the pasted line's math silently (20). **Recommend: target
-    wins by default, but show a review list (what differs, what will be added, the total
-    change) before the paste lands.**
 13. **Charge row position on the topsheet.** Reference: after the last production total,
     before the ATL/BTL summary rows; ours: after them (23). Math is identical. **Recommend:
-    match the reference**, since printed topsheets get read side by side.
-14. **Who signs the Mac app.** Notarization needs an Apple Developer ID (INSTALL.md).
-    Options: a personal account; a company account (needs a D-U-N-S number); stay
-    ad-hoc. **Recommend: an organization account**, so the signer name on the
-    installer is an organization, not a person. Windows signing can wait until there is a
-    Windows user.
-15. **Where presets and setup libraries live.** Options: in the budget file; a per-user
-    library file; both. **Recommend: tag presets in the budget (they travel with it); a
-    library as its own open file in a folder the user picks; first, "import setup from another
-    .mthd"**, which covers most of the value with no new file type (24).
+    match the reference**, since printed topsheets get read side by side. D60 kept ours
+    until a parity run confirms the reference's place.
 
 ---
 
@@ -121,7 +145,7 @@ What the owner needs to do real work every day. Ordered by priority.
 
 | # | Item | Notes | Status | Size | Depends |
 |---|---|---|---|---|---|
-| 1.1 | **Never lose work**: autosave into the file (default on, toggle), recovery copy for untitled budgets, rolling backups, restore after a crash, recent files list, open a `.mthd` by double-clicking it (file type is registered; the app ignores the open event) | 07, inv 15, APP | [have] | M | decision 9 |
+| 1.1 | **Never lose work**: autosave into the file (default on, toggle), recovery copy for untitled budgets, rolling backups, restore after a crash, recent files list, open a `.mthd` by double-clicking it in the Finder | 07, inv 15, APP | [have] | M | decision 9 |
 | 1.2 | **Type-ahead in cells**: units, currencies, sets, locations by prefix; global names in Amt, X, Rate, 4X; Enter or Tab accepts | 02, 07, 09, inv 3, 5 | [have] | M | none |
 | 1.3 | **Add on the fly**: typing an unknown unit, currency, set, location or global offers "add it", then applies the edit, one undo step (today an unknown currency is refused) | 02, 07, inv 3, 7 | [have] | S | 1.2 |
 | 1.4 | **New-line defaults**: copy fringes (and optionally groups, set, location, currency) from the line above, Amt 1, empty account shows one ready line; per-budget switches in the file | 02, 03, 17, inv 2 | [have] | S | decision 10 |
@@ -137,7 +161,7 @@ What the owner needs to do real work every day. Ordered by priority.
 | 1.14 | **Compare screen**: pick versions of this budget or other `.mthd` files, compare grid on topsheet and account levels (base stays editable), drill to detail lines (our edge), print it | 21, 04, 22, D17 | [have] | L | 1.12, decision 1 |
 | 1.15 | **Report sections and PDF**: choose topsheet, category summary, account detail; a tree of categories and accounts; include or leave out suppressed lines and empty accounts; portrait or landscape; page numbers, date and file name in the footer; save straight to PDF | 07, 15, inv 20 | [have] | L | none |
 | 1.16 | **Import from the reference product's exports**: all five, JSON, XML (basic and advanced), Excel and tab-delimited, with a reconciliation against the export's own totals, figure by figure. Built (decision 59, docs/IMPORT.md): one reader of the layout and one builder for all five; categories, accounts, lines, adjustment rows, units, currencies, fringes, groups, sets, locations, budget information and the originals come over; fringe posting, cutoffs and ranges, exchange rates, unit hours and (for the workbook) fringe rates are worked out from the figures and listed to check; formulas and globals, production totals (but under production-level posting), suppressed lines and the rules of charges and credits can't come over and are listed; `method-budget import-export`, the `import_budget_export` MCP tool and File > Import Budget Export… with the review before importing. Every parity-run export comes to its own figures but one shown in pounds (0.01 to 0.03). The app's dialog needs a live check | inv 21, ETP | [have] | L | none |
-| 1.17 | **Engine fixes from the export test**: currency direction, cutoff factor, flat fringe rules (done: D54, engine check 6), adjustment rows, charge base, rounding points, whatever the totals disagree on | ETP, inv Q2 to Q11 | [partial] | M | 1.16 samples |
+| 1.17 | **Engine fixes from the export test**: currency direction, cutoff factor, flat fringe rules, adjustment rows, charge base, rounding points, whatever the totals disagree on. Done from the parity runs: D54 to D61 and D69 (engine checks 1 to 13 and 15). Left: engine checks 14 and 16 and the parity tracker's "built but not checked" list, which need a licensed copy | ETP, inv Q2 to Q11 | [partial] | M | 1.16 samples |
 | 1.18 | **Rename setup items** with every reference rewritten (globals token-exact in formulas, fringes, groups, units, sets, locations, currencies). Built (decision 32): the editor's name field, Rename everywhere in the lists' right-click menu, a global's or unit's name, Find's replace panel and the base currency setting; one undo step, says how many places changed; charges, credits, report, tag and line presets follow; the new name must be free (no merging), so renaming back gives the identical budget (property-tested) | 09, APP | [have] | M | decision 7 |
 | 1.19 | **Tag presets**: save a line's tags as a named bundle, apply to a selection with add or replace, in the Apply panel, stored in the budget. Built (decision 31): a Presets tab in the tools panel (after Units) and Apply preset > in the right-click menu; Save tags as preset… from the cursor line (a box per tag), edit, rename, delete, reorder (keyboard); Add (fringes and groups joined, set, location and currency only where a line has none) or Replace (the five tags become exactly the preset's) on lines or everything under selected accounts or categories, one undo step, a preset naming a deleted item refused. Needs a live check in the app | 05, inv 13 | [have] | M | decision 15 |
 | 1.20 | **Start a budget from another**: "import setup from another .mthd" (pick items, dependencies come along) and "new from template" (a budget with its chart and setup, no lines). Built (decision 29): File > Import Setup From… (every kind of setup item, the presets and the three budget settings, each new, the same or different here, what an item needs ticked along with it, the paste review's keep, imported or new-name choices, one undo step); File > New From Template… (any `.mthd`, opened in a new untitled tab without its lines, info, baseline, versions or notes, "keep the detail lines" optional) and Save as Template… (the same stripping, into a new file). Bundled chart-of-accounts templates are 3.16; the native dialogs need a live check | 24, 07, inv 12 | [have] | M | decision 15 |
@@ -186,7 +210,7 @@ total to the cent exists in spirit (D4 property tests); keep it explicit (02).
 | 2.21 | **Share-ready copies**: save a snapshot named by title, version and date, optionally without notes or private info, stamped with where it came from; open read-only; offer to compare a returned copy or store it as a version. Built (decision 39): File > Save a Copy for Sharing…, `provenance` in the file, read-only banner with Make Editable Copy, Compare With Original and Store as a Version. Needs a live check in the app | 22, inv 16 | [have] | M | 1.14 |
 | 2.22 | **Sub-budgets**: a filtered copy by categories, accounts and tags, optionally without fringes or notes. Built (decision 39): File > New Sub-Budget…, groups, sets and locations OR within a kind and AND across kinds, new untitled tab stamped with its parent; no fringe lock yet. Needs a live check in the app | 04, inv 14 | [have] | M | none |
 | 2.23 | **History list**: every undo step listed, jump back, or branch it into a version. Built (decision 40): every undo step named by its command ("Edit rate on 21-01 line 3", "Paste 12 rows") with its time; the History tab (bottom tools pane) lists them oldest first, a click undoes or redoes to a step, "Version…" saves a step as a named version without changing the budget. Needs a live check (the tab in the tools window, long histories) | inv 15 | [have] | M | 1.12 |
-| 2.24 | **Group rules as budget settings** (only if decision 3 changes) | 14, 24 | [missing] | M | decision 3 |
+| 2.24 | **Group rules as budget settings**. Built (decision 57): `group_rules` with the reference's three rules (lines with no group, a line in a counted and an uncounted group, fringes in group totals), each written only when not the reference's default; Budget Setup's Groups table, `method-budget set` and scripts set them | 14, 24 | [have] | M | decision 3 |
 | 2.25 | **Windows and Linux live check**: printing, menu keys, installers, file association | APP | [partial] | M | none |
 | 2.26 | **Split view**: two budget tabs side by side in one window, each pane with its own tab strip, breadcrumb and grid; one pane is the target (dot and bold tab) and the toolbar and tools act on it; move a tab to the other pane; exit merges the panes. Built (decision 40): View > Split Right (Shift+Cmd+\\) and Close Split; each pane its own tabs, breadcrumb, grid and footer; the target (accent on its strip, its tab bold) is what the toolbar, menus, keys, tools panel and formula bar act on; one budget can show in both panes; Move Tab to Other Pane (Window menu, a tab's right-click menu) or drag a tab onto the other strip; a resizable divider; the panes kept in tabs.json. Needs a live check (the keys and menus in the system web views, the tools window following the target) | 04 | [have] | M | 1.9 |
 
@@ -216,7 +240,7 @@ Where competitors and the pain points (inv "Gaps and pain points", inv 24) say w
 | 3.16 | **Charts of accounts**: bundled chart templates and importing any chart. Built (decision 51; docs/TEMPLATES.md): File > Import Chart of Accounts… and `method-budget coa import` read a chart from any sheet of a workbook, CSV, tab-delimited text or another budget (flat lists, outlines, side-by-side columns, number and name in one cell, separators or none, lost leading zeros, header, total and level rows, the `kind,code,name,parent` layout), infer the numbering pattern (changeable) and preview with duplicates and gaps; into a new budget with no lines, or applied to this one (adds, renames by number, never removes an account with lines, one undo step). Seven charts written by us and the studio charts built from the owner's exports ship in New From Template under Charts of accounts and in `method-budget new --template`; the sources sit in `imports/coa-sources/` (never committed) and are built by `scripts/build-coa-templates.py`. Needs a live check of the dialogs in the app | top request: start from the studio's chart | [have] | L | 2.2, 1.20 |
 | 3.17 | **Agents can work on budgets**: a Model Context Protocol server so Claude Code and other coding agents open, read, edit, check and report on budgets with typed tools. Built (decision 52; docs/MCP.md): `method-budget mcp [--root DIR]... [--read-only]` over stdio, both protocol eras (the `initialize` handshake from 2024-11-05 to 2025-11-25, and 2026-07-28 per-request metadata); 43 tools: open and summarize, topsheet, accounts, lines with what they work out to, globals, setup tables, charges and credits, totals, explain, find, validate, diff, merge, add, update, delete, move and tag lines, setup add, change, rename everywhere and delete with a use check, charges and credits, categories, production totals and accounts, export and reports, spreadsheet import, new budgets from the starter or a template, copies and undo; every path inside a root (symlinks out, hidden folders and wrong extensions refused), atomic writes, a change refused when the file changed on disk since the server read it, shared copies read-only, input limits; an example agent skill in docs/agents/. A live bridge to the running app (edits through the session, in History and undo) is designed in docs/MCP.md, not built | agents should push the buttons too | [have] | L | 3.12 |
 | 3.18 | **Working together on one budget**: several people in the same budget, changes merging on their own; first through a shared folder you already use (Dropbox, iCloud Drive, Google Drive, LucidLink), then live sessions with presence and cursors over an encrypted peer-to-peer link; roles (edit everything, some categories, actuals, comment, read only), who-changed-this, per-person undo. Design: docs/research/collaboration.md. Built so far (decisions 62 and 64): the change log under the budget and `method-budget log` and `method-budget sync`; in the app, folder mode end to end: File > Share, every edit recorded and shared through the folder, the keeper's file, the status item, presence, flashes, conflict badges, Review and Activity tabs, Who Changed This, per-person undo. Next: roles and invites, then live sessions | the reference only sends copies | [partial] | L | 3.1, 3.2 |
-| 3.19 | **New project window**: start a budget from one window: title and production details, chart of accounts or template, schedule length, currency and union or location rate setup, then open it ready to fill. Design: docs/research/new-project-window.md. Phase 1 built (decision 63): a start window at launch when nothing is open and from File > New… (Cmd+N) with pinned and recent budgets (title, net total, last changed, folder), search, open, pin, show in folder and remove, all from the keyboard; New Budget with title, type (season, episode, episode count), dates, schedule length as globals, location, base currency, start from (starter, empty, bundled charts, a budget file), fringe posting and arithmetic, in a new tab as one undo step. Phase 2 so far (decision 65): the start window when the last tab closes, a chart-of-accounts step listing every bundled chart by budget type with its description and account count, Save In (a folder and file name, never over a file, opened as a saved tab), pinned and recent following files moved in the Finder (macOS bookmarks), net totals kept between runs. Later: projects as folders, thumbnails, setup packs at creation, rates (3.9), schedule link (3.8), shared-folder badges (3.18). Needs a live check in the app | getting started fast | [partial] | M | 1.20, 3.9, 3.16 |
+| 3.19 | **New project window**: start a budget from one window: title and production details, chart of accounts or template, schedule length, currency and union or location rate setup, then open it ready to fill. Design: docs/research/new-project-window.md. Phase 1 built (decision 63): a start window at launch when nothing is open and from File > New… (Cmd+N) with pinned and recent budgets (title, net total, last changed, folder), search, open, pin, show in folder and remove, all from the keyboard; New Budget with title, type (season, episode, episode count), dates, schedule length as globals, location, base currency, start from (starter, empty, bundled charts, a budget file), fringe posting and arithmetic, in a new tab as one undo step. Phase 2 so far (decision 65): the start window when the last tab closes, a chart-of-accounts step listing every bundled chart by budget type with its description and account count, Save In (a folder and file name, never over a file, opened as a saved tab), pinned and recent following files moved in the Finder (macOS bookmarks), net totals kept between runs. Phase 2 setup step (decision 77): everything in the setup library and any setup packs ticked in the form come in before the form's details; built on the recommendation that what is ticked replaces the starting point's same-named items (the owner can reverse it), and two ticked sources that disagree are refused. Later: projects as folders, thumbnails, duplicate and new sub-budget from a row, rates (3.9), schedule link (3.8), shared-folder badges (3.18), sorting. Needs a live check in the app | getting started fast | [partial] | M | 1.20, 3.9, 3.16 |
 
 Skipped on purpose: accounts and sign-in, cloud sync, a send-to-user inbox, live currency
 rates (no network), vendor template or rate data, other products' native file formats.
@@ -226,25 +250,27 @@ rates (no network), vendor template or rate data, other products' native file fo
 ## Engine checks to run
 
 Semantic questions only a licensed copy can settle. Most are covered by the export test
-(ETP); the quick test is for settling one on its own in a few minutes.
+(ETP); the quick test is for settling one on its own in a few minutes. The parity runs of
+2026-10-10 to 2026-10-12 answered most of them (docs/research/parity-tracker.md); still
+open: 14 in part and 16.
 
 | # | Question | Our rule today | Quick test | In ETP |
 |---|---|---|---|---|
-| 1 | Is a percent cutoff per fringe range? | per earner: a line or a range (D3) | Three lines of 1,000 each, a 12.5% fringe with a 2,000 cutoff. Fringe total with them bracketed into a range: ours says 250. Unbracketed: 375 | yes (7201) |
-| 2 | Do detail subtotal and total rows drop suppressed lines? | yes, they count as 0 everywhere | Subtotal row under two lines, suppress one line's group, read the subtotal row and the account total row | no |
-| 3 | Does toggling a group off and on drift the total? | never; exact to the cent | In a real budget note the net total, suppress a group, restore it, read the net total and "last change" again | no |
-| 4 | Currency direction | rate = base units per one foreign unit (D10) | One line of 100 with currency EUR at rate 3. Total 300 means ours; 33.33 means the other way | yes (7301, V3) |
-| 5 | What does the percentage cutoff factor do? | not modeled | Export test variation V2 (factor 2.0) and read the driver line's fringe against the table | yes (V2) |
+| 1 | Is a percent cutoff per fringe range? | **Answered (D56, ZTEST04)**: per earner, a line or a range, as ours | Three lines of 1,000 each, a 12.5% fringe with a 2,000 cutoff. Fringe total with them bracketed into a range: ours says 250. Unbracketed: 375 | yes (7201) |
+| 2 | Do detail subtotal and total rows drop suppressed lines? | **Answered (ZTEST07, D57)**: they drop out, as ours | Subtotal row under two lines, suppress one line's group, read the subtotal row and the account total row | no |
+| 3 | Does toggling a group off and on drift the total? | **Answered (V07-1b)**: no drift, as ours | In a real budget note the net total, suppress a group, restore it, read the net total and "last change" again | no |
+| 4 | Currency direction | **Answered (CU-01)**: line x rate = base, as ours | One line of 100 with currency EUR at rate 3. Total 300 means ours; 33.33 means the other way | yes (7301, V3) |
+| 5 | What does the percentage cutoff factor do? | **Answered (D60)**: it multiplies every percent cutoff; built as `cutoff_factor` | Export test variation V2 (factor 2.0) and read the driver line's fringe against the table | yes (V2) |
 | 6 | Flat fringes: once per line or per range; do they multiply on non-time units? | **Answered 2026-10-11 (D54)**: per line; the Amount only, converted through unit hours; X and 4X never count; once when either unit has no hours. Built, with an optional basis (amount plus counts, or the full quantity) and most hours a day | Export test grip and driver kit lines | yes |
-| 7 | Adjustment rows: can they be fringed, do they include fringes above, do they restart at a subtotal? | no, no, no | Export test account 7102 plus screenshot 19 | yes |
-| 8 | Charge base and stacking | ATL + BTL with posted fringes, no stacking, flat fee minus exclusions | Export test ZPCTCHG and ZFLATCHG, and V1 for post-by-budget | yes |
-| 9 | Line with one "out" group and one "in" group | out | Export test Option B lens; or tag one line with both and read its total | yes |
-| 10 | Do suppressed lines inside a range still count toward the cutoff? | no | Bracket three lines that cross a cutoff, suppress the middle one, read the fringe on the other two | no |
-| 11 | Where does rounding happen? | once per line, half away from zero (D1, D2) | Export test Polish line (1,296.315): 1,296.32 or 1,296.31 | yes |
+| 7 | Adjustment rows: can they be fringed, do they include fringes above, do they restart at a subtotal? | **Answered (ZTEST07, D56)**: they take the lines above without their fringes and don't restart at a subtotal (550.00 is 10% of 5,500.00 across one); an adjustment row can carry fringes (built) | Export test account 7102 plus screenshot 19 | yes |
+| 8 | Charge base and stacking | **Answered (D56, V09-2)**: the base is everything before charges; charges never stack | Export test ZPCTCHG and ZFLATCHG, and V1 for post-by-budget | yes |
+| 9 | Line with one "out" group and one "in" group | **Answered (D57, GR-03)**: out by default; the conflict rule is a budget setting | Export test Option B lens; or tag one line with both and read its total | yes |
+| 10 | Do suppressed lines inside a range still count toward the cutoff? | **Answered (D56)**: no, as ours | Bracket three lines that cross a cutoff, suppress the middle one, read the fringe on the other two | no |
+| 11 | Where does rounding happen? | **Answered (D55)**: once per line in the reference's arithmetic, now our default | Export test Polish line (1,296.315): 1,296.32 or 1,296.31 | yes |
 | 12 | Group "total" column after suppression | **Answered 2026-10-11 (D58)**: base of every tagged line plus only the fringes earned (ZOFF 5,000.00 total, 0.00 active). Built | Open the groups setup in 2026 and read total vs active total for a suppressed group | yes |
-| 13 | Does a global's unit do anything? | not modeled | Give a global the unit "week", type it into a line's Amt, see whether the line's unit fills in | no |
-| 14 | 2026 new-line and preference defaults | none yet | Screenshot budget preferences in a fresh blank budget (ETP step 1 does this) | yes |
-| 15 | Fringe percent shown on a suppressed line | the counted value | Turn on the Agg column, suppress a fringed line, read its Agg | no |
+| 13 | Does a global's unit do anything? | **Answered (D60)**: it fills an empty Unit when typed into Amt; built | Give a global the unit "week", type it into a line's Amt, see whether the line's unit fills in | no |
+| 14 | 2026 new-line and preference defaults | **Partly answered (D60)**: new-budget settings match; Amt starting at 1 and one ready line not compared yet | Screenshot budget preferences in a fresh blank budget (ETP step 1 does this) | yes |
+| 15 | Fringe percent shown on a suppressed line | **Answered (D61, R2-05)**: 0.00, as ours earns 0; the blank cell is an open display call | Turn on the Agg column, suppress a fringed line, read its Agg | no |
 | 16 | Next account at the end of a category | wraps across categories | On the last account of a category, press the next-account step | no |
 
 ---
@@ -255,18 +281,21 @@ Short clips (1 to 3 minutes, the Z test budget is fine, no real figures needed) 
 gaps the 2020/2021 tutorials leave or that need 2026 confirmation. In priority order.
 
 1. **Two minutes of real keystrokes** with an on-screen key display: moving, inserting,
-   setup keys, ranges, notes. Settles decision 2 and item 1.7 in one go.
+   setup keys, ranges, notes. Confirms the keys built for decision 2 and item 1.7.
 2. **Reports in 2026**: open report setup, pick sections and accounts, change orientation,
    add a page number, export a PDF. Shapes 1.15 and 2.3 to 2.6.
 3. **Compare in 2026**: link one budget, then two, and hover or read the variance and
-   percent columns on a row whose numbers are easy. Settles decision 1.
+   percent columns on a row whose numbers are easy. Confirms the columns built for
+   decision 1.
 4. **Versions and history**: make a version, look at the history list, revert a step, branch
    one into a version. Shapes 1.12 and 2.23.
 5. **Copy rows between two budgets** where the target has a same-named fringe with a
-   different rate and lacks a group the rows use. Settles decision 12 and fills note 20's gaps.
+   different rate and lacks a group the rows use. Checks the paste review built for
+   decision 12 and fills note 20's gaps.
 6. **Find and replace a global and a fringe** in 2026, including the remove action and what
    a cell holds afterwards. Shapes 1.11.
 7. **Suppression detail**: suppress a group with a subtotal row under the lines, then open
-   the groups setup to show total and active total. Settles engine checks 2 and 12.
+   the groups setup to show total and active total. Engine checks 2 and 12 are answered;
+   a clip would still confirm them on screen.
 8. **Saving and opening**: the autosave switch, closing with unsaved work, saving a local
    file, opening a recent budget. Shapes 1.1 and decision 9.

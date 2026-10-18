@@ -18,7 +18,11 @@
 //!   posting and arithmetic, all through the edit functions the setup tabs
 //!   use, so the same checks apply. It opens in a new tab (or in place of an
 //!   untouched Untitled budget alone in the window), with no file, as one
-//!   undo step.
+//!   undo step, or saved into a folder (Save In).
+//! - **Setup at creation** (decision 77): everything in the setup library
+//!   and any ticked setup packs come in before the form's own details,
+//!   through method-session's `new_budget` module; this side reads the
+//!   library's file and the listed packs.
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
@@ -26,13 +30,17 @@ use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use method_core::{starter, Budget, Dec};
+use method_session::new_budget::{self, Ticked};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Runtime, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::app::{finish, safe_file_stem, AppState, DocId};
 use crate::bookmark::{self, Tracked};
+use crate::docs::Docs;
 use crate::edit::{self, InfoInput};
+use crate::library::Library;
+use crate::packs::{ListedPack, Packs};
 use crate::safety::{self, Access};
 use crate::safety_app::Safety;
 use crate::session::Session;
@@ -647,6 +655,11 @@ pub struct NewBudgetSpec {
     pub folder: Option<u64>,
     /// The file's name, with or without `.mthd` (blank: from the title).
     pub file_name: String,
+    /// Setup: bring in everything in the setup library.
+    pub library: bool,
+    /// Setup: the packs to bring in, by their tokens from
+    /// `new_budget_setup`'s listing.
+    pub packs: Vec<u64>,
 }
 
 fn text(field: &str, value: &str, max: usize) -> Result<String, String> {
@@ -666,8 +679,13 @@ fn said(field: &str, e: &str) -> String {
 }
 
 /// The budget the form describes, starting from `template` when the form
-/// says `file`, and a sentence saying what it holds.
-pub fn build(spec: &NewBudgetSpec, template: Option<&Budget>) -> Result<(Budget, String), String> {
+/// says `file`, with the `setup` ticked (the library, packs) brought in
+/// before the form's own details, and a sentence saying what it holds.
+pub fn build(
+    spec: &NewBudgetSpec,
+    template: Option<&Budget>,
+    setup: &[Ticked],
+) -> Result<(Budget, String), String> {
     let title = text("The title", &spec.title, TITLE_MAX)?;
     if title.is_empty() {
         return Err("Give the budget a title.".into());
@@ -710,6 +728,10 @@ pub fn build(spec: &NewBudgetSpec, template: Option<&Budget>) -> Result<(Budget,
         }
         edit::set_base_currency(&mut b, &currency).map_err(|e| said("Currency", &e))?;
     }
+
+    // The ticked setup, before the details typed here, so those win (a
+    // library's SHOOT_DAYS gives way to the Shoot days typed).
+    let brought = new_budget::bring_in(&mut b, setup)?;
 
     // Budget info, in plain words.
     let mut info = |name: &str, kind: &str, value: &str| -> Result<(), String> {
@@ -806,6 +828,10 @@ pub fn build(spec: &NewBudgetSpec, template: Option<&Budget>) -> Result<(Budget,
             n(accounts, "account", "accounts")
         )
     };
+    let message = match brought.sentence() {
+        Some(more) => format!("{message} {more}"),
+        None => message,
+    };
     Ok((b, message))
 }
 
@@ -874,6 +900,103 @@ pub fn chart_choices() -> &'static [ChartChoice] {
             })
             .collect()
     })
+}
+
+// ---------------------------------------------------------------------------
+// Setup: the library and setup packs to bring in
+
+/// The library, as New Budget's setup step offers it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct LibraryChoice {
+    /// Its file name without the extension.
+    pub name: String,
+    /// How many setup items it holds.
+    pub items: usize,
+    /// Why it can't be read (moved, deleted, not a budget).
+    pub problem: Option<String>,
+}
+
+/// What New Budget's setup step offers.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct SetupChoices {
+    /// The setup library (`None`: no library picked yet).
+    pub library: Option<LibraryChoice>,
+    /// The Packs list (the user's Packs folder, then the bundled packs),
+    /// each named by its token.
+    pub packs: Vec<ListedPack>,
+}
+
+/// How many setup items `b` holds that New Budget brings (no settings).
+fn setup_items(b: &Budget) -> usize {
+    crate::import_setup::all_items(b)
+        .into_iter()
+        .filter(|(w, _)| !w.is_setting())
+        .count()
+}
+
+/// The library and the packs to offer, listing the packs again (their
+/// tokens are the Packs list's).
+pub fn setup_choices(docs: &Docs, library: &Library, packs: &Packs) -> SetupChoices {
+    let library = library.path().map(|path| {
+        let name = path
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        match crate::library::read(docs, &path) {
+            Ok((b, _)) => LibraryChoice {
+                name,
+                items: setup_items(&b),
+                problem: None,
+            },
+            Err(e) => LibraryChoice {
+                name,
+                items: 0,
+                problem: Some(e),
+            },
+        }
+    });
+    SetupChoices {
+        library,
+        packs: crate::packs::list(packs).packs,
+    }
+}
+
+/// The setup the form ticked, read: the library first (from its tab when it
+/// is open), then the packs in the order listed.
+pub fn ticked_setup(
+    docs: &Docs,
+    library: &Library,
+    packs: &Packs,
+    spec: &NewBudgetSpec,
+) -> Result<Vec<Ticked>, String> {
+    let mut out = Vec::new();
+    if spec.library {
+        let path = library.path().ok_or(
+            "There's no setup library yet. Untick it, or make one in the Library tab first.",
+        )?;
+        let (budget, _) = crate::library::read(docs, &path)
+            .map_err(|e| format!("Your library can't be read: {}.", e.trim_end_matches('.')))?;
+        out.push(Ticked {
+            label: "your library".into(),
+            budget,
+        });
+    }
+    let mut seen = Vec::new();
+    for &token in &spec.packs {
+        if seen.contains(&token) {
+            continue;
+        }
+        seen.push(token);
+        let path = packs.listed(token)?;
+        let (budget, _) = crate::session::read_budget(&path)?;
+        let label = method_core::pack::info(&budget)
+            .map(|i| i.title.trim().to_string())
+            .filter(|t| !t.is_empty())
+            .or_else(|| path.file_stem().map(|s| s.to_string_lossy().into_owned()))
+            .unwrap_or_else(|| "a pack".into());
+        out.push(Ticked { label, budget });
+    }
+    Ok(out)
 }
 
 // ---------------------------------------------------------------------------
@@ -1141,6 +1264,16 @@ pub async fn new_budget_pick_folder<R: Runtime>(
     Ok(Some(FolderChoice { token, folder }))
 }
 
+/// What New Budget's setup step offers: the library and the Packs list.
+#[tauri::command]
+pub fn new_budget_setup(
+    state: State<'_, AppState>,
+    library: State<'_, Library>,
+    packs: State<'_, Packs>,
+) -> SetupChoices {
+    setup_choices(&state.docs(), &library, &packs)
+}
+
 /// Every bundled chart of accounts, with its group, description and size.
 #[tauri::command]
 pub async fn new_budget_charts() -> Result<Vec<ChartChoice>, String> {
@@ -1164,11 +1297,14 @@ pub struct Created {
 /// and opens as a saved budget listed in Open Recent; without, it opens with
 /// no file, as one undo step.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn new_budget_create<R: Runtime>(
     window: WebviewWindow<R>,
     state: State<'_, AppState>,
     safety: State<'_, Safety>,
     start: State<'_, StartState>,
+    library: State<'_, Library>,
+    packs: State<'_, Packs>,
     spec: NewBudgetSpec,
 ) -> Result<Created, String> {
     let template = if spec.start.trim() == "file" {
@@ -1177,7 +1313,8 @@ pub fn new_budget_create<R: Runtime>(
         None
     };
     let folder = spec.folder.map(|t| start.folder(t)).transpose()?;
-    let (b, message) = build(&spec, template.as_ref())?;
+    let setup = ticked_setup(&state.docs(), &library, &packs, &spec)?;
+    let (b, message) = build(&spec, template.as_ref(), &setup)?;
     let Some(dir) = folder else {
         let id = open_new(&state, &safety, b)?;
         return Ok(Created {
@@ -1217,7 +1354,6 @@ pub fn new_budget_create<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::docs::Docs;
     use crate::session::SessionFiles;
     use method_core::{FringePosting, InfoValue};
 
@@ -1257,7 +1393,7 @@ mod tests {
             arithmetic: "exact".into(),
             ..NewBudgetSpec::default()
         };
-        let (b, msg) = build(&s, None).unwrap();
+        let (b, msg) = build(&s, None, &[]).unwrap();
         assert_eq!(b.title, "Big Show");
         assert_eq!(b.base_currency, "CAD");
         assert_eq!(
@@ -1305,7 +1441,7 @@ mod tests {
             chart: "feature".into(),
             ..spec("Chart")
         };
-        let (b, msg) = build(&chart, None).unwrap();
+        let (b, msg) = build(&chart, None, &[]).unwrap();
         assert!(b.categories().count() > 5);
         assert!(b
             .categories()
@@ -1321,7 +1457,7 @@ mod tests {
             currency: "EUR".into(),
             ..spec("Empty")
         };
-        let (b, _) = build(&blank, None).unwrap();
+        let (b, _) = build(&blank, None, &[]).unwrap();
         assert_eq!(b.categories().count(), 0);
         assert_eq!(b.base_currency, "EUR");
         assert_eq!(
@@ -1338,16 +1474,19 @@ mod tests {
             start: "file".into(),
             ..spec("From file")
         };
-        let (b, _) = build(&file, Some(&from)).unwrap();
+        let (b, _) = build(&file, Some(&from), &[]).unwrap();
         assert_eq!(b.title, "From file");
         assert_eq!(info(&b, "Director"), None, "a template's info is left out");
         assert_eq!(b.fringes, from.fringes, "its setup is kept");
-        assert!(build(&file, None).is_err(), "the file has to be picked");
+        assert!(
+            build(&file, None, &[]).is_err(),
+            "the file has to be picked"
+        );
     }
 
     #[test]
     fn the_form_refuses_what_it_cant_use() {
-        let bad = |s: NewBudgetSpec| build(&s, None).unwrap_err();
+        let bad = |s: NewBudgetSpec| build(&s, None, &[]).unwrap_err();
         assert_eq!(bad(spec("  ")), "Give the budget a title.");
         assert!(bad(NewBudgetSpec {
             kind: "opera".into(),
@@ -1410,6 +1549,7 @@ mod tests {
                 ..spec("X")
             },
             Some(&from),
+            &[],
         )
         .unwrap_err();
         assert!(e.contains("foreign currency"), "{e}");
@@ -1421,7 +1561,7 @@ mod tests {
         let safety = Safety::new(Some(&dir));
         let state = AppState::with(Docs::default());
         let first = state.docs().active();
-        let (b, _) = build(&spec("Big Show"), None).unwrap();
+        let (b, _) = build(&spec("Big Show"), None, &[]).unwrap();
         let id = open_new(&state, &safety, b).unwrap();
         {
             let docs = state.docs();
@@ -1433,7 +1573,7 @@ mod tests {
             assert_eq!(s.budget().title, "Big Show");
         }
         // With a budget in use, the next one gets its own tab.
-        let (b, _) = build(&spec("Pilot"), None).unwrap();
+        let (b, _) = build(&spec("Pilot"), None, &[]).unwrap();
         let second = open_new(&state, &safety, b).unwrap();
         let docs = state.docs();
         assert_eq!(docs.len(), 2);
@@ -1624,7 +1764,7 @@ mod tests {
         let dir = std::fs::canonicalize(safety::tests::temp_dir("start-save")).unwrap();
         let safety = Safety::new(Some(&dir.join("data")));
         let state = AppState::with(Docs::default());
-        let (b, _) = build(&spec("Big Show"), None).unwrap();
+        let (b, _) = build(&spec("Big Show"), None, &[]).unwrap();
         let made = save_new(&state, &safety, &b, &dir, "Big Show").unwrap();
         let path = dir.join("Big Show.mthd");
         let Made::Opened(id, at) = made else {
@@ -1643,7 +1783,7 @@ mod tests {
         let text = std::fs::read_to_string(&path).unwrap();
 
         // The same name again: nothing written, a free name offered.
-        let (other, _) = build(&spec("Other"), None).unwrap();
+        let (other, _) = build(&spec("Other"), None, &[]).unwrap();
         assert_eq!(
             save_new(&state, &safety, &other, &dir, "Big Show").unwrap(),
             Made::Taken("Big Show 2".into())
@@ -1759,5 +1899,123 @@ mod tests {
         );
         assert_eq!(state.docs().len(), 1);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A library with a global the starter has too and one it hasn't.
+    fn a_library() -> Budget {
+        let mut lib = crate::library::new_library("USD");
+        lib.globals.insert("SHOOT_DAYS".into(), "40".into());
+        lib.globals.insert("KIT_WEEKS".into(), "10".into());
+        lib
+    }
+
+    #[test]
+    fn ticked_setup_comes_in_before_what_the_form_says() {
+        let s = NewBudgetSpec {
+            shoot_days: "30".into(),
+            ..spec("Big Show")
+        };
+        let ticked = [Ticked {
+            label: "your library".into(),
+            budget: a_library(),
+        }];
+        let (b, msg) = build(&s, None, &ticked).unwrap();
+        assert_eq!(b.globals["KIT_WEEKS"].0, "10");
+        assert_eq!(b.globals["SHOOT_DAYS"].0, "30", "the form wins");
+        assert!(
+            msg.ends_with(" Setup from your library: 1 item added, 1 item replaced."),
+            "{msg}"
+        );
+        // Settings typed in the form are untouched by the library.
+        let (b, _) = build(
+            &NewBudgetSpec {
+                fringe_posting: "account".into(),
+                ..spec("Big Show")
+            },
+            None,
+            &ticked,
+        )
+        .unwrap();
+        assert_eq!(b.fringe_posting, FringePosting::Account);
+    }
+
+    #[test]
+    fn the_setup_step_lists_the_library_and_packs_and_reads_what_is_ticked() {
+        let dir = std::fs::canonicalize(safety::tests::temp_dir("start-setup")).unwrap();
+        let docs = Docs::default();
+        let library = Library::new(Some(&dir.join("data")));
+        let packs = Packs::new(Some(dir.join("Packs")), None);
+        let none = NewBudgetSpec {
+            library: true,
+            ..spec("X")
+        };
+        // No library yet: none offered, and ticking it is refused.
+        let c = setup_choices(&docs, &library, &packs);
+        assert_eq!(c.library, None);
+        assert!(c.packs.is_empty());
+        assert!(ticked_setup(&docs, &library, &packs, &none)
+            .unwrap_err()
+            .contains("no setup library"));
+
+        // A library and a pack.
+        let lib_path = dir.join(crate::library::LIBRARY_FILE_NAME);
+        crate::library::write(&lib_path, &a_library()).unwrap();
+        library.set_path(lib_path.clone()).unwrap();
+        let mut items = crate::library::new_library("USD");
+        items.globals.insert("PENSION_RATE".into(), "5".into());
+        let picks = vec![crate::import_setup::ItemRef {
+            kind: "global".into(),
+            name: "PENSION_RATE".into(),
+        }];
+        let details = method_format::setup::pack::PackDetails {
+            title: "Union Basics".into(),
+            ..Default::default()
+        };
+        let (pack, _) = crate::packs::pack_build(&items, &picks, &details, "2026-10-18").unwrap();
+        crate::library::write(&dir.join("Packs").join("union.mthd"), &pack).unwrap();
+
+        let c = setup_choices(&docs, &library, &packs);
+        let lib = c.library.unwrap();
+        assert_eq!(lib.name, "My Method Budget Library");
+        assert_eq!(lib.items, 2);
+        assert_eq!(lib.problem, None);
+        assert_eq!(c.packs.len(), 1);
+        assert_eq!(c.packs[0].title, "Union Basics");
+
+        let s = NewBudgetSpec {
+            library: true,
+            packs: vec![c.packs[0].token, c.packs[0].token],
+            ..spec("Big Show")
+        };
+        let t = ticked_setup(&docs, &library, &packs, &s).unwrap();
+        let labels: Vec<&str> = t.iter().map(|t| t.label.as_str()).collect();
+        assert_eq!(
+            labels,
+            ["your library", "Union Basics"],
+            "each once, library first"
+        );
+        let (b, msg) = build(&s, None, &t).unwrap();
+        assert_eq!(b.globals["PENSION_RATE"].0, "5");
+        assert!(
+            msg.contains("Setup from your library and Union Basics"),
+            "{msg}"
+        );
+
+        // A token from an older listing is refused.
+        setup_choices(&docs, &library, &packs);
+        assert!(ticked_setup(&docs, &library, &packs, &s).is_err());
+
+        // A library that has gone says so.
+        std::fs::remove_file(&lib_path).unwrap();
+        let c = setup_choices(&docs, &library, &packs);
+        assert!(c.library.unwrap().problem.is_some());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn the_setup_step_is_wired_for_the_main_window() {
+        assert!(include_str!("app.rs").contains("crate::start::new_budget_setup,"));
+        assert!(include_str!("../build.rs").contains("\"new_budget_setup\","));
+        assert!(include_str!("../capabilities/main.json").contains("\"allow-new-budget-setup\""));
     }
 }

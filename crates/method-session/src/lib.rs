@@ -33,6 +33,7 @@ pub mod host;
 pub mod import_setup;
 pub mod library;
 pub mod moverows;
+pub mod new_budget;
 pub mod notes;
 pub mod open_any;
 pub mod overtime;

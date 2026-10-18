@@ -468,6 +468,6 @@ ref = "3.9"
 [[feature]]
 group = "setup"
 title = "New project window"
-text = "Start a budget from one window with its title, chart of accounts, schedule, currency and rate setup, ready to fill in."
+text = "Start a budget from one window with its title, chart of accounts, schedule, currency, your setup library and setup packs, and later rate setup, ready to fill in."
 status = "soon"
 ref = "3.19"

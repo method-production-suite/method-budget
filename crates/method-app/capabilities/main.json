@@ -178,6 +178,7 @@
     "allow-new-budget-folder",
     "allow-new-budget-pick-folder",
     "allow-new-budget-charts",
+    "allow-new-budget-setup",
     "allow-actuals-pick",
     "allow-actuals-preview",
     "allow-actuals-import",
