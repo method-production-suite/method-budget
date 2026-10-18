@@ -127,7 +127,8 @@ let reply: serde_json::Value = host.dispatch("set_title", json!({"title": "Featu
   steps and validate alike.
 - **Files in.** Where the desktop shows an Open dialog (`open_budget`, `template_new`,
   `import_setup_pick`, `sheet_import_pick`, `coa_import_pick`, `export_import_pick`,
-  `setup_sheet_pick`, `actuals_pick`, `merge_pick_file`, `pack_import_pick`), the host's
+  `setup_sheet_pick`, `actuals_pick`, `merge_pick_file`, `pack_import_pick`,
+  `schedule_days_pick`), the host's
   command of the same name takes the picked file as `file: {name, bytes}` beside the
   desktop's arguments, and replies as the desktop does (a review with its token, so the
   page's next calls work unchanged). `compare_pick_files` takes `files: [{name, bytes}]`, as
@@ -159,7 +160,7 @@ let reply: serde_json::Value = host.dispatch("set_title", json!({"title": "Featu
   `dispatch` runs; a test checks each is dispatched, and another (in method-app) that each is
   a desktop command of the same name.
 
-Commands in version 1 (173: 60 from phase 1, 113 from phase 1b):
+Commands in version 1 (176: 60 from phase 1, 113 from phase 1b, 3 added since):
 
 | Group | Commands |
 |---|---|
@@ -183,7 +184,7 @@ Commands in version 1 (173: 60 from phase 1, 113 from phase 1b):
 | Compare, What Changed, merge | `compare_budgets`, `compare_detail`, `compare_pick_files`, `what_changed`, `merge_preview`, `merge_apply`, `merge_pick_file` (What Changed against the saved file is refused: the host keeps no file; pick it as a file) |
 | Export, reports | `export_budget`, `save_report_preset`, `delete_report_preset` |
 | Templates, charts | `template_new`, `template_save`, `chart_templates`, `chart_template_new` |
-| Imports | `open_budget`, `import_setup_pick`, `import_setup`, `sheet_import_pick`, `sheet_import_preview`, `sheet_import`, `coa_import_pick`, `coa_import_preview`, `coa_import`, `export_import_pick`, `export_import_preview`, `export_import`, `setup_sheet_export`, `setup_sheet_pick`, `setup_sheet_guess`, `setup_sheet_review` |
+| Imports | `open_budget`, `import_setup_pick`, `import_setup`, `sheet_import_pick`, `sheet_import_preview`, `sheet_import`, `coa_import_pick`, `coa_import_preview`, `coa_import`, `export_import_pick`, `export_import_preview`, `export_import`, `setup_sheet_export`, `setup_sheet_pick`, `setup_sheet_guess`, `setup_sheet_review`, `schedule_days_pick`, `schedule_days_review`, `schedule_days_apply` (decisions.md, entry 76) |
 | Actuals | `actuals_pick`, `actuals_preview`, `actuals_import`, `actuals_list`, `actuals_update`, `actuals_delete`, `actuals_remove_batch`, `actuals_set_etc`, `actuals_lines` |
 | Sharing copies | `share_copy_save`, `share_copy_editable`, `share_copy_original`, `share_copy_store`, `sub_budget_new` |
 | Setup packs | `pack_items`, `pack_export`, `pack_import_pick`, `pack_import` (into and out of a budget; `source` or `into` `library` is refused) |
@@ -393,7 +394,7 @@ uses:
   the message, as Tauri does. Where the desktop shows an Open dialog (`open_budget`,
   `template_new`, `import_setup_pick`, `sheet_import_pick`, `coa_import_pick`,
   `export_import_pick`, `setup_sheet_pick`, `actuals_pick`, `merge_pick_file`,
-  `pack_import_pick`, `compare_pick_files`) it shows the browser's file picker with the
+  `pack_import_pick`, `schedule_days_pick`, `compare_pick_files`) it shows the browser's file picker with the
   same file types and adds `file` (or `files`) as `{name, bytes}` in base64; cancelling
   resolves `null`, as the desktop's dialog does. A reply's `downloads` are offered as
   browser downloads and the rest goes to the page.
