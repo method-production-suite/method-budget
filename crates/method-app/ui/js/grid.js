@@ -20,6 +20,9 @@
 //   head: a function returning a node to show in the header instead of label.
 //   editOnDoubleClick: true edits the cell on a double-click even on an
 //   activatable row (where double-click otherwise calls onActivate).
+//   rowHeader: true marks the column that names a row (its description):
+//   screen readers hear it with every cell of the row.
+//   name: the column's full name, when the label is short ('X', 'Cur').
 //
 // Handlers:  onCommit(rowKey, colKey, value)        one cell edited
 //            onCommitMany(rowKeys, colKey, value)   same value into many rows
@@ -47,6 +50,13 @@
 // A grid longer than WINDOW_MIN_ROWS draws only the rows near the visible
 // ones, with spacer rows standing in for the rest; everything else (cursor,
 // selection, copy and paste) works on the row specs, so it covers every row.
+//
+// Screen readers (decision 82): the host is an ARIA grid that keeps focus
+// itself, with aria-activedescendant on the cursor cell. Rows and cells
+// carry their place (aria-rowindex, aria-colindex, so a long grid drawing
+// only some rows still says where you are), read-only cells say so, the
+// selected cells are aria-selected, and the cursor cell's name is its value,
+// its column and its row's description.
 
 import { el, hasMod, isMac } from './dom.js';
 import { setRules, dynamicStyles } from './sheet.js';
@@ -145,9 +155,14 @@ export class Grid {
     this.zoom = 1; // setZoom(): the grid's size, 1 is 100%
     this.showFormulas = false; // setShowFormulas(): selected ranges show `alt`
 
-    this.table = el('table', { class: `grid ${this.uid}`, attrs: { role: 'grid' } });
+    // The host keeps focus, so it is the grid; the table under it only lays
+    // the rows out (its rows and cells carry their roles themselves).
+    this.table = el('table', { class: `grid ${this.uid}`, attrs: { role: 'presentation' } });
     host.replaceChildren(this.table);
     host.tabIndex = 0;
+    host.setAttribute('role', 'grid');
+    host.setAttribute('aria-multiselectable', 'true');
+    this.activeTd = null; // the cell aria-activedescendant names
     host.classList.add(`${this.uid}-host`);
 
     this.table.addEventListener('mousedown', (e) => this.onMouseDown(e));
@@ -480,7 +495,7 @@ export class Grid {
   /** What the header depends on; a change rebuilds the table. */
   columnSig() {
     return this.columns
-      .map((c) => [c.key, c.label, c.cls, c.title, c.pin, typeof c.head === 'function' ? 1 : 0].join('\u0001'))
+      .map((c) => [c.key, c.label, c.cls, c.title, c.pin, c.rowHeader ? 1 : 0, c.name, typeof c.head === 'function' ? 1 : 0].join('\u0001'))
       .join('\u0002');
   }
 
@@ -500,7 +515,7 @@ export class Grid {
 
   /** A fresh element for row `r` (its cursor and selection marks come later). */
   buildRow(r, pins) {
-    const tr = el('tr', { class: r.cls || '' });
+    const tr = el('tr', { class: r.cls || '', attrs: { role: 'row' } });
     if (r.color && HEX_COLOR.test(r.color)) tr.classList.add(`tc-${r.color.toLowerCase().slice(1)}`);
     if (r.selectable === false) tr.classList.add('static');
     if (r.activatable) tr.classList.add('drill');
@@ -510,9 +525,13 @@ export class Grid {
         class: `c-${c.key} ${c.cls || ''} ${cell.cls || ''} ${pins[ci]}`,
         title: cell.error && cell.title ? `${cell.error}\n\n${cell.title}` : cell.error || cell.title,
         data: { col: ci },
+        attrs: { role: c.rowHeader ? 'rowheader' : 'gridcell', 'aria-colindex': String(ci + 1) },
       });
       if (cell.edit !== undefined) td.classList.add('editable');
-      else td.classList.add('ro');
+      else {
+        td.classList.add('ro');
+        td.setAttribute('aria-readonly', 'true');
+      }
       if (cell.error) td.classList.add('has-error');
       Grid.fillCell(td, cell);
       tr.append(td);
@@ -589,16 +608,20 @@ export class Grid {
   buildFrame(pins) {
     const colgroup = el('colgroup');
     for (const c of this.columns) colgroup.append(el('col', { class: `c-${c.key}` }));
-    const head = el('tr');
+    const head = el('tr', { attrs: { role: 'row', 'aria-rowindex': '1' } });
     this.columns.forEach((c, ci) => {
-      const th = el('th', { class: `c-${c.key} ${c.cls || ''} ${pins[ci]}`, title: c.title, attrs: { scope: 'col' } });
+      const th = el('th', {
+        class: `c-${c.key} ${c.cls || ''} ${pins[ci]}`,
+        title: c.title,
+        attrs: { scope: 'col', role: 'columnheader', 'aria-colindex': String(ci + 1) },
+      });
       const node = typeof c.head === 'function' ? c.head() : null;
       if (node) th.append(node);
       else th.textContent = c.label;
       head.append(th);
     });
-    this.tbody = el('tbody');
-    this.table.replaceChildren(colgroup, el('thead', {}, head), this.tbody);
+    this.tbody = el('tbody', { attrs: { role: 'rowgroup' } });
+    this.table.replaceChildren(colgroup, el('thead', { attrs: { role: 'rowgroup' } }, head), this.tbody);
     this.rowEls = new Map();
     this.marked = new Set();
     // Stand-ins for the rows above and below the drawn ones (long grids).
@@ -631,6 +654,9 @@ export class Grid {
     }
 
     this.pins = pins;
+    // Header row + rows, so a long grid drawing some rows says how many there are.
+    this.host.setAttribute('aria-rowcount', String(this.rows.length + 1));
+    this.host.setAttribute('aria-colcount', String(this.columns.length));
     this.windowed = dynamicStyles && this.rows.length > WINDOW_MIN_ROWS;
     this.win = this.windowed ? this.wantedWindow(true) : { start: 0, end: this.rows.length };
     this.patchRows();
@@ -679,6 +705,7 @@ export class Grid {
       let ent = old.get(r.key);
       if (!ent || ent.sig !== sig || next.has(r.key)) ent = { tr: this.buildRow(r, pins), sig };
       ent.tr.dataset.row = String(ri);
+      ent.tr.setAttribute('aria-rowindex', String(ri + 2));
       if (!next.has(r.key)) next.set(r.key, ent);
       trs.push(ent.tr);
     }
@@ -850,10 +877,16 @@ export class Grid {
       tr.classList.remove('sel');
       for (const td of tr.cells) {
         td.classList.remove('cursor', 'in-range');
+        td.removeAttribute('aria-selected');
         if (td.classList.contains('alt-shown')) this.showAlt(tr, td, false);
       }
     }
     this.marked.clear();
+    if (this.activeTd) {
+      this.activeTd.removeAttribute('id');
+      this.activeTd.removeAttribute('aria-label');
+      this.activeTd = null;
+    }
     const ranged = this.hasRange();
     const alt = ranged && this.showFormulas;
     const [ca, cb] = this.colRange();
@@ -873,13 +906,55 @@ export class Grid {
         for (let ci = ca; ci <= cb; ci++) {
           if (!tr.cells[ci]) continue;
           tr.cells[ci].classList.add('in-range');
+          tr.cells[ci].setAttribute('aria-selected', 'true');
           if (alt) this.showAlt(tr, tr.cells[ci], true);
         }
       }
     }
     const k = this.cursorKey();
     const tr = k === null ? null : markable(k);
-    if (tr && tr.cells[this.cur.col]) tr.cells[this.cur.col].classList.add('cursor');
+    const td = tr ? tr.cells[this.cur.col] : null;
+    if (td) {
+      td.classList.add('cursor');
+      td.setAttribute('aria-selected', 'true');
+      // The cell screen readers are on: an id for aria-activedescendant and
+      // a name that says where it is.
+      td.id = `${this.uid}-active`;
+      td.setAttribute('aria-label', this.cellName(this.cursorRow(), this.columns[this.cur.col], td));
+      this.activeTd = td;
+      this.host.setAttribute('aria-activedescendant', td.id);
+    } else {
+      this.host.removeAttribute('aria-activedescendant');
+    }
+  }
+
+  /** A column's name as heard: its full name when the label is short. */
+  static colName(c) {
+    return (c && (c.name || c.label)) || '';
+  }
+
+  /** What names a row: its description column's text, else its place. */
+  rowName(r) {
+    const head = this.columns.find((c) => c.rowHeader);
+    const cell = head && r ? r.cells[head.key] : null;
+    const text = cell && cell.text !== undefined && cell.text !== null ? String(cell.text).trim() : '';
+    if (text) return text;
+    const i = r ? this.nav.findIndex((n) => this.rows[n] === r) : -1;
+    return i >= 0 ? `row ${i + 1}` : '';
+  }
+
+  /**
+   * The cursor cell's accessible name: what it shows (or "blank"), its
+   * column, and the row's description unless this is that column, then any
+   * problem with it. "45.00, Rate, Gaffer".
+   */
+  cellName(r, c, td) {
+    const shown = (td ? td.textContent : '').trim();
+    const parts = [shown || 'blank', Grid.colName(c)];
+    if (!c || !c.rowHeader) parts.push(this.rowName(r));
+    const cell = r && c ? r.cells[c.key] : null;
+    if (cell && cell.error) parts.push(`problem: ${cell.error}`);
+    return parts.filter(Boolean).join(', ');
   }
 
   /** Redraws just the cursor and selection marks (cheap; used while moving). */
@@ -1046,7 +1121,13 @@ export class Grid {
     const original = String(at.cell.edit);
     const input = el('input', {
       class: 'cell-editor',
-      attrs: { type: 'text', spellcheck: 'false', autocomplete: 'off', autocapitalize: 'off', 'aria-label': at.col.label },
+      attrs: {
+        type: 'text',
+        spellcheck: 'false',
+        autocomplete: 'off',
+        autocapitalize: 'off',
+        'aria-label': at.col.rowHeader ? Grid.colName(at.col) : `${Grid.colName(at.col)}, ${this.rowName(at.row)}`,
+      },
     });
     input.value = text === null ? original : text;
     this.editor = {

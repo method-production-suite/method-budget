@@ -20,7 +20,7 @@ let behind = [];
 function shutBehind() {
   openBehind();
   const root = $('modal-root');
-  behind = [...document.body.children].filter((n) => n !== root && n.id !== 'toast' && !n.inert);
+  behind = [...document.body.children].filter((n) => n !== root && n.id !== 'toast' && n.id !== 'announce' && !n.inert);
   for (const n of behind) n.inert = true;
 }
 
@@ -42,9 +42,12 @@ export function formDialog({ title, message = '', fields = [], submitText = 'OK'
     const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
     error.hidden = true;
     const inputs = {};
-    const form = el('form', { class: 'modal', attrs: { 'aria-labelledby': 'modal-title', novalidate: true } });
+    const form = el('form', {
+      class: 'modal',
+      attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'modal-title', 'aria-describedby': message ? 'modal-message' : null, novalidate: true },
+    });
     form.append(el('h2', { class: 'modal-title', text: title, attrs: { id: 'modal-title' } }));
-    if (message) form.append(el('p', { class: 'modal-message', text: message }));
+    if (message) form.append(el('p', { class: 'modal-message', text: message, attrs: { id: 'modal-message' } }));
     for (const f of fields) {
       const id = `modal-${f.key}`;
       const input = el('input', {
@@ -126,7 +129,7 @@ export function anchoredDialog({ anchor, title, message = '', label, value = '',
       ? el('textarea', { class: 'modal-input popover-text', attrs: { id, rows: '6', spellcheck: 'true', placeholder } })
       : el('input', { class: 'modal-input', attrs: { id, type: 'text', autocomplete: 'off', spellcheck: 'false', placeholder } });
     input.value = value;
-    const form = el('form', { class: 'modal popover', attrs: { role: 'dialog', 'aria-labelledby': 'popover-title', novalidate: true } });
+    const form = el('form', { class: 'modal popover', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'popover-title', novalidate: true } });
     form.append(el('h2', { class: 'modal-title popover-title', text: title, attrs: { id: 'popover-title' } }));
     if (message) form.append(el('p', { class: 'modal-message', text: message }));
     form.append(el('label', { class: 'modal-field', attrs: { for: id } }, el('span', { text: label }), input));
@@ -206,7 +209,7 @@ export function anchoredForm({ anchor, title, message = '', fields = [], submitT
     const previous = document.activeElement;
     const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
     error.hidden = true;
-    const form = el('form', { class: 'modal popover popover-form', attrs: { role: 'dialog', 'aria-labelledby': 'popover-title', novalidate: true } });
+    const form = el('form', { class: 'modal popover popover-form', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'popover-title', novalidate: true } });
     form.append(el('h2', { class: 'modal-title popover-title', text: title, attrs: { id: 'popover-title' } }));
     if (message) form.append(el('p', { class: 'modal-message', text: message }));
     const box = el('div', { class: 'popover-fields' });
@@ -429,6 +432,10 @@ export function customDialog(build, { onClose = null } = {}) {
     if (onClose) onClose();
   };
   const box = build(close);
+  // Every dialog is modal (the page behind goes inert below), so screen
+  // readers are told so even when the builder didn't say.
+  if (!box.getAttribute('role')) box.setAttribute('role', 'dialog');
+  box.setAttribute('aria-modal', 'true');
   box.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       e.preventDefault();

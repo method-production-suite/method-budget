@@ -8,7 +8,11 @@
 // the topsheet draws with its totals, that an edit updates the footer's grand
 // total, that the chart list and one chart are fetched only when asked for,
 // and that the page logs no errors (a Content-Security-Policy refusal among
-// them).
+// them). It also reads the page the way a screen reader does (Chrome's
+// accessibility tree, decision 82): every control has a name, the budget
+// grid is an ARIA grid whose cursor cell says its column and row, an edit
+// is announced politely, and a dialog is a named modal dialog that gives
+// focus back when it closes.
 //
 // No npm packages: Node's own http server and Chrome's DevTools protocol over
 // a pipe (scripts/chrome-pipe.mjs, which also finds Chrome; CHROME= names
@@ -107,6 +111,7 @@ async function main() {
     await send('Runtime.enable');
     await send('Log.enable');
     await send('Page.enable');
+    await send('Accessibility.enable');
     await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
 
     const evaluate = async (expression) => {
@@ -142,6 +147,41 @@ async function main() {
     console.log(`web-smoke: the topsheet draws (grand total ${(before / 100).toFixed(2)})`);
     if (requests.some((p) => p.startsWith('/charts/'))) fail(`charts were fetched before anyone asked: ${requests.join(', ')}`);
 
+    // 1b. What a screen reader is given (decision 82).
+    const ax = async () => (await send('Accessibility.getFullAXTree')).nodes.filter((n) => !n.ignored);
+    const prop = (n, name) => {
+      const p = (n.properties || []).find((x) => x.name === name);
+      return p ? p.value.value : undefined;
+    };
+    const named = (n) => String((n.name && n.name.value) || '').trim();
+    const NAMED_ROLES = new Set(['button', 'checkbox', 'combobox', 'textbox', 'tab', 'link', 'menuitem', 'radio', 'switch', 'slider', 'spinbutton']);
+    const unnamed = (nodes) => nodes.filter((n) => NAMED_ROLES.has(n.role && n.role.value) && !named(n)).map((n) => `${n.role.value} (node ${n.backendDOMNodeId})`);
+    await evaluate(`document.getElementById('grid-host').focus()`);
+    await new Promise((r) => setTimeout(r, 200));
+    let nodes = await ax();
+    const missing = unnamed(nodes);
+    if (missing.length) fail(`controls without an accessible name: ${missing.join(', ')}`);
+    for (const label of ['New', 'Open', 'Save', 'Undo', 'Setup', 'Tools', 'New tab']) {
+      if (!nodes.some((n) => n.role.value === 'button' && named(n) === label)) fail(`no button named "${label}" in the accessibility tree`);
+    }
+    const gridNode = nodes.find((n) => n.role.value === 'grid');
+    if (!gridNode || named(gridNode) !== 'Budget grid' || !prop(gridNode, 'focused')) fail('the budget grid is not a focused ARIA grid named "Budget grid"');
+    const count = (role) => nodes.filter((n) => n.role.value === role).length;
+    if (count('row') < 10 || count('columnheader') < 3 || count('gridcell') < 20) {
+      fail(`the grid's rows and cells are missing (rows ${count('row')}, column headers ${count('columnheader')}, cells ${count('gridcell')})`);
+    }
+    if (!nodes.some((n) => n.role.value === 'gridcell' && prop(n, 'readonly') === true)) fail('no computed cell is marked read-only');
+    const active = nodes.find((n) => ['gridcell', 'rowheader'].includes(n.role.value) && prop(n, 'selected') === true);
+    if (!active || !/Acct #, Story and rights$/.test(named(active))) fail(`the cursor cell's name lacks its column and row: "${active ? named(active) : 'none'}"`);
+    const places = await evaluate(`(() => {
+      const host = document.getElementById('grid-host');
+      const id = host.getAttribute('aria-activedescendant');
+      const td = id && document.getElementById(id);
+      return { rowcount: host.getAttribute('aria-rowcount'), row: td && td.parentElement.getAttribute('aria-rowindex'), col: td && td.getAttribute('aria-colindex') };
+    })()`);
+    if (!places.row || places.col !== '1' || !(Number(places.rowcount) > 10)) fail(`the cursor cell's place isn't given: ${JSON.stringify(places)}`);
+    console.log(`web-smoke: the screen reader's view: named controls, a grid of ${count('row')} rows, the cursor on "${named(active)}"`);
+
     // 2. An edit (a fringe's rate, as Budget Setup sends it) updates the
     // page's grand total to the engine's.
     const after = await evaluate(`(async () => {
@@ -155,6 +195,28 @@ async function main() {
     if (!(after > before)) fail(`raising FICA didn't raise the grand total (${before} -> ${after})`);
     await until('the edited grand total on the page', `(${GRAND}) === ${after}`);
     console.log(`web-smoke: an edit updates the total (grand total ${(after / 100).toFixed(2)})`);
+    // ...and a screen reader hears the new net total, politely.
+    const said = await until('the edit announced', `(() => { const a = document.getElementById('announce'); return a && /^Net total .+, up .+/.test(a.textContent) && a.getAttribute('aria-live') === 'polite' ? a.textContent : null; })()`, 10_000);
+    console.log(`web-smoke: the edit is announced ("${said}")`);
+
+    // 2b. A dialog (Rename budget, on the topsheet): a named modal dialog
+    // with focus inside and the page behind inert; Escape closes it and
+    // focus goes back to the button that opened it.
+    await evaluate(`(() => {
+      const b = [...document.querySelectorAll('#actions button')].find((x) => x.textContent.trim() === 'Rename budget');
+      b.focus();
+      b.click();
+      return true;
+    })()`);
+    await until('the Rename budget dialog', `Boolean(document.querySelector('#modal-root [role="dialog"]'))`, 5_000);
+    nodes = await ax();
+    const dialog = nodes.find((n) => n.role.value === 'dialog');
+    if (!dialog || !named(dialog) || prop(dialog, 'modal') !== true) fail(`the dialog isn't a named modal dialog: ${dialog ? `"${named(dialog)}" modal=${prop(dialog, 'modal')}` : 'none'}`);
+    const trapped = await evaluate(`document.querySelector('#modal-root').contains(document.activeElement) && document.querySelector('.app').inert`);
+    if (!trapped) fail('focus is not held in the dialog');
+    await evaluate(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`);
+    await until('focus back on Rename budget', `!document.querySelector('#modal-root [role="dialog"]') && document.activeElement.textContent.trim() === 'Rename budget'`, 5_000);
+    console.log(`web-smoke: the "${named(dialog)}" dialog is modal, holds focus and gives it back`);
 
     // 3. The charts of accounts: the list, then one chart, fetched when asked.
     const charts = await evaluate(`window.__METHOD_WEB__.invoke('smoke', 'chart_templates', {})`);

@@ -249,7 +249,7 @@
 }
 
 .share-line.is-warn .share-line-value {
-  color: var(--share-warn);
+  color: var(--note); /* text, so the amber that reads 4.5:1; the dot keeps --share-warn */
   font-weight: 600;
 }
 

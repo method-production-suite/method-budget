@@ -1114,6 +1114,35 @@ one through its own Save dialog; a cancelled dialog or a failed save stops it an
 closes), **Discard All** (no recovery copies either) and **Cancel**. With one budget it
 reads Save, Discard, Cancel.
 
+### Screen readers and contrast
+
+The keys above are the same with a screen reader on; nothing here changes them (decision
+82; what was checked and what is left: docs/research/accessibility-audit.md).
+
+- **The grid** is an ARIA grid. Focus stays on the grid itself and
+  `aria-activedescendant` points at the cursor cell, so a screen reader follows the
+  cursor as it moves. Each cell says what it shows (or "blank"), its column (the full
+  name for a short label: "X (multiplier)") and the row's description ("45.00, Rate,
+  Gaffer"), and a problem in it. Totals and other computed cells are read only; the
+  cursor cell and the cells of a selected range are selected. Rows and cells give their
+  place (row 212 of 400), also in a long grid that draws only the rows near the visible
+  ones. The description column is the row header. The cell editor is named by its
+  column and row.
+- **Totals after an edit**: when an edit moves the net total, a screen reader hears
+  "Net total ..., up ..." (or down) a moment later, politely; a run of quick edits is one
+  sentence. The words come from a hidden live region (`#announce`, `ui/js/announce.js`).
+  Messages (the toast) are alerts; banners and the Find count are status.
+- **Dialogs** are labelled modal dialogs: the page behind is inert, Tab stays inside,
+  Escape cancels and focus goes back to what opened it.
+- **Contrast**: text and focus rings follow docs/BRAND.md's rules (4.5:1 for text, 3:1
+  for focus rings and borders that carry meaning) in light and dark. Every focused control
+  shows a 2-pixel accent ring.
+
+`scripts/web-smoke.mjs` checks this headless in the browser build, through Chrome's
+accessibility tree: every control has a name, the grid's roles and the cursor cell's name,
+the announcement after an edit, and a dialog's role, its hold on focus and focus coming
+back.
+
 ### The Help menu
 
 In order: **Keyboard Shortcuts**; **User Guide** (this file on GitHub, in your browser);
@@ -2781,7 +2810,7 @@ and shows totals marked as partial. The budget keeps what the user typed.
 **The UI** is a handful of ES modules with no dependencies: `main.js` (state, navigation,
 shortcuts, and where each tab was left), `tabs.js` (the tab strip: switching, closing,
 dragging, scrolling), `grid.js` (a generic keyboard grid used at all three levels), `levels.js`
-(turns a View into rows and columns), `footer.js`,
+(turns a View into rows and columns), `footer.js`, `announce.js` (polite words for screen readers),
 `modal.js`, `format.js` (money and decimal display), `api.js` (the command queue),
 `dom.js`, `util.js` (small shared helpers: plurals, error text), `panelsize.js` (the
 tools panel resizer and saved window sizes), `shortcuts.js` (the one list of shortcuts, shared with the Rust menu and checked
@@ -3038,6 +3067,11 @@ check: Shift+Cmd+\\ and the View and Window menu items reaching the page in the 
 views, dragging a tab between the strips with a real pointer, the tools window following
 the target, and the panes coming back at the next start. The History tab needs a live
 check in the tools window and with a long history.
+
+Screen readers (decisions.md, entry 82) need a live check with VoiceOver, and with
+Narrator or NVDA on Windows: the grid's cells, the announcement after an edit and the
+dialogs. The footer's other totals aren't announced, and an empty grid shows focus only
+by its border.
 
 The Person column (decisions.md, entry 79) needs a live check: typing a name, the
 type-ahead of people, the running-total tooltip and the cutoff mark. The spreadsheet
