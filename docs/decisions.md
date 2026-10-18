@@ -3673,6 +3673,33 @@ Docs/APP.md, "Sharing a budget", says what a person sees; this records the choic
     a file the log wrote for an outside edit. Its read, change and write needs no lock now:
     each actor folder has one writing program (the app as the person, every other program
     as a tool actor it holds alone).
+  - *`acts_for` can't raise anyone* (MReview, after a098bdb). As first built it was taken at
+    its word, so a read-only member's own actor could say it wrote for the owner and get
+    the owner's rights. Now it is refused, the same on every computer: before roles are
+    set; for the owner's own actor; for an actor with a role of its own; for an actor with a
+    change already kept that was made once roles were set (`State::judged`), so it can only
+    be a new program's first word; when the person named isn't the owner or someone with a
+    role; and when either side already writes for someone. A program for a person with no
+    role is refused in words before it writes (`NO_ROLE`). Test:
+    `acts_for_never_raises_a_member` (core: a read-only member, the owner, an editor already
+    judged, a claim before roles and a claim for nobody, each refused by its own log and,
+    forged with an owner's edit and a self-grant riding along, by fresh logs in eight
+    orders), and the format test `a_program_without_a_window_changes_a_shared_budget_as_its_person`
+    (a person with no role). **What remains possible without signatures:** a brand-new
+    actor can still say it writes for any member, the owner included, and get that member's
+    rights. That is the limit already stated above (anyone who can write in the folder can
+    write a change in someone's name); signed changes, where a program's key is signed by
+    its person's, close it.
+  - *Programs before roles are never listed as people.* Before roles a program's actor
+    doesn't say whose it is (that would raise the format for budgets without roles). This
+    computer knows its own person's programs from the tool pool (`tools/<person>/`, read by
+    `log::tool_actors`) and shows them as that person ("Jordan Lee (command line or
+    agent)"), leaving them out of People, the role menu and the first-role question. Other
+    computers can't see that pool, so the honest thing there is not to guess: an actor that
+    made changes but never wrote a heartbeat (every app writes one), has no role and didn't
+    start sharing shows as "A command line or agent (whose isn't known yet)", in grey, and
+    is left out of People too, until its `acts_for` arrives. Test:
+    `programs_before_roles_are_never_listed_as_people` (app, from both computers).
   - Known, for the record: a 0.3.0 session already open when the first role is set never
     reads `budget.json` again, so it keeps editing what it has, with no notice, until it
     reopens; anything it saves is an outside edit, kept aside.
