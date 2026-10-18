@@ -3430,7 +3430,8 @@ behavior: docs/APP.md, "The start window and New Budget"). Phases so far: entrie
   replaced. Reversible: keeping the starting point's version is one choice in
   `method_session::new_budget::bring_in`.
 - **Two ticked sources that disagree are refused**, naming the item and both sources, and
-  nothing is made. Letting the later one win would decide quietly by list order; the
+  nothing is made, whatever order they are ticked in and even when one of them matches the
+  starting point (every item a source has counts, not only those it changed). Letting the later one win would decide quietly by list order; the
   review in the Library tab or the Packs list is where a person chooses item by item.
 - **Before the form's details.** The setup comes in after the starting point and the base
   currency and before the info, the schedule-length globals and the settings, so what is

@@ -12,8 +12,9 @@
 //! - **What is ticked wins over the starting point.** The starter's or a
 //!   chart's items are defaults nobody chose for this production; an item
 //!   the ticked setup has under the same name replaces it.
-//! - **Two ticked sources that disagree are refused.** Nothing decides
-//!   between them quietly: the sentence names the item and both sources, and
+//! - **Two ticked sources that disagree are refused**, whatever their order
+//!   and whether or not one of them matches the starting point. Nothing
+//!   decides between them quietly: the sentence names the item and both sources, and
 //!   the other one can be brought in later from the Library tab or the Packs
 //!   list, item by item.
 //! - **All or nothing.** The budget changes only when every source came in.
@@ -105,7 +106,10 @@ fn kind_words(w: What) -> String {
 pub fn bring_in(b: &mut Budget, ticked: &[Ticked]) -> Result<SetupBrought, String> {
     let mut out = b.clone();
     let mut done = SetupBrought::default();
-    // Items an earlier source wrote: which source.
+    // Every item an earlier source has, written or already the same here:
+    // which source. After it came in, the budget holds that source's version
+    // of each, so a later source that differs disagrees with it, in
+    // whichever order they were ticked.
     let mut from: BTreeMap<(What, String), &str> = BTreeMap::new();
     for t in ticked {
         let src = &t.budget;
@@ -138,13 +142,13 @@ pub fn bring_in(b: &mut Budget, ticked: &[Ticked]) -> Result<SetupBrought, Strin
                 choice: "imported".into(),
             });
         }
-        let picks: Vec<_> = picks.iter().map(item_ref).collect();
-        let c = pack::import_pack(&mut out, src, &picks, &resolutions)
+        let refs: Vec<_> = picks.iter().map(item_ref).collect();
+        let c = pack::import_pack(&mut out, src, &refs, &resolutions)
             .map_err(|e| format!("Setup from {}: {}.", t.label, e.trim_end_matches('.')))?;
         done.added += c.added;
         done.replaced += c.replaced;
-        for (w, _, here) in &c.written {
-            from.entry(key(*w, here)).or_insert(t.label.as_str());
+        for (w, name) in &picks {
+            from.entry(key(*w, name)).or_insert(t.label.as_str());
         }
     }
     *b = out;
@@ -319,5 +323,96 @@ mod tests {
         assert_eq!(s(&["a"]), "a");
         assert_eq!(s(&["a", "b"]), "a and b");
         assert_eq!(s(&["a", "b", "c"]), "a, b and c");
+    }
+
+    /// A source holding the starter's own first fringe as the starter has
+    /// it, and one holding it with another rate.
+    fn same_and_other() -> (Budget, Budget, String) {
+        let b = starter::budget();
+        let (name, f) = b
+            .fringes
+            .iter()
+            .next()
+            .map(|(n, f)| (n.clone(), f.clone()))
+            .expect("the starter has fringes");
+        let mut same = Budget::new("Same", "USD");
+        same.units.clear();
+        same.fringes.insert(name.clone(), f);
+        let mut other = Budget::new("Other", "USD");
+        other.units.clear();
+        other.fringes.insert(name.clone(), fringe("99"));
+        (same, other, name)
+    }
+
+    /// Refused, naming both, and `b` untouched.
+    fn refused(ticked: &[Ticked], name: &str, first: &str, second: &str) {
+        let mut b = starter::budget();
+        let before = b.clone();
+        let e = bring_in(&mut b, ticked).unwrap_err();
+        assert!(
+            e.contains(&format!(
+                "\u{201c}{name}\u{201d} is in both {first} and {second}"
+            )),
+            "{e}"
+        );
+        assert_eq!(b, before, "all or nothing");
+    }
+
+    #[test]
+    fn disagreeing_sources_are_refused_in_either_order_even_when_one_matches_the_start() {
+        let (same, other, name) = same_and_other();
+        // Library (as the starter has it) then a pack (another rate).
+        refused(
+            &[
+                ticked("your library", same.clone()),
+                ticked("Union Basics", pack_of("Union Basics", &other)),
+            ],
+            &name,
+            "your library",
+            "Union Basics",
+        );
+        // The pack first, then the library.
+        refused(
+            &[
+                ticked("Union Basics", pack_of("Union Basics", &other)),
+                ticked("your library", same.clone()),
+            ],
+            &name,
+            "Union Basics",
+            "your library",
+        );
+        // Two packs, both orders.
+        refused(
+            &[
+                ticked("Pack A", pack_of("Pack A", &same)),
+                ticked("Pack B", pack_of("Pack B", &other)),
+            ],
+            &name,
+            "Pack A",
+            "Pack B",
+        );
+        refused(
+            &[
+                ticked("Pack B", pack_of("Pack B", &other)),
+                ticked("Pack A", pack_of("Pack A", &same)),
+            ],
+            &name,
+            "Pack B",
+            "Pack A",
+        );
+        // Agreeing sources, matching the start or not, are fine in any order.
+        for t in [
+            [
+                ticked("your library", same.clone()),
+                ticked("Pack A", pack_of("Pack A", &same)),
+            ],
+            [
+                ticked("Pack B", pack_of("Pack B", &other)),
+                ticked("your library", other.clone()),
+            ],
+        ] {
+            let mut b = starter::budget();
+            bring_in(&mut b, &t).unwrap();
+        }
     }
 }
