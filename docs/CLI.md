@@ -273,6 +273,49 @@ method-budget import-export "Pilot budget.json" -o pilot.mthd   # and write the 
 method-budget import-export pilot.xml --report --json > check.json
 ```
 
+### `method-budget schedule-days <budget.mthd> <days.json> [--pick KEY[=GLOBAL]]... [--skip KEY]... [--apply] [--json]`
+
+Sets a budget's globals from a schedule's day counts, as the app's File > Import Schedule
+Days… does (docs/APP.md, "Globals from a schedule's days"). The file is the days file
+Method Schedule writes for a budget (`format: "method-schedule-days"`, versions 0 and 1;
+docs/research/schedule-exchange.md).
+
+- Every figure the file counts has a key: `total` (shoot days in all), `unit:NAME`,
+  `set:NAME`, `location:NAME`, `week:YYYY-MM-DD` (the Monday) and `element:ID` (an
+  element's days in all, the day out of days total).
+- The shoot days in all go to `SHOOT_DAYS`. Any other figure only with `--pick KEY`, to its
+  default global (the name in capitals with `_DAYS`: `location:Cold Spring field station`
+  is `COLD_SPRING_FIELD_STATION_DAYS`) or to the one named after the last `=`
+  (`--pick "location:Cold Spring field station=STATION_DAYS"`, an existing global to
+  update it). A global that only has a figure's default name is not picked for it.
+- Each global set records where its figure came from (its setup source). Running again
+  with the same schedule picks those globals again and says which ones the schedule has
+  changed; a global set from a figure the file no longer has (a location dropped, an
+  element cut) is offered at 0 days, under the key `linked:GLOBAL`. `--skip KEY` leaves a
+  picked figure out.
+- Prep and wrap globals are never touched: they are the budget's own assumptions.
+- It prints the schedule, the globals it would set (each with its new value, the old one
+  and the figure's key), every figure not picked with its key and default global, and how
+  many globals are new, changed or already set. Nothing is written unless `--apply`, which
+  saves the budget atomically. A new global gets the figure as its description (and the
+  Day unit when the budget has one).
+- `--json` prints the review: `schedule`, `board`, `sub_board`, `version`, `days_hash`,
+  `shoot_days`, `start`, `end`, `notes`, `figures` (each with `key`, `kind`, `label`,
+  `days`, `global`, `picked`, `linked`, `current`, `current_value`, `new`, `action`: `add`,
+  `update` or `same`, `changed`, `problem`), `adds`, `updates`, `same`, `changed`,
+  `problems`, `can_apply`, `written` and `message`.
+
+Exit code 0 when the file was read (and, with `--apply`, the budget written); 1 when a file
+can't be read or isn't a schedule days file; 3 when a pick is refused (a key the file
+doesn't have, a name that can't be a global, two figures in one global), with nothing
+written.
+
+```sh
+method-budget schedule-days film.mthd field-station.budget.json          # review only
+method-budget schedule-days film.mthd field-station.budget.json \
+  --pick "location:Cold Spring field station=STATION_DAYS" --apply
+```
+
 ### `method-budget coa import <chart> -o <out.mthd> [--sheet N|NAME] [--mapping M.json] [--title T] [--currency C] [--into B.mthd] [--remove-unlisted] [--force] [--dry-run]`
 
 Reads a chart of accounts (category and account numbers, names and production totals,

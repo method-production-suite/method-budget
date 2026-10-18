@@ -242,6 +242,41 @@ pub fn tools() -> Vec<Tool> {
             run: import_budget_export,
         },
         Tool {
+            name: "schedule_days",
+            title: "Globals from a schedule's days",
+            description: "Reads a schedule's days file (format method-schedule-days, the file \
+                Method Schedule writes for a budget) and sets the budget's globals from its day \
+                counts. Returns every figure the file counts (key total, unit:NAME, set:NAME, \
+                location:NAME, week:YYYY-MM-DD, element:ID) with the global it would set, that \
+                global's formula now and the new value, and what changes. Shoot days in all go \
+                to SHOOT_DAYS; any other figure only when picked (pick: its key, and global to \
+                name the global, else its default name); globals an earlier import set are \
+                picked again, and skip leaves one out. Prep and wrap are never touched. Applies \
+                as one undoable change unless dry_run.",
+            mutating: true,
+            destructive: false,
+            schema: || {
+                let pick = object(
+                    vec![
+                        ("key", s::text("A figure's key, as the review lists it.")),
+                        ("global", s::name("The global to set (default: the figure's default name).")),
+                    ],
+                    &["key"],
+                );
+                object(
+                    vec![
+                        path_prop(),
+                        ("file", s::path("The schedule days file (.json).")),
+                        ("pick", s::array("Figures to set besides the ones picked to start.", pick, 1000)),
+                        ("skip", s::array("Keys of figures to leave out.", s::text("A figure's key."), 1000)),
+                        ("dry_run", s::boolean("Only review; change nothing.")),
+                    ],
+                    &["path", "file"],
+                )
+            },
+            run: schedule_days,
+        },
+        Tool {
             name: "new_budget",
             title: "New budget",
             description: "Writes a new budget: the starter (a small chart of accounts with \
@@ -803,6 +838,76 @@ fn import_budget_export(ctx: &mut Ctx, a: &Args) -> ToolResult {
         match written.as_str() {
             Some(o) => format!(" Wrote {o}."),
             None => String::new(),
+        }
+    );
+    Ok(ToolOut { summary, data })
+}
+
+fn schedule_days(ctx: &mut Ctx, a: &Args) -> ToolResult {
+    use method_session::schedule_days as sd;
+    let (path, shown) = budget_path(ctx, a, "path")?;
+    let file = ctx.roots.existing(a.req("file")?, paths::SCHEDULE_EXTS)?;
+    let file_shown = ctx.roots.show(&file);
+    let bytes = read_file(&file, &file_shown)?;
+    let name = file
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let days = sd::read(&name, &bytes).map_err(ToolError::invalid)?;
+    let add: Vec<(String, Option<String>)> = a
+        .list("pick")
+        .iter()
+        .filter_map(|p| {
+            let key = p.get("key")?.as_str()?.to_string();
+            let global = p.get("global").and_then(Value::as_str).map(str::to_string);
+            Some((key, global))
+        })
+        .collect();
+    let skip = a.strings("skip");
+    let b = ctx.docs.view(&path, &shown)?.budget.into_owned();
+    let picks = sd::picks_with(&b, &days, &add, &skip).map_err(ToolError::invalid)?;
+    let mut review = sd::review(&b, &days, Some(&picks));
+    review.file = file_shown.clone();
+    if let Some(p) = review.problems.first() {
+        return Err(ToolError::invalid(format!("{p} Nothing was changed.")));
+    }
+    let dry = a.bool("dry_run");
+    let mut message = None;
+    if !dry && review.can_apply {
+        let label = format!("Set globals from the schedule {}", days.schedule.trim());
+        let e = ctx.docs.edit(&path, &shown, label.trim(), |b| {
+            sd::apply(b, &days, Some(&picks)).map_err(ToolError::refused)
+        })?;
+        message = Some(e.out.message());
+    }
+    let mut data = serde_json::to_value(&review).map_err(|e| ToolError::io(e.to_string()))?;
+    if let Value::Object(m) = &mut data {
+        m.remove("token");
+        m.insert("applied".into(), json!(message.is_some()));
+        m.insert("message".into(), json!(message));
+    }
+    let summary = format!(
+        "{file_shown}: {} ({}, {}), {} shoot days. {}{}",
+        review.schedule,
+        review.board,
+        review.sub_board,
+        review.shoot_days,
+        match &message {
+            Some(m) => m.clone(),
+            None if !review.can_apply =>
+                "The picked globals already match; nothing to change.".into(),
+            None => format!(
+                "Would set {} new and {} changed globals ({} already match).",
+                review.adds, review.updates, review.same
+            ),
+        },
+        if review.changed.is_empty() {
+            String::new()
+        } else {
+            format!(
+                " The schedule changed since these were set from it: {}.",
+                review.changed.join(", ")
+            )
         }
     );
     Ok(ToolOut { summary, data })

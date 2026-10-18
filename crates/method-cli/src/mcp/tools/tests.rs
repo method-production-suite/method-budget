@@ -1555,3 +1555,61 @@ fn import_a_budget_export() {
         "",
     );
 }
+
+#[test]
+fn globals_from_a_schedules_days() {
+    let mut f = Fixture::new("schedule", false);
+    let src = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/field-station/field-station.budget.json");
+    std::fs::copy(src, f.path("days.json")).unwrap();
+    // A dry run: the review, nothing changed.
+    let r = f
+        .tool(
+            "schedule_days",
+            json!({"path": "film.mthd", "file": "days.json", "dry_run": true}),
+        )
+        .unwrap();
+    assert_eq!(r["schedule"], "Field Station");
+    assert_eq!(r["applied"], false);
+    assert_eq!(r["figures"][0]["global"], "SHOOT_DAYS");
+    assert_eq!(r["figures"][0]["current"], "25");
+    assert_eq!(r["figures"][0]["action"], "update");
+    let before = net(&mut f, "film.mthd");
+    // Applied, with a location under a name of our own.
+    let r = f
+        .tool(
+            "schedule_days",
+            json!({"path": "film.mthd", "file": "days.json",
+                   "pick": [{"key": "location:Cold Spring field station", "global": "STATION_DAYS"}]}),
+        )
+        .unwrap();
+    assert_eq!(r["applied"], true);
+    assert_eq!(r["message"], "Set 2 globals from the schedule (1 new).");
+    assert_ne!(net(&mut f, "film.mthd"), before);
+    let g = f
+        .tool("list_globals", json!({"path": "film.mthd"}))
+        .unwrap();
+    assert!(g.to_string().contains("STATION_DAYS"), "{g}");
+    // Undo takes back the whole import.
+    let u = f.tool("undo", json!({"path": "film.mthd"})).unwrap();
+    assert!(u["undone"]
+        .as_str()
+        .unwrap()
+        .starts_with("Set globals from the schedule"));
+    assert_eq!(net(&mut f, "film.mthd"), before);
+    err_contains(
+        f.tool(
+            "schedule_days",
+            json!({"path": "film.mthd", "file": "days.json", "pick": [{"key": "set:NOWHERE"}]}),
+        ),
+        "no figure",
+    );
+    std::fs::write(f.path("notes.json"), "{}").unwrap();
+    err_contains(
+        f.tool(
+            "schedule_days",
+            json!({"path": "film.mthd", "file": "notes.json"}),
+        ),
+        "isn't a schedule days file",
+    );
+}

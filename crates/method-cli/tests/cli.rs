@@ -722,3 +722,97 @@ fn import_export_checks_and_writes() {
     assert_eq!(code(&o), 1);
     assert!(err(&o).contains("budget export"), "{}", err(&o));
 }
+
+#[test]
+fn schedule_days_set_globals_from_a_schedule() {
+    let d = Dir::new("schedule-days");
+    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/field-station");
+    let days = fixtures
+        .join("field-station.budget.json")
+        .to_string_lossy()
+        .into_owned();
+    // The starter has 25 shoot days; the schedule 4.
+    let b = d.starter("film.mthd");
+    let before = read(&b);
+    let o = method(&["schedule-days", &b, &days]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let text = out(&o);
+    assert!(
+        text.starts_with("field-station.budget.json: Field Station (Shooting Order, Main), 4 shoot days, 2027-05-03 to 2027-05-06"),
+        "{text}"
+    );
+    assert!(
+        text.contains("SHOOT_DAYS = 4 (was 25)  Shoot days in all  [total]"),
+        "{text}"
+    );
+    assert!(
+        text.contains(
+            "location:Cold Spring field station  Shoot days at location Cold Spring field station: 4 days  -> COLD_SPRING_FIELD_STATION_DAYS"
+        ),
+        "{text}"
+    );
+    assert!(text.contains("dry run: nothing written"), "{text}");
+    assert_eq!(read(&b), before);
+    // A location picked under a name of our own, then applied.
+    let o = method(&[
+        "schedule-days",
+        &b,
+        &days,
+        "--pick",
+        "location:Hollins Ridge fire road=RIDGE_DAYS",
+        "--apply",
+    ]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(
+        out(&o).contains("Set 2 globals from the schedule (1 new)."),
+        "{}",
+        out(&o)
+    );
+    assert!(out(&o).contains("wrote"));
+    let o = method(&["check", &b]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let text = read(&b);
+    assert!(text.contains("\"RIDGE_DAYS\": \"2\""), "{text}");
+    assert!(text.contains("\"SHOOT_DAYS\": \"4\""));
+    assert!(text.contains(
+        "Shoot days at location Hollins Ridge fire road, from the schedule Field Station (Shooting Order, Main)"
+    ));
+    // Again: both are picked by their link and already set.
+    let o = method(&["schedule-days", &b, &days, "--json"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let v: method_format::serde_json::Value =
+        method_format::serde_json::from_str(&out(&o)).unwrap();
+    assert_eq!((v["same"].clone(), v["adds"].clone()), (2.into(), 0.into()));
+    assert_eq!(v["written"], method_format::serde_json::Value::Null);
+    assert_eq!(v["can_apply"], false);
+    // A key the file doesn't have, and a bad global name, are refused.
+    let after = read(&b);
+    let o = method(&[
+        "schedule-days",
+        &b,
+        &days,
+        "--pick",
+        "set:NOWHERE",
+        "--apply",
+    ]);
+    assert_eq!(code(&o), 3, "{}", err(&o));
+    let o = method(&[
+        "schedule-days",
+        &b,
+        &days,
+        "--pick",
+        "set:RIDGE=1 2",
+        "--apply",
+    ]);
+    assert_eq!(code(&o), 3, "{}", err(&o));
+    assert!(err(&o).contains("can't be a global name"), "{}", err(&o));
+    assert_eq!(read(&b), after);
+    // Not a days file.
+    let o = method(&["schedule-days", &b, &b]);
+    assert_eq!(code(&o), 1);
+    assert!(
+        err(&o).contains("isn't a schedule days file"),
+        "{}",
+        err(&o)
+    );
+}
