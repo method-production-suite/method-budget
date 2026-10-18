@@ -51,6 +51,12 @@ this page goes ahead without waiting.
   recommendation.
 - **Separator with a label** (decision 6 below): **Recommend: a bare rule**; bold title
   lines do the labeling. Built on the recommendation (today's separator).
+- **How a person's cutoff is shared** (3.11; D79): past the cutoff, a person paid in
+  several accounts earns the percent of the cutoff once, split over their lines by pay.
+  The other way would use the cutoff up in line order across accounts, as a fringe range
+  does within one account. The reference product has no person, so no parity run can
+  decide it. **Recommend: by pay**, so moving lines or accounts never moves a cent. Built
+  on the recommendation.
 - **Built on the recommendation, never confirmed by the owner** (any can be reversed from
   the digest): renames rewrite every reference (decision 7; D32), new-line defaults match
   the reference as per-budget switches (decision 10; 1.4, D60), dated notes on lines,
@@ -102,7 +108,7 @@ from the Finder, budget tabs and split view, right-click menus, bold, italic, in
 color and dated notes, copying rows with their tags and the paste review, find and
 replace, versions, compare and the History list, report choices with a live preview and
 PDF, imports from spreadsheets and from the reference product's exports, and a signed,
-notarized Mac build with updates inside the app (decision 48). Ten of Phase 3's nineteen
+notarized Mac build with updates inside the app (decision 48). Eleven of Phase 3's nineteen
 items are built; sharing through a folder (3.18), the start window (3.19) and
 schedule-linked globals (3.8) are partway. Around the app: the command line is `method-budget` (decision 74; `method`
 still runs as an alias for now); an MCP server lets coding agents work on budget files
@@ -230,7 +236,7 @@ Where competitors and the pain points (inv "Gaps and pain points", inv 24) say w
 | 3.8 | **Schedule-linked quantities**: read a schedule's day counts from an open export and drive globals. Agreed input: the `sched-days` exchange file written by Method Scheduling (`method-schedule budget FILE`, spec in that repo's docs/EXCHANGE.md); globals keep their source as (category, board ID, name) with the element id as fallback, a performer's days default to the DOOD total, a missing element counts 0 with a warning. Built so far: the reader for versions 0 and 1, frozen 2026-10-15 (`method_format::import::schedule`, spec copy docs/research/schedule-exchange.md: every field checked, days_hash verified, shoot days to `SHOOT_DAYS`, the dates to budget info, elements found again by identity); not yet the app's Link a Schedule, the stored link or globals per element | competitor feature; the reference only imports static blocks | [partial] | L | 2.2 |
 | 3.9 | **Rate tables**: user-kept tables from public union rates; pick a classification to fill the rate (flag the legal line before shipping any data) | competitor add-on | [missing] | L | 2.15 |
 | 3.10 | **Overtime helper** for labor lines. Built (decision 43): the tools panel's Overtime tab (also Edit > Overtime Helper… and the line's right-click menu) on the cursor line: straight-time rate, hours a day, straight-time hours, overtime bands, sixth and seventh day multipliers, days a week; shows a day and a week exactly (pay per multiplier, straight-time equivalent hours, average an hour) and writes the day's or week's pay into the line as its rate or as one line per multiplier in one fringe range, one undo step. Patterns saved by name in the budget (`ot_patterns`, tools, not content). No union rules shipped. Needs a live check in the app | competitor feature | [have] | M | none |
-| 3.11 | **Person-level cutoffs across accounts**, opt-in, for one person paid in several accounts | inv 23 quirk | [missing] | M | engine check 1 |
+| 3.11 | **Person-level cutoffs across accounts**, opt-in, for one person paid in several accounts. Built (decision 79): a line or adjustment row's optional `person` (free text; FORMAT.md, additive, left out when unset) makes every counted row with that person, in any account, one earner for each percent fringe: within the cutoff each row earns its own percent; past it the person earns the percent of the cutoff once, split over the rows by pay in whole cents (largest remainder, ties to the lower row id), so the order of lines and accounts never matters; a person row leaves its fringe range. Budgets without a person are unchanged (tested). Explain shows the person, the cutoff and each line's share; the lines' optional Person column (shown once a line has one) has type-ahead and the person's pay against each cutoff as its tooltip; `set line ROW person NAME` and the MCP `update_lines` set it. Property-tested (no double counting, order-independent, excluding equals deleting). Needs a live check of the column in the app | inv 23 quirk | [have] | M | engine check 1 |
 | 3.12 | **Scriptable command line**: batch edits, headless PDF and spreadsheet output for pipelines. Built (decision 41, docs/CLI.md): `method-budget report` (a saved preset as HTML, text, CSV or a plain Courier PDF from our own small writer), `method-budget export --xlsx/--csv/--tsv`, `method-budget totals [--json]`, `method-budget set` and `method-budget apply` (a line-oriented edit script: globals, fringe rates and cutoffs, line fields by row id or account and line, tags, renames, charges; atomic, all or nothing, `--dry-run` with a diff), `method-budget import` with a JSON column mapping; documented exit codes. The app's typeset PDF stays Mac-app only | open format advantage | [have] | M | 2.1, 1.15 |
 | 3.13 | **Commercial bid layouts** (industry bid form style) | competitor feature; check the legal line on form layouts | [missing] | L | 2.4 |
 | 3.14 | **Localization and accessibility pass** | reference is English only | [missing] | M | none |
@@ -254,7 +260,7 @@ open: 14 in part and 16.
 
 | # | Question | Our rule today | Quick test | In ETP |
 |---|---|---|---|---|
-| 1 | Is a percent cutoff per fringe range? | **Answered (D56, ZTEST04)**: per earner, a line or a range, as ours | Three lines of 1,000 each, a 12.5% fringe with a 2,000 cutoff. Fringe total with them bracketed into a range: ours says 250. Unbracketed: 375 | yes (7201) |
+| 1 | Is a percent cutoff per fringe range? | **Answered (D56, ZTEST04)**: per earner, a line or a range, as ours; ours adds an opt-in person across accounts (3.11, D79), which the reference doesn't have, so there is nothing to check | Three lines of 1,000 each, a 12.5% fringe with a 2,000 cutoff. Fringe total with them bracketed into a range: ours says 250. Unbracketed: 375 | yes (7201) |
 | 2 | Do detail subtotal and total rows drop suppressed lines? | **Answered (ZTEST07, D57)**: they drop out, as ours | Subtotal row under two lines, suppress one line's group, read the subtotal row and the account total row | no |
 | 3 | Does toggling a group off and on drift the total? | **Answered (V07-1b)**: no drift, as ours | In a real budget note the net total, suppress a group, restore it, read the net total and "last change" again | no |
 | 4 | Currency direction | **Answered (CU-01)**: line x rate = base, as ours | One line of 100 with currency EUR at rate 3. Total 300 means ours; 33.33 means the other way | yes (7301, V3) |

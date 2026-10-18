@@ -497,8 +497,10 @@ grid numbers them. `21-01:*` is every line and adjustment row of the account.
 **Line fields.** `description`; the formulas `amount`, `x`, `rate`, `x4`; the units
 `unit`, `unit2`, `unit3`, `unit4` (a unit in the budget, or `""`); `currency` (a currency
 in the budget or the base currency), `set`, `location` (each must exist, or `none`);
-`fringe_range` (a number or `none`); `bold`, `italic` (`true`/`false`); `indent` (0 to
-4); `color` (`#rrggbb` or `none`).
+`fringe_range` (a number or `none`); `person` (the person the row pays, any text, or
+`none`: every line and adjustment with the same person, in any account, shares each percent
+fringe's cutoff once; decisions.md, entry 79); `bold`, `italic` (`true`/`false`); `indent`
+(0 to 4); `color` (`#rrggbb` or `none`).
 
 Each command acts on the budget as the commands before it left it, so a later line can
 use a global an earlier one added. Formulas aren't checked line by line: the whole

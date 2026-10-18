@@ -212,8 +212,8 @@ globals, fringes, groups, sets, locations, units, currencies, charges, credits, 
 **`get_account`** `{path, account, offset?, limit?}`: the account's rows, 500 at a time by
 default (5,000 at most). Each row: `id`, `n`, `kind` (`line`, `subtotal`, `adjustment`,
 `separator`), `description`, `amount`, `unit`, `x`, `unit2`, `rate`, `unit3`, `x4`, `unit4`,
-`currency`, `fringes`, `groups`, `set`, `location`, `fringe_range`, `bold`, `italic`,
-`indent`, `color`, `notes`; and what it works out to: `included`, `quantity`,
+`currency`, `fringes`, `groups`, `set`, `location`, `fringe_range`, `person` (only when
+set), `bold`, `italic`, `indent`, `color`, `notes`; and what it works out to: `included`, `quantity`,
 `row_currency`, `local_total_cents`, `total_cents`, `subtotal_cents`, `fringes_cents` (per
 fringe), `fringe_total_cents`, `fringe_full_total_cents` (the fringes with no cutoff and no
 range: each percent fringe on the whole total, the flat ones as earned; 0 on a row that
@@ -303,8 +303,10 @@ included, unless it gives them itself or `use_defaults` is false. Returns `added
 Fields: `description`; the formulas `amount`, `x`, `rate`, `x4` (text or a number); the units
 `unit`, `unit2`, `unit3`, `unit4` (a unit in the budget, or null); `currency` (a currency in
 the budget, or null for the base), `set`, `location` (each must exist, or null);
-`fringe_range` (a number or null); `bold`, `italic`; `indent` (0 to 4); `color` (`#rrggbb`
-or null); `fringes` and `groups` (each replaces the row's whole list). A subtotal row takes
+`fringe_range` (a number or null); `person` (the person the row pays, or null: every
+line and adjustment with the same person, in any account, shares each percent fringe's
+cutoff once; decisions.md, entry 79); `bold`, `italic`; `indent` (0 to 4); `color`
+(`#rrggbb` or null); `fringes` and `groups` (each replaces the row's whole list). A subtotal row takes
 only the description and style; an adjustment takes no rate, rate unit or currency (it does
 take fringes, decisions.md, entry 56);
 a separator only style. Every row in the call must work or nothing is written.

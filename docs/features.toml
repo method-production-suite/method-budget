@@ -130,6 +130,13 @@ ref = "D3"
 
 [[feature]]
 group = "fringes"
+title = "One cutoff per person"
+text = "Name the person on each of their lines, in any account, and a fringe cutoff such as a wage base applies once to everything they are paid."
+status = "have"
+ref = ["3.11", "D79"]
+
+[[feature]]
+group = "fringes"
 title = "Globals with details"
 text = "Give a global a description, a unit and decimals, show it by name in cells, and see the formulas behind a selection."
 status = "have"
