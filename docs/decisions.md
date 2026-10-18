@@ -3442,8 +3442,9 @@ Docs/APP.md, "Sharing a budget", says what a person sees; this records the choic
   before this version keep working unchanged until their owner sets a role, and the
   Share dialog asks before the first one, naming who would read only.
 - **What each role may do**, from the design's table and entry 62's settled defaults:
-  admin everything and other people's roles, but only the owner makes admins or changes an
-  admin's role; editor everything but roles and the root's `baseline` (locking the
+  co-owner (added after review, below) everything and every role but the owner's and
+  co-owners'; admin everything and other people's roles, but only the owner and co-owners
+  make admins or change an admin's role; editor everything but roles and the root's `baseline` (locking the
   originals, design 9.9); department editor creates, changes, moves (within the scope at
   both ends) and deletes lines and notes in its categories or accounts, which covers
   applying existing fringes and groups, and nothing else (no setup items, so a unit typed
@@ -3511,9 +3512,21 @@ Docs/APP.md, "Sharing a budget", says what a person sees; this records the choic
     (a malformed line in a file), `set_role` refuses it in words, and the dialog keeps
     ticked categories in view with another role and refuses to set it until they are
     unticked. Tests: `roles_round_trip_through_json`, `setting_a_role_checks_what_is_asked`.
-  - The first-role question also suggests making someone trusted an admin, since the
-    owner is one computer's id and only it and admins set roles (co-owners wait for the
-    owner's answer, docs/ROADMAP.md, "Waiting on the owner").
+- **Decided by the owner (2026-10-18)**, the three questions the review raised, each as
+  recommended:
+  1. *Older apps*: the format bump at the first role, so they refuse the budget, with the
+     warning in the first-role question. Built as above.
+  2. *Owner lockout*: the owner names an admin at the first role, and can make someone a
+     co-owner. Built: a `co_owner` role (`Role::CoOwner`), given only by the owner, may do
+     everything the owner does except change the owner or make or change co-owners; it
+     makes and changes admins. Admins now set the roles of everyone but the owner,
+     co-owners and admins. The first-role question, shown in place in the Share dialog (a
+     second dialog would hide the first), warns what roles mean, warns about older
+     versions and offers "Make <name> an admin" for each person, or Not now. Tests:
+     `a_co_owner_sets_roles_admins_included` (core), `a_co_owner_sets_roles_from_their_own_computer`
+     (app), `roles_round_trip_through_json` (format).
+  3. *Command line and agents*: act as this computer's person within their role. Built as
+     above.
 - Tests: core (above, and a department editor in and out of scope, refusals by every
   peer, a role not yet seen, a move apart, who sets roles), format (grant round trip,
   roles through the folder with a forged change refused by a newcomer), session (a

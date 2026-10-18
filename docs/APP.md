@@ -1496,9 +1496,11 @@ refused while a budget is shared (versions are saved from the budget as it is no
 
 **Who may change what** (decisions.md, entry 78). The person who started sharing owns
 the budget. Until the owner sets what someone may change, everyone who opens the budget
-edits everything, as before. In the Share dialog the owner, and anyone the owner makes an
-admin, picks each person's role under their name: Edits everything and sets roles (an
-admin; only the owner makes or changes admins), Edits everything, Edits some categories
+edits everything, as before. In the Share dialog the owner, and anyone the owner makes a
+co-owner or an admin, picks each person's role under their name: Co-owner (sets every
+role, admins included, but the owner's and other co-owners'; only the owner gives it),
+Edits everything and sets roles (an admin; only the owner and co-owners make or change
+admins), Edits everything, Edits some categories
 (a checklist of the topsheet's categories: that person adds, changes, moves within and
 deletes lines and notes there and applies existing fringes and groups, and changes nothing
 else), Actuals and notes, Notes only, or Read only. Set saves it as a change shared like
@@ -1506,8 +1508,9 @@ any other. The first role set asks first, because from then on someone without a
 reads only; the dialog names who that would be, says that everyone sharing the budget then
 needs this version or later (an older version won't join it: it says the shared changes are
 newer than it reads and opens the file on its own, and what is changed there isn't shared),
-and suggests making someone trusted an admin, since only the owner's computer and admins
-can set roles. Categories ticked for any role other than Edits some categories are refused
+and offers to make someone an admin at the same time (or Not now), since only the owner's
+computer, co-owners and admins can set roles. The question shows in place under the
+person, not as a second dialog. Categories ticked for any role other than Edits some categories are refused
 with a sentence, in the dialog and in Rust.
 Under the people the dialog also says plainly that roles stop changes by accident, not
 someone who edits the shared folder's files directly, and that signed changes come later. A person given a role before they ever
@@ -1533,8 +1536,8 @@ the computer that keeps the file doesn't take it in: it keeps the edited file be
 "Feature (outside edit 2026-10-18 140322).mthd", writes the file again from everyone's
 changes, and the status panel says so.
 
-**Not yet** (later phases of the design): handing ownership on or a co-owner who also
-makes admins (the owner is one computer's id), invite links, signed changes and removing a
+**Not yet** (later phases of the design): handing ownership itself on (the owner is one
+computer's id; a co-owner can do everything else), invite links, signed changes and removing a
 person's later changes (a removed member's work is judged by what they had seen, as
 above), picking single accounts (not only whole categories) in the dialog, muted cells and
 locks on what a person can't change, access requests, live sessions with cursors,
@@ -1553,7 +1556,7 @@ Google Drive, LucidLink) the design calls for.
 | `share_activity` | `limit` | Recent changes, newest first: `actor`, `name`, `color`, `me`, `time`, `label`, `ops`, `place` |
 | `share_blame` | `kind`, `key`, `field` | Every value the field has had, oldest first: `value`, `actor`, `name`, `color`, `me`, `time`, `label`, `kept`, `index` |
 | `share_use_value` | `kind`, `key`, `field`, `index` | View, with the value put back as one change |
-| `share_set_role` | `actor` (64 hex characters), `role` (`admin`, `editor`, `department`, `actuals`, `comment`, `read_only`), `scope` (category numbers, for `department`) | The status, with the role set as one change; refused unless this person is the owner or an admin who may give it |
+| `share_set_role` | `actor` (64 hex characters), `role` (`co_owner`, `admin`, `editor`, `department`, `actuals`, `comment`, `read_only`), `scope` (category numbers, for `department`) | The status, with the role set as one change; refused unless this person is the owner, a co-owner or an admin who may give it |
 
 Rust sends `share-status` (`{doc, status}`) whenever the status changes and
 `share-changed` (`{doc, rev, remote: [{actor, name, color, label, time, places}]}`)

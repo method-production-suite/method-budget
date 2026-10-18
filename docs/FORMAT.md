@@ -1500,19 +1500,20 @@ the `.mthd`). Entity kinds: `category`, `production_total`, `account`, `row`, `n
 | `delete`, `restore` | `entity` | The tombstone, last writer wins. |
 | `add` | `entity`, `field`, `member` | Adds to a tag set; an add wins over a concurrent remove. |
 | `remove` | `entity`, `field`, `member`, `seen` | Removes the adds the remover had seen (`seen` lists their stamps). |
-| `grant` | `actor`, `role`, `scope` | Gives a person a role (decisions.md, entry 78): `role` is `admin`, `editor`, `department`, `actuals`, `comment` or `read_only`; `scope` (only for `department`, left out when empty) lists the categories and accounts by entity id. Last writer wins per person. |
+| `grant` | `actor`, `role`, `scope` | Gives a person a role (decisions.md, entry 78): `role` is `co_owner`, `admin`, `editor`, `department`, `actuals`, `comment` or `read_only`; `scope` (only for `department`, left out when empty) lists the categories and accounts by entity id. Last writer wins per person. |
 
 **Roles.** The actor of the first change (the genesis) owns the budget. Until a `grant`
 appears, every actor may write anything. Once one has, an actor without a role reads only.
 A reader checks every change against its author's role as of the change's own `deps` (the
 roles, and where each line and note was, as its author had seen them) and skips one that
 goes beyond it, listing it as refused; so every reader keeps and skips the same changes,
-whatever order they arrive in. The roles: `admin` everything, and sets the roles of
-everyone but the owner and admins; `editor` everything but roles and the root's
+whatever order they arrive in. The roles: `co_owner` everything, and sets every role
+but the owner's and co-owners' (only the owner gives or changes `co_owner`); `admin`
+everything, and sets the roles of everyone but the owner, co-owners and admins; `editor` everything but roles and the root's
 `baseline`; `department` creates, changes, moves and deletes rows and notes within its
 scope only (a move must start and end there); `actuals` transactions, batches, `etc`
-entries and notes; `comment` notes only; `read_only` nothing. Only the owner gives
-`admin` or changes an admin's role; nobody changes the owner's. Until changes are signed
+entries and notes; `comment` notes only; `read_only` nothing. Only the owner and
+co-owners give `admin` or change an admin's role; nobody changes the owner's. Until changes are signed
 this holds against honest applications only. A `grant` whose `scope` is not empty is
 malformed unless its role is `department`. A program writing a shared budget without a
 window (the command line, the MCP server) records its edit as a change by this computer's
