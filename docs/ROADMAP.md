@@ -56,7 +56,9 @@ this page goes ahead without waiting.
   the reference as per-budget switches (decision 10; 1.4, D60), dated notes on lines,
   accounts and categories (decision 11; D35), the paste review with the target winning
   (decision 12; D23; the review doesn't show the total change yet), tag presets in the
-  budget, Import Setup and a library file (decision 15; D29, D31, D37).
+  budget, Import Setup and a library file (decision 15; D29, D31, D37), and in New Budget a
+  ticked library or pack item replaces the starting point's item of the same name (D77;
+  Import Setup elsewhere keeps the budget's own).
 
 ### Tests that need the owner's hands or hardware
 
