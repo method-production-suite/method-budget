@@ -3901,3 +3901,51 @@ docs/FORMAT.md, "Credit"; command line: docs/CLI.md, `method-budget incentives`;
   as a flat amount, uplifts as anything but more rows, several programs sharing one cap,
   an unapplied credit's row figures in its rows table, and a per-location view in the
   printed reports.
+
+## 82. Accessibility, first slice: an ARIA grid, polite totals, modal dialogs, contrast (2026-10-18)
+
+Roadmap 3.14, the accessibility half, first slice (behavior: docs/APP.md, "Screen readers
+and contrast"; the audit and what is left: docs/research/accessibility-audit.md).
+
+- **The grid keeps focus; the cursor is an active descendant.** The grid already keeps
+  focus on its host and moves a cursor cell, and every key in docs/APP.md depends on
+  that. Moving focus into cells (a roving tab index) would touch every key path and
+  every redraw. So the host is the `role="grid"` element with `aria-activedescendant` on
+  the cursor cell, and the table under it is presentation, its rows and cells carrying
+  their roles themselves. Keyboard behavior is unchanged.
+- **Places, states and a name for the cursor cell.** `aria-rowcount`, `aria-rowindex` and
+  `aria-colindex` are there because long grids draw only some rows. Computed cells are
+  `aria-readonly`; the cursor cell and the cells of a selected range are `aria-selected`
+  (only those get the attribute, so a move touches a few cells, as the marks do). The
+  cursor cell alone gets an `aria-label`: what it shows, its column and the row's
+  description, value first so moving along a row starts with what changed. A column
+  marks itself `rowHeader` (the Description column at each level) to be the row's name
+  and its cells `rowheader`.
+- **Totals are announced after an edit, politely and once.** The sentence is the net
+  total and how far the edit moved it, the same figure as the footer's Last change, so
+  it costs no new command. It waits 700 ms after the last edit, so typing down a column
+  is one sentence at the end, not one per cell. An edit that moves no money, opening,
+  switching tabs and other people's changes say nothing (the same list as the footer's
+  counters). The live region sits outside the app so an open dialog, which makes the app
+  inert, doesn't silence it.
+- **Every dialog is a modal dialog to a screen reader.** The common form, confirm and
+  popover dialogs gain `role="dialog"` and `aria-modal`; `customDialog` adds them when a
+  builder left them out. The trap was already there (the page behind goes inert) and
+  focus already went back.
+- **Contrast follows BRAND.md.** The app's secondary text and note amber were lighter
+  than the brand tokens and fell under 4.5:1 on table heads and selected rows; they now
+  use the brand's muted and pencil amber. A popup menu's focused item gains the accent
+  ring, since its tint alone was 1.1:1.
+- **Tested headless, through the accessibility tree.** The repository tests UI scripts
+  through the browser build, so `scripts/web-smoke.mjs` reads Chrome's accessibility tree
+  (the DevTools protocol's Accessibility domain, no new dependency) and fails if a control
+  lacks a name, the grid's roles or the cursor cell's name are missing, an edit isn't
+  announced, or a dialog isn't a named modal that holds focus and gives it back. Written
+  first; it failed on the code before this change. A real screen reader still needs the
+  owner's hands (docs/ROADMAP.md, "Waiting on the owner").
+- **No localization framework yet.** The audit lists where the words live and what a
+  slice would need; which languages come first is the owner's call.
+- **Not built** (3.14 stays partial): a check with real screen readers, announcing the
+  footer's other totals, focus going back to a redrawn opener, an empty grid's focus,
+  forced colors and reduced motion, dialog semantics for the browser build's Budget Setup
+  frame, and localization.
