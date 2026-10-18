@@ -331,6 +331,26 @@ pub struct ShareStatus {
     /// Changes in the folder this computer didn't take in: beyond their
     /// author's role, or unreadable.
     pub refused: usize,
+    /// The latest of them, newest last (at most [`REFUSED_SHOWN`]).
+    pub refused_changes: Vec<RefusedDto>,
+    /// Something to tell the person about the file (an edit made outside
+    /// the app kept aside), until the next one.
+    pub notice: Option<String>,
+}
+
+/// How many refused changes the status lists.
+pub const REFUSED_SHOWN: usize = 20;
+
+/// A change left out: who made it, when, what it was and why.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct RefusedDto {
+    pub actor: String,
+    pub name: String,
+    pub color: String,
+    pub time: String,
+    pub label: String,
+    /// Why, in a sentence.
+    pub why: String,
 }
 
 /// One thing to review (design, 9.5).
@@ -419,6 +439,8 @@ pub struct SharedDoc {
     recent: Vec<RemoteChange>,
     /// Changes waiting for ones that haven't arrived, from the last read.
     waiting: usize,
+    /// What happened to an outside edit kept aside, for the status.
+    outside: Option<String>,
 }
 
 impl std::fmt::Debug for SharedDoc {
@@ -565,6 +587,7 @@ impl SharedDoc {
             people: BTreeMap::new(),
             recent: Vec::new(),
             waiting: 0,
+            outside: None,
         }
         .with_scan()
     }
@@ -929,7 +952,25 @@ impl SharedDoc {
     fn keep_file(&mut self, now: Instant, budget: &mut Budget) -> bool {
         let path = self.shared.path.clone();
         let mut changed = false;
-        if self.disk.is_some() && !self.file_matches(&path) {
+        if self.disk.is_some() && !self.file_matches(&path) && self.shared.log.roles_started() {
+            // Roles are set: nobody can say whose edit the file holds, so it
+            // isn't taken in as the keeper's (decisions.md, entry 78). It is
+            // kept beside the file and the file is written again.
+            match flog::set_aside(&self.shared, &iso_now()) {
+                Ok(Some(kept)) => {
+                    self.outside = Some(format!(
+                        "Someone changed {} outside Method Budget. Because roles are set, that change wasn\u{2019}t taken in: it was kept as \u{201c}{}\u{201d} beside it, and the file was written again from everyone\u{2019}s changes.",
+                        self.shared.info.file,
+                        kept.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+                    ));
+                    self.snapshot_len = self.shared.log.len();
+                    self.note_snapshot(&path);
+                }
+                Ok(None) => {}
+                Err(e) => self.error = Some(e.0),
+            }
+            self.disk = std::fs::read(&path).ok().map(|b| DiskStamp::of(&path, &b));
+        } else if self.disk.is_some() && !self.file_matches(&path) {
             match flog::ingest(&mut self.shared, &iso_now()) {
                 Ok(Some(_)) => {
                     self.reproject();
@@ -1175,7 +1216,31 @@ impl SharedDoc {
             can_set_roles: self.role().sets_roles(),
             roles_started: self.shared.log.roles_started(),
             refused: self.shared.log.rejected().len(),
+            refused_changes: self.refused_changes(),
+            notice: self.outside.clone(),
         }
+    }
+
+    /// The changes left out, newest last, with why in plain words.
+    fn refused_changes(&self) -> Vec<RefusedDto> {
+        let all = self.shared.log.rejected();
+        all[all.len().saturating_sub(REFUSED_SHOWN)..]
+            .iter()
+            .map(|(c, reason)| RefusedDto {
+                actor: c.actor.hex(),
+                name: self.name_of(c.actor),
+                color: self.color_of(c.actor),
+                time: c.time.clone(),
+                label: c.label.clone(),
+                why: match reason.strip_prefix("not allowed: ") {
+                    Some(r) => format!("Their role doesn\u{2019}t allow it ({r})."),
+                    None if reason.contains("first change") => {
+                        "It wasn\u{2019}t made from this budget\u{2019}s shared history.".into()
+                    }
+                    None => "It didn\u{2019}t fit the budget as it stood.".into(),
+                },
+            })
+            .collect()
     }
 
     /// Where an entity is in the projected budget, for the page.
@@ -1488,6 +1553,12 @@ impl SharedDoc {
                     .into(),
             );
         }
+        if role != "department" && !scope.is_empty() {
+            return Err(
+                "Only Edits some categories names categories. Untick them, or pick Edits some categories."
+                    .into(),
+            );
+        }
         let mut uids = std::collections::BTreeSet::new();
         for code in scope {
             let code = code.trim();
@@ -1503,9 +1574,6 @@ impl SharedDoc {
         let role = Role::parse(role, uids).ok_or("That isn't a role a person can have.")?;
         if role.scope().is_some_and(|s| s.is_empty()) {
             return Err("Pick at least one category for this person to edit.".into());
-        }
-        if role.scope().is_none() && !scope.is_empty() {
-            return Err("Only a department editor's role names categories.".into());
         }
         let label = format!("{}: {}", self.name_of(who), self.role_text(&role));
         let me = self.role();

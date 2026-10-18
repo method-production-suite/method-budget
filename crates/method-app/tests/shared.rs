@@ -526,11 +526,107 @@ fn setting_a_role_checks_what_is_asked() {
         ("not an id".to_string(), "editor", vec![], "person"),
         (ALEX.hex(), "read_only", vec![], "owner"),
         (JORDAN.hex(), "owner", vec![], "owner"),
+        (
+            JORDAN.hex(),
+            "editor",
+            vec!["50".to_string()],
+            "Edits some categories",
+        ),
+        (
+            JORDAN.hex(),
+            "read_only",
+            vec!["50".to_string()],
+            "Edits some categories",
+        ),
     ] {
         let err = sh.set_role(&who, role, &scope).unwrap_err();
         assert!(err.contains(why), "{role}: {err}");
     }
     assert_eq!(sh.unshared(), 0, "nothing was written");
+}
+
+/// After roles are set, an edit to the `.mthd` by a program that doesn't
+/// write the log isn't taken in as the keeper's: it is kept beside the file,
+/// the file is written again, and the status says so in words.
+#[test]
+fn an_outside_edit_after_roles_is_kept_aside_by_the_keeper() {
+    let (path, mut alex, mut jordan) = two_sessions();
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "editor", &[])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    alex.share_tick(Instant::now() + SNAPSHOT_QUIET + Duration::from_secs(3));
+    let changes = alex.shared().unwrap().log().len();
+    let title = alex.budget().title.clone();
+
+    let mut edited = method_format::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    edited.title = "Edited by hand".into();
+    std::fs::write(&path, method_format::to_string(&edited)).unwrap();
+    alex.share_tick(later());
+
+    assert_eq!(alex.budget().title, title);
+    assert_eq!(
+        alex.shared().unwrap().log().len(),
+        changes,
+        "nothing taken in"
+    );
+    let on_disk = method_format::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(on_disk.title, title);
+    let st = alex.shared().unwrap().status(Instant::now());
+    let notice = st.notice.unwrap();
+    assert!(notice.contains("(outside edit"), "{notice}");
+    assert!(notice.contains("Feature.mthd"), "{notice}");
+    let kept = std::fs::read_dir(path.parent().unwrap())
+        .unwrap()
+        .flatten()
+        .filter(|e| e.file_name().to_string_lossy().contains("(outside edit"))
+        .count();
+    assert_eq!(kept, 1);
+}
+
+/// A change left out because its author's role didn't allow it is listed
+/// in the status: who, when, what, and why, in plain words.
+#[test]
+fn refused_changes_are_shown_with_who_when_and_what() {
+    let (_path, mut alex, mut jordan) = two_sessions();
+    exchange(&mut alex, &mut jordan);
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "read_only", &[])
+        .unwrap();
+    alex.share_flush();
+    // Another program writes a change in Jordan's name anyway.
+    let sh = alex.shared().unwrap();
+    let forged = method_core::log::Change {
+        actor: JORDAN,
+        seq: sh.log().frontier().get(&JORDAN) + 1,
+        deps: sh.log().frontier().clone(),
+        lamport: sh.log().lamport() + 1,
+        time: "2026-10-18T14:03:00Z".into(),
+        label: "Edit title".into(),
+        ops: vec![Op::Set {
+            entity: method_core::log::Uid::ROOT,
+            field: method_core::log::Field::Title,
+            value: method_core::log::Value::text("Forged"),
+        }],
+    };
+    method_format::log::LogDir::at(sh.folder())
+        .write_segment(&[forged])
+        .unwrap();
+    alex.share_tick(later());
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert_eq!(st.refused, 1);
+    let r = &st.refused_changes[0];
+    assert_eq!(r.name, "Jordan Lee");
+    assert_eq!(r.label, "Edit title");
+    assert_eq!(r.time, "2026-10-18T14:03:00Z");
+    assert!(
+        r.why.starts_with("Their role doesn\u{2019}t allow it"),
+        "{}",
+        r.why
+    );
+    assert_ne!(alex.budget().title, "Forged");
 }
 
 /// A second person for a live check of the built app (ignored: run by

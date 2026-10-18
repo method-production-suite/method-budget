@@ -305,6 +305,7 @@ function drawPanel() {
   rows.push(line('Keeps the file', s.keeper ? 'This computer' : (s.people.find((p) => p.keeper) || {}).name || 'Another computer'));
   if (s.file_written) rows.push(line('File last written', localTime(s.file_written)));
   if (s.error) rows.push(el('p', { class: 'share-problem', text: s.error, attrs: { role: 'alert' } }));
+  if (s.notice) rows.push(el('p', { class: 'share-notice', text: s.notice, attrs: { role: 'status' } }));
   rows.push(line('Your changes not yet shared', String(s.unshared), s.unshared ? 'is-busy' : ''));
   if (s.waiting) rows.push(line('Changes waiting for ones that haven’t arrived', String(s.waiting), 'is-warn'));
   if (typeof s.synced_secs === 'number') rows.push(line('Folder last read', ago(s.synced_secs + extra)));
@@ -313,6 +314,8 @@ function drawPanel() {
   people.append(personRow(s.me));
   for (const p of s.people) people.append(personRow(p));
   rows.push(el('h4', { class: 'share-panel-sub', text: 'People' }), people);
+  const refused = refusedList(s);
+  if (refused) rows.push(...refused);
   const actions = el('div', { class: 'share-panel-actions' });
   if (s.review_count > 0) {
     actions.append(el('button', { class: 'btn btn-primary', text: s.review_count === 1 ? 'Review 1 item' : `Review ${s.review_count} items`, attrs: { type: 'button' }, on: { click: () => { closeStatusPanel(); ctx.showTab('review'); } } }));
@@ -321,6 +324,25 @@ function drawPanel() {
   actions.append(el('button', { class: 'btn', text: 'Share settings…', attrs: { type: 'button' }, on: { click: () => { closeStatusPanel(); openShareDialog(); } } }));
   rows.push(actions);
   panel.replaceChildren(...rows);
+}
+
+/** Changes left out on this computer: who, when, what and why (decisions.md, entry 78). */
+function refusedList(s) {
+  const list = s.refused_changes || [];
+  if (!list.length) return null;
+  const title = s.refused === 1 ? '1 change left out' : `${s.refused} changes left out`;
+  const items = el('ul', { class: 'share-refused' });
+  for (const r of [...list].reverse()) {
+    items.append(el(
+      'li',
+      {},
+      el('span', { class: 'share-person-name', text: r.name }),
+      el('span', { class: 'share-person-when', text: ` · ${localTime(r.time)} · ` }),
+      el('span', { text: r.label }),
+      el('div', { class: 'share-muted', text: r.why }),
+    ));
+  }
+  return [el('h4', { class: 'share-panel-sub', text: title }), items];
 }
 
 function personRow(p) {
@@ -813,7 +835,13 @@ function sharedDialog(title, setup) {
 const UNSIGNED_NOTE = 'Roles stop people changing what they shouldn’t by accident. They don’t stop someone who edits the shared folder’s files directly; signed changes come later.';
 
 /** An app older than this one can't read a change file that holds a role. */
-const OLDER_APPS_NOTE = 'Once roles are set, everyone sharing this budget needs this version of Method Budget or later, because an older one can’t open the shared changes.';
+const OLDER_APPS_NOTE = 'Once roles are set, everyone sharing this budget needs this version of Method Budget or later. An older version won’t join it: it says the shared changes are newer than it reads and opens the file on its own, and what is changed there isn’t shared.';
+
+/** The owner is one computer: an admin is the way back if it is lost. */
+const ADMIN_NOTE = 'Only you and admins can set roles, so if this computer is lost, an admin is the only way to change them. Think about making someone you trust an admin.';
+
+/** A scope only goes with Edits some categories (Rust refuses it too). */
+const SCOPE_NOTE = 'Only Edits some categories names categories. Untick them, or pick Edits some categories.';
 
 function rolesNote(s) {
   const invite = 'To invite someone, give them access to the folder; opening the budget there joins them.';
@@ -856,20 +884,30 @@ function rolePicker(p, s, setup, error) {
   for (const c of setup.categories || []) {
     const box = el('input', { attrs: { type: 'checkbox' } });
     box.checked = picked.has(c.code);
-    box.addEventListener('change', () => { if (box.checked) picked.add(c.code); else picked.delete(c.code); });
+    box.addEventListener('change', () => {
+      if (box.checked) picked.add(c.code);
+      else picked.delete(c.code);
+      drawCats();
+    });
     cats.append(el('label', { class: 'share-radio' }, box, el('span', { text: `${c.code} ${c.name}` })));
   }
-  const drawCats = () => { cats.hidden = select.value !== 'department'; };
+  // Ticked categories stay in view with another role, so they can be unticked.
+  const drawCats = () => { cats.hidden = select.value !== 'department' && picked.size === 0; };
   select.addEventListener('change', drawCats);
   drawCats();
   const set = el('button', { class: 'btn', text: 'Set', attrs: { type: 'button' } });
   set.addEventListener('click', async () => {
     error.hidden = true;
+    if (select.value !== 'department' && picked.size > 0) {
+      error.textContent = SCOPE_NOTE;
+      error.hidden = false;
+      return;
+    }
     if (!s.roles_started) {
       const others = s.people.filter((x) => x.actor !== p.actor && x.role !== 'owner').map((x) => x.name);
       const yes = await confirmDialog({
         title: 'Set what people may change',
-        message: `From now on, people without a role can only read this budget.${others.length ? ` ${others.join(', ')} will read only until you give them a role too.` : ''} ${OLDER_APPS_NOTE}`,
+        message: `From now on, people without a role can only read this budget.${others.length ? ` ${others.join(', ')} will read only until you give them a role too.` : ''} ${OLDER_APPS_NOTE} ${ADMIN_NOTE}`,
         confirmText: 'Set Role',
       });
       if (!yes) return;
@@ -880,7 +918,7 @@ function rolePicker(p, s, setup, error) {
         doc: ctx.doc(),
         actor: p.actor,
         role: select.value,
-        scope: select.value === 'department' ? [...picked] : [],
+        scope: [...picked],
       });
       if (status) statusArrived({ doc: ctx.doc(), status });
       ctx.toast(`Saved. ${p.name} sees it once it reaches them through the folder.`);

@@ -712,3 +712,22 @@
   font-size: 11px;
   padding: 0 6px;
 }
+
+/* Changes left out, and what happened to an edit made outside the app. */
+.share-refused {
+  margin: 0 0 6px;
+  padding-left: 18px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.share-refused li {
+  margin: 2px 0;
+}
+
+.share-notice {
+  margin: 6px 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
