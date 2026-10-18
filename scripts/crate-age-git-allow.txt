@@ -1,0 +1,5 @@
+# Git repositories whose packages may come from git rather than crates.io, read by
+# scripts/check-crate-ages.py. A package passes only when Cargo.toml pins it with
+# rev = a full 40-character commit (and Cargo.lock agrees). Add a repository here only
+# after reviewing it, with the reason beside it.
+https://github.com/method-production-suite/method-libs   # the suite's shared crates (method-update), SUITE-STANDARDS.md section 6
