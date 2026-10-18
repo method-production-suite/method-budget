@@ -3518,3 +3518,69 @@ behavior: docs/APP.md, "The start window and New Budget"). Phases so far: entrie
 - **Not built** (3.19 still open): projects as folders, thumbnails, duplicate and new
   sub-budget from a row, rates at creation (waits on 3.9), the schedule link (3.8),
   shared-folder badges and presence (3.18), sorting and created dates (phase 4).
+
+## 81. Review files: comments beside a budget, merged back as notes (2026-10-18)
+
+Roadmap 3.3, first slice: a reviewer marks up a budget they can't change, the comments land
+in a small file beside it, and the author merges them back. The local stand-in for shared
+comments (decision 14: no accounts, no cloud), built on the copies for sharing of entry 39
+and the dated notes of entry 35. Behavior: docs/APP.md, "Review files"; the file:
+docs/FORMAT.md, "Review files"; the command line: docs/CLI.md, `method-budget review`.
+
+- **A sidecar of its own, no `.mthd` change.** Comments go in `<budget>.review.json`
+  (`format: "method-budget-review"`, version 1), never in the budget: a reviewer works on
+  a copy they may not be allowed to change, a review should not make the budget dirty, and
+  the format stays at version 1 with nothing for older readers to refuse. The file is
+  strict like the `.mthd` (unknown fields refused, so a version number means a shape),
+  deterministic, at most 8 MB and 10,000 comments, and names no path. Its `budget` block
+  carries the reviewed title and, for a copy saved for sharing, the provenance's source
+  title, version and time, so the author's app can say "this review was written on another
+  budget" (matched by title as returned copies are, entry 39).
+- **Anchors by identity**, as diff and merge match (entry 44): a line by row id, an account
+  by number, a category by code, a setup item by kind and name, or the whole budget. Each
+  comment also keeps `where`, its place in words when written, so one whose place has gone
+  (a line deleted, an account renumbered, a fringe renamed) is listed with where it was,
+  never dropped, and never guessed onto another place.
+- **Reviewing is read-only in the session.** A session with a review file open for writing
+  refuses every edit, undo, redo and history jump in `check_writable` (one message, as for
+  shared copies), whatever sends it. The desktop writes the file beside the budget after
+  every comment change (atomically); a write that fails is said once and the comments stay
+  in memory until Save Review File As…. A budget never saved has no place beside it and is
+  refused; a budget shared through a folder too (its change log is the shared way).
+- **Merging makes notes** on the line, account or category: the comment's text, author,
+  `created` and `edited`, and ticked off as reviewed when the reviewer resolved it. The
+  merges of one action are one undo step ("Merge 3 review comments as notes").
+- **A merged comment is known by its note**, not by the file: a note on its place with the
+  same text, time and author. Merging twice adds nothing, and undoing the merge shows the
+  comment open again with no bookkeeping. The file's `outcome` records what the author did
+  (merged or dismissed, when, by whom) for the reviewer to see; only "dismissed" is read
+  back as a state.
+- **Built on the recommendation: dismissing is not an undo step.** It changes only the
+  review file (the budget doesn't change), so Undo can't take it back; Restore does. The
+  alternative, the session's undo stack carrying review state, would make the history mix
+  budget changes and file changes. Reversible.
+- **Built on the recommendation: comments on setup items and the whole budget stay in the
+  file.** Setup items and the budget have no notes, so they can't be merged without a
+  format change (a `notes` list on setup items, or budget-level notes; additive, but an
+  older reader refuses a file that has one). They are listed with the reason, can be
+  dismissed, and the reviewer can see them answered by the outcome. Reversible: adding
+  notes there later turns them into merges.
+- **The author's outcomes go back into the reviewer's file** (written where it was opened
+  from), so the file is the conversation's record; the budget never points at it.
+- **Logic in method-session** (`review`: no file system, no clock, builds for the browser;
+  the format in method-format's `review`), so the desktop, the browser build (eleven host
+  commands; the page's picker takes the file and Download Review File gives it back), the
+  command line and the MCP server read alike.
+- **Not built** (3.3 still open): writing comments on setup items from the app (the command
+  line can), replies and threads, more than one reviewer's file at once (each is opened in
+  turn; ids are per file), showing a comment's text in the grid's tooltip, an Open for Review
+  that continues an existing file in the browser build, the returned-copy question offering
+  the review file, and notes on setup items.
+- Tests: method-format's `review` tests (round trip to the same bytes, a hand-written file,
+  every refusal), method-session's `review` tests (reviewing read-only, every comment
+  command, the list's order and places, merging as one undo step, merging twice, undo,
+  dismiss and restore, gone places listed not dropped, another budget's review, a shared
+  copy's provenance, command-line anchors) and its host test (a review out as a download and
+  back as notes), method-app's (the file written beside the budget after each change and
+  read back), method-cli's `review_comments_are_written_listed_and_merged_back` and the MCP
+  tool's test.

@@ -321,6 +321,46 @@ method-budget schedule-days film.mthd field-station.budget.json \
   --pick "location:Cold Spring field station=STATION_DAYS" --apply
 ```
 
+### `method-budget review <budget.mthd> [<review.json>] ...`
+
+A review file's comments on a budget (roadmap 3.3; docs/FORMAT.md, "Review files"), as the
+app's Comments tab works with them (docs/APP.md, "Review files"). The review file is
+`<budget>.review.json` beside the budget unless named.
+
+- `method-budget review film.mthd [--json]` lists every comment at its place in the budget
+  (the whole budget's first, then categories, accounts and lines in budget order, then
+  setup items, then those whose place is gone, marked `gone:` with where they were), with
+  its author, time, status (`open`, `resolved`, `merged`, `dismissed`) and why it can't
+  become a note when it can't, then how many are left to settle.
+- `--add ON --text TEXT [--author NAME] [--at TIME]` writes a comment, making the review
+  file when there is none; the budget is not touched. `ON` is `row:ID`, `account:NUMBER`
+  (or just the number), `category:CODE` (or just the code), a setup item as `KIND:NAME`
+  (`fringe:FICA`; `global`, `group`, `unit`, `set`, `location`, `currency`, `charge`,
+  `credit`) or `budget`. It must be in the budget now.
+- `--merge ID|all` (repeatable) puts comments into the budget as dated notes on their line,
+  account or category (`all`: every one to settle that can be); `--dismiss ID` sets one
+  aside; `--by NAME` says who. A comment whose place is gone, or on a setup item or the
+  whole budget, stays open and is counted. Nothing is written unless `--apply`, which
+  saves the budget and the review file (with each comment's outcome) atomically. Merging
+  a comment already in the budget adds nothing.
+- `--at` is the time written into a comment or an outcome (ISO 8601); by default the time
+  now, in UTC.
+- `--json` prints the list: `file`, `budget` (the reviewed budget's title and, for a copy
+  saved for sharing, where it came from), `title`, `matches`, `comments`, `to_settle`,
+  `entries` (each with `id`, `on`, `text`, `author`, `created`, `edited`, `resolved`,
+  `outcome`, `status`, `found`, `place`, `written_at`, `can_merge`, `why_not` and where it
+  is: `ti`, `ai`, `row_id`, `line`, `category`, `account`) and `message`.
+
+Exit code 0 when the files were read (and written, with `--add` or `--apply`); 1 when a
+file can't be read or isn't a review file; 3 when a comment is refused (its place isn't in
+the budget, blank text, an id the review doesn't have), with nothing written.
+
+```sh
+method-budget review film.mthd --add 21-01 --text "Why ten weeks of prep?" --author Jordan
+method-budget review film.mthd                               # each comment at its place
+method-budget review film.mthd --merge all --dismiss 3 --by Sky --apply
+```
+
 ### `method-budget coa import <chart> -o <out.mthd> [--sheet N|NAME] [--mapping M.json] [--title T] [--currency C] [--into B.mthd] [--remove-unlisted] [--force] [--dry-run]`
 
 Reads a chart of accounts (category and account numbers, names and production totals,

@@ -1560,3 +1560,102 @@ type) keep the version and are left out when unused; breaking changes raise it, 
 readers refuse a newer version with a message to update.
 
 - **Version 1** (2026-10): first form, unsigned.
+
+## Review files
+
+A reviewer's comments on a budget live in a small file of their own beside it, never in
+the `.mthd` (roadmap 3.3; decisions.md, entry 81): `Field Station.mthd` has
+`Field Station.review.json`. The reviewer writes it while the budget is open read-only
+(File > Open for Review…, or `method-budget review --add`); the author opens it on their
+budget, sees each comment at its place, and merges it in as a dated note or dismisses it.
+The budget file is the same before and after a review. The reference implementation is
+`crates/method-format/src/review.rs` (the file) under `crates/method-session/src/review.rs`
+(what it does).
+
+File name: the budget file's name without `.mthd`, then `.review.json`. Encoding: UTF-8.
+At most 8 MB and 10,000 comments. Written as pretty JSON (2-space indent, one trailing
+newline), keys in the order below, fields at their default left out, so the same review
+gives the same bytes. Readers are strict, as for the `.mthd`: an unknown field is an
+error.
+
+```json
+{
+  "format": "method-budget-review",
+  "version": 1,
+  "budget": {
+    "title": "Field Station",
+    "source_title": "Field Station",
+    "source_version": "Draft 2",
+    "saved": "2027-01-04T09:00:00Z"
+  },
+  "comments": [
+    {
+      "id": 1,
+      "on": {"row": 12},
+      "where": "21-01 Director, line 1: Director",
+      "text": "Is ten weeks of prep right?",
+      "author": "Jordan Vale",
+      "created": "2027-01-05T10:00:00Z"
+    },
+    {
+      "id": 2,
+      "on": {"setup": {"kind": "fringe", "name": "FICA"}},
+      "where": "Fringe FICA",
+      "text": "Check this year's cap.",
+      "created": "2027-01-05T10:05:00Z",
+      "edited": "2027-01-05T10:06:00Z",
+      "resolved": true,
+      "outcome": {"action": "dismissed", "at": "2027-01-06T08:00:00Z", "by": "Sky"}
+    }
+  ]
+}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `format` | string | Always `"method-budget-review"`. Anything else is refused. |
+| `version` | integer | `1`. A newer version is refused with a message to update. |
+| `budget` | object | Which budget was reviewed: no path, nothing about the reviewer's disk. |
+| `budget.title` | string | The reviewed budget's title. |
+| `budget.source_title`, `source_version`, `saved` | string, optional | When the reviewed budget is a copy saved for sharing: its provenance (the original's title, the version it was made from, when it was made). The author's budget matches when its title is `title` or `source_title`, ignoring case and spaces at the ends; otherwise the app warns before merging. |
+| `comments` | array, optional | Oldest first. Left out when empty. |
+| `id` | integer | At least 1, unique in the file. A new comment gets one past the highest. |
+| `on` | anchor | What the comment is about (below). |
+| `where` | string, optional | The anchor in words when the comment was written, for when it has gone since. At most 1,000 characters. |
+| `text` | string | Not blank, at most 10,000 characters (a note's limit). |
+| `author` | string, optional | Free text, at most 100 characters. |
+| `created` | string | When it was written, ISO 8601 from the reviewer's computer (may be empty). At most 64 characters. |
+| `edited` | string, optional | When its text last changed. |
+| `resolved` | boolean, optional | The reviewer ticked it off. Left out when false. |
+| `outcome` | object, optional | What the author did: `action` `"merged"` or `"dismissed"`, `at` (when) and `by` (who), both optional. |
+
+Anchors name things by identity, never by position, as the rest of the format does:
+
+| `on` | The place |
+|---|---|
+| `{"row": 12}` | A line (any detail row) by its `id`, which survives every edit and move. |
+| `{"account": "21-01"}` | An account by its number. |
+| `{"category": "21"}` | A category by its code. |
+| `{"setup": {"kind": "fringe", "name": "FICA"}}` | A setup item: `kind` is `global`, `fringe`, `group`, `unit`, `set`, `location`, `currency` (a foreign currency's code, or the base currency), `charge` or `credit`; `name` its name. |
+| `"budget"` | The budget as a whole. |
+
+Rules for a program reading one on a budget:
+
+1. **A comment's place may be gone**: a line deleted, an account renumbered, a fringe
+   renamed. It is still a comment: list it with `where`, never drop it.
+2. **Merging makes a note** (the `notes` of the line, account or category; see Note
+   above) with the comment's `text`, `author`, `created` and `edited`, and `done` set to
+   `resolved`. Setup items and the whole budget have no notes, so comments on them stay
+   in the review file.
+3. **A merged comment is recognized by its note**: a note on its place with the same
+   text, time and author. So merging twice adds nothing, and a merge taken back (Undo)
+   shows the comment as open again whatever `outcome` says. `outcome` with
+   `"dismissed"` is what marks a dismissed comment.
+
+### Versioning
+
+Its own `version`, with the `.mthd`'s rules: additive changes keep the number only if an
+older reader can still read every file (it can't here: readers refuse unknown fields), so
+in practice any new field raises the version, and readers refuse a newer one.
+
+- **Version 1** (2026-10): first form.
