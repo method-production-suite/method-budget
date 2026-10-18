@@ -54,9 +54,12 @@
 // Screen readers (decision 82): the host is an ARIA grid that keeps focus
 // itself, with aria-activedescendant on the cursor cell. Rows and cells
 // carry their place (aria-rowindex, aria-colindex, so a long grid drawing
-// only some rows still says where you are), read-only cells say so, the
-// selected cells are aria-selected, and the cursor cell's name is its value,
-// its column and its row's description.
+// only some rows still says where you are), read-only cells say so, every
+// cell of a selectable row is aria-selected true or false (the cursor alone
+// isn't a selection), and the cursor cell's name is its value, its column and
+// its row's description. Each cell's id comes from its row key and column
+// key (cellId), so the active descendant names the same cell across redraws
+// and scrolling, and every cursor move changes the attribute.
 
 import { el, hasMod, isMac } from './dom.js';
 import { setRules, dynamicStyles } from './sheet.js';
@@ -162,7 +165,7 @@ export class Grid {
     host.tabIndex = 0;
     host.setAttribute('role', 'grid');
     host.setAttribute('aria-multiselectable', 'true');
-    this.activeTd = null; // the cell aria-activedescendant names
+    this.activeTd = null; // the cursor cell, which carries the spoken name
     host.classList.add(`${this.uid}-host`);
 
     this.table.addEventListener('mousedown', (e) => this.onMouseDown(e));
@@ -513,6 +516,17 @@ export class Grid {
     return parts.join('\u0001');
   }
 
+  /**
+   * A cell's id: the grid's, the row key's and the column key's, so it stays
+   * the same for the same cell whatever is drawn where. Characters outside
+   * [A-Za-z0-9-] are written as _ and their code, so different keys never
+   * meet.
+   */
+  cellId(rowKey, colKey) {
+    const safe = (v) => String(v).replace(/[^A-Za-z0-9-]/g, (ch) => `_${ch.codePointAt(0).toString(16)}_`);
+    return `${this.uid}-${safe(rowKey)}--${safe(colKey)}`;
+  }
+
   /** A fresh element for row `r` (its cursor and selection marks come later). */
   buildRow(r, pins) {
     const tr = el('tr', { class: r.cls || '', attrs: { role: 'row' } });
@@ -525,7 +539,13 @@ export class Grid {
         class: `c-${c.key} ${c.cls || ''} ${cell.cls || ''} ${pins[ci]}`,
         title: cell.error && cell.title ? `${cell.error}\n\n${cell.title}` : cell.error || cell.title,
         data: { col: ci },
-        attrs: { role: c.rowHeader ? 'rowheader' : 'gridcell', 'aria-colindex': String(ci + 1) },
+        attrs: {
+          id: this.cellId(r.key, c.key),
+          role: c.rowHeader ? 'rowheader' : 'gridcell',
+          'aria-colindex': String(ci + 1),
+          // In a multi-select grid every selectable cell says whether it is selected.
+          'aria-selected': r.selectable === false ? null : 'false',
+        },
       });
       if (cell.edit !== undefined) td.classList.add('editable');
       else {
@@ -877,13 +897,12 @@ export class Grid {
       tr.classList.remove('sel');
       for (const td of tr.cells) {
         td.classList.remove('cursor', 'in-range');
-        td.removeAttribute('aria-selected');
+        td.setAttribute('aria-selected', 'false');
         if (td.classList.contains('alt-shown')) this.showAlt(tr, td, false);
       }
     }
     this.marked.clear();
     if (this.activeTd) {
-      this.activeTd.removeAttribute('id');
       this.activeTd.removeAttribute('aria-label');
       this.activeTd = null;
     }
@@ -902,11 +921,14 @@ export class Grid {
       const tr = markable(k);
       if (!tr) continue;
       tr.classList.add('sel');
-      if (ranged) {
+      // Picked rows (a range, or rows Cmd/Ctrl-clicked) are selected across
+      // the selected columns; the cursor on its own is not a selection.
+      if (ranged || this.selected.size > 0) {
         for (let ci = ca; ci <= cb; ci++) {
           if (!tr.cells[ci]) continue;
-          tr.cells[ci].classList.add('in-range');
           tr.cells[ci].setAttribute('aria-selected', 'true');
+          if (!ranged) continue;
+          tr.cells[ci].classList.add('in-range');
           if (alt) this.showAlt(tr, tr.cells[ci], true);
         }
       }
@@ -916,10 +938,9 @@ export class Grid {
     const td = tr ? tr.cells[this.cur.col] : null;
     if (td) {
       td.classList.add('cursor');
-      td.setAttribute('aria-selected', 'true');
-      // The cell screen readers are on: an id for aria-activedescendant and
-      // a name that says where it is.
-      td.id = `${this.uid}-active`;
+      // The cell screen readers are on: its own id (set when the row was
+      // built) for aria-activedescendant, and a name that says where it is.
+      // It counts as selected only inside a range, marked above.
       td.setAttribute('aria-label', this.cellName(this.cursorRow(), this.columns[this.cur.col], td));
       this.activeTd = td;
       this.host.setAttribute('aria-activedescendant', td.id);

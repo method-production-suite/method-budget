@@ -3945,6 +3945,15 @@ and contrast"; the audit and what is left: docs/research/accessibility-audit.md)
   owner's hands (docs/ROADMAP.md, "Waiting on the owner").
 - **No localization framework yet.** The audit lists where the words live and what a
   slice would need; which languages come first is the owner's call.
+- **Review follow-up: per-cell ids and explicit "not selected".** The first version moved
+  one id (`<grid>-active`) from cell to cell, so `aria-activedescendant` kept the same
+  value on every move; whether a move is announced then rests on the engine noticing the
+  id moved, which WKWebView with VoiceOver may not. Each cell now gets its id when its row
+  is built, from the row key and the column key (never the drawn position), so every
+  move changes the attribute and a redraw or a scroll leaves it on the same cell. And in a
+  multi-select grid every selectable cell carries `aria-selected`, `false` unless it is in
+  a selected range or a picked row; the cursor alone is no longer "selected", so a plain
+  move isn't announced as a selection. The smoke test checks both.
 - **Not built** (3.14 stays partial): a check with real screen readers, announcing the
   footer's other totals, focus going back to a redrawn opener, an empty grid's focus,
   forced colors and reduced motion, dialog semantics for the browser build's Budget Setup

@@ -10,8 +10,9 @@
 // and that the page logs no errors (a Content-Security-Policy refusal among
 // them). It also reads the page the way a screen reader does (Chrome's
 // accessibility tree, decision 82): every control has a name, the budget
-// grid is an ARIA grid whose cursor cell says its column and row, an edit
-// is announced politely, and a dialog is a named modal dialog that gives
+// grid is an ARIA grid whose cursor cell says its column and row, cells
+// say whether they are selected, the cursor cell's id stays the same across
+// a redraw, an edit is announced politely, and a dialog is a named modal dialog that gives
 // focus back when it closes.
 //
 // No npm packages: Node's own http server and Chrome's DevTools protocol over
@@ -171,8 +172,31 @@ async function main() {
       fail(`the grid's rows and cells are missing (rows ${count('row')}, column headers ${count('columnheader')}, cells ${count('gridcell')})`);
     }
     if (!nodes.some((n) => n.role.value === 'gridcell' && prop(n, 'readonly') === true)) fail('no computed cell is marked read-only');
-    const active = nodes.find((n) => ['gridcell', 'rowheader'].includes(n.role.value) && prop(n, 'selected') === true);
+    // The cursor cell, found the way a screen reader finds it: through the
+    // grid's aria-activedescendant.
+    const activeId = async () => evaluate(`document.getElementById('grid-host').getAttribute('aria-activedescendant')`);
+    const axOf = async (id) => {
+      const { result } = await send('Runtime.evaluate', { expression: `document.getElementById(${JSON.stringify(id)})` });
+      if (!result.objectId) return null;
+      const { node } = await send('DOM.describeNode', { objectId: result.objectId });
+      return nodes.find((n) => n.backendDOMNodeId === node.backendNodeId) || null;
+    };
+    const firstId = await activeId();
+    const active = firstId && (await axOf(firstId));
     if (!active || !/Acct #, Story and rights$/.test(named(active))) fail(`the cursor cell's name lacks its column and row: "${active ? named(active) : 'none'}"`);
+    // In a multi-select grid every selectable cell says whether it is
+    // selected; the cursor on its own is not a selection.
+    if (prop(active, 'selected') !== false) fail(`the lone cursor cell reports selected=${prop(active, 'selected')}, not false`);
+    if (!nodes.some((n) => n.role.value === 'gridcell' && prop(n, 'selected') === false && n !== active)) fail('no unselected cell reports not-selected');
+    const unmarked = await evaluate(`document.querySelectorAll('#grid-host tr[role="row"]:not(.static) > [role="gridcell"]:not([aria-selected]), #grid-host tr[role="row"]:not(.static) > [role="rowheader"]:not([aria-selected])').length`);
+    if (unmarked) fail(`${unmarked} selectable cells have no aria-selected`);
+    // Each cell has its own id, from its row and column, not its drawn place.
+    if (/-active$/.test(firstId) || !/--code$/.test(firstId)) fail(`the cursor cell's id isn't its own: ${firstId}`);
+    const key = (k) => `document.getElementById('grid-host').dispatchEvent(new KeyboardEvent('keydown', { key: '${k}', bubbles: true, cancelable: true }))`;
+    await evaluate(key('ArrowDown'));
+    const downId = await activeId();
+    await evaluate(key('ArrowUp'));
+    if (downId === firstId || (await activeId()) !== firstId) fail(`moving the cursor doesn't change the active descendant to the next cell and back (${firstId}, ${downId})`);
     const places = await evaluate(`(() => {
       const host = document.getElementById('grid-host');
       const id = host.getAttribute('aria-activedescendant');
@@ -180,7 +204,8 @@ async function main() {
       return { rowcount: host.getAttribute('aria-rowcount'), row: td && td.parentElement.getAttribute('aria-rowindex'), col: td && td.getAttribute('aria-colindex') };
     })()`);
     if (!places.row || places.col !== '1' || !(Number(places.rowcount) > 10)) fail(`the cursor cell's place isn't given: ${JSON.stringify(places)}`);
-    console.log(`web-smoke: the screen reader's view: named controls, a grid of ${count('row')} rows, the cursor on "${named(active)}"`);
+    console.log(`web-smoke: the screen reader's view: named controls, a grid of ${count('row')} rows, the cursor on "${named(active)}", unselected cells marked`);
+
 
     // 2. An edit (a fringe's rate, as Budget Setup sends it) updates the
     // page's grand total to the engine's.
@@ -198,6 +223,22 @@ async function main() {
     // ...and a screen reader hears the new net total, politely.
     const said = await until('the edit announced', `(() => { const a = document.getElementById('announce'); return a && /^Net total .+, up .+/.test(a.textContent) && a.getAttribute('aria-live') === 'polite' ? a.textContent : null; })()`, 10_000);
     console.log(`web-smoke: the edit is announced ("${said}")`);
+
+    // 2a. The cursor cell keeps its id when its row is drawn again: rename
+    // the first category (the cursor's row) and the new cell has the same id.
+    const keptId = await activeId();
+    await evaluate(`(window.__smokeCell = document.getElementById(${JSON.stringify(keptId)}), true)`);
+    await evaluate(`window.__METHOD_WEB__.invoke('smoke', 'update_topsheet_row', { index: 0, code: null, name: 'Story and rights, revised' })`);
+    const redrawn = await until('the cursor row redrawn', `(() => {
+      const td = document.getElementById(${JSON.stringify(keptId)});
+      return td && td !== window.__smokeCell && td.parentElement.textContent.includes('Story and rights, revised')
+        ? { cursor: td.classList.contains('cursor'), id: document.getElementById('grid-host').getAttribute('aria-activedescendant'), name: td.getAttribute('aria-label') }
+        : null;
+    })()`, 10_000);
+    if (!redrawn.cursor || redrawn.id !== keptId || !/Story and rights, revised$/.test(redrawn.name || '')) {
+      fail(`after a redraw the active descendant is ${redrawn.id} ("${redrawn.name}"), not ${keptId}`);
+    }
+    console.log(`web-smoke: the cursor cell keeps its id (${keptId}) across a redraw`);
 
     // 2b. A dialog (Rename budget, on the topsheet): a named modal dialog
     // with focus inside and the page behind inert; Escape closes it and
