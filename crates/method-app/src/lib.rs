@@ -40,6 +40,7 @@ pub mod reports;
 pub mod rowstyle;
 pub mod safety;
 pub mod safety_app;
+pub mod schedule_days;
 pub mod session;
 pub mod setup_lists;
 pub mod setup_sheets;

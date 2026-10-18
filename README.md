@@ -107,6 +107,7 @@ this section.
 - **Topsheet, accounts and detail lines.** The familiar three levels, with every total rolling up live as you type.
 - **Money to the cent.** Every amount is kept in whole cents and rounds the way production budgets have always rounded, with an exact mode if you want one.
 - **Formulas and globals.** Amount, quantity and rate cells take formulas and named globals; change a global and every line that uses it follows.
+- **Schedule-linked quantities.** Read a schedule's day counts (shoot days, days per location, set, week or cast member) and set your globals from them, after a review of every change.
 - **Currencies.** Any line can be in its own currency, converted to the budget's base currency at rates you set.
 - **Groups and what-ifs.** Tag lines into groups, leave a group out of the total to see a what-if, and get back to the exact cent when you put it back.
 - **Explain this number.** Trace any total down to the lines, fringes, cutoffs, ranges and rounding steps that make it up.
@@ -180,7 +181,6 @@ this section.
 - **Windows and Linux, tested.** Installers for both are built today; printing, keys and file types still need a hands-on check.
 - **Review files.** A reviewer marks up a read-only copy, and their comments come back in a small file you merge.
 - **Incentive what-ifs.** Move lines between locations and see what each incentive program gains or loses, with minimum spends and shared caps.
-- **Schedule-linked quantities.** Read day counts from a schedule's export and let them drive your globals.
 - **Accessibility and translations.** A full accessibility pass and the app in more languages.
 - **Work on a budget together.** Several people in one budget at once, through a shared Dropbox or iCloud folder or a live link, with who changed what and undo that only takes back your own edits.
 - **Rate card lookup.** Pick a union classification and fill in the rate from public rate cards, with the source and effective date shown.

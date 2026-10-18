@@ -72,6 +72,7 @@ import { importSetup, newFromTemplate, saveAsTemplate } from './importsetup.js';
 import { importSpreadsheet, showDialog as showSheetImport } from './sheetimport.js';
 import { importChart } from './coaimport.js';
 import { importBudgetExport, showExportDialog } from './exchangeimport.js';
+import { importScheduleDays } from './scheduledays.js';
 import { renderConvertBanner } from './convertbanner.js';
 import { exportPack, importPack } from './packs.js';
 import { exportSetupLists, importSetupLists } from './setuplists.js';
@@ -2413,6 +2414,22 @@ Object.assign(COMMANDS, {
   },
 });
 
+// File > Import Schedule Days…: a schedule's day counts set globals, after a
+// review, as one undo step (scheduledays.js; src/schedule_days.rs).
+Object.assign(COMMANDS, {
+  'file.import_schedule_days': () => {
+    if (grid.editor) grid.commitEdit(null);
+    if (!state.view) return;
+    importScheduleDays({
+      invoke,
+      apply: (v) => apply(v, { cmd: 'schedule_days_apply' }),
+      toast,
+      focus: () => grid.focus(),
+      globals: () => Object.keys((state.view && state.view.budget && state.view.budget.globals) || {}),
+    });
+  },
+});
+
 // File > Import Actuals…: transactions from an accounting export for the
 // cost report (actualsimport.js; src/actuals.rs). One undo step; the Actuals
 // tab lists them and can remove the import.
@@ -3159,6 +3176,7 @@ function webFileMenu() {
         item('file.import_spreadsheet', 'Import Spreadsheet…'),
         item('file.import_chart', 'Import Chart of Accounts…'),
         item('file.import_budget_export', 'Import Budget Export…'),
+        item('file.import_schedule_days', 'Import Schedule Days…'),
         item('file.import_setup_lists', 'Import Setup Lists…'),
         item('file.import_actuals', 'Import Actuals…'),
       ],

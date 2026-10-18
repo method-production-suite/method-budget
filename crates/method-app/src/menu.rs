@@ -134,6 +134,8 @@ pub const FILE: &[Entry] = &[
     plain("file.import_chart", "Import Chart of Accounts…"),
     // A whole budget from another program's export, reconciled (src/export_import.rs).
     plain("file.import_budget_export", "Import Budget Export…"),
+    // A schedule's day counts into globals (src/schedule_days.rs).
+    plain("file.import_schedule_days", "Import Schedule Days…"),
     // Setup lists from a workbook or CSV files (src/setup_sheets.rs).
     plain("file.import_setup_lists", "Import Setup Lists…"),
     // Actual costs from an accounting export (src/actuals.rs).

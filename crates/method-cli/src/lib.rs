@@ -37,6 +37,7 @@ mod cmd {
     pub mod pack;
     pub mod report;
     pub mod sample;
+    pub mod schedule_days;
     pub mod set;
     pub mod show;
     pub mod sync;
@@ -120,6 +121,11 @@ const COMMANDS: &[Command] = &[
         name: "import-export",
         usage: cmd::import_export::USAGE,
         run: cmd::import_export::run,
+    },
+    Command {
+        name: "schedule-days",
+        usage: cmd::schedule_days::USAGE,
+        run: cmd::schedule_days::run,
     },
     Command {
         name: "coa",

@@ -23,6 +23,8 @@ pub const BUDGET_EXTS: &[&str] = method_format::EXTENSIONS;
 pub const SHEET_EXTS: &[&str] = &["xlsx", "csv", "tsv", "txt"];
 /// Budget exports `import_budget_export` reads.
 pub const EXPORT_EXTS: &[&str] = &["json", "xml", "xlsx", "txt", "tsv", "tab"];
+/// Schedule days files `schedule_days` reads.
+pub const SCHEDULE_EXTS: &[&str] = &["json"];
 
 /// The folders the server works in, each canonical (symlinks resolved).
 #[derive(Clone, Debug)]
