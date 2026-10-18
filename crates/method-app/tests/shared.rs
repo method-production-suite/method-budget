@@ -733,6 +733,51 @@ fn an_older_copy_of_the_file_is_written_again() {
     assert!(notice.contains("older version"), "{notice}");
 }
 
+/// Before roles, a program's actor doesn't say whose it is in the log.
+/// This computer knows its own person's programs from its tool pool and
+/// shows them as that person; another computer's program shows as a
+/// program whose person isn't known yet, never as a new person.
+#[test]
+fn programs_before_roles_are_never_listed_as_people() {
+    let (path, mut alex, mut jordan) = two_sessions();
+    exchange(&mut alex, &mut jordan);
+    let dir = path.parent().unwrap().to_path_buf();
+    let jordan_file = dir.join("jordan-actor");
+    std::fs::write(&jordan_file, JORDAN.hex()).unwrap();
+    let mut e = method_format::log::SharedEdit::open(&path, Some(&jordan_file)).unwrap();
+    let tool = e.actor();
+    let mut b = e.budget();
+    b.title = "From Jordan's command line".into();
+    e.record(&b, "Command line: set title", "2026-10-18T14:00:00Z")
+        .unwrap();
+    drop(e);
+
+    // On Jordan's computer: Jordan's own program.
+    jordan
+        .shared_mut()
+        .unwrap()
+        .set_tools_root(method_format::log::tools_root(&jordan_file));
+    let out = jordan.share_tick(later()).unwrap();
+    assert_eq!(jordan.budget().title, "From Jordan's command line");
+    assert_eq!(out.remote[0].name, "Jordan Lee (command line or agent)");
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert!(
+        st.people.iter().all(|p| p.actor != tool.hex()),
+        "{:?}",
+        st.people
+    );
+
+    // On Alex's computer: a program, whose isn't known yet.
+    let out = alex.share_tick(later()).unwrap();
+    assert_eq!(
+        out.remote[0].name,
+        "A command line or agent (whose isn\u{2019}t known yet)"
+    );
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert_eq!(st.people.len(), 1, "{:?}", st.people);
+    assert_eq!(st.people[0].actor, JORDAN.hex());
+}
+
 /// A second person for a live check of the built app (ignored: run by
 /// hand). `METHOD_LIVE_BUDGET` names a shared `.mthd`; this joins it as
 /// Jordan Lee, changes the first line's rate (to `METHOD_LIVE_RATE`,

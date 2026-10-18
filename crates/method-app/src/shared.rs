@@ -441,6 +441,10 @@ pub struct SharedDoc {
     waiting: usize,
     /// What happened to an outside edit kept aside, for the status.
     outside: Option<String>,
+    /// Where this computer's tool actor pools are (`None`: nowhere known).
+    tools_root: Option<PathBuf>,
+    /// This person's own programs' actors on this computer.
+    local_tools: BTreeSet<ActorId>,
 }
 
 impl std::fmt::Debug for SharedDoc {
@@ -588,6 +592,8 @@ impl SharedDoc {
             recent: Vec::new(),
             waiting: 0,
             outside: None,
+            tools_root: flog::actor_id_path().map(|p| flog::tools_root(&p)),
+            local_tools: BTreeSet::new(),
         }
         .with_scan()
     }
@@ -876,6 +882,7 @@ impl SharedDoc {
             .is_none_or(|t| now.duration_since(t) >= PRESENCE_EVERY)
         {
             self.people = self.shared.dir.presences();
+            self.read_local_tools();
             self.presence_read_at = Some(now);
         }
         // What others wrote.
@@ -1123,11 +1130,51 @@ impl SharedDoc {
     // Names and places
 
     /// The name a person shows with: their own, or "Person 7f3a".
-    pub fn name_of(&self, actor: ActorId) -> String {
-        // A command line or agent writing for someone shows as them.
+    /// Uses `root` for this computer's tool actor pools (tests).
+    pub fn set_tools_root(&mut self, root: PathBuf) {
+        self.tools_root = Some(root);
+        self.read_local_tools();
+    }
+
+    fn read_local_tools(&mut self) {
+        self.local_tools = self
+            .tools_root
+            .as_deref()
+            .map(|r| flog::tool_actors(r, self.actor()).into_iter().collect())
+            .unwrap_or_default();
+    }
+
+    /// The person a program's actor writes for: from the log once it says
+    /// so, and for this person's own programs from this computer's pool
+    /// (which only this computer can see).
+    fn person_for(&self, actor: ActorId) -> Option<ActorId> {
         let person = self.shared.log.person_of(actor);
         if person != actor {
+            return Some(person);
+        }
+        self.local_tools.contains(&actor).then(|| self.actor())
+    }
+
+    /// An actor that is surely a program whose person isn't known here
+    /// yet: it made changes but never wrote a heartbeat (every app does),
+    /// has no role and didn't start sharing. Other people's programs say
+    /// whose they are only once roles are set (`acts_for`), so until then
+    /// this computer can't honestly name them.
+    fn unknown_program(&self, actor: ActorId) -> bool {
+        actor != self.actor()
+            && self.shared.log.owner() != Some(actor)
+            && self.person_for(actor).is_none()
+            && !self.people.contains_key(&actor)
+            && !self.shared.log.state().grants().contains_key(&actor)
+    }
+
+    pub fn name_of(&self, actor: ActorId) -> String {
+        // A command line or agent writing for someone shows as them.
+        if let Some(person) = self.person_for(actor) {
             return format!("{} (command line or agent)", self.name_of(person));
+        }
+        if self.unknown_program(actor) {
+            return "A command line or agent (whose isn\u{2019}t known yet)".into();
         }
         if actor == self.actor() {
             if !self.me.name.is_empty() {
@@ -1144,9 +1191,11 @@ impl SharedDoc {
     }
 
     pub fn color_of(&self, actor: ActorId) -> String {
-        let person = self.shared.log.person_of(actor);
-        if person != actor {
+        if let Some(person) = self.person_for(actor) {
             return self.color_of(person);
+        }
+        if self.unknown_program(actor) {
+            return "slate".into();
         }
         if actor == self.actor() {
             return self.me.color.clone();
@@ -1212,7 +1261,7 @@ impl SharedDoc {
         actors.insert(me);
         let people: Vec<PersonDto> = actors
             .iter()
-            .filter(|a| **a != me && self.shared.log.person_of(**a) == **a)
+            .filter(|a| **a != me && self.person_for(**a).is_none() && !self.unknown_program(**a))
             .map(|a| self.person_dto(*a, now))
             .collect();
         let review = self.review();
