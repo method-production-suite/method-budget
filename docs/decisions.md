@@ -66,6 +66,10 @@ budgeting tools work in practice (see docs/research/mmb-feature-inventory.md).
 line's fringe rounded on its own, as the reference product works it; nothing is split pro
 rata. Adjustment rows can be earners too.
 
+**Amended 2026-10-18 (entry 79):** an opt-in `person` on a line makes every line with that
+person, in any account, one earner, so a cutoff applies once to everything one person is
+paid. Budgets without it are unchanged.
+
 ## 4. Groups (2026-10-08, revised)
 
 Groups are budget data with an "in budget total" switch: turning it off suppresses every
@@ -3519,6 +3523,304 @@ behavior: docs/APP.md, "The start window and New Budget"). Phases so far: entrie
   sub-budget from a row, rates at creation (waits on 3.9), the schedule link (3.8),
   shared-folder badges and presence (3.18), sorting and created dates (phase 4).
 
+## 78. Who may change what in a shared budget: roles in the change log (2026-10-18)
+
+Roadmap 3.18's next step after folder mode (entries 62 and 64): roles, the first half of
+the design's phase 3 (docs/research/collaboration.md, sections 7 and 9.7). Invites, key
+pairs and signatures are the other half and wait for a dependency (`ed25519-dalek`, open
+question 14), so roles are built first, unsigned, the way `sig` was reserved in entry 62.
+Docs/APP.md, "Sharing a budget", says what a person sees; this records the choices.
+
+- **A role is a change.** A new op, `grant {actor, role, scope}` (docs/FORMAT.md, "The
+  change log"), gives one person a role: admin, editor, department editor with a scope of
+  categories or accounts by entity id, actuals, comment or read only. Grants are a
+  last-writer-wins register per person in the `State`, every write kept, like any field.
+  The owner is the actor of the first change applied (the genesis, which every other
+  change depends on, so every computer agrees), and is never given or taken a role.
+- **Judged where each change was made.** `log::access::check` runs on every change, this
+  computer's own before it is recorded and everyone else's as it is applied, and judges
+  it by its author's role as of the change's own `deps`: the last grant write whose change
+  is within them, and, for a department editor, where each line or note was within them
+  (the move register's history, or this change's own creates). Nothing in the check reads
+  the receiver's newer state, so every computer keeps and refuses the same changes in any
+  order. That also settles the concurrent cases without a rule of their own: a change made
+  before its author saw a new role keeps the old role's rights, and a line moved out of a
+  department editor's categories while they edited it keeps their edit. A refused change
+  is skipped whole and listed with the reason (`Log::rejected`), its seq still counted,
+  exactly as a malformed one (entry 62); `LogError::NotAllowed` says why. Property test
+  (crates/method-core/tests/log.rs): an owner, a department editor and an editor making
+  random edits for 4 rounds while the owner changes their roles, plus changes forged in
+  the name of someone without a role, exchanged in random orders: every log ends with the
+  same frontier, budget, roles and refused set, 24 seeds.
+- **Before any role, everyone edits everything; after the first, no role reads only**
+  (design 9.1: "someone who opens it without a role gets read only"). Budgets shared
+  before this version keep working unchanged until their owner sets a role, and the
+  Share dialog asks before the first one, naming who would read only.
+- **What each role may do**, from the design's table and entry 62's settled defaults:
+  co-owner (added after review, below) everything and every role but the owner's and
+  co-owners'; admin everything and other people's roles, but only the owner and co-owners
+  make admins or change an admin's role; editor everything but roles and the root's `baseline` (locking the
+  originals, design 9.9); department editor creates, changes, moves (within the scope at
+  both ends) and deletes lines and notes in its categories or accounts, which covers
+  applying existing fringes and groups, and nothing else (no setup items, so a unit typed
+  that doesn't exist yet is refused); actuals transactions, imports, estimates to complete
+  and notes; comment notes only; read only nothing. The dialog offers categories; the
+  engine and `share_set_role` take account numbers as well.
+- **Not undoable.** A role is set again in the dialog; it never enters the person's undo
+  steps, and `Log::undo` passes over a grant.
+- **The session asks before editing.** `SharedLog::refusal` (method-session, default none)
+  gives the sentence for a read-only person, and `Session::check_writable` returns it, so
+  every edit, value put back and undo is refused before anything is made. Narrower roles
+  are refused by the log when the edit is recorded; `SharedDoc` turns `NotAllowed` into a
+  sentence about what the role allows and who sets roles, and the session takes the edit
+  back as it does any failed capture.
+- **Limits, said in APP.md**: unsigned, so an app that doesn't check (or another program
+  writing in the folder) can write a change in anyone's name; the folder's own sharing is
+  what stops a reader writing at all. Revocation by cutoff (the design's "last seq of
+  theirs accepted") needs signatures to mean anything and comes with them; until then a
+  removed person's offline work is judged by what they had seen. Anyone can still write
+  a change whose `deps` hold only the genesis, judged as from before roles existed; the
+  cutoff has to close that too.
+- **Interface** (share.js, shared.css): a role menu and Set button under each person in
+  the Share dialog for the owner and admins, a category checklist for Edits some
+  categories, each person's role in words in the People lists, a chip in the toolbar for
+  a person who may change less than everything. No muted cells or locks yet (design 9.7),
+  no access requests.
+- **After review (MReview on pull request #27), five fixes:**
+  - *The owner is the genesis, not the first change read.* The log folder's `budget.json`
+    names the genesis, and `Log::set_genesis` is called before any segment is read, so the
+    owner never depends on read order. Every change but the genesis must have it within its
+    `deps`, or `State::check` refuses it as made outside this budget's history: a forged
+    first change, or a second computer that started sharing the same file before the
+    folder synced, is refused by every reader alike. Tests: `a_forged_first_change_never_takes_the_budget`
+    (core, every order of the genesis, a grant, a forged first change and a second start),
+    `a_forged_first_change_in_the_folder_never_takes_the_budget` (format, three fresh opens).
+  - *Every write path follows roles.* `method_format::log::SharedEdit` opens a shared budget
+    as this computer's person (the actor file the app and `method-budget log` use), reads it
+    as the log makes it and records an edit as one change checked against the role; only
+    the computer that started sharing rewrites the `.mthd`. The command line's `set` and
+    `apply` and the MCP server's every change and undo go through it; any other command
+    that would rewrite a shared `.mthd` whole is refused. Without an actor id, a write is
+    refused once roles are set (`NO_PERSON`); before that one is made, as `method-budget log`
+    does. Once roles are set an edit to the `.mthd` by another program has no author, so
+    neither the app's keeper nor `method-budget sync` takes it in: `log::set_aside` keeps it
+    beside the file as "Feature (outside edit <date> <time>).mthd", never over another file,
+    and the file is written again. Each actor's `written.json` lists the hashes of the files
+    it wrote from the log (and started from), so a file that is only behind the log is
+    never mistaken for an outside edit and taken in, which would undo the changes it lacks
+    (the command line made that easy to reach: a person who doesn't keep the file changes
+    the log and not the file). Tests: `a_program_without_a_window_changes_a_shared_budget_as_its_person`,
+    `an_outside_edit_after_roles_is_kept_aside`, `a_file_behind_the_log_is_not_an_outside_edit`
+    (format), `command_line_writes_to_a_shared_budget_follow_roles` and the updated
+    `log_init_show_and_sync` (command line), `shared_budgets_are_changed_through_the_log_within_a_role`
+    (MCP), `an_outside_edit_after_roles_is_kept_aside_by_the_keeper` (app).
+  - *Older apps refuse cleanly.* `budget.json`'s `version` and the `format` of every segment
+    holding a `grant` are 2 from the first role on (raised before the role's segment is
+    written); before it, 1 as always. 0.3.0 then refuses the change log as newer than it
+    reads and opens the file on its own with that notice, instead of skipping the role's
+    segment and editing a stale budget; what it saves there is an outside edit, kept aside
+    as above. Test: `the_first_role_raises_the_log_format`.
+  - *Refused changes are shown.* The status panel lists the latest 20 changes left out,
+    with who, when, the step's label and why in a sentence. Test:
+    `refused_changes_are_shown_with_who_when_and_what`.
+  - *A scope on any role but department is refused*, not dropped: `Role::parse` refuses it
+    (a malformed line in a file), `set_role` refuses it in words, and the dialog keeps
+    ticked categories in view with another role and refuses to set it until they are
+    unticked. Tests: `roles_round_trip_through_json`, `setting_a_role_checks_what_is_asked`.
+- **Decided by the owner (2026-10-18)**, the three questions the review raised, each as
+  recommended:
+  1. *Older apps*: the format bump at the first role, so they refuse the budget, with the
+     warning in the first-role question. Built as above.
+  2. *Owner lockout*: the owner names an admin at the first role, and can make someone a
+     co-owner. Built: a `co_owner` role (`Role::CoOwner`), given only by the owner, may do
+     everything the owner does except change the owner or make or change co-owners; it
+     makes and changes admins. Admins now set the roles of everyone but the owner,
+     co-owners and admins. The first-role question, shown in place in the Share dialog (a
+     second dialog would hide the first), warns what roles mean, warns about older
+     versions and offers "Make <name> an admin" for each person, or Not now. Tests:
+     `a_co_owner_sets_roles_admins_included` (core), `a_co_owner_sets_roles_from_their_own_computer`
+     (app), `roles_round_trip_through_json` (format).
+  3. *Command line and agents*: act as this computer's person within their role. Built as
+     above.
+- **Final review (MReview, pull request #27), two fixes and two small ones:**
+  - *The app and a command line or agent never write as one actor.* Before, both wrote as
+    this computer's actor: with an app edit not yet in the folder, the two took the same
+    place in its sequence, the app's edit was lost and replicas disagreed. Two ways out were
+    weighed: a lock on the sequence across processes, or an actor per program. A lock is
+    not enough on its own: the app keeps edits in memory for up to six seconds before
+    writing them, so the lock would have to cover every edit until it is written, or the
+    app write a file per keystroke; and a lock left by a stopped program must be noticed.
+    An actor per program needs nothing shared between processes: each sequence has one
+    writer, so a fork can't happen and nothing waits. Programs take a tool actor from a
+    pool per person beside the actor file (`tools/<person>/tool-k`), held with the
+    system's file lock (`File::try_lock`, let go if the program stops), so one tool actor is
+    used by one program at a time and the pool stays small. Once roles are set, a tool actor
+    says whose it is with a new op, `acts_for {person}` (once, and only for itself), in the
+    same segment as its first edit, and has that person's role; the app shows its changes
+    under the person's name and doesn't list it as a person. Before roles it needs no
+    `acts_for` (everyone edits everything), so budgets without roles stay at format 1. The
+    owner's own programs still rewrite the `.mthd`, as the owner's app does; `method-budget
+    sync` writes as a tool actor too. Tests: `the_app_and_a_command_line_on_one_computer_never_share_a_sequence`
+    (format: an unwritten app edit and two programs at once; it fails with one shared
+    actor), `a_tool_actor_has_its_persons_role` (core), `a_program_writing_for_a_person_shows_with_their_name`
+    (app), and the command line's `log_init_show_and_sync`, updated.
+  - *Grants made apart are settled by rank.* Each grant keeps how its granter ranked when
+    giving it and what they had seen (`GrantWrite`). A grant made after seeing another
+    replaces it; among grants none of which saw the others, owner beats co-owner beats
+    admin, then the later stamp. So a co-owner who hadn't seen "make Jordan a co-owner"
+    can't undo it, nor an admin a concurrent "make Kim an admin". Test:
+    `concurrent_grants_go_to_the_higher_ranked_granter`.
+  - *A file put back to an older version* (it matches a hash the log wrote, but not what
+    the log holds now) is written again by the keeper, and the status panel says so,
+    instead of being left as it is. Test: `an_older_copy_of_the_file_is_written_again`.
+  - *`written.json`*: the hash is noted before the file is written, so no program mistakes
+    a file the log wrote for an outside edit. Its read, change and write needs no lock now:
+    each actor folder has one writing program (the app as the person, every other program
+    as a tool actor it holds alone).
+  - *`acts_for` can't raise anyone* (MReview, after a098bdb). As first built it was taken at
+    its word, so a read-only member's own actor could say it wrote for the owner and get
+    the owner's rights. Now it is refused, the same on every computer: before roles are
+    set; for the owner's own actor; for an actor with a role of its own; for an actor with a
+    change already kept that was made once roles were set (`State::judged`), so it can only
+    be a new program's first word; when the person named isn't the owner or someone with a
+    role; and when either side already writes for someone. A program for a person with no
+    role is refused in words before it writes (`NO_ROLE`). Test:
+    `acts_for_never_raises_a_member` (core: a read-only member, the owner, an editor already
+    judged, a claim before roles and a claim for nobody, each refused by its own log and,
+    forged with an owner's edit and a self-grant riding along, by fresh logs in eight
+    orders), and the format test `a_program_without_a_window_changes_a_shared_budget_as_its_person`
+    (a person with no role). **What remains possible without signatures:** a brand-new
+    actor can still say it writes for any member, the owner included, and get that member's
+    rights. That is the limit already stated above (anyone who can write in the folder can
+    write a change in someone's name); signed changes, where a program's key is signed by
+    its person's, close it.
+  - *Programs before roles are never listed as people.* Before roles a program's actor
+    doesn't say whose it is (that would raise the format for budgets without roles). This
+    computer knows its own person's programs from the tool pool (`tools/<person>/`, read by
+    `log::tool_actors`) and shows them as that person ("Jordan Lee (command line or
+    agent)"), leaving them out of People, the role menu and the first-role question. Other
+    computers can't see that pool, so the honest thing there is not to guess: an actor that
+    made changes but never wrote a heartbeat (every app writes one), has no role and didn't
+    start sharing shows as "A command line or agent (whose isn't known yet)", in grey, and
+    is left out of People too, until its `acts_for` arrives. Test:
+    `programs_before_roles_are_never_listed_as_people` (app, from both computers).
+  - Known, for the record: a 0.3.0 session already open when the first role is set never
+    reads `budget.json` again, so it keeps editing what it has, with no notice, until it
+    reopens; anything it saves is an outside edit, kept aside.
+- Tests: core (above, and a department editor in and out of scope, refusals by every
+  peer, a role not yet seen, a move apart, who sets roles), format (grant round trip,
+  roles through the folder with a forged change refused by a newcomer), session (a
+  read-only role refuses before recording), app (two sessions on one folder: a department
+  role, a refusal in words, a downgrade made apart keeping the edit, read only after
+  reopening; `set_role`'s checks). No dependency was added.
+
+## 79. Person cutoffs across accounts, opt-in (2026-10-18)
+
+Roadmap 3.11. One person can be paid in several accounts (a designer in art prep and in set
+dressing, a performer in cast and in looping), but a fringe range is a run of lines inside
+one account (entry 3), so each account's lines get a cutoff of their own and a fringe with
+a wage base, unemployment for one, is charged on more pay than the base.
+
+- **A person on the line, not a range across accounts.** A line or adjustment row gets an
+  optional `person`, free text. Every counted line and adjustment row with the same person,
+  in any account or category, is one earner for each percent fringe.
+- **Which names are one person.** Names match with the ends trimmed, each inner run of
+  spaces read as one, and case ignored (`person_key`): "Mara Lee", "mara  lee " and "MARA
+  LEE" are one person; blank is no person. The person shows as the first of their rows in
+  budget order spells the name, and typing a name the budget already has under other
+  spacing or case writes it the budget's way (the rows being typed in don't count, so
+  retyping a person's only rows changes the spelling). **Built on the recommendation**,
+  reversible: the other choice is exact matching, where a stray space or capital makes a
+  second person and charges the fringe twice. Extending fringe ranges across accounts was the
+  other way, and was turned down: range numbers are per account today, so range 1 in two
+  accounts would join and existing budgets would change, and a range is a run in row
+  order, which a person spread over accounts doesn't have. The tag is one optional field,
+  left out when unset, so it changes the format least and leaves entry 3's earners as they
+  are.
+- **How the cutoff is shared.** With no cutoff, or when the person's pay on the rows
+  carrying the fringe is no more than the cutoff, each row earns its own percent, rounded
+  on its own, exactly as a row alone does. Past the cutoff, the person earns the percent of
+  the cutoff, rounded once by the budget's arithmetic, and that amount is split over the
+  rows by their pay in whole cents: each row's share rounded down, then the cents left over
+  to the largest remainders, ties to the lower row id. A cutoff of 0 or less earns nothing.
+  The cutoff is the factored one (entry 60). Checked by hand: SUTA 10% with a 7,000.00
+  cutoff on 3,000.00 / 5,000.00 / 2,000.00 in three accounts is 210.00 / 350.00 / 140.00
+  (700.00; 1,000.00 without the person); 12.5% of a 2,000.00 cutoff on three 1,000.00
+  lines is 83.34 / 83.33 / 83.33, the cent to the lowest row id wherever it sits.
+- **By pay, not in line order as a range is (entry 56).** A range uses its cutoff up in
+  line order because the reference product works ranges that way. The reference has no
+  person (docs/research/mmb-feature-inventory.md, section 4 and the quirks in section 23),
+  so there is nothing to match, and a person's lines have no order of their own: accounts
+  move and are renumbered. Split by pay, nothing depends on where the lines sit (moving
+  lines, accounts or categories never moves a cent) and the person's pieces always come to
+  exactly one cutoff's worth. **Built on the recommendation**, reversible: the other
+  choice is line order across accounts in budget order.
+- **What is guaranteed, exactly.** Past the cutoff, a person's fringe is exactly the
+  percent of one cutoff, rounded once. When none of the person's rows carrying the fringe
+  is a credit, that is never more than the rows would earn each on its own cutoff, give or
+  take each row's own rounding (under a cent a row). With a credit it can be more, and
+  should be: 10% with a 7,000.00 cutoff on a 10,000.00 line and a -5,000.00 credit is
+  200.00 row by row (the line capped, the credit its full -500.00), but the person is paid
+  5,000.00 in all, within the cutoff, so earns 500.00.
+- **A person row leaves its fringe range** for percent fringes. Like an uncounted row it
+  doesn't break the run around it. Flat fringes stay per line. A left-out line (a group
+  out of the total, a filter) is not in the person, so excluding a group still equals
+  deleting its lines (tested).
+- **Opt-in.** A budget with no person on any row skips the pass, so its figures are
+  exactly what they were (tested over generated budgets), and a person on one line alone,
+  outside a range, is the same as no person.
+- **Engine** (`calc::persons`): stage 2 leaves percent fringes off person rows; a pass
+  after every account's rows are worked out puts them on, in integer cents (the split's
+  products in 128 bits, no floats). The recalc cache keeps rows from before the pass and
+  runs the pass on every recalc, since an edit in one account moves a person's pieces in
+  another. The unfiltered and earned rows behind group totals (entry 58) run it too, over
+  every account with a person row. The reference engine runs the same pass (it calls
+  `apply_persons`) over every account, so its agreement with the optimized engine and the
+  cache checks where and when the pass runs, not the rule; the hand-checked figures and the
+  properties in tests/persons.rs check the rule.
+  `person_totals` reports each person's rows, accounts, pay and each percent fringe's pay
+  against its cutoff.
+- **Explain** says it on each person row's fringe: "Person: Dana Reyes is paid on 3 lines
+  in accounts 2100, 2200 and 3100, so they share one cutoff"; past the cutoff "Cutoff
+  reached: Dana Reyes is paid 10,000.00 with SUTA, past the 7,000.00 cutoff, so Dana Reyes
+  earns 10% of 7,000.00 = 700.00" and "Share: this line's part of Dana Reyes's 700.00, by
+  pay: 700.00 x 5,000.00 / 10,000.00, 350.00 rounded down", saying when a left-over cent
+  was added; under it "Cutoff: 7,000.00 per person, not reached". Its leaves still add up
+  to every total.
+- **Format**: detail row and line block row `person`, optional text, written after
+  `fringe_range` and left out when unset (FORMAT.md). Version 1, additive: a file without
+  it reads and writes byte for byte as before; an older reader refuses a file that uses it,
+  as with every additive field. The change log's rows carry `person` only when set, as
+  the `.mthd` does, so a shared budget that never uses it writes logs that 0.3.0 still
+  reads; clearing a person is logged as a write of nothing (`null`), and a log from before
+  reads as no person.
+- **Line blocks never keep a person.** A block is reusable (pasted, or from the personal
+  library into other budgets), so saving one drops each row's person; otherwise its rows
+  would join that person's cutoff unasked. The block row field stays readable.
+- **App**: an optional Person column on the lines, shown by default once a line in the
+  budget has a person, typed as free text with type-ahead of the people the budget already
+  has. Its tooltip is the person's running total: pay across accounts and each percent
+  fringe's pay against its cutoff ("SUI: 18,420.00 of a 7,000.00 cutoff, reached; 238.00
+  across the lines", or how much is left), with a mark in the cell's corner once a cutoff
+  is reached. The view carries `persons` (keyed by the matching form, each with its shown
+  `name`) only when a row has one, and `has_persons` whenever a row has one, so the column
+  stays when the totals can't be worked out. The fringe range bracket
+  skips person rows, as the engine does.
+- **Command line and MCP**: `person` is a `set line` field (`none` clears) for
+  `method-budget set` and edit scripts; `update_lines` takes `person` (null clears) and
+  `get_account` shows it when set. Diff and merge treat it as one more row field.
+- **Not yet**: the spreadsheet export and import have no Person column (one would change
+  every export); no list of people with their totals beyond the column's tooltip.
+- Tests: crates/method-core/tests/persons.rs (the figures above, Explain's words, person
+  totals, name matching; properties over generated budgets: no person and a lone person
+  change nothing, a person past a cutoff earns exactly one earner's worth of it, every
+  fringe dollar is on one row, moving categories and accounts
+  changes no row's fringes, excluding a group equals deleting its lines, Explain adds up),
+  `with_a_credit_a_person_can_earn_more_than_lines_alone`), unit tests of the split in
+  `calc::persons`, the reference engine and cache tests with persons, round trips in
+  method-format and `an_unset_person_writes_no_key_in_the_file_or_the_log`, the session's
+  edit and view, `a_stored_block_never_keeps_a_person`, the MCP tool.
+
 ## 81. Review files: comments beside a budget, merged back as notes (2026-10-18)
 
 Roadmap 3.3, first slice: a reviewer marks up a budget they can't change, the comments land
@@ -3565,6 +3867,12 @@ docs/FORMAT.md, "Review files"; the command line: docs/CLI.md, `method-budget re
   older reader refuses a file that has one). They are listed with the reason, can be
   dismissed, and the reviewer can see them answered by the outcome. Reversible: adding
   notes there later turns them into merges.
+- **Roles (entry 78) apply to merging like any edit.** Merging goes through the session's
+  edit, so a person whose role only reads is refused before anything is made, and a note
+  their role doesn't allow (a department editor outside its categories) is refused by the
+  change log; either way nothing is merged and no outcome is marked. Dismissing changes
+  only the review file and is allowed. Reviewing a budget shared through a folder is
+  refused: its change log is the shared way to talk about it.
 - **The author's outcomes go back into the reviewer's file** (written where it was opened
   from), so the file is the conversation's record; the budget never points at it.
 - **Logic in method-session** (`review`: no file system, no clock, builds for the browser;
@@ -3580,7 +3888,8 @@ docs/FORMAT.md, "Review files"; the command line: docs/CLI.md, `method-budget re
   every refusal), method-session's `review` tests (reviewing read-only, every comment
   command, the list's order and places, merging as one undo step, merging twice, undo,
   dismiss and restore, gone places listed not dropped, another budget's review, a shared
-  copy's provenance, command-line anchors) and its host test (a review out as a download and
+  copy's provenance, command-line anchors, merging into a shared budget through the role
+  check) and its host test (a review out as a download and
   back as notes), method-app's (the file written beside the budget after each change and
   read back), method-cli's `review_comments_are_written_listed_and_merged_back` and the MCP
   tool's test.

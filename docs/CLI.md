@@ -24,6 +24,20 @@ folder, then renamed over the target, so a reader never sees half a file and a f
 write leaves the old file as it was. A replaced file keeps its permissions. No command ever writes over the budget it is reading
 from unless that is its job (`fmt`, `set`, `apply`).
 
+**A budget shared through a folder** (a `<file.mthd>-log/` folder beside it; decisions.md,
+entries 62 and 78) changes only through its change log. `set` and `apply` read it as
+everyone's changes make it and record the edit as one change for this computer's person
+(the actor id in `~/.method/actor` or `$METHOD_ACTOR_FILE`), labeled "Command line: set
+title" and so on, checked against that person's role like an edit in the app; the `.mthd`
+is rewritten only by the person who started sharing. They write as an actor of their own
+(`tools/<person>/tool-0`, `tool-1`... beside the actor file, each held by one program at a
+time through a file lock the system lets go if the program stops), which says once roles
+are set that it writes for the person (the `acts_for` op), so the app and these commands
+never take the same place in one sequence of changes. `sync` writes the same way. An edit the role doesn't allow is
+refused (exit 3) with nothing written, and so is any edit from a computer with no actor
+id yet once the owner has set roles. Every other command that would rewrite the whole
+file (`fmt`, `pack apply`, a merge or import into it) is refused for a shared budget.
+
 ## Exit codes
 
 | Code | Meaning |
@@ -522,8 +536,10 @@ in `~/.method/actor` (or `$METHOD_ACTOR_FILE`), made on first use.
 ### `method-budget sync <file.mthd|FOLDER> [--no-write] [--roll]`
 
 Merges a shared budget: reads every actor's segments, records an outside edit to the
-`.mthd` (a save by a program that doesn't write the log, such as `method-budget set`) as a change
-by this computer, writes this computer's unwritten changes as a sealed segment, and writes
+`.mthd` (a save by a program that doesn't write the log) as a change by this computer (a
+file that is only behind the log is not an outside edit; once roles are set, an outside
+edit is kept beside the file as `Feature (outside edit <date> <time>).mthd` and not taken
+in, since nobody can say whose it was), writes this computer's unwritten changes as a sealed segment, and writes
 the merged budget back as the `.mthd`, which is the keeper's job (collaboration design,
 4.3). With a folder, every `.mthd` in it that has a log beside it. `--no-write` merges and
 reports without rewriting the `.mthd`; `--roll` joins this computer's segment files into
@@ -585,8 +601,10 @@ grid numbers them. `21-01:*` is every line and adjustment row of the account.
 **Line fields.** `description`; the formulas `amount`, `x`, `rate`, `x4`; the units
 `unit`, `unit2`, `unit3`, `unit4` (a unit in the budget, or `""`); `currency` (a currency
 in the budget or the base currency), `set`, `location` (each must exist, or `none`);
-`fringe_range` (a number or `none`); `bold`, `italic` (`true`/`false`); `indent` (0 to
-4); `color` (`#rrggbb` or `none`).
+`fringe_range` (a number or `none`); `person` (the person the row pays, any text, or
+`none`: every line and adjustment with the same person, in any account, shares each percent
+fringe's cutoff once; decisions.md, entry 79); `bold`, `italic` (`true`/`false`); `indent`
+(0 to 4); `color` (`#rrggbb` or `none`).
 
 Each command acts on the budget as the commands before it left it, so a later line can
 use a global an earlier one added. Formulas aren't checked line by line: the whole

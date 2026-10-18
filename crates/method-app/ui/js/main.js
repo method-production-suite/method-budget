@@ -469,7 +469,7 @@ function rowKeyFor(place) {
 }
 
 // Fields a cell shows under the same name the change log uses.
-const GRID_FIELDS = new Set(['description', 'amount', 'unit', 'x', 'unit2', 'rate', 'unit3', 'currency', 'x4', 'unit4', 'fringes', 'groups', 'set', 'location', 'name', 'code']);
+const GRID_FIELDS = new Set(['description', 'amount', 'unit', 'x', 'unit2', 'rate', 'unit3', 'currency', 'x4', 'unit4', 'fringes', 'groups', 'set', 'location', 'person', 'name', 'code']);
 
 /** The place and field of a grid cell, for Who Changed This; null for a cell nobody types in. */
 function placeOfCell(row, colKey) {
@@ -1963,7 +1963,7 @@ function readColumnChoices() {
  * and Var) and actuals (the cost report columns, levels.js).
  */
 function columnContext() {
-  return { baseline: Boolean(state.ix && state.ix.variance), cost: Boolean(state.ix && state.ix.cost) };
+  return { baseline: Boolean(state.ix && state.ix.variance), cost: Boolean(state.ix && state.ix.cost), persons: Boolean(state.ix && state.ix.hasPersons) };
 }
 
 function gridDetailColumns() {

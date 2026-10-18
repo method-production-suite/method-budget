@@ -1240,6 +1240,137 @@ mod tests {
         .is_err());
     }
 
+    /// A shared budget's log that takes changes only within this person's
+    /// role (decisions.md, entry 78): `read_only` refuses every edit up
+    /// front; otherwise `record` refuses the change, as a department
+    /// editor's role refuses a note outside its categories.
+    #[derive(Debug)]
+    struct Roles {
+        read_only: bool,
+        recorded: usize,
+    }
+
+    impl crate::collab::SharedLog for Roles {
+        fn is_dirty(&self) -> bool {
+            false
+        }
+        fn can_undo(&self) -> bool {
+            false
+        }
+        fn can_redo(&self) -> bool {
+            false
+        }
+        fn randomize_new_rows(
+            &mut self,
+            _before: &Budget,
+            _after: &mut Budget,
+        ) -> HashMap<RowId, RowId> {
+            HashMap::new()
+        }
+        fn record(
+            &mut self,
+            _after: &Budget,
+            _hints: &[method_core::log::Hint],
+            _label: &str,
+        ) -> Result<Option<Budget>, String> {
+            Err("Your role doesn't let you change that account.".into())
+        }
+        fn undo(&mut self) -> Option<(Budget, Option<String>)> {
+            None
+        }
+        fn redo(&mut self) -> Option<(Budget, Option<String>)> {
+            None
+        }
+        fn history(&self) -> crate::session::History {
+            crate::session::History {
+                steps: Vec::new(),
+                current: self.recorded,
+                trimmed: false,
+            }
+        }
+        fn history_len(&self) -> usize {
+            0
+        }
+        fn applied_steps(&self) -> usize {
+            0
+        }
+        fn refusal(&self) -> Option<String> {
+            self.read_only
+                .then(|| "You can read this budget but not change it.".to_string())
+        }
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+            self
+        }
+    }
+
+    #[test]
+    fn merging_into_a_shared_budget_goes_through_the_role_check() {
+        for read_only in [true, false] {
+            let (mut s, review, ..) = authored();
+            s.attach_shared(
+                Box::new(Roles {
+                    read_only,
+                    recorded: 0,
+                }),
+                None,
+            );
+            open_for_author(&mut s, review, "r.review.json".into(), None).unwrap();
+            let before = s.budget().clone();
+            let err = settle(
+                &mut s,
+                &[
+                    Pick {
+                        id: 1,
+                        action: PickAction::Merge,
+                    },
+                    Pick {
+                        id: 2,
+                        action: PickAction::Dismiss,
+                    },
+                ],
+                "t",
+                None,
+            )
+            .unwrap_err();
+            let want = if read_only {
+                "You can read this budget but not change it."
+            } else {
+                "Your role doesn't let you change that account."
+            };
+            assert_eq!(err, want);
+            assert_eq!(s.budget(), &before, "no note was added");
+            // Nothing was marked in the review file either.
+            let l = list(&s).unwrap();
+            assert!(l.entries.iter().all(|e| e.outcome.is_none()));
+            assert!(!l.brief.unsaved);
+            // Dismissing alone changes only the review file: allowed.
+            settle(
+                &mut s,
+                &[Pick {
+                    id: 2,
+                    action: PickAction::Dismiss,
+                }],
+                "t",
+                None,
+            )
+            .unwrap();
+            assert_eq!(s.budget(), &before);
+        }
+        // Reviewing a shared budget is refused: its change log is the way.
+        let (mut s, ..) = starter();
+        s.attach_shared(
+            Box::new(Roles {
+                read_only: false,
+                recorded: 0,
+            }),
+            None,
+        );
+        assert!(start_reviewing(&mut s, None, "x".into(), None).is_err());
+    }
+
     #[test]
     fn comments_whose_place_is_gone_are_listed_not_dropped() {
         let (mut s, review, row, acct) = authored();

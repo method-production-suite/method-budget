@@ -5,6 +5,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
+use super::access::Role;
 use super::clock::{ChangeId, Frontier, Stamp};
 use super::ids::{ActorId, Uid};
 use super::seq::{Node, PosId};
@@ -390,10 +391,12 @@ pub enum Field {
     Separators,
     // Added by entry 69, at the end for the same reason.
     RoundAccountTotals,
+    // Added by entry 79 (a row's person), at the end for the same reason.
+    Person,
 }
 
 impl Field {
-    pub const ALL: [Field; 95] = [
+    pub const ALL: [Field; 96] = [
         Field::Name,
         Field::Code,
         Field::Description,
@@ -489,6 +492,7 @@ impl Field {
         Field::SymbolAfter,
         Field::Separators,
         Field::RoundAccountTotals,
+        Field::Person,
     ];
 
     /// The name files use.
@@ -589,6 +593,7 @@ impl Field {
             Field::SymbolAfter => "symbol_after",
             Field::Separators => "separators",
             Field::RoundAccountTotals => "round_account_totals",
+            Field::Person => "person",
         }
     }
 
@@ -788,6 +793,15 @@ pub enum Op {
         member: Member,
         seen: Vec<Stamp>,
     },
+    /// Gives `actor` a role (decisions.md, entry 78): last writer wins per
+    /// person, judged at each change's causal point
+    /// ([`super::access`]). About the budget, so its entity is the root.
+    Grant { actor: ActorId, role: Role },
+    /// Says that the change's actor writes for `person` (a command line or
+    /// an agent on that person's computer, which has an actor of its own so
+    /// it never shares a sequence of changes with the app): it has that
+    /// person's role. Once per actor, never for itself.
+    ActsFor { person: ActorId },
 }
 
 impl Op {
@@ -801,6 +815,7 @@ impl Op {
             | Op::Restore { entity }
             | Op::Add { entity, .. }
             | Op::Remove { entity, .. } => *entity,
+            Op::Grant { .. } | Op::ActsFor { .. } => Uid::ROOT,
         }
     }
 
@@ -814,6 +829,8 @@ impl Op {
             Op::Restore { .. } => "restore",
             Op::Add { .. } => "add",
             Op::Remove { .. } => "remove",
+            Op::Grant { .. } => "grant",
+            Op::ActsFor { .. } => "acts_for",
         }
     }
 }

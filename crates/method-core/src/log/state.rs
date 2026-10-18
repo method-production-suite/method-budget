@@ -10,8 +10,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use super::clock::Stamp;
-use super::ids::Uid;
+use super::access::{self, Role};
+use super::clock::{ChangeId, Frontier, Stamp};
+use super::ids::{ActorId, Uid};
 use super::op::{Change, Field, Kind, ListKey, Member, Op, Placement, Value};
 use super::seq::{PosId, SeqTree};
 
@@ -176,6 +177,16 @@ impl Entity {
     }
 }
 
+/// One grant as the state keeps it: the role, how its granter ranked when
+/// they gave it (owner 3, co-owner 2, admin 1), and what they had seen.
+/// Grants made apart are settled by rank (`access::grant_at`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GrantWrite {
+    pub role: Role,
+    pub rank: u8,
+    pub deps: Frontier,
+}
+
 /// Why a change cannot be applied: it names something that doesn't
 /// exist, or would put an entity where its kind can't go. A change that
 /// fails is skipped whole.
@@ -198,6 +209,18 @@ pub struct State {
     lists: BTreeMap<ListKey, SeqTree>,
     /// The highest Lamport clock applied.
     lamport: u64,
+    /// The budget's first change (the genesis): whoever made it started
+    /// sharing and owns the budget, and every other change must have seen
+    /// it. Set from the log folder's `budget.json` before anything is
+    /// applied ([`State::set_genesis`]), or else the first change applied.
+    genesis: Option<ChangeId>,
+    /// Each person's role, every grant kept (decisions.md, entry 78).
+    grants: BTreeMap<ActorId, Register<GrantWrite>>,
+    /// Actors that write for a person (`Op::ActsFor`), by actor.
+    links: BTreeMap<ActorId, Register<ActorId>>,
+    /// Actors with a change applied that was made once roles were set
+    /// (judged under roles): they can no longer say whose they are.
+    judged: std::collections::BTreeSet<ActorId>,
 }
 
 impl Default for State {
@@ -215,7 +238,45 @@ impl State {
             entities,
             lists: BTreeMap::new(),
             lamport: 0,
+            genesis: None,
+            grants: BTreeMap::new(),
+            links: BTreeMap::new(),
+            judged: std::collections::BTreeSet::new(),
         }
+    }
+
+    /// Who started sharing: the genesis change's actor.
+    pub fn owner(&self) -> Option<ActorId> {
+        self.genesis.map(|g| g.actor)
+    }
+
+    /// The budget's first change, once known.
+    pub fn genesis(&self) -> Option<ChangeId> {
+        self.genesis
+    }
+
+    /// Names the budget's first change (from the log folder's record of
+    /// it), before anything is applied. Ignored once one is known.
+    pub fn set_genesis(&mut self, genesis: ChangeId) {
+        if self.genesis.is_none() {
+            self.genesis = Some(genesis);
+        }
+    }
+
+    /// Every role given, with every earlier one.
+    pub fn grants(&self) -> &BTreeMap<ActorId, Register<GrantWrite>> {
+        &self.grants
+    }
+
+    /// Whether `actor` has a change applied that was made once roles were
+    /// set.
+    pub fn judged(&self, actor: ActorId) -> bool {
+        self.judged.contains(&actor)
+    }
+
+    /// Actors that write for a person, with every such write.
+    pub fn links(&self) -> &BTreeMap<ActorId, Register<ActorId>> {
+        &self.links
     }
 
     pub fn entity(&self, uid: Uid) -> Option<&Entity> {
@@ -247,6 +308,18 @@ impl State {
     /// the change itself creates counted as present), without applying
     /// anything.
     pub fn check(&self, change: &Change) -> Result<(), Malformed> {
+        // Every change but the first was made from the shared history, so
+        // it has seen the first. One that hasn't (a second computer that
+        // started sharing the same file, or a forged one) belongs to
+        // another history and is refused everywhere alike.
+        if let Some(g) = self.genesis {
+            if change.id() != g && !change.deps.includes(g) {
+                return Err(Malformed {
+                    index: 0,
+                    reason: "made without this budget's first change".into(),
+                });
+            }
+        }
         let mut made: BTreeMap<Uid, Kind> = BTreeMap::new();
         let mut positions: BTreeSet<(ListKey, PosId)> = BTreeSet::new();
         let kind_of = |made: &BTreeMap<Uid, Kind>, uid: Uid| -> Option<Kind> {
@@ -374,6 +447,12 @@ impl State {
                         ));
                     }
                 }
+                Op::Grant { .. } => {}
+                Op::ActsFor { person } => {
+                    if *person == change.actor {
+                        return Err(bad(index, "an actor can't write for itself".into()));
+                    }
+                }
             }
         }
         Ok(())
@@ -384,6 +463,12 @@ impl State {
     pub fn apply(&mut self, change: &Change) {
         if change.lamport > self.lamport {
             self.lamport = change.lamport;
+        }
+        if self.genesis.is_none() {
+            self.genesis = Some(change.id());
+        }
+        if access::started_at(&self.grants, &change.deps) {
+            self.judged.insert(change.actor);
         }
         for (index, op) in change.ops.iter().enumerate() {
             let stamp = change.stamp(index);
@@ -474,6 +559,26 @@ impl State {
                         e.sets.entry(*field).or_default().remove(member, seen);
                     }
                 }
+                Op::Grant { actor, role } => {
+                    let w = GrantWrite {
+                        role: role.clone(),
+                        rank: access::rank(&access::role_at(self, change.actor, &change.deps)),
+                        deps: change.deps.clone(),
+                    };
+                    match self.grants.get_mut(actor) {
+                        Some(r) => r.write(stamp, w),
+                        None => {
+                            self.grants.insert(*actor, Register::new(stamp, w));
+                        }
+                    }
+                }
+                Op::ActsFor { person } => match self.links.get_mut(&change.actor) {
+                    Some(r) => r.write(stamp, *person),
+                    None => {
+                        self.links
+                            .insert(change.actor, Register::new(stamp, *person));
+                    }
+                },
             }
         }
     }

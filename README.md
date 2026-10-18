@@ -117,6 +117,7 @@ this section.
 ### Fringes, globals, charges and credits
 
 - **Fringes with cutoffs and ranges.** Percent and flat fringes, cutoffs per earner, fringe ranges across several lines, unit-hour flats and four ways to post them.
+- **One cutoff per person.** Name the person on each of their lines, in any account, and a fringe cutoff such as a wage base applies once to everything they are paid.
 - **Globals with details.** Give a global a description, a unit and decimals, show it by name in cells, and see the formulas behind a selection.
 - **Contractual charges.** Percent and flat charges with exclusions, a live preview while you type, and the percent shown on the topsheet if you want it.
 - **Credits.** Credit rows show gross, excluded fringes, net and how far you are from a cap.

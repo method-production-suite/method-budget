@@ -159,6 +159,15 @@ the first time a tool names it, and `budget_open` opens it again on purpose.
 - **Shared copies are read-only.** A budget saved for sharing (its provenance says so) is
   refused for every change, as the app refuses it; `save_as` with `editable: true` makes an
   editable copy.
+- **Budgets shared through a folder follow roles** (decisions.md, entry 78). A budget with
+  a change log beside it is read as everyone's changes make it, and every change (undo
+  included) is recorded in the log as one change for this computer's person (labeled
+  "Agent: ..."), through an actor of the server's own that writes for that person, so it
+  never shares a sequence of changes with the app (docs/CLI.md), checked against their
+  role as the app checks an edit; the `.mthd` is
+  written only on the computer that started sharing. A change the role doesn't allow is
+  `refused` with nothing written, and so is any change from a computer with no actor id
+  yet once the owner has set roles.
 - At most 32 files are kept open; past that the one used longest ago is forgotten, with its
   undo steps.
 
@@ -212,8 +221,8 @@ globals, fringes, groups, sets, locations, units, currencies, charges, credits, 
 **`get_account`** `{path, account, offset?, limit?}`: the account's rows, 500 at a time by
 default (5,000 at most). Each row: `id`, `n`, `kind` (`line`, `subtotal`, `adjustment`,
 `separator`), `description`, `amount`, `unit`, `x`, `unit2`, `rate`, `unit3`, `x4`, `unit4`,
-`currency`, `fringes`, `groups`, `set`, `location`, `fringe_range`, `bold`, `italic`,
-`indent`, `color`, `notes`; and what it works out to: `included`, `quantity`,
+`currency`, `fringes`, `groups`, `set`, `location`, `fringe_range`, `person` (only when
+set), `bold`, `italic`, `indent`, `color`, `notes`; and what it works out to: `included`, `quantity`,
 `row_currency`, `local_total_cents`, `total_cents`, `subtotal_cents`, `fringes_cents` (per
 fringe), `fringe_total_cents`, `fringe_full_total_cents` (the fringes with no cutoff and no
 range: each percent fringe on the whole total, the flat ones as earned; 0 on a row that
@@ -303,8 +312,10 @@ included, unless it gives them itself or `use_defaults` is false. Returns `added
 Fields: `description`; the formulas `amount`, `x`, `rate`, `x4` (text or a number); the units
 `unit`, `unit2`, `unit3`, `unit4` (a unit in the budget, or null); `currency` (a currency in
 the budget, or null for the base), `set`, `location` (each must exist, or null);
-`fringe_range` (a number or null); `bold`, `italic`; `indent` (0 to 4); `color` (`#rrggbb`
-or null); `fringes` and `groups` (each replaces the row's whole list). A subtotal row takes
+`fringe_range` (a number or null); `person` (the person the row pays, or null: every
+line and adjustment with the same person, in any account, shares each percent fringe's
+cutoff once; decisions.md, entry 79); `bold`, `italic`; `indent` (0 to 4); `color`
+(`#rrggbb` or null); `fringes` and `groups` (each replaces the row's whole list). A subtotal row takes
 only the description and style; an adjustment takes no rate, rate unit or currency (it does
 take fringes, decisions.md, entry 56);
 a separator only style. Every row in the call must work or nothing is written.

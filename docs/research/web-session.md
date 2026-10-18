@@ -215,7 +215,9 @@ browser passes the name it shows. The page still never sees a path on the deskto
 design is untouched, since the dialogs and tokens all stay in method-app.
 
 **Sharing.** A session records edits through `collab::SharedLog`, takes this person's undo
-and redo from it and lists its steps; folder sharing (`SharedDoc`) implements it in
+and redo from it, lists its steps and asks it whether this person may change anything at
+all (`refusal`, decisions.md entry 78; roles themselves live in `method_core::log::access`,
+so a server carrying the log gets them too); folder sharing (`SharedDoc`) implements it in
 method-app. The change log's types and logic (`method_core::log`: `Log`, `Change`,
 `Projection`, recording, undo) and its line and segment codecs (`method_format::log`'s
 `change_to_json`, `change_from_json`, `segment_bytes`, `read_segment`) are already free of

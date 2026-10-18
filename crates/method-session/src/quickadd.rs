@@ -41,7 +41,7 @@ pub fn creatable_kind(field: Field) -> Option<&'static str> {
         Field::Location => Some("location"),
         Field::Currency => Some("currency"),
         Field::Amount | Field::X | Field::Rate | Field::X4 => Some("global"),
-        Field::Description | Field::Fringes | Field::Groups => None,
+        Field::Description | Field::Fringes | Field::Groups | Field::Person => None,
     }
 }
 

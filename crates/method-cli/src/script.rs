@@ -174,6 +174,7 @@ pub const LINE_FIELDS: &[&str] = &[
     "set",
     "location",
     "fringe_range",
+    "person",
     "bold",
     "italic",
     "indent",
@@ -534,6 +535,7 @@ fn field_text(d: &Detail, field: &str) -> String {
         "currency" => opt_shown(&d.currency),
         "set" => opt_shown(&d.set),
         "location" => opt_shown(&d.location),
+        "person" => opt_shown(&d.person),
         "color" => opt_shown(&d.color),
         "fringe_range" => d.fringe_range.map_or("none".into(), |n| n.to_string()),
         "bold" => d.bold.to_string(),
@@ -615,7 +617,7 @@ fn set_line_field(
             let f = Field::parse(field)?;
             // `none` clears a name; elsewhere it is the text.
             let value = match f {
-                Field::Currency | Field::Set | Field::Location if v.is_none() => "",
+                Field::Currency | Field::Set | Field::Location | Field::Person if v.is_none() => "",
                 _ => text,
             };
             if let [id] = ids {
@@ -964,7 +966,21 @@ pub fn totals_summary(before: &Report, after: &Report) -> String {
 /// when a command fails or the result doesn't recalculate; nothing is
 /// written then.
 pub fn run(path: &str, ops: &[(String, Op)], dry_run: bool) -> Outcome {
-    let before = crate::cli::load(path)?;
+    // A budget shared through a folder is changed through its change log,
+    // as this computer's person and within their role (decisions.md, entry
+    // 78): read as everyone's changes make it, and recorded as one change.
+    let mut shared = if method_format::log::is_shared(std::path::Path::new(path)) {
+        Some(
+            method_format::log::SharedEdit::open(std::path::Path::new(path), None)
+                .map_err(|e| CliError::rejected(format!("{path}: {}", e.0)))?,
+        )
+    } else {
+        None
+    };
+    let before = match &shared {
+        Some(e) => e.budget(),
+        None => crate::cli::load(path)?,
+    };
     let mut after = before.clone();
     let mut log = Vec::new();
     for (label, op) in ops {
@@ -999,8 +1015,24 @@ pub fn run(path: &str, ops: &[(String, Op)], dry_run: bool) -> Outcome {
     if dry_run {
         out.push_str("dry run: nothing written\n");
     } else if changed {
-        crate::cli::save(path, &after)?;
-        let _ = writeln!(out, "wrote {path}");
+        match shared.as_mut() {
+            Some(e) => {
+                let label = match ops {
+                    [(one, _)] => format!("Command line: {one}"),
+                    many => format!("Command line: {} edits", many.len()),
+                };
+                e.record(&after, &label, &crate::cmd::log::now())
+                    .map_err(|err| CliError::rejected(format!("{path}: {}", err.0)))?;
+                let _ = writeln!(
+                    out,
+                    "shared {path}: recorded as one change by this computer"
+                );
+            }
+            None => {
+                crate::cli::save(path, &after)?;
+                let _ = writeln!(out, "wrote {path}");
+            }
+        }
     }
     Ok(out)
 }

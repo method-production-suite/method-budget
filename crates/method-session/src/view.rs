@@ -86,6 +86,82 @@ pub struct View {
     /// being written or read, and which places have comments to settle.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub review: Option<crate::review::ReviewBrief>,
+    /// Each person a row pays (decisions.md, entry 79), by the matching
+    /// form of the name (`method_core::person_key`): what they
+    /// are paid across accounts and each percent fringe's pay against its
+    /// cutoff, for the Person column. Left out when no row has a person (or
+    /// there are no totals), so other budgets' views are unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub persons: Option<BTreeMap<String, PersonDto>>,
+    /// Some row has a person, whatever the state of the totals: the Person
+    /// column shows by default then. Left out when false.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub has_persons: bool,
+}
+
+/// A person's running totals, as [`method_core::calc::persons::person_totals`]
+/// works them out.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct PersonDto {
+    /// The name as the person's first row spells it (the map's key is the
+    /// matching form: trimmed, single spaces, lower case).
+    pub name: String,
+    /// How many lines and adjustment rows have the person.
+    pub lines: usize,
+    /// The accounts they are in, in budget order.
+    pub accounts: Vec<String>,
+    /// What the counted rows come to.
+    pub pay: Cents,
+    pub fringe_total: Cents,
+    pub fringes: Vec<PersonFringeDto>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct PersonFringeDto {
+    pub fringe: String,
+    /// As applied (times the cutoff factor); `None` for no cutoff.
+    pub cutoff: Option<Cents>,
+    /// Pay on the counted rows carrying the fringe.
+    pub pay: Cents,
+    pub amount: Cents,
+    /// The pay is past the cutoff.
+    pub reached: bool,
+}
+
+/// Every person of `b` from `report`, or `None` when there are none.
+pub fn persons(b: &Budget, report: Option<&Report>) -> Option<BTreeMap<String, PersonDto>> {
+    let report = report?;
+    if !method_core::calc::persons::any(b) {
+        return None;
+    }
+    // A partial report (flagged cells read as blank) still lines up with
+    // `b` row for row, so its persons are as good as its totals.
+    let all = method_core::calc::persons::person_totals(b, report)?;
+    let out: BTreeMap<String, PersonDto> = all
+        .into_iter()
+        .map(|(name, p)| {
+            let dto = PersonDto {
+                name: p.name,
+                lines: p.rows.len(),
+                accounts: p.accounts,
+                pay: p.pay,
+                fringe_total: p.fringe_total,
+                fringes: p
+                    .fringes
+                    .into_iter()
+                    .map(|f| PersonFringeDto {
+                        fringe: f.fringe,
+                        cutoff: f.cutoff,
+                        pay: f.pay,
+                        amount: f.amount,
+                        reached: f.reached,
+                    })
+                    .collect(),
+            };
+            (name, dto)
+        })
+        .collect();
+    (!out.is_empty()).then_some(out)
 }
 
 /// One account in full: its rows in file-format JSON and their totals.
@@ -498,6 +574,8 @@ impl View {
             notice: None,
             converted: None,
             review: None,
+            persons: persons(b, report),
+            has_persons: method_core::calc::persons::any(b),
         }
     }
 }

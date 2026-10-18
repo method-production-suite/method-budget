@@ -212,8 +212,8 @@ Option+Cmd+0; Cmd+= is Insert Subtotal) size the grid's text, rows and columns f
 
 **Detail grid columns.** The button in the grid's top-left corner (Shift+Tab from the
 first cell reaches it) opens the column menu: X, the three unit columns, currency, 4X,
-fringes, fringe percent, full fringe percent, fringe dollars, groups, set and location can
-each be shown or hidden, and the choice is remembered for you (in the web view's local
+fringes, fringe percent, full fringe percent, fringe dollars, groups, set, location and
+person can each be shown or hidden, and the choice is remembered for you (in the web view's local
 storage, not in the budget). Fringe % is the line's fringe dollars over its total, blank
 when the total is 0. **Full fringe %** (hidden until chosen; decisions.md, entry 61) is
 the line's fringes before cutoffs and ranges over its total: each percent fringe on the
@@ -225,6 +225,25 @@ cut with an ellipsis, in full on hover) before the grid scrolls sideways, and wh
 scrolls, # and Description stay at the left and Total at the right. At 1280 pixels wide
 with the tools panel docked at the right, the default columns fit without scrolling (docked
 at the bottom, the grid has the window's whole width).
+
+**Person.** One person paid in several accounts can share each percent fringe's cutoff
+across all of them (roadmap 3.11; decisions.md, entry 79). Turn on the **Person** column
+from the column menu and type the person's name on each of their lines and adjustment rows
+(type-ahead offers the people the budget already has; clearing the cell takes the person
+off). Spacing and capitals don't make another person: "mara  lee" is Mara Lee, and is
+written the way the budget already spells her. Once any line has a person the column shows
+by default, even while the totals can't be worked out. A saved line block never keeps a
+person. Lines with the same person,
+in any account, are one earner: within the cutoff each line earns its own percent; past
+it, the person earns the percent of the cutoff once, shared over their lines by pay. The
+cell's tooltip is the person's running total: what they are paid, on how many lines in
+which accounts, and for each fringe with a cutoff the pay against it ("SUI: 18,420.00 of a
+7,000.00 cutoff, reached; 238.00 across the lines", or how much is left); a mark in the
+cell's corner shows a cutoff is reached. A line with a person leaves its fringe range for
+percent fringes, and Explain This Number shows the person, the cutoff and each line's
+share. Budgets that never set a person work out exactly as before. Needs a live check in
+the app (the column, the type-ahead and the tooltip are drawn from tested pieces, but not
+yet seen in the app's web view).
 
 **Original and variance columns.** When the budget has a baseline (Tools, Budget,
 Baseline: Lock), every level shows **Orig** (the total when the baseline was locked) and
@@ -1511,15 +1530,63 @@ left as they set it, and a message says so ("Undid "Edit rate on 2300 line 2". L
 undo. The History tab lists your steps only; saving a version from a past step is
 refused while a budget is shared (versions are saved from the budget as it is now).
 
-**Not yet** (later phases of the design): roles and invite links (for now everyone who
-can open the file can edit it), live sessions with cursors, access requests, proposals,
-checkpoints for very long logs, and the service-by-service checks (iCloud, Google Drive,
-LucidLink) the design calls for.
+**Who may change what** (decisions.md, entry 78). The person who started sharing owns
+the budget. Until the owner sets what someone may change, everyone who opens the budget
+edits everything, as before. In the Share dialog the owner, and anyone the owner makes a
+co-owner or an admin, picks each person's role under their name: Co-owner (sets every
+role, admins included, but the owner's and other co-owners'; only the owner gives it),
+Edits everything and sets roles (an admin; only the owner and co-owners make or change
+admins), Edits everything, Edits some categories
+(a checklist of the topsheet's categories: that person adds, changes, moves within and
+deletes lines and notes there and applies existing fringes and groups, and changes nothing
+else), Actuals and notes, Notes only, or Read only. Set saves it as a change shared like
+any other. The first role set asks first, because from then on someone without a role
+reads only; the dialog names who that would be, says that everyone sharing the budget then
+needs this version or later (an older version won't join it: it says the shared changes are
+newer than it reads and opens the file on its own, and what is changed there isn't shared),
+and offers to make someone an admin at the same time (or Not now), since only the owner's
+computer, co-owners and admins can set roles. The question shows in place under the
+person, not as a second dialog. Categories ticked for any role other than Edits some categories are refused
+with a sentence, in the dialog and in Rust.
+Under the people the dialog also says plainly that roles stop changes by accident, not
+someone who edits the shared folder's files directly, and that signed changes come later. A person given a role before they ever
+opened the budget is listed too. The People list shows each person's role in words; a
+person who may change less than everything sees a chip in the toolbar ("Some categories",
+"Actuals", "Notes only", "Read only") with the details on hover. An edit beyond the role
+is refused before anything changes, with a sentence that says what the role allows and
+who sets roles ("You can change lines and notes in 2000 Production only. Alex Kim sets
+who may change what."); a read-only person's every edit, undo and redo is refused that
+way. Every computer also checks everyone else's changes as they arrive and leaves out one
+its author's role didn't allow; the status panel lists what was left out (the latest 20),
+each with who, when, what it was and why in a sentence. Each change is
+judged by the roles its author had seen when making it, so a change made before someone
+saw their new role is kept everywhere, and a line moved out of a person's categories
+while they edited it keeps their edit; every computer keeps and leaves out the same
+changes. Roles are checked by the app, not yet secured: changes aren't signed, so another
+program that can write in the shared folder can still write a change in someone's name,
+and the folder's own sharing settings are what keeps a reader from writing at all.
+The command line's `set` and `apply` and the MCP server change a shared budget the same
+way, as this computer's person and within their role (docs/CLI.md, docs/MCP.md). Once roles
+are set, an edit to the `.mthd` made by another program can't be said to be anyone's, so
+the computer that keeps the file doesn't take it in: it keeps the edited file beside it as
+"Feature (outside edit 2026-10-18 140322).mthd", writes the file again from everyone's
+changes, and the status panel says so. A file put back to an older version of the budget
+(a sync service's history, a backup) is behind the log, not an outside edit: it is written
+again and the panel says so. Changes made by a person's command line or agent show under
+their name, as "Jordan Lee (command line or agent)", and aren't listed as another person.
+
+**Not yet** (later phases of the design): handing ownership itself on (the owner is one
+computer's id; a co-owner can do everything else), invite links, signed changes and removing a
+person's later changes (a removed member's work is judged by what they had seen, as
+above), picking single accounts (not only whole categories) in the dialog, muted cells and
+locks on what a person can't change, access requests, live sessions with cursors,
+proposals, checkpoints for very long logs, and the service-by-service checks (iCloud,
+Google Drive, LucidLink) the design calls for.
 
 | Command | Arguments | Returns |
 |---|---|---|
-| `share_status` | none | The status item's state (`mode`, `folder`, `file`, `me`, `keeper`, `people`, `synced_secs`, `unshared`, `waiting`, `review_count`, `error`, `file_written`, `changes`, `recent`, `conflicts`), or `null` when the budget isn't shared |
-| `share_setup` | none | What the Share dialog starts from: `name`, `color`, `colors`, `file`, `folder`, `blocked` (why it can't be shared yet), `picked` |
+| `share_status` | none | The status item's state (`mode`, `folder`, `file`, `me`, `keeper`, `people`, `synced_secs`, `unshared`, `waiting`, `review_count`, `error`, `file_written`, `changes`, `recent`, `conflicts`, `can_set_roles`, `roles_started`, `refused`; each person also has `role`, `role_text` and `scope`), or `null` when the budget isn't shared |
+| `share_setup` | none | What the Share dialog starts from: `name`, `color`, `colors`, `file`, `folder`, `blocked` (why it can't be shared yet), `picked`, `categories` (`[{code, name}]`, when this person sets roles) |
 | `share_pick_folder` | none; shows Rust's folder dialog | The folder's path (kept in Rust until `share_start`), or `null` when cancelled |
 | `share_start` | `use_picked`, `move_file`, `me` (`{name, color}`) | View of the budget, now shared |
 | `share_set_me` | `name`, `color` | The person as kept, for every shared budget |
@@ -1528,6 +1595,7 @@ LucidLink) the design calls for.
 | `share_activity` | `limit` | Recent changes, newest first: `actor`, `name`, `color`, `me`, `time`, `label`, `ops`, `place` |
 | `share_blame` | `kind`, `key`, `field` | Every value the field has had, oldest first: `value`, `actor`, `name`, `color`, `me`, `time`, `label`, `kept`, `index` |
 | `share_use_value` | `kind`, `key`, `field`, `index` | View, with the value put back as one change |
+| `share_set_role` | `actor` (64 hex characters), `role` (`co_owner`, `admin`, `editor`, `department`, `actuals`, `comment`, `read_only`), `scope` (category numbers, for `department`) | The status, with the role set as one change; refused unless this person is the owner, a co-owner or an admin who may give it |
 
 Rust sends `share-status` (`{doc, status}`) whenever the status changes and
 `share-changed` (`{doc, rev, remote: [{actor, name, color, label, time, places}]}`)
@@ -2686,6 +2754,11 @@ account.
 - `variance`: original vs current totals when there is a baseline: `accounts`,
   `categories`, `grand_total`, `net_total`, `rows` for `account`'s rows only, and
   `rows_changed` (rows that moved, anywhere).
+- `persons`, only when a line has a person and there are totals (decisions.md, entry 79):
+  each person by the matching form of the name (trimmed, single spaces, lower case) with
+  `name` (as shown), `lines`, `accounts`, `pay`, `fringe_total` and per percent fringe
+  `fringe`, `cutoff`, `pay`, `amount` and `reached`, for the Person column; and
+  `has_persons`, `true` whenever a line has a person (left out otherwise).
 - `file` (`name`, `path`, `dirty`), `can_undo`, `can_redo`, and `created_row` after an insert.
 - `doc`: which open budget this is, and `tabs`: every tab in order (`id`, `label`, `title`,
   `name`, `path`, `dirty`, `conflict`, `active`). A page draws only the view of the budget
@@ -3024,6 +3097,10 @@ views, dragging a tab between the strips with a real pointer, the tools window f
 the target, and the panes coming back at the next start. The History tab needs a live
 check in the tools window and with a long history.
 
+The Person column (decisions.md, entry 79) needs a live check: typing a name, the
+type-ahead of people, the running-total tooltip and the cutoff mark. The spreadsheet
+export and import have no Person column yet.
+
 Moving rows by drag, editing fringe ranges in the grid, import from other tools' own formats (spreadsheets import, see
 Importing spreadsheets), single-instance handling on Windows and Linux,
 the macOS system recent documents list, a mark on copied rows, and the total change a
@@ -3102,6 +3179,10 @@ Moving rows and renaming need a live check: Option+Up and Option+Down reaching t
 the system web views (Alt+Up and Alt+Down on Windows and Linux), the Edit menu's Move Up and
 Move Down, and the rename forms and right-click menus in the tools window (all checked in a
 browser harness against the real Rust session).
+Roles in a shared budget need a live check in the app: the Share dialog's role menus and
+category checklist, the first-role question, the toolbar chip and the refusal toasts in a
+second person's window (logic tested in Rust through two sessions on one folder; the
+script passes `node --check`).
 Renumbering accounts, Save a Copy for Sharing, the read-only banner and New Sub-Budget need
 a live check in the app: the Save dialog's suggested name, opening a shared copy from the
 Finder, the returned-copy question when the original is open, and the renumber preview in

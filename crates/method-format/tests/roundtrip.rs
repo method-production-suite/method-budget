@@ -465,6 +465,7 @@ fn files_without_new_fields_read_with_defaults() {
         assert_eq!(&d.color, &None);
         assert!(d.notes.is_empty());
         assert_ne!(d.kind, RowKind::Separator);
+        assert_eq!(&d.person, &None);
     }
     assert_eq!(b.new_line_defaults, NewLineDefaults::default());
     assert_eq!(method_format::to_string(&b), golden, "golden is unchanged");
@@ -1053,4 +1054,67 @@ fn round_account_totals_round_trips_and_is_left_out_when_off() {
     assert_eq!(v["budget"]["round_account_totals"], true);
     let file = r#"{"format": "method-budget", "version": 1, "budget": {"title": "T", "base_currency": "USD", "round_account_totals": "yes"}}"#;
     assert!(method_format::from_str(file).is_err());
+}
+
+/// A row's person (decisions.md, entry 79): written after `fringe_range`,
+/// only when set, on rows and in line blocks; a file without one is
+/// unchanged, and the person's one cutoff survives the round trip.
+#[test]
+fn person_round_trips_and_is_left_out_when_unset() {
+    let mut b = Budget::new("T", "USD");
+    let mut prep = Detail::line(1, "Prep", "1", "", "3000");
+    prep.fringes.insert("SUI".into());
+    prep.fringe_range = Some(1);
+    prep.person = Some("Dana Reyes".into());
+    let mut shoot = Detail::line(2, "Shoot", "1", "", "5000");
+    shoot.fringes.insert("SUI".into());
+    shoot.person = Some("Dana Reyes".into());
+    b.topsheet.push(category(
+        "1100",
+        "C",
+        vec![
+            account("1101", "A", vec![prep]),
+            account(
+                "1102",
+                "B",
+                vec![shoot, Detail::line(3, "Other", "1", "", "10")],
+            ),
+        ],
+    ));
+    b.fringes.insert(
+        "SUI".into(),
+        Fringe {
+            short_code: None,
+            description: String::new(),
+            rate: "10".into(),
+            kind: FringeKind::Percent {
+                cutoff: Some(700_000),
+            },
+        },
+    );
+    let text = round_trip(&b);
+    assert!(
+        text.contains("\"fringe_range\": 1,\n                \"person\": \"Dana Reyes\","),
+        "{text}"
+    );
+    assert_eq!(text.matches("\"person\"").count(), 2);
+    let r = recalc(
+        &method_format::from_str(&text).unwrap(),
+        &RecalcOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(
+        r.categories[0].accounts[0].rows[0].fringes["SUI"]
+            + r.categories[0].accounts[1].rows[0].fringes["SUI"],
+        70_000
+    );
+    // Without the person, nothing about it is written.
+    for d in b
+        .categories_mut()
+        .flat_map(|c| &mut c.accounts)
+        .flat_map(|a| &mut a.details)
+    {
+        d.person = None;
+    }
+    assert!(!round_trip(&b).contains("person"));
 }
