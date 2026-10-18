@@ -295,3 +295,76 @@ fn diff_merge_rename_and_usage_follow_a_programs_locations() {
     assert_eq!(u["Ridge"].other, 1);
     assert_eq!(u["Coast"].other, 0);
 }
+
+/// A person-cutoff line in a credit's location (decisions.md, entries 79
+/// and 80): Dana is paid 1,000.00 at Ridge and 1,000.00 at Coast under a
+/// 10% fringe with a 1,500.00 cutoff, so as one earner she earns 150.00,
+/// 75.00 on each line (100.00 each on their own). A Ridge program counts
+/// the Ridge line's person share like any other fringe, and leaves it out
+/// like any other excluded fringe.
+#[test]
+fn a_person_cutoff_fringe_counts_in_a_programs_location_like_any_fringe() {
+    let mut b = budget();
+    b.fringes.insert(
+        "CAP".into(),
+        Fringe {
+            short_code: None,
+            description: String::new(),
+            rate: "10".into(),
+            kind: FringeKind::Percent {
+                cutoff: Some(150_000),
+            },
+        },
+    );
+    let mut coast = Detail::line(5, "Dana, Coast", "1", "", "1000");
+    coast.location = Some("Coast".into());
+    coast.fringes = set(&["CAP"]);
+    coast.person = Some("Dana".into());
+    for cat in b.categories_mut() {
+        for a in &mut cat.accounts {
+            for d in &mut a.details {
+                if d.id == 1 {
+                    d.fringes.insert("CAP".into());
+                    d.person = Some("Dana".into());
+                }
+            }
+        }
+        cat.accounts
+            .push(account("2103", "Dana", vec![coast.clone()]));
+    }
+    let r = recalc(&b, &RecalcOptions::default()).unwrap();
+    let row = |id: RowId| {
+        r.categories
+            .iter()
+            .flat_map(|c| &c.accounts)
+            .flat_map(|a| &a.rows)
+            .find(|x| x.id == id)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(row(1).fringes["CAP"], 7_500);
+    assert_eq!(row(5).fringes["CAP"], 7_500);
+
+    b.credits
+        .push(program("Ridge program", &["Ridge"], cat("2100"), "100"));
+    let mut ex = program("Ridge less CAP", &["Ridge"], cat("2100"), "100");
+    ex.excluded_fringes = set(&["CAP"]);
+    b.credits.push(ex);
+    let got = estimate(&b);
+    // 1,000.00 + PEN 100.00 + Dana's share 75.00, and the 300.00 local hire.
+    assert_eq!(got.programs[0].qualified, 147_500);
+    assert_eq!(got.programs[0].amount(), Some(147_500));
+    assert_eq!(got.programs[1].qualified, 140_000);
+    let ridge = got
+        .locations
+        .iter()
+        .find(|l| l.location.as_deref() == Some("Ridge"))
+        .unwrap();
+    assert_eq!(ridge.total, 147_500);
+
+    // Applied, Explain adds up to the same.
+    b.credits[0].applied = true;
+    let e = explain::explain(&b, &RecalcOptions::default(), &explain::Target::Credit(0)).unwrap();
+    assert_eq!(e.reported, 147_500);
+    assert_eq!(e.root.amount, Some(147_500));
+}

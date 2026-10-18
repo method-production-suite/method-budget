@@ -411,6 +411,12 @@ pub fn encode_row(d: &Detail, b: &dyn Binder) -> Record {
         .put(Field::Color, Value::opt_text(d.color.as_deref()))
         .tags(Field::Fringes, members(b, Kind::Fringe, &d.fringes))
         .tags(Field::Groups, members(b, Kind::Group, &d.groups));
+    // Only when set, as the `.mthd` writes it (decisions.md, entry 79): a
+    // log of a budget that never uses it stays readable by an app without
+    // the field. Clearing it is a write of nothing (see `Capture::diff`).
+    if let Some(p) = &d.person {
+        r.put(Field::Person, Value::text(p));
+    }
     r
 }
 
@@ -434,6 +440,7 @@ pub fn decode_row(e: &Entity, r: &dyn Resolver, id: RowId) -> Detail {
         location: ref_opt_text(r, g(Field::Location)),
         set: ref_opt_text(r, g(Field::Set)),
         fringe_range: opt_int(g(Field::FringeRange)).and_then(|n| u32::try_from(n).ok()),
+        person: opt_text(g(Field::Person)),
         bold: boolean(g(Field::Bold)),
         italic: boolean(g(Field::Italic)),
         indent: u8::try_from(int(g(Field::Indent))).unwrap_or(0),

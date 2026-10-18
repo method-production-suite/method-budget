@@ -212,8 +212,8 @@ Option+Cmd+0; Cmd+= is Insert Subtotal) size the grid's text, rows and columns f
 
 **Detail grid columns.** The button in the grid's top-left corner (Shift+Tab from the
 first cell reaches it) opens the column menu: X, the three unit columns, currency, 4X,
-fringes, fringe percent, full fringe percent, fringe dollars, groups, set and location can
-each be shown or hidden, and the choice is remembered for you (in the web view's local
+fringes, fringe percent, full fringe percent, fringe dollars, groups, set, location and
+person can each be shown or hidden, and the choice is remembered for you (in the web view's local
 storage, not in the budget). Fringe % is the line's fringe dollars over its total, blank
 when the total is 0. **Full fringe %** (hidden until chosen; decisions.md, entry 61) is
 the line's fringes before cutoffs and ranges over its total: each percent fringe on the
@@ -225,6 +225,25 @@ cut with an ellipsis, in full on hover) before the grid scrolls sideways, and wh
 scrolls, # and Description stay at the left and Total at the right. At 1280 pixels wide
 with the tools panel docked at the right, the default columns fit without scrolling (docked
 at the bottom, the grid has the window's whole width).
+
+**Person.** One person paid in several accounts can share each percent fringe's cutoff
+across all of them (roadmap 3.11; decisions.md, entry 79). Turn on the **Person** column
+from the column menu and type the person's name on each of their lines and adjustment rows
+(type-ahead offers the people the budget already has; clearing the cell takes the person
+off). Spacing and capitals don't make another person: "mara  lee" is Mara Lee, and is
+written the way the budget already spells her. Once any line has a person the column shows
+by default, even while the totals can't be worked out. A saved line block never keeps a
+person. Lines with the same person,
+in any account, are one earner: within the cutoff each line earns its own percent; past
+it, the person earns the percent of the cutoff once, shared over their lines by pay. The
+cell's tooltip is the person's running total: what they are paid, on how many lines in
+which accounts, and for each fringe with a cutoff the pay against it ("SUI: 18,420.00 of a
+7,000.00 cutoff, reached; 238.00 across the lines", or how much is left); a mark in the
+cell's corner shows a cutoff is reached. A line with a person leaves its fringe range for
+percent fringes, and Explain This Number shows the person, the cutoff and each line's
+share. Budgets that never set a person work out exactly as before. Needs a live check in
+the app (the column, the type-ahead and the tooltip are drawn from tested pieces, but not
+yet seen in the app's web view).
 
 **Original and variance columns.** When the budget has a baseline (Tools, Budget,
 Baseline: Lock), every level shows **Orig** (the total when the baseline was locked) and
@@ -2677,6 +2696,11 @@ account.
 - `variance`: original vs current totals when there is a baseline: `accounts`,
   `categories`, `grand_total`, `net_total`, `rows` for `account`'s rows only, and
   `rows_changed` (rows that moved, anywhere).
+- `persons`, only when a line has a person and there are totals (decisions.md, entry 79):
+  each person by the matching form of the name (trimmed, single spaces, lower case) with
+  `name` (as shown), `lines`, `accounts`, `pay`, `fringe_total` and per percent fringe
+  `fringe`, `cutoff`, `pay`, `amount` and `reached`, for the Person column; and
+  `has_persons`, `true` whenever a line has a person (left out otherwise).
 - `file` (`name`, `path`, `dirty`), `can_undo`, `can_redo`, and `created_row` after an insert.
 - `doc`: which open budget this is, and `tabs`: every tab in order (`id`, `label`, `title`,
   `name`, `path`, `dirty`, `conflict`, `active`). A page draws only the view of the budget
@@ -3014,6 +3038,10 @@ check: Shift+Cmd+\\ and the View and Window menu items reaching the page in the 
 views, dragging a tab between the strips with a real pointer, the tools window following
 the target, and the panes coming back at the next start. The History tab needs a live
 check in the tools window and with a long history.
+
+The Person column (decisions.md, entry 79) needs a live check: typing a name, the
+type-ahead of people, the running-total tooltip and the cutoff mark. The spreadsheet
+export and import have no Person column yet.
 
 Moving rows by drag, editing fringe ranges in the grid, import from other tools' own formats (spreadsheets import, see
 Importing spreadsheets), single-instance handling on Windows and Linux,

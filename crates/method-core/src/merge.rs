@@ -2455,6 +2455,7 @@ fn merge_detail(cx: &mut Cx, at: &At, th: Three<Detail>, id: RowId) -> Detail {
             |d| &d.fringe_range,
             |r| r.map_or("none".into(), |n| n.to_string()),
         ),
+        person: th.field(cx, at, "person", "person", |d| &d.person, opt_text),
         bold: th.field(cx, at, "bold", "bold", |d| &d.bold, |v| on_off(*v)),
         italic: th.field(cx, at, "italic", "italic", |d| &d.italic, |v| on_off(*v)),
         indent: th.field(cx, at, "indent", "indent", |d| &d.indent, |v| v.to_string()),

@@ -155,6 +155,10 @@ fn line_props() -> Vec<(&'static str, Value)> {
             "fringe_range",
             s::nullable(s::integer("Fringe range number: neighboring lines with the same number share percent fringe cutoffs as one earner.", 0, i64::from(u32::MAX))),
         ),
+        (
+            "person",
+            s::nullable(s::name("The person the row pays, or null: every line and adjustment with the same person, in any account, shares each percent fringe's cutoff once.")),
+        ),
         ("bold", s::boolean("Bold text.")),
         ("italic", s::boolean("Italic text.")),
         ("indent", s::integer("Indent, 0 to 4.", 0, 4)),
@@ -191,6 +195,7 @@ const SCRIPT_FIELDS: &[&str] = &[
     "set",
     "location",
     "fringe_range",
+    "person",
     "bold",
     "italic",
     "indent",

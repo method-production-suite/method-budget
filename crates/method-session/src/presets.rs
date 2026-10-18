@@ -569,8 +569,9 @@ fn to_setup(s: &SetupItems) -> Setup {
 
 /// Saves copies of rows `ids` (in budget order) as a new line block named
 /// `name`, keeping the fields `keep` asks for, at the end of the list. Rows
-/// lose their ids, a line in the base currency keeps no currency, and the
-/// block's fringe ranges are numbered 1, 2... in order. Returns its position.
+/// lose their ids and any person, a line in the base currency keeps no
+/// currency, and the block's fringe ranges are numbered 1, 2... in order.
+/// Returns its position.
 pub fn store_line_block(
     b: &mut Budget,
     name: &str,
@@ -599,6 +600,9 @@ pub fn store_line_block(
     let mut ranges: BTreeMap<u32, u32> = BTreeMap::new();
     for d in &mut rows {
         d.id = 0;
+        // A block is reusable: its rows never join a person's cutoff
+        // (decisions.md, entry 79).
+        d.person = None;
         if !keep.formulas {
             for f in [&mut d.amount, &mut d.x, &mut d.rate, &mut d.x4] {
                 f.0.clear();
@@ -1227,6 +1231,38 @@ mod tests {
             assert!(err.contains(want), "{err}");
             assert_eq!(s.budget(), &before);
         }
+    }
+
+    /// A block is reusable, so it never keeps a person (decisions.md, entry
+    /// 79): pasted or inserted from the library, its rows would join that
+    /// person's cutoff without anyone saying so.
+    #[test]
+    fn a_stored_block_never_keeps_a_person() {
+        let mut s = Session::with_budget(budget(), None);
+        let rows = ids(s.budget(), "20-01");
+        s.edit("Test edit", |b| {
+            crate::edit::set_rows_field(b, &rows, crate::edit::Field::Person, "Mara Lee")
+        })
+        .unwrap();
+        s.edit("Test edit", |b| {
+            store_line_block(b, "Staff", &rows, BlockFields::default())
+        })
+        .unwrap();
+        let bare = BlockFields {
+            formulas: false,
+            units: false,
+            tags: false,
+            notes: false,
+        };
+        s.edit("Test edit", |b| store_line_block(b, "Bare", &rows, bare))
+            .unwrap();
+        for p in &s.budget().line_presets {
+            assert!(p.rows.iter().all(|d| d.person.is_none()), "{}", p.name);
+        }
+        // The lines themselves keep theirs.
+        assert!(crate::edit::details(s.budget())
+            .filter(|d| rows.contains(&d.id))
+            .all(|d| d.person.as_deref() == Some("Mara Lee")));
     }
 
     #[test]

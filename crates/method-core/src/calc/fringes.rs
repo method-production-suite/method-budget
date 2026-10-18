@@ -9,7 +9,8 @@
 //! the fringe takes the percent of its total, or of the cutoff still left
 //! when that is less, rounded on its own ([`percent_step`]). A flat fringe
 //! is charged per row: its rate times the row's count, which [`flat_count`]
-//! works out (decisions.md, entry 54).
+//! works out (decisions.md, entry 54). Rows with a person get their percent
+//! fringes later, across accounts ([`super::persons`]).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -189,12 +190,14 @@ fn full_fringes(
 /// and separator rows, and rows that don't count (suppressed or filtered
 /// out), are skipped, so they never break a run; any other row with a
 /// different value does. Skipping uncounted rows keeps "excluding a group
-/// equals deleting its lines" true (decisions.md 4).
+/// equals deleting its lines" true (decisions.md 4). Rows with a person are
+/// skipped the same way: they earn their percent fringes with the person,
+/// across accounts ([`super::persons`], decisions.md, entry 79).
 pub(super) fn earners(details: &[Detail], rows: &[RowTotals]) -> Vec<Vec<usize>> {
     let mut out = Vec::new();
     let mut run: Option<(u32, Vec<usize>)> = None;
     for (i, d) in details.iter().enumerate() {
-        if !d.kind.is_costed() || !rows[i].included {
+        if !d.kind.is_costed() || !rows[i].included || super::persons::is_person_row(d) {
             continue;
         }
         if let (Some((m, members)), Some(n)) = (&mut run, d.fringe_range) {

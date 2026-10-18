@@ -1556,6 +1556,43 @@ fn import_a_budget_export() {
     );
 }
 
+/// A row's person (decisions.md, entry 79): set and cleared with
+/// `update_lines`, shown by `get_account` only when set.
+#[test]
+fn update_lines_sets_and_clears_a_person() {
+    let mut f = Fixture::new("person", false);
+    let before = net(&mut f, "film.mthd");
+    let r = f
+        .tool(
+            "update_lines",
+            json!({"path": "film.mthd", "rows": [
+                {"id": 8, "person": "  Dana Reyes "},
+                {"id": 9, "person": "Dana Reyes"}
+            ]}),
+        )
+        .unwrap();
+    assert_eq!(r["changed"], true);
+    let cam = rows(&mut f, "21-01");
+    for id in [8, 9] {
+        let row = cam.iter().find(|x| x["id"] == id).unwrap();
+        assert_eq!(row["person"], "Dana Reyes");
+    }
+    // PAYROLL has no cutoff, so nothing moves.
+    assert_eq!(net(&mut f, "film.mthd"), before);
+    let text = std::fs::read_to_string(f.path("film.mthd")).unwrap();
+    assert!(text.contains("\"person\": \"Dana Reyes\""));
+
+    f.tool(
+        "update_lines",
+        json!({"path": "film.mthd", "rows": [{"id": 8, "person": null}, {"id": 9, "person": null}]}),
+    )
+    .unwrap();
+    let cam = rows(&mut f, "21-01");
+    assert!(cam.iter().all(|x| x.get("person").is_none()));
+    let text = std::fs::read_to_string(f.path("film.mthd")).unwrap();
+    assert!(!text.contains("\"person\""));
+}
+
 #[test]
 fn globals_from_a_schedules_days() {
     let mut f = Fixture::new("schedule", false);

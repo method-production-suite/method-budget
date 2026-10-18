@@ -913,6 +913,16 @@ pub const MAX_INDENT: u8 = 4;
 /// Longest [`Note::text`], in characters.
 pub const MAX_NOTE_CHARS: usize = 10_000;
 
+/// A person's name as rows are matched by it (decisions.md, entry 79):
+/// the ends trimmed, each inner run of spaces one space, and lower case, so
+/// "Mara Lee", "mara  lee " and "MARA LEE" are one person.
+pub fn person_key(name: &str) -> String {
+    name.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
 /// One row in an account.
 ///
 /// Blank formulas: `amount` and `rate` count as 0, `x` and `x4` as 1.
@@ -941,6 +951,12 @@ pub struct Detail {
     /// Consecutive lines with the same `Some(n)` form one fringe range: percent
     /// fringe cutoffs apply to their combined subtotal, as one earner.
     pub fringe_range: Option<u32>,
+    /// The person this row pays (decisions.md, entry 79), opt-in. Every
+    /// counted line and adjustment row with the same person, in any
+    /// account, shares each percent fringe's cutoff as one earner; a row
+    /// with a person leaves its fringe range for percent fringes. `None`
+    /// (the default) changes nothing. See [`Detail::person_name`].
+    pub person: Option<String>,
     /// Text style. Display only: never affects totals.
     pub bold: bool,
     pub italic: bool,
@@ -972,12 +988,27 @@ impl Detail {
             location: None,
             set: None,
             fringe_range: None,
+            person: None,
             bold: false,
             italic: false,
             indent: 0,
             color: None,
             notes: Vec::new(),
         }
+    }
+
+    /// The row's person as typed, trimmed; `None` when unset or blank.
+    pub fn person_name(&self) -> Option<&str> {
+        self.person
+            .as_deref()
+            .map(str::trim)
+            .filter(|p| !p.is_empty())
+    }
+
+    /// The row's person as the engine matches it ([`person_key`]); `None`
+    /// when unset or blank.
+    pub fn person_key(&self) -> Option<String> {
+        self.person_name().map(person_key)
     }
 
     /// A costed line: `amount` `unit` at `rate`, with blank X and 4X.

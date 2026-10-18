@@ -1,7 +1,10 @@
 //! The engine as it was before the speed work, kept for tests only: percent
 //! fringes visit every fringe the account uses for every earner, and the
 //! "full" group totals come from a second pass over every account. The
-//! optimized engine must give exactly the same reports and errors.
+//! optimized engine must give exactly the same reports and errors. Person
+//! cutoffs (decisions.md, entry 79) are the one stage it doesn't do on its
+//! own: it calls the engine's pass, so it isn't an independent check of
+//! that rule.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -177,6 +180,14 @@ fn eval_categories(ctx: &Ctx) -> Result<Vec<CategoryTotals>, CalcError> {
             total: details_total,
         });
     }
+    // Persons across accounts, over every account (decisions.md, entry 79).
+    // This reuses the engine's own pass (`apply_persons`), so agreement here
+    // checks where and when the pass runs (the cache, the shortcut for
+    // accounts that all count, the unfiltered and earned rows), not the rule
+    // itself: tests/persons.rs checks the rule by hand and by its properties.
+    if super::persons::any(ctx.b) {
+        super::apply_persons(ctx, &mut categories)?;
+    }
     Ok(categories)
 }
 
@@ -308,6 +319,10 @@ mod tests {
             if seed % 3 == 0 {
                 b.arithmetic = crate::model::Arithmetic::Exact;
             }
+            // Half the budgets pay people across accounts (entry 79).
+            if seed % 2 == 0 {
+                sample::persons(&mut b, seed);
+            }
             b.fringe_posting = match seed % 4 {
                 0 => FringePosting::Budget,
                 1 => FringePosting::ProductionLevel,
@@ -348,7 +363,7 @@ mod tests {
                 let n = all_details(&mut e).len() as u64;
                 for _ in 0..1 + rng.below(4) {
                     let k = rng.below(n) as usize;
-                    let pick = rng.below(9);
+                    let pick = rng.below(11);
                     let fringes: Vec<String> = e.fringes.keys().cloned().collect();
                     let d = &mut all_details(&mut e)[k];
                     match pick {
@@ -363,6 +378,12 @@ mod tests {
                             d.fringes.insert("NOFRINGE".into());
                         }
                         6 => d.fringe_range = Some(rng.below(3) as u32 + 1),
+                        9 | 10 => {
+                            d.person = Some(
+                                ["Dana Reyes", "Lee Park", " Dana Reyes"][rng.below(3) as usize]
+                                    .into(),
+                            );
+                        }
                         7 => {
                             if let Some(f) = fringes.get(rng.below(fringes.len() as u64) as usize) {
                                 d.fringes.insert(f.clone());

@@ -327,6 +327,17 @@ impl<'a> Capture<'a> {
                 });
             }
         }
+        // A field written only when set (a row's person, decisions.md,
+        // entry 79) that is gone now: a write of nothing.
+        for (f, v) in &before.fields {
+            if *v != Value::Null && !after.fields.contains_key(f) {
+                self.ops.push(Op::Set {
+                    entity,
+                    field: *f,
+                    value: Value::Null,
+                });
+            }
+        }
         // A set the record leaves out is empty (a credit's `locations`
         // is left out when empty, decisions.md, entry 80).
         let none = BTreeSet::new();
