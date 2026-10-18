@@ -3461,9 +3461,16 @@ one account (entry 3), so each account's lines get a cutoff of their own and a f
 a wage base, unemployment for one, is charged on more pay than the base.
 
 - **A person on the line, not a range across accounts.** A line or adjustment row gets an
-  optional `person`, free text. Every counted line and adjustment row with the same person
-  (spaces around the name don't count; blank is no person), in any account or category, is
-  one earner for each percent fringe. Extending fringe ranges across accounts was the
+  optional `person`, free text. Every counted line and adjustment row with the same person,
+  in any account or category, is one earner for each percent fringe.
+- **Which names are one person.** Names match with the ends trimmed, each inner run of
+  spaces read as one, and case ignored (`person_key`): "Mara Lee", "mara  lee " and "MARA
+  LEE" are one person; blank is no person. The person shows as the first of their rows in
+  budget order spells the name, and typing a name the budget already has under other
+  spacing or case writes it the budget's way (the rows being typed in don't count, so
+  retyping a person's only rows changes the spelling). **Built on the recommendation**,
+  reversible: the other choice is exact matching, where a stray space or capital makes a
+  second person and charges the fringe twice. Extending fringe ranges across accounts was the
   other way, and was turned down: range numbers are per account today, so range 1 in two
   accounts would join and existing budgets would change, and a range is a run in row
   order, which a person spread over accounts doesn't have. The tag is one optional field,
@@ -3487,6 +3494,13 @@ a wage base, unemployment for one, is charged on more pay than the base.
   lines, accounts or categories never moves a cent) and the person's pieces always come to
   exactly one cutoff's worth. **Built on the recommendation**, reversible: the other
   choice is line order across accounts in budget order.
+- **What is guaranteed, exactly.** Past the cutoff, a person's fringe is exactly the
+  percent of one cutoff, rounded once. When none of the person's rows carrying the fringe
+  is a credit, that is never more than the rows would earn each on its own cutoff, give or
+  take each row's own rounding (under a cent a row). With a credit it can be more, and
+  should be: 10% with a 7,000.00 cutoff on a 10,000.00 line and a -5,000.00 credit is
+  200.00 row by row (the line capped, the credit its full -500.00), but the person is paid
+  5,000.00 in all, within the cutoff, so earns 500.00.
 - **A person row leaves its fringe range** for percent fringes. Like an uncounted row it
   doesn't break the run around it. Flat fringes stay per line. A left-out line (a group
   out of the total, a filter) is not in the person, so excluding a group still equals
@@ -3499,8 +3513,10 @@ a wage base, unemployment for one, is charged on more pay than the base.
   products in 128 bits, no floats). The recalc cache keeps rows from before the pass and
   runs the pass on every recalc, since an edit in one account moves a person's pieces in
   another. The unfiltered and earned rows behind group totals (entry 58) run it too, over
-  every account with a person row. The reference engine runs it over every account, and
-  the optimized engine and the cache match it with persons in the generated budgets.
+  every account with a person row. The reference engine runs the same pass (it calls
+  `apply_persons`) over every account, so its agreement with the optimized engine and the
+  cache checks where and when the pass runs, not the rule; the hand-checked figures and the
+  properties in tests/persons.rs check the rule.
   `person_totals` reports each person's rows, accounts, pay and each percent fringe's pay
   against its cutoff.
 - **Explain** says it on each person row's fringe: "Person: Dana Reyes is paid on 3 lines
@@ -3513,14 +3529,21 @@ a wage base, unemployment for one, is charged on more pay than the base.
 - **Format**: detail row and line block row `person`, optional text, written after
   `fringe_range` and left out when unset (FORMAT.md). Version 1, additive: a file without
   it reads and writes byte for byte as before; an older reader refuses a file that uses it,
-  as with every additive field. The change log has a row field `person`, always written (a
-  log from before reads as none).
+  as with every additive field. The change log's rows carry `person` only when set, as
+  the `.mthd` does, so a shared budget that never uses it writes logs that 0.3.0 still
+  reads; clearing a person is logged as a write of nothing (`null`), and a log from before
+  reads as no person.
+- **Line blocks never keep a person.** A block is reusable (pasted, or from the personal
+  library into other budgets), so saving one drops each row's person; otherwise its rows
+  would join that person's cutoff unasked. The block row field stays readable.
 - **App**: an optional Person column on the lines, shown by default once a line in the
   budget has a person, typed as free text with type-ahead of the people the budget already
   has. Its tooltip is the person's running total: pay across accounts and each percent
   fringe's pay against its cutoff ("SUI: 18,420.00 of a 7,000.00 cutoff, reached; 238.00
   across the lines", or how much is left), with a mark in the cell's corner once a cutoff
-  is reached. The view carries `persons` only when a row has one. The fringe range bracket
+  is reached. The view carries `persons` (keyed by the matching form, each with its shown
+  `name`) only when a row has one, and `has_persons` whenever a row has one, so the column
+  stays when the totals can't be worked out. The fringe range bracket
   skips person rows, as the engine does.
 - **Command line and MCP**: `person` is a `set line` field (`none` clears) for
   `method-budget set` and edit scripts; `update_lines` takes `person` (null clears) and
@@ -3528,9 +3551,11 @@ a wage base, unemployment for one, is charged on more pay than the base.
 - **Not yet**: the spreadsheet export and import have no Person column (one would change
   every export); no list of people with their totals beyond the column's tooltip.
 - Tests: crates/method-core/tests/persons.rs (the figures above, Explain's words, person
-  totals; properties over generated budgets: no person and a lone person change nothing, a
-  person past a cutoff earns exactly one earner's worth of it and never more than with a
-  cutoff per line, every fringe dollar is on one row, moving categories and accounts
+  totals, name matching; properties over generated budgets: no person and a lone person
+  change nothing, a person past a cutoff earns exactly one earner's worth of it, every
+  fringe dollar is on one row, moving categories and accounts
   changes no row's fringes, excluding a group equals deleting its lines, Explain adds up),
-  unit tests of the split in `calc::persons`, the reference engine and cache tests with
-  persons, round trips in method-format, the session's edit and view, the MCP tool.
+  `with_a_credit_a_person_can_earn_more_than_lines_alone`), unit tests of the split in
+  `calc::persons`, the reference engine and cache tests with persons, round trips in
+  method-format and `an_unset_person_writes_no_key_in_the_file_or_the_log`, the session's
+  edit and view, `a_stored_block_never_keeps_a_person`, the MCP tool.

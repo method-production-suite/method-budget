@@ -1933,7 +1933,7 @@ function readColumnChoices() {
  * and Var) and actuals (the cost report columns, levels.js).
  */
 function columnContext() {
-  return { baseline: Boolean(state.ix && state.ix.variance), cost: Boolean(state.ix && state.ix.cost), persons: Boolean(state.ix && state.ix.persons) };
+  return { baseline: Boolean(state.ix && state.ix.variance), cost: Boolean(state.ix && state.ix.cost), persons: Boolean(state.ix && state.ix.hasPersons) };
 }
 
 function gridDetailColumns() {

@@ -230,7 +230,10 @@ at the bottom, the grid has the window's whole width).
 across all of them (roadmap 3.11; decisions.md, entry 79). Turn on the **Person** column
 from the column menu and type the person's name on each of their lines and adjustment rows
 (type-ahead offers the people the budget already has; clearing the cell takes the person
-off). Once any line has a person the column shows by default. Lines with the same person,
+off). Spacing and capitals don't make another person: "mara  lee" is Mara Lee, and is
+written the way the budget already spells her. Once any line has a person the column shows
+by default, even while the totals can't be worked out. A saved line block never keeps a
+person. Lines with the same person,
 in any account, are one earner: within the cutoff each line earns its own percent; past
 it, the person earns the percent of the cutoff once, shared over their lines by pay. The
 cell's tooltip is the person's running total: what they are paid, on how many lines in
@@ -2557,9 +2560,11 @@ account.
 - `variance`: original vs current totals when there is a baseline: `accounts`,
   `categories`, `grand_total`, `net_total`, `rows` for `account`'s rows only, and
   `rows_changed` (rows that moved, anywhere).
-- `persons`, only when a line has a person (decisions.md, entry 79): each person by name
-  with `lines`, `accounts`, `pay`, `fringe_total` and per percent fringe `fringe`,
-  `cutoff`, `pay`, `amount` and `reached`, for the Person column.
+- `persons`, only when a line has a person and there are totals (decisions.md, entry 79):
+  each person by the matching form of the name (trimmed, single spaces, lower case) with
+  `name` (as shown), `lines`, `accounts`, `pay`, `fringe_total` and per percent fringe
+  `fringe`, `cutoff`, `pay`, `amount` and `reached`, for the Person column; and
+  `has_persons`, `true` whenever a line has a person (left out otherwise).
 - `file` (`name`, `path`, `dirty`), `can_undo`, `can_redo`, and `created_row` after an insert.
 - `doc`: which open budget this is, and `tabs`: every tab in order (`id`, `label`, `title`,
   `name`, `path`, `dirty`, `conflict`, `active`). A page draws only the view of the budget

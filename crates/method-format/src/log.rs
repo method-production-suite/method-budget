@@ -1250,6 +1250,67 @@ mod tests {
         assert_eq!(budget_id(genesis).len(), 64);
     }
 
+    /// A row's `person` (decisions.md, entry 79) is written to the log only
+    /// when set, as in the `.mthd`, so a shared budget that never uses it
+    /// writes logs an app without the field still reads. Setting and
+    /// clearing it still travel through the log.
+    #[test]
+    fn an_unset_person_writes_no_key_in_the_file_or_the_log() {
+        let b = method_core::sample::budget(&method_core::sample::SampleSpec {
+            rows: 40,
+            accounts: 4,
+            categories: 2,
+            fringes: 3,
+            groups: 2,
+            ..Default::default()
+        });
+        assert!(!crate::to_string(&b).contains("\"person\""));
+        let t = "2026-10-18T00:00:00Z";
+        let mut log = Log::adopt(actor(1), Ids::seeded(1), &b, "Adopted", t);
+        // A new row without a person.
+        let p = log.project();
+        let mut after = p.budget.clone();
+        let next = after.highest_row_id().unwrap_or(0) + 1;
+        if let Some(a) = after.categories_mut().flat_map(|c| &mut c.accounts).next() {
+            a.details
+                .push(method_core::Detail::line(next, "New", "1", "", "10"));
+        }
+        log.record(&p, &after, &[], "Insert", t).unwrap();
+        for c in log.changes() {
+            assert!(
+                !change_to_json(c).contains("\"person\""),
+                "{}",
+                change_to_json(c)
+            );
+        }
+        // Set, then clear: both are logged and project back.
+        let set_person = |b: &mut method_core::Budget, v: Option<&str>| {
+            for d in b
+                .categories_mut()
+                .flat_map(|c| &mut c.accounts)
+                .flat_map(|a| &mut a.details)
+                .filter(|d| d.id == next)
+            {
+                d.person = v.map(String::from);
+            }
+        };
+        let p = log.project();
+        let mut after = p.budget.clone();
+        set_person(&mut after, Some("Mara Lee"));
+        log.record(&p, &after, &[], "Person", t).unwrap();
+        assert_eq!(log.project().budget, after);
+        let p = log.project();
+        let mut after = p.budget.clone();
+        set_person(&mut after, None);
+        log.record(&p, &after, &[], "No person", t).unwrap();
+        assert_eq!(log.project().budget, after);
+        // Each change still reads back.
+        for c in log.changes() {
+            let line = change_to_json(c);
+            assert_eq!(&change_from_json(&line).unwrap(), c);
+        }
+    }
+
     #[test]
     fn every_value_type_round_trips() {
         let b = crate::from_str(&crate::to_string(&method_core::sample::budget(

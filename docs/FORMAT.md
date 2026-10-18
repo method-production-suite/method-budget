@@ -457,9 +457,11 @@ no effect.
 #### Person cutoffs
 
 Optional, for one person paid in several accounts (`docs/decisions.md`, entry 79). Every
-counted line and adjustment row with the same `person` (spaces around the name don't count;
-blank is no person), in any account or category, is one earner for each percent fringe, so
-the fringe's cutoff applies once to everything the person is paid:
+counted line and adjustment row with the same `person`, in any account or category, is one
+earner for each percent fringe, so the fringe's cutoff applies once to everything the
+person is paid. Names match with the ends trimmed, each inner run of whitespace read as one
+space and case ignored (`"Mara Lee"`, `"mara  lee "` and `"MARA LEE"` are one person);
+blank is no person. The file stores each row's text as written.
 
 - With no cutoff, or when the person's pay on the rows carrying the fringe is no more than
   the cutoff (times the [cutoff factor](#cutoff-factor)), each row earns its own percent,
@@ -1066,7 +1068,7 @@ tag presets: a [version](#version) never has them. Fields in written order:
 | Field   | Type | Notes |
 |---------|------|-------|
 | `name`  | text, **required** | Unique within the list, ignoring case, as for tag presets. |
-| `rows`  | list of block rows | The rows in order. Left out when empty. |
+| `rows`  | list of block rows | The rows in order. Left out when empty. The application never saves a row's `person` in a block (a reader still accepts one). |
 | `setup` | object | The setup items the rows use, as defined when the block was saved, with what those use in turn. Left out when empty. |
 
 A **block row** is a [detail row](#detail-row) without `id`: inserted copies get new ids.
@@ -1276,8 +1278,8 @@ valid. Loading and saving it in Method Budget normalizes it.
 - Version 1, additive (2026-10): detail row and line block row `person` ([person
   cutoffs](#person-cutoffs), decisions.md, entry 79), written after `fringe_range` and
   left out when unset, so files that don't use it read and write byte for byte as before.
-  An older reader refuses a file that uses it. The change log's row field `person` is
-  always written; a log from before reads as no person.
+  An older reader refuses a file that uses it. The change log's rows carry `person` only
+  when set, so a log of a budget that never uses it is one an older reader reads.
 
 ## Complete example
 
@@ -1560,8 +1562,8 @@ fields of `root`: `title`, `base_currency`, `totals_currency`, `fringe_posting`,
 `new_line_defaults`, `group_rules`, `display`, `compact_versions`, `report_presets`,
 `tag_presets`, `line_presets`, `setup_order`, `setup_folders`, `setup_sources`,
 `ot_patterns`, `baseline` and `round_account_totals` (always written; a log from before
-reads as `false`). A row's `person` is always written too, `null` when unset (a log from
-before reads as no person). The provenance is about one file and is not logged.
+reads as `false`). A row's `person` is written only when set, as in the `.mthd`;
+clearing it is a write of `null`, and a log without it reads as no person. The provenance is about one file and is not logged.
 
 ### Reading rules
 

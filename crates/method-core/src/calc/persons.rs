@@ -1,7 +1,8 @@
 //! Stage 2b: person cutoffs across accounts (decisions.md, entry 79).
 //!
 //! Opt-in. A line or adjustment row with a [`Detail::person`] pays that
-//! person; every counted row with the same person, in any account, is one
+//! person; every counted row with the same person (matched by
+//! [`person_key`]: spacing and case don't count), in any account, is one
 //! earner for each percent fringe, so the fringe's cutoff applies once to
 //! everything the person is paid. Stage 2 ([`super::fringes`]) leaves
 //! percent fringes off those rows (a person row leaves its fringe range);
@@ -29,6 +30,8 @@ use crate::decimal::Dec;
 use crate::model::{Account, Arithmetic, Budget, Detail, FringeKind, RowId};
 use crate::report::{Report, RowTotals};
 use crate::Cents;
+
+pub use crate::model::person_key;
 
 /// Whether any line or adjustment row of `b` has a person: the person pass
 /// runs only then.
@@ -142,17 +145,17 @@ pub(crate) fn person_shares(
 }
 
 /// The person rows of `accts` (budget order; `rows[k]` are `accts[k]`'s
-/// evaluated rows) that earn, by person, as (account, row) positions in
-/// budget order.
-pub(crate) fn members<'a>(
-    accts: &[&'a Account],
+/// evaluated rows) that earn, by person ([`person_key`]), as (account, row)
+/// positions in budget order.
+pub(crate) fn members(
+    accts: &[&Account],
     rows: &[&mut [RowTotals]],
-) -> BTreeMap<&'a str, Vec<(usize, usize)>> {
-    let mut people: BTreeMap<&'a str, Vec<(usize, usize)>> = BTreeMap::new();
+) -> BTreeMap<String, Vec<(usize, usize)>> {
+    let mut people: BTreeMap<String, Vec<(usize, usize)>> = BTreeMap::new();
     for (k, (acct, rs)) in accts.iter().zip(rows).enumerate() {
         for (i, d) in acct.details.iter().enumerate() {
             let earns = rs.get(i).is_some_and(|r| r.included);
-            if let (true, true, Some(p)) = (d.kind.is_costed(), earns, d.person_name()) {
+            if let (true, true, Some(p)) = (d.kind.is_costed(), earns, d.person_key()) {
                 people.entry(p).or_default().push((k, i));
             }
         }
@@ -229,6 +232,8 @@ pub struct PersonFringe {
 /// A person's running totals across the budget.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PersonTotals {
+    /// The name as the first of the person's rows in budget order spells
+    /// it (trimmed).
     pub name: String,
     /// Every line and adjustment row with the person, counted or not, in
     /// budget order.
@@ -243,7 +248,7 @@ pub struct PersonTotals {
     pub fringes: Vec<PersonFringe>,
 }
 
-/// Every person in `b`, by name, with their pay and each percent fringe's
+/// Every person in `b`, by [`person_key`], with their pay and each percent fringe's
 /// pay against its cutoff, read from `r` (which must come from
 /// recalculating `b`). Empty when no row has a person. `None` on overflow
 /// or when `r` doesn't match `b`.
@@ -253,11 +258,12 @@ pub fn person_totals(b: &Budget, r: &Report) -> Option<BTreeMap<String, PersonTo
     for (cat, ct) in b.categories().zip(&r.categories) {
         for (acct, at) in cat.accounts.iter().zip(&ct.accounts) {
             for (d, row) in acct.details.iter().zip(&at.rows) {
-                let (true, Some(p)) = (d.kind.is_costed(), d.person_name()) else {
+                let (true, Some(shown)) = (d.kind.is_costed(), d.person_name()) else {
                     continue;
                 };
-                let t = out.entry(p.to_string()).or_insert_with(|| PersonTotals {
-                    name: p.to_string(),
+                let p = person_key(shown);
+                let t = out.entry(p.clone()).or_insert_with(|| PersonTotals {
+                    name: shown.to_string(),
                     rows: Vec::new(),
                     accounts: Vec::new(),
                     pay: 0,
@@ -273,7 +279,7 @@ pub fn person_totals(b: &Budget, r: &Report) -> Option<BTreeMap<String, PersonTo
                 }
                 t.pay = t.pay.checked_add(row.total)?;
                 t.fringe_total = t.fringe_total.checked_add(row.fringe_total)?;
-                let fr = carried.entry(p.to_string()).or_default();
+                let fr = carried.entry(p).or_default();
                 for name in &d.fringes {
                     let Some(f) = b.fringes.get(name) else {
                         continue;

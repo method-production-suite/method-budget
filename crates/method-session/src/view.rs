@@ -82,18 +82,26 @@ pub struct View {
     /// entry 67).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub converted: Option<String>,
-    /// Each person a row pays (decisions.md, entry 79), by name: what they
+    /// Each person a row pays (decisions.md, entry 79), by the matching
+    /// form of the name (`method_core::person_key`): what they
     /// are paid across accounts and each percent fringe's pay against its
     /// cutoff, for the Person column. Left out when no row has a person (or
     /// there are no totals), so other budgets' views are unchanged.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub persons: Option<BTreeMap<String, PersonDto>>,
+    /// Some row has a person, whatever the state of the totals: the Person
+    /// column shows by default then. Left out when false.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub has_persons: bool,
 }
 
 /// A person's running totals, as [`method_core::calc::persons::person_totals`]
 /// works them out.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct PersonDto {
+    /// The name as the person's first row spells it (the map's key is the
+    /// matching form: trimmed, single spaces, lower case).
+    pub name: String,
     /// How many lines and adjustment rows have the person.
     pub lines: usize,
     /// The accounts they are in, in budget order.
@@ -122,11 +130,14 @@ pub fn persons(b: &Budget, report: Option<&Report>) -> Option<BTreeMap<String, P
     if !method_core::calc::persons::any(b) {
         return None;
     }
+    // A partial report (flagged cells read as blank) still lines up with
+    // `b` row for row, so its persons are as good as its totals.
     let all = method_core::calc::persons::person_totals(b, report)?;
     let out: BTreeMap<String, PersonDto> = all
         .into_iter()
         .map(|(name, p)| {
             let dto = PersonDto {
+                name: p.name,
                 lines: p.rows.len(),
                 accounts: p.accounts,
                 pay: p.pay,
@@ -559,6 +570,7 @@ impl View {
             notice: None,
             converted: None,
             persons: persons(b, report),
+            has_persons: method_core::calc::persons::any(b),
         }
     }
 }

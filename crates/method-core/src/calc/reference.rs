@@ -1,7 +1,10 @@
 //! The engine as it was before the speed work, kept for tests only: percent
 //! fringes visit every fringe the account uses for every earner, and the
 //! "full" group totals come from a second pass over every account. The
-//! optimized engine must give exactly the same reports and errors.
+//! optimized engine must give exactly the same reports and errors. Person
+//! cutoffs (decisions.md, entry 79) are the one stage it doesn't do on its
+//! own: it calls the engine's pass, so it isn't an independent check of
+//! that rule.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -178,6 +181,10 @@ fn eval_categories(ctx: &Ctx) -> Result<Vec<CategoryTotals>, CalcError> {
         });
     }
     // Persons across accounts, over every account (decisions.md, entry 79).
+    // This reuses the engine's own pass (`apply_persons`), so agreement here
+    // checks where and when the pass runs (the cache, the shortcut for
+    // accounts that all count, the unfiltered and earned rows), not the rule
+    // itself: tests/persons.rs checks the rule by hand and by its properties.
     if super::persons::any(ctx.b) {
         super::apply_persons(ctx, &mut categories)?;
     }

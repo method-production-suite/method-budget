@@ -375,8 +375,30 @@ fn apply_entry(d: &mut Detail, field: Field, value: &str, unit: Option<&str>) ->
     Ok(())
 }
 
+/// A person typed into rows `ids`, spelled the way the budget already
+/// spells that person on another row (matched as the engine matches,
+/// [`method_core::person_key`]; decisions.md, entry 79), else as typed.
+fn person_spelling(b: &Budget, ids: &[RowId], value: &str) -> String {
+    let key = method_core::person_key(value);
+    if key.is_empty() {
+        return value.to_string();
+    }
+    details(b)
+        .filter(|d| d.kind.is_costed() && !ids.contains(&d.id))
+        .filter_map(Detail::person_name)
+        .find(|p| method_core::person_key(p) == key)
+        .map_or_else(|| value.to_string(), str::to_string)
+}
+
 pub fn set_detail_field(b: &mut Budget, id: RowId, field: Field, value: &str) -> EditResult {
     check_entry(b, field, value)?;
+    let spelled;
+    let value = if field == Field::Person {
+        spelled = person_spelling(b, &[id], value);
+        spelled.as_str()
+    } else {
+        value
+    };
     let unit = (field == Field::Amount)
         .then(|| method_core::edit::unit_from_global(b, value).map(str::to_string))
         .flatten();
@@ -387,6 +409,13 @@ pub fn set_detail_field(b: &mut Budget, id: RowId, field: Field, value: &str) ->
 /// it's an error only if none do.
 pub fn set_rows_field(b: &mut Budget, ids: &[RowId], field: Field, value: &str) -> EditResult {
     check_entry(b, field, value)?;
+    let spelled;
+    let value = if field == Field::Person {
+        spelled = person_spelling(b, ids, value);
+        spelled.as_str()
+    } else {
+        value
+    };
     let unit = (field == Field::Amount)
         .then(|| method_core::edit::unit_from_global(b, value).map(str::to_string))
         .flatten();
@@ -1747,7 +1776,8 @@ mod tests {
             .take(2)
             .collect();
         let mut s = crate::session::Session::with_budget(b.clone(), None);
-        assert!(s.view().persons.is_none());
+        let v = s.view();
+        assert!(v.persons.is_none() && !v.has_persons);
         set_detail_field(
             &mut b,
             ids[0],
@@ -1760,10 +1790,34 @@ mod tests {
             .filter(|d| ids.contains(&d.id))
             .all(|d| d.person.as_deref() == Some("Dana Reyes")));
         let mut s = crate::session::Session::with_budget(b.clone(), None);
-        let people = s.view().persons.unwrap();
-        assert_eq!(people["Dana Reyes"].lines, 2);
+        let v = s.view();
+        assert!(v.has_persons);
+        let people = v.persons.unwrap();
+        assert_eq!(people["dana reyes"].lines, 2);
+        assert_eq!(people["dana reyes"].name, "Dana Reyes");
         set_detail_field(&mut b, ids[0], Field::Person, "   ").unwrap();
         assert_eq!(details(&b).find(|d| d.id == ids[0]).unwrap().person, None);
+        // A name the budget has under other spacing or case is written the
+        // way the budget first spells it; the rows being typed in don't count.
+        let others: Vec<RowId> = details(&b)
+            .filter(|d| d.kind == RowKind::Line && !ids.contains(&d.id))
+            .map(|d| d.id)
+            .take(1)
+            .collect();
+        set_detail_field(&mut b, others[0], Field::Person, " dana   REYES").unwrap();
+        assert_eq!(
+            details(&b)
+                .find(|d| d.id == others[0])
+                .unwrap()
+                .person
+                .as_deref(),
+            Some("Dana Reyes")
+        );
+        // Retyping the only row of a person changes the spelling.
+        set_rows_field(&mut b, &[ids[1], others[0]], Field::Person, "DANA reyes").unwrap();
+        assert!(details(&b)
+            .filter(|d| d.id == ids[1] || d.id == others[0])
+            .all(|d| d.person.as_deref() == Some("DANA reyes")));
         let sub = method_core::Detail::subtotal(9_999, "Sub");
         let mut d = sub.clone();
         assert!(apply_field(&mut d, Field::Person, "Dana Reyes").is_err());

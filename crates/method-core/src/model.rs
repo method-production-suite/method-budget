@@ -913,6 +913,16 @@ pub const MAX_INDENT: u8 = 4;
 /// Longest [`Note::text`], in characters.
 pub const MAX_NOTE_CHARS: usize = 10_000;
 
+/// A person's name as rows are matched by it (decisions.md, entry 79):
+/// the ends trimmed, each inner run of spaces one space, and lower case, so
+/// "Mara Lee", "mara  lee " and "MARA LEE" are one person.
+pub fn person_key(name: &str) -> String {
+    name.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
 /// One row in an account.
 ///
 /// Blank formulas: `amount` and `rate` count as 0, `x` and `x4` as 1.
@@ -987,13 +997,18 @@ impl Detail {
         }
     }
 
-    /// The row's person as the engine reads it: trimmed, `None` when unset
-    /// or blank.
+    /// The row's person as typed, trimmed; `None` when unset or blank.
     pub fn person_name(&self) -> Option<&str> {
         self.person
             .as_deref()
             .map(str::trim)
             .filter(|p| !p.is_empty())
+    }
+
+    /// The row's person as the engine matches it ([`person_key`]); `None`
+    /// when unset or blank.
+    pub fn person_key(&self) -> Option<String> {
+        self.person_name().map(person_key)
     }
 
     /// A costed line: `amount` `unit` at `rate`, with blank X and 4X.

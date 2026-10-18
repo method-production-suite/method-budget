@@ -61,8 +61,10 @@ export function indexView(view) {
   // Each person lines pay, across accounts (decisions.md, entry 79): null
   // when no line has one.
   const persons = view.persons && typeof view.persons === 'object' ? view.persons : null;
+  // Some line has a person even when the totals failed: the Person column stays.
+  const hasPersons = Boolean(view.has_persons) || Boolean(persons);
 
-  return { b, r, topsheet, cats, levels, cellIssues, accountHasIssue, categoryHasIssue, variance, cost, persons };
+  return { b, r, topsheet, cats, levels, cellIssues, accountHasIssue, categoryHasIssue, variance, cost, persons, hasPersons };
 }
 
 // ---------------------------------------------------------------------------
@@ -557,14 +559,23 @@ export function rowColor(d, groups) {
 }
 
 /**
+ * A person's name as lines are matched by it (decisions.md, entry 79): ends
+ * trimmed, inner runs of spaces as one, lower case (as Rust's person_key).
+ */
+export function personKey(name) {
+  return typeof name === 'string' ? name.trim().split(/\s+/).join(' ').toLowerCase() : '';
+}
+
+/**
  * A line's Person cell: the name, with the person's running totals across
  * accounts as its tooltip (what they are paid, and each percent fringe's pay
  * against its cutoff); a cutoff reached is marked.
  */
 export function personCell(ix, person) {
   const cell = textCell(person);
-  const name = typeof person === 'string' ? person.trim() : '';
-  const p = name && ix.persons ? ix.persons[name] : null;
+  const key = personKey(person);
+  const p = key && ix.persons ? ix.persons[key] : null;
+  const name = p && p.name ? p.name : String(person || '').trim();
   if (!p) return cell;
   const lines = `${p.lines} ${p.lines === 1 ? 'line' : 'lines'}`;
   const where = `${p.accounts.length === 1 ? 'account' : 'accounts'} ${p.accounts.join(', ')}`;
@@ -578,7 +589,7 @@ export function personCell(ix, person) {
     );
   }
   cell.title = parts.join('\n');
-  if ((p.fringes || []).some((f) => f.reached)) cell.cls = 'person-reached';
+  if ((p.fringes || []).some((f) => f.reached)) cell.cls = cell.cls ? `${cell.cls} person-reached` : 'person-reached';
   return cell;
 }
 

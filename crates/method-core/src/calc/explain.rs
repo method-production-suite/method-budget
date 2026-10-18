@@ -2356,13 +2356,19 @@ fn and_list(items: &[String]) -> String {
 /// up again.
 fn persons_calc(ctx: &Ctx, accounts: &mut [Vec<AccountCalc>]) -> R<()> {
     // Each person's earning rows, as (ci, ai, row), in budget order.
-    let mut people: BTreeMap<&str, Vec<(usize, usize, usize)>> = BTreeMap::new();
+    // By the matching form of the name; shown as the first row spells it.
+    let mut people: BTreeMap<String, Vec<(usize, usize, usize)>> = BTreeMap::new();
+    let mut shown: BTreeMap<String, &str> = BTreeMap::new();
     for (ci, cat) in ctx.b.categories().enumerate() {
         for (ai, acct) in cat.accounts.iter().enumerate() {
             for (i, d) in acct.details.iter().enumerate() {
-                let earns = accounts[ci][ai].rows.get(i).is_some_and(|r| r.included);
-                if let (true, true, Some(p)) = (d.kind.is_costed(), earns, d.person_name()) {
-                    people.entry(p).or_default().push((ci, ai, i));
+                let Some(name) = d.person_name().filter(|_| d.kind.is_costed()) else {
+                    continue;
+                };
+                let key = persons::person_key(name);
+                shown.entry(key.clone()).or_insert(name);
+                if accounts[ci][ai].rows.get(i).is_some_and(|r| r.included) {
+                    people.entry(key).or_default().push((ci, ai, i));
                 }
             }
         }
@@ -2385,7 +2391,8 @@ fn persons_calc(ctx: &Ctx, accounts: &mut [Vec<AccountCalc>]) -> R<()> {
             .map(|a| a.code.clone())
             .unwrap_or_default()
     };
-    for (person, at) in &people {
+    for (key, at) in &people {
+        let person = shown.get(key).copied().unwrap_or(key.as_str());
         let mut names: BTreeSet<&str> = BTreeSet::new();
         for &(ci, ai, i) in at {
             names.extend(detail(ci, ai, i)?.fringes.iter().map(String::as_str));

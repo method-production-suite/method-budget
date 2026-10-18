@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use common::*;
 use method_core::calc::cache::RecalcCache;
-use method_core::calc::persons::person_totals;
+use method_core::calc::persons::{person_key, person_totals};
 use method_core::explain::{Explainer, Target};
 use method_core::sample::{self, SampleSpec};
 use method_core::*;
@@ -234,8 +234,13 @@ fn person_totals_show_pay_against_the_cutoff() {
     let b = dana(Some(DANA));
     let r = recalc(&b, &RecalcOptions::default()).unwrap();
     let people = person_totals(&b, &r).unwrap();
-    assert_eq!(people.keys().collect::<Vec<_>>(), [DANA, "Lee Park"]);
-    let p = &people[DANA];
+    // Keyed by the matching form of the name, shown as typed.
+    assert_eq!(
+        people.keys().collect::<Vec<_>>(),
+        ["dana reyes", "lee park"]
+    );
+    let p = &people["dana reyes"];
+    assert_eq!(p.name, DANA);
     assert_eq!(p.rows, [1, 3, 4]);
     assert_eq!(p.accounts, ["2100", "2200", "3100"]);
     assert_eq!(p.pay, 1_000_000);
@@ -255,7 +260,7 @@ fn person_totals_show_pay_against_the_cutoff() {
         &recalc(&dana(None), &RecalcOptions::default()).unwrap()
     )
     .unwrap()
-    .contains_key("Lee Park"));
+    .contains_key("lee park"));
 }
 
 #[test]
@@ -373,7 +378,8 @@ fn one_earner_at(b: &Budget, name: &str, pay: Cents) -> Cents {
 /// A person's percent fringe never counts the cutoff twice: across all of
 /// the person's counted rows, it is exactly the percent of the cutoff
 /// (rounded once) when their pay is past it, and each row's own percent
-/// otherwise. Never more than either.
+/// otherwise. Without credits, never more than with a cutoff per line (give
+/// or take each line's rounding).
 #[test]
 fn a_person_cutoff_never_double_counts() {
     let mut checked_past = 0;
@@ -396,9 +402,11 @@ fn a_person_cutoff_never_double_counts() {
                     );
                 }
             }
-            // Never more than with every line on its own cutoff (pay is
-            // never negative in the sample).
-            let own: Cents = p
+            // Without credits, never more than with every line on its own
+            // cutoff, give or take each line's own rounding (under a cent a
+            // line). With a credit it can be more: see
+            // `with_a_credit_a_person_can_earn_more_than_lines_alone`.
+            let own_rows: Vec<&RowTotals> = p
                 .rows
                 .iter()
                 .filter_map(|id| {
@@ -408,9 +416,12 @@ fn a_person_cutoff_never_double_counts() {
                         .flat_map(|a| &a.rows)
                         .find(|row| row.id == *id)
                 })
-                .map(|row| row.fringe_total)
-                .sum();
-            assert!(p.fringe_total <= own, "seed {seed} {}", p.name);
+                .collect();
+            if own_rows.iter().all(|row| row.total >= 0) {
+                let own: Cents = own_rows.iter().map(|row| row.fringe_total).sum();
+                let n = own_rows.len() as Cents;
+                assert!(p.fringe_total <= own + n, "seed {seed} {}", p.name);
+            }
         }
         // Every fringe dollar is on exactly one row.
         let rows: Cents = r
@@ -503,4 +514,72 @@ fn explain_adds_up_with_persons() {
             );
         }
     }
+}
+
+/// Names match with the ends trimmed, inner runs of spaces as one and case
+/// ignored (decisions.md, entry 79): "Mara Lee", "mara  lee " and "MARA LEE"
+/// are one person, shown as the first row in the budget spells it.
+#[test]
+fn names_match_ignoring_case_and_spacing() {
+    assert_eq!(person_key("  Mara \t Lee "), "mara lee");
+    assert_eq!(person_key("MARA LEE"), person_key("mara  lee "));
+    let mut b = dana(None);
+    for (id, name) in [(1, "Mara Lee"), (3, "mara  lee "), (4, "MARA LEE")] {
+        for d in b
+            .categories_mut()
+            .flat_map(|c| &mut c.accounts)
+            .flat_map(|a| &mut a.details)
+            .filter(|d| d.id == id)
+        {
+            d.person = Some(name.into());
+        }
+    }
+    let r = checked(&b);
+    let f = row_fringes(&r);
+    assert_eq!(
+        (f[&1]["SUTA"], f[&3]["SUTA"], f[&4]["SUTA"]),
+        (21_000, 35_000, 14_000)
+    );
+    let people = person_totals(&b, &r).unwrap();
+    let p = &people["mara lee"];
+    assert_eq!(
+        (p.name.as_str(), p.rows.as_slice()),
+        ("Mara Lee", &[1, 3, 4][..])
+    );
+    let ex = Explainer::new(&b, &RecalcOptions::default()).unwrap();
+    let text = ex
+        .explain(&Target::LineFringe(4, "SUTA".into()))
+        .unwrap()
+        .to_text(None);
+    assert!(text.contains("Mara Lee is paid on 3 lines"), "{text}");
+}
+
+/// The "never more than per line" guarantee needs rows of pay, not credits:
+/// 10% with a 7,000.00 cutoff on 10,000.00 and a -5,000.00 credit is
+/// 700.00 - 500.00 = 200.00 line by line, but the person is paid 5,000.00,
+/// within the cutoff, so earns 1,000.00 - 500.00 = 500.00.
+#[test]
+fn with_a_credit_a_person_can_earn_more_than_lines_alone() {
+    let mut b = dana(None);
+    fn lines(b: &mut Budget) -> Vec<&mut Detail> {
+        b.categories_mut()
+            .flat_map(|c| &mut c.accounts)
+            .flat_map(|a| &mut a.details)
+            .filter(|d| d.id == 1 || d.id == 3)
+            .collect()
+    }
+    for (d, pay) in lines(&mut b).into_iter().zip(["10000", "-5000"]) {
+        d.rate = pay.into();
+        d.fringes = set(&["SUTA"]);
+    }
+    let alone: Cents = [1, 3]
+        .iter()
+        .map(|id| row_fringes(&checked(&b))[id]["SUTA"])
+        .sum();
+    assert_eq!(alone, 20_000);
+    for d in lines(&mut b) {
+        d.person = Some(DANA.into());
+    }
+    let f = row_fringes(&checked(&b));
+    assert_eq!((f[&1]["SUTA"], f[&3]["SUTA"]), (100_000, -50_000));
 }

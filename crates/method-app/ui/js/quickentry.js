@@ -117,9 +117,9 @@ export function assistConfig(colKey) {
   if (colKey === 'person') {
     const v = ctx.view();
     const people = (v && v.persons) || {};
-    const candidates = Object.keys(people).map((name) => {
-      const n = people[name].lines;
-      return { name, hint: `${n} ${n === 1 ? 'line' : 'lines'}` };
+    const candidates = Object.values(people).map((p) => {
+      const n = p.lines;
+      return { name: p.name, hint: `${n} ${n === 1 ? 'line' : 'lines'}` };
     });
     return { mode: 'whole', candidates, label: 'People' };
   }

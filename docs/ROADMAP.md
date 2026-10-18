@@ -57,6 +57,11 @@ this page goes ahead without waiting.
   does within one account. The reference product has no person, so no parity run can
   decide it. **Recommend: by pay**, so moving lines or accounts never moves a cent. Built
   on the recommendation.
+- **Which person names are one person** (3.11; D79): names match with the ends trimmed,
+  inner runs of spaces as one and case ignored ("Mara Lee", "mara  lee " and "MARA LEE"
+  are one person), shown as the budget first spells them. The other way is exact
+  matching, where a stray space or capital makes a second person. **Recommend: loose
+  matching**, so a typo can't charge a wage base twice. Built on the recommendation.
 - **Built on the recommendation, never confirmed by the owner** (any can be reversed from
   the digest): renames rewrite every reference (decision 7; D32), new-line defaults match
   the reference as per-budget switches (decision 10; 1.4, D60), dated notes on lines,
