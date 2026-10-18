@@ -86,6 +86,13 @@ ref = ["D5", "2.10"]
 
 [[feature]]
 group = "engine"
+title = "Schedule-linked quantities"
+text = "Read a schedule's day counts (shoot days, days per location, set, week or cast member) and set your globals from them, after a review of every change."
+status = "have"
+ref = ["3.8", "D76"]
+
+[[feature]]
+group = "engine"
 title = "Currencies"
 text = "Any line can be in its own currency, converted to the budget's base currency at rates you set."
 status = "have"
@@ -436,13 +443,6 @@ title = "Incentive modeling"
 text = "Qualified spend by location, several programs side by side, caps and what-ifs, from rules you enter yourself."
 status = "soon"
 ref = "3.6"
-
-[[feature]]
-group = "engine"
-title = "Schedule-linked quantities"
-text = "Read day counts from a schedule's export and let them drive your globals."
-status = "soon"
-ref = "3.8"
 
 [[feature]]
 group = "engine"

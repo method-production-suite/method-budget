@@ -2064,6 +2064,60 @@ is the working file.
 | `export_import_preview` | `token`, `format` (`null` to detect) | the review, read as that layout; changes nothing |
 | `export_import` | `token`, `format` | `{view, message}`: the budget in a new tab in front; `message` is `null` for a conversion, whose banner comes with every view (`converted`) until saved |
 
+### Globals from a schedule's days
+
+**File > Import Schedule Days…** sets the budget's globals from a schedule's day counts
+(roadmap 3.8; decisions.md, entry 76). The file is the one Method Schedule writes for a
+budget (File > Export for Budget there, or `method-schedule budget FILE`): one sub-board's
+shoot days, in all and by unit, set, location and week, and each element's days
+(`format: "method-schedule-days"`, versions 0 and 1; docs/research/schedule-exchange.md).
+Rust shows the Open dialog (JSON files) and reads the file; then a review shows, before
+anything changes:
+
+- **The schedule**: its title, board and sub-board, how many shoot days and their dates,
+  when the file was written, and notes on anything odd in the file (a count that doesn't
+  add up, a `days_hash` that doesn't match its days).
+- **Figures and globals**, grouped: shoot days in all, by unit, set, location and week,
+  then each category's elements. Each row has a tick (use it), the figure, its days, the
+  global it would set (a field to rename it, offering the budget's globals), that global's
+  value now (its formula, and what it comes to when it isn't a plain number), the new value,
+  and what happens: a new global, a new value, the same value, or changed in the schedule.
+- **The rule**: shoot days in all go to `SHOOT_DAYS`, ticked to start. Any other figure is
+  set only when ticked, to the global named in its row: by default the figure's name in
+  capitals with `_DAYS` (`COLD_SPRING_FIELD_STATION_DAYS`), or any name typed there, an
+  existing global to update it (`STATION_DAYS`). Typing a name ticks the row. A global that
+  only has a figure's default name is not ticked for it (in the Field Station budget
+  `RIDGE_DAYS` is the fire road location's days, not the RIDGE set's). An element's days
+  are its day out of days total. Prep and wrap globals are never touched.
+- **What Set Globals does**: how many globals are new, change or already match, and
+  anything refused (a name that can't be a global, two figures in one global), which keeps
+  Set Globals off.
+
+**Set Globals** applies it as one undo step ("Set globals from the schedule Field
+Station"); the toast says how many globals were set. A new global gets the figure as its
+description ("Shoot days at location Cold Spring field station") and the Day unit when the
+budget has one. Each global set records its figure in its source (the setup source packs
+use, so the file format is unchanged): "Shoot days at location Cold Spring field station,
+from the schedule Field Station (Shooting Order, Main)". The next import of the same
+schedule and sub-board ticks those globals again under their own names, says which ones
+the schedule has changed since ("The schedule changed since these globals were set from
+it: STATION_DAYS"), and lists a global whose figure is no longer in the file (a location
+dropped, an element cut) under "Set from this schedule before, no longer in it" at 0 days,
+ticked, rather than keeping an old number. A global already at its value can still be set,
+which only records the link. The file's `days_hash` is not stored in the budget (that would
+be a format change; the roadmap's 3.8 row has the proposal).
+
+The command line does the same with `method-budget schedule-days <budget.mthd> <days.json>
+[--pick KEY[=GLOBAL]]... [--skip KEY]... [--apply] [--json]` (docs/CLI.md), and agents
+with the `schedule_days` MCP tool (docs/MCP.md). In the browser build the page's file
+picker takes the file.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `schedule_days_pick` | none (shows the Open dialog) | the review, or `null` when cancelled: `{token, file, schedule, board, sub_board, generated, version, source_hash, days_hash, shoot_days, start, end, notes, figures: [{key, kind, name, category, label, days, global, picked, linked, current, current_value, new, action, problem, changed}], adds, updates, same, changed, problems, can_apply}`; `kind` is `total`, `unit`, `set`, `location`, `week`, `element` or `missing`, `action` `add`, `update` or `same` |
+| `schedule_days_review` | `token`, `picks` (`[{key, global}]`, `global` empty for the default; `null` for the review's own) | the review with those picks; changes nothing |
+| `schedule_days_apply` | `token`, `picks` | `{view, message}`: the globals set as one undo step |
+
 ### Actuals and the cost report
 
 **File > Import Actuals…** brings in actual costs from an accounting system's export (an
@@ -2415,6 +2469,8 @@ crates/method-session/   no window, no file system, no threads, no clock of its 
   src/sheet_import.rs  Import Spreadsheet: the picked file kept by token, the mapping
                      dialog's preview and the import (method_format::import does the work)
   src/export_import.rs  Import Budget Export: the review and the new tab
+  src/schedule_days.rs  Import Schedule Days: a schedule's figures, the global each sets,
+                     the review and applying it as one undo step (the file kept by token)
   src/open_any.rs    Open's routing by content: a budget, a budget export, a spreadsheet
   src/setup_sheets.rs  setup lists as spreadsheets: export by kind, import with a column
                      mapping per sheet, then Import Setup's review
@@ -2451,7 +2507,7 @@ crates/method-app/
   src/export.rs, src/templates.rs, src/sharing.rs, src/setup_sheets.rs
                      the Save dialogs and atomic writes
   src/import_setup.rs, src/coa_import.rs, src/sheet_import.rs, src/export_import.rs,
-  src/open_any.rs, src/actuals.rs
+  src/open_any.rs, src/actuals.rs, src/schedule_days.rs
                      the Open dialogs and reading the files (a file open in a tab is read
                      from the tab)
   src/library.rs     which file is the library (library.json), reading and writing it
@@ -2922,6 +2978,10 @@ Import Budget Export needs a live check: the Open dialog's filters and the revie
 app (checked here with the parity runs' exports in every layout through `method-budget
 import-export`, and the review in a browser harness with a canned reply, Import calling
 `export_import` with the token and layout).
+Import Schedule Days needs a live check in the app: the Open dialog and the menu item
+(checked here with the Field Station files through `method-budget schedule-days`, and the
+review, renaming, ticking, a refused name and Set Globals in the browser build against the
+real Rust code).
 Exports need a live check: File > Export's Save dialogs, and the workbook opened in Excel
 and Numbers (checked here by reading it back: ZIP CRCs, every part well-formed with
 `xmllint` and Python's parser, content types and relationships complete, every cell's
