@@ -104,6 +104,9 @@ pub fn sample_at_launch<R: Runtime>(
         nothing_open: state.docs().lone_untouched().is_some(),
         own_budgets: !safety.recent_paths().is_empty() || !start.pinned().is_empty(),
     };
+    if sample::retire_at_launch(launch) {
+        safety.mark_sample_seen();
+    }
     if !sample::at_launch(launch) {
         return Ok(None);
     }

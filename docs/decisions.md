@@ -4103,7 +4103,7 @@ docs/APP.md, "The sample budget"; the file: fixtures/field-station/README.md.
 - **One production with Method Schedule.** The budget is made from Method Schedule's own
   days file for its Field Station sample (18 shoot days, 3 to 26 May 2027; three
   locations; a one-day second unit; nine cast; stunts, background, vehicles, boats and the
-  rest of the breakdown), copied from its commit `fb3bbe3` (its pull request #29, not
+  rest of the breakdown), copied from its commit `093e951` (its pull request #29, not
   merged yet; we copy it again when it merges). Every day count goes through
   `method-budget schedule-days --apply`, as the real hand-off does, so each global keeps
   its link to the schedule and a second import changes nothing (tested). An element's
@@ -4137,9 +4137,11 @@ docs/APP.md, "The sample budget"; the file: fixtures/field-station/README.md.
   tab label and the banner already travel in the view.
 - **The setting** is Help > Open the Sample on First Launch, a check in `settings.json`
   beside Autosave (the app's preferences), on by default; showing the sample (either way)
-  sets `sample_seen`. Help > Open Sample opens a copy any time. A check in the Help menu
-  follows Check for Updates Automatically; the app has no preferences window to put it
-  in.
+  sets `sample_seen`, and so does a start that finds the person already at work (budgets
+  on the recent or pinned lists, or something opened or recovered), so clearing the
+  recent list later never brings it up unasked. Help > Open Sample opens a copy any time.
+  The check sits right after Open Sample in the Help menu; the app has no preferences
+  window to put it in.
 - **Where the logic is.** method-session's `sample` (the decision and the copy; no
   window, builds for the browser), the app's src/sample.rs (the bundled bytes, the menu
   items, two commands). The browser demo at `/try/` and the browser smoke test now open

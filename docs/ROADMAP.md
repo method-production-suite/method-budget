@@ -40,14 +40,6 @@ this page goes ahead without waiting.
   pinned lists are empty, so nobody upgrading from 0.4.0 with budgets of their own sees it
   unasked (Help > Open Sample is there for them). **Recommend: keep it so.** Built on the
   recommendation; the other choice is to show it once to everyone after the update.
-- **The sample's prep and wrap** (3.20; D84): Method Schedule's file has prep from 26 April
-  and wrap to 28 May, one week and two days around the shoot, and the budget's
-  information takes those dates; the budget still pays four weeks of prep and two of wrap
-  (`PREP_WKS`, `WRAP_WKS`), which is usual for a feature this size. **Recommend: ask
-  MSchedule to widen their sample's prep and wrap to match** (5 April and 9 June), or
-  accept the difference as the budget's own assumption. Built as it stands; nothing waits
-  on it.
-
 - **Which languages first** (3.14; D82): nothing is translated yet and no translation
   framework is started. The words live inline in the page scripts, the menu bar and the
   engine's messages; docs/research/accessibility-audit.md, "Localization", lists where

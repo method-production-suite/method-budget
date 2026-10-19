@@ -1275,7 +1275,8 @@ is made up.
 - **Help > Open the Sample on First Launch** is the setting, a check kept in the data
   folder's `settings.json` beside Autosave, on by default. Off, a start never opens the
   sample. Showing the sample either way marks it seen (`sample_seen` in the same file),
-  so a start opens it once at most.
+  so a start opens it once at most. A start that finds budgets of yours, or something
+  to open, marks it seen too, so clearing the recent list later never brings it up.
 - **The logic** is method-session's `sample` module (the decision and the copy, no
   window); the app bundles the file with `include_bytes!` (src/sample.rs). The browser
   build's demo at `/try/` starts with the same file (docs/WEBSITE.md, "The demo").

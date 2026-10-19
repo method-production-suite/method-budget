@@ -12,7 +12,7 @@
     "info": {
       "Prep start": {
         "kind": "date",
-        "value": "2027-04-26"
+        "value": "2027-04-05"
       },
       "Production type": {
         "kind": "text",
@@ -28,7 +28,7 @@
       },
       "Wrap end": {
         "kind": "date",
-        "value": "2027-05-28"
+        "value": "2027-06-09"
       }
     },
     "currencies": {

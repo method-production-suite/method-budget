@@ -40,6 +40,14 @@ pub fn at_launch(l: Launch) -> bool {
     l.setting_on && !l.seen && l.nothing_open && !l.own_budgets
 }
 
+/// The start found someone already at work (budgets of their own, or
+/// something opened or recovered), so the sample is not for them: marked
+/// seen without showing it, so it doesn't open unasked at a later start
+/// after they clear their recent list. The setting doesn't matter here.
+pub fn retire_at_launch(l: Launch) -> bool {
+    !l.seen && (l.own_budgets || !l.nothing_open)
+}
+
 /// A fresh untitled copy of the sample `bytes` (a `.mthd` file): no file,
 /// nothing to undo and nothing unsaved (closing it asks nothing, and a
 /// budget opened next takes its tab as it would an untouched Untitled
@@ -93,6 +101,44 @@ mod tests {
             },
         ] {
             assert!(!at_launch(l), "{l:?}");
+        }
+    }
+
+    #[test]
+    fn someone_already_at_work_never_sees_it_later() {
+        assert!(!retire_at_launch(launch()));
+        for l in [
+            Launch {
+                own_budgets: true,
+                ..launch()
+            },
+            Launch {
+                nothing_open: false,
+                ..launch()
+            },
+            Launch {
+                own_budgets: true,
+                setting_on: false,
+                ..launch()
+            },
+        ] {
+            assert!(retire_at_launch(l), "{l:?}");
+            assert!(!at_launch(l), "{l:?}");
+        }
+        // Already seen: nothing to mark. Setting off, nothing of their own:
+        // left unmarked, so turning the setting on still shows it once.
+        for l in [
+            Launch {
+                own_budgets: true,
+                seen: true,
+                ..launch()
+            },
+            Launch {
+                setting_on: false,
+                ..launch()
+            },
+        ] {
+            assert!(!retire_at_launch(l), "{l:?}");
         }
     }
 
