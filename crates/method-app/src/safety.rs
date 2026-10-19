@@ -211,12 +211,28 @@ pub trait DiskStampExt {
     fn check(&self, path: &Path) -> DiskCheck;
 }
 
+/// How close to "now" a file's time must be for a stamp not to trust it. Linux and
+/// Windows give a file the time of a coarse clock tick, and FAT and exFAT drives count in
+/// two seconds, so a change written just after ours can keep our exact time and size.
+const RACY: Duration = Duration::from_secs(2);
+
+/// The file's time, when it is old enough to tell our write from a later one (and not
+/// in the future: another computer's clock). Otherwise `None`, and checks compare the
+/// content, as git does with a "racily clean" file.
+fn trusted_time(modified: Option<SystemTime>, now: SystemTime) -> Option<SystemTime> {
+    let m = modified?;
+    match now.duration_since(m) {
+        Ok(age) if age >= RACY => Some(m),
+        _ => None,
+    }
+}
+
 impl DiskStampExt for DiskStamp {
     fn of(path: &Path, bytes: &[u8]) -> DiskStamp {
         let meta = fs::metadata(path).ok();
         DiskStamp {
             len: meta.as_ref().map_or(bytes.len() as u64, |m| m.len()),
-            modified: meta.and_then(|m| m.modified().ok()),
+            modified: trusted_time(meta.and_then(|m| m.modified().ok()), SystemTime::now()),
             hash: content_hash(bytes),
         }
     }
@@ -1290,18 +1306,14 @@ pub(crate) mod tests {
         let dir = temp_dir("stamp");
         let path = dir.join("film.mthd");
         fs::write(&path, b"ours").unwrap();
+        // Written a minute ago, so its time can be trusted.
+        set_modified(&path, SystemTime::now() - Duration::from_secs(60));
         let stamp = DiskStamp::of(&path, b"ours");
         assert_eq!(stamp.check(&path), DiskCheck::Same(None));
 
         // Touched (a sync service rewriting the same bytes): still the same,
         // with a fresh stamp to remember.
-        let later = SystemTime::now() + Duration::from_secs(5);
-        File::options()
-            .write(true)
-            .open(&path)
-            .unwrap()
-            .set_modified(later)
-            .unwrap();
+        set_modified(&path, SystemTime::now() - Duration::from_secs(30));
         let DiskCheck::Same(Some(fresh)) = stamp.check(&path) else {
             panic!("touching isn't changing");
         };
@@ -1314,6 +1326,45 @@ pub(crate) mod tests {
         assert_eq!(stamp.check(&path), DiskCheck::Changed);
         fs::remove_file(&path).unwrap();
         assert_eq!(stamp.check(&path), DiskCheck::Missing);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    fn set_modified(path: &Path, when: SystemTime) {
+        File::options()
+            .write(true)
+            .open(path)
+            .unwrap()
+            .set_modified(when)
+            .unwrap();
+    }
+
+    #[test]
+    fn a_change_within_the_same_clock_tick_is_noticed() {
+        // Linux and Windows give a file the time of a coarse clock tick, and FAT drives
+        // count in two seconds, so a same-size change written just after ours can keep
+        // our file's exact time. A stamp taken that close to the file's time doesn't
+        // trust it: the content decides.
+        let dir = temp_dir("stamp-tick");
+        let path = dir.join("film.mthd");
+        fs::write(&path, b"ours").unwrap();
+        let ours = fs::metadata(&path).unwrap().modified().unwrap();
+        let stamp = DiskStamp::of(&path, b"ours");
+        fs::write(&path, b"them").unwrap();
+        set_modified(&path, ours);
+        assert_eq!(stamp.check(&path), DiskCheck::Changed);
+
+        // The same bytes are still the same, and the stamp to remember comes back.
+        fs::write(&path, b"ours").unwrap();
+        set_modified(&path, ours);
+        assert!(matches!(stamp.check(&path), DiskCheck::Same(_)));
+
+        // A time in the future (another computer's clock) isn't trusted either.
+        let ahead = SystemTime::now() + Duration::from_secs(3600);
+        set_modified(&path, ahead);
+        let stamp = DiskStamp::of(&path, b"ours");
+        fs::write(&path, b"them").unwrap();
+        set_modified(&path, ahead);
+        assert_eq!(stamp.check(&path), DiskCheck::Changed);
         fs::remove_dir_all(&dir).unwrap();
     }
 
