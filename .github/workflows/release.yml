@@ -433,6 +433,22 @@ jobs:
             echo "::notice::No updater archive in this release: no latest.json, so installed apps won't see it (docs/RELEASING.md)."
           fi
 
+      - name: Checksums of every download
+        # SHA256SUMS lists every file the release carries, by bare name (SUITE-STANDARDS.md,
+        # section 3): Method Launcher checks a Windows or Linux download against it before
+        # installing, and anyone can with `sha256sum -c --ignore-missing SHA256SUMS`.
+        run: |
+          set -euo pipefail
+          cd dist
+          rm -f SHA256SUMS
+          # Bare names on purpose: they are what SHA256SUMS lists, and every one starts
+          # with "Method-Budget" or is latest.json, never a dash.
+          # shellcheck disable=SC2035
+          sha256sum * > "$RUNNER_TEMP/SHA256SUMS"
+          mv "$RUNNER_TEMP/SHA256SUMS" SHA256SUMS
+          sha256sum -c SHA256SUMS
+          cat SHA256SUMS
+
       - name: Draft the release
         env:
           GH_TOKEN: ${{ github.token }}

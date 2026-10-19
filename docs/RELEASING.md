@@ -156,6 +156,7 @@ one means changing the workflow, this table and the site's links together.
 | `Method-Budget-linux-x86_64.AppImage` | the Linux AppImage (untested, not updated in place yet) |
 | `Method-Budget_<version>_aarch64.app.tar.gz` and `.sig` | the Mac updater archive and its signature (versioned: `latest.json` names it) |
 | `latest.json` | the update manifest installed apps read |
+| `SHA256SUMS` | the SHA-256 of every file above, one per line (`sha256sum -c --ignore-missing SHA256SUMS` checks a download); Method Launcher checks Windows and Linux downloads against it |
 
 Before publishing, download the `.dmg`, open it on a Mac and run the app once. With the
 Apple secrets set, `scripts/check-macos-bundle.sh` on the downloaded app shows a
