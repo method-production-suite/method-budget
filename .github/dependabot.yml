@@ -2,7 +2,10 @@
 # ecosystem each week, after the same 14-day cooldown CI enforces (scripts/check-crate-ages.py),
 # so a group never fails the cooldown check. Security updates are never grouped: each arrives
 # as its own pull request when an advisory is published. GitHub Actions are not here: their
-# pinned SHAs move in every suite repository at once, by MOrg.
+# pinned SHAs move in every suite repository at once, by MOrg. Nor are the Tauri crates: they
+# are pinned to exact versions and move as one set, by hand, together with the Tauri CLI pin in
+# scripts/install-tauri-cli.sh (docs/APP.md, "Dependencies"); a lone tauri-build bump would split
+# the set. An advisory against any of them still fails the deny job in CI.
 version: 2
 updates:
   - package-ecosystem: cargo
@@ -13,6 +16,8 @@ updates:
     cooldown:
       default-days: 14
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "tauri*"
     groups:
       cargo:
         applies-to: version-updates
