@@ -1,18 +1,18 @@
 # Dependabot (SUITE-STANDARDS.md section 6): version updates grouped into one pull request per
-# ecosystem each week, after the same 14-day cooldown CI enforces (scripts/check-crate-ages.py),
-# so a group never fails the cooldown check. Security updates are never grouped: each arrives
-# as its own pull request when an advisory is published. GitHub Actions are not here: their
-# pinned SHAs move in every suite repository at once, by MOrg. The Tauri crates are pinned to
-# exact versions and move as one set, so they have their own group, listed first (a crate goes
-# to the first group it matches): its pull request is the starting point, and the Tauri CLI pin
-# in scripts/install-tauri-cli.sh is moved with it by hand (docs/APP.md, "Dependencies").
+# group each month, after the same 14-day cooldown CI enforces (scripts/check-crate-ages.py),
+# so a group never fails the cooldown check. Security updates are never grouped and don't wait
+# for the month: each arrives as its own pull request when an advisory is published. GitHub
+# Actions are not here: their pinned SHAs move in every suite repository at once, by MOrg. The
+# Tauri crates are pinned to exact versions and move as one set, so they have their own group,
+# listed first (a crate goes to the first group it matches): its pull request is the starting
+# point, and the Tauri CLI pin in scripts/install-tauri-cli.sh is moved with it by hand
+# (docs/APP.md, "Dependencies").
 version: 2
 updates:
   - package-ecosystem: cargo
     directories: ["/", "/fuzz"]
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     cooldown:
       default-days: 14
     open-pull-requests-limit: 5
