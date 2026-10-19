@@ -17,22 +17,22 @@ missing pieces), **[missing]** not started. Size: **S** a day or two, **M** abou
 
 ## Waiting on the owner
 
-Updated 2026-10-18. Only what needs the owner's answer, hands or yes; everything else on
+Updated 2026-10-19. Only what needs the owner's answer, hands or yes; everything else on
 this page goes ahead without waiting.
 
 ### Release go-aheads
 
-- **0.3.0**: pull request #21 (the version bump, the notes, the site's What's new) is open.
-  After it merges, the tag `v0.3.0`, already made locally on that commit, is pushed only on
-  the owner's yes; the push starts the release workflow, which drafts the GitHub release
-  for the owner to publish. The pull request touches `site/`, so MOrg syncs the website
-  after the merge.
+- **0.6.0, when the owner wants it**: on main so far, the launcher contract (two
+  command-line flags and the suite's `recent.json`, D85), the first-start sample without its
+  setting (D86), a missed same-size change on Linux and Windows fixed, the Windows build no
+  longer bundling copies with Windows line endings, checksums on every release and the
+  prebuilt Tauri CLI; queued, the weekly full build (#52) and the release key check (#53).
+  Before the tag: run `updater-key-check` once (proves the release key still signs with the new
+  minisign, D83) and the weekly build on the release commit. The tag needs the owner's yes.
 - **rustls update, on or after 2026-10-28**: the fix (0.23.46) leaves the 14-day crate
   cooldown then. `cargo update -p rustls` and the four RUSTSEC-2026-0346 to 0349 ignores
-  taken out of `deny.toml` go in as one pull request; it needs only the usual merge label.
-- **The 0.2.1 draft release** on GitHub was never published (the `v0.2.1` tag is public).
-  0.3.0's notes cover its fixes. Delete the draft or leave it. **Recommend: delete it**, so
-  the releases page shows 0.2.0 then 0.3.0; the tag stays as it is.
+  taken out of `deny.toml` go in as one pull request. None of the four applies to the
+  updater (deny.toml gives each reason), so nothing waits on it.
 
 ### Open decisions
 
@@ -136,7 +136,8 @@ this page goes ahead without waiting.
       print the topsheet and detail; menu keys (Alt+Up and Alt+Down, Ctrl+F, the setup
       keys); double-click a `.mthd` to open it; on Windows, install 0.3.0 over 0.2.x and
       check the install folder doesn't keep an old `method-budget.exe` beside
-      `method-budget-app.exe` (D74).
+      `method-budget-app.exe` (D74). Best on 0.6.0 or later: earlier Windows builds
+      bundled the chart templates and the sample with Windows line endings.
 - [ ] **Help menu on a Mac**: User Guide opens docs/APP.md; Report a Bug opens a new issue
       with the version and system filled in; Licenses and Notices opens and scrolls;
       methodproduction.com opens; About shows "Licensed under MIT OR Apache-2.0".
@@ -151,9 +152,9 @@ this page goes ahead without waiting.
       press Escape (it should say the dialog's name, then come back to the button). Note
       anything said twice, missed or confusing. Narrator or NVDA on Windows if one is to
       hand.
-- [ ] **An update through method-update** (D83; needs two signed releases and an Apple
-      silicon Mac): install the first release that has method-update, publish the next
-      one, then in the installed app: Help > Check for Updates finds and downloads it and
+- [ ] **An update through method-update** (D83; an Apple silicon Mac; **ready now**: 0.4.0
+      and 0.5.0 are both signed method-update releases): install 0.4.0 from its release
+      page, then in the installed app: Help > Check for Updates finds and downloads it and
       "Update ready: Restart to update" appears; Restart to update saves, swaps the app in
       /Applications (and asks for an administrator when the folder isn't writable), starts
       the new version with its tabs back, and What's New shows once. Also: the release
