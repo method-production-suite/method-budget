@@ -4158,3 +4158,49 @@ docs/APP.md, "The sample budget"; the file: fixtures/field-station/README.md.
   real file, `incentives_text_and_json` on the sample's own program.
 - **Not checked here.** The first start, the tab, the banner and the Help items in the
   running app need the owner's screen; they are on the owner's list.
+
+## 85. The Method Launcher contract: two flags and the suite's recent.json (2026-10-18)
+
+SUITE-STANDARDS.md, section 2 (the owner, 2026-10-18: every app, on every system, meets
+the launcher the same way). Behavior: docs/APP.md, "Command-line options" and the recent
+list under "Saving and recovery"; the code: src/launch.rs, src/safety.rs.
+
+- **Two flags on the window binary.** `method-budget-app --check-for-updates` checks now,
+  as Help > Check for Updates… does, with the answer in the toolbar. `--open-sample` opens
+  the Field Station sample, as Help > Open Sample does, in place of the start window.
+  Flags count anywhere on the line and can come with a file to open; any other option,
+  known or not, is skipped and never taken for a file (`LaunchArgs::parse`, a pure
+  function with its own tests; `path_from_args` uses it).
+- **Read at the start only.** The app has no single-instance hand-off: on macOS a second
+  launch brings the running app forward without its arguments, and on Windows and Linux
+  it starts a second copy, which reads its own. Adding a hand-off (a plugin or our own
+  socket) is more than the contract needs.
+- **Started when the page can hear it.** Both flags wait for the page. The check starts
+  when the page first asks where an update is (`update_status`, at the end of its start),
+  so "Method Budget is up to date." isn't said before anything listens. The sample opens
+  in `sample_at_launch`, the page's own first-start question, whatever the setting says;
+  it is taken once there, so the first-start rule can't open a second copy and the start
+  window doesn't open over it. With a recovery question showing, the page doesn't ask,
+  and the flag is dropped, as the first-start sample is.
+- **recent.json in the suite's shape.** A top-level array, newest first:
+  `[{"path": "/abs/path", "opened": "<RFC 3339, UTC>", "bookmark": "<hex>"}]`. `opened` is
+  when the file was last added to the list (opened or saved). `bookmark` is ours, there
+  only when the system made one (src/bookmark.rs, entry 64); the launcher ignores it, and
+  the app ignores keys it doesn't know. Paths are absolute (canonical when the file
+  exists). The old shape, `{"files": [...], "bookmarks": {path: hex}}`, is still read with
+  its bookmarks; its files get the time it was read, and the next change writes the new
+  shape. Nothing else changes: ten files, each once, pruning and following moved files as
+  before. The pinned list (`start.json`) keeps its own shape; it isn't part of the
+  contract.
+- **No time crate.** `opened` is formatted by a small tested helper from `SystemTime`
+  (days to a civil date, as the CLI and xtask already do), so no dependency is added.
+- **Installed names already match.** The Linux package is `method-budget` and the
+  Windows display name `Method Budget`, both from `productName` in tauri.conf.json, so
+  nothing changes there.
+- Tests: `launch` (flags anywhere, unknown options skipped, a file beside a flag),
+  `command_line_paths` with the flags, the once-only sample and update requests, the
+  recent list (the existing order, dedup, cap and prune test on the new shape; the new
+  shape round-trips; the old shape read with its bookmarks and rewritten; `opened`
+  renewed on a second add; unreadable files are an empty list; the RFC 3339 helper).
+- **Not checked here.** Starting the built app with each flag needs the owner's screen;
+  it is on the owner's list.

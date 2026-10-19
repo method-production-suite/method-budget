@@ -1271,7 +1271,9 @@ is made up.
   nothing, and a budget you open or make next takes its tab, as with an untouched
   Untitled budget. Saved as a file, it is yours: the mark and the line go.
 - **Help > Open Sample** opens a fresh copy any time (in a new tab, or in place of an
-  untouched Untitled budget alone in the window).
+  untouched Untitled budget alone in the window). Starting the app with `--open-sample`
+  (Method Launcher's way; "Command-line options" under Saving and recovery) does the same
+  at the start, instead of the start window.
 - **Help > Open the Sample on First Launch** is the setting, a check kept in the data
   folder's `settings.json` beside Autosave, on by default. Off, a start never opens the
   sample. Showing the sample either way marks it seen (`sample_seen` in the same file),
@@ -1283,7 +1285,7 @@ is made up.
 
 | Command | Arguments | Returns |
 |---|---|---|
-| `sample_at_launch` | none (the page asks after the files to open and the budgets to recover) | the sample's view when it was opened, else `null` |
+| `sample_at_launch` | none (the page asks after the files to open and the budgets to recover) | the sample's view when it was opened (always, once, after `--open-sample`), else `null` |
 | `sample_open` | none | the view of a fresh copy of the sample, in front |
 
 ### The start window and New Budget
@@ -2591,6 +2593,24 @@ and save). Clear Menu
 empties it; the start window's Remove takes one file off. macOS's own system-wide recent
 documents list is not updated.
 
+`recent.json` has the suite's shape, which Method Launcher reads (SUITE-STANDARDS.md,
+section 2; decisions.md, entry 85): a JSON array, newest first, one entry per file, each
+with its absolute `path` and `opened`, the time it was last opened or saved (RFC 3339 in
+UTC, to the second), plus a `bookmark` (hex) when the system made one:
+
+```json
+[
+  {"path": "/Users/me/Films/Field.mthd", "opened": "2026-10-18T09:31:00Z", "bookmark": "626f6f6b..."},
+  {"path": "/Users/me/Films/Short.mthd", "opened": "2026-10-17T16:02:45Z"}
+]
+```
+
+Keys the app doesn't know are ignored, and an entry without `opened` gets the time it was
+read. A list in the earlier shape (`{"files": [...], "bookmarks": {path: hex}}`) is still
+read, bookmarks and all; its files get the time it was read as their `opened`, and the
+next change to the list writes the new shape. A file that can't be read as either shape
+is an empty list.
+
 **Opening from the system.** Double-clicking a `.mthd` file, Open With, or dropping one on
 the Dock icon or the window opens it in a tab (its own tab, when it is open already): on
 macOS the app receives an open event, on Windows and Linux the path arrives on the command
@@ -2608,9 +2628,25 @@ second double-click goes to the running app. On Windows and Linux there is no
 single-instance handling: a second launch with a path starts a second copy of the app with
 that file (each copy has its own recovery copies and doesn't offer the other's).
 
+**Command-line options.** The window binary, `method-budget-app`, takes these besides a
+file to open (SUITE-STANDARDS.md, section 2; Method Launcher starts the app with them;
+src/launch.rs):
+
+| Option | Does |
+|---|---|
+| `--check-for-updates` | checks for an update at once, as Help > Check for Updates… does, with its answer in the toolbar. The check starts when the window has finished starting (when the page first asks where an update is), so the answer is seen. |
+| `--open-sample` | opens the Field Station sample, as Help > Open Sample does, in place of the start window. It opens once, whatever Open the Sample on First Launch says, and the first-start sample doesn't open a second copy. When the start shows a question first (budgets to recover, or the review of an export handed over with it), it doesn't open; Help > Open Sample is there. |
+
+Options count anywhere on the line and can be given with a file, which opens first; any
+other option (one this version doesn't know, or macOS's `-psn_...`) is skipped and never
+taken for a file. They are read when the app starts: there is no single-instance
+hand-off, so on macOS a second launch while the app runs brings the running app forward
+without them, and on Windows and Linux it starts a second copy with its own options.
+
 The app's data folder is the platform's local app data folder for
 `com.methodbudget.desktop`: `~/Library/Application Support/...` on macOS,
-`%LOCALAPPDATA%\...` on Windows, `~/.local/share/...` on Linux.
+`%LOCALAPPDATA%\...` on Windows, `~/.local/share/...` on Linux. Method Launcher reads
+`recent.json` there.
 
 | Command | Arguments | Returns |
 |---|---|---|
@@ -2647,7 +2683,8 @@ and page.
   address is written; build.rs bakes it into the app) whether a newer version exists. Help >
   Check for Updates Automatically (a check item, on unless turned off, kept in
   `updates.json` in the app's data folder, `{ "automatic": ..., "seen": ... }`) stops the
-  timed checks; Help > Check for Updates… checks at once. A check gives up after 30
+  timed checks; Help > Check for Updates… checks at once, and so does starting the app
+  with `--check-for-updates` (Method Launcher's way), once the window has started. A check gives up after 30
   seconds, a download after 20 minutes.
 - **Quietly.** A newer version downloads in the background. Its signature is checked
   against the public key the app was built with (`plugins.updater.pubkey`, baked in the
