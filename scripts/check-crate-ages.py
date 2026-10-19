@@ -25,6 +25,7 @@ import subprocess
 import sys
 import time
 import tomllib
+import urllib.error
 import urllib.request
 
 UA = "method-budget cooldown check (https://github.com/method-production-suite/method-budget)"
@@ -55,12 +56,47 @@ def external_packages(lock_text):
     }
 
 
-def published(name, version):
+# Rate limited (429) or briefly down (5xx): wait and ask again, longer each time, as
+# crates.io's Retry-After says when it says. A full check makes hundreds of requests,
+# and other repositories' checks share the limit, so one 429 must not fail the run.
+RETRY_STATUS = {429, 500, 502, 503, 504}
+RETRY_WAITS = (5, 15, 30, 60, 120, 300, 300)
+
+
+def retry_wait(err, attempt):
+    """Seconds to wait before asking again, or None to give up and raise. A network
+    failure (a timeout, a dropped connection) is asked again like a 5xx."""
+    if attempt >= len(RETRY_WAITS):
+        return None
+    if not isinstance(err, urllib.error.HTTPError):
+        return RETRY_WAITS[attempt]
+    if err.code not in RETRY_STATUS:
+        return None
+    after = (err.headers or {}).get("Retry-After", "")
+    if after.strip().isdigit():
+        return min(int(after), 300)
+    return RETRY_WAITS[attempt]
+
+
+def published(name, version, sleep=time.sleep, urlopen=urllib.request.urlopen):
     req = urllib.request.Request(
         f"https://crates.io/api/v1/crates/{name}/{version}", headers={"User-Agent": UA}
     )
-    with urllib.request.urlopen(req, timeout=30) as r:
-        v = json.load(r)["version"]
+    attempt = 0
+    while True:
+        try:
+            with urlopen(req, timeout=30) as r:
+                v = json.load(r)["version"]
+            break
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as err:
+            wait = retry_wait(err, attempt)
+            if wait is None:
+                raise
+            what = err.code if isinstance(err, urllib.error.HTTPError) else err
+            print(f"crates.io: {what} for {name} {version}; asking again in {wait}s",
+                  file=sys.stderr)
+            sleep(wait)
+            attempt += 1
     return dt.datetime.fromisoformat(v["created_at"].replace("Z", "+00:00")), v["yanked"]
 
 

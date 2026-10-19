@@ -1,0 +1,29 @@
+# Weekly: every crate in both locks against the 14-day cooldown and for yanks, even when
+# nothing was pushed (ci.yml's cooldown job does the same on every push to main; a pull
+# request checks only what it adds). Least privilege; actions pinned to full commit SHAs
+# (pinact run).
+name: crate-ages
+on:
+  schedule:
+    - cron: "41 6 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: crate-ages
+  cancel-in-progress: true
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check every locked crate
+        run: |
+          set -euo pipefail
+          # fuzz/ is its own workspace with its own lock (fuzz/README.md).
+          for lock in Cargo.lock fuzz/Cargo.lock; do
+            python3 scripts/check-crate-ages.py --lock "$lock"
+          done

@@ -3193,6 +3193,8 @@ untrusted (a budget file is data from anywhere).
 
 Tauri crates are pinned to exact versions and, like every crate in `Cargo.lock`, must be at
 least 14 days old when added (`python3 scripts/check-crate-ages.py --only-changed HEAD`).
+CI checks what a pull request adds, and the whole lock on every push to main and weekly
+(crate-ages.yml), so a young crate that slipped in is caught too.
 `tauri` uses `default-features = false` with only `wry`, `common-controls-v6`, `x11` and
 `dbus` (no asset compression, no runtime ACL changes). The updater is `method-update`, from
 the suite's method-libs repository, pinned to a full commit (`rev = "<40 hex>"`): the
