@@ -85,8 +85,10 @@ jobs:
         run: rustup target add "$TARGET"
 
       - name: Test
+        # Every test binary runs even after one fails, so a night shows everything a
+        # platform breaks, not only the first crate's failures.
         shell: bash
-        run: cargo test --workspace --locked
+        run: cargo test --workspace --locked --no-fail-fast
 
       - name: Install Tauri CLI (pinned, prebuilt)
         shell: bash
