@@ -4103,8 +4103,8 @@ docs/APP.md, "The sample budget"; the file: fixtures/field-station/README.md.
 - **One production with Method Schedule.** The budget is made from Method Schedule's own
   days file for its Field Station sample (18 shoot days, 3 to 26 May 2027; three
   locations; a one-day second unit; nine cast; stunts, background, vehicles, boats and the
-  rest of the breakdown), copied from its commit `093e951` (its pull request #29, not
-  merged yet; we copy it again when it merges). Every day count goes through
+  rest of the breakdown), copied from its `main` at commit `d1616af` (its pull request
+  #29). Every day count goes through
   `method-budget schedule-days --apply`, as the real hand-off does, so each global keeps
   its link to the schedule and a second import changes nothing (tested). An element's
   days are its day out of days total, holds included (entry 76). How many people each
