@@ -262,17 +262,20 @@ the app. Details: [docs/MERGE.md](docs/MERGE.md).
 
 ## Coding agents
 
-`method-budget mcp` is an MCP server, so Claude Code and other MCP clients can open, read and edit
-budgets with typed tools: lines, globals, fringes, charges, totals, explain, export, import and
-undo, all through the same engine and the same exact arithmetic as the app. It only touches
-files inside the folders you give it, writes atomically, won't overwrite a file someone else
-just saved, and has a read-only mode. Nothing is sent anywhere.
+`method-budget mcp` is an MCP server, so coding agents and other MCP clients can open, read
+and edit budgets with typed tools: lines, globals, fringes, charges, totals, explain,
+export, import and undo, all through the same engine and the same exact arithmetic as the
+app. It only touches files inside the folders you give it, writes atomically, won't
+overwrite a file someone else just saved, and has a read-only mode. Nothing is sent
+anywhere.
+
+Register this command with your client as a stdio server:
 
 ```bash
-claude mcp add method -- method-budget mcp --root ~/Budgets
+method-budget mcp --root ~/Budgets
 ```
 
-Every tool and the safety model: [docs/MCP.md](docs/MCP.md).
+How to register it, every tool and the safety model: [docs/MCP.md](docs/MCP.md).
 
 ## Importing
 
@@ -281,7 +284,7 @@ native files ([CLEAN-ROOM.md](CLEAN-ROOM.md)).
 
 | From | Formats | What comes across |
 |---|---|---|
-| Movie Magic Budgeting | JSON (best), XML Advanced, Excel, XML Basic, tab-delimited | Accounts, lines, fringes, globals, groups, charges and credits; Basic XML has no groups or globals, tab-delimited has account totals only |
+| Other budgeting software | JSON (best), XML Advanced, Excel, XML Basic, tab-delimited | Accounts, lines, fringes, globals, groups, charges and credits; Basic XML has no groups or globals, tab-delimited has account totals only |
 | Any spreadsheet | Excel, CSV, tab-delimited | Budget lines, with a column mapping |
 | Accounting systems | Excel, CSV, tab-delimited | Actuals for cost reports, with a column mapping |
 | Another Method budget | `.mthd` | Fringes, globals, charges, credits and other setup |
@@ -295,9 +298,6 @@ method-budget import-export "Pilot budget.json" -o pilot.mthd
 Every import ends with a review that compares each line, account, fringe and total with
 the figures in the file. Suppressed lines are not in the exports, and charge and credit
 rules arrive as the fixed amounts they came to.
-
-Method Budget is independent and not affiliated with or endorsed by Entertainment
-Partners. Movie Magic is a trademark of Entertainment Partners.
 
 ## File format
 
