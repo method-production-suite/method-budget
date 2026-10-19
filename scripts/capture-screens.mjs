@@ -161,7 +161,12 @@ function captureScript(sheet) {
 // the state the picture is taken in.
 // The tools panel a little wider than its first-run width, as someone who
 // works in it drags it (its edge is saved per user, js/panelsize.js).
-const PANEL = { 'method.panelWidth': 470 };
+// The sample has original totals and actuals, so the grid would also show
+// Orig, Var and the cost report's columns; these pictures are about the
+// budget's own totals, so they are hidden from the column menu, as a person
+// working on the budget (not the cost report) has them (js/levels.js).
+const COLUMNS = { orig: false, var: false, act: false, etc: false, eac: false, cvar: false, spent: false };
+const PANEL = { 'method.panelWidth': 470, 'method.detailColumns': COLUMNS };
 const ALL_TABS = ['fringes', 'groups', 'globals', 'units', 'presets', 'find', 'explain', 'sets', 'locations', 'currencies', 'notes', 'library', 'history', 'overtime', 'actuals', 'review', 'activity', 'comments'];
 
 // Each shot's steps run on a freshly opened Field Station budget, with the
@@ -409,7 +414,7 @@ async function main() {
       await send('Emulation.setDefaultBackgroundColorOverride', {});
       await send('Emulation.setDeviceMetricsOverride', { width: PAGE.width, height: PAGE.height, deviceScaleFactor: SCALE, mobile: false });
       await send('Page.navigate', { url: `${origin}/?open=fs/${encodeURIComponent(BUDGET_NAME)}` });
-      await until('the Field Station topsheet', `document.title.startsWith(${JSON.stringify(BUDGET_NAME)}) && document.body.innerText.includes('Story and screenplay') && document.body.innerText.includes('393,018.91')`);
+      await until('the Field Station topsheet', `document.title.startsWith(${JSON.stringify(BUDGET_NAME)}) && document.body.innerText.includes('Story and screenplay') && document.body.innerText.includes('1,036,308.49')`);
       await until('the desktop layout', `!document.getElementById('btn-file')`);
       await settle();
     };
