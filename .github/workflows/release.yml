@@ -34,7 +34,7 @@ jobs:
   check:
     name: version and notes
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -51,6 +51,17 @@ jobs:
           fi
       - name: The tag, the version and the notes agree
         run: cargo xtask check-version --tag "$GITHUB_REF_NAME"
+      - name: Every locked crate is at least 14 days old
+        # SUITE-STANDARDS.md section 6: no release ships a crate younger than the
+        # cooldown, so both locks are checked in full here, before any build or signing
+        # step (build and release need this job). The script has no list of young crates
+        # to excuse; the one exception it knows, a git dependency pinned to a full commit
+        # from scripts/crate-age-git-allow.txt, has no publish date and cannot change.
+        run: |
+          set -euo pipefail
+          for lock in Cargo.lock fuzz/Cargo.lock; do
+            python3 scripts/check-crate-ages.py --lock "$lock"
+          done
 
   build:
     name: build (${{ matrix.name }})
