@@ -1,0 +1,51 @@
+# By hand only: proves the release's updater key still signs what the app accepts, without the
+# key leaving GitHub. It signs a throwaway archive with TAURI_SIGNING_PRIVATE_KEY the way a
+# release does (cargo xtask sign-update), then checks it the way the app does (cargo xtask
+# verify-update, the app's own method-update verifier, against tauri.conf.json's public key).
+# Run it after the signing tools change (the minisign crate, the key format) and before the
+# next release tag. Built before secrets (SUITE-STANDARDS.md section 3): xtask is compiled
+# first, and the step that holds the key runs only that binary, never cargo.
+# Least privilege; actions pinned to full commit SHAs (pinact run).
+name: updater-key-check
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    # Only main's code ever runs with the key: a run started from another branch would
+    # compile that branch's xtask and hand it the secret, so it does nothing there.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compile the release tooling (no secrets in reach)
+        run: cargo build --locked -p xtask
+
+      - name: A throwaway archive named as a release's
+        id: archive
+        run: |
+          set -euo pipefail
+          v="$(target/debug/xtask version)"
+          mkdir -p "$RUNNER_TEMP/updater"
+          head -c 65536 /dev/urandom > "$RUNNER_TEMP/updater/Method-Budget_${v}_aarch64.app.tar.gz"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Sign it with the release key
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VERSION: ${{ steps.archive.outputs.version }}
+        run: |
+          set -euo pipefail
+          test -n "$TAURI_SIGNING_PRIVATE_KEY" || { echo "::error::No TAURI_SIGNING_PRIVATE_KEY secret."; exit 1; }
+          target/debug/xtask sign-update --dir "$RUNNER_TEMP/updater" --version "$VERSION"
+
+      - name: Check it the way the app does
+        env:
+          VERSION: ${{ steps.archive.outputs.version }}
+        run: target/debug/xtask verify-update --dir "$RUNNER_TEMP/updater" --version "$VERSION"
