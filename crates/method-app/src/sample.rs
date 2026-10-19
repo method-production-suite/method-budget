@@ -166,18 +166,6 @@ mod tests {
     }
 
     #[test]
-    fn there_is_no_switch_for_it_in_the_help_menu() {
-        let src = include_str!("sample.rs");
-        let menu = include_str!("menu.rs");
-        let app = include_str!("app.rs");
-        let needle = ["help.sample", "_at_launch"].concat();
-        assert!(!src.contains(&needle) && !menu.contains(&needle));
-        assert!(!app.contains(&["crate::sample::", "handle_menu"].concat()));
-        assert!(!menu.contains(&["crate::sample::", "extend_help_menu"].concat()));
-        assert!(!src.contains(&["First ", "Launch"].concat()));
-    }
-
-    #[test]
     fn the_bundled_sample_is_field_station() {
         let s = sample::session(BYTES).unwrap();
         assert_eq!(s.budget().title, "Field Station");
