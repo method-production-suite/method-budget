@@ -845,32 +845,26 @@ fn schedule_days_set_globals_from_a_schedule() {
     );
 }
 
-/// `method-budget incentives` on the invented Field Station budget with a
-/// program limited to one location (decisions.md, entry 80).
+/// `method-budget incentives` on the invented Field Station budget, whose
+/// county program counts spend at the field station only and is not applied
+/// (decisions.md, entry 80).
 #[test]
 fn incentives_text_and_json() {
-    let d = Dir::new("incentives");
-    let src = read(&format!(
+    let p = format!(
         "{}/../../fixtures/field-station/field-station.mthd",
         env!("CARGO_MANIFEST_DIR")
-    ));
-    let program = r#""credits": [{"name": "Station program", "applied": false,
-        "locations": ["Cold Spring field station"],
-        "rows": [{"description": "Site", "source": {"kind": "category", "category": "26"}, "percent": "25"}]}],
-    "topsheet""#;
-    let p = d.path("station.mthd");
-    std::fs::write(&p, src.replacen("\"topsheet\"", program, 1)).unwrap();
+    );
 
     let o = method(&["incentives", &p]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     let text = out(&o);
     assert!(
-        text.contains("location\tCold Spring field station\t7400.00\t0.00\t7400.00\n"),
+        text.contains("location\tCold Spring field station\t53931.00\t0.00\t53931.00\n"),
         "{text}"
     );
     assert!(
         text.contains(
-            "program\tStation program\testimate\t7400.00\t1850.00\tCold Spring field station\n"
+            "program\tCold Spring County film program\testimate\t43971.00\t10329.00\tCold Spring field station\n"
         ),
         "{text}"
     );
@@ -878,8 +872,8 @@ fn incentives_text_and_json() {
     assert_eq!(total(&p, "credits_total"), "0.00");
 
     let j = out(&method(&["incentives", &p, "--json"]));
-    assert!(j.contains("\"amount\": 185000"), "{j}");
-    assert!(j.contains("\"qualified\": 740000"), "{j}");
+    assert!(j.contains("\"amount\": 1032900"), "{j}");
+    assert!(j.contains("\"qualified\": 4397100"), "{j}");
     assert_eq!(code(&method(&["incentives"])), 2);
 }
 

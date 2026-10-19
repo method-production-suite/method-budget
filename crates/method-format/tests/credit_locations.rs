@@ -102,8 +102,21 @@ fn locations_read_as_a_name_set() {
 fn field_station_reads_and_writes_byte_identical() {
     let text = field_station();
     let b = from_str(&text).unwrap();
-    assert!(b.credits.iter().all(|c| c.locations.is_empty()));
+    // The sample's county program counts spend at the field station only.
+    assert_eq!(b.credits.len(), 1);
+    assert_eq!(b.credits[0].locations, set(&["Cold Spring field station"]));
     assert_eq!(to_string(&b), text);
+
+    // Without its locations the program writes no `locations` key, and
+    // putting them back gives the same bytes.
+    let mut anywhere = b.clone();
+    anywhere.credits[0].locations = set(&[]);
+    let plain = to_string(&anywhere);
+    let v: Value = serde_json::from_str(&plain).unwrap();
+    assert!(v["budget"]["credits"][0].get("locations").is_none());
+    let mut back = from_str(&plain).unwrap();
+    back.credits[0].locations = set(&["Cold Spring field station"]);
+    assert_eq!(to_string(&back), text);
 
     // A program added and taken away again leaves the same bytes.
     let mut with = b.clone();

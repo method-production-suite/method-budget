@@ -1350,20 +1350,29 @@ mod tests {
         assert!(schedule_days_review(&b, &sources, r.token, None).is_err());
     }
 
-    #[test]
-    fn the_field_station_budget_already_agrees_with_its_schedule() {
-        // The suite's invented production: its budget's day globals were
-        // made from this file (scripts/make-field-station.py), under names
-        // of its own for the two locations.
+    /// The Field Station sample and the schedule days file it was made from
+    /// (the 18-day stand-in until Method Schedule's export replaces it;
+    /// fixtures/field-station/README.md).
+    fn field_station() -> (ScheduleDays, Budget) {
         let d = read(
-            "field-station.budget.json",
-            include_bytes!("../../../fixtures/field-station/field-station.budget.json"),
+            "field-station.budget.next.json",
+            include_bytes!("../../../fixtures/field-station/field-station.budget.next.json"),
         )
         .unwrap();
         let b = method_format::from_str(include_str!(
             "../../../fixtures/field-station/field-station.mthd"
         ))
         .unwrap();
+        (d, b)
+    }
+
+    #[test]
+    fn the_field_station_budget_already_agrees_with_its_schedule() {
+        // The suite's invented production: its budget's day globals were set
+        // from this file (scripts/make-field-station.py runs `method-budget
+        // schedule-days --apply`), under names of its own, so a second import
+        // finds every one by its link and nothing changes.
+        let (d, b) = field_station();
         let r = review(&b, &d, None);
         let picked: Vec<&str> = r
             .figures
@@ -1371,53 +1380,35 @@ mod tests {
             .filter(|f| f.picked)
             .map(|f| f.global.as_str())
             .collect();
-        assert_eq!(picked, ["SHOOT_DAYS"]);
-        assert_eq!(row(&r, "total").action, "same");
-        let picks = [
-            pick("total", ""),
-            pick("location:Cold Spring field station", "STATION_DAYS"),
-            pick("location:Hollins Ridge fire road", "RIDGE_DAYS"),
-        ];
-        let r = review(&b, &d, Some(&picks));
-        assert!(r
-            .figures
-            .iter()
-            .filter(|f| f.picked)
-            .all(|f| f.action == "same"));
-        assert_eq!((r.adds, r.updates, r.same), (0, 0, 3));
-        // Applying links them; nothing else changes.
+        assert_eq!(picked.len(), 24, "{picked:?}");
+        for g in [
+            "SHOOT_DAYS",
+            "STATION_DAYS",
+            "RIDGE_DAYS",
+            "LAKE_DAYS",
+            "SECOND_UNIT_DAYS",
+            "DELACROIX_DAYS",
+            "KEEPER_DAYS",
+            "BACKGROUND_DAYS",
+        ] {
+            assert!(picked.contains(&g), "{g}");
+        }
+        assert!(r.figures.iter().filter(|f| f.picked).all(|f| f.linked));
+        assert_eq!((r.adds, r.updates, r.same), (0, 0, 24));
+        assert!(!r.can_apply);
+        assert_eq!(row(&r, "location:Kettle Lake boathouse").global, "LAKE_DAYS");
+        // Applying again changes nothing.
         let mut after = b.clone();
-        let done = apply(&mut after, &d, Some(&picks)).unwrap();
-        assert_eq!(
-            done.message(),
-            "The globals already match the schedule; 3 globals are now linked to it."
-        );
+        apply(&mut after, &d, None).unwrap();
         assert_eq!(after.globals, b.globals);
-        let again = review(&after, &d, None);
-        let picked: Vec<&str> = again
-            .figures
-            .iter()
-            .filter(|f| f.picked)
-            .map(|f| f.global.as_str())
-            .collect();
-        assert_eq!(picked, ["SHOOT_DAYS", "STATION_DAYS", "RIDGE_DAYS"]);
-        assert!(!again.can_apply);
     }
 
     #[test]
     fn default_names_never_land_on_an_existing_global() {
-        // Field Station: RIDGE_DAYS is the fire road location's 2 days. The
+        // Field Station: RIDGE_DAYS is the fire road location's 3 days. The
         // RIDGE set's default name would be RIDGE_DAYS too; it gets a free
         // one, and ticking the set leaves the fire road's global alone.
-        let d = read(
-            "field-station.budget.json",
-            include_bytes!("../../../fixtures/field-station/field-station.budget.json"),
-        )
-        .unwrap();
-        let mut b = method_format::from_str(include_str!(
-            "../../../fixtures/field-station/field-station.mthd"
-        ))
-        .unwrap();
+        let (d, mut b) = field_station();
         let r = review(&b, &d, None);
         let ridge = row(&r, "set:RIDGE");
         assert_eq!(
@@ -1426,18 +1417,18 @@ mod tests {
         );
         let p = picks_with(&b, &d, &[("set:RIDGE".into(), None)], &[]).unwrap();
         apply(&mut b, &d, Some(&p)).unwrap();
-        assert_eq!(b.globals["RIDGE_DAYS"].0, "2");
-        assert_eq!(b.globals["RIDGE_DAYS_2"].0, "1");
-        // Naming the existing global in the row is what updates it.
+        assert_eq!(b.globals["RIDGE_DAYS"].0, "3");
+        assert_eq!(b.globals["RIDGE_DAYS_2"].0, "2");
+        // Naming an existing global in the row is what updates it.
         let p = picks_with(
             &b,
             &d,
-            &[("set:RIDGE ROAD".into(), Some("RIDGE_DAYS".into()))],
+            &[("set:FIELD STATION".into(), Some("VOLUNTEERS".into()))],
             &[],
         )
         .unwrap();
         let r = review(&b, &d, Some(&p));
-        assert_eq!(row(&r, "set:RIDGE ROAD").action, "update");
+        assert_eq!(row(&r, "set:FIELD STATION").action, "update");
     }
 
     #[test]

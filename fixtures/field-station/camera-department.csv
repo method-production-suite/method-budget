@@ -1,10 +1,10 @@
 "Field Station, camera department rental list",,,,,,
 Acct #,Description,Qty,Unit,X,Rate,Total
-21-04,Camera body,4,Days,1,450.00,"1,800.00"
-21-04,"Prime lens set, five lenses",4,Days,1,325.00,"1,300.00"
-21-04,Zoom lens,4,Days,1,150.00,600.00
-21-04,Wireless focus and monitor,4,Days,1,180.00,720.00
-21-04,"Tripod, head and sticks",4,Days,1,65.00,260.00
-21-04,Batteries and charging,4,Days,2,20.00,160.00
+21-04,Camera body,18,Days,1,450.00,"8,100.00"
+21-04,"Prime lens set, five lenses",18,Days,1,325.00,"5,850.00"
+21-04,Zoom lens,18,Days,1,150.00,"2,700.00"
+21-04,Wireless focus and monitor,18,Days,1,180.00,"3,240.00"
+21-04,"Tripod, head and sticks",18,Days,1,65.00,"1,170.00"
+21-04,Batteries and charging,18,Days,2,20.00,720.00
 21-05,Filters and diffusion,1,Allow,1,350.00,350.00
 21-05,Lens tissue and camera tape,1,Allow,1,120.00,120.00
