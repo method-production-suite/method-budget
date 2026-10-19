@@ -1149,6 +1149,7 @@ back.
 ### The Help menu
 
 In order: **Keyboard Shortcuts**; **User Guide** (this file on GitHub, in your browser);
+**Open Sample** and **Open the Sample on First Launch** (below, "The sample budget");
 **Release Notes** (this version's notes, below under "Updates"); **Check for Updates…** and
 **Check for Updates Automatically** (also under "Updates"); **Report a Bug…**; **Licenses and
 Notices**; **methodproduction.com** (the suite's website, in your browser). On Windows and
@@ -1244,6 +1245,45 @@ from), `items` (`[{kind, name, status, copied, here, rename_to}]`: status `add` 
 different base currency) and `review` (whether to show it). `clip_paste` is refused, with
 nothing changed, when another copy replaced the reviewed one, the target is gone, or a
 choice is unknown.
+
+### The sample budget
+
+The app comes with one invented budget, **Field Station** (SUITE-STANDARDS.md, section 8;
+decisions.md, entry 84): an independent feature of about a million dollars, budgeted from
+Method Schedule's schedule of the same production (fixtures/field-station/, made by
+`scripts/make-field-station.py`). It uses globals set from the schedule's days, fringes
+with cutoffs and a flat hourly one, a person paid in two accounts, groups (one left out of
+the total), locations and sets, lines in euros, a contingency and a completion bond, a
+county incentive program worked out but not applied, dated notes, frozen original totals,
+an earlier draft kept as a version, and actuals for a cost report. Every name and figure
+is made up.
+
+- **At the first start.** When the app starts with nothing to open (no tabs from last
+  time, no file handed over, no recovered budget offered), has never shown the sample,
+  and has no budgets of yours on the recent or pinned lists, it opens Field Station in
+  place of the untouched Untitled budget, instead of the start window. Someone who has
+  opened a budget of their own never sees it unasked.
+- **Always a copy.** The sample opens as an untitled copy of the file built into the app,
+  never the file itself: its tab says **Sample: Field Station**, and a quiet line above
+  the grid (the converted-budget banner, closed with ×) says it is an invented sample, that
+  nothing is kept unless you save it, and that New… in the File menu starts a budget of
+  your own. It starts with nothing to undo and nothing unsaved, so closing it asks
+  nothing, and a budget you open or make next takes its tab, as with an untouched
+  Untitled budget. Saved as a file, it is yours: the mark and the line go.
+- **Help > Open Sample** opens a fresh copy any time (in a new tab, or in place of an
+  untouched Untitled budget alone in the window).
+- **Help > Open the Sample on First Launch** is the setting, a check kept in the data
+  folder's `settings.json` beside Autosave, on by default. Off, a start never opens the
+  sample. Showing the sample either way marks it seen (`sample_seen` in the same file),
+  so a start opens it once at most.
+- **The logic** is method-session's `sample` module (the decision and the copy, no
+  window); the app bundles the file with `include_bytes!` (src/sample.rs). The browser
+  build's demo at `/try/` starts with the same file (docs/WEBSITE.md, "The demo").
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `sample_at_launch` | none (the page asks after the files to open and the budgets to recover) | the sample's view when it was opened, else `null` |
+| `sample_open` | none | the view of a fresh copy of the sample, in front |
 
 ### The start window and New Budget
 
@@ -3175,6 +3215,10 @@ check: Shift+Cmd+\\ and the View and Window menu items reaching the page in the 
 views, dragging a tab between the strips with a real pointer, the tools window following
 the target, and the panes coming back at the next start. The History tab needs a live
 check in the tools window and with a long history.
+
+The sample budget (decisions.md, entry 84) needs a live check in the app: the first start
+on a fresh data folder opening it with its Sample tab and line, Help > Open Sample, and the
+setting's check in the Help menu.
 
 Screen readers (decisions.md, entry 82) need a live check with VoiceOver, and with
 Narrator or NVDA on Windows: the grid's cells, the announcement after an edit and the

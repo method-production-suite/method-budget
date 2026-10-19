@@ -170,6 +170,7 @@ this section.
 - **Rename everywhere.** Rename a fringe, global, group or unit and every reference follows, formulas included, as one undo step.
 - **Renumber accounts.** Change the account numbering pattern and preview every old and new number before it applies.
 - **Sub-budgets.** Make a filtered copy by categories, accounts, groups, sets or locations, for a department or a unit.
+- **A sample budget to explore.** The first time you open the app, an invented feature of about a million dollars opens as an untitled copy, with every feature in use; Help > Open Sample brings a fresh copy back any time.
 
 ### Command line and git
 
