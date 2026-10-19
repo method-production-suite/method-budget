@@ -3,6 +3,9 @@
 # on every release (release.yml). Each platform runs the tests, then compiles and packages
 # the app the way release.yml does, unsigned: no secrets are used, and nothing is uploaded.
 # A night whose main is the commit the last green night already built is skipped.
+# The nightly is the only workflow that saves a build cache (SUITE-STANDARDS.md section 6):
+# each system's crates and debug build, without the release build, so all three fit in
+# GitHub's 10 GB; ci.yml's pull requests restore the Linux one.
 # Least privilege; actions pinned to full commit SHAs (pinact run).
 name: nightly
 on:
@@ -71,6 +74,20 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Restore the build cache
+        id: cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+            !target/release
+            !target/*/release
+          key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: rust-${{ runner.os }}-
+
       - name: Install Tauri system dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -89,6 +106,50 @@ jobs:
         # platform breaks, not only the first crate's failures.
         shell: bash
         run: cargo test --workspace --locked --no-fail-fast
+
+      # Saved after the tests (the debug build pull requests reuse), before the release
+      # compile below, and only from main, when the key is new.
+      - name: Save the build cache (main only)
+        if: github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+            !target/release
+            !target/*/release
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+
+      # The wasm-bindgen command line ci.yml's pull requests restore (the version
+      # Cargo.lock has), installed and saved here on Linux, since main no longer builds.
+      - name: wasm-bindgen version (Linux)
+        id: wasm-bindgen
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          v=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | sed -n 's/^version = "\(.*\)"$/\1/p')
+          test -n "$v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - name: Restore the wasm-bindgen command line (Linux)
+        id: wasm-bindgen-cache
+        if: runner.os == 'Linux'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/wasm-bindgen
+          key: wasm-bindgen-cli-${{ steps.wasm-bindgen.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
+      - name: Install and save the wasm-bindgen command line (Linux, main only)
+        if: runner.os == 'Linux' && github.ref == 'refs/heads/main' && steps.wasm-bindgen-cache.outputs.cache-hit != 'true'
+        env:
+          VERSION: ${{ steps.wasm-bindgen.outputs.version }}
+        run: cargo install wasm-bindgen-cli --version "$VERSION" --locked
+      - name: Save the wasm-bindgen command line (Linux, main only)
+        if: runner.os == 'Linux' && github.ref == 'refs/heads/main' && steps.wasm-bindgen-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/wasm-bindgen
+          key: ${{ steps.wasm-bindgen-cache.outputs.cache-primary-key }}
 
       - name: Install Tauri CLI (pinned, prebuilt)
         shell: bash

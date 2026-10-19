@@ -1,8 +1,9 @@
 # Least privilege by default. Pin all actions to full commit SHAs (pinact run).
 name: ci
-# Pushes to main, and pull requests: a feature branch runs once (as its pull request), not
-# twice. The org's Actions plan runs 20 jobs at a time across every repo (SUITE-STANDARDS.md,
-# section 6).
+# Lean CI (SUITE-STANDARDS.md section 6). A pull request runs the Linux checks. A push to
+# main runs only the whole-lock crate-age check and cargo deny: the code it carries was built
+# and tested as its pull request, and nightly.yml builds main on every system each night. A
+# feature branch runs once (as its pull request), not twice.
 # A draft pull request builds nothing (SUITE-STANDARDS.md section 6): CI starts when it is
 # marked ready (`gh pr ready`) and runs on every push after that.
 on:
@@ -18,10 +19,10 @@ env:
   CARGO_INCREMENTAL: "0"
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
   CARGO_PROFILE_TEST_DEBUG: line-tables-only
-# A newer push to a pull request cancels its older run; main always finishes.
+# A newer push cancels an older run, on a pull request and on main alike.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: true
 jobs:
   changes:
     # Decides what this push needs. Skipped on a draft pull request, and every other job
@@ -76,13 +77,27 @@ jobs:
           echo "rust=$rust" | tee -a "$GITHUB_OUTPUT"
   build:
     needs: changes
-    if: needs.changes.outputs.rust == 'true'
-    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && needs.changes.outputs.rust == 'true'
+    # The nightly's Linux image, so its saved cache fits exactly.
+    runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The nightly saves it (nightly.yml); a pull request only restores, never saves.
+      - name: Restore the nightly's Linux build cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+            !target/release
+            !target/*/release
+          key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: rust-${{ runner.os }}-
       - name: Install Tauri system dependencies
         run: |
           sudo apt-get update
@@ -120,8 +135,7 @@ jobs:
           v=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | sed -n 's/^version = "\(.*\)"$/\1/p')
           test -n "$v"
           echo "version=$v" >> "$GITHUB_OUTPUT"
-      # Restored everywhere, saved only from main (SUITE-STANDARDS.md section 6), so pull
-      # requests never add cache entries of their own.
+      # Saved by the nightly (nightly.yml); a pull request only restores it.
       - name: Restore the wasm-bindgen command line
         id: wasm-bindgen-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -133,12 +147,6 @@ jobs:
         env:
           VERSION: ${{ steps.wasm-bindgen.outputs.version }}
         run: cargo install wasm-bindgen-cli --version "$VERSION" --locked
-      - name: Save the wasm-bindgen command line (main only)
-        if: github.ref == 'refs/heads/main' && steps.wasm-bindgen-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cargo/bin/wasm-bindgen
-          key: ${{ steps.wasm-bindgen-cache.outputs.cache-primary-key }}
       - name: The page in a browser
         # cargo xtask web builds target/web (the page, the shim, the module and
         # the charts as files); the smoke test opens it in the runner's headless
@@ -158,7 +166,7 @@ jobs:
     # so only a full check catches one that slipped in). crate-ages.yml runs the full
     # check weekly too.
     needs: changes
-    if: needs.changes.outputs.rust == 'true'
+    if: github.event_name == 'push' || needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -183,7 +191,7 @@ jobs:
     # deny.toml: known advisories, licenses compatible with MIT OR Apache-2.0,
     # crates.io as the only source.
     needs: changes
-    if: needs.changes.outputs.rust == 'true'
+    if: github.event_name == 'push' || needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -197,6 +205,7 @@ jobs:
     # README.md and site/index.html must match docs/features.toml and the newest release
     # notes (docs/WEBSITE.md); the Claude Code hooks behind that rule must still work.
     needs: changes
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
