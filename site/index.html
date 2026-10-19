@@ -9,7 +9,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>Method Budget: open-source film and TV budgeting</title>
-<meta name="description" content="Method Budget is a free, open-source alternative to Movie Magic Budgeting for film and TV. It runs on your own computer, opens Movie Magic Budgeting exports, and explains every number. No subscription.">
+<meta name="description" content="Method Budget is free, open-source film and TV budgeting. It runs on your own computer, opens the budgets other programs export, and explains every number. No subscription.">
 <link rel="canonical" href="https://methodbudget.com/">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon.ico" sizes="16x16 32x32">
@@ -23,14 +23,14 @@
 <meta property="og:site_name" content="Method Budget">
 <meta property="og:url" content="https://methodbudget.com/">
 <meta property="og:title" content="Method Budget: open-source film and TV budgeting">
-<meta property="og:description" content="A free, open-source alternative to Movie Magic Budgeting. Your budgets stay on your computer as open files, and its exports open with every figure checked. No subscription.">
+<meta property="og:description" content="Free, open-source film and TV budgeting. Your budgets stay on your computer as open files, and budgets exported from other programs open with every figure checked. No subscription.">
 <meta property="og:image" content="https://methodbudget.com/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Method Budget: film and TV budgeting that shows its working.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Method Budget: open-source film and TV budgeting">
-<meta name="twitter:description" content="A free, open-source alternative to Movie Magic Budgeting. Open files, keyboard first, every number explained, no subscription.">
+<meta name="twitter:description" content="Free, open-source film and TV budgeting. Open files, keyboard first, every number explained, no subscription.">
 <meta name="twitter:image" content="https://methodbudget.com/og.png">
 <meta name="twitter:image:alt" content="Method Budget: film and TV budgeting that shows its working.">
 <link rel="stylesheet" href="assets/tokens.css">
@@ -68,7 +68,7 @@
           <img src="assets/brand/wordmark.svg" alt="Method Budget" width="660" height="98">
         </picture>
       </h1>
-      <p class="status"><span class="badge alpha">Alpha</span> Ready for testing. Version 0.2 is out and changing fast. <a href="#help">Found a bug? Tell us.</a></p>
+      <p class="status"><span class="badge alpha">Alpha</span> Ready for testing. Version 0.5 is out and changing fast. <a href="#help">Found a bug? Tell us.</a></p>
       <p class="pitch">Film and TV budgeting that shows its working.</p>
       <p class="lede">A free, open-source desktop app for production budgets: topsheet,
         fringes, globals, charges, versions and cost reports. Your budgets are open files on
@@ -80,7 +80,7 @@
         <a class="btn ghost" href="try/">Try it in your browser</a>
         <a class="btn ghost" href="#features">See what it does</a>
       </div>
-      <p class="fine">No account, no subscription, no cloud. The Mac app is out; Windows and Linux builds are on the way.</p>
+      <p class="fine">No account, no subscription, no cloud. The Mac app is out; Windows and Linux builds are included but not yet tested by hand.</p>
       <p class="fine footnote">* From the formats it exports for you: JSON, XML, Excel and tab-delimited.
         Method Budget reads a variety of open export and spreadsheet formats, never another
         program's native files. <a href="#formats">What comes across</a>.</p>
@@ -250,7 +250,7 @@
         in the file, and saves everything back out in open formats anyone can read.</p>
       <div class="fmt-grid">
         <div class="fmt-card">
-          <h3>Budgets from Movie Magic Budgeting</h3>
+          <h3>Budgets from other budgeting software</h3>
           <p>Export from your own copy (File &gt; Export) and open it here. Every account,
             line, fringe, global, group, charge and credit comes across, then the review
             compares each total with the export's own.</p>
@@ -283,9 +283,8 @@
         </div>
       </div>
       <p class="fine">Method Budget reads only the open files other apps export for their
-        users, never their native files. It is independent and not affiliated with or
-        endorsed by Entertainment Partners. Movie Magic is a trademark of Entertainment
-        Partners.</p>
+        users, never their native files. It is independent and not affiliated with
+        Entertainment Partners or Movie Magic Budgeting, a trademark of its owner.</p>
     </div>
   </section>
 
@@ -529,7 +528,7 @@
     <div class="wrap">
       <p class="kicker">Command line and coding agents</p>
       <h2 id="cli-title">The same engine, without the window</h2>
-      <p class="intro">The <code>method</code> command reads and writes budgets with no window
+      <p class="intro">The <code>method-budget</code> command reads and writes budgets with no window
         and no network, so budgets fit into scripts, build steps and automated checks.</p>
 <pre class="term"><code><span class="p">$ </span>method-budget show my-film.mthd                  <span class="c"># the topsheet</span>
 <span class="p">$ </span>method-budget check my-film.mthd                 <span class="c"># recalculate, report problems</span>
@@ -548,7 +547,7 @@
         </div>
         <div class="card">
           <h3>Coding agents</h3>
-          <p>An MCP server lets Claude Code and other agents open, read and edit budgets
+          <p>An MCP server lets coding agents open, read and edit budgets
             through the same engine, with the same exact arithmetic. It only touches the
             folders you allow and nothing is sent anywhere.
             <a href="https://github.com/method-production-suite/method-budget/blob/main/docs/MCP.md" data-repo="docs/MCP.md">How to connect</a></p>
@@ -655,22 +654,16 @@
       <h2 id="faq-title">Questions</h2>
       <div class="faq">
         <details>
-          <summary>Is it an alternative to Movie Magic Budgeting?</summary>
-          <p>Yes: a free, open-source one that runs on your own computer and opens Movie Magic
-            Budgeting's exports (JSON, XML, Excel and tab-delimited), checking every figure as
-            it comes in. See <a href="#formats">Bring your budgets with you</a>.</p>
-        </details>
-        <details>
           <summary>Is Method Budget affiliated with other budgeting software?</summary>
           <p>No. Method Budget is an independent, clean-room project, not affiliated with
             Entertainment Partners or Movie Magic Budgeting.</p>
         </details>
         <details>
           <summary>Can it open budgets from other apps?</summary>
-          <p>Yes, from the open files they export, never their native files. A Movie Magic
-            Budgeting budget comes in from its JSON, XML, Excel or tab-delimited export (JSON
-            carries the most), and any spreadsheet comes in with a column mapping, each with a
-            line-by-line check against the totals in the file. See
+          <p>Yes, from the open files they export, never their native files. A budget comes in
+            from another program's JSON, XML, Excel or tab-delimited export (JSON carries the
+            most), and any spreadsheet comes in with a column mapping, each with a line-by-line
+            check against the totals in the file. See
             <a href="#formats">Bring your budgets with you</a>.</p>
         </details>
         <details>
@@ -691,7 +684,7 @@
         </details>
         <details>
           <summary>Can I script it or keep budgets in git?</summary>
-          <p>Yes. The <code>method</code> command line checks budgets, prints totals, draws
+          <p>Yes. The <code>method-budget</code> command line checks budgets, prints totals, draws
             reports and makes batch edits, and its git merge driver combines two people's
             edits to the same budget.</p>
         </details>
