@@ -9,6 +9,12 @@ on:
   pull_request:
 permissions:
   contents: read
+# SUITE-STANDARDS.md section 6: no incremental builds (CI never reuses them) and only line
+# tables for debug info, which keeps panics' file and line but cuts target/ several times.
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_TEST_DEBUG: line-tables-only
 # A newer push to a pull request cancels its older run; main always finishes.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -58,9 +64,11 @@ jobs:
           v=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | sed -n 's/^version = "\(.*\)"$/\1/p')
           test -n "$v"
           echo "version=$v" >> "$GITHUB_OUTPUT"
-      - name: Cache the wasm-bindgen command line
+      # Restored everywhere, saved only from main (SUITE-STANDARDS.md section 6), so pull
+      # requests never add cache entries of their own.
+      - name: Restore the wasm-bindgen command line
         id: wasm-bindgen-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cargo/bin/wasm-bindgen
           key: wasm-bindgen-cli-${{ steps.wasm-bindgen.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
@@ -69,6 +77,12 @@ jobs:
         env:
           VERSION: ${{ steps.wasm-bindgen.outputs.version }}
         run: cargo install wasm-bindgen-cli --version "$VERSION" --locked
+      - name: Save the wasm-bindgen command line (main only)
+        if: github.ref == 'refs/heads/main' && steps.wasm-bindgen-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/wasm-bindgen
+          key: ${{ steps.wasm-bindgen-cache.outputs.cache-primary-key }}
       - name: The page in a browser
         # cargo xtask web builds target/web (the page, the shim, the module and
         # the charts as files); the smoke test opens it in the runner's headless
