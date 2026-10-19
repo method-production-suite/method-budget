@@ -1,9 +1,8 @@
 //! The Field Station fixtures (fixtures/field-station/, the suite's invented
 //! production: the app's sample and the README and site pictures): the budget
 //! is in canonical form, as `method-budget fmt` writes it, and it agrees with
-//! the schedule days file it was made from, read with our own reader. That is
-//! the 18-day stand-in, `field-station.budget.next.json`, until Method
-//! Schedule's own export replaces it (the folder's README.md).
+//! the schedule days file it was made from (Method Schedule's export of its
+//! own Field Station sample), read with our own reader.
 //! `python3 scripts/make-field-station.py --check` makes the budget again
 //! from that file and compares every byte.
 
@@ -13,7 +12,7 @@ use method_format::import::schedule;
 use method_format::serde_json::{self, Value};
 
 /// The schedule days file the budget is made from.
-const DAYS: &str = "field-station.budget.next.json";
+const DAYS: &str = "field-station.budget.json";
 
 fn fixture(name: &str) -> String {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -30,8 +29,8 @@ fn the_budget_is_canonical() {
 }
 
 #[test]
-fn both_schedule_files_read_without_notes() {
-    for name in [DAYS, "field-station.budget.json"] {
+fn the_schedule_file_reads_without_notes() {
+    for name in [DAYS] {
         let days = schedule::read(fixture(name).as_bytes()).unwrap();
         assert!(days.notes.is_empty(), "{name}: {:?}", days.notes);
         assert_eq!(days.schedule, "Field Station", "{name}");
@@ -94,7 +93,11 @@ fn the_budget_agrees_with_its_schedule() {
         .iter()
         .filter(|e| e.category == "Cast")
         .collect();
-    assert_eq!(cast.len(), 8, "four leads and four day players");
+    assert_eq!(
+        cast.len(),
+        9,
+        "four leads, four day players and a silent part"
+    );
     for e in cast {
         let line = lines
             .iter()

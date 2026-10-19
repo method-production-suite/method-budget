@@ -12,7 +12,7 @@
     "info": {
       "Prep start": {
         "kind": "date",
-        "value": "2027-03-29"
+        "value": "2027-04-26"
       },
       "Production type": {
         "kind": "text",
@@ -28,7 +28,7 @@
       },
       "Wrap end": {
         "kind": "date",
-        "value": "2027-06-09"
+        "value": "2027-05-28"
       }
     },
     "currencies": {
@@ -65,39 +65,69 @@
       }
     },
     "globals": {
-      "BACKGROUND_DAYS": "6",
+      "ANSEL_DAYS": "3",
+      "BASE_STAFF": "4",
+      "BASE_STAFF_DAYS": "3",
+      "BOAT_CREW": "2",
+      "BOAT_CREW_DAYS": "1",
+      "CAMERA_BOAT_DAYS": "2",
       "COATS_DAYS": "10",
       "CREW_MEALS": "36",
-      "DELACROIX_DAYS": "18",
-      "DISPATCHER_DAYS": "2",
-      "FOG_DAYS": "2",
-      "GENERATOR_DAYS": "6",
-      "HAND_RADIO_DAYS": "14",
-      "IVERSEN_DAYS": "4",
+      "DELACROIX_DAYS": "16",
+      "DISPATCHER_DAYS": "9",
+      "DIVER_DAYS": "2",
+      "GENERATOR_DAYS": "10",
+      "HAND_RADIO_DAYS": "11",
+      "IVERSEN_DAYS": "18",
       "KEEPER_DAYS": "3",
-      "LADDER_DAYS": "3",
       "LAKE_DAYS": "3",
-      "MARA_DAYS": "15",
-      "PILOT_DAYS": "1",
-      "PREP_WKS": "5",
-      "RADIO_SET_DAYS": "9",
-      "RAIN_DAYS": "3",
-      "RANGER_DAYS": "3",
+      "MARA_DAYS": "18",
+      "MARINE_DAYS": "2",
+      "MAST_CLIMB_DAYS": "2",
+      "MIST_DAYS": "2",
+      "PILOT_DAYS": "12",
+      "PLANE_DAYS": "5",
+      "PREP_WKS": "4",
+      "QUAD_DAYS": "5",
+      "QUAD_RIDE_DAYS": "3",
+      "RADIO_SET_DAYS": "11",
+      "RAIN_DAYS": "5",
+      "RANGER_DAYS": "17",
+      "RAVEN_DAYS": "1",
+      "RELIEF_TEAM": "4",
+      "RELIEF_TEAM_DAYS": "2",
       "RIDGE_DAYS": "3",
-      "ROWBOAT_DAYS": "3",
+      "ROWBOAT_DAYS": "2",
       "SECOND_UNIT_DAYS": "1",
       "SHOOT_DAYS": "18",
       "SHOOT_WKS": "SHOOT_DAYS / 5",
       "STATION_DAYS": "12",
       "TEO_DAYS": "17",
-      "TRUCK_DAYS": "3",
-      "VOLUNTEERS": "12",
-      "WIND_DAYS": "7",
+      "TRUCK_DAYS": "7",
+      "WIND_DAYS": "12",
       "WRAP_WKS": "2"
     },
     "global_info": {
-      "BACKGROUND_DAYS": {
-        "description": "Days of Background SEARCH VOLUNTEERS",
+      "ANSEL_DAYS": {
+        "description": "Days of Cast 9 ANSEL",
+        "unit": "Day"
+      },
+      "BASE_STAFF": {
+        "description": "Base staff in the background each of their days"
+      },
+      "BASE_STAFF_DAYS": {
+        "description": "Days of Background BASE STAFF",
+        "unit": "Day"
+      },
+      "BOAT_CREW": {
+        "description": "Second boat crew in the background"
+      },
+      "BOAT_CREW_DAYS": {
+        "description": "Days of Background SECOND BOAT CREW",
+        "unit": "Day"
+      },
+      "CAMERA_BOAT_DAYS": {
+        "description": "Days of Special equipment CAMERA BOAT",
         "unit": "Day"
       },
       "COATS_DAYS": {
@@ -112,11 +142,11 @@
         "unit": "Day"
       },
       "DISPATCHER_DAYS": {
-        "description": "Days of Cast 8 PARK DISPATCHER",
+        "description": "Days of Cast 5 DISPATCHER",
         "unit": "Day"
       },
-      "FOG_DAYS": {
-        "description": "Days of Practical effects FOG",
+      "DIVER_DAYS": {
+        "description": "Days of Safety SAFETY DIVER",
         "unit": "Day"
       },
       "GENERATOR_DAYS": {
@@ -135,10 +165,6 @@
         "description": "Days of Cast 6 BOATHOUSE KEEPER",
         "unit": "Day"
       },
-      "LADDER_DAYS": {
-        "description": "Days of Set dressing MAST LADDER",
-        "unit": "Day"
-      },
       "LAKE_DAYS": {
         "description": "Shoot days at location Kettle Lake boathouse",
         "unit": "Day"
@@ -147,12 +173,36 @@
         "description": "Days of Cast 2 MARA",
         "unit": "Day"
       },
+      "MARINE_DAYS": {
+        "description": "Days of Extra crew MARINE COORDINATOR",
+        "unit": "Day"
+      },
+      "MAST_CLIMB_DAYS": {
+        "description": "Days of Stunts 1 MAST CLIMB",
+        "unit": "Day"
+      },
+      "MIST_DAYS": {
+        "description": "Days of Practical effects MIST",
+        "unit": "Day"
+      },
       "PILOT_DAYS": {
-        "description": "Days of Cast 7 SEARCH PILOT",
+        "description": "Days of Cast 8 PILOT",
+        "unit": "Day"
+      },
+      "PLANE_DAYS": {
+        "description": "Days of Picture vehicles SEARCH PLANE",
         "unit": "Day"
       },
       "PREP_WKS": {
         "description": "Weeks of prep"
+      },
+      "QUAD_DAYS": {
+        "description": "Days of Picture vehicles QUAD BIKE",
+        "unit": "Day"
+      },
+      "QUAD_RIDE_DAYS": {
+        "description": "Days of Stunts 2 QUAD RIDE",
+        "unit": "Day"
       },
       "RADIO_SET_DAYS": {
         "description": "Days of Set dressing STATION RADIO SET",
@@ -163,7 +213,18 @@
         "unit": "Day"
       },
       "RANGER_DAYS": {
-        "description": "Days of Cast 5 RANGER",
+        "description": "Days of Cast 7 RANGER",
+        "unit": "Day"
+      },
+      "RAVEN_DAYS": {
+        "description": "Days of Animals RAVEN",
+        "unit": "Day"
+      },
+      "RELIEF_TEAM": {
+        "description": "Relief team in the background each of their days"
+      },
+      "RELIEF_TEAM_DAYS": {
+        "description": "Days of Background RELIEF TEAM",
         "unit": "Day"
       },
       "RIDGE_DAYS": {
@@ -171,7 +232,7 @@
         "unit": "Day"
       },
       "ROWBOAT_DAYS": {
-        "description": "Days of Vehicles ROWBOAT",
+        "description": "Days of Picture vehicles ROWBOAT",
         "unit": "Day"
       },
       "SECOND_UNIT_DAYS": {
@@ -194,11 +255,8 @@
         "unit": "Day"
       },
       "TRUCK_DAYS": {
-        "description": "Days of Vehicles PATROL TRUCK",
+        "description": "Days of Picture vehicles PARK TRUCK",
         "unit": "Day"
-      },
-      "VOLUNTEERS": {
-        "description": "Search volunteers in the background each of their days"
       },
       "WIND_DAYS": {
         "description": "Days of Practical effects WIND",
@@ -253,17 +311,29 @@
       }
     },
     "sets": {
+      "BASE - RADIO ROOM": {
+        "description": "The station's radio room, where the base calls in"
+      },
       "BOATHOUSE": {
         "description": "The boathouse and its dock"
       },
       "FIELD STATION": {
         "description": "The station's main room and radio desk"
       },
-      "LAKE SHORE": {
-        "description": "The shore below the boathouse"
+      "FIELD STATION - BUNKHOUSE": {
+        "description": "The bunks"
+      },
+      "FIELD STATION - LAB": {
+        "description": "The lab bench and its instruments"
+      },
+      "FIRE ROAD": {
+        "description": "The fire road below the ridge"
+      },
+      "KETTLE LAKE": {
+        "description": "The lake, from the boats"
       },
       "LOWER STATION": {
-        "description": "The bunk room and stores below"
+        "description": "The stores below the station"
       },
       "RADIO MAST": {
         "description": "The mast above the station"
@@ -272,7 +342,7 @@
         "description": "The ridge top, night and day"
       },
       "RIDGE ROAD": {
-        "description": "The fire road up the ridge"
+        "description": "The road up the ridge"
       }
     },
     "locations": {
@@ -319,7 +389,7 @@
                 "amount": "1",
                 "unit": "Flat",
                 "x": "1",
-                "rate": "20000",
+                "rate": "18000",
                 "fringes": [
                   "FICA",
                   "SUI",
@@ -372,7 +442,7 @@
                 "amount": "1",
                 "unit": "Flat",
                 "x": "1",
-                "rate": "12000"
+                "rate": "10000"
               },
               {
                 "id": 6,
@@ -380,7 +450,7 @@
                 "amount": "1",
                 "unit": "Flat",
                 "x": "1",
-                "rate": "8000"
+                "rate": "7000"
               }
             ]
           },
@@ -435,7 +505,7 @@
                 "amount": "1",
                 "unit": "Flat",
                 "x": "1",
-                "rate": "22000",
+                "rate": "20000",
                 "fringes": [
                   "FICA",
                   "SUI",
@@ -475,7 +545,7 @@
                 "amount": "DELACROIX_DAYS",
                 "unit": "Day",
                 "x": "1",
-                "rate": "1650",
+                "rate": "1500",
                 "fringes": [
                   "CAST_PH",
                   "FICA",
@@ -497,7 +567,7 @@
                 "amount": "MARA_DAYS",
                 "unit": "Day",
                 "x": "1",
-                "rate": "1650",
+                "rate": "1500",
                 "fringes": [
                   "CAST_PH",
                   "FICA",
@@ -511,7 +581,7 @@
                 "amount": "TEO_DAYS",
                 "unit": "Day",
                 "x": "1",
-                "rate": "1300",
+                "rate": "1150",
                 "fringes": [
                   "CAST_PH",
                   "FICA",
@@ -521,11 +591,25 @@
               },
               {
                 "id": 14,
-                "description": "Rehearsal days, three leads",
-                "amount": "4",
+                "description": "IVERSEN",
+                "amount": "IVERSEN_DAYS",
                 "unit": "Day",
-                "x": "3",
-                "rate": "450",
+                "x": "1",
+                "rate": "1000",
+                "fringes": [
+                  "CAST_PH",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              },
+              {
+                "id": 15,
+                "description": "Rehearsal days, four leads",
+                "amount": "3",
+                "unit": "Day",
+                "x": "4",
+                "rate": "400",
                 "fringes": [
                   "CAST_PH",
                   "FICA",
@@ -540,26 +624,12 @@
             "name": "Supporting cast and day players",
             "details": [
               {
-                "id": 15,
-                "description": "IVERSEN, radio voice",
-                "amount": "IVERSEN_DAYS",
-                "unit": "Day",
-                "x": "1",
-                "rate": "1000",
-                "fringes": [
-                  "CAST_PH",
-                  "FICA",
-                  "SUI",
-                  "WC"
-                ]
-              },
-              {
                 "id": 16,
                 "description": "RANGER, day player",
                 "amount": "RANGER_DAYS",
                 "unit": "Day",
                 "x": "1",
-                "rate": "900",
+                "rate": "750",
                 "fringes": [
                   "CAST_PH",
                   "FICA",
@@ -570,11 +640,39 @@
               },
               {
                 "id": 17,
+                "description": "DISPATCHER, day player",
+                "amount": "DISPATCHER_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "750",
+                "fringes": [
+                  "CAST_PH",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              },
+              {
+                "id": 18,
+                "description": "PILOT, day player",
+                "amount": "PILOT_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "750",
+                "fringes": [
+                  "CAST_PH",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              },
+              {
+                "id": 19,
                 "description": "BOATHOUSE KEEPER, day player",
                 "amount": "KEEPER_DAYS",
                 "unit": "Day",
                 "x": "1",
-                "rate": "900",
+                "rate": "750",
                 "fringes": [
                   "CAST_PH",
                   "FICA",
@@ -584,44 +682,12 @@
                 "location": "Kettle Lake boathouse"
               },
               {
-                "id": 18,
-                "description": "SEARCH PILOT, day player",
-                "amount": "PILOT_DAYS",
-                "unit": "Day",
-                "x": "1",
-                "rate": "900",
-                "fringes": [
-                  "CAST_PH",
-                  "FICA",
-                  "SUI",
-                  "WC"
-                ],
-                "groups": [
-                  "Second unit"
-                ],
-                "location": "Hollins Ridge fire road"
-              },
-              {
-                "id": 19,
-                "description": "PARK DISPATCHER, day player",
-                "amount": "DISPATCHER_DAYS",
-                "unit": "Day",
-                "x": "1",
-                "rate": "900",
-                "fringes": [
-                  "CAST_PH",
-                  "FICA",
-                  "SUI",
-                  "WC"
-                ]
-              },
-              {
                 "id": 20,
-                "description": "Background, search volunteers",
-                "amount": "BACKGROUND_DAYS",
+                "description": "ANSEL, silent, featured background",
+                "amount": "ANSEL_DAYS",
                 "unit": "Day",
-                "x": "VOLUNTEERS",
-                "rate": "180",
+                "x": "1",
+                "rate": "320",
                 "fringes": [
                   "CAST_PH",
                   "FICA",
@@ -631,6 +697,95 @@
               },
               {
                 "id": 21,
+                "description": "Stunt coordinator",
+                "amount": "MAST_CLIMB_DAYS + QUAD_RIDE_DAYS + 1",
+                "unit": "Day",
+                "x": "1",
+                "rate": "950",
+                "fringes": [
+                  "CAST_PH",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              },
+              {
+                "id": 22,
+                "description": "Stunt double, the mast climb",
+                "amount": "MAST_CLIMB_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "900",
+                "fringes": [
+                  "CAST_PH",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ],
+                "set": "RADIO MAST",
+                "location": "Cold Spring field station"
+              },
+              {
+                "id": 23,
+                "description": "Stunt double, the quad ride",
+                "amount": "QUAD_RIDE_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "900",
+                "fringes": [
+                  "CAST_PH",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ],
+                "location": "Hollins Ridge fire road"
+              },
+              {
+                "id": 24,
+                "description": "Background, base staff",
+                "amount": "BASE_STAFF_DAYS",
+                "unit": "Day",
+                "x": "BASE_STAFF",
+                "rate": "180",
+                "fringes": [
+                  "CAST_PH",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ],
+                "location": "Cold Spring field station"
+              },
+              {
+                "id": 25,
+                "description": "Background, relief team",
+                "amount": "RELIEF_TEAM_DAYS",
+                "unit": "Day",
+                "x": "RELIEF_TEAM",
+                "rate": "180",
+                "fringes": [
+                  "CAST_PH",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ]
+              },
+              {
+                "id": 26,
+                "description": "Background, second boat crew",
+                "amount": "BOAT_CREW_DAYS",
+                "unit": "Day",
+                "x": "BOAT_CREW",
+                "rate": "180",
+                "fringes": [
+                  "CAST_PH",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ],
+                "location": "Kettle Lake boathouse"
+              },
+              {
+                "id": 27,
                 "description": "Overtime and adjustments",
                 "amount": "1",
                 "unit": "Allow",
@@ -650,15 +805,15 @@
             "name": "Casting",
             "details": [
               {
-                "id": 22,
+                "id": 28,
                 "description": "Casting director, package",
                 "amount": "1",
                 "unit": "Flat",
                 "x": "1",
-                "rate": "7500"
+                "rate": "6500"
               },
               {
-                "id": 23,
+                "id": 29,
                 "description": "Background casting",
                 "amount": "1",
                 "unit": "Flat",
@@ -672,7 +827,7 @@
             "name": "Cast expenses",
             "details": [
               {
-                "id": 24,
+                "id": 30,
                 "description": "Cast travel and lodging, Cold Spring",
                 "amount": "STATION_DAYS",
                 "unit": "Day",
@@ -681,7 +836,7 @@
                 "location": "Cold Spring field station"
               },
               {
-                "id": 25,
+                "id": 31,
                 "description": "Cast lodging, Kettle Lake",
                 "amount": "LAKE_DAYS",
                 "unit": "Day",
@@ -707,12 +862,12 @@
             "name": "Line producer",
             "details": [
               {
-                "id": 26,
+                "id": 32,
                 "description": "Line producer",
                 "amount": "PREP_WKS + SHOOT_WKS + WRAP_WKS",
                 "unit": "Week",
                 "x": "1",
-                "rate": "1450",
+                "rate": "1300",
                 "fringes": [
                   "CREW_HW",
                   "FICA",
@@ -727,12 +882,12 @@
             "name": "First assistant director",
             "details": [
               {
-                "id": 27,
+                "id": 33,
                 "description": "First assistant director",
                 "amount": "2 + SHOOT_WKS",
                 "unit": "Week",
                 "x": "1",
-                "rate": "1800",
+                "rate": "1650",
                 "fringes": [
                   "CREW_HW",
                   "FICA",
@@ -747,7 +902,7 @@
             "name": "Second assistant director",
             "details": [
               {
-                "id": 28,
+                "id": 34,
                 "description": "Second assistant director",
                 "amount": "SHOOT_DAYS + 3",
                 "unit": "Day",
@@ -767,12 +922,12 @@
             "name": "Production coordinator",
             "details": [
               {
-                "id": 29,
+                "id": 35,
                 "description": "Production coordinator",
                 "amount": "PREP_WKS + SHOOT_WKS + 1",
                 "unit": "Week",
                 "x": "1",
-                "rate": "950",
+                "rate": "900",
                 "fringes": [
                   "CREW_HW",
                   "FICA",
@@ -787,7 +942,7 @@
             "name": "Script supervisor",
             "details": [
               {
-                "id": 30,
+                "id": 36,
                 "description": "Script supervisor",
                 "amount": "SHOOT_DAYS + 2",
                 "unit": "Day",
@@ -807,7 +962,7 @@
             "name": "Production assistants",
             "details": [
               {
-                "id": 31,
+                "id": 37,
                 "description": "Production assistants",
                 "amount": "SHOOT_DAYS",
                 "unit": "Day",
@@ -827,7 +982,7 @@
             "name": "Production accountant",
             "details": [
               {
-                "id": 32,
+                "id": 38,
                 "description": "Production accountant",
                 "amount": "PREP_WKS + SHOOT_WKS + 1",
                 "unit": "Week",
@@ -854,12 +1009,12 @@
             "name": "Director of photography",
             "details": [
               {
-                "id": 33,
+                "id": 39,
                 "description": "Director of photography",
                 "amount": "SHOOT_DAYS + 6",
                 "unit": "Day",
                 "x": "1",
-                "rate": "650",
+                "rate": "600",
                 "fringes": [
                   "CREW_HW",
                   "FICA",
@@ -868,7 +1023,7 @@
                 ]
               },
               {
-                "id": 34,
+                "id": 40,
                 "description": "Second unit director of photography",
                 "amount": "SECOND_UNIT_DAYS",
                 "unit": "Day",
@@ -892,7 +1047,7 @@
             "name": "Camera assistants",
             "details": [
               {
-                "id": 35,
+                "id": 41,
                 "description": "First assistant camera",
                 "amount": "SHOOT_DAYS + 2",
                 "unit": "Day",
@@ -906,7 +1061,7 @@
                 ]
               },
               {
-                "id": 36,
+                "id": 42,
                 "description": "Second assistant camera",
                 "amount": "SHOOT_DAYS + 1",
                 "unit": "Day",
@@ -920,7 +1075,7 @@
                 ]
               },
               {
-                "id": 37,
+                "id": 43,
                 "description": "Second unit camera assistant",
                 "amount": "SECOND_UNIT_DAYS",
                 "unit": "Day",
@@ -944,7 +1099,7 @@
             "name": "Digital imaging technician",
             "details": [
               {
-                "id": 38,
+                "id": 44,
                 "description": "Digital imaging technician",
                 "amount": "SHOOT_DAYS",
                 "unit": "Day",
@@ -964,12 +1119,12 @@
             "name": "Camera package",
             "details": [
               {
-                "id": 39,
+                "id": 45,
                 "description": "Camera package, rental house estimate",
                 "amount": "SHOOT_DAYS",
                 "unit": "Day",
                 "x": "1",
-                "rate": "1050",
+                "rate": "950",
                 "notes": [
                   {
                     "id": 1,
@@ -987,7 +1142,7 @@
                 ]
               },
               {
-                "id": 40,
+                "id": 46,
                 "description": "Second unit camera package",
                 "amount": "SECOND_UNIT_DAYS",
                 "unit": "Day",
@@ -999,7 +1154,7 @@
                 "location": "Hollins Ridge fire road"
               },
               {
-                "id": 41,
+                "id": 47,
                 "description": "Drone and pilot, lake aerials",
                 "amount": "2",
                 "unit": "Day",
@@ -1017,7 +1172,7 @@
             "name": "Camera supplies",
             "details": [
               {
-                "id": 42,
+                "id": 48,
                 "description": "Expendables and batteries",
                 "amount": "1",
                 "unit": "Allow",
@@ -1038,7 +1193,7 @@
             "name": "Gaffer",
             "details": [
               {
-                "id": 43,
+                "id": 49,
                 "description": "Gaffer",
                 "amount": "SHOOT_DAYS + 2",
                 "unit": "Day",
@@ -1058,7 +1213,7 @@
             "name": "Key grip",
             "details": [
               {
-                "id": 44,
+                "id": 50,
                 "description": "Key grip",
                 "amount": "SHOOT_DAYS + 2",
                 "unit": "Day",
@@ -1078,12 +1233,12 @@
             "name": "Grip and electric crew",
             "details": [
               {
-                "id": 45,
+                "id": 51,
                 "description": "Grip and electric crew",
                 "amount": "SHOOT_DAYS",
                 "unit": "Day",
                 "x": "3",
-                "rate": "380",
+                "rate": "340",
                 "fringes": [
                   "CREW_HW",
                   "FICA",
@@ -1098,15 +1253,15 @@
             "name": "Lighting and grip package",
             "details": [
               {
-                "id": 46,
+                "id": 52,
                 "description": "Lighting and grip package",
                 "amount": "SHOOT_DAYS",
                 "unit": "Day",
                 "x": "1",
-                "rate": "1050"
+                "rate": "900"
               },
               {
-                "id": 47,
+                "id": 53,
                 "description": "Tow generator and operator",
                 "amount": "STATION_DAYS",
                 "unit": "Day",
@@ -1121,7 +1276,7 @@
             "name": "Expendables",
             "details": [
               {
-                "id": 48,
+                "id": 54,
                 "description": "Expendables",
                 "amount": "1",
                 "unit": "Allow",
@@ -1142,7 +1297,7 @@
             "name": "Sound mixer",
             "details": [
               {
-                "id": 49,
+                "id": 55,
                 "description": "Production sound mixer",
                 "amount": "SHOOT_DAYS + 1",
                 "unit": "Day",
@@ -1162,7 +1317,7 @@
             "name": "Boom operator",
             "details": [
               {
-                "id": 50,
+                "id": 56,
                 "description": "Boom operator",
                 "amount": "SHOOT_DAYS",
                 "unit": "Day",
@@ -1182,7 +1337,7 @@
             "name": "Sound package",
             "details": [
               {
-                "id": 51,
+                "id": 57,
                 "description": "Sound package",
                 "amount": "SHOOT_DAYS",
                 "unit": "Day",
@@ -1203,7 +1358,7 @@
             "name": "Production designer",
             "details": [
               {
-                "id": 52,
+                "id": 58,
                 "description": "Production designer",
                 "amount": "PREP_WKS + SHOOT_WKS",
                 "unit": "Week",
@@ -1224,12 +1379,12 @@
             "name": "Art department crew",
             "details": [
               {
-                "id": 53,
+                "id": 59,
                 "description": "Art director",
                 "amount": "PREP_WKS + SHOOT_WKS",
                 "unit": "Week",
                 "x": "1",
-                "rate": "1000",
+                "rate": "900",
                 "fringes": [
                   "CREW_HW",
                   "FICA",
@@ -1238,7 +1393,7 @@
                 ]
               },
               {
-                "id": 54,
+                "id": 60,
                 "description": "Set dresser",
                 "amount": "SHOOT_DAYS + 4",
                 "unit": "Day",
@@ -1258,7 +1413,7 @@
             "name": "Set dressing and props",
             "details": [
               {
-                "id": 55,
+                "id": 61,
                 "description": "Station radio set, rental",
                 "amount": "RADIO_SET_DAYS",
                 "unit": "Day",
@@ -1268,7 +1423,7 @@
                 "location": "Cold Spring field station"
               },
               {
-                "id": 56,
+                "id": 62,
                 "description": "Generator, non-working prop",
                 "amount": "GENERATOR_DAYS",
                 "unit": "Day",
@@ -1276,9 +1431,9 @@
                 "rate": "60"
               },
               {
-                "id": 57,
-                "description": "Mast ladder, rental",
-                "amount": "LADDER_DAYS",
+                "id": 63,
+                "description": "Mast ladder and rigging, rental",
+                "amount": "MAST_CLIMB_DAYS + 1",
                 "unit": "Day",
                 "x": "1",
                 "rate": "140",
@@ -1286,7 +1441,15 @@
                 "location": "Cold Spring field station"
               },
               {
-                "id": 58,
+                "id": 64,
+                "description": "Raven and handler",
+                "amount": "RAVEN_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "850"
+              },
+              {
+                "id": 65,
                 "description": "Hand radios, pair",
                 "amount": "HAND_RADIO_DAYS",
                 "unit": "Day",
@@ -1294,7 +1457,7 @@
                 "rate": "35"
               },
               {
-                "id": 59,
+                "id": 66,
                 "description": "Camp stove, maps, packs and lamps",
                 "amount": "1",
                 "unit": "Allow",
@@ -1302,7 +1465,7 @@
                 "rate": "900"
               },
               {
-                "id": 60,
+                "id": 67,
                 "description": "Tea mugs, notebook, key ring and torch",
                 "amount": "1",
                 "unit": "Allow",
@@ -1310,7 +1473,7 @@
                 "rate": "300"
               },
               {
-                "id": 61,
+                "id": 68,
                 "description": "Set dressing purchases",
                 "amount": "1",
                 "unit": "Allow",
@@ -1324,7 +1487,7 @@
             "name": "Construction",
             "details": [
               {
-                "id": 62,
+                "id": 69,
                 "description": "Station interior, build, dress and strike",
                 "amount": "1",
                 "unit": "Allow",
@@ -1342,7 +1505,7 @@
                 ]
               },
               {
-                "id": 63,
+                "id": 70,
                 "description": "Boathouse dock repair and dressing",
                 "amount": "1",
                 "unit": "Allow",
@@ -1352,7 +1515,7 @@
                 "location": "Kettle Lake boathouse"
               },
               {
-                "id": 64,
+                "id": 71,
                 "description": "Production designer, construction supervision",
                 "amount": "3",
                 "unit": "Week",
@@ -1373,7 +1536,7 @@
             "name": "Practical effects",
             "details": [
               {
-                "id": 65,
+                "id": 72,
                 "description": "Rain, towers and water truck",
                 "amount": "RAIN_DAYS",
                 "unit": "Day",
@@ -1381,7 +1544,7 @@
                 "rate": "1800"
               },
               {
-                "id": 66,
+                "id": 73,
                 "description": "Wind, fans and operator",
                 "amount": "WIND_DAYS",
                 "unit": "Day",
@@ -1389,18 +1552,18 @@
                 "rate": "550"
               },
               {
-                "id": 67,
-                "description": "Fog on the lake",
-                "amount": "FOG_DAYS",
+                "id": 74,
+                "description": "Mist on the lake",
+                "amount": "MIST_DAYS",
                 "unit": "Day",
                 "x": "1",
                 "rate": "700",
                 "location": "Kettle Lake boathouse"
               },
               {
-                "id": 68,
+                "id": 75,
                 "description": "Effects technician",
-                "amount": "RAIN_DAYS + WIND_DAYS + FOG_DAYS",
+                "amount": "RAIN_DAYS + WIND_DAYS + MIST_DAYS",
                 "unit": "Day",
                 "x": "1",
                 "rate": "450",
@@ -1425,7 +1588,7 @@
             "name": "Costume designer",
             "details": [
               {
-                "id": 69,
+                "id": 76,
                 "description": "Costume designer",
                 "amount": "PREP_WKS + SHOOT_WKS",
                 "unit": "Week",
@@ -1445,7 +1608,7 @@
             "name": "Wardrobe assistant",
             "details": [
               {
-                "id": 70,
+                "id": 77,
                 "description": "Wardrobe assistant",
                 "amount": "SHOOT_DAYS + 2",
                 "unit": "Day",
@@ -1465,7 +1628,7 @@
             "name": "Wardrobe purchases and rentals",
             "details": [
               {
-                "id": 71,
+                "id": 78,
                 "description": "Weather coats, three, with doubles",
                 "amount": "1",
                 "unit": "Flat",
@@ -1473,7 +1636,7 @@
                 "rate": "180"
               },
               {
-                "id": 72,
+                "id": 79,
                 "description": "Weather coats, cleaning on wet days",
                 "amount": "COATS_DAYS",
                 "unit": "Day",
@@ -1481,7 +1644,7 @@
                 "rate": "45"
               },
               {
-                "id": 73,
+                "id": 80,
                 "description": "Wardrobe purchases, rentals and alterations",
                 "amount": "1",
                 "unit": "Allow",
@@ -1495,12 +1658,12 @@
             "name": "Makeup and hair artists",
             "details": [
               {
-                "id": 74,
+                "id": 81,
                 "description": "Makeup and hair artists",
                 "amount": "SHOOT_DAYS",
                 "unit": "Day",
                 "x": "2",
-                "rate": "380",
+                "rate": "340",
                 "fringes": [
                   "CREW_HW",
                   "FICA",
@@ -1515,7 +1678,7 @@
             "name": "Makeup and hair supplies",
             "details": [
               {
-                "id": 75,
+                "id": 82,
                 "description": "Makeup and hair supplies",
                 "amount": "1",
                 "unit": "Allow",
@@ -1536,12 +1699,12 @@
             "name": "Location manager",
             "details": [
               {
-                "id": 76,
+                "id": 83,
                 "description": "Location manager",
                 "amount": "PREP_WKS + SHOOT_WKS + WRAP_WKS",
                 "unit": "Week",
                 "x": "1",
-                "rate": "1100",
+                "rate": "1000",
                 "fringes": [
                   "CREW_HW",
                   "FICA",
@@ -1550,7 +1713,7 @@
                 ]
               },
               {
-                "id": 77,
+                "id": 84,
                 "description": "Assistant location manager",
                 "amount": "SHOOT_DAYS + 5",
                 "unit": "Day",
@@ -1570,12 +1733,12 @@
             "name": "Site fees",
             "details": [
               {
-                "id": 78,
+                "id": 85,
                 "description": "Site fee, Cold Spring field station",
                 "amount": "STATION_DAYS",
                 "unit": "Day",
                 "x": "1",
-                "rate": "1250",
+                "rate": "1100",
                 "location": "Cold Spring field station",
                 "notes": [
                   {
@@ -1587,7 +1750,7 @@
                 ]
               },
               {
-                "id": 79,
+                "id": 86,
                 "description": "Site fee, Hollins Ridge fire road",
                 "amount": "RIDGE_DAYS",
                 "unit": "Day",
@@ -1596,7 +1759,7 @@
                 "location": "Hollins Ridge fire road"
               },
               {
-                "id": 80,
+                "id": 87,
                 "description": "Site fee, Kettle Lake boathouse",
                 "amount": "LAKE_DAYS",
                 "unit": "Day",
@@ -1611,7 +1774,7 @@
             "name": "Permits and insurance certificates",
             "details": [
               {
-                "id": 81,
+                "id": 88,
                 "description": "Permits and certificates",
                 "amount": "1",
                 "unit": "Allow",
@@ -1625,7 +1788,7 @@
             "name": "Location expenses",
             "details": [
               {
-                "id": 82,
+                "id": 89,
                 "description": "Heaters, tents and toilets, field station",
                 "amount": "STATION_DAYS",
                 "unit": "Day",
@@ -1634,7 +1797,7 @@
                 "location": "Cold Spring field station"
               },
               {
-                "id": 83,
+                "id": 90,
                 "description": "Base camp and parking, fire road",
                 "amount": "RIDGE_DAYS",
                 "unit": "Day",
@@ -1643,7 +1806,7 @@
                 "location": "Hollins Ridge fire road"
               },
               {
-                "id": 84,
+                "id": 91,
                 "description": "Base camp and parking, boathouse",
                 "amount": "LAKE_DAYS",
                 "unit": "Day",
@@ -1652,7 +1815,7 @@
                 "location": "Kettle Lake boathouse"
               },
               {
-                "id": 85,
+                "id": 92,
                 "description": "Overnight security",
                 "amount": "SHOOT_DAYS",
                 "unit": "Day",
@@ -1678,7 +1841,7 @@
             "name": "Vehicles",
             "details": [
               {
-                "id": 86,
+                "id": 93,
                 "description": "Production vans",
                 "amount": "SHOOT_DAYS + 4",
                 "unit": "Day",
@@ -1686,7 +1849,7 @@
                 "rate": "150"
               },
               {
-                "id": 87,
+                "id": 94,
                 "description": "Fire road shuttle, four-wheel drive",
                 "amount": "RIDGE_DAYS",
                 "unit": "Day",
@@ -1695,25 +1858,80 @@
                 "location": "Hollins Ridge fire road"
               },
               {
-                "id": 88,
-                "description": "Patrol truck, picture vehicle",
+                "id": 95,
+                "description": "Park truck, picture vehicle",
                 "amount": "TRUCK_DAYS",
                 "unit": "Day",
                 "x": "1",
-                "rate": "300",
+                "rate": "250"
+              },
+              {
+                "id": 96,
+                "description": "Quad bike, picture vehicle",
+                "amount": "QUAD_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "180",
                 "location": "Hollins Ridge fire road"
               },
               {
-                "id": 89,
-                "description": "Rowboat and safety boat",
+                "id": 97,
+                "description": "Search plane and pilot, picture aircraft",
+                "amount": "PLANE_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "1400"
+              },
+              {
+                "id": 98,
+                "description": "Rowboat, picture boat",
                 "amount": "ROWBOAT_DAYS",
                 "unit": "Day",
                 "x": "1",
-                "rate": "400",
+                "rate": "150",
                 "location": "Kettle Lake boathouse"
               },
               {
-                "id": 90,
+                "id": 99,
+                "description": "Camera boat and operator",
+                "amount": "CAMERA_BOAT_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "750",
+                "location": "Kettle Lake boathouse"
+              },
+              {
+                "id": 100,
+                "description": "Marine coordinator",
+                "amount": "MARINE_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "650",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ],
+                "location": "Kettle Lake boathouse"
+              },
+              {
+                "id": 101,
+                "description": "Safety diver",
+                "amount": "DIVER_DAYS",
+                "unit": "Day",
+                "x": "1",
+                "rate": "600",
+                "fringes": [
+                  "CREW_HW",
+                  "FICA",
+                  "SUI",
+                  "WC"
+                ],
+                "location": "Kettle Lake boathouse"
+              },
+              {
+                "id": 102,
                 "description": "Driver",
                 "amount": "SHOOT_DAYS + 2",
                 "unit": "Day",
@@ -1733,7 +1951,7 @@
             "name": "Fuel and parking",
             "details": [
               {
-                "id": 91,
+                "id": 103,
                 "description": "Fuel and parking",
                 "amount": "1",
                 "unit": "Allow",
@@ -1754,16 +1972,16 @@
             "name": "Meals",
             "details": [
               {
-                "id": 92,
+                "id": 104,
                 "description": "Catering, field station days",
                 "amount": "STATION_DAYS",
                 "unit": "Day",
                 "x": "CREW_MEALS",
-                "rate": "28",
+                "rate": "26",
                 "location": "Cold Spring field station"
               },
               {
-                "id": 93,
+                "id": 105,
                 "description": "Catering, fire road days",
                 "amount": "RIDGE_DAYS",
                 "unit": "Day",
@@ -1772,7 +1990,7 @@
                 "location": "Hollins Ridge fire road"
               },
               {
-                "id": 94,
+                "id": 106,
                 "description": "Catering, boathouse days",
                 "amount": "LAKE_DAYS",
                 "unit": "Day",
@@ -1781,11 +1999,11 @@
                 "location": "Kettle Lake boathouse"
               },
               {
-                "id": 95,
+                "id": 107,
                 "description": "Background meals",
-                "amount": "BACKGROUND_DAYS",
+                "amount": "BASE_STAFF_DAYS * BASE_STAFF + RELIEF_TEAM_DAYS * RELIEF_TEAM + BOAT_CREW_DAYS * BOAT_CREW",
                 "unit": "Day",
-                "x": "VOLUNTEERS",
+                "x": "1",
                 "rate": "15"
               }
             ]
@@ -1795,7 +2013,7 @@
             "name": "Craft service",
             "details": [
               {
-                "id": 96,
+                "id": 108,
                 "description": "Craft service",
                 "amount": "SHOOT_DAYS",
                 "unit": "Day",
@@ -1816,7 +2034,7 @@
             "name": "Office and supplies",
             "details": [
               {
-                "id": 97,
+                "id": 109,
                 "description": "Production office and supplies",
                 "amount": "3",
                 "unit": "Month",
@@ -1830,7 +2048,7 @@
             "name": "Communications",
             "details": [
               {
-                "id": 98,
+                "id": 110,
                 "description": "Walkie-talkie rental",
                 "amount": "SHOOT_DAYS",
                 "unit": "Day",
@@ -1838,7 +2056,7 @@
                 "rate": "120"
               },
               {
-                "id": 99,
+                "id": 111,
                 "description": "Phones and internet",
                 "amount": "3",
                 "unit": "Month",
@@ -1852,7 +2070,7 @@
             "name": "Shipping",
             "details": [
               {
-                "id": 100,
+                "id": 112,
                 "description": "Shipping and courier",
                 "amount": "1",
                 "unit": "Allow",
@@ -1873,7 +2091,7 @@
             "name": "Drives and media",
             "details": [
               {
-                "id": 101,
+                "id": 113,
                 "description": "Drives and media",
                 "amount": "1",
                 "unit": "Allow",
@@ -1887,7 +2105,7 @@
             "name": "Backup and storage",
             "details": [
               {
-                "id": 102,
+                "id": 114,
                 "description": "Backup storage, twelve months",
                 "amount": "12",
                 "unit": "Month",
@@ -1912,12 +2130,12 @@
             "name": "Editor",
             "details": [
               {
-                "id": 103,
+                "id": 115,
                 "description": "Editor",
-                "amount": "12",
+                "amount": "10",
                 "unit": "Week",
                 "x": "1",
-                "rate": "1700",
+                "rate": "1600",
                 "fringes": [
                   "FICA",
                   "SUI",
@@ -1931,7 +2149,7 @@
             "name": "Assistant editor",
             "details": [
               {
-                "id": 104,
+                "id": 116,
                 "description": "Assistant editor",
                 "amount": "8",
                 "unit": "Week",
@@ -1950,7 +2168,7 @@
             "name": "Edit system",
             "details": [
               {
-                "id": 105,
+                "id": 117,
                 "description": "Edit system",
                 "amount": "5",
                 "unit": "Month",
@@ -1971,12 +2189,12 @@
             "name": "Sound design and editing",
             "details": [
               {
-                "id": 106,
+                "id": 118,
                 "description": "Sound design and editing",
                 "amount": "1",
                 "unit": "Flat",
                 "x": "1",
-                "rate": "12000"
+                "rate": "10000"
               }
             ]
           },
@@ -1985,12 +2203,12 @@
             "name": "Mix",
             "details": [
               {
-                "id": 107,
+                "id": 119,
                 "description": "Mix",
                 "amount": "1",
                 "unit": "Flat",
                 "x": "1",
-                "rate": "9500"
+                "rate": "8500"
               }
             ]
           },
@@ -1999,7 +2217,7 @@
             "name": "ADR and foley",
             "details": [
               {
-                "id": 108,
+                "id": 120,
                 "description": "ADR and foley",
                 "amount": "1",
                 "unit": "Allow",
@@ -2020,16 +2238,16 @@
             "name": "Composer",
             "details": [
               {
-                "id": 109,
+                "id": 121,
                 "description": "Composer, package",
                 "amount": "1",
                 "unit": "Flat",
                 "x": "1",
-                "rate": "13000",
+                "rate": "12000",
                 "currency": "EUR"
               },
               {
-                "id": 110,
+                "id": 122,
                 "description": "Recording session, string quartet",
                 "amount": "1",
                 "unit": "Flat",
@@ -2044,7 +2262,7 @@
             "name": "Music licensing",
             "details": [
               {
-                "id": 111,
+                "id": 123,
                 "description": "Music licensing",
                 "amount": "1",
                 "unit": "Allow",
@@ -2065,12 +2283,12 @@
             "name": "Visual effects",
             "details": [
               {
-                "id": 112,
+                "id": 124,
                 "description": "Visual effects, cleanup and sky",
                 "amount": "1",
                 "unit": "Allow",
                 "x": "1",
-                "rate": "12000"
+                "rate": "10000"
               }
             ]
           },
@@ -2079,7 +2297,7 @@
             "name": "Titles and graphics",
             "details": [
               {
-                "id": 113,
+                "id": 125,
                 "description": "Titles and graphics",
                 "amount": "1",
                 "unit": "Flat",
@@ -2100,12 +2318,12 @@
             "name": "Color grading",
             "details": [
               {
-                "id": 114,
+                "id": 126,
                 "description": "Color grading",
                 "amount": "1",
                 "unit": "Flat",
                 "x": "1",
-                "rate": "9500"
+                "rate": "8500"
               }
             ]
           },
@@ -2114,7 +2332,7 @@
             "name": "Conform and online",
             "details": [
               {
-                "id": 115,
+                "id": 127,
                 "description": "Conform and online",
                 "amount": "1",
                 "unit": "Flat",
@@ -2135,7 +2353,7 @@
             "name": "Masters",
             "details": [
               {
-                "id": 116,
+                "id": 128,
                 "description": "Masters",
                 "amount": "1",
                 "unit": "Allow",
@@ -2149,7 +2367,7 @@
             "name": "Digital cinema package",
             "details": [
               {
-                "id": 117,
+                "id": 129,
                 "description": "Digital cinema package",
                 "amount": "1",
                 "unit": "Flat",
@@ -2163,7 +2381,7 @@
             "name": "Closed captions and subtitles",
             "details": [
               {
-                "id": 118,
+                "id": 130,
                 "description": "Closed captions and subtitles",
                 "amount": "1",
                 "unit": "Flat",
@@ -2188,12 +2406,12 @@
             "name": "Production insurance",
             "details": [
               {
-                "id": 119,
+                "id": 131,
                 "description": "Production insurance",
                 "amount": "1",
                 "unit": "Allow",
                 "x": "1",
-                "rate": "12000"
+                "rate": "11000"
               }
             ]
           },
@@ -2202,7 +2420,7 @@
             "name": "Errors and omissions",
             "details": [
               {
-                "id": 120,
+                "id": 132,
                 "description": "Errors and omissions",
                 "amount": "1",
                 "unit": "Allow",
@@ -2223,12 +2441,12 @@
             "name": "Legal",
             "details": [
               {
-                "id": 121,
+                "id": 133,
                 "description": "Production legal",
                 "amount": "1",
                 "unit": "Allow",
                 "x": "1",
-                "rate": "11000"
+                "rate": "9000"
               }
             ]
           },
@@ -2237,7 +2455,7 @@
             "name": "Accounting and payroll fees",
             "details": [
               {
-                "id": 122,
+                "id": 134,
                 "description": "Payroll service fees",
                 "amount": "1",
                 "unit": "Allow",
@@ -2245,7 +2463,7 @@
                 "rate": "4000"
               },
               {
-                "id": 123,
+                "id": 135,
                 "description": "Cost report and audit",
                 "amount": "1",
                 "unit": "Allow",
@@ -2266,7 +2484,7 @@
             "name": "Festival fees",
             "details": [
               {
-                "id": 124,
+                "id": 136,
                 "description": "Festival entry fees",
                 "amount": "15",
                 "unit": "Flat",
@@ -2280,7 +2498,7 @@
             "name": "Marketing materials",
             "details": [
               {
-                "id": 125,
+                "id": 137,
                 "description": "Poster, trailer and press kit",
                 "amount": "1",
                 "unit": "Allow",
@@ -2301,7 +2519,7 @@
             "name": "Bank fees",
             "details": [
               {
-                "id": 126,
+                "id": 138,
                 "description": "Bank fees",
                 "amount": "1",
                 "unit": "Allow",
@@ -2315,7 +2533,7 @@
             "name": "Miscellaneous",
             "details": [
               {
-                "id": 127,
+                "id": 139,
                 "description": "Miscellaneous",
                 "amount": "1",
                 "unit": "Allow",
@@ -2385,203 +2603,215 @@
     "baseline": {
       "rows": {
         "1": 800000,
-        "2": 2000000,
+        "2": 1800000,
         "3": 350000,
         "4": 120000,
-        "5": 1200000,
-        "6": 800000,
-        "7": 928000,
+        "5": 1000000,
+        "6": 700000,
+        "7": 848000,
         "8": 200000,
-        "9": 2200000,
+        "9": 2000000,
         "10": 150000,
-        "11": 2970000,
-        "12": 2475000,
-        "13": 2210000,
-        "14": 540000,
-        "15": 400000,
-        "16": 270000,
-        "17": 270000,
-        "18": 90000,
-        "19": 180000,
-        "20": 1296000,
-        "21": 250000,
-        "22": 750000,
-        "23": 150000,
-        "24": 540000,
-        "25": 135000,
-        "26": 1682000,
-        "27": 1008000,
-        "28": 714000,
-        "29": 1007000,
-        "30": 800000,
-        "31": 1080000,
-        "32": 1007000,
-        "33": 1560000,
-        "35": 900000,
-        "36": 684000,
-        "38": 720000,
-        "39": 2160000,
-        "41": 0,
-        "42": 150000,
-        "43": 960000,
-        "44": 960000,
-        "45": 2052000,
-        "46": 1890000,
-        "47": 456000,
-        "48": 220000,
-        "49": 988000,
-        "50": 684000,
-        "51": 540000,
-        "52": 1344000,
-        "53": 960000,
-        "54": 704000,
-        "55": 85500,
-        "56": 36000,
-        "57": 42000,
-        "58": 98000,
-        "59": 90000,
-        "60": 30000,
-        "61": 450000,
-        "62": 1050000,
-        "63": 500000,
-        "64": 420000,
-        "65": 540000,
-        "66": 385000,
-        "68": 540000,
-        "69": 1008000,
-        "70": 520000,
-        "71": 108000,
-        "72": 45000,
-        "73": 400000,
-        "74": 1368000,
-        "75": 140000,
-        "76": 1276000,
-        "77": 644000,
-        "78": 1500000,
-        "79": 135000,
-        "80": 360000,
-        "81": 280000,
-        "82": 360000,
-        "83": 78000,
-        "84": 78000,
-        "85": 468000,
-        "86": 660000,
-        "87": 132000,
-        "88": 90000,
-        "89": 120000,
-        "90": 600000,
-        "91": 320000,
-        "92": 1344000,
-        "93": 396000,
-        "94": 336000,
-        "95": 108000,
-        "96": 432000,
-        "97": 330000,
-        "98": 216000,
-        "99": 75000,
-        "100": 60000,
-        "101": 300000,
-        "102": 72000,
-        "103": 2040000,
-        "104": 720000,
-        "105": 200000,
-        "106": 1200000,
-        "107": 950000,
-        "108": 500000,
-        "109": 1242000,
-        "110": 345600,
-        "111": 500000,
-        "112": 1600000,
-        "113": 250000,
-        "114": 950000,
-        "115": 250000,
-        "116": 350000,
-        "117": 180000,
-        "118": 140000,
-        "119": 1200000,
+        "11": 2400000,
+        "12": 2700000,
+        "13": 1955000,
+        "14": 1800000,
+        "15": 480000,
+        "16": 1275000,
+        "17": 675000,
+        "18": 900000,
+        "19": 225000,
+        "20": 96000,
+        "21": 570000,
+        "22": 180000,
+        "23": 270000,
+        "24": 216000,
+        "25": 144000,
+        "26": 36000,
+        "27": 250000,
+        "28": 650000,
+        "29": 150000,
+        "30": 540000,
+        "31": 135000,
+        "32": 1378000,
+        "33": 924000,
+        "34": 714000,
+        "35": 864000,
+        "36": 800000,
+        "37": 1080000,
+        "38": 912000,
+        "39": 1440000,
+        "41": 900000,
+        "42": 684000,
+        "44": 720000,
+        "45": 2160000,
+        "47": 0,
+        "48": 150000,
+        "49": 960000,
+        "50": 960000,
+        "51": 1836000,
+        "52": 1620000,
+        "53": 456000,
+        "54": 220000,
+        "55": 988000,
+        "56": 684000,
+        "57": 540000,
+        "58": 1204000,
+        "59": 774000,
+        "60": 704000,
+        "61": 104500,
+        "62": 60000,
+        "63": 42000,
+        "64": 85000,
+        "65": 77000,
+        "66": 90000,
+        "67": 30000,
+        "68": 450000,
+        "69": 1050000,
+        "70": 500000,
+        "71": 420000,
+        "72": 900000,
+        "73": 660000,
+        "75": 855000,
+        "76": 903000,
+        "77": 520000,
+        "78": 108000,
+        "79": 45000,
+        "80": 400000,
+        "81": 1224000,
+        "82": 140000,
+        "83": 1060000,
+        "84": 644000,
+        "85": 1320000,
+        "86": 135000,
+        "87": 360000,
+        "88": 280000,
+        "89": 360000,
+        "90": 78000,
+        "91": 78000,
+        "92": 468000,
+        "93": 660000,
+        "94": 132000,
+        "95": 175000,
+        "96": 90000,
+        "97": 700000,
+        "98": 30000,
+        "99": 150000,
+        "100": 130000,
+        "101": 120000,
+        "102": 600000,
+        "103": 320000,
+        "104": 1248000,
+        "105": 396000,
+        "106": 336000,
+        "107": 33000,
+        "108": 432000,
+        "109": 330000,
+        "110": 216000,
+        "111": 75000,
+        "112": 60000,
+        "113": 300000,
+        "114": 72000,
+        "115": 1600000,
+        "116": 720000,
+        "117": 200000,
+        "118": 1000000,
+        "119": 850000,
         "120": 500000,
-        "121": 1100000,
-        "122": 400000,
-        "123": 350000,
-        "124": 135000,
-        "125": 500000,
-        "126": 50000,
-        "127": 200000
+        "121": 1134000,
+        "122": 345600,
+        "123": 500000,
+        "124": 1350000,
+        "125": 250000,
+        "126": 850000,
+        "127": 250000,
+        "128": 350000,
+        "129": 180000,
+        "130": 140000,
+        "131": 1100000,
+        "132": 500000,
+        "133": 900000,
+        "134": 400000,
+        "135": 350000,
+        "136": 135000,
+        "137": 500000,
+        "138": 50000,
+        "139": 200000
       },
       "accounts": {
         "10-01": 800000,
-        "10-02": 2350000,
+        "10-02": 2150000,
         "10-03": 120000,
-        "11-01": 2000000,
-        "11-02": 928000,
+        "11-01": 1700000,
+        "11-02": 848000,
         "11-03": 200000,
-        "12-01": 2200000,
+        "12-01": 2000000,
         "12-02": 150000,
-        "13-01": 8195000,
-        "13-02": 2756000,
-        "13-03": 900000,
+        "13-01": 9335000,
+        "13-02": 4837000,
+        "13-03": 800000,
         "13-04": 675000,
-        "20-01": 1682000,
-        "20-02": 1008000,
+        "20-01": 1378000,
+        "20-02": 924000,
         "20-03": 714000,
-        "20-04": 1007000,
+        "20-04": 864000,
         "20-05": 800000,
         "20-06": 1080000,
-        "20-07": 1007000,
-        "21-01": 1560000,
+        "20-07": 912000,
+        "21-01": 1440000,
         "21-02": 1584000,
         "21-03": 720000,
         "21-04": 2160000,
         "21-05": 150000,
         "22-01": 960000,
         "22-02": 960000,
-        "22-03": 2052000,
-        "22-04": 2346000,
+        "22-03": 1836000,
+        "22-04": 2076000,
         "22-05": 220000,
         "23-01": 988000,
         "23-02": 684000,
         "23-03": 540000,
-        "24-01": 1344000,
-        "24-02": 1664000,
-        "24-03": 831500,
+        "24-01": 1204000,
+        "24-02": 1478000,
+        "24-03": 938500,
         "24-04": 1970000,
-        "24-05": 1465000,
-        "25-01": 1008000,
+        "24-05": 2415000,
+        "25-01": 903000,
         "25-02": 520000,
         "25-03": 553000,
-        "25-04": 1368000,
+        "25-04": 1224000,
         "25-05": 140000,
-        "26-01": 1920000,
-        "26-02": 1995000,
+        "26-01": 1704000,
+        "26-02": 1815000,
         "26-03": 280000,
         "26-04": 984000,
-        "27-01": 1602000,
+        "27-01": 2787000,
         "27-02": 320000,
-        "28-01": 2184000,
+        "28-01": 2013000,
         "28-02": 432000,
         "29-01": 330000,
         "29-02": 291000,
         "29-03": 60000,
         "30-01": 300000,
         "30-02": 72000,
-        "40-01": 2040000,
+        "40-01": 1600000,
         "40-02": 720000,
         "40-03": 200000,
-        "41-01": 1200000,
-        "41-02": 950000,
+        "41-01": 1000000,
+        "41-02": 850000,
         "41-03": 500000,
-        "42-01": 1587600,
+        "42-01": 1479600,
         "42-02": 500000,
-        "43-01": 1600000,
+        "43-01": 1350000,
         "43-02": 250000,
-        "44-01": 950000,
+        "44-01": 850000,
         "44-02": 250000,
         "45-01": 350000,
         "45-02": 180000,
         "45-03": 140000,
-        "50-01": 1200000,
+        "50-01": 1100000,
         "50-02": 500000,
-        "51-01": 1100000,
+        "51-01": 900000,
         "51-02": 750000,
         "52-01": 135000,
         "52-02": 500000,
@@ -2589,34 +2819,34 @@
         "53-02": 200000
       },
       "categories": {
-        "10": 3270000,
-        "11": 3128000,
-        "12": 2350000,
-        "13": 12526000,
-        "20": 7298000,
-        "21": 6174000,
-        "22": 6538000,
+        "10": 3070000,
+        "11": 2748000,
+        "12": 2150000,
+        "13": 15647000,
+        "20": 6672000,
+        "21": 6054000,
+        "22": 6052000,
         "23": 2212000,
-        "24": 7274500,
-        "25": 3589000,
-        "26": 5179000,
-        "27": 1922000,
-        "28": 2616000,
+        "24": 8005500,
+        "25": 3340000,
+        "26": 4783000,
+        "27": 3107000,
+        "28": 2445000,
         "29": 681000,
         "30": 372000,
-        "40": 2960000,
-        "41": 2650000,
-        "42": 2087600,
-        "43": 1850000,
-        "44": 1200000,
+        "40": 2520000,
+        "41": 2350000,
+        "42": 1979600,
+        "43": 1600000,
+        "44": 1100000,
         "45": 670000,
-        "50": 1700000,
-        "51": 1850000,
+        "50": 1600000,
+        "51": 1650000,
         "52": 635000,
         "53": 250000
       },
-      "grand_total": 105136310,
-      "net_total": 105136310,
+      "grand_total": 106620216,
+      "net_total": 106620216,
       "frozen": true
     },
     "actuals": {
@@ -2646,7 +2876,7 @@
           "vendor": "Writer's payroll",
           "description": "Screenplay fee, first steps",
           "reference": "INV-4126",
-          "amount": 1880000,
+          "amount": 1720000,
           "batch": 1
         },
         {
@@ -2656,7 +2886,7 @@
           "vendor": "Producers' payroll",
           "description": "Producer fees, first installments",
           "reference": "INV-4139",
-          "amount": 1000000,
+          "amount": 850000,
           "batch": 1
         },
         {
@@ -2666,7 +2896,7 @@
           "vendor": "Director's payroll",
           "description": "Director fee, prep and two weeks",
           "reference": "INV-4152",
-          "amount": 1320000,
+          "amount": 1200000,
           "batch": 1
         },
         {
@@ -2676,7 +2906,7 @@
           "vendor": "Cast payroll",
           "description": "Principal cast, weeks one and two",
           "reference": "INV-4165",
-          "amount": 3441900,
+          "amount": 3920700,
           "batch": 1
         },
         {
@@ -2686,7 +2916,7 @@
           "vendor": "Northfield Casting",
           "description": "Casting package",
           "reference": "INV-4178",
-          "amount": 900000,
+          "amount": 800000,
           "batch": 1
         },
         {
@@ -2696,7 +2926,7 @@
           "vendor": "Crew payroll",
           "description": "Prep and weeks one and two",
           "reference": "INV-4191",
-          "amount": 922200,
+          "amount": 748800,
           "batch": 1
         },
         {
@@ -2706,7 +2936,7 @@
           "vendor": "Crew payroll",
           "description": "Prep and weeks one and two",
           "reference": "INV-4204",
-          "amount": 565440,
+          "amount": 479880,
           "batch": 1
         },
         {
@@ -2716,7 +2946,7 @@
           "vendor": "Larkfield Camera Rentals",
           "description": "Camera package, weeks one and two",
           "reference": "INV-4217",
-          "amount": 1000000,
+          "amount": 910000,
           "batch": 1
         },
         {
@@ -2726,7 +2956,7 @@
           "vendor": "Tamarack Grip and Lighting",
           "description": "Lighting and grip, weeks one and two",
           "reference": "INV-4230",
-          "amount": 1219920,
+          "amount": 1079520,
           "batch": 1
         },
         {
@@ -2746,7 +2976,7 @@
           "vendor": "Various",
           "description": "Set dressing purchases, petty cash",
           "reference": "INV-4256",
-          "amount": 582050,
+          "amount": 656950,
           "batch": 1
         },
         {
@@ -2766,7 +2996,7 @@
           "vendor": "Cold Spring Field Station Trust",
           "description": "Site fees, first weeks",
           "reference": "INV-4282",
-          "amount": 897750,
+          "amount": 816750,
           "batch": 1
         },
         {
@@ -2786,7 +3016,7 @@
           "vendor": "Fernhill Vehicle Rental",
           "description": "Vans and shuttle, weeks one and two",
           "reference": "INV-4308",
-          "amount": 640800,
+          "amount": 1114800,
           "batch": 1
         },
         {
@@ -2796,7 +3026,7 @@
           "vendor": "Hearthstone Catering",
           "description": "Catering, weeks one and two",
           "reference": "INV-4321",
-          "amount": 950400,
+          "amount": 872928,
           "batch": 1
         },
         {
@@ -2816,7 +3046,7 @@
           "vendor": "Insurance broker",
           "description": "Production package premium",
           "reference": "INV-4347",
-          "amount": 1200000,
+          "amount": 1100000,
           "batch": 1
         },
         {
@@ -2826,7 +3056,7 @@
           "vendor": "Production counsel",
           "description": "Legal, prep",
           "reference": "INV-4360",
-          "amount": 440000,
+          "amount": 360000,
           "batch": 1
         }
       ],
@@ -2843,35 +3073,41 @@
     },
     "setup_sources": {
       "global": {
-        "BACKGROUND_DAYS": {
-          "notes": "Days of Background SEARCH VOLUNTEERS, from the schedule Field Station (Shooting Order, Main) [key: element:85 | Background |  | SEARCH VOLUNTEERS]"
+        "ANSEL_DAYS": {
+          "notes": "Days of Cast 9 ANSEL, from the schedule Field Station (Shooting Order, Main) [key: element:226 | Cast | 9 | ANSEL]"
+        },
+        "BASE_STAFF_DAYS": {
+          "notes": "Days of Background BASE STAFF, from the schedule Field Station (Shooting Order, Main) [key: element:227 | Background |  | BASE STAFF]"
+        },
+        "BOAT_CREW_DAYS": {
+          "notes": "Days of Background SECOND BOAT CREW, from the schedule Field Station (Shooting Order, Main) [key: element:229 | Background |  | SECOND BOAT CREW]"
+        },
+        "CAMERA_BOAT_DAYS": {
+          "notes": "Days of Special equipment CAMERA BOAT, from the schedule Field Station (Shooting Order, Main) [key: element:272 | Special equipment |  | CAMERA BOAT]"
         },
         "COATS_DAYS": {
-          "notes": "Days of Wardrobe WEATHER COATS, from the schedule Field Station (Shooting Order, Main) [key: element:76 | Wardrobe |  | WEATHER COATS]"
+          "notes": "Days of Wardrobe WEATHER COATS, from the schedule Field Station (Shooting Order, Main) [key: element:256 | Wardrobe |  | WEATHER COATS]"
         },
         "DELACROIX_DAYS": {
           "notes": "Days of Cast 1 DELACROIX, from the schedule Field Station (Shooting Order, Main) [key: element:40 | Cast | 1 | DELACROIX]"
         },
         "DISPATCHER_DAYS": {
-          "notes": "Days of Cast 8 PARK DISPATCHER, from the schedule Field Station (Shooting Order, Main) [key: element:84 | Cast | 8 | PARK DISPATCHER]"
+          "notes": "Days of Cast 5 DISPATCHER, from the schedule Field Station (Shooting Order, Main) [key: element:68 | Cast | 5 | DISPATCHER]"
         },
-        "FOG_DAYS": {
-          "notes": "Days of Practical effects FOG, from the schedule Field Station (Shooting Order, Main) [key: element:79 | Practical effects |  | FOG]"
+        "DIVER_DAYS": {
+          "notes": "Days of Safety SAFETY DIVER, from the schedule Field Station (Shooting Order, Main) [key: element:275 | Safety |  | SAFETY DIVER]"
         },
         "GENERATOR_DAYS": {
-          "notes": "Days of Set dressing GENERATOR, from the schedule Field Station (Shooting Order, Main) [key: element:74 | Set dressing |  | GENERATOR]"
+          "notes": "Days of Set dressing GENERATOR, from the schedule Field Station (Shooting Order, Main) [key: element:247 | Set dressing |  | GENERATOR]"
         },
         "HAND_RADIO_DAYS": {
-          "notes": "Days of Hand props HAND RADIO, from the schedule Field Station (Shooting Order, Main) [key: element:66 | Hand props |  | HAND RADIO]"
+          "notes": "Days of Hand props HAND RADIO, from the schedule Field Station (Shooting Order, Main) [key: element:236 | Hand props |  | HAND RADIO]"
         },
         "IVERSEN_DAYS": {
           "notes": "Days of Cast 4 IVERSEN, from the schedule Field Station (Shooting Order, Main) [key: element:47 | Cast | 4 | IVERSEN]"
         },
         "KEEPER_DAYS": {
-          "notes": "Days of Cast 6 BOATHOUSE KEEPER, from the schedule Field Station (Shooting Order, Main) [key: element:82 | Cast | 6 | BOATHOUSE KEEPER]"
-        },
-        "LADDER_DAYS": {
-          "notes": "Days of Set dressing MAST LADDER, from the schedule Field Station (Shooting Order, Main) [key: element:75 | Set dressing |  | MAST LADDER]"
+          "notes": "Days of Cast 6 BOATHOUSE KEEPER, from the schedule Field Station (Shooting Order, Main) [key: element:109 | Cast | 6 | BOATHOUSE KEEPER]"
         },
         "LAKE_DAYS": {
           "notes": "Shoot days at location Kettle Lake boathouse, from the schedule Field Station (Shooting Order, Main) [key: location:Kettle Lake boathouse]"
@@ -2879,23 +3115,47 @@
         "MARA_DAYS": {
           "notes": "Days of Cast 2 MARA, from the schedule Field Station (Shooting Order, Main) [key: element:41 | Cast | 2 | MARA]"
         },
+        "MARINE_DAYS": {
+          "notes": "Days of Extra crew MARINE COORDINATOR, from the schedule Field Station (Shooting Order, Main) [key: element:273 | Extra crew |  | MARINE COORDINATOR]"
+        },
+        "MAST_CLIMB_DAYS": {
+          "notes": "Days of Stunts 1 MAST CLIMB, from the schedule Field Station (Shooting Order, Main) [key: element:232 | Stunts | 1 | MAST CLIMB]"
+        },
+        "MIST_DAYS": {
+          "notes": "Days of Practical effects MIST, from the schedule Field Station (Shooting Order, Main) [key: element:266 | Practical effects |  | MIST]"
+        },
         "PILOT_DAYS": {
-          "notes": "Days of Cast 7 SEARCH PILOT, from the schedule Field Station (Shooting Order, Main) [key: element:83 | Cast | 7 | SEARCH PILOT]"
+          "notes": "Days of Cast 8 PILOT, from the schedule Field Station (Shooting Order, Main) [key: element:149 | Cast | 8 | PILOT]"
+        },
+        "PLANE_DAYS": {
+          "notes": "Days of Picture vehicles SEARCH PLANE, from the schedule Field Station (Shooting Order, Main) [key: element:261 | Picture vehicles |  | SEARCH PLANE]"
+        },
+        "QUAD_DAYS": {
+          "notes": "Days of Picture vehicles QUAD BIKE, from the schedule Field Station (Shooting Order, Main) [key: element:259 | Picture vehicles |  | QUAD BIKE]"
+        },
+        "QUAD_RIDE_DAYS": {
+          "notes": "Days of Stunts 2 QUAD RIDE, from the schedule Field Station (Shooting Order, Main) [key: element:233 | Stunts | 2 | QUAD RIDE]"
         },
         "RADIO_SET_DAYS": {
-          "notes": "Days of Set dressing STATION RADIO SET, from the schedule Field Station (Shooting Order, Main) [key: element:72 | Set dressing |  | STATION RADIO SET]"
+          "notes": "Days of Set dressing STATION RADIO SET, from the schedule Field Station (Shooting Order, Main) [key: element:246 | Set dressing |  | STATION RADIO SET]"
         },
         "RAIN_DAYS": {
-          "notes": "Days of Practical effects RAIN, from the schedule Field Station (Shooting Order, Main) [key: element:78 | Practical effects |  | RAIN]"
+          "notes": "Days of Practical effects RAIN, from the schedule Field Station (Shooting Order, Main) [key: element:265 | Practical effects |  | RAIN]"
         },
         "RANGER_DAYS": {
-          "notes": "Days of Cast 5 RANGER, from the schedule Field Station (Shooting Order, Main) [key: element:81 | Cast | 5 | RANGER]"
+          "notes": "Days of Cast 7 RANGER, from the schedule Field Station (Shooting Order, Main) [key: element:114 | Cast | 7 | RANGER]"
+        },
+        "RAVEN_DAYS": {
+          "notes": "Days of Animals RAVEN, from the schedule Field Station (Shooting Order, Main) [key: element:263 | Animals |  | RAVEN]"
+        },
+        "RELIEF_TEAM_DAYS": {
+          "notes": "Days of Background RELIEF TEAM, from the schedule Field Station (Shooting Order, Main) [key: element:228 | Background |  | RELIEF TEAM]"
         },
         "RIDGE_DAYS": {
           "notes": "Shoot days at location Hollins Ridge fire road, from the schedule Field Station (Shooting Order, Main) [key: location:Hollins Ridge fire road]"
         },
         "ROWBOAT_DAYS": {
-          "notes": "Days of Vehicles ROWBOAT, from the schedule Field Station (Shooting Order, Main) [key: element:87 | Vehicles |  | ROWBOAT]"
+          "notes": "Days of Picture vehicles ROWBOAT, from the schedule Field Station (Shooting Order, Main) [key: element:262 | Picture vehicles |  | ROWBOAT]"
         },
         "SECOND_UNIT_DAYS": {
           "notes": "Shoot days of unit Second Unit, from the schedule Field Station (Shooting Order, Main) [key: unit:Second Unit]"
@@ -2910,10 +3170,10 @@
           "notes": "Days of Cast 3 TEO, from the schedule Field Station (Shooting Order, Main) [key: element:44 | Cast | 3 | TEO]"
         },
         "TRUCK_DAYS": {
-          "notes": "Days of Vehicles PATROL TRUCK, from the schedule Field Station (Shooting Order, Main) [key: element:86 | Vehicles |  | PATROL TRUCK]"
+          "notes": "Days of Picture vehicles PARK TRUCK, from the schedule Field Station (Shooting Order, Main) [key: element:260 | Picture vehicles |  | PARK TRUCK]"
         },
         "WIND_DAYS": {
-          "notes": "Days of Practical effects WIND, from the schedule Field Station (Shooting Order, Main) [key: element:77 | Practical effects |  | WIND]"
+          "notes": "Days of Practical effects WIND, from the schedule Field Station (Shooting Order, Main) [key: element:264 | Practical effects |  | WIND]"
         }
       }
     },
@@ -2964,39 +3224,69 @@
             }
           },
           "globals": {
-            "BACKGROUND_DAYS": "6",
+            "ANSEL_DAYS": "3",
+            "BASE_STAFF": "4",
+            "BASE_STAFF_DAYS": "3",
+            "BOAT_CREW": "2",
+            "BOAT_CREW_DAYS": "1",
+            "CAMERA_BOAT_DAYS": "2",
             "COATS_DAYS": "10",
             "CREW_MEALS": "40",
-            "DELACROIX_DAYS": "18",
-            "DISPATCHER_DAYS": "2",
-            "FOG_DAYS": "2",
-            "GENERATOR_DAYS": "6",
-            "HAND_RADIO_DAYS": "14",
-            "IVERSEN_DAYS": "4",
+            "DELACROIX_DAYS": "16",
+            "DISPATCHER_DAYS": "9",
+            "DIVER_DAYS": "2",
+            "GENERATOR_DAYS": "10",
+            "HAND_RADIO_DAYS": "11",
+            "IVERSEN_DAYS": "18",
             "KEEPER_DAYS": "3",
-            "LADDER_DAYS": "3",
             "LAKE_DAYS": "3",
-            "MARA_DAYS": "15",
-            "PILOT_DAYS": "1",
-            "PREP_WKS": "6",
-            "RADIO_SET_DAYS": "9",
-            "RAIN_DAYS": "3",
-            "RANGER_DAYS": "3",
+            "MARA_DAYS": "18",
+            "MARINE_DAYS": "2",
+            "MAST_CLIMB_DAYS": "2",
+            "MIST_DAYS": "2",
+            "PILOT_DAYS": "12",
+            "PLANE_DAYS": "5",
+            "PREP_WKS": "5",
+            "QUAD_DAYS": "5",
+            "QUAD_RIDE_DAYS": "3",
+            "RADIO_SET_DAYS": "11",
+            "RAIN_DAYS": "5",
+            "RANGER_DAYS": "17",
+            "RAVEN_DAYS": "1",
+            "RELIEF_TEAM": "4",
+            "RELIEF_TEAM_DAYS": "2",
             "RIDGE_DAYS": "3",
-            "ROWBOAT_DAYS": "3",
+            "ROWBOAT_DAYS": "2",
             "SECOND_UNIT_DAYS": "1",
             "SHOOT_DAYS": "18",
             "SHOOT_WKS": "SHOOT_DAYS / 5",
             "STATION_DAYS": "12",
             "TEO_DAYS": "17",
-            "TRUCK_DAYS": "3",
-            "VOLUNTEERS": "12",
-            "WIND_DAYS": "7",
+            "TRUCK_DAYS": "7",
+            "WIND_DAYS": "12",
             "WRAP_WKS": "2"
           },
           "global_info": {
-            "BACKGROUND_DAYS": {
-              "description": "Days of Background SEARCH VOLUNTEERS",
+            "ANSEL_DAYS": {
+              "description": "Days of Cast 9 ANSEL",
+              "unit": "Day"
+            },
+            "BASE_STAFF": {
+              "description": "Base staff in the background each of their days"
+            },
+            "BASE_STAFF_DAYS": {
+              "description": "Days of Background BASE STAFF",
+              "unit": "Day"
+            },
+            "BOAT_CREW": {
+              "description": "Second boat crew in the background"
+            },
+            "BOAT_CREW_DAYS": {
+              "description": "Days of Background SECOND BOAT CREW",
+              "unit": "Day"
+            },
+            "CAMERA_BOAT_DAYS": {
+              "description": "Days of Special equipment CAMERA BOAT",
               "unit": "Day"
             },
             "COATS_DAYS": {
@@ -3011,11 +3301,11 @@
               "unit": "Day"
             },
             "DISPATCHER_DAYS": {
-              "description": "Days of Cast 8 PARK DISPATCHER",
+              "description": "Days of Cast 5 DISPATCHER",
               "unit": "Day"
             },
-            "FOG_DAYS": {
-              "description": "Days of Practical effects FOG",
+            "DIVER_DAYS": {
+              "description": "Days of Safety SAFETY DIVER",
               "unit": "Day"
             },
             "GENERATOR_DAYS": {
@@ -3034,10 +3324,6 @@
               "description": "Days of Cast 6 BOATHOUSE KEEPER",
               "unit": "Day"
             },
-            "LADDER_DAYS": {
-              "description": "Days of Set dressing MAST LADDER",
-              "unit": "Day"
-            },
             "LAKE_DAYS": {
               "description": "Shoot days at location Kettle Lake boathouse",
               "unit": "Day"
@@ -3046,12 +3332,36 @@
               "description": "Days of Cast 2 MARA",
               "unit": "Day"
             },
+            "MARINE_DAYS": {
+              "description": "Days of Extra crew MARINE COORDINATOR",
+              "unit": "Day"
+            },
+            "MAST_CLIMB_DAYS": {
+              "description": "Days of Stunts 1 MAST CLIMB",
+              "unit": "Day"
+            },
+            "MIST_DAYS": {
+              "description": "Days of Practical effects MIST",
+              "unit": "Day"
+            },
             "PILOT_DAYS": {
-              "description": "Days of Cast 7 SEARCH PILOT",
+              "description": "Days of Cast 8 PILOT",
+              "unit": "Day"
+            },
+            "PLANE_DAYS": {
+              "description": "Days of Picture vehicles SEARCH PLANE",
               "unit": "Day"
             },
             "PREP_WKS": {
               "description": "Weeks of prep"
+            },
+            "QUAD_DAYS": {
+              "description": "Days of Picture vehicles QUAD BIKE",
+              "unit": "Day"
+            },
+            "QUAD_RIDE_DAYS": {
+              "description": "Days of Stunts 2 QUAD RIDE",
+              "unit": "Day"
             },
             "RADIO_SET_DAYS": {
               "description": "Days of Set dressing STATION RADIO SET",
@@ -3062,7 +3372,18 @@
               "unit": "Day"
             },
             "RANGER_DAYS": {
-              "description": "Days of Cast 5 RANGER",
+              "description": "Days of Cast 7 RANGER",
+              "unit": "Day"
+            },
+            "RAVEN_DAYS": {
+              "description": "Days of Animals RAVEN",
+              "unit": "Day"
+            },
+            "RELIEF_TEAM": {
+              "description": "Relief team in the background each of their days"
+            },
+            "RELIEF_TEAM_DAYS": {
+              "description": "Days of Background RELIEF TEAM",
               "unit": "Day"
             },
             "RIDGE_DAYS": {
@@ -3070,7 +3391,7 @@
               "unit": "Day"
             },
             "ROWBOAT_DAYS": {
-              "description": "Days of Vehicles ROWBOAT",
+              "description": "Days of Picture vehicles ROWBOAT",
               "unit": "Day"
             },
             "SECOND_UNIT_DAYS": {
@@ -3093,11 +3414,8 @@
               "unit": "Day"
             },
             "TRUCK_DAYS": {
-              "description": "Days of Vehicles PATROL TRUCK",
+              "description": "Days of Picture vehicles PARK TRUCK",
               "unit": "Day"
-            },
-            "VOLUNTEERS": {
-              "description": "Search volunteers in the background each of their days"
             },
             "WIND_DAYS": {
               "description": "Days of Practical effects WIND",
@@ -3152,17 +3470,29 @@
             }
           },
           "sets": {
+            "BASE - RADIO ROOM": {
+              "description": "The station's radio room, where the base calls in"
+            },
             "BOATHOUSE": {
               "description": "The boathouse and its dock"
             },
             "FIELD STATION": {
               "description": "The station's main room and radio desk"
             },
-            "LAKE SHORE": {
-              "description": "The shore below the boathouse"
+            "FIELD STATION - BUNKHOUSE": {
+              "description": "The bunks"
+            },
+            "FIELD STATION - LAB": {
+              "description": "The lab bench and its instruments"
+            },
+            "FIRE ROAD": {
+              "description": "The fire road below the ridge"
+            },
+            "KETTLE LAKE": {
+              "description": "The lake, from the boats"
             },
             "LOWER STATION": {
-              "description": "The bunk room and stores below"
+              "description": "The stores below the station"
             },
             "RADIO MAST": {
               "description": "The mast above the station"
@@ -3171,7 +3501,7 @@
               "description": "The ridge top, night and day"
             },
             "RIDGE ROAD": {
-              "description": "The fire road up the ridge"
+              "description": "The road up the ridge"
             }
           },
           "locations": {
@@ -3218,7 +3548,7 @@
                       "amount": "1",
                       "unit": "Flat",
                       "x": "1",
-                      "rate": "20000",
+                      "rate": "18000",
                       "fringes": [
                         "FICA",
                         "SUI",
@@ -3271,7 +3601,7 @@
                       "amount": "1",
                       "unit": "Flat",
                       "x": "1",
-                      "rate": "12000"
+                      "rate": "10000"
                     },
                     {
                       "id": 6,
@@ -3279,7 +3609,7 @@
                       "amount": "1",
                       "unit": "Flat",
                       "x": "1",
-                      "rate": "8000"
+                      "rate": "7000"
                     }
                   ]
                 },
@@ -3334,7 +3664,7 @@
                       "amount": "1",
                       "unit": "Flat",
                       "x": "1",
-                      "rate": "22000",
+                      "rate": "20000",
                       "fringes": [
                         "FICA",
                         "SUI",
@@ -3374,7 +3704,7 @@
                       "amount": "DELACROIX_DAYS",
                       "unit": "Day",
                       "x": "1",
-                      "rate": "1650",
+                      "rate": "1500",
                       "fringes": [
                         "CAST_PH",
                         "FICA",
@@ -3388,7 +3718,7 @@
                       "amount": "MARA_DAYS",
                       "unit": "Day",
                       "x": "1",
-                      "rate": "1650",
+                      "rate": "1500",
                       "fringes": [
                         "CAST_PH",
                         "FICA",
@@ -3402,7 +3732,7 @@
                       "amount": "TEO_DAYS",
                       "unit": "Day",
                       "x": "1",
-                      "rate": "1300",
+                      "rate": "1150",
                       "fringes": [
                         "CAST_PH",
                         "FICA",
@@ -3412,11 +3742,25 @@
                     },
                     {
                       "id": 14,
-                      "description": "Rehearsal days, three leads",
-                      "amount": "4",
+                      "description": "IVERSEN",
+                      "amount": "IVERSEN_DAYS",
                       "unit": "Day",
-                      "x": "3",
-                      "rate": "450",
+                      "x": "1",
+                      "rate": "1000",
+                      "fringes": [
+                        "CAST_PH",
+                        "FICA",
+                        "SUI",
+                        "WC"
+                      ]
+                    },
+                    {
+                      "id": 15,
+                      "description": "Rehearsal days, four leads",
+                      "amount": "3",
+                      "unit": "Day",
+                      "x": "4",
+                      "rate": "400",
                       "fringes": [
                         "CAST_PH",
                         "FICA",
@@ -3431,26 +3775,12 @@
                   "name": "Supporting cast and day players",
                   "details": [
                     {
-                      "id": 15,
-                      "description": "IVERSEN, radio voice",
-                      "amount": "IVERSEN_DAYS",
-                      "unit": "Day",
-                      "x": "1",
-                      "rate": "1000",
-                      "fringes": [
-                        "CAST_PH",
-                        "FICA",
-                        "SUI",
-                        "WC"
-                      ]
-                    },
-                    {
                       "id": 16,
                       "description": "RANGER, day player",
                       "amount": "RANGER_DAYS",
                       "unit": "Day",
                       "x": "1",
-                      "rate": "900",
+                      "rate": "750",
                       "fringes": [
                         "CAST_PH",
                         "FICA",
@@ -3461,11 +3791,39 @@
                     },
                     {
                       "id": 17,
+                      "description": "DISPATCHER, day player",
+                      "amount": "DISPATCHER_DAYS",
+                      "unit": "Day",
+                      "x": "1",
+                      "rate": "750",
+                      "fringes": [
+                        "CAST_PH",
+                        "FICA",
+                        "SUI",
+                        "WC"
+                      ]
+                    },
+                    {
+                      "id": 18,
+                      "description": "PILOT, day player",
+                      "amount": "PILOT_DAYS",
+                      "unit": "Day",
+                      "x": "1",
+                      "rate": "750",
+                      "fringes": [
+                        "CAST_PH",
+                        "FICA",
+                        "SUI",
+                        "WC"
+                      ]
+                    },
+                    {
+                      "id": 19,
                       "description": "BOATHOUSE KEEPER, day player",
                       "amount": "KEEPER_DAYS",
                       "unit": "Day",
                       "x": "1",
-                      "rate": "900",
+                      "rate": "750",
                       "fringes": [
                         "CAST_PH",
                         "FICA",
@@ -3475,44 +3833,12 @@
                       "location": "Kettle Lake boathouse"
                     },
                     {
-                      "id": 18,
-                      "description": "SEARCH PILOT, day player",
-                      "amount": "PILOT_DAYS",
-                      "unit": "Day",
-                      "x": "1",
-                      "rate": "900",
-                      "fringes": [
-                        "CAST_PH",
-                        "FICA",
-                        "SUI",
-                        "WC"
-                      ],
-                      "groups": [
-                        "Second unit"
-                      ],
-                      "location": "Hollins Ridge fire road"
-                    },
-                    {
-                      "id": 19,
-                      "description": "PARK DISPATCHER, day player",
-                      "amount": "DISPATCHER_DAYS",
-                      "unit": "Day",
-                      "x": "1",
-                      "rate": "900",
-                      "fringes": [
-                        "CAST_PH",
-                        "FICA",
-                        "SUI",
-                        "WC"
-                      ]
-                    },
-                    {
                       "id": 20,
-                      "description": "Background, search volunteers",
-                      "amount": "BACKGROUND_DAYS",
+                      "description": "ANSEL, silent, featured background",
+                      "amount": "ANSEL_DAYS",
                       "unit": "Day",
-                      "x": "VOLUNTEERS",
-                      "rate": "180",
+                      "x": "1",
+                      "rate": "320",
                       "fringes": [
                         "CAST_PH",
                         "FICA",
@@ -3522,6 +3848,95 @@
                     },
                     {
                       "id": 21,
+                      "description": "Stunt coordinator",
+                      "amount": "MAST_CLIMB_DAYS + QUAD_RIDE_DAYS + 1",
+                      "unit": "Day",
+                      "x": "1",
+                      "rate": "950",
+                      "fringes": [
+                        "CAST_PH",
+                        "FICA",
+                        "SUI",
+                        "WC"
+                      ]
+                    },
+                    {
+                      "id": 22,
+                      "description": "Stunt double, the mast climb",
+                      "amount": "MAST_CLIMB_DAYS",
+                      "unit": "Day",
+                      "x": "1",
+                      "rate": "900",
+                      "fringes": [
+                        "CAST_PH",
+                        "FICA",
+                        "SUI",
+                        "WC"
+                      ],
+                      "set": "RADIO MAST",
+                      "location": "Cold Spring field station"
+                    },
+                    {
+                      "id": 23,
+                      "description": "Stunt double, the quad ride",
+                      "amount": "QUAD_RIDE_DAYS",
+                      "unit": "Day",
+                      "x": "1",
+                      "rate": "900",
+                      "fringes": [
+                        "CAST_PH",
+                        "FICA",
+                        "SUI",
+                        "WC"
+                      ],
+                      "location": "Hollins Ridge fire road"
+                    },
+                    {
+                      "id": 24,
+                      "description": "Background, base staff",
+                      "amount": "BASE_STAFF_DAYS",
+                      "unit": "Day",
+                      "x": "BASE_STAFF",
+                      "rate": "180",
+                      "fringes": [
+                        "CAST_PH",
+                        "FICA",
+                        "SUI",
+                        "WC"
+                      ],
+                      "location": "Cold Spring field station"
+                    },
+                    {
+                      "id": 25,
+                      "description": "Background, relief team",
+                      "amount": "RELIEF_TEAM_DAYS",
+                      "unit": "Day",
+                      "x": "RELIEF_TEAM",
+                      "rate": "180",
+                      "fringes": [
+                        "CAST_PH",
+                        "FICA",
+                        "SUI",
+                        "WC"
+                      ]
+                    },
+                    {
+                      "id": 26,
+                      "description": "Background, second boat crew",
+                      "amount": "BOAT_CREW_DAYS",
+                      "unit": "Day",
+                      "x": "BOAT_CREW",
+                      "rate": "180",
+                      "fringes": [
+                        "CAST_PH",
+                        "FICA",
+                        "SUI",
+                        "WC"
+                      ],
+                      "location": "Kettle Lake boathouse"
+                    },
+                    {
+                      "id": 27,
                       "description": "Overtime and adjustments",
                       "amount": "1",
                       "unit": "Allow",
@@ -3541,15 +3956,15 @@
                   "name": "Casting",
                   "details": [
                     {
-                      "id": 22,
+                      "id": 28,
                       "description": "Casting director, package",
                       "amount": "1",
                       "unit": "Flat",
                       "x": "1",
-                      "rate": "7500"
+                      "rate": "6500"
                     },
                     {
-                      "id": 23,
+                      "id": 29,
                       "description": "Background casting",
                       "amount": "1",
                       "unit": "Flat",
@@ -3563,7 +3978,7 @@
                   "name": "Cast expenses",
                   "details": [
                     {
-                      "id": 24,
+                      "id": 30,
                       "description": "Cast travel and lodging, Cold Spring",
                       "amount": "STATION_DAYS",
                       "unit": "Day",
@@ -3572,7 +3987,7 @@
                       "location": "Cold Spring field station"
                     },
                     {
-                      "id": 25,
+                      "id": 31,
                       "description": "Cast lodging, Kettle Lake",
                       "amount": "LAKE_DAYS",
                       "unit": "Day",
@@ -3598,12 +4013,12 @@
                   "name": "Line producer",
                   "details": [
                     {
-                      "id": 26,
+                      "id": 32,
                       "description": "Line producer",
                       "amount": "PREP_WKS + SHOOT_WKS + WRAP_WKS",
                       "unit": "Week",
                       "x": "1",
-                      "rate": "1450",
+                      "rate": "1300",
                       "fringes": [
                         "CREW_HW",
                         "FICA",
@@ -3618,12 +4033,12 @@
                   "name": "First assistant director",
                   "details": [
                     {
-                      "id": 27,
+                      "id": 33,
                       "description": "First assistant director",
                       "amount": "2 + SHOOT_WKS",
                       "unit": "Week",
                       "x": "1",
-                      "rate": "1800",
+                      "rate": "1650",
                       "fringes": [
                         "CREW_HW",
                         "FICA",
@@ -3638,7 +4053,7 @@
                   "name": "Second assistant director",
                   "details": [
                     {
-                      "id": 28,
+                      "id": 34,
                       "description": "Second assistant director",
                       "amount": "SHOOT_DAYS + 3",
                       "unit": "Day",
@@ -3658,12 +4073,12 @@
                   "name": "Production coordinator",
                   "details": [
                     {
-                      "id": 29,
+                      "id": 35,
                       "description": "Production coordinator",
                       "amount": "PREP_WKS + SHOOT_WKS + 1",
                       "unit": "Week",
                       "x": "1",
-                      "rate": "950",
+                      "rate": "900",
                       "fringes": [
                         "CREW_HW",
                         "FICA",
@@ -3678,7 +4093,7 @@
                   "name": "Script supervisor",
                   "details": [
                     {
-                      "id": 30,
+                      "id": 36,
                       "description": "Script supervisor",
                       "amount": "SHOOT_DAYS + 2",
                       "unit": "Day",
@@ -3698,7 +4113,7 @@
                   "name": "Production assistants",
                   "details": [
                     {
-                      "id": 31,
+                      "id": 37,
                       "description": "Production assistants",
                       "amount": "SHOOT_DAYS",
                       "unit": "Day",
@@ -3718,7 +4133,7 @@
                   "name": "Production accountant",
                   "details": [
                     {
-                      "id": 32,
+                      "id": 38,
                       "description": "Production accountant",
                       "amount": "PREP_WKS + SHOOT_WKS + 1",
                       "unit": "Week",
@@ -3745,12 +4160,12 @@
                   "name": "Director of photography",
                   "details": [
                     {
-                      "id": 33,
+                      "id": 39,
                       "description": "Director of photography",
                       "amount": "SHOOT_DAYS + 6",
                       "unit": "Day",
                       "x": "1",
-                      "rate": "650",
+                      "rate": "600",
                       "fringes": [
                         "CREW_HW",
                         "FICA",
@@ -3765,7 +4180,7 @@
                   "name": "Camera assistants",
                   "details": [
                     {
-                      "id": 35,
+                      "id": 41,
                       "description": "First assistant camera",
                       "amount": "SHOOT_DAYS + 2",
                       "unit": "Day",
@@ -3779,7 +4194,7 @@
                       ]
                     },
                     {
-                      "id": 36,
+                      "id": 42,
                       "description": "Second assistant camera",
                       "amount": "SHOOT_DAYS + 1",
                       "unit": "Day",
@@ -3799,7 +4214,7 @@
                   "name": "Digital imaging technician",
                   "details": [
                     {
-                      "id": 38,
+                      "id": 44,
                       "description": "Digital imaging technician",
                       "amount": "SHOOT_DAYS",
                       "unit": "Day",
@@ -3819,7 +4234,7 @@
                   "name": "Camera package",
                   "details": [
                     {
-                      "id": 39,
+                      "id": 45,
                       "description": "Camera package, rental house estimate",
                       "amount": "SHOOT_DAYS",
                       "unit": "Day",
@@ -3827,7 +4242,7 @@
                       "rate": "1200"
                     },
                     {
-                      "id": 41,
+                      "id": 47,
                       "description": "Drone and pilot, lake aerials",
                       "amount": "2",
                       "unit": "Day",
@@ -3845,7 +4260,7 @@
                   "name": "Camera supplies",
                   "details": [
                     {
-                      "id": 42,
+                      "id": 48,
                       "description": "Expendables and batteries",
                       "amount": "1",
                       "unit": "Allow",
@@ -3866,7 +4281,7 @@
                   "name": "Gaffer",
                   "details": [
                     {
-                      "id": 43,
+                      "id": 49,
                       "description": "Gaffer",
                       "amount": "SHOOT_DAYS + 2",
                       "unit": "Day",
@@ -3886,7 +4301,7 @@
                   "name": "Key grip",
                   "details": [
                     {
-                      "id": 44,
+                      "id": 50,
                       "description": "Key grip",
                       "amount": "SHOOT_DAYS + 2",
                       "unit": "Day",
@@ -3906,12 +4321,12 @@
                   "name": "Grip and electric crew",
                   "details": [
                     {
-                      "id": 45,
+                      "id": 51,
                       "description": "Grip and electric crew",
                       "amount": "SHOOT_DAYS",
                       "unit": "Day",
                       "x": "3",
-                      "rate": "380",
+                      "rate": "340",
                       "fringes": [
                         "CREW_HW",
                         "FICA",
@@ -3926,15 +4341,15 @@
                   "name": "Lighting and grip package",
                   "details": [
                     {
-                      "id": 46,
+                      "id": 52,
                       "description": "Lighting and grip package",
                       "amount": "SHOOT_DAYS",
                       "unit": "Day",
                       "x": "1",
-                      "rate": "1050"
+                      "rate": "900"
                     },
                     {
-                      "id": 47,
+                      "id": 53,
                       "description": "Tow generator and operator",
                       "amount": "STATION_DAYS",
                       "unit": "Day",
@@ -3949,7 +4364,7 @@
                   "name": "Expendables",
                   "details": [
                     {
-                      "id": 48,
+                      "id": 54,
                       "description": "Expendables",
                       "amount": "1",
                       "unit": "Allow",
@@ -3970,7 +4385,7 @@
                   "name": "Sound mixer",
                   "details": [
                     {
-                      "id": 49,
+                      "id": 55,
                       "description": "Production sound mixer",
                       "amount": "SHOOT_DAYS + 1",
                       "unit": "Day",
@@ -3990,7 +4405,7 @@
                   "name": "Boom operator",
                   "details": [
                     {
-                      "id": 50,
+                      "id": 56,
                       "description": "Boom operator",
                       "amount": "SHOOT_DAYS",
                       "unit": "Day",
@@ -4010,7 +4425,7 @@
                   "name": "Sound package",
                   "details": [
                     {
-                      "id": 51,
+                      "id": 57,
                       "description": "Sound package",
                       "amount": "SHOOT_DAYS",
                       "unit": "Day",
@@ -4031,7 +4446,7 @@
                   "name": "Production designer",
                   "details": [
                     {
-                      "id": 52,
+                      "id": 58,
                       "description": "Production designer",
                       "amount": "PREP_WKS + SHOOT_WKS",
                       "unit": "Week",
@@ -4052,12 +4467,12 @@
                   "name": "Art department crew",
                   "details": [
                     {
-                      "id": 53,
+                      "id": 59,
                       "description": "Art director",
                       "amount": "PREP_WKS + SHOOT_WKS",
                       "unit": "Week",
                       "x": "1",
-                      "rate": "1000",
+                      "rate": "900",
                       "fringes": [
                         "CREW_HW",
                         "FICA",
@@ -4066,7 +4481,7 @@
                       ]
                     },
                     {
-                      "id": 54,
+                      "id": 60,
                       "description": "Set dresser",
                       "amount": "SHOOT_DAYS + 4",
                       "unit": "Day",
@@ -4086,7 +4501,7 @@
                   "name": "Set dressing and props",
                   "details": [
                     {
-                      "id": 55,
+                      "id": 61,
                       "description": "Station radio set, rental",
                       "amount": "RADIO_SET_DAYS",
                       "unit": "Day",
@@ -4096,7 +4511,7 @@
                       "location": "Cold Spring field station"
                     },
                     {
-                      "id": 56,
+                      "id": 62,
                       "description": "Generator, non-working prop",
                       "amount": "GENERATOR_DAYS",
                       "unit": "Day",
@@ -4104,9 +4519,9 @@
                       "rate": "60"
                     },
                     {
-                      "id": 57,
-                      "description": "Mast ladder, rental",
-                      "amount": "LADDER_DAYS",
+                      "id": 63,
+                      "description": "Mast ladder and rigging, rental",
+                      "amount": "MAST_CLIMB_DAYS + 1",
                       "unit": "Day",
                       "x": "1",
                       "rate": "140",
@@ -4114,7 +4529,15 @@
                       "location": "Cold Spring field station"
                     },
                     {
-                      "id": 58,
+                      "id": 64,
+                      "description": "Raven and handler",
+                      "amount": "RAVEN_DAYS",
+                      "unit": "Day",
+                      "x": "1",
+                      "rate": "850"
+                    },
+                    {
+                      "id": 65,
                       "description": "Hand radios, pair",
                       "amount": "HAND_RADIO_DAYS",
                       "unit": "Day",
@@ -4122,7 +4545,7 @@
                       "rate": "35"
                     },
                     {
-                      "id": 59,
+                      "id": 66,
                       "description": "Camp stove, maps, packs and lamps",
                       "amount": "1",
                       "unit": "Allow",
@@ -4130,7 +4553,7 @@
                       "rate": "900"
                     },
                     {
-                      "id": 60,
+                      "id": 67,
                       "description": "Tea mugs, notebook, key ring and torch",
                       "amount": "1",
                       "unit": "Allow",
@@ -4138,7 +4561,7 @@
                       "rate": "300"
                     },
                     {
-                      "id": 61,
+                      "id": 68,
                       "description": "Set dressing purchases",
                       "amount": "1",
                       "unit": "Allow",
@@ -4152,7 +4575,7 @@
                   "name": "Construction",
                   "details": [
                     {
-                      "id": 62,
+                      "id": 69,
                       "description": "Station interior, build, dress and strike",
                       "amount": "1",
                       "unit": "Allow",
@@ -4162,7 +4585,7 @@
                       "location": "Cold Spring field station"
                     },
                     {
-                      "id": 63,
+                      "id": 70,
                       "description": "Boathouse dock repair and dressing",
                       "amount": "1",
                       "unit": "Allow",
@@ -4172,7 +4595,7 @@
                       "location": "Kettle Lake boathouse"
                     },
                     {
-                      "id": 64,
+                      "id": 71,
                       "description": "Production designer, construction supervision",
                       "amount": "3",
                       "unit": "Week",
@@ -4193,7 +4616,7 @@
                   "name": "Practical effects",
                   "details": [
                     {
-                      "id": 65,
+                      "id": 72,
                       "description": "Rain, towers and water truck",
                       "amount": "RAIN_DAYS",
                       "unit": "Day",
@@ -4201,7 +4624,7 @@
                       "rate": "1800"
                     },
                     {
-                      "id": 66,
+                      "id": 73,
                       "description": "Wind, fans and operator",
                       "amount": "WIND_DAYS",
                       "unit": "Day",
@@ -4209,9 +4632,9 @@
                       "rate": "550"
                     },
                     {
-                      "id": 68,
+                      "id": 75,
                       "description": "Effects technician",
-                      "amount": "RAIN_DAYS + WIND_DAYS + FOG_DAYS",
+                      "amount": "RAIN_DAYS + WIND_DAYS + MIST_DAYS",
                       "unit": "Day",
                       "x": "1",
                       "rate": "450",
@@ -4236,7 +4659,7 @@
                   "name": "Costume designer",
                   "details": [
                     {
-                      "id": 69,
+                      "id": 76,
                       "description": "Costume designer",
                       "amount": "PREP_WKS + SHOOT_WKS",
                       "unit": "Week",
@@ -4256,7 +4679,7 @@
                   "name": "Wardrobe assistant",
                   "details": [
                     {
-                      "id": 70,
+                      "id": 77,
                       "description": "Wardrobe assistant",
                       "amount": "SHOOT_DAYS + 2",
                       "unit": "Day",
@@ -4276,7 +4699,7 @@
                   "name": "Wardrobe purchases and rentals",
                   "details": [
                     {
-                      "id": 71,
+                      "id": 78,
                       "description": "Weather coats, three, with doubles",
                       "amount": "1",
                       "unit": "Flat",
@@ -4284,7 +4707,7 @@
                       "rate": "180"
                     },
                     {
-                      "id": 72,
+                      "id": 79,
                       "description": "Weather coats, cleaning on wet days",
                       "amount": "COATS_DAYS",
                       "unit": "Day",
@@ -4292,7 +4715,7 @@
                       "rate": "45"
                     },
                     {
-                      "id": 73,
+                      "id": 80,
                       "description": "Wardrobe purchases, rentals and alterations",
                       "amount": "1",
                       "unit": "Allow",
@@ -4306,12 +4729,12 @@
                   "name": "Makeup and hair artists",
                   "details": [
                     {
-                      "id": 74,
+                      "id": 81,
                       "description": "Makeup and hair artists",
                       "amount": "SHOOT_DAYS",
                       "unit": "Day",
                       "x": "2",
-                      "rate": "380",
+                      "rate": "340",
                       "fringes": [
                         "CREW_HW",
                         "FICA",
@@ -4326,7 +4749,7 @@
                   "name": "Makeup and hair supplies",
                   "details": [
                     {
-                      "id": 75,
+                      "id": 82,
                       "description": "Makeup and hair supplies",
                       "amount": "1",
                       "unit": "Allow",
@@ -4347,12 +4770,12 @@
                   "name": "Location manager",
                   "details": [
                     {
-                      "id": 76,
+                      "id": 83,
                       "description": "Location manager",
                       "amount": "PREP_WKS + SHOOT_WKS + WRAP_WKS",
                       "unit": "Week",
                       "x": "1",
-                      "rate": "1100",
+                      "rate": "1000",
                       "fringes": [
                         "CREW_HW",
                         "FICA",
@@ -4361,7 +4784,7 @@
                       ]
                     },
                     {
-                      "id": 77,
+                      "id": 84,
                       "description": "Assistant location manager",
                       "amount": "SHOOT_DAYS + 5",
                       "unit": "Day",
@@ -4381,16 +4804,16 @@
                   "name": "Site fees",
                   "details": [
                     {
-                      "id": 78,
+                      "id": 85,
                       "description": "Site fee, Cold Spring field station",
                       "amount": "STATION_DAYS",
                       "unit": "Day",
                       "x": "1",
-                      "rate": "1250",
+                      "rate": "1100",
                       "location": "Cold Spring field station"
                     },
                     {
-                      "id": 79,
+                      "id": 86,
                       "description": "Site fee, Hollins Ridge fire road",
                       "amount": "RIDGE_DAYS",
                       "unit": "Day",
@@ -4399,7 +4822,7 @@
                       "location": "Hollins Ridge fire road"
                     },
                     {
-                      "id": 80,
+                      "id": 87,
                       "description": "Site fee, Kettle Lake boathouse",
                       "amount": "LAKE_DAYS",
                       "unit": "Day",
@@ -4414,7 +4837,7 @@
                   "name": "Permits and insurance certificates",
                   "details": [
                     {
-                      "id": 81,
+                      "id": 88,
                       "description": "Permits and certificates",
                       "amount": "1",
                       "unit": "Allow",
@@ -4428,7 +4851,7 @@
                   "name": "Location expenses",
                   "details": [
                     {
-                      "id": 82,
+                      "id": 89,
                       "description": "Heaters, tents and toilets, field station",
                       "amount": "STATION_DAYS",
                       "unit": "Day",
@@ -4437,7 +4860,7 @@
                       "location": "Cold Spring field station"
                     },
                     {
-                      "id": 83,
+                      "id": 90,
                       "description": "Base camp and parking, fire road",
                       "amount": "RIDGE_DAYS",
                       "unit": "Day",
@@ -4446,7 +4869,7 @@
                       "location": "Hollins Ridge fire road"
                     },
                     {
-                      "id": 84,
+                      "id": 91,
                       "description": "Base camp and parking, boathouse",
                       "amount": "LAKE_DAYS",
                       "unit": "Day",
@@ -4455,7 +4878,7 @@
                       "location": "Kettle Lake boathouse"
                     },
                     {
-                      "id": 85,
+                      "id": 92,
                       "description": "Overnight security",
                       "amount": "SHOOT_DAYS",
                       "unit": "Day",
@@ -4481,7 +4904,7 @@
                   "name": "Vehicles",
                   "details": [
                     {
-                      "id": 86,
+                      "id": 93,
                       "description": "Production vans",
                       "amount": "SHOOT_DAYS + 4",
                       "unit": "Day",
@@ -4489,7 +4912,7 @@
                       "rate": "150"
                     },
                     {
-                      "id": 87,
+                      "id": 94,
                       "description": "Fire road shuttle, four-wheel drive",
                       "amount": "RIDGE_DAYS",
                       "unit": "Day",
@@ -4498,25 +4921,80 @@
                       "location": "Hollins Ridge fire road"
                     },
                     {
-                      "id": 88,
-                      "description": "Patrol truck, picture vehicle",
+                      "id": 95,
+                      "description": "Park truck, picture vehicle",
                       "amount": "TRUCK_DAYS",
                       "unit": "Day",
                       "x": "1",
-                      "rate": "300",
+                      "rate": "250"
+                    },
+                    {
+                      "id": 96,
+                      "description": "Quad bike, picture vehicle",
+                      "amount": "QUAD_DAYS",
+                      "unit": "Day",
+                      "x": "1",
+                      "rate": "180",
                       "location": "Hollins Ridge fire road"
                     },
                     {
-                      "id": 89,
-                      "description": "Rowboat and safety boat",
+                      "id": 97,
+                      "description": "Search plane and pilot, picture aircraft",
+                      "amount": "PLANE_DAYS",
+                      "unit": "Day",
+                      "x": "1",
+                      "rate": "1400"
+                    },
+                    {
+                      "id": 98,
+                      "description": "Rowboat, picture boat",
                       "amount": "ROWBOAT_DAYS",
                       "unit": "Day",
                       "x": "1",
-                      "rate": "400",
+                      "rate": "150",
                       "location": "Kettle Lake boathouse"
                     },
                     {
-                      "id": 90,
+                      "id": 99,
+                      "description": "Camera boat and operator",
+                      "amount": "CAMERA_BOAT_DAYS",
+                      "unit": "Day",
+                      "x": "1",
+                      "rate": "750",
+                      "location": "Kettle Lake boathouse"
+                    },
+                    {
+                      "id": 100,
+                      "description": "Marine coordinator",
+                      "amount": "MARINE_DAYS",
+                      "unit": "Day",
+                      "x": "1",
+                      "rate": "650",
+                      "fringes": [
+                        "CREW_HW",
+                        "FICA",
+                        "SUI",
+                        "WC"
+                      ],
+                      "location": "Kettle Lake boathouse"
+                    },
+                    {
+                      "id": 101,
+                      "description": "Safety diver",
+                      "amount": "DIVER_DAYS",
+                      "unit": "Day",
+                      "x": "1",
+                      "rate": "600",
+                      "fringes": [
+                        "CREW_HW",
+                        "FICA",
+                        "SUI",
+                        "WC"
+                      ],
+                      "location": "Kettle Lake boathouse"
+                    },
+                    {
+                      "id": 102,
                       "description": "Driver",
                       "amount": "SHOOT_DAYS + 2",
                       "unit": "Day",
@@ -4536,7 +5014,7 @@
                   "name": "Fuel and parking",
                   "details": [
                     {
-                      "id": 91,
+                      "id": 103,
                       "description": "Fuel and parking",
                       "amount": "1",
                       "unit": "Allow",
@@ -4557,16 +5035,16 @@
                   "name": "Meals",
                   "details": [
                     {
-                      "id": 92,
+                      "id": 104,
                       "description": "Catering, field station days",
                       "amount": "STATION_DAYS",
                       "unit": "Day",
                       "x": "CREW_MEALS",
-                      "rate": "28",
+                      "rate": "26",
                       "location": "Cold Spring field station"
                     },
                     {
-                      "id": 93,
+                      "id": 105,
                       "description": "Catering, fire road days",
                       "amount": "RIDGE_DAYS",
                       "unit": "Day",
@@ -4575,7 +5053,7 @@
                       "location": "Hollins Ridge fire road"
                     },
                     {
-                      "id": 94,
+                      "id": 106,
                       "description": "Catering, boathouse days",
                       "amount": "LAKE_DAYS",
                       "unit": "Day",
@@ -4584,11 +5062,11 @@
                       "location": "Kettle Lake boathouse"
                     },
                     {
-                      "id": 95,
+                      "id": 107,
                       "description": "Background meals",
-                      "amount": "BACKGROUND_DAYS",
+                      "amount": "BASE_STAFF_DAYS * BASE_STAFF + RELIEF_TEAM_DAYS * RELIEF_TEAM + BOAT_CREW_DAYS * BOAT_CREW",
                       "unit": "Day",
-                      "x": "VOLUNTEERS",
+                      "x": "1",
                       "rate": "15"
                     }
                   ]
@@ -4598,7 +5076,7 @@
                   "name": "Craft service",
                   "details": [
                     {
-                      "id": 96,
+                      "id": 108,
                       "description": "Craft service",
                       "amount": "SHOOT_DAYS",
                       "unit": "Day",
@@ -4619,7 +5097,7 @@
                   "name": "Office and supplies",
                   "details": [
                     {
-                      "id": 97,
+                      "id": 109,
                       "description": "Production office and supplies",
                       "amount": "3",
                       "unit": "Month",
@@ -4633,7 +5111,7 @@
                   "name": "Communications",
                   "details": [
                     {
-                      "id": 98,
+                      "id": 110,
                       "description": "Walkie-talkie rental",
                       "amount": "SHOOT_DAYS",
                       "unit": "Day",
@@ -4641,7 +5119,7 @@
                       "rate": "120"
                     },
                     {
-                      "id": 99,
+                      "id": 111,
                       "description": "Phones and internet",
                       "amount": "3",
                       "unit": "Month",
@@ -4655,7 +5133,7 @@
                   "name": "Shipping",
                   "details": [
                     {
-                      "id": 100,
+                      "id": 112,
                       "description": "Shipping and courier",
                       "amount": "1",
                       "unit": "Allow",
@@ -4676,7 +5154,7 @@
                   "name": "Drives and media",
                   "details": [
                     {
-                      "id": 101,
+                      "id": 113,
                       "description": "Drives and media",
                       "amount": "1",
                       "unit": "Allow",
@@ -4690,7 +5168,7 @@
                   "name": "Backup and storage",
                   "details": [
                     {
-                      "id": 102,
+                      "id": 114,
                       "description": "Backup storage, twelve months",
                       "amount": "12",
                       "unit": "Month",
@@ -4715,12 +5193,12 @@
                   "name": "Editor",
                   "details": [
                     {
-                      "id": 103,
+                      "id": 115,
                       "description": "Editor",
-                      "amount": "12",
+                      "amount": "10",
                       "unit": "Week",
                       "x": "1",
-                      "rate": "1700",
+                      "rate": "1600",
                       "fringes": [
                         "FICA",
                         "SUI",
@@ -4734,7 +5212,7 @@
                   "name": "Assistant editor",
                   "details": [
                     {
-                      "id": 104,
+                      "id": 116,
                       "description": "Assistant editor",
                       "amount": "8",
                       "unit": "Week",
@@ -4753,7 +5231,7 @@
                   "name": "Edit system",
                   "details": [
                     {
-                      "id": 105,
+                      "id": 117,
                       "description": "Edit system",
                       "amount": "5",
                       "unit": "Month",
@@ -4774,12 +5252,12 @@
                   "name": "Sound design and editing",
                   "details": [
                     {
-                      "id": 106,
+                      "id": 118,
                       "description": "Sound design and editing",
                       "amount": "1",
                       "unit": "Flat",
                       "x": "1",
-                      "rate": "12000"
+                      "rate": "10000"
                     }
                   ]
                 },
@@ -4788,12 +5266,12 @@
                   "name": "Mix",
                   "details": [
                     {
-                      "id": 107,
+                      "id": 119,
                       "description": "Mix",
                       "amount": "1",
                       "unit": "Flat",
                       "x": "1",
-                      "rate": "9500"
+                      "rate": "8500"
                     }
                   ]
                 },
@@ -4802,7 +5280,7 @@
                   "name": "ADR and foley",
                   "details": [
                     {
-                      "id": 108,
+                      "id": 120,
                       "description": "ADR and foley",
                       "amount": "1",
                       "unit": "Allow",
@@ -4823,16 +5301,16 @@
                   "name": "Composer",
                   "details": [
                     {
-                      "id": 109,
+                      "id": 121,
                       "description": "Composer, package",
                       "amount": "1",
                       "unit": "Flat",
                       "x": "1",
-                      "rate": "11500",
+                      "rate": "10500",
                       "currency": "EUR"
                     },
                     {
-                      "id": 110,
+                      "id": 122,
                       "description": "Recording session, string quartet",
                       "amount": "1",
                       "unit": "Flat",
@@ -4847,7 +5325,7 @@
                   "name": "Music licensing",
                   "details": [
                     {
-                      "id": 111,
+                      "id": 123,
                       "description": "Music licensing",
                       "amount": "1",
                       "unit": "Allow",
@@ -4868,12 +5346,12 @@
                   "name": "Visual effects",
                   "details": [
                     {
-                      "id": 112,
+                      "id": 124,
                       "description": "Visual effects, cleanup and sky",
                       "amount": "1",
                       "unit": "Allow",
                       "x": "1",
-                      "rate": "16000"
+                      "rate": "13500"
                     }
                   ]
                 },
@@ -4882,7 +5360,7 @@
                   "name": "Titles and graphics",
                   "details": [
                     {
-                      "id": 113,
+                      "id": 125,
                       "description": "Titles and graphics",
                       "amount": "1",
                       "unit": "Flat",
@@ -4903,12 +5381,12 @@
                   "name": "Color grading",
                   "details": [
                     {
-                      "id": 114,
+                      "id": 126,
                       "description": "Color grading",
                       "amount": "1",
                       "unit": "Flat",
                       "x": "1",
-                      "rate": "9500"
+                      "rate": "8500"
                     }
                   ]
                 },
@@ -4917,7 +5395,7 @@
                   "name": "Conform and online",
                   "details": [
                     {
-                      "id": 115,
+                      "id": 127,
                       "description": "Conform and online",
                       "amount": "1",
                       "unit": "Flat",
@@ -4938,7 +5416,7 @@
                   "name": "Masters",
                   "details": [
                     {
-                      "id": 116,
+                      "id": 128,
                       "description": "Masters",
                       "amount": "1",
                       "unit": "Allow",
@@ -4952,7 +5430,7 @@
                   "name": "Digital cinema package",
                   "details": [
                     {
-                      "id": 117,
+                      "id": 129,
                       "description": "Digital cinema package",
                       "amount": "1",
                       "unit": "Flat",
@@ -4966,7 +5444,7 @@
                   "name": "Closed captions and subtitles",
                   "details": [
                     {
-                      "id": 118,
+                      "id": 130,
                       "description": "Closed captions and subtitles",
                       "amount": "1",
                       "unit": "Flat",
@@ -4991,12 +5469,12 @@
                   "name": "Production insurance",
                   "details": [
                     {
-                      "id": 119,
+                      "id": 131,
                       "description": "Production insurance",
                       "amount": "1",
                       "unit": "Allow",
                       "x": "1",
-                      "rate": "12000"
+                      "rate": "11000"
                     }
                   ]
                 },
@@ -5005,7 +5483,7 @@
                   "name": "Errors and omissions",
                   "details": [
                     {
-                      "id": 120,
+                      "id": 132,
                       "description": "Errors and omissions",
                       "amount": "1",
                       "unit": "Allow",
@@ -5026,12 +5504,12 @@
                   "name": "Legal",
                   "details": [
                     {
-                      "id": 121,
+                      "id": 133,
                       "description": "Production legal",
                       "amount": "1",
                       "unit": "Allow",
                       "x": "1",
-                      "rate": "11000"
+                      "rate": "9000"
                     }
                   ]
                 },
@@ -5040,7 +5518,7 @@
                   "name": "Accounting and payroll fees",
                   "details": [
                     {
-                      "id": 122,
+                      "id": 134,
                       "description": "Payroll service fees",
                       "amount": "1",
                       "unit": "Allow",
@@ -5048,7 +5526,7 @@
                       "rate": "4000"
                     },
                     {
-                      "id": 123,
+                      "id": 135,
                       "description": "Cost report and audit",
                       "amount": "1",
                       "unit": "Allow",
@@ -5069,7 +5547,7 @@
                   "name": "Festival fees",
                   "details": [
                     {
-                      "id": 124,
+                      "id": 136,
                       "description": "Festival entry fees",
                       "amount": "15",
                       "unit": "Flat",
@@ -5083,7 +5561,7 @@
                   "name": "Marketing materials",
                   "details": [
                     {
-                      "id": 125,
+                      "id": 137,
                       "description": "Poster, trailer and press kit",
                       "amount": "1",
                       "unit": "Allow",
@@ -5104,7 +5582,7 @@
                   "name": "Bank fees",
                   "details": [
                     {
-                      "id": 126,
+                      "id": 138,
                       "description": "Bank fees",
                       "amount": "1",
                       "unit": "Allow",
@@ -5118,7 +5596,7 @@
                   "name": "Miscellaneous",
                   "details": [
                     {
-                      "id": 127,
+                      "id": 139,
                       "description": "Miscellaneous",
                       "amount": "1",
                       "unit": "Allow",

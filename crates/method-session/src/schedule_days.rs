@@ -1351,12 +1351,11 @@ mod tests {
     }
 
     /// The Field Station sample and the schedule days file it was made from
-    /// (the 18-day stand-in until Method Schedule's export replaces it;
-    /// fixtures/field-station/README.md).
+    /// (Method Schedule's export; fixtures/field-station/README.md).
     fn field_station() -> (ScheduleDays, Budget) {
         let d = read(
-            "field-station.budget.next.json",
-            include_bytes!("../../../fixtures/field-station/field-station.budget.next.json"),
+            "field-station.budget.json",
+            include_bytes!("../../../fixtures/field-station/field-station.budget.json"),
         )
         .unwrap();
         let b = method_format::from_str(include_str!(
@@ -1380,7 +1379,7 @@ mod tests {
             .filter(|f| f.picked)
             .map(|f| f.global.as_str())
             .collect();
-        assert_eq!(picked.len(), 24, "{picked:?}");
+        assert_eq!(picked.len(), 34, "{picked:?}");
         for g in [
             "SHOOT_DAYS",
             "STATION_DAYS",
@@ -1389,12 +1388,12 @@ mod tests {
             "SECOND_UNIT_DAYS",
             "DELACROIX_DAYS",
             "KEEPER_DAYS",
-            "BACKGROUND_DAYS",
+            "BASE_STAFF_DAYS",
         ] {
             assert!(picked.contains(&g), "{g}");
         }
         assert!(r.figures.iter().filter(|f| f.picked).all(|f| f.linked));
-        assert_eq!((r.adds, r.updates, r.same), (0, 0, 24));
+        assert_eq!((r.adds, r.updates, r.same), (0, 0, 34));
         assert!(!r.can_apply);
         assert_eq!(
             row(&r, "location:Kettle Lake boathouse").global,
@@ -1426,7 +1425,7 @@ mod tests {
         let p = picks_with(
             &b,
             &d,
-            &[("set:FIELD STATION".into(), Some("VOLUNTEERS".into()))],
+            &[("set:FIELD STATION".into(), Some("BASE_STAFF".into()))],
             &[],
         )
         .unwrap();

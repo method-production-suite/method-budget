@@ -190,8 +190,8 @@ const SHOTS = [
     async steps(p) {
       await p.click('the Cast category', rowCell('13', 'Cast', 'last'), 2);
       await p.click('the Principal cast account', rowCell('13-01', 'Principal cast', 'last'), 2);
-      await p.until('the Cast detail lines', `document.body.innerText.includes('DELACROIX') && document.body.innerText.includes('Rehearsal days, three leads')`);
-      await p.click("DELACROIX's fringes", rowCell('DELACROIX', null, '8,554.00'));
+      await p.until('the Cast detail lines', `document.body.innerText.includes('DELACROIX') && document.body.innerText.includes('Rehearsal days, four leads')`);
+      await p.click("DELACROIX's fringes", rowCell('DELACROIX', null, '6,958.00'));
       await p.menu('edit.explain');
       await p.until('the explanation', `(() => { const t = document.body.innerText; return t.includes('SUI') && t.includes('7,000.00'); })()`);
       // Open the fringe that stops at its cutoff, and the one that doesn't reach its own.
@@ -414,7 +414,7 @@ async function main() {
       await send('Emulation.setDefaultBackgroundColorOverride', {});
       await send('Emulation.setDeviceMetricsOverride', { width: PAGE.width, height: PAGE.height, deviceScaleFactor: SCALE, mobile: false });
       await send('Page.navigate', { url: `${origin}/?open=fs/${encodeURIComponent(BUDGET_NAME)}` });
-      await until('the Field Station topsheet', `document.title.startsWith(${JSON.stringify(BUDGET_NAME)}) && document.body.innerText.includes('Story and screenplay') && document.body.innerText.includes('1,036,308.49')`);
+      await until('the Field Station topsheet', `document.title.startsWith(${JSON.stringify(BUDGET_NAME)}) && document.body.innerText.includes('Story and screenplay') && document.body.innerText.includes('1,050,288.03')`);
       await until('the desktop layout', `!document.getElementById('btn-file')`);
       await settle();
     };

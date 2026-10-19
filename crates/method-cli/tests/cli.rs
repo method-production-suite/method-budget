@@ -731,23 +731,23 @@ fn schedule_days_set_globals_from_a_schedule() {
         .join("field-station.budget.json")
         .to_string_lossy()
         .into_owned();
-    // The starter has 25 shoot days; the schedule 4.
+    // The starter has 25 shoot days; the schedule 18.
     let b = d.starter("film.mthd");
     let before = read(&b);
     let o = method(&["schedule-days", &b, &days]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     let text = out(&o);
     assert!(
-        text.starts_with("field-station.budget.json: Field Station (Shooting Order, Main), 4 shoot days, 2027-05-03 to 2027-05-06"),
+        text.starts_with("field-station.budget.json: Field Station (Shooting Order, Main), 18 shoot days, 2027-05-03 to 2027-05-26"),
         "{text}"
     );
     assert!(
-        text.contains("SHOOT_DAYS = 4 (was 25)  Shoot days in all  [total]"),
+        text.contains("SHOOT_DAYS = 18 (was 25)  Shoot days in all  [total]"),
         "{text}"
     );
     assert!(
         text.contains(
-            "location:Cold Spring field station  Shoot days at location Cold Spring field station: 4 days  -> COLD_SPRING_FIELD_STATION_DAYS"
+            "location:Cold Spring field station  Shoot days at location Cold Spring field station: 12 days  -> COLD_SPRING_FIELD_STATION_DAYS"
         ),
         "{text}"
     );
@@ -772,8 +772,8 @@ fn schedule_days_set_globals_from_a_schedule() {
     let o = method(&["check", &b]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     let text = read(&b);
-    assert!(text.contains("\"RIDGE_DAYS\": \"2\""), "{text}");
-    assert!(text.contains("\"SHOOT_DAYS\": \"4\""));
+    assert!(text.contains("\"RIDGE_DAYS\": \"3\""), "{text}");
+    assert!(text.contains("\"SHOOT_DAYS\": \"18\""));
     assert!(text.contains(
         "Shoot days at location Hollins Ridge fire road, from the schedule Field Station (Shooting Order, Main)"
     ));
@@ -824,7 +824,7 @@ fn schedule_days_set_globals_from_a_schedule() {
         "{}",
         out(&o)
     );
-    assert!(read(&b).contains("\"RIDGE_DAYS\": \"2\""));
+    assert!(read(&b).contains("\"RIDGE_DAYS\": \"3\""));
     let o = method(&[
         "schedule-days",
         &b,
@@ -859,12 +859,12 @@ fn incentives_text_and_json() {
     assert_eq!(code(&o), 0, "{}", err(&o));
     let text = out(&o);
     assert!(
-        text.contains("location\tCold Spring field station\t53931.00\t0.00\t53931.00\n"),
+        text.contains("location\tCold Spring field station\t55417.00\t1243.44\t56660.44\n"),
         "{text}"
     );
     assert!(
         text.contains(
-            "program\tCold Spring County film program\testimate\t43971.00\t10329.00\tCold Spring field station\n"
+            "program\tCold Spring County film program\testimate\t41497.00\t9701.00\tCold Spring field station\n"
         ),
         "{text}"
     );
@@ -872,8 +872,8 @@ fn incentives_text_and_json() {
     assert_eq!(total(&p, "credits_total"), "0.00");
 
     let j = out(&method(&["incentives", &p, "--json"]));
-    assert!(j.contains("\"amount\": 1032900"), "{j}");
-    assert!(j.contains("\"qualified\": 4397100"), "{j}");
+    assert!(j.contains("\"amount\": 970100"), "{j}");
+    assert!(j.contains("\"qualified\": 4149700"), "{j}");
     assert_eq!(code(&method(&["incentives"])), 2);
 }
 

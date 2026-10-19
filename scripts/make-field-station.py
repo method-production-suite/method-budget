@@ -28,12 +28,10 @@ beside it in fixtures/field-station/:
   camera-department.csv      the camera department's rental list, the spreadsheet the
                              Import Spreadsheet picture reviews
 
-The schedule days file is `field-station.budget.next.json`, a stand-in with the 18-day
-shape agreed with Method Schedule, until Method Schedule's own export replaces it
-(README.md in that folder). The script also works with the older four-day file,
-`field-station.budget.json`: a figure that file doesn't count (the boathouse, the second
-unit, the day players) is set to 0 and said so, so the budget is smaller but whole;
-`--check` builds that one too and checks it.
+The schedule days file is `field-station.budget.json`, Method Schedule's export of its
+own 18-day Field Station sample (README.md in that folder says which commit). A figure
+the file doesn't count is set to 0 and its global says so, so another schedule days file
+(`--days`) still makes a whole budget.
 
 Every name and figure is made up: no real production, person or company, and no credit
 line. The budget starts from a bundled chart (`method-budget new --template`), gets its
@@ -59,11 +57,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 FIXTURES = REPO / "fixtures" / "field-station"
-# The schedule days file the sample is built from: the stand-in until Method Schedule's
-# 18-day export lands (then it becomes field-station.budget.json again).
-SCHEDULE = FIXTURES / "field-station.budget.next.json"
-# Method Schedule's four-day file of today, which the script must keep working with.
-OLD_SCHEDULE = FIXTURES / "field-station.budget.json"
+# The schedule days file the sample is built from: Method Schedule's export of its own
+# Field Station sample (fixtures/field-station/README.md says which commit).
+SCHEDULE = FIXTURES / "field-station.budget.json"
 BUDGET = "field-station.mthd"
 SHEET = "camera-department.csv"
 DRAFT = "field-station-draft-2.mthd"
@@ -95,20 +91,30 @@ FIGURES = [
     (("element", ("Cast", "TEO")), "TEO_DAYS"),
     (("element", ("Cast", "IVERSEN")), "IVERSEN_DAYS"),
     (("element", ("Cast", "RANGER")), "RANGER_DAYS"),
+    (("element", ("Cast", "DISPATCHER")), "DISPATCHER_DAYS"),
+    (("element", ("Cast", "PILOT")), "PILOT_DAYS"),
     (("element", ("Cast", "BOATHOUSE KEEPER")), "KEEPER_DAYS"),
-    (("element", ("Cast", "SEARCH PILOT")), "PILOT_DAYS"),
-    (("element", ("Cast", "PARK DISPATCHER")), "DISPATCHER_DAYS"),
-    (("element", ("Background", "SEARCH VOLUNTEERS")), "BACKGROUND_DAYS"),
+    (("element", ("Cast", "ANSEL")), "ANSEL_DAYS"),
+    (("element", ("Stunts", "MAST CLIMB")), "MAST_CLIMB_DAYS"),
+    (("element", ("Stunts", "QUAD RIDE")), "QUAD_RIDE_DAYS"),
+    (("element", ("Background", "BASE STAFF")), "BASE_STAFF_DAYS"),
+    (("element", ("Background", "RELIEF TEAM")), "RELIEF_TEAM_DAYS"),
+    (("element", ("Background", "SECOND BOAT CREW")), "BOAT_CREW_DAYS"),
     (("element", ("Practical effects", "RAIN")), "RAIN_DAYS"),
     (("element", ("Practical effects", "WIND")), "WIND_DAYS"),
-    (("element", ("Practical effects", "FOG")), "FOG_DAYS"),
+    (("element", ("Practical effects", "MIST")), "MIST_DAYS"),
     (("element", ("Wardrobe", "WEATHER COATS")), "COATS_DAYS"),
     (("element", ("Set dressing", "STATION RADIO SET")), "RADIO_SET_DAYS"),
     (("element", ("Set dressing", "GENERATOR")), "GENERATOR_DAYS"),
-    (("element", ("Set dressing", "MAST LADDER")), "LADDER_DAYS"),
     (("element", ("Hand props", "HAND RADIO")), "HAND_RADIO_DAYS"),
-    (("element", ("Vehicles", "PATROL TRUCK")), "TRUCK_DAYS"),
-    (("element", ("Vehicles", "ROWBOAT")), "ROWBOAT_DAYS"),
+    (("element", ("Picture vehicles", "PARK TRUCK")), "TRUCK_DAYS"),
+    (("element", ("Picture vehicles", "QUAD BIKE")), "QUAD_DAYS"),
+    (("element", ("Picture vehicles", "SEARCH PLANE")), "PLANE_DAYS"),
+    (("element", ("Picture vehicles", "ROWBOAT")), "ROWBOAT_DAYS"),
+    (("element", ("Special equipment", "CAMERA BOAT")), "CAMERA_BOAT_DAYS"),
+    (("element", ("Extra crew", "MARINE COORDINATOR")), "MARINE_DAYS"),
+    (("element", ("Safety", "SAFETY DIVER")), "DIVER_DAYS"),
+    (("element", ("Animals", "RAVEN")), "RAVEN_DAYS"),
 ]
 
 
@@ -135,6 +141,8 @@ def schedule(path):
         "title": s["schedule"],
         "start": days["start"],
         "end": days["end"],
+        "prep_start": days.get("prep_start"),
+        "wrap_end": days.get("wrap_end"),
         "total": days["total"],
         "picks": picks,
         "missing": missing,
@@ -174,13 +182,17 @@ LOCATIONS = [
             "region": "Kettle Lake"}),
 ]
 SETS = [
+    ("BASE - RADIO ROOM", "The station's radio room, where the base calls in"),
+    ("BOATHOUSE", "The boathouse and its dock"),
     ("FIELD STATION", "The station's main room and radio desk"),
-    ("LOWER STATION", "The bunk room and stores below"),
+    ("FIELD STATION - BUNKHOUSE", "The bunks"),
+    ("FIELD STATION - LAB", "The lab bench and its instruments"),
+    ("FIRE ROAD", "The fire road below the ridge"),
+    ("KETTLE LAKE", "The lake, from the boats"),
+    ("LOWER STATION", "The stores below the station"),
     ("RADIO MAST", "The mast above the station"),
     ("RIDGE", "The ridge top, night and day"),
-    ("RIDGE ROAD", "The fire road up the ridge"),
-    ("BOATHOUSE", "The boathouse and its dock"),
-    ("LAKE SHORE", "The shore below the boathouse"),
+    ("RIDGE ROAD", "The road up the ridge"),
 ]
 EUR = {"rate": "1.08", "description": "Euro", "symbol": "€", "symbol_after": True,
        "separators": "point_comma"}
@@ -193,10 +205,12 @@ def plan():
     """The globals the schedule doesn't set and every account's lines."""
     globals_ = [
         ("SHOOT_WKS", "SHOOT_DAYS / 5", "Shooting weeks, five-day weeks"),
-        ("PREP_WKS", "5", "Weeks of prep"),
+        ("PREP_WKS", "4", "Weeks of prep"),
         ("WRAP_WKS", "2", "Weeks of wrap"),
         ("CREW_MEALS", "36", "People fed each shooting day"),
-        ("VOLUNTEERS", "12", "Search volunteers in the background each of their days"),
+        ("BASE_STAFF", "4", "Base staff in the background each of their days"),
+        ("RELIEF_TEAM", "4", "Relief team in the background each of their days"),
+        ("BOAT_CREW", "2", "Second boat crew in the background"),
     ]
     st = {"location": STATION}
     rd = {"location": RIDGE}
@@ -208,51 +222,58 @@ def plan():
     # A line: (description, amount, unit, x, rate, fringe set[, extra fields]).
     lines = {
         "10-01": [("Story rights, original screenplay", 1, "Flat", 1, 8000, "none")],
-        "10-02": [("Screenplay fee", 1, "Flat", 1, 20000, "tax"),
+        "10-02": [("Screenplay fee", 1, "Flat", 1, 18000, "tax"),
                   ("Production polish", 1, "Flat", 1, 3500, "tax")],
         "10-03": [("Script printing, table read and research", 1, "Allow", 1, 1200, "none")],
-        "11-01": [("Producer fee", 1, "Flat", 1, 12000, "none"),
-                  ("Producer fee, second producer", 1, "Flat", 1, 8000, "none")],
+        "11-01": [("Producer fee", 1, "Flat", 1, 10000, "none"),
+                  ("Producer fee, second producer", 1, "Flat", 1, 7000, "none")],
         "11-02": [("Associate producer", ALL_WKS, "Week", 1, 800, "crew")],
         "11-03": [("Producers' travel and expenses", 1, "Allow", 1, 2000, "none")],
-        "12-01": [("Director fee", 1, "Flat", 1, 22000, "tax")],
+        "12-01": [("Director fee", 1, "Flat", 1, 20000, "tax")],
         "12-02": [("Director's travel and expenses", 1, "Allow", 1, 1500, "none")],
-        "13-01": [("DELACROIX", "DELACROIX_DAYS", "Day", 1, 1650, "cast"),
-                  ("MARA", "MARA_DAYS", "Day", 1, 1650, "cast"),
-                  ("TEO", "TEO_DAYS", "Day", 1, 1300, "cast"),
-                  ("Rehearsal days, three leads", 4, "Day", 3, 450, "cast")],
-        "13-02": [("IVERSEN, radio voice", "IVERSEN_DAYS", "Day", 1, 1000, "cast"),
-                  ("RANGER, day player", "RANGER_DAYS", "Day", 1, 900, "cast", rd),
-                  ("BOATHOUSE KEEPER, day player", "KEEPER_DAYS", "Day", 1, 900, "cast", lk),
-                  ("SEARCH PILOT, day player", "PILOT_DAYS", "Day", 1, 900, "cast", su),
-                  ("PARK DISPATCHER, day player", "DISPATCHER_DAYS", "Day", 1, 900, "cast"),
-                  ("Background, search volunteers", "BACKGROUND_DAYS", "Day", "VOLUNTEERS", 180, "cast"),
+        "13-01": [("DELACROIX", "DELACROIX_DAYS", "Day", 1, 1500, "cast"),
+                  ("MARA", "MARA_DAYS", "Day", 1, 1500, "cast"),
+                  ("TEO", "TEO_DAYS", "Day", 1, 1150, "cast"),
+                  ("IVERSEN", "IVERSEN_DAYS", "Day", 1, 1000, "cast"),
+                  ("Rehearsal days, four leads", 3, "Day", 4, 400, "cast")],
+        "13-02": [("RANGER, day player", "RANGER_DAYS", "Day", 1, 750, "cast", rd),
+                  ("DISPATCHER, day player", "DISPATCHER_DAYS", "Day", 1, 750, "cast"),
+                  ("PILOT, day player", "PILOT_DAYS", "Day", 1, 750, "cast"),
+                  ("BOATHOUSE KEEPER, day player", "KEEPER_DAYS", "Day", 1, 750, "cast", lk),
+                  ("ANSEL, silent, featured background", "ANSEL_DAYS", "Day", 1, 320, "cast"),
+                  ("Stunt coordinator", "MAST_CLIMB_DAYS + QUAD_RIDE_DAYS + 1", "Day", 1, 950, "cast"),
+                  ("Stunt double, the mast climb", "MAST_CLIMB_DAYS", "Day", 1, 900, "cast",
+                   {"set": "RADIO MAST", "location": STATION}),
+                  ("Stunt double, the quad ride", "QUAD_RIDE_DAYS", "Day", 1, 900, "cast", rd),
+                  ("Background, base staff", "BASE_STAFF_DAYS", "Day", "BASE_STAFF", 180, "cast", st),
+                  ("Background, relief team", "RELIEF_TEAM_DAYS", "Day", "RELIEF_TEAM", 180, "cast"),
+                  ("Background, second boat crew", "BOAT_CREW_DAYS", "Day", "BOAT_CREW", 180, "cast", lk),
                   ("Overtime and adjustments", 1, "Allow", 1, 2500, "cast")],
-        "13-03": [("Casting director, package", 1, "Flat", 1, 7500, "none"),
+        "13-03": [("Casting director, package", 1, "Flat", 1, 6500, "none"),
                   ("Background casting", 1, "Flat", 1, 1500, "none")],
         "13-04": [("Cast travel and lodging, Cold Spring", "STATION_DAYS", "Day", 3, 150, "none", st),
                   ("Cast lodging, Kettle Lake", "LAKE_DAYS", "Day", 3, 150, "none", lk)],
-        "20-01": [("Line producer", ALL_WKS, "Week", 1, 1450, "crew")],
-        "20-02": [("First assistant director", "2 + SHOOT_WKS", "Week", 1, 1800, "crew")],
+        "20-01": [("Line producer", ALL_WKS, "Week", 1, 1300, "crew")],
+        "20-02": [("First assistant director", "2 + SHOOT_WKS", "Week", 1, 1650, "crew")],
         "20-03": [("Second assistant director", "SHOOT_DAYS + 3", "Day", 1, 340, "crew")],
-        "20-04": [("Production coordinator", "PREP_WKS + SHOOT_WKS + 1", "Week", 1, 950, "crew")],
+        "20-04": [("Production coordinator", "PREP_WKS + SHOOT_WKS + 1", "Week", 1, 900, "crew")],
         "20-05": [("Script supervisor", "SHOOT_DAYS + 2", "Day", 1, 400, "crew")],
         "20-06": [("Production assistants", "SHOOT_DAYS", "Day", 3, 200, "crew")],
         "20-07": [("Production accountant", "PREP_WKS + SHOOT_WKS + 1", "Week", 1, 950, "crew")],
-        "21-01": [("Director of photography", "SHOOT_DAYS + 6", "Day", 1, 650, "crew"),
+        "21-01": [("Director of photography", "SHOOT_DAYS + 6", "Day", 1, 600, "crew"),
                   ("Second unit director of photography", "SECOND_UNIT_DAYS", "Day", 1, 900, "crew", su)],
         "21-02": [("First assistant camera", "SHOOT_DAYS + 2", "Day", 1, 450, "crew"),
                   ("Second assistant camera", "SHOOT_DAYS + 1", "Day", 1, 360, "crew"),
                   ("Second unit camera assistant", "SECOND_UNIT_DAYS", "Day", 1, 420, "crew", su)],
         "21-03": [("Digital imaging technician", "SHOOT_DAYS", "Day", 1, 400, "crew")],
-        "21-04": [("Camera package, rental house estimate", "SHOOT_DAYS", "Day", 1, 1050, "none"),
+        "21-04": [("Camera package, rental house estimate", "SHOOT_DAYS", "Day", 1, 950, "none"),
                   ("Second unit camera package", "SECOND_UNIT_DAYS", "Day", 1, 1100, "none", su),
                   ("Drone and pilot, lake aerials", 2, "Day", 1, 3800, "none", air)],
         "21-05": [("Expendables and batteries", 1, "Allow", 1, 1500, "none")],
         "22-01": [("Gaffer", "SHOOT_DAYS + 2", "Day", 1, 480, "crew")],
         "22-02": [("Key grip", "SHOOT_DAYS + 2", "Day", 1, 480, "crew")],
-        "22-03": [("Grip and electric crew", "SHOOT_DAYS", "Day", 3, 380, "crew")],
-        "22-04": [("Lighting and grip package", "SHOOT_DAYS", "Day", 1, 1050, "none"),
+        "22-03": [("Grip and electric crew", "SHOOT_DAYS", "Day", 3, 340, "crew")],
+        "22-04": [("Lighting and grip package", "SHOOT_DAYS", "Day", 1, 900, "none"),
                   ("Tow generator and operator", "STATION_DAYS", "Day", 1, 380, "none", st)],
         "22-05": [("Expendables", 1, "Allow", 1, 2200, "none")],
         "23-01": [("Production sound mixer", "SHOOT_DAYS + 1", "Day", 1, 520, "crew")],
@@ -260,13 +281,14 @@ def plan():
         "23-03": [("Sound package", "SHOOT_DAYS", "Day", 1, 300, "none")],
         "24-01": [("Production designer", "PREP_WKS + SHOOT_WKS", "Week", 1, 1400, "crew",
                    {"person": DESIGNER})],
-        "24-02": [("Art director", "PREP_WKS + SHOOT_WKS", "Week", 1, 1000, "crew"),
+        "24-02": [("Art director", "PREP_WKS + SHOOT_WKS", "Week", 1, 900, "crew"),
                   ("Set dresser", "SHOOT_DAYS + 4", "Day", 1, 320, "crew")],
         "24-03": [("Station radio set, rental", "RADIO_SET_DAYS", "Day", 1, 95, "none",
                    {"set": "FIELD STATION", "location": STATION}),
                   ("Generator, non-working prop", "GENERATOR_DAYS", "Day", 1, 60, "none"),
-                  ("Mast ladder, rental", "LADDER_DAYS", "Day", 1, 140, "none",
+                  ("Mast ladder and rigging, rental", "MAST_CLIMB_DAYS + 1", "Day", 1, 140, "none",
                    {"set": "RADIO MAST", "location": STATION}),
+                  ("Raven and handler", "RAVEN_DAYS", "Day", 1, 850, "none"),
                   ("Hand radios, pair", "HAND_RADIO_DAYS", "Day", 2, 35, "none"),
                   ("Camp stove, maps, packs and lamps", 1, "Allow", 1, 900, "none"),
                   ("Tea mugs, notebook, key ring and torch", 1, "Allow", 1, 300, "none"),
@@ -279,18 +301,18 @@ def plan():
                    {"person": DESIGNER})],
         "24-05": [("Rain, towers and water truck", "RAIN_DAYS", "Day", 1, 1800, "none"),
                   ("Wind, fans and operator", "WIND_DAYS", "Day", 1, 550, "none"),
-                  ("Fog on the lake", "FOG_DAYS", "Day", 1, 700, "none", lk),
-                  ("Effects technician", "RAIN_DAYS + WIND_DAYS + FOG_DAYS", "Day", 1, 450, "crew")],
+                  ("Mist on the lake", "MIST_DAYS", "Day", 1, 700, "none", lk),
+                  ("Effects technician", "RAIN_DAYS + WIND_DAYS + MIST_DAYS", "Day", 1, 450, "crew")],
         "25-01": [("Costume designer", "PREP_WKS + SHOOT_WKS", "Week", 1, 1050, "crew")],
         "25-02": [("Wardrobe assistant", "SHOOT_DAYS + 2", "Day", 1, 260, "crew")],
         "25-03": [("Weather coats, three, with doubles", 1, "Flat", 6, 180, "none"),
                   ("Weather coats, cleaning on wet days", "COATS_DAYS", "Day", 1, 45, "none"),
                   ("Wardrobe purchases, rentals and alterations", 1, "Allow", 1, 4000, "none")],
-        "25-04": [("Makeup and hair artists", "SHOOT_DAYS", "Day", 2, 380, "crew")],
+        "25-04": [("Makeup and hair artists", "SHOOT_DAYS", "Day", 2, 340, "crew")],
         "25-05": [("Makeup and hair supplies", 1, "Allow", 1, 1400, "none")],
-        "26-01": [("Location manager", ALL_WKS, "Week", 1, 1100, "crew"),
+        "26-01": [("Location manager", ALL_WKS, "Week", 1, 1000, "crew"),
                   ("Assistant location manager", "SHOOT_DAYS + 5", "Day", 1, 280, "crew")],
-        "26-02": [("Site fee, Cold Spring field station", "STATION_DAYS", "Day", 1, 1250, "none", st),
+        "26-02": [("Site fee, Cold Spring field station", "STATION_DAYS", "Day", 1, 1100, "none", st),
                   ("Site fee, Hollins Ridge fire road", "RIDGE_DAYS", "Day", 1, 450, "none", rd),
                   ("Site fee, Kettle Lake boathouse", "LAKE_DAYS", "Day", 1, 1200, "none", lk)],
         "26-03": [("Permits and certificates", 1, "Allow", 1, 2800, "none")],
@@ -300,14 +322,19 @@ def plan():
                   ("Overnight security", "SHOOT_DAYS", "Day", 1, 260, "tax")],
         "27-01": [("Production vans", "SHOOT_DAYS + 4", "Day", 2, 150, "none"),
                   ("Fire road shuttle, four-wheel drive", "RIDGE_DAYS", "Day", 2, 220, "none", rd),
-                  ("Patrol truck, picture vehicle", "TRUCK_DAYS", "Day", 1, 300, "none", rd),
-                  ("Rowboat and safety boat", "ROWBOAT_DAYS", "Day", 1, 400, "none", lk),
+                  ("Park truck, picture vehicle", "TRUCK_DAYS", "Day", 1, 250, "none"),
+                  ("Quad bike, picture vehicle", "QUAD_DAYS", "Day", 1, 180, "none", rd),
+                  ("Search plane and pilot, picture aircraft", "PLANE_DAYS", "Day", 1, 1400, "none"),
+                  ("Rowboat, picture boat", "ROWBOAT_DAYS", "Day", 1, 150, "none", lk),
+                  ("Camera boat and operator", "CAMERA_BOAT_DAYS", "Day", 1, 750, "none", lk),
+                  ("Marine coordinator", "MARINE_DAYS", "Day", 1, 650, "crew", lk),
+                  ("Safety diver", "DIVER_DAYS", "Day", 1, 600, "crew", lk),
                   ("Driver", "SHOOT_DAYS + 2", "Day", 1, 300, "crew")],
         "27-02": [("Fuel and parking", 1, "Allow", 1, 3200, "none")],
-        "28-01": [("Catering, field station days", "STATION_DAYS", "Day", "CREW_MEALS", 28, "none", st),
+        "28-01": [("Catering, field station days", "STATION_DAYS", "Day", "CREW_MEALS", 26, "none", st),
                   ("Catering, fire road days", "RIDGE_DAYS", "Day", "CREW_MEALS + 4", 30, "none", rd),
                   ("Catering, boathouse days", "LAKE_DAYS", "Day", "CREW_MEALS", 28, "none", lk),
-                  ("Background meals", "BACKGROUND_DAYS", "Day", "VOLUNTEERS", 15, "none")],
+                  ("Background meals", "BASE_STAFF_DAYS * BASE_STAFF + RELIEF_TEAM_DAYS * RELIEF_TEAM + BOAT_CREW_DAYS * BOAT_CREW", "Day", 1, 15, "none")],
         "28-02": [("Craft service", "SHOOT_DAYS", "Day", 1, 240, "none")],
         "29-01": [("Production office and supplies", 3, "Month", 1, 1100, "none")],
         "29-02": [("Walkie-talkie rental", "SHOOT_DAYS", "Day", 1, 120, "none"),
@@ -315,25 +342,25 @@ def plan():
         "29-03": [("Shipping and courier", 1, "Allow", 1, 600, "none")],
         "30-01": [("Drives and media", 1, "Allow", 1, 3000, "none")],
         "30-02": [("Backup storage, twelve months", 12, "Month", 1, 60, "none")],
-        "40-01": [("Editor", 12, "Week", 1, 1700, "tax")],
+        "40-01": [("Editor", 10, "Week", 1, 1600, "tax")],
         "40-02": [("Assistant editor", 8, "Week", 1, 900, "tax")],
         "40-03": [("Edit system", 5, "Month", 1, 400, "none")],
-        "41-01": [("Sound design and editing", 1, "Flat", 1, 12000, "none")],
-        "41-02": [("Mix", 1, "Flat", 1, 9500, "none")],
+        "41-01": [("Sound design and editing", 1, "Flat", 1, 10000, "none")],
+        "41-02": [("Mix", 1, "Flat", 1, 8500, "none")],
         "41-03": [("ADR and foley", 1, "Allow", 1, 5000, "none")],
-        "42-01": [("Composer, package", 1, "Flat", 1, 13000, "none", eur),
+        "42-01": [("Composer, package", 1, "Flat", 1, 12000, "none", eur),
                   ("Recording session, string quartet", 1, "Flat", 1, 3200, "none", eur)],
         "42-02": [("Music licensing", 1, "Allow", 1, 5000, "none")],
-        "43-01": [("Visual effects, cleanup and sky", 1, "Allow", 1, 12000, "none")],
+        "43-01": [("Visual effects, cleanup and sky", 1, "Allow", 1, 10000, "none")],
         "43-02": [("Titles and graphics", 1, "Flat", 1, 2500, "none")],
-        "44-01": [("Color grading", 1, "Flat", 1, 9500, "none")],
+        "44-01": [("Color grading", 1, "Flat", 1, 8500, "none")],
         "44-02": [("Conform and online", 1, "Flat", 1, 2500, "none")],
         "45-01": [("Masters", 1, "Allow", 1, 3500, "none")],
         "45-02": [("Digital cinema package", 1, "Flat", 1, 1800, "none")],
         "45-03": [("Closed captions and subtitles", 1, "Flat", 1, 1400, "none")],
-        "50-01": [("Production insurance", 1, "Allow", 1, 12000, "none")],
+        "50-01": [("Production insurance", 1, "Allow", 1, 11000, "none")],
         "50-02": [("Errors and omissions", 1, "Allow", 1, 5000, "none")],
-        "51-01": [("Production legal", 1, "Allow", 1, 11000, "none")],
+        "51-01": [("Production legal", 1, "Allow", 1, 9000, "none")],
         "51-02": [("Payroll service fees", 1, "Allow", 1, 4000, "none"),
                   ("Cost report and audit", 1, "Allow", 1, 3500, "none")],
         "52-01": [("Festival entry fees", 15, "Flat", 1, 90, "none")],
@@ -352,19 +379,19 @@ def line(desc, amount, unit, x, rate, fr, extra=None):
 
 
 # Draft 2, the draft the financiers approved: draft 3 (the budget) is these changes
-# applied to it. The second unit and the lake fog were added after; the camera package
+# applied to it. The second unit and the lake mist were added after; the camera package
 # came in lower than estimated; the composer's package and visual effects moved.
-DRAFT2_GLOBALS = {"CREW_MEALS": "40", "PREP_WKS": "6"}
+DRAFT2_GLOBALS = {"CREW_MEALS": "40", "PREP_WKS": "5"}
 DRAFT2_LINES = [
     ("21-04", "Camera package, rental house estimate", "rate", "1200"),
-    ("42-01", "Composer, package", "rate", "11500"),
-    ("43-01", "Visual effects, cleanup and sky", "rate", "16000"),
+    ("42-01", "Composer, package", "rate", "10500"),
+    ("43-01", "Visual effects, cleanup and sky", "rate", "13500"),
     ("24-04", "Station interior, build, dress and strike", "rate", "10500"),
 ]
 DRAFT2_DELETE = [("21-01", "Second unit director of photography"),
                  ("21-02", "Second unit camera assistant"),
                  ("21-04", "Second unit camera package"),
-                 ("24-05", "Fog on the lake")]
+                 ("24-05", "Mist on the lake")]
 
 # Dated notes on a few lines: (account, line, [(created, author, text, done)]). Authors
 # are roles, never names.
@@ -521,14 +548,17 @@ def build(out, days_file):
     # end): prep and wrap from the budget's own weeks around the schedule's shoot days.
     start = datetime.date.fromisoformat(s["start"])
     end = datetime.date.fromisoformat(s["end"])
-    prep = start - datetime.timedelta(weeks=int(b["globals"]["PREP_WKS"]))
-    wrap = end + datetime.timedelta(weeks=int(b["globals"]["WRAP_WKS"]))
+    # The schedule's own prep and wrap dates when it has them, as New Budget fills them.
+    prep = s["prep_start"] or (
+        start - datetime.timedelta(weeks=int(b["globals"]["PREP_WKS"]))).isoformat()
+    wrap = s["wrap_end"] or (
+        end + datetime.timedelta(weeks=int(b["globals"]["WRAP_WKS"]))).isoformat()
     b["info"] = {
         "Production type": {"kind": "text", "value": "Feature"},
-        "Prep start": {"kind": "date", "value": prep.isoformat()},
+        "Prep start": {"kind": "date", "value": prep},
         "Shoot start": {"kind": "date", "value": s["start"]},
         "Shoot end": {"kind": "date", "value": s["end"]},
-        "Wrap end": {"kind": "date", "value": wrap.isoformat()},
+        "Wrap end": {"kind": "date", "value": wrap},
     }
     add_notes(b)
     b["baseline"] = original
@@ -623,8 +653,6 @@ def main(argv):
             stale = [f.name for f in made
                      if not (FIXTURES / f.name).exists()
                      or not filecmp.cmp(f, FIXTURES / f.name, shallow=False)]
-            # Today's four-day file still makes a whole budget.
-            build(Path(tmp) / "four-day", OLD_SCHEDULE)
         if stale:
             print("make-field-station: out of date (run python3 scripts/make-field-station.py): "
                   + ", ".join(stale), file=sys.stderr)
