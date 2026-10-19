@@ -3,10 +3,13 @@ name: ci
 # Pushes to main, and pull requests: a feature branch runs once (as its pull request), not
 # twice. The org's Actions plan runs 20 jobs at a time across every repo (SUITE-STANDARDS.md,
 # section 6).
+# A draft pull request builds nothing (SUITE-STANDARDS.md section 6): CI starts when it is
+# marked ready (`gh pr ready`) and runs on every push after that.
 on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 permissions:
   contents: read
 # SUITE-STANDARDS.md section 6: no incremental builds (CI never reuses them) and only line
@@ -20,7 +23,58 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
+  changes:
+    # Decides what this push needs. Skipped on a draft pull request, and every other job
+    # needs it, so a draft runs nothing. `rust` is false when every changed file is
+    # documentation (below); the Rust jobs then skip with `if:` rather than
+    # `paths-ignore`, so the required checks still report.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      rust: ${{ steps.decide.outputs.rust }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Documentation only?
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = pull_request ]; then
+            from="$(git merge-base "$BASE" HEAD)"
+          elif [ -n "${BEFORE:-}" ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            from="$BEFORE"
+          else
+            echo "rust=true" >> "$GITHUB_OUTPUT"   # nothing to compare with: build
+            exit 0
+          fi
+          git diff --name-only "$from" HEAD > "$RUNNER_TEMP/changed"
+          cat "$RUNNER_TEMP/changed"
+          # Documentation: docs/ (but not the files the build reads: the release notes
+          # and their template, and FORMAT.md, whose example a test checks), Markdown files
+          # at the top (README.md is checked by the site job, which always runs), the
+          # licences and the issue templates.
+          rust=false
+          while IFS= read -r f; do
+            case "$f" in
+              docs/releases/*|docs/release-notes-template.md|docs/FORMAT.md) rust=true ;;
+              docs/*|LICENSE*|.github/ISSUE_TEMPLATE/*) ;;
+              */*) rust=true ;;
+              *.md) ;;
+              *) rust=true ;;
+            esac
+          done < "$RUNNER_TEMP/changed"
+          [ -s "$RUNNER_TEMP/changed" ] || rust=true
+          echo "rust=$rust" | tee -a "$GITHUB_OUTPUT"
   build:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -98,6 +152,8 @@ jobs:
   cooldown:
     # Fails a pull request or a push that adds crates published less than 14 days ago
     # (pushes too: most work lands on main directly, not through pull requests).
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -134,6 +190,8 @@ jobs:
   deny:
     # deny.toml: known advisories, licenses compatible with MIT OR Apache-2.0,
     # crates.io as the only source.
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -146,6 +204,7 @@ jobs:
   site:
     # README.md and site/index.html must match docs/features.toml and the newest release
     # notes (docs/WEBSITE.md); the Claude Code hooks behind that rule must still work.
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
