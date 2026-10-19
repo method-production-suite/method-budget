@@ -96,10 +96,13 @@ jobs:
         # docs/releases/<version>.md must agree on every push.
         run: cargo xtask check-version
   cooldown:
-    # Fails a pull request or a push that adds crates published less than 14 days ago
-    # (pushes too: most work lands on main directly, not through pull requests).
+    # Fails a pull request that adds crates published less than 14 days ago, and a push
+    # to main whose lock holds any: a pull request checks what it adds or bumps, main
+    # checks the whole lock every time (a crate already in the lock is never "changed",
+    # so only a full check catches one that slipped in). crate-ages.yml runs the full
+    # check weekly too.
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -108,25 +111,12 @@ jobs:
       - name: Check crate ages
         env:
           EVENT: ${{ github.event_name }}
-          BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
-          # Compare with what the branch had before: main for a pull request, the
-          # pushed-over commit for a push, main for a new branch. When there is nothing
-          # to compare with (main itself force-pushed), every crate is checked.
-          if [ "$EVENT" = pull_request ]; then
-            base=origin/main
-          elif [ -n "${BEFORE:-}" ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-            base="$BEFORE"
-          elif [ "$GITHUB_REF" != refs/heads/main ]; then
-            base=origin/main
-          else
-            base=""
-          fi
           # fuzz/ is its own workspace with its own lock (fuzz/README.md).
           for lock in Cargo.lock fuzz/Cargo.lock; do
-            if [ -n "$base" ]; then
-              python3 scripts/check-crate-ages.py --lock "$lock" --only-changed "$base"
+            if [ "$EVENT" = pull_request ]; then
+              python3 scripts/check-crate-ages.py --lock "$lock" --only-changed origin/main
             else
               python3 scripts/check-crate-ages.py --lock "$lock"
             fi
