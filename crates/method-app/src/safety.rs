@@ -617,12 +617,11 @@ pub struct Settings {
     /// Save into the budget's file a few seconds after each change (budgets
     /// with a file; others get a recovery copy). On unless turned off.
     pub autosave: bool,
-    /// Open the sample budget when the app starts with nothing to open, the
-    /// first time (Help > Open the Sample on First Launch; src/sample.rs,
-    /// decisions.md, entry 84). On unless turned off.
-    pub sample_at_launch: bool,
     /// The sample has been shown once (at a start or from Help > Open
-    /// Sample), so a start never opens it again.
+    /// Sample), or a start found the person already at work, so a start
+    /// never opens it again (src/sample.rs; decisions.md, entries 84 and
+    /// 86). A `sample_at_launch` field left by 0.5.0, whose switch is gone,
+    /// is ignored when read and dropped at the next save.
     pub sample_seen: bool,
 }
 
@@ -630,7 +629,6 @@ impl Default for Settings {
     fn default() -> Settings {
         Settings {
             autosave: true,
-            sample_at_launch: true,
             sample_seen: false,
         }
     }
@@ -1336,20 +1334,53 @@ pub(crate) mod tests {
             Settings::load(&file).autosave,
             "missing fields are defaults"
         );
-        // A settings file from before the sample: open it at the first
-        // start, not shown yet (decisions.md, entry 84).
+        // A settings file from before the sample: not shown yet
+        // (decisions.md, entry 84).
         fs::write(&file, "{\"autosave\": false}").unwrap();
         let s = Settings::load(&file);
-        assert!(!s.autosave && s.sample_at_launch && !s.sample_seen);
+        assert!(!s.autosave && !s.sample_seen);
         Settings {
-            sample_at_launch: false,
             sample_seen: true,
             ..s
         }
         .save(&file)
         .unwrap();
-        let s = Settings::load(&file);
-        assert!(!s.sample_at_launch && s.sample_seen);
+        assert!(Settings::load(&file).sample_seen);
+        fs::write(&file, "garbage").unwrap();
+        assert!(Settings::load(&file).autosave);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn settings_with_the_dropped_sample_setting_still_load() {
+        // 0.5.0 kept a switch for the first-start sample (decisions.md,
+        // entries 84 and 86). A file that still has it loads with its other
+        // values kept, and the next save leaves it out.
+        let dir = temp_dir("settings-old-sample");
+        let file = dir.join("settings.json");
+        for (old, seen) in [
+            (
+                "{\"autosave\": false, \"sample_at_launch\": false, \"sample_seen\": true}",
+                true,
+            ),
+            (
+                "{\"autosave\": false, \"sample_at_launch\": true, \"sample_seen\": false}",
+                false,
+            ),
+            (
+                "{\"autosave\": false, \"sample_at_launch\": false, \"sample_seen\": false}",
+                false,
+            ),
+        ] {
+            fs::write(&file, old).unwrap();
+            let s = Settings::load(&file);
+            assert!(!s.autosave, "{old}");
+            assert_eq!(s.sample_seen, seen, "{old}");
+            s.save(&file).unwrap();
+            let kept = fs::read_to_string(&file).unwrap();
+            assert!(!kept.contains("sample_at_launch"), "{kept}");
+            assert_eq!(Settings::load(&file), s);
+        }
         fs::write(&file, "garbage").unwrap();
         assert!(Settings::load(&file).autosave);
         fs::remove_dir_all(&dir).unwrap();

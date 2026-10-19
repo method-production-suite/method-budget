@@ -354,8 +354,7 @@ pub const HELP: &[Entry] = &[
     item("help.shortcuts", "Keyboard Shortcuts", "mod+shift+/"),
     // docs/APP.md in the browser (src/help.rs).
     plain(crate::help::USER_GUIDE_ITEM, "User Guide"),
-    // A fresh untitled copy of the sample budget (src/sample.rs); its
-    // first-launch setting follows as a check.
+    // A fresh untitled copy of the sample budget (src/sample.rs).
     plain(crate::sample::OPEN_ITEM, "Open Sample"),
     // This version's notes, in the page (ui/js/updates.js). Check for
     // Updates and its automatic switch follow (src/updater.rs), then
@@ -532,7 +531,6 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 
     let help = Submenu::with_id(app, HELP_SUBMENU_ID, "&Help", true)?;
     append(app, &help, HELP)?;
-    crate::sample::extend_help_menu(app, &help)?;
     crate::updater::extend_help_menu(app, &help)?;
     append(app, &help, HELP_LINKS)?;
     if !cfg!(target_os = "macos") {

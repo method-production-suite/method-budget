@@ -4141,7 +4141,7 @@ docs/APP.md, "The sample budget"; the file: fixtures/field-station/README.md.
   on the recent or pinned lists, or something opened or recovered), so clearing the
   recent list later never brings it up unasked. Help > Open Sample opens a copy any time.
   The check sits right after Open Sample in the Help menu; the app has no preferences
-  window to put it in.
+  window to put it in. (Dropped after 0.5.0: entry 86.)
 - **Where the logic is.** method-session's `sample` (the decision and the copy; no
   window, builds for the browser), the app's src/sample.rs (the bundled bytes, the menu
   items, two commands). The browser demo at `/try/` and the browser smoke test now open
@@ -4204,3 +4204,36 @@ list under "Saving and recovery"; the code: src/launch.rs, src/safety.rs.
   renewed on a second add; unreadable files are an empty list; the RFC 3339 helper).
 - **Not checked here.** Starting the built app with each flag needs the owner's screen;
   it is on the owner's list.
+
+## 86. The first-start sample has no setting (2026-10-18, the suite standard)
+
+SUITE-STANDARDS.md, section 8, now says no setting is needed for the sample: the first
+launch comes before anyone can reach a setting. This drops the switch entry 84 added in
+0.5.0. Behavior: docs/APP.md, "The sample budget".
+
+- **The rule.** Field Station opens once, at the first start with nothing to open, and
+  never again unasked. Someone who already has budgets of their own (anything on the recent
+  or pinned lists, or something opened or recovered at that start) never sees it, and the
+  start marks it seen so clearing the recent list later doesn't bring it up. Help > Open
+  Sample opens a fresh copy any time. Entry 84's choice of who sees it (empty lists only,
+  so an upgrade from 0.4.0 with budgets doesn't show it) is now the standard's rule, no
+  longer a recommendation.
+- **What goes.** Help > Open the Sample on First Launch, its menu handler, the
+  `sample_at_launch` field of `settings.json` and method-session's `Launch::setting_on`.
+  `sample_seen` stays. A `settings.json` written by 0.5.0 still loads: the old field is
+  ignored when read (the setting is gone, so its value no longer matters, even off) and
+  left out at the next save.
+- **What stays.** `--open-sample` (entry 85) opens the sample at the start whatever else is
+  true, once, through the same `sample_at_launch` command. The command keeps its name; it
+  was never the setting.
+- **Where the logic is.** method-session's `sample::at_launch` and `retire_at_launch`; the
+  app's start decision is a small pure function in src/sample.rs (`at_start`: the flag,
+  then the first-start rule, then marking it seen), so the flag's path is tested without a
+  window.
+- Tests: method-session's `sample` tests (the first start opens it, every other case
+  doesn't; someone at work has it retired; every start shows it, retires it or finds it
+  seen), the app's `at_start` tests (first start, at work, `--open-sample` in every case),
+  a check that the Help menu has no switch, and a `settings.json` from 0.5.0 loading with
+  the old field present.
+- **Not checked here.** The first start in the running app needs the owner's screen; it is
+  on the owner's list.

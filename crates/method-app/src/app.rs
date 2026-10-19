@@ -1155,12 +1155,11 @@ pub fn run() {
             } else if !crate::safety_app::handle_menu(app, id)
                 && !crate::updater::handle_menu(app, id)
                 && !crate::help::handle_menu(app, id)
-                && !crate::sample::handle_menu(app, id)
             {
                 // Open Recent's Clear Menu and the Autosave check are answered
                 // in src/safety_app.rs, Check for Updates and its automatic
                 // switch in src/updater.rs, the Help menu's links in
-                // src/help.rs, the sample's setting in src/sample.rs.
+                // src/help.rs.
                 crate::menu::handle(app, id);
             }
         });
