@@ -160,7 +160,7 @@ function captureScript(sheet) {
 // The tools panel a little wider than its first-run width, as someone who
 // works in it drags it (its edge is saved per user, js/panelsize.js).
 const PANEL = { 'method.panelWidth': 470 };
-const ALL_TABS = ['fringes', 'groups', 'globals', 'units', 'presets', 'find', 'explain', 'sets', 'locations', 'currencies', 'notes', 'library', 'history', 'overtime', 'actuals', 'review', 'activity'];
+const ALL_TABS = ['fringes', 'groups', 'globals', 'units', 'presets', 'find', 'explain', 'sets', 'locations', 'currencies', 'notes', 'library', 'history', 'overtime', 'actuals', 'review', 'activity', 'comments'];
 
 // Each shot's steps run on a freshly opened Field Station budget, with the
 // preferences a person would have saved (`prefs`, the page's localStorage);
