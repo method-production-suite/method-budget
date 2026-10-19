@@ -4,9 +4,11 @@
 //! copy marked "Sample", never as the bundled file itself, so nothing a
 //! person types can change what the next copy starts from.
 //!
-//! The host bundles the file's bytes and keeps the two settings; this side
-//! decides, with no window, whether the app's start opens it, and makes the
-//! copy.
+//! The host bundles the file's bytes and remembers whether the sample has
+//! been shown; this side decides, with no window, whether the app's start
+//! opens it, and makes the copy. There is no setting for it (decisions.md,
+//! entry 86): it opens once at the first start, and Help > Open Sample
+//! brings a copy back any time.
 
 use crate::session::Session;
 
@@ -20,8 +22,6 @@ in the File menu.";
 /// What the app's start knows when it decides whether to open the sample.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Launch {
-    /// The setting "Open the sample on first launch" (on by default).
-    pub setting_on: bool,
     /// The sample has been shown before (at a start or from Help > Open
     /// Sample).
     pub seen: bool,
@@ -35,15 +35,15 @@ pub struct Launch {
 
 /// Whether the app's start opens the sample: only the first time, with
 /// nothing else to show, for someone who hasn't opened a budget of their
-/// own, and with the setting on.
+/// own.
 pub fn at_launch(l: Launch) -> bool {
-    l.setting_on && !l.seen && l.nothing_open && !l.own_budgets
+    !l.seen && l.nothing_open && !l.own_budgets
 }
 
 /// The start found someone already at work (budgets of their own, or
 /// something opened or recovered), so the sample is not for them: marked
 /// seen without showing it, so it doesn't open unasked at a later start
-/// after they clear their recent list. The setting doesn't matter here.
+/// after they clear their recent list.
 pub fn retire_at_launch(l: Launch) -> bool {
     !l.seen && (l.own_budgets || !l.nothing_open)
 }
@@ -72,7 +72,6 @@ mod tests {
 
     fn launch() -> Launch {
         Launch {
-            setting_on: true,
             seen: false,
             nothing_open: true,
             own_budgets: false,
@@ -83,10 +82,6 @@ mod tests {
     fn the_start_opens_it_once_with_nothing_else_to_show() {
         assert!(at_launch(launch()));
         for l in [
-            Launch {
-                setting_on: false,
-                ..launch()
-            },
             Launch {
                 seen: true,
                 ..launch()
@@ -118,27 +113,46 @@ mod tests {
             },
             Launch {
                 own_budgets: true,
-                setting_on: false,
+                nothing_open: false,
                 ..launch()
             },
         ] {
             assert!(retire_at_launch(l), "{l:?}");
             assert!(!at_launch(l), "{l:?}");
         }
-        // Already seen: nothing to mark. Setting off, nothing of their own:
-        // left unmarked, so turning the setting on still shows it once.
+        // Already seen: nothing to mark.
         for l in [
+            Launch {
+                seen: true,
+                ..launch()
+            },
             Launch {
                 own_budgets: true,
                 seen: true,
                 ..launch()
             },
-            Launch {
-                setting_on: false,
-                ..launch()
-            },
         ] {
             assert!(!retire_at_launch(l), "{l:?}");
+            assert!(!at_launch(l), "{l:?}");
+        }
+    }
+
+    #[test]
+    fn every_start_either_shows_it_marks_it_or_finds_it_seen() {
+        // Once a start has run, the sample never opens unasked again: it was
+        // shown (and marked seen), or retired, or seen already.
+        for seen in [false, true] {
+            for nothing_open in [false, true] {
+                for own_budgets in [false, true] {
+                    let l = Launch {
+                        seen,
+                        nothing_open,
+                        own_budgets,
+                    };
+                    let outcomes = [at_launch(l), retire_at_launch(l), l.seen];
+                    assert_eq!(outcomes.iter().filter(|o| **o).count(), 1, "{l:?}");
+                }
+            }
         }
     }
 

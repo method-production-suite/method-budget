@@ -1149,7 +1149,7 @@ back.
 ### The Help menu
 
 In order: **Keyboard Shortcuts**; **User Guide** (this file on GitHub, in your browser);
-**Open Sample** and **Open the Sample on First Launch** (below, "The sample budget");
+**Open Sample** (below, "The sample budget");
 **Release Notes** (this version's notes, below under "Updates"); **Check for Updates…** and
 **Check for Updates Automatically** (also under "Updates"); **Report a Bug…**; **Licenses and
 Notices**; **methodproduction.com** (the suite's website, in your browser). On Windows and
@@ -1261,8 +1261,12 @@ is made up.
 - **At the first start.** When the app starts with nothing to open (no tabs from last
   time, no file handed over, no recovered budget offered), has never shown the sample,
   and has no budgets of yours on the recent or pinned lists, it opens Field Station in
-  place of the untouched Untitled budget, instead of the start window. Someone who has
-  opened a budget of their own never sees it unasked.
+  place of the untouched Untitled budget, instead of the start window. That happens once:
+  showing the sample marks it seen (`sample_seen` in the data folder's `settings.json`),
+  and a start never opens it again. A start that finds budgets of yours, or something to
+  open or recover, marks it seen without showing it, so someone already at work never sees
+  it unasked, even after clearing the recent list. There is no setting for it
+  (SUITE-STANDARDS.md, section 8; decisions.md, entry 86).
 - **Always a copy.** The sample opens as an untitled copy of the file built into the app,
   never the file itself: its tab says **Sample: Field Station**, and a quiet line above
   the grid (the converted-budget banner, closed with ×) says it is an invented sample, that
@@ -1274,11 +1278,6 @@ is made up.
   untouched Untitled budget alone in the window). Starting the app with `--open-sample`
   (Method Launcher's way; "Command-line options" under Saving and recovery) does the same
   at the start, instead of the start window.
-- **Help > Open the Sample on First Launch** is the setting, a check kept in the data
-  folder's `settings.json` beside Autosave, on by default. Off, a start never opens the
-  sample. Showing the sample either way marks it seen (`sample_seen` in the same file),
-  so a start opens it once at most. A start that finds budgets of yours, or something
-  to open, marks it seen too, so clearing the recent list later never brings it up.
 - **The logic** is method-session's `sample` module (the decision and the copy, no
   window); the app bundles the file with `include_bytes!` (src/sample.rs). The browser
   build's demo at `/try/` starts with the same file (docs/WEBSITE.md, "The demo").
@@ -2635,7 +2634,7 @@ src/launch.rs):
 | Option | Does |
 |---|---|
 | `--check-for-updates` | checks for an update at once, as Help > Check for Updates… does, with its answer in the toolbar. The check starts when the window has finished starting (when the page first asks where an update is), so the answer is seen. |
-| `--open-sample` | opens the Field Station sample, as Help > Open Sample does, in place of the start window. It opens once, whatever Open the Sample on First Launch says, and the first-start sample doesn't open a second copy. When the start shows a question first (budgets to recover, or the review of an export handed over with it), it doesn't open; Help > Open Sample is there. |
+| `--open-sample` | opens the Field Station sample, as Help > Open Sample does, in place of the start window. It opens once, whether or not the sample was shown before, and the first-start sample doesn't open a second copy. When the start shows a question first (budgets to recover, or the review of an export handed over with it), it doesn't open; Help > Open Sample is there. |
 
 Options count anywhere on the line and can be given with a file, which opens first; any
 other option (one this version doesn't know, or macOS's `-psn_...`) is skipped and never
@@ -3255,8 +3254,8 @@ the target, and the panes coming back at the next start. The History tab needs a
 check in the tools window and with a long history.
 
 The sample budget (decisions.md, entry 84) needs a live check in the app: the first start
-on a fresh data folder opening it with its Sample tab and line, Help > Open Sample, and the
-setting's check in the Help menu.
+on a fresh data folder opening it with its Sample tab and line, a second start not opening
+it, and Help > Open Sample.
 
 Screen readers (decisions.md, entry 82) need a live check with VoiceOver, and with
 Narrator or NVDA on Windows: the grid's cells, the announcement after an edit and the
