@@ -56,15 +56,17 @@ jobs:
           fi
           git diff --name-only "$from" HEAD > "$RUNNER_TEMP/changed"
           cat "$RUNNER_TEMP/changed"
-          # Documentation: docs/ (but not the files the build reads: the release notes
-          # and their template, and FORMAT.md, whose example a test checks), Markdown files
-          # at the top (README.md is checked by the site job, which always runs), the
-          # licences and the issue templates.
+          # Documentation: docs/ and the Markdown files at the top (README.md is checked by
+          # the site job, which always runs) and the issue templates, but never a file the
+          # build reads (SUITE-STANDARDS.md section 6, docs are code when compiled in): the
+          # release notes and their template, FORMAT.md (a test checks its example), and
+          # the licences and THIRD-PARTY-NOTICES.md (the app's Licenses and Notices).
           rust=false
           while IFS= read -r f; do
             case "$f" in
               docs/releases/*|docs/release-notes-template.md|docs/FORMAT.md) rust=true ;;
-              docs/*|LICENSE*|.github/ISSUE_TEMPLATE/*) ;;
+              LICENSE*|THIRD-PARTY-NOTICES.md) rust=true ;;
+              docs/*|.github/ISSUE_TEMPLATE/*) ;;
               */*) rust=true ;;
               *.md) ;;
               *) rust=true ;;
