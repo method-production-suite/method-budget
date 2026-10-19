@@ -1,0 +1,14 @@
+# Every text file is checked out with LF line endings on every system, Windows included.
+# The bundled chart templates, the Field Station sample and the test fixtures are compiled
+# in and compared byte for byte, so a CRLF checkout (Git for Windows' default) would change
+# what the Windows build ships and fail those tests (found by the first nightly build).
+* text=auto eol=lf
+
+# Kept byte for byte, never converted: pictures and icons, compressed test data, and
+# spreadsheets (one test file is plain text with CRLF on purpose, to be refused as "not a zip").
+*.png binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.deflate binary
+*.xlsx binary

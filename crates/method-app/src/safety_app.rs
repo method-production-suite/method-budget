@@ -150,15 +150,9 @@ impl Safety {
         }
     }
 
-    /// The sample's two settings: open it at the first start, and whether
-    /// it has been shown (src/sample.rs).
-    pub fn sample_settings(&self) -> (bool, bool) {
-        let s = lock(&self.settings);
-        (s.sample_at_launch, s.sample_seen)
-    }
-
-    pub fn set_sample_at_launch(&self, on: bool) {
-        self.change_settings(|s| s.sample_at_launch = on);
+    /// The sample has been shown, so a start won't open it (src/sample.rs).
+    pub fn sample_seen(&self) -> bool {
+        lock(&self.settings).sample_seen
     }
 
     /// The sample has been shown: a start won't open it again.

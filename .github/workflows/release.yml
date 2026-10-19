@@ -34,7 +34,7 @@ jobs:
   check:
     name: version and notes
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -51,6 +51,17 @@ jobs:
           fi
       - name: The tag, the version and the notes agree
         run: cargo xtask check-version --tag "$GITHUB_REF_NAME"
+      - name: Every locked crate is at least 14 days old
+        # SUITE-STANDARDS.md section 6: no release ships a crate younger than the
+        # cooldown, so both locks are checked in full here, before any build or signing
+        # step (build and release need this job). The script has no list of young crates
+        # to excuse; the one exception it knows, a git dependency pinned to a full commit
+        # from scripts/crate-age-git-allow.txt, has no publish date and cannot change.
+        run: |
+          set -euo pipefail
+          for lock in Cargo.lock fuzz/Cargo.lock; do
+            python3 scripts/check-crate-ages.py --lock "$lock"
+          done
 
   build:
     name: build (${{ matrix.name }})
@@ -106,8 +117,11 @@ jobs:
           # shellcheck disable=SC2086 # word splitting is intended
           rustup target add $RUST_TARGETS
 
-      - name: Install Tauri CLI (pinned)
-        run: cargo install tauri-cli --version 2.11.4 --locked
+      - name: Install Tauri CLI (pinned, prebuilt)
+        # Its release download, checked against the SHA-256 pinned in the script, instead
+        # of compiling it here (which took half the macOS build's time).
+        shell: bash
+        run: bash scripts/install-tauri-cli.sh
 
       - name: Decide what gets signed
         shell: bash

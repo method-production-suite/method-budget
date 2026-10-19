@@ -9,22 +9,22 @@
 //! - **At the start** (`sample_at_launch`, asked by the page after the files
 //!   to open and the budgets to recover): opened in the place of the
 //!   untouched Untitled budget when method-session's `sample::at_launch`
-//!   says so (the setting on, never shown, nothing open, no budgets of the
-//!   person's own on the recent or pinned lists). It then takes the start
-//!   window's place.
+//!   says so (never shown, nothing open, no budgets of the person's own on
+//!   the recent or pinned lists). It then takes the start window's place.
+//!   A start that finds the person already at work marks it seen unshown.
 //! - **`--open-sample`** on the command line (src/launch.rs; Method
 //!   Launcher starts the app this way): `sample_at_launch` opens it whatever
-//!   the setting says, once, again in the start window's place.
+//!   else is true, once, again in the start window's place.
 //! - **Help > Open Sample** (`sample_open`): a fresh copy any time, in a new
 //!   tab (or in the place of an untouched Untitled budget alone in the
 //!   window, as Open does).
-//! - **Help > Open the Sample on First Launch**: the setting, a check kept
-//!   in `settings.json` beside Autosave (src/safety.rs), on by default.
-//!   Either way of showing the sample marks it seen.
+//!
+//! There is no setting for it (decisions.md, entry 86). Every way of
+//! showing the sample marks it seen (`sample_seen` in `settings.json`,
+//! src/safety.rs), so a start never opens it again.
 
 use method_session::sample::{self, Launch};
-use tauri::menu::{CheckMenuItem, MenuItemKind, Submenu};
-use tauri::{AppHandle, Manager, Runtime, State, WebviewWindow};
+use tauri::{Runtime, State, WebviewWindow};
 
 use crate::app::{finish, AppState};
 use crate::safety_app::Safety;
@@ -37,46 +37,6 @@ pub const BYTES: &[u8] = include_bytes!("../../../fixtures/field-station/field-s
 /// Help > Open Sample: a menu item the page answers (it asks for
 /// [`sample_open`]).
 pub const OPEN_ITEM: &str = "help.open_sample";
-/// Help > Open the Sample on First Launch: a check answered here.
-pub const AT_LAUNCH_ITEM: &str = "help.sample_at_launch";
-
-/// Adds the setting's check right after Open Sample in the Help menu.
-/// Called by `menu::build`.
-pub fn extend_help_menu<R: Runtime>(app: &AppHandle<R>, help: &Submenu<R>) -> tauri::Result<()> {
-    let on = app
-        .try_state::<Safety>()
-        .is_none_or(|s| s.sample_settings().0);
-    let check = CheckMenuItem::with_id(
-        app,
-        AT_LAUNCH_ITEM,
-        "Open the Sample on First Launch",
-        true,
-        on,
-        None::<&str>,
-    )?;
-    crate::safety_app::insert_after(help, OPEN_ITEM, &[&check])
-}
-
-/// The setting's check in the menu, turned over. False for any other item
-/// (the caller passes it on).
-pub fn handle_menu<R: Runtime>(app: &AppHandle<R>, id: &str) -> bool {
-    if id != AT_LAUNCH_ITEM {
-        return false;
-    }
-    let Some(safety) = app.try_state::<Safety>() else {
-        return true;
-    };
-    let on = !safety.sample_settings().0;
-    safety.set_sample_at_launch(on);
-    if let Some(MenuItemKind::Check(c)) = app
-        .menu()
-        .and_then(|m| crate::safety_app::find(m.items().unwrap_or_default(), AT_LAUNCH_ITEM))
-    {
-        let _ = c.set_checked(on);
-    }
-    true
-}
-
 /// A fresh copy of the sample in front: in the place of an untouched
 /// Untitled budget alone in the window, else in a new tab. Marks it seen.
 fn open<R: Runtime>(
@@ -100,25 +60,44 @@ pub fn sample_at_launch<R: Runtime>(
     safety: State<'_, Safety>,
     start: State<'_, StartState>,
 ) -> Result<Option<View>, String> {
-    // Asked for on the command line (`--open-sample`, src/launch.rs): opened
-    // now whatever the setting says, and only here, so once.
-    if safety.take_sample_asked() {
-        return open(&window, &state, &safety).map(Some);
-    }
-    let (setting_on, seen) = safety.sample_settings();
+    // Asked for on the command line (`--open-sample`, src/launch.rs): taken
+    // here, so once.
+    let asked = safety.take_sample_asked();
     let launch = Launch {
-        setting_on,
-        seen,
+        seen: safety.sample_seen(),
         nothing_open: state.docs().lone_untouched().is_some(),
         own_budgets: !safety.recent_paths().is_empty() || !start.pinned().is_empty(),
     };
-    if sample::retire_at_launch(launch) {
-        safety.mark_sample_seen();
+    match at_start(asked, launch) {
+        AtStart::Open => open(&window, &state, &safety).map(Some),
+        AtStart::MarkSeen => {
+            safety.mark_sample_seen();
+            Ok(None)
+        }
+        AtStart::Nothing => Ok(None),
     }
-    if !sample::at_launch(launch) {
-        return Ok(None);
+}
+
+/// What the start does about the sample.
+#[derive(Debug, PartialEq, Eq)]
+enum AtStart {
+    /// Opens a copy (which marks it seen).
+    Open,
+    /// Leaves it unshown and marks it seen: the person is already at work.
+    MarkSeen,
+    Nothing,
+}
+
+/// `asked`: `--open-sample` was on the command line, which opens it
+/// whatever else is true. Else method-session's rules.
+fn at_start(asked: bool, launch: Launch) -> AtStart {
+    if asked || sample::at_launch(launch) {
+        AtStart::Open
+    } else if sample::retire_at_launch(launch) {
+        AtStart::MarkSeen
+    } else {
+        AtStart::Nothing
     }
-    open(&window, &state, &safety).map(Some)
 }
 
 /// Help > Open Sample: a fresh untitled copy of the sample, any time.
@@ -134,6 +113,57 @@ pub fn sample_open<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn first_start() -> Launch {
+        Launch {
+            seen: false,
+            nothing_open: true,
+            own_budgets: false,
+        }
+    }
+
+    #[test]
+    fn the_first_start_opens_it_once() {
+        assert_eq!(at_start(false, first_start()), AtStart::Open);
+        // Shown before: never again unasked.
+        let seen = Launch {
+            seen: true,
+            ..first_start()
+        };
+        assert_eq!(at_start(false, seen), AtStart::Nothing);
+    }
+
+    #[test]
+    fn someone_already_at_work_has_it_marked_seen_unshown() {
+        for l in [
+            Launch {
+                own_budgets: true,
+                ..first_start()
+            },
+            Launch {
+                nothing_open: false,
+                ..first_start()
+            },
+        ] {
+            assert_eq!(at_start(false, l), AtStart::MarkSeen, "{l:?}");
+        }
+    }
+
+    #[test]
+    fn open_sample_on_the_command_line_opens_it_whatever_else_is_true() {
+        for seen in [false, true] {
+            for nothing_open in [false, true] {
+                for own_budgets in [false, true] {
+                    let l = Launch {
+                        seen,
+                        nothing_open,
+                        own_budgets,
+                    };
+                    assert_eq!(at_start(true, l), AtStart::Open, "{l:?}");
+                }
+            }
+        }
+    }
 
     #[test]
     fn the_bundled_sample_is_field_station() {
