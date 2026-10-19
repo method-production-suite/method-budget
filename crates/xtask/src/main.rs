@@ -86,6 +86,10 @@ cargo xtask <command> [--root <repository>]
       the signature's trusted comment), writing <archive>.sig. The key is
       TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD; it
       must be the one tauri.conf.json's public key belongs to.
+  verify-update --dir <artifacts> --version X.Y.Z [--config <tauri.conf.json>]
+      Check each updater archive in <artifacts> against its .sig the way the
+      app does (method-update): the public key in tauri.conf.json and the
+      version X.Y.Z. Needs no secret.
 ";
 
 fn main() -> ExitCode {
@@ -230,6 +234,15 @@ fn run(args: &[String]) -> Result<String, String> {
                 &key,
                 &password,
             )
+        }
+        "verify-update" => {
+            let need = |k: &str| a.value(k).ok_or_else(|| format!("verify-update needs {k}"));
+            let config = a
+                .value("--config")
+                .map(path)
+                .unwrap_or_else(|| repo::tauri_conf(&root));
+            let (pubkey, _) = manifest::updater_config(&config)?;
+            sign::verify_command(&path(need("--dir")?), need("--version")?, &pubkey)
         }
         "notices" => notices::command(&root, a.has("--check")),
         "wasm-check" => wasm::command(&root),

@@ -293,6 +293,14 @@ Tauri CLI doesn't write the version, so the release workflow signs the archive a
 it. Copies from before entry 83 (the Tauri updater plugin) accept these signatures too: the
 plugin checks the version when the signature names one.
 
+**Checked the way the app checks.** `cargo xtask verify-update --dir <artifacts> --version
+X.Y.Z` runs the app's own verifier (method-update) over each archive and its `.sig` with the
+public key in `tauri.conf.json`; the release workflow runs it right after signing. To prove
+the key itself still works without a release (after a change to the signing tools, and
+before the next tag), run the `updater-key-check` workflow by hand (Actions, or
+`gh workflow run updater-key-check.yml`): it signs a throwaway archive with the key secret and
+checks it the same way. The key never leaves GitHub.
+
 ## Hosting
 
 Updates are served from GitHub Releases. The endpoint is written in one place,

@@ -117,6 +117,49 @@ pub fn command(
     Ok(out)
 }
 
+/// `cargo xtask verify-update --dir <artifacts> --version X.Y.Z`: every
+/// archive in `dir` must have a `.sig` that the app's own updater
+/// (method-update) accepts for `version` with the public key the app
+/// trusts. Says what passed, or every archive that didn't.
+pub fn verify_command(dir: &Path, version: &str, pubkey: &str) -> Result<String, String> {
+    use method_update::verify::verify_signature;
+    let mut names: Vec<String> = std::fs::read_dir(dir)
+        .map_err(|e| format!("can't read {}: {e}", dir.display()))?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| !n.ends_with(".sig"))
+        .collect();
+    names.sort();
+    if names.is_empty() {
+        return Err(format!("{}: no updater archives to check", dir.display()));
+    }
+    let mut out = String::new();
+    let mut problems = Vec::new();
+    for name in &names {
+        let sig = match std::fs::read_to_string(dir.join(format!("{name}.sig"))) {
+            Ok(s) => s,
+            Err(_) => {
+                problems.push(format!("{name}: no signature beside it"));
+                continue;
+            }
+        };
+        let data = std::fs::read(dir.join(name)).map_err(|e| format!("can't read {name}: {e}"))?;
+        match verify_signature(&data, sig.trim(), pubkey, version, true) {
+            Ok(trusted) => out.push_str(&format!("{name}: signed for {version} ({trusted})\n")),
+            Err(e) => problems.push(format!("{name}: {e}")),
+        }
+    }
+    if problems.is_empty() {
+        Ok(out)
+    } else {
+        Err(format!(
+            "the app would refuse:\n  - {}",
+            problems.join("\n  - ")
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -227,6 +270,31 @@ mod tests {
             "right"
         )
         .is_err());
+    }
+
+    /// `verify-update`: what `sign-update` writes passes the app's own check;
+    /// a changed archive, another version, a missing signature or another key
+    /// don't.
+    #[test]
+    fn verify_passes_what_sign_update_wrote_and_nothing_else() {
+        let (sk, pk) = keygen("pw");
+        let r = TempRepo::new("verify-update");
+        let dir = r.root().join("dist");
+        assert!(verify_command(&dir, "0.4.0", &pk).is_err());
+        r.write(&format!("dist/{NAME}"), "bytes");
+        assert!(verify_command(&dir, "0.4.0", &pk)
+            .unwrap_err()
+            .contains("no signature"));
+        command(&dir, "0.4.0", &pk, &sk, "pw").unwrap();
+        let ok = verify_command(&dir, "0.4.0", &pk).unwrap();
+        assert!(ok.contains(&format!("{NAME}: signed for 0.4.0")), "{ok}");
+        assert!(verify_command(&dir, "0.4.1", &pk).is_err());
+        let (_, other_pk) = keygen("");
+        assert!(verify_command(&dir, "0.4.0", &other_pk).is_err());
+        r.write(&format!("dist/{NAME}"), "changed bytes");
+        assert!(verify_command(&dir, "0.4.0", &pk)
+            .unwrap_err()
+            .contains(NAME));
     }
 
     #[test]
