@@ -15,7 +15,7 @@ serde_json = "=1.0.151"
 # (`sign-update`), the way the Tauri CLI signs it otherwise: the same key
 # format and the same crate the CLI uses. The app requires that version
 # (method-update; docs/RELEASING.md, "The updater key").
-minisign = "=0.7.3"
+minisign = "=0.10.0"
 
 [dev-dependencies]
 # The app's updater, so the tests can check that what `sign-update` writes
