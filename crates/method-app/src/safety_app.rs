@@ -94,6 +94,9 @@ pub struct Safety {
     discarded: AtomicBool,
     /// The last autosave problem reported, so it is said once.
     last_error: Mutex<Option<String>>,
+    /// `--open-sample` on the command line (src/launch.rs): the sample
+    /// opens at the start (src/sample.rs, `sample_at_launch`).
+    sample_asked: AtomicBool,
 }
 
 impl Safety {
@@ -120,7 +123,19 @@ impl Safety {
             pending_open: Mutex::new(None),
             discarded: AtomicBool::new(false),
             last_error: Mutex::new(None),
+            sample_asked: AtomicBool::new(false),
         }
+    }
+
+    /// The command line asked for the sample (`--open-sample`).
+    pub fn ask_for_sample(&self) {
+        self.sample_asked.store(true, Ordering::SeqCst);
+    }
+
+    /// True once, when the command line asked for the sample and it hasn't
+    /// been opened for it yet.
+    pub fn take_sample_asked(&self) -> bool {
+        self.sample_asked.swap(false, Ordering::SeqCst)
     }
 
     pub fn autosave_on(&self) -> bool {
@@ -611,12 +626,10 @@ pub fn restore(
 }
 
 /// The first command-line argument that names an existing file (Windows and
-/// Linux pass a double-clicked file this way; options are skipped).
+/// Linux pass a double-clicked file this way; options, the launcher's flags
+/// among them, are skipped: src/launch.rs).
 pub fn path_from_args(args: impl IntoIterator<Item = std::ffi::OsString>) -> Option<PathBuf> {
-    args.into_iter()
-        .filter(|a| !a.to_string_lossy().starts_with('-'))
-        .map(PathBuf::from)
-        .find(|p| p.is_file())
+    crate::launch::LaunchArgs::parse(args).file()
 }
 
 // ---------------------------------------------------------------------------
@@ -634,9 +647,13 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) {
     // The budgets that were open as tabs last time, before the page asks.
     restore_tabs(&app.state::<AppState>(), &app.state::<Safety>());
     refresh_menu(app);
+    let args = crate::launch::LaunchArgs::from_env();
     let early = lock(&EARLY_OPEN).take();
-    if let Some(p) = early.or_else(|| path_from_args(std::env::args_os().skip(1))) {
+    if let Some(p) = early.or_else(|| args.file()) {
         *lock(&app.state::<Safety>().pending_open) = Some(p);
+    }
+    if args.open_sample {
+        app.state::<Safety>().ask_for_sample();
     }
     let handle = app.clone();
     std::thread::spawn(move || loop {
@@ -2068,6 +2085,27 @@ mod tests {
         assert_eq!(args(&[dir.join("missing.mthd").as_os_str()]), None);
         assert_eq!(args(&[dir.as_os_str()]), None, "a folder isn't a budget");
         assert_eq!(args(&[]), None);
+        // The launcher's flags are options, never files (src/launch.rs).
+        assert_eq!(
+            args(&[
+                "--open-sample".as_ref(),
+                "--check-for-updates".as_ref(),
+                f.as_os_str()
+            ]),
+            Some(f.clone())
+        );
+        assert_eq!(args(&["--open-sample".as_ref()]), None);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn the_sample_asked_for_on_the_command_line_opens_once() {
+        let dir = temp_dir("app-sample-asked");
+        let safety = Safety::new(Some(&dir));
+        assert!(!safety.take_sample_asked());
+        safety.ask_for_sample();
+        assert!(safety.take_sample_asked());
+        assert!(!safety.take_sample_asked(), "once");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

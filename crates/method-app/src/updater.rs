@@ -45,6 +45,7 @@
 //! download hosts), over https, redirects included.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
@@ -192,6 +193,10 @@ pub fn page_said(said: Option<policy::Said>, failed: Option<CheckFailed>) -> Opt
 pub struct Updates {
     pub updater: Updater,
     last_failure: Mutex<Option<CheckFailed>>,
+    /// `--check-for-updates` on the command line (src/launch.rs): a check
+    /// as Help > Check for Updates…, started when the page first asks
+    /// where an update is (so it is listening for the answer).
+    check_at_start: AtomicBool,
 }
 
 impl Updates {
@@ -206,7 +211,19 @@ impl Updates {
         Updates {
             updater: Updater::new(config, current, settings_file, Instant::now()),
             last_failure: Mutex::new(None),
+            check_at_start: AtomicBool::new(false),
         }
+    }
+
+    /// The command line asked for a check (`--check-for-updates`).
+    pub fn ask_to_check_at_start(&self) {
+        self.check_at_start.store(true, Ordering::SeqCst);
+    }
+
+    /// True once, when the command line asked for a check and it hasn't
+    /// been started yet.
+    pub fn take_check_at_start(&self) -> bool {
+        self.check_at_start.swap(false, Ordering::SeqCst)
     }
 
     pub fn automatic(&self) -> bool {
@@ -403,6 +420,10 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) {
         .map(|d| d.join("updates.json"));
     let current = app.package_info().version.to_string();
     app.manage(Updates::new(config, &current, settings_file));
+    if crate::launch::LaunchArgs::from_env().check_for_updates {
+        // Even a build that can't update answers, as the menu item does.
+        app.state::<Updates>().ask_to_check_at_start();
+    }
     refresh_menu(app);
     if app.state::<Updates>().updater.unavailable().is_some() {
         // Never checks: no timer, no network.
@@ -531,10 +552,16 @@ pub fn handle_menu<R: Runtime>(app: &AppHandle<R>, id: &str) -> bool {
 // Commands (registered in app.rs, build.rs and capabilities/main.json; the
 // main window only)
 
-/// Where an update is, for the page's quiet indicator.
+/// Where an update is, for the page's quiet indicator. The page asks once
+/// it is listening, at the end of its start: a check the command line asked
+/// for (`--check-for-updates`) begins then, as Help > Check for Updates…
 #[tauri::command]
-pub fn update_status(updates: State<'_, Updates>) -> Status {
-    updates.status(None)
+pub fn update_status<R: Runtime>(app: AppHandle<R>, updates: State<'_, Updates>) -> Status {
+    let status = updates.status(None);
+    if updates.take_check_at_start() {
+        std::thread::spawn(move || check_now(&app, true));
+    }
+    status
 }
 
 /// Restart to update: saves what can be saved, asks about what can't (as
@@ -1126,6 +1153,19 @@ mod tests {
         let again = Updates::new(config(), "0.4.0", Some(file.clone()));
         assert!(!again.updater.take_whats_new());
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_check_asked_for_on_the_command_line_starts_once() {
+        let u = Updates::new(
+            config_with(ENDPOINT_HERE, &fixture::public_key(7)),
+            "0.4.0",
+            None,
+        );
+        assert!(!u.take_check_at_start(), "not unless asked");
+        u.ask_to_check_at_start();
+        assert!(u.take_check_at_start());
+        assert!(!u.take_check_at_start(), "once");
     }
 
     #[test]

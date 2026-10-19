@@ -12,6 +12,9 @@
 //!   says so (the setting on, never shown, nothing open, no budgets of the
 //!   person's own on the recent or pinned lists). It then takes the start
 //!   window's place.
+//! - **`--open-sample`** on the command line (src/launch.rs; Method
+//!   Launcher starts the app this way): `sample_at_launch` opens it whatever
+//!   the setting says, once, again in the start window's place.
 //! - **Help > Open Sample** (`sample_open`): a fresh copy any time, in a new
 //!   tab (or in the place of an untouched Untitled budget alone in the
 //!   window, as Open does).
@@ -97,6 +100,11 @@ pub fn sample_at_launch<R: Runtime>(
     safety: State<'_, Safety>,
     start: State<'_, StartState>,
 ) -> Result<Option<View>, String> {
+    // Asked for on the command line (`--open-sample`, src/launch.rs): opened
+    // now whatever the setting says, and only here, so once.
+    if safety.take_sample_asked() {
+        return open(&window, &state, &safety).map(Some);
+    }
     let (setting_on, seen) = safety.sample_settings();
     let launch = Launch {
         setting_on,
