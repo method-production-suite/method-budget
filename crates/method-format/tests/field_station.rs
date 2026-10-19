@@ -30,11 +30,10 @@ fn the_budget_is_canonical() {
 
 #[test]
 fn the_schedule_file_reads_without_notes() {
-    for name in [DAYS] {
-        let days = schedule::read(fixture(name).as_bytes()).unwrap();
-        assert!(days.notes.is_empty(), "{name}: {:?}", days.notes);
-        assert_eq!(days.schedule, "Field Station", "{name}");
-    }
+    let days = schedule::read(fixture(DAYS).as_bytes()).unwrap();
+    assert!(days.notes.is_empty(), "{:?}", days.notes);
+    assert_eq!(days.schedule, "Field Station");
+    assert_eq!(days.shoot_days.total, 18);
 }
 
 #[test]
