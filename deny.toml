@@ -13,15 +13,16 @@ ignore = [
     { id = "RUSTSEC-2025-0081", reason = "unic-char-property: via urlpattern in tauri-utils" },
     { id = "RUSTSEC-2025-0098", reason = "unic-ucd-version: via urlpattern in tauri-utils" },
     { id = "RUSTSEC-2025-0100", reason = "unic-ucd-ident: via urlpattern in tauri-utils" },
-    # rustls 0.23.45, used only by the updater's HTTPS client (ureq, in
-    # method-update; the same ignores method-libs carries). The fix,
-    # 0.23.46, was published 2026-10-14 and is still inside the 14-day crate
-    # cooldown (scripts/check-crate-ages.py): `cargo update -p rustls` and remove
-    # these four on or after 2026-10-28.
-    { id = "RUSTSEC-2026-0346", reason = "rustls fix inside the crate cooldown until 2026-10-28" },
-    { id = "RUSTSEC-2026-0347", reason = "rustls fix inside the crate cooldown until 2026-10-28" },
-    { id = "RUSTSEC-2026-0348", reason = "rustls fix inside the crate cooldown until 2026-10-28" },
-    { id = "RUSTSEC-2026-0349", reason = "rustls fix inside the crate cooldown until 2026-10-28" },
+    # rustls 0.23.45, used only by the updater's HTTPS client: ureq 3.4.2 in
+    # method-update, with rustls features std, tls12, logging and ring, and ureq's own
+    # ClientConfig (ring provider, its built-in session cache, no ECH). Checked one by
+    # one against that setup on 2026-10-19; none applies. The fix is 0.23.46
+    # (published 2026-10-14): `cargo update -p rustls` and drop these four once it is
+    # 14 days old (2026-10-28).
+    { id = "RUSTSEC-2026-0346", reason = "Debug of client session values leaks secrets only through a custom ClientSessionStore; ureq uses rustls's built-in, redacted session cache and nothing here formats session values" },
+    { id = "RUSTSEC-2026-0347", reason = "affects only clients with EchMode::Enable; ureq never configures Encrypted Client Hello" },
+    { id = "RUSTSEC-2026-0348", reason = "affects only builds with the brotli feature; rustls is built without it (std, tls12, logging, ring)" },
+    { id = "RUSTSEC-2026-0349", reason = "a downgrade from post-quantum to classical key exchange; the ring provider offers only X25519, P-256 and P-384, so no post-quantum group is ever offered to lose" },
 ]
 
 [licenses]
