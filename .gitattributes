@@ -4,6 +4,11 @@
 # what the Windows build ships and fail those tests (found by the first nightly build).
 * text=auto eol=lf
 
-# Kept byte for byte, never converted: spreadsheets (one test file is plain text with CRLF
-# on purpose, to be refused as "not a zip").
+# Kept byte for byte, never converted: pictures and icons, compressed test data, and
+# spreadsheets (one test file is plain text with CRLF on purpose, to be refused as "not a zip").
+*.png binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.deflate binary
 *.xlsx binary
