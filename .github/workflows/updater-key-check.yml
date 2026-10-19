@@ -13,6 +13,9 @@ permissions:
   contents: read
 jobs:
   check:
+    # Only main's code ever runs with the key: a run started from another branch would
+    # compile that branch's xtask and hand it the secret, so it does nothing there.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

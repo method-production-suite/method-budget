@@ -298,8 +298,8 @@ X.Y.Z` runs the app's own verifier (method-update) over each archive and its `.s
 public key in `tauri.conf.json`; the release workflow runs it right after signing. To prove
 the key itself still works without a release (after a change to the signing tools, and
 before the next tag), run the `updater-key-check` workflow by hand (Actions, or
-`gh workflow run updater-key-check.yml`): it signs a throwaway archive with the key secret and
-checks it the same way. The key never leaves GitHub.
+`gh workflow run updater-key-check.yml --ref main`; it runs only from main): it signs a
+throwaway archive with the key secret and checks it the same way. The key never leaves GitHub.
 
 ## Hosting
 
