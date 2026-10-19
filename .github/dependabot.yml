@@ -1,0 +1,19 @@
+# Dependabot (SUITE-STANDARDS.md section 6): version updates grouped into one pull request per
+# ecosystem each week, after the same 14-day cooldown CI enforces (scripts/check-crate-ages.py),
+# so a group never fails the cooldown check. Security updates are never grouped: each arrives
+# as its own pull request when an advisory is published. GitHub Actions are not here: their
+# pinned SHAs move in every suite repository at once, by MOrg.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directories: ["/", "/fuzz"]
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 5
+    groups:
+      cargo:
+        applies-to: version-updates
+        patterns: ["*"]

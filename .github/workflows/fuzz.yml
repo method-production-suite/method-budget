@@ -7,6 +7,10 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+# SUITE-STANDARDS.md section 6. Its one cache (cargo-fuzz) is saved only from main already:
+# a schedule and workflow_dispatch run on the default branch.
+env:
+  CARGO_INCREMENTAL: "0"
 concurrency:
   group: fuzz-${{ github.ref }}
   cancel-in-progress: true
