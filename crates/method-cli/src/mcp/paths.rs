@@ -171,10 +171,16 @@ impl Roots {
     }
 
     /// How a real path is shown back: relative to the first root when inside
-    /// it (so it can be passed back as is), else absolute.
+    /// it (so it can be passed back as is), with `/` between its parts on every
+    /// system, Windows included (which reads `/` too); else absolute, as the
+    /// system writes it.
     pub fn show(&self, real: &Path) -> String {
         match real.strip_prefix(&self.dirs[0]) {
-            Ok(rest) if !rest.as_os_str().is_empty() => rest.display().to_string(),
+            Ok(rest) if !rest.as_os_str().is_empty() => rest
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/"),
             _ => real.display().to_string(),
         }
     }
@@ -228,9 +234,11 @@ mod tests {
         assert!(roots.existing("sub/b.mthd", b).is_ok());
         let abs = root.join("a.mthd");
         assert!(roots.existing(abs.to_str().unwrap(), b).is_ok());
+        // Relative paths are shown with `/` on every system (Windows reads them too),
+        // so an agent sees the same text everywhere and can pass it back as is.
         assert_eq!(
             roots.show(&roots.existing("sub/b.mthd", b).unwrap()),
-            Path::new("sub").join("b.mthd").display().to_string()
+            "sub/b.mthd"
         );
 
         let refused = |r: Result<PathBuf, ToolError>, want: &str| {
