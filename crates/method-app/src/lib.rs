@@ -23,6 +23,7 @@ pub mod find;
 pub mod help;
 pub mod history;
 pub mod import_setup;
+pub mod launch;
 pub mod library;
 pub mod menu;
 pub mod moverows;

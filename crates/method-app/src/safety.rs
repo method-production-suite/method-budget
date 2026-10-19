@@ -15,7 +15,8 @@
 //! Recovery/owner-<id>.lock    held (locked) by each running copy of the app
 //! Backups/<path hash>/        the last few versions of one document, as
 //!                             they were on disk before each save replaced them
-//! recent.json                 File > Open Recent
+//! recent.json                 File > Open Recent, in the suite's shape
+//!                             (also read by Method Launcher)
 //! settings.json               the Autosave switch
 //! tabs.json                   the budgets open as tabs, to reopen next time
 //! ```
@@ -656,54 +657,154 @@ impl Settings {
 // ---------------------------------------------------------------------------
 // Recent files
 
-#[derive(Default, Serialize, Deserialize)]
-struct RecentJson {
-    files: Vec<String>,
-    /// Each file's bookmark, by path, as hex (src/bookmark.rs): how a file
-    /// moved in the Finder is found again. Older lists have none.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    bookmarks: BTreeMap<String, String>,
+/// `recent.json` as the suite keeps it (SUITE-STANDARDS.md, section 2, read
+/// by Method Launcher): a list, newest first, of absolute paths with the
+/// time each was last opened or saved. `bookmark` is Method Budget's own
+/// (src/bookmark.rs, as hex), there only when the system made one; other
+/// readers ignore it, and keys this build doesn't know are ignored too.
+#[derive(Serialize, Deserialize)]
+struct RecentEntry {
+    path: String,
+    /// RFC 3339, UTC. Missing: the time the list was read.
+    #[serde(default)]
+    opened: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bookmark: Option<String>,
+}
+
+/// What `recent.json` may hold: the suite's list, or the shape before it
+/// (decisions.md, entry 85), read once and written as a list at the next
+/// save.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum RecentJson {
+    List(Vec<RecentEntry>),
+    Old {
+        files: Vec<String>,
+        /// Each file's bookmark, by path, as hex.
+        #[serde(default)]
+        bookmarks: BTreeMap<String, String>,
+    },
+}
+
+/// One file on the recent list: where it is (with its bookmark) and when it
+/// was last opened or saved, as RFC 3339 in UTC.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Recent {
+    tracked: Tracked,
+    opened: String,
+}
+
+/// `time` as RFC 3339 in UTC to the second (`2026-10-18T09:30:00Z`). A time
+/// before 1970 reads as 1970. Days to a civil date: Howard Hinnant's
+/// public-domain algorithm, as in the CLI and xtask (no time crate).
+pub fn rfc3339_utc(time: SystemTime) -> String {
+    let secs = time
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let days = (secs / 86_400) as i64;
+    let rem = secs % 86_400;
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    format!(
+        "{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z",
+        rem / 3600,
+        rem / 60 % 60,
+        rem % 60
+    )
 }
 
 /// File > Open Recent: the last [`RECENT_LIMIT`] budgets opened or saved,
 /// newest first, kept in `recent.json` (when there is a file to keep it in),
-/// each with a bookmark where the system makes one, so a file moved or
-/// renamed in the Finder stays on the list at its new place.
+/// each with the time it was last opened or saved and a bookmark where the
+/// system makes one, so a file moved or renamed in the Finder stays on the
+/// list at its new place.
 #[derive(Debug, Default)]
 pub struct RecentFiles {
     file: Option<PathBuf>,
-    list: Vec<Tracked>,
+    list: Vec<Recent>,
 }
 
 impl RecentFiles {
     /// Reads the list from `file`; a missing or unreadable file is an empty list.
     pub fn load(file: Option<PathBuf>) -> RecentFiles {
+        RecentFiles::load_at(file, SystemTime::now())
+    }
+
+    /// [`RecentFiles::load`], with `now` as the time given to entries that
+    /// have none (those carried over from the old shape).
+    fn load_at(file: Option<PathBuf>, now: SystemTime) -> RecentFiles {
+        let now = rfc3339_utc(now);
         let json = file
             .as_deref()
             .and_then(|f| fs::read_to_string(f).ok())
-            .and_then(|t| serde_json::from_str::<RecentJson>(&t).ok())
-            .unwrap_or_default();
-        let mut list = bookmark::load_list(json.files, &json.bookmarks);
+            .and_then(|t| serde_json::from_str::<RecentJson>(&t).ok());
+        let mut list: Vec<Recent> = match json {
+            None => Vec::new(),
+            Some(RecentJson::List(entries)) => entries
+                .into_iter()
+                .filter(|e| !e.path.is_empty())
+                .map(|e| Recent {
+                    tracked: Tracked {
+                        mark: e.bookmark.as_deref().and_then(bookmark::from_hex),
+                        path: PathBuf::from(e.path),
+                    },
+                    opened: if e.opened.is_empty() {
+                        now.clone()
+                    } else {
+                        e.opened
+                    },
+                })
+                .collect(),
+            Some(RecentJson::Old { files, bookmarks }) => bookmark::load_list(files, &bookmarks)
+                .into_iter()
+                .map(|tracked| Recent {
+                    tracked,
+                    opened: now.clone(),
+                })
+                .collect(),
+        };
         list.truncate(RECENT_LIMIT);
         RecentFiles { file, list }
     }
 
     pub fn paths(&self) -> Vec<PathBuf> {
-        self.list.iter().map(|t| t.path.clone()).collect()
+        self.list.iter().map(|e| e.tracked.path.clone()).collect()
     }
 
-    /// Puts `path` at the top (once), keeping at most [`RECENT_LIMIT`].
+    /// Puts `path` at the top (once), opened now, keeping at most
+    /// [`RECENT_LIMIT`].
     pub fn add(&mut self, path: &Path) -> io::Result<()> {
-        let path = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        self.add_at(path, SystemTime::now())
+    }
+
+    fn add_at(&mut self, path: &Path, now: SystemTime) -> io::Result<()> {
+        // Absolute, as the launcher reads it.
+        let path = fs::canonicalize(path)
+            .or_else(|_| std::path::absolute(path))
+            .unwrap_or_else(|_| path.to_path_buf());
         // The bookmark already kept for the file is kept; else one is made.
         let kept = self
             .list
             .iter()
-            .position(|t| t.path == path)
-            .map(|i| self.list.remove(i))
+            .position(|e| e.tracked.path == path)
+            .map(|i| self.list.remove(i).tracked)
             .filter(|t| t.mark.is_some());
-        self.list
-            .insert(0, kept.unwrap_or_else(|| Tracked::new(path)));
+        self.list.insert(
+            0,
+            Recent {
+                tracked: kept.unwrap_or_else(|| Tracked::new(path)),
+                opened: rfc3339_utc(now),
+            },
+        );
         self.list.truncate(RECENT_LIMIT);
         self.save()
     }
@@ -712,15 +813,23 @@ impl RecentFiles {
     /// not touched).
     pub fn remove(&mut self, path: &Path) -> io::Result<()> {
         let canonical = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-        self.list.retain(|t| t.path != canonical && t.path != path);
+        self.list
+            .retain(|e| e.tracked.path != canonical && e.tracked.path != path);
         self.save()
     }
 
     /// Follows files moved or renamed since they were listed (their
-    /// bookmarks say where they went). True if any path changed.
+    /// bookmarks say where they went); one moved onto a file listed already
+    /// is dropped, so each file stays once (as `bookmark::follow_all`). True
+    /// if any path changed.
     pub fn follow(&mut self) -> bool {
-        let changed = bookmark::follow_all(&mut self.list);
+        let mut changed = false;
+        for e in self.list.iter_mut() {
+            changed |= e.tracked.follow();
+        }
         if changed {
+            let mut seen = std::collections::HashSet::new();
+            self.list.retain(|e| seen.insert(e.tracked.path.clone()));
             let _ = self.save();
         }
         changed
@@ -731,7 +840,7 @@ impl RecentFiles {
     pub fn prune(&mut self) -> bool {
         let moved = self.follow();
         let before = self.list.len();
-        self.list.retain(|t| t.path.is_file());
+        self.list.retain(|e| e.tracked.path.is_file());
         let changed = self.list.len() != before;
         if changed {
             let _ = self.save();
@@ -751,8 +860,17 @@ impl RecentFiles {
         if let Some(dir) = file.parent() {
             create_private_dir(dir)?;
         }
-        let (files, bookmarks) = bookmark::save_list(&self.list);
-        let json = RecentJson { files, bookmarks };
+        let json: Vec<RecentEntry> = self
+            .list
+            .iter()
+            .filter_map(|e| {
+                Some(RecentEntry {
+                    path: e.tracked.path.to_str()?.to_string(),
+                    opened: e.opened.clone(),
+                    bookmark: e.tracked.mark.as_deref().map(bookmark::to_hex),
+                })
+            })
+            .collect();
         let bytes = serde_json::to_vec_pretty(&json).map_err(io::Error::other)?;
         write_atomically(file, &bytes, Access::Private)
     }
@@ -1285,6 +1403,186 @@ pub(crate) mod tests {
         fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// 2026-10-18T09:30:00Z, and a minute later.
+    fn at(minutes: u64) -> SystemTime {
+        UNIX_EPOCH + Duration::from_secs(1_792_315_800 + minutes * 60)
+    }
+
+    #[test]
+    fn rfc3339_times_are_utc_to_the_second() {
+        assert_eq!(rfc3339_utc(UNIX_EPOCH), "1970-01-01T00:00:00Z");
+        assert_eq!(rfc3339_utc(at(0)), "2026-10-18T09:30:00Z");
+        assert_eq!(
+            rfc3339_utc(UNIX_EPOCH + Duration::from_secs(951_782_400 + 86_399)),
+            "2000-02-29T23:59:59Z"
+        );
+        assert_eq!(
+            rfc3339_utc(UNIX_EPOCH + Duration::from_millis(1_500)),
+            "1970-01-01T00:00:01Z",
+            "fractions are dropped"
+        );
+        // A clock set before 1970 reads as 1970.
+        assert_eq!(
+            rfc3339_utc(UNIX_EPOCH - Duration::from_secs(5)),
+            "1970-01-01T00:00:00Z"
+        );
+    }
+
+    #[test]
+    fn recent_json_is_the_suite_shape_and_round_trips() {
+        let dir = temp_dir("recent-shape");
+        let store = dir.join("recent.json");
+        let a = dir.join("a.mthd");
+        let b = dir.join("b.mthd");
+        fs::write(&a, "{}").unwrap();
+        fs::write(&b, "{}").unwrap();
+        let (a, b) = (a.canonicalize().unwrap(), b.canonicalize().unwrap());
+        let mut r = RecentFiles::load(Some(store.clone()));
+        r.add_at(&a, at(0)).unwrap();
+        r.add_at(&b, at(1)).unwrap();
+
+        // A top-level array, newest first, absolute paths, RFC 3339 times.
+        let json: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&store).unwrap()).unwrap();
+        let list = json.as_array().expect("a top-level array");
+        assert_eq!(list.len(), 2);
+        assert_eq!(list[0]["path"], b.to_str().unwrap());
+        assert_eq!(list[0]["opened"], "2026-10-18T09:31:00Z");
+        assert_eq!(list[1]["path"], a.to_str().unwrap());
+        assert_eq!(list[1]["opened"], "2026-10-18T09:30:00Z");
+        for e in list {
+            assert!(Path::new(e["path"].as_str().unwrap()).is_absolute());
+            // Only a bookmark the system made; nothing else.
+            let keys: Vec<&String> = e.as_object().unwrap().keys().collect();
+            let has_mark = e.get("bookmark").is_some();
+            assert_eq!(keys.len(), 2 + usize::from(has_mark), "{keys:?}");
+            assert_eq!(has_mark, cfg!(target_os = "macos"));
+        }
+
+        // Read back as written, times and all.
+        let again = RecentFiles::load_at(Some(store.clone()), at(60));
+        assert_eq!(again.paths(), [b.clone(), a.clone()]);
+        assert_eq!(again.list, r.list);
+        again.save().unwrap();
+        let rewritten: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&store).unwrap()).unwrap();
+        assert_eq!(rewritten, json);
+
+        // An entry this build doesn't know all of: unknown keys are ignored,
+        // a missing time is the time it was read.
+        fs::write(
+            &store,
+            format!(
+                "[{{\"path\": {:?}, \"opened\": \"2026-01-02T03:04:05Z\", \"pinned\": true}}, {{\"path\": {:?}}}]",
+                a.to_str().unwrap(),
+                b.to_str().unwrap()
+            ),
+        )
+        .unwrap();
+        let r = RecentFiles::load_at(Some(store.clone()), at(5));
+        assert_eq!(r.paths(), [a.clone(), b.clone()]);
+        assert_eq!(r.list[0].opened, "2026-01-02T03:04:05Z");
+        assert_eq!(r.list[1].opened, "2026-10-18T09:35:00Z");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn the_old_recent_json_is_read_with_its_bookmarks_and_rewritten_new() {
+        let dir = temp_dir("recent-old");
+        let store = dir.join("recent.json");
+        fs::write(
+            &store,
+            r#"{"files": ["/films/one.mthd", "/films/two.mthd"],
+                "bookmarks": {"/films/two.mthd": "0a0b0c"}}"#,
+        )
+        .unwrap();
+        let r = RecentFiles::load_at(Some(store.clone()), at(0));
+        assert_eq!(
+            r.paths(),
+            [
+                PathBuf::from("/films/one.mthd"),
+                PathBuf::from("/films/two.mthd")
+            ]
+        );
+        assert_eq!(r.list[0].tracked.mark, None);
+        assert_eq!(r.list[1].tracked.mark, Some(vec![10, 11, 12]));
+        // Carried over: the time of the move to the new shape.
+        assert!(r.list.iter().all(|e| e.opened == "2026-10-18T09:30:00Z"));
+        // Still the old file until the next save, then the new shape.
+        assert!(fs::read_to_string(&store).unwrap().contains("\"files\""));
+        r.save().unwrap();
+        let json: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&store).unwrap()).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!([
+                {"path": "/films/one.mthd", "opened": "2026-10-18T09:30:00Z"},
+                {"path": "/films/two.mthd", "opened": "2026-10-18T09:30:00Z", "bookmark": "0a0b0c"},
+            ])
+        );
+        // An old list with no bookmarks at all.
+        fs::write(&store, r#"{"files": ["/films/one.mthd"]}"#).unwrap();
+        assert_eq!(
+            RecentFiles::load(Some(store.clone())).paths(),
+            [PathBuf::from("/films/one.mthd")]
+        );
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn adding_a_listed_file_again_moves_it_up_with_a_new_time() {
+        let dir = temp_dir("recent-again");
+        let store = dir.join("recent.json");
+        let file = |n: &str| {
+            let p = dir.join(n);
+            fs::write(&p, "{}").unwrap();
+            fs::canonicalize(p).unwrap()
+        };
+        let (a, b) = (file("a.mthd"), file("b.mthd"));
+        let mut r = RecentFiles::load(Some(store.clone()));
+        r.add_at(&a, at(0)).unwrap();
+        r.add_at(&b, at(1)).unwrap();
+        let mark = r.list[1].tracked.mark.clone();
+        r.add_at(&a, at(7)).unwrap();
+        assert_eq!(r.paths(), [a.clone(), b.clone()]);
+        assert_eq!(r.list[0].opened, "2026-10-18T09:37:00Z");
+        assert_eq!(r.list[1].opened, "2026-10-18T09:31:00Z");
+        assert_eq!(r.list[0].tracked.mark, mark, "its bookmark is kept");
+        let kept = RecentFiles::load(Some(store));
+        assert_eq!(kept.list[0].opened, "2026-10-18T09:37:00Z");
+        // A relative path is listed as an absolute one.
+        let mut r = RecentFiles::load(None);
+        r.add_at(Path::new("no-such-budget.mthd"), at(0)).unwrap();
+        assert!(r.paths()[0].is_absolute());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn an_unreadable_recent_json_is_an_empty_list() {
+        let dir = temp_dir("recent-bad");
+        let store = dir.join("recent.json");
+        for text in [
+            "",
+            "not json",
+            "{}",
+            "[1, 2]",
+            "{\"files\": 3}",
+            "[{\"opened\": \"2026-10-18T09:30:00Z\"}]",
+        ] {
+            fs::write(&store, text).unwrap();
+            assert!(
+                RecentFiles::load(Some(store.clone())).paths().is_empty(),
+                "{text:?}"
+            );
+        }
+        // A folder where the file should be, and no file at all.
+        fs::remove_file(&store).unwrap();
+        assert!(RecentFiles::load(Some(store.clone())).paths().is_empty());
+        fs::create_dir(&store).unwrap();
+        assert!(RecentFiles::load(Some(store)).paths().is_empty());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
     #[test]
     fn recent_labels_tell_same_named_files_apart() {
         let r = RecentFiles {
@@ -1295,9 +1593,12 @@ pub(crate) mod tests {
                 "/films/Rock & Roll.mthd",
             ]
             .into_iter()
-            .map(|p| Tracked {
-                path: PathBuf::from(p),
-                mark: None,
+            .map(|p| Recent {
+                tracked: Tracked {
+                    path: PathBuf::from(p),
+                    mark: None,
+                },
+                opened: String::new(),
             })
             .collect(),
         };
