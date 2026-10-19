@@ -178,6 +178,13 @@ signed and the draft's description says the first launch needs the one-time step
 | `build` (macOS Apple silicon, Windows, Linux) | contents: read | builds the bundles; on macOS signs, notarizes, staples and verifies, and writes the updater archive and signs it for its version (`cargo xtask sign-update`), each only when its secrets are there |
 | `release` | contents: write (the only job with it: it creates the draft and uploads the files) | `cargo xtask update-manifest`, then `gh release create --draft` with the notes |
 
+The Tauri CLI comes from its prebuilt release, checked against the SHA-256 pinned in
+`scripts/install-tauri-cli.sh` (moving it to a new version is described there). The same
+build without signing runs every night on main on all three platforms
+(`.github/workflows/nightly.yml`, skipped when main hasn't changed since the last green
+night), so a platform-only break shows up before a release; pull requests run the Linux
+checks only (`ci.yml`).
+
 Only first-party actions are used, each pinned to a full commit SHA. Each secret is given
 only to the steps that use it, never to the Windows and Linux builds. Every signing,
 notarizing and updater-signing step is skipped cleanly when its secrets are absent; the

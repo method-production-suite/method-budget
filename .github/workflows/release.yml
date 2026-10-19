@@ -117,8 +117,11 @@ jobs:
           # shellcheck disable=SC2086 # word splitting is intended
           rustup target add $RUST_TARGETS
 
-      - name: Install Tauri CLI (pinned)
-        run: cargo install tauri-cli --version 2.11.4 --locked
+      - name: Install Tauri CLI (pinned, prebuilt)
+        # Its release download, checked against the SHA-256 pinned in the script, instead
+        # of compiling it here (which took half the macOS build's time).
+        shell: bash
+        run: bash scripts/install-tauri-cli.sh
 
       - name: Decide what gets signed
         shell: bash
