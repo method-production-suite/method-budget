@@ -18,7 +18,8 @@
 //! With `--demo`, the website's demo (docs/WEBSITE.md): `index.html` also
 //! carries a Content-Security-Policy that allows only its own files, the
 //! note about running in the browser and `demo/` (its script and styles),
-//! and `sample/` holds the invented budget the demo starts with.
+//! and `sample/` holds the invented budget the demo starts with: Field
+//! Station, the app's own sample (fixtures/field-station/).
 //!
 //! No npm and no bundler. The `wasm-bindgen` command line must be the
 //! version in Cargo.lock: `cargo install wasm-bindgen-cli --version <it>
@@ -45,11 +46,12 @@ const SUBDIR: &str = "method-web";
 const BOOT: &str = r#"<script type="module" src="js/boot.js"></script>"#;
 const SHIM_TAG: &str = r#"<script src="method-web/tauri-shim.js"></script>"#;
 
-/// The demo's sample budget (invented: crates/method-web/demo/, made by
-/// scripts/make-showcase-budgets.py) and the name it is served under, which
+/// The demo's sample budget, Field Station: the one the desktop app opens
+/// as its sample (invented: fixtures/field-station/, made by
+/// scripts/make-field-station.py), and the name it is served under, which
 /// the tab shows. demo.js opens it.
-const SAMPLE: &str = "lanterns-over-kettle-lake.mthd";
-const SAMPLE_NAME: &str = "Lanterns Over Kettle Lake.mthd";
+const SAMPLE: &str = "fixtures/field-station/field-station.mthd";
+const SAMPLE_NAME: &str = "Field Station.mthd";
 
 /// The demo page's Content-Security-Policy: its own files only, plus
 /// compiling the WebAssembly module. Nothing from anyone else, no inline
@@ -143,7 +145,7 @@ fn write_charts(dir: &Path) -> Result<u64, String> {
 }
 
 /// The demo's own files: its script and styles, the patched index.html and
-/// the sample budget.
+/// the sample budget (from the repository's fixtures).
 fn add_demo(root: &Path, out: &Path) -> Result<(), String> {
     let demo = root.join(DEMO);
     let read =
@@ -161,7 +163,11 @@ fn add_demo(root: &Path, out: &Path) -> Result<(), String> {
     };
     copy("demo.js", &out.join("demo").join("demo.js"))?;
     copy("demo.css", &out.join("demo").join("demo.css"))?;
-    copy(SAMPLE, &out.join("sample").join(SAMPLE_NAME))
+    let sample = out.join("sample");
+    fs::create_dir_all(&sample).map_err(|e| format!("couldn't make {}: {e}", sample.display()))?;
+    fs::copy(root.join(SAMPLE), sample.join(SAMPLE_NAME))
+        .map(|_| ())
+        .map_err(|e| format!("couldn't copy {SAMPLE}: {e}"))
 }
 
 /// The `cargo build` arguments for the browser build.
@@ -355,10 +361,11 @@ mod tests {
         let demo = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
             .join(DEMO);
-        for f in ["demo.js", "demo.css", SAMPLE] {
+        for f in ["demo.js", "demo.css"] {
             assert!(demo.join(f).is_file(), "{f}");
         }
-        let sample = fs::read_to_string(demo.join(SAMPLE)).unwrap();
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let sample = fs::read_to_string(root.join(SAMPLE)).unwrap();
         method_format::from_str(&sample).unwrap();
         let script = fs::read_to_string(demo.join("demo.js")).unwrap();
         assert!(script.contains(&SAMPLE_NAME.replace(' ', "%20")));

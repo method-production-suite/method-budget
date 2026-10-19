@@ -616,11 +616,22 @@ pub struct Settings {
     /// Save into the budget's file a few seconds after each change (budgets
     /// with a file; others get a recovery copy). On unless turned off.
     pub autosave: bool,
+    /// Open the sample budget when the app starts with nothing to open, the
+    /// first time (Help > Open the Sample on First Launch; src/sample.rs,
+    /// decisions.md, entry 84). On unless turned off.
+    pub sample_at_launch: bool,
+    /// The sample has been shown once (at a start or from Help > Open
+    /// Sample), so a start never opens it again.
+    pub sample_seen: bool,
 }
 
 impl Default for Settings {
     fn default() -> Settings {
-        Settings { autosave: true }
+        Settings {
+            autosave: true,
+            sample_at_launch: true,
+            sample_seen: false,
+        }
     }
 }
 
@@ -1195,13 +1206,32 @@ pub(crate) mod tests {
         let dir = temp_dir("settings");
         let file = dir.join("settings.json");
         assert!(Settings::load(&file).autosave);
-        Settings { autosave: false }.save(&file).unwrap();
+        Settings {
+            autosave: false,
+            ..Settings::default()
+        }
+        .save(&file)
+        .unwrap();
         assert!(!Settings::load(&file).autosave);
         fs::write(&file, "{}").unwrap();
         assert!(
             Settings::load(&file).autosave,
             "missing fields are defaults"
         );
+        // A settings file from before the sample: open it at the first
+        // start, not shown yet (decisions.md, entry 84).
+        fs::write(&file, "{\"autosave\": false}").unwrap();
+        let s = Settings::load(&file);
+        assert!(!s.autosave && s.sample_at_launch && !s.sample_seen);
+        Settings {
+            sample_at_launch: false,
+            sample_seen: true,
+            ..s
+        }
+        .save(&file)
+        .unwrap();
+        let s = Settings::load(&file);
+        assert!(!s.sample_at_launch && s.sample_seen);
         fs::write(&file, "garbage").unwrap();
         assert!(Settings::load(&file).autosave);
         fs::remove_dir_all(&dir).unwrap();

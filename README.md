@@ -27,25 +27,25 @@ is a file you own.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/screens/hero-dark.png">
-    <img src="assets/screens/hero-light.png" width="92%" alt="The topsheet of Field Station, an invented four-day independent feature: category numbers, names and totals, a grand total of 393,018.91, and the tools panel showing the fringes on the Cast category and the budget's two locations.">
+    <img src="assets/screens/hero-light.png" width="92%" alt="The topsheet of Field Station, an invented eighteen-day independent feature of about a million dollars: category numbers, names and totals, a grand total of 1,050,288.03, and the tools panel showing the fringes on the Cast category and the budget's three locations.">
   </picture>
 </p>
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/screens/explain-dark.png">
-    <img src="assets/screens/explain-light.png" width="92%" alt="Explain this number on the fringes of one cast line, DELACROIX, 4 days at 2,400: each fringe with its rate and cutoff, the state unemployment fringe stopping at its 7,000.00 cutoff and coming to 238.00.">
+    <img src="assets/screens/explain-light.png" width="92%" alt="Explain this number on the fringes of one cast line, DELACROIX, 16 days at 1,500: each fringe with its rate and cutoff, the state unemployment fringe stopping at its 7,000.00 cutoff and coming to 238.00.">
   </picture>
 </p>
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/screens/import-dark.png">
-    <img src="assets/screens/import-light.png" width="92%" alt="Import Spreadsheet reviewing an invented camera department rental list: the import options, the eight lines as they will import, and the check that every line comes to the sheet's own total of 5,310.00.">
+    <img src="assets/screens/import-light.png" width="92%" alt="Import Spreadsheet reviewing an invented camera department rental list: the import options, the eight lines as they will import, and the check that every line comes to the sheet's own total of 22,250.00.">
   </picture>
 </p>
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/screens/file-dark.png">
-    <img src="assets/screens/file-light.png" width="92%" alt="The budget is a file you own: the app beside a terminal running the method-budget totals command on field-station.mthd, printing each category's total and the grand total of 393018.91.">
+    <img src="assets/screens/file-light.png" width="92%" alt="The budget is a file you own: the app beside a terminal running the method-budget totals command on field-station.mthd, printing each category's total and the grand total of 1050288.03.">
   </picture>
 </p>
 <p align="center"><sub>Field Station is an invented production: its title, its people and every figure are made up.</sub></p>
@@ -170,6 +170,7 @@ this section.
 - **Rename everywhere.** Rename a fringe, global, group or unit and every reference follows, formulas included, as one undo step.
 - **Renumber accounts.** Change the account numbering pattern and preview every old and new number before it applies.
 - **Sub-budgets.** Make a filtered copy by categories, accounts, groups, sets or locations, for a department or a unit.
+- **A sample budget to explore.** The first time you open the app, an invented feature of about a million dollars opens as an untitled copy, with every feature in use; Help > Open Sample brings a fresh copy back any time.
 
 ### Command line and git
 

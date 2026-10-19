@@ -207,6 +207,9 @@ const COMMANDS: &[&str] = &[
     "new_budget_pick_folder",
     "new_budget_charts",
     "new_budget_setup",
+    // The sample budget (src/sample.rs)
+    "sample_at_launch",
+    "sample_open",
     // A whole budget from another program's export (src/export_import.rs)
     "export_import_pick",
     "export_import_preview",

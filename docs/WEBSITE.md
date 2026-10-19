@@ -161,10 +161,13 @@ row are the same. Fonts are the Mac's own. Two runs on one Mac give identical fi
 limits: it is Chrome drawing the page, not the Mac's own web view, and the frame is drawn,
 not captured.
 
-The budget is `fixtures/field-station/field-station.mthd`, made by
+The budget is `fixtures/field-station/field-station.mthd`, an independent feature of
+about a million dollars and the app's own sample (decisions.md, entry 84), made by
 `python3 scripts/make-field-station.py` from Method Schedule's schedule days file for the
 same production (fixtures/field-station/README.md); the sheet is `camera-department.csv`
-beside it.
+beside it. The budget has original totals and actuals, so the capture hides the Orig, Var
+and cost report columns in the page's saved column choices (as a person working on the
+budget rather than the cost report would): the pictures show the budget's own totals.
 
 The six earlier screenshots in the gallery (`site/assets/shots/`: topsheet, detail lines
 with fringes, Explain this number, Budget Setup's fringes, Compare, and the cost report)
@@ -196,10 +199,10 @@ cd site && python3 -m http.server 8000    # then open http://127.0.0.1:8000/
 
 "Try it in your browser" (a button in the hero, a link in the nav and on the release
 notes page) opens `/try/`: the real app's page (`crates/method-app/ui`) running against
-the engine compiled to WebAssembly (docs/research/web-session.md). It starts with an
-invented sample budget, "Lanterns Over Kettle Lake" (the feature from Screenshots,
-`crates/method-web/demo/lanterns-over-kettle-lake.mthd`, made by
-`scripts/make-showcase-budgets.py`; never a real budget). Budgets live in the page:
+the engine compiled to WebAssembly (docs/research/web-session.md). It starts with the
+app's own sample budget, Field Station (the budget in the pictures,
+`fixtures/field-station/field-station.mthd`, made by `scripts/make-field-station.py`;
+invented, never a real budget; decisions.md, entry 84). Budgets live in the page:
 Open reads a file the visitor picks, Save and every export download a file, and nothing
 is sent anywhere. Reloading the page starts over.
 
@@ -215,8 +218,9 @@ picks one), and, for the demo only:
   frame. Under 760 pixels wide it adds that the app works best on a computer: on a
   phone the grid and the tools panel do not fit side by side, and the app wants a
   keyboard.
-- `sample/Lanterns Over Kettle Lake.mthd`, which demo.js opens (`?open=`) unless the
-  address names another budget.
+- `sample/Field Station.mthd`, copied from the fixtures, which demo.js opens (`?open=`)
+  unless the address names another budget. The browser smoke test
+  (`scripts/web-smoke.mjs`) opens the same file.
 - A Content-Security-Policy on the page: `default-src 'self'; script-src 'self'
   'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self';
   frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'` (and

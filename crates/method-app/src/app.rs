@@ -1155,11 +1155,12 @@ pub fn run() {
             } else if !crate::safety_app::handle_menu(app, id)
                 && !crate::updater::handle_menu(app, id)
                 && !crate::help::handle_menu(app, id)
+                && !crate::sample::handle_menu(app, id)
             {
                 // Open Recent's Clear Menu and the Autosave check are answered
                 // in src/safety_app.rs, Check for Updates and its automatic
                 // switch in src/updater.rs, the Help menu's links in
-                // src/help.rs.
+                // src/help.rs, the sample's setting in src/sample.rs.
                 crate::menu::handle(app, id);
             }
         });
@@ -1404,6 +1405,9 @@ pub fn run() {
             // The start window and New Budget (src/start.rs)
             crate::start::start_list,
             crate::start::start_open,
+            // The sample budget (src/sample.rs)
+            crate::sample::sample_at_launch,
+            crate::sample::sample_open,
             crate::start::start_pin,
             crate::start::start_forget,
             crate::start::start_reveal,

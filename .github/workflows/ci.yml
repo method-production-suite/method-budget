@@ -34,8 +34,9 @@ jobs:
       - name: Test
         run: cargo test --workspace --locked
       - name: The Field Station budget is reproducible
-        # fixtures/field-station/: made again from the schedule file through the
-        # command line and its MCP server, every byte the same.
+        # fixtures/field-station/: made again in a scratch folder from Method
+        # Schedule's days file (field-station.budget.json) through the command
+        # line and its MCP server, and every byte must match the committed files.
         run: |
           cargo build --locked -p method-cli
           METHOD=target/debug/method-budget python3 scripts/make-field-station.py --check

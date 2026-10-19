@@ -1690,7 +1690,7 @@ fn globals_from_a_schedules_days() {
     assert_eq!(gone["picked"], false);
     assert_eq!(r["applied"], false);
     let text = std::fs::read_to_string(f.path("film.mthd")).unwrap();
-    assert!(text.contains("\"STATION_DAYS\": \"4\""), "{text}");
+    assert!(text.contains("\"STATION_DAYS\": \"12\""), "{text}");
     std::fs::write(f.path("notes.json"), "{}").unwrap();
     err_contains(
         f.tool(

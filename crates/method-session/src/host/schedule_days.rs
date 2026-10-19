@@ -78,11 +78,11 @@ mod tests {
         );
         assert_eq!(r["file"], "field-station.budget.json");
         assert_eq!(r["schedule"], "Field Station");
-        assert_eq!(r["shoot_days"], 4);
+        assert_eq!(r["shoot_days"], 18);
         let total = &r["figures"][0];
         assert_eq!(
             (&total["global"], &total["picked"], &total["new"]),
-            (&json!("SHOOT_DAYS"), &json!(true), &json!("4"))
+            (&json!("SHOOT_DAYS"), &json!(true), &json!("18"))
         );
         let picks = json!([
             {"key": "total"},
@@ -104,7 +104,7 @@ mod tests {
         );
         assert_eq!(done["message"], "Set 2 globals from the schedule (1 new).");
         assert_eq!(done["view"]["can_undo"], true);
-        assert_eq!(done["view"]["budget"]["globals"]["STATION_DAYS"], "4");
+        assert_eq!(done["view"]["budget"]["globals"]["STATION_DAYS"], "12");
         call(&h, "undo", json!({}));
         assert!(h
             .dispatch(

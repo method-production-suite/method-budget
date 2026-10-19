@@ -731,23 +731,23 @@ fn schedule_days_set_globals_from_a_schedule() {
         .join("field-station.budget.json")
         .to_string_lossy()
         .into_owned();
-    // The starter has 25 shoot days; the schedule 4.
+    // The starter has 25 shoot days; the schedule 18.
     let b = d.starter("film.mthd");
     let before = read(&b);
     let o = method(&["schedule-days", &b, &days]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     let text = out(&o);
     assert!(
-        text.starts_with("field-station.budget.json: Field Station (Shooting Order, Main), 4 shoot days, 2027-05-03 to 2027-05-06"),
+        text.starts_with("field-station.budget.json: Field Station (Shooting Order, Main), 18 shoot days, 2027-05-03 to 2027-05-26"),
         "{text}"
     );
     assert!(
-        text.contains("SHOOT_DAYS = 4 (was 25)  Shoot days in all  [total]"),
+        text.contains("SHOOT_DAYS = 18 (was 25)  Shoot days in all  [total]"),
         "{text}"
     );
     assert!(
         text.contains(
-            "location:Cold Spring field station  Shoot days at location Cold Spring field station: 4 days  -> COLD_SPRING_FIELD_STATION_DAYS"
+            "location:Cold Spring field station  Shoot days at location Cold Spring field station: 12 days  -> COLD_SPRING_FIELD_STATION_DAYS"
         ),
         "{text}"
     );
@@ -772,8 +772,8 @@ fn schedule_days_set_globals_from_a_schedule() {
     let o = method(&["check", &b]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     let text = read(&b);
-    assert!(text.contains("\"RIDGE_DAYS\": \"2\""), "{text}");
-    assert!(text.contains("\"SHOOT_DAYS\": \"4\""));
+    assert!(text.contains("\"RIDGE_DAYS\": \"3\""), "{text}");
+    assert!(text.contains("\"SHOOT_DAYS\": \"18\""));
     assert!(text.contains(
         "Shoot days at location Hollins Ridge fire road, from the schedule Field Station (Shooting Order, Main)"
     ));
@@ -824,7 +824,7 @@ fn schedule_days_set_globals_from_a_schedule() {
         "{}",
         out(&o)
     );
-    assert!(read(&b).contains("\"RIDGE_DAYS\": \"2\""));
+    assert!(read(&b).contains("\"RIDGE_DAYS\": \"3\""));
     let o = method(&[
         "schedule-days",
         &b,
@@ -845,32 +845,26 @@ fn schedule_days_set_globals_from_a_schedule() {
     );
 }
 
-/// `method-budget incentives` on the invented Field Station budget with a
-/// program limited to one location (decisions.md, entry 80).
+/// `method-budget incentives` on the invented Field Station budget, whose
+/// county program counts spend at the field station only and is not applied
+/// (decisions.md, entry 80).
 #[test]
 fn incentives_text_and_json() {
-    let d = Dir::new("incentives");
-    let src = read(&format!(
+    let p = format!(
         "{}/../../fixtures/field-station/field-station.mthd",
         env!("CARGO_MANIFEST_DIR")
-    ));
-    let program = r#""credits": [{"name": "Station program", "applied": false,
-        "locations": ["Cold Spring field station"],
-        "rows": [{"description": "Site", "source": {"kind": "category", "category": "26"}, "percent": "25"}]}],
-    "topsheet""#;
-    let p = d.path("station.mthd");
-    std::fs::write(&p, src.replacen("\"topsheet\"", program, 1)).unwrap();
+    );
 
     let o = method(&["incentives", &p]);
     assert_eq!(code(&o), 0, "{}", err(&o));
     let text = out(&o);
     assert!(
-        text.contains("location\tCold Spring field station\t7400.00\t0.00\t7400.00\n"),
+        text.contains("location\tCold Spring field station\t55417.00\t1243.44\t56660.44\n"),
         "{text}"
     );
     assert!(
         text.contains(
-            "program\tStation program\testimate\t7400.00\t1850.00\tCold Spring field station\n"
+            "program\tCold Spring County film program\testimate\t41497.00\t9701.00\tCold Spring field station\n"
         ),
         "{text}"
     );
@@ -878,8 +872,8 @@ fn incentives_text_and_json() {
     assert_eq!(total(&p, "credits_total"), "0.00");
 
     let j = out(&method(&["incentives", &p, "--json"]));
-    assert!(j.contains("\"amount\": 185000"), "{j}");
-    assert!(j.contains("\"qualified\": 740000"), "{j}");
+    assert!(j.contains("\"amount\": 970100"), "{j}");
+    assert!(j.contains("\"qualified\": 4149700"), "{j}");
     assert_eq!(code(&method(&["incentives"])), 2);
 }
 

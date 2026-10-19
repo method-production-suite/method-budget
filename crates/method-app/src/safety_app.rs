@@ -135,6 +135,35 @@ impl Safety {
         }
     }
 
+    /// The sample's two settings: open it at the first start, and whether
+    /// it has been shown (src/sample.rs).
+    pub fn sample_settings(&self) -> (bool, bool) {
+        let s = lock(&self.settings);
+        (s.sample_at_launch, s.sample_seen)
+    }
+
+    pub fn set_sample_at_launch(&self, on: bool) {
+        self.change_settings(|s| s.sample_at_launch = on);
+    }
+
+    /// The sample has been shown: a start won't open it again.
+    pub fn mark_sample_seen(&self) {
+        self.change_settings(|s| s.sample_seen = true);
+    }
+
+    /// Changes the settings and keeps them (best effort), unless nothing
+    /// changed.
+    fn change_settings(&self, change: impl FnOnce(&mut Settings)) {
+        let mut s = lock(&self.settings);
+        let before = s.clone();
+        change(&mut s);
+        if *s != before {
+            if let Some(f) = &self.settings_file {
+                let _ = s.save(f);
+            }
+        }
+    }
+
     fn remove_recovery(&self, key: &str) {
         if let Some(store) = &self.store {
             let _ = store.remove(key);
@@ -864,7 +893,7 @@ pub(crate) fn find<R: Runtime>(items: Vec<MenuItemKind<R>>, id: &str) -> Option<
     None
 }
 
-fn insert_after<R: Runtime>(
+pub(crate) fn insert_after<R: Runtime>(
     menu: &Submenu<R>,
     after: &str,
     items: &[&dyn IsMenuItem<R>],

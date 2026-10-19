@@ -1,13 +1,14 @@
 // The website's demo (methodbudget.com/try/, docs/WEBSITE.md). Loaded
 // before the shim, which reads the address: unless it names a budget
-// already, the demo starts with the invented sample budget beside the page
+// already, the demo starts with the invented sample budget beside the page,
+// Field Station, the one the desktop app opens as its sample
 // (?open=sample/...). On the page itself (not in the Budget Setup frame)
 // it shows the note about running in the browser, which can be hidden.
 
 (function () {
   'use strict';
 
-  const SAMPLE = 'sample/Lanterns%20Over%20Kettle%20Lake.mthd';
+  const SAMPLE = 'sample/Field%20Station.mthd';
   const params = new URLSearchParams(window.location.search);
   if (window.parent !== window || params.has('panel')) return;
 

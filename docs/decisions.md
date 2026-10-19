@@ -4093,3 +4093,68 @@ and contrast"; the audit and what is left: docs/research/accessibility-audit.md)
 - **Not verifiable here.** An update between two signed releases (download, signature,
   swap, admin prompt, restart, What's New) needs two real releases and a Mac; it is on the
   owner's list.
+
+## 84. The Field Station sample: a million-dollar feature, opened once at the first start (2026-10-18, the owner's ask)
+
+Roadmap 3.20; SUITE-STANDARDS.md, section 8 (the owner: a fake budget of about a million
+dollars that shows the whole feature set, open when the app first starts). Behavior:
+docs/APP.md, "The sample budget"; the file: fixtures/field-station/README.md.
+
+- **One production with Method Schedule.** The budget is made from Method Schedule's own
+  days file for its Field Station sample (18 shoot days, 3 to 26 May 2027; three
+  locations; a one-day second unit; nine cast; stunts, background, vehicles, boats and the
+  rest of the breakdown), copied from its commit `093e951` (its pull request #29, not
+  merged yet; we copy it again when it merges). Every day count goes through
+  `method-budget schedule-days --apply`, as the real hand-off does, so each global keeps
+  its link to the schedule and a second import changes nothing (tested). An element's
+  days are its day out of days total, holds included (entry 76). How many people each
+  background group is, and the weeks of prep and wrap the crew is paid for, are the
+  budget's own assumptions; the budget information's prep and wrap dates are the
+  schedule's.
+- **About a million, showing everything.** Net 1,050,288.03 on the low-budget feature
+  chart, exact arithmetic: globals, percent fringes with cutoffs and a flat hourly one, a
+  person paid in two accounts sharing a cutoff (entry 79), two groups with one left out of
+  the total, three locations and eleven sets, two lines in euros, a contingency and a
+  completion bond, an invented county program limited to the field station and not
+  applied (an estimate, entry 80), dated notes with roles as authors, the original totals
+  frozen at draft 2, draft 2 kept as a version for Compare, and actuals through the
+  second shoot week with two estimate-to-complete methods. Every name, vendor and figure
+  is invented; the budget information has no credit line. `scripts/make-field-station.py`
+  builds it through the command line and the MCP server and adds what no tool writes
+  (dates, notes, the version, the original totals worked out from draft 2's figures, the
+  actuals) in FORMAT.md's shape; `--check` makes it again byte for byte (CI).
+- **Opened at the first start, once.** When the app starts with nothing to open, has never
+  shown the sample, the setting is on and the recent and pinned lists are empty, it opens
+  the sample instead of the start window. The empty lists are what keep it from anyone
+  who has used the app (an upgrade from 0.4.0 included): the standard says a person who
+  opens a file of their own never sees it unasked. **Built on the recommendation**,
+  reversible: the other choice was to show it once to everyone after the update.
+- **Always an untitled copy.** Each opening is a new session from the bundled bytes, with
+  no file, nothing to undo and nothing unsaved, so closing it asks nothing and a budget
+  opened next takes its tab (as an untouched Untitled one's). Its tab says "Sample: Field
+  Station" and its banner says what it is and how to start your own (the converted
+  budget's banner, entry 67), both until it is saved as a file. No new view field: the
+  tab label and the banner already travel in the view.
+- **The setting** is Help > Open the Sample on First Launch, a check in `settings.json`
+  beside Autosave (the app's preferences), on by default; showing the sample (either way)
+  sets `sample_seen`, and so does a start that finds the person already at work (budgets
+  on the recent or pinned lists, or something opened or recovered), so clearing the
+  recent list later never brings it up unasked. Help > Open Sample opens a copy any time.
+  The check sits right after Open Sample in the Help menu; the app has no preferences
+  window to put it in.
+- **Where the logic is.** method-session's `sample` (the decision and the copy; no
+  window, builds for the browser), the app's src/sample.rs (the bundled bytes, the menu
+  items, two commands). The browser demo at `/try/` and the browser smoke test now open
+  Field Station too (copied from the fixtures by `cargo xtask web --demo`), and the
+  Lanterns demo file goes; the browser build has no first-start sample, since the demo
+  already opens it by address.
+- **Pictures.** The README and site pictures are retaken from it; the capture hides the
+  Orig, Var and cost report columns the original totals and actuals would add, so the
+  topsheet shows its own totals.
+- Tests: method-session's `sample` tests (the decision, the copy and its mark until saved,
+  the line's words), the app's settings test (an older `settings.json` reads with the
+  sample on and unseen) and bundled-file test, `fixtures`' `field_station.rs` (canonical,
+  agrees with the schedule, every feature group present), the schedule-days tests on the
+  real file, `incentives_text_and_json` on the sample's own program.
+- **Not checked here.** The first start, the tab, the banner and the Help items in the
+  running app need the owner's screen; they are on the owner's list.

@@ -1,17 +1,31 @@
 # Field Station
 
-The suite's one invented production (SUITE-STANDARDS.md, section 7): the script, its
-schedule and its budget, so every app's pictures tell one story. Every name and figure is
-made up. The README and site pictures are taken from these files
-(`cargo xtask capture-screens`, docs/WEBSITE.md, "Screenshots").
+The suite's one invented production (SUITE-STANDARDS.md, sections 7 and 8): the script,
+its schedule and its budget, so every app's pictures tell one story and every app opens
+the same production as its sample. Every name and figure is made up. The README and site
+pictures are taken from these files (`cargo xtask capture-screens`, docs/WEBSITE.md,
+"Screenshots"), the app opens the budget as its sample on first launch and from Help >
+Open Sample (docs/APP.md, "The sample budget"), and the browser demo starts with it.
 
 | File | What it is | Who owns it |
 |---|---|---|
-| `field-station.budget.json` | The schedule's shoot days (format `method-schedule-days`, version 1): four shoot days, Monday 3 to Thursday 6 May 2027, the two locations, and each cast member's and element's days | **Method Schedule.** A copy of its `fixtures/field-station.budget.json`. Change it there and copy it here; never edit this copy |
-| `field-station.mthd` | The budget for that schedule: a small independent feature on the low-budget feature chart | Made by `scripts/make-field-station.py` from the file above |
+| `field-station.budget.json` | The schedule's shoot days (format `method-schedule-days`, version 1, `days_hash` `e9245ad76e787b1e`): 18 shoot days, Monday 3 to Wednesday 26 May 2027 (weeks of 5, 5, 5 and 3), prep from 5 April, wrap to 9 June; Cold Spring field station 12 days, Hollins Ridge fire road 3, Kettle Lake boathouse 3; the Main Unit's 18 days and a one-day Second Unit; the cast DELACROIX, MARA, TEO, IVERSEN, RANGER, DISPATCHER, PILOT, BOATHOUSE KEEPER and ANSEL (silent); background, stunts, vehicles, effects and the rest of the breakdown | **Method Schedule.** A copy of its `fixtures/field-station.budget.json` at commit `093e95107aed7010f78b7c19a32c2f9f28089b31` (branch `sample/field-station-feature`, its pull request #29, not merged yet). Change it there and copy it here; never edit this copy. When that pull request merges, copy the file again from Method Schedule's `main` and run the script |
+| `field-station.mthd` | The budget for that schedule: an independent feature of about a million dollars on the low-budget feature chart | Made by `scripts/make-field-station.py` from the file above |
 | `camera-department.csv` | The camera department's rental list, the spreadsheet the Import Spreadsheet picture reviews | Made by the same script |
 
 Made, never edited by hand: `python3 scripts/make-field-station.py` writes the budget and
 the spreadsheet again, and `--check` says whether they are what it would write (CI runs it).
-`crates/method-format/tests/field_station.rs` checks the budget is in canonical form and
-agrees with the schedule, read with Budget's own reader.
+Every day count in the budget comes from the schedule days file through
+`method-budget schedule-days --apply`, as the real hand-off does: the shoot days, each
+location's days, the second unit's days, each cast member's, stunt's and background
+group's days, and the effects, wardrobe, set dressing, prop, vehicle, boat, marine and
+animal days the lines use (an element's days are its day out of days total, holds
+included). How many people each background group is, and the weeks of prep and wrap the
+crew is paid for, are the budget's own assumptions. A figure the file doesn't have is set
+to 0 and its global says "Not in this schedule".
+
+`crates/method-format/tests/field_station.rs` checks the budget is in canonical form,
+agrees with the schedule (read with Budget's own reader) and shows every feature group;
+`crates/method-session/src/schedule_days.rs` checks a second import of the file finds
+every global by its link and changes nothing. The command line's, the MCP tool's and the
+browser host's schedule-days tests apply the same file to a starter budget.

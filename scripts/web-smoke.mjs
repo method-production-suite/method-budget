@@ -4,7 +4,7 @@
 //   cargo xtask web && node scripts/web-smoke.mjs [target/web]
 //
 // Serves the built folder on 127.0.0.1, opens it in headless Chrome or
-// Chromium with the demo's invented sample budget (?open=), and checks that
+// Chromium with the demo's invented sample budget, Field Station (?open=), and checks that
 // the topsheet draws with its totals, that an edit updates the footer's grand
 // total, that the chart list and one chart are fetched only when asked for,
 // that comments written while reviewing and not downloaded yet make closing
@@ -29,7 +29,7 @@ import { findChrome, launch } from './chrome-pipe.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIR = resolve(process.argv[2] || join(REPO, 'target', 'web'));
-const SAMPLE = join(REPO, 'crates', 'method-web', 'demo', 'lanterns-over-kettle-lake.mthd');
+const SAMPLE = join(REPO, 'fixtures', 'field-station', 'field-station.mthd');
 const SAMPLE_PATH = '/smoke-sample.mthd';
 const TIMEOUT_MS = 90_000;
 
@@ -144,7 +144,7 @@ async function main() {
 
     // 1. The topsheet draws, with the sample's categories and totals.
     await until('the sample budget in the tab', `document.title.startsWith('smoke-sample.mthd')`);
-    await until('the topsheet', `document.body.innerText.includes('Story and rights') && document.body.innerText.includes('Lanterns Over Kettle Lake')`);
+    await until('the topsheet', `document.body.innerText.includes('Story and screenplay') && document.body.innerText.includes('Field Station')`);
     const before = await until('the grand total', `(${GRAND}) || null`);
     console.log(`web-smoke: the topsheet draws (grand total ${(before / 100).toFixed(2)})`);
     if (requests.some((p) => p.startsWith('/charts/'))) fail(`charts were fetched before anyone asked: ${requests.join(', ')}`);
@@ -184,7 +184,7 @@ async function main() {
     };
     const firstId = await activeId();
     const active = firstId && (await axOf(firstId));
-    if (!active || !/Acct #, Story and rights$/.test(named(active))) fail(`the cursor cell's name lacks its column and row: "${active ? named(active) : 'none'}"`);
+    if (!active || !/Acct #, Story and screenplay$/.test(named(active))) fail(`the cursor cell's name lacks its column and row: "${active ? named(active) : 'none'}"`);
     // In a multi-select grid every selectable cell says whether it is
     // selected; the cursor on its own is not a selection.
     if (prop(active, 'selected') !== false) fail(`the lone cursor cell reports selected=${prop(active, 'selected')}, not false`);
@@ -236,14 +236,14 @@ async function main() {
     // the first category (the cursor's row) and the new cell has the same id.
     const keptId = await activeId();
     await evaluate(`(window.__smokeCell = document.getElementById(${JSON.stringify(keptId)}), true)`);
-    await evaluate(`window.__METHOD_WEB__.invoke('smoke', 'update_topsheet_row', { index: 0, code: null, name: 'Story and rights, revised' })`);
+    await evaluate(`window.__METHOD_WEB__.invoke('smoke', 'update_topsheet_row', { index: 0, code: null, name: 'Story and screenplay, revised' })`);
     const redrawn = await until('the cursor row redrawn', `(() => {
       const td = document.getElementById(${JSON.stringify(keptId)});
-      return td && td !== window.__smokeCell && td.parentElement.textContent.includes('Story and rights, revised')
+      return td && td !== window.__smokeCell && td.parentElement.textContent.includes('Story and screenplay, revised')
         ? { cursor: td.classList.contains('cursor'), id: document.getElementById('grid-host').getAttribute('aria-activedescendant'), name: td.getAttribute('aria-label') }
         : null;
     })()`, 10_000);
-    if (!redrawn.cursor || redrawn.id !== keptId || !/Story and rights, revised$/.test(redrawn.name || '')) {
+    if (!redrawn.cursor || redrawn.id !== keptId || !/Story and screenplay, revised$/.test(redrawn.name || '')) {
       fail(`after a redraw the active descendant is ${redrawn.id} ("${redrawn.name}"), not ${keptId}`);
     }
     console.log(`web-smoke: the cursor cell keeps its id (${keptId}) across a redraw`);
