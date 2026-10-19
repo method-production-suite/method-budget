@@ -1396,7 +1396,10 @@ mod tests {
         assert!(r.figures.iter().filter(|f| f.picked).all(|f| f.linked));
         assert_eq!((r.adds, r.updates, r.same), (0, 0, 24));
         assert!(!r.can_apply);
-        assert_eq!(row(&r, "location:Kettle Lake boathouse").global, "LAKE_DAYS");
+        assert_eq!(
+            row(&r, "location:Kettle Lake boathouse").global,
+            "LAKE_DAYS"
+        );
         // Applying again changes nothing.
         let mut after = b.clone();
         apply(&mut after, &d, None).unwrap();

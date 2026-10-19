@@ -79,7 +79,8 @@ pub struct View {
     pub notice: Option<String>,
     /// A budget converted from an export and not saved yet: the banner the
     /// page shows on its tab until it is dismissed or saved (decisions.md,
-    /// entry 67).
+    /// entry 67). The sample budget's line about itself goes here too
+    /// (src/sample.rs; entry 84).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub converted: Option<String>,
     /// A review file open on this budget (src/review.rs): whether it is

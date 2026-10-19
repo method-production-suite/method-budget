@@ -117,6 +117,8 @@ function captureScript(sheet) {
   const DESKTOP = {
     update_status: { state: 'none' },
     start_list: { fresh: false, folders: [], recent: [], pinned: [] },
+    // The budget the pictures show is opened already: no sample at the start.
+    sample_at_launch: null,
     whats_new: null,
   };
   const NOT_HERE = 'That is only in the Method Budget app, not in the browser.';
@@ -183,8 +185,8 @@ const SHOTS = [
     async steps(p) {
       await p.click('the Cast category', rowCell('13', 'Cast', 'last'), 2);
       await p.click('the Principal cast account', rowCell('13-01', 'Principal cast', 'last'), 2);
-      await p.until('the Cast detail lines', `document.body.innerText.includes('DELACROIX') && document.body.innerText.includes('Rehearsal day, three leads')`);
-      await p.click("DELACROIX's fringes", rowCell('DELACROIX', null, '2,926.00'));
+      await p.until('the Cast detail lines', `document.body.innerText.includes('DELACROIX') && document.body.innerText.includes('Rehearsal days, three leads')`);
+      await p.click("DELACROIX's fringes", rowCell('DELACROIX', null, '8,554.00'));
       await p.menu('edit.explain');
       await p.until('the explanation', `(() => { const t = document.body.innerText; return t.includes('SUI') && t.includes('7,000.00'); })()`);
       // Open the fringe that stops at its cutoff, and the one that doesn't reach its own.

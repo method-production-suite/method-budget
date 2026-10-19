@@ -186,6 +186,8 @@
     "allow-start-pin",
     "allow-start-forget",
     "allow-start-reveal",
+    "allow-sample-at-launch",
+    "allow-sample-open",
     "allow-new-budget-pick-template",
     "allow-new-budget-create",
     "allow-new-budget-folder",

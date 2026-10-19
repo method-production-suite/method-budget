@@ -210,6 +210,7 @@ export const SHORTCUTS = [
   // Help
   { id: 'help.shortcuts', group: 'Help', label: 'Show this list of shortcuts', keys: 'mod+shift+/', scope: 'app' },
   { id: 'help.user_guide', group: 'Help', label: 'User guide, in your browser', scope: 'menu' },
+  { id: 'help.open_sample', group: 'Help', label: 'Open the sample budget, Field Station, as an untitled copy', scope: 'menu' },
   { id: 'help.release_notes', group: 'Help', label: 'Release notes: what is new in this version', scope: 'menu' },
   { id: 'help.report_bug', group: 'Help', label: 'Report a bug: a new GitHub issue in your browser, with the app and system versions filled in', scope: 'menu' },
   { id: 'help.licenses', group: 'Help', label: 'Licenses and third-party notices', scope: 'menu' },

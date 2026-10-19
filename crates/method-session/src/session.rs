@@ -330,6 +330,10 @@ pub struct Session {
     /// <file>..."; decisions.md, entry 67): every view carries it until the
     /// first Save. Never written into the file.
     converted: Option<String>,
+    /// Opened as the sample budget, an untitled copy of the one the app
+    /// bundles (src/sample.rs; decisions.md, entry 84): its tab says
+    /// "Sample" until it is first saved as a file of the person's own.
+    sample: bool,
     /// A review file open on this budget (src/review.rs): a reviewer's
     /// comments, being written (the budget is then read-only) or read by
     /// the author to merge back.
@@ -409,6 +413,7 @@ impl Session {
             save_hint: None,
             held: false,
             converted: None,
+            sample: false,
             review: None,
         }
     }
@@ -478,13 +483,16 @@ impl Session {
 
     /// What the budget's tab (and the Window menu) calls it: the file's
     /// name without its extension, or the budget's title while it has no file.
+    /// The sample budget, while it has no file, is marked so: "Sample:
+    /// Field Station".
     pub fn tab_label(&self) -> String {
         if let Some(stem) = self.path.as_deref().and_then(Path::file_stem) {
             return stem.to_string_lossy().into_owned();
         }
         let title = self.budget.title.trim();
-        if title.is_empty() {
-            "Untitled".to_string()
+        let title = if title.is_empty() { "Untitled" } else { title };
+        if self.sample {
+            format!("Sample: {title}")
         } else {
             title.to_string()
         }
@@ -505,8 +513,10 @@ impl Session {
         self.safety.confirm_overwrite = false;
         self.safety.disk = Some(stamp);
         self.safety.conflict = false;
-        // Saved as a Method Budget file: no longer just converted.
+        // Saved as a Method Budget file: no longer just converted, and no
+        // longer the sample but the person's own.
         self.converted = None;
+        self.sample = false;
     }
 
     /// What the budget's file looked like when it was last read or written.
@@ -798,6 +808,19 @@ impl Session {
     /// The converted budget's banner, until it is first saved.
     pub fn converted(&self) -> Option<&str> {
         self.converted.as_deref()
+    }
+
+    /// Marks this budget as the sample (src/sample.rs): its tab says so and
+    /// `notice` is its banner, both until the first Save, as a converted
+    /// budget's banner is.
+    pub fn set_sample(&mut self, notice: String) {
+        self.sample = true;
+        self.converted = Some(notice);
+    }
+
+    /// Opened as the sample and not saved as a file since.
+    pub fn is_sample(&self) -> bool {
+        self.sample
     }
 
     /// A copy saved for sharing opens read-only (src/sharing.rs): its

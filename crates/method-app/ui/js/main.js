@@ -315,6 +315,9 @@ const NOT_EDITS = new Set([
   // The start window (src/start.rs): a budget opened or made in a new tab.
   'start_open',
   'new_budget_create',
+  // The sample budget (src/sample.rs): a copy opened in a tab.
+  'sample_at_launch',
+  'sample_open',
   // Split view (src/tabs.rs): the panes changed, not the budget.
   'split_view',
   'close_split',
@@ -2121,6 +2124,8 @@ const COMMANDS = {
   'view.panel.bottom': () => setPosition('bottom'),
   'view.panel.window': () => setPosition('window'),
   'help.shortcuts': toggleHelp,
+  // A fresh untitled copy of the sample budget (src/sample.rs); the desktop only.
+  'help.open_sample': () => (isWeb() ? undefined : openBy('sample_open')),
   // The menu items are answered in Rust; these run only for the keys on
   // Windows and Linux, where the page sees them first.
   'file.close': closeWindow,
@@ -3282,8 +3287,22 @@ async function start() {
   if (state.position === 'window' && state.panelOpen) openToolsWindow(true).then(sendToolsState);
   await safety.start(); // a file to open, budgets to recover
   // Nothing open but the untouched Untitled budget, and no question asked:
-  // the start window (start.js), unless it was turned off there.
-  if (!isWeb() && !isModalOpen() && startAtLaunch()) {
+  // the first time, the sample budget in its place (src/sample.rs, which
+  // decides); else the start window (start.js), unless it was turned off
+  // there.
+  let sample = null;
+  if (!isWeb() && !isModalOpen()) {
+    try {
+      sample = await invoke('sample_at_launch');
+    } catch (e) {
+      sample = null; // the start window instead
+    }
+    if (sample) {
+      apply(sample, { cmd: 'sample_at_launch', fresh: true });
+      grid.focus();
+    }
+  }
+  if (!sample && !isWeb() && !isModalOpen() && startAtLaunch()) {
     try {
       const list = await invoke('start_list');
       if (list && list.fresh && !isModalOpen()) await openStart({ list });

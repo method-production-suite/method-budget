@@ -146,7 +146,12 @@ fn the_sample_shows_the_features() {
     assert_eq!(b["versions"].as_array().unwrap().len(), 1);
     assert!(!b["actuals"]["transactions"].as_array().unwrap().is_empty());
     let text = fixture("field-station.mthd");
-    for needle in ["\"person\"", "\"currency\": \"EUR\"", "\"notes\"", "\"cutoff\""] {
+    for needle in [
+        "\"person\"",
+        "\"currency\": \"EUR\"",
+        "\"notes\"",
+        "\"cutoff\"",
+    ] {
         assert!(text.contains(needle), "{needle}");
     }
 }
