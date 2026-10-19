@@ -7,7 +7,9 @@ use std::path::PathBuf;
 
 use method_format::serde_json::{json, Value};
 
-use super::protocol::{parse_line, read_line, run, Incoming, Scripted, Server, LEGACY, MODERN};
+use super::protocol::{
+    call_log_line, parse_line, read_line, run, Called, Incoming, Scripted, Server, LEGACY, MODERN,
+};
 use super::{limits, schema, Config};
 
 /// A server on a fresh folder holding the starter budget as `film.mthd`.
@@ -366,6 +368,19 @@ fn bad_messages_get_json_rpc_errors() {
             json!(4),
         ),
         (json!([]), -32600, Value::Null),
+        // No id and not a valid request either: answered with a null id, as JSON-RPC
+        // 2.0's own examples do ({"jsonrpc": "2.0", "method": 1, "params": "bar"}). Only a
+        // valid notification goes unanswered.
+        (
+            json!({"jsonrpc": "2.0", "method": 1, "params": "bar"}),
+            -32600,
+            Value::Null,
+        ),
+        (
+            json!({"jsonrpc": "1.0", "method": "ping"}),
+            -32600,
+            Value::Null,
+        ),
     ];
     for (msg, code, id) in cases {
         let r = f.raw(msg.clone());
@@ -562,4 +577,22 @@ fn cacheable_results_carry_caching_hints() {
         .unwrap();
     assert!(r["result"].get("ttlMs").is_none() && r["result"].get("cacheScope").is_none());
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Every tools/call writes one stderr line, a tool that panics included
+/// (it used to return before the line was written).
+#[test]
+fn every_call_is_logged_a_panic_included() {
+    assert_eq!(
+        call_log_line("totals", Called::Ok, 12),
+        "method-budget mcp: totals ok (12 ms)"
+    );
+    assert_eq!(
+        call_log_line("set", Called::Refused("invalid"), 3),
+        "method-budget mcp: set refused: invalid (3 ms)"
+    );
+    assert_eq!(
+        call_log_line("export", Called::Panicked, 40),
+        "method-budget mcp: export panicked (40 ms)"
+    );
 }
