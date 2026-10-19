@@ -1,106 +1,29 @@
 # Least privilege by default. Pin all actions to full commit SHAs (pinact run).
 name: ci
-# Pushes to main, and pull requests: a feature branch runs once (as its pull request), not
-# twice. The org's Actions plan runs 20 jobs at a time across every repo (SUITE-STANDARDS.md,
-# section 6).
+# The dependency checks only (SUITE-STANDARDS.md section 6): on a pull request and on every
+# push to main, the crate-age check and cargo deny, the two checks the ruleset requires.
+# Everything else is run before a pull request is marked ready (scripts/check.sh, pasted under
+# "Tested locally"), by the weekly build on every system (weekly.yml) and by every release
+# (release.yml). A draft pull request runs nothing: marking it ready (`gh pr ready`) starts CI.
 on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 permissions:
   contents: read
-# SUITE-STANDARDS.md section 6: no incremental builds (CI never reuses them) and only line
-# tables for debug info, which keeps panics' file and line but cuts target/ several times.
-env:
-  CARGO_INCREMENTAL: "0"
-  CARGO_PROFILE_DEV_DEBUG: line-tables-only
-  CARGO_PROFILE_TEST_DEBUG: line-tables-only
-# A newer push to a pull request cancels its older run; main always finishes.
+# A newer push cancels an older run, on a pull request and on main alike.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: true
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Install Tauri system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev build-essential pkg-config libgtk-3-dev
-      - name: Rust components
-        run: rustup component add clippy rustfmt
-      - name: Format
-        run: cargo fmt --all -- --check
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - name: Test
-        run: cargo test --workspace --locked
-      - name: The Field Station budget is reproducible
-        # fixtures/field-station/: made again in a scratch folder from Method
-        # Schedule's days file (field-station.budget.json) through the command
-        # line and its MCP server, and every byte must match the committed files.
-        run: |
-          cargo build --locked -p method-cli
-          METHOD=target/debug/method-budget python3 scripts/make-field-station.py --check
-      - name: Third-party notices are up to date
-        # THIRD-PARTY-NOTICES.md lists the crates the app and the command line ship,
-        # from Cargo.lock; regenerate it with `cargo xtask notices` (docs/RELEASING.md).
-        run: cargo xtask notices --check
-      - name: The browser's crates build for WebAssembly
-        # docs/research/web-session.md: method-session (and the engine and
-        # format under it) must stay free of files, threads and clocks.
-        run: |
-          rustup target add wasm32-unknown-unknown
-          cargo xtask wasm-check
-      # The wasm-bindgen command line, the version Cargo.lock has (cargo xtask web
-      # refuses any other), built once and cached.
-      - name: wasm-bindgen version
-        id: wasm-bindgen
-        run: |
-          v=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | sed -n 's/^version = "\(.*\)"$/\1/p')
-          test -n "$v"
-          echo "version=$v" >> "$GITHUB_OUTPUT"
-      # Restored everywhere, saved only from main (SUITE-STANDARDS.md section 6), so pull
-      # requests never add cache entries of their own.
-      - name: Restore the wasm-bindgen command line
-        id: wasm-bindgen-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cargo/bin/wasm-bindgen
-          key: wasm-bindgen-cli-${{ steps.wasm-bindgen.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
-      - name: Install the wasm-bindgen command line
-        if: steps.wasm-bindgen-cache.outputs.cache-hit != 'true'
-        env:
-          VERSION: ${{ steps.wasm-bindgen.outputs.version }}
-        run: cargo install wasm-bindgen-cli --version "$VERSION" --locked
-      - name: Save the wasm-bindgen command line (main only)
-        if: github.ref == 'refs/heads/main' && steps.wasm-bindgen-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cargo/bin/wasm-bindgen
-          key: ${{ steps.wasm-bindgen-cache.outputs.cache-primary-key }}
-      - name: The page in a browser
-        # cargo xtask web builds target/web (the page, the shim, the module and
-        # the charts as files); the smoke test opens it in the runner's headless
-        # Chrome: the topsheet draws, an edit updates the grand total, a chart
-        # is fetched only when picked, and the page logs no errors.
-        run: |
-          cargo xtask web
-          node scripts/web-smoke.mjs target/web
-      - name: Version agrees everywhere and has release notes
-        # docs/RELEASING.md: the workspace version, Cargo.lock, tauri.conf.json and
-        # docs/releases/<version>.md must agree on every push.
-        run: cargo xtask check-version
   cooldown:
     # Fails a pull request that adds crates published less than 14 days ago, and a push
     # to main whose lock holds any: a pull request checks what it adds or bumps, main
     # checks the whole lock every time (a crate already in the lock is never "changed",
     # so only a full check catches one that slipped in). crate-ages.yml runs the full
     # check weekly too.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -124,6 +47,7 @@ jobs:
   deny:
     # deny.toml: known advisories, licenses compatible with MIT OR Apache-2.0,
     # crates.io as the only source.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -133,18 +57,3 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
           command: check
-  site:
-    # README.md and site/index.html must match docs/features.toml and the newest release
-    # notes (docs/WEBSITE.md); the Claude Code hooks behind that rule must still work.
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Feature list and site are up to date
-        run: python3 scripts/site.py --check
-      - name: Brand files match scripts/make-brand.py
-        run: python3 scripts/make-brand.py --check
-      - name: Hook scripts
-        run: bash scripts/hooks/test-hooks.sh

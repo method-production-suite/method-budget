@@ -1,9 +1,11 @@
-# Nightly fuzzing of the hand-written parsers (fuzz/README.md). Least privilege;
-# all actions pinned to full commit SHAs (pinact run).
+# Weekly fuzzing of the hand-written parsers (fuzz/README.md): Thursdays, apart from the
+# Monday full build (weekly.yml), since scheduled jobs run at most weekly (SUITE-STANDARDS.md
+# section 6); and by hand. Least privilege; all actions pinned to full commit SHAs
+# (pinact run).
 name: fuzz
 on:
   schedule:
-    - cron: "17 7 * * *"
+    - cron: "17 7 * * 4"
   workflow_dispatch:
 permissions:
   contents: read

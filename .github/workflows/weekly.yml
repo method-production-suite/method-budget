@@ -1,0 +1,193 @@
+# The full build (SUITE-STANDARDS.md section 6): pull requests run only the dependency checks
+# (ci.yml) and are tested locally before they are marked ready (scripts/check.sh); this runs
+# everything on macOS, Windows and Linux once a week on main (and by hand), as release.yml
+# does before every release. Linux runs scripts/check.sh (format, lints, every test, the
+# Field Station sample, notices, version, site, WebAssembly and the page in a browser); macOS
+# and Windows run every test. Each then compiles and packages the app the way release.yml
+# does, unsigned: no secrets are used, and nothing is uploaded. A week whose main is the
+# commit the last green run built is skipped. This is the only workflow that saves a build
+# cache: each system's crates and debug build, without the release build, so all three fit
+# in GitHub's 10 GB; anything restoring them (none of ci.yml's jobs build) takes them from
+# here. Least privilege; actions pinned to full commit SHAs (pinact run).
+name: weekly
+on:
+  schedule:
+    - cron: "23 3 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: weekly
+  cancel-in-progress: false
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_TEST_DEBUG: line-tables-only
+jobs:
+  decide:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read # this workflow's earlier runs
+    outputs:
+      build: ${{ steps.last.outputs.build }}
+    steps:
+      - name: Same commit as the last green run?
+        id: last
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          last="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/weekly.yml/runs?branch=main&status=success&per_page=1" \
+            --jq '.workflow_runs[0].head_sha // ""')"
+          if [ "$EVENT" = schedule ] && [ "$last" = "$GITHUB_SHA" ]; then
+            echo "main is still $GITHUB_SHA, built green last time: skipping."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: build (${{ matrix.name }})
+    needs: decide
+    if: needs.decide.outputs.build == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            bundles: app,dmg
+          - name: windows-x64
+            os: windows-latest
+            target: ""
+            bundles: msi,nsis
+          - name: linux-x64
+            # The release's runner: the oldest supported Ubuntu.
+            os: ubuntu-22.04
+            target: ""
+            bundles: deb,appimage
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Restore the build cache
+        id: cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+            !target/release
+            !target/*/release
+          key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: rust-${{ runner.os }}-
+
+      - name: Install Tauri system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev build-essential pkg-config libgtk-3-dev file
+
+      - name: Add Rust targets
+        if: matrix.target != ''
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: rustup target add "$TARGET"
+
+      # The wasm-bindgen command line scripts/check.sh needs on Linux (the version Cargo.lock
+      # has), cached between weeks.
+      - name: The WebAssembly target (Linux)
+        if: runner.os == 'Linux'
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: wasm-bindgen version (Linux)
+        id: wasm-bindgen
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          v=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | sed -n 's/^version = "\(.*\)"$/\1/p')
+          test -n "$v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - name: Restore the wasm-bindgen command line (Linux)
+        id: wasm-bindgen-cache
+        if: runner.os == 'Linux'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/wasm-bindgen
+          key: wasm-bindgen-cli-${{ steps.wasm-bindgen.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
+      - name: Install the wasm-bindgen command line (Linux)
+        if: runner.os == 'Linux' && steps.wasm-bindgen-cache.outputs.cache-hit != 'true'
+        env:
+          VERSION: ${{ steps.wasm-bindgen.outputs.version }}
+        run: cargo install wasm-bindgen-cli --version "$VERSION" --locked
+      - name: Save the wasm-bindgen command line (Linux, main only)
+        if: runner.os == 'Linux' && github.ref == 'refs/heads/main' && steps.wasm-bindgen-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/wasm-bindgen
+          key: ${{ steps.wasm-bindgen-cache.outputs.cache-primary-key }}
+
+      - name: Every check (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash scripts/check.sh
+
+      - name: Test (macOS and Windows)
+        # Every test binary runs even after one fails, so a run shows everything a
+        # system breaks, not only the first crate's failures.
+        if: runner.os != 'Linux'
+        shell: bash
+        run: cargo test --workspace --locked --no-fail-fast
+
+      # Saved after the tests (the debug build), before the release compile below, and only
+      # from main, when the key is new.
+      - name: Save the build cache (main only)
+        if: github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+            !target/release
+            !target/*/release
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+
+      - name: Install Tauri CLI (pinned, prebuilt)
+        shell: bash
+        run: bash scripts/install-tauri-cli.sh
+
+      - name: Compile the app (as release.yml does)
+        shell: bash
+        working-directory: crates/method-app
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          args=(build --no-bundle)
+          if [ -n "$TARGET" ]; then args+=(--target "$TARGET"); fi
+          cargo tauri "${args[@]}" -- --locked
+
+      - name: Package the app, unsigned
+        # The macOS app is ad-hoc signed (signingIdentity "-"), as a release without the
+        # Apple secrets is; no notarizing, no updater archive.
+        shell: bash
+        working-directory: crates/method-app
+        env:
+          BUNDLES: ${{ matrix.bundles }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          args=(bundle --bundles "$BUNDLES")
+          if [ -n "$TARGET" ]; then args+=(--target "$TARGET"); fi
+          cargo tauri "${args[@]}"

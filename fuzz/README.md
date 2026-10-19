@@ -46,7 +46,7 @@ cargo +nightly fuzz run  --fuzz-dir fuzz xlsx fuzz/artifacts/xlsx/minimized-from
 Fix the cause in the parser and add the shrunk input, as inline bytes, to a
 unit test in the parser's own module.
 
-`.github/workflows/fuzz.yml` runs every target for five minutes each night (and
+`.github/workflows/fuzz.yml` runs every target for five minutes each Thursday (and
 on demand), uploading any crashing inputs as artifacts.
 
 ## Dependencies

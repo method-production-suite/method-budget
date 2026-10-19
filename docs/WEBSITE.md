@@ -69,9 +69,10 @@ text only, as in the app. With no release notes yet both say so.
 Exit codes: 0 done or up to date, 1 out of date (`--check`), 2 the input is wrong (the
 message names the entry and the problem; nothing was written).
 
-CI runs `python3 scripts/site.py --check` in the `site` job of `.github/workflows/ci.yml`,
-so main never carries a site that is out of date (the suite website copies it from main;
-below, "Publishing").
+`python3 scripts/site.py --check` is part of `scripts/check.sh`, the local check every pull
+request passes before it is marked ready, and of the weekly build (`.github/workflows/weekly.yml`),
+so main doesn't carry a site that is out of date (the suite website copies it from a release
+tag; below, "Publishing").
 
 ## The site: site/
 
@@ -250,8 +251,9 @@ working tree), adds the suite bar and band, and publishes. So:
   was retired in October 2026).
 - Only committed files are copied. The demo at `/try/` is built, not committed
   (`site/try/` is in `.gitignore`), so it goes live only if the suite website builds it
-  with `cargo xtask web --demo`; CI still builds the page with `cargo xtask web` and
-  smoke-tests it in headless Chrome on every push (`ci.yml`, "The page in a browser").
+  with `cargo xtask web --demo`; `scripts/check.sh` (before a pull request is ready, and in
+  the weekly build) still builds the page with `cargo xtask web` and smoke-tests it in
+  headless Chrome.
 
 To change the site: edit `site/` here (or the feature file and release notes, then
 `python3 scripts/site.py`), push to `main`, then sync and publish from the website

@@ -122,9 +122,10 @@ cargo xtask review-screens --out target/screens/review.html   # and look at what
 python3 scripts/site.py                     # the website's "What's new" box follows the notes
 cargo xtask check-version --tag v0.2.0      # what the release workflow checks first
 python3 scripts/check-crate-ages.py          # and every locked crate 14 days old (fuzz/Cargo.lock too, with --lock)
-cargo test --workspace --locked
+scripts/check.sh                            # the full local check
 git add Cargo.toml Cargo.lock crates/method-app/tauri.conf.json docs/releases/0.2.0.md README.md site/index.html assets/screens site/img
 git commit -m "0.2.0"
+gh workflow run weekly.yml --ref main       # once the release commit is on main: wait for green
 git tag -a v0.2.0 -m "Method Budget 0.2.0"
 git push --atomic origin main v0.2.0
 ```
@@ -180,10 +181,12 @@ signed and the draft's description says the first launch needs the one-time step
 
 The Tauri CLI comes from its prebuilt release, checked against the SHA-256 pinned in
 `scripts/install-tauri-cli.sh` (moving it to a new version is described there). The same
-build without signing runs every night on main on all three platforms
-(`.github/workflows/nightly.yml`, skipped when main hasn't changed since the last green
-night), so a platform-only break shows up before a release; pull requests run the Linux
-checks only (`ci.yml`).
+build without signing, with every test and check, runs once a week on main on all three
+platforms (`.github/workflows/weekly.yml`, skipped when main hasn't changed since the last
+green run). Pull requests run only the dependency checks (`ci.yml`: crate ages and cargo
+deny) and are tested locally before they are marked ready (`scripts/check.sh`). So before a
+tag, run the weekly build by hand on the release commit and wait for it to pass on all three
+systems (below).
 
 Only first-party actions are used, each pinned to a full commit SHA. Each secret is given
 only to the steps that use it, never to the Windows and Linux builds. Every signing,
