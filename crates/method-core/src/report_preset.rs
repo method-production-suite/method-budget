@@ -173,6 +173,10 @@ pub enum ReportSection {
     CostReport,
     /// The bid: the spec's [`BidLayout`] worked out (see [`crate::bid`]).
     Bid,
+    /// Each location's spend and the incentive programs counting it, then
+    /// every program with its terms and the totals (see
+    /// [`crate::incentives::by_location`]).
+    Incentives,
 }
 
 names!(ReportSection {
@@ -191,6 +195,7 @@ names!(ReportSection {
     Currencies = "currencies",
     CostReport = "cost_report",
     Bid = "bid",
+    Incentives = "incentives",
 });
 
 /// An optional column of the detail pages (the grid's columns, plus the

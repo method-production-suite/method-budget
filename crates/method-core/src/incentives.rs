@@ -19,6 +19,13 @@
 //! built in. Figures are the engine's own (exact integer cents, rounded once
 //! per credit as the topsheet rounds them), so an applied program's estimate
 //! is what the topsheet takes off.
+//!
+//! [`what_if`] works out what moving lines to another location would do to
+//! every program, and [`by_location`] lays the figures out location by
+//! location for the printed report (decisions.md, entry 93).
+
+pub mod by_location;
+pub mod what_if;
 
 use std::collections::{BTreeMap, BTreeSet};
 

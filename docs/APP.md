@@ -606,10 +606,31 @@ broker's fee when they apply. Programs side by side gains **Minimum**, **Shared 
 (the cap's name, and the program's share when the cap holds it down) and **Fee** columns,
 and says "Below minimum" for a program that pays nothing for that reason.
 
+An unapplied credit's rows table shows each row's figures (gross, fringes out, net
+spend, credit, over cap) the way an applied credit's does, worked out as if it were
+applied alongside the applied ones, under a note that they are an estimate; each figure's
+tooltip starts with "Estimate." (decisions.md, entry 93). They fill in once the estimates
+come, without redrawing the table.
+
+**What if…** (decisions.md, entry 93), under Spend by location, asks what moving lines to
+another location would do. Pick **Lines in** (a category or an account: every line in
+it), **Now at** (anywhere, no location, or one location: only the lines there now) and
+**Move to** (a location, or no location). Nothing changes in the budget: the panel lists
+the lines it would move (untick one to leave it out), every program's estimate before
+and after with the change, the credits taken off, the unapplied estimates and the net
+total after credits before and after, and the spend at the locations that change. The
+figures come from the same code as the topsheet and the tables above (`what_if`), on a
+copy of the budget with the lines moved. **Move N lines to …** applies it: the lines'
+location changes as one step (Undo in the budget window puts it back), and the figures
+are then exactly the what-if's "after". A what-if made before the budget changed says
+so and asks for a new pick.
+
 | Command | Arguments | Returns |
 |---|---|---|
 | `preview_charge` | `index` (`null` for a new charge), `charge` (as `set_charge`) | `{name, base, excluded, amount}`, figured on the current totals; nothing changes |
 | `incentives` | none | `{partial, locations: [{location, known, lines, fringes, total}], programs: [{index, name, applied, locations, cap, discount_percent, minimum_spend, broker_fee, shared_cap, shared_cap_amount, amount, problem, qualified, by_location: [{location, net}], rows_total, capped, figures}]}` (`figures` has `below_minimum`, `shared`, the share in cents when a shared cap holds it down, and `fee`, the fee taken off): spend by location (`location` `null` for lines with none) and every credit as an estimate, applied or not; figured on the current totals; `partial` when those come from the cleaned copy of a budget with problems, and then a program's own problems are in its `problem` with its (possibly short) `amount`; nothing changes |
+| `what_if` | `pick` (`{row_ids, accounts, categories, from, except, to}`: rows by id, every line of the accounts and categories by code, `from` left out for wherever they are now or `{location}` (`null`: no location) for only the lines there, rows left out, and `to`, a location the budget has or `null` for no location) | `{partial, lines: [{id, account, line, description, location, total, fringes}], changed, to, programs: [{index, name, applied, qualified_before, qualified_after, before, after, difference, problem}], locations: [{location, before, after}], before, after}` (`before` and `after`: `{grand_total, credits_total, net_total, estimates_total}`): what moving the lines would do, figured as the budget is; nothing changes |
+| `apply_what_if` | `pick` (as `what_if`) | View: the lines moved to `to`, one undo step; refused when no line is picked or they are all there already |
 | `clear_from_rows` | `rowIds`, `field` (`fringes` or `groups`) | View |
 | `replace_tags_on_rows` | `rowIds`, `tags` (`{fringes, groups, set, location, currency}`: names the budget defines; `null` values and empty lists clear; the base currency is none) | View |
 
@@ -2166,9 +2187,13 @@ still prints the topsheet straight away, with the standard layout.
   account code with its name, account and row counts, production totals where they fall),
   units (plural, description, hours, rows using it), sets and locations with totals (rows,
   lines total, fringes, total of the lines in the budget total), currencies (the base
-  first, then each with its symbol and rate, rows in it), the cost report and the bid
-  (below). A checkbox prints a section, the
-  arrows move it.
+  first, then each with its symbol and rate, rows in it), the cost report, the bid
+  (below), and incentives by location (decisions.md, entry 93: each location's spend with
+  the programs that count it and what each counts there; then every program with its
+  status, qualified spend, minimum, cap, discount, fee and credit, a line saying where its
+  spend has to be and which terms held it down; then the credits applied, which are the
+  topsheet's credits, the estimates not applied, the grand total and the net total). A
+  checkbox prints a section, the arrows move it.
 - **Categories and accounts**: a tree with a checkbox for every category (its accounts
   under the ▸) and an All box. It decides the account level, the detail level and the
   notes list; the topsheet always lists every category, so its totals add up.
@@ -2273,7 +2298,8 @@ spec (a preset's fields) or the older `"topsheet"`, `"detail"` or `"both"`.
 (in the budget's folder, named after its file or, untitled, its title):
 
 - **Spreadsheet (.xlsx)…** writes one `.xlsx` with a sheet per table: Topsheet, Accounts,
-  Detail, Globals, Fringes, Groups, Units, Currencies, Sets and Locations.
+  Detail, Globals, Fringes, Groups, Units, Currencies, Sets and Locations, then
+  Incentives when the budget has credits (a budget without them exports as before).
 - **CSV Files…** writes the same tables as one CSV file each, named from the name chosen:
   `Pilot.csv` gives `Pilot - Topsheet.csv`, `Pilot - Accounts.csv` and so on, beside it.
   They start with a UTF-8 byte order mark, so spreadsheet apps read accented letters.
@@ -2304,6 +2330,12 @@ What the tables hold:
   hours per day (added last); groups with their switch and
   totals (every tagged line, and what counts toward the budget); units with hours;
   currencies with their rate in the base currency; sets and locations with their totals.
+- **Incentives** (only when the budget has credits; decisions.md, entry 93): the printed
+  incentives by location as one table, a Kind column telling the rows apart: `Location`
+  (its spend), `Counted` (a program and what it counts there), `Program` (status,
+  qualified spend, minimum, cap, shared cap share, discount, fee, credit and a note), then
+  `Total` (the spend at every location, the credits applied, the estimates not applied,
+  the grand and net totals).
 
 Figures are the budget's own, unfiltered: every group as the budget sets it. Money is
 exact: integer cents written as a decimal (`1234.56`), never through a float; in the
@@ -3552,9 +3584,11 @@ then says what is missing). Line blocks are reordered from the keyboard only.
 Incentive programs need a live check in the app: the Spend at these locations chips, the
 program's terms band, the estimate in the rail and footer, and the Programs side by side
 and Spend by location tables (checked here offscreen in the browser build in headless
-Chrome, against the real engine). Not yet: an unapplied credit's rows grid shows its row
-figures (the footer and the tables have them), a what-if that moves lines between
-locations, a printed per-location report, and a preset of program fields to fill in.
+Chrome, against the real engine). The What if… panel, an unapplied credit's estimated row
+figures and the printed incentives by location need the same live check (checked here in
+headless Chrome against the browser build). Not yet: a preset of program fields to fill
+in, and a what-if from lines picked in the budget grid (the panel picks a category or an
+account, less the lines unticked).
 Import Actuals and the Actuals tab need a live check: the Open dialog, real exports from
 accounting systems (checked here with synthetic CSV, tab-delimited and workbook files and
 the dialog, tab, grid columns and Cost report preview in a browser harness against the

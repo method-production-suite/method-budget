@@ -1342,22 +1342,60 @@ function renderCredits(panel) {
 // Every credit's estimate, applied or not, and spend by location, from the
 // read-only `incentives` command: fetched once per budget revision, the last
 // one kept for the footer until the new one comes.
-const estimates = { stamp: '', p: null, last: null };
+const estimates = { stamp: '', p: null, last: null, lastStamp: '' };
+
+function viewStamp() {
+  const v = obj(k.view());
+  return `${v.doc}:${v.rev}`;
+}
 
 function loadEstimates() {
-  const v = obj(k.view());
-  const stamp = `${v.doc}:${v.rev}`;
+  const stamp = viewStamp();
   if (estimates.stamp !== stamp || !estimates.p) {
     estimates.stamp = stamp;
     estimates.p = invoke('incentives', {}).then(
       (got) => {
-        if (estimates.stamp === stamp) estimates.last = obj(got);
+        if (estimates.stamp === stamp) {
+          estimates.last = obj(got);
+          estimates.lastStamp = stamp;
+        }
         return obj(got);
       },
       () => null,
     );
   }
   return estimates.p;
+}
+
+// An unapplied credit's row figures as if applied (decisions.md, entry 93),
+// from the estimates of this very revision only; none until they come.
+function estimatedRows(i) {
+  if (estimates.lastStamp !== viewStamp()) return [];
+  const p = estimateOf(i);
+  return p && p.figures && Array.isArray(p.figures.rows) ? p.figures.rows.map(obj) : [];
+}
+
+// Fills the row figures of unapplied credit `i`'s rows table in place, once
+// the estimates come (no redraw, so focus stays where it is).
+function fillEstimatedRows(i, rows) {
+  rows.forEach((rt, n) => {
+    const set = (f, text, title) => {
+      const c = k.findByData('fig', k.key('credits', i, n, f));
+      if (!c) return;
+      const span = c.querySelector('.sw-num');
+      if (span) span.textContent = text;
+      c.title = title ? `Estimate. ${title}` : '';
+    };
+    if (isNone(rt.net)) return;
+    const row = obj(arr(obj(arr(k.budget().credits)[i]).rows)[n]);
+    const capKind = obj(row.cap).kind || 'none';
+    const [overText, overTitle] = overCap(rt, { cap: { kind: capKind } });
+    set('gross', k.formatCents(rt.gross), 'The row’s spend before fringes are left out');
+    set('fringes', k.formatCents(rt.excluded_fringes), 'Fringes left out of the spend');
+    set('net', k.formatCents(rt.net), 'The spend the percent applies to');
+    set('credit', money(rt.credit), `Exactly ${k.formatDecimal(rt.credit)}; rows are added before rounding`);
+    set('over', overText, overTitle);
+  });
 }
 
 function estimateOf(i) {
@@ -1391,6 +1429,11 @@ function showEstimates() {
       }
     }
     if (picked.credits < programs.length) setFooterTotals(creditFoot(picked.credits));
+    // The picked credit, when not applied: its rows' estimated figures.
+    const pickedProgram = programs.find((p) => p.index === picked.credits);
+    if (pickedProgram && !pickedProgram.applied && estimates.lastStamp === viewStamp()) {
+      fillEstimatedRows(pickedProgram.index, estimatedRows(pickedProgram.index));
+    }
     // From a cleaned copy of a budget with problems: say the figures may be short.
     if (got.partial === true) {
       box.append(k.el('p', 'tss-note', 'Some cells have problems; these figures count them as blank, so an estimate may be short.'));
@@ -1398,6 +1441,7 @@ function showEstimates() {
     if (programs.length) box.append(programsTable(programs));
     const spend = arr(got.locations).map(obj);
     if (spend.length) box.append(locationsTable(spend));
+    if (programs.length) box.append(whatIfPanel());
   });
 }
 
@@ -1507,6 +1551,271 @@ function locationsTable(spend) {
         'Each line with the fringes it earns, as the lines work out. It can differ from the topsheet when account totals are rounded to whole units or when fringes after the last production total are dropped.',
     }),
   ], ul);
+}
+
+// ---------------------------------------------------------------------------
+// What if… (decisions.md, entry 93): move lines to another location on paper
+// and see every program before and after. `what_if` changes nothing;
+// Apply runs `apply_what_if`, one undo step in the budget window. The
+// panel's choices and last figures live here, so a redraw keeps them.
+
+const whatIf = {
+  open: false,
+  lines: '', // 'category:CODE' or 'account:CODE'
+  from: '*', // '*' anywhere, '' no location, else a location
+  to: null, // a location, or '' for no location
+  except: [],
+  got: null, // the last figures, for `stamp`
+  stamp: '',
+  status: '',
+};
+
+function whatIfPick() {
+  const [kind, code] = whatIf.lines.split(/:(.*)/s);
+  return {
+    accounts: kind === 'account' ? [code] : [],
+    categories: kind === 'category' ? [code] : [],
+    from: whatIf.from === '*' ? null : { location: whatIf.from === '' ? null : whatIf.from },
+    except: whatIf.except,
+    to: whatIf.to === '' ? null : whatIf.to,
+  };
+}
+
+function placeName(l) {
+  return isNone(l) || l === '' ? 'No location' : k.str(l);
+}
+
+// Works the what-if out and shows it (nothing changes).
+function runWhatIf() {
+  if (whatIf.lines === '' || whatIf.to === null) {
+    whatIf.got = null;
+    whatIf.status = 'Pick the lines and where to move them.';
+    redrawWhatIf();
+    return;
+  }
+  const stamp = viewStamp();
+  whatIf.status = 'Working it out…';
+  redrawWhatIf();
+  invoke('what_if', { pick: whatIfPick() }).then(
+    (got) => {
+      whatIf.got = obj(got);
+      whatIf.stamp = stamp;
+      whatIf.status = '';
+      redrawWhatIf();
+    },
+    (e) => {
+      whatIf.got = null;
+      whatIf.status = k.str(e && e.message ? e.message : e);
+      redrawWhatIf();
+    },
+  );
+}
+
+// Redraws the panel in place, focus staying on the same control.
+function redrawWhatIf() {
+  const old = k.findByData('item', 'credits-whatif');
+  if (!old) return;
+  const a = document.activeElement;
+  const key = a && old.contains(a) && a.dataset ? a.dataset.key : '';
+  old.replaceWith(whatIfPanel());
+  const again = key ? k.findByData('key', key) : null;
+  if (again) again.focus({ preventScroll: true });
+}
+
+function whatIfPanel() {
+  const box = k.el('section', 'tss-whatif');
+  box.dataset.item = 'credits-whatif';
+  box.setAttribute('aria-label', 'What if lines moved');
+  const toggle = button(whatIf.open ? 'Close What if' : 'What if…', 'sw-act', 'credits-whatif-open', () => {
+    whatIf.open = !whatIf.open;
+    redrawWhatIf();
+  });
+  toggle.title = 'See what each program would come to if some lines were shot at another location';
+  box.append(band('What if', bandTitle('What if lines were shot somewhere else'), toggle));
+  if (!whatIf.open) return box;
+
+  const cats = categoryNames();
+  const accts = accountNames();
+  const places = locationNames();
+  if (whatIf.to === null && places.length) whatIf.to = places[0];
+  const pickSel = k.selectInput({
+    fieldKey: 'credits-whatif-lines',
+    value: whatIf.lines,
+    options: [
+      ['', 'Pick…'],
+      ...[...cats].map(([code, name]) => [`category:${code}`, `Category ${code} ${name}`.trim()]),
+      ...[...accts].map(([code, name]) => [`account:${code}`, `Account ${code} ${name}`.trim()]),
+    ],
+    label: 'Lines in',
+    onCommit: (v) => {
+      whatIf.lines = v;
+      whatIf.except = [];
+      runWhatIf();
+    },
+  });
+  const fromSel = k.selectInput({
+    fieldKey: 'credits-whatif-from',
+    value: whatIf.from,
+    options: [['*', 'Anywhere'], ['', 'No location'], ...places.map((n) => [n, n])],
+    label: 'Now at',
+    onCommit: (v) => {
+      whatIf.from = v;
+      whatIf.except = [];
+      runWhatIf();
+    },
+  });
+  const toSel = k.selectInput({
+    fieldKey: 'credits-whatif-to',
+    value: whatIf.to === null ? '' : whatIf.to,
+    options: [...places.map((n) => [n, n]), ['', 'No location']],
+    label: 'Move to',
+    onCommit: (v) => {
+      whatIf.to = v;
+      runWhatIf();
+    },
+  });
+  box.append(
+    band(
+      'What if: which lines and where',
+      bandInput('Lines in', pickSel, { title: 'Every line of this category or account' }),
+      bandInput('Now at', fromSel, { title: 'Only the lines at this location now' }),
+      bandInput('Move to', toSel, { title: 'Where they would be shot' }),
+    ),
+  );
+
+  const got = whatIf.got;
+  const fresh = got && whatIf.stamp === viewStamp();
+  if (whatIf.status) box.append(k.el('p', 'tss-note', whatIf.status));
+  if (!got) return box;
+  if (!fresh) {
+    box.append(k.el('p', 'tss-note', 'The budget has changed since; pick again to see it now.'));
+    return box;
+  }
+  if (got.partial === true) {
+    box.append(k.el('p', 'tss-note', 'Some cells have problems; these figures count them as blank, so a figure may be short.'));
+  }
+  box.append(whatIfLines(got), whatIfPrograms(got), whatIfTotals(got));
+  const spend = arr(got.locations).map(obj).filter((l) => l.before !== l.after);
+  if (spend.length) box.append(whatIfSpend(spend));
+
+  const moving = arr(got.lines).length;
+  const apply = button(
+    `Move ${k.plural(moving, 'line', 'lines')} to ${placeName(got.to)}`,
+    'setup-btn setup-btn-primary',
+    'credits-whatif-apply',
+    () => {
+      const pick = whatIfPick();
+      k.run('credits-whatif', () => ['apply_what_if', { pick }], {
+        onOk: () => {
+          whatIf.got = null;
+          whatIf.except = [];
+          whatIf.status = `Moved ${k.plural(got.changed, 'line', 'lines')} to ${placeName(got.to)}. Undo in the budget window puts them back.`;
+        },
+      });
+    },
+  );
+  apply.disabled = !got.changed;
+  apply.title = got.changed
+    ? 'Changes these lines’ location in the budget, as one step you can undo'
+    : 'These lines are already there';
+  box.append(band('Apply the what-if', apply, k.el('span', 'tss-hint', 'Nothing changes until you apply it.')));
+  return box;
+}
+
+// The lines it moves, each with a box to leave it out.
+function whatIfLines(got) {
+  const ul = k.el('ul');
+  ul.setAttribute('aria-label', 'Lines it moves');
+  const lines = arr(got.lines).map(obj);
+  for (const l of lines) {
+    const li = gridRow();
+    const box = k.el('input', 'setup-check');
+    box.type = 'checkbox';
+    box.checked = true;
+    box.dataset.key = k.key('credits-whatif-line', l.id);
+    box.setAttribute('aria-label', `Move ${k.str(l.description) || `line ${l.line}`}`);
+    box.addEventListener('change', () => {
+      if (k.isBusy()) return;
+      whatIf.except = [...whatIf.except, l.id];
+      runWhatIf();
+      const pick = k.findByData('key', 'credits-whatif-lines');
+      if (pick) pick.focus({ preventScroll: true });
+    });
+    li.append(
+      lead(),
+      cell(box),
+      textCell(`${k.str(l.account)}:${l.line}`),
+      textCell(k.str(l.description)),
+      textCell(placeName(l.location), { muted: isNone(l.location) }),
+      textCell(k.formatCents(l.total), { num: true, title: `Fringes it earns: ${k.formatCents(l.fringes)}` }),
+    );
+    ul.append(li);
+  }
+  if (!lines.length) return k.emptyNote('No lines there: nothing would move.');
+  return gridTable('whatif-lines', [lead(), head(''), head('Line'), head('Description'), head('Now at'), head('Total', { num: true })], ul);
+}
+
+// Every program before and after, and the change.
+function whatIfPrograms(got) {
+  const ul = k.el('ul');
+  ul.setAttribute('aria-label', 'Programs before and after');
+  for (const p of arr(got.programs).map(obj)) {
+    const li = gridRow();
+    const d = isNone(p.difference) ? '' : p.difference === 0 ? 'No change' : `${p.difference > 0 ? '+' : ''}${k.formatCents(p.difference)}`;
+    li.append(
+      lead(),
+      textCell(k.str(p.name)),
+      textCell(p.applied ? 'Applied' : 'Estimate', { muted: !p.applied, title: p.applied ? 'Taken off the grand total' : 'Not applied: worked out as if applied alongside the applied programs' }),
+      textCell(isNone(p.before) ? '' : k.formatCents(p.before), { num: true, title: `Qualified spend ${k.formatCents(p.qualified_before)}` }),
+      textCell(isNone(p.after) ? '' : k.formatCents(p.after), { num: true, title: `Qualified spend ${k.formatCents(p.qualified_after)}` }),
+      textCell(d, { num: true, title: isNone(p.problem) ? '' : k.str(p.problem) }),
+    );
+    ul.append(li);
+  }
+  return gridTable('whatif-programs', [lead(), head('Program'), head(''), head('Before', { num: true }), head('After', { num: true }), head('Change', { num: true })], ul);
+}
+
+// The credits taken off, the estimates and the net total, before and after.
+function whatIfTotals(got) {
+  const ul = k.el('ul');
+  ul.setAttribute('aria-label', 'Totals before and after');
+  const b = obj(got.before);
+  const a = obj(got.after);
+  for (const [label, f, title] of [
+    ['Credits taken off', 'credits_total', 'The applied programs'],
+    ['Estimates, not applied', 'estimates_total', 'The programs not applied, each as if applied'],
+    ['Net total after credits', 'net_total', 'The grand total less the applied programs'],
+  ]) {
+    const li = gridRow();
+    const d = a[f] - b[f];
+    li.append(
+      lead(),
+      textCell(label, { title }),
+      textCell(k.formatCents(b[f]), { num: true }),
+      textCell(k.formatCents(a[f]), { num: true }),
+      textCell(d === 0 ? 'No change' : `${d > 0 ? '+' : ''}${k.formatCents(d)}`, { num: true }),
+    );
+    ul.append(li);
+  }
+  return gridTable('whatif-totals', [lead(), head('Totals'), head('Before', { num: true }), head('After', { num: true }), head('Change', { num: true })], ul);
+}
+
+// The spend at the locations that change.
+function whatIfSpend(spend) {
+  const ul = k.el('ul');
+  ul.setAttribute('aria-label', 'Spend by location before and after');
+  for (const l of spend) {
+    const li = gridRow();
+    li.append(
+      lead(),
+      textCell(placeName(l.location), { muted: isNone(l.location) }),
+      textCell(k.formatCents(l.before), { num: true }),
+      textCell(k.formatCents(l.after), { num: true }),
+      textCell(`${l.after - l.before > 0 ? '+' : ''}${k.formatCents(l.after - l.before)}`, { num: true }),
+    );
+    ul.append(li);
+  }
+  return gridTable('whatif-totals', [lead(), head('Spend at'), head('Before', { num: true }), head('After', { num: true }), head('Change', { num: true })], ul);
 }
 
 // Credit `i`'s editor: a band with its name, Applied, cap, discount and
@@ -1665,11 +1974,14 @@ function creditEditor(i, c0, c, entry, issues) {
 // the totals, its cap. Their sums are the footer's.
 function creditGrid(i, c, raw, entry, ik) {
   if (!c.rows.length) return k.emptyNote('No rows yet.');
-  const totals = entry && Array.isArray(entry.rows) ? entry.rows.map(obj) : [];
+  // An unapplied credit shows the figures it would have applied, marked as
+  // an estimate (decisions.md, entry 93).
+  const est = !c.applied;
+  const totals = est ? estimatedRows(i) : entry && Array.isArray(entry.rows) ? entry.rows.map(obj) : [];
   const ul = k.el('ul');
-  ul.setAttribute('aria-label', `Rows of ${c.name}`);
-  c.rows.forEach((row, n) => ul.append(creditRow(i, n, row, raw, totals[n] || null, ik, c.rows.length)));
-  return gridTable('credit-rows', [
+  ul.setAttribute('aria-label', est ? `Rows of ${c.name}, figures estimated` : `Rows of ${c.name}`);
+  c.rows.forEach((row, n) => ul.append(creditRow(i, n, row, raw, totals[n] || null, ik, c.rows.length, est)));
+  const table = gridTable('credit-rows', [
     lead(),
     head('Spend'),
     head('Description'),
@@ -1684,9 +1996,13 @@ function creditGrid(i, c, raw, entry, ik) {
     head('Over cap', { num: true }),
     head(''),
   ], ul);
+  if (!est) return table;
+  const wrap = k.el('div', 'tss-estimated');
+  wrap.append(k.el('p', 'tss-note', 'Not applied: the row figures are an estimate, worked out as if this credit were applied alongside the applied ones.'), table);
+  return wrap;
 }
 
-function creditRow(i, n, row, raw, rt, ik, count) {
+function creditRow(i, n, row, raw, rt, ik, count, est = false) {
   const li = gridRow();
   const fk = (f) => k.key('credits', i, n, f);
   const send = (f, old) => (v) => k.run(ik, () => creditArgs(i, rowPatch(n, () => v)), old === undefined ? {} : { restore: [f, old] });
@@ -1786,7 +2102,13 @@ function creditRow(i, n, row, raw, rt, ik, count) {
   });
 
   const has = rt && !isNone(rt.net);
-  const fig = (v, title) => textCell(has ? v : '', { num: true, title: has ? title : '' });
+  // Each figure cell is found by its key, so an estimate can fill it in
+  // when it comes; an estimate's tooltip says so.
+  const fig = (v, title, f) => {
+    const c = textCell(has ? v : '', { num: true, title: has && title ? (est ? `Estimate. ${title}` : title) : '' });
+    c.dataset.fig = k.key('credits', i, n, f);
+    return c;
+  };
   const [overText, overTitle] = has ? overCap(rt, row) : ['', ''];
 
   // Focus goes to the row taking this one's place, else the one before,
@@ -1802,14 +2124,14 @@ function creditRow(i, n, row, raw, rt, ik, count) {
     cell(spend),
     cell(desc),
     cell(amount),
-    fig(has ? k.formatCents(rt.gross) : '', 'The row’s spend before fringes are left out'),
-    fig(has ? k.formatCents(rt.excluded_fringes) : '', 'Fringes left out of the spend'),
-    fig(has ? k.formatCents(rt.net) : '', 'The spend the percent applies to'),
+    fig(has ? k.formatCents(rt.gross) : '', 'The row’s spend before fringes are left out', 'gross'),
+    fig(has ? k.formatCents(rt.excluded_fringes) : '', 'Fringes left out of the spend', 'fringes'),
+    fig(has ? k.formatCents(rt.net) : '', 'The spend the percent applies to', 'net'),
     cell(capKind),
     cell(capAmount),
     cell(percent),
-    fig(has ? money(rt.credit) : '', has ? `Exactly ${k.formatDecimal(rt.credit)}; rows are added before rounding` : ''),
-    fig(overText, overTitle),
+    fig(has ? money(rt.credit) : '', has ? `Exactly ${k.formatDecimal(rt.credit)}; rows are added before rounding` : '', 'credit'),
+    fig(overText, overTitle, 'over'),
     acts(del),
   );
   return li;

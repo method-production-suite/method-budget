@@ -14,7 +14,7 @@ use crate::edit::{
     self, ChargeInput, CreditInput, CurrencyInput, EditResult, FringeInput, FringeRowInput,
     GroupInput, InfoInput, LocationInput, SetInput, UnitInput,
 };
-use crate::report_dto::{ChargeDto, IncentivesDto};
+use crate::report_dto::{ChargeDto, IncentivesDto, LocationReportDto};
 use crate::session::Session;
 use crate::view::Focus;
 
@@ -112,18 +112,44 @@ pub fn incentives(s: &mut Session) -> Result<IncentivesDto, String> {
     // so a short estimate never shows as a whole one.
     dto.partial = outcome.sanitized.is_some();
     for p in &mut dto.programs {
-        let own: Vec<&str> = outcome
-            .issues
-            .iter()
-            .filter(|x| x.target == crate::diagnose::Target::Credit { index: p.index })
-            .map(|x| x.message.as_str())
-            .collect();
-        if !own.is_empty() && p.problem.is_none() {
-            p.problem = Some(format!(
-                "{}; counted as 0 here, so the estimate may be short",
-                own.join("; ")
-            ));
-        }
+        own_problems(outcome, p.index, &mut p.problem);
+    }
+    Ok(dto)
+}
+
+/// A credit's own problems in a budget figured from its cleaned copy, in
+/// `problem` unless it has one already.
+fn own_problems(outcome: &crate::diagnose::Outcome, index: usize, problem: &mut Option<String>) {
+    let own: Vec<&str> = outcome
+        .issues
+        .iter()
+        .filter(|x| x.target == crate::diagnose::Target::Credit { index })
+        .map(|x| x.message.as_str())
+        .collect();
+    if !own.is_empty() && problem.is_none() {
+        *problem = Some(format!(
+            "{}; counted as 0 here, so the estimate may be short",
+            own.join("; ")
+        ));
+    }
+}
+
+/// The printed per-location incentive report's figures (decisions.md,
+/// entry 93), from the same estimates as [`incentives`]. Nothing changes.
+pub fn location_report(s: &mut Session) -> Result<LocationReportDto, String> {
+    let (budget, outcome) = s.totals();
+    let report = outcome
+        .report
+        .as_ref()
+        .ok_or("the totals can't be worked out until the budget's problems are fixed")?;
+    let figured = outcome.sanitized.as_ref().unwrap_or(budget);
+    let i = method_core::incentives::incentives(figured, report).map_err(|e| e.to_string())?;
+    let r = method_core::incentives::by_location::location_report(report, &i)
+        .map_err(|e| e.to_string())?;
+    let mut dto = LocationReportDto::from(&r);
+    dto.partial = outcome.sanitized.is_some();
+    for p in &mut dto.programs {
+        own_problems(outcome, p.index, &mut p.problem);
     }
     Ok(dto)
 }

@@ -225,6 +225,30 @@ fn date_and_time_slots_round_trip() {
     assert_eq!(report_preset_to_value(&p), v);
 }
 
+/// The incentives section (decisions.md, entry 93) is written by its name
+/// and read back, and only a preset that prints it names it: Field Station
+/// still reads and writes byte for byte.
+#[test]
+fn the_incentives_section_round_trips() {
+    let mut p = plain("Incentives");
+    p.spec.sections = vec![ReportSection::Topsheet, ReportSection::Incentives];
+    let v = report_preset_to_value(&p);
+    assert_eq!(v["sections"], json!(["topsheet", "incentives"]));
+    assert_eq!(report_preset_from_value(v).unwrap(), p);
+    let mut b = Budget::new("Film", "USD");
+    b.report_presets = vec![p];
+    let text = to_string(&b);
+    assert_eq!(from_str(&text).unwrap(), b);
+
+    let fs = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../fixtures/field-station/field-station.mthd"
+    ))
+    .unwrap();
+    assert!(!fs.contains("\"incentives\""));
+    assert_eq!(to_string(&from_str(&fs).unwrap()), fs);
+}
+
 // ---------------------------------------------------------------------------
 // Bid layouts (roadmap 3.13; decisions.md, entry 92)
 
