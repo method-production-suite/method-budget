@@ -69,6 +69,29 @@ pub fn this_actor() -> Result<ActorId, String> {
     method_format::log::load_or_make_actor(&path, &mut Ids::from_os()).map_err(|e| e.0)
 }
 
+/// This computer's key pair for signing changes (decisions.md, entry 89):
+/// `signing-key` beside the actor id in the app's data folder, readable by
+/// its owner only, made the first time it is needed.
+pub fn this_key() -> Result<std::sync::Arc<dyn method_core::log::Signer>, String> {
+    let path = method_format::log::actor_id_path()
+        .ok_or("No home folder to keep this computer's key in.")?;
+    let key =
+        method_format::log::sign::load_or_make_key(&method_format::log::sign::key_path(&path))
+            .map_err(|e| e.0)?;
+    Ok(std::sync::Arc::new(key))
+}
+
+/// Gives the shared budget in `s` this computer's key, saying why in the
+/// budget's notice when it can't.
+fn sign_with_this_key(s: &mut Session) {
+    let Some(sh) = s.shared_mut() else { return };
+    if let Err(e) = this_key().and_then(|k| sh.use_key(k)) {
+        s.set_notice(format!(
+            "This computer's key for signed changes couldn't be used, so changes you make here may be left out by others: {e}"
+        ));
+    }
+}
+
 /// The person this computer shares as (name and color), as kept beside
 /// the actor id.
 pub fn this_person(actor: ActorId) -> Person {
@@ -87,6 +110,8 @@ pub fn open_joining(path: &std::path::Path) -> Result<Session, String> {
             s.set_notice(format!(
                 "This budget has a change log beside it that couldn't be read, so it opened on its own: {e}"
             ));
+        } else {
+            sign_with_this_key(&mut s);
         }
     }
     Ok(s)
@@ -278,6 +303,7 @@ pub fn share_start<R: Runtime>(
     }
     shared::write_person(shared::person_path().as_deref(), &me);
     s.start_sharing(actor, me)?;
+    sign_with_this_key(&mut s);
     *lock(&share.picked) = None;
     Ok(finish(&window, &mut s, None))
 }
@@ -319,6 +345,21 @@ pub fn share_set_role(
     let mut s = state.lock_doc(doc)?;
     let sh = s.shared_mut().ok_or("This budget isn't shared.")?;
     sh.set_role(&actor, &role, &scope.unwrap_or_default())?;
+    Ok(sh.status(Instant::now()))
+}
+
+/// Removes person `actor` from budget `doc` (decisions.md, entry 89): they
+/// read only from then on, and their changes this computer hasn't seen are
+/// left out everywhere. Returns the status.
+#[tauri::command]
+pub fn share_remove_person(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    actor: String,
+) -> Result<ShareStatus, String> {
+    let mut s = state.lock_doc(doc)?;
+    let sh = s.shared_mut().ok_or("This budget isn't shared.")?;
+    sh.remove_person(&actor)?;
     Ok(sh.status(Instant::now()))
 }
 
@@ -480,6 +521,7 @@ mod tests {
             "share_blame",
             "share_use_value",
             "share_set_role",
+            "share_remove_person",
         ] {
             assert!(APP_RS.contains(&format!("crate::shared_app::{c},")), "{c}");
         }

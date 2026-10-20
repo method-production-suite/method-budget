@@ -216,6 +216,7 @@ fn roles_travel_through_the_folder() {
             field: method_core::log::Field::Title,
             value: Value::text("Forged"),
         }],
+        sig: None,
     };
     jordan.dir.write_segment(&[forged]).unwrap();
     let mut a_scan = Scan::default();
@@ -263,6 +264,7 @@ fn a_forged_first_change_in_the_folder_never_takes_the_budget() {
             actor: actor(3),
             role: Role::Admin,
         }],
+        sig: None,
     };
     alex.dir.write_segment(&[forged]).unwrap();
 
@@ -553,5 +555,293 @@ fn the_app_and_a_command_line_on_one_computer_never_share_a_sequence() {
         assert_eq!(fresh.log.frontier(), app.log.frontier());
         assert_eq!(fresh.log.project().budget, budget);
     }
+    let _ = fs::remove_dir_all(&dir);
+}
+
+// ---------------------------------------------------------------------------
+// Signed changes (decisions.md, entry 89)
+
+fn keyed(log: &mut method_core::log::Log, seed: u8) -> method_core::log::PublicKey {
+    use method_core::log::Signer;
+    let k = log::sign::KeyPair::from_seed([seed; 32]);
+    let public = k.public();
+    log.set_signer(std::sync::Arc::new(k));
+    public
+}
+
+fn info_version(dir: &LogDir) -> u64 {
+    let text = fs::read_to_string(dir.root().join("budget.json")).unwrap();
+    let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+    v["version"].as_u64().unwrap()
+}
+
+/// Rewrites one segment with its last line replaced, header hash and all,
+/// so the file reads as whole: what someone with access to the folder could
+/// do.
+fn rewrite_last_line(seg: &std::path::Path, f: impl FnOnce(&str) -> String) {
+    let text = fs::read_to_string(seg).unwrap();
+    let mut lines: Vec<String> = text.lines().map(String::from).collect();
+    let last = lines.pop().unwrap();
+    lines.push(f(&last));
+    let changes: Vec<method_core::log::Change> = lines[1..]
+        .iter()
+        .map(|l| log::change_from_json(l).unwrap())
+        .collect();
+    // Re-made from the changes so the header matches; the altered line is
+    // written as the reader will rebuild it.
+    fs::write(seg, log::segment_bytes(&changes).unwrap()).unwrap();
+}
+
+#[test]
+fn the_first_role_starts_signing_and_raises_the_log_format_to_3() {
+    use method_core::log::Role;
+
+    let dir = temp_dir("signed");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    let mut alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+    let alex_key = keyed(&mut alex.log, 1);
+    // Edits before any role are not signed, and the format stays 1.
+    let p = alex.log.project();
+    let mut after = p.budget.clone();
+    row_rate(&mut after, 0, 111);
+    alex.log.record(&p, &after, &[], "Alex edits", T).unwrap();
+    log::flush(&alex.log, &alex.dir).unwrap();
+    assert_eq!(info_version(&alex.dir), 1);
+    assert!(alex.log.changes().all(|c| c.sig.is_none()));
+
+    alex.log
+        .grant(actor(2), Role::Editor, "Jordan edits", T)
+        .unwrap();
+    let seg = log::flush(&alex.log, &alex.dir).unwrap().unwrap();
+    assert_eq!(info_version(&alex.dir), 3);
+    let text = fs::read_to_string(&seg).unwrap();
+    assert!(
+        text.lines().next().unwrap().contains("\"format\":3"),
+        "{text}"
+    );
+    let line = text.lines().nth(1).unwrap();
+    assert!(line.contains(r#""op":"key""#), "{line}");
+    assert!(line.contains(&alex_key.hex()), "{line}");
+    assert!(line.contains(r#""sig":""#), "{line}");
+
+    // Jordan joins: the key goes in with Jordan's first change, signed.
+    let (mut jordan, report) = log::open(&path, actor(2), Ids::seeded(2)).unwrap();
+    assert!(report.rejected.is_empty(), "{:?}", report.rejected);
+    keyed(&mut jordan.log, 2);
+    let p = jordan.log.project();
+    let mut after = p.budget.clone();
+    after.title = "Jordan's".into();
+    jordan
+        .log
+        .record(&p, &after, &[], "Jordan edits", T)
+        .unwrap();
+    log::flush(&jordan.log, &jordan.dir).unwrap();
+
+    // A reader with no key of its own checks every signature.
+    let (reader, report) = log::open(&path, actor(9), Ids::seeded(9)).unwrap();
+    assert!(report.rejected.is_empty(), "{:?}", report.rejected);
+    assert_eq!(reader.log.project().budget.title, "Jordan's");
+    assert!(reader.log.signing_started());
+    assert_eq!(reader.log.key_of(actor(1)), Some(alex_key));
+
+    // No key file is ever written into the shared folder.
+    let mut stack = vec![alex.dir.root().to_path_buf()];
+    while let Some(d) = stack.pop() {
+        for e in fs::read_dir(&d).unwrap().flatten() {
+            if e.path().is_dir() {
+                stack.push(e.path());
+            }
+            assert_ne!(e.file_name(), log::sign::KEY_FILE);
+        }
+    }
+
+    // A program that reads only format 2 (Method Budget 0.6.0) refuses a
+    // folder at 3 as newer than it reads, rather than taking in changes it
+    // can't check; this one reads 3.
+    assert_eq!(log::LOG_FORMAT_VERSION, log::LOG_FORMAT_SIGNED);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn changes_altered_or_unsigned_in_the_folder_are_kept_aside() {
+    use method_core::log::{Change, Field, Op, Role, Uid, Value};
+
+    let dir = temp_dir("tampered");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    let mut alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+    keyed(&mut alex.log, 1);
+    alex.log
+        .grant(actor(2), Role::Editor, "Jordan edits", T)
+        .unwrap();
+    log::flush(&alex.log, &alex.dir).unwrap();
+    let (mut jordan, _) = log::open(&path, actor(2), Ids::seeded(2)).unwrap();
+    keyed(&mut jordan.log, 2);
+    let p = jordan.log.project();
+    let mut after = p.budget.clone();
+    after.title = "Jordan's".into();
+    jordan
+        .log
+        .record(&p, &after, &[], "Jordan edits", T)
+        .unwrap();
+    let mut after = jordan.log.project().budget.clone();
+    after.title = "Jordan's second".into();
+    let p = jordan.log.project();
+    jordan
+        .log
+        .record(&p, &after, &[], "Jordan edits again", T)
+        .unwrap();
+    // Two segments: the key's, then the second edit's.
+    let first = jordan.log.own_after(0)[0].clone();
+    let second = jordan.log.own_after(0)[1].clone();
+    jordan.dir.write_segment(&[first]).unwrap();
+    let seg = jordan.dir.write_segment(&[second]).unwrap();
+
+    // Someone with the folder changes the second edit's title.
+    rewrite_last_line(&seg, |l| l.replace("Jordan's second", "Someone else's"));
+    let (reader, report) = log::open(&path, actor(9), Ids::seeded(9)).unwrap();
+    assert_eq!(report.rejected.len(), 1, "{:?}", report.rejected);
+    assert!(
+        report.rejected[0].1.contains("doesn't match"),
+        "{:?}",
+        report.rejected
+    );
+    assert_eq!(reader.log.project().budget.title, "Jordan's");
+    let (_, why) = &reader.log.rejected()[0];
+    assert!(
+        why.starts_with(method_core::log::refused::SIGNATURE),
+        "{why}"
+    );
+
+    // An unsigned change in Jordan's name, after Jordan's key.
+    let unsigned = Change {
+        actor: actor(2),
+        seq: 3,
+        deps: reader.log.frontier().clone(),
+        lamport: reader.log.lamport() + 1,
+        time: T.into(),
+        label: "Unsigned".into(),
+        ops: vec![Op::Set {
+            entity: Uid::ROOT,
+            field: Field::Title,
+            value: Value::text("Unsigned"),
+        }],
+        sig: None,
+    };
+    jordan.dir.write_segment(&[unsigned]).unwrap();
+    let (reader, report) = log::open(&path, actor(9), Ids::seeded(9)).unwrap();
+    assert_eq!(report.rejected.len(), 2, "{:?}", report.rejected);
+    assert!(
+        report.rejected[1].1.contains("isn't signed"),
+        "{:?}",
+        report.rejected
+    );
+    assert_eq!(reader.log.project().budget.title, "Jordan's");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_removed_persons_later_changes_are_kept_aside_through_the_folder() {
+    use method_core::log::Role;
+
+    let dir = temp_dir("removed");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    let mut alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+    keyed(&mut alex.log, 1);
+    alex.log
+        .grant(actor(2), Role::Editor, "Jordan edits", T)
+        .unwrap();
+    log::flush(&alex.log, &alex.dir).unwrap();
+    let (mut jordan, _) = log::open(&path, actor(2), Ids::seeded(2)).unwrap();
+    keyed(&mut jordan.log, 2);
+    let edit = |s: &mut log::Shared, title: &str| {
+        let p = s.log.project();
+        let mut after = p.budget.clone();
+        after.title = title.into();
+        s.log.record(&p, &after, &[], title, T).unwrap();
+        log::flush(&s.log, &s.dir).unwrap();
+    };
+    edit(&mut jordan, "Seen before the removal");
+    let mut scan = Scan::default();
+    log::absorb(&mut alex.log, &alex.dir, &mut scan);
+    edit(&mut jordan, "Made after, unseen");
+    alex.log.revoke(actor(2), "Remove Jordan", T).unwrap();
+    log::flush(&alex.log, &alex.dir).unwrap();
+
+    let (reader, report) = log::open(&path, actor(9), Ids::seeded(9)).unwrap();
+    assert_eq!(report.rejected.len(), 1, "{:?}", report.rejected);
+    assert!(
+        report.rejected[0].1.contains("removed"),
+        "{:?}",
+        report.rejected
+    );
+    assert_eq!(reader.log.project().budget.title, "Seen before the removal");
+    assert!(reader.log.removed(actor(2)));
+    // The line in the file names who, and the cutoff is the change's own deps.
+    let seg = alex.dir.segments(actor(1)).last().unwrap().path.clone();
+    let text = fs::read_to_string(seg).unwrap();
+    assert!(text.contains(r#""op":"revoke""#), "{text}");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_program_signs_with_its_persons_key_or_is_refused_in_words() {
+    use method_core::log::Role;
+    use method_format::log::SharedEdit;
+
+    let dir = temp_dir("program-signs");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    let mut alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+    keyed(&mut alex.log, 1);
+    alex.log
+        .grant(actor(3), Role::Editor, "Sam edits", T)
+        .unwrap();
+    log::flush(&alex.log, &alex.dir).unwrap();
+
+    // Sam's key file beside Sam's actor id; Sam's app hasn't published it.
+    let sam_file = actor_file(&dir, 3);
+    let sam_key = log::sign::load_or_make_key(&log::sign::key_path(&sam_file)).unwrap();
+    let mut e = SharedEdit::open(&path, Some(&sam_file)).unwrap();
+    let mut after = e.budget();
+    after.title = "Sam's".into();
+    let err = e.record(&after, "Command line: set title", T).unwrap_err();
+    assert_eq!(err.0, log::NO_KEY_YET);
+    assert!(LogDir::for_budget(&path).segments(e.actor()).is_empty());
+    drop(e);
+
+    // Sam's app publishes the key (as Sam's own actor).
+    let (mut sam, _) = log::open(&path, actor(3), Ids::seeded(3)).unwrap();
+    sam.log.set_signer(std::sync::Arc::new(sam_key));
+    sam.log.publish_key("Key", T).unwrap().unwrap();
+    log::flush(&sam.log, &sam.dir).unwrap();
+
+    let mut e = SharedEdit::open(&path, Some(&sam_file)).unwrap();
+    let mut after = e.budget();
+    after.title = "Sam's".into();
+    assert!(e.record(&after, "Command line: set title", T).unwrap());
+    let tool = e.actor();
+    drop(e);
+    let seg = LogDir::for_budget(&path).segments(tool)[0].path.clone();
+    let text = fs::read_to_string(seg).unwrap();
+    assert!(
+        text.contains(r#""op":"acts_for""#) && text.contains(r#""sig":""#),
+        "{text}"
+    );
+    let (reader, report) = log::open(&path, actor(9), Ids::seeded(9)).unwrap();
+    assert!(report.rejected.is_empty(), "{:?}", report.rejected);
+    assert_eq!(reader.log.project().budget.title, "Sam's");
+    assert_eq!(reader.log.person_of(tool), actor(3));
+
+    // Removed, the program is told so.
+    alex.log.revoke(actor(3), "Remove Sam", T).unwrap();
+    log::flush(&alex.log, &alex.dir).unwrap();
+    let mut e = SharedEdit::open(&path, Some(&sam_file)).unwrap();
+    let mut after = e.budget();
+    after.title = "Sam again".into();
+    let err = e.record(&after, "Command line: set title", T).unwrap_err();
+    assert_eq!(err.0, log::REMOVED);
     let _ = fs::remove_dir_all(&dir);
 }

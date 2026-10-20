@@ -627,6 +627,7 @@ fn a_malformed_change_is_refused_and_listed() {
             field: Field::Name,
             value: Value::text("x"),
         }],
+        sig: None,
     };
     assert!(matches!(
         a.apply(bogus).unwrap_err(),
@@ -1374,6 +1375,7 @@ fn forged(who: ActorId, seq: u64, seen: &Log, ops: Vec<Op>) -> Change {
         time: T.into(),
         label: "forged".into(),
         ops,
+        sig: None,
     }
 }
 
@@ -1777,6 +1779,7 @@ fn a_forged_first_change_never_takes_the_budget() {
             actor: actor(3),
             role: Role::Admin,
         }],
+        sig: None,
     };
     let second_start = adopt(0, &sample()).changes().next().unwrap().clone();
     let mut all: Vec<Change> = a.changes().cloned().collect();
@@ -2022,6 +2025,7 @@ fn acts_for_never_raises_a_member() {
                 role: Role::Admin,
             },
         ],
+        sig: None,
     };
     let bad = vec![
         forge(2, 1, &owner, 1),
@@ -2149,4 +2153,480 @@ fn a_credit_without_locations_logs_no_locations() {
     let p = log.project();
     assert!(p.budget.credits.last().unwrap().locations.is_empty());
     assert_eq!(normalized(&p.budget), normalized(&cleared));
+}
+
+// ---------------------------------------------------------------------------
+// Signed changes and removal by cutoff (decisions.md, entry 89). The engine
+// holds no cryptography: these tests sign with a stand-in scheme (a hash of
+// the key and the change), enough to tell a matching signature from a
+// missing, altered or someone else's one. method-format's tests use Ed25519.
+
+use method_core::log::{Frontier, PublicKey, Signature, Signer, Verifier};
+
+struct TestKey(u8);
+
+fn test_sig(key: &PublicKey, change: &Change) -> Signature {
+    let mut c = change.clone();
+    c.sig = None;
+    let h = method_core::log::hash::sha256(format!("{key:?}{c:?}").as_bytes());
+    let mut out = [0u8; 64];
+    out[..32].copy_from_slice(&h);
+    out[32..].copy_from_slice(&h);
+    Signature(out)
+}
+
+impl Signer for TestKey {
+    fn public(&self) -> PublicKey {
+        PublicKey([self.0; 32])
+    }
+    fn sign(&self, change: &Change) -> Signature {
+        test_sig(&self.public(), change)
+    }
+}
+
+struct TestVerifier;
+
+impl Verifier for TestVerifier {
+    fn verify(&self, key: &PublicKey, change: &Change) -> bool {
+        change.sig == Some(test_sig(key, change))
+    }
+}
+
+/// `log` checking signatures, and signing with key `k` when given.
+fn keyed(mut log: Log, k: Option<u8>) -> Log {
+    log.set_verifier(Arc::new(TestVerifier));
+    if let Some(k) = k {
+        log.set_signer(Arc::new(TestKey(k)));
+    }
+    log
+}
+
+/// A second actor's log with `from`'s history, checking signatures and
+/// signing with key `k`.
+fn signed_follower(n: u8, from: &Log, k: u8) -> Log {
+    let mut log = keyed(Log::new(actor(n), Ids::seeded(100 + n as u64)), Some(k));
+    deliver(&mut log, &written(&[from]));
+    assert!(log.rejected().is_empty(), "{:?}", log.rejected());
+    log
+}
+
+/// An owner (actor 1, key 1) who has made actor 2 an editor: signing has
+/// started with that first role.
+fn signed_budget() -> Log {
+    let mut owner = keyed(adopt(1, &sample()), Some(1));
+    owner
+        .grant(actor(2), Role::Editor, "Jordan edits", T)
+        .unwrap();
+    owner
+}
+
+/// Every change each log made, applied or refused: what the folder holds.
+fn written(logs: &[&Log]) -> Vec<Change> {
+    let mut all: Vec<Change> = logs
+        .iter()
+        .flat_map(|l| {
+            l.changes()
+                .cloned()
+                .chain(l.rejected().iter().map(|(c, _)| c.clone()))
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    all.sort_by_key(|c| (c.actor, c.seq));
+    all.dedup_by_key(|c| c.id());
+    all
+}
+
+/// Hands `to` every change in `changes` it hasn't taken in yet.
+fn deliver(to: &mut Log, changes: &[Change]) {
+    for c in changes {
+        if !to.frontier().includes(c.id()) {
+            let _ = to.apply(c.clone());
+        }
+    }
+}
+
+fn reason_of(log: &Log, id: ChangeId) -> Option<String> {
+    log.rejected()
+        .iter()
+        .find(|(c, _)| c.id() == id)
+        .map(|(_, r)| r.clone())
+}
+
+#[test]
+fn the_first_role_starts_signing_and_every_change_after_it_is_signed() {
+    let owner = signed_budget();
+    assert!(owner.signing_started());
+    let grant = owner.changes().last().unwrap();
+    assert_eq!(grant.key(), Some(PublicKey([1; 32])));
+    assert!(grant.sig.is_some());
+    assert_eq!(owner.key_of(actor(1)), Some(PublicKey([1; 32])));
+    // The adopted first change, made before signing, stays unsigned.
+    assert!(owner.changes().next().unwrap().sig.is_none());
+    // Jordan's computer publishes its key with its first change and signs
+    // it, and everyone checking signatures takes both in.
+    let mut jordan = signed_follower(2, &owner, 2);
+    try_edit(&mut jordan, |b| b.title = "Jordan's".into())
+        .unwrap()
+        .unwrap();
+    let mine = jordan.changes().last().unwrap();
+    assert_eq!(mine.key(), Some(PublicKey([2; 32])));
+    assert!(mine.sig.is_some());
+    try_edit(&mut jordan, |b| b.title = "Jordan's again".into())
+        .unwrap()
+        .unwrap();
+    let second = jordan.changes().last().unwrap();
+    assert_eq!(second.key(), None, "a key is published once");
+    assert!(second.sig.is_some());
+    let mut reader = keyed(Log::new(actor(9), Ids::seeded(9)), None);
+    deliver(&mut reader, &written(&[&owner, &jordan]));
+    assert!(reader.rejected().is_empty(), "{:?}", reader.rejected());
+    assert_eq!(reader.project().budget.title, "Jordan's again");
+    assert_eq!(reader.key_of(actor(2)), Some(PublicKey([2; 32])));
+}
+
+#[test]
+fn a_budget_without_roles_never_signs() {
+    let mut owner = keyed(adopt(1, &sample()), Some(1));
+    let mut jordan = signed_follower(2, &owner, 2);
+    try_edit(&mut owner, |b| b.title = "Owner's".into())
+        .unwrap()
+        .unwrap();
+    try_edit(&mut jordan, |b| b.title = "Jordan's".into())
+        .unwrap()
+        .unwrap();
+    for l in [&owner, &jordan] {
+        assert!(!l.signing_started());
+        assert!(l.changes().all(|c| c.sig.is_none() && c.key().is_none()));
+    }
+}
+
+#[test]
+fn a_tampered_change_is_kept_aside_with_why() {
+    let owner = signed_budget();
+    let mut jordan = signed_follower(2, &owner, 2);
+    try_edit(&mut jordan, |b| b.title = "Jordan's".into())
+        .unwrap()
+        .unwrap();
+    try_edit(&mut jordan, |b| b.title = "Jordan's second".into())
+        .unwrap()
+        .unwrap();
+    let mut changes = written(&[&owner, &jordan]);
+    let last = changes.last_mut().unwrap();
+    last.ops = vec![title_op("Altered on the way")];
+    let altered = last.id();
+    let mut reader = keyed(Log::new(actor(9), Ids::seeded(9)), None);
+    for c in &changes {
+        let r = reader.apply(c.clone());
+        if c.id() == altered {
+            assert!(matches!(r, Err(LogError::Unsigned { .. })), "{r:?}");
+        }
+    }
+    assert_eq!(reader.project().budget.title, "Jordan's");
+    let why = reason_of(&reader, altered).unwrap();
+    assert!(
+        why.starts_with(method_core::log::refused::SIGNATURE),
+        "{why}"
+    );
+    assert!(why.contains("doesn't match"), "{why}");
+}
+
+#[test]
+fn a_change_without_a_signature_once_signing_has_started_is_kept_aside() {
+    let owner = signed_budget();
+    let mut jordan = signed_follower(2, &owner, 2);
+    try_edit(&mut jordan, |b| b.title = "Jordan's".into())
+        .unwrap()
+        .unwrap();
+    // In Jordan's name, after Jordan's key: no signature.
+    let unsigned = forged(
+        actor(2),
+        jordan.own_seq() + 1,
+        &jordan,
+        vec![title_op("Unsigned")],
+    );
+    // Signed by someone else's key.
+    let mut wrong = forged(
+        actor(2),
+        jordan.own_seq() + 1,
+        &jordan,
+        vec![title_op("Wrong key")],
+    );
+    wrong.sig = Some(TestKey(7).sign(&wrong));
+    // A stranger who claims to have written before the owner's key and the
+    // first role, unsigned.
+    let mut early = Frontier::new();
+    early.advance(actor(1), 1);
+    let stranger = Change {
+        deps: early.clone(),
+        ..forged(actor(8), 1, &owner, vec![title_op("Before roles, it says")])
+    };
+    // The same stranger with a key of its own, signed: it signs, but it is
+    // judged as after the first role, where it has none.
+    let mut keyed_stranger = Change {
+        deps: early,
+        ..forged(
+            actor(6),
+            1,
+            &owner,
+            vec![
+                title_op("Signed, before roles, it says"),
+                Op::Key {
+                    key: TestKey(6).public(),
+                },
+            ],
+        )
+    };
+    keyed_stranger.sig = Some(TestKey(6).sign(&keyed_stranger));
+    for (bad, what) in [
+        (&unsigned, "isn't signed"),
+        (&wrong, "doesn't match"),
+        (&stranger, "isn't signed"),
+        (&keyed_stranger, "reads only"),
+    ] {
+        let mut reader = keyed(Log::new(actor(9), Ids::seeded(9)), None);
+        deliver(&mut reader, &written(&[&owner, &jordan]));
+        let _ = reader.apply(bad.clone());
+        let why = reason_of(&reader, bad.id()).unwrap_or_else(|| panic!("{what}: taken in"));
+        assert!(why.contains(what), "{what}: {why}");
+        assert_eq!(reader.project().budget.title, "Jordan's");
+    }
+    // A log that can't check signatures keeps aside every signed change.
+    let mut blind = Log::new(actor(9), Ids::seeded(9));
+    deliver(&mut blind, &written(&[&owner]));
+    let why = reason_of(&blind, owner.changes().last().unwrap().id()).unwrap();
+    assert!(why.contains("can't be checked"), "{why}");
+}
+
+#[test]
+fn a_removed_persons_later_changes_are_kept_aside_and_earlier_ones_stay() {
+    let mut owner = signed_budget();
+    let mut jordan = signed_follower(2, &owner, 2);
+    // Seen by the owner before the removal: stays.
+    try_edit(&mut jordan, |b| b.title = "Before".into())
+        .unwrap()
+        .unwrap();
+    send(&jordan, &mut owner);
+    // Made apart, the owner not having seen it: after the cutoff.
+    try_edit(&mut jordan, |b| {
+        let id = rows(b)[0];
+        row_mut(b, id).unwrap().description = "after".into();
+    })
+    .unwrap()
+    .unwrap();
+    let late = jordan.changes().last().unwrap().id();
+    let removal = owner.revoke(actor(2), "Remove Jordan", T).unwrap();
+    assert!(owner.removed(actor(2)));
+    assert_eq!(owner.role_of(actor(2)), Role::ReadOnly);
+    // Every order: the late change is kept aside, the early one kept.
+    let all = written(&[&owner, &jordan]);
+    let mut rng = Rng::new(5);
+    for n in 0..12 {
+        let mut fresh = keyed(Log::new(actor(9), Ids::seeded(n)), None);
+        let mut shuffled = all.clone();
+        rng.shuffle(&mut shuffled);
+        deliver(&mut fresh, &shuffled);
+        assert!(fresh.pending().is_empty());
+        assert_eq!(fresh.project().budget.title, "Before", "order {n}");
+        let why = reason_of(&fresh, late).unwrap_or_else(|| panic!("order {n}: late taken in"));
+        assert!(why.starts_with(method_core::log::refused::REMOVED), "{why}");
+        assert_eq!(
+            fresh.rejected().len(),
+            1,
+            "order {n}: {:?}",
+            fresh.rejected()
+        );
+    }
+    // Jordan's own computer takes the removal in and lets the late change go.
+    send(&owner, &mut jordan);
+    assert!(reason_of(&jordan, late).is_some());
+    assert_eq!(jordan.project().budget.title, "Before");
+    // And can't change anything now.
+    assert!(try_edit(&mut jordan, |b| b.title = "Still here".into()).is_err());
+    // A role given again lets Jordan back in from then on.
+    owner
+        .grant(actor(2), Role::Editor, "Jordan edits again", T)
+        .unwrap();
+    assert!(!owner.removed(actor(2)));
+    send(&owner, &mut jordan);
+    try_edit(&mut jordan, |b| b.title = "Back".into())
+        .unwrap()
+        .unwrap();
+    deliver(&mut owner, &written(&[&jordan]));
+    assert!(owner.pending().is_empty());
+    assert_eq!(owner.project().budget.title, "Back");
+    assert!(reason_of(&owner, late).is_some(), "still kept aside");
+    let _ = removal;
+}
+
+#[test]
+fn only_those_who_set_a_persons_role_remove_them() {
+    let mut owner = signed_budget();
+    owner.grant(actor(3), Role::Admin, "Sam admin", T).unwrap();
+    owner.grant(actor(4), Role::Editor, "Kim edits", T).unwrap();
+    let mut jordan = signed_follower(2, &owner, 2);
+    assert!(matches!(
+        jordan.revoke(actor(4), "Remove Kim", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    let mut sam = signed_follower(3, &owner, 3);
+    assert!(sam.revoke(actor(1), "Remove the owner", T).is_err());
+    sam.revoke(actor(4), "Remove Kim", T).unwrap();
+    owner.grant(actor(5), Role::Admin, "Lee admin", T).unwrap();
+    send(&owner, &mut sam);
+    assert!(
+        sam.revoke(actor(5), "Remove Lee", T).is_err(),
+        "an admin doesn't remove an admin"
+    );
+}
+
+/// A command line or agent signs with its person's key: the same key file
+/// on the same computer (decisions.md, entry 89).
+#[test]
+fn a_program_signs_with_its_persons_key() {
+    let owner = signed_budget();
+    let mut jordan = signed_follower(2, &owner, 2);
+    jordan.publish_key("Key", T).unwrap().unwrap();
+    // Jordan's command line, with Jordan's key.
+    let mut tool = signed_follower(12, &owner, 2);
+    deliver(&mut tool, &written(&[&jordan]));
+    tool.acts_for(actor(2), "Command line for Jordan", T)
+        .unwrap();
+    try_edit(&mut tool, |b| b.title = "From the command line".into())
+        .unwrap()
+        .unwrap();
+    // A program with a key of its own can't write for Jordan.
+    let mut other = signed_follower(13, &owner, 13);
+    deliver(&mut other, &written(&[&jordan]));
+    assert!(matches!(
+        other.acts_for(actor(2), "Not Jordan's", T),
+        Err(LogError::Unsigned { .. })
+    ));
+    let mut reader = keyed(Log::new(actor(9), Ids::seeded(9)), None);
+    deliver(&mut reader, &written(&[&owner, &jordan, &tool]));
+    assert!(reader.rejected().is_empty(), "{:?}", reader.rejected());
+    assert_eq!(reader.project().budget.title, "From the command line");
+    assert_eq!(reader.person_of(actor(12)), actor(2));
+}
+
+/// Signed changes, forged and altered ones, removals and roles given again,
+/// exchanged in random orders: every log, and a newcomer, ends with the same
+/// frontier, budget and set of changes kept aside.
+#[test]
+fn signed_changes_and_removals_converge_in_any_order() {
+    let mut cut = 0;
+    for seed in 0..24u64 {
+        let mut rng = Rng::new(seed);
+        let mut owner = signed_budget();
+        owner.grant(actor(3), Role::Editor, "Sam edits", T).unwrap();
+        owner
+            .grant(actor(4), scope(&owner, &["2000"]), "Kim's department", T)
+            .unwrap();
+        owner.grant(actor(5), Role::Editor, "Lee edits", T).unwrap();
+        // Lee publishes a key and then says nothing more: every later
+        // change in Lee's name is a forgery (so none collides with a real
+        // one, which would be a fork, a separate rule).
+        let mut lee = signed_follower(5, &owner, 5);
+        lee.publish_key("Key", T).unwrap().unwrap();
+        let mut logs = vec![owner.clone()];
+        for n in 2..=4u8 {
+            logs.push(signed_follower(n, &owner, n));
+        }
+        let mut extra: Vec<Change> = lee
+            .changes()
+            .filter(|c| c.actor == actor(5))
+            .cloned()
+            .collect();
+        for round in 0..4 {
+            for (i, log) in logs.iter_mut().enumerate() {
+                for _ in 0..2 {
+                    let p = log.project();
+                    let mut after = p.budget.clone();
+                    let (label, hints) = random_edit(&mut rng, &mut after, i as u8 + 1);
+                    match log.record(&p, &after, &hints, &label, T) {
+                        Ok(_) | Err(LogError::NotAllowed { .. }) => {}
+                        Err(e) => panic!("seed {seed}: {label}: {e}"),
+                    }
+                }
+                if i == 0 && rng.chance(50) {
+                    let who = actor(*rng.pick(&[2u8, 3, 4]));
+                    if log.removed(who) || rng.chance(30) {
+                        log.grant(who, Role::Editor, "Back", T).unwrap();
+                    } else {
+                        log.revoke(who, "Remove", T).unwrap();
+                    }
+                }
+            }
+            // Forgeries in Lee's name: unsigned, signed with another key,
+            // and a real signed change of someone else's relabelled as Lee's.
+            let seen = &logs[rng.below(4) as usize];
+            let seq = extra.iter().filter(|c| c.actor == actor(5)).count() as u64 + 1;
+            let mut f = forged(
+                actor(5),
+                seq,
+                seen,
+                vec![title_op(&format!("Forged {round}"))],
+            );
+            match rng.below(3) {
+                0 => {}
+                1 => f.sig = Some(TestKey(9).sign(&f)),
+                _ => {
+                    if let Some(real) = seen.changes().filter(|c| c.sig.is_some()).last() {
+                        f = Change {
+                            actor: actor(5),
+                            seq,
+                            deps: real.deps.clone(),
+                            ..real.clone()
+                        };
+                    }
+                }
+            }
+            extra.push(f);
+            // Exchange everything written so far, in a random order per log.
+            let mut all = written(&logs.iter().collect::<Vec<_>>());
+            all.extend(extra.iter().cloned());
+            for log in logs.iter_mut() {
+                let mut missing: Vec<Change> = all
+                    .iter()
+                    .filter(|c| !log.frontier().includes(c.id()))
+                    .cloned()
+                    .collect();
+                rng.shuffle(&mut missing);
+                for c in missing {
+                    let _ = log.apply(c);
+                }
+            }
+        }
+        let mut all = written(&logs.iter().collect::<Vec<_>>());
+        all.extend(extra.iter().cloned());
+        let mut newcomer = keyed(Log::new(actor(30), Ids::seeded(seed)), None);
+        rng.shuffle(&mut all);
+        deliver(&mut newcomer, &all);
+        let first = &logs[0];
+        for log in logs.iter().skip(1).chain([&newcomer]) {
+            assert!(log.pending().is_empty(), "seed {seed}");
+            assert_eq!(log.frontier(), first.frontier(), "seed {seed}");
+            assert_eq!(rejected_ids(log), rejected_ids(first), "seed {seed}");
+            assert_eq!(
+                normalized(&log.project().budget),
+                normalized(&first.project().budget),
+                "seed {seed}"
+            );
+            assert_eq!(log.members(), first.members(), "seed {seed}");
+        }
+        // Lee's key change stands; every forgery after it is kept aside
+        // (for its signature, or for not fitting at all).
+        let forgeries = extra.iter().filter(|c| c.seq > 1).count();
+        let kept_aside = first
+            .rejected()
+            .iter()
+            .filter(|(c, _)| c.actor == actor(5))
+            .count();
+        assert_eq!(kept_aside, forgeries, "seed {seed}");
+        cut += first
+            .rejected()
+            .iter()
+            .filter(|(_, r)| r.starts_with(method_core::log::refused::REMOVED))
+            .count();
+    }
+    assert!(cut > 5, "removals cut {cut} changes in all");
 }

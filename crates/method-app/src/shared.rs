@@ -24,6 +24,11 @@
 //!   change ([`SharedDoc::set_role`]; decisions.md, entry 78); an edit
 //!   beyond this person's role is refused in plain words before anything
 //!   is written, and someone else's is refused when it arrives.
+//! - From the first role on, every change is signed with this computer's
+//!   key ([`SharedDoc::use_key`]; decisions.md, entry 89), and a change
+//!   whose signature is missing or doesn't match is left out and listed;
+//!   removing a person ([`SharedDoc::remove_person`]) leaves out their
+//!   changes the remover hadn't seen.
 //!
 //! The words for the interface: changes are "shared", never synced; a
 //! conflict is "changed by two people"; there are no actors, logs or
@@ -34,8 +39,8 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use method_core::log::{
-    ActorId, ChangeId, Field, Hint, Ids, Kind, LogError, Projection, Review, Role, Stamp, Uid,
-    Value,
+    ActorId, ChangeId, Field, Hint, Ids, Kind, LogError, Projection, Review, Role, Signer, Stamp,
+    Uid, Value,
 };
 use method_core::{Budget, RowId};
 use method_format::log::{self as flog, LoadReport, Presence, Scan, Shared};
@@ -295,6 +300,11 @@ pub struct PersonDto {
     pub role_text: String,
     /// A department editor's categories and accounts, by number.
     pub scope: Vec<String>,
+    /// Their computer's key is in the budget: their changes are signed.
+    pub signs: bool,
+    /// Removed by the owner, a co-owner or an admin, and not given a role
+    /// since: their later changes are left out.
+    pub removed: bool,
 }
 
 /// The status item and its panel.
@@ -336,6 +346,10 @@ pub struct ShareStatus {
     /// Something to tell the person about the file (an edit made outside
     /// the app kept aside), until the next one.
     pub notice: Option<String>,
+    /// Changes in this budget are signed (the owner's key is in it).
+    pub signed: bool,
+    /// What signing means here, in a sentence.
+    pub signed_text: String,
 }
 
 /// How many refused changes the status lists.
@@ -394,6 +408,8 @@ pub struct ActivityDto {
     pub label: String,
     pub ops: usize,
     pub place: Option<PlaceDto>,
+    /// Signed with its author's key.
+    pub signed: bool,
 }
 
 /// What a tick did, for the window to tell the page.
@@ -887,9 +903,24 @@ impl SharedDoc {
         }
         // What others wrote.
         let before = self.shared.log.len();
+        let folds = self.shared.log.folds();
         let report = flog::absorb(&mut self.shared.log, &self.shared.dir, &mut self.scan);
+        if self.shared.log.folds() != folds {
+            // A removal (or the owner's first role or key) left out changes
+            // this computer had applied: the budget is made again.
+            self.reproject();
+            *budget = self.proj.budget.clone();
+            out.budget_changed = true;
+            self.last_change = now;
+        }
         self.last_sync = Some(now);
         self.waiting = report.pending;
+        // The owner's key arrived: this computer's goes in too.
+        if report.applied > 0 && self.shared.log.signer_key().is_some() {
+            if let Err(e) = self.publish_key() {
+                self.error = Some(e);
+            }
+        }
         if report.applied > 0 {
             let me = self.actor();
             let arrived: Vec<ChangeId> = self
@@ -1208,6 +1239,7 @@ impl SharedDoc {
 
     fn person_dto(&self, actor: ActorId, now: Instant) -> PersonDto {
         let role = self.shared.log.role_of(actor);
+        let removed = self.shared.log.removed(actor);
         let name = self.name_of(actor);
         let me = actor == self.actor();
         let presence = self.people.get(&actor);
@@ -1243,11 +1275,17 @@ impl SharedDoc {
             },
             changes: self.shared.log.frontier().get(&actor),
             role: role.key().to_string(),
-            role_text: self.role_text(&role),
+            role_text: if removed {
+                "Removed: reads only, and later changes are left out".into()
+            } else {
+                self.role_text(&role)
+            },
             scope: role
                 .scope()
                 .map(|s| self.scope_codes(s))
                 .unwrap_or_default(),
+            signs: self.shared.log.key_of(actor).is_some(),
+            removed,
         }
     }
 
@@ -1296,6 +1334,19 @@ impl SharedDoc {
             refused: self.shared.log.rejected().len(),
             refused_changes: self.refused_changes(),
             notice: self.outside.clone(),
+            signed: self.shared.log.signing_started(),
+            signed_text: self.signed_text(),
+        }
+    }
+
+    /// What signing means in this budget now, in a sentence.
+    fn signed_text(&self) -> String {
+        if self.shared.log.signing_started() {
+            "Changes are signed: each person\u{2019}s computer signs what they change with a key kept on that computer, and a change whose signature doesn\u{2019}t match is left out.".into()
+        } else if self.shared.log.roles_started() {
+            "Changes aren\u{2019}t signed yet: they will be once the owner opens this budget in this version.".into()
+        } else {
+            "Changes are signed once the owner sets the first role.".into()
         }
     }
 
@@ -1310,13 +1361,7 @@ impl SharedDoc {
                 color: self.color_of(c.actor),
                 time: c.time.clone(),
                 label: c.label.clone(),
-                why: match reason.strip_prefix("not allowed: ") {
-                    Some(r) => format!("Their role doesn\u{2019}t allow it ({r})."),
-                    None if reason.contains("first change") => {
-                        "It wasn\u{2019}t made from this budget\u{2019}s shared history.".into()
-                    }
-                    None => "It didn\u{2019}t fit the budget as it stood.".into(),
-                },
+                why: refused_why(reason),
             })
             .collect()
     }
@@ -1512,6 +1557,12 @@ impl SharedDoc {
 
     /// Why this person can't change anything, when their role reads only.
     pub fn refusal(&self) -> Option<String> {
+        if self.shared.log.removed(self.actor()) {
+            return Some(format!(
+                "You were removed from this shared budget, so you can read it but not change it. {} can give you a role again.",
+                self.owner_name()
+            ));
+        }
         self.role().reads_only().then(|| {
             format!(
                 "You can read this budget but not change it. {} sets who may change what.",
@@ -1523,8 +1574,17 @@ impl SharedDoc {
     /// A refused change in the words the page shows: what this person's
     /// role allows, and who to ask.
     fn refused_text(&self, e: &LogError) -> String {
-        if !matches!(e, LogError::NotAllowed { .. }) {
-            return format!("This change couldn't be shared: {e}");
+        match e {
+            LogError::Unsigned { .. } => {
+                return "Changes in this shared budget are signed, and this one couldn\u{2019}t be signed with this computer\u{2019}s key, so it wasn\u{2019}t shared.".into()
+            }
+            LogError::Removed { .. } => {
+                return self.refusal().unwrap_or_else(|| {
+                    "You were removed from this shared budget.".into()
+                })
+            }
+            LogError::NotAllowed { .. } => {}
+            _ => return format!("This change couldn't be shared: {e}"),
         }
         let ask = format!("{} sets who may change what.", self.owner_name());
         match self.role() {
@@ -1685,6 +1745,73 @@ impl SharedDoc {
         Ok(())
     }
 
+    /// Signs this person's changes with `key` (this computer's key pair,
+    /// kept in the app's data folder, never in the shared folder;
+    /// decisions.md, entry 89). When the budget's changes are signed, or
+    /// this is the owner of a budget with roles, the key goes into the
+    /// log now, as a change of its own.
+    pub fn use_key(&mut self, key: std::sync::Arc<dyn Signer>) -> Result<(), String> {
+        self.shared.log.set_signer(key);
+        self.publish_key()
+    }
+
+    /// Puts this computer's key into the log when it should be there and
+    /// isn't (after the owner's key arrives, for everyone else).
+    fn publish_key(&mut self) -> Result<(), String> {
+        let added = self
+            .shared
+            .log
+            .publish_key("Added this computer\u{2019}s key", &iso_now())
+            .map_err(|e| self.refused_text(&e))?;
+        if added.is_some() {
+            self.reproject();
+            let now = Instant::now();
+            self.last_edit = Some(now);
+            self.unwritten_since.get_or_insert(now);
+            self.last_change = now;
+        }
+        Ok(())
+    }
+
+    /// Removes the person `actor` (64 hex characters): they read only, and
+    /// their changes this computer hasn't seen are left out on every
+    /// computer (decisions.md, entry 89). One change by this person, shared
+    /// like any edit; giving them a role again lets them back in from then on.
+    pub fn remove_person(&mut self, actor: &str) -> Result<(), String> {
+        let who = ActorId::parse(actor).ok_or("Couldn't tell which person that is.")?;
+        if Some(who) == self.shared.log.owner() {
+            return Err("The owner can't be removed.".into());
+        }
+        if who == self.actor() {
+            return Err("You can't remove yourself.".into());
+        }
+        let label = format!("Removed {}", self.name_of(who));
+        let me = self.role();
+        self.shared
+            .log
+            .revoke(who, &label, &iso_now())
+            .map_err(|e| match (me, e) {
+                (_, e @ (LogError::Unsigned { .. } | LogError::Removed { .. })) => {
+                    self.refused_text(&e)
+                }
+                (Role::Admin, _) => {
+                    "Only the owner and co-owners remove an admin or a co-owner.".to_string()
+                }
+                (Role::CoOwner, _) => "Only the owner removes a co-owner.".to_string(),
+                (Role::Owner, e) => format!("This person couldn't be removed: {e}"),
+                _ => format!(
+                    "Only the owner, co-owners and admins remove people. {} can.",
+                    self.owner_name()
+                ),
+            })?;
+        self.reproject();
+        let now = Instant::now();
+        self.last_edit = Some(now);
+        self.unwritten_since.get_or_insert(now);
+        self.last_change = now;
+        Ok(())
+    }
+
     /// Writes value `index` of a field's history back as this person's
     /// change. Returns the budget to adopt.
     pub fn use_value(
@@ -1752,15 +1879,54 @@ impl SharedDoc {
                     label: c.label.clone(),
                     ops: c.ops.len(),
                     place: first.and_then(|(u, f)| self.place_of(u, f)),
+                    signed: c.sig.is_some(),
                 }
             })
             .collect()
     }
 }
 
+/// Why a change was left out, in a sentence for the status panel.
+pub fn refused_why(reason: &str) -> String {
+    use method_core::log::{refused, sign::why};
+    if let Some(r) = reason.strip_prefix(refused::NOT_ALLOWED) {
+        return format!("Their role doesn\u{2019}t allow it ({r}).");
+    }
+    if let Some(r) = reason.strip_prefix(refused::SIGNATURE) {
+        return match r {
+            why::MISMATCH => "Its signature doesn\u{2019}t match the person\u{2019}s key, so it may have been changed in the folder or written in their name.".into(),
+            why::MISSING => "It isn\u{2019}t signed, and changes in this budget must be.".into(),
+            why::NO_KEY => "It is signed, but its author\u{2019}s key isn\u{2019}t in this budget.".into(),
+            why::NOT_PERSONS_KEY | why::PERSON_HAS_NO_KEY => "It came from a command line or agent that doesn\u{2019}t have its person\u{2019}s key.".into(),
+            why::TWO_KEYS => "It tried to give its author a second key.".into(),
+            _ => "Its signature couldn\u{2019}t be checked.".into(),
+        };
+    }
+    if reason.starts_with(refused::REMOVED) {
+        return "It was made after its author was removed.".into();
+    }
+    if reason.contains("first change") {
+        return "It wasn\u{2019}t made from this budget\u{2019}s shared history.".into();
+    }
+    "It didn\u{2019}t fit the budget as it stood.".into()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reasons_for_leaving_a_change_out_are_plain() {
+        use method_core::log::{refused, sign::why};
+        let sig = |w: &str| refused_why(&format!("{}{w}", refused::SIGNATURE));
+        assert!(sig(why::MISMATCH).starts_with("Its signature doesn\u{2019}t match"));
+        assert!(sig(why::MISSING).contains("isn\u{2019}t signed"));
+        assert!(refused_why(&format!("{}made after", refused::REMOVED)).contains("removed"));
+        assert!(refused_why("not allowed: this person reads only").contains("role"));
+        for text in [sig(why::MISMATCH), sig(why::NO_KEY), sig(why::CANT_CHECK)] {
+            assert!(!text.contains('\u{2014}') && !text.contains('!'), "{text}");
+        }
+    }
 
     #[test]
     fn iso_times_round_trip() {

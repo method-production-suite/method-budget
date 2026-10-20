@@ -15,6 +15,7 @@ use super::clock::{ChangeId, Frontier, Stamp};
 use super::ids::{ActorId, Uid};
 use super::op::{Change, Field, Kind, ListKey, Member, Op, Placement, Value};
 use super::seq::{PosId, SeqTree};
+use super::sign::PublicKey;
 
 /// A last-writer-wins register with its history. Writes are kept in stamp
 /// order; the last one is the current value.
@@ -185,6 +186,9 @@ pub struct GrantWrite {
     pub role: Role,
     pub rank: u8,
     pub deps: Frontier,
+    /// Written by a removal (`Op::Revoke`): the role is read only and the
+    /// person's later changes are kept aside.
+    pub removed: bool,
 }
 
 /// Why a change cannot be applied: it names something that doesn't
@@ -221,6 +225,9 @@ pub struct State {
     /// Actors with a change applied that was made once roles were set
     /// (judged under roles): they can no longer say whose they are.
     judged: std::collections::BTreeSet<ActorId>,
+    /// Each actor's published key and the change that published it
+    /// (decisions.md, entry 89).
+    keys: BTreeMap<ActorId, (PublicKey, ChangeId)>,
 }
 
 impl Default for State {
@@ -242,7 +249,18 @@ impl State {
             grants: BTreeMap::new(),
             links: BTreeMap::new(),
             judged: std::collections::BTreeSet::new(),
+            keys: BTreeMap::new(),
         }
+    }
+
+    /// `actor`'s published key and the change that published it.
+    pub fn key_of(&self, actor: ActorId) -> Option<(PublicKey, ChangeId)> {
+        self.keys.get(&actor).copied()
+    }
+
+    /// Every published key, by actor.
+    pub fn keys(&self) -> &BTreeMap<ActorId, (PublicKey, ChangeId)> {
+        &self.keys
     }
 
     /// Who started sharing: the genesis change's actor.
@@ -447,7 +465,18 @@ impl State {
                         ));
                     }
                 }
-                Op::Grant { .. } => {}
+                Op::Grant { .. } | Op::Revoke { .. } => {}
+                Op::Key { .. } => {
+                    if change
+                        .ops
+                        .iter()
+                        .filter(|o| matches!(o, Op::Key { .. }))
+                        .count()
+                        > 1
+                    {
+                        return Err(bad(index, "one key per change".into()));
+                    }
+                }
                 Op::ActsFor { person } => {
                     if *person == change.actor {
                         return Err(bad(index, "an actor can't write for itself".into()));
@@ -560,17 +589,13 @@ impl State {
                     }
                 }
                 Op::Grant { actor, role } => {
-                    let w = GrantWrite {
-                        role: role.clone(),
-                        rank: access::rank(&access::role_at(self, change.actor, &change.deps)),
-                        deps: change.deps.clone(),
-                    };
-                    match self.grants.get_mut(actor) {
-                        Some(r) => r.write(stamp, w),
-                        None => {
-                            self.grants.insert(*actor, Register::new(stamp, w));
-                        }
-                    }
+                    self.write_grant(change, stamp, *actor, role.clone(), false);
+                }
+                Op::Revoke { actor } => {
+                    self.write_grant(change, stamp, *actor, Role::ReadOnly, true);
+                }
+                Op::Key { key } => {
+                    self.keys.entry(change.actor).or_insert((*key, change.id()));
                 }
                 Op::ActsFor { person } => match self.links.get_mut(&change.actor) {
                     Some(r) => r.write(stamp, *person),
@@ -579,6 +604,28 @@ impl State {
                             .insert(change.actor, Register::new(stamp, *person));
                     }
                 },
+            }
+        }
+    }
+
+    fn write_grant(
+        &mut self,
+        change: &Change,
+        stamp: Stamp,
+        actor: ActorId,
+        role: Role,
+        removed: bool,
+    ) {
+        let w = GrantWrite {
+            role,
+            rank: access::rank(&access::role_at(self, change.actor, &change.deps)),
+            deps: change.deps.clone(),
+            removed,
+        };
+        match self.grants.get_mut(&actor) {
+            Some(r) => r.write(stamp, w),
+            None => {
+                self.grants.insert(actor, Register::new(stamp, w));
             }
         }
     }

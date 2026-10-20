@@ -610,6 +610,7 @@ fn refused_changes_are_shown_with_who_when_and_what() {
             field: method_core::log::Field::Title,
             value: method_core::log::Value::text("Forged"),
         }],
+        sig: None,
     };
     method_format::log::LogDir::at(sh.folder())
         .write_segment(&[forged])
@@ -840,4 +841,141 @@ fn live_second_actor() {
     for r in jordan.shared().unwrap().review() {
         println!("  {}", r.sentence);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Signed changes and removing a person (decisions.md, entry 89)
+
+fn key(seed: u8) -> std::sync::Arc<dyn method_core::log::Signer> {
+    std::sync::Arc::new(method_format::log::sign::KeyPair::from_seed([seed; 32]))
+}
+
+/// Two sessions with keys, Alex having made Jordan an editor (the first
+/// role, which starts signing), everything exchanged.
+fn signed_sessions() -> (PathBuf, Session, Session) {
+    let (path, mut alex, mut jordan) = two_sessions();
+    alex.shared_mut().unwrap().use_key(key(1)).unwrap();
+    jordan.shared_mut().unwrap().use_key(key(2)).unwrap();
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert!(!st.signed, "no signing before the first role");
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "editor", &[])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    exchange(&mut alex, &mut jordan);
+    (path, alex, jordan)
+}
+
+#[test]
+fn changes_are_signed_from_the_first_role_and_the_lists_say_so() {
+    let (_path, mut alex, mut jordan) = signed_sessions();
+    let id = ids_in(&alex, "50-01")[0];
+    jordan.set_detail_field(id, "rate", "4321").unwrap();
+    exchange(&mut alex, &mut jordan);
+    assert_eq!(rate_of(&alex, id), "4321");
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert!(st.signed);
+    assert!(
+        st.signed_text.starts_with("Changes are signed"),
+        "{}",
+        st.signed_text
+    );
+    assert_eq!(st.refused, 0, "{:?}", st.refused_changes);
+    assert!(st.me.signs);
+    let j = st.people.iter().find(|p| p.actor == JORDAN.hex()).unwrap();
+    assert!(j.signs, "Jordan's key arrived");
+    // The Activity list marks signed changes: Jordan's edit is.
+    let activity = alex.shared().unwrap().activity(10);
+    let edit = activity
+        .iter()
+        .find(|a| a.label.starts_with("Edit rate on 50-01"))
+        .unwrap();
+    assert!(edit.signed);
+    assert_eq!(edit.name, "Jordan Lee");
+    // The first change, made before signing, isn't.
+    let all = alex.shared().unwrap().activity(500);
+    assert!(!all.last().unwrap().signed);
+    // The file says so: format 3.
+    let dir = alex.shared().unwrap().folder().to_path_buf();
+    let info = std::fs::read_to_string(dir.join("budget.json")).unwrap();
+    assert!(info.contains("\"version\": 3"), "{info}");
+}
+
+#[test]
+fn a_change_altered_in_the_folder_is_left_out_with_why() {
+    let (_path, mut alex, mut jordan) = signed_sessions();
+    jordan.shared_mut().unwrap().flush_all();
+    // Jordan's next change, altered in the folder before Alex reads it.
+    let id = ids_in(&jordan, "50-01")[0];
+    jordan.set_detail_field(id, "rate", "555").unwrap();
+    jordan.share_tick(later());
+    let dir = method_format::log::LogDir::at(jordan.shared().unwrap().folder());
+    let seg = dir.segments(JORDAN).last().unwrap().path.clone();
+    let text = std::fs::read_to_string(&seg).unwrap();
+    let line = text.lines().nth(1).unwrap().replace("\"555\"", "\"5\"");
+    let mut changes: Vec<method_core::log::Change> =
+        vec![method_format::log::change_from_json(&line).unwrap()];
+    changes.truncate(1);
+    std::fs::write(&seg, method_format::log::segment_bytes(&changes).unwrap()).unwrap();
+    alex.share_tick(later());
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert_eq!(st.refused, 1, "{:?}", st.refused_changes);
+    let r = &st.refused_changes[0];
+    assert_eq!(r.name, "Jordan Lee");
+    assert!(
+        r.why.starts_with("Its signature doesn\u{2019}t match"),
+        "{}",
+        r.why
+    );
+    assert_ne!(rate_of(&alex, id), "5");
+}
+
+#[test]
+fn removing_a_person_leaves_out_their_later_changes() {
+    let (_path, mut alex, mut jordan) = signed_sessions();
+    let id = ids_in(&alex, "50-01")[0];
+    // Seen by Alex before the removal: kept.
+    jordan.set_detail_field(id, "rate", "100").unwrap();
+    exchange(&mut alex, &mut jordan);
+    // Made while Alex removes Jordan, unseen: left out everywhere.
+    jordan.set_detail_field(id, "rate", "200").unwrap();
+    jordan.shared_mut().unwrap().flush_all();
+    let err = jordan
+        .shared_mut()
+        .unwrap()
+        .remove_person(&ALEX.hex())
+        .unwrap_err();
+    assert!(err.contains("owner"), "{err}");
+    alex.shared_mut()
+        .unwrap()
+        .remove_person(&JORDAN.hex())
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    exchange(&mut alex, &mut jordan);
+    for s in [&alex, &jordan] {
+        assert_eq!(rate_of(s, id), "100");
+    }
+    let st = alex.shared().unwrap().status(Instant::now());
+    let j = st.people.iter().find(|p| p.actor == JORDAN.hex()).unwrap();
+    assert!(j.removed);
+    assert!(j.role_text.starts_with("Removed"), "{}", j.role_text);
+    let r = st
+        .refused_changes
+        .iter()
+        .find(|r| r.name == "Jordan Lee")
+        .unwrap();
+    assert_eq!(r.why, "It was made after its author was removed.");
+    // Jordan's computer says so, and refuses edits before they are made.
+    let err = jordan.set_detail_field(id, "rate", "300").unwrap_err();
+    assert!(err.starts_with("You were removed"), "{err}");
+    // Given a role again, Jordan is back from then on.
+    alex.shared_mut()
+        .unwrap()
+        .set_role(&JORDAN.hex(), "editor", &[])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+    jordan.set_detail_field(id, "rate", "400").unwrap();
+    exchange(&mut alex, &mut jordan);
+    assert_eq!(rate_of(&alex, id), "400");
 }

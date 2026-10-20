@@ -16,8 +16,10 @@ use std::sync::Arc;
 use method_core::log::hash::sha256_hex;
 use method_core::log::{
     ActorId, Change, ChangeId, Field, Frontier, Ids, Kind, ListKey, ListName, Log, LogError,
-    Member, Node, Op, Placement, Projection, Role, Side, Stamp, Uid, Value,
+    Member, Node, Op, Placement, Projection, PublicKey, Role, Side, Signature, Stamp, Uid, Value,
 };
+
+pub mod sign;
 use method_core::Budget;
 use serde::{Deserialize, Serialize};
 
@@ -31,16 +33,29 @@ use crate::fsio::{read_capped, read_to_string_capped, MAX_READ_BYTES};
 /// The value of `format` in `budget.json`.
 pub const LOG_FORMAT_NAME: &str = "method-budget-log";
 /// The highest log format version this build reads.
-pub const LOG_FORMAT_VERSION: u64 = 2;
+pub const LOG_FORMAT_VERSION: u64 = 3;
 /// The version a log is written at until someone is given a role.
 pub const LOG_FORMAT_BASE: u64 = 1;
 /// The version from the first role on (decisions.md, entry 78): `budget.json`
 /// and every segment holding a `grant` say 2, so a program that reads only 1
 /// refuses the folder as newer than it reads rather than skipping the roles.
 pub const LOG_FORMAT_ROLES: u64 = 2;
+/// The version from the owner's key on (decisions.md, entry 89):
+/// `budget.json` and every segment holding a `key`, a `revoke` or a signed
+/// change say 3, so a program that can't check signatures refuses the
+/// folder as newer than it reads rather than taking in unsigned changes.
+pub const LOG_FORMAT_SIGNED: u64 = 3;
 
 /// The format a segment holding `changes` is written at.
 fn format_for(changes: &[Change]) -> u64 {
+    if changes.iter().any(|c| {
+        c.sig.is_some()
+            || c.ops
+                .iter()
+                .any(|op| matches!(op, Op::Key { .. } | Op::Revoke { .. }))
+    }) {
+        return LOG_FORMAT_SIGNED;
+    }
     if changes.iter().any(|c| {
         c.ops
             .iter()
@@ -256,6 +271,14 @@ enum FileOp {
     ActsFor {
         person: String,
     },
+    /// The change's actor's public key (decisions.md, entry 89).
+    Key {
+        key: String,
+    },
+    /// A person removed, with a cutoff at the change's own `deps`.
+    Revoke {
+        actor: String,
+    },
 }
 
 fn parse_field(s: &str) -> Result<Field, String> {
@@ -331,6 +354,8 @@ impl From<&Op> for FileOp {
             Op::ActsFor { person } => FileOp::ActsFor {
                 person: person.hex(),
             },
+            Op::Key { key } => FileOp::Key { key: key.hex() },
+            Op::Revoke { actor } => FileOp::Revoke { actor: actor.hex() },
             Op::Grant { actor, role } => FileOp::Grant {
                 actor: actor.hex(),
                 role: role.key().into(),
@@ -419,6 +444,12 @@ impl TryFrom<FileOp> for Op {
             FileOp::ActsFor { person } => Op::ActsFor {
                 person: ActorId::parse(&person).ok_or_else(|| format!("bad actor {person:?}"))?,
             },
+            FileOp::Key { key } => Op::Key {
+                key: PublicKey::parse(&key).ok_or_else(|| format!("bad key {key:?}"))?,
+            },
+            FileOp::Revoke { actor } => Op::Revoke {
+                actor: ActorId::parse(&actor).ok_or_else(|| format!("bad actor {actor:?}"))?,
+            },
             FileOp::Grant { actor, role, scope } => {
                 let scope = scope
                     .iter()
@@ -450,6 +481,11 @@ struct FileChange {
     time: String,
     label: String,
     ops: Vec<FileOp>,
+    /// The author's Ed25519 signature over the line without this field
+    /// (decisions.md, entry 89), 128 hex characters; last, so the signed
+    /// bytes are the line up to it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sig: Option<String>,
 }
 
 /// One compound value as the `.mthd` writes it, under a key naming its
@@ -608,7 +644,18 @@ pub fn value_from_json(v: serde_json::Value) -> Result<Value, String> {
 /// One change as one line of JSON (no newline), in canonical form: the
 /// same change always gives the same bytes.
 pub fn change_to_json(c: &Change) -> String {
-    let f = FileChange {
+    let f = file_change(c, c.sig.map(|s| s.hex()));
+    serde_json::to_string(&f).expect("a change always serializes")
+}
+
+/// The line a signature is made over: the change's line without its
+/// `sig` (decisions.md, entry 89).
+pub fn unsigned_line(c: &Change) -> String {
+    serde_json::to_string(&file_change(c, None)).expect("a change always serializes")
+}
+
+fn file_change(c: &Change, sig: Option<String>) -> FileChange {
+    FileChange {
         actor: c.actor.hex(),
         seq: c.seq,
         deps: c.deps.0.iter().map(|(a, s)| (a.hex(), *s)).collect(),
@@ -616,8 +663,8 @@ pub fn change_to_json(c: &Change) -> String {
         time: c.time.clone(),
         label: c.label.clone(),
         ops: c.ops.iter().map(FileOp::from).collect(),
-    };
-    serde_json::to_string(&f).expect("a change always serializes")
+        sig,
+    }
 }
 
 /// Reads one change from its line of JSON.
@@ -642,6 +689,10 @@ pub fn change_from_json(line: &str) -> Result<Change, String> {
             .into_iter()
             .map(Op::try_from)
             .collect::<Result<_, String>>()?,
+        sig: f
+            .sig
+            .map(|s| Signature::parse(&s).ok_or_else(|| format!("bad signature {s:?}")))
+            .transpose()?,
     })
 }
 
@@ -1142,7 +1193,8 @@ pub fn init(path: &Path, actor: ActorId, ids: Ids, time: &str) -> Result<Shared,
         .and_then(|n| n.to_str())
         .unwrap_or("budget.mthd")
         .to_string();
-    let log = Log::adopt(actor, ids, &budget, &format!("Adopted {file}"), time);
+    let mut log = Log::adopt(actor, ids, &budget, &format!("Adopted {file}"), time);
+    log.set_verifier(Arc::new(sign::Ed25519));
     let genesis = log
         .changes()
         .next()
@@ -1163,6 +1215,8 @@ pub fn open(path: &Path, actor: ActorId, ids: Ids) -> Result<(Shared, LoadReport
     let dir = LogDir::for_budget(path);
     let info = dir.info()?;
     let mut log = Log::new(actor, ids);
+    // Every signature is checked (decisions.md, entry 89).
+    log.set_verifier(Arc::new(sign::Ed25519));
     // The owner is whoever started sharing, as `budget.json` records,
     // whatever order the segments are read in.
     log.set_genesis(info.genesis);
@@ -1396,6 +1450,15 @@ pub fn read_shared(path: &Path) -> Result<Budget, LogFileError> {
 /// shared budget whose owner has set roles.
 pub const NO_PERSON: &str = "This computer has no person in this shared budget, and its owner has set who may change what, so nothing was written. Open the budget in Method Budget to join it; the owner can then give you a role.";
 
+/// What a program is told when changes in the budget are signed and this
+/// computer's person hasn't published their key yet (their app does when it
+/// opens the budget).
+pub const NO_KEY_YET: &str = "Changes in this shared budget are signed, and this computer's key isn't in it yet, so nothing was written. Open the budget in Method Budget once; it adds the key, and then this works.";
+
+/// What a program is told when this computer's person was removed from a
+/// shared budget.
+pub const REMOVED: &str = "This computer's person was removed from this shared budget, so nothing was written. The owner can give you a role again in the Share dialog.";
+
 /// How many tool actors one computer keeps (one per program changing a
 /// shared budget at the same moment).
 const TOOL_ACTORS: usize = 32;
@@ -1487,7 +1550,11 @@ pub fn open_as_tool(
 ) -> Result<(Shared, LoadReport, ToolLock), LogFileError> {
     let tools = tools_root(person_file).join(person.hex());
     let (tool, lock) = take_tool_actor(&tools)?;
-    let (shared, report) = open(path, tool, Ids::from_os())?;
+    let (mut shared, report) = open(path, tool, Ids::from_os())?;
+    // A program signs with its person's key (decisions.md, entry 89): the
+    // same key file, beside the person's actor id.
+    let key = sign::load_or_make_key(&sign::key_path(person_file))?;
+    shared.log.set_signer(Arc::new(key));
     Ok((shared, report, ToolLock(lock)))
 }
 
@@ -1565,6 +1632,9 @@ impl SharedEdit {
         label: &str,
         time: &str,
     ) -> Result<bool, LogFileError> {
+        if self.shared.log.removed(self.person) {
+            return Err(LogFileError(REMOVED.into()));
+        }
         // Once roles are set, the tool actor says whose it is first, so it
         // has its person's role; the two go into the folder together, or
         // neither does.
@@ -1584,7 +1654,15 @@ impl SharedEdit {
             self.shared
                 .log
                 .acts_for(self.person, "Writes for this computer's person", time)
-                .map_err(|e| LogFileError(format!("This change couldn't be shared: {e}")))?;
+                .map_err(|e| match e {
+                    LogError::Unsigned { reason, .. }
+                        if reason == method_core::log::sign::why::PERSON_HAS_NO_KEY =>
+                    {
+                        LogFileError(NO_KEY_YET.into())
+                    }
+                    LogError::Removed { .. } => LogFileError(REMOVED.into()),
+                    e => LogFileError(format!("This change couldn't be shared: {e}")),
+                })?;
         }
         let recorded = self
             .shared
@@ -1595,6 +1673,12 @@ impl SharedEdit {
                     "Your role in this shared budget doesn't allow this change ({}), so nothing was written. The owner sets who may change what.",
                     refusal.reason
                 )),
+                LogError::Removed { .. } => LogFileError(REMOVED.into()),
+                LogError::Unsigned { reason, .. }
+                    if reason == method_core::log::sign::why::PERSON_HAS_NO_KEY =>
+                {
+                    LogFileError(NO_KEY_YET.into())
+                }
                 other => LogFileError(format!("This change couldn't be shared: {other}")),
             })?;
         if recorded.is_none() {
@@ -1795,6 +1879,7 @@ mod tests {
                 })
                 .chain([Op::ActsFor { person: actor(3) }])
                 .collect(),
+            sig: None,
         };
         let line = change_to_json(&change);
         assert!(line.contains(r#""op":"grant""#), "{line}");

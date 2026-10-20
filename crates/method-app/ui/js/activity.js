@@ -147,7 +147,7 @@ function row(it) {
     { class: 'activity-main' },
     el('span', { class: `share-avatar share-avatar-sm ${colorClass(it.color)}`, text: initials(it.name), title: it.name }),
     el('span', { class: 'activity-text' }, el('span', { class: 'activity-who', text: it.me ? 'You' : it.name }), ' ', el('span', { class: 'activity-label', text: it.label, title: it.label })),
-    el('span', { class: 'activity-time', text: timeText(it.time) }),
+    el('span', { class: 'activity-time', text: it.signed ? `${timeText(it.time)} · signed` : timeText(it.time), title: it.signed ? 'Signed with this person’s key' : '' }),
   );
   const li = el('li', { class: `activity-item ${it.me ? 'is-me' : ''}` }, main);
   if (it.place && it.place.text) {

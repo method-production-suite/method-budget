@@ -223,3 +223,79 @@ fn command_line_writes_to_a_shared_budget_follow_roles() {
         .count();
     assert_eq!(kept, 1);
 }
+
+/// Once signing has started, the command line writes as a program of this
+/// computer's person and signs with the person's key, kept beside the actor
+/// id; until the person's app has put that key in the budget it is refused
+/// in words (decisions.md, entry 89).
+#[test]
+fn command_line_writes_are_signed_with_the_persons_key() {
+    use method_core::log::{ActorId, Ids, Role};
+    use method_format::log;
+
+    let d = Dir::new("signed");
+    let file = d.path("Feature.mthd");
+    let alex = d.actor("alex");
+    let jordan = d.actor("jordan");
+    assert_eq!(code(&method_as(&alex, &["log", &file, "--init"])), 0);
+    let o = method_as(&jordan, &["set", &file, "title", "Before roles"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let actor_of = |f: &str| ActorId::parse(&std::fs::read_to_string(f).unwrap()).unwrap();
+    let key_of = |f: &str| {
+        std::sync::Arc::new(
+            log::sign::load_or_make_key(&log::sign::key_path(std::path::Path::new(f))).unwrap(),
+        )
+    };
+    let path = std::path::Path::new(&file);
+    // The owner's app sets the first role: signing starts.
+    let (mut owner, _) = log::open(path, actor_of(&alex), Ids::seeded(1)).unwrap();
+    owner.log.set_signer(key_of(&alex));
+    owner
+        .log
+        .grant(
+            actor_of(&jordan),
+            Role::Editor,
+            "Jordan edits",
+            "2026-10-20T00:00:00Z",
+        )
+        .unwrap();
+    log::flush(&owner.log, &owner.dir).unwrap();
+    let o = method_as(&alex, &["log", &file]);
+    assert!(out(&o).contains("Changes are signed"), "{}", out(&o));
+
+    // Jordan's key isn't in the budget yet: refused, nothing written.
+    let o = method_as(&jordan, &["set", &file, "title", "Too soon"]);
+    assert_ne!(code(&o), 0);
+    assert!(err(&o).contains("key isn't in it yet"), "{}", err(&o));
+
+    // Jordan's app opens the budget and adds the key.
+    let (mut app, _) = log::open(path, actor_of(&jordan), Ids::seeded(2)).unwrap();
+    app.log.set_signer(key_of(&jordan));
+    app.log
+        .publish_key("Added this computer's key", "2026-10-20T00:00:00Z")
+        .unwrap()
+        .unwrap();
+    log::flush(&app.log, &app.dir).unwrap();
+
+    let o = method_as(
+        &jordan,
+        &["set", &file, "title", "Signed from the command line"],
+    );
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let (reader, report) = log::open(path, ActorId::NONE, Ids::seeded(9)).unwrap();
+    assert!(report.rejected.is_empty(), "{:?}", report.rejected);
+    assert_eq!(
+        reader.log.project().budget.title,
+        "Signed from the command line"
+    );
+    let last = reader.log.changes().last().unwrap();
+    assert!(last.sig.is_some());
+    assert_ne!(last.actor, actor_of(&jordan), "a program's own actor");
+    assert_eq!(reader.log.person_of(last.actor), actor_of(&jordan));
+    assert_eq!(
+        reader.log.key_of(last.actor),
+        reader.log.key_of(actor_of(&jordan))
+    );
+    let o = method_as(&jordan, &["log", &file, "--json"]);
+    assert!(out(&o).contains("\"signed\": true"), "{}", out(&o));
+}

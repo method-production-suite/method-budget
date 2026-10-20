@@ -262,6 +262,7 @@ const COMMANDS: &[&str] = &[
     "share_blame",
     "share_use_value",
     "share_set_role",
+    "share_remove_person",
     // The personal setup library (src/library.rs)
     "library_view",
     "library_create",

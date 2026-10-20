@@ -9,6 +9,7 @@ use super::access::Role;
 use super::clock::{ChangeId, Frontier, Stamp};
 use super::ids::{ActorId, Uid};
 use super::seq::{Node, PosId};
+use super::sign::{PublicKey, Signature};
 use crate::coding::AccountCoding;
 use crate::model::{
     Baseline, BudgetSnapshot, DisplayPrefs, FringePosting, FringeRow, GroupRules, InfoValue,
@@ -807,6 +808,16 @@ pub enum Op {
     /// it never shares a sequence of changes with the app): it has that
     /// person's role. Once per actor, never for itself.
     ActsFor { person: ActorId },
+    /// Publishes the public key of the change's actor (decisions.md, entry
+    /// 89): from this change on, every change it writes is signed with it.
+    /// Once per actor; the change carrying it is signed with the key itself.
+    Key { key: PublicKey },
+    /// Removes a person (decisions.md, entry 89): a role of read only, and a
+    /// cutoff. Their changes that the remover hadn't seen (the change's own
+    /// `deps`) and that hadn't seen this one are kept aside on every
+    /// computer, whatever they claim to have seen. A role given again later
+    /// lets them back in from then on.
+    Revoke { actor: ActorId },
 }
 
 impl Op {
@@ -820,7 +831,7 @@ impl Op {
             | Op::Restore { entity }
             | Op::Add { entity, .. }
             | Op::Remove { entity, .. } => *entity,
-            Op::Grant { .. } | Op::ActsFor { .. } => Uid::ROOT,
+            Op::Grant { .. } | Op::ActsFor { .. } | Op::Key { .. } | Op::Revoke { .. } => Uid::ROOT,
         }
     }
 
@@ -836,12 +847,15 @@ impl Op {
             Op::Remove { .. } => "remove",
             Op::Grant { .. } => "grant",
             Op::ActsFor { .. } => "acts_for",
+            Op::Key { .. } => "key",
+            Op::Revoke { .. } => "revoke",
         }
     }
 }
 
 /// One undo step by one person: the unit of the log (docs/research/
-/// collaboration.md, 3.4). Signed in phase 3; until then `sig` is empty.
+/// collaboration.md, 3.4). Signed by its author once signing has started
+/// for the budget (decisions.md, entry 89; [`super::sign`]).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Change {
     pub actor: ActorId,
@@ -856,6 +870,8 @@ pub struct Change {
     /// What the person did: "Edit rate on 21-01 line 3".
     pub label: String,
     pub ops: Vec<Op>,
+    /// The author's signature over everything above, or none.
+    pub sig: Option<Signature>,
 }
 
 impl Change {
@@ -874,5 +890,20 @@ impl Change {
             seq: self.seq,
             index: index as u32,
         }
+    }
+
+    /// The key this change publishes, if it holds a [`Op::Key`].
+    pub fn key(&self) -> Option<PublicKey> {
+        self.ops.iter().find_map(|op| match op {
+            Op::Key { key } => Some(*key),
+            _ => None,
+        })
+    }
+
+    /// Whether it gives anyone a role or removes anyone.
+    pub fn grants(&self) -> bool {
+        self.ops
+            .iter()
+            .any(|op| matches!(op, Op::Grant { .. } | Op::Revoke { .. }))
     }
 }

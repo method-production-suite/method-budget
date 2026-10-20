@@ -29,13 +29,15 @@ pub mod project;
 pub mod review;
 pub mod schema;
 pub mod seq;
+pub mod sign;
 pub mod state;
 pub mod undo;
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::sync::Arc;
 
-pub use access::{Refusal, Role};
+pub use access::{Bounds, Refusal, Role};
 pub use capture::Hint;
 pub use clock::{ChangeId, Frontier, Stamp};
 pub use ids::{ActorId, Ids, Uid};
@@ -43,6 +45,7 @@ pub use op::{Change, Field, Kind, ListKey, ListName, Member, Op, Placement, Valu
 pub use project::{project, Binding, Projection};
 pub use review::{Review, ReviewItem};
 pub use seq::{Node, PosId, SeqTree, Side};
+pub use sign::{PublicKey, Signature, Signer, Verifier};
 pub use state::{Entity, GrantWrite, Malformed, OrSet, Place, Register, State};
 pub use undo::Inverse;
 
@@ -76,6 +79,23 @@ pub enum LogError {
     /// The change goes beyond its author's role (decisions.md, entry 78).
     /// Refused by every app, so it is listed and skipped.
     NotAllowed { id: ChangeId, refusal: Refusal },
+    /// The change's signature is missing or doesn't match its author's key
+    /// (decisions.md, entry 89). Kept aside and listed.
+    Unsigned { id: ChangeId, reason: String },
+    /// The change was made after its author was removed, without having
+    /// seen the removal (decisions.md, entry 89). Kept aside and listed.
+    Removed { id: ChangeId },
+}
+
+/// The prefixes of [`Log::rejected`]'s reasons, so a reader can tell why
+/// without parsing sentences.
+pub mod refused {
+    /// Beyond the author's role.
+    pub const NOT_ALLOWED: &str = "not allowed: ";
+    /// A signature missing or not matching.
+    pub const SIGNATURE: &str = "signature: ";
+    /// After the author was removed.
+    pub const REMOVED: &str = "removed: ";
 }
 
 impl fmt::Display for LogError {
@@ -88,6 +108,12 @@ impl fmt::Display for LogError {
             LogError::NotMine { id } => write!(f, "change {id} is not one of this actor's"),
             LogError::NotAllowed { id, refusal } => {
                 write!(f, "change {id} is not allowed: {}", refusal.reason)
+            }
+            LogError::Unsigned { id, reason } => {
+                write!(f, "change {id} isn't signed properly: {reason}")
+            }
+            LogError::Removed { id } => {
+                write!(f, "change {id} was made after its author was removed")
             }
         }
     }
@@ -108,7 +134,7 @@ pub enum Applied {
 
 /// One actor's log: the folded state, every change applied (in order),
 /// changes waiting for their dependencies, and changes refused.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Log {
     actor: ActorId,
     ids: Ids,
@@ -118,6 +144,31 @@ pub struct Log {
     frontier: Frontier,
     pending: Vec<Change>,
     rejected: Vec<(Change, String)>,
+    /// Every change taken in (applied or refused), in the order taken: what
+    /// a fold starts again from.
+    received: Vec<ChangeId>,
+    /// The changes that judge changes which never saw them.
+    bounds: Bounds,
+    /// This computer's key, when it signs (decisions.md, entry 89).
+    signer: Option<Arc<dyn Signer>>,
+    /// What checks signatures; without it a change that needs one is kept
+    /// aside.
+    verifier: Option<Arc<dyn Verifier>>,
+    /// How many times everything was folded again.
+    folds: u64,
+}
+
+impl fmt::Debug for Log {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Log")
+            .field("actor", &self.actor)
+            .field("changes", &self.order.len())
+            .field("frontier", &self.frontier)
+            .field("pending", &self.pending.len())
+            .field("rejected", &self.rejected.len())
+            .field("signs", &self.signer.is_some())
+            .finish()
+    }
 }
 
 impl Log {
@@ -132,7 +183,36 @@ impl Log {
             frontier: Frontier::new(),
             pending: Vec::new(),
             rejected: Vec::new(),
+            received: Vec::new(),
+            bounds: Bounds::default(),
+            signer: None,
+            verifier: None,
+            folds: 0,
         }
+    }
+
+    /// How many times the log has folded everything again because a change
+    /// arrived that judged changes applied before it (a removal, the
+    /// owner's first role or key): a reader's cue that changes it had may
+    /// have been left out since.
+    pub fn folds(&self) -> u64 {
+        self.folds
+    }
+
+    /// Checks signatures with `verifier` from now on.
+    pub fn set_verifier(&mut self, verifier: Arc<dyn Verifier>) {
+        self.verifier = Some(verifier);
+    }
+
+    /// Signs this actor's changes with `signer` from now on, publishing its
+    /// key with the first change that needs it.
+    pub fn set_signer(&mut self, signer: Arc<dyn Signer>) {
+        self.signer = Some(signer);
+    }
+
+    /// This computer's public key, when it has one.
+    pub fn signer_key(&self) -> Option<PublicKey> {
+        self.signer.as_ref().map(|s| s.public())
     }
 
     /// A log whose first change (the genesis) creates everything in
@@ -201,11 +281,18 @@ impl Log {
             .collect()
     }
 
-    /// This actor's own changes with a seq above `seq`, in order.
+    /// This actor's own changes with a seq above `seq`, in order: those
+    /// applied and those refused (refused after the fact: a removal that
+    /// arrived later), so the folder never has a gap in its sequence.
     pub fn own_after(&self, seq: u64) -> Vec<&Change> {
-        self.changes()
+        let mut out: Vec<&Change> = self
+            .changes()
+            .chain(self.rejected.iter().map(|(c, _)| c))
             .filter(|c| c.actor == self.actor && c.seq > seq)
-            .collect()
+            .collect();
+        out.sort_by_key(|c| c.seq);
+        out.dedup_by_key(|c| c.seq);
+        out
     }
 
     /// Changes waiting for their dependencies.
@@ -252,7 +339,7 @@ impl Log {
         if ops.is_empty() {
             return Ok(None);
         }
-        let change = Change {
+        let change = self.sealed(Change {
             actor: self.actor,
             seq,
             deps: self.frontier.clone(),
@@ -260,7 +347,8 @@ impl Log {
             time: time.to_string(),
             label: label.to_string(),
             ops,
-        };
+            sig: None,
+        });
         self.check_own(&change)?;
         let id = change.id();
         // Checked just above, so this cannot refuse it.
@@ -268,22 +356,129 @@ impl Log {
         Ok(Some(id))
     }
 
+    /// Whether this actor's next change should publish its key: it signs,
+    /// has no key in the log yet, and signing has started (or this is the
+    /// owner, and roles exist or this change gives the first).
+    fn wants_key(&self, change: &Change) -> bool {
+        self.signer.is_some()
+            && self.state.key_of(self.actor).is_none()
+            && (self.bounds.signing.is_some()
+                || (self.state.owner() == Some(self.actor)
+                    && (self.roles_started() || change.grants())))
+    }
+
+    /// One of this actor's own changes, made ready to apply: its key added
+    /// when it publishes one (as the last op, so no op's stamp moves), and
+    /// signed when this actor signs.
+    fn sealed(&self, mut change: Change) -> Change {
+        let Some(signer) = &self.signer else {
+            return change;
+        };
+        if change.key().is_none() && self.wants_key(&change) {
+            change.ops.push(Op::Key {
+                key: signer.public(),
+            });
+        }
+        if self.state.key_of(self.actor).is_some() || change.key().is_some() {
+            change.sig = None;
+            change.sig = Some(signer.sign(&change));
+        }
+        change
+    }
+
     /// Checks one of this actor's own changes before it is applied: it
-    /// must fit the state and this person's role. Nothing is recorded
-    /// when it doesn't.
+    /// must fit the state, be signed when it must, and fit this person's
+    /// role. Nothing is recorded when it doesn't.
     fn check_own(&self, change: &Change) -> Result<(), LogError> {
+        self.judge(change).map_err(|b| b.1)
+    }
+
+    /// Every check a change passes before it is applied, in order: it fits
+    /// the state, its signature (decisions.md, entry 89), its author wasn't
+    /// removed before it, and its author's role. The reason for the
+    /// rejected list and the error, when it doesn't.
+    fn judge(&self, change: &Change) -> Result<(), Box<(String, LogError)>> {
         let id = change.id();
-        self.state.check(change).map_err(|m| LogError::Malformed {
-            id,
-            reason: m.to_string(),
-        })?;
-        access::check(&self.state, change).map_err(|refusal| LogError::NotAllowed { id, refusal })
+        if let Err(m) = self.state.check(change) {
+            let reason = m.to_string();
+            return Err(Box::new((
+                reason.clone(),
+                LogError::Malformed { id, reason },
+            )));
+        }
+        if let Err(why) = self.check_signature(change) {
+            return Err(Box::new((
+                format!("{}{why}", refused::SIGNATURE),
+                LogError::Unsigned {
+                    id,
+                    reason: why.to_string(),
+                },
+            )));
+        }
+        if self.bounds.removed(&self.state, change).is_some() {
+            return Err(Box::new((
+                format!(
+                    "{}made after its author was removed, without having seen it",
+                    refused::REMOVED
+                ),
+                LogError::Removed { id },
+            )));
+        }
+        access::check_within(&self.state, &self.bounds, change).map_err(|refusal| {
+            Box::new((
+                format!("{}{}", refused::NOT_ALLOWED, refusal.reason),
+                LogError::NotAllowed { id, refusal },
+            ))
+        })
+    }
+
+    /// The signature rules (decisions.md, entry 89; [`sign`]).
+    fn check_signature(&self, change: &Change) -> Result<(), &'static str> {
+        let actor = change.actor;
+        let published = change.key();
+        let had = self.state.key_of(actor);
+        if published.is_some() && had.is_some() {
+            return Err(sign::why::TWO_KEYS);
+        }
+        if !self.bounds.must_sign(&self.state, change) {
+            return match change.sig {
+                Some(_) => Err(sign::why::NO_KEY),
+                None => Ok(()),
+            };
+        }
+        let Some(key) = published.or(had.map(|(k, _)| k)) else {
+            return Err(sign::why::MISSING);
+        };
+        if change.sig.is_none() {
+            return Err(sign::why::MISSING);
+        }
+        let Some(verifier) = &self.verifier else {
+            return Err(sign::why::CANT_CHECK);
+        };
+        if !verifier.verify(&key, change) {
+            return Err(sign::why::MISMATCH);
+        }
+        // A program signs with its person's key, which must be in the log
+        // where the program writes from.
+        let person = access::person_of_change(&self.state, change);
+        let says_whose = change.ops.iter().any(|op| matches!(op, Op::ActsFor { .. }));
+        if person != actor && (says_whose || published.is_some()) {
+            match self.state.key_of(person) {
+                Some((k, at)) if change.deps.includes(at) => {
+                    if k != key {
+                        return Err(sign::why::NOT_PERSONS_KEY);
+                    }
+                }
+                _ => return Err(sign::why::PERSON_HAS_NO_KEY),
+            }
+        }
+        Ok(())
     }
 
     /// Records a change made of `ops` by this actor (an undo, a change
     /// built by a tool).
     fn record_ops(&mut self, ops: Vec<Op>, label: &str, time: &str) -> Result<ChangeId, LogError> {
-        let change = Change {
+        let change = self.sealed(Change {
             actor: self.actor,
             seq: self.own_seq() + 1,
             deps: self.frontier.clone(),
@@ -291,7 +486,8 @@ impl Log {
             time: time.to_string(),
             label: label.to_string(),
             ops,
-        };
+            sig: None,
+        });
         self.check_own(&change)?;
         let id = change.id();
         let _ = self.apply_now(change);
@@ -328,22 +524,78 @@ impl Log {
     }
 
     fn apply_now(&mut self, change: Change) -> Result<(), LogError> {
+        self.take(change, true)
+    }
+
+    /// Applies or refuses one change whose dependencies are in. With
+    /// `refold`, a change that adds a bound judging changes already applied
+    /// differently makes the log fold everything again.
+    fn take(&mut self, change: Change, refold: bool) -> Result<(), LogError> {
         let id = change.id();
         self.frontier.advance(change.actor, change.seq);
-        if let Err(m) = self.state.check(&change) {
-            let reason = m.to_string();
-            self.rejected.push((change, reason.clone()));
-            return Err(LogError::Malformed { id, reason });
-        }
-        if let Err(refusal) = access::check(&self.state, &change) {
-            self.rejected
-                .push((change, format!("not allowed: {}", refusal.reason)));
-            return Err(LogError::NotAllowed { id, refusal });
+        self.received.push(id);
+        if let Err(b) = self.judge(&change) {
+            let (reason, e) = *b;
+            self.rejected.push((change, reason));
+            return Err(e);
         }
         self.state.apply(&change);
         self.order.push(id);
+        let mut bounds = self.bounds.clone();
+        bounds.note(&self.state, &change);
         self.changes.insert(id, change);
+        if bounds != self.bounds && refold {
+            let old = std::mem::replace(&mut self.bounds, bounds);
+            let judged_again = self.order.iter().any(|c| {
+                *c != id
+                    && self.changes.get(c).is_some_and(|c| {
+                        access::Bounds::changes_verdict(&self.state, &self.bounds, &old, c)
+                    })
+            });
+            if judged_again {
+                self.refold();
+            }
+        } else if refold {
+            self.bounds = bounds;
+        }
         Ok(())
+    }
+
+    /// Folds every change taken in again from an empty state, in the order
+    /// they were taken, judged with the bounds known now, until the bounds
+    /// the fold ends with are the ones it was judged with (a removal can be
+    /// undone by its author's own removal). Rare: only when a change arrives
+    /// that judges changes applied before it.
+    fn refold(&mut self) {
+        self.folds += 1;
+        for _ in 0..16 {
+            let mut taken: BTreeMap<ChangeId, Change> = std::mem::take(&mut self.changes);
+            for (c, _) in std::mem::take(&mut self.rejected) {
+                taken.entry(c.id()).or_insert(c);
+            }
+            let received = std::mem::take(&mut self.received);
+            let genesis = self.state.genesis();
+            self.state = State::new();
+            if let Some(g) = genesis {
+                self.state.set_genesis(g);
+            }
+            self.order.clear();
+            self.frontier = Frontier::new();
+            let mut fresh = Bounds::default();
+            for id in received {
+                if let Some(c) = taken.remove(&id) {
+                    let applied = self.take(c, false).is_ok();
+                    if applied {
+                        let c = self.changes.get(&id).expect("just applied");
+                        fresh.note(&self.state, c);
+                    }
+                }
+            }
+            if fresh == self.bounds {
+                return;
+            }
+            self.bounds = fresh;
+        }
     }
 
     fn drain_pending(&mut self) -> usize {
@@ -430,6 +682,65 @@ impl Log {
         time: &str,
     ) -> Result<ChangeId, LogError> {
         self.record_ops(vec![Op::Grant { actor, role }], label, time)
+    }
+
+    /// Removes `actor` (decisions.md, entry 89): a change by this actor
+    /// that makes them read only and keeps aside their changes this actor
+    /// hasn't seen. Refused unless this actor may set their role.
+    pub fn revoke(
+        &mut self,
+        actor: ActorId,
+        label: &str,
+        time: &str,
+    ) -> Result<ChangeId, LogError> {
+        self.record_ops(vec![Op::Revoke { actor }], label, time)
+    }
+
+    /// Publishes this computer's key now, as a change of its own, when it
+    /// should have one in the log and hasn't (signing has started, or this
+    /// is the owner of a budget with roles). `None` when there is nothing
+    /// to publish.
+    pub fn publish_key(&mut self, label: &str, time: &str) -> Result<Option<ChangeId>, LogError> {
+        let probe = Change {
+            actor: self.actor,
+            seq: 0,
+            deps: Frontier::new(),
+            lamport: 0,
+            time: String::new(),
+            label: String::new(),
+            ops: Vec::new(),
+            sig: None,
+        };
+        if !self.wants_key(&probe) {
+            return Ok(None);
+        }
+        self.record_ops(Vec::new(), label, time).map(Some)
+    }
+
+    /// `actor`'s published key.
+    pub fn key_of(&self, actor: ActorId) -> Option<PublicKey> {
+        self.state.key_of(actor).map(|(k, _)| k)
+    }
+
+    /// Whether signing has started for this budget: the owner's key is in
+    /// the log.
+    pub fn signing_started(&self) -> bool {
+        self.bounds.signing.is_some()
+    }
+
+    /// Whether `actor` (a person) was removed and not given a role since.
+    pub fn removed(&self, actor: ActorId) -> bool {
+        self.state
+            .grants()
+            .get(&actor)
+            .and_then(|r| access::grant_write_at(r, &self.frontier))
+            .is_some_and(|w| w.removed)
+    }
+
+    /// The bounds the log judges with (the owner's first role and key, and
+    /// every removal).
+    pub fn bounds(&self) -> &Bounds {
+        &self.bounds
     }
 
     /// Who started sharing.

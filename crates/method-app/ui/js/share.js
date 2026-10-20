@@ -311,8 +311,8 @@ function drawPanel() {
   if (typeof s.synced_secs === 'number') rows.push(line('Folder last read', ago(s.synced_secs + extra)));
   rows.push(line('Changes in all', String(s.changes)));
   const people = el('div', { class: 'share-people-list' });
-  people.append(personRow(s.me));
-  for (const p of s.people) people.append(personRow(p));
+  people.append(personRow(s.me, s));
+  for (const p of s.people) people.append(personRow(p, s));
   rows.push(el('h4', { class: 'share-panel-sub', text: 'People' }), people);
   const refused = refusedList(s);
   if (refused) rows.push(...refused);
@@ -345,8 +345,15 @@ function refusedList(s) {
   return [el('h4', { class: 'share-panel-sub', text: title }), items];
 }
 
-function personRow(p) {
+/** Whether a person's changes are signed, in words (decisions.md, entry 89). */
+function signText(p, s) {
+  if (!s || !s.signed) return '';
+  return p.signs ? 'Signs changes' : 'No key yet: their changes are left out until their computer adds one';
+}
+
+function personRow(p, s) {
   const when = p.me ? 'you' : typeof p.seen_secs === 'number' ? (p.away ? `away · last seen ${ago(p.seen_secs)}` : ago(p.seen_secs)) : 'not seen yet';
+  const signed = signText(p, s);
   return el(
     'div',
     { class: `share-person ${p.away ? 'is-away' : ''}` },
@@ -355,6 +362,7 @@ function personRow(p) {
     el('span', { class: 'share-person-where', text: p.keeper ? `${whereText(p)} · keeps the file` : whereText(p) }),
     el('span', { class: 'share-person-when', text: when }),
     p.role_text ? el('span', { class: 'share-person-role', text: p.role_text, title: p.role_text }) : null,
+    signed ? el('span', { class: 'share-person-role share-person-signed', text: signed, title: signed }) : null,
   );
 }
 
@@ -790,9 +798,9 @@ function sharedDialog(title, setup) {
       name.value = me.name;
       const colors = colorPicker(me.color, (c) => { me.color = c; });
       const people = el('div', { class: 'share-people-list share-people-dialog' });
-      if (s.me) people.append(personRow({ ...s.me, name: `${s.me.name} (you)` }));
+      if (s.me) people.append(personRow({ ...s.me, name: `${s.me.name} (you)` }, s));
       for (const p of s.people) {
-        people.append(personRow(p));
+        people.append(personRow(p, s));
         const picker = s.can_set_roles ? rolePicker(p, s, setup, error) : null;
         if (picker) people.append(picker);
       }
@@ -821,7 +829,7 @@ function sharedDialog(title, setup) {
         el('h4', { class: 'share-panel-sub', text: 'People' }),
         people,
         el('p', { class: 'share-muted', text: rolesNote(s) }),
-        s.can_set_roles ? el('p', { class: 'share-muted', text: UNSIGNED_NOTE }) : null,
+        s.signed_text ? el('p', { class: 'share-muted', text: s.signed_text }) : null,
         el('div', { class: 'share-me' }, el('label', { class: 'modal-field', attrs: { for: 'share-name' } }, el('span', { text: 'Your name' }), name), el('div', { class: 'modal-field' }, el('span', { text: 'Your color' }), colors), save),
         error,
         el('div', { class: 'modal-actions' }, done),
@@ -831,11 +839,13 @@ function sharedDialog(title, setup) {
   );
 }
 
-/** Roles are checked by the app, not yet signed (decisions.md, entry 78). */
-const UNSIGNED_NOTE = 'Roles stop people changing what they shouldn’t by accident. They don’t stop someone who edits the shared folder’s files directly; signed changes come later.';
+/** An app older than this one can't read a change file that holds a role or a signature. */
+const OLDER_APPS_NOTE = 'Once roles are set, changes are signed, and everyone sharing this budget needs this version of Method Budget or later. An older version won’t join it: it says the shared changes are newer than it reads and opens the file on its own, and what is changed there isn’t shared.';
 
-/** An app older than this one can't read a change file that holds a role. */
-const OLDER_APPS_NOTE = 'Once roles are set, everyone sharing this budget needs this version of Method Budget or later. An older version won’t join it: it says the shared changes are newer than it reads and opens the file on its own, and what is changed there isn’t shared.';
+/** What Remove does (decisions.md, entry 89). */
+function removeNote(name) {
+  return `Remove ${name}? From now on ${name} reads only, and any change of theirs that hasn’t reached you yet is left out on every computer. You can give them a role again later.`;
+}
 
 /** The owner is one computer: an admin (or co-owner) is the way back if it is lost. */
 const ADMIN_NOTE = 'Only you, co-owners and admins can set roles, so if this computer is lost, they are the only way to change them. Name someone you trust as an admin now; you can make them a co-owner later, who can also make admins.';
@@ -969,7 +979,36 @@ function rolePicker(p, s, setup, error) {
     }
     apply(null);
   });
-  return el('div', { class: 'share-role-row' }, el('label', { class: 'share-line-label', text: 'May change', attrs: { for: id } }), select, set, cats, first);
+  // Remove: read only, with a cutoff at what has reached this computer.
+  const remove = p.removed ? null : el('button', { class: 'btn btn-quiet', text: 'Remove…', attrs: { type: 'button', 'aria-label': `Remove ${p.name}` } });
+  const confirmRemove = el('div', { class: 'share-first-role', attrs: { role: 'group', 'aria-label': `Remove ${p.name}` } });
+  confirmRemove.hidden = true;
+  if (remove) {
+    remove.addEventListener('click', () => {
+      error.hidden = true;
+      const go = el('button', { class: 'btn btn-primary', text: 'Remove', attrs: { type: 'button' } });
+      const keep = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
+      keep.addEventListener('click', () => { confirmRemove.hidden = true; remove.focus(); });
+      go.addEventListener('click', async () => {
+        go.disabled = true;
+        try {
+          const status = await ctx.invoke('share_remove_person', { doc: ctx.doc(), actor: p.actor });
+          if (status) statusArrived({ doc: ctx.doc(), status });
+          ctx.toast(`Removed ${p.name}. Everyone else sees it once it reaches them through the folder.`);
+          Object.assign(s, status || {});
+          confirmRemove.hidden = true;
+        } catch (e) {
+          error.textContent = String(e);
+          error.hidden = false;
+        }
+        go.disabled = false;
+      });
+      confirmRemove.replaceChildren(el('p', { class: 'modal-message', text: removeNote(p.name) }), el('div', { class: 'modal-actions' }, keep, go));
+      confirmRemove.hidden = false;
+      go.focus();
+    });
+  }
+  return el('div', { class: 'share-role-row' }, el('label', { class: 'share-line-label', text: 'May change', attrs: { for: id } }), select, set, remove, cats, first, confirmRemove);
 }
 
 /** Once per budget: what sharing means for saving (design 9.2). */
