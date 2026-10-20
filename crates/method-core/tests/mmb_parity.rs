@@ -522,6 +522,9 @@ fn credit_rows_round_once_together() {
             discount_percent: Dec::ZERO,
             excluded_fringes: set(&[]),
             locations: Default::default(),
+            minimum_spend: None,
+            broker_fee: 0,
+            shared_cap: None,
             rows: vec![row.clone(), row],
         });
         let (_, r) = totals(&b);
@@ -1289,6 +1292,9 @@ fn credit_less(name: &str, excluded: &[&str], rows: Vec<CreditRow>) -> Credit {
         discount_percent: Dec::ZERO,
         excluded_fringes: set(excluded),
         locations: Default::default(),
+        minimum_spend: None,
+        broker_fee: 0,
+        shared_cap: None,
         rows,
     }
 }

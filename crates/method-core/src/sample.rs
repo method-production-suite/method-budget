@@ -457,6 +457,9 @@ pub fn budget(spec: &SampleSpec) -> Budget {
         discount_percent: Dec::from_int(5),
         excluded_fringes: credit_excluded,
         locations: BTreeSet::new(),
+        minimum_spend: None,
+        broker_fee: 0,
+        shared_cap: None,
         rows: credit_rows,
     }];
 

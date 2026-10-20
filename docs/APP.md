@@ -588,16 +588,36 @@ an estimated credit takes off exactly the estimate. Renaming a location renames 
 credits; deleting one leaves its name in a credit, which then counts nothing there
 (`method-budget check` and the MCP `validate` tool warn about it).
 
+A program's terms (decisions.md, entry 88) are a band of their own under Spend at these
+locations: **Minimum spend** (below this qualified spend, the rows' net spend at its
+locations before any cap, the credit pays nothing; a spend at the minimum qualifies),
+**Broker's fee** (a flat amount taken off after the cap and the discount, never taking the
+credit below zero), and **Shared cap** with **Shared cap amount**: credits naming the same
+shared cap never come to more than its amount together. When they would, each gets a share
+in proportion to what it comes to after its own cap, in whole cents that add up to the
+shared cap exactly (a cent left over goes to the largest remainder, then by name), and
+then takes its own discount and fee off its share. The amount belongs to the shared cap,
+so changing it on one credit changes it for all; a new shared cap needs an amount, and
+typing a new name keeps the amount shown. A shared cap no credit names any more goes away.
+An unapplied credit is estimated as if it were applied alongside the applied ones, so
+applying it takes off exactly its estimate (and may lower the others sharing its cap).
+The footer of an applied credit adds "Minimum: Not met", its shared cap share and the
+broker's fee when they apply. Programs side by side gains **Minimum**, **Shared cap**
+(the cap's name, and the program's share when the cap holds it down) and **Fee** columns,
+and says "Below minimum" for a program that pays nothing for that reason.
+
 | Command | Arguments | Returns |
 |---|---|---|
 | `preview_charge` | `index` (`null` for a new charge), `charge` (as `set_charge`) | `{name, base, excluded, amount}`, figured on the current totals; nothing changes |
-| `incentives` | none | `{partial, locations: [{location, known, lines, fringes, total}], programs: [{index, name, applied, locations, cap, discount_percent, amount, problem, qualified, by_location: [{location, net}], rows_total, capped, figures}]}`: spend by location (`location` `null` for lines with none) and every credit as an estimate, applied or not; figured on the current totals; `partial` when those come from the cleaned copy of a budget with problems, and then a program's own problems are in its `problem` with its (possibly short) `amount`; nothing changes |
+| `incentives` | none | `{partial, locations: [{location, known, lines, fringes, total}], programs: [{index, name, applied, locations, cap, discount_percent, minimum_spend, broker_fee, shared_cap, shared_cap_amount, amount, problem, qualified, by_location: [{location, net}], rows_total, capped, figures}]}` (`figures` has `below_minimum`, `shared`, the share in cents when a shared cap holds it down, and `fee`, the fee taken off): spend by location (`location` `null` for lines with none) and every credit as an estimate, applied or not; figured on the current totals; `partial` when those come from the cleaned copy of a budget with problems, and then a program's own problems are in its `problem` with its (possibly short) `amount`; nothing changes |
 | `clear_from_rows` | `rowIds`, `field` (`fringes` or `groups`) | View |
 | `replace_tags_on_rows` | `rowIds`, `tags` (`{fringes, groups, set, location, currency}`: names the budget defines; `null` values and empty lists clear; the base currency is none) | View |
 
 `set_charge` takes `label_percent` and `label_excluded` (left out: the charge keeps its own
 setting). `set_credit` takes `locations` (location names the budget has, or ones the
-credit already names; empty: every line). A credit row's report entry has `cap_variance` (unrounded currency units like
+credit already names; empty: every line), and `minimum_spend`, `broker_fee`, `shared_cap`
+and `shared_cap_amount` (money text, blank or `null` for none; a new shared cap needs an
+amount, an amount sets it for every credit sharing it; decisions.md, entry 88). A credit row's report entry has `cap_variance` (unrounded currency units like
 `credit`; positive under the cap, negative over it, `null` with no cap). **Numbers on screen** (saved in the budget, one undo step per change): the rate
 cutoff and decimals below and at or above it, whether a rate's global decimals win, and
 whether the topsheet shows the above- and below-the-line summary rows and the net total.
@@ -3315,12 +3335,11 @@ review and menus in a browser harness). Presets follow a rename of a setup item,
 deleting a fringe, group, set or location leaves its name in tag presets (applying one
 then says what is missing). Line blocks are reordered from the keyboard only.
 Incentive programs need a live check in the app: the Spend at these locations chips, the
-estimate in the rail and footer, and the Programs side by side and Spend by location
-tables (checked here offscreen in the browser build in headless Chrome, against the real
-engine). Not yet: an unapplied credit's rows grid shows its row figures (the footer and
-the tables have them), a what-if that moves lines between locations, several applied
-programs that share a cap, a broker's fee as a flat amount, and a preset of program
-fields to fill in.
+program's terms band, the estimate in the rail and footer, and the Programs side by side
+and Spend by location tables (checked here offscreen in the browser build in headless
+Chrome, against the real engine). Not yet: an unapplied credit's rows grid shows its row
+figures (the footer and the tables have them), a what-if that moves lines between
+locations, a printed per-location report, and a preset of program fields to fill in.
 Import Actuals and the Actuals tab need a live check: the Open dialog, real exports from
 accounting systems (checked here with synthetic CSV, tab-delimited and workbook files and
 the dialog, tab, grid columns and Cost report preview in a browser harness against the

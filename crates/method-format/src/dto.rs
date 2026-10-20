@@ -225,6 +225,10 @@ pub(crate) struct FileBudget {
     charges: Vec<FileCharge>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     credits: Vec<FileCredit>,
+    /// Caps credits share, by name (decisions.md, entry 88). Left out when
+    /// there are none, so other files are unchanged.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    shared_caps: BTreeMap<String, FileSharedCap>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     baseline: Option<FileBaseline>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -278,6 +282,7 @@ impl From<&Budget> for FileBudget {
             topsheet,
             charges,
             credits,
+            shared_caps,
             baseline,
             display,
             versions,
@@ -338,6 +343,7 @@ impl From<&Budget> for FileBudget {
             topsheet: topsheet.iter().map(FileTopsheetRow::from).collect(),
             charges: charges.iter().map(FileCharge::from).collect(),
             credits: credits.iter().map(FileCredit::from).collect(),
+            shared_caps: map(shared_caps, |a| FileSharedCap { amount: *a }),
             baseline: baseline.as_ref().map(FileBaseline::from),
             display: (*display != DisplayPrefs::default()).then(|| FileDisplay::from(display)),
             // Only names that exist, and nothing when a table is in byte order.
@@ -410,6 +416,7 @@ impl From<FileBudget> for Budget {
             topsheet: f.topsheet.into_iter().map(TopsheetRow::from).collect(),
             charges: f.charges.into_iter().map(Charge::from).collect(),
             credits: f.credits.into_iter().map(Credit::from).collect(),
+            shared_caps: unmap(f.shared_caps, |c| c.amount),
             baseline: f.baseline.map(Baseline::from),
             display: f.display.map(DisplayPrefs::from).unwrap_or_default(),
             setup_order: f.setup_order.map(SetupOrder::from).unwrap_or_default(),
@@ -2263,8 +2270,29 @@ struct FileCredit {
     /// when empty, so a credit without them is written as before.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     locations: BTreeSet<String>,
+    /// The qualified spend below which the credit is 0 (decisions.md,
+    /// entry 88). Left out when there is none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    minimum_spend: Option<Cents>,
+    /// A flat fee taken off after the discount. Left out when 0.
+    #[serde(default, skip_serializing_if = "is_zero_cents")]
+    broker_fee: Cents,
+    /// The name of a cap in the budget's `shared_caps`. Left out when none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    shared_cap: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     rows: Vec<FileCreditRow>,
+}
+
+fn is_zero_cents(c: &Cents) -> bool {
+    *c == 0
+}
+
+/// A cap several credits share (decisions.md, entry 88).
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FileSharedCap {
+    pub(crate) amount: Cents,
 }
 
 fn zero() -> DecStr {
@@ -2281,6 +2309,9 @@ impl From<&Credit> for FileCredit {
             discount_percent,
             excluded_fringes,
             locations,
+            minimum_spend,
+            broker_fee,
+            shared_cap,
             rows,
         } = c;
         FileCredit {
@@ -2291,6 +2322,9 @@ impl From<&Credit> for FileCredit {
             discount_percent: DecStr(*discount_percent),
             excluded_fringes: excluded_fringes.clone(),
             locations: locations.clone(),
+            minimum_spend: *minimum_spend,
+            broker_fee: *broker_fee,
+            shared_cap: shared_cap.clone(),
             rows: rows.iter().map(FileCreditRow::from).collect(),
         }
     }
@@ -2322,6 +2356,9 @@ impl From<FileCredit> for Credit {
             discount_percent: f.discount_percent.0,
             excluded_fringes,
             locations: f.locations,
+            minimum_spend: f.minimum_spend,
+            broker_fee: f.broker_fee,
+            shared_cap: f.shared_cap,
             rows: f.rows.into_iter().map(CreditRow::from).collect(),
         }
     }
