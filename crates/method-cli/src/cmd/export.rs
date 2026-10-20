@@ -14,7 +14,7 @@ pub const USAGE: &str = "  method-budget export <file.mthd> --xlsx|--csv|--tsv <
       Detail and the setup tables); csv is one file per table, named
       `<stem> - <Table>.csv` from the path (a folder: the budget's file name);
       tsv is the Detail table as tab-delimited text for accounting tools.
-      --bom starts CSV and TSV files with a UTF-8 byte order mark (Excel).
+      --bom starts CSV and TSV files with a UTF-8 byte order mark (for spreadsheet apps that need it).
 ";
 
 pub fn run(args: &[String]) -> Outcome {

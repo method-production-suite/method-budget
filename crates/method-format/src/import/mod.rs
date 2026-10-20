@@ -221,12 +221,12 @@ pub fn read_file(bytes: &[u8], file_name: &str) -> Result<Book, ReadError> {
     }
     if bytes.starts_with(&[0xD0, 0xCF, 0x11, 0xE0]) {
         return Err(ReadError::new(
-            "this is an older Excel workbook (.xls); save it as an Excel Workbook (.xlsx) or CSV to import it",
+            "this is an older .xls spreadsheet; save it as .xlsx or CSV to import it",
         ));
     }
     if matches!(ext.as_str(), "xlsx" | "xlsm" | "xltx") {
         return Err(ReadError::new(
-            "the file isn't an Excel workbook (it isn't a ZIP package)",
+            "the file isn't a spreadsheet (.xlsx) (it isn't a ZIP package)",
         ));
     }
     let hint = match ext.as_str() {

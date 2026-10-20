@@ -83,7 +83,7 @@ pub fn read(
         Some(f) => f,
         None => {
             return Err(ReadError::new(
-                "this isn't a budget export this version reads (budget exchange JSON or XML, or the export's Excel or tab-delimited file)",
+                "this isn't a budget export this version reads (budget exchange JSON or XML, or the export's .xlsx spreadsheet or tab-delimited file)",
             ))
         }
     };

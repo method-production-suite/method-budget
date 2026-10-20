@@ -144,12 +144,12 @@ integer cents, as the app's `incentives` command returns it (docs/APP.md).
 
 ### `method-budget export <file.mthd> --xlsx|--csv|--tsv <path> [--bom]`
 
-Also `--format xlsx|csv|tsv --out <path>`. The evaluated budget as an Excel workbook
+Also `--format xlsx|csv|tsv --out <path>`. The evaluated budget as a spreadsheet (.xlsx)
 (Topsheet, Accounts, Detail and the setup tables), as one CSV file per table (named
 `<stem> - <Table>.csv` beside the path), or the Detail table as tab-delimited text for
 accounting tools (decision 30). A folder as the path names the file after the budget.
-`--bom` starts CSV and TSV with a UTF-8 byte order mark, which Excel needs for accented
-letters.
+`--bom` starts CSV and TSV with a UTF-8 byte order mark, for spreadsheet apps that need it
+for accented letters.
 
 ### `method-budget report <file.mthd> [--preset NAME] [--sections LIST] [--format F] [-o PATH] [--date TEXT] [--bom]`
 
@@ -275,13 +275,13 @@ The **mapping file** is JSON; every field may be left out:
 | `create_setup` | Add fringes, groups, units, sets, locations and currencies it doesn't have (else they are left off the lines). |
 | `default_account` | The account for rows without one. |
 
-Our own Excel export imports back with no mapping at all.
+Our own .xlsx export imports back with no mapping at all.
 
 ### `method-budget import-export <export> [-o <out.mthd>] [--format F] [--title T] [--report] [--json] [--force]`
 
 Makes a whole budget from another budgeting program's export and checks it against the
 export's own figures (docs/IMPORT.md): budget exchange JSON or XML (basic or advanced), its
-Excel workbook or its tab-delimited topsheet. The layout is found from the content;
+.xlsx spreadsheet or its tab-delimited topsheet. The layout is found from the content;
 `--format json|xml|xml-advanced|xlsx|tab` reads it as another.
 
 - It prints what came over (categories, accounts, lines, setup), then the notes: what was
@@ -405,7 +405,7 @@ method-budget review film.mthd --merge all --dismiss 3 --by Sky --apply
 ### `method-budget coa import <chart> -o <out.mthd> [--sheet N|NAME] [--mapping M.json] [--title T] [--currency C] [--into B.mthd] [--remove-unlisted] [--force] [--dry-run]`
 
 Reads a chart of accounts (category and account numbers, names and production totals,
-nothing else) from an Excel workbook, a CSV or tab-delimited file, or another budget file,
+nothing else) from a spreadsheet (.xlsx), a CSV or tab-delimited file, or another budget file,
 and writes it as a new budget with no lines: a template, titled after the file unless
 `--title` says otherwise. The header row, the columns and the numbering pattern are found
 (docs/TEMPLATES.md lists the shapes it reads, and the `kind,code,name,parent` layout that

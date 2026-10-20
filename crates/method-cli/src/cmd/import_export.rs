@@ -16,7 +16,7 @@ pub const USAGE: &str =
     "  method-budget import-export <export-file> [-o <out.mthd>] [--format F] [--title TEXT]
                 [--report] [--json] [--force]
       Make a budget from another program's budget export (budget exchange
-      JSON or XML, or its Excel or tab-delimited export; --format json, xml,
+      JSON or XML, or its .xlsx spreadsheet or tab-delimited export; --format json, xml,
       xml-advanced, xlsx or tab when the file doesn't say) and compare the
       budget's totals with the export's own, line by line. Prints what came
       over, what was worked out and what couldn't come over, then every

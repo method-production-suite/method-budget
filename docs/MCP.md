@@ -457,7 +457,7 @@ and warnings (the first 20), the sheet-versus-budget reconciliation and the tota
 
 **`import_budget_export`** `{file, out?, format?, title?, overwrite?, dry_run?, all_differences?}`:
 a whole budget from another budgeting program's export (budget exchange JSON or XML, its
-Excel workbook or tab-delimited topsheet; `format` `json`, `xml`, `xml-advanced`, `xlsx` or
+.xlsx spreadsheet or tab-delimited topsheet; `format` `json`, `xml`, `xml-advanced`, `xlsx` or
 `tab` when the content doesn't say), as `method-budget import-export` (docs/IMPORT.md). Returns
 `counts`, `notes` (`kind` `check`, `not_imported` or `info`: what was worked out from the
 figures and should be checked, and what couldn't come over) and `reconciliation`: the

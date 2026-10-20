@@ -47,7 +47,7 @@
         "contentTypes": [
           "org.openxmlformats.spreadsheetml.sheet"
         ],
-        "name": "Budget export (Excel)",
+        "name": "Budget export (.xlsx)",
         "role": "Viewer",
         "rank": "Alternate"
       },

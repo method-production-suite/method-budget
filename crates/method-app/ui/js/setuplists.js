@@ -90,7 +90,7 @@ export function exportSetupLists(ctx) {
         el('h2', { class: 'modal-title', text: 'Export Setup Lists', attrs: { id: titleId } }),
         el('p', { class: 'modal-message', text: "Each kind of setup item as a table: one row per item with its whole definition and where it came from, to edit in a spreadsheet and import back. A charge's excluded amounts stay in the budget." }),
         kinds,
-        el('div', { class: 'pk-formats' }, el('label', { class: 'rs-check' }, xlsx, el('span', { text: 'Excel workbook (a sheet per kind)' })), el('label', { class: 'rs-check' }, csv, el('span', { text: 'CSV files (one per kind)' }))),
+        el('div', { class: 'pk-formats' }, el('label', { class: 'rs-check' }, xlsx, el('span', { text: 'Spreadsheet (.xlsx), a sheet per kind' })), el('label', { class: 'rs-check' }, csv, el('span', { text: 'CSV files (one per kind)' }))),
         error,
         el('div', { class: 'modal-actions' }, cancel, ok),
       );

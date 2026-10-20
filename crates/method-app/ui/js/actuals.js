@@ -159,7 +159,7 @@ function draw() {
     box.append(
       el('p', {
         class: 'actuals-empty',
-        text: 'No actuals yet. File > Import Actuals… brings in transactions from your accounting system’s CSV or Excel export, and the cost report columns (Actual, ETC, EAC) appear in the grid.',
+        text: 'No actuals yet. File > Import Actuals… brings in transactions from your accounting system’s CSV or spreadsheet (.xlsx) export, and the cost report columns (Actual, ETC, EAC) appear in the grid.',
       }),
     );
     host.replaceChildren(box);
