@@ -13,6 +13,7 @@ use std::process::ExitCode;
 mod facts;
 mod manifest;
 mod notices;
+mod release_workflow;
 mod repo;
 mod screens;
 mod sign;
