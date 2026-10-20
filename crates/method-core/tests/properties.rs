@@ -1140,3 +1140,142 @@ fn explaining_a_program_at_its_locations_adds_up() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Bid layouts (roadmap 3.13; decisions.md, entry 92)
+
+fn gen_bid(rng: &mut Rng, b: &Budget) -> BidLayout {
+    let cats: Vec<String> = b.categories().map(|c| c.code.clone()).collect();
+    let accts: Vec<String> = b
+        .categories()
+        .flat_map(|c| c.accounts.iter().map(|a| a.code.clone()))
+        .collect();
+    let any = |rng: &mut Rng, list: &[String], stray: &str| {
+        if list.is_empty() || rng.chance(10) {
+            stray.to_string()
+        } else {
+            list[rng.below(list.len() as u64) as usize].clone()
+        }
+    };
+    let mut lines = Vec::new();
+    let mut names = Vec::new();
+    for i in 0..rng.below(7) {
+        match rng.below(6) {
+            0 => lines.push(BidLine::Subtotal {
+                name: format!("Subtotal {i}"),
+            }),
+            1 => {
+                let mut of: Vec<String> =
+                    names.iter().filter(|_| rng.chance(50)).cloned().collect();
+                if rng.chance(10) {
+                    of.push("Nowhere".into());
+                }
+                lines.push(BidLine::Percent {
+                    name: format!("Markup {i}"),
+                    percent: format!("{}.{}", rng.below(30), rng.below(1000))
+                        .parse()
+                        .unwrap(),
+                    of,
+                });
+            }
+            2 => lines.push(BidLine::Flat {
+                name: format!("Fee {i}"),
+                amount: rng.below(1_000_000) as i64 - 100_000,
+            }),
+            _ => {
+                let mut picks = Vec::new();
+                for _ in 0..rng.below(4) {
+                    picks.push(match rng.below(3) {
+                        0 => BidPick::Category(any(rng, &cats, "9999")),
+                        1 => BidPick::Account(any(rng, &accts, "1015")),
+                        _ => {
+                            let (x, y) = (any(rng, &accts, "1000"), any(rng, &accts, "9000"));
+                            BidPick::Range { from: x, to: y }
+                        }
+                    });
+                }
+                let name = format!("Section {i}");
+                names.push(name.clone());
+                lines.push(BidLine::Section { name, picks });
+            }
+        }
+    }
+    BidLayout {
+        fields: Vec::new(),
+        lines,
+        show_accounts: rng.chance(50),
+    }
+}
+
+#[test]
+fn a_bid_always_reconciles_with_the_budget() {
+    for seed in 1..=CASES {
+        let msg = format!("seed {seed}");
+        let mut rng = Rng(seed);
+        let b = gen_budget(&mut rng);
+        let r = recalc(&b, &RecalcOptions::default()).unwrap();
+        for _ in 0..3 {
+            let layout = gen_bid(&mut rng, &b);
+            let s = bid_sheet(&b, &r, &layout).unwrap();
+            // Every account exactly once: in one section or Unassigned.
+            let mut seen: Vec<&str> = s
+                .lines
+                .iter()
+                .flat_map(|l| match l {
+                    BidSheetLine::Section { accounts, .. } => accounts.as_slice(),
+                    _ => &[],
+                })
+                .chain(&s.unassigned)
+                .map(|a| a.code.as_str())
+                .collect();
+            let mut every: Vec<&str> = b
+                .categories()
+                .flat_map(|c| c.accounts.iter().map(|a| a.code.as_str()))
+                .collect();
+            seen.sort_unstable();
+            every.sort_unstable();
+            assert_eq!(seen, every, "{msg}");
+            // Each section is its accounts; sections and Unassigned are
+            // every account at its lines plus the fringes it earns.
+            let mut sections = 0;
+            let mut markups = 0;
+            for l in &s.lines {
+                match l {
+                    BidSheetLine::Section {
+                        accounts, total, ..
+                    } => {
+                        assert_eq!(*total, accounts.iter().map(|a| a.amount).sum(), "{msg}");
+                        sections += total;
+                    }
+                    BidSheetLine::Markup { amount, .. } => markups += amount,
+                    BidSheetLine::Subtotal { .. } => {}
+                }
+            }
+            let earned: Cents = r
+                .categories
+                .iter()
+                .flat_map(|c| &c.accounts)
+                .map(|a| a.details_total + a.fringe_total)
+                .sum();
+            assert_eq!(sections + s.unassigned_total, earned, "{msg}");
+            // Down to the budget's charges and credits, the bid is the
+            // budget's net total; the markups are on top.
+            let charges: Cents = s.charges.iter().map(|c| c.1).sum();
+            let credits: Cents = s.credits.iter().map(|c| c.1).sum();
+            assert_eq!(
+                sections + s.unassigned_total + s.unposted_fringes + charges - credits,
+                r.net_total,
+                "{msg}"
+            );
+            assert_eq!(s.markups, markups, "{msg}");
+            assert_eq!(s.total, r.net_total + markups, "{msg}");
+            // Fringes go unposted only when the budget drops them.
+            if !(b.fringe_posting == FringePosting::ProductionLevel
+                && b.trailing_level_fringes == TrailingFringes::Drop)
+            {
+                assert_eq!(s.unposted_fringes, 0, "{msg}");
+            }
+            assert!(s.unposted_fringes <= 0, "{msg}");
+        }
+    }
+}

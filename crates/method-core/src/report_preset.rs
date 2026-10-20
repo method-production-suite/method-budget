@@ -12,6 +12,8 @@
 
 use std::collections::BTreeSet;
 
+use crate::bid::{BidError, BidLayout};
+
 /// Longest preset name, in characters.
 pub const MAX_PRESET_NAME_CHARS: usize = 80;
 
@@ -79,6 +81,10 @@ pub struct ReportSpec {
     pub header: Option<Band>,
     /// `None` means the standard footer (page number at the right).
     pub footer: Option<Band>,
+    /// The bid the `bid` section prints (roadmap 3.13; see [`crate::bid`]).
+    /// `None`: the preset has no bid layout, and a `bid` section prints the
+    /// example layout ([`BidLayout::example`]).
+    pub bid: Option<BidLayout>,
 }
 
 impl Default for ReportSpec {
@@ -106,6 +112,7 @@ impl Default for ReportSpec {
             topsheet_pages: false,
             header: None,
             footer: None,
+            bid: None,
         }
     }
 }
@@ -164,6 +171,8 @@ pub enum ReportSection {
     /// completion, variance and percent spent per account, category and
     /// the topsheet (see [`crate::actuals`]).
     CostReport,
+    /// The bid: the spec's [`BidLayout`] worked out (see [`crate::bid`]).
+    Bid,
 }
 
 names!(ReportSection {
@@ -181,6 +190,7 @@ names!(ReportSection {
     Locations = "locations",
     Currencies = "currencies",
     CostReport = "cost_report",
+    Bid = "bid",
 });
 
 /// An optional column of the detail pages (the grid's columns, plus the
@@ -283,6 +293,7 @@ pub enum PresetError {
     TextTooLong,
     RepeatedSection(ReportSection),
     RepeatedColumn(ReportColumn),
+    Bid(BidError),
 }
 
 impl std::fmt::Display for PresetError {
@@ -303,6 +314,7 @@ impl std::fmt::Display for PresetError {
             PresetError::RepeatedColumn(c) => {
                 write!(f, "the column \"{}\" is listed twice", c.name())
             }
+            PresetError::Bid(e) => e.fmt(f),
         }
     }
 }
@@ -334,6 +346,9 @@ impl ReportPreset {
             if !seen.insert(col) {
                 return Err(PresetError::RepeatedColumn(col));
             }
+        }
+        if let Some(bid) = &s.bid {
+            bid.validate().map_err(PresetError::Bid)?;
         }
         for band in [&s.header, &s.footer].into_iter().flatten() {
             for field in [&band.left, &band.center, &band.right]
@@ -394,12 +409,24 @@ mod tests {
             p.validate(),
             Err(PresetError::RepeatedColumn(ReportColumn::Rate))
         );
-        let mut p = ok;
+        let mut p = ok.clone();
         p.spec.footer = Some(Band {
             left: Some(BandField::Text("y".repeat(MAX_BAND_TEXT_CHARS + 1))),
             ..Band::default()
         });
         assert_eq!(p.validate(), Err(PresetError::TextTooLong));
+        let mut p = ok;
+        let mut bid = BidLayout::example();
+        assert_eq!(p.validate(), Ok(()));
+        bid.lines.push(crate::BidLine::Section {
+            name: "POST".into(),
+            picks: Vec::new(),
+        });
+        p.spec.bid = Some(bid);
+        assert_eq!(
+            p.validate(),
+            Err(PresetError::Bid(BidError::RepeatedSection("POST".into())))
+        );
         let mut p = ok_global();
         assert_eq!(p.validate(), Ok(()));
         p.spec.header.as_mut().unwrap().center =

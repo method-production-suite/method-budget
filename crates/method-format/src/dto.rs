@@ -19,7 +19,8 @@ use method_core::{
     TopsheetRow, TrailingFringes, UnitDef, Version,
 };
 use method_core::{
-    Band, BandField, FontSize, ReportColumn, ReportPreset, ReportSection, ReportSpec,
+    Band, BandField, BidField, BidLayout, BidLine, BidPick, FontSize, ReportColumn, ReportPreset,
+    ReportSection, ReportSpec,
 };
 use method_core::{CurrencyFormat, Separators};
 use method_core::{LinePreset, SetupItems, TagPreset};
@@ -2691,6 +2692,152 @@ pub(crate) struct FileReportPreset {
     header: Option<FileBand>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     footer: Option<FileBand>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bid: Option<FileBid>,
+}
+
+/// A bid layout (method_core::bid; docs/FORMAT.md, "Bid layout").
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FileBid {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    fields: Vec<FileBidField>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    lines: Vec<FileBidLine>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    show_accounts: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileBidField {
+    label: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    value: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum FileBidLine {
+    Section {
+        name: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        picks: Vec<FileBidPick>,
+    },
+    Subtotal {
+        name: String,
+    },
+    Percent {
+        name: String,
+        percent: DecStr,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        of: Vec<String>,
+    },
+    Flat {
+        name: String,
+        amount: Cents,
+    },
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum FileBidPick {
+    Category { code: String },
+    Account { code: String },
+    Range { from: String, to: String },
+}
+
+impl From<&BidLayout> for FileBid {
+    fn from(l: &BidLayout) -> FileBid {
+        let BidLayout {
+            fields,
+            lines,
+            show_accounts,
+        } = l;
+        FileBid {
+            fields: fields
+                .iter()
+                .map(|f| FileBidField {
+                    label: f.label.clone(),
+                    value: f.value.clone(),
+                })
+                .collect(),
+            lines: lines
+                .iter()
+                .map(|l| match l {
+                    BidLine::Section { name, picks } => FileBidLine::Section {
+                        name: name.clone(),
+                        picks: picks
+                            .iter()
+                            .map(|p| match p {
+                                BidPick::Category(code) => {
+                                    FileBidPick::Category { code: code.clone() }
+                                }
+                                BidPick::Account(code) => {
+                                    FileBidPick::Account { code: code.clone() }
+                                }
+                                BidPick::Range { from, to } => FileBidPick::Range {
+                                    from: from.clone(),
+                                    to: to.clone(),
+                                },
+                            })
+                            .collect(),
+                    },
+                    BidLine::Subtotal { name } => FileBidLine::Subtotal { name: name.clone() },
+                    BidLine::Percent { name, percent, of } => FileBidLine::Percent {
+                        name: name.clone(),
+                        percent: DecStr(*percent),
+                        of: of.clone(),
+                    },
+                    BidLine::Flat { name, amount } => FileBidLine::Flat {
+                        name: name.clone(),
+                        amount: *amount,
+                    },
+                })
+                .collect(),
+            show_accounts: *show_accounts,
+        }
+    }
+}
+
+impl From<FileBid> for BidLayout {
+    fn from(f: FileBid) -> BidLayout {
+        BidLayout {
+            fields: f
+                .fields
+                .into_iter()
+                .map(|f| BidField {
+                    label: f.label,
+                    value: f.value,
+                })
+                .collect(),
+            lines: f
+                .lines
+                .into_iter()
+                .map(|l| match l {
+                    FileBidLine::Section { name, picks } => BidLine::Section {
+                        name,
+                        picks: picks
+                            .into_iter()
+                            .map(|p| match p {
+                                FileBidPick::Category { code } => BidPick::Category(code),
+                                FileBidPick::Account { code } => BidPick::Account(code),
+                                FileBidPick::Range { from, to } => BidPick::Range { from, to },
+                            })
+                            .collect(),
+                    },
+                    FileBidLine::Subtotal { name } => BidLine::Subtotal { name },
+                    FileBidLine::Percent { name, percent, of } => BidLine::Percent {
+                        name,
+                        percent: percent.0,
+                        of,
+                    },
+                    FileBidLine::Flat { name, amount } => BidLine::Flat { name, amount },
+                })
+                .collect(),
+            show_accounts: f.show_accounts,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -2710,6 +2857,7 @@ enum FileSection {
     Locations,
     Currencies,
     CostReport,
+    Bid,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -2799,7 +2947,7 @@ macro_rules! same_variants {
 
 same_variants!(ReportSection <-> FileSection {
     Topsheet, Accounts, Detail, Fringes, Globals, Groups, Notes, Info, Chart, Units, Sets,
-    Locations, Currencies, CostReport,
+    Locations, Currencies, CostReport, Bid,
 });
 same_variants!(ReportColumn <-> FileColumn {
     Amount, Unit, X, Unit2, Rate, Unit3, Currency, X4, Unit4, Fringes, FringePercent,
@@ -2899,6 +3047,7 @@ impl From<&ReportPreset> for FileReportPreset {
             topsheet_pages,
             header,
             footer,
+            bid,
         } = spec;
         FileReportPreset {
             name: name.clone(),
@@ -2925,6 +3074,7 @@ impl From<&ReportPreset> for FileReportPreset {
             topsheet_pages: *topsheet_pages,
             header: header.as_ref().map(FileBand::from),
             footer: footer.as_ref().map(FileBand::from),
+            bid: bid.as_ref().map(FileBid::from),
         }
     }
 }
@@ -2955,6 +3105,7 @@ impl From<FileReportPreset> for ReportPreset {
                 topsheet_pages: f.topsheet_pages,
                 header: f.header.map(Band::from),
                 footer: f.footer.map(Band::from),
+                bid: f.bid.map(BidLayout::from),
             },
         }
     }

@@ -574,6 +574,18 @@ pub fn renumber(b: &mut Budget, to: AccountCoding) -> Result<RenumberPlan, Renum
         let spec = &mut p.spec;
         spec.excluded_categories = carry_set(&spec.excluded_categories, &cats, &cat_new, cat_conv);
         spec.excluded_accounts = carry_set(&spec.excluded_accounts, &accts, &acct_new, acct_conv);
+        // A bid's picks and a range's ends follow too (decisions.md, entry
+        // 92); a range end that names no account is converted by the
+        // pattern like any stale number, so the range keeps its place.
+        for (is_cat, code) in spec.bid.iter_mut().flat_map(|l| l.codes_mut()) {
+            let label = Some(std::mem::take(code));
+            *code = if is_cat {
+                carry_label(&label, &cats, &cat_new, cat_conv)
+            } else {
+                carry_label(&label, &accts, &acct_new, acct_conv)
+            }
+            .unwrap_or_default();
+        }
     }
     if let Some(base) = &mut b.baseline {
         base.categories = carry_keys(&base.categories, &cats, &cat_new, cat_conv);
@@ -852,6 +864,20 @@ mod tests {
         };
         preset.spec.excluded_categories.insert("20".into());
         preset.spec.excluded_accounts.insert("11-01".into());
+        preset.spec.bid = Some(crate::BidLayout {
+            lines: vec![crate::BidLine::Section {
+                name: "Shoot".into(),
+                picks: vec![
+                    crate::BidPick::Category("20".into()),
+                    crate::BidPick::Account("11-02".into()),
+                    crate::BidPick::Range {
+                        from: "11-01".into(),
+                        to: "11-99".into(),
+                    },
+                ],
+            }],
+            ..crate::BidLayout::default()
+        });
         b.report_presets.push(preset);
         let r = recalc(&b, &RecalcOptions::default()).unwrap();
         b.baseline = Baseline::capture(&r);
@@ -876,6 +902,21 @@ mod tests {
         assert_eq!(
             b.report_presets[0].spec.excluded_accounts,
             ["011.001".to_string()].into()
+        );
+        let bid = b.report_presets[0].spec.bid.as_ref().unwrap();
+        assert_eq!(
+            bid.lines[0],
+            crate::BidLine::Section {
+                name: "Shoot".into(),
+                picks: vec![
+                    crate::BidPick::Category("020".into()),
+                    crate::BidPick::Account("011.002".into()),
+                    crate::BidPick::Range {
+                        from: "011.001".into(),
+                        to: "011.099".into(),
+                    },
+                ],
+            }
         );
         let r = recalc(&b, &RecalcOptions::default()).unwrap();
         assert_eq!(r.grand_total, grand, "totals don't move");

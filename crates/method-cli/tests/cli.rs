@@ -310,6 +310,97 @@ fn report_presets_from_the_budget() {
 }
 
 #[test]
+fn bid_layouts_print_from_the_command_line() {
+    let d = Dir::new("bid");
+    let p = d.starter("a.mthd");
+    let date = "2026-10-20 09:00 UTC";
+    // With no bid layout in the budget, the bid section prints the example:
+    // every account Unassigned, the bid total the budget's net total.
+    let o = method(&["report", &p, "--sections", "bid", "--date", date]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let txt = out(&o);
+    assert!(txt.contains("Bid\n==="), "{txt}");
+    for want in [
+        "Pre-production",
+        "Unassigned",
+        "Contingency",
+        "Bid total",
+        "578,600.00",
+    ] {
+        assert!(txt.contains(want), "{want}: {txt}");
+    }
+
+    // A layout of the user's own, written into the file (the format is open).
+    let text = read(&p);
+    let preset = r#"    "report_presets": [
+      {
+        "name": "Spot bid",
+        "sections": ["bid"],
+        "bid": {
+          "fields": [{ "label": "Client", "value": "Bluefin Juice" }, { "label": "Job number", "value": "BJ-7" }],
+          "lines": [
+            { "kind": "section", "name": "Above", "picks": [{ "kind": "range", "from": "1000", "to": "1399" }] },
+            { "kind": "section", "name": "Shoot", "picks": [{ "kind": "category", "code": "20" }, { "kind": "category", "code": "21" }, { "kind": "category", "code": "22" }] },
+            { "kind": "section", "name": "Post", "picks": [{ "kind": "range", "from": "4000", "to": "4999" }, { "kind": "account", "code": "9999" }] },
+            { "kind": "subtotal", "name": "Production" },
+            { "kind": "flat", "name": "Handling", "amount": 100000 }
+          ],
+          "show_accounts": true
+        }
+      }
+    ]
+  }
+}
+"#;
+    let cut = text.rfind("\n  }\n}").unwrap();
+    std::fs::write(&p, format!("{},\n{preset}", &text[..cut])).unwrap();
+    let o = method(&["check", &p]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let o = method(&["report", &p, "--preset", "Spot bid", "--date", date]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let txt = out(&o);
+    for want in [
+        "Bluefin Juice",
+        "BJ-7",
+        "Above",
+        "1001",
+        "Total Above",
+        "Shoot",
+        "Production",
+        "Handling",
+        "Unassigned",
+        "5001",
+        "Contingency",
+        "52,600.00",
+        // The budget's net total plus the bid's markups.
+        "579,600.00",
+        "\"Post\" takes account 9999",
+    ] {
+        assert!(txt.contains(want), "{want}: {txt}");
+    }
+    let c = d.path("bid.csv");
+    let o = method(&[
+        "report", &p, "--preset", "Spot bid", "-o", &c, "--date", date,
+    ]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let csv = read(&c);
+    assert!(csv.contains("Client,Bluefin Juice\r\n"), "{csv}");
+    assert!(csv.contains(",Bid total,579600.00\r\n"), "{csv}");
+    let h = d.path("bid.html");
+    assert_eq!(
+        code(&method(&["report", &p, "--preset", "Spot bid", "-o", &h])),
+        0
+    );
+    assert!(read(&h).contains("Bid total"));
+    let pdf = d.path("bid.pdf");
+    let o = method(&[
+        "report", &p, "--preset", "Spot bid", "-o", &pdf, "--date", date,
+    ]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    check_pdf(&std::fs::read(&pdf).unwrap());
+}
+
+#[test]
 fn set_changes_one_value() {
     let d = Dir::new("set");
     let p = d.starter("a.mthd");
