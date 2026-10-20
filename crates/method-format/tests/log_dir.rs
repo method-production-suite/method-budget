@@ -366,7 +366,7 @@ fn a_program_without_a_window_changes_a_shared_budget_as_its_person() {
         .grant(actor(2), Role::ReadOnly, "Jordan reads", T)
         .unwrap();
     alex.log
-        .grant(actor(3), Role::Editor, "Sam edits", T)
+        .grant(actor(3), Role::Editor, "Riley edits", T)
         .unwrap();
     log::flush(&alex.log, &alex.dir).unwrap();
 
@@ -384,13 +384,13 @@ fn a_program_without_a_window_changes_a_shared_budget_as_its_person() {
 
     // An editor's change goes into their own folder; the file is the
     // keeper's to write, so it stays as it was.
-    let sam_file = actor_file(&dir, 3);
-    let mut e = SharedEdit::open(&path, Some(&sam_file)).unwrap();
+    let riley_file = actor_file(&dir, 3);
+    let mut e = SharedEdit::open(&path, Some(&riley_file)).unwrap();
     let mut after = e.budget();
-    after.title = "Sam's".into();
+    after.title = "Riley's".into();
     assert!(e.record(&after, "Command line: set title", T).unwrap());
     assert!(!e.record(&after, "again", T).unwrap(), "nothing new");
-    // In the program's own folder, as Sam's.
+    // In the program's own folder, as Riley's.
     assert_ne!(e.actor(), actor(3));
     assert_eq!(e.person(), actor(3));
     assert_eq!(LogDir::for_budget(&path).segments(e.actor()).len(), 1);
@@ -399,8 +399,8 @@ fn a_program_without_a_window_changes_a_shared_budget_as_its_person() {
     assert_eq!(fs::read(&path).unwrap(), file_before);
     let mut scan = Scan::default();
     log::absorb(&mut alex.log, &alex.dir, &mut scan);
-    assert_eq!(alex.log.project().budget.title, "Sam's");
-    assert_eq!(log::read_shared(&path).unwrap().title, "Sam's");
+    assert_eq!(alex.log.project().budget.title, "Riley's");
+    assert_eq!(log::read_shared(&path).unwrap().title, "Riley's");
 
     // The keeper's own change rewrites the file too.
     let alex_file = actor_file(&dir, 1);
@@ -797,30 +797,30 @@ fn a_program_signs_with_its_persons_key_or_is_refused_in_words() {
     let mut alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
     keyed(&mut alex.log, 1);
     alex.log
-        .grant(actor(3), Role::Editor, "Sam edits", T)
+        .grant(actor(3), Role::Editor, "Riley edits", T)
         .unwrap();
     log::flush(&alex.log, &alex.dir).unwrap();
 
-    // Sam's key file beside Sam's actor id; Sam's app hasn't published it.
-    let sam_file = actor_file(&dir, 3);
-    let sam_key = log::sign::load_or_make_key(&log::sign::key_path(&sam_file)).unwrap();
-    let mut e = SharedEdit::open(&path, Some(&sam_file)).unwrap();
+    // Riley's key file beside Riley's actor id; Riley's app hasn't published it.
+    let riley_file = actor_file(&dir, 3);
+    let riley_key = log::sign::load_or_make_key(&log::sign::key_path(&riley_file)).unwrap();
+    let mut e = SharedEdit::open(&path, Some(&riley_file)).unwrap();
     let mut after = e.budget();
-    after.title = "Sam's".into();
+    after.title = "Riley's".into();
     let err = e.record(&after, "Command line: set title", T).unwrap_err();
     assert_eq!(err.0, log::NO_KEY_YET);
     assert!(LogDir::for_budget(&path).segments(e.actor()).is_empty());
     drop(e);
 
-    // Sam's app publishes the key (as Sam's own actor).
-    let (mut sam, _) = log::open(&path, actor(3), Ids::seeded(3)).unwrap();
-    sam.log.set_signer(std::sync::Arc::new(sam_key));
-    sam.log.publish_key("Key", T).unwrap().unwrap();
-    log::flush(&sam.log, &sam.dir).unwrap();
+    // Riley's app publishes the key (as Riley's own actor).
+    let (mut riley, _) = log::open(&path, actor(3), Ids::seeded(3)).unwrap();
+    riley.log.set_signer(std::sync::Arc::new(riley_key));
+    riley.log.publish_key("Key", T).unwrap().unwrap();
+    log::flush(&riley.log, &riley.dir).unwrap();
 
-    let mut e = SharedEdit::open(&path, Some(&sam_file)).unwrap();
+    let mut e = SharedEdit::open(&path, Some(&riley_file)).unwrap();
     let mut after = e.budget();
-    after.title = "Sam's".into();
+    after.title = "Riley's".into();
     assert!(e.record(&after, "Command line: set title", T).unwrap());
     let tool = e.actor();
     drop(e);
@@ -832,16 +832,74 @@ fn a_program_signs_with_its_persons_key_or_is_refused_in_words() {
     );
     let (reader, report) = log::open(&path, actor(9), Ids::seeded(9)).unwrap();
     assert!(report.rejected.is_empty(), "{:?}", report.rejected);
-    assert_eq!(reader.log.project().budget.title, "Sam's");
+    assert_eq!(reader.log.project().budget.title, "Riley's");
     assert_eq!(reader.log.person_of(tool), actor(3));
 
     // Removed, the program is told so.
-    alex.log.revoke(actor(3), "Remove Sam", T).unwrap();
+    alex.log.revoke(actor(3), "Remove Riley", T).unwrap();
     log::flush(&alex.log, &alex.dir).unwrap();
-    let mut e = SharedEdit::open(&path, Some(&sam_file)).unwrap();
+    let mut e = SharedEdit::open(&path, Some(&riley_file)).unwrap();
     let mut after = e.budget();
-    after.title = "Sam again".into();
+    after.title = "Riley again".into();
     let err = e.record(&after, "Command line: set title", T).unwrap_err();
     assert_eq!(err.0, log::REMOVED);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// A key put into the folder in someone's name by someone else (decisions.md,
+/// entry 89; MReview, pull request #73): the person's own programs compare it
+/// with this computer's key, say so, and write nothing.
+#[test]
+fn a_key_in_a_persons_name_that_isnt_theirs_stops_their_programs() {
+    use method_core::log::{Change, Op, Role, Signer};
+    use method_format::log::SharedEdit;
+
+    let dir = temp_dir("key-not-yours");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    let mut alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+    keyed(&mut alex.log, 1);
+    alex.log
+        .grant(actor(3), Role::Editor, "Riley edits", T)
+        .unwrap();
+    log::flush(&alex.log, &alex.dir).unwrap();
+
+    // Someone with the folder publishes a key for Riley first.
+    let theirs = log::sign::KeyPair::from_seed([77; 32]);
+    let mut taken = Change {
+        actor: actor(3),
+        seq: 1,
+        deps: alex.log.frontier().clone(),
+        lamport: alex.log.lamport() + 1,
+        time: T.into(),
+        label: "Added this computer's key".into(),
+        ops: vec![Op::Key {
+            key: theirs.public(),
+        }],
+        sig: None,
+    };
+    taken.sig = Some(theirs.sign(&taken));
+    alex.dir.write_segment(&[taken]).unwrap();
+
+    let riley_file = actor_file(&dir, 3);
+    log::sign::load_or_make_key(&log::sign::key_path(&riley_file)).unwrap();
+    let mut e = SharedEdit::open(&path, Some(&riley_file)).unwrap();
+    assert!(e.key_not_ours());
+    let mut after = e.budget();
+    after.title = "Riley's".into();
+    let err = e.record(&after, "Command line: set title", T).unwrap_err();
+    assert_eq!(err.0, log::KEY_NOT_YOURS);
+    assert!(LogDir::for_budget(&path).segments(e.actor()).is_empty());
+    // Riley's own app, as Riley's actor, signs nothing either.
+    let (mut riley, _) = log::open(&path, actor(3), Ids::seeded(3)).unwrap();
+    riley.log.set_signer(std::sync::Arc::new(
+        log::sign::read_key(&log::sign::key_path(&riley_file)).unwrap(),
+    ));
+    assert_eq!(riley.log.key_conflict(), Some(theirs.public()));
+    assert!(riley.log.publish_key("Key", T).unwrap().is_none());
+    let p = riley.log.project();
+    let mut after = p.budget.clone();
+    after.title = "Riley's".into();
+    assert!(riley.log.record(&p, &after, &[], "edit", T).is_err());
     let _ = fs::remove_dir_all(&dir);
 }

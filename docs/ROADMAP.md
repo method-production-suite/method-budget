@@ -34,6 +34,29 @@ this page goes ahead without waiting.
 
 ### Open decisions
 
+- **A key put in the owner's name before the owner's app does** (3.18; D89, MReview on pull
+  request #73): anyone who can write in the shared folder can publish a key for a person who
+  has none yet. For a member, their own app and programs now find it, say so and refuse to
+  sign or change anything as that person (built). For the owner it is worse: on a budget
+  whose roles were set before 0.7.0, or a new one before its first role, a key in the
+  owner's name starts signing, and whoever holds it signs as the owner. The owner's app finds
+  it and refuses too (built), but who counts as the owner afterwards is the owner's call.
+  Options: (1) **start again as a new signed budget**: the owner's app, on finding it, offers
+  to make a fresh change log from the budget as it stands, its first change signed by the
+  owner's real key, roles carried over and the old log kept aside; everyone reopens the
+  file to rejoin; costs everyone's history in the old log (who changed what, per-person
+  undo) and anything made offline there must be redone; (2) **confirm the owner's key out
+  of band**: the Share dialog shows the owner's key as a short code and each member confirms
+  it with the owner (by phone or chat) once per budget, and changes signed by an unconfirmed
+  owner key are shown but held; costs one step per member, which busy people skip, and
+  doesn't help until someone checks; (3) **remember the first owner key seen**: each
+  computer keeps the owner key it first saw for the budget and refuses a different one
+  later; costs nothing to use, but a key planted before anyone looked is the one remembered.
+  There is no secret the owner's computer held before signing that a member could check, so
+  nothing in the folder alone can tell the real key from a planted one. **Recommend: (1),
+  offered only when the owner's app finds a key that isn't its own, with (3) on members'
+  computers to catch a later swap.** Not built: waiting on the owner.
+
 - **Signed changes in shared budgets: decided by the owner (2026-10-20)** (3.18; D89): "Method
   Budget may merge 3.18 signed changes with the shared log format 3 for 0.7.0." Built:
   signed changes (each person's key pair, every change signed, removal by cutoff) use the

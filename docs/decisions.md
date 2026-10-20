@@ -4492,6 +4492,38 @@ log", has the file rules; this records the choices.
   the reasons are plain. Command line: `set` is refused until the person's key is in, then
   signs with it, and `log` reports it.
 
+- **After review (MReview, pull request #73):**
+  - *A key in someone else's name.* Anyone who can write in the folder can publish a `key` for
+    a person who has none yet. `Log::key_conflict` compares the key published for this
+    actor with this computer's; when they differ the log signs nothing and records nothing
+    as that actor (`LogError::Unsigned` with `why::KEY_TAKEN`). The app says so in the
+    toolbar, the status panel and the Share dialog (`key_warning`) and refuses edits with
+    that sentence; `SharedEdit` (command line, MCP) checks the person's key and its own and
+    refuses with `KEY_NOT_YOURS`, writing nothing. For the owner, on a budget whose roles
+    predate signing (or a new one before its first role), a planted key in the owner's name
+    would start signing; the owner's app finds it and refuses, but who counts as the owner
+    then changes who can do what, so the options are with the owner (roadmap, open
+    decisions). Tests: `a_key_published_in_my_name_stops_me_signing` (core),
+    `a_key_in_a_persons_name_that_isnt_theirs_stops_their_programs` (format),
+    `a_key_in_my_name_that_isnt_mine_is_said_and_stops_my_edits` and
+    `a_key_in_the_owners_name_on_a_roles_budget_is_found_and_refused` (app).
+  - *A refused change no longer takes the real change's number.* Before, a forgery that
+    arrived first was refused but held the number, so the real change with it was dropped as
+    a duplicate on that computer only, and computers disagreed. Now a different change at a
+    number already taken is kept with the others claiming it (`Log::forks`) and the log folds
+    again; in the fold a claimed number is settled only when nothing else can go on, among
+    every claim ready by then: the one that passes is applied, the rest listed; none passing
+    refuses the number; more than one passing (a fork) applies none and lists all, loudly,
+    in the status panel (decided as impossible with signing, so refused rather than picked).
+    A claim still waiting for its dependencies is weighed again when they arrive. Entry 62's
+    "the first stays" rule for forks is replaced by this. Tests:
+    `a_real_change_takes_the_place_of_a_forgery_at_its_number_in_either_order`,
+    `two_valid_changes_with_one_number_are_refused_loudly`, the updated
+    `a_malformed_change_is_refused_and_listed`, and the property test, which now plants
+    forgeries at members' next numbers, keeps them from the member until the end, and adds
+    two newcomers taking every forgery first and every one last (24 seeds; 200 run once).
+  - Test names: invented names only.
+
 ## 90. Rate tables the user keeps, and filling a line's rate from one (2026-10-20, the owner's direction)
 
 Roadmap 3.9. The owner (relayed 2026-10-20): 3.9 is on the legal line, so build only the

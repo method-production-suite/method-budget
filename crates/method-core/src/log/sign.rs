@@ -93,6 +93,8 @@ pub mod why {
     pub const MISMATCH: &str = "its signature doesn't match the person's key";
     pub const NO_KEY: &str = "it is signed, but its author has no key in this budget";
     pub const CANT_CHECK: &str = "signatures can't be checked here";
+    pub const KEY_TAKEN: &str =
+        "a key in this computer's name is in the budget and it isn't this computer's";
     pub const TWO_KEYS: &str = "a person's key is published once and doesn't change";
     pub const NOT_PERSONS_KEY: &str =
         "a command line or agent signs with its person's key, and this one doesn't";

@@ -1478,6 +1478,11 @@ pub const NO_PERSON: &str = "This computer has no person in this shared budget, 
 /// opens the budget).
 pub const NO_KEY_YET: &str = "Changes in this shared budget are signed, and this computer's key isn't in it yet, so nothing was written. Open the budget in Method Budget once; it adds the key, and then this works.";
 
+/// What a program is told when the key published in this computer's
+/// person's name (or its own) isn't the key on this computer: someone else
+/// may have put it in (decisions.md, entry 89).
+pub const KEY_NOT_YOURS: &str = "A key in this computer's name is in this shared budget, and it isn't this computer's key, so nothing was written: someone else may have put it there. Tell the budget's owner before going on.";
+
 /// What a program is told when this computer's person was removed from a
 /// shared budget.
 pub const REMOVED: &str = "This computer's person was removed from this shared budget, so nothing was written. The owner can give you a role again in the Share dialog.";
@@ -1624,6 +1629,20 @@ impl SharedEdit {
         })
     }
 
+    /// Whether a key published for this computer's person, or for the
+    /// program's own actor, isn't the key on this computer.
+    pub fn key_not_ours(&self) -> bool {
+        let Some(mine) = self.shared.log.signer_key() else {
+            return false;
+        };
+        self.shared.log.key_conflict().is_some()
+            || self
+                .shared
+                .log
+                .key_of(self.person)
+                .is_some_and(|k| k != mine)
+    }
+
     /// The program's own actor (the tool actor).
     pub fn actor(&self) -> ActorId {
         self.shared.log.actor()
@@ -1655,6 +1674,9 @@ impl SharedEdit {
         label: &str,
         time: &str,
     ) -> Result<bool, LogFileError> {
+        if self.key_not_ours() {
+            return Err(LogFileError(KEY_NOT_YOURS.into()));
+        }
         if self.shared.log.removed(self.person) {
             return Err(LogFileError(REMOVED.into()));
         }

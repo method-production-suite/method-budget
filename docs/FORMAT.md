@@ -1823,8 +1823,13 @@ only when there are any, the whole list as one value) and a row's `rate_source`
 2. A change that names an entity that doesn't exist, puts an entity in a list its kind
    can't be in, or hangs a position on a missing one is refused whole, listed for the
    owner, and the actor's count moves past it.
-3. A second change with the same `(actor, seq)` and different content is a fork: the
-   first stays, the second is refused.
+3. Two different changes with the same `(actor, seq)` are settled the same way in any
+   order (decisions.md, entry 89): when that number comes up and nothing else can go on,
+   the one change among them that passes is applied and the others are listed; when none
+   passes, the number is refused; when more than one passes (a fork, which signing makes
+   impossible without the key), none is applied and all are listed. A claim whose
+   dependencies haven't arrived when its number is settled is weighed again when they do.
+   A refused change never keeps the real one out.
 4. A change that must be signed and isn't, or whose signature doesn't match its author's
    key, is refused and listed; so is one made by a removed person after the cutoff, and one
    by a stranger to the first role that goes beyond read only (see Signatures). The actor's

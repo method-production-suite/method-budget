@@ -87,6 +87,21 @@ pub enum LogError {
     Removed { id: ChangeId },
 }
 
+/// Why a change is in [`Log::forks`]: it doesn't pass, and the change with
+/// the same number that does was taken in.
+pub const FORK_REPLACED: &str =
+    "refused, and the change with the same number that passes was taken in";
+/// Why a change is in [`Log::forks`]: it doesn't pass, and neither does
+/// the other change with its number.
+pub const FORK_REFUSED_TOO: &str = "refused, as was the other change with the same number";
+/// Why a change is in [`Log::forks`] for now: its number was settled before
+/// the changes it depends on arrived; it is weighed again when they do.
+pub const FORK_WAITING: &str = "waiting for the changes it depends on";
+/// Why two changes with one number that both pass are both left out (a
+/// fork): in [`Log::forks`], and with [`refused::FORK`] in the rejected list.
+pub const FORK_SECOND: &str =
+    "two different changes that both pass claim the same number, so neither was taken in";
+
 /// The prefixes of [`Log::rejected`]'s reasons, so a reader can tell why
 /// without parsing sentences.
 pub mod refused {
@@ -96,6 +111,8 @@ pub mod refused {
     pub const SIGNATURE: &str = "signature: ";
     /// After the author was removed.
     pub const REMOVED: &str = "removed: ";
+    /// Two changes that both pass claim one number.
+    pub const FORK: &str = "fork: ";
 }
 
 impl fmt::Display for LogError {
@@ -156,6 +173,11 @@ pub struct Log {
     verifier: Option<Arc<dyn Verifier>>,
     /// How many times everything was folded again.
     folds: u64,
+    /// Changes that claimed a number already taken by another change of
+    /// the same actor: a forgery that lost its place to the real change, or
+    /// two different changes that both pass (a fork, which signing makes
+    /// impossible without the key). Listed loudly, never applied.
+    forks: Vec<(Change, String)>,
 }
 
 impl fmt::Debug for Log {
@@ -188,7 +210,26 @@ impl Log {
             signer: None,
             verifier: None,
             folds: 0,
+            forks: Vec::new(),
         }
+    }
+
+    /// Changes that claimed a number another change of the same actor has:
+    /// a refused change that a valid one took the place of, or a second
+    /// valid change at a number already applied (a fork). Never applied.
+    pub fn forks(&self) -> &[(Change, String)] {
+        &self.forks
+    }
+
+    /// The key published in this actor's name, when it isn't this
+    /// computer's own (decisions.md, entry 89): someone else put a key in
+    /// for it. This actor then signs nothing and records nothing.
+    pub fn key_conflict(&self) -> Option<PublicKey> {
+        let mine = self.signer.as_ref()?.public();
+        self.state
+            .key_of(self.actor)
+            .map(|(k, _)| k)
+            .filter(|k| *k != mine)
     }
 
     /// How many times the log has folded everything again because a change
@@ -374,6 +415,10 @@ impl Log {
         let Some(signer) = &self.signer else {
             return change;
         };
+        if self.key_conflict().is_some() {
+            // Never sign as an actor whose published key isn't ours.
+            return change;
+        }
         if change.key().is_none() && self.wants_key(&change) {
             change.ops.push(Op::Key {
                 key: signer.public(),
@@ -390,6 +435,12 @@ impl Log {
     /// must fit the state, be signed when it must, and fit this person's
     /// role. Nothing is recorded when it doesn't.
     fn check_own(&self, change: &Change) -> Result<(), LogError> {
+        if self.key_conflict().is_some() {
+            return Err(LogError::Unsigned {
+                id: change.id(),
+                reason: sign::why::KEY_TAKEN.to_string(),
+            });
+        }
         self.judge(change).map_err(|b| b.1)
     }
 
@@ -501,22 +552,103 @@ impl Log {
     pub fn apply(&mut self, change: Change) -> Result<Applied, LogError> {
         let id = change.id();
         if self.frontier.includes(id) {
-            return match self.changes.get(&id) {
-                Some(have) if *have == change => Ok(Applied::Duplicate),
-                Some(_) => Err(LogError::Fork { id }),
-                // Rejected earlier: the frontier moved past it.
-                None => Ok(Applied::Duplicate),
-            };
+            return self.contest(change);
         }
         if !self.ready(&change) {
-            if !self.pending.iter().any(|p| p.id() == id) {
+            // Two different changes with one number may both wait; the
+            // first taken holds the place and the other contests it.
+            if !self.pending.contains(&change) {
                 self.pending.push(change);
             }
             return Ok(Applied::Pending);
         }
         let result = self.apply_now(change);
         let unblocked = self.drain_pending();
+        self.settle_waiting_claims();
         result.map(|()| Applied::Applied { unblocked })
+    }
+
+    /// A change whose number this log has already taken. The same change is
+    /// a duplicate. A different one is kept with the other changes that
+    /// claim that number and everything is folded again, where the fold
+    /// settles the number the same way whatever order they came in: the one
+    /// change that passes is taken in and the others listed in
+    /// [`Log::forks`]; when none passes, the number is refused; when more
+    /// than one passes (a fork, which signing makes impossible without the
+    /// key), none is taken in and all are listed.
+    fn contest(&mut self, change: Change) -> Result<Applied, LogError> {
+        let id = change.id();
+        let known = self.changes.get(&id) == Some(&change)
+            || self.rejected.iter().any(|(c, _)| *c == change)
+            || self.forks.iter().any(|(c, _)| *c == change);
+        if known {
+            return Ok(Applied::Duplicate);
+        }
+        self.forks.push((change.clone(), String::new()));
+        self.refold();
+        if self.changes.get(&id) == Some(&change) {
+            Ok(Applied::Applied { unblocked: 0 })
+        } else if self
+            .forks
+            .iter()
+            .any(|(c, why)| *c == change && why == FORK_SECOND)
+        {
+            Err(LogError::Fork { id })
+        } else {
+            Ok(Applied::Duplicate)
+        }
+    }
+
+    /// Takes `first` in the fold, or whichever of it and the other changes
+    /// claiming its number (`others`) passes; see [`Log::contest`].
+    fn take_contested(&mut self, first: Change, others: Vec<Change>) -> bool {
+        if others.is_empty() {
+            return self.take(first, false).is_ok();
+        }
+        let mut all = vec![first];
+        all.extend(others);
+        let passing: Vec<usize> = (0..all.len())
+            .filter(|i| self.judge(&all[*i]).is_ok())
+            .collect();
+        match passing.as_slice() {
+            [one] => {
+                let winner = all.remove(*one);
+                for c in all {
+                    self.forks.push((c, FORK_REPLACED.into()));
+                }
+                self.take(winner, false).is_ok()
+            }
+            [] => {
+                let first = all.remove(0);
+                for c in all {
+                    self.forks.push((c, FORK_REFUSED_TOO.into()));
+                }
+                self.take(first, false).is_ok()
+            }
+            _ => {
+                let first = all.remove(0);
+                for c in all {
+                    self.forks.push((c, FORK_SECOND.into()));
+                }
+                self.frontier.advance(first.actor, first.seq);
+                self.received.push(first.id());
+                self.rejected
+                    .push((first, format!("{}{FORK_SECOND}", refused::FORK)));
+                false
+            }
+        }
+    }
+
+    /// Folds again when a claim on a settled number now has what it depends
+    /// on, so it is weighed with the others as if it had come in time.
+    fn settle_waiting_claims(&mut self) {
+        let due = self
+            .forks
+            .iter()
+            .any(|(c, why)| why == FORK_WAITING && self.frontier.covers(&c.deps));
+        if due {
+            self.refold();
+        }
     }
 
     fn ready(&self, change: &Change) -> bool {
@@ -582,14 +714,88 @@ impl Log {
             self.order.clear();
             self.frontier = Frontier::new();
             let mut fresh = Bounds::default();
-            for id in received {
-                if let Some(c) = taken.remove(&id) {
-                    let applied = self.take(c, false).is_ok();
-                    if applied {
-                        let c = self.changes.get(&id).expect("just applied");
-                        fresh.note(&self.state, c);
+            // In the order taken, each once its dependencies are in again (a
+            // change that took a refused one's place may depend on later ones).
+            let mut waiting: Vec<Change> = received
+                .into_iter()
+                .filter_map(|id| taken.remove(&id))
+                .collect();
+            // Every change that claimed a number another has, considered
+            // again with the others when that number comes up.
+            let mut others: Vec<Change> = std::mem::take(&mut self.forks)
+                .into_iter()
+                .map(|(c, _)| c)
+                .collect();
+            // Claims not ready when their number was settled.
+            let mut unplaced: Vec<Change> = Vec::new();
+            loop {
+                // Every ready change whose number nobody else claims.
+                let mut progress = false;
+                let mut rest = Vec::new();
+                for c in waiting {
+                    let contested = others.iter().any(|o| o.id() == c.id());
+                    if !contested && self.ready(&c) {
+                        let id = c.id();
+                        if self.take(c, false).is_ok() {
+                            let c = self.changes.get(&id).expect("just applied");
+                            fresh.note(&self.state, c);
+                        }
+                        progress = true;
+                    } else {
+                        rest.push(c);
                     }
                 }
+                waiting = rest;
+                if progress {
+                    continue;
+                }
+                // Then the lowest claimed number with a claim ready, settled
+                // among all its claims ready by now: decided only once nothing
+                // else can go on, so the same claims are there in any order.
+                let Some(id) = waiting
+                    .iter()
+                    .chain(others.iter())
+                    .filter(|c| others.iter().any(|o| o.id() == c.id()) && self.ready(c))
+                    .map(Change::id)
+                    .min()
+                else {
+                    break;
+                };
+                let mut claims: Vec<Change> = Vec::new();
+                let (mine, rest): (Vec<Change>, Vec<Change>) =
+                    waiting.into_iter().partition(|c| c.id() == id);
+                waiting = rest;
+                claims.extend(mine);
+                let (mine, rest): (Vec<Change>, Vec<Change>) = std::mem::take(&mut others)
+                    .into_iter()
+                    .partition(|c| c.id() == id);
+                others = rest;
+                claims.extend(mine);
+                let (ready, late): (Vec<Change>, Vec<Change>) =
+                    claims.into_iter().partition(|c| self.ready(c));
+                unplaced.extend(late);
+                let mut ready = ready.into_iter();
+                let first = ready.next().expect("a claim is ready");
+                if self.take_contested(first, ready.collect()) {
+                    let c = self.changes.get(&id).expect("just applied");
+                    fresh.note(&self.state, c);
+                }
+            }
+            for c in waiting {
+                if !self.pending.contains(&c) {
+                    self.pending.push(c);
+                }
+            }
+            // Claims not placed: still waiting for changes that haven't
+            // arrived (settled again when they do), or needing their own
+            // number's other claim to have been taken in (refused).
+            for c in others.into_iter().chain(unplaced) {
+                let why = if self.frontier.covers(&c.deps) {
+                    FORK_REFUSED_TOO
+                } else {
+                    FORK_WAITING
+                };
+                self.forks.push((c, why.into()));
             }
             if fresh == self.bounds {
                 return;
@@ -601,6 +807,18 @@ impl Log {
     fn drain_pending(&mut self) -> usize {
         let mut applied = 0;
         loop {
+            // A waiting change whose number was taken meanwhile contests it.
+            if let Some(i) = self
+                .pending
+                .iter()
+                .position(|c| self.frontier.includes(c.id()))
+            {
+                let change = self.pending.remove(i);
+                if matches!(self.contest(change), Ok(Applied::Applied { .. })) {
+                    applied += 1;
+                }
+                continue;
+            }
             let Some(i) = self.pending.iter().position(|c| self.ready(c)) else {
                 return applied;
             };

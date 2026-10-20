@@ -497,7 +497,7 @@ mod tests {
             "home is ~"
         );
         assert_eq!(
-            redact("in /data/sam/x.mthd", Some("/data/sam")),
+            redact("in /data/riley/x.mthd", Some("/data/riley")),
             "in <path>.mthd"
         );
         let url = new_issue_url("0.2.1", "x", Some("at /Users/ann/Secret Film.mthd"), None);

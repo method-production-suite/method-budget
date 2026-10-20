@@ -645,8 +645,12 @@ fn a_malformed_change_is_refused_and_listed() {
     record(&mut b, &p, &after, &[], "Title");
     let next = b.changes().last().unwrap().clone();
     assert_eq!(next.seq, 1);
-    // Seen as seq 1 again from actor 2: the refused one moved the frontier.
-    assert_eq!(a.apply(next).unwrap(), Applied::Duplicate);
+    // The same number from actor 2, a change that fits: it takes the refused
+    // one's place, which is listed as such (MReview, pull request #73).
+    assert_eq!(a.apply(next).unwrap(), Applied::Applied { unblocked: 0 });
+    assert!(a.rejected().is_empty());
+    assert_eq!(a.forks().len(), 1);
+    assert_eq!(a.project().budget.title, "fine");
 }
 
 // ---------------------------------------------------------------------------
@@ -1601,7 +1605,7 @@ fn only_the_owner_and_admins_change_roles() {
     // An admin sets other people's roles, but makes no admins and leaves
     // the owner alone.
     admin
-        .grant(actor(4), Role::Actuals, "Sam does actuals", T)
+        .grant(actor(4), Role::Actuals, "Riley does actuals", T)
         .unwrap();
     for (who, role) in [
         (actor(4), Role::Admin),
@@ -1828,10 +1832,10 @@ fn a_co_owner_sets_roles_admins_included() {
     let mut co = follower(2, &a);
     assert!(co.role_of(actor(2)).sets_roles());
     // A co-owner makes and changes admins, as the owner does.
-    co.grant(actor(3), Role::Admin, "Sam is an admin", T)
+    co.grant(actor(3), Role::Admin, "Riley is an admin", T)
         .unwrap();
-    co.grant(actor(3), Role::Editor, "Sam edits", T).unwrap();
-    co.grant(actor(3), Role::Admin, "Sam is an admin again", T)
+    co.grant(actor(3), Role::Editor, "Riley edits", T).unwrap();
+    co.grant(actor(3), Role::Admin, "Riley is an admin again", T)
         .unwrap();
     // Only the owner makes co-owners or changes one, and nobody changes
     // the owner.
@@ -1873,7 +1877,9 @@ fn concurrent_grants_go_to_the_higher_ranked_granter() {
     owner
         .grant(actor(2), Role::CoOwner, "Priya co-owns", T)
         .unwrap();
-    owner.grant(actor(3), Role::Admin, "Sam admin", T).unwrap();
+    owner
+        .grant(actor(3), Role::Admin, "Riley admin", T)
+        .unwrap();
     let mut co = follower(2, &owner);
     let mut admin = follower(3, &owner);
     // Apart: the owner makes Jordan a co-owner and Kim an admin; the
@@ -1925,8 +1931,10 @@ fn a_tool_actor_has_its_persons_role() {
     owner
         .grant(actor(2), Role::Comment, "Jordan comments", T)
         .unwrap();
-    owner.grant(actor(3), Role::Editor, "Sam edits", T).unwrap();
-    // Jordan's command line (actor 12) and Sam's (actor 13).
+    owner
+        .grant(actor(3), Role::Editor, "Riley edits", T)
+        .unwrap();
+    // Jordan's command line (actor 12) and Riley's (actor 13).
     let mut jt = follower(12, &owner);
     jt.acts_for(actor(2), "Command line for Jordan", T).unwrap();
     assert_eq!(jt.role_of(actor(12)), Role::Comment);
@@ -1935,8 +1943,8 @@ fn a_tool_actor_has_its_persons_role() {
         Err(LogError::NotAllowed { .. })
     ));
     let mut st = follower(13, &owner);
-    st.acts_for(actor(3), "Command line for Sam", T).unwrap();
-    try_edit(&mut st, |b| b.title = "Sam's".into())
+    st.acts_for(actor(3), "Command line for Riley", T).unwrap();
+    try_edit(&mut st, |b| b.title = "Riley's".into())
         .unwrap()
         .unwrap();
     // Without saying whose it is, a new actor reads only once roles exist.
@@ -1954,10 +1962,10 @@ fn a_tool_actor_has_its_persons_role() {
     assert_eq!(owner.role_of(actor(13)), Role::Editor);
     assert_eq!(owner.person_of(actor(13)), actor(3));
     assert_eq!(owner.person_of(actor(3)), actor(3));
-    assert_eq!(owner.project().budget.title, "Sam's");
+    assert_eq!(owner.project().budget.title, "Riley's");
     // The person's role changes, and their tool's with it.
     owner
-        .grant(actor(3), Role::ReadOnly, "Sam reads", T)
+        .grant(actor(3), Role::ReadOnly, "Riley reads", T)
         .unwrap();
     assert_eq!(owner.role_of(actor(13)), Role::ReadOnly);
 }
@@ -1975,9 +1983,11 @@ fn acts_for_never_raises_a_member() {
     owner
         .grant(actor(2), Role::ReadOnly, "Jordan reads", T)
         .unwrap();
-    owner.grant(actor(3), Role::Editor, "Sam edits", T).unwrap();
+    owner
+        .grant(actor(3), Role::Editor, "Riley edits", T)
+        .unwrap();
     let mut jordan = follower(2, &owner);
-    let mut sam = follower(3, &owner);
+    let mut riley = follower(3, &owner);
     let mut stranger = follower(8, &owner);
     let title = |t: &str| Op::Set {
         entity: Uid::ROOT,
@@ -1990,7 +2000,7 @@ fn acts_for_never_raises_a_member() {
         Err(LogError::NotAllowed { .. })
     ));
     assert!(matches!(
-        owner.acts_for(actor(3), "Owner as Sam", T),
+        owner.acts_for(actor(3), "Owner as Riley", T),
         Err(LogError::NotAllowed { .. })
     ));
     assert!(matches!(
@@ -2001,12 +2011,12 @@ fn acts_for_never_raises_a_member() {
         early.acts_for(actor(1), "Early claim", T),
         Err(LogError::NotAllowed { .. })
     ));
-    // Sam edits as an editor (judged under roles), then claims the owner.
-    try_edit(&mut sam, |b| b.title = "Sam's".into())
+    // Riley edits as an editor (judged under roles), then claims the owner.
+    try_edit(&mut riley, |b| b.title = "Riley's".into())
         .unwrap()
         .unwrap();
     assert!(matches!(
-        sam.acts_for(actor(1), "Sam as owner", T),
+        riley.acts_for(actor(1), "Riley as owner", T),
         Err(LogError::NotAllowed { .. })
     ));
     // Forged versions of each, written anyway, with an edit only the owner
@@ -2034,7 +2044,7 @@ fn acts_for_never_raises_a_member() {
         forge(2, 1, &owner, 1),
         forge(1, owner.own_seq() + 1, &owner, 3),
         forge(8, 1, &owner, 6),
-        forge(3, sam.own_seq() + 1, &sam, 1),
+        forge(3, riley.own_seq() + 1, &riley, 1),
         Change {
             deps: {
                 let mut f = method_core::log::Frontier::new();
@@ -2045,7 +2055,7 @@ fn acts_for_never_raises_a_member() {
         },
     ];
     let mut honest: Vec<Change> = owner.changes().cloned().collect();
-    honest.extend(sam.changes().filter(|c| c.actor == actor(3)).cloned());
+    honest.extend(riley.changes().filter(|c| c.actor == actor(3)).cloned());
     let mut rng = Rng::new(11);
     for n in 0..8 {
         let mut fresh = Log::new(actor(20), Ids::seeded(n));
@@ -2059,7 +2069,7 @@ fn acts_for_never_raises_a_member() {
         for c in &bad {
             assert!(refused.contains(&c.id()), "run {n}: {:?} kept", c.id());
         }
-        assert_eq!(fresh.project().budget.title, "Sam's", "run {n}");
+        assert_eq!(fresh.project().budget.title, "Riley's", "run {n}");
         assert_eq!(fresh.role_of(actor(2)), Role::ReadOnly, "run {n}");
         assert_eq!(fresh.role_of(actor(7)), Role::ReadOnly, "run {n}");
         assert_eq!(fresh.role_of(actor(8)), Role::ReadOnly, "run {n}");
@@ -2238,7 +2248,9 @@ fn written(logs: &[&Log]) -> Vec<Change> {
         })
         .collect();
     all.sort_by_key(|c| (c.actor, c.seq));
-    all.dedup_by_key(|c| c.id());
+    // Two different changes with one number (a forgery and the real one)
+    // are both kept: each computer settles them.
+    all.dedup();
     all
 }
 
@@ -2467,20 +2479,22 @@ fn a_removed_persons_later_changes_are_kept_aside_and_earlier_ones_stay() {
 #[test]
 fn only_those_who_set_a_persons_role_remove_them() {
     let mut owner = signed_budget();
-    owner.grant(actor(3), Role::Admin, "Sam admin", T).unwrap();
+    owner
+        .grant(actor(3), Role::Admin, "Riley admin", T)
+        .unwrap();
     owner.grant(actor(4), Role::Editor, "Kim edits", T).unwrap();
     let mut jordan = signed_follower(2, &owner, 2);
     assert!(matches!(
         jordan.revoke(actor(4), "Remove Kim", T),
         Err(LogError::NotAllowed { .. })
     ));
-    let mut sam = signed_follower(3, &owner, 3);
-    assert!(sam.revoke(actor(1), "Remove the owner", T).is_err());
-    sam.revoke(actor(4), "Remove Kim", T).unwrap();
+    let mut riley = signed_follower(3, &owner, 3);
+    assert!(riley.revoke(actor(1), "Remove the owner", T).is_err());
+    riley.revoke(actor(4), "Remove Kim", T).unwrap();
     owner.grant(actor(5), Role::Admin, "Lee admin", T).unwrap();
-    send(&owner, &mut sam);
+    send(&owner, &mut riley);
     assert!(
-        sam.revoke(actor(5), "Remove Lee", T).is_err(),
+        riley.revoke(actor(5), "Remove Lee", T).is_err(),
         "an admin doesn't remove an admin"
     );
 }
@@ -2520,10 +2534,15 @@ fn a_program_signs_with_its_persons_key() {
 #[test]
 fn signed_changes_and_removals_converge_in_any_order() {
     let mut cut = 0;
+    // Forgeries at a member's next number that lost their place to the
+    // real change.
+    let mut replaced = 0;
     for seed in 0..24u64 {
         let mut rng = Rng::new(seed);
         let mut owner = signed_budget();
-        owner.grant(actor(3), Role::Editor, "Sam edits", T).unwrap();
+        owner
+            .grant(actor(3), Role::Editor, "Riley edits", T)
+            .unwrap();
         owner
             .grant(actor(4), scope(&owner, &["2000"]), "Kim's department", T)
             .unwrap();
@@ -2537,6 +2556,7 @@ fn signed_changes_and_removals_converge_in_any_order() {
         for n in 2..=4u8 {
             logs.push(signed_follower(n, &owner, n));
         }
+        let mut collisions: Vec<Change> = Vec::new();
         let mut extra: Vec<Change> = lee
             .changes()
             .filter(|c| c.actor == actor(5))
@@ -2587,13 +2607,31 @@ fn signed_changes_and_removals_converge_in_any_order() {
                 }
             }
             extra.push(f);
-            // Exchange everything written so far, in a random order per log.
+            // A forgery at a member's next number, before the member writes
+            // it: unsigned or signed with another key. It reaches the other
+            // computers now, the member's own only at the end.
+            if rng.chance(60) {
+                let v = &logs[1 + rng.below(3) as usize];
+                let mut f = forged(
+                    v.actor(),
+                    v.own_seq() + 1,
+                    v,
+                    vec![title_op(&format!("Taken {round}"))],
+                );
+                if rng.chance(50) {
+                    f.sig = Some(TestKey(9).sign(&f));
+                }
+                collisions.push(f);
+            }
+            // Exchange everything written so far, in a random order per log
+            // (a change whose number another has taken is handed over too).
             let mut all = written(&logs.iter().collect::<Vec<_>>());
             all.extend(extra.iter().cloned());
             for log in logs.iter_mut() {
                 let mut missing: Vec<Change> = all
                     .iter()
-                    .filter(|c| !log.frontier().includes(c.id()))
+                    .chain(collisions.iter().filter(|c| c.actor != log.actor()))
+                    .filter(|c| log.change(c.id()) != Some(*c))
                     .cloned()
                     .collect();
                 rng.shuffle(&mut missing);
@@ -2604,14 +2642,54 @@ fn signed_changes_and_removals_converge_in_any_order() {
         }
         let mut all = written(&logs.iter().collect::<Vec<_>>());
         all.extend(extra.iter().cloned());
+        all.extend(collisions.iter().cloned());
         let mut newcomer = keyed(Log::new(actor(30), Ids::seeded(seed)), None);
         rng.shuffle(&mut all);
-        deliver(&mut newcomer, &all);
+        deliver_all(&mut newcomer, &all);
+        // Two more newcomers: every forgery at a member's number first, and
+        // every one last.
+        let is_collision = |c: &Change| collisions.contains(c);
+        let mut forged_first = keyed(Log::new(actor(31), Ids::seeded(seed)), None);
+        let mut real_first = keyed(Log::new(actor(32), Ids::seeded(seed)), None);
+        let (fakes, reals): (Vec<Change>, Vec<Change>) =
+            all.iter().cloned().partition(|c| is_collision(c));
+        deliver_all(&mut forged_first, &[fakes.clone(), reals.clone()].concat());
+        deliver_all(&mut real_first, &[reals, fakes].concat());
+        for log in logs.iter_mut() {
+            let mut mine = all.clone();
+            rng.shuffle(&mut mine);
+            deliver_all(log, &mine);
+        }
+        replaced += newcomer
+            .forks()
+            .iter()
+            .filter(|(_, why)| why == method_core::log::FORK_REPLACED)
+            .count();
         let first = &logs[0];
-        for log in logs.iter().skip(1).chain([&newcomer]) {
+        // No forgery at a member's number is ever applied.
+        for f in &collisions {
+            for log in logs.iter().chain([&newcomer, &forged_first, &real_first]) {
+                assert_ne!(
+                    log.change(f.id()),
+                    Some(f),
+                    "seed {seed}: forgery {} applied",
+                    f.id()
+                );
+            }
+        }
+        for log in logs
+            .iter()
+            .skip(1)
+            .chain([&newcomer, &forged_first, &real_first])
+        {
             assert!(log.pending().is_empty(), "seed {seed}");
             assert_eq!(log.frontier(), first.frontier(), "seed {seed}");
-            assert_eq!(rejected_ids(log), rejected_ids(first), "seed {seed}");
+            assert_eq!(
+                rejected_ids(log),
+                rejected_ids(first),
+                "seed {seed}: log of {:?}",
+                log.actor()
+            );
             assert_eq!(
                 normalized(&log.project().budget),
                 normalized(&first.project().budget),
@@ -2635,6 +2713,132 @@ fn signed_changes_and_removals_converge_in_any_order() {
             .count();
     }
     assert!(cut > 5, "removals cut {cut} changes in all");
+    assert!(replaced > 5, "forgeries that lost their place: {replaced}");
+}
+
+/// Hands `to` every change in `changes` (a change it already has is a
+/// duplicate; one whose number another took contests it).
+fn deliver_all(to: &mut Log, changes: &[Change]) {
+    for c in changes {
+        let _ = to.apply(c.clone());
+    }
+}
+
+/// A refused change never keeps the real change with its number out: the
+/// real one takes its place whichever arrives first, and the refused one
+/// is listed (MReview, pull request #73).
+#[test]
+fn a_real_change_takes_the_place_of_a_forgery_at_its_number_in_either_order() {
+    let owner = signed_budget();
+    let mut jordan = signed_follower(2, &owner, 2);
+    try_edit(&mut jordan, |b| b.title = "Jordan's".into())
+        .unwrap()
+        .unwrap();
+    // A forgery at Jordan's next number, unsigned.
+    let forgery = forged(
+        actor(2),
+        jordan.own_seq() + 1,
+        &jordan,
+        vec![title_op("Forged")],
+    );
+    try_edit(&mut jordan, |b| b.title = "Jordan's second".into())
+        .unwrap()
+        .unwrap();
+    let real = jordan.changes().last().unwrap().clone();
+    assert_eq!(real.id(), forgery.id());
+    let base = written(&[&owner, &jordan]);
+    for forged_first in [true, false] {
+        let mut reader = keyed(Log::new(actor(9), Ids::seeded(9)), None);
+        let mut order: Vec<Change> = base
+            .iter()
+            .filter(|c| c.id() != real.id())
+            .cloned()
+            .collect();
+        if forged_first {
+            order.push(forgery.clone());
+            order.push(real.clone());
+        } else {
+            order.push(real.clone());
+            order.push(forgery.clone());
+        }
+        deliver_all(&mut reader, &order);
+        assert_eq!(
+            reader.change(real.id()),
+            Some(&real),
+            "forged first {forged_first}"
+        );
+        assert_eq!(reader.project().budget.title, "Jordan's second");
+        assert!(reader.rejected().is_empty(), "{:?}", reader.rejected());
+        assert_eq!(reader.forks().len(), 1);
+        assert_eq!(reader.forks()[0].0, forgery);
+        // The same reason in either order: it doesn't pass, the real one does.
+        assert_eq!(reader.forks()[0].1, method_core::log::FORK_REPLACED);
+    }
+}
+
+/// Two different changes at one number that both pass can only come from
+/// one actor writing twice (or, before signing, a forgery): neither is taken
+/// in, in either order, and both are listed: never one applied in silence.
+#[test]
+fn two_valid_changes_with_one_number_are_refused_loudly() {
+    let a = adopt(1, &sample());
+    let title = a.project().budget.title.clone();
+    let probe = follower(2, &a);
+    let one = forged(actor(2), 1, &probe, vec![title_op("One")]);
+    let two = forged(actor(2), 1, &probe, vec![title_op("Two")]);
+    for (x, y) in [(&one, &two), (&two, &one)] {
+        let mut b = follower(2, &a);
+        b.apply(x.clone()).unwrap();
+        assert!(matches!(b.apply(y.clone()), Err(LogError::Fork { .. })));
+        assert_eq!(b.project().budget.title, title);
+        assert_eq!(b.forks().len(), 1);
+        assert_eq!(b.forks()[0].1, method_core::log::FORK_SECOND);
+        assert_eq!(b.rejected().len(), 1);
+        assert!(b.rejected()[0]
+            .1
+            .starts_with(method_core::log::refused::FORK));
+        // Handed over again, nothing changes.
+        let _ = b.apply(y.clone());
+        let _ = b.apply(x.clone());
+        assert_eq!(b.forks().len(), 1);
+        assert_eq!(b.rejected().len(), 1);
+    }
+}
+
+/// A key in this computer's name that isn't its own (someone else put one in
+/// first): it signs nothing and records nothing as that actor, and says so.
+#[test]
+fn a_key_published_in_my_name_stops_me_signing() {
+    let owner = signed_budget();
+    // Someone with the folder publishes a key for Jordan before Jordan does.
+    let mut taken = forged(
+        actor(2),
+        1,
+        &owner,
+        vec![Op::Key {
+            key: TestKey(66).public(),
+        }],
+    );
+    taken.sig = Some(TestKey(66).sign(&taken));
+    let mut changes = written(&[&owner]);
+    changes.push(taken);
+    let mut jordan = keyed(Log::new(actor(2), Ids::seeded(2)), Some(2));
+    deliver(&mut jordan, &changes);
+    assert_eq!(jordan.key_conflict(), Some(TestKey(66).public()));
+    let before = jordan.own_seq();
+    let err = try_edit(&mut jordan, |b| b.title = "Mine".into()).unwrap_err();
+    match err {
+        LogError::Unsigned { reason, .. } => {
+            assert_eq!(reason, method_core::log::sign::why::KEY_TAKEN)
+        }
+        e => panic!("{e}"),
+    }
+    assert!(jordan.publish_key("Key", T).is_err() || jordan.own_seq() == before);
+    assert_eq!(jordan.own_seq(), before, "nothing recorded");
+    // With no key of its own, a log has nothing to compare.
+    let mut reader = keyed(Log::new(actor(9), Ids::seeded(9)), None);
+    deliver(&mut reader, &changes);
+    assert_eq!(reader.key_conflict(), None);
 }
 
 /// A credit's minimum spend, broker's fee and shared cap, and the budget's

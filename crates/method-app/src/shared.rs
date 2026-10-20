@@ -350,6 +350,10 @@ pub struct ShareStatus {
     pub signed: bool,
     /// What signing means here, in a sentence.
     pub signed_text: String,
+    /// A key in this person's name is in the budget and it isn't this
+    /// computer's (someone else put it in): nothing here is signed or
+    /// shared until that is sorted out. In a sentence.
+    pub key_warning: Option<String>,
 }
 
 /// How many refused changes the status lists.
@@ -1331,12 +1335,27 @@ impl SharedDoc {
                 .collect(),
             can_set_roles: self.role().sets_roles(),
             roles_started: self.shared.log.roles_started(),
-            refused: self.shared.log.rejected().len(),
+            refused: self.shared.log.rejected().len() + self.shared.log.forks().len(),
             refused_changes: self.refused_changes(),
             notice: self.outside.clone(),
             signed: self.shared.log.signing_started(),
             signed_text: self.signed_text(),
+            key_warning: self.key_warning(),
         }
+    }
+
+    /// When a key in this person's name is in the budget and it isn't this
+    /// computer's, what to tell them (decisions.md, entry 89).
+    pub fn key_warning(&self) -> Option<String> {
+        self.shared.log.key_conflict()?;
+        Some(format!(
+            "A key in your name is in this shared budget, and it isn\u{2019}t this computer\u{2019}s: someone else may have put it there. Nothing you change here is signed or shared until this is sorted out. Tell {} before you go on.",
+            if self.shared.log.owner() == Some(self.actor()) {
+                "the people you share this budget with".to_string()
+            } else {
+                self.owner_name()
+            }
+        ))
     }
 
     /// What signing means in this budget now, in a sentence.
@@ -1352,9 +1371,18 @@ impl SharedDoc {
 
     /// The changes left out, newest last, with why in plain words.
     fn refused_changes(&self) -> Vec<RefusedDto> {
-        let all = self.shared.log.rejected();
+        // Changes refused, then other changes claiming the same number as
+        // another (MReview, pull request #73): both listed.
+        let all: Vec<&(method_core::log::Change, String)> = self
+            .shared
+            .log
+            .rejected()
+            .iter()
+            .chain(self.shared.log.forks())
+            .collect();
         all[all.len().saturating_sub(REFUSED_SHOWN)..]
             .iter()
+            .copied()
             .map(|(c, reason)| RefusedDto {
                 actor: c.actor.hex(),
                 name: self.name_of(c.actor),
@@ -1557,6 +1585,9 @@ impl SharedDoc {
 
     /// Why this person can't change anything, when their role reads only.
     pub fn refusal(&self) -> Option<String> {
+        if let Some(w) = self.key_warning() {
+            return Some(w);
+        }
         if self.shared.log.removed(self.actor()) {
             return Some(format!(
                 "You were removed from this shared budget, so you can read it but not change it. {} can give you a role again.",
@@ -1575,6 +1606,11 @@ impl SharedDoc {
     /// role allows, and who to ask.
     fn refused_text(&self, e: &LogError) -> String {
         match e {
+            LogError::Unsigned { reason, .. }
+                if reason == method_core::log::sign::why::KEY_TAKEN =>
+            {
+                return self.key_warning().unwrap_or_default()
+            }
             LogError::Unsigned { .. } => {
                 return "Changes in this shared budget are signed, and this one couldn\u{2019}t be signed with this computer\u{2019}s key, so it wasn\u{2019}t shared.".into()
             }
@@ -1889,6 +1925,18 @@ impl SharedDoc {
 /// Why a change was left out, in a sentence for the status panel.
 pub fn refused_why(reason: &str) -> String {
     use method_core::log::{refused, sign::why};
+    if reason.starts_with(refused::FORK) || reason == method_core::log::FORK_SECOND {
+        return "Two different changes claim to be the same change by this person, so neither was taken in.".into();
+    }
+    if reason == method_core::log::FORK_REPLACED {
+        return "It claimed the place of one of this person\u{2019}s changes, which was taken in instead.".into();
+    }
+    if reason == method_core::log::FORK_REFUSED_TOO {
+        return "It claimed the same place as another of this person\u{2019}s changes, and neither fits.".into();
+    }
+    if reason == method_core::log::FORK_WAITING {
+        return "It claims the place of one of this person\u{2019}s changes and waits for changes that haven\u{2019}t arrived.".into();
+    }
     if let Some(r) = reason.strip_prefix(refused::NOT_ALLOWED) {
         return format!("Their role doesn\u{2019}t allow it ({r}).");
     }
@@ -1923,6 +1971,8 @@ mod tests {
         assert!(sig(why::MISSING).contains("isn\u{2019}t signed"));
         assert!(refused_why(&format!("{}made after", refused::REMOVED)).contains("removed"));
         assert!(refused_why("not allowed: this person reads only").contains("role"));
+        assert!(refused_why(method_core::log::FORK_REPLACED).contains("taken in instead"));
+        assert!(refused_why(&format!("{}x", refused::FORK)).starts_with("Two different changes"));
         for text in [sig(why::MISMATCH), sig(why::NO_KEY), sig(why::CANT_CHECK)] {
             assert!(!text.contains('\u{2014}') && !text.contains('!'), "{text}");
         }

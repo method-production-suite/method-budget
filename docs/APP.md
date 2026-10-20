@@ -1872,6 +1872,20 @@ person's app has put the key in the budget; until then it is refused in words. B
 without roles are not signed and work as before. Once signing has started the change log is
 format 3, and an older version refuses it as it refuses roles (above).
 
+**A key in your name that isn't yours.** Anyone who can write in the shared folder could
+put a key in someone's name before that person's computer does. Each app (and the command
+line and MCP server for their person) compares the key published in its person's name with
+the one on this computer; when they differ, the toolbar item and the status panel say "A key
+in your name is in this shared budget, and it isn't this computer's...", the Share dialog
+says it too, and nothing is signed or changed as that person (edits are refused with that
+sentence; the command line and MCP server refuse with it and write nothing). What happens
+next for the owner's own key is an open decision (docs/ROADMAP.md).
+
+**Two changes with one number.** A change in someone's name at a number their real change
+also has (a forgery that arrived first, say) never keeps the real one out: every computer
+takes in the one that passes and lists the other in the status panel. Two different changes
+at one number that both pass are both left out and listed.
+
 **Removing a person.** Under each person the owner, a co-owner or an admin (by the same
 rules as setting roles) has Remove…, which asks first and then records the removal as a
 change: the person reads only from then on, and their changes that hadn't reached the

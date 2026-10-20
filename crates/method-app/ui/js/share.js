@@ -132,6 +132,9 @@ export function renderBar(view) {
   if (s.error) {
     text = s.error;
     tone = 'bad';
+  } else if (s.key_warning) {
+    text = 'Your changes here aren’t shared: a key in your name isn’t this computer’s';
+    tone = 'bad';
   } else if (s.unshared > 0) {
     text = s.unshared === 1 ? 'Sharing 1 change…' : `Sharing ${s.unshared} changes…`;
     tone = 'busy';
@@ -305,6 +308,7 @@ function drawPanel() {
   rows.push(line('Keeps the file', s.keeper ? 'This computer' : (s.people.find((p) => p.keeper) || {}).name || 'Another computer'));
   if (s.file_written) rows.push(line('File last written', localTime(s.file_written)));
   if (s.error) rows.push(el('p', { class: 'share-problem', text: s.error, attrs: { role: 'alert' } }));
+  if (s.key_warning) rows.push(el('p', { class: 'share-problem', text: s.key_warning, attrs: { role: 'alert' } }));
   if (s.notice) rows.push(el('p', { class: 'share-notice', text: s.notice, attrs: { role: 'status' } }));
   rows.push(line('Your changes not yet shared', String(s.unshared), s.unshared ? 'is-busy' : ''));
   if (s.waiting) rows.push(line('Changes waiting for ones that haven’t arrived', String(s.waiting), 'is-warn'));
@@ -829,6 +833,7 @@ function sharedDialog(title, setup) {
         el('h4', { class: 'share-panel-sub', text: 'People' }),
         people,
         el('p', { class: 'share-muted', text: rolesNote(s) }),
+        s.key_warning ? el('p', { class: 'share-problem', text: s.key_warning, attrs: { role: 'alert' } }) : null,
         s.signed_text ? el('p', { class: 'share-muted', text: s.signed_text }) : null,
         el('div', { class: 'share-me' }, el('label', { class: 'modal-field', attrs: { for: 'share-name' } }, el('span', { text: 'Your name' }), name), el('div', { class: 'modal-field' }, el('span', { text: 'Your color' }), colors), save),
         error,
