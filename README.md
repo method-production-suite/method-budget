@@ -172,6 +172,7 @@ this section.
 - **Renumber accounts.** Change the account numbering pattern and preview every old and new number before it applies.
 - **Sub-budgets.** Make a filtered copy by categories, accounts, groups, sets or locations, for a department or a unit.
 - **A sample budget to explore.** The first time you open the app, an invented feature of about a million dollars opens as an untitled copy, with every feature in use; Help > Open Sample brings a fresh copy back any time.
+- **New project window.** Start a budget from one window with its title, chart of accounts, schedule, currency, your setup library and setup packs, in a project folder of its own, ready to fill in. Duplicate a budget, or start a new one from a category or account.
 
 ### Command line and git
 
@@ -187,7 +188,6 @@ this section.
 - **Accessibility and translations.** A full accessibility pass and the app in more languages.
 - **Work on a budget together.** Several people in one budget at once, through a shared Dropbox or iCloud folder or a live link, with who changed what and undo that only takes back your own edits.
 - **Rate card lookup.** Pick a union classification from public rate cards that come with the app and fill in the rate, with the source and effective date shown.
-- **New project window.** Start a budget from one window with its title, chart of accounts, schedule, currency, your setup library and setup packs, and later rate setup, ready to fill in.
 
 <!-- features:end -->
 
