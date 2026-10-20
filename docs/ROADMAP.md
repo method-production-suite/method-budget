@@ -34,14 +34,15 @@ this page goes ahead without waiting.
 
 ### Open decisions
 
-- **A signing dependency for shared budgets, built on the recommendation** (3.18; D89):
+- **Signed changes in shared budgets: decided by the owner (2026-10-20)** (3.18; D89): "Method
+  Budget may merge 3.18 signed changes with the shared log format 3 for 0.7.0." Built:
   signed changes (each person's key pair, every change signed, removal by cutoff) use the
   `ed25519-dalek` crate (3.0.0, 106 days old when added; pure Rust, BSD-3-Clause, already
   on `deny.toml`'s licence list), with `sha2` held at 0.11.0 for the 14-day check; both the
   crate-age check and `cargo deny` pass. Signing raises the change log's format to 3 once
   the owner's key is in, so Method Budget 0.6.0 and older refuse a signed budget rather
-  than take in unsigned changes. **Recommend: keep it**; reversible from the digest
-  (signing would come out with it, and roles would again be checked by honest apps only).
+  than take in unsigned changes. 0.7.0's notes say everyone sharing a budget with roles
+  needs 0.7.0. Later (the owner): key rotation, and publishing a key from the command line.
 
 - **Which languages first** (3.14; D82): nothing is translated yet and no translation
   framework is started. The words live inline in the page scripts, the menu bar and the
