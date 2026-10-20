@@ -444,7 +444,7 @@ pub fn parse(line: &str) -> Result<Option<Op>, String> {
 }
 
 /// The rows `r` names, as ids (one or more), or why there are none.
-fn resolve(b: &Budget, r: &RowRef) -> Result<Vec<RowId>, String> {
+pub(crate) fn resolve(b: &Budget, r: &RowRef) -> Result<Vec<RowId>, String> {
     match r {
         RowRef::Id(id) => {
             let found = b

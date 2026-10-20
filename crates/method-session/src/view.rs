@@ -201,6 +201,9 @@ pub struct FullView {
     pub variance: Option<VarianceDto>,
     /// Cost figures with every line's sums, when the budget has actuals.
     pub cost: Option<crate::actuals::CostDto>,
+    /// The per-location incentive report's figures (decisions.md, entry
+    /// 93), when the totals can be worked out.
+    pub incentives: Option<crate::report_dto::LocationReportDto>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -596,6 +599,7 @@ impl FullView {
             can_undo: st.can_undo,
             can_redo: st.can_redo,
             cost: None,
+            incentives: None,
         }
     }
 }

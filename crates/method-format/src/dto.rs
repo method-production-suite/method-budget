@@ -2747,6 +2747,7 @@ enum FileSection {
     Locations,
     Currencies,
     CostReport,
+    Incentives,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -2836,7 +2837,7 @@ macro_rules! same_variants {
 
 same_variants!(ReportSection <-> FileSection {
     Topsheet, Accounts, Detail, Fringes, Globals, Groups, Notes, Info, Chart, Units, Sets,
-    Locations, Currencies, CostReport,
+    Locations, Currencies, CostReport, Incentives,
 });
 same_variants!(ReportColumn <-> FileColumn {
     Amount, Unit, X, Unit2, Rate, Unit3, Currency, X4, Unit4, Fringes, FringePercent,

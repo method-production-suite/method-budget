@@ -352,6 +352,7 @@ fn section_title(s: ReportSection) -> &'static str {
         ReportSection::Sets => "Sets",
         ReportSection::Locations => "Locations",
         ReportSection::Currencies => "Currencies",
+        ReportSection::Incentives => "Incentives by location",
         // Sections this writer doesn't draw yet print their title only.
         #[allow(unreachable_patterns)]
         _ => "",
@@ -384,6 +385,7 @@ impl Builder<'_> {
             ReportSection::Sets => vec![self.sheet("Sets")],
             ReportSection::Locations => vec![self.sheet("Locations")],
             ReportSection::Currencies => vec![self.sheet("Currencies")],
+            ReportSection::Incentives => vec![self.incentives()],
             #[allow(unreachable_patterns)]
             _ => Vec::new(),
         };
@@ -870,6 +872,21 @@ impl Builder<'_> {
     }
 
     /// A setup table straight from the export.
+    /// The Incentives sheet (decisions.md, entry 93), or a note when the
+    /// budget has no credits.
+    fn incentives(&self) -> Table {
+        if self.wb.sheet(export::INCENTIVES_SHEET).is_some() {
+            return self.sheet(export::INCENTIVES_SHEET);
+        }
+        Table {
+            columns: vec![col("Incentives", false)],
+            rows: vec![Row::spanning(
+                "This budget has no credits, so no incentive programs.",
+                Style::Note,
+            )],
+        }
+    }
+
     fn sheet(&self, name: &str) -> Table {
         let empty = Sheet {
             name: "",

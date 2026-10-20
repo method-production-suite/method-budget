@@ -51,6 +51,7 @@ export const SECTIONS = [
   { key: 'locations', label: 'Locations with totals' },
   { key: 'currencies', label: 'Currencies' },
   { key: 'cost_report', label: 'Cost report' },
+  { key: 'incentives', label: 'Incentives by location' },
 ];
 const SECTION_KEYS = new Set(SECTIONS.map((s) => s.key));
 
@@ -1518,6 +1519,80 @@ function costReportSection(ctx) {
   return [simpleTable('Cost report', 'rpt-cost', spec, rows)];
 }
 
+// --- Incentives by location (decisions.md, entry 93) ---
+
+/**
+ * Each location's spend and what each incentive program counts there, then
+ * every program with its terms, then the totals: the credits applied are
+ * the topsheet's credits, the net total the topsheet's. From the full
+ * view's `incentives` (the same estimates as the Credits tab).
+ */
+function incentivesSection(ctx) {
+  const inc = ctx.view && ctx.view.incentives && Array.isArray(ctx.view.incentives.locations) ? ctx.view.incentives : null;
+  const where = (l) => (l === null || l === undefined ? 'No location' : String(l));
+  const status = (p) => (p.amount === null || p.amount === undefined ? 'Problem' : p.applied ? 'Applied' : 'Estimate');
+  const spendSpec = [
+    ['Location and program', 'c-desc'],
+    ['Status', 'c-short'],
+    ['Spend', 'c-cm', 'num'],
+    ['Qualified', 'c-cm', 'num'],
+  ];
+  if (!inc) {
+    return [simpleTable('Incentives by location', 'rpt-incent', spendSpec, [emptyRow('The totals can’t be worked out until the budget’s problems are fixed.', spendSpec.length)])];
+  }
+  const programs = Array.isArray(inc.programs) ? inc.programs : [];
+  const spendRows = [];
+  for (const l of inc.locations) {
+    const counted = Array.isArray(l.programs) ? l.programs : [];
+    spendRows.push(row(el('tr', { class: 'rpt-row rpt-incent-loc' }, td(where(l.location), 'name'), td(l.known === false ? 'Not in the list' : '', 'txt'), td(m(l.total), 'num'), td('', 'num')), counted.length > 0));
+    for (const c of counted) {
+      const p = programs.find((q) => q.index === c.index) || c;
+      spendRows.push(row(el('tr', { class: 'rpt-row indent-1' }, td(c.name, 'desc'), td(status(p), 'txt'), td('', 'num'), td(m(c.qualified_here), 'num'))));
+    }
+    if (!counted.length) spendRows.push(row(el('tr', { class: 'rpt-row indent-1' }, td('No program counts this spend.', 'desc muted'), td('', 'txt'), td('', 'num'), td('', 'num'))));
+  }
+  spendRows.push(row(el('tr', { class: 'rpt-row rpt-st-total' }, td('Spend at every location', 'name'), td('', 'txt'), td(m(inc.spend_total), 'num'), td('', 'num')), true));
+  spendRows.push(row(el('tr', { class: 'rpt-note-row' }, td('Spend is each line with the fringes it earns, by the location of the line. Qualified is what a program counts there, after the fringes it leaves out.', 'note', spendSpec.length))));
+
+  const progSpec = [
+    ['Program', 'c-desc'],
+    ['Status', 'c-short'],
+    ['Qualified', 'c-cm', 'num'],
+    ['Minimum', 'c-cm', 'num'],
+    ['Cap', 'c-cm', 'num'],
+    ['Discount', 'c-cm', 'num'],
+    ['Fee', 'c-cm', 'num'],
+    ['Credit', 'c-cm', 'num'],
+  ];
+  const progRows = [];
+  for (const p of programs) {
+    const notes = [];
+    const places = Array.isArray(p.locations) && p.locations.length ? p.locations.join(', ') : 'anywhere';
+    notes.push(`Spend at ${places}`);
+    if (p.below_minimum) notes.push('below the minimum spend, so it pays nothing');
+    if (p.capped) notes.push('held to its cap');
+    if (p.shared_cap) notes.push(p.shared === null || p.shared === undefined ? `shares cap ${p.shared_cap}` : `its share of shared cap ${p.shared_cap}: ${m(p.shared)}`);
+    if (p.typed) notes.push(`includes ${m(p.typed)} typed in`);
+    if (p.problem) notes.push(String(p.problem));
+    progRows.push(
+      row(
+        el('tr', { class: 'rpt-row' }, td(p.name, 'name'), td(status(p), 'txt'), td(m(p.qualified), 'num'), td(p.minimum_spend === null || p.minimum_spend === undefined ? '' : m(p.minimum_spend), 'num'), td(p.cap === null || p.cap === undefined ? '' : m(p.cap), 'num'), td(m(p.discount), 'num'), td(m(p.fee), 'num'), td(m(p.amount), 'num')),
+        true,
+      ),
+    );
+    progRows.push(row(el('tr', { class: 'rpt-row indent-1' }, td(notes.join('; '), 'desc muted', progSpec.length))));
+  }
+  if (!programs.length) progRows.push(emptyRow('This budget has no credits, so no incentive programs.', progSpec.length));
+  const sum = (label, v, first) => progRows.push(row(el('tr', { class: `rpt-row${first ? ' rpt-st-total' : ''}` }, td(label, 'name', progSpec.length - 1), td(m(v), 'num')), first));
+  sum('Credits applied', inc.applied_total, true);
+  sum('Estimates not applied', inc.estimates_total, false);
+  sum('Grand total', inc.grand_total, false);
+  sum('Net total', inc.net_total, false);
+  const note = 'Credits applied are the topsheet’s credits. An estimate is what a program not applied would take off, worked out as if it were applied alongside the applied ones; it is not in the net total.';
+  progRows.push(row(el('tr', { class: 'rpt-note-row' }, td(inc.partial ? `${note} Some cells have problems and count as blank, so a figure may be short.` : note, 'note', progSpec.length))));
+  return [simpleTable('Incentives by location', 'rpt-incent', spendSpec, spendRows), simpleTable('Incentive programs', 'rpt-incent', progSpec, progRows)];
+}
+
 const BUILD = {
   topsheet,
   accounts: accountLevel,
@@ -1533,6 +1608,7 @@ const BUILD = {
   locations: locationsSection,
   currencies: currenciesSection,
   cost_report: costReportSection,
+  incentives: incentivesSection,
 };
 
 // ---------------------------------------------------------------------------

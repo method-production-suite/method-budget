@@ -201,6 +201,50 @@ pub fn tools() -> Vec<Tool> {
             run: incentives,
         },
         Tool {
+            name: "incentives_what_if",
+            title: "Incentive what-if",
+            description: "What moving lines to another location would do to every incentive \
+                program, without changing the budget: the lines moved (rows by id, every line \
+                of some accounts or categories, optionally only those now at from_location, \
+                less except), each program's estimate before and after and the difference, \
+                the spend at each location before and after, and the credits taken off, the \
+                unapplied estimates and the net total before and after. to_location null \
+                means no location. To make the move, tag_lines with that location on the \
+                same rows gives exactly the after figures.",
+            mutating: false,
+            destructive: false,
+            schema: || {
+                let ids = |d: &str| {
+                    s::array(d, s::integer("A row id.", 1, i64::MAX), limits::MAX_BATCH)
+                };
+                let codes = |d: &str| s::array(d, s::name("A code."), limits::MAX_BATCH);
+                object(
+                    vec![
+                        path_prop(),
+                        ("rows", ids("Row ids to move.")),
+                        ("accounts", codes("Account codes: every line in them.")),
+                        ("categories", codes("Category codes: every line in them.")),
+                        (
+                            "from_location",
+                            s::nullable(s::name(
+                                "Only the lines now at this location (null: lines with no \
+                                 location). Leave out for wherever they are.",
+                            )),
+                        ),
+                        ("except", ids("Row ids left out.")),
+                        (
+                            "to_location",
+                            s::nullable(s::name(
+                                "The location to move them to (null: no location).",
+                            )),
+                        ),
+                    ],
+                    &["path", "to_location"],
+                )
+            },
+            run: incentives_what_if,
+        },
+        Tool {
             name: "totals",
             title: "Totals",
             description: "Every total in cents: production levels with their categories, \
@@ -1045,6 +1089,63 @@ fn incentives(ctx: &mut Ctx, a: &Args) -> ToolResult {
             got.programs.len(),
             crate::cmd::incentives::text(&got)
         ),
+        data: Value::Object(data),
+    })
+}
+
+fn incentives_what_if(ctx: &mut Ctx, a: &Args) -> ToolResult {
+    use method_core::incentives::what_if::{pick_lines, what_if, LinePick};
+    let (b, r, shown, changed) = load(ctx, a)?;
+    let ids = |k: &str| -> Vec<method_core::RowId> {
+        a.list(k).iter().filter_map(Value::as_u64).collect()
+    };
+    let place = |k: &str| a.get(k).and_then(Value::as_str).map(str::to_string);
+    let pick = LinePick {
+        rows: ids("rows"),
+        accounts: a.strings("accounts"),
+        categories: a.strings("categories"),
+        from: a.has("from_location").then(|| place("from_location")),
+        except: ids("except"),
+    };
+    let to = place("to_location");
+    let refused = |e: method_core::incentives::what_if::WhatIfError| {
+        ToolError::refused(format!("{shown}: {e}"))
+    };
+    let rows = pick_lines(&b, &pick).map_err(refused)?;
+    let w = what_if(&b, &rows, to.as_deref()).map_err(refused)?;
+    let dto = method_session::what_if::dto(&b, &r, &w, false);
+    let mut data = obj(vec![("path", json!(shown))]);
+    let v = method_format::serde_json::to_value(&dto)
+        .map_err(|e| ToolError::refused(format!("{shown}: {e}")))?;
+    if let Value::Object(m) = v {
+        data.extend(m);
+    }
+    note_changed(&mut data, changed);
+    let mut summary = format!(
+        "{shown}: {} line(s) to {}, {} changing location.",
+        dto.lines.len(),
+        to.as_deref().unwrap_or("no location"),
+        dto.changed
+    );
+    for p in &dto.programs {
+        let m = |c: Option<method_core::Cents>| c.map(money).unwrap_or_else(|| "?".into());
+        let _ = write!(
+            summary,
+            "\n{}: {} -> {} ({})",
+            p.name,
+            m(p.before),
+            m(p.after),
+            m(p.difference)
+        );
+    }
+    let _ = write!(
+        summary,
+        "\nNet total: {} -> {}",
+        money(dto.before.net_total),
+        money(dto.after.net_total)
+    );
+    Ok(ToolOut {
+        summary,
         data: Value::Object(data),
     })
 }

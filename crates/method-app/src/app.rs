@@ -788,6 +788,32 @@ pub fn incentives_in(s: &mut Session) -> CmdResult<crate::report_dto::Incentives
     commands::incentives(s)
 }
 
+/// What moving the picked lines to a location would do to every program,
+/// before and after (roadmap 3.6; decisions.md, entry 93). Nothing changes.
+#[tauri::command]
+pub fn what_if(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    pick: method_session::what_if::WhatIfInput,
+) -> CmdResult<method_session::what_if::WhatIfDto> {
+    let mut s = state.lock_doc(doc)?;
+    method_session::what_if::what_if(&mut s, &pick)
+}
+
+/// Moves the picked lines to the location, as one undo step: the what-if
+/// applied.
+#[tauri::command]
+pub fn apply_what_if<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    pick: method_session::what_if::WhatIfInput,
+) -> CmdResult {
+    apply(&window, &state, doc, |s| {
+        method_session::what_if::apply_what_if(s, &pick)
+    })
+}
+
 #[tauri::command]
 pub fn set_credit<R: Runtime>(
     window: WebviewWindow<R>,
@@ -1251,6 +1277,8 @@ pub fn run() {
             delete_credit,
             move_credit,
             incentives,
+            what_if,
+            apply_what_if,
             set_set,
             delete_set,
             set_location,

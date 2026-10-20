@@ -15,10 +15,12 @@ pub const USAGE: &str =
       Draw a report from a saved preset (default: the budget's default preset,
       else the topsheet and the detail). --sections replaces the preset's
       sections (comma-separated: topsheet,accounts,detail,fringes,globals,
-      groups,notes,info,chart,units,sets,locations,currencies). The format
-      comes from --format, else the extension of -o, else txt. Without -o (or
-      with -o -) the report goes to stdout (not pdf). --date sets the printed
-      date and time instead of the clock. --bom starts CSV with a byte order mark.
+      groups,notes,info,chart,units,sets,locations,currencies,incentives;
+      incentives is each location's spend and the incentive programs counting
+      it, every program's terms and the totals). The format comes from
+      --format, else the extension of -o, else txt. Without -o (or with -o -)
+      the report goes to stdout (not pdf). --date sets the printed date and
+      time instead of the clock. --bom starts CSV with a byte order mark.
   method-budget report <file.mthd> --list-presets
       List the budget's report presets, the default marked with *.
 ";

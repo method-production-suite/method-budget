@@ -1756,6 +1756,64 @@ fn incentives_estimate_programs_by_location() {
     );
 }
 
+/// `incentives_what_if` (decisions.md, entry 93): moving a line to the
+/// program's location raises its estimate without changing the file, and
+/// tagging the line there gives the what-if's figures.
+#[test]
+fn incentives_what_if_changes_nothing_and_tagging_gives_its_figures() {
+    let mut f = Fixture::new("incentives-what-if", false);
+    f.tool(
+        "add_setup",
+        json!({"path": "film.mthd", "type": "location", "name": "Ridge", "fields": {}}),
+    )
+    .unwrap();
+    f.tool(
+        "set_credit",
+        json!({"path": "film.mthd", "name": "Ridge program", "applied": true,
+               "locations": ["Ridge"],
+               "rows": [{"source": {"kind": "account", "account": "21-01"}, "percent": 25}]}),
+    )
+    .unwrap();
+    let before = f.tool("incentives", json!({"path": "film.mthd"})).unwrap();
+    assert_eq!(before["programs"][0]["amount"], 0);
+    let got = f
+        .tool(
+            "incentives_what_if",
+            json!({"path": "film.mthd", "rows": [8], "to_location": "Ridge"}),
+        )
+        .unwrap();
+    assert_eq!(got["changed"], 1);
+    assert_eq!(got["lines"][0]["id"], 8);
+    let p = &got["programs"][0];
+    assert_eq!(p["before"], 0);
+    let after = p["after"].as_i64().unwrap();
+    assert!(after > 0);
+    assert_eq!(p["difference"].as_i64().unwrap(), after);
+    assert_eq!(
+        got["after"]["net_total"].as_i64().unwrap(),
+        got["before"]["net_total"].as_i64().unwrap() - after
+    );
+    // Nothing changed.
+    assert_eq!(
+        f.tool("incentives", json!({"path": "film.mthd"})).unwrap(),
+        before
+    );
+    f.tool(
+        "update_lines",
+        json!({"path": "film.mthd", "rows": [{"id": 8, "location": "Ridge"}]}),
+    )
+    .unwrap();
+    let now = f.tool("incentives", json!({"path": "film.mthd"})).unwrap();
+    assert_eq!(now["programs"][0]["amount"].as_i64().unwrap(), after);
+    err_contains(
+        f.tool(
+            "incentives_what_if",
+            json!({"path": "film.mthd", "rows": [8], "to_location": "Harbor"}),
+        ),
+        "no location named Harbor",
+    );
+}
+
 /// A minimum spend, a broker's fee and a cap shared by two programs
 /// (decisions.md, entry 88), through `set_credit`, `list_charges` and
 /// `incentives`.

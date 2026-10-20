@@ -166,9 +166,16 @@ ref = ["2.16", "D38"]
 [[feature]]
 group = "fringes"
 title = "Incentive estimates by location"
-text = "Limit a credit to the locations where the money is spent and see every program's estimate side by side, applied or not, from rates, caps, minimum spends, broker's fees and shared caps you enter yourself."
+text = "Limit a credit to the locations where the money is spent and see every program's estimate side by side, applied or not, from rates, caps, minimum spends, broker's fees and shared caps you enter yourself, and print them location by location."
 status = "have"
-ref = ["D80", "D88"]
+ref = ["D80", "D88", "D93"]
+
+[[feature]]
+group = "fringes"
+title = "Incentive what-ifs"
+text = "See what each incentive program gains or loses if lines were shot at another location, then move them in one step you can undo."
+status = "have"
+ref = ["3.6", "D93"]
 
 [[feature]]
 group = "fringes"
@@ -450,13 +457,6 @@ title = "Windows and Linux, tested"
 text = "Installers for both are built today; printing, keys and file types still need a hands-on check."
 status = "soon"
 ref = "2.25"
-
-[[feature]]
-group = "engine"
-title = "Incentive what-ifs"
-text = "Move lines between locations and see what each incentive program gains or loses."
-status = "soon"
-ref = "3.6"
 
 [[feature]]
 group = "engine"

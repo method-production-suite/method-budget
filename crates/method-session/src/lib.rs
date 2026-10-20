@@ -59,6 +59,7 @@ pub mod tabs;
 pub mod templates;
 pub mod versions;
 pub mod view;
+pub mod what_if;
 
 pub use docs::{AppState, DocGuard, DocId, Docs};
 pub use host::{Downloads, Error, FileIn, FileOut, Host, HostInfo, COMMANDS, COMMANDS_VERSION};

@@ -1352,3 +1352,174 @@ fn explaining_a_program_with_its_terms_adds_up() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// What-ifs and the per-location report (decisions.md, entry 93)
+
+/// Every line id in `b`, in budget order.
+fn line_ids(b: &Budget) -> Vec<RowId> {
+    b.categories()
+        .flat_map(|c| &c.accounts)
+        .flat_map(|a| &a.details)
+        .map(|d| d.id)
+        .collect()
+}
+
+/// Random lines (about a third) and a random place: L1, L2 or none.
+fn gen_move(rng: &mut Rng, b: &Budget) -> (Vec<RowId>, Option<String>) {
+    let rows: Vec<RowId> = line_ids(b).into_iter().filter(|_| rng.chance(35)).collect();
+    let to = match rng.below(3) {
+        0 => None,
+        1 => Some("L1".to_string()),
+        _ => Some("L2".to_string()),
+    };
+    (rows, to)
+}
+
+/// A what-if's "after" is exactly what applying it gives: the estimates,
+/// the topsheet's credits and the net total. Its "before" is the budget as
+/// it is, and the budget doesn't change.
+#[test]
+fn a_what_if_is_what_applying_it_gives() {
+    use incentives::what_if::{move_lines, what_if};
+    for seed in 1..=CASES {
+        let (b, mut rng) = shared_cap_budget(seed);
+        let (rows, to) = gen_move(&mut rng, &b);
+        let kept = b.clone();
+        let w = what_if(&b, &rows, to.as_deref()).unwrap_or_else(|e| panic!("seed {seed}: {e}"));
+        assert_eq!(b, kept, "seed {seed}: the what-if changed the budget");
+        assert_eq!(w.before, estimates(&b, seed), "seed {seed}");
+        let mut moved = b.clone();
+        let n = move_lines(&mut moved, &rows, to.as_deref()).unwrap();
+        assert_eq!(n, w.changed, "seed {seed}");
+        assert_eq!(w.after, estimates(&moved, seed), "seed {seed}");
+        let r = recalc(&moved, &RecalcOptions::default()).unwrap();
+        assert_eq!(w.after_totals.credits_total, r.credits_total, "seed {seed}");
+        assert_eq!(w.after_totals.net_total, r.net_total, "seed {seed}");
+        // Moving lines never changes the grand total.
+        assert_eq!(
+            w.before_totals.grand_total, w.after_totals.grand_total,
+            "seed {seed}"
+        );
+        for p in &w.programs {
+            if let (Some(a), Some(z)) = (p.before, p.after) {
+                assert_eq!(p.difference, Some(z - a), "seed {seed}");
+            }
+        }
+    }
+}
+
+/// The order the lines are listed in changes nothing, and moving two sets
+/// of lines to one place one after the other is moving them together.
+#[test]
+fn a_what_if_is_order_independent() {
+    use incentives::what_if::{move_lines, what_if};
+    for seed in 1..=CASES {
+        let (b, mut rng) = shared_cap_budget(seed);
+        let (rows, to) = gen_move(&mut rng, &b);
+        let w = what_if(&b, &rows, to.as_deref()).unwrap();
+        let mut back = rows.clone();
+        back.reverse();
+        let mut wb = what_if(&b, &back, to.as_deref()).unwrap();
+        wb.rows = w.rows.clone();
+        assert_eq!(w, wb, "seed {seed}");
+
+        let (first, second) = rows.split_at(rows.len() / 2);
+        let mut step = b.clone();
+        move_lines(&mut step, second, to.as_deref()).unwrap();
+        move_lines(&mut step, first, to.as_deref()).unwrap();
+        assert_eq!(estimates(&step, seed), w.after, "seed {seed}");
+    }
+}
+
+/// A what-if with no lines, or with lines already where it moves them,
+/// changes nothing: every program the same, every total the same.
+#[test]
+fn an_empty_what_if_changes_nothing() {
+    use incentives::what_if::what_if;
+    for seed in 1..=CASES {
+        let (b, mut rng) = shared_cap_budget(seed);
+        let (_, to) = gen_move(&mut rng, &b);
+        let w = what_if(&b, &[], to.as_deref()).unwrap();
+        assert_eq!(w.changed, 0, "seed {seed}");
+        assert_eq!(w.before, w.after, "seed {seed}");
+        assert_eq!(w.before_totals, w.after_totals, "seed {seed}");
+        assert!(
+            w.programs
+                .iter()
+                .all(|p| p.difference == Some(0) || p.before.is_none()),
+            "seed {seed}"
+        );
+        assert!(
+            w.locations.iter().all(|l| l.before == l.after),
+            "seed {seed}"
+        );
+        // Lines already there.
+        let here: Vec<RowId> = b
+            .categories()
+            .flat_map(|c| &c.accounts)
+            .flat_map(|a| &a.details)
+            .filter(|d| d.location == to)
+            .map(|d| d.id)
+            .collect();
+        let w = what_if(&b, &here, to.as_deref()).unwrap();
+        assert_eq!(w.changed, 0, "seed {seed}");
+        assert_eq!(w.before, w.after, "seed {seed}");
+    }
+}
+
+/// The per-location report reconciles with the topsheet: the applied
+/// programs' credits are its credits total, the net total is the grand
+/// total less them, each program's spend location by location (plus its
+/// typed amounts) is its qualified spend, and the locations' spend adds
+/// up.
+#[test]
+fn the_location_report_reconciles() {
+    use incentives::by_location::location_report;
+    for seed in 1..=CASES {
+        let (b, _) = shared_cap_budget(seed);
+        let r = recalc(&b, &RecalcOptions::default()).unwrap();
+        let inc = incentives::incentives(&b, &r).unwrap();
+        let rep = location_report(&r, &inc).unwrap();
+        assert_eq!(rep.applied_total, r.credits_total, "seed {seed}");
+        assert_eq!(
+            rep.net_total,
+            rep.grand_total - rep.applied_total,
+            "seed {seed}"
+        );
+        assert_eq!(
+            rep.spend_total,
+            rep.locations.iter().map(|l| l.spend.total).sum::<Cents>(),
+            "seed {seed}"
+        );
+        for p in &rep.programs {
+            let here: Cents = rep
+                .locations
+                .iter()
+                .flat_map(|l| &l.programs)
+                .filter(|q| q.index == p.index)
+                .map(|q| q.qualified_here)
+                .sum();
+            assert_eq!(here + p.typed, p.qualified, "seed {seed} {}", p.name);
+            let amount = p.amount.unwrap();
+            if !p.below_minimum && p.shared.is_none() {
+                // The discount and the fee take the capped figure to the
+                // credit, to the cent.
+                let c = inc.programs[p.index].figures.as_ref().unwrap();
+                assert_eq!(
+                    c.capped.to_cents().unwrap() - p.discount - p.fee,
+                    amount,
+                    "seed {seed} {}",
+                    p.name
+                );
+            }
+        }
+        let estimated: Cents = rep
+            .programs
+            .iter()
+            .filter(|p| !p.applied)
+            .filter_map(|p| p.amount)
+            .sum();
+        assert_eq!(rep.estimates_total, estimated, "seed {seed}");
+    }
+}

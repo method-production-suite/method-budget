@@ -164,6 +164,10 @@ pub enum ReportSection {
     /// completion, variance and percent spent per account, category and
     /// the topsheet (see [`crate::actuals`]).
     CostReport,
+    /// Each location's spend and the incentive programs counting it, then
+    /// every program with its terms and the totals (see
+    /// [`crate::incentives::by_location`]).
+    Incentives,
 }
 
 names!(ReportSection {
@@ -181,6 +185,7 @@ names!(ReportSection {
     Locations = "locations",
     Currencies = "currencies",
     CostReport = "cost_report",
+    Incentives = "incentives",
 });
 
 /// An optional column of the detail pages (the grid's columns, plus the
