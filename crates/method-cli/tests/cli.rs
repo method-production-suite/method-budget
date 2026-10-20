@@ -991,3 +991,108 @@ fn review_files_over_the_size_cap_are_refused_unread() {
     }
     assert_eq!(std::fs::metadata(&review).unwrap().len(), 9 * 1024 * 1024);
 }
+
+/// Rate tables (decisions.md, entry 90): a table imported from a
+/// spreadsheet, a line filled from it, a changed table offering an update
+/// without changing the line, and the update. Every name and figure here is
+/// invented.
+#[test]
+fn rate_tables_from_a_sheet_to_a_line() {
+    let d = Dir::new("rates");
+    let p = d.starter("a.mthd");
+    let sheet = d.path("Invented rates.csv");
+    std::fs::write(
+        &sheet,
+        "Made-up card\n\nPosition,Daily,Weekly,Notes\nLead,500,2400,Invented\n\"Helper, Made Up\",,1500,\n",
+    )
+    .unwrap();
+    let o = method(&["rates", "list", &p]);
+    assert_eq!(out(&o), "no rate tables\n");
+    let before = read(&p);
+    let o = method(&["rates", "import", &p, &sheet, "--dry-run"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(
+        out(&o).contains("rate table Invented rates added (2 rows)"),
+        "{}",
+        out(&o)
+    );
+    assert_eq!(read(&p), before, "a dry run writes nothing");
+    let o = method(&["rates", "import", &p, &sheet]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(read(&p).contains("\"rate_tables\""));
+    let o = method(&["rates", "list", &p]);
+    assert_eq!(
+        out(&o),
+        "Invented rates\t2 rows\t2 classifications\tDay, Week\n"
+    );
+    let o = method(&["rates", "show", &p, "Invented rates", "--json"]);
+    let v: method_format::serde_json::Value =
+        method_format::serde_json::from_str(&out(&o)).unwrap();
+    assert_eq!(v["rows"][0]["rates"]["Day"], "500");
+    assert_eq!(v["rows"][1]["classification"], "Helper, Made Up");
+
+    // Fill a line: the figure once, as a number, with its source.
+    let o = method(&[
+        "rates",
+        "fill",
+        &p,
+        "1001:1",
+        "Invented rates",
+        "lead",
+        "--unit",
+        "Day",
+    ]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(
+        out(&o).contains("-> 500 per Day from Invented rates, Lead"),
+        "{}",
+        out(&o)
+    );
+    assert!(read(&p).contains("\"rate\": \"500\""));
+    let o = method(&["rates", "check", &p]);
+    assert!(
+        out(&o).starts_with("1001:1\tcurrent\tInvented rates / Lead per Day\t500"),
+        "{}",
+        out(&o)
+    );
+
+    // The table changes: the line keeps 500 and says what the table says.
+    std::fs::write(&sheet, "Position,Daily\nLead,520\n").unwrap();
+    let o = method(&["rates", "import", &p, &sheet]);
+    assert_eq!(code(&o), 3, "a table of that name needs --replace");
+    assert!(err(&o).contains("already a rate table"), "{}", err(&o));
+    let o = method(&["rates", "import", &p, &sheet, "--replace"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(
+        read(&p).contains("\"rate\": \"500\""),
+        "the line's figure stays"
+    );
+    let o = method(&["rates", "check", &p, "--json"]);
+    let v: method_format::serde_json::Value =
+        method_format::serde_json::from_str(&out(&o)).unwrap();
+    assert_eq!(v[0]["state"], "changed");
+    assert_eq!(v[0]["now"], "520");
+    let o = method(&["rates", "update", &p]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(
+        out(&o).contains("rate 500 -> 520 (its table now)"),
+        "{}",
+        out(&o)
+    );
+    assert!(read(&p).contains("\"rate\": \"520\""));
+
+    // Deleting the table keeps the figure.
+    let o = method(&["rates", "delete", &p, "Invented rates"]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(read(&p).contains("\"rate\": \"520\""));
+    let o = method(&["rates", "check", &p]);
+    assert!(out(&o).contains("missing"), "{}", out(&o));
+
+    // A sheet without the columns, an unknown action, a bad row.
+    std::fs::write(&sheet, "Name,Amount\nX,1\n").unwrap();
+    let o = method(&["rates", "import", &p, &sheet]);
+    assert_eq!(code(&o), 3);
+    assert!(err(&o).contains("nothing was imported"), "{}", err(&o));
+    assert_eq!(code(&method(&["rates", "nope", &p])), 2);
+    assert_eq!(code(&method(&["rates", "fill", &p, "row", "T", "C"])), 2);
+}

@@ -40,6 +40,7 @@ pub mod overtime;
 pub mod packs;
 pub mod presets;
 pub mod quickadd;
+pub mod rates;
 pub mod rename;
 pub mod renumber;
 pub mod report_dto;

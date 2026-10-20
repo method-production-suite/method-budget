@@ -55,6 +55,7 @@ pub fn share_copy(
             out.tag_presets = b.tag_presets.clone();
             out.line_presets = b.line_presets.clone();
             out.ot_patterns = b.ot_patterns.clone();
+            out.rate_tables = b.rate_tables.clone();
             out.display = b.display.clone();
             out.setup_order = b.setup_order.clone();
             out.setup_folders = b.setup_folders.clone();

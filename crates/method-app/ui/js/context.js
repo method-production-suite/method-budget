@@ -340,7 +340,32 @@ function detailItems(onRow) {
       disabled: !rows.some((d) => kindOf(d) === 'line'),
       title: 'Work out the line with overtime and write it in (the Overtime tab)',
     }),
+    ...rateItems(rows),
   ];
+}
+
+/**
+ * Fill rate from table, and Update rate when the line's table now says
+ * something else (ratepick.js; decisions.md, entry 90).
+ */
+function rateItems(rows) {
+  const line = rows.length === 1 && kindOf(rows[0]) === 'line' ? rows[0] : null;
+  const items = [
+    cmd('edit.fill_rate', 'Fill rate from table…', {
+      disabled: !line,
+      title: 'Pick a classification from one of the budget’s rate tables to fill the line’s rate',
+    }),
+  ];
+  const view = typeof ctx.view === 'function' ? ctx.view() : null;
+  const check = line && view && view.rate_checks ? view.rate_checks[line.id] : null;
+  if (check && check.state === 'changed') {
+    items.push({
+      label: `Update rate to ${check.now}`,
+      title: 'Take what the line’s rate table says now (one undo step)',
+      run: () => ctx.act('rate_update', { row_ids: [line.id] }),
+    });
+  }
+  return items;
 }
 
 function accountItems(onRow) {

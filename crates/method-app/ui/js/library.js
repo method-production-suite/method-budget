@@ -52,6 +52,7 @@ export const LIBRARY_KINDS = [
   ['line_preset', 'Line blocks'],
   ['report_preset', 'Report presets'],
   ['ot_pattern', 'Overtime patterns'],
+  ['rate_table', 'Rate tables'],
 ];
 
 const KIND_IDS = LIBRARY_KINDS.map(([k]) => k);

@@ -245,6 +245,13 @@ pub fn encode_root(b: &Budget) -> Record {
                 None => Value::Null,
             },
         );
+    // Only when there are any, as the `.mthd` writes them (decisions.md,
+    // entry 90): a log of a budget without rate tables stays readable by
+    // an app that doesn't know them. Removing the last is a write of
+    // nothing (see `Capture::diff`).
+    if !b.rate_tables.is_empty() {
+        r.put(Field::RateTables, Value::RateTables(b.rate_tables.clone()));
+    }
     r
 }
 
@@ -306,6 +313,10 @@ pub fn decode_root(e: &Entity, b: &mut Budget) {
     };
     b.ot_patterns = match g(Field::OtPatterns) {
         Some(Value::OtPatterns(p)) => p.clone(),
+        _ => Vec::new(),
+    };
+    b.rate_tables = match g(Field::RateTables) {
+        Some(Value::RateTables(t)) => t.clone(),
         _ => Vec::new(),
     };
     b.baseline = match g(Field::Baseline) {
@@ -417,6 +428,10 @@ pub fn encode_row(d: &Detail, b: &dyn Binder) -> Record {
     if let Some(p) = &d.person {
         r.put(Field::Person, Value::text(p));
     }
+    // The same for where the rate came from (decisions.md, entry 90).
+    if let Some(s) = &d.rate_source {
+        r.put(Field::RateSource, Value::RateSource(s.clone()));
+    }
     r
 }
 
@@ -441,6 +456,10 @@ pub fn decode_row(e: &Entity, r: &dyn Resolver, id: RowId) -> Detail {
         set: ref_opt_text(r, g(Field::Set)),
         fringe_range: opt_int(g(Field::FringeRange)).and_then(|n| u32::try_from(n).ok()),
         person: opt_text(g(Field::Person)),
+        rate_source: match g(Field::RateSource) {
+            Some(Value::RateSource(s)) => Some(s.clone()),
+            _ => None,
+        },
         bold: boolean(g(Field::Bold)),
         italic: boolean(g(Field::Italic)),
         indent: u8::try_from(int(g(Field::Indent))).unwrap_or(0),

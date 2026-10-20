@@ -10,7 +10,8 @@
 //! double holds; decisions.md, entry 55), each fringe on each line
 //! (percent or flat, the cutoff and how much of it the lines above in a
 //! range left, decisions.md, entry 56; a person's one cutoff across
-//! accounts and each line's share of it, entry 79), where fringes post, what a group or a
+//! accounts and each line's share of it, entry 79), the rate table a
+//! line's rate was filled from and how it stands now (entry 90), where fringes post, what a group or a
 //! report filter left out and why, a charge's base and exclusions, a credit's
 //! gross, excluded, net and caps.
 //!
@@ -2026,6 +2027,11 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
                     )
                 };
                 notes.push(Step::note("Rate", rate_text));
+                // Where the rate came from, when it was filled from a rate
+                // table (decisions.md, entry 90): words only.
+                if let Some(words) = crate::rates::source_words(ctx.b, d) {
+                    notes.push(Step::note("Rate source", words));
+                }
                 let line = Money::num(quantity).checked_mul(rate).ok_or_else(ovf)?;
                 let local = line.to_cents().ok_or_else(ovf)?;
                 let cur_code = match &d.currency {

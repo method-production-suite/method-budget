@@ -16,8 +16,9 @@
 // group, set, location and currency tables are apply.js's lists drawn as
 // setup tables (ctx.mode 'setup': every column of each item's definition,
 // most of them edited in place, no selection and nothing to apply), Globals
-// and Units are setup.js's full tables, and Charges, Credits, Info, Settings
-// and Baseline are topsheet-setup.js's (through setup.js).
+// and Units are setup.js's full tables, Rate Tables is rates.js's, and
+// Charges, Credits, Info, Settings and Baseline are topsheet-setup.js's
+// (through setup.js).
 //
 // It follows the budget in front (the target pane's when the main window is
 // split): it fetches the view with no `doc`, and every command it sends names
@@ -44,6 +45,7 @@ import { applyView, applyListHost, APPLY_LISTS } from './apply.js';
 import { setupBegin, renderSetupTab, setupEnd } from './setup.js';
 import { setFindHook, onUsage, sortSelect, showSelect, redrawLists } from './setuplist.js';
 import { renderLibrarySetup, setLibraryKind } from './library.js';
+import { renderRatesTab } from './rates.js';
 import { SETUP_TABS, isSetupTab } from './setuptabs.js';
 import { setFrameHooks, footerBar, clearFooterTotals, setRailHost } from './setupframe.js';
 import { matchShortcut, menuRunsAppKeys, pageRunsAppKeys, shortcutById } from './shortcuts.js';
@@ -238,6 +240,7 @@ function listRail(t) {
 /** Draws tab `t`'s own content into `main`. */
 function drawTab(main, t) {
   if (APPLY_LISTS.includes(t.id)) main.append(applyListHost(t.id));
+  else if (t.id === 'rates') renderRatesTab(main, state.view, ctx());
   else renderSetupTab(main, t.id);
   // A host drawn as a frame (apply.js's lists) fills the area.
   if (main.querySelector(':scope > .sw-framed')) main.classList.add('sw-main-framed');

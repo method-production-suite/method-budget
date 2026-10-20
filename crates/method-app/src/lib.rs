@@ -35,6 +35,7 @@ pub mod packs;
 mod pdf_mac;
 pub mod presets;
 pub mod quickadd;
+pub mod rates;
 pub mod rename;
 pub mod renumber;
 pub mod reports;

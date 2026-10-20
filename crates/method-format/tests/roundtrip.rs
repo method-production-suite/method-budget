@@ -466,7 +466,9 @@ fn files_without_new_fields_read_with_defaults() {
         assert!(d.notes.is_empty());
         assert_ne!(d.kind, RowKind::Separator);
         assert_eq!(&d.person, &None);
+        assert_eq!(&d.rate_source, &None);
     }
+    assert!(b.rate_tables.is_empty());
     assert_eq!(b.new_line_defaults, NewLineDefaults::default());
     assert_eq!(method_format::to_string(&b), golden, "golden is unchanged");
 }
@@ -1119,4 +1121,103 @@ fn person_round_trips_and_is_left_out_when_unset() {
         d.person = None;
     }
     assert!(!round_trip(&b).contains("person"));
+}
+
+/// Rate tables and a line's rate source (decisions.md, entry 90): written
+/// only when used (`rate_tables` after `ot_patterns`, `rate_source` after
+/// `person`), so files without them are byte for byte as before; tables
+/// are checked when read. Every name and figure here is invented.
+#[test]
+fn rate_tables_round_trip_and_are_left_out_when_unused() {
+    use method_core::rates::{fill, RateRow, RateTable};
+    let mut b = Budget::new("T", "USD");
+    b.topsheet.push(category(
+        "1100",
+        "C",
+        vec![account(
+            "1101",
+            "A",
+            vec![
+                Detail::line(1, "Made-up lead", "5", "Day", ""),
+                Detail::line(2, "Other", "1", "", "10"),
+            ],
+        )],
+    ));
+    let plain = round_trip(&b);
+    assert!(!plain.contains("rate_tables") && !plain.contains("rate_source"));
+    b.rate_tables.push(RateTable {
+        name: "Invented Crew".into(),
+        notes: "Made-up figures.".into(),
+        rows: vec![
+            RateRow {
+                classification: "Lead, Made Up".into(),
+                rates: [
+                    ("Day".to_string(), d("410.5")),
+                    ("Hour".to_string(), d("35")),
+                ]
+                .into(),
+                from: Some("2030-01-01".into()),
+                to: Some("2030-12-31".into()),
+                notes: "Invented.".into(),
+            },
+            RateRow {
+                classification: "Helper, Made Up".into(),
+                rates: [("Week".to_string(), d("1500"))].into(),
+                from: None,
+                to: None,
+                notes: String::new(),
+            },
+        ],
+    });
+    fill(
+        &mut b,
+        1,
+        "Invented Crew",
+        "lead, made up",
+        None,
+        Some("2030-06-01"),
+    )
+    .unwrap();
+    let text = round_trip(&b);
+    // Keys in written order, whitespace aside.
+    let flat: String = text.split_whitespace().collect();
+    assert!(
+        flat.contains(r#""unit3":"Day","rate_source":{"table":"InventedCrew","classification":"Lead,MadeUp","unit":"Day","as_of":"2030-06-01","rate":"410.5"}"#),
+        "{text}"
+    );
+    assert!(flat.contains(r#""rate_tables":[{"name":"InventedCrew","notes":"Made-upfigures.","rows":[{"classification":"Lead,MadeUp","rates":{"Day":"410.5","Hour":"35"},"from":"2030-01-01","to":"2030-12-31","notes":"Invented."}"#), "{text}");
+    assert_eq!(
+        text.matches("\"rate_source\"").count(),
+        1,
+        "only the filled line"
+    );
+    // Taking the tables and the source away gives the plain file again.
+    let mut back = method_format::from_str(&text).unwrap();
+    back.rate_tables.clear();
+    for d in back
+        .categories_mut()
+        .flat_map(|c| &mut c.accounts)
+        .flat_map(|a| &mut a.details)
+    {
+        d.rate_source = None;
+        if d.id == 1 {
+            d.rate = Formula::default();
+            d.unit3.clear();
+        }
+    }
+    assert_eq!(method_format::to_string(&back), plain);
+    // A table that breaks the rules is refused when read.
+    let bad = text.replace("\"to\": \"2030-12-31\"", "\"to\": \"2029-12-31\"");
+    let e = method_format::from_str(&bad).unwrap_err().to_string();
+    assert!(e.contains("ends before it starts"), "{e}");
+    let bad = text.replace("\"as_of\": \"2030-06-01\"", "\"as_of\": \"June\"");
+    assert!(method_format::from_str(&bad).is_err());
+    let bad = text.replace(
+        "\"classification\": \"Helper, Made Up\"",
+        "\"classification\": \"Helper, Made Up\", \"colour\": 1",
+    );
+    assert!(
+        method_format::from_str(&bad).is_err(),
+        "unknown fields are refused"
+    );
 }

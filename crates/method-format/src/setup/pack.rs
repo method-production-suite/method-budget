@@ -168,6 +168,7 @@ pub fn parse_kind(s: &str) -> Option<What> {
         "currencies" => "currency".to_string(),
         "line_blocks" | "line_block" | "blocks" => "line_preset".to_string(),
         "overtime" | "overtime_patterns" | "ot" => "ot_pattern".to_string(),
+        "rates" | "rate_tables" | "rate" => "rate_table".to_string(),
         _ => k.strip_suffix('s').map(str::to_string).unwrap_or(k),
     };
     What::parse(&k).ok().filter(|w| pack_kind(*w))

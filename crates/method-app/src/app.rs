@@ -1500,6 +1500,14 @@ pub fn run() {
             crate::overtime::ot_apply,
             crate::overtime::ot_save_pattern,
             crate::overtime::ot_delete_pattern,
+            // Rate tables (src/rates.rs)
+            crate::rates::rate_table_save,
+            crate::rates::rate_table_delete,
+            crate::rates::rate_choices,
+            crate::rates::rate_fill,
+            crate::rates::rate_update,
+            crate::rates::rate_import_pick,
+            crate::rates::rate_import_read,
             // Updates, release notes and What's New (src/updater.rs)
             crate::updater::update_status,
             crate::updater::update_restart,

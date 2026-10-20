@@ -53,6 +53,7 @@ mod overtime;
 mod packs;
 mod presets;
 mod quickadd;
+mod rates;
 mod rename;
 mod renumber;
 mod reports;
@@ -197,6 +198,14 @@ pub const COMMANDS: &[&str] = &[
     "ot_apply",
     "ot_save_pattern",
     "ot_delete_pattern",
+    // Rate tables
+    "rate_table_save",
+    "rate_table_delete",
+    "rate_choices",
+    "rate_fill",
+    "rate_update",
+    "rate_import_pick",
+    "rate_import_read",
     // Notes
     "add_note",
     "update_note",
@@ -728,6 +737,7 @@ const MODULES: &[Dispatch] = &[
     setup_lists::dispatch,
     explain::dispatch,
     overtime::dispatch,
+    rates::dispatch,
     packs::dispatch,
     notes::dispatch,
     rowstyle::dispatch,

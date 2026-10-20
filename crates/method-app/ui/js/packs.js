@@ -41,6 +41,7 @@ export const PACK_KINDS = [
   ['line_preset', 'Line blocks'],
   ['report_preset', 'Report presets'],
   ['ot_pattern', 'Overtime patterns'],
+  ['rate_table', 'Rate tables'],
 ];
 
 const keyOf = (kind, name) => `${kind}\u0000${name}`;

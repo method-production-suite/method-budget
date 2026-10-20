@@ -339,6 +339,8 @@ mod tests {
             include_str!("../ui/js/packs.js"),
             // Which host it runs in (host_info): a browser has no menu bar.
             include_str!("../ui/js/host.js"),
+            // The Rate Tables tab (src/rates.rs).
+            include_str!("../ui/js/rates.js"),
         ];
         let mut named = std::collections::BTreeSet::new();
         for js in scripts {

@@ -1409,6 +1409,17 @@ impl<'a> Capture<'a> {
                 });
             }
         }
+        // A field written only when used (the rate tables, decisions.md,
+        // entry 90) that is gone now: a write of nothing.
+        for (f, v) in &before.fields {
+            if *v != Value::Null && !rec.fields.contains_key(f) {
+                self.ops.push(Op::Set {
+                    entity: Uid::ROOT,
+                    field: *f,
+                    value: Value::Null,
+                });
+            }
+        }
     }
 
     fn write_deletes(&mut self) {

@@ -90,6 +90,7 @@ export const SHORTCUTS = [
   // How a total is worked out (explain.js) and the overtime helper (overtime.js).
   { id: 'edit.explain', group: 'Edit', label: 'Explain the total under the cursor: every step of how it is worked out, in the Explain tab', keys: 'mod+e', scope: 'grid' },
   { id: 'edit.overtime', group: 'Edit', label: 'Overtime helper: work out a day or week of a labor line with overtime, and write it into the line', scope: 'menu' },
+  { id: 'edit.fill_rate', group: 'Edit', label: 'Fill the line’s rate from one of the budget’s rate tables, or update it to what its table says now', scope: 'menu' },
   { id: 'share.blame', group: 'Edit', label: 'Who changed this: every value the cell under the cursor has had since the budget was shared, and who typed it', scope: 'menu' },
   // Find and replace: the Find tab of the tools panel (find.js). Cmd+G is
   // the Globals tab, so the next and previous result are F3 and Shift+F3
@@ -175,6 +176,7 @@ export const SHORTCUTS = [
   { id: 'view.tab.currencies', group: 'View', label: 'Budget Setup: Currency', keys: 'mod+6', scope: 'app' },
   { id: 'view.tab.charges', group: 'View', label: 'Budget Setup: Charges', keys: 'mod+/', scope: 'app' },
   { id: 'view.tab.credits', group: 'View', label: 'Budget Setup: Credits', keys: 'mod+backslash', scope: 'app' },
+  { id: 'view.tab.rates', group: 'View', label: 'Budget Setup: Rate Tables (rate tables you keep, to fill a line’s rate from)', scope: 'menu' },
   { id: 'view.tab.info', group: 'View', label: 'Budget Setup: Info', scope: 'menu' },
   { id: 'view.tab.settings', group: 'View', label: 'Budget Setup: Settings (budget preferences)', keys: 'mod+9', scope: 'app' },
   { id: 'view.tab.baseline', group: 'View', label: 'Budget Setup: Baseline', scope: 'menu' },

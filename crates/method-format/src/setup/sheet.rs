@@ -36,7 +36,7 @@ use crate::import::mapping::{norm, parse_number_text};
 use crate::import::{Table, Value};
 
 /// The kinds a spreadsheet can hold, in workbook order.
-pub const SHEET_KINDS: [What; 11] = [
+pub const SHEET_KINDS: [What; 12] = [
     What::Global,
     What::Fringe,
     What::Group,
@@ -48,6 +48,7 @@ pub const SHEET_KINDS: [What; 11] = [
     What::Credit,
     What::TagPreset,
     What::OtPattern,
+    What::RateTable,
 ];
 
 /// One column of a kind's table.
@@ -204,6 +205,39 @@ const OT_PATTERN: [Column; 5] = [
     col("seventh", "7th Day", &["seventhday", "7thday"]),
 ];
 
+/// One row per classification, period and unit (decisions.md, entry 90):
+/// a table's rows share its name, as a credit's rows do.
+const RATE_TABLE: [Column; 8] = [
+    col("name", "Table", &["ratetable", "tablename", "name"]),
+    col(
+        "table_notes",
+        "Table Notes",
+        &["tablenote", "aboutthetable"],
+    ),
+    col(
+        "classification",
+        "Classification",
+        &["class", "position", "job", "title", "role"],
+    ),
+    col("unit", "Unit", &["per", "units"]),
+    col("rate", "Rate", &["amount", "figure", "wage", "scale"]),
+    col(
+        "from",
+        "From",
+        &["effectivefrom", "start", "startdate", "begins"],
+    ),
+    col(
+        "to",
+        "To",
+        &["effectiveto", "end", "enddate", "until", "through"],
+    ),
+    col(
+        "row_notes",
+        "Row Notes",
+        &["rownote", "classificationnotes", "comment", "comments"],
+    ),
+];
+
 /// The columns of kind `w`'s table, where each item came from last (empty
 /// for a kind no sheet holds).
 pub fn columns(w: What) -> Vec<Column> {
@@ -219,6 +253,7 @@ pub fn columns(w: What) -> Vec<Column> {
         What::Credit => &CREDIT,
         What::TagPreset => &TAG_PRESET,
         What::OtPattern => &OT_PATTERN,
+        What::RateTable => &RATE_TABLE,
         _ => return Vec::new(),
     };
     own.iter().chain(SOURCE.iter()).copied().collect()
@@ -238,6 +273,7 @@ pub fn sheet_name(w: What) -> &'static str {
         What::Credit => "Credits",
         What::TagPreset => "Tag Presets",
         What::OtPattern => "Overtime Patterns",
+        What::RateTable => "Rate Tables",
         _ => "Setup",
     }
 }
@@ -574,6 +610,37 @@ pub fn sheet(b: &Budget, w: What) -> Sheet {
                 );
             }
         }
+        What::RateTable => {
+            for t in &b.rate_tables {
+                let mut first = true;
+                let mut row = |cells: Vec<Cell>| {
+                    let notes = if first {
+                        t.notes.clone()
+                    } else {
+                        String::new()
+                    };
+                    first = false;
+                    let mut own = vec![Cell::text(t.name.clone()), Cell::text(notes)];
+                    own.extend(cells);
+                    push(&t.name, own);
+                };
+                if t.rows.is_empty() {
+                    row(vec![Cell::Empty; 6]);
+                }
+                for r in &t.rows {
+                    for (u, v) in &r.rates {
+                        row(vec![
+                            Cell::text(r.classification.clone()),
+                            Cell::text(u.clone()),
+                            Cell::Number(*v),
+                            opt(&r.from),
+                            opt(&r.to),
+                            Cell::text(r.notes.clone()),
+                        ]);
+                    }
+                }
+            }
+        }
         _ => {}
     }
     Sheet {
@@ -847,6 +914,89 @@ fn ot_bands(s: &str) -> Result<Vec<OtBand>, String> {
     Ok(out)
 }
 
+/// One sheet row of a rate table into `into`: the table (made on its first
+/// row), and the classification's figure for the row's unit, in the row
+/// of that classification and period (made when new).
+fn read_rate_row(row: &Row<'_>, name: &str, into: &mut Budget) -> Result<(), String> {
+    use method_core::rates::{classification_key, RateRow, RateTable};
+    let name = method_core::rates::valid_table_name(name).map_err(|e| e.0)?;
+    let i = match into.rate_tables.iter().position(|t| t.name == name) {
+        Some(i) => i,
+        None => {
+            into.rate_tables.push(RateTable {
+                name: name.clone(),
+                notes: String::new(),
+                rows: Vec::new(),
+            });
+            into.rate_tables.len() - 1
+        }
+    };
+    let notes = row.get("table_notes");
+    let t = &mut into.rate_tables[i];
+    if !notes.is_empty() {
+        if !t.notes.is_empty() && t.notes != notes {
+            t.notes.push('\n');
+        }
+        if t.notes != notes {
+            t.notes.push_str(&notes);
+        }
+    }
+    let class = row.get("classification");
+    let (unit, rate) = (row.get("unit"), row.number("rate", "the rate")?);
+    if class.is_empty() {
+        if unit.is_empty() && rate.is_none() {
+            return Ok(()); // the table's name and notes only
+        }
+        return Err("a rate needs its classification".into());
+    }
+    if unit.is_empty() {
+        return Err(format!("{class}: the rate needs its unit"));
+    }
+    let rate = rate.ok_or_else(|| format!("{class}: the rate per {unit} is missing"))?;
+    let date = |key: &str, what: &str| -> Result<Option<String>, String> {
+        let Some(&c) = row.m.columns.get(key) else {
+            return Ok(None);
+        };
+        crate::import::actuals::cell_date_in(
+            row.t.cell(row.r, c),
+            crate::import::actuals::DateOrder::default(),
+            row.t.date1904,
+        )
+        .map_err(|_| format!("{what} \u{201c}{}\u{201d} isn't a date", row.get(key)))
+    };
+    let (from, to) = (date("from", "the From date")?, date("to", "the To date")?);
+    let key = classification_key(&class);
+    let same =
+        |r: &RateRow| classification_key(&r.classification) == key && r.from == from && r.to == to;
+    let r = match t.rows.iter().position(same) {
+        Some(j) => &mut t.rows[j],
+        None => {
+            t.rows.push(RateRow {
+                classification: class.clone(),
+                rates: BTreeMap::new(),
+                from,
+                to,
+                notes: String::new(),
+            });
+            t.rows.last_mut().expect("just pushed")
+        }
+    };
+    if r.rates.contains_key(&unit) {
+        return Err(format!(
+            "{class} has two rates per {unit} for the same dates"
+        ));
+    }
+    r.rates.insert(unit, rate);
+    let notes = row.get("row_notes");
+    if !notes.is_empty() && r.notes != notes {
+        if !r.notes.is_empty() {
+            r.notes.push_str("; ");
+        }
+        r.notes.push_str(&notes);
+    }
+    Ok(())
+}
+
 /// Reads table `t` as kind `w` under mapping `m` into `into` (a setup-only
 /// budget), with where each item came from. Every problem is returned with
 /// its row; `known_globals` are the names a formula may use besides the
@@ -871,6 +1021,9 @@ pub fn read(
     }
     let mut first_row: BTreeMap<String, usize> = BTreeMap::new();
     let mut uses: Vec<(usize, String, BTreeSet<String>)> = Vec::new();
+    // Each rate table's first row, to say where a table that breaks the
+    // rules starts.
+    let mut rate_rows: BTreeMap<String, usize> = BTreeMap::new();
     for r in m.first_data_row()..t.rows.len() {
         let row = Row {
             t,
@@ -887,12 +1040,12 @@ pub fn read(
             if name.is_empty() {
                 return Err("no name".into());
             }
-            if name.contains(',') && !matches!(w, What::Charge | What::Credit) {
+            if name.contains(',') && !matches!(w, What::Charge | What::Credit | What::RateTable) {
                 return Err(format!(
                     "\u{201c}{name}\u{201d}: names can't contain commas"
                 ));
             }
-            if w != What::Credit {
+            if !matches!(w, What::Credit | What::RateTable) {
                 if let Some(first) = first_row.get(&name) {
                     return Err(format!(
                         "\u{201c}{name}\u{201d} is listed twice (first on row {first})"
@@ -1211,6 +1364,10 @@ pub fn read(
                     p.validate_all().map_err(|e| e.to_string())?;
                     into.ot_patterns.push(p);
                 }
+                What::RateTable => {
+                    read_rate_row(&row, &name, into)?;
+                    rate_rows.entry(name.clone()).or_insert(at);
+                }
                 _ => return Err("that kind of item can't come from a spreadsheet".into()),
             }
             if !source.is_empty() {
@@ -1225,6 +1382,18 @@ pub fn read(
                 row: at,
                 message,
             });
+        }
+    }
+    // A rate table is checked whole, once all its rows are read.
+    for (name, at) in &rate_rows {
+        if let Some(t) = into.rate_tables.iter().find(|t| &t.name == name) {
+            if let Err(e) = t.validate() {
+                errors.push(RowError {
+                    sheet: sheet.clone(),
+                    row: *at,
+                    message: format!("rate table {name}: {e}"),
+                });
+            }
         }
     }
     // Formulas may name only globals the sheet or the budget defines.
@@ -1443,6 +1612,42 @@ mod tests {
             sixth_day: Some("1.5".parse().unwrap()),
             seventh_day: None,
         });
+        // An invented rate table: made-up classifications and figures.
+        b.rate_tables.push(method_core::rates::RateTable {
+            name: "Invented Crew".into(),
+            notes: "Made-up figures.".into(),
+            rows: vec![
+                method_core::rates::RateRow {
+                    classification: "Grip, Key".into(),
+                    rates: [
+                        ("Day".to_string(), "410.5".parse().unwrap()),
+                        ("Hour".to_string(), "35".parse().unwrap()),
+                    ]
+                    .into(),
+                    from: Some("2030-01-01".into()),
+                    to: Some("2030-06-30".into()),
+                    notes: "Invented, like the rest.".into(),
+                },
+                method_core::rates::RateRow {
+                    classification: "Grip, Key".into(),
+                    rates: [("Day".to_string(), "420".parse().unwrap())].into(),
+                    from: Some("2030-07-01".into()),
+                    to: None,
+                    notes: String::new(),
+                },
+                method_core::rates::RateRow {
+                    classification: "Grip, Best Boy".into(),
+                    rates: [("Week".to_string(), "1800".parse().unwrap())].into(),
+                    from: None,
+                    to: None,
+                    notes: String::new(),
+                },
+            ],
+        });
+        b.rate_tables.push(method_core::rates::RateTable {
+            name: "Empty Table".into(),
+            ..Default::default()
+        });
         b.setup_sources.set(
             "fringe",
             "FICA",
@@ -1485,6 +1690,7 @@ mod tests {
         assert_eq!(a.credits, b.credits);
         assert_eq!(a.tag_presets, b.tag_presets);
         assert_eq!(a.ot_patterns, b.ot_patterns);
+        assert_eq!(a.rate_tables, b.rate_tables);
         assert_eq!(
             method_core::pack::normalized(a),
             method_core::pack::normalized(b)
@@ -1516,6 +1722,48 @@ mod tests {
             assert!(errs.is_empty(), "{w:?}: {errs:?}");
         }
         same_setup(&b, &back);
+    }
+
+    /// A rate table in a sheet: one row per classification, period and
+    /// unit, rows of one table together or not; problems with their rows.
+    #[test]
+    fn rate_tables_read_row_by_row() {
+        let t = csv_table(
+            "Table,Classification,Unit,Rate,From,To\n\
+             Made Up,Lead,Day,500,,\n\
+             Other,Helper,Hour,20,,\n\
+             Made Up,Lead,Week,2400,,\n\
+             Made Up,Lead,Day,1,,\n\
+             Made Up,,Day,1,,\n\
+             Made Up,Extra,,1,,\n\
+             Made Up,Late,Day,1,someday,\n",
+        );
+        let m = guess(&t, What::RateTable);
+        let mut into = empty_source("x", "USD");
+        let errs = read(&t, What::RateTable, &m, &BTreeSet::new(), &mut into);
+        let rows: Vec<usize> = errs.iter().map(|e| e.row).collect();
+        assert_eq!(rows, [5, 6, 7, 8], "{errs:?}");
+        assert_eq!(into.rate_tables.len(), 2);
+        let made = &into.rate_tables[0];
+        assert_eq!(made.rows.len(), 1);
+        assert_eq!(made.rows[0].rates.len(), 2, "Day and Week in one row");
+        // Two rows of one classification in effect on the same day.
+        let t = csv_table(
+            "Table,Classification,Unit,Rate,From,To\n\
+             Made Up,Lead,Day,500,2030-01-01,\n\
+             Made Up,Lead,Day,510,2030-06-01,\n",
+        );
+        let mut into = empty_source("x", "USD");
+        let errs = read(
+            &t,
+            What::RateTable,
+            &guess(&t, What::RateTable),
+            &BTreeSet::new(),
+            &mut into,
+        );
+        assert_eq!(errs.len(), 1, "{errs:?}");
+        assert_eq!(errs[0].row, 2);
+        assert!(errs[0].message.contains("same days"), "{}", errs[0].message);
     }
 
     fn csv_table(text: &str) -> Table {
