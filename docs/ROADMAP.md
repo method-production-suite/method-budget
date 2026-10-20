@@ -22,8 +22,10 @@ this page goes ahead without waiting.
 
 ### Release go-aheads
 
-- **0.6.0, when the owner wants it**: universal Mac builds again (D87, the owner's
-  decision of 2026-10-19; Intel Macs on 0.2.x are offered it). On main so far, the launcher contract (two
+- **0.6.0, not before Method Launcher 0.1.2 is published** (about 2026-10-28 at the
+  earliest; MOrg says when): Launcher 0.1.0 and 0.1.1 refuse universal app bundles, and
+  0.6.0 is universal again (D87, the owner's decision of 2026-10-19; Intel Macs on 0.2.x are
+  offered it). The app's own updates aren't affected. On main so far, the launcher contract (two
   command-line flags and the suite's `recent.json`, D85), the first-start sample without its
   setting (D86), a missed same-size change on Linux and Windows fixed, the Windows build no
   longer bundling copies with Windows line endings, checksums on every release and the
