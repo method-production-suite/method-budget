@@ -22,6 +22,10 @@
 //!   of the original (one undo step in the original).
 //! - **New Sub-Budget** opens a filtered copy of the budget in front in a new
 //!   tab with no file, titled after its parent, stamped with it.
+//! - **New Sub-Budget from This Category or Account** (decision 91) makes a
+//!   budget of one row: its accounts and lines and only the setup they use
+//!   ([`make_row_sub_budget`] lists what carries over), with the row's
+//!   totals. The desktop saves it beside the parent's file.
 //!
 //! The page sends the time (`saved`, `created`) as its local ISO 8601
 //! date-time, checked for shape only, as for versions; the engine never
@@ -238,6 +242,122 @@ pub fn make_sub_budget(
 }
 
 // ---------------------------------------------------------------------------
+// A sub-budget from one row (roadmap 3.19; decisions.md, entry 91)
+
+/// The category or account row a sub-budget starts from, as the page sends
+/// it: `{kind: "category" | "account", code}`.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct RowInput {
+    pub kind: String,
+    pub code: String,
+}
+
+/// The sub-budget of one category or account row of `parent`: that row's
+/// accounts and every line in them, and only the setup those lines use.
+///
+/// What carries over, exactly:
+/// - **The row**: the category with all its accounts, or the account under
+///   its own category (the category's other accounts left out); every line,
+///   subtotal, adjustment and separator in them, with their notes, fringes,
+///   groups, sets, locations and units. Production total rows stay in place.
+/// - **The setup those lines use**, and what that setup needs in turn: the
+///   fringes, globals (a global another kept global names comes too),
+///   units, groups, sets, locations and foreign currencies. Anything no
+///   kept line uses is left out, with its place in a folder, its hand-made
+///   order and where it came from.
+/// - **The budget settings and details**: base and totals currency,
+///   arithmetic, fringe posting, the fringe row, cutoff factor, account
+///   numbering, new-line defaults, group rules, rounding, budget info and
+///   display settings, and the overtime patterns.
+///
+/// Left out: every other category and account, charges and credits (they
+/// work on the whole budget), tag, line and report presets, saved versions,
+/// the baseline and actuals. So the row keeps the totals it has in `parent`
+/// (a fringe cutoff shared with lines outside the row is the exception:
+/// each line is counted only with the lines kept).
+///
+/// Titled `<parent title> - <row name>` and stamped as a sub-budget of
+/// `parent`, its note naming the row.
+pub fn make_row_sub_budget(parent: &Budget, row: &RowInput, saved: &str) -> EditResult<Budget> {
+    let saved = check_created(saved)?;
+    let code = row.code.trim();
+    let mut spec = SubBudgetSpec::default();
+    let (what, name) = match row.kind.as_str() {
+        "category" => {
+            let c = parent
+                .categories()
+                .find(|c| c.code == code)
+                .ok_or_else(|| format!("There is no category {code}."))?;
+            spec.categories.insert(c.code.clone());
+            ("category", c.name.trim().to_string())
+        }
+        "account" => {
+            let a = parent
+                .categories()
+                .flat_map(|c| &c.accounts)
+                .find(|a| a.code == code)
+                .ok_or_else(|| format!("There is no account {code}."))?;
+            spec.accounts.insert(a.code.clone());
+            ("account", a.name.trim().to_string())
+        }
+        other => {
+            return Err(format!(
+                "A sub-budget starts from a category or an account, not \"{other}\"."
+            ))
+        }
+    };
+    let mut b = subbudget::sub_budget(parent, &spec).map_err(|e| e.to_string())?;
+    b.charges.clear();
+    b.credits.clear();
+    b.tag_presets.clear();
+    b.line_presets.clear();
+    b.report_presets.clear();
+    share::prune_unused_setup(&mut b);
+    b.setup_order = method_core::order::normalized_all(&b);
+    b.setup_folders = method_core::folders::normalized(&b);
+    b.setup_sources = method_core::pack::normalized(&b);
+    let parent_title = match parent.title.trim() {
+        "" => UNTITLED,
+        t => t,
+    };
+    let row_name = if name.is_empty() {
+        code.to_string()
+    } else {
+        format!("{code} {name}")
+    };
+    b.title = format!(
+        "{parent_title} - {}",
+        if name.is_empty() { code } else { &name }
+    );
+    b.provenance = Some(Provenance {
+        kind: ProvenanceKind::SubBudget,
+        source_title: parent.title.trim().to_string(),
+        source_version: None,
+        saved,
+        app_version: APP_VERSION.to_string(),
+        note: Some(format!("From {what} {row_name}")),
+        pack: None,
+    });
+    Ok(b)
+}
+
+/// Opens the sub-budget of row `row` of budget `doc` (`None`: the one in
+/// front) in a new tab, in front, with no file; its id. (The desktop saves
+/// it beside its parent's file instead, src/sharing.rs.)
+pub fn row_sub_budget_new(
+    state: &AppState,
+    doc: Option<DocId>,
+    row: &RowInput,
+    saved: &str,
+) -> Result<DocId, String> {
+    let b = {
+        let s = state.lock_doc(doc)?;
+        make_row_sub_budget(s.budget(), row, saved)?
+    };
+    Ok(state.docs().add(Session::with_budget(b, None)))
+}
+
+// ---------------------------------------------------------------------------
 // Commands (the desktop's src/sharing.rs and the host's src/host/sharing.rs
 // call these)
 
@@ -427,6 +547,135 @@ mod tests {
         }
         let mut b = original.clone();
         assert!(store_as_version(&mut b, &copy, " ", AT).is_err());
+    }
+
+    /// The starter as "Big Show", with a version, a tag preset, an unused
+    /// global and a group on one Camera line, to see what a row's
+    /// sub-budget carries.
+    fn row_parent() -> Budget {
+        let mut b = show();
+        b.globals.insert("UNUSED".into(), "3".into());
+        b.groups.insert(
+            "Night".into(),
+            method_core::Group {
+                description: String::new(),
+                short_code: None,
+                in_budget_total: true,
+                color: None,
+            },
+        );
+        let cam = b.categories_mut().find(|c| c.code == "21").unwrap();
+        cam.accounts[0].details[0].groups.insert("Night".into());
+        b.tag_presets.push(method_core::presets::TagPreset {
+            name: "Nights".into(),
+            groups: ["Night".to_string()].into(),
+            ..Default::default()
+        });
+        b
+    }
+
+    fn keys<V>(m: &std::collections::BTreeMap<String, V>) -> Vec<&str> {
+        m.keys().map(String::as_str).collect()
+    }
+
+    fn row(kind: &str, code: &str) -> RowInput {
+        RowInput {
+            kind: kind.into(),
+            code: code.into(),
+        }
+    }
+
+    #[test]
+    fn a_rows_sub_budget_carries_its_accounts_lines_and_the_setup_they_use() {
+        let parent = row_parent();
+        let b = make_row_sub_budget(&parent, &row("category", "21"), AT).unwrap();
+        assert_eq!(b.title, "Big Show - Camera");
+        let p = b.provenance.as_ref().unwrap();
+        assert_eq!(p.kind, ProvenanceKind::SubBudget);
+        assert_eq!(p.source_title, "Big Show");
+        assert_eq!(p.note.as_deref(), Some("From category 21 Camera"));
+        // The row, whole.
+        let cats: Vec<&str> = b.categories().map(|c| c.code.as_str()).collect();
+        assert_eq!(cats, ["21"]);
+        let parent_cam = parent.categories().find(|c| c.code == "21").unwrap();
+        let cam = b.categories().next().unwrap();
+        assert_eq!(cam.accounts, parent_cam.accounts, "every line as it was");
+        // Exactly the setup its lines use, and what that needs.
+        assert_eq!(keys(&b.fringes), ["PAYROLL"]);
+        assert_eq!(keys(&b.globals), ["SHOOT_DAYS", "SHOOT_WEEKS"]);
+        assert_eq!(keys(&b.groups), ["Night"]);
+        let mut units = keys(&b.units);
+        units.sort_unstable();
+        assert_eq!(units, ["Week"]);
+        // The budget settings and details come along.
+        assert_eq!(b.base_currency, parent.base_currency);
+        assert_eq!(b.fringe_posting, parent.fringe_posting);
+        assert_eq!(b.arithmetic, parent.arithmetic);
+        assert_eq!(b.account_coding, parent.account_coding);
+        assert_eq!(b.info, parent.info);
+        // What works on the whole budget stays behind.
+        assert!(b.charges.is_empty() && b.credits.is_empty());
+        assert!(b.tag_presets.is_empty() && b.report_presets.is_empty());
+        assert!(b.line_presets.is_empty());
+        assert!(b.versions.is_empty() && b.baseline.is_none());
+        // It round-trips through the file format.
+        let text = method_format::to_string(&b);
+        assert_eq!(method_format::from_str(&text).unwrap(), b);
+
+        // A row with no fringes or globals brings none.
+        let ins = make_row_sub_budget(&parent, &row("category", "50"), AT).unwrap();
+        assert!(ins.fringes.is_empty() && ins.globals.is_empty() && ins.groups.is_empty());
+        assert_eq!(ins.title, "Big Show - Insurance");
+    }
+
+    #[test]
+    fn a_rows_sub_budget_keeps_the_rows_totals() {
+        let parent = row_parent();
+        let opts = method_core::RecalcOptions::default();
+        let whole = method_core::recalc(&parent, &opts).unwrap();
+        for cat in &whole.categories {
+            let b = make_row_sub_budget(&parent, &row("category", &cat.code), AT).unwrap();
+            let r = method_core::recalc(&b, &opts).unwrap();
+            assert_eq!(r.categories.len(), 1);
+            let mine = &r.categories[0];
+            assert_eq!(mine.total, cat.total, "category {}", cat.code);
+            assert_eq!(mine.fringe_total, cat.fringe_total, "category {}", cat.code);
+            for (a, want) in mine.accounts.iter().zip(&cat.accounts) {
+                assert_eq!((a.code.as_str(), a.total), (want.code.as_str(), want.total));
+            }
+            // With no charges or credits, its bottom line is the row and
+            // the fringes it earns.
+            assert_eq!(r.charges.len(), 0);
+            assert_eq!(r.net_total, r.grand_total);
+            for acct in &cat.accounts {
+                let b = make_row_sub_budget(&parent, &row("account", &acct.code), AT).unwrap();
+                let r = method_core::recalc(&b, &opts).unwrap();
+                let only: Vec<&str> = r.categories[0]
+                    .accounts
+                    .iter()
+                    .map(|a| a.code.as_str())
+                    .collect();
+                assert_eq!(only, [acct.code.as_str()]);
+                assert_eq!(r.categories[0].accounts[0].total, acct.total);
+                assert_eq!(r.categories[0].accounts[0].fringe_total, acct.fringe_total);
+            }
+        }
+    }
+
+    #[test]
+    fn a_rows_sub_budget_refuses_what_isnt_there() {
+        let parent = row_parent();
+        assert!(make_row_sub_budget(&parent, &row("category", "99"), AT).is_err());
+        assert!(make_row_sub_budget(&parent, &row("account", "9999"), AT).is_err());
+        assert!(make_row_sub_budget(&parent, &row("line", "21"), AT).is_err());
+        assert!(make_row_sub_budget(&parent, &row("category", "21"), "today").is_err());
+        // Opened in a new tab with no file (the browser's way).
+        let state = AppState::with(Docs::with(Session::with_budget(parent, None)));
+        let id = row_sub_budget_new(&state, None, &row("account", "2101"), AT).unwrap();
+        let docs = state.docs();
+        let s = docs.get(id).unwrap();
+        assert!(s.path().is_none());
+        assert_eq!(s.budget().title, "Big Show - Camera");
     }
 
     #[test]

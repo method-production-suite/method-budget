@@ -145,10 +145,11 @@ export function whenText(ms, now = new Date()) {
  * The New Budget spec (src/start.rs, NewBudgetSpec) from the form's
  * `values` (strings by field name) and its Start From value (`starter`,
  * `blank`, `chart:<id>` or `file`), with the picked file's `token`, Save
- * In's folder token (`folder`; null: no file yet) and the setup step's
- * ticks (`setup`: { library: bool, packs: [token] }).
+ * In's folder token (`folder`; null: no file yet), the setup step's ticks
+ * (`setup`: { library: bool, packs: [token] }) and whether to make a
+ * project folder for it in that folder (`project`).
  */
-export function specFrom(values, startFrom, token, folder = null, setup = null) {
+export function specFrom(values, startFrom, token, folder = null, setup = null, project = false) {
   const v = values && typeof values === 'object' ? values : {};
   const s = (k) => (typeof v[k] === 'string' ? v[k].trim() : '');
   const spec = {
@@ -177,6 +178,7 @@ export function specFrom(values, startFrom, token, folder = null, setup = null) 
     file_name: s('file_name'),
     library: !!(setup && setup.library === true),
     packs: setup && Array.isArray(setup.packs) ? [...new Set(setup.packs.filter(Number.isSafeInteger))] : [],
+    project: project === true && Number.isSafeInteger(folder),
   };
   const tv = tvFields(spec.kind);
   if (tv.season) spec.season = s('season');
@@ -211,4 +213,42 @@ export function packText(p) {
   bits.push(`${n} ${n === 1 ? 'item' : 'items'}`);
   if (p.place === 'bundled') bits.push('comes with the app');
   return { name, detail: bits.join(', ') };
+}
+
+/**
+ * A thumbnail's bars (src/start.rs, StartEntry.bars: [{label, share}],
+ * share in thousandths) as rectangles in a `width` by `height` box: one
+ * column each, bottom-aligned, the largest bar the full height, every bar
+ * above nothing at least 1 high. Each with its label and share as words
+ * ("21 Camera, 32%").
+ */
+export function thumbRects(bars, width = 56, height = 24) {
+  const list = (Array.isArray(bars) ? bars : []).filter((b) => b && Number.isFinite(b.share));
+  if (!list.length) return [];
+  const max = Math.max(...list.map((b) => b.share));
+  if (!(max > 0)) return [];
+  const step = width / list.length;
+  const gap = step > 3 ? 1 : 0;
+  return list.map((b, i) => {
+    const h = b.share > 0 ? Math.max(1, Math.round((b.share / max) * height)) : 0;
+    return {
+      x: Math.round(i * step * 100) / 100,
+      y: height - h,
+      w: Math.max(0.5, Math.round((step - gap) * 100) / 100),
+      h,
+      text: `${String(b.label || '')}, ${shareText(b.share)}`,
+    };
+  });
+}
+
+/** A share in thousandths as a percent: "32%", "0.4%". */
+export function shareText(share) {
+  if (!Number.isFinite(share) || share <= 0) return '0%';
+  if (share < 100) return `${(share / 10).toFixed(1).replace(/\.0$/, '')}%`;
+  return `${Math.round(share / 10)}%`;
+}
+
+/** The rows of `project` ({items}) that match `query`, as filterEntries does. */
+export function projectEntries(project, query) {
+  return filterEntries(project && Array.isArray(project.items) ? project.items : [], query);
 }

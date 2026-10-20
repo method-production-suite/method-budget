@@ -79,7 +79,7 @@ import { renderConvertBanner } from './convertbanner.js';
 import { exportPack, importPack } from './packs.js';
 import { exportSetupLists, importSetupLists } from './setuplists.js';
 import { importActuals } from './actualsimport.js';
-import { saveShareCopy, newSubBudget, renderShareBanner, offerReturnedCopy } from './sharing.js';
+import { saveShareCopy, newSubBudget, renderShareBanner, offerReturnedCopy, subBudgetFromRow, subBudgetRow } from './sharing.js';
 import { displayCommands, userDisplay, withoutZeroRows, totalText } from './display.js';
 import { announce } from './announce.js';
 import { initShare, renderBar as renderShareBar, decorateShare, reportPlace, openShareDialog, whoChangedThis, lookedAt, shareShown } from './share.js';
@@ -315,6 +315,7 @@ const NOT_EDITS = new Set([
   // The start window (src/start.rs): a budget opened or made in a new tab.
   'start_open',
   'new_budget_create',
+  'start_duplicate',
   // The sample budget (src/sample.rs): a copy opened in a tab.
   'sample_at_launch',
   'sample_open',
@@ -327,6 +328,7 @@ const NOT_EDITS = new Set([
   'pane_view',
   'share_copy_editable',
   'sub_budget_new',
+  'sub_budget_from_row',
   // Other people's changes arriving in a shared budget (share.js).
   'share-changed',
 ]);
@@ -2389,6 +2391,11 @@ Object.assign(COMMANDS, {
   'file.new_sub_budget': () => {
     if (grid.editor) grid.commitEdit(null);
     if (state.view) newSubBudget(sharingCtx());
+  },
+  // The category or account under the cursor as its own budget (context menu).
+  'file.sub_budget_from_row': () => {
+    if (grid.editor) grid.commitEdit(null);
+    if (state.view) subBudgetFromRow(sharingCtx(), subBudgetRow(state.level, grid.cursorRow(), state.acct));
   },
 });
 
