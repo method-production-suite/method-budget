@@ -844,6 +844,9 @@ fn category_credit_rows_round_trip() {
         discount_percent: Dec::ZERO,
         excluded_fringes: set(&["P"]),
         locations: Default::default(),
+        minimum_spend: None,
+        broker_fee: 0,
+        shared_cap: None,
         rows: vec![
             CreditRow {
                 description: "Electric".into(),
@@ -947,6 +950,9 @@ fn per_row_excluded_fringes_become_the_credits_list() {
         discount_percent: Dec::ZERO,
         excluded_fringes: set(&[]),
         locations: Default::default(),
+        minimum_spend: None,
+        broker_fee: 0,
+        shared_cap: None,
         rows: vec![
             CreditRow {
                 description: "Group".into(),

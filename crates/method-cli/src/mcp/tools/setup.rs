@@ -183,7 +183,9 @@ pub fn tools() -> Vec<Tool> {
                 topsheet category's total or of an account's total, with their fringes (less \
                 the credit's excluded fringes, one list for all its group, category and \
                 account rows), with \
-                caps, an overall cap and a discount. rows replaces every \
+                caps, an overall cap and a discount; optionally a minimum spend below which it \
+                pays nothing, a flat broker's fee taken off after the discount, and a cap it \
+                shares with other credits by name. rows replaces every \
                 row when given. New credits are applied unless applied is false.",
             mutating: true,
             destructive: false,
@@ -225,6 +227,10 @@ pub fn tools() -> Vec<Tool> {
                         ("discount_percent", s::formula("Taken off after the cap (5 means 5%).")),
                         ("excluded_fringes", s::array("Fringes left out of the spend of every group, category and account row (replaces the list).", s::name("A fringe."), 100)),
                         ("locations", s::array("Only lines at these locations count toward every group, category and account row, with their fringes; empty counts every line (replaces the list).", s::name("A location."), 100)),
+                        ("minimum_spend", s::nullable(money_schema("The qualified spend (the rows' net spend added up, at its locations, before any cap) below which the credit is 0, or null for none."))),
+                        ("broker_fee", s::nullable(money_schema("A flat fee taken off after the cap and the discount, never below zero, or null for none."))),
+                        ("shared_cap", s::nullable(s::name("The name of a cap this credit shares with other credits: together they never come to more than it. null for none."))),
+                        ("shared_cap_amount", money_schema("The shared cap's amount, for every credit sharing it. Needed when the shared cap is new.")),
                         ("rows", s::array("The credit's rows (replaces them all).", row, 200)),
                     ],
                     &["path", "name"],
@@ -1180,6 +1186,25 @@ fn set_credit(ctx: &mut Ctx, a: &Args) -> ToolResult {
             } else {
                 old.iter().flat_map(|o| &o.locations).cloned().collect()
             },
+            minimum_spend: if a.has("minimum_spend") {
+                a.get("minimum_spend").map(formula_text)
+            } else {
+                old.as_ref().and_then(|o| o.minimum_spend).map(money_text)
+            },
+            broker_fee: if a.has("broker_fee") {
+                a.get("broker_fee").map(formula_text)
+            } else {
+                old.as_ref()
+                    .map(|o| o.broker_fee)
+                    .filter(|f| *f != 0)
+                    .map(money_text)
+            },
+            shared_cap: if a.has("shared_cap") {
+                opt_arg(&a, "shared_cap").flatten()
+            } else {
+                old.as_ref().and_then(|o| o.shared_cap.clone())
+            },
+            shared_cap_amount: a.get("shared_cap_amount").map(formula_text),
             rows,
         };
         typed::set_credit(b, index, &input)?;

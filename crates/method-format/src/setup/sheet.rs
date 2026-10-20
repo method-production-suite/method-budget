@@ -167,7 +167,7 @@ const CHARGE: [Column; 9] = [
         &["excludeaccounts"],
     ),
 ];
-const CREDIT: [Column; 15] = [
+const CREDIT: [Column; 19] = [
     col("name", "Credit", &["name", "incentive"]),
     col("account", "Account", &["acct"]),
     col("applied", "Applied", &["on", "active"]),
@@ -187,6 +187,23 @@ const CREDIT: [Column; 15] = [
     col("row_cap", "Row Cap", &[]),
     col("excluded_fringes", "Excluded Fringes", &["excludefringes"]),
     col("locations", "Locations", &["location"]),
+    // Decisions.md, entry 88.
+    col(
+        "minimum_spend",
+        "Minimum Spend",
+        &["minimum", "minimumqualifiedspend", "spendthreshold"],
+    ),
+    col(
+        "broker_fee",
+        "Broker Fee",
+        &["brokersfee", "fee", "flatfee"],
+    ),
+    col("shared_cap", "Shared Cap", &["sharedcapname", "capgroup"]),
+    col(
+        "shared_cap_amount",
+        "Shared Cap Amount",
+        &["sharedcapamount", "capgroupamount"],
+    ),
 ];
 const TAG_PRESET: [Column; 6] = [
     col("name", "Name", &["preset", "tagpreset"]),
@@ -488,12 +505,30 @@ pub fn sheet(b: &Budget, w: What) -> Sheet {
                         },
                     ])
                 };
+                // The credit's terms, repeated on each of its rows like its
+                // lists (decisions.md, entry 88).
+                let terms = || {
+                    [
+                        c.minimum_spend.map_or(Cell::Empty, Cell::Money),
+                        if c.broker_fee == 0 {
+                            Cell::Empty
+                        } else {
+                            Cell::Money(c.broker_fee)
+                        },
+                        opt(&c.shared_cap),
+                        c.shared_cap
+                            .as_ref()
+                            .and_then(|n| b.shared_caps.get(n))
+                            .map_or(Cell::Empty, |a| Cell::Money(*a)),
+                    ]
+                };
                 if c.rows.is_empty() {
                     let mut cells = Vec::new();
                     head(&mut cells);
                     cells.extend(std::iter::repeat_n(Cell::Empty, 8));
                     cells.push(list(&c.excluded_fringes));
                     cells.push(list(&c.locations));
+                    cells.extend(terms());
                     push(&c.name, cells);
                 }
                 for r in &c.rows {
@@ -541,6 +576,7 @@ pub fn sheet(b: &Budget, w: What) -> Sheet {
                         excluded,
                         list(&c.locations),
                     ]);
+                    cells.extend(terms());
                     push(&c.name, cells);
                 }
             }
@@ -1114,6 +1150,9 @@ pub fn read(
                                     .unwrap_or(Dec::ZERO),
                                 excluded_fringes: BTreeSet::new(),
                                 locations: BTreeSet::new(),
+                                minimum_spend: None,
+                                broker_fee: 0,
+                                shared_cap: None,
                                 rows: Vec::new(),
                             });
                             into.credits.len() - 1
@@ -1124,6 +1163,43 @@ pub fn read(
                         .excluded_fringes
                         .extend(row.names("excluded_fringes"));
                     into.credits[i].locations.extend(row.names("locations"));
+                    // The credit's terms (decisions.md, entry 88): any of its
+                    // rows may give them, and two rows can't disagree.
+                    let c = &mut into.credits[i];
+                    if let Some(m) = row.money("minimum_spend", "the minimum spend")? {
+                        if c.minimum_spend.is_some_and(|x| x != m) {
+                            return Err(format!("credit {name} has two minimum spends"));
+                        }
+                        c.minimum_spend = Some(m);
+                    }
+                    if let Some(f) = row.money("broker_fee", "the broker fee")? {
+                        if f < 0 {
+                            return Err("the broker fee can't be less than 0".into());
+                        }
+                        if c.broker_fee != 0 && c.broker_fee != f {
+                            return Err(format!("credit {name} has two broker fees"));
+                        }
+                        c.broker_fee = f;
+                    }
+                    if let Some(cap) = row.opt("shared_cap") {
+                        if c.shared_cap.as_ref().is_some_and(|x| *x != cap) {
+                            return Err(format!("credit {name} has two shared caps"));
+                        }
+                        c.shared_cap = Some(cap.clone());
+                        if let Some(a) = row.money("shared_cap_amount", "the shared cap amount")? {
+                            if a < 0 {
+                                return Err("a shared cap can't be less than 0".into());
+                            }
+                            if into.shared_caps.get(&cap).is_some_and(|x| *x != a) {
+                                return Err(format!(
+                                    "the shared cap {cap} has two amounts; give it one"
+                                ));
+                            }
+                            into.shared_caps.insert(cap, a);
+                        }
+                    } else if !row.get("shared_cap_amount").trim().is_empty() {
+                        return Err("a shared cap amount needs a shared cap name".into());
+                    }
                     if has_row {
                         let group = row.opt("group");
                         let category = row.opt("category");
@@ -1378,6 +1454,9 @@ mod tests {
             discount_percent: Dec::from_int(5),
             excluded_fringes: ["KIT".to_string()].into(),
             locations: ["Stage 4".to_string()].into(),
+            minimum_spend: Some(50_000),
+            broker_fee: 2_500,
+            shared_cap: Some("Pool".into()),
             rows: vec![
                 CreditRow {
                     description: "Labor".into(),
@@ -1417,8 +1496,12 @@ mod tests {
             discount_percent: Dec::ZERO,
             excluded_fringes: BTreeSet::new(),
             locations: BTreeSet::new(),
+            minimum_spend: None,
+            broker_fee: 0,
+            shared_cap: Some("Pool".into()),
             rows: Vec::new(),
         });
+        b.shared_caps.insert("Pool".into(), 300_000);
         b.tag_presets.push(TagPreset {
             name: "Crew".into(),
             fringes: ["FICA".to_string(), "KIT".to_string()].into(),
@@ -1483,6 +1566,7 @@ mod tests {
         assert_eq!(a.currencies, b.currencies);
         assert_eq!(a.charges, b.charges);
         assert_eq!(a.credits, b.credits);
+        assert_eq!(a.shared_caps, b.shared_caps);
         assert_eq!(a.tag_presets, b.tag_presets);
         assert_eq!(a.ot_patterns, b.ot_patterns);
         assert_eq!(

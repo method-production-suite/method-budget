@@ -272,9 +272,21 @@ pub struct ChargeTotals {
 pub struct CreditTotals {
     pub name: String,
     pub rows: Vec<CreditRowTotals>,
-    /// Sum of row credits, unrounded, after the overall cap.
+    /// Sum of row credits, unrounded, after the overall cap; 0 when the
+    /// qualified spend is below the credit's minimum.
     pub capped: Dec,
-    /// Final credit after the discount, rounded once.
+    /// The rows' net spend is below the credit's minimum spend, so the
+    /// credit is 0 (decisions.md, entry 88).
+    pub below_minimum: bool,
+    /// The credit's share of its shared cap, in cents, when the credits
+    /// sharing it come to more than it together (decisions.md, entry 88).
+    /// `None` when the shared cap doesn't hold it down.
+    pub shared: Option<Cents>,
+    /// The broker's fee taken off, after the discount: the credit's flat
+    /// fee, or less when the credit is smaller than the fee.
+    pub fee: Cents,
+    /// Final credit after the caps, the discount and the fee, rounded once
+    /// (the shares of a shared cap are whole cents before the discount).
     pub amount: Cents,
 }
 

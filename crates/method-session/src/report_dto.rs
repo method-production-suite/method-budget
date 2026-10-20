@@ -130,6 +130,12 @@ pub struct CreditDto {
     pub name: String,
     pub rows: Vec<CreditRowDto>,
     pub capped: String,
+    /// Below its minimum spend, so 0 (decisions.md, entry 88).
+    pub below_minimum: bool,
+    /// Its share of its shared cap, when the cap holds it down.
+    pub shared: Option<Cents>,
+    /// The broker's fee taken off.
+    pub fee: Cents,
     pub amount: Cents,
 }
 
@@ -172,6 +178,13 @@ pub struct ProgramDto {
     pub locations: Vec<String>,
     pub cap: Option<Cents>,
     pub discount_percent: String,
+    /// Decisions.md, entry 88: the qualified spend below which it pays
+    /// nothing, the flat fee after the discount, the shared cap it names
+    /// and that cap's amount (`null` when the budget doesn't have it).
+    pub minimum_spend: Option<Cents>,
+    pub broker_fee: Cents,
+    pub shared_cap: Option<String>,
+    pub shared_cap_amount: Option<Cents>,
     /// The estimate; `null` when it can't be worked out (`problem`). With
     /// both, the estimate is from a cleaned copy and may be short.
     pub amount: Option<Cents>,
@@ -216,6 +229,10 @@ impl From<&method_core::incentives::Incentives> for IncentivesDto {
                     locations: p.locations.iter().cloned().collect(),
                     cap: p.cap,
                     discount_percent: dec(p.discount_percent),
+                    minimum_spend: p.minimum_spend,
+                    broker_fee: p.broker_fee,
+                    shared_cap: p.shared_cap.clone(),
+                    shared_cap_amount: p.shared_cap_amount,
                     amount: p.amount(),
                     problem: p.problem.clone(),
                     qualified: p.qualified,
@@ -389,6 +406,9 @@ impl From<&CreditTotals> for CreditDto {
             name: c.name.clone(),
             rows: c.rows.iter().map(CreditRowDto::from).collect(),
             capped: dec(c.capped),
+            below_minimum: c.below_minimum,
+            shared: c.shared,
+            fee: c.fee,
             amount: c.amount,
         }
     }

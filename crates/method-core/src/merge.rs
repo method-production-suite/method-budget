@@ -843,6 +843,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         topsheet: _,
         charges: _,
         credits: _,
+        shared_caps: _,
         baseline: _,
         display: _,
         versions: _,
@@ -1209,6 +1210,30 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
             ),
             excluded_fringes: th.names(|c| &c.excluded_fringes),
             locations: th.names(|c| &c.locations),
+            minimum_spend: th.field(
+                cx,
+                at,
+                "minimum_spend",
+                "minimum spend",
+                |c| &c.minimum_spend,
+                |v| v.map_or("none".into(), crate::diff::money),
+            ),
+            broker_fee: th.field(
+                cx,
+                at,
+                "broker_fee",
+                "broker's fee",
+                |c| &c.broker_fee,
+                |v| crate::diff::money(*v),
+            ),
+            shared_cap: th.field(
+                cx,
+                at,
+                "shared_cap",
+                "shared cap",
+                |c| &c.shared_cap,
+                opt_text,
+            ),
             rows: th.field(
                 cx,
                 at,
@@ -1224,10 +1249,35 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
                         discount_percent: crate::Dec::ZERO,
                         excluded_fringes: BTreeSet::new(),
                         locations: BTreeSet::new(),
+                        minimum_spend: None,
+                        broker_fee: 0,
+                        shared_cap: None,
                         rows: rows.clone(),
                     })
                 },
             ),
+        },
+    );
+
+    // Shared caps name by name (decisions.md, entry 88).
+    let shared_caps = merge_map(
+        cx,
+        Kind {
+            key: "shared_cap",
+            word: "Shared cap",
+            table: None,
+        },
+        (&b.shared_caps, &o.shared_caps, &t.shared_caps),
+        &|v| crate::diff::shared_cap_fields(*v),
+        &|cx, at, th| {
+            th.field(
+                cx,
+                at,
+                "amount",
+                "amount",
+                |v| v,
+                |v| crate::diff::money(*v),
+            )
         },
     );
 
@@ -1341,6 +1391,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         topsheet,
         charges,
         credits,
+        shared_caps,
         baseline,
         display,
         versions,

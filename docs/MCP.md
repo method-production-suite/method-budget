@@ -248,14 +248,17 @@ cutoff it never uses. The base currency is listed first with `base: true`; the o
 **`list_charges`** `{path}`: charges (`charge_kind`, `percent` or `flat_amount_cents` and
 `currency`, `applied`, `account`, the exclusions, and `base_cents`, `excluded_cents`,
 `amount_cents` when applied) and credits (`rows` with their `source`, `percent` and `cap`,
-`cap_cents`, `discount_percent`, `locations`, `amount_cents`).
+`cap_cents`, `discount_percent`, `locations`, `minimum_spend_cents`, `broker_fee_cents`,
+`shared_cap`, `shared_cap_cents`, `amount_cents`).
 
 **`incentives`** `{path}`: spend at each location (`locations`: `location`, `null` for
 lines with none, `known`, `lines`, `fringes`, `total`) and every credit as an incentive
 program, applied or not (`programs`: `name`, `applied`, `locations`, `cap`,
-`discount_percent`, `qualified` and `by_location`, `amount` after the caps and discount,
-`capped`, `problem`, `figures`), money in integer cents (decisions.md, entry 80). Nothing
-changes.
+`discount_percent`, `minimum_spend`, `broker_fee`, `shared_cap` and `shared_cap_amount`,
+`qualified` and `by_location`, `amount` after the minimum, caps, discount and fee,
+`capped`, `problem`, `figures` with `below_minimum`, `shared` and `fee`), money in integer
+cents (decisions.md, entries 80 and 88). An unapplied program is worked out as if applied
+alongside the applied ones. Nothing changes.
 
 **`totals`** `{path, exclude_groups?}`: `levels` (each production total with its categories
 and their accounts), `total_atl_cents`, `total_btl_cents`, `atl_btl_cents`,
@@ -391,7 +394,14 @@ below-the-line) or flat `amount`, and is applied unless `applied` is false.
 ```
 
 **`set_credit`** `{path, name, new_name?, account?, applied?, cap?, discount_percent?,
-excluded_fringes?, locations?, rows?}`: adds a credit or changes it; `rows` replaces every row.
+excluded_fringes?, locations?, minimum_spend?, broker_fee?, shared_cap?,
+shared_cap_amount?, rows?}`: adds a credit or changes it; `rows` replaces every row.
+`minimum_spend` is the qualified spend (the rows' net spend at its locations, before any
+cap) below which the credit is 0; `broker_fee` a flat amount taken off after the cap and
+the discount, never below zero; `shared_cap` the name of a cap it shares with other
+credits, which together never come to more than its amount (shared in proportion, to the
+cent). `null` clears each, left out keeps it. `shared_cap_amount` sets the shared cap's
+amount for every credit sharing it; a new shared cap needs one (decisions.md, entry 88).
 `locations` limits every group, category and account row to lines at those locations,
 with their fringes (decisions.md, entry 80); empty counts every line, left out keeps it,
 and a location the budget doesn't have is refused.
@@ -404,7 +414,8 @@ topsheet category's total with the fringes its lines earn, wherever fringes post
 wherever fringes post), `percent`, `cap` (`{"kind": "none" | "qualified_spend" |
 "credit", "amount"}`), `description`. A group, category, account or fringe the budget
 doesn't have is refused. `list_charges` shows each credit's
-`excluded_fringes` and `locations`.
+`excluded_fringes`, `locations`, `minimum_spend_cents`, `broker_fee_cents`, `shared_cap`
+and `shared_cap_cents`.
 
 **`apply_charge`** `{path, type, name, applied}`: makes a charge or credit count or stop
 counting. **`delete_charge`** `{path, type, name}` removes it.

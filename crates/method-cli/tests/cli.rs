@@ -877,6 +877,39 @@ fn incentives_text_and_json() {
     assert_eq!(code(&method(&["incentives"])), 2);
 }
 
+/// The text output notes a minimum spend, a shared cap and a broker's fee
+/// (decisions.md, entry 88).
+#[test]
+fn incentives_text_notes_the_minimum_shared_cap_and_fee() {
+    let p = format!(
+        "{}/../../fixtures/field-station/field-station.mthd",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let d = Dir::new("incentive-terms");
+    let file = d.path("field.mthd");
+    let mut b = method_format::from_str(&read(&p)).unwrap();
+    let mut other = b.credits[0].clone();
+    other.name = "Second program".into();
+    other.minimum_spend = Some(100_000_000);
+    b.credits[0].shared_cap = Some("Pool".into());
+    b.credits[0].broker_fee = 1_000;
+    b.shared_caps.insert("Pool".into(), 500_000);
+    b.credits.push(other);
+    std::fs::write(&file, method_format::to_string(&b)).unwrap();
+
+    let o = method(&["incentives", &file]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let text = out(&o);
+    assert!(
+        text.contains("\tshared cap Pool: 5000.00 of 5000.00; less a 10.00 broker's fee\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("\tbelow the minimum spend of 1000000.00\n"),
+        "{text}"
+    );
+}
+
 #[test]
 fn review_comments_are_written_listed_and_merged_back() {
     let d = Dir::new("review");

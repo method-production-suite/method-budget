@@ -4271,6 +4271,109 @@ From 0.6.0 the Mac app holds both Intel and Apple silicon code.
 - **Not checked here.** A real Intel Mac: installing 0.6.0, and a copy of 0.2 updating to it,
   is on the owner's list.
 
+## 88. Incentive programs: a minimum spend, a flat broker's fee and caps shared by programs (2026-10-20)
+
+Roadmap 3.6, second slice, on entry 80's model: a program is still a credit, worked out by
+the topsheet's own code, rounded once. Three optional terms join it. Behavior: docs/APP.md,
+"Incentive programs"; file: docs/FORMAT.md, "Credit" and "Shared cap"; command line:
+docs/CLI.md, `method-budget incentives`; MCP: `set_credit`, `list_charges`, `incentives`.
+
+- **The order.** A credit is worked out as: each row's percent of its net spend under the
+  row's cap; the rows added up; 0 when the qualified spend is below the minimum; the
+  credit's own cap; its share of a shared cap; less the discount; rounded once to the cent;
+  less the broker's fee, never below zero.
+- **A minimum spend compares the spend the program counts.** `minimum_spend` is checked
+  against the qualified spend: the rows' net spend added up (typed amounts included), after
+  the credit's locations and excluded fringes, before any cap on the spend, the rows or the
+  credit. A spend at the minimum qualifies; one cent under pays nothing, whatever the caps.
+  Before caps, because a cap on the spend limits what the percent applies to, not what was
+  spent, and a threshold in a program's rules is about what the production spends there.
+  The credit's figures say `below_minimum`, Explain names the spend and the minimum, the
+  footer says "Minimum: Not met", Programs side by side says "Below minimum", and
+  `method-budget incentives` adds "below the minimum spend of …". A credit below its
+  minimum takes no share of a shared cap (it counts as 0 there).
+- **A broker's fee comes off last.** `broker_fee` is a flat amount taken off after the
+  caps, the shared cap and the percentage discount, from the rounded figure. The fee is
+  whole cents, so taking it off after the one rounding adds no rounding of its own. A fee
+  larger than the credit leaves 0, never less: the fee taken is the credit (the figures
+  say how much was taken). A credit of 0 or less pays no fee.
+- **A shared cap is a named amount in the budget.** `shared_caps` is a map of name to
+  `{amount}` beside the credits, and a credit joins one with `shared_cap`. One amount in
+  one place, so two credits can never disagree about it. Changing it on any credit sharing
+  it changes it for all; a new shared cap needs an amount; typing a new name in the app
+  keeps the amount shown; a shared cap no credit names any more goes when a credit is
+  saved or deleted. It is a setting, not a setup kind: no library, folders or packs, and no
+  rename command (a credit's name for it is changed credit by credit). A name the budget
+  doesn't have holds nothing down, and `method-budget check` warns.
+- **Own cap first, then the shared cap, shared in proportion.** The applied credits naming
+  one shared cap are worked out to their own caps and rounded to the cent. When the ones
+  worth more than 0 come to more than the shared cap, each of them gets the cap times its
+  figure over their sum, rounded down to the cent; the cents left (fewer than the number
+  of credits) go one each to the largest remainders, then in credit name order, then list
+  order for two credits with one name. So the shares add up to the cap exactly, and
+  neither the order of the credits nor the order of the lines changes a share. Integer
+  arithmetic on cents gives the same shares in exact and binary arithmetic. A credit worth
+  0 or less keeps its figure. Each credit then takes its own discount and fee off its
+  share. **The one place a figure is rounded twice**: a credit held to a shared cap is a
+  whole-cent share before its discount, so the shares add up to the cap to the cent; a
+  shared cap that holds nothing down changes no figure and no rounding.
+- **An unapplied credit is estimated alongside the applied ones.** The topsheet shares a
+  cap among the applied credits only, so an unapplied credit still changes no figure.
+  Its estimate is its share were it applied too, beside the applied credits as they are,
+  so applying it takes off exactly its estimate (entry 80's promise), and may lower the
+  others' figures through the cap they share. The other way, every credit sharing as if
+  all were applied, would make an unapplied credit's estimate depend on other unapplied
+  credits and break that promise. For a credit without a shared cap nothing changes: its
+  estimate is the same applied or not.
+- **Built on the recommendation** (the owner can reverse each from the digest): the
+  minimum compares the qualified spend before caps; a shared cap is shared in proportion,
+  remainder cents by largest remainder then name; an unapplied credit is estimated
+  alongside the applied ones.
+- **The file: additive, version 1 kept.** `minimum_spend`, `broker_fee` and `shared_cap`
+  are written on a credit after `locations`, and `shared_caps` after `credits`, each only
+  when set, so every existing file reads and writes byte for byte as before (Field
+  Station is tested). Readers are strict: an older reader refuses a file using them with
+  an unknown-field error, so it can't misread one (drop the fee or the cap silently) and
+  no version bump is needed; a reader of version 1 that knows them reads every older file
+  unchanged. The change log writes a credit's three fields and the root's `shared_caps`
+  (a value tagged `shared_caps`) only when set and clears them with `null`; their field
+  names are added at the end of the list, so a log of a budget that doesn't use them stays
+  readable by older versions. The root's `shared_caps` is one register in the log (two
+  people changing shared caps at once keep the later change); `.mthd` merges take them
+  name by name.
+- **Everywhere a credit goes.** Explain (the minimum, the share with the cap and the
+  credits sharing it, the fee; it still adds up to the credit exactly); diff (the three
+  credit fields, and "shared caps" among the budget settings); merge (the three fields, and
+  shared caps name by name, a conflict when both sides change one's amount); setup import
+  (a credit's shared cap comes with it when the budget has none of that name; one it has
+  keeps its amount); setup sheets (Minimum Spend, Broker Fee, Shared Cap and Shared Cap
+  Amount columns on the credits sheet, repeated on each of a credit's rows; two rows that
+  disagree are an error); versions (shared caps are content, so versions carry them);
+  the change log; `method-budget incentives` (a note column); the MCP `set_credit`
+  (`minimum_spend`, `broker_fee`, `shared_cap`, `shared_cap_amount`), `list_charges` and
+  `incentives`; the browser build (the same `incentives` and `set_credit` commands); and
+  Budget Setup's Credits tab (a band of terms under Spend at these locations, the footer,
+  and Minimum, Shared cap and Fee columns in Programs side by side). Renames: nothing to
+  follow, since the terms name no setup item.
+- Tests: the rules by hand (method-core `incentives`: minimum below, at and above, after
+  the locations and before a spend cap and the credit's cap; a fee after the cap and
+  discount, larger than the credit, and below the minimum; a shared cap with one, two and
+  three programs, the remainder cent by largest remainder and by name in either order;
+  own cap then shared cap with the fee after the share; an unapplied program estimated
+  beside an applied one; a program below its minimum taking no share; a cap the budget
+  doesn't have; diff and merge); properties (shared caps never exceeded, adding up to the
+  cent with no discount or fee, never raising a program, order independent, no programs or
+  unapplied ones changing nothing, every estimate what applying takes off, Explain adding
+  up; random minimums and fees in the existing incentive properties); the format
+  (`credit_terms`: placement, left out when unset, the documented example, misspellings
+  refused, versions full and compact, Field Station byte for byte, the log on disk; random
+  terms in the format properties; the setup sheets round trip); the change log (written only
+  when set, cleared); `set_credit` in the app, the MCP and setup import; the command
+  line's note column.
+- **Not built** (3.6 stays partial): the what-if that moves lines between locations, an
+  unapplied credit's row figures in its rows table, and a per-location view in the printed
+  reports. The terms band needs a live check in the app.
+
 ## 91. The start window and New Budget, the rest: projects, thumbnails, Duplicate, sub-budgets from a row, a linked schedule, shared badges, sorting (2026-10-20)
 
 Roadmap 3.19 (design: docs/research/new-project-window.md, sections 4, 5, 7, 8 and 9;

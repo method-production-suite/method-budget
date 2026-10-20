@@ -20,6 +20,9 @@ fn program(locations: &[&str]) -> Credit {
         discount_percent: d("8"),
         excluded_fringes: set(&["P"]),
         locations: set(locations),
+        minimum_spend: None,
+        broker_fee: 0,
+        shared_cap: None,
         rows: vec![CreditRow {
             description: "Qualified spend".into(),
             source: CreditSource::Category {
