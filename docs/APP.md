@@ -588,16 +588,36 @@ an estimated credit takes off exactly the estimate. Renaming a location renames 
 credits; deleting one leaves its name in a credit, which then counts nothing there
 (`method-budget check` and the MCP `validate` tool warn about it).
 
+A program's terms (decisions.md, entry 88) are a band of their own under Spend at these
+locations: **Minimum spend** (below this qualified spend, the rows' net spend at its
+locations before any cap, the credit pays nothing; a spend at the minimum qualifies),
+**Broker's fee** (a flat amount taken off after the cap and the discount, never taking the
+credit below zero), and **Shared cap** with **Shared cap amount**: credits naming the same
+shared cap never come to more than its amount together. When they would, each gets a share
+in proportion to what it comes to after its own cap, in whole cents that add up to the
+shared cap exactly (a cent left over goes to the largest remainder, then by name), and
+then takes its own discount and fee off its share. The amount belongs to the shared cap,
+so changing it on one credit changes it for all; a new shared cap needs an amount, and
+typing a new name keeps the amount shown. A shared cap no credit names any more goes away.
+An unapplied credit is estimated as if it were applied alongside the applied ones, so
+applying it takes off exactly its estimate (and may lower the others sharing its cap).
+The footer of an applied credit adds "Minimum: Not met", its shared cap share and the
+broker's fee when they apply. Programs side by side gains **Minimum**, **Shared cap**
+(the cap's name, and the program's share when the cap holds it down) and **Fee** columns,
+and says "Below minimum" for a program that pays nothing for that reason.
+
 | Command | Arguments | Returns |
 |---|---|---|
 | `preview_charge` | `index` (`null` for a new charge), `charge` (as `set_charge`) | `{name, base, excluded, amount}`, figured on the current totals; nothing changes |
-| `incentives` | none | `{partial, locations: [{location, known, lines, fringes, total}], programs: [{index, name, applied, locations, cap, discount_percent, amount, problem, qualified, by_location: [{location, net}], rows_total, capped, figures}]}`: spend by location (`location` `null` for lines with none) and every credit as an estimate, applied or not; figured on the current totals; `partial` when those come from the cleaned copy of a budget with problems, and then a program's own problems are in its `problem` with its (possibly short) `amount`; nothing changes |
+| `incentives` | none | `{partial, locations: [{location, known, lines, fringes, total}], programs: [{index, name, applied, locations, cap, discount_percent, minimum_spend, broker_fee, shared_cap, shared_cap_amount, amount, problem, qualified, by_location: [{location, net}], rows_total, capped, figures}]}` (`figures` has `below_minimum`, `shared`, the share in cents when a shared cap holds it down, and `fee`, the fee taken off): spend by location (`location` `null` for lines with none) and every credit as an estimate, applied or not; figured on the current totals; `partial` when those come from the cleaned copy of a budget with problems, and then a program's own problems are in its `problem` with its (possibly short) `amount`; nothing changes |
 | `clear_from_rows` | `rowIds`, `field` (`fringes` or `groups`) | View |
 | `replace_tags_on_rows` | `rowIds`, `tags` (`{fringes, groups, set, location, currency}`: names the budget defines; `null` values and empty lists clear; the base currency is none) | View |
 
 `set_charge` takes `label_percent` and `label_excluded` (left out: the charge keeps its own
 setting). `set_credit` takes `locations` (location names the budget has, or ones the
-credit already names; empty: every line). A credit row's report entry has `cap_variance` (unrounded currency units like
+credit already names; empty: every line), and `minimum_spend`, `broker_fee`, `shared_cap`
+and `shared_cap_amount` (money text, blank or `null` for none; a new shared cap needs an
+amount, an amount sets it for every credit sharing it; decisions.md, entry 88). A credit row's report entry has `cap_variance` (unrounded currency units like
 `credit`; positive under the cap, negative over it, `null` with no cap). **Numbers on screen** (saved in the budget, one undo step per change): the rate
 cutoff and decimals below and at or above it, whether a rate's global decimals win, and
 whether the topsheet shows the above- and below-the-line summary rows and the net total.
@@ -661,7 +681,7 @@ does while the tools window is in front.
 
 **The Budget Setup window** (decisions.md, entry 42). One window, titled Budget Setup, with
 a tab per table: **Fringes, Groups, Globals, Units, Sets, Locations, Currency, Charges,
-Credits, Info, Settings and Baseline** (a tab's tooltip says what it is for). It is laid out
+Credits, Rate Tables, Info, Settings and Baseline** (a tab's tooltip says what it is for). It is laid out
 for density: under the tab strip, a narrow **rail** at the left (on the tabs that have a
 library kind) and the tab's own area, and at the bottom a **footer** with the tab's totals
 at the left and **Close** at the right.
@@ -937,6 +957,71 @@ Either way it is one undo step. **Pattern** picks a saved pattern to fill the fo
 **Save as…** saves the form's straight time, bands and day multipliers in the budget by
 name, **Update** saves into the picked one and **Delete** removes it (one undo step each).
 Patterns are tools, not content, like tag presets: versions don't carry them.
+
+### Rate tables
+
+Rate tables are yours to keep (roadmap 3.9; decisions.md, entry 90): a named table of
+classifications ("Grip, Key", "Grip, Best Boy"), each with a rate per unit (the budget's
+own units: Hour, Day, Week) and, when the figures change over time, the dates each row is
+in effect, with notes. Nothing comes with the app: there are no bundled rates, union or
+otherwise. Tables are kept in the budget, as tools like overtime patterns (versions don't
+carry them, restoring one keeps the current tables), and go between budgets the way setup
+items do: Import Setup, the setup library (a **Rate tables** kind), setup packs and setup
+lists in a spreadsheet (a **Rate Tables** sheet, one row per classification, period and
+unit). So you can keep your own tables in your library and bring them into any budget.
+
+**Budget Setup > Rate Tables** (View > Budget Setup > Rate Tables) lists the budget's
+tables in the rail; the one picked shows as a grid: Classification, a **Per Day**
+(and so on) column per unit, **From**, **To** and **Notes**, and × to remove a row. Typing
+changes a draft; **Save Table** keeps it (one undo step) and **Revert** drops it. **Add
+unit…** in the band adds a column for another of the budget's units, **Add
+classification** a row, **New Table** a table of your own, **Delete Table…** removes one
+(lines filled from it keep their rates). Two rows of one classification can't be in
+effect on the same day; a row with no dates is in effect every day. The rail's Library
+switch shows your setup library's rate tables, to copy in or out.
+
+**Import from Spreadsheet…** reads a sheet you have (.xlsx, CSV or tab-delimited, Import
+Spreadsheet's readers and limits) into a new table: the dialog picks the sheet, names the
+table (after the sheet or file) and maps the columns, guessed from their titles: a
+**Classification** column, then a column per unit (`Hourly`, `Daily`, `Weekly`, `Day`,
+`Per Day`, `Day Rate`...) or a **Unit column** and a **Rate column**, with optional
+**From**, **To** and **Notes**. Every row is checked and problems are listed with their row
+numbers; nothing is imported while any is left. A table of the same name is replaced only
+when you choose **Replace Table**. **Update Filled Lines** gives every line filled from a
+table what its table says now (one undo step); lines changed by hand are left alone.
+
+**Fill Rate from Table…** (Edit menu, or the line's right-click menu) opens a picker for the
+cursor line: every classification and period of every table, each with the rate it gives
+for the line's unit (**Rate per** changes the unit), and a search box. A unit the table has
+no figure for is converted from the unit closest in hours, only when both units have hours
+in the budget, rounded to cents (a 50.00 Hour rate is 600.00 for a 12-hour Day); a row that
+can't give a rate says why. Picking one writes its figure into the line's rate once, as a
+plain number, and its unit as the rate unit, as one undo step. The line remembers where the
+rate came from: its Rate cell has a dotted underline and says so in its tooltip, and
+**Explain This Number** on the line says "filled from the rate table ..., at ... per ...".
+
+**A changed table never changes a line.** When a table now says something else for a line
+filled from it, the line keeps its figure; its Rate cell gets a mark in the corner and its
+tooltip and Explain say "the table now says ...". **Update rate to ...** (the line's
+right-click menu and the picker) takes the table's figure, as one undo step. A rate typed
+over by hand is yours: the line says it was changed by hand since, and nothing offers to
+update it (pick a classification again to refill it). Deleting a table keeps every figure.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `rate_table_save` | `table` (`{name, notes, rows: [{classification, rates: {unit: "figure"}, from, to, notes}]}`), `replacing` (a table's name, or null for a new one) | the view |
+| `rate_table_delete` | `name` | the view |
+| `rate_choices` | `row_id`, `unit` (null: the line's) | `{row_id, unit, units, choices: [{table, classification, period, as_of, rate, table_unit, table_rate, converted, problem, notes}], current}` |
+| `rate_fill` | `row_id`, `table`, `classification`, `unit`, `as_of` | the view |
+| `rate_update` | `row_ids` (empty: every line whose table changed) | the view |
+| `rate_import_pick` | none (shows Rust's Open dialog) | `{token, file, sheets, index, mapping, titles, units, name, exists, table, errors}`, or `null` |
+| `rate_import_read` | `token`, `index`, `mapping` (null: the guess), `name` | the same, read again |
+
+The view's `rate_checks` (left out when empty) gives, for each line of the account on
+screen filled from a table, its `state` (`current`, `changed` with `now`, `edited`,
+`missing`) and `words`. The main window may call all of these; the Budget Setup window
+the five its tab uses. From a terminal, `method-budget rates` (docs/CLI.md); agents have
+MCP tools (docs/MCP.md).
 
 ### Find and replace
 
@@ -1289,22 +1374,34 @@ is made up.
 
 ### The start window and New Budget
 
-**The start window** (roadmap 3.19; decisions.md, entries 63 and 65; design and later
-phases: docs/research/new-project-window.md) shows when the app starts with nothing to
+**The start window** (roadmap 3.19; decisions.md, entries 63, 65, 77 and 91; design and
+later phases: docs/research/new-project-window.md) shows when the app starts with nothing to
 reopen (no tabs from last time, no file handed over by the system, no recovered budgets to
 offer), over the untouched Untitled budget; when the last tab closes, over the untouched
 Untitled budget that takes its place; and any time from **File > New…** (Cmd+N) or the
-toolbar's New. **Pinned** budgets come first, then **Recent** (Open Recent's list, without
-the pinned ones). Each row has the budget's title, its file name and folder (the home
-folder written `~`), its net total in its base currency, when the file last changed, "Open
-in a tab" for a budget that is (its unsaved changes are in the total), and "Can't find this
-file." or why it can't be read. Typing searches both lists (every word must be in the
-title, the file name or the folder). Keys: Down from the search box into the list, Up and
+toolbar's New. Down the left are the places: **Pinned and recent**, then each **project
+folder** (below), then **Add Folder…**. Under Pinned and recent, **Pinned** budgets come
+first, then **Recent** (Open Recent's list, without the pinned ones). Each row has the
+budget's thumbnail (below), its title, its file name and folder (the home folder written
+`~`), its net total in its base currency, when the file last changed, "Open in a tab" for
+a budget that is (its unsaved changes are in the total), and "Can't find this file." or why
+it can't be read. Typing searches both lists (every word must be in the
+title, the file name or the folder). **Sort** beside the search box (decision 91) puts the
+lists, and a project's, in another order: Last opened (as listed: pinned as pinned,
+recent newest first, a project by title), Name, Last changed (newest first) or Net total
+(largest first), rows without one last; a row shown under a budget stays with it. The
+choice is kept for next time. A budget with a change log beside it (`X.mthd-log/`, shared
+through a folder, decision 64) says "shared" and, on a line of its own, who was in it
+lately and where, latest first, from each person's heartbeat in the log ("Bo in account
+2101, Today 09:00; Ann, Yesterday"; at most five people). The start window only reads the
+log folder; it never writes to it. Keys: Down from the search box into the list, Up and
 Down, Home and End move, Enter opens (in the search box, the first match), P pins or
-unpins, Delete or Backspace takes a budget off the list (recent and pinned; the file is
-never touched), any other letter goes back to the search box, Escape clears the search and
-then closes the window. A row's own buttons (Pin or Unpin, Show in Folder, Remove) show
-under the pointer and with the keyboard on the row. **New Budget…** (Cmd+N in the window)
+unpins, D duplicates, Delete or Backspace takes a budget off the list (recent and pinned;
+the file is never touched), Left goes to the places and Right (from a place) back to the
+list, any other letter goes back to the search box, Escape clears the search and then
+closes the window. In the places, Up and Down move and Enter or Space shows that place. A
+row's own buttons (Pin or Unpin, Duplicate, Show in Folder, Remove) show under the pointer
+and with the keyboard on the row. **New Budget…** (Cmd+N in the window)
 opens the form; **Open…** (Cmd+O) shows the Open dialog and keeps the window if it is
 cancelled. "Show this window when the app starts and when the last tab closes" is kept in
 this window's local storage; turned off, the window shows only from New, and Cmd+W on the
@@ -1315,6 +1412,38 @@ Opening or making a budget closes the window; one opened and an untouched Untitl
 alone in the window gives its tab up to it, as Open does. A budget opened another way
 while the window shows (a file from the system) closes it too. New Tab and the **+** still
 make a starter budget at once.
+
+**Thumbnails** (decision 91): each budget's row starts with a small drawing of its topsheet,
+a bar per category in topsheet order, each as tall as its share of what the categories
+come to (the tallest bar the full height; a category below zero counts as nothing). With
+more than 12 categories the 11 largest keep their own bar, in their places, and the rest
+share the last one ("8 more"). Under the pointer a bar names its category and share. The
+bars are worked out when the row's total is (from the file, or from its tab when it is
+open), kept with the row's summary in the app's data folder and read again only when the
+file changes. Nothing is drawn from the screen, and nothing is written into the budget.
+
+**Duplicate** (D, or the row's button; decision 91) writes the budget file again beside
+itself under the first free name ("Big Show 2.mthd", then "Big Show 3.mthd"…), as it is on
+disk (a tab's unsaved changes are not in it), never over another file, and opens the
+duplicate in front as a saved budget listed in Open Recent; the title stays the same, so
+rename it in Budget Info. A file that isn't a readable budget is refused.
+
+**Projects** (decision 91; design section 5): a project is a folder. **Add Folder…** picks
+one in the folder dialog, and New Budget's **Make a project folder** box makes one; each is
+listed down the left by its name, in the order added, at most 50. Choosing a project shows
+what is in the folder and in the folders directly in it (at most 300 files and folders are
+looked at; past that a line says so; hidden files and change-log folders, `X.mthd-log`, are
+passed over): each budget by title, with the sub-budgets and copies made from it (by their
+source title, as a returned copy finds its original) indented under it and named so
+("sub-budget", "shared copy", "editable copy"); then sub-budgets and copies of budgets not
+in the folder, setup packs, schedule days files (a `.json` file that says it is
+`method-schedule-days`) and actuals exports (`.csv`, `.tsv` or `.xlsx` in a folder named
+`actuals`). Budgets open, pin and duplicate as in the other lists; a schedule or actuals
+file is shown, and Enter shows it in its folder. The project's own buttons: **New Budget
+Here…** (the form, saving in this folder, without a folder of its own), **Show Folder**
+and **Remove from List** (the folder and its files are never touched). A folder that has
+gone says "Can't find this folder." with Remove from List. Nothing is written into a
+project folder except what is made there.
 
 **New Budget** asks for a title and, all optional: the production type (Feature, TV
 episode, TV season, Commercial, Documentary, Other; a season and an episode number for an
@@ -1351,9 +1480,24 @@ what came in ("Setup from your library and Union Basics: 12 items added, 1 item
 replaced."). Nothing in a pack or a library is bundled rate data: packs ship empty
 (decision 50) and a library holds only what the user put in it.
 
+**Link a Schedule…** (under the schedule's length; decision 91, with roadmap 3.8) picks the
+days file Method Schedule writes for a budget (`method-schedule-days`, as File > Import
+Schedule Days reads it). The form's Shoot days, Shoot start and Shoot end take its
+figures (they can still be changed), and a line says which schedule it is and how many
+shoot days it has; **Unlink** takes it back. At Create the file's shoot days in all go to
+`SHOOT_DAYS` linked to the schedule exactly as Import Schedule Days links a global (its
+setup source names the figure and the schedule), so a later import finds it and says what
+changed; its prep start and wrap end, when it has them, go to those budget info fields. All
+of that comes in after the setup and before the form's details, so a value typed in the
+form wins (the global stays linked). The other figures (units, sets, locations, weeks,
+elements) are picked later in Import Schedule Days. The budget file gets no new field.
+
 **Save in**: the folder the last new budget was saved in, else Documents, else the home
-folder; **Choose Folder…** changes it. The file name follows the title (characters a file
-name can't have become spaces) until it is typed by hand; `.mthd` is added. Enter in a text
+folder; **Choose Folder…** changes it. **Make a project folder for it** (decision 91; on
+unless turned off, which is remembered; off for New Budget Here) makes a folder named like
+the file in that folder, saves the budget in it (`Big Show/Big Show.mthd`) and lists the
+folder with the projects. The file name follows the title (characters a file name can't
+have become spaces) until it is typed by hand; `.mthd` is added. Enter in a text
 box, or Cmd+Enter anywhere, creates; Escape goes back to the lists keeping what was typed.
 Where things go:
 
@@ -1375,30 +1519,37 @@ in the form with nothing made. The budget is written into the folder as a new fi
 opens in front as a saved budget, listed in Open Recent; a message says how many
 categories, accounts and lines it has and where it was saved. An existing file is never
 written over: when the name is taken nothing is made, and the form says so and offers the
-first free name ("Big Show 2") in one click. With no folder to offer (none of the three is
+first free name ("Big Show 2") in one click; with a project folder, a folder or a file of
+that name in the folder counts as taken. With no folder to offer (none of the three is
 there), the budget opens with no file (the first Save asks where, suggesting the title),
 as one undo step, so closing it asks to save.
 
 | Command | Arguments | Returns |
 |---|---|---|
-| `start_list` | none | `{pinned, recent, fresh}`: each row `{token, file, title, folder, modified (ms since 1970), net_total (cents), currency, pinned, recent, open, problem}`; `fresh` when only an untouched Untitled budget is open |
-| `start_open` | `token` | View of its tab |
+| `start_list` | none | `{pinned, recent, projects, fresh}`: each row `{token, file, title, folder, modified (ms since 1970), net_total (cents), currency, bars, kind, openable, under, shared, people, pinned, recent, open, problem}` (`bars` the thumbnail, `[{label, share}]` with `share` in thousandths; `shared` when a change log is beside it, `people` then `[{name, place, at}]`, latest first; `kind` `budget`, `sub-budget`, `shared copy`, `editable copy`, `setup pack`, `schedule` or `actuals`; `openable` false for a schedule or actuals file; `under` for something shown under the budget it came from); each project `{token, name, folder, items, more, problem}`, its rows' `file` the path inside the folder; `fresh` when only an untouched Untitled budget is open |
+| `start_open` | `token` (a budget file) | View of its tab |
+| `start_duplicate` | `token` | `{view, message}`: the duplicate in front |
+| `start_add_project` | none (shows the folder dialog) | the lists again, or `null` when cancelled |
+| `start_remove_project` | `token` (a project) | the lists again |
+| `start_project_folder` | `token` (a project) | `{token, folder}` for New Budget's Save In |
 | `start_pin` | `token`, `pinned` | the lists again |
 | `start_forget` | `token` (off the recent list and unpinned) | the lists again |
-| `start_reveal` | `token` (shown in Finder, Explorer or the file manager) | nothing |
+| `start_reveal` | `token` (shown in Finder, Explorer or the file manager; a project folder is opened) | nothing |
 | `new_budget_pick_template` | none (shows the Open dialog) | `{token, file, title, categories, accounts}`, or `null` when cancelled |
 | `new_budget_charts` | none | every bundled chart: `[{id, name, group, description, ours, categories, accounts}]` |
 | `new_budget_setup` | none | `{library, packs}`: `library` `{name, items, problem}` or `null` when none is picked; `packs` the Packs list's rows (`{token, file, place, title, version, effective, region, items, problem}`), listed again (tokens from an older listing are refused) |
 | `new_budget_folder` | none | Save In's first folder: `{token, folder}` (`folder` to show, `~` for home), or `null` |
 | `new_budget_pick_folder` | `current` (a folder token, or `null`; shows the folder dialog from there) | `{token, folder}`, or `null` when cancelled |
-| `new_budget_create` | `spec` (`{title, kind, season, episode, episodes, prep_start, shoot_start, shoot_end, wrap_end, prep_weeks, shoot_days, wrap_weeks, country, region, city, currency, start, chart, template, fringe_posting, arithmetic, folder, file_name, library, packs}`; `start` is `starter`, `blank`, `chart` with `chart` an id, or `file` with `template` the picked token; `folder` a folder token or `null` for no file; `file_name` blank for the title; `library` true to bring in the setup library, `packs` the tokens of packs from `new_budget_setup`) | `{view, message, taken}`: `taken` (a free file name, without `.mthd`) when a file of that name is there, and then nothing was made (`view` is `null`) |
+| `new_budget_create` | `spec` (`{title, kind, season, episode, episodes, prep_start, shoot_start, shoot_end, wrap_end, prep_weeks, shoot_days, wrap_weeks, country, region, city, currency, start, chart, template, fringe_posting, arithmetic, folder, file_name, library, packs, project, schedule}`; `start` is `starter`, `blank`, `chart` with `chart` an id, or `file` with `template` the picked token; `folder` a folder token or `null` for no file; `file_name` blank for the title; `library` true to bring in the setup library, `packs` the tokens of packs from `new_budget_setup`; `project` true to make a project folder in `folder`; `schedule` the token of a days file picked with `schedule_days_pick`, or `null`) | `{view, message, taken}`: `taken` (a free file name, without `.mthd`) when a file of that name is there, and then nothing was made (`view` is `null`) |
 
-The pinned list (at most 100), each file's bookmark and the last Save In folder are the
-data folder's `start.json`. A file is read once for its row and read again only when its
-modified time or size changes; the summaries (title, net total, currency, with the modified
-time and size they were read at; at most 200) are kept in `start-cache.json`, so a new
-run doesn't read every file again. A token names a row of the last listing only (the
-picked file: the last one picked; the folder: the last one offered or picked).
+The pinned list (at most 100), each file's bookmark, the last Save In folder and the
+project folders are the data folder's `start.json`. A file is read once for its row and
+read again only when its modified time or size changes; the summaries (title, net total,
+currency, thumbnail, kind and source title, with the modified time and size they were read
+at; at most 500) are kept in `start-cache.json` (version 2; an older one is read as empty,
+so every file is read once more), so a new run doesn't read every file again. A token names
+a row or project of the last listing only (the picked file: the last one picked; the
+folder: the last one offered or picked).
 
 ### Starting from another budget
 
@@ -1533,6 +1684,33 @@ and the baseline stay behind. The sub-budget is titled after its parent ("Big Sh
 file, like a template, and is stamped with its parent's title and a line saying what it keeps. Totals
 are worked out normally: there is no fringe lock yet.
 
+**New Sub-Budget from This Category** (the topsheet's context menu on a category row) and
+**from This Account** (the account list's, on an account row; decision 91) make a budget
+of that one row, keyboard first with Shift+F10 or the menu key. What carries over,
+exactly:
+
+- the row: the category with all its accounts, or the account under its own category
+  (the category's other accounts left out), with every line, subtotal, adjustment and
+  separator in them and their notes, fringes, groups, sets, locations and units;
+  production total rows stay in place;
+- the setup those lines use, and what that setup needs in turn: fringes, globals (a
+  global another kept global names comes too), units, groups, sets, locations and
+  foreign currencies; anything the lines don't use is left out, with its folder, order
+  and source;
+- the budget settings and details: base and totals currency, arithmetic, fringe posting
+  and the fringe row, cutoff factor, account numbering, new-line defaults, group rules,
+  rounding, budget info, display settings and overtime patterns.
+
+Left out: every other category and account, charges and credits (they work on the whole
+budget), tag, line and report presets, versions, the baseline and actuals. So the row's
+category, account and fringe totals are the same as in the budget it came from, and its
+bottom line is the row and the fringes it earns (a fringe cutoff shared with lines outside
+the row is the one exception: the kept lines are counted alone). It is titled `<budget> -
+<row name>` ("Big Show - Camera"), stamped as a sub-budget of its parent with a note naming
+the row, and saved as its own file beside the budget's file (the first free name when
+that one is taken, never over a file), opened in front as a saved budget. A budget with no
+file yet, and the browser build, open it in a new tab with no file.
+
 | Command | Arguments | Returns |
 |---|---|---|
 | `share_copy_save` | `version` (id or `null`), `leaveOut` (`{notes, info, versions, baseline, unused_setup}`), `note`, `saved` (the page's local time, ISO 8601); shows the Save dialog | `{name, path}`, or `null` when cancelled |
@@ -1540,6 +1718,7 @@ are worked out normally: there is no fringe lock yet.
 | `share_copy_original` | none | `{doc, label}` of the open budget the copy came from, or `null` |
 | `share_copy_store` | `original` (its doc id), `name`, `created` | View of the original (one undo step there) |
 | `sub_budget_new` | `spec` (`{categories, accounts, groups, sets, locations, skip_empty_accounts, drop_fringes, drop_notes}`, each tag kind `{values, include_untagged}`), `saved` | View of the new tab |
+| `sub_budget_from_row` | `row` (`{kind: "category" or "account", code}`), `saved` | `{view, message}`: the sub-budget in front |
 
 ### Sharing a budget
 
@@ -1718,7 +1897,7 @@ Library…** (any budget file, in Rust's Open dialog).
 The choice is remembered for you in `library.json` in the app's data folder; **Change…**
 and **New…** switch libraries at any time. Then the tab shows the library's name, a kind
 picker (globals, fringes, groups, units, sets, locations, currencies, charges, credits, tag
-presets, line blocks, report presets, each with its count), a folder picker (All folders,
+presets, line blocks, report presets, overtime patterns, rate tables, each with its count), a folder picker (All folders,
 Unfiled, then the kind's folders) and a filter on names and definitions. Each item shows
 its definition in words (its tooltip adds what it brings along), a tick box, and its folder
 when All folders is shown. Budget Setup shows the same library when a tab's rail is switched
@@ -1836,7 +2015,8 @@ Library tab is in each; the dialogs are Rust's and the page never names a path.
 **File > Export > Setup Lists…** writes the budget's setup items as tables, one row per item
 (per credit row for credits) with every part of its definition and where it came from
 (Effective, Source Notes, Source Links): globals, fringes, groups, units, sets, locations,
-currencies, charges, credits, tag presets and overtime patterns, whichever are ticked, as a
+currencies, charges, credits, tag presets, overtime patterns and rate tables (a row per
+classification, period and unit), whichever are ticked, as a
 spreadsheet (.xlsx), a sheet per kind, or CSV files (one per kind, named `<file> - Fringes.csv`
 and so on). Lists (a charge's excluded groups, a tag preset's fringes) are names joined with
 commas; an overtime pattern's bands read `2 @ 1.5; rest @ 2`; a flat fringe's Basis is the
@@ -3181,8 +3361,10 @@ untrusted (a budget file is data from anywhere).
   `capabilities/setup.json` grants the Budget Setup window, by its label, only what its
   tabs call: `get_view`, the setup tables (editing, adding, deleting, renaming, order,
   short codes, in-use counts, a global's details and the numbers-on-screen settings),
-  charges, credits, info, settings with renumbering, the baseline, and the setup library's
-  commands, and listening for and sending events. Nothing on the selected lines (its
+  charges, credits, info, settings with renumbering, the baseline, the rate tables
+  (`rate_table_save`, `rate_table_delete`, `rate_update`, and `rate_import_pick` and
+  `rate_import_read`, whose Open dialog is Rust's), and the setup library's commands, and
+  listening for and sending events. Nothing on the selected lines (its
   tables have no selection, and a test checks that setup mode never asks for one), no
   notes, find, history, files, undo, tabs or windows. A test in `src/setupwin.rs` compares
   the grant with what its scripts name, both ways. `build.rs` lists those commands in an app manifest,
@@ -3291,6 +3473,15 @@ views, dragging a tab between the strips with a real pointer, the tools window f
 the target, and the panes coming back at the next start. The History tab needs a live
 check in the tools window and with a long history.
 
+The start window's projects, thumbnails and Duplicate, and New Sub-Budget from This
+Category or Account (decisions.md, entry 91), need a live check in the app: Add Folder…'s
+dialog, a project made by New Budget appearing down the left, the bars' look in light and
+dark, D and the arrows between the places and the list, Link a Schedule…'s dialog, a shared
+budget's people, and the sub-budget's file appearing beside its parent. Their logic and file
+work are tested in Rust, the page in a headless browser harness, and the row sub-budget's
+menu item in the browser smoke. Rates at creation wait on 3.9; created dates and hiding
+archived projects are later.
+
 The sample budget (decisions.md, entry 84) needs a live check in the app: the first start
 on a fresh data folder opening it with its Sample tab and line, a second start not opening
 it, and Help > Open Sample.
@@ -3304,6 +3495,12 @@ The report setup's Bid layout group (decisions.md, entry 92) needs a live check 
 (it is checked headless in the browser build): ticking Bid, editing the lines, saving the
 preset and printing a bid to PDF. A ready-made layout of the industry bid form waits on
 the owner's legal-line answer.
+
+Rate tables (decisions.md, entry 90) need a live check in the app: the Rate Tables tab
+(typing a table, Save Table and Revert, Add unit…, the rail and its Library switch), the
+import dialog with a real workbook and Rust's Open dialog, the Fill Rate from Table picker,
+the Rate cell's mark and tooltip, and Update rate from the right-click menu. Bundled public
+rate data waits on the owner's answer about which public sources may ship.
 
 The Person column (decisions.md, entry 79) needs a live check: typing a name, the
 type-ahead of people, the running-total tooltip and the cutoff mark. The spreadsheet
@@ -3353,12 +3550,11 @@ review and menus in a browser harness). Presets follow a rename of a setup item,
 deleting a fringe, group, set or location leaves its name in tag presets (applying one
 then says what is missing). Line blocks are reordered from the keyboard only.
 Incentive programs need a live check in the app: the Spend at these locations chips, the
-estimate in the rail and footer, and the Programs side by side and Spend by location
-tables (checked here offscreen in the browser build in headless Chrome, against the real
-engine). Not yet: an unapplied credit's rows grid shows its row figures (the footer and
-the tables have them), a what-if that moves lines between locations, several applied
-programs that share a cap, a broker's fee as a flat amount, and a preset of program
-fields to fill in.
+program's terms band, the estimate in the rail and footer, and the Programs side by side
+and Spend by location tables (checked here offscreen in the browser build in headless
+Chrome, against the real engine). Not yet: an unapplied credit's rows grid shows its row
+figures (the footer and the tables have them), a what-if that moves lines between
+locations, a printed per-location report, and a preset of program fields to fill in.
 Import Actuals and the Actuals tab need a live check: the Open dialog, real exports from
 accounting systems (checked here with synthetic CSV, tab-delimited and workbook files and
 the dialog, tab, grid columns and Cost report preview in a browser harness against the

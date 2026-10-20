@@ -39,7 +39,8 @@ It assumes the `method` MCP server is registered (docs/MCP.md):
   out on request (`exclude_groups`).
 - **Charges.** Applied after the topsheet: contingency, fees, insurance as a percent of ATL plus
   BTL (with exclusions), or a flat amount. **Credits** are incentives taken off at the end:
-  a percent of a group's spend or of a flat amount, with caps and a discount. The **grand
+  a percent of a group's spend or of a flat amount, with caps and a discount, and optionally
+  a minimum spend, a flat broker's fee and a cap shared with other credits. The **grand
   total** includes charges; the **net total** is after credits.
 - **Currencies.** Lines may be in a foreign currency; its rate is base-currency units per one
   of it.
@@ -77,6 +78,11 @@ It assumes the `method` MCP server is registered (docs/MCP.md):
 - Don't invent union scale, rental prices or tax rates. Use what the user gives you, or put a
   clearly marked placeholder (a description like "Rate TBD") and say so. The starter budget's
   rates are placeholders.
+- When the budget keeps rate tables of the user's (`list_rate_tables`), fill a line's rate
+  from one with `fill_rate` rather than typing the figure: the line then remembers where it
+  came from. Never write figures into a rate table yourself unless the user gives them.
+  When `list_rate_tables` shows lines whose table changed, say so and ask before
+  `update_rates`.
 - Keep the user's structure: their numbering, their category names, their globals. Ask before
   renumbering or moving accounts between categories.
 - Say what you assumed: shoot days, weeks of prep and wrap, which lines carry which fringes.

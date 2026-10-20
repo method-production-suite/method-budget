@@ -4,7 +4,11 @@ Status: design, 2026-10-12. Phase 1 (section 9) is built: decisions.md, entry 63
 "The start window". Part of phase 2 is built with the owner's answers to questions 1, 2, 4
 and 5 (decisions.md, entry 65): the start window when the last tab closes, a chart picker,
 Save In at creation, and pinned and recent following moved files. Setup library and packs
-at creation are built (decisions.md, entry 77).
+at creation are built (decisions.md, entry 77). The rest of phase 2, and of phases 3 and 4
+that doesn't wait on rate data, is built (decisions.md, entry 91): projects as folders,
+thumbnails, Duplicate, New Sub-Budget from a category or account row, Link a Schedule…,
+shared badges with who was in, and sorting. Rates at creation wait on roadmap 3.9; created
+dates and archived projects are not built.
 
 The owner likes the reference product's home screen, the one shown before a budget is
 open, minus its cloud parts. This note says what that screen offers, from the reference's
@@ -131,8 +135,10 @@ accounting link ids.
 - **Keys**: Up and Down move, Enter opens, P pins or unpins, Delete or Backspace removes
   from Recent, Cmd+N starts a new budget, Cmd+O shows the Open dialog, Escape clears the
   search and then closes.
-- **Thumbnails** (phase 2): a small drawing of the topsheet, one bar per category scaled to
-  its share of the total, made from the cached summary, no images on disk.
+- **Thumbnails** (phase 2, built): a small drawing of the topsheet, one bar per category scaled to
+  its share of the total, made from the cached summary, no images on disk. As built: the
+  bars (at most 12, the largest categories in their places and the rest sharing the last
+  bar) are kept with the summary in the app's data folder and drawn as SVG shapes.
 
 With projects (phase 2) the window gets a left column:
 
@@ -174,6 +180,24 @@ An optional `project.json` (later, only if needed) could pin the main budget and
 project; the folder's name does that until then. Project actions: New Budget here,
 Show Folder, Remove from list (the folder stays). Duplicate, new version copy and new
 sub-budget act on a selected budget (they exist today as File menu commands).
+
+**As built (decision 91).** Settled one way where the above left it open:
+
+- **New Budget makes the project folder.** "The folder a new budget is saved in" would
+  make Documents a project the first time a budget is saved there, so instead Save In has a
+  box, **Make a project folder for it** (on by default), that makes `<Save In>/<Name>/`
+  and saves `<Name>.mthd` inside; only that folder joins the projects. Saving loose in a
+  folder adds nothing. Built on that recommendation; reversible (the box's default, or
+  listing every Save In folder, is one line in src/start.rs).
+- **Read on every showing**, two levels deep, at most 300 files and folders, hidden files
+  and `X.mthd-log` folders passed over. Budgets come through the same summary cache as the
+  other lists.
+- **Templates are not guessed** from "a budget with no lines": a new budget made from a
+  chart has no lines either, and would show as a template in its own project. Setup packs
+  (by provenance) are listed; templates stay in New From Template and Start From.
+- **Duplicate** is a byte copy of the file beside itself under the first free name; **New
+  Sub-Budget from a row** (the topsheet's and account list's context menus) keeps the row's
+  accounts and lines and only the setup they use, beside the parent's file.
 
 ---
 
@@ -264,7 +288,10 @@ end, prep start and wrap end when the schedule has them, and each element's days
 
 - **New Budget > Link a schedule…** (phase 3, with 3.8): pick an exchange file to fill
   Shoot days, the dates and later the cast and crew day counts; the link keeps the file's
-  path (relative to the project folder when inside it) and its `source_hash`.
+  path (relative to the project folder when inside it) and its `source_hash`. As built
+  (decision 91): Shoot days and the four dates, the link kept as Import Schedule Days keeps
+  it (the global's setup source, decision 76), so no new field in the budget file; the
+  file's path and hash are not kept.
 - The project view lists exchange files in the folder, and a linked budget's row says
   "schedule changed since linked" when the hash differs, with a button to review the new
   counts (3.8's own review).
@@ -276,9 +303,9 @@ end, prep start and wrap end when the schedule has them, and each element's days
 | Phase | What | Depends |
 |---|---|---|
 | **1 (built)** | Start window: pinned and recent with title, net total, modified time and folder, search, open, pin, show in folder, remove from list; shown at launch when nothing is open and from File > New… and the New button; New Budget form: title, type, season, episode, episodes, dates, schedule length, location, currency, start from (starter, empty, bundled charts, a budget file), fringe posting, arithmetic | 1.20, 3.16 |
-| 2 | Projects as folders (section 5), thumbnails, Save In a folder at create, setup library and packs at create, the start window when the last tab closes, duplicate and new sub-budget from a row | phase 1 |
-| 3 | Rates at create (3.9, once rate data ships), Link a schedule (3.8), shared badges and presence (3.18 phase 2), Join | 3.8, 3.9, 3.18 |
-| 4 | Sorting (name, modified, total), created date, archived projects hidden | phase 2 |
+| 2 (built) | Projects as folders (section 5), thumbnails, Save In a folder at create, setup library and packs at create, the start window when the last tab closes, duplicate and new sub-budget from a row | phase 1 |
+| 3 | Rates at create (3.9, once rate data ships), Link a schedule (3.8, built), shared badges and presence (3.18 phase 2, built), Join | 3.8, 3.9, 3.18 |
+| 4 | Sorting (name, modified, total; built), created date, archived projects hidden | phase 2 |
 
 ---
 

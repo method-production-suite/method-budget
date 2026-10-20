@@ -1756,6 +1756,79 @@ fn incentives_estimate_programs_by_location() {
     );
 }
 
+/// A minimum spend, a broker's fee and a cap shared by two programs
+/// (decisions.md, entry 88), through `set_credit`, `list_charges` and
+/// `incentives`.
+#[test]
+fn set_credit_takes_a_minimum_a_fee_and_a_shared_cap() {
+    let mut f = Fixture::new("incentive-terms", false);
+    let row = json!([{"source": {"kind": "flat", "amount": 1000}, "percent": 25}]);
+    err_contains(
+        f.tool(
+            "set_credit",
+            json!({"path": "film.mthd", "name": "A", "shared_cap": "State", "rows": row}),
+        ),
+        "needs an amount",
+    );
+    // 250.00 and 250.00 under a shared 300.00: 150.00 each.
+    f.tool(
+        "set_credit",
+        json!({"path": "film.mthd", "name": "A", "applied": false, "shared_cap": "State",
+               "shared_cap_amount": 300, "broker_fee": 10, "rows": row}),
+    )
+    .unwrap();
+    f.tool(
+        "set_credit",
+        json!({"path": "film.mthd", "name": "B", "applied": false, "shared_cap": "State",
+               "minimum_spend": 2000, "rows": row}),
+    )
+    .unwrap();
+    let cr = f
+        .tool("list_charges", json!({"path": "film.mthd"}))
+        .unwrap();
+    let a = cr["credits"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "A")
+        .unwrap();
+    assert_eq!(a["shared_cap"], "State");
+    assert_eq!(a["shared_cap_cents"], 30_000);
+    assert_eq!(a["broker_fee_cents"], 1_000);
+
+    // Unapplied, each is estimated as if applied beside the applied ones
+    // (none), so each alone is within 300.00; B is below its minimum.
+    let got = f.tool("incentives", json!({"path": "film.mthd"})).unwrap();
+    let find = |got: &Value, n: &str| {
+        got["programs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["name"] == n)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(find(&got, "A")["amount"], 24_000);
+    assert_eq!(find(&got, "B")["amount"], 0);
+    assert_eq!(find(&got, "B")["figures"]["below_minimum"], true);
+
+    // B's minimum taken off and both applied: they share the cap.
+    f.tool(
+        "set_credit",
+        json!({"path": "film.mthd", "name": "B", "applied": true, "minimum_spend": null}),
+    )
+    .unwrap();
+    f.tool(
+        "set_credit",
+        json!({"path": "film.mthd", "name": "A", "applied": true}),
+    )
+    .unwrap();
+    let got = f.tool("incentives", json!({"path": "film.mthd"})).unwrap();
+    assert_eq!(find(&got, "A")["figures"]["shared"], 15_000);
+    assert_eq!(find(&got, "A")["amount"], 14_000);
+    assert_eq!(find(&got, "B")["amount"], 15_000);
+}
+
 #[test]
 fn review_comments_are_listed_at_their_places() {
     use method_session::review as rv;
@@ -1828,4 +1901,142 @@ fn review_comments_are_listed_at_their_places() {
         ),
         "isn't a review file",
     );
+}
+
+/// Rate tables (decisions.md, entry 90): kept from JSON or a spreadsheet,
+/// a line filled from one, a changed table offering an update without
+/// changing the line. Every name and figure is invented.
+#[test]
+fn rate_tables_fill_and_update_lines() {
+    let mut f = Fixture::new("rates", false);
+    let table = json!({"name": "Invented Crew", "notes": "Made-up figures.", "rows": [
+        {"classification": "Lead, Made Up", "rates": [{"unit": "Day", "rate": "410.50"}, {"unit": "Hour", "rate": "35"}]},
+        {"classification": "Helper", "rates": [{"unit": "Week", "rate": "1500"}],
+         "from": "2030-01-01", "to": null}
+    ]});
+    f.tool(
+        "set_rate_table",
+        json!({"path": "film.mthd", "table": table}),
+    )
+    .unwrap();
+    let l = f
+        .tool("list_rate_tables", json!({"path": "film.mthd"}))
+        .unwrap();
+    assert_eq!(l["tables"][0]["name"], "Invented Crew");
+    assert_eq!(l["tables"][0]["units"], json!(["Day", "Hour", "Week"]));
+    let t = f
+        .tool(
+            "get_rate_table",
+            json!({"path": "film.mthd", "name": "Invented Crew"}),
+        )
+        .unwrap();
+    assert_eq!(t["rows"][0]["rates"]["Day"], "410.5");
+
+    // Fill line 8 per Day: the figure once, with its source.
+    let before = net(&mut f, "film.mthd");
+    let r = f
+        .tool(
+            "fill_rate",
+            json!({"path": "film.mthd", "ids": [8], "table": "Invented Crew",
+                   "classification": "lead, made up", "unit": "Day"}),
+        )
+        .unwrap();
+    assert_eq!(r["lines"][0]["rate"], "410.5");
+    assert_ne!(net(&mut f, "film.mthd"), before);
+    let row = rows(&mut f, "21-01")
+        .into_iter()
+        .find(|x| x["id"] == 8)
+        .unwrap();
+    assert_eq!(row["rate"], "410.5");
+    assert_eq!(row["rate_source"]["table"], "Invented Crew");
+
+    // The table changes: the line keeps its figure until update_rates.
+    let mut changed = table.clone();
+    changed["rows"][0]["rates"][0]["rate"] = json!("420");
+    f.tool(
+        "set_rate_table",
+        json!({"path": "film.mthd", "table": changed, "replacing": "Invented Crew"}),
+    )
+    .unwrap();
+    let l = f
+        .tool("list_rate_tables", json!({"path": "film.mthd"}))
+        .unwrap();
+    assert_eq!(l["filled_lines"][0]["state"], "changed");
+    assert_eq!(l["filled_lines"][0]["now"], "420");
+    assert_eq!(l["filled_lines"][0]["rate"], "410.5");
+    let u = f
+        .tool("update_rates", json!({"path": "film.mthd"}))
+        .unwrap();
+    assert_eq!(u["lines"][0]["rate"], "420");
+
+    // A spreadsheet, guessed and mapped; problems come back with rows.
+    std::fs::write(
+        f.path("Invented.csv"),
+        "Position,Daily,Weekly\nGaffer Made Up,450,2000\nOther,,abc\n",
+    )
+    .unwrap();
+    err_contains(
+        f.tool(
+            "import_rate_table",
+            json!({"path": "film.mthd", "sheet": "Invented.csv"}),
+        ),
+        "row 3",
+    );
+    std::fs::write(
+        f.path("Invented.csv"),
+        "Position,Daily\nGaffer Made Up,450\n",
+    )
+    .unwrap();
+    let d = f
+        .tool(
+            "import_rate_table",
+            json!({"path": "film.mthd", "sheet": "Invented.csv", "dry_run": true}),
+        )
+        .unwrap();
+    assert_eq!(d["table"]["name"], "Invented");
+    let i = f
+        .tool(
+            "import_rate_table",
+            json!({"path": "film.mthd", "sheet": "Invented.csv", "name": "Second",
+                   "columns": {"unit_columns": [{"unit": "Day", "column": 2}]}}),
+        )
+        .unwrap();
+    assert_eq!(i["rows"], 1);
+    err_contains(
+        f.tool(
+            "import_rate_table",
+            json!({"path": "film.mthd", "sheet": "Invented.csv", "name": "Second"}),
+        ),
+        "already a rate table",
+    );
+    // Refusals: no such table, a classification it doesn't have, bad rows.
+    err_contains(
+        f.tool(
+            "fill_rate",
+            json!({"path": "film.mthd", "ids": [8], "table": "Nope", "classification": "X"}),
+        ),
+        "no rate table Nope",
+    );
+    err_contains(
+        f.tool(
+            "fill_rate",
+            json!({"path": "film.mthd", "ids": [8], "table": "Second", "classification": "X"}),
+        ),
+        "no classification X",
+    );
+    let bad = json!({"name": "Bad", "rows": [{"classification": "A", "rates": []}]});
+    err_contains(
+        f.tool("set_rate_table", json!({"path": "film.mthd", "table": bad})),
+        "at least one unit",
+    );
+    f.tool(
+        "delete_rate_table",
+        json!({"path": "film.mthd", "name": "Invented Crew"}),
+    )
+    .unwrap();
+    let row = rows(&mut f, "21-01")
+        .into_iter()
+        .find(|x| x["id"] == 8)
+        .unwrap();
+    assert_eq!(row["rate"], "420", "deleting a table changes no figure");
 }

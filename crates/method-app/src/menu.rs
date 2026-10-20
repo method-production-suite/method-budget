@@ -201,6 +201,8 @@ pub const EDIT: &[Entry] = &[
     // ui/js/overtime.js; the tools panel's Explain and Overtime tabs).
     item("edit.explain", "Explain This Number…", "mod+e"),
     plain("edit.overtime", "Overtime Helper…"),
+    // A line's rate from one of the budget's rate tables (ui/js/ratepick.js).
+    plain("edit.fill_rate", "Fill Rate from Table…"),
     // Who changed a cell of a shared budget (src/shared_app.rs).
     plain("share.blame", "Who Changed This…"),
     SEP,
@@ -331,6 +333,7 @@ pub const SETUP_TABS: &[Entry] = &[
     SEP,
     item("view.tab.charges", "Charges", "mod+/"),
     item("view.tab.credits", "Credits", "mod+backslash"),
+    plain("view.tab.rates", "Rate Tables"),
     plain("view.tab.info", "Info"),
     item("view.tab.settings", "Settings", "mod+9"),
     plain("view.tab.baseline", "Baseline"),

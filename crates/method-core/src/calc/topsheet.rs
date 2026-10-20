@@ -68,13 +68,15 @@ pub(crate) fn finish(
         .and_then(|c| c.checked_add(base))
         .ok_or_else(ovf)?;
 
-    let credits = ctx
-        .b
-        .credits
+    let applied: Vec<&Credit> = ctx.b.credits.iter().filter(|c| c.applied).collect();
+    let stages = applied
         .iter()
-        .filter(|c| c.applied)
-        .map(|c| credit(ctx, &categories, c))
+        .map(|c| credit_stage(ctx.b, &categories, c))
         .collect::<Result<Vec<_>, _>>()?;
+    let credits = finish_credits(ctx.b, &applied, stages)?
+        .into_iter()
+        .map(|(t, _)| t)
+        .collect::<Vec<_>>();
     let credits_total = sum(credits.iter().map(|c| c.amount)).ok_or_else(ovf)?;
     let net_total = grand_total.checked_sub(credits_total).ok_or_else(ovf)?;
 
@@ -220,6 +222,16 @@ pub(crate) fn credit_category_warnings(b: &Budget) -> Vec<String> {
                 "credit {} counts spend at location {l}, which is not in the budget's locations",
                 c.name
             ));
+        }
+        // A shared cap the budget doesn't have (decisions.md, entry 88)
+        // holds nothing down.
+        if let Some(cap) = c.shared_cap.as_ref() {
+            if !b.shared_caps.contains_key(cap) {
+                out.push(format!(
+                    "credit {} shares the cap {cap}, which is not in the budget's shared caps, so no shared cap holds it down",
+                    c.name
+                ));
+            }
         }
     }
     out
@@ -395,10 +407,6 @@ fn charge(
     })
 }
 
-fn credit(ctx: &Ctx, cats: &[CategoryTotals], c: &Credit) -> Result<CreditTotals, CalcError> {
-    credit_figures(ctx.b, cats, c).map(|(t, _)| t)
-}
-
 /// Net spend by the location of the lines it came from (`None`: lines
 /// with no location), over a credit's group, category and account rows.
 pub(crate) type SpendByLocation = BTreeMap<Option<String>, Cents>;
@@ -471,20 +479,35 @@ pub(crate) fn counts_at(locations: &BTreeSet<String>, location: Option<&str>) ->
     locations.is_empty() || location.is_some_and(|l| locations.contains(l))
 }
 
-/// Credit `c` worked out on `cats`, applied or not, and its net spend by
-/// location. Every figure is a sum over lines, so neither the order of the
-/// lines nor the order of the credits changes it.
-pub(crate) fn credit_figures(
+/// A credit worked out up to its own cap (decisions.md, entries 80 and
+/// 88): its rows, its minimum spend and its cap, unrounded. The shared cap,
+/// the discount, the fee and the rounding come in [`finish_credits`],
+/// which sees every credit counted with it.
+#[derive(Clone)]
+pub(crate) struct CreditStage {
+    /// The figures so far: `amount` and `fee` are 0 and `shared` is `None`
+    /// until [`finish_credits`].
+    totals: CreditTotals,
+    by_location: SpendByLocation,
+    /// After the minimum and the credit's cap, before the shared cap.
+    value: Money,
+}
+
+/// Credit `c` worked out on `cats` up to its own cap, applied or not, and
+/// its net spend by location. Every figure is a sum over lines, so neither
+/// the order of the lines nor the order of the credits changes it.
+pub(crate) fn credit_stage(
     b: &Budget,
     cats: &[CategoryTotals],
     c: &Credit,
-) -> Result<(CreditTotals, SpendByLocation), CalcError> {
+) -> Result<CreditStage, CalcError> {
     let ovf = || overflow(format!("credit {}", c.name));
     let arith = b.arithmetic;
 
     let mut rows = Vec::with_capacity(c.rows.len());
     let mut by_location = SpendByLocation::new();
     let mut total = Money::cents(arith, 0);
+    let mut qualified: Cents = 0;
     for (i, cr) in c.rows.iter().enumerate() {
         let at = || format!("credit {} row {} ({})", c.name, i + 1, cr.description);
         let row_ovf = || overflow(at());
@@ -524,6 +547,7 @@ pub(crate) fn credit_figures(
             }
         };
         let net = gross.checked_sub(excluded_fringes).ok_or_else(row_ovf)?;
+        qualified = qualified.checked_add(net).ok_or_else(ovf)?;
 
         // Unrounded: rows are summed, capped and discounted before the one
         // rounding.
@@ -541,18 +565,135 @@ pub(crate) fn credit_figures(
         });
     }
 
-    let capped = credit_cap(arith, total, c.cap).ok_or_else(ovf)?;
-    let amount = capped
-        .checked_mul_money(credit_keep(arith, c.discount_percent).ok_or_else(ovf)?)
-        .and_then(Money::to_cents)
-        .ok_or_else(ovf)?;
+    // Below the minimum the program pays nothing, whatever its caps
+    // (decisions.md, entry 88).
+    let below_minimum = below_minimum(c.minimum_spend, qualified);
+    let value = if below_minimum {
+        Money::cents(arith, 0)
+    } else {
+        credit_cap(arith, total, c.cap).ok_or_else(ovf)?
+    };
     let totals = CreditTotals {
         name: c.name.clone(),
         rows,
-        capped: capped.to_dec().ok_or_else(ovf)?,
-        amount,
+        capped: value.to_dec().ok_or_else(ovf)?,
+        below_minimum,
+        shared: None,
+        fee: 0,
+        amount: 0,
     };
-    Ok((totals, by_location))
+    Ok(CreditStage {
+        totals,
+        by_location,
+        value,
+    })
+}
+
+/// Whether `qualified` spend is under a credit's `minimum` (decisions.md,
+/// entry 88): a spend at the minimum qualifies.
+pub(crate) fn below_minimum(minimum: Option<Cents>, qualified: Cents) -> bool {
+    minimum.is_some_and(|m| qualified < m)
+}
+
+/// Finishes `credits` (each with its stage, in the same order), which are
+/// counted together: the credits that name the same shared cap share it
+/// ([`share_cap`]), then each takes off its discount, rounds once and takes
+/// off its fee (decisions.md, entry 88). A shared cap the budget doesn't
+/// have holds nothing down (`warnings` says so).
+pub(crate) fn finish_credits(
+    b: &Budget,
+    credits: &[&Credit],
+    stages: Vec<CreditStage>,
+) -> Result<Vec<(CreditTotals, SpendByLocation)>, CalcError> {
+    let arith = b.arithmetic;
+    let mut values: Vec<Money> = stages.iter().map(|s| s.value).collect();
+    let mut shared: Vec<Option<Cents>> = vec![None; stages.len()];
+
+    let mut groups: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
+    for (i, c) in credits.iter().enumerate() {
+        if let Some(name) = c.shared_cap.as_deref() {
+            if b.shared_caps.contains_key(name) {
+                groups.entry(name).or_default().push(i);
+            }
+        }
+    }
+    for (name, members) in groups {
+        let ovf = || overflow(format!("shared cap {name}"));
+        let figures = members
+            .iter()
+            .map(|&i| Some((credits[i].name.as_str(), values[i].to_cents()?)))
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(ovf)?;
+        if let Some(shares) = share_cap(b.shared_caps[name], &figures) {
+            for (&i, share) in members.iter().zip(shares) {
+                if let Some(s) = share {
+                    shared[i] = Some(s);
+                    values[i] = Money::cents(arith, s);
+                }
+            }
+        }
+    }
+
+    let mut out = Vec::with_capacity(stages.len());
+    for (((c, stage), value), shared) in credits.iter().zip(stages).zip(values).zip(shared) {
+        let ovf = || overflow(format!("credit {}", c.name));
+        let before_fee = value
+            .checked_mul_money(credit_keep(arith, c.discount_percent).ok_or_else(ovf)?)
+            .and_then(Money::to_cents)
+            .ok_or_else(ovf)?;
+        // The fee never takes the credit below zero.
+        let fee = c.broker_fee.max(0).min(before_fee.max(0));
+        let mut totals = stage.totals;
+        totals.shared = shared;
+        totals.fee = fee;
+        totals.amount = before_fee - fee;
+        out.push((totals, stage.by_location));
+    }
+    Ok(out)
+}
+
+/// The shares of a shared cap of `cap` cents among credits worth `figures`
+/// (name, cents) before it, in the same order (decisions.md, entry 88).
+/// `None` when the credits worth more than zero come to no more than the
+/// cap together, so it holds nothing down. Otherwise each of those credits
+/// gets its part of the cap in proportion to its figure, rounded down to
+/// the cent, and the cents left go one each to the largest remainders, then
+/// in name order, so the shares add up to the cap exactly whatever order
+/// the credits are in; a credit worth zero or less keeps its figure
+/// (`None` in its place).
+pub(crate) fn share_cap(cap: Cents, figures: &[(&str, Cents)]) -> Option<Vec<Option<Cents>>> {
+    let cap = i128::from(cap.max(0));
+    let total: i128 = figures
+        .iter()
+        .filter(|(_, v)| *v > 0)
+        .map(|(_, v)| i128::from(*v))
+        .sum();
+    if total <= cap {
+        return None;
+    }
+    let mut shares: Vec<Option<i128>> = vec![None; figures.len()];
+    let mut left = cap;
+    let mut remainders = Vec::new();
+    for (i, (name, v)) in figures.iter().enumerate() {
+        if *v <= 0 {
+            continue;
+        }
+        let part = cap * i128::from(*v);
+        let share = part / total;
+        shares[i] = Some(share);
+        left -= share;
+        remainders.push((part % total, *name, i));
+    }
+    // Largest remainder first, then by name, then by place for two
+    // credits with one name.
+    remainders.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(b.1)).then(a.2.cmp(&b.2)));
+    for (_, _, i) in remainders.into_iter().take(left as usize) {
+        if let Some(s) = shares[i].as_mut() {
+            *s += 1;
+        }
+    }
+    // Every share is at most the cap, which is a Cents.
+    Some(shares.into_iter().map(|s| s.map(|s| s as Cents)).collect())
 }
 
 /// One credit row, unrounded: `percent` of `net` (or of the capped spend,
@@ -785,6 +926,9 @@ mod tests {
             discount_percent: Dec::ZERO,
             excluded_fringes: BTreeSet::new(),
             locations: BTreeSet::new(),
+            minimum_spend: None,
+            broker_fee: 0,
+            shared_cap: None,
             rows,
         }
     }

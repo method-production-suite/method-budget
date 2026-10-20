@@ -79,11 +79,12 @@ import { renderConvertBanner } from './convertbanner.js';
 import { exportPack, importPack } from './packs.js';
 import { exportSetupLists, importSetupLists } from './setuplists.js';
 import { importActuals } from './actualsimport.js';
-import { saveShareCopy, newSubBudget, renderShareBanner, offerReturnedCopy } from './sharing.js';
+import { saveShareCopy, newSubBudget, renderShareBanner, offerReturnedCopy, subBudgetFromRow, subBudgetRow } from './sharing.js';
 import { displayCommands, userDisplay, withoutZeroRows, totalText } from './display.js';
 import { announce } from './announce.js';
 import { initShare, renderBar as renderShareBar, decorateShare, reportPlace, openShareDialog, whoChangedThis, lookedAt, shareShown } from './share.js';
 import { setExplainTarget, explainTargetAt } from './explain.js';
+import { openRatePicker } from './ratepick.js';
 import { showStart, closeStart, startMenu, isStartOpen, startAtLaunch, startOnLastClose } from './start.js';
 import { loadHost, isWeb } from './host.js';
 
@@ -315,6 +316,7 @@ const NOT_EDITS = new Set([
   // The start window (src/start.rs): a budget opened or made in a new tab.
   'start_open',
   'new_budget_create',
+  'start_duplicate',
   // The sample budget (src/sample.rs): a copy opened in a tab.
   'sample_at_launch',
   'sample_open',
@@ -327,6 +329,7 @@ const NOT_EDITS = new Set([
   'pane_view',
   'share_copy_editable',
   'sub_budget_new',
+  'sub_budget_from_row',
   // Other people's changes arriving in a shared budget (share.js).
   'share-changed',
 ]);
@@ -2197,7 +2200,23 @@ Object.assign(COMMANDS, {
 Object.assign(COMMANDS, {
   'edit.explain': () => explainCell(grid.cursorRow(), grid.cursorColKey()),
   'edit.overtime': () => showTab('overtime'),
+  // A line's rate from one of the budget's rate tables (ratepick.js).
+  'edit.fill_rate': () => fillRateAtCursor(),
 });
+
+/** Fill Rate from Table on the line under the cursor (ratepick.js). */
+function fillRateAtCursor() {
+  const key = state.level === 'details' ? grid.cursorKey() : null;
+  if (typeof key !== 'string' || !key.startsWith('r')) {
+    toast('Put the cursor on a line to fill its rate from a rate table.');
+    return;
+  }
+  openRatePicker(Number(key.slice(1)), {
+    call: (cmd, args) => call(cmd, args),
+    toast,
+    openRates: () => openSetup('rates'),
+  });
+}
 
 /** The total a grid cell shows, as the Explain tab names it, or null. */
 function explainTargetFor(row, colKey) {
@@ -2389,6 +2408,11 @@ Object.assign(COMMANDS, {
   'file.new_sub_budget': () => {
     if (grid.editor) grid.commitEdit(null);
     if (state.view) newSubBudget(sharingCtx());
+  },
+  // The category or account under the cursor as its own budget (context menu).
+  'file.sub_budget_from_row': () => {
+    if (grid.editor) grid.commitEdit(null);
+    if (state.view) subBudgetFromRow(sharingCtx(), subBudgetRow(state.level, grid.cursorRow(), state.acct));
   },
 });
 

@@ -229,6 +229,9 @@ fn gen_budget(rng: &mut Rng) -> Budget {
             1 => set(&["L1", "L2"]),
             _ => Default::default(),
         },
+        minimum_spend: None,
+        broker_fee: 0,
+        shared_cap: None,
         rows: vec![
             CreditRow {
                 description: String::new(),
@@ -900,7 +903,9 @@ fn renaming_any_setup_item_keeps_every_total_and_renaming_back_undoes_it() {
 // Incentive programs (roadmap 3.6; decisions.md, entry 80)
 
 /// A random program: rows on groups, categories, accounts and typed
-/// amounts, random caps and a discount from 0 to 100%, maybe locations.
+/// amounts, random caps and a discount from 0 to 100%, maybe locations, a
+/// minimum spend and a broker's fee (no shared cap: see
+/// [`gen_shared_caps`]).
 fn gen_program(rng: &mut Rng, b: &Budget, name: &str) -> Credit {
     let cats: Vec<String> = b.categories().map(|c| c.code.clone()).collect();
     let accts: Vec<String> = b
@@ -949,6 +954,13 @@ fn gen_program(rng: &mut Rng, b: &Budget, name: &str) -> Credit {
             2 => set(&["L1", "L2", "L3"]),
             _ => Default::default(),
         },
+        minimum_spend: rng.chance(30).then(|| rng.below(4_000_000) as i64),
+        broker_fee: if rng.chance(30) {
+            rng.below(200_000) as i64
+        } else {
+            0
+        },
+        shared_cap: None,
         rows,
     }
 }
@@ -1056,7 +1068,23 @@ fn caps_are_never_exceeded() {
                 );
             }
             assert!(f.capped <= p.rows_total, "seed {seed}");
-            assert_eq!(p.capped, f.capped < p.rows_total, "seed {seed}");
+            assert_eq!(
+                p.capped,
+                !f.below_minimum && f.capped < p.rows_total,
+                "seed {seed}"
+            );
+            // Below the minimum the program pays nothing; at or above it,
+            // the minimum changes nothing.
+            assert_eq!(
+                f.below_minimum,
+                c.minimum_spend.is_some_and(|m| p.qualified < m),
+                "seed {seed}"
+            );
+            if f.below_minimum {
+                assert_eq!(f.amount, 0, "seed {seed}");
+            }
+            // The fee is never more than the credit had.
+            assert!(f.fee >= 0 && f.fee <= c.broker_fee, "seed {seed}");
             assert!(f.amount >= 0, "seed {seed}");
         }
     }
@@ -1276,6 +1304,190 @@ fn a_bid_always_reconciles_with_the_budget() {
                 assert_eq!(s.unposted_fringes, 0, "{msg}");
             }
             assert!(s.unposted_fringes <= 0, "{msg}");
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Caps shared by programs (decisions.md, entry 88)
+
+/// Two shared caps, S1 and S2, of random amounts, and each program in one
+/// of them, in a cap the budget doesn't have, or in none.
+fn gen_shared_caps(rng: &mut Rng, b: &mut Budget) {
+    b.shared_caps.clear();
+    b.shared_caps
+        .insert("S1".into(), rng.below(1_000_000) as i64);
+    b.shared_caps.insert("S2".into(), rng.below(300_000) as i64);
+    for c in &mut b.credits {
+        c.shared_cap = match rng.below(5) {
+            0 | 1 => Some("S1".into()),
+            2 => Some("S2".into()),
+            3 => Some("Missing".into()),
+            _ => None,
+        };
+    }
+}
+
+/// Budgets with four random programs, some sharing caps.
+fn shared_cap_budget(seed: u64) -> (Budget, Rng) {
+    let mut rng = Rng(seed);
+    let mut b = gen_budget(&mut rng);
+    b.credits.clear();
+    for i in 0..4 {
+        let p = gen_program(&mut rng, &b, &format!("P{i}"));
+        b.credits.push(p);
+    }
+    gen_shared_caps(&mut rng, &mut b);
+    (b, rng)
+}
+
+/// What the topsheet takes off for each applied program, by name.
+fn taken(b: &Budget, seed: u64) -> std::collections::BTreeMap<String, Cents> {
+    let r = recalc(b, &RecalcOptions::default()).unwrap_or_else(|e| panic!("seed {seed}: {e}"));
+    r.credits
+        .iter()
+        .map(|c| (c.name.clone(), c.amount))
+        .collect()
+}
+
+/// The applied programs under one shared cap never come to more than it;
+/// with no discount and no fee they come to exactly the cap when they
+/// would be more without it, and to what they would be when not; and no
+/// program gets more from sharing a cap than it would alone.
+#[test]
+fn a_shared_cap_is_never_exceeded_and_adds_up_to_the_cent() {
+    let mut held = 0;
+    for seed in 1..=CASES {
+        let (mut b, _) = shared_cap_budget(seed);
+        let got = taken(&b, seed);
+        let mut alone = b.clone();
+        for c in &mut alone.credits {
+            c.shared_cap = None;
+        }
+        let without = taken(&alone, seed);
+        for (name, amount) in &got {
+            assert!(*amount <= without[name], "seed {seed} {name}");
+        }
+        for (cap_name, cap) in &b.shared_caps {
+            let members: Vec<&String> = b
+                .credits
+                .iter()
+                .filter(|c| c.applied && c.shared_cap.as_deref() == Some(cap_name.as_str()))
+                .map(|c| &c.name)
+                .collect();
+            let sum: Cents = members.iter().map(|n| got[*n]).sum();
+            assert!(sum <= *cap, "seed {seed}: {cap_name} {sum} over {cap}");
+        }
+
+        // No discount, no fee: the shares add up to the cap exactly.
+        for c in &mut b.credits {
+            c.discount_percent = Dec::ZERO;
+            c.broker_fee = 0;
+        }
+        let got = taken(&b, seed);
+        let mut alone = b.clone();
+        for c in &mut alone.credits {
+            c.shared_cap = None;
+        }
+        let without = taken(&alone, seed);
+        for (cap_name, cap) in &b.shared_caps {
+            let members: Vec<&String> = b
+                .credits
+                .iter()
+                .filter(|c| c.applied && c.shared_cap.as_deref() == Some(cap_name.as_str()))
+                .map(|c| &c.name)
+                .collect();
+            let sum: Cents = members.iter().map(|n| got[*n]).sum();
+            let before: Cents = members.iter().map(|n| without[*n]).sum();
+            assert_eq!(sum, before.min(*cap), "seed {seed}: {cap_name}");
+            held += usize::from(members.len() > 1 && before > *cap);
+        }
+        // A cap the budget doesn't have holds nothing down.
+        for c in b.credits.iter().filter(|c| c.applied) {
+            if c.shared_cap.as_deref() == Some("Missing") {
+                assert_eq!(got[&c.name], without[&c.name], "seed {seed}");
+            }
+        }
+    }
+    // The generator does share caps between programs that are over them.
+    assert!(held > CASES as usize / 10, "only {held} shared caps held");
+}
+
+/// Sharing a cap doesn't depend on the order of the programs, applied or
+/// estimated.
+#[test]
+fn a_shared_cap_is_order_independent() {
+    for seed in 1..=CASES {
+        let (b, _) = shared_cap_budget(seed);
+        let got = estimates(&b, seed);
+        let mut reversed = b.clone();
+        reversed.credits.reverse();
+        let back = estimates(&reversed, seed);
+        for p in &got.programs {
+            let q = back.programs.iter().find(|q| q.name == p.name).unwrap();
+            assert_eq!(p.figures, q.figures, "seed {seed} {}", p.name);
+        }
+        let mut rotated = b.clone();
+        rotated.credits.rotate_left(1);
+        assert_eq!(taken(&rotated, seed), taken(&b, seed), "seed {seed}");
+    }
+}
+
+/// With shared caps: no programs change nothing, unapplied programs change
+/// nothing, an applied program's estimate is what the topsheet takes off,
+/// and an unapplied one's is what it would take off once applied.
+#[test]
+fn shared_caps_with_no_programs_or_unapplied_ones_change_nothing() {
+    for seed in 1..=CASES {
+        let (b, _) = shared_cap_budget(seed);
+        let mut none = b.clone();
+        none.credits.clear();
+        let mut bare = none.clone();
+        bare.shared_caps.clear();
+        let r_none = recalc(&none, &RecalcOptions::default()).unwrap();
+        assert_eq!(
+            r_none,
+            recalc(&bare, &RecalcOptions::default()).unwrap(),
+            "seed {seed}: shared caps alone change nothing"
+        );
+        let mut off = b.clone();
+        for c in &mut off.credits {
+            c.applied = false;
+        }
+        assert_eq!(
+            recalc(&off, &RecalcOptions::default()).unwrap(),
+            r_none,
+            "seed {seed}: unapplied programs change nothing"
+        );
+
+        let got = estimates(&b, seed);
+        let now = taken(&b, seed);
+        for (c, p) in b.credits.iter().zip(&got.programs) {
+            let amount = p
+                .amount()
+                .unwrap_or_else(|| panic!("seed {seed}: {:?}", p.problem));
+            if c.applied {
+                assert_eq!(amount, now[&c.name], "seed {seed} {}", c.name);
+            } else {
+                let mut on = b.clone();
+                on.credits[p.index].applied = true;
+                assert_eq!(amount, taken(&on, seed)[&c.name], "seed {seed} {}", c.name);
+            }
+        }
+    }
+}
+
+/// An applied program with a minimum, a fee or a shared cap explains to
+/// exactly its amount.
+#[test]
+fn explaining_a_program_with_its_terms_adds_up() {
+    for seed in 1..=CASES / 4 {
+        let (b, _) = shared_cap_budget(seed);
+        let r = recalc(&b, &RecalcOptions::default()).unwrap();
+        for (i, c) in r.credits.iter().enumerate() {
+            let e = explain::explain(&b, &RecalcOptions::default(), &explain::Target::Credit(i))
+                .unwrap_or_else(|e| panic!("seed {seed}: {e}"));
+            assert_eq!(e.root.amount, Some(c.amount), "seed {seed} {}", c.name);
         }
     }
 }

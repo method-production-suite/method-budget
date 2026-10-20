@@ -523,6 +523,31 @@ pub fn set_credit(
         .as_ref()
         .map(|o| o.locations.clone())
         .unwrap_or_default();
+    // A cap shared with other credits (decisions.md, entry 88): its name,
+    // and its amount for every credit sharing it.
+    let shared_cap = c
+        .shared_cap
+        .as_deref()
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+        .map(str::to_string);
+    let shared_amount = match (&shared_cap, c.shared_cap_amount.as_deref().map(str::trim)) {
+        (None, Some(a)) if !a.is_empty() => {
+            return Err(EditError::Invalid(
+                "a shared cap amount needs a shared cap name".into(),
+            ))
+        }
+        (None, _) => None,
+        (Some(n), None | Some("")) => {
+            if !b.shared_caps.contains_key(n) {
+                return Err(EditError::Invalid(format!(
+                    "the shared cap {n} is new, so it needs an amount"
+                )));
+            }
+            None
+        }
+        (Some(n), Some(a)) => Some((n.clone(), money_at_least_zero(a, "the shared cap")?)),
+    };
     let mut rows = Vec::with_capacity(c.rows.len());
     for (i, r) in c.rows.iter().enumerate() {
         let n = i + 1;
@@ -593,9 +618,21 @@ pub fn set_credit(
             .map_err(EditError::NotFound)?,
         locations: picked_names(&c.locations, &locations, Some(&old_locations), "location")
             .map_err(EditError::NotFound)?,
+        minimum_spend: match c.minimum_spend.as_deref().map(str::trim) {
+            None | Some("") => None,
+            Some(t) => Some(money_at_least_zero(t, "the minimum spend")?),
+        },
+        broker_fee: match c.broker_fee.as_deref().map(str::trim) {
+            None | Some("") => 0,
+            Some(t) => money_at_least_zero(t, "the broker's fee")?,
+        },
+        shared_cap,
         rows,
     };
-    Ok(match index {
+    if let Some((name, amount)) = shared_amount {
+        b.shared_caps.insert(name, amount);
+    }
+    let i = match index {
         Some(i) => {
             b.credits[i] = credit;
             i
@@ -604,7 +641,20 @@ pub fn set_credit(
             b.credits.push(credit);
             b.credits.len() - 1
         }
-    })
+    };
+    drop_unshared_caps(b);
+    Ok(i)
+}
+
+/// Takes off the shared caps no credit names any more (decisions.md, entry
+/// 88): a shared cap lives as long as a credit shares it.
+pub fn drop_unshared_caps(b: &mut Budget) {
+    let named: BTreeSet<String> = b
+        .credits
+        .iter()
+        .filter_map(|c| c.shared_cap.clone())
+        .collect();
+    b.shared_caps.retain(|n, _| named.contains(n));
 }
 
 #[cfg(test)]

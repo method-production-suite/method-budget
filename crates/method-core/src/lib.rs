@@ -26,6 +26,7 @@ pub mod order;
 pub mod overtime;
 pub mod pack;
 pub mod presets;
+pub mod rates;
 pub mod rename;
 pub mod renumber;
 pub mod report;

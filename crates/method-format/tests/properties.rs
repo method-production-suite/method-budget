@@ -138,6 +138,7 @@ fn gen_detail(rng: &mut Rng, id: RowId) -> Detail {
             _ => None,
         },
         person: rng.opt_text(),
+        rate_source: rng.chance(20).then(|| gen_rate_source(rng)),
         bold: rng.chance(30),
         italic: rng.chance(30),
         indent: match rng.below(4) {
@@ -153,6 +154,48 @@ fn gen_detail(rng: &mut Rng, id: RowId) -> Detail {
 }
 
 /// Dated notes, as a row, account or category keeps them.
+/// Where a line's rate came from (decisions.md, entry 90): names are never
+/// blank, a date is a real one.
+fn gen_rate_source(rng: &mut Rng) -> method_core::rates::RateSource {
+    method_core::rates::RateSource {
+        table: rng
+            .pick(&["Invented Crew", "quote \" table", "caf\u{e9}"])
+            .into(),
+        classification: rng.pick(&["Grip, Key", "\u{1F3AC} Made Up"]).into(),
+        unit: rng.pick(&["Day", "Hour", "Week"]).into(),
+        as_of: rng.chance(50).then(|| "2030-07-01".into()),
+        rate: rng
+            .pick(&["410.5", "0", "123456789.123456789"])
+            .parse()
+            .unwrap(),
+    }
+}
+
+/// Rate tables (top level only: versions never hold them), every one
+/// valid as the reader checks it.
+fn gen_rate_tables(rng: &mut Rng) -> Vec<method_core::rates::RateTable> {
+    use method_core::rates::{RateRow, RateTable};
+    (0..rng.below(3))
+        .map(|i| RateTable {
+            name: format!("Invented table {i}"),
+            notes: rng.pick(&["", "Made-up figures", "line\nbreak"]).into(),
+            rows: (0..rng.below(4))
+                .map(|j| RateRow {
+                    classification: format!("Made Up {j}"),
+                    rates: [("Day", "410.5"), ("Hour", "0"), ("Week", "2000")]
+                        .into_iter()
+                        .take(1 + rng.below(3) as usize)
+                        .map(|(u, v)| (u.to_string(), v.parse().unwrap()))
+                        .collect(),
+                    from: rng.chance(50).then(|| "2030-01-01".into()),
+                    to: rng.chance(50).then(|| "2031-12-31".into()),
+                    notes: rng.pick(&["", "tab\tnote"]).into(),
+                })
+                .collect(),
+        })
+        .collect()
+}
+
 fn gen_notes(rng: &mut Rng) -> Vec<Note> {
     (0..rng.below(4).saturating_sub(1))
         .map(|_| Note {
@@ -222,6 +265,9 @@ fn gen_credit(rng: &mut Rng) -> Credit {
         discount_percent: rng.dec(),
         excluded_fringes: rng.texts(),
         locations: rng.texts(),
+        minimum_spend: rng.chance(30).then(|| rng.cents()),
+        broker_fee: if rng.chance(30) { rng.cents() } else { 0 },
+        shared_cap: rng.opt_text(),
         rows: (0..rng.below(4))
             .map(|_| CreditRow {
                 description: rng.text(),
@@ -410,6 +456,9 @@ fn gen_content(rng: &mut Rng) -> Budget {
     }
     b.charges = (0..rng.below(4)).map(|_| gen_charge(rng)).collect();
     b.credits = (0..rng.below(3)).map(|_| gen_credit(rng)).collect();
+    b.shared_caps = (0..rng.below(3))
+        .map(|_| (rng.text(), rng.cents()))
+        .collect();
     if rng.chance(60) {
         b.baseline = Some(Baseline {
             rows: (0..rng.below(5))
@@ -525,6 +574,7 @@ fn gen_actuals(rng: &mut Rng) -> method_core::actuals::Actuals {
 fn gen_budget(rng: &mut Rng) -> Budget {
     let mut b = gen_content(rng);
     gen_tool_presets(rng, &mut b);
+    b.rate_tables = gen_rate_tables(rng);
     b.display = gen_display(rng);
     gen_order(rng, &mut b);
     if rng.chance(40) {
@@ -736,6 +786,14 @@ fn generator_covers_every_variant_and_field() {
         "reference",
         "batch",
         "percent",
+        "rate_tables",
+        "classification",
+        "rates",
+        "from",
+        "to",
+        "rate_source",
+        "table",
+        "as_of",
     ];
     for f in fields {
         assert!(

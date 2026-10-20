@@ -789,6 +789,9 @@ mod tests {
             cap: None,
             discount_percent: Dec::ZERO,
             excluded_fringes: BTreeSet::new(),
+            minimum_spend: None,
+            broker_fee: 0,
+            shared_cap: None,
             locations: BTreeSet::new(),
             rows: vec![CreditRow {
                 description: String::new(),

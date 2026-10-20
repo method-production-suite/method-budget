@@ -202,6 +202,10 @@ const COMMANDS: &[&str] = &[
     "start_pin",
     "start_forget",
     "start_reveal",
+    "start_duplicate",
+    "start_add_project",
+    "start_remove_project",
+    "start_project_folder",
     "new_budget_pick_template",
     "new_budget_create",
     "new_budget_folder",
@@ -251,6 +255,7 @@ const COMMANDS: &[&str] = &[
     "share_copy_original",
     "share_copy_store",
     "sub_budget_new",
+    "sub_budget_from_row",
     // Working together through a shared folder (src/shared_app.rs)
     "share_status",
     "share_setup",
@@ -294,6 +299,14 @@ const COMMANDS: &[&str] = &[
     "ot_apply",
     "ot_save_pattern",
     "ot_delete_pattern",
+    // Rate tables (src/rates.rs)
+    "rate_table_save",
+    "rate_table_delete",
+    "rate_choices",
+    "rate_fill",
+    "rate_update",
+    "rate_import_pick",
+    "rate_import_read",
     // Updates, release notes and What's New (src/updater.rs)
     "update_status",
     "update_restart",

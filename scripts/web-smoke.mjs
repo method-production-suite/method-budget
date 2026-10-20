@@ -8,7 +8,9 @@
 // the topsheet draws with its totals, that an edit updates the footer's grand
 // total, that the chart list and one chart are fetched only when asked for,
 // that comments written while reviewing and not downloaded yet make closing
-// the page and Stop Reviewing ask first, and that the page logs no errors (a
+// the page and Stop Reviewing ask first, that New Sub-Budget from This
+// Category (from the keyboard's context menu) opens the row alone with its
+// total, and that the page logs no errors (a
 // Content-Security-Policy refusal among them). It also reads the page the way
 // a screen reader does (Chrome's accessibility tree, decision 82): every
 // control has a name, the budget grid is an ARIA grid whose cursor cell says
@@ -374,6 +376,28 @@ async function main() {
     await clickBanner('Stop Reviewing');
     await until('the review closed without a question', `document.getElementById('review-banner').hidden`);
     console.log('web-smoke: unsaved review comments make closing ask first');
+
+    // 4b. New Sub-Budget from This Category, the keyboard's way: Shift+F10
+    // on the first category opens the context menu; its item opens the
+    // category as a budget of its own in a new tab, with the same total
+    // (decisions.md, entry 91).
+    const catTotal = await evaluate(`(async () => {
+      const web = window.__METHOD_WEB__;
+      const tabs = await web.invoke('smoke', 'list_tabs', {});
+      const v = await web.invoke('smoke', 'get_view', { doc: tabs.find((t) => t.name === 'smoke-sample.mthd').id });
+      return v.report.categories[0].total;
+    })()`);
+    await evaluate(`(() => {
+      const h = document.getElementById('grid-host');
+      h.focus();
+      h.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true }));
+      return true;
+    })()`);
+    await until('the topsheet context menu', `[...document.querySelectorAll('[role=menuitem]')].some((e) => e.textContent.includes('New Sub-Budget from This Category'))`, 5_000);
+    await evaluate(`[...document.querySelectorAll('[role=menuitem]')].find((e) => e.textContent.includes('New Sub-Budget from This Category')).click()`);
+    const sub = await until('the sub-budget in front', `window.__METHOD_WEB__.invoke('smoke', 'get_view', {}).then((v) => v.budget.title.endsWith(' - Story and screenplay, revised') ? { title: v.budget.title, cats: v.report.categories.length, total: v.report.categories[0].total, charges: v.report.charges.length } : null)`, 10_000);
+    if (sub.cats !== 1 || sub.total !== catTotal || sub.charges !== 0) fail(`the sub-budget from a row isn't the row alone with its total: ${JSON.stringify(sub)} (the row's total ${catTotal})`);
+    console.log(`web-smoke: New Sub-Budget from This Category opens "${sub.title}" with the row's total (${(sub.total / 100).toFixed(2)})`);
 
     // 5. Nothing went wrong on the way.
     await new Promise((r) => setTimeout(r, 300));
