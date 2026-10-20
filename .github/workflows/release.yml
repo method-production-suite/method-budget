@@ -432,12 +432,14 @@ jobs:
         shell: bash
         run: target/debug/xtask verify-update --dir updater --version "$VERSION"
 
+      # Kept one day (Method Reader's way): the release job needs them only during the run,
+      # and a rehearsal's signed bundles shouldn't stay downloadable for a month.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: bundles-${{ matrix.name }}
           path: dist/*
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: runner.os == 'macOS'
@@ -445,7 +447,7 @@ jobs:
           name: updater-${{ matrix.name }}
           path: updater/*
           if-no-files-found: ignore
-          retention-days: 30
+          retention-days: 1
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: runner.os == 'macOS'
@@ -453,7 +455,7 @@ jobs:
           name: meta-${{ matrix.name }}
           path: meta/*
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1
 
   release:
     name: draft release
