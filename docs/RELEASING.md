@@ -190,8 +190,8 @@ signed and the draft's description says the first launch needs the one-time step
 the whole workflow on main as it is, the real signing and notarizing included, and drafts
 nothing: no tag is made or needed, and the release job is skipped. It runs only from main.
 Before a tag, rehearse the release commit and wait for green; it is the only full build
-before a release (SUITE-STANDARDS.md section 6). Its bundles stay on the run as artifacts:
-delete them once it is green (`gh run delete` or the run's page).
+before a release (SUITE-STANDARDS.md section 6). Its bundles stay on the run as artifacts
+for one day only (every run's are); delete them sooner once it is green if you like.
 
 The Tauri CLI comes from its prebuilt release, checked against the SHA-256 pinned in
 `scripts/install-tauri-cli.sh` (moving it to a new version is described there). The same
