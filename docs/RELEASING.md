@@ -123,9 +123,10 @@ python3 scripts/site.py                     # the website's "What's new" box fol
 cargo xtask check-version --tag v0.2.0      # what the release workflow checks first
 python3 scripts/check-crate-ages.py          # and every locked crate 14 days old (fuzz/Cargo.lock too, with --lock)
 scripts/check.sh                            # the full local check
+cargo test --workspace --locked --target x86_64-apple-darwin   # the Mac app's Intel half, under Rosetta (rustup target add x86_64-apple-darwin once)
 git add Cargo.toml Cargo.lock crates/method-app/tauri.conf.json docs/releases/0.2.0.md README.md site/index.html assets/screens site/img
 git commit -m "0.2.0"
-gh workflow run weekly.yml --ref main       # once the release commit is on main: wait for green
+gh workflow run release.yml --ref main -f rehearse_version=0.2.0   # the rehearsal, once the release commit is on main: wait for green
 git tag -a v0.2.0 -m "Method Budget 0.2.0"
 git push --atomic origin main v0.2.0
 ```
@@ -160,11 +161,17 @@ one means changing the workflow, this table and the site's links together.
 | `latest.json` | the update manifest installed apps read |
 | `SHA256SUMS` | the SHA-256 of every file above, one per line (`sha256sum -c --ignore-missing SHA256SUMS` checks a download); Method Launcher checks Windows and Linux downloads against it |
 
-Before publishing, download the `.dmg`, open it on a Mac and run the app once. With the
-Apple secrets set, `scripts/check-macos-bundle.sh` on the downloaded app shows a
-`TeamIdentifier` and Gatekeeper `accepted` (source: Notarized Developer ID). Then publish
-the draft. Installed apps find it at their next check (a couple of minutes after they
-start, then every six hours) or at once with Help > Check for Updates.
+The owner's one yes covers the tag and the publish (the suite CLAUDE.md, "Faster
+releases"): after the tag, the session that made it checks the draft and publishes it,
+unless the owner has said stop; any failed check stops it there. The checks: every file in
+the table is attached at a sensible size; `sha256sum -c SHA256SUMS` passes on the
+downloaded files; `cargo xtask verify-update` passes on the updater archive and its `.sig`
+(and `latest.json` names this version for both Mac keys); the `.dmg`'s app is notarized and
+stapled, `scripts/check-macos-bundle.sh` on it shows a `TeamIdentifier`, `x86_64 arm64` and
+Gatekeeper `accepted` (source: Notarized Developer ID); and the build log's bundle step
+compiled nothing. Report them to MOrg, then publish the draft. Installed apps find it at
+their next check (a couple of minutes after they start, then every six hours) or at once
+with Help > Check for Updates.
 
 A release built without the updater key has no `latest.json`: installed apps keep seeing
 the previous release as the newest. Without the Apple secrets, the Mac build is ad-hoc
@@ -175,18 +182,24 @@ signed and the draft's description says the first launch needs the one-time step
 
 | Job | Permissions | What it does |
 |---|---|---|
-| `check` | contents: read | the tagged commit is on `main`; `cargo xtask check-version --tag "$GITHUB_REF_NAME"`; every crate in `Cargo.lock` and `fuzz/Cargo.lock` at least 14 days old (`scripts/check-crate-ages.py` in full, SUITE-STANDARDS.md section 6), before anything is built or signed |
-| `build` (macOS universal, Windows, Linux) | contents: read | builds the bundles; on macOS signs, notarizes, staples and verifies, and writes the updater archive and signs it for its version (`cargo xtask sign-update`), each only when its secrets are there |
-| `release` | contents: write (the only job with it: it creates the draft and uploads the files) | `cargo xtask update-manifest`, then `gh release create --draft` with the notes |
+| `check` | contents: read | a rehearsal runs only from `main`; a tag's commit is on `main`; `cargo xtask check-version --tag` (the tag, or `v<rehearse_version>`); every crate in `Cargo.lock` and `fuzz/Cargo.lock` at least 14 days old (`scripts/check-crate-ages.py` in full, SUITE-STANDARDS.md section 6), before anything is built or signed |
+| `build` (macOS universal, Windows, Linux) | contents: read | runs every test (`cargo test --workspace --locked`) before anything is built or signed; builds the bundles; on macOS signs, notarizes, staples and verifies, and writes the updater archive and signs it for its version (`cargo xtask sign-update`), each only when its secrets are there |
+| `release` | contents: write (the only job with it: it creates the draft and uploads the files) | `cargo xtask update-manifest`, then `gh release create --draft` with the notes; skipped by a rehearsal |
+
+**The rehearsal.** `gh workflow run release.yml --ref main -f rehearse_version=X.Y.Z` runs
+the whole workflow on main as it is, the real signing and notarizing included, and drafts
+nothing: no tag is made or needed, and the release job is skipped. It runs only from main.
+Before a tag, rehearse the release commit and wait for green; it is the only full build
+before a release (SUITE-STANDARDS.md section 6). Its bundles stay on the run as artifacts:
+delete them once it is green (`gh run delete` or the run's page).
 
 The Tauri CLI comes from its prebuilt release, checked against the SHA-256 pinned in
 `scripts/install-tauri-cli.sh` (moving it to a new version is described there). The same
 build without signing, with every test and check, runs once a week on main on all three
 platforms (`.github/workflows/weekly.yml`, skipped when main hasn't changed since the last
 green run). Pull requests run only the dependency checks (`ci.yml`: crate ages and cargo
-deny) and are tested locally before they are marked ready (`scripts/check.sh`). So before a
-tag, run the weekly build by hand on the release commit and wait for it to pass on all three
-systems (below).
+deny) and are tested locally before they are marked ready (`scripts/check.sh`). Before a
+tag, the rehearsal (above) is the full build; no weekly run is needed first.
 
 Only first-party actions are used, each pinned to a full commit SHA. Each secret is given
 only to the steps that use it, never to the Windows and Linux builds. Every signing,
