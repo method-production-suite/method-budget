@@ -22,16 +22,12 @@ this page goes ahead without waiting.
 
 ### Release go-aheads
 
-- **The next release: 0.6.1 or 0.7.0** (waiting on the owner's choice). 0.6.0 is out
-  (2026-10-20, universal; methodbudget.com follows it). Since then main has a security fix
-  (rustls-webpki 0.103.16 and webpki-roots 1.0.10, for the webpki advisories) and new
-  features (3.6 done, 3.9 and 3.13 machinery, 3.19 done, 3.22, the first slice of 3.14).
-  Both things the next release waited on have landed: bundling with the prebuilt Tauri CLI
-  only while signing keys are present, and 3.22, so the release tests no longer set an
-  8 MiB stack. The release workflow only releases from main, so a fix-only 0.6.1 would
-  need a branch it can't release from. **Recommend: 0.7.0 from main** (the security fix
-  and the features together), rehearsed on main first; notes drafted in the 0.7.0 release
-  pull request. Signed changes (3.18, pull request #73) follow in the release after it.
+- **0.7.0 from main, without signed changes: decided by the owner (2026-10-20)**: "prepare
+  Budget 0.7.0 from main without 3.18". Since 0.6.0 main has a security fix (rustls-webpki
+  0.103.16 and webpki-roots 1.0.10) and new features (3.6 done, 3.9 and 3.13 machinery,
+  3.19 done, 3.22, the first slice of 3.14). The release pull request (#79) has the notes;
+  the version bump, the site, the local check and the rehearsal on main come next, then
+  the tag request. The tag needs the owner's yes.
 - **rustls update, on or after 2026-10-28**: the fix (0.23.46) leaves the 14-day crate
   cooldown then. `cargo update -p rustls` and the four RUSTSEC-2026-0346 to 0349 ignores
   taken out of `deny.toml` go in as one pull request. None of the four applies to the
@@ -42,21 +38,16 @@ this page goes ahead without waiting.
 ### Open decisions
 
 - **Signed changes in shared budgets: decided by the owner (2026-10-20)** (3.18; D89):
-  "Method Budget may merge 3.18 signed changes with the shared log format 3 for 0.7.0."
-  Built in pull request #73 (each person's key pair, every change signed with
-  `ed25519-dalek`, removal by cutoff), held until 0.7.0 is tagged so 0.7.0 ships without a
-  log format change.
+  "Method Budget may merge 3.18 signed changes with the shared log format 3", then "prepare
+  Budget 0.7.0 from main without 3.18". Built in pull request #73 (each person's key pair,
+  every change signed with `ed25519-dalek`, removal by cutoff), held until 0.7.0 is tagged,
+  so it ships in the release after.
 
-- **A key put in the owner's name before the owner's app does** (3.18; D89, raised in
-  review of pull request #73): anyone who can write in the shared folder can publish a key
-  in the owner's name before the owner's app does, and whoever holds it then signs as the
-  owner. The owner's app finds it and refuses to sign (built in #73); what happens next is
-  the owner's call. **Recommend: (1) start again as a new signed budget**, offered only
-  on the owner's computer when it finds a key in its name that isn't its own, **with (3)
-  each computer remembering the first owner key it sees** to catch a later swap. Option
-  (2), confirming the key by phone or chat, is left out: one step per member that people
-  skip. Design ready to build: docs/research/owner-key.md (about a week). Not built:
-  waiting on the owner.
+- **A key put in the owner's name before the owner's app does: decided by the owner
+  (2026-10-20)** (3.18; D89): "build 3.18 options 1 and 3". (1) Start again as a new signed
+  budget, offered only on the owner's computer when it finds a key in its name that isn't
+  its own, and (3) each computer remembering the first owner key it sees, to catch a later
+  swap. Design: docs/research/owner-key.md. Being built on top of #73.
 
 - **Which languages first** (3.14; D82, D94): the framework is built and English is
   the only language (docs/APP.md, "Languages"): one string table read by the page and
