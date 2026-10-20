@@ -59,6 +59,7 @@ fn full_preset() -> ReportPreset {
                 right: Some(BandField::Page),
                 first_page_only: false,
             }),
+            bid: None,
         },
     }
 }
@@ -246,4 +247,137 @@ fn the_incentives_section_round_trips() {
     .unwrap();
     assert!(!fs.contains("\"incentives\""));
     assert_eq!(to_string(&from_str(&fs).unwrap()), fs);
+}
+
+// ---------------------------------------------------------------------------
+// Bid layouts (roadmap 3.13; decisions.md, entry 92)
+
+fn bid_preset() -> ReportPreset {
+    let mut p = plain("Spot bid");
+    p.spec.sections = vec![ReportSection::Bid];
+    p.spec.bid = Some(BidLayout {
+        fields: vec![
+            BidField {
+                label: "Client".into(),
+                value: "Field Station Films".into(),
+            },
+            BidField {
+                label: "Job number".into(),
+                value: String::new(),
+            },
+        ],
+        lines: vec![
+            BidLine::Section {
+                name: "Shoot".into(),
+                picks: vec![
+                    BidPick::Category("20".into()),
+                    BidPick::Account("3100".into()),
+                    BidPick::Range {
+                        from: "4000".into(),
+                        to: "4999".into(),
+                    },
+                ],
+            },
+            BidLine::Section {
+                name: "Post".into(),
+                picks: Vec::new(),
+            },
+            BidLine::Subtotal {
+                name: "Subtotal".into(),
+            },
+            BidLine::Percent {
+                name: "Markup".into(),
+                percent: "12.5".parse().unwrap(),
+                of: vec!["Shoot".into()],
+            },
+            BidLine::Percent {
+                name: "On everything".into(),
+                percent: "1".parse().unwrap(),
+                of: Vec::new(),
+            },
+            BidLine::Flat {
+                name: "Handling".into(),
+                amount: 25_000,
+            },
+        ],
+        show_accounts: true,
+    });
+    p
+}
+
+#[test]
+fn bid_layout_shape() {
+    let v = report_preset_to_value(&bid_preset());
+    assert_eq!(
+        v,
+        json!({
+            "name": "Spot bid",
+            "sections": ["bid"],
+            "bid": {
+                "fields": [
+                    {"label": "Client", "value": "Field Station Films"},
+                    {"label": "Job number"}
+                ],
+                "lines": [
+                    {"kind": "section", "name": "Shoot", "picks": [
+                        {"kind": "category", "code": "20"},
+                        {"kind": "account", "code": "3100"},
+                        {"kind": "range", "from": "4000", "to": "4999"}
+                    ]},
+                    {"kind": "section", "name": "Post"},
+                    {"kind": "subtotal", "name": "Subtotal"},
+                    {"kind": "percent", "name": "Markup", "percent": "12.5", "of": ["Shoot"]},
+                    {"kind": "percent", "name": "On everything", "percent": "1"},
+                    {"kind": "flat", "name": "Handling", "amount": 25000}
+                ],
+                "show_accounts": true
+            }
+        })
+    );
+    assert_eq!(report_preset_from_value(v).unwrap(), bid_preset());
+    // An empty layout is a real choice and is written as {}.
+    let mut p = plain("Empty bid");
+    p.spec.bid = Some(BidLayout::default());
+    let v = report_preset_to_value(&p);
+    assert_eq!(v["bid"], json!({}));
+    assert_eq!(report_preset_from_value(v).unwrap(), p);
+}
+
+#[test]
+fn bid_layouts_round_trip_and_leave_other_files_alone() {
+    let mut b = Budget::new("Film", "USD");
+    b.report_presets = vec![full_preset(), plain("Topsheet only")];
+    // Without a bid layout the file has no trace of one.
+    let before = to_string(&b);
+    assert!(!before.contains("\"bid\""));
+    let back = from_str(&before).unwrap();
+    assert_eq!(to_string(&back), before, "byte-identical when unused");
+    let mut example = plain("Example bid");
+    example.spec.sections = vec![ReportSection::Topsheet, ReportSection::Bid];
+    example.spec.bid = Some(BidLayout::example());
+    b.report_presets.push(bid_preset());
+    b.report_presets.push(example);
+    let text = to_string(&b);
+    let back = from_str(&text).unwrap();
+    assert_eq!(back, b);
+    assert_eq!(to_string(&back), text, "stable bytes");
+}
+
+#[test]
+fn bid_layouts_are_read_strictly() {
+    for bad in [
+        json!({"name": "x", "bid": {"rows": []}}),
+        json!({"name": "x", "bid": {"lines": [{"kind": "heading", "name": "A"}]}}),
+        json!({"name": "x", "bid": {"lines": [{"kind": "section"}]}}),
+        json!({"name": "x", "bid": {"lines": [{"kind": "section", "name": "A", "picks": [{"kind": "group", "code": "X"}]}]}}),
+        json!({"name": "x", "bid": {"lines": [{"kind": "section", "name": "A", "picks": [{"kind": "range", "from": "1"}]}]}}),
+        json!({"name": "x", "bid": {"lines": [{"kind": "percent", "name": "M", "percent": 10}]}}),
+        json!({"name": "x", "bid": {"lines": [{"kind": "flat", "name": "F", "amount": "10.00"}]}}),
+        json!({"name": "x", "bid": {"lines": [{"kind": "flat", "name": "F", "amount": 1, "of": []}]}}),
+        json!({"name": "x", "bid": {"lines": [{"kind": "subtotal", "name": "S", "picks": []}]}}),
+        json!({"name": "x", "bid": {"fields": [{"value": "v"}]}}),
+        json!({"name": "x", "bid": {"show_accounts": "yes"}}),
+    ] {
+        assert!(report_preset_from_value(bad.clone()).is_err(), "{bad}");
+    }
 }

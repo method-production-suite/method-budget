@@ -1062,3 +1062,59 @@ select.setup-input.sw-cell-input {
   grid-column: 1 / -1;
   margin: 2px 8px 6px 20px;
 }
+
+/* The Rate Tables tab (js/rates.js): the rail's list of tables, the column
+   per unit (its grid columns are set at run time, sheet.js), and the import
+   dialog's mapping and preview. */
+.rates-rail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rates-rail-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.rates-rail-item:hover {
+  background: var(--row-hover);
+}
+
+.rates-rail-item.is-selected {
+  background: var(--selection);
+  font-weight: 600;
+}
+
+.rates-import {
+  width: min(720px, calc(100vw - 32px));
+}
+
+.rates-import-map {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 16px;
+}
+
+.rates-import-errors,
+.rates-import-preview {
+  max-height: 220px;
+  overflow: auto;
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.rates-import-errors {
+  color: var(--danger);
+}

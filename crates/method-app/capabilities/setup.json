@@ -1,6 +1,6 @@
 {
   "identifier": "setup",
-  "description": "The Budget Setup window (every setup table's full editor, in a window of its own) may call only the commands its tabs use: get_view; host_info (which host it runs in); the fringe, group, global, unit, set, location and currency tables (editing, adding, deleting, renaming everywhere, their order, short codes and in-use counts, a global's details and the numbers-on-screen settings); charges, credits, info, settings with renumbering accounts to a new pattern, and the baseline; and the personal setup library beside each table (its view, copying items to and from it, its folders, and picking its file in Rust's own dialogs: no path comes from the page) with its Setup packs section (listing packs, exporting and importing them through Rust's own dialogs, showing the Packs folder); and send and receive events between the windows. Nothing on the selected lines, no notes, find, history, file, save, undo, tab or window commands: it passes those keys to the main window.",
+  "description": "The Budget Setup window (every setup table's full editor, in a window of its own) may call only the commands its tabs use: get_view; host_info (which host it runs in); the fringe, group, global, unit, set, location and currency tables (editing, adding, deleting, renaming everywhere, their order, short codes and in-use counts, a global's details and the numbers-on-screen settings); charges, credits, info, settings with renumbering accounts to a new pattern, and the baseline; and the personal setup library beside each table (its view, copying items to and from it, its folders, and picking its file in Rust's own dialogs: no path comes from the page) with its Setup packs section (listing packs, exporting and importing them through Rust's own dialogs, showing the Packs folder); the rate tables (saving, deleting, updating the lines filled from them, and reading a spreadsheet picked in Rust's own dialog into one); and send and receive events between the windows. Nothing on the selected lines, no notes, find, history, file, save, undo, tab or window commands: it passes those keys to the main window.",
   "windows": [
     "setup"
   ],
@@ -73,6 +73,11 @@
     "allow-pack-review",
     "allow-pack-import",
     "allow-pack-import-library",
+    "allow-rate-table-save",
+    "allow-rate-table-delete",
+    "allow-rate-update",
+    "allow-rate-import-pick",
+    "allow-rate-import-read",
     "core:event:allow-listen",
     "core:event:allow-emit-to"
   ]

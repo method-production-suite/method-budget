@@ -125,6 +125,7 @@ this section.
 - **Incentive what-ifs.** See what each incentive program gains or loses if lines were shot at another location, then move them in one step you can undo.
 - **Apply panel.** Select lines, then tick fringes, groups, sets and locations on or off, with live totals for the selection.
 - **In-use counts.** Every setup list shows how many lines use each item and what they cost, warns before you delete one in use, and finds them in a click.
+- **Your own rate tables.** Keep rate tables of your own (classifications with a rate per hour, day or week and the dates each is in effect), type them in or import them from a spreadsheet, and pick a classification on a line to fill its rate; the line remembers where the rate came from and tells you when the table changes.
 
 ### Editing, split view and history
 
@@ -172,6 +173,7 @@ this section.
 - **Renumber accounts.** Change the account numbering pattern and preview every old and new number before it applies.
 - **Sub-budgets.** Make a filtered copy by categories, accounts, groups, sets or locations, for a department or a unit.
 - **A sample budget to explore.** The first time you open the app, an invented feature of about a million dollars opens as an untitled copy, with every feature in use; Help > Open Sample brings a fresh copy back any time.
+- **New project window.** Start a budget from one window with its title, chart of accounts, schedule, currency, your setup library and setup packs, in a project folder of its own, ready to fill in. Duplicate a budget, or start a new one from a category or account.
 
 ### Command line and git
 
@@ -185,8 +187,7 @@ this section.
 - **Windows and Linux, tested.** Installers for both are built today; printing, keys and file types still need a hands-on check.
 - **Accessibility and translations.** A full accessibility pass and the app in more languages.
 - **Work on a budget together.** Several people in one budget at once, through a shared Dropbox or iCloud folder or a live link, with who changed what and undo that only takes back your own edits.
-- **Rate card lookup.** Pick a union classification and fill in the rate from public rate cards, with the source and effective date shown.
-- **New project window.** Start a budget from one window with its title, chart of accounts, schedule, currency, your setup library and setup packs, and later rate setup, ready to fill in.
+- **Rate card lookup.** Pick a union classification from public rate cards that come with the app and fill in the rate, with the source and effective date shown.
 
 <!-- features:end -->
 

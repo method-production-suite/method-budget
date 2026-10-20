@@ -601,8 +601,10 @@ pub fn store_line_block(
     for d in &mut rows {
         d.id = 0;
         // A block is reusable: its rows never join a person's cutoff
-        // (decisions.md, entry 79).
+        // (decisions.md, entry 79), nor say they were filled from one of
+        // this budget's rate tables (entry 90).
         d.person = None;
+        d.rate_source = None;
         if !keep.formulas {
             for f in [&mut d.amount, &mut d.x, &mut d.rate, &mut d.x4] {
                 f.0.clear();

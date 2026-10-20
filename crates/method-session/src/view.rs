@@ -98,6 +98,12 @@ pub struct View {
     /// column shows by default then. Left out when false.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub has_persons: bool,
+    /// How each line of `account` filled from a rate table stands against
+    /// its table now (decisions.md, entry 90), by row id: the Rate cell's
+    /// mark and the line's Update Rate. Left out when no line on screen was
+    /// filled from one, so other views are unchanged.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub rate_checks: BTreeMap<RowId, crate::rates::RateCheckDto>,
 }
 
 /// A person's running totals, as [`method_core::calc::persons::person_totals`]
@@ -580,6 +586,7 @@ impl View {
             review: None,
             persons: persons(b, report),
             has_persons: method_core::calc::persons::any(b),
+            rate_checks: crate::rates::checks(b, &shown.iter().copied().collect::<Vec<_>>()),
         }
     }
 }

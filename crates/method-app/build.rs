@@ -159,6 +159,7 @@ const COMMANDS: &[&str] = &[
     // Reports: saved report presets, printing and PDF (src/reports.rs)
     "save_report_preset",
     "delete_report_preset",
+    "bid_sheet",
     "print_report",
     // Spreadsheet export: Excel, CSV, tab-delimited (src/export.rs)
     "export_budget",
@@ -300,6 +301,14 @@ const COMMANDS: &[&str] = &[
     "ot_apply",
     "ot_save_pattern",
     "ot_delete_pattern",
+    // Rate tables (src/rates.rs)
+    "rate_table_save",
+    "rate_table_delete",
+    "rate_choices",
+    "rate_fill",
+    "rate_update",
+    "rate_import_pick",
+    "rate_import_read",
     // Updates, release notes and What's New (src/updater.rs)
     "update_status",
     "update_restart",

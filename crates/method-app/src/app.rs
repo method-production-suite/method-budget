@@ -1389,6 +1389,7 @@ pub fn run() {
             // Reports: saved presets, printing and PDF (src/reports.rs)
             crate::reports::save_report_preset,
             crate::reports::delete_report_preset,
+            crate::reports::bid_sheet,
             crate::reports::print_report,
             // Spreadsheet export: Excel, CSV, tab-delimited (src/export.rs)
             crate::export::export_budget,
@@ -1533,6 +1534,14 @@ pub fn run() {
             crate::overtime::ot_apply,
             crate::overtime::ot_save_pattern,
             crate::overtime::ot_delete_pattern,
+            // Rate tables (src/rates.rs)
+            crate::rates::rate_table_save,
+            crate::rates::rate_table_delete,
+            crate::rates::rate_choices,
+            crate::rates::rate_fill,
+            crate::rates::rate_update,
+            crate::rates::rate_import_pick,
+            crate::rates::rate_import_read,
             // Updates, release notes and What's New (src/updater.rs)
             crate::updater::update_status,
             crate::updater::update_restart,

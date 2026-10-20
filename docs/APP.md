@@ -702,7 +702,7 @@ does while the tools window is in front.
 
 **The Budget Setup window** (decisions.md, entry 42). One window, titled Budget Setup, with
 a tab per table: **Fringes, Groups, Globals, Units, Sets, Locations, Currency, Charges,
-Credits, Info, Settings and Baseline** (a tab's tooltip says what it is for). It is laid out
+Credits, Rate Tables, Info, Settings and Baseline** (a tab's tooltip says what it is for). It is laid out
 for density: under the tab strip, a narrow **rail** at the left (on the tabs that have a
 library kind) and the tab's own area, and at the bottom a **footer** with the tab's totals
 at the left and **Close** at the right.
@@ -978,6 +978,71 @@ Either way it is one undo step. **Pattern** picks a saved pattern to fill the fo
 **Save as…** saves the form's straight time, bands and day multipliers in the budget by
 name, **Update** saves into the picked one and **Delete** removes it (one undo step each).
 Patterns are tools, not content, like tag presets: versions don't carry them.
+
+### Rate tables
+
+Rate tables are yours to keep (roadmap 3.9; decisions.md, entry 90): a named table of
+classifications ("Grip, Key", "Grip, Best Boy"), each with a rate per unit (the budget's
+own units: Hour, Day, Week) and, when the figures change over time, the dates each row is
+in effect, with notes. Nothing comes with the app: there are no bundled rates, union or
+otherwise. Tables are kept in the budget, as tools like overtime patterns (versions don't
+carry them, restoring one keeps the current tables), and go between budgets the way setup
+items do: Import Setup, the setup library (a **Rate tables** kind), setup packs and setup
+lists in a spreadsheet (a **Rate Tables** sheet, one row per classification, period and
+unit). So you can keep your own tables in your library and bring them into any budget.
+
+**Budget Setup > Rate Tables** (View > Budget Setup > Rate Tables) lists the budget's
+tables in the rail; the one picked shows as a grid: Classification, a **Per Day**
+(and so on) column per unit, **From**, **To** and **Notes**, and × to remove a row. Typing
+changes a draft; **Save Table** keeps it (one undo step) and **Revert** drops it. **Add
+unit…** in the band adds a column for another of the budget's units, **Add
+classification** a row, **New Table** a table of your own, **Delete Table…** removes one
+(lines filled from it keep their rates). Two rows of one classification can't be in
+effect on the same day; a row with no dates is in effect every day. The rail's Library
+switch shows your setup library's rate tables, to copy in or out.
+
+**Import from Spreadsheet…** reads a sheet you have (.xlsx, CSV or tab-delimited, Import
+Spreadsheet's readers and limits) into a new table: the dialog picks the sheet, names the
+table (after the sheet or file) and maps the columns, guessed from their titles: a
+**Classification** column, then a column per unit (`Hourly`, `Daily`, `Weekly`, `Day`,
+`Per Day`, `Day Rate`...) or a **Unit column** and a **Rate column**, with optional
+**From**, **To** and **Notes**. Every row is checked and problems are listed with their row
+numbers; nothing is imported while any is left. A table of the same name is replaced only
+when you choose **Replace Table**. **Update Filled Lines** gives every line filled from a
+table what its table says now (one undo step); lines changed by hand are left alone.
+
+**Fill Rate from Table…** (Edit menu, or the line's right-click menu) opens a picker for the
+cursor line: every classification and period of every table, each with the rate it gives
+for the line's unit (**Rate per** changes the unit), and a search box. A unit the table has
+no figure for is converted from the unit closest in hours, only when both units have hours
+in the budget, rounded to cents (a 50.00 Hour rate is 600.00 for a 12-hour Day); a row that
+can't give a rate says why. Picking one writes its figure into the line's rate once, as a
+plain number, and its unit as the rate unit, as one undo step. The line remembers where the
+rate came from: its Rate cell has a dotted underline and says so in its tooltip, and
+**Explain This Number** on the line says "filled from the rate table ..., at ... per ...".
+
+**A changed table never changes a line.** When a table now says something else for a line
+filled from it, the line keeps its figure; its Rate cell gets a mark in the corner and its
+tooltip and Explain say "the table now says ...". **Update rate to ...** (the line's
+right-click menu and the picker) takes the table's figure, as one undo step. A rate typed
+over by hand is yours: the line says it was changed by hand since, and nothing offers to
+update it (pick a classification again to refill it). Deleting a table keeps every figure.
+
+| Command | Arguments | Returns |
+|---|---|---|
+| `rate_table_save` | `table` (`{name, notes, rows: [{classification, rates: {unit: "figure"}, from, to, notes}]}`), `replacing` (a table's name, or null for a new one) | the view |
+| `rate_table_delete` | `name` | the view |
+| `rate_choices` | `row_id`, `unit` (null: the line's) | `{row_id, unit, units, choices: [{table, classification, period, as_of, rate, table_unit, table_rate, converted, problem, notes}], current}` |
+| `rate_fill` | `row_id`, `table`, `classification`, `unit`, `as_of` | the view |
+| `rate_update` | `row_ids` (empty: every line whose table changed) | the view |
+| `rate_import_pick` | none (shows Rust's Open dialog) | `{token, file, sheets, index, mapping, titles, units, name, exists, table, errors}`, or `null` |
+| `rate_import_read` | `token`, `index`, `mapping` (null: the guess), `name` | the same, read again |
+
+The view's `rate_checks` (left out when empty) gives, for each line of the account on
+screen filled from a table, its `state` (`current`, `changed` with `now`, `edited`,
+`missing`) and `words`. The main window may call all of these; the Budget Setup window
+the five its tab uses. From a terminal, `method-budget rates` (docs/CLI.md); agents have
+MCP tools (docs/MCP.md).
 
 ### Find and replace
 
@@ -1853,7 +1918,7 @@ Library…** (any budget file, in Rust's Open dialog).
 The choice is remembered for you in `library.json` in the app's data folder; **Change…**
 and **New…** switch libraries at any time. Then the tab shows the library's name, a kind
 picker (globals, fringes, groups, units, sets, locations, currencies, charges, credits, tag
-presets, line blocks, report presets, each with its count), a folder picker (All folders,
+presets, line blocks, report presets, overtime patterns, rate tables, each with its count), a folder picker (All folders,
 Unfiled, then the kind's folders) and a filter on names and definitions. Each item shows
 its definition in words (its tooltip adds what it brings along), a tick box, and its folder
 when All folders is shown. Budget Setup shows the same library when a tab's rail is switched
@@ -1971,7 +2036,8 @@ Library tab is in each; the dialogs are Rust's and the page never names a path.
 **File > Export > Setup Lists…** writes the budget's setup items as tables, one row per item
 (per credit row for credits) with every part of its definition and where it came from
 (Effective, Source Notes, Source Links): globals, fringes, groups, units, sets, locations,
-currencies, charges, credits, tag presets and overtime patterns, whichever are ticked, as a
+currencies, charges, credits, tag presets, overtime patterns and rate tables (a row per
+classification, period and unit), whichever are ticked, as a
 spreadsheet (.xlsx), a sheet per kind, or CSV files (one per kind, named `<file> - Fringes.csv`
 and so on). Lists (a charge's excluded groups, a tag preset's fringes) are names joined with
 commas; an overtime pattern's bands read `2 @ 1.5; rest @ 2`; a flat fringe's Basis is the
@@ -2121,11 +2187,11 @@ still prints the topsheet straight away, with the standard layout.
   account code with its name, account and row counts, production totals where they fall),
   units (plural, description, hours, rows using it), sets and locations with totals (rows,
   lines total, fringes, total of the lines in the budget total), currencies (the base
-  first, then each with its symbol and rate, rows in it), the cost report, and
-  incentives by location (decisions.md, entry 93: each location's spend with the
-  programs that count it and what each counts there; then every program with its status,
-  qualified spend, minimum, cap, discount, fee and credit, a line saying where its spend
-  has to be and which terms held it down; then the credits applied, which are the
+  first, then each with its symbol and rate, rows in it), the cost report, the bid
+  (below), and incentives by location (decisions.md, entry 93: each location's spend with
+  the programs that count it and what each counts there; then every program with its
+  status, qualified spend, minimum, cap, discount, fee and credit, a line saying where its
+  spend has to be and which terms held it down; then the credits applied, which are the
   topsheet's credits, the estimates not applied, the grand total and the net total). A
   checkbox prints a section, the arrows move it.
 - **Categories and accounts**: a tree with a checkbox for every category (its accounts
@@ -2174,7 +2240,38 @@ figures: a report is always drawn from the budget as it is. Each change is one u
 and marks the budget edited. Versions don't carry presets, and restoring a version keeps
 the current ones.
 
-**Print… and Save as PDF….** Print… opens the system print sheet with the orientation
+**Bid layouts** (roadmap 3.13; decisions entry 92). For commercial work a budget is often
+shown as a bid: a summary in sections the producer defines, with markups and a total.
+Tick **Bid** under Sections and a **Bid layout** group opens below them, starting from a
+plain example (header fields Client, Agency, Job number, Dates and Contact; sections
+Pre-production, Shoot, Post and Fees; a subtotal and a 10% markup) that takes no accounts
+yet. Everything in it is yours to rename, remove and add to:
+
+- **Header fields**: a label and a value each, printed above the bid. Add Header Field
+  adds one; × removes it.
+- **Sections** take accounts: **Categories** (category codes, comma-separated) take every
+  account in them, **Accounts** take account numbers and ranges (`4000 to 4999`). An
+  account counts in the first section that takes it.
+- **Subtotal** adds up everything above it. **Markup (%)** is a percent of the sections
+  ticked under it (none ticked: every section and Unassigned); **Flat amount** is a fixed
+  amount. Renaming a section keeps the markups ticked on it.
+- **List each section's accounts** prints each account under its section instead of the
+  section's total alone. The arrows move a line, × removes it.
+
+The bid prints its fields, its lines in order, then **Unassigned** (every account no
+section takes, with its total; accounts at zero are counted, not listed), the budget's own
+charges and credits, and the **Bid total**, with a line saying how it reconciles: the
+budget's net total plus the bid's markups. Each account counts once, at its lines plus the
+fringes they earn wherever the budget posts them. The group lists what to check: accounts
+in no section, an account two sections take, a pick that takes nothing, a markup of a
+section that isn't there. Figures come from the engine (`bid_sheet`) as the layout
+changes. The layout is saved with the preset, so it goes wherever a preset goes: in the
+budget, through What Changed and Merge, Import Setup and the setup library; a preset that
+prints Bid with no layout prints the example. The bid prints in the base currency. Not yet: a ready-made
+layout of the industry bid form, which waits on the owner's legal-line answer (roadmap,
+"Legal line before building").
+
+**Print… and Save as PDF….****Print… and Save as PDF….** Print… opens the system print sheet with the orientation
 already set. Save as PDF… asks where to save and writes the PDF straight there, with no
 print sheet. Both print exactly the pages in the preview: the report is laid out by the app
 into Letter-sized pages, each with its own header, footer and page number, because the
@@ -2185,6 +2282,7 @@ entry 28).
 |---|---|---|
 | `save_report_preset` | `index` (the preset to replace, or `null` to add one), `preset` (FORMAT.md, "Report preset") | View |
 | `delete_report_preset` | `index` | View |
+| `bid_sheet` | `layout` (a bid layout in the file's shape, FORMAT.md "Bid layout"; `null`: the example) | The bid worked out on the current totals, changing nothing: `layout` (the one used), `fields`, `lines` (`section` with `accounts` and `total`, `subtotal` and `markup` with `amount`; a markup's `percent` and `base`, `percent` `null` when flat), `unassigned`, `unassigned_total`, `unposted_fringes`, `charges`, `credits` (`{name, amount}`), `budget_net`, `markups`, `total`, `warnings`; money in cents |
 | `print_report` | `pdf` (true: into a PDF file chosen in a Save dialog), `landscape`, `title` (the job's name and the suggested file name) | `{supported, done, file}`: `supported` false where the app prints with `window.print()` instead (not macOS); `done` false when cancelled; `file` the PDF's file name |
 
 For other screens, `ui/js/report.js` lays out and prints any table the same way:
@@ -3295,8 +3393,10 @@ untrusted (a budget file is data from anywhere).
   `capabilities/setup.json` grants the Budget Setup window, by its label, only what its
   tabs call: `get_view`, the setup tables (editing, adding, deleting, renaming, order,
   short codes, in-use counts, a global's details and the numbers-on-screen settings),
-  charges, credits, info, settings with renumbering, the baseline, and the setup library's
-  commands, and listening for and sending events. Nothing on the selected lines (its
+  charges, credits, info, settings with renumbering, the baseline, the rate tables
+  (`rate_table_save`, `rate_table_delete`, `rate_update`, and `rate_import_pick` and
+  `rate_import_read`, whose Open dialog is Rust's), and the setup library's commands, and
+  listening for and sending events. Nothing on the selected lines (its
   tables have no selection, and a test checks that setup mode never asks for one), no
   notes, find, history, files, undo, tabs or windows. A test in `src/setupwin.rs` compares
   the grant with what its scripts name, both ways. `build.rs` lists those commands in an app manifest,
@@ -3422,6 +3522,17 @@ Screen readers (decisions.md, entry 82) need a live check with VoiceOver, and wi
 Narrator or NVDA on Windows: the grid's cells, the announcement after an edit and the
 dialogs. The footer's other totals aren't announced, and an empty grid shows focus only
 by its border.
+
+The report setup's Bid layout group (decisions.md, entry 92) needs a live check in the app
+(it is checked headless in the browser build): ticking Bid, editing the lines, saving the
+preset and printing a bid to PDF. A ready-made layout of the industry bid form waits on
+the owner's legal-line answer.
+
+Rate tables (decisions.md, entry 90) need a live check in the app: the Rate Tables tab
+(typing a table, Save Table and Revert, Add unit…, the rail and its Library switch), the
+import dialog with a real workbook and Rust's Open dialog, the Fill Rate from Table picker,
+the Rate cell's mark and tooltip, and Update rate from the right-click menu. Bundled public
+rate data waits on the owner's answer about which public sources may ship.
 
 The Person column (decisions.md, entry 79) needs a live check: typing a name, the
 type-ahead of people, the running-total tooltip and the cutoff mark. The spreadsheet

@@ -4374,6 +4374,104 @@ docs/CLI.md, `method-budget incentives`; MCP: `set_credit`, `list_charges`, `inc
   unapplied credit's row figures in its rows table, and a per-location view in the printed
   reports. The terms band needs a live check in the app.
 
+## 90. Rate tables the user keeps, and filling a line's rate from one (2026-10-20, the owner's direction)
+
+Roadmap 3.9. The owner (relayed 2026-10-20): 3.9 is on the legal line, so build only the
+machinery for tables the user keeps, with no bundled rate data of any kind, and leave which
+public rate sources may ship with the owner (docs/ROADMAP.md, "Waiting on the owner";
+docs/research/rate-data-plan.md, section 4). Behavior: docs/APP.md, "Rate tables"; format:
+docs/FORMAT.md, "Rate table" and "Rate source".
+
+- **Nothing ships.** No union rates, no sample rates, no example table in the app, the
+  packs folder or the templates. Tests, fixtures and docs use invented classifications and
+  figures only. Which public sources may be bundled, and how, waits on the owner.
+- **Where tables live: in the budget, as setup tools.** A budget keeps `rate_tables`, a
+  list like `ot_patterns`: tools, not content, so versions don't carry them and restoring
+  a version keeps the current ones (the research's first shape, section 6.2: a budget sent
+  to someone else still shows where its rates came from). Rather than a new store, they are
+  a new kind of setup item (`rate_table`) in the existing plumbing: Import Setup's review
+  (a table needs the units it has figures for, and a unit brought in under a new name
+  carries the figures), the setup library and its folders, setup packs and their sources
+  (`setup_sources` stamps a table like any item), setup lists in a spreadsheet (a Rate
+  Tables sheet, one row per classification, period and unit, rows of one table read
+  together like a credit's) and the three-way merge (a whole table, like an overtime
+  pattern). So a person keeps their own tables in their library and brings them into any
+  budget.
+- **A table** is a name, notes and rows; a row is a classification as the user writes it
+  (matched ignoring case and extra spaces), a rate per unit (the budget's own unit names,
+  at least one), optional first and last days in effect, and notes. Effective dates are on
+  rows, not tables, so one table can hold a classification's successive periods; two rows
+  of one classification may not share a day (a row with no dates covers every day), so a
+  date always picks at most one row. The reader refuses a table that breaks the rules.
+- **Filling a line writes a number once.** Picking a classification puts its figure into
+  the line's `rate` as a plain number and the unit into the rate unit, as one undo step,
+  and records where it came from in the line's new optional `rate_source` (table,
+  classification as the table spells it, unit, the date picked for, the figure written).
+  It is not a live formula: the model's one natural place for that would be a global per
+  classification (the research's option 2), which fills a big budget with globals and
+  shows names where figures were; we chose the number plus its source (option 1) and an
+  explicit update, which is how a line producer works.
+- **The update rule: offered, never made.** How a filled line stands is worked out when
+  read (`method_core::rates::check`), never stored: `current`; `changed` when the table now
+  gives another figure for the same question (the line keeps its figure; its Rate cell gets
+  a mark, its tooltip and Explain say "the table now says X"); `edited` when the line's
+  rate or rate unit no longer matches what was filled (it was typed over, so nothing
+  offers to update it: pick again to refill); or `missing` when the table, classification,
+  unit or period is gone (the figure stays). Update Rate (one line), Update Filled Lines
+  (all) and their command line and MCP forms refill only `changed` lines, as one undo step.
+  Renaming a table carries the lines filled from it; renaming a unit carries the tables'
+  figures and the lines' sources; deleting a table keeps every figure.
+- **Units.** The table's figure for the line's unit is used as it is. When the table has
+  no figure for that unit, it is converted from the figure whose unit is closest in hours
+  (the smaller on a tie), only when both units have hours in this budget, and rounded to
+  cents: `figure x hours in the line's unit / hours in the table's unit`. Units without
+  hours (Flat, Allow) never convert. The picker shows the converted figure and the figure
+  it came from, and Explain says how it was reached.
+- **The unit a fill uses**: the one asked for, else the line's rate unit, else its amount
+  unit, else the row's only unit. A classification with more than one period needs a date;
+  the picker passes each row's first day (or its last, when it has no first).
+- **A table from a spreadsheet** reuses the spreadsheet import's readers, limits, title
+  matching and date reading with a mapping of its own (`method_format::setup::rates`): a
+  classification column, then a column per unit (titles like Daily, Day, Per Day, Day Rate
+  name a unit) or a unit and a rate column, with optional From, To and Notes. Rows of one
+  classification and period join; every row is checked and nothing is read while any
+  problem is left. Saved mappings are not kept (the import is one table at a time).
+- **Format: no version bump.** Budget `rate_tables` and detail and line block row
+  `rate_source` are additive, optional and left out when unused, so every existing file
+  reads and writes byte for byte as before (tested). Readers are strict, so an older app
+  refuses a file that keeps a table or a filled line; that is the documented rule for
+  additive fields (docs/FORMAT.md, "Versioning") and touches only files that use the
+  feature. The change log writes both only when used (a log of a budget without them stays
+  readable by 0.3.0); removing the last table, or a source, is a write of null, which a
+  root field now gets as row fields already did.
+- **A saved line block** never keeps a rate source (as it never keeps a person): a block
+  is reused in other budgets with other tables.
+- **The browser build** keeps method-session free of files, threads and clocks: the
+  session's `rates` module takes a picked file's bytes from the host, as the other imports
+  do (`cargo xtask wasm-check`).
+- **Surfaces.** Budget Setup gains a Rate Tables tab (a draft edited as a grid, saved as
+  one undo step; Import from Spreadsheet…; Update Filled Lines). A line gets Fill Rate from
+  Table… (Edit menu, right-click) and Update rate to X when its table changed. Commands
+  `rate_table_save`, `rate_table_delete`, `rate_choices`, `rate_fill`, `rate_update`,
+  `rate_import_pick`, `rate_import_read` (the host runs them too), and the view's
+  `rate_checks`. `method-budget rates list|show|check|fill|update|import|delete` and the
+  edit script commands `fill rate`, `update rates` and `delete rate_table`. MCP tools
+  `list_rate_tables`, `get_rate_table`, `set_rate_table`, `delete_rate_table`,
+  `import_rate_table`, `fill_rate` and `update_rates`.
+- Tests: the core rules (checking a table, filling, conversion only through hours both
+  units have, rounding, effective dates, a changed table offering an update and changing
+  no figure, typed over, deleted, renamed) and properties on random tables and units (a
+  fill writes the table's figure or changes nothing; a changed table changes no total
+  until updated; a date picks exactly the row in effect); Explain; the format (byte for
+  byte without them, positions, the reader's refusals, random budgets round-trip); the
+  change log (nothing written when unused, adding, filling and removing travel); Import
+  Setup and packs with a renamed unit; the setup sheet; the spreadsheet mapping (a column
+  per unit, a unit and a rate column, problems with rows); session and host commands (one
+  undo step each); the desktop's wiring and the setup window's grant; the command line
+  and MCP end to end.
+- **Not checked here.** The tab, the picker and the import dialog in the running app need
+  the owner's screen; they are on the owner's list.
+
 ## 91. The start window and New Budget, the rest: projects, thumbnails, Duplicate, sub-budgets from a row, a linked schedule, shared badges, sorting (2026-10-20)
 
 Roadmap 3.19 (design: docs/research/new-project-window.md, sections 4, 5, 7, 8 and 9;
@@ -4448,6 +4546,66 @@ doesn't wait on rate data; rates at creation come from 3.9 when it lands.
   smoke opens a sub-budget from a category with Shift+F10 and checks its total.
 - **Not built**: rates at creation (3.9), created dates and hiding archived projects (design
   phase 4), keeping a schedule link's path and hash, and a live check in the app.
+
+## 92. Bid layouts the user makes; the industry form waits on the legal line (2026-10-20, the owner's instruction)
+
+Roadmap 3.13. The owner (relayed 2026-10-20): 3.13 is on the legal line, so build only the
+machinery a user lays out a bid with, and leave whether the industry bid form's layout may
+be reproduced for the owner to answer. Nothing here follows that form: no section names,
+numbering, wording or order of it, and no template that imitates it. The one layout the
+app ships is an example the project wrote for itself (header fields Client, Agency, Job
+number, Dates and Contact; sections Pre-production, Shoot, Post and Fees; a subtotal and a
+10% markup), plain and generic, taking no accounts until the user picks them.
+
+- **A bid layout is part of a report preset** (`bid`, with a new `bid` section), not a new
+  kind of item: it reuses the preset's name, default, undo, header and footer, page
+  layout and PDF, and goes wherever presets go (the budget, What Changed and Merge,
+  Import Setup, the setup library, the change log, renumbering). A preset that prints
+  the Bid section with no layout prints the example; ticking Bid in the setup starts a
+  layout from it.
+- **What the user makes**: header fields with their own labels and values; sections that
+  take accounts by category, by account or by a range of account numbers (codes sort by
+  number where they hold digits, so `1000 to 1999` takes `1100-01`); running subtotals;
+  markups that are a percent of chosen sections (none chosen: every section and
+  Unassigned) or a flat amount; whether sections list their accounts.
+- **The reconciliation rule.** Every account counts exactly once: in the first section,
+  in layout order, whose picks take it, or else in **Unassigned**, which prints whenever
+  anything is there. An account counts at its lines plus the fringes they earn, wherever
+  the budget posts them, because a bid shows labor with its fringes. Below the lines come
+  the budget's own applied charges and credits, so everything down to there adds up to
+  the budget's net total, and the bid's markups go on top: **bid total = budget net total
+  + the bid's markups**. The one other row takes back fringes the budget earns but
+  doesn't post (fringes posted by production level, trailing level dropped), so the rule
+  holds in every posting mode. The bid's markups never change the budget: they are the
+  bid's, not charges; a markup is not a percent of another markup or of the budget's
+  charges, only of sections.
+- **Arithmetic.** A percent markup is the exact decimal product, rounded once to cents,
+  half away from zero, whatever the budget's arithmetic setting: no reference product
+  defines this figure, so it follows the engine's own rule (decisions 1 and 2).
+- **Overlaps are allowed and named.** An account two sections take counts in the first;
+  the bid says so, as it does a pick that takes nothing and a markup of a section that
+  isn't there. These are checks for the user, never errors: a layout reused on another
+  budget still prints.
+- **The figures come from the engine.** `method_core::bid::bid_sheet` works the bid out;
+  the app's preview asks for it through a read-only command (`bid_sheet`) as the layout
+  changes, the command line prints it as text, HTML, CSV or PDF, and the page never adds
+  money up itself.
+- **File format: additive, version 1.** A preset's `bid` and the section name `"bid"` are
+  left out when unused, so files without a bid read and write byte for byte as before
+  (tested). An older reader refuses a file that has one, as it refuses any field it
+  doesn't know; that is acceptable for a new feature, and the version stays 1 under
+  FORMAT.md's versioning rules.
+- **Not built**: a ready-made layout of the industry bid form (waiting on the owner's
+  legal-line answer), the bid in the totals currency (it prints in the base currency),
+  charges and credits placed inside sections (they print below them, as the budget has
+  them), a markup on other markups, and an MCP tool (reports aren't exposed there).
+- Tests: the engine's mapping and reconciliation (`bid::tests`: Unassigned shown, nothing
+  counted twice, markups on chosen sections, flat amounts, rounding, every fringe posting,
+  dropped fringes, checks), a property test that the bid reconciles for random budgets
+  and layouts (`a_bid_always_reconciles_with_the_budget`), the file's shape, strict
+  reading, round trips and byte identity (`report_presets`), renumbering, the host
+  command, the command line in every format, and the browser build drawing a bid and
+  editing a layout in the report setup (scripts/web-smoke.mjs).
 
 ## 93. Incentive programs: a what-if that moves lines, an estimate's row figures, a printed report by location (2026-10-20)
 

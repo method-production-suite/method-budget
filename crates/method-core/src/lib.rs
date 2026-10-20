@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 
 pub mod actuals;
+pub mod bid;
 pub mod calc;
 pub mod coa;
 pub mod coding;
@@ -25,6 +26,7 @@ pub mod order;
 pub mod overtime;
 pub mod pack;
 pub mod presets;
+pub mod rates;
 pub mod rename;
 pub mod renumber;
 pub mod report;
@@ -36,6 +38,9 @@ pub mod subbudget;
 pub mod usage;
 pub mod versions;
 
+pub use bid::{
+    bid_sheet, BidAccount, BidField, BidLayout, BidLine, BidPick, BidSheet, BidSheetLine,
+};
 pub use calc::breakdown::{selection_totals, SelectionTotals};
 pub use calc::explain;
 pub use calc::{charge_preview, recalc, warnings, CalcError, ErrorKind, RecalcOptions};

@@ -152,6 +152,10 @@ pub struct Budget {
     /// and source notes (see [`crate::pack`]). About the items, not
     /// content: versions don't carry it.
     pub setup_sources: crate::pack::SetupSources,
+    /// Rate tables the user keeps, in the user's order (see
+    /// [`crate::rates`]). Tools, not content, like overtime patterns:
+    /// versions don't carry them.
+    pub rate_tables: Vec<crate::rates::RateTable>,
 }
 
 impl Budget {
@@ -195,6 +199,7 @@ impl Budget {
             actuals: Arc::default(),
             ot_patterns: Vec::new(),
             setup_sources: crate::pack::SetupSources::default(),
+            rate_tables: Vec::new(),
         }
     }
 
@@ -962,6 +967,10 @@ pub struct Detail {
     /// with a person leaves its fringe range for percent fringes. `None`
     /// (the default) changes nothing. See [`Detail::person_name`].
     pub person: Option<String>,
+    /// Where the rate came from, when it was filled from a rate table
+    /// (decisions.md, entry 90). Never changes a figure: the rate is the
+    /// number written; this only says where it came from.
+    pub rate_source: Option<crate::rates::RateSource>,
     /// Text style. Display only: never affects totals.
     pub bold: bool,
     pub italic: bool,
@@ -994,6 +1003,7 @@ impl Detail {
             set: None,
             fringe_range: None,
             person: None,
+            rate_source: None,
             bold: false,
             italic: false,
             indent: 0,
@@ -1334,6 +1344,7 @@ impl Budget {
             actuals: _,
             ot_patterns: _,
             setup_sources: _,
+            rate_tables: _,
         } = self;
         BudgetSnapshot {
             title: title.clone(),
@@ -1407,6 +1418,7 @@ impl Budget {
             actuals: _,
             ot_patterns: _,
             setup_sources: _,
+            rate_tables: _,
         } = self;
         let content = BudgetSnapshot {
             title,
@@ -1553,6 +1565,7 @@ impl BudgetSnapshot {
             actuals: Arc::default(),
             ot_patterns: Vec::new(),
             setup_sources: crate::pack::SetupSources::default(),
+            rate_tables: Vec::new(),
         }
     }
 

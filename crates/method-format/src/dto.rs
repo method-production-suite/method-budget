@@ -19,7 +19,8 @@ use method_core::{
     TopsheetRow, TrailingFringes, UnitDef, Version,
 };
 use method_core::{
-    Band, BandField, FontSize, ReportColumn, ReportPreset, ReportSection, ReportSpec,
+    Band, BandField, BidField, BidLayout, BidLine, BidPick, FontSize, ReportColumn, ReportPreset,
+    ReportSection, ReportSpec,
 };
 use method_core::{CurrencyFormat, Separators};
 use method_core::{LinePreset, SetupItems, TagPreset};
@@ -249,6 +250,8 @@ pub(crate) struct FileBudget {
     line_presets: Vec<FileLinePreset>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     ot_patterns: Vec<FileOtPattern>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    rate_tables: Vec<FileRateTable>,
     #[serde(default, skip_serializing_if = "is_false")]
     compact_versions: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -296,6 +299,7 @@ impl From<&Budget> for FileBudget {
             setup_sources: _,
             provenance,
             actuals,
+            rate_tables,
         } = b;
         FileBudget {
             provenance: provenance.as_ref().map(FileProvenance::from),
@@ -362,6 +366,7 @@ impl From<&Budget> for FileBudget {
             tag_presets: tag_presets.iter().map(FileTagPreset::from).collect(),
             line_presets: line_presets.iter().map(FileLinePreset::from).collect(),
             ot_patterns: ot_patterns.iter().cloned().map(FileOtPattern).collect(),
+            rate_tables: rate_tables.iter().cloned().map(FileRateTable).collect(),
             compact_versions: *compact_versions,
             // Full copies; `to_string` turns them into deltas when
             // `compact_versions` is on (crate::delta).
@@ -441,6 +446,7 @@ impl From<FileBudget> for Budget {
             tag_presets: f.tag_presets.into_iter().map(TagPreset::from).collect(),
             line_presets: f.line_presets.into_iter().map(LinePreset::from).collect(),
             ot_patterns: f.ot_patterns.into_iter().map(|p| p.0).collect(),
+            rate_tables: f.rate_tables.into_iter().map(|t| t.0).collect(),
         }
     }
 }
@@ -981,6 +987,11 @@ impl<'de> Deserialize<'de> for FileSnapshot {
         if !b.ot_patterns.is_empty() {
             return Err(de::Error::custom(
                 "a version's budget cannot have overtime patterns",
+            ));
+        }
+        if !b.rate_tables.is_empty() {
+            return Err(de::Error::custom(
+                "a version's budget cannot have rate tables",
             ));
         }
         if b.setup_order.is_some() {
@@ -1926,6 +1937,8 @@ struct FileDetail {
     fringe_range: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     person: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rate_source: Option<FileRateSource>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     fringes: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
@@ -1971,6 +1984,7 @@ impl From<&Detail> for FileDetail {
             set,
             fringe_range,
             person,
+            rate_source,
             bold,
             italic,
             indent,
@@ -1997,6 +2011,7 @@ impl From<&Detail> for FileDetail {
             currency: currency.clone(),
             fringe_range: *fringe_range,
             person: person.clone(),
+            rate_source: rate_source.clone().map(FileRateSource),
             fringes: fringes.clone(),
             groups: groups.clone(),
             set: set.clone(),
@@ -2037,6 +2052,7 @@ impl From<FileDetail> for Detail {
             set: f.set,
             fringe_range: f.fringe_range,
             person: f.person,
+            rate_source: f.rate_source.map(|s| s.0),
             bold: f.bold,
             italic: f.italic,
             indent: f.indent,
@@ -2728,6 +2744,152 @@ pub(crate) struct FileReportPreset {
     header: Option<FileBand>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     footer: Option<FileBand>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bid: Option<FileBid>,
+}
+
+/// A bid layout (method_core::bid; docs/FORMAT.md, "Bid layout").
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FileBid {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    fields: Vec<FileBidField>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    lines: Vec<FileBidLine>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    show_accounts: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileBidField {
+    label: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    value: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum FileBidLine {
+    Section {
+        name: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        picks: Vec<FileBidPick>,
+    },
+    Subtotal {
+        name: String,
+    },
+    Percent {
+        name: String,
+        percent: DecStr,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        of: Vec<String>,
+    },
+    Flat {
+        name: String,
+        amount: Cents,
+    },
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum FileBidPick {
+    Category { code: String },
+    Account { code: String },
+    Range { from: String, to: String },
+}
+
+impl From<&BidLayout> for FileBid {
+    fn from(l: &BidLayout) -> FileBid {
+        let BidLayout {
+            fields,
+            lines,
+            show_accounts,
+        } = l;
+        FileBid {
+            fields: fields
+                .iter()
+                .map(|f| FileBidField {
+                    label: f.label.clone(),
+                    value: f.value.clone(),
+                })
+                .collect(),
+            lines: lines
+                .iter()
+                .map(|l| match l {
+                    BidLine::Section { name, picks } => FileBidLine::Section {
+                        name: name.clone(),
+                        picks: picks
+                            .iter()
+                            .map(|p| match p {
+                                BidPick::Category(code) => {
+                                    FileBidPick::Category { code: code.clone() }
+                                }
+                                BidPick::Account(code) => {
+                                    FileBidPick::Account { code: code.clone() }
+                                }
+                                BidPick::Range { from, to } => FileBidPick::Range {
+                                    from: from.clone(),
+                                    to: to.clone(),
+                                },
+                            })
+                            .collect(),
+                    },
+                    BidLine::Subtotal { name } => FileBidLine::Subtotal { name: name.clone() },
+                    BidLine::Percent { name, percent, of } => FileBidLine::Percent {
+                        name: name.clone(),
+                        percent: DecStr(*percent),
+                        of: of.clone(),
+                    },
+                    BidLine::Flat { name, amount } => FileBidLine::Flat {
+                        name: name.clone(),
+                        amount: *amount,
+                    },
+                })
+                .collect(),
+            show_accounts: *show_accounts,
+        }
+    }
+}
+
+impl From<FileBid> for BidLayout {
+    fn from(f: FileBid) -> BidLayout {
+        BidLayout {
+            fields: f
+                .fields
+                .into_iter()
+                .map(|f| BidField {
+                    label: f.label,
+                    value: f.value,
+                })
+                .collect(),
+            lines: f
+                .lines
+                .into_iter()
+                .map(|l| match l {
+                    FileBidLine::Section { name, picks } => BidLine::Section {
+                        name,
+                        picks: picks
+                            .into_iter()
+                            .map(|p| match p {
+                                FileBidPick::Category { code } => BidPick::Category(code),
+                                FileBidPick::Account { code } => BidPick::Account(code),
+                                FileBidPick::Range { from, to } => BidPick::Range { from, to },
+                            })
+                            .collect(),
+                    },
+                    FileBidLine::Subtotal { name } => BidLine::Subtotal { name },
+                    FileBidLine::Percent { name, percent, of } => BidLine::Percent {
+                        name,
+                        percent: percent.0,
+                        of,
+                    },
+                    FileBidLine::Flat { name, amount } => BidLine::Flat { name, amount },
+                })
+                .collect(),
+            show_accounts: f.show_accounts,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -2747,6 +2909,7 @@ enum FileSection {
     Locations,
     Currencies,
     CostReport,
+    Bid,
     Incentives,
 }
 
@@ -2837,7 +3000,7 @@ macro_rules! same_variants {
 
 same_variants!(ReportSection <-> FileSection {
     Topsheet, Accounts, Detail, Fringes, Globals, Groups, Notes, Info, Chart, Units, Sets,
-    Locations, Currencies, CostReport, Incentives,
+    Locations, Currencies, CostReport, Bid, Incentives,
 });
 same_variants!(ReportColumn <-> FileColumn {
     Amount, Unit, X, Unit2, Rate, Unit3, Currency, X4, Unit4, Fringes, FringePercent,
@@ -2937,6 +3100,7 @@ impl From<&ReportPreset> for FileReportPreset {
             topsheet_pages,
             header,
             footer,
+            bid,
         } = spec;
         FileReportPreset {
             name: name.clone(),
@@ -2963,6 +3127,7 @@ impl From<&ReportPreset> for FileReportPreset {
             topsheet_pages: *topsheet_pages,
             header: header.as_ref().map(FileBand::from),
             footer: footer.as_ref().map(FileBand::from),
+            bid: bid.as_ref().map(FileBid::from),
         }
     }
 }
@@ -2993,6 +3158,7 @@ impl From<FileReportPreset> for ReportPreset {
                 topsheet_pages: f.topsheet_pages,
                 header: f.header.map(Band::from),
                 footer: f.footer.map(Band::from),
+                bid: f.bid.map(BidLayout::from),
             },
         }
     }
@@ -3185,6 +3351,8 @@ struct FileBlockRow {
     fringe_range: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     person: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rate_source: Option<FileRateSource>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     fringes: BTreeSet<String>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
@@ -3225,6 +3393,7 @@ impl From<&Detail> for FileBlockRow {
             currency,
             fringe_range,
             person,
+            rate_source,
             fringes,
             groups,
             set,
@@ -3250,6 +3419,7 @@ impl From<&Detail> for FileBlockRow {
             currency,
             fringe_range,
             person,
+            rate_source,
             fringes,
             groups,
             set,
@@ -3281,6 +3451,7 @@ impl From<FileBlockRow> for Detail {
             currency,
             fringe_range,
             person,
+            rate_source,
             fringes,
             groups,
             set,
@@ -3307,6 +3478,7 @@ impl From<FileBlockRow> for Detail {
             currency,
             fringe_range,
             person,
+            rate_source,
             fringes,
             groups,
             set,
@@ -3400,5 +3572,157 @@ impl TryFrom<FileOtPatternRaw> for FileOtPattern {
         p.validate_all()
             .map_err(|e| format!("overtime pattern {:?}: {e}", p.name))?;
         Ok(FileOtPattern(p))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Rate tables (method_core::rates; decisions.md, entry 90)
+
+/// One row of a rate table as written.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileRateRow {
+    classification: String,
+    rates: BTreeMap<String, DecStr>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    from: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    to: Option<String>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    notes: String,
+}
+
+/// A rate table as written.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileRateTableRaw {
+    name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    notes: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    rows: Vec<FileRateRow>,
+}
+
+/// A rate table, checked when read (the same rules as saving one in the
+/// app).
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(try_from = "FileRateTableRaw", into = "FileRateTableRaw")]
+pub(crate) struct FileRateTable(pub(crate) method_core::rates::RateTable);
+
+impl From<FileRateTable> for FileRateTableRaw {
+    fn from(t: FileRateTable) -> FileRateTableRaw {
+        let method_core::rates::RateTable { name, notes, rows } = t.0;
+        FileRateTableRaw {
+            name,
+            notes,
+            rows: rows
+                .into_iter()
+                .map(|r| {
+                    let method_core::rates::RateRow {
+                        classification,
+                        rates,
+                        from,
+                        to,
+                        notes,
+                    } = r;
+                    FileRateRow {
+                        classification,
+                        rates: rates.into_iter().map(|(u, v)| (u, DecStr(v))).collect(),
+                        from,
+                        to,
+                        notes,
+                    }
+                })
+                .collect(),
+        }
+    }
+}
+
+impl TryFrom<FileRateTableRaw> for FileRateTable {
+    type Error = String;
+
+    fn try_from(f: FileRateTableRaw) -> Result<FileRateTable, String> {
+        let t = method_core::rates::RateTable {
+            name: f.name,
+            notes: f.notes,
+            rows: f
+                .rows
+                .into_iter()
+                .map(|r| method_core::rates::RateRow {
+                    classification: r.classification,
+                    rates: r.rates.into_iter().map(|(u, v)| (u, v.0)).collect(),
+                    from: r.from,
+                    to: r.to,
+                    notes: r.notes,
+                })
+                .collect(),
+        };
+        t.validate()
+            .map_err(|e| format!("rate table {:?}: {e}", t.name))?;
+        Ok(FileRateTable(t))
+    }
+}
+
+/// Where a line's rate came from, as written.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FileRateSourceRaw {
+    table: String,
+    classification: String,
+    unit: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    as_of: Option<String>,
+    rate: DecStr,
+}
+
+/// Where a line's rate came from, checked when read: names given, a real
+/// date.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(try_from = "FileRateSourceRaw", into = "FileRateSourceRaw")]
+pub(crate) struct FileRateSource(pub(crate) method_core::rates::RateSource);
+
+impl From<FileRateSource> for FileRateSourceRaw {
+    fn from(s: FileRateSource) -> FileRateSourceRaw {
+        let method_core::rates::RateSource {
+            table,
+            classification,
+            unit,
+            as_of,
+            rate,
+        } = s.0;
+        FileRateSourceRaw {
+            table,
+            classification,
+            unit,
+            as_of,
+            rate: DecStr(rate),
+        }
+    }
+}
+
+impl TryFrom<FileRateSourceRaw> for FileRateSource {
+    type Error = String;
+
+    fn try_from(f: FileRateSourceRaw) -> Result<FileRateSource, String> {
+        if f.table.trim().is_empty()
+            || f.classification.trim().is_empty()
+            || f.unit.trim().is_empty()
+        {
+            return Err("a rate source needs its table, classification and unit".into());
+        }
+        if let Some(d) = &f.as_of {
+            if !method_core::actuals::is_iso_date(d) {
+                return Err(format!(
+                    "a rate source's as_of {d:?} is not a date written YYYY-MM-DD"
+                ));
+            }
+        }
+        Ok(FileRateSource(method_core::rates::RateSource {
+            table: f.table,
+            classification: f.classification,
+            unit: f.unit,
+            as_of: f.as_of,
+            rate: f.rate.0,
+        }))
     }
 }

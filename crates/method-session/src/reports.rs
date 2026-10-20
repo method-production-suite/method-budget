@@ -132,6 +132,162 @@ pub fn save_report_preset(
     s.edit(label, |b| apply_save_preset(b, index, preset))
 }
 
+/// The bid `layout` (in the file format's shape, docs/FORMAT.md, "Bid
+/// layout"; `None`: the example layout) worked out on the current totals,
+/// without changing anything: what the report setup's preview draws while
+/// the layout is still being edited (decisions.md, entry 92).
+pub fn bid_sheet(
+    s: &mut Session,
+    layout: Option<serde_json::Value>,
+) -> Result<BidSheetDto, String> {
+    let layout = match layout {
+        None | Some(serde_json::Value::Null) => method_core::BidLayout::example(),
+        Some(v) => method_format::bid_layout_from_value(v)
+            .map_err(|e| format!("That bid layout can't be read: {e}"))?,
+    };
+    let (budget, outcome) = s.totals();
+    let report = outcome
+        .report
+        .as_ref()
+        .ok_or("the totals can't be worked out until the budget's problems are fixed")?;
+    let figured = outcome.sanitized.as_ref().unwrap_or(budget);
+    let sheet = method_core::bid_sheet(figured, report, &layout).map_err(|e| e.to_string())?;
+    let mut dto = BidSheetDto::from(&sheet);
+    dto.layout = method_format::bid_layout_to_value(&layout);
+    Ok(dto)
+}
+
+/// [`method_core::BidSheet`] as JSON: money in integer cents, a percent as a
+/// decimal string.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct BidSheetDto {
+    /// The layout worked out, in the file's shape: the example's when none
+    /// was given, so the page can start editing from it.
+    pub layout: serde_json::Value,
+    pub fields: Vec<BidFieldDto>,
+    pub lines: Vec<BidLineDto>,
+    pub unassigned: Vec<BidAccountDto>,
+    pub unassigned_total: i64,
+    pub unposted_fringes: i64,
+    pub charges: Vec<BidAmountDto>,
+    pub credits: Vec<BidAmountDto>,
+    pub budget_net: i64,
+    pub markups: i64,
+    pub total: i64,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct BidFieldDto {
+    pub label: String,
+    pub value: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct BidAccountDto {
+    pub category: String,
+    pub code: String,
+    pub name: String,
+    pub amount: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct BidAmountDto {
+    pub name: String,
+    pub amount: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum BidLineDto {
+    Section {
+        name: String,
+        accounts: Vec<BidAccountDto>,
+        total: i64,
+    },
+    Subtotal {
+        name: String,
+        amount: i64,
+    },
+    Markup {
+        name: String,
+        /// `null` for a flat markup.
+        percent: Option<String>,
+        base: i64,
+        amount: i64,
+    },
+}
+
+impl From<&method_core::BidSheet> for BidSheetDto {
+    fn from(s: &method_core::BidSheet) -> BidSheetDto {
+        use method_core::BidSheetLine;
+        let account = |a: &method_core::BidAccount| BidAccountDto {
+            category: a.category.clone(),
+            code: a.code.clone(),
+            name: a.name.clone(),
+            amount: a.amount,
+        };
+        let amounts = |list: &[(String, i64)]| {
+            list.iter()
+                .map(|(name, amount)| BidAmountDto {
+                    name: name.clone(),
+                    amount: *amount,
+                })
+                .collect()
+        };
+        BidSheetDto {
+            layout: serde_json::Value::Null,
+            fields: s
+                .fields
+                .iter()
+                .map(|f| BidFieldDto {
+                    label: f.label.clone(),
+                    value: f.value.clone(),
+                })
+                .collect(),
+            lines: s
+                .lines
+                .iter()
+                .map(|l| match l {
+                    BidSheetLine::Section {
+                        name,
+                        accounts,
+                        total,
+                    } => BidLineDto::Section {
+                        name: name.clone(),
+                        accounts: accounts.iter().map(account).collect(),
+                        total: *total,
+                    },
+                    BidSheetLine::Subtotal { name, amount } => BidLineDto::Subtotal {
+                        name: name.clone(),
+                        amount: *amount,
+                    },
+                    BidSheetLine::Markup {
+                        name,
+                        percent,
+                        base,
+                        amount,
+                    } => BidLineDto::Markup {
+                        name: name.clone(),
+                        percent: percent.map(|p| p.to_string()),
+                        base: *base,
+                        amount: *amount,
+                    },
+                })
+                .collect(),
+            unassigned: s.unassigned.iter().map(account).collect(),
+            unassigned_total: s.unassigned_total,
+            unposted_fringes: s.unposted_fringes,
+            charges: amounts(&s.charges),
+            credits: amounts(&s.credits),
+            budget_net: s.budget_net,
+            markups: s.markups,
+            total: s.total,
+            warnings: s.warnings.clone(),
+        }
+    }
+}
+
 /// Removes preset `index`, as one undo step.
 pub fn delete_report_preset(s: &mut Session, index: usize) -> EditResult {
     s.edit("Delete a report preset", |b| apply_delete_preset(b, index))
@@ -314,6 +470,68 @@ mod tests {
         assert_eq!(pdf_file_name("..hidden"), "hidden.pdf");
         assert_eq!(pdf_file_name("line\nbreak"), "line break.pdf");
         assert_eq!(pdf_file_name(&"x".repeat(300)).len(), 124);
+    }
+
+    #[test]
+    fn a_bid_is_worked_out_through_the_host() {
+        use serde_json::json;
+        let h = crate::host::Host::new();
+        let net = h.dispatch("get_full_view", json!({})).unwrap()["report"]["net_total"]
+            .as_i64()
+            .unwrap();
+        let v = h
+            .dispatch(
+                "bid_sheet",
+                json!({"layout": {
+                    "fields": [{"label": "Client", "value": "Bluefin Juice"}],
+                    "lines": [
+                        {"kind": "section", "name": "Above", "picks": [{"kind": "range", "from": "1000", "to": "1399"}]},
+                        {"kind": "subtotal", "name": "Subtotal"},
+                        {"kind": "percent", "name": "Markup", "percent": "10", "of": ["Above"]},
+                        {"kind": "flat", "name": "Handling", "amount": 100000}
+                    ]
+                }}),
+            )
+            .unwrap();
+        assert_eq!(
+            v["fields"][0],
+            json!({"label": "Client", "value": "Bluefin Juice"})
+        );
+        let above = &v["lines"][0];
+        assert_eq!(above["kind"], "section");
+        assert_eq!(above["accounts"][0]["code"], "1001");
+        let total = above["total"].as_i64().unwrap();
+        assert_eq!(
+            v["lines"][1],
+            json!({"kind": "subtotal", "name": "Subtotal", "amount": total})
+        );
+        let markup = &v["lines"][2];
+        assert_eq!(markup["percent"], "10");
+        assert_eq!(markup["base"], total);
+        let m = markup["amount"].as_i64().unwrap();
+        assert_eq!(v["lines"][3]["percent"], json!(null));
+        assert_eq!(v["budget_net"], net);
+        assert_eq!(v["markups"], m + 100_000);
+        assert_eq!(v["total"], net + m + 100_000);
+        assert!(v["unassigned"].as_array().unwrap().len() > 1);
+        assert!(v["charges"][0]["name"].is_string());
+        // No layout: the example, everything Unassigned.
+        let v = h.dispatch("bid_sheet", json!({"layout": null})).unwrap();
+        assert_eq!(v["lines"][0]["name"], "Pre-production");
+        assert_eq!(v["layout"]["lines"][0]["name"], "Pre-production");
+        assert_eq!(v["layout"]["fields"][0], json!({"label": "Client"}));
+        assert_eq!(v["total"], net);
+        // A layout the file couldn't hold is refused, saying why.
+        let e = h
+            .dispatch(
+                "bid_sheet",
+                json!({"layout": {"lines": [{"kind": "heading"}]}}),
+            )
+            .unwrap_err();
+        assert!(
+            e.message().starts_with("That bid layout can't be read"),
+            "{e}"
+        );
     }
 
     #[test]

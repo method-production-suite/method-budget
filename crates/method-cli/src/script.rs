@@ -221,6 +221,23 @@ pub enum Op {
     /// One of the group rules ([`GROUP_RULES`]; docs/FORMAT.md, "Group
     /// rules").
     GroupRule(&'static str, Inclusion),
+    /// Fill lines' rates from a rate table's classification (decisions.md,
+    /// entry 90): `fill rate ROW TABLE CLASSIFICATION [UNIT [AS_OF]]`.
+    RateFill {
+        rows: RowRef,
+        table: String,
+        classification: String,
+        unit: Option<String>,
+        as_of: Option<String>,
+    },
+    /// Bring lines filled from rate tables up to what their tables say now
+    /// (every such line when `None`): `update rates [ROW]`.
+    RateUpdate(Option<RowRef>),
+    /// Keep a rate table: a new one, or (`replace`) in place of the one of
+    /// that name. The command line's `rates import`.
+    RateTable(method_core::rates::RateTable, bool),
+    /// Delete a rate table: `delete rate_table NAME`.
+    RateTableDelete(String),
 }
 
 /// The budget's fringe row fields, by the names files and commands use.
@@ -428,14 +445,45 @@ pub fn parse(line: &str) -> Result<Option<Op>, String> {
             let w = need(&w, 4, form)?;
             Op::Rename(k, w[2].text.clone(), w[3].text.clone())
         }
+        ["fill", "rate"] => {
+            let form = "fill rate ROW TABLE CLASSIFICATION [UNIT [YYYY-MM-DD]]";
+            if w.len() < 5 {
+                return Err(format!("missing a value: {form}"));
+            }
+            if w.len() > 7 {
+                return Err(format!("too many words (quote values with spaces): {form}"));
+            }
+            let opt = |i: usize| {
+                w.get(i)
+                    .filter(|x| !x.is_none())
+                    .map(|x| x.text.trim().to_string())
+                    .filter(|t| !t.is_empty())
+            };
+            Op::RateFill {
+                rows: RowRef::parse(&w[2].text)?,
+                table: w[3].text.clone(),
+                classification: w[4].text.clone(),
+                unit: opt(5),
+                as_of: opt(6),
+            }
+        }
+        ["update", "rates"] => match w.len() {
+            2 => Op::RateUpdate(None),
+            3 => Op::RateUpdate(Some(RowRef::parse(&w[2].text)?)),
+            _ => return Err("too many words: update rates [ROW]".into()),
+        },
+        ["delete", "rate_table"] => {
+            let w = need(&w, 3, "delete rate_table NAME")?;
+            Op::RateTableDelete(w[2].text.clone())
+        }
         [verb @ ("apply" | "remove" | "unapply"), "charge"] => {
             let w = need(&w, 3, &format!("{verb} charge NAME"))?;
             Op::Charge(w[2].text.clone(), *verb == "apply")
         }
         _ => {
             return Err(format!(
-                "unknown command `{}`: use set, add tag, remove tag, rename, apply charge \
-                 or remove charge",
+                "unknown command `{}`: use set, add tag, remove tag, rename, apply charge, \
+                 remove charge, fill rate, update rates or delete rate_table",
                 head.join(" ")
             ))
         }
@@ -898,6 +946,92 @@ pub fn apply(b: &mut Budget, op: &Op) -> Result<Vec<String>, String> {
             ));
             *slot = *v;
         }
+        Op::RateFill {
+            rows,
+            table,
+            classification,
+            unit,
+            as_of,
+        } => {
+            let ids = resolve(b, rows)?;
+            for id in ids {
+                // An adjustment in an account's `*` has no rate to fill.
+                if matches!(rows, RowRef::All(_))
+                    && method_session::edit::details(b)
+                        .any(|d| d.id == id && d.kind != method_core::RowKind::Line)
+                {
+                    continue;
+                }
+                let f = method_core::rates::fill(
+                    b,
+                    id,
+                    table,
+                    classification,
+                    unit.as_deref(),
+                    as_of.as_deref(),
+                )
+                .map_err(|e| format!("{}: {e}", located(b, id)))?;
+                let how = f
+                    .found
+                    .conversion_words(&f.unit)
+                    .map(|w| format!(" ({w})"))
+                    .unwrap_or_default();
+                log.push(format!(
+                    "line {} rate {} -> {} per {} from {table}, {}{how}",
+                    located(b, id),
+                    shown(&f.before),
+                    f.found.rate,
+                    f.unit,
+                    f.found.classification
+                ));
+            }
+        }
+        Op::RateUpdate(rows) => {
+            let want = match rows {
+                Some(r) => Some(resolve(b, r)?),
+                None => None,
+            };
+            let changed = method_core::rates::changed_lines(b);
+            let mut n = 0;
+            for (id, was, now) in changed {
+                if want.as_ref().is_some_and(|w| !w.contains(&id)) {
+                    continue;
+                }
+                method_core::rates::update(b, id)
+                    .map_err(|e| format!("{}: {e}", located(b, id)))?;
+                log.push(format!(
+                    "line {} rate {was} -> {now} (its table now)",
+                    located(b, id)
+                ));
+                n += 1;
+            }
+            if n == 0 {
+                log.push("no line's rate table says anything different now".into());
+            }
+        }
+        Op::RateTable(t, replace) => {
+            let exists = b.rate_tables.iter().any(|x| x.name == t.name);
+            if exists && !replace {
+                return Err(format!(
+                    "there is already a rate table named {}: give another name, or replace it",
+                    t.name
+                ));
+            }
+            let replacing = exists.then(|| t.name.clone());
+            method_core::rates::save_table(b, t.clone(), replacing.as_deref()).map_err(|e| e.0)?;
+            log.push(format!(
+                "rate table {} {} ({} rows)",
+                t.name,
+                if exists { "replaced" } else { "added" },
+                t.rows.len()
+            ));
+        }
+        Op::RateTableDelete(name) => {
+            method_core::rates::delete_table(b, name).map_err(|e| e.0)?;
+            log.push(format!(
+                "rate table {name} deleted (lines filled from it keep their rates)"
+            ));
+        }
         Op::Charge(name, applied) => {
             let c = b
                 .charges
@@ -1167,5 +1301,41 @@ mod tests {
         assert!(e.contains("divides by zero"), "{e}");
         let log = run(&mut b, &line("rate \" 900 \"")).unwrap();
         assert!(log[0].ends_with("-> \"900\""), "{log:?}");
+    }
+
+    #[test]
+    fn rate_commands_parse() {
+        assert_eq!(
+            parse("fill rate 21-01:2 \"Invented Crew\" \"Grip, Key\" Day 2030-07-01").unwrap(),
+            Some(Op::RateFill {
+                rows: RowRef::Nth("21-01".into(), 2),
+                table: "Invented Crew".into(),
+                classification: "Grip, Key".into(),
+                unit: Some("Day".into()),
+                as_of: Some("2030-07-01".into()),
+            })
+        );
+        assert_eq!(
+            parse("fill rate #8 T C").unwrap(),
+            Some(Op::RateFill {
+                rows: RowRef::Id(8),
+                table: "T".into(),
+                classification: "C".into(),
+                unit: None,
+                as_of: None,
+            })
+        );
+        assert_eq!(parse("update rates").unwrap(), Some(Op::RateUpdate(None)));
+        assert_eq!(
+            parse("update rates 21-01:*").unwrap(),
+            Some(Op::RateUpdate(Some(RowRef::All("21-01".into()))))
+        );
+        assert_eq!(
+            parse("delete rate_table \"Invented Crew\"").unwrap(),
+            Some(Op::RateTableDelete("Invented Crew".into()))
+        );
+        assert!(parse("fill rate #8 T").is_err());
+        assert!(parse("fill rate #8 T C Day 2030-01-01 extra").is_err());
+        assert!(parse("update rates #1 #2").is_err());
     }
 }

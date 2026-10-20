@@ -84,6 +84,7 @@ import { displayCommands, userDisplay, withoutZeroRows, totalText } from './disp
 import { announce } from './announce.js';
 import { initShare, renderBar as renderShareBar, decorateShare, reportPlace, openShareDialog, whoChangedThis, lookedAt, shareShown } from './share.js';
 import { setExplainTarget, explainTargetAt } from './explain.js';
+import { openRatePicker } from './ratepick.js';
 import { showStart, closeStart, startMenu, isStartOpen, startAtLaunch, startOnLastClose } from './start.js';
 import { loadHost, isWeb } from './host.js';
 
@@ -2199,7 +2200,23 @@ Object.assign(COMMANDS, {
 Object.assign(COMMANDS, {
   'edit.explain': () => explainCell(grid.cursorRow(), grid.cursorColKey()),
   'edit.overtime': () => showTab('overtime'),
+  // A line's rate from one of the budget's rate tables (ratepick.js).
+  'edit.fill_rate': () => fillRateAtCursor(),
 });
+
+/** Fill Rate from Table on the line under the cursor (ratepick.js). */
+function fillRateAtCursor() {
+  const key = state.level === 'details' ? grid.cursorKey() : null;
+  if (typeof key !== 'string' || !key.startsWith('r')) {
+    toast('Put the cursor on a line to fill its rate from a rate table.');
+    return;
+  }
+  openRatePicker(Number(key.slice(1)), {
+    call: (cmd, args) => call(cmd, args),
+    toast,
+    openRates: () => openSetup('rates'),
+  });
+}
 
 /** The total a grid cell shows, as the Explain tab names it, or null. */
 function explainTargetFor(row, colKey) {

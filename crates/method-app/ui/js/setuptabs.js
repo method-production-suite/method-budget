@@ -67,6 +67,13 @@ export const SETUP_TABS = Object.freeze([
     list: false,
     hint: 'Incentives and rebates taken off the grand total to give the net total. Each row is a percent of some spend; the row credits add up, then the cap and discount apply.',
   },
+  {
+    id: 'rates',
+    label: 'Rate Tables',
+    library: 'rate_table',
+    list: false,
+    hint: 'Rate tables you keep: classifications with a rate per unit, typed in or imported from a spreadsheet. Pick one on a line to fill its rate.',
+  },
   { id: 'info', label: 'Info', library: null, list: false, hint: 'Facts about the production. Notes only; they don’t feed formulas.' },
   { id: 'settings', label: 'Settings', library: null, list: false, hint: '' },
   {

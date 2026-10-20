@@ -168,6 +168,7 @@ pub fn parse_kind(s: &str) -> Option<What> {
         "currencies" => "currency".to_string(),
         "line_blocks" | "line_block" | "blocks" => "line_preset".to_string(),
         "overtime" | "overtime_patterns" | "ot" => "ot_pattern".to_string(),
+        "rates" | "rate_tables" | "rate" => "rate_table".to_string(),
         _ => k.strip_suffix('s').map(str::to_string).unwrap_or(k),
     };
     What::parse(&k).ok().filter(|w| pack_kind(*w))
@@ -447,6 +448,77 @@ mod tests {
         assert_eq!(s.details.as_ref().unwrap().title, "Test Rates");
         assert_eq!(s.sources.len(), 1);
         assert!(describe(&s).iter().any(|l| l == "Effective: 2026-01-01"));
+    }
+
+    /// A rate table (decisions.md, entry 90) goes out in a pack with the
+    /// units its figures are per, comes into a budget through Import
+    /// Setup's review (a unit renamed on the way in carries its figures),
+    /// and a second import of the same pack finds it the same. Invented
+    /// names and figures.
+    #[test]
+    fn a_rate_table_travels_in_a_pack_with_its_units() {
+        use method_core::rates::{RateRow, RateTable};
+        let mut src = source();
+        src.rate_tables.push(RateTable {
+            name: "Invented Crew".into(),
+            notes: String::new(),
+            rows: vec![RateRow {
+                classification: "Made Up".into(),
+                rates: [("Shift".to_string(), Dec::from_int(400))].into(),
+                from: None,
+                to: None,
+                notes: String::new(),
+            }],
+        });
+        let (pack, _) = build(
+            &src,
+            &[r("rate_table", "Invented Crew")],
+            &details(),
+            "2030-01-01T00:00:00Z",
+            "0.1.0",
+        )
+        .unwrap();
+        assert_eq!(pack.rate_tables.len(), 1);
+        assert!(
+            pack.units.contains_key("Shift"),
+            "the unit its figures are per"
+        );
+        let back = crate::from_str(&crate::to_string(&pack)).unwrap();
+        assert_eq!(back, pack);
+
+        // Into a budget with another Shift: added under a new name, the
+        // table's figures follow it.
+        let mut here = starter::budget();
+        here.units.insert(
+            "Shift".into(),
+            UnitDef {
+                plural: "Shifts".into(),
+                description: String::new(),
+                hours: Some(Dec::from_int(10)),
+            },
+        );
+        import_pack(
+            &mut here,
+            &pack,
+            &[r("rate_table", "Invented Crew")],
+            &[res("unit", "Shift", "rename")],
+        )
+        .unwrap();
+        let t = &here.rate_tables[0];
+        assert_eq!(t.rows[0].rates.keys().collect::<Vec<_>>(), ["Shift (2)"]);
+        assert_eq!(
+            here.setup_sources
+                .get("rate_table", "Invented Crew")
+                .unwrap()
+                .pack,
+            "Test Rates",
+            "stamped with the pack"
+        );
+        // Again: the same, nothing added.
+        let done = import_pack(&mut here, &pack, &[r("rate_table", "Invented Crew")], &[]).unwrap();
+        assert_eq!(done.added, 0);
+        assert_eq!(here.rate_tables.len(), 1);
+        assert_eq!(parse_kind("rate-tables"), Some(What::RateTable));
     }
 
     #[test]
