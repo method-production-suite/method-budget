@@ -7,7 +7,7 @@ use serde_json::Value;
 
 use super::{json, Call, Downloads, Error, FileOut};
 use crate::docs::DocId;
-use crate::sharing::{self as sh, ShareInput, SubBudgetInput};
+use crate::sharing::{self as sh, RowInput, ShareInput, SubBudgetInput};
 
 pub(super) fn dispatch(d: &Call<'_>) -> Option<Result<Value, Error>> {
     Some(match d.command() {
@@ -50,6 +50,18 @@ pub(super) fn dispatch(d: &Call<'_>) -> Option<Result<Value, Error>> {
             let id = sh::sub_budget_new(d.state(), d.doc(), a.spec, &a.saved)?;
             json(d.state().lock_doc(Some(id))?.finish(None))
         })(),
+        // `{doc, row: {kind, code}, saved}`: the sub-budget of one category
+        // or account row in a new tab with no file, as `{view, message}`
+        // (the desktop saves it beside its parent's file).
+        "sub_budget_from_row" => (|| {
+            let a: FromRow = d.args()?;
+            let id = sh::row_sub_budget_new(d.state(), d.doc(), &a.row, &a.saved)?;
+            let view = d.state().lock_doc(Some(id))?.finish(None);
+            json(serde_json::json!({
+                "view": view,
+                "message": "Opened the sub-budget in a new tab. It has no file until you save it.",
+            }))
+        })(),
         _ => return None,
     })
 }
@@ -73,6 +85,12 @@ struct Store {
 #[derive(Deserialize)]
 struct SubBudget {
     spec: SubBudgetInput,
+    saved: String,
+}
+
+#[derive(Deserialize)]
+struct FromRow {
+    row: RowInput,
     saved: String,
 }
 
@@ -127,5 +145,13 @@ mod tests {
             json!({"doc": first, "spec": {"drop_notes": true}, "saved": AT}),
         );
         assert_eq!(v["budget"]["title"], "Big Show (sub-budget)");
+
+        let v = call(
+            &h,
+            "sub_budget_from_row",
+            json!({"doc": first, "row": {"kind": "category", "code": "21"}, "saved": AT}),
+        );
+        assert_eq!(v["view"]["budget"]["title"], "Big Show - Camera");
+        assert!(v["message"].as_str().unwrap().contains("new tab"));
     }
 }

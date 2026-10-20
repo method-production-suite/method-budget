@@ -4373,3 +4373,78 @@ docs/CLI.md, `method-budget incentives`; MCP: `set_credit`, `list_charges`, `inc
 - **Not built** (3.6 stays partial): the what-if that moves lines between locations, an
   unapplied credit's row figures in its rows table, and a per-location view in the printed
   reports. The terms band needs a live check in the app.
+
+## 91. The start window and New Budget, the rest: projects, thumbnails, Duplicate, sub-budgets from a row, a linked schedule, shared badges, sorting (2026-10-20)
+
+Roadmap 3.19 (design: docs/research/new-project-window.md, sections 4, 5, 7, 8 and 9;
+behavior: docs/APP.md, "The start window and New Budget" and "Sharing copies and
+sub-budgets"). Phases so far: entries 63, 65 and 77. This builds every later item that
+doesn't wait on rate data; rates at creation come from 3.9 when it lands.
+
+- **A project is a folder, listed by the app.** Projects are paths in `start.json` (at most
+  50), shown down the start window's left under Pinned and recent, and read every time the
+  window lists: the folder and the folders directly in it, at most 300 files and folders,
+  hidden ones and `X.mthd-log` folders passed over. No index is kept that could drift from
+  the disk; budgets come through the summary cache like the other lists. What each file is
+  comes from its provenance (method-session's `projects`): budgets by title, each with
+  the sub-budgets and copies whose source title is its title under it, then the rest,
+  setup packs, schedule days files (a `.json` that says `method-schedule-days`) and
+  actuals exports (`.csv`, `.tsv`, `.xlsx` in an `actuals` folder). Add Folder…, New
+  Budget Here…, Show Folder and Remove from List (the folder is never touched).
+- **Built on the recommendation: New Budget makes the project folder.** The design said a
+  project is also "the folder a new budget is saved in", which would turn Documents into a
+  project. Instead Save In has **Make a project folder for it**, on by default (the choice
+  is remembered; off for New Budget Here): it makes `<folder>/<name>/`, saves
+  `<name>.mthd` in it, never over a folder or file of that name (a free name is offered),
+  and lists the folder. Reversible: the box's default, or listing every Save In folder.
+- **Templates aren't guessed** from "no lines": a budget just made from a chart has none
+  either. Setup packs show by their provenance.
+- **Thumbnails are bars from the totals.** One bar per category, in topsheet order, by its
+  share of what the categories come to (below zero counts as nothing); over 12 categories
+  the 11 largest keep their own bar in place and the rest share the last. Worked out with
+  the net total, kept with each file's summary in `start-cache.json` (now version 2, with
+  the kind and source title too; an older cache is read as empty) and read again only
+  when the file's modified time or size changes. Drawn as SVG shapes sized by attributes
+  (the page's CSP has no inline styles). Nothing from the screen, nothing in the budget.
+- **Duplicate is a byte copy beside the file** under the first free "Name 2", "Name 3"…,
+  written to a temporary file and linked into place so it never replaces a file, then
+  opened as a saved tab and listed in Open Recent. The file on disk, so a tab's unsaved
+  changes aren't in it; the title is unchanged; a change log isn't copied (the duplicate
+  is a budget of its own). A file that doesn't read as a budget is refused.
+- **New Sub-Budget from This Category or Account** (context menus of the topsheet and the
+  account list, so Shift+F10 reaches them) keeps exactly: the row (the category with its
+  accounts, or the account under its category) with every row in it and their notes and
+  tags; the setup those lines use and what that setup needs (fringes, globals with the
+  globals they name, units, groups, sets, locations, foreign currencies), anything else
+  pruned with its folder, order and source entries; the settings, budget info, display
+  settings and overtime patterns. It leaves out the other rows, charges and credits (they
+  work on the whole budget), tag, line and report presets, versions, the baseline and
+  actuals. So the row's totals are the same as in its parent (tested for every category
+  and account of the starter): the one exception is a fringe cutoff shared with lines
+  outside the row. Titled "Parent - Row", stamped as a sub-budget with "From category 21
+  Camera", and saved beside the parent's file under the first free name; a budget with no
+  file, and the browser build, open it in a new tab. Logic in
+  `method_session::sharing::make_row_sub_budget`.
+- **Link a Schedule… at New Budget** (with 3.8, entry 76): the days file's shoot days in all
+  go to `SHOOT_DAYS` with Import Schedule Days' own link (the global's setup source), its
+  prep start, shoot start, shoot end and wrap end to the budget info fields the budget
+  doesn't have yet, before the form's details so a typed value wins. No new field in the
+  budget file; the file's path and hash aren't kept (that was proposed in 3.8 as a format
+  change and stays a proposal). `method_session::new_budget::link_schedule`.
+- **Shared badges read, never write.** A budget with a change log folder beside it says
+  "shared" and lists up to five people from their heartbeats (`presence.json`), latest
+  first, one row per name, with the category or account they were in.
+- **Sorting is the page's**: last opened (as listed), name, last changed, net total,
+  kept per user; a row under a budget moves with it.
+- **Paths stay in Rust**: projects, their files and the duplicate's source are named by
+  tokens of the last listing, as before.
+- Tests: method-session's `projects` (thumbnails, kinds, arrangement, recognizing schedule
+  and actuals files, people), `sharing` (what a row's sub-budget carries and that its
+  totals match the row), `new_budget` (the linked schedule) and the host's
+  `sub_budget_from_row`; method-app's start tests (the project folder made and never over a
+  folder or file, Duplicate never over a file, thumbnails kept and read again when the
+  file changes, projects listed by folder, a large folder read to the limit, shared
+  badges, the linked schedule under typed values, the commands wired); and the browser
+  smoke opens a sub-budget from a category with Shift+F10 and checks its total.
+- **Not built**: rates at creation (3.9), created dates and hiding archived projects (design
+  phase 4), keeping a schedule link's path and hash, and a live check in the app.
