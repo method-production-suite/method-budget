@@ -17,6 +17,13 @@
 #   version) and drafts the release. Publishing the
 #   draft is left to a person; until then nothing is served at releases/latest.
 #
+# The rehearsal (Method Reader's and Launcher's way; SUITE-STANDARDS.md section 6): run
+# by hand on main with rehearse_version set to the workspace version, it runs every check,
+# test, build, signature, notarization and bundle check, and creates, edits and uploads to
+# no release (the release job is skipped). No tag is made or needed. It runs only from main,
+# since it uses the real signing keys. It is the only full build before a release; its
+# bundles stay on the run as artifacts (docs/RELEASING.md).
+#
 # Only first-party actions, pinned to full commit SHAs. No caches (release builds start
 # clean). Permissions: contents: read everywhere except the release job's contents: write
 # (it creates the draft release and uploads its files).
@@ -25,6 +32,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      rehearse_version:
+        description: "Rehearse the release on main, without one: the workspace version, such as 0.6.0."
+        type: string
+        required: true
 permissions:
   contents: read
 concurrency:
@@ -35,22 +48,41 @@ jobs:
     name: version and notes
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
+      # The rehearsal uses the real signing secrets, so only reviewed code meets them:
+      # it runs only from main. Every other job needs this one.
+      - name: A rehearsal runs only from main
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          [ "$REF" = refs/heads/main ] || {
+            echo "::error::A rehearsal runs only from main, with reviewed code beside the signing keys. This run is on $REF."; exit 1; }
       - name: The tagged commit is on main
         # A tag pushed on a side branch must not build or draft a release.
         # fetch-depth: 0 above fetched every branch, so origin/main is here
         # (no second fetch: credentials are not kept after checkout).
+        if: github.event_name == 'push'
         run: |
           if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
             echo "::error::$GITHUB_REF_NAME points at a commit that is not on main"
             exit 1
           fi
-      - name: The tag, the version and the notes agree
-        run: cargo xtask check-version --tag "$GITHUB_REF_NAME"
+      - name: The tag (or the rehearsal's version), the version and the notes agree
+        id: version
+        env:
+          REHEARSE: ${{ inputs.rehearse_version }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then tag="v$REHEARSE"; else tag="$GITHUB_REF_NAME"; fi
+          cargo xtask check-version --tag "$tag"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
       - name: Every locked crate is at least 14 days old
         # SUITE-STANDARDS.md section 6: no release ships a crate younger than the
         # cooldown, so both locks are checked in full here, before any build or signing
@@ -99,6 +131,8 @@ jobs:
       # The Apple team the macOS build is signed for (decisions.md, entry 48). The identity
       # itself is read from the imported certificate, so no name sits in this file.
       SIGNING_TEAM_ID: XSRB3D643J
+      # The release's version, from the tag or the rehearsal (the check job checked it).
+      VERSION: ${{ needs.check.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -118,6 +152,13 @@ jobs:
         run: |
           # shellcheck disable=SC2086 # word splitting is intended
           rustup target add $RUST_TARGETS
+
+      - name: Test (no signing secrets in reach)
+        # Every release tests each system before anything is built for it or signed
+        # (SUITE-STANDARDS.md section 6). On macOS this runs the Apple silicon code; the
+        # Intel half is tested under Rosetta before the tag (docs/RELEASING.md).
+        shell: bash
+        run: cargo test --workspace --locked --no-fail-fast
 
       - name: Install Tauri CLI (pinned, prebuilt)
         # Its release download, checked against the SHA-256 pinned in the script, instead
@@ -318,7 +359,7 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
           if [ -n "$TARGET" ]; then root="target/$TARGET/release/bundle"; else root="target/release/bundle"; fi
-          version="${GITHUB_REF_NAME#v}"
+          version="$VERSION"
           mkdir -p dist updater meta
           # one <what> <files...>: prints the single file, or stops the job when the
           # pattern matched none or several (the bundle changed shape: look before shipping).
@@ -382,14 +423,14 @@ jobs:
         run: |
           set -euo pipefail
           test -x target/debug/xtask
-          target/debug/xtask sign-update --dir updater --version "${GITHUB_REF_NAME#v}"
+          target/debug/xtask sign-update --dir updater --version "$VERSION"
 
       - name: Check the updater signature the way the app does (macOS)
         # The app's own verifier (method-update) on what was just signed, with the public key
         # in tauri.conf.json: a release never ships an update the app would refuse.
         if: runner.os == 'macOS' && env.UPDATER == 'yes'
         shell: bash
-        run: target/debug/xtask verify-update --dir updater --version "${GITHUB_REF_NAME#v}"
+        run: target/debug/xtask verify-update --dir updater --version "$VERSION"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -418,7 +459,9 @@ jobs:
     name: draft release
     # The only job with write access: it drafts a GitHub Release for the tag with the
     # notes, the bundles and the update manifest. Publishing the draft is left to a person.
+    # A rehearsal stops before it: no release is created, edited or uploaded to.
     needs: [check, build]
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
