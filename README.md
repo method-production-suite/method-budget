@@ -124,6 +124,7 @@ this section.
 - **Incentive estimates by location.** Limit a credit to the locations where the money is spent and see every program's estimate side by side, applied or not, from rates and caps you enter yourself.
 - **Apply panel.** Select lines, then tick fringes, groups, sets and locations on or off, with live totals for the selection.
 - **In-use counts.** Every setup list shows how many lines use each item and what they cost, warns before you delete one in use, and finds them in a click.
+- **Your own rate tables.** Keep rate tables of your own (classifications with a rate per hour, day or week and the dates each is in effect), type them in or import them from a spreadsheet, and pick a classification on a line to fill its rate; the line remembers where the rate came from and tells you when the table changes.
 
 ### Editing, split view and history
 
@@ -185,7 +186,7 @@ this section.
 - **Incentive what-ifs.** Move lines between locations and see what each incentive program gains or loses, with minimum spends and shared caps.
 - **Accessibility and translations.** A full accessibility pass and the app in more languages.
 - **Work on a budget together.** Several people in one budget at once, through a shared Dropbox or iCloud folder or a live link, with who changed what and undo that only takes back your own edits.
-- **Rate card lookup.** Pick a union classification and fill in the rate from public rate cards, with the source and effective date shown.
+- **Rate card lookup.** Pick a union classification from public rate cards that come with the app and fill in the rate, with the source and effective date shown.
 - **New project window.** Start a budget from one window with its title, chart of accounts, schedule, currency, your setup library and setup packs, and later rate setup, ready to fill in.
 
 <!-- features:end -->

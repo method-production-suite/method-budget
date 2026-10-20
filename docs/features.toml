@@ -474,8 +474,15 @@ ref = "3.18"
 
 [[feature]]
 group = "fringes"
+title = "Your own rate tables"
+text = "Keep rate tables of your own (classifications with a rate per hour, day or week and the dates each is in effect), type them in or import them from a spreadsheet, and pick a classification on a line to fill its rate; the line remembers where the rate came from and tells you when the table changes."
+status = "have"
+ref = "D90"
+
+[[feature]]
+group = "fringes"
 title = "Rate card lookup"
-text = "Pick a union classification and fill in the rate from public rate cards, with the source and effective date shown."
+text = "Pick a union classification from public rate cards that come with the app and fill in the rate, with the source and effective date shown."
 status = "soon"
 ref = "3.9"
 

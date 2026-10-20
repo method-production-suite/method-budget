@@ -511,11 +511,11 @@ details (docs/FORMAT.md, "Setup packs"; docs/APP.md, "Setup packs").
 `method-budget pack export <budget.mthd> -o <pack.mthd> [--kinds K,K] [--items NAME,NAME] [--item NAME] [--title T] [--description D] [--author A] [--pack-version V] [--effective YYYY-MM-DD] [--region R] [--notes N] [--url URL]... [--created DATE]`
 writes a pack of the budget's setup items of `--kinds` (`globals`, `fringes`, `groups`,
 `units`, `sets`, `locations`, `currencies`, `charges`, `credits`, `tag-presets`,
-`line-blocks`, `report-presets`, `ot-patterns`; every kind when left out), or only the
+`line-blocks`, `report-presets`, `ot-patterns`, `rate-tables`; every kind when left out), or only the
 named `--items` (split on commas; `--item` takes a name whole, for names with commas;
 `kind:Name` says which kind), with everything they need: a fringe's globals and unit, a
-global's globals, a charge's groups, a credit's groups and fringes, a tag preset's tags.
-The budget settings never go in a pack. The title defaults to the budget's; `--created`
+global's globals, a charge's groups, a credit's groups and fringes, a tag preset's tags,
+a rate table's units. The budget settings never go in a pack. The title defaults to the budget's; `--created`
 defaults to today (UTC). The details are checked (a date `YYYY-MM-DD`, links `http://` or
 `https://`); a refusal is exit 3. The pack is written atomically, never over the budget.
 
@@ -536,6 +536,55 @@ method-budget pack export show.mthd -o "Crew Rates.mthd" --kinds fringes,globals
   --title "Crew Rates" --pack-version 2026.1 --effective 2026-01-01 --region "Example"
 method-budget pack import "Crew Rates.mthd" new-show.mthd --dry-run
 method-budget pack import "Crew Rates.mthd" new-show.mthd --theirs
+```
+
+### Rate tables: `method-budget rates list`, `show`, `check`, `fill`, `update`, `import` and `delete`
+
+Rate tables are the user's own: classifications with a rate per unit and, when figures
+change over time, the dates each row is in effect (docs/FORMAT.md, "Rate table";
+decisions.md, entry 90). Nothing comes with the app. Filling a line's rate writes the
+figure once, as a number, and the line remembers where it came from; a table changed later
+never changes the line on its own.
+
+- `method-budget rates list <file.mthd> [--json]` prints each table: name, rows,
+  classifications and units.
+- `method-budget rates show <file.mthd> <TABLE> [--json]` prints its rows, one line per
+  classification, period and unit: `classification<TAB>unit<TAB>rate<TAB>from<TAB>to<TAB>notes`.
+- `method-budget rates check <file.mthd> [--json]` prints every line filled from a table:
+  `row<TAB>state<TAB>table / classification per unit<TAB>rate`, where the state is
+  `current`, `changed` (the table now says something else, and says what), `edited` (the
+  rate or its unit was changed by hand since) or `missing` (the table, classification,
+  unit or period is gone, and says why).
+- `method-budget rates fill <file.mthd> <ROW> <TABLE> <CLASSIFICATION> [--unit UNIT] [--as-of YYYY-MM-DD] [--dry-run]`
+  fills the rate of `ROW` (`#ID`, `ACCOUNT:N`, or `ACCOUNT:*` for every line of an
+  account; rows as in edit scripts below) from the classification (case and extra spaces
+  ignored). The unit is `--unit`, else the line's rate unit, else its amount unit, else
+  the row's only one. When the table has no figure for that unit, it converts from the
+  unit closest in hours, only when both units have hours in the budget, rounded to cents
+  (a 50.00 Hour rate is 600.00 for a 12-hour Day). A classification with dated rows needs
+  `--as-of`, which picks the row in effect then.
+- `method-budget rates update <file.mthd> [ROW] [--dry-run]` gives every line filled from
+  a table (or `ROW`'s) what its table says now. Lines changed by hand are left alone.
+- `method-budget rates import <file.mthd> <sheet.xlsx|csv> [--name NAME] [--sheet N|NAME] [--header-row N] [--column FIELD=COLUMN]... [--replace] [--dry-run]`
+  reads a rate table from a spreadsheet: a classification column, then a column per unit
+  (titles like `Daily`, `Day`, `Per Day` or `Day Rate` are guessed) or a `Unit` and a
+  `Rate` column, with optional `From`, `To` and `Notes` columns. `--column` changes the
+  guess: `FIELD` is `classification`, `from`, `to`, `notes`, `unit`, `rate` or
+  `unit:NAME`; `COLUMN` a letter, a number from 1 or a title, `none` to leave it out.
+  Every row is checked; problems are listed with their rows and nothing is written while
+  any is left (exit 3). The table is named `--name`, else after the sheet (in a workbook
+  of several) or the file. A table of the same name is refused unless `--replace`.
+- `method-budget rates delete <file.mthd> <TABLE> [--dry-run]` deletes a table; lines
+  filled from it keep their rates.
+
+Every change goes through the same path as `apply` (a shared budget records it in its
+change log; `--dry-run` prints the change and writes nothing; a refusal is exit 3).
+
+```sh
+method-budget rates import film.mthd "Crew card.xlsx" --name "Crew Card" --column unit:Week=Weekly
+method-budget rates fill film.mthd 21-01:2 "Crew Card" "Grip, Key" --unit Day
+method-budget rates check film.mthd
+method-budget rates update film.mthd --dry-run
 ```
 
 ### `method-budget mcp [--root DIR]... [--read-only]`
@@ -597,6 +646,8 @@ remove tag #17 group Night
 rename location "Stage 4" "Stage 5"
 apply charge Contingency
 remove charge Insurance
+fill rate 21-01:2 "Crew Card" "Grip, Key" Day
+update rates
 ```
 
 | Command | Does |
@@ -620,6 +671,9 @@ remove charge Insurance
 | `rename KIND OLD NEW` | Renames a global, fringe, group, unit, set, location or currency and every reference to it, exactly as the app's rename does (decision 32). |
 | `apply charge NAME` | Makes a contractual charge count. |
 | `remove charge NAME` (or `unapply`) | Makes it stop counting. The charge stays in the budget, so `apply charge` brings it back. |
+| `fill rate ROW TABLE CLASSIFICATION [UNIT [YYYY-MM-DD]]` | Fills the rows' rates from a rate table's classification, as `rates fill` does (`none` leaves the unit to the line). |
+| `update rates [ROW]` | Gives lines filled from a rate table (all, or `ROW`'s) what their tables say now, as `rates update` does. |
+| `delete rate_table NAME` | Deletes a rate table; lines filled from it keep their rates. |
 
 **Rows.** `#17` is the row with id 17 (ids are stable: docs/FORMAT.md). `21-01:3` is the
 third row of account 21-01, counting every row (subtotals and separators too), as the
