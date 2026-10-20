@@ -1361,6 +1361,7 @@ pub fn run() {
             // Reports: saved presets, printing and PDF (src/reports.rs)
             crate::reports::save_report_preset,
             crate::reports::delete_report_preset,
+            crate::reports::bid_sheet,
             crate::reports::print_report,
             // Spreadsheet export: Excel, CSV, tab-delimited (src/export.rs)
             crate::export::export_budget,

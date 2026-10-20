@@ -51,6 +51,7 @@ export const SECTIONS = [
   { key: 'locations', label: 'Locations with totals' },
   { key: 'currencies', label: 'Currencies' },
   { key: 'cost_report', label: 'Cost report' },
+  { key: 'bid', label: 'Bid' },
 ];
 const SECTION_KEYS = new Set(SECTIONS.map((s) => s.key));
 
@@ -160,7 +161,83 @@ export function normalizeSpec(spec) {
     topsheet_pages: s.topsheet_pages === true,
     header: band(s.header),
     footer: band(s.footer),
+    bid: bidLayout(s.bid),
   };
+}
+
+// --- Bid layouts (docs/FORMAT.md, "Bid layout"; decisions.md, entry 92) ---
+
+function text(v) {
+  return typeof v === 'string' ? v : '';
+}
+
+/** One pick of a bid section in the file's shape, or null. */
+function bidPick(p) {
+  if (!p || typeof p !== 'object') return null;
+  if (p.kind === 'category' || p.kind === 'account') return { kind: p.kind, code: text(p.code) };
+  if (p.kind === 'range') return { kind: 'range', from: text(p.from), to: text(p.to) };
+  return null;
+}
+
+/** One line of a bid in the file's shape, or null. */
+function bidLine(l) {
+  if (!l || typeof l !== 'object') return null;
+  const name = text(l.name);
+  switch (l.kind) {
+    case 'section':
+      return { kind: 'section', name, picks: (Array.isArray(l.picks) ? l.picks : []).map(bidPick).filter(Boolean) };
+    case 'subtotal':
+      return { kind: 'subtotal', name };
+    case 'percent':
+      return { kind: 'percent', name, percent: text(l.percent) || '0', of: strings(l.of) };
+    case 'flat':
+      return { kind: 'flat', name, amount: Number.isSafeInteger(l.amount) ? l.amount : 0 };
+    default:
+      return null;
+  }
+}
+
+/** A bid layout from the file's shape (every part filled in), or null when there is none. */
+export function bidLayout(b) {
+  if (!b || typeof b !== 'object' || Array.isArray(b)) return null;
+  return {
+    fields: (Array.isArray(b.fields) ? b.fields : []).filter((f) => f && typeof f === 'object').map((f) => ({ label: text(f.label), value: text(f.value) })),
+    lines: (Array.isArray(b.lines) ? b.lines : []).map(bidLine).filter(Boolean),
+    show_accounts: b.show_accounts === true,
+  };
+}
+
+/** A bid layout in the file's shape, parts at their default left out. */
+export function compactBid(b) {
+  const l = bidLayout(b);
+  if (!l) return null;
+  const out = {};
+  if (l.fields.length) out.fields = l.fields.map((f) => (f.value ? { label: f.label, value: f.value } : { label: f.label }));
+  if (l.lines.length) {
+    out.lines = l.lines.map((x) => {
+      if (x.kind === 'section') return x.picks.length ? x : { kind: 'section', name: x.name };
+      if (x.kind === 'percent') return x.of.length ? x : { kind: 'percent', name: x.name, percent: x.percent };
+      return x;
+    });
+  }
+  if (l.show_accounts) out.show_accounts = true;
+  return out;
+}
+
+/**
+ * The view with the bid worked out for `spec` (`bid_sheet`), when the spec
+ * prints the bid section: the figures come from the engine, never from the
+ * page. On a refusal the view says why instead (`bid_error`).
+ */
+export async function withBid(view, spec) {
+  const s = normalizeSpec(spec);
+  if (!s.sections.includes('bid')) return view;
+  try {
+    const sheet = await invoke('bid_sheet', { layout: compactBid(s.bid) });
+    return { ...view, bid_sheet: sheet, bid_error: '' };
+  } catch (e) {
+    return { ...view, bid_sheet: null, bid_error: String(e) };
+  }
 }
 
 /**
@@ -182,6 +259,7 @@ export function compactSpec(spec) {
   for (const k of ['vertical_rules', 'collapse_details', 'topsheet_fringes', 'topsheet_pages']) if (s[k]) out[k] = true;
   if (s.header) out.header = s.header;
   if (s.footer) out.footer = s.footer;
+  if (s.bid) out.bid = compactBid(s.bid);
   return out;
 }
 
@@ -1518,6 +1596,82 @@ function costReportSection(ctx) {
   return [simpleTable('Cost report', 'rpt-cost', spec, rows)];
 }
 
+/**
+ * The bid (decisions.md, entry 92), from the view's bid_sheet: its header
+ * fields, then its lines in the layout's order, the Unassigned bucket, the
+ * budget's own charges and credits and the bid total, with a line saying how
+ * it reconciles. Every figure is the engine's.
+ */
+function bidSection(ctx) {
+  const sheet = ctx.view && ctx.view.bid_sheet && Array.isArray(ctx.view.bid_sheet.lines) ? ctx.view.bid_sheet : null;
+  const spec = [
+    ['Acct #', 'c-code2'],
+    ['Description', 'c-desc'],
+    ['Amount', 'c-money', 'num'],
+  ];
+  const rows = [];
+  if (!sheet) {
+    const why = ctx.view && ctx.view.bid_error ? ctx.view.bid_error : 'The bid could not be worked out.';
+    rows.push(emptyRow(why, spec.length));
+    return [simpleTable('Bid', 'rpt-bid', spec, rows)];
+  }
+  const showAccounts = Boolean(ctx.spec.bid && ctx.spec.bid.show_accounts);
+  // The header fields head the same table, so they print with the bid.
+  const fields = Array.isArray(sheet.fields) ? sheet.fields : [];
+  fields.forEach((f, i) => {
+    const cell = td('', 'txt', spec.length);
+    cell.append(el('span', { class: 'rpt-bid-label', text: f.label || '' }), el('span', { class: 'rpt-bid-value', text: f.value || '' }));
+    rows.push(row(el('tr', { class: `rpt-row rpt-bid-field${i === fields.length - 1 ? ' last' : ''}` }, cell), true));
+  });
+  const line = (cls, code, label, cents, keep = false) => rows.push(row(el('tr', { class: `rpt-row ${cls}` }, td(code, 'code'), td(label, cls.includes('total') ? 'name' : 'txt'), td(m(cents), 'num')), keep));
+  const heading = (text) => {
+    const cap = td('', 'cat', spec.length);
+    cap.append(el('span', { class: 'cat-name', text }));
+    rows.push(row(el('tr', { class: 'rpt-bid-head' }, cap), true));
+  };
+  const accounts = (list) => {
+    for (const a of list) line('rpt-bid-acct', a.code || '', a.name || '', a.amount);
+  };
+  for (const l of sheet.lines) {
+    if (l.kind === 'section' && showAccounts) {
+      heading(l.name);
+      accounts(l.accounts || []);
+      line('rpt-st-total', '', `Total ${l.name}`, l.total);
+    } else if (l.kind === 'section') {
+      line('rpt-bid-section', '', l.name, l.total);
+    } else if (l.kind === 'subtotal') {
+      line('rpt-st-total', '', l.name, l.amount);
+    } else if (l.kind === 'markup') {
+      const label = l.percent === null || l.percent === undefined ? l.name : `${l.name} (${decimal(l.percent)}% of ${money(l.base)})`;
+      line('rpt-bid-markup', '', label, l.amount);
+    }
+  }
+  const unassigned = Array.isArray(sheet.unassigned) ? sheet.unassigned : [];
+  if (unassigned.length) {
+    heading('Unassigned');
+    const shown = unassigned.filter((a) => a.amount !== 0);
+    accounts(shown);
+    const zero = unassigned.length - shown.length;
+    if (zero) rows.push(row(el('tr', { class: 'rpt-note-row' }, td(`${zero} more ${zero === 1 ? 'account' : 'accounts'} at zero.`, 'note', spec.length))));
+    line('rpt-st-total', '', 'Total Unassigned', sheet.unassigned_total);
+  }
+  if (sheet.unposted_fringes) line('rpt-bid-budget', '', 'Fringes the budget doesn’t post', sheet.unposted_fringes);
+  (sheet.charges || []).forEach((c, i) => line(`rpt-bid-budget${i === 0 ? ' first' : ''}`, '', c.name, c.amount, true));
+  for (const c of sheet.credits || []) line('rpt-bid-budget', '', `Less ${c.name}`, -c.amount, true);
+  line('rpt-st-total rpt-bid-total', '', 'Bid total', sheet.total, true);
+  rows.push(
+    row(
+      el(
+        'tr',
+        { class: 'rpt-note-row' },
+        td(`The budget’s net total ${money(sheet.budget_net)} plus the bid’s markups ${money(sheet.markups)}. Each account counts once, with the fringes it earns.`, 'note', spec.length),
+      ),
+    ),
+  );
+  for (const w of sheet.warnings || []) rows.push(row(el('tr', { class: 'rpt-note-row' }, td(`Check: ${w}.`, 'note', spec.length))));
+  return [simpleTable('Bid', 'rpt-bid', spec, rows)];
+}
+
 const BUILD = {
   topsheet,
   accounts: accountLevel,
@@ -1533,6 +1687,7 @@ const BUILD = {
   locations: locationsSection,
   currencies: currenciesSection,
   cost_report: costReportSection,
+  bid: bidSection,
 };
 
 // ---------------------------------------------------------------------------
@@ -1954,9 +2109,10 @@ function jobTitle(view, extra) {
  * into a PDF file. `name` (a preset's name) goes into the job's title.
  * Resolves with { done, file }.
  */
-export function printReport(view, spec = 'both', { pdf = false, name = '' } = {}) {
+export async function printReport(view, spec = 'both', { pdf = false, name = '' } = {}) {
   const s = normalizeSpec(spec);
-  return printPages((root) => renderReport(root, view, s), { landscape: s.landscape, pdf, title: jobTitle(view, name || 'Report') });
+  const v = await withBid(view, s);
+  return printPages((root) => renderReport(root, v, s), { landscape: s.landscape, pdf, title: jobTitle(view, name || 'Report') });
 }
 
 /** printReport into a PDF file. */

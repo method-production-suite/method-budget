@@ -382,6 +382,19 @@ pub fn report_preset_from_value(v: serde_json::Value) -> Result<method_core::Rep
         .map_err(|e| e.to_string())
 }
 
+/// A bid layout as the file writes it: a report preset's `bid` (docs/FORMAT.md,
+/// "Bid layout"). For the app, which sends a layout being edited in this shape.
+pub fn bid_layout_to_value(l: &method_core::BidLayout) -> serde_json::Value {
+    serde_json::to_value(dto::FileBid::from(l)).expect("a bid layout always serializes")
+}
+
+/// Reads a bid layout in the file's shape, as strictly as a file is read.
+pub fn bid_layout_from_value(v: serde_json::Value) -> Result<method_core::BidLayout, String> {
+    serde_json::from_value::<dto::FileBid>(v)
+        .map(method_core::BidLayout::from)
+        .map_err(|e| e.to_string())
+}
+
 /// A tag preset as the file writes it: one entry of the budget's
 /// `tag_presets` (docs/FORMAT.md, "Tag preset"). For the app, which sends and
 /// receives tag presets in this shape.

@@ -13,6 +13,10 @@ pub(super) fn dispatch(d: &Call<'_>) -> Option<Result<Value, Error>> {
             d.view_with(|s, a: SavePreset| r::save_report_preset(s, a.index, a.preset))
         }
         "delete_report_preset" => d.view_with(|s, a: Index| r::delete_report_preset(s, a.index)),
+        "bid_sheet" => d.args::<Layout>().and_then(|a| {
+            let sheet = r::bid_sheet(&mut *d.lock()?, a.layout)?;
+            Ok(serde_json::to_value(sheet).expect("a bid sheet always serializes"))
+        }),
         _ => return None,
     })
 }
@@ -21,6 +25,12 @@ pub(super) fn dispatch(d: &Call<'_>) -> Option<Result<Value, Error>> {
 struct SavePreset {
     index: Option<usize>,
     preset: Value,
+}
+
+#[derive(Deserialize)]
+struct Layout {
+    #[serde(default)]
+    layout: Option<Value>,
 }
 
 #[derive(Deserialize)]

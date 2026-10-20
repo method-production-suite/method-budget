@@ -163,13 +163,14 @@ for accented letters.
 Draws a report from one of the budget's saved report presets (docs/FORMAT.md, "Report
 preset"): its sections in order, category and account exclusions, skipped accounts and
 lines, "only these groups", detail columns, notes, orientation, type size, shading,
-vertical rules, collapsed detail, the topsheet fringes column, header and footer.
+vertical rules, collapsed detail, the topsheet fringes column, header and footer, and its
+bid layout.
 
 - `--preset NAME` picks a preset by name (exact, else ignoring case). Without it, the
   budget's default preset, else the topsheet and the detail with the standard columns.
 - `--sections topsheet,detail,...` replaces the preset's sections. Names: `topsheet`,
   `accounts`, `detail`, `fringes`, `globals`, `groups`, `notes`, `info`, `chart`,
-  `units`, `sets`, `locations`, `currencies`.
+  `units`, `sets`, `locations`, `currencies`, `bid`.
 - `--format html|txt|csv|pdf`, else from the extension of `-o`, else `txt`.
 - `-o PATH` writes the report; without it (or with `-o -`) it goes to stdout. PDF needs
   `-o`.
@@ -181,6 +182,20 @@ vertical rules, collapsed detail, the topsheet fringes column, header and footer
 Like the app's reports, a filter never changes a total: leaving accounts or lines out
 prints the budget's own totals with a note, and the topsheet always lists every
 category. Original and variance columns print only when the budget has a baseline.
+
+**Bids.** The `bid` section prints the preset's bid layout (docs/FORMAT.md, "Bid layout";
+decisions entry 92), or the example layout when the preset has none: the header fields,
+each section (with its accounts when the layout lists them), subtotals and markups,
+Unassigned, the budget's own charges and credits, and the bid total, which is the
+budget's net total plus the bid's markups; a closing note says so, and any `Check:` line
+names an account two sections take, a pick that takes nothing or a markup of a missing
+section. In CSV the fields come first as `label,value` rows, then `code,description,amount`
+rows, the amounts as exact decimals:
+
+```sh
+method-budget report spot.mthd --preset "Spot bid" -o "Spot bid.pdf"
+method-budget report spot.mthd --sections bid --format csv
+```
 
 The formats:
 

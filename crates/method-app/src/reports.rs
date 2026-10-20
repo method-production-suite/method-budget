@@ -47,6 +47,19 @@ pub fn delete_report_preset<R: Runtime>(
     })
 }
 
+/// `{layout}`: a bid layout in the file format's shape (docs/FORMAT.md, "Bid
+/// layout"; `null`: the example) worked out on the current totals. Changes
+/// nothing.
+#[tauri::command]
+pub fn bid_sheet(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    layout: Option<serde_json::Value>,
+) -> Result<BidSheetDto, String> {
+    let mut s = state.lock_doc(doc)?;
+    method_session::reports::bid_sheet(&mut s, layout)
+}
+
 /// Prints what the main window's page shows for print media (the page has
 /// drawn the report into `#print-root` first): with `pdf`, into a PDF file
 /// chosen in a Save dialog, with no print sheet; otherwise through the print
@@ -173,7 +186,12 @@ mod tests {
         const BUILD_RS: &str = include_str!("../build.rs");
         const MAIN: &str = include_str!("../capabilities/main.json");
         const TOOLS: &str = include_str!("../capabilities/tools.json");
-        for c in ["save_report_preset", "delete_report_preset", "print_report"] {
+        for c in [
+            "save_report_preset",
+            "delete_report_preset",
+            "bid_sheet",
+            "print_report",
+        ] {
             assert!(
                 APP_RS.contains(&format!("crate::reports::{c},")),
                 "{c} not in generate_handler!"
