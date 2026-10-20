@@ -18,4 +18,4 @@ serde_json = "=1.0.151"
 minisign = "=0.10.0"
 # The app's updater, so `verify-update` (and the tests) check signatures exactly
 # the way the app does (the same pinned commit as crates/method-app).
-method-update = { git = "https://github.com/method-production-suite/method-libs", rev = "37a9c8b9801bfcdedb9d79565a62f84fcdfb9a4a" }
+method-update = { git = "https://github.com/method-production-suite/method-libs", rev = "25c80f8cfcc2e5222de4c5b79413a9de488196af" }

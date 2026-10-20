@@ -16,12 +16,12 @@ exe="$app/Contents/MacOS/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable
 echo "== Bundle"
 du -sh "$app"
 file "$exe"
-# Releases are Apple silicon only (docs/INSTALL.md): a release bundle is arm64 and
-# nothing else. A local build on an Intel Mac is x86_64, which is fine for its own use.
+# Releases are universal (docs/INSTALL.md): a release bundle holds exactly Intel and
+# Apple silicon code. A plain local build has only this Mac's, which is fine for its own use.
 archs="$(lipo -archs "$exe")"
 echo "Architectures: $archs"
-if [ "$archs" != arm64 ]; then
-  echo "NOTE: not arm64 only; a release bundle must be (build with --target aarch64-apple-darwin)" >&2
+if [ "$archs" != "x86_64 arm64" ]; then
+  echo "NOTE: not universal; a release bundle must be (build with --target universal-apple-darwin)" >&2
 fi
 for key in CFBundleIdentifier CFBundleShortVersionString LSMinimumSystemVersion LSApplicationCategoryType NSHumanReadableCopyright; do
   printf '%s: %s\n' "$key" "$(/usr/libexec/PlistBuddy -c "Print :$key" "$plist")"

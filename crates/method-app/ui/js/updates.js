@@ -28,9 +28,9 @@ export const TEXT = {
   installing: 'Restarting to update…',
   current: 'Method Budget is up to date.',
   failed: 'Couldn’t check for updates',
-  // A manifest with no build for this computer (an Intel Mac: releases are
-  // Apple silicon only).
-  'no-build': 'Updates are for Apple silicon Macs. This version stays as it is.',
+  // A manifest with no build for this computer (an Intel Mac before releases
+  // were universal again in 0.6, or anything that isn't a Mac).
+  'no-build': 'There’s no update for this computer yet. This version stays as it is.',
   'install-failed': 'Couldn’t install the update. Try again in a moment.',
 };
 

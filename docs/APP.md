@@ -2692,10 +2692,11 @@ and page.
   to update**. An automatic check that finds nothing or can't reach the endpoint says
   nothing at all; only Help > Check for Updates answers, in the same place for a few
   seconds ("Method Budget is up to date." or "Couldn't check for updates"). Releases are
-  for Apple silicon Macs only: on an Intel Mac (or anywhere the manifest has no build for
-  the computer: method-update's `UpdateError::Platform`) the answer is "Updates are for
-  Apple silicon Macs. This version stays as it is." and the installed version keeps
-  working. Nothing appears as a dialog while you work.
+  universal (Intel and Apple silicon) from 0.6, and the manifest lists the one archive for
+  both Macs. Where the manifest has no build for the computer (method-update's
+  `UpdateError::Platform`: not a Mac, or an Intel Mac reading a manifest from 0.3 to 0.5)
+  the answer is "There's no update for this computer yet. This version stays as it is." and
+  the installed version keeps working. Nothing appears as a dialog while you work.
 - **Only the update's hosts.** Every request and every redirect goes over https to the
   endpoint's host, or to GitHub's two download hosts when the endpoint is on github.com
   (`transport::host_allowed`); a manifest that points the download anywhere else fails the

@@ -4237,3 +4237,36 @@ launch comes before anyone can reach a setting. This drops the switch entry 84 a
   the old field present.
 - **Not checked here.** The first start in the running app needs the owner's screen; it is
   on the owner's list.
+
+## 87. Universal Mac builds again (2026-10-19, the owner's decision)
+
+The owner: "Yes, and do it for every app and the launcher too: universal Mac builds at each
+one's next release." (relayed by MOrg, 2026-10-19; SUITE-STANDARDS.md, section 3). This
+reverses the Apple-silicon-only standard of 2026-10-16, which 0.3.0 to 0.5.0 followed.
+From 0.6.0 the Mac app holds both Intel and Apple silicon code.
+
+- **The build.** release.yml's Mac job builds `universal-apple-darwin` (both targets, joined
+  with `lipo` by the Tauri CLI), still compiling before any secret is in reach and only
+  packaging in the step that has them. The path is the one 0.2.x shipped, taken back from
+  the commit that removed it (7e70dbc), with that commit's stricter checks kept.
+- **The check.** Every executable in the app must be exactly `x86_64 arm64`, compared, not
+  printed; scripts/check-macos-bundle.sh says so locally.
+- **Updates.** The updater archive is `Method-Budget_<version>_universal.app.tar.gz`, signed
+  for its version as before, and `cargo xtask update-manifest` lists it under both
+  `darwin-aarch64` and `darwin-x86_64`. method-update asks for `darwin-x86_64-app`, then
+  `darwin-x86_64` on an Intel Mac; it is pinned to method-libs `25c80f8` (its #7), which
+  lets an Intel Mac ask at all. Copies of 0.2.x on Intel Macs use the Tauri updater plugin,
+  ask the old `ssandweiss/method-budget` address (GitHub forwards it to the org's latest
+  release) for the same keys and trust the same key, so they are offered 0.6.0.
+- **What an Intel Mac says when there's no build.** The words were "Updates are for Apple
+  silicon Macs."; they are now "There's no update for this computer yet. This version stays
+  as it is.", for any computer a manifest has no build for (not a Mac, or an Intel Mac
+  reading a manifest from 0.3 to 0.5).
+- **Not changed.** The weekly full build stays Apple silicon only, to keep it cheap; every
+  release builds universal.
+- Tests: `a_universal_archive_serves_both_macs` and the universal case beside an Apple
+  silicon archive (xtask), `an_intel_mac_reading_a_universal_manifest_finds_the_update`
+  (the app, against a manifest served locally), and the whole workspace's tests run as
+  x86_64 code under Rosetta before the tag.
+- **Not checked here.** A real Intel Mac: installing 0.6.0, and a copy of 0.2 updating to it,
+  is on the owner's list.

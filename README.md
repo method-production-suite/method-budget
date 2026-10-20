@@ -87,7 +87,7 @@ room.
 | Platform | Built | Signed | Tested by hand | Updates itself |
 |---|---|---|---|---|
 | macOS, Apple silicon | Yes | Yes, notarized by Apple | Yes | Yes |
-| macOS, Intel | Up to 0.2; later releases are Apple silicon only | Yes | Not checked | Stays on its version |
+| macOS, Intel | Yes, from 0.6 (one app for both kinds of Mac; 0.3 to 0.5 were Apple silicon only) | Yes | Not checked | From 0.6; a copy of 0.2 updates to it |
 | Windows (x64) | Yes | Not yet | Not yet | Not yet |
 | Linux (x64, `.deb` and AppImage) | Yes | Not applicable | Not yet | Not yet |
 
@@ -192,8 +192,8 @@ this section.
 
 ## Install
 
-Method Budget is a desktop app for macOS on Apple silicon, with Windows and Linux builds
-that have not been tested by hand yet. Download the Mac app from the
+Method Budget is a desktop app for macOS, one app for Intel and Apple silicon Macs, with
+Windows and Linux builds that have not been tested by hand yet. Download the Mac app from the
 [latest release](https://github.com/method-production-suite/method-budget/releases/latest),
 or build it from source. [docs/INSTALL.md](docs/INSTALL.md) covers building, installing on a
 Mac, the one-time security step for builds that are not notarized, and what signed releases

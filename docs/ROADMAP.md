@@ -22,7 +22,8 @@ this page goes ahead without waiting.
 
 ### Release go-aheads
 
-- **0.6.0, when the owner wants it**: on main so far, the launcher contract (two
+- **0.6.0, when the owner wants it**: universal Mac builds again (D87, the owner's
+  decision of 2026-10-19; Intel Macs on 0.2.x are offered it). On main so far, the launcher contract (two
   command-line flags and the suite's `recent.json`, D85), the first-start sample without its
   setting (D86), a missed same-size change on Linux and Windows fixed, the Windows build no
   longer bundling copies with Windows line endings, checksums on every release and the
@@ -132,6 +133,10 @@ this page goes ahead without waiting.
       list in docs/research/parity-tracker.md, section 2. The export test plan
       (docs/research/export-test-plan.md) has the steps; exports go in `imports/`, never
       committed.
+- [ ] **An Intel Mac** (D87; needs an Intel Mac, after 0.6.0 is published): install
+      0.6.0 from the release's `.dmg` and open the Field Station sample; and on an Intel Mac
+      that has 0.2.x, Help > Check for Updates should find 0.6.0, download it and restart
+      into it.
 - [ ] **Windows and Linux live check** (2.25): install from the release's installers;
       print the topsheet and detail; menu keys (Alt+Up and Alt+Down, Ctrl+F, the setup
       keys); double-click a `.mthd` to open it; on Windows, install 0.3.0 over 0.2.x and
