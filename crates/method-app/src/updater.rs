@@ -24,9 +24,10 @@
 //! - Nothing interrupts: an automatic check that fails says nothing. Only a
 //!   check the user asked for (Help > Check for Updates) answers, in the same
 //!   quiet place: up to date, or "Couldn't check for updates". A computer
-//!   the manifest has no build for (an Intel Mac: releases are Apple
-//!   silicon only) answers "Updates are for Apple silicon Macs. This version
-//!   stays as it is." instead.
+//!   the manifest has no build for (anything but a Mac; an Intel Mac reading
+//!   a manifest from 0.3 to 0.5, which were Apple silicon only) answers
+//!   "There's no update for this computer yet. This version stays as it is."
+//!   instead. Releases are universal again from 0.6, so both Macs find theirs.
 //! - Restart to update saves first: every open budget's changes go into its
 //!   file (Autosave's own rules, so a file changed outside the app is never
 //!   written over), the open tabs and split view are remembered, and what
@@ -115,8 +116,8 @@ pub enum Said {
     /// A check (or its download) the user asked for didn't work.
     Failed,
     /// A check the user asked for, on a computer the manifest has no build
-    /// for (an Intel Mac, since releases are Apple silicon only): this
-    /// version stays as it is.
+    /// for (not a Mac, or an Intel Mac reading an Apple-silicon-only
+    /// manifest): this version stays as it is.
     NoBuild,
     /// Restart to update couldn't install; the update is still ready.
     InstallFailed,
@@ -845,7 +846,7 @@ mod tests {
             Some(serde_json::json!("no-build"))
         );
         assert!(UPDATES_JS.contains(
-            "'no-build': 'Updates are for Apple silicon Macs. This version stays as it is.',"
+            "'no-build': 'There’s no update for this computer yet. This version stays as it is.',"
         ));
     }
 
@@ -909,6 +910,60 @@ mod tests {
             run(&u, true, || Err(err), |_| unreachable!()).0,
             Some(Said::NoBuild)
         );
+    }
+
+    /// A universal release's manifest lists the same archive under both Mac keys
+    /// (crates/xtask/src/manifest.rs), so an Intel Mac finds the update too.
+    #[test]
+    fn an_intel_mac_reading_a_universal_manifest_finds_the_update() {
+        use method_update::target::TargetSet;
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let name = "Method-Budget_0.6.0_universal.app.tar.gz";
+        let entry = serde_json::json!({
+            "signature": fixture::signature(7, name),
+            "url": format!("http://127.0.0.1:{port}/{name}")
+        });
+        let manifest = serde_json::json!({
+            "version": "0.6.0",
+            "notes": "Notes",
+            "pub_date": "2026-10-20T00:00:00Z",
+            "platforms": { "darwin-aarch64": entry, "darwin-x86_64": entry }
+        })
+        .to_string();
+        let server = std::thread::spawn(move || {
+            for _ in 0..2 {
+                let (mut s, _) = listener.accept().unwrap();
+                let mut buf = [0u8; 4096];
+                let _ = s.read(&mut buf);
+                let reply = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{manifest}",
+                    manifest.len()
+                );
+                s.write_all(reply.as_bytes()).unwrap();
+            }
+        });
+        let config = AppConfig::new(
+            "Method Budget",
+            BUNDLE_NAME,
+            "method-budget-update/test",
+            Baked {
+                endpoint: leak(&format!("http://127.0.0.1:{port}/latest.json")),
+                pubkey: leak(&fixture::public_key(7)),
+                insecure: true,
+                rehearsal: true,
+            },
+        );
+        let version = method_update::manifest::parse_version("0.5.0").unwrap();
+        let mut c = config.transport(Some(Installer::App));
+        for (arch, key) in [("x86_64", "darwin-x86_64"), ("aarch64", "darwin-aarch64")] {
+            c.targets = Some(TargetSet::new("darwin", arch, Some(Installer::App)));
+            let found = transport::check(&c, &version).unwrap().unwrap();
+            assert_eq!(found.version, "0.6.0", "{arch}");
+            assert_eq!(found.target, key, "{arch}");
+        }
+        server.join().unwrap();
     }
 
     #[test]

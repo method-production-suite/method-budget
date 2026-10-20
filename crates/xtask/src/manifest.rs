@@ -26,11 +26,12 @@ use crate::versions;
 /// `{os}-{arch}-{installer}` and then `{os}-{arch}`. Anything else in the
 /// folder is refused.
 ///
-/// The Mac build is Apple silicon only (the Method suite standard, 2026-10-16), so
-/// the release workflow ships `aarch64.app.tar.gz`. A universal archive is
-/// refused on purpose: it would offer the update to Intel Macs, which keep
-/// the version they have (the app says so when asked: src/updater.rs).
+/// The Mac build is universal (the suite standard, 2026-10-19; Apple silicon only
+/// from 0.3.0 to 0.5.0): the release workflow ships `universal.app.tar.gz`, listed
+/// for both kinds of Mac, so Intel Macs find it under `darwin-x86_64` (method-update
+/// asks for `darwin-x86_64-app` and then `darwin-x86_64`, as 0.2.x's plugin does).
 const PLATFORMS: &[(&str, &[&str])] = &[
+    ("universal.app.tar.gz", &["darwin-aarch64", "darwin-x86_64"]),
     ("aarch64.app.tar.gz", &["darwin-aarch64"]),
     ("x64.app.tar.gz", &["darwin-x86_64"]),
     ("x64-setup.exe", &["windows-x86_64", "windows-x86_64-nsis"]),
@@ -451,6 +452,30 @@ mod tests {
         assert!(!r.read_dir("").iter().any(|n| n.ends_with(".tmp")));
     }
 
+    /// The Mac build is universal again (the suite standard, 2026-10-19): one archive,
+    /// listed for both kinds of Mac, so Intel Macs (method-update asks for
+    /// darwin-x86_64-app, then darwin-x86_64; 0.2.x's plugin the same) find it too.
+    #[test]
+    fn a_universal_archive_serves_both_macs() {
+        let r = repo(&fixture::public_key(KEY));
+        let name = "Method-Budget_0.2.0_universal.app.tar.gz";
+        artifact(&r, name, KEY);
+        let out = command(opts(&r)).unwrap();
+        assert!(out.contains("darwin-aarch64, darwin-x86_64"), "{out}");
+        let m: Value = serde_json::from_str(&r.read("latest.json")).unwrap();
+        let url =
+            format!("https://github.com/example/method-budget/releases/download/v0.2.0/{name}");
+        for key in ["darwin-aarch64", "darwin-x86_64"] {
+            assert_eq!(m["platforms"][key]["url"], url.as_str(), "{key}");
+            assert_eq!(
+                m["platforms"][key]["signature"],
+                fixture::signature_for_version(KEY, name, "0.2.0"),
+                "{key}"
+            );
+        }
+        assert_eq!(m["platforms"].as_object().unwrap().len(), 2);
+    }
+
     #[test]
     fn malformed_signatures_are_refused() {
         let r = repo(&fixture::public_key(KEY));
@@ -548,14 +573,13 @@ mod tests {
             "{e}"
         );
 
+        // A universal archive serves both Macs, so beside an Apple silicon one it is
+        // a second artifact for darwin-aarch64.
         let r = repo(&fixture::public_key(KEY));
         artifact(&r, "Method-Budget_0.2.0_aarch64.app.tar.gz", KEY);
         artifact(&r, "Method-Budget_0.2.0_universal.app.tar.gz", KEY);
         let e = command(opts(&r)).unwrap_err();
-        assert!(
-            e.contains("an unknown platform (universal.app.tar.gz)"),
-            "a universal archive would update Intel Macs: {e}"
-        );
+        assert!(e.contains("a second artifact for darwin-aarch64"), "{e}");
 
         let r = repo(&fixture::public_key(KEY));
         std::fs::create_dir_all(r.root().join("dist")).unwrap();

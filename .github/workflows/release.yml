@@ -4,8 +4,8 @@
 #
 # - check: the tag names the workspace version, every place the version lives agrees,
 #   and docs/releases/<version>.md is ready to publish (cargo xtask check-version --tag).
-# - build: macOS Apple silicon (.app zip, .dmg and the updater archive), Windows and Linux.
-#   Intel Macs are not built: they keep the version they have installed.
+# - build: macOS universal, Intel and Apple silicon in one app (.app zip, .dmg and the
+#   updater archive; SUITE-STANDARDS.md section 3, 2026-10-19), Windows and Linux.
 #   The macOS job signs with the Developer ID, notarizes, staples and verifies when the
 #   Apple secrets are set; it writes the updater archive and its signature when the
 #   updater key is set and the app trusts a real key. Each of those steps skips cleanly
@@ -70,10 +70,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: macos-arm64
+          # Both Macs' code in one app: the Tauri CLI builds each target and joins them
+          # with lipo (universal-apple-darwin).
+          - name: macos-universal
             os: macos-latest
-            rust_targets: aarch64-apple-darwin
-            target: aarch64-apple-darwin
+            rust_targets: aarch64-apple-darwin x86_64-apple-darwin
+            target: universal-apple-darwin
             bundles: app,dmg
           - name: windows-x64
             os: windows-latest
@@ -272,12 +274,13 @@ jobs:
           root="target/$TARGET/release/bundle"
           for app in "$root"/macos/*.app; do
             codesign --verify --deep --strict --verbose=2 "$app"
-            # Apple silicon only: every executable in the app is arm64 and nothing else.
+            # Universal: every executable in the app holds exactly Intel and Apple silicon
+            # code, compared, not just printed.
             for exe in "$app/Contents/MacOS/"*; do
               archs="$(lipo -archs "$exe")"
               echo "$(basename "$exe"): $archs"
-              if [ "$archs" != arm64 ]; then
-                echo "::error::$exe is built for \"$archs\", expected arm64 only."
+              if [ "$archs" != "x86_64 arm64" ]; then
+                echo "::error::$exe is built for \"$archs\", expected \"x86_64 arm64\"."
                 exit 1
               fi
             done
@@ -344,7 +347,7 @@ jobs:
                   echo "::error::The updater archive has no signature ($sig)."
                   exit 1
                 fi
-                name="Method-Budget_${version}_aarch64.app.tar.gz"
+                name="Method-Budget_${version}_universal.app.tar.gz"
                 cp "$tgz" "updater/$name"
                 cp "$sig" "updater/$name.sig"
               fi

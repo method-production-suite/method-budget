@@ -11,14 +11,14 @@ builds every platform and drafts a GitHub Release with the files attached:
 
 | Platform | Files | Status |
 |---|---|---|
-| macOS 11 or later, Apple silicon | `Method-Budget-macOS.dmg`, and the `.app` as `Method-Budget-macOS.app.zip` | signed and notarized once the release secrets are set (until then ad-hoc signed) |
+| macOS 11 or later, Intel and Apple silicon (one universal app) | `Method-Budget-macOS.dmg`, and the `.app` as `Method-Budget-macOS.app.zip` | signed and notarized once the release secrets are set (until then ad-hoc signed) |
 | Windows 10/11 (x64) | `Method-Budget-windows-x64.msi` and the NSIS `Method-Budget-windows-x64-setup.exe` | unsigned, untested |
 | Linux (x64) | `Method-Budget-linux-amd64.deb` and `Method-Budget-linux-x86_64.AppImage` | untested |
 
-Releases after 0.2.1 are for Apple silicon Macs only. An Intel Mac keeps the version it
-has installed: it goes on working, and Help > Check for Updates there says "Updates are for
-Apple silicon Macs. This version stays as it is." An Intel Mac can still build the app from
-source (below) for its own use.
+Releases are universal again from 0.6: one app with both Intel and Apple silicon code.
+0.3 to 0.5 were for Apple silicon only, so an Intel Mac stayed on 0.2; Help > Check for
+Updates on that copy now finds 0.6. A copy of 0.3 to 0.5 on an Intel Mac (built from
+source) says "There's no update for this computer yet" until it reads 0.6's manifest.
 
 The draft is published by hand once it has been checked ([RELEASING.md](RELEASING.md)).
 Until the macOS build is signed with a Developer ID and notarized, the first launch needs
@@ -44,13 +44,13 @@ The app lands in `target/release/bundle/macos/Method Budget.app` (at the reposit
 root, not inside `crates/method-app`), and the disk image in `target/release/bundle/dmg/`.
 Making the `.dmg` briefly opens and arranges a Finder window; that is normal.
 
-That build runs on your Mac's own architecture. Releases are built for Apple silicon only,
-the way the release workflow does it:
+That build runs on your Mac's own architecture. Releases are universal, built the way the
+release workflow does it (both targets, joined with `lipo`):
 
 ```bash
-rustup target add aarch64-apple-darwin
-cargo tauri build --bundles app,dmg --target aarch64-apple-darwin
-# lands in target/aarch64-apple-darwin/release/bundle/
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+cargo tauri build --bundles app,dmg --target universal-apple-darwin
+# lands in target/universal-apple-darwin/release/bundle/
 ```
 
 To check a built bundle without opening it (architecture, minimum macOS, the `.mthd`

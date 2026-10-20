@@ -150,13 +150,13 @@ one means changing the workflow, this table and the site's links together.
 
 | File | What it is |
 |---|---|
-| `Method-Budget-macOS.dmg` | the Mac installer (Apple silicon only) |
+| `Method-Budget-macOS.dmg` | the Mac installer (universal: Intel and Apple silicon) |
 | `Method-Budget-macOS.app.zip` | the Mac app on its own |
 | `Method-Budget-windows-x64-setup.exe` | the Windows installer (NSIS; untested, not updated in place yet) |
 | `Method-Budget-windows-x64.msi` | the Windows installer (MSI; untested, not updated in place yet) |
 | `Method-Budget-linux-amd64.deb` | the Linux package for Debian and Ubuntu (untested, not updated in place yet) |
 | `Method-Budget-linux-x86_64.AppImage` | the Linux AppImage (untested, not updated in place yet) |
-| `Method-Budget_<version>_aarch64.app.tar.gz` and `.sig` | the Mac updater archive and its signature (versioned: `latest.json` names it) |
+| `Method-Budget_<version>_universal.app.tar.gz` and `.sig` | the Mac updater archive and its signature (versioned: `latest.json` lists it for both `darwin-aarch64` and `darwin-x86_64`) |
 | `latest.json` | the update manifest installed apps read |
 | `SHA256SUMS` | the SHA-256 of every file above, one per line (`sha256sum -c --ignore-missing SHA256SUMS` checks a download); Method Launcher checks Windows and Linux downloads against it |
 
@@ -176,7 +176,7 @@ signed and the draft's description says the first launch needs the one-time step
 | Job | Permissions | What it does |
 |---|---|---|
 | `check` | contents: read | the tagged commit is on `main`; `cargo xtask check-version --tag "$GITHUB_REF_NAME"`; every crate in `Cargo.lock` and `fuzz/Cargo.lock` at least 14 days old (`scripts/check-crate-ages.py` in full, SUITE-STANDARDS.md section 6), before anything is built or signed |
-| `build` (macOS Apple silicon, Windows, Linux) | contents: read | builds the bundles; on macOS signs, notarizes, staples and verifies, and writes the updater archive and signs it for its version (`cargo xtask sign-update`), each only when its secrets are there |
+| `build` (macOS universal, Windows, Linux) | contents: read | builds the bundles; on macOS signs, notarizes, staples and verifies, and writes the updater archive and signs it for its version (`cargo xtask sign-update`), each only when its secrets are there |
 | `release` | contents: write (the only job with it: it creates the draft and uploads the files) | `cargo xtask update-manifest`, then `gh release create --draft` with the notes |
 
 The Tauri CLI comes from its prebuilt release, checked against the SHA-256 pinned in
