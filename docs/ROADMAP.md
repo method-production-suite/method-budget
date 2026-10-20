@@ -17,29 +17,46 @@ missing pieces), **[missing]** not started. Size: **S** a day or two, **M** abou
 
 ## Waiting on the owner
 
-Updated 2026-10-20. Only what needs the owner's answer, hands or yes; everything else on
+Updated 2026-10-20 (evening). Only what needs the owner's answer, hands or yes; everything else on
 this page goes ahead without waiting.
 
 ### Release go-aheads
 
-- **0.6.0 is out** (published 2026-10-20, universal; methodbudget.com follows it). The
-  next release needs the owner's yes as usual, after two things on this page's roadmap land:
-  the release bundling with the prebuilt Tauri CLI only while signing keys are present (the
-  suite's stricter rule of 2026-10-19), and 3.22 (formulas walked without recursion), which
-  lets the release tests drop their 8 MiB stack setting. Nothing waits on the owner yet.
+- **The next release: 0.6.1 or 0.7.0** (waiting on the owner's choice). 0.6.0 is out
+  (2026-10-20, universal; methodbudget.com follows it). Since then main has a security fix
+  (rustls-webpki 0.103.16 and webpki-roots 1.0.10, for the webpki advisories) and new
+  features (3.6 done, 3.9 and 3.13 machinery, 3.19 done, 3.22, the first slice of 3.14).
+  Both things the next release waited on have landed: bundling with the prebuilt Tauri CLI
+  only while signing keys are present, and 3.22, so the release tests no longer set an
+  8 MiB stack. The release workflow only releases from main, so a fix-only 0.6.1 would
+  need a branch it can't release from. **Recommend: 0.7.0 from main** (the security fix
+  and the features together), rehearsed on main first; notes drafted in the 0.7.0 release
+  pull request. Signed changes (3.18, pull request #73) follow in the release after it.
 - **rustls update, on or after 2026-10-28**: the fix (0.23.46) leaves the 14-day crate
   cooldown then. `cargo update -p rustls` and the four RUSTSEC-2026-0346 to 0349 ignores
   taken out of `deny.toml` go in as one pull request. None of the four applies to the
   updater (deny.toml gives each reason), so nothing waits on it.
+- **Crate-age exceptions end**: webpki-roots on 2026-11-02 and rustls-webpki on
+  2026-11-03 reach 14 days; their lines in the age-check exceptions come out then.
 
 ### Open decisions
 
-- **A signing dependency for shared budgets** (3.18; D78): the next step, signed changes
-  (each person's key pair, every change signed, removal by cutoff), needs the
-  `ed25519-dalek` crate (3.0.0), a new cryptography dependency: widely used, pure Rust,
-  BSD-3-Clause (already on `deny.toml`'s licence list). **Recommend: yes**, held to the
-  usual 14-day age and `cargo deny` checks. Not
-  started: waiting on the yes, since it adds security-critical code.
+- **Signed changes in shared budgets: decided by the owner (2026-10-20)** (3.18; D89):
+  "Method Budget may merge 3.18 signed changes with the shared log format 3 for 0.7.0."
+  Built in pull request #73 (each person's key pair, every change signed with
+  `ed25519-dalek`, removal by cutoff), held until 0.7.0 is tagged so 0.7.0 ships without a
+  log format change.
+
+- **A key put in the owner's name before the owner's app does** (3.18; D89, raised in
+  review of pull request #73): anyone who can write in the shared folder can publish a key
+  in the owner's name before the owner's app does, and whoever holds it then signs as the
+  owner. The owner's app finds it and refuses to sign (built in #73); what happens next is
+  the owner's call. **Recommend: (1) start again as a new signed budget**, offered only
+  on the owner's computer when it finds a key in its name that isn't its own, **with (3)
+  each computer remembering the first owner key it sees** to catch a later swap. Option
+  (2), confirming the key by phone or chat, is left out: one step per member that people
+  skip. Design ready to build: docs/research/owner-key.md (about a week). Not built:
+  waiting on the owner.
 
 - **Which languages first** (3.14; D82, D94): the framework is built and English is
   the only language (docs/APP.md, "Languages"): one string table read by the page and
