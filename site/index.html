@@ -81,7 +81,7 @@
         <a class="btn ghost" href="#features">See what it does</a>
       </div>
       <p class="fine">No account, no subscription, no cloud. The Mac app is out; Windows and Linux builds are included but not yet tested by hand.</p>
-      <p class="fine footnote">* From the formats it exports for you: JSON, XML, Excel and tab-delimited.
+      <p class="fine footnote">* From the formats it exports for you: JSON, XML, spreadsheet (.xlsx) and tab-delimited.
         Method Budget reads a variety of open export and spreadsheet formats, never another
         program's native files. <a href="#formats">What comes across</a>.</p>
     </div>
@@ -257,7 +257,7 @@
           <ul class="fmt-list">
             <li><span>JSON</span> Best: everything the export carries</li>
             <li><span>XML (Advanced)</span> The same as JSON</li>
-            <li><span>Excel</span> Nearly the same</li>
+            <li><span>.xlsx</span> Nearly the same</li>
             <li><span>XML (Basic)</span> No groups or globals, whole units</li>
             <li><span>Tab-delimited</span> Account totals only</li>
           </ul>
@@ -266,8 +266,8 @@
           <h3>Spreadsheets and accounting</h3>
           <p>Map the columns once and bring in the rest of your world.</p>
           <ul class="fmt-list">
-            <li><span>Excel, CSV, tab</span> Department sheets become budget lines</li>
-            <li><span>Excel, CSV, tab</span> Accounting exports become actuals for cost reports</li>
+            <li><span>.xlsx, CSV, tab</span> Department sheets become budget lines</li>
+            <li><span>.xlsx, CSV, tab</span> Accounting exports become actuals for cost reports</li>
             <li><span>.mthd</span> Fringes, globals and setup from any other budget</li>
           </ul>
         </div>
@@ -276,7 +276,7 @@
           <p>Nothing you make here is locked in.</p>
           <ul class="fmt-list">
             <li><span>.mthd</span> Plain, documented JSON with a published spec</li>
-            <li><span>Excel</span> Topsheet, accounts, detail and setup in one workbook</li>
+            <li><span>.xlsx</span> Topsheet, accounts, detail and setup in one workbook</li>
             <li><span>CSV, tab</span> Account-level files for accounting</li>
             <li><span>PDF</span> Saved report layouts, ready to send</li>
           </ul>
@@ -392,7 +392,7 @@
             <span class="group-teaser">Import actuals, Cost report</span>
           </summary>
           <ul class="feats">
-            <li><strong>Import actuals</strong> Bring in transactions from CSV, tab-delimited or Excel accounting exports with a column mapping, duplicate checks and a review of unknown accounts.</li>
+            <li><strong>Import actuals</strong> Bring in transactions from CSV, tab-delimited or spreadsheet (.xlsx) accounting exports with a column mapping, duplicate checks and a review of unknown accounts.</li>
             <li><strong>Cost report</strong> Budget, actual to date, estimate to complete and variance by account, with each account's estimate method your choice.</li>
           </ul>
         </details>
@@ -405,9 +405,9 @@
             <li><strong>Reports saved in the budget</strong> Pick sections, accounts and layout, save them as named presets with header and footer fields, and print straight to PDF.</li>
             <li><strong>Live preview</strong> The setup dialog shows the printed pages as you change them, with page navigation and a jump list of sections.</li>
             <li><strong>More than the topsheet</strong> Category summaries, account detail, setup tables, chart of accounts, group totals, budget information and a notes list.</li>
-            <li><strong>Spreadsheet export</strong> One Excel workbook with topsheet, accounts, detail and setup tables, plus CSV and tab-delimited files for accounting.</li>
-            <li><strong>Spreadsheet import</strong> Turn any department's Excel, CSV or tab-delimited sheet into budget lines with a column mapping and a line-by-line check of the totals.</li>
-            <li><strong>Import from other budgeting apps</strong> Open a budget from another program's JSON, XML, Excel or tab-delimited export, with a line-by-line check against that program's own totals.</li>
+            <li><strong>Spreadsheet export</strong> One spreadsheet (.xlsx) with topsheet, accounts, detail and setup tables, plus CSV and tab-delimited files for accounting.</li>
+            <li><strong>Spreadsheet import</strong> Turn any department's spreadsheet (.xlsx), CSV or tab-delimited file into budget lines with a column mapping and a line-by-line check of the totals.</li>
+            <li><strong>Import from other budgeting apps</strong> Open a budget from another program's JSON, XML, spreadsheet (.xlsx) or tab-delimited export, with a line-by-line check against that program's own totals.</li>
           </ul>
         </details>
         <details class="group" id="g-setup">
@@ -661,7 +661,7 @@
         <details>
           <summary>Can it open budgets from other apps?</summary>
           <p>Yes, from the open files they export, never their native files. A budget comes in
-            from another program's JSON, XML, Excel or tab-delimited export (JSON carries the
+            from another program's JSON, XML, spreadsheet (.xlsx) or tab-delimited export (JSON carries the
             most), and any spreadsheet comes in with a column mapping, each with a line-by-line
             check against the totals in the file. See
             <a href="#formats">Bring your budgets with you</a>.</p>
