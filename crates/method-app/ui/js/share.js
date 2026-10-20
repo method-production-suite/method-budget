@@ -132,8 +132,14 @@ export function renderBar(view) {
   if (s.error) {
     text = s.error;
     tone = 'bad';
+  } else if (s.replaced) {
+    text = 'The owner started this budget again: reopen it to join';
+    tone = 'bad';
   } else if (s.key_warning) {
     text = 'Your changes here aren’t shared: a key in your name isn’t this computer’s';
+    tone = 'bad';
+  } else if (s.owner_key_warning) {
+    text = 'The owner’s key changed: ask the owner before you go on';
     tone = 'bad';
   } else if (s.unshared > 0) {
     text = s.unshared === 1 ? 'Sharing 1 change…' : `Sharing ${s.unshared} changes…`;
@@ -309,6 +315,8 @@ function drawPanel() {
   if (s.file_written) rows.push(line('File last written', localTime(s.file_written)));
   if (s.error) rows.push(el('p', { class: 'share-problem', text: s.error, attrs: { role: 'alert' } }));
   if (s.key_warning) rows.push(el('p', { class: 'share-problem', text: s.key_warning, attrs: { role: 'alert' } }));
+  const keyRows = ownerKeyRows(s);
+  if (keyRows) rows.push(...keyRows);
   if (s.notice) rows.push(el('p', { class: 'share-notice', text: s.notice, attrs: { role: 'status' } }));
   rows.push(line('Your changes not yet shared', String(s.unshared), s.unshared ? 'is-busy' : ''));
   if (s.waiting) rows.push(line('Changes waiting for ones that haven’t arrived', String(s.waiting), 'is-warn'));
@@ -329,6 +337,91 @@ function drawPanel() {
   rows.push(actions);
   panel.replaceChildren(...rows);
 }
+
+/**
+ * A key in the owner's name (docs/research/owner-key.md): Start Again on the
+ * owner's computer, Reopen once the owner started the budget again, and
+ * Trust the New Key when the owner's key isn't the one this computer saw.
+ * Each asks first.
+ */
+function ownerKeyRows(s) {
+  const out = [];
+  const confirm = el('div', { class: 'share-first-role', attrs: { role: 'group' } });
+  confirm.hidden = true;
+  const error = el('p', { class: 'share-problem', attrs: { role: 'alert' } });
+  error.hidden = true;
+  const ask = (button, label, message, goText, run) => {
+    button.addEventListener('click', () => {
+      error.hidden = true;
+      const go = el('button', { class: 'btn btn-primary', text: goText, attrs: { type: 'button' } });
+      const keep = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
+      keep.addEventListener('click', () => { confirm.hidden = true; button.focus(); });
+      go.addEventListener('click', async () => {
+        go.disabled = true;
+        try {
+          await run();
+          confirm.hidden = true;
+        } catch (e) {
+          error.textContent = String(e);
+          error.hidden = false;
+        }
+        go.disabled = false;
+      });
+      confirm.setAttribute('aria-label', label);
+      confirm.replaceChildren(el('p', { class: 'modal-message', text: message }), el('div', { class: 'modal-actions' }, keep, go));
+      confirm.hidden = false;
+      go.focus();
+    });
+  };
+  const reopen = async (trust) => {
+    const v = await ctx.invoke('share_reopen', { doc: ctx.doc(), trust });
+    if (v) ctx.apply(v, { cmd: 'share_reopen' });
+    fetchStatus();
+  };
+  if (s.replaced) {
+    out.push(el('p', { class: 'share-problem', text: s.replaced, attrs: { role: 'alert' } }));
+    const lost = s.not_in_new || [];
+    if (lost.length) {
+      out.push(el('h4', { class: 'share-panel-sub', text: lost.length === 1 ? '1 change of yours isn’t in the new budget' : `${lost.length} changes of yours aren’t in the new budget` }));
+      out.push(el('p', { class: 'share-muted', text: 'They weren’t shared before the owner started again. Make them again by hand after you reopen.' }));
+      out.push(el('ul', { class: 'share-refused' }, ...lost.map((label) => el('li', { text: label }))));
+    }
+    const b = el('button', { class: 'btn btn-primary', text: 'Reopen', attrs: { type: 'button' } });
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      try {
+        await reopen(false);
+      } catch (e) {
+        error.textContent = String(e);
+        error.hidden = false;
+      }
+      b.disabled = false;
+    });
+    out.push(el('div', { class: 'share-panel-actions' }, b));
+  }
+  if (s.can_start_again) {
+    const b = el('button', { class: 'btn btn-primary', text: 'Start Again…', attrs: { type: 'button' } });
+    ask(b, 'Start this shared budget again', START_AGAIN_NOTE, 'Start Again', async () => {
+      const status = await ctx.invoke('share_start_again', { doc: ctx.doc() });
+      if (status) statusArrived({ doc: ctx.doc(), status });
+      ctx.toast('Started again. Everyone else reopens the budget to join.');
+    });
+    out.push(el('div', { class: 'share-panel-actions' }, b));
+  }
+  if (s.owner_key_warning) {
+    out.push(el('p', { class: 'share-problem', text: s.owner_key_warning, attrs: { role: 'alert' } }));
+    const b = el('button', { class: 'btn', text: 'Trust the New Key…', attrs: { type: 'button' } });
+    ask(b, 'Trust the owner’s new key', TRUST_NOTE, 'Trust the New Key', () => reopen(true));
+    out.push(el('div', { class: 'share-panel-actions' }, b));
+  }
+  if (!out.length) return null;
+  out.push(confirm, error);
+  return out;
+}
+
+const START_AGAIN_NOTE = 'Someone put a key in your name in this shared budget before your computer did. Changes signed with it count as yours, so you can’t tell your own changes from theirs. Start Again makes a new shared budget from this one as it stands now, signed with this computer’s key. Everyone’s roles come with it. The old history is kept aside in the folder, but who changed what and undo start fresh. Each person reopens the budget to join the new one. Anything they changed and hadn’t shared yet must be made again.';
+
+const TRUST_NOTE = 'Only do this if the owner told you they moved to a new computer. This computer will take the new key as the owner’s from now on, and the changes signed with it come in. If you aren’t sure, ask the owner first.';
 
 /** Changes left out on this computer: who, when, what and why (decisions.md, entry 78). */
 function refusedList(s) {

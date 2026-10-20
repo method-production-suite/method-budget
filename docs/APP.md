@@ -1899,8 +1899,29 @@ line and MCP server for their person) compares the key published in its person's
 the one on this computer; when they differ, the toolbar item and the status panel say "A key
 in your name is in this shared budget, and it isn't this computer's...", the Share dialog
 says it too, and nothing is signed or changed as that person (edits are refused with that
-sentence; the command line and MCP server refuse with it and write nothing). What happens
-next for the owner's own key is an open decision (docs/ROADMAP.md).
+sentence; the command line and MCP server refuse with it and write nothing).
+
+**Start Again.** When the key in your name is the owner's and it isn't this computer's
+(someone put one in before your app did), the status panel offers **Start Again…** on the
+owner's computer only (decision 95; docs/research/owner-key.md). It asks first, then makes a
+new shared budget from this one as it stands: its first change is this computer's, the next
+adds this computer's key, and everyone's roles come with it (a department's categories
+matched by code). The old log folder is kept beside the budget as
+"Feature.mthd-log-replaced-<date>", with a `REPLACED` file in it, and nothing reads it again.
+The budget doesn't change; who changed what and undo start fresh. On everyone else's
+computer the toolbar item and the status panel say "The owner started this shared budget
+again. Reopen it to join; until then you can read it but not change it.", edits are refused
+with that sentence, their changes that hadn't reached the folder are listed by name to make
+again by hand, and **Reopen** joins the new budget.
+
+**The owner's key, remembered.** Each computer remembers the owner's key the first time it
+sees it in a shared budget, outside the shared folder (`~/.method/owner-keys/`, one small
+file per budget; the owner's own computer remembers only its own key). If the owner's key in
+the folder is ever a different one, changes signed with it are left out on that computer and
+listed, the status panel says "The owner's key in this shared budget changed...", and nothing
+is changed or shared there; the command line and MCP server refuse with the same words.
+**Trust the New Key…** (it asks first) takes the new key as the owner's, for an owner who
+moved to a new computer, and reads the budget again.
 
 **Two changes with one number.** A change in someone's name at a number their real change
 also has (a forgery that arrived first, say) never keeps the real one out: every computer

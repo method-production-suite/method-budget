@@ -178,6 +178,10 @@ pub struct Log {
     /// two different changes that both pass (a fork, which signing makes
     /// impossible without the key). Listed loudly, never applied.
     forks: Vec<(Change, String)>,
+    /// The owner's key as this computer first saw it (docs/research/
+    /// owner-key.md, part 2): a different key in the owner's name is
+    /// refused here, whatever the folder holds.
+    owner_key_pin: Option<PublicKey>,
 }
 
 impl fmt::Debug for Log {
@@ -211,7 +215,35 @@ impl Log {
             verifier: None,
             folds: 0,
             forks: Vec::new(),
+            owner_key_pin: None,
         }
+    }
+
+    /// Remembers `key` as the owner's (docs/research/owner-key.md, part 2):
+    /// from now on a change by the owner that publishes a different key, or
+    /// is signed with one, is kept aside on this computer. Set before the
+    /// log is read; the app keeps the key outside the shared folder.
+    pub fn pin_owner_key(&mut self, key: PublicKey) {
+        self.owner_key_pin = Some(key);
+    }
+
+    /// The owner's key this computer remembers, when it does.
+    pub fn owner_key_pin(&self) -> Option<PublicKey> {
+        self.owner_key_pin
+    }
+
+    /// A key in the owner's name, other than the one this computer
+    /// remembers, that the folder tried to bring in (and this log kept
+    /// aside): the owner's key changed. Nothing is recorded here then.
+    pub fn owner_key_changed(&self) -> Option<PublicKey> {
+        let pin = self.owner_key_pin?;
+        let owner = self.state.owner()?;
+        self.rejected
+            .iter()
+            .chain(self.forks.iter())
+            .filter(|(c, _)| c.actor == owner)
+            .filter_map(|(c, _)| c.key())
+            .find(|k| *k != pin)
     }
 
     /// Changes that claimed a number another change of the same actor has:
@@ -441,6 +473,12 @@ impl Log {
                 reason: sign::why::KEY_TAKEN.to_string(),
             });
         }
+        if self.owner_key_changed().is_some() {
+            return Err(LogError::Unsigned {
+                id: change.id(),
+                reason: sign::why::OWNER_KEY_CHANGED.to_string(),
+            });
+        }
         self.judge(change).map_err(|b| b.1)
     }
 
@@ -490,6 +528,14 @@ impl Log {
         let had = self.state.key_of(actor);
         if published.is_some() && had.is_some() {
             return Err(sign::why::TWO_KEYS);
+        }
+        // A key in the owner's name other than the one this computer
+        // remembers (docs/research/owner-key.md, part 2).
+        if let (Some(pin), Some(owner)) = (self.owner_key_pin, self.state.owner()) {
+            let owners = published.or(had.map(|(k, _)| k));
+            if actor == owner && owners.is_some_and(|k| k != pin) {
+                return Err(sign::why::OWNER_KEY_CHANGED);
+            }
         }
         if !self.bounds.must_sign(&self.state, change) {
             return match change.sig {
@@ -933,6 +979,26 @@ impl Log {
             return Ok(None);
         }
         self.record_ops(Vec::new(), label, time).map(Some)
+    }
+
+    /// Publishes this computer's key now, whatever the budget's roles: the
+    /// change a budget started again begins with after its genesis (docs/
+    /// research/owner-key.md, part 1). The owner's first key starts signing.
+    /// `None` when there is no key to publish or one is in already.
+    pub fn publish_key_now(
+        &mut self,
+        label: &str,
+        time: &str,
+    ) -> Result<Option<ChangeId>, LogError> {
+        let Some(signer) = &self.signer else {
+            return Ok(None);
+        };
+        if self.state.key_of(self.actor).is_some() {
+            return Ok(None);
+        }
+        let key = signer.public();
+        self.record_ops(vec![Op::Key { key }], label, time)
+            .map(Some)
     }
 
     /// `actor`'s published key.

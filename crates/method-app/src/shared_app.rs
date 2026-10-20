@@ -85,6 +85,9 @@ pub fn this_key() -> Result<std::sync::Arc<dyn method_core::log::Signer>, String
 /// budget's notice when it can't.
 fn sign_with_this_key(s: &mut Session) {
     let Some(sh) = s.shared_mut() else { return };
+    // Owner keys are remembered beside the actor id (docs/research/
+    // owner-key.md, part 2).
+    sh.set_owner_keys_dir(method_format::log::owner_keys_dir());
     if let Err(e) = this_key().and_then(|k| sh.use_key(k)) {
         s.set_notice(format!(
             "This computer's key for signed changes couldn't be used, so changes you make here may be left out by others: {e}"
@@ -103,7 +106,9 @@ pub fn this_person(actor: ActorId) -> Person {
 /// leaves the budget open on its own, with the reason as a notice.
 pub fn open_joining(path: &std::path::Path) -> Result<Session, String> {
     let mut s = Session::open(path)?;
-    if method_format::log::LogDir::for_budget(path).exists() {
+    // A log folder beside it, or one a start-again left half moved in
+    // (docs/research/owner-key.md, part 1), which opening finishes.
+    if method_format::log::is_shared(path) {
         let actor = this_actor()?;
         let me = this_person(actor);
         if let Err(e) = s.join_shared(actor, me) {
@@ -363,6 +368,55 @@ pub fn share_remove_person(
     Ok(sh.status(Instant::now()))
 }
 
+/// Start Again… in the status panel (docs/research/owner-key.md, part 1):
+/// on the owner's computer, when a key in the owner's name isn't its own, a
+/// new shared budget from this one takes the log folder's place. The budget
+/// doesn't change; returns the status.
+#[tauri::command]
+pub fn share_start_again(
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+) -> Result<ShareStatus, String> {
+    let mut s = state.lock_doc(doc)?;
+    let sh = s.shared_mut().ok_or("This budget isn't shared.")?;
+    sh.start_again()?;
+    Ok(sh.status(Instant::now()))
+}
+
+/// Reopen in the status panel, after the owner started the budget again,
+/// or Trust the New Key (`trust`, docs/research/owner-key.md, part 2): the
+/// budget is read afresh from its folder and the page is redrawn.
+#[tauri::command]
+pub fn share_reopen<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    doc: Option<DocId>,
+    trust: Option<bool>,
+) -> Result<View, String> {
+    let mut s = state.lock_doc(doc)?;
+    let trust = trust.unwrap_or(false);
+    s.with_shared(|log, budget| {
+        let any = method_session::collab::SharedLog::as_any_mut(log);
+        let Some(sh) = any.downcast_mut::<shared::SharedDoc>() else {
+            return (Err("This budget isn't shared.".to_string()), false);
+        };
+        let opened = if trust {
+            sh.trust_owner_key()
+        } else {
+            sh.reopen()
+        };
+        match opened {
+            Ok(b) => {
+                *budget = b;
+                (Ok(()), true)
+            }
+            Err(e) => (Err(e), false),
+        }
+    })
+    .unwrap_or_else(|| Err("This budget isn't shared.".to_string()))?;
+    Ok(finish(&window, &mut s, None))
+}
+
 /// Where this person is in budget `doc` (the category and account on
 /// screen), for the heartbeat other people see.
 #[tauri::command]
@@ -522,6 +576,8 @@ mod tests {
             "share_use_value",
             "share_set_role",
             "share_remove_person",
+            "share_start_again",
+            "share_reopen",
         ] {
             assert!(APP_RS.contains(&format!("crate::shared_app::{c},")), "{c}");
         }

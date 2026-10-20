@@ -1772,6 +1772,23 @@ its own `deps` is refused and listed, on every reader, whatever it claims to hav
 changes within the remover's `deps` stay. A later `grant` to them (made having seen the
 `revoke`) gives them a role again for changes that have seen it.
 
+**A budget started again** (decision 95). The owner can replace a shared budget's log with
+a new one: a new genesis (so a new budget id), the owner's `key` in the next change, then a
+`grant` for each person who had a role. The new folder is written beside the old one as
+`.~Feature.mthd-log-new/`, a `REPLACED` file holding the new budget id and a newline is
+written into the old folder, the old folder is renamed `Feature.mthd-log-replaced-<date>`
+(with `-2`, `-3`... when taken) and the new one renamed into its place. A reader ignores a
+log folder holding `REPLACED`. A reader that finds no log folder but a whole
+`.~Feature.mthd-log-new/` (a stop between the two renames) moves it into place first. No op
+is added; the version stays 3.
+
+**The owner's key, remembered.** A reader may remember the owner's key the first time it
+sees it, outside the folder (the reference implementation keeps
+`~/.method/owner-keys/<budget id>.json`, `{ "owner", "key", "seen" }`, or under
+`$METHOD_OWNER_KEYS`), and from then on refuse and list a change by the owner that publishes
+or is signed with any other key. Such a reader writes nothing until the person trusts the new
+key. Nothing about it is written into the folder.
+
 These three (the owner's first `grant`, the owner's first `key`, each `revoke`) judge changes
 outside their own future, so a reader that applied a change before one of them arrived
 folds every change it holds again, in the order it took them, with all three known, until

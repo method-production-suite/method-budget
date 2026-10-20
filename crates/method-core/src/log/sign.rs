@@ -98,6 +98,8 @@ pub mod why {
     pub const TWO_KEYS: &str = "a person's key is published once and doesn't change";
     pub const NOT_PERSONS_KEY: &str =
         "a command line or agent signs with its person's key, and this one doesn't";
+    pub const OWNER_KEY_CHANGED: &str =
+        "it is signed with an owner key this computer hasn't seen before";
     pub const PERSON_HAS_NO_KEY: &str =
         "a command line or agent writes for a person only once that person's key is in the budget";
 }

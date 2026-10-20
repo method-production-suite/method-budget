@@ -4842,3 +4842,46 @@ docs/CLI.md, `method-budget incentives what-if` and `method-budget report`; MCP:
   headless Chrome against the browser build; the app itself needs a live check.
 - **Not built**: a what-if from lines picked in the budget grid (the panel picks a
   category or an account), and a preset of program fields to fill in.
+
+## 95. The owner's key: start again, and the first key seen remembered (2026-10-20, the owner's decision)
+
+Roadmap 3.18, the open question entry 89 left: anyone who can write in a shared folder can
+publish a key in the owner's name before the owner's app does, and whoever holds it then
+signs as the owner. The owner (relayed 2026-10-20): "build 3.18 options 1 and 3". Design:
+docs/research/owner-key.md. Behavior: docs/APP.md, "Start Again" and "The owner's key,
+remembered"; format: docs/FORMAT.md, "A budget started again" and "The owner's key,
+remembered".
+
+- **Start Again (option 1), on the owner's computer only.** Offered when the key in the
+  owner's name isn't this computer's. `method_format::log::start_again` makes a new log in
+  memory from the budget as the old log folds it (refused changes left out): `Log::adopt` by
+  the owner, then `Log::publish_key_now` (the owner's key in a change of its own, which
+  starts signing before any role), then a `grant` per person with a role, a department's
+  scope matched to the new ids by category and account code. It is written beside the old
+  folder, the old one is marked `REPLACED` and moved aside, and the new one moved in; a stop
+  between the two moves is finished by the next open. The keeper's file is written from the
+  new log. Nothing is deleted. Members' unshared changes are listed, not replayed: they were
+  made against a history that no longer exists, and replaying them silently is how a planted
+  change could slip through.
+- **The first owner key seen (option 3).** Each computer keeps the owner's key the first
+  time it sees it, outside the shared folder (which anyone in the budget can write):
+  `owner-keys/<budget id>.json` beside the actor id. `Log::pin_owner_key` is set before the
+  log is read; a change by the owner that publishes or is signed with another key is refused
+  with "it is signed with an owner key this computer hasn't seen before", and
+  `Log::owner_key_changed` stops this computer recording anything. On the owner's own
+  computer only its own key is remembered. A budget started again has a new id, so its key is
+  remembered afresh. **Trust the New Key** rewrites the file, for an owner who moved to a new
+  computer without handing over.
+- **Not built: option 2** (confirming the owner's key by phone or chat): a step per member
+  that people skip. It can sit on top of the remembered key later without a format change.
+- **What it leaves.** A member who joins only after a key was planted, and whose owner never
+  opens the budget again, takes the planted key as the owner's. The owner's app finds the
+  mismatch the moment it opens the budget, and offers Start Again.
+- **Tests.** Engine: a remembered key keeps a rebuilt folder's owner key out and stops
+  recording; the real folder raises nothing; a computer that remembers nothing takes it in;
+  the owner's key before any role starts signing. Format: a planted key, Start Again with
+  roles and a department scope carried, the budget unchanged, the old folder kept aside and
+  ignored, a member's open log noticing, a fresh reader taking everything in, a stop between
+  the moves finished; the first key remembered outside the folder, never a planted one on the
+  owner's computer. App: Start Again offered only to the owner, a member refused until they
+  reopen, then sharing as before.

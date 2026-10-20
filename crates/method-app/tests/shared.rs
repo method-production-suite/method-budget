@@ -1073,3 +1073,81 @@ fn a_key_in_the_owners_name_on_a_roles_budget_is_found_and_refused() {
         .unwrap_err();
     assert!(err.contains("key"), "{err}");
 }
+
+// ---------------------------------------------------------------------------
+// The owner's key (docs/research/owner-key.md)
+
+/// A key put in Alex's name before Alex's app did: Alex's status offers Start
+/// Again, which makes a new shared budget signed with Alex's own key; Jordan's
+/// app says the owner started again and refuses edits until Jordan reopens,
+/// and after that the two share as before.
+#[test]
+fn the_owner_starts_again_and_a_member_reopens_to_join() {
+    use method_core::log::Signer;
+
+    let (path, mut alex, mut jordan) = two_sessions();
+    let dir = path.parent().unwrap().to_path_buf();
+    alex.shared_mut()
+        .unwrap()
+        .set_owner_keys_dir(Some(dir.join("keys-alex")));
+    jordan
+        .shared_mut()
+        .unwrap()
+        .set_owner_keys_dir(Some(dir.join("keys-jordan")));
+    alex.shared_mut().unwrap().use_key(key(1)).unwrap();
+    jordan.shared_mut().unwrap().use_key(key(2)).unwrap();
+
+    // Someone with the folder puts a key in Alex's name.
+    let theirs = method_format::log::sign::KeyPair::from_seed([77; 32]);
+    let log = alex.shared().unwrap().log();
+    let mut planted = method_core::log::Change {
+        actor: ALEX,
+        seq: log.own_seq() + 1,
+        deps: log.frontier().clone(),
+        lamport: log.lamport() + 1,
+        time: "2026-10-20T12:00:00Z".into(),
+        label: "Added this computer's key".into(),
+        ops: vec![Op::Key {
+            key: theirs.public(),
+        }],
+        sig: None,
+    };
+    planted.sig = Some(theirs.sign(&planted));
+    method_format::log::LogDir::for_budget(&path)
+        .write_segment(&[planted])
+        .unwrap();
+    exchange(&mut alex, &mut jordan);
+
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert!(st.key_warning.is_some());
+    assert!(st.can_start_again);
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert!(!st.can_start_again, "only on the owner's computer");
+    assert!(jordan.shared_mut().unwrap().start_again().is_err());
+
+    alex.shared_mut().unwrap().start_again().unwrap();
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert!(st.key_warning.is_none(), "{:?}", st.key_warning);
+    assert!(!st.can_start_again);
+    assert!(st.signed);
+    assert!(st.replaced.is_none());
+
+    // Jordan's app notices and refuses edits until Jordan reopens.
+    exchange(&mut alex, &mut jordan);
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert!(st.replaced.is_some(), "{st:?}");
+    let id = ids_in(&jordan, "50-01")[0];
+    assert!(jordan.set_detail_field(id, "rate", "1234").is_err());
+
+    let merged = jordan.shared_mut().unwrap().reopen().unwrap();
+    assert_eq!(&merged, alex.budget());
+    let st = jordan.shared().unwrap().status(Instant::now());
+    assert!(st.replaced.is_none());
+    assert!(st.owner_key_warning.is_none());
+    jordan.set_detail_field(id, "rate", "1234").unwrap();
+    exchange(&mut alex, &mut jordan);
+    exchange(&mut alex, &mut jordan);
+    assert_eq!(rate_of(&alex, id), "1234");
+    let st = alex.shared().unwrap().status(Instant::now());
+    assert_eq!(st.refused, 0, "{:?}", st.refused_changes);
+}

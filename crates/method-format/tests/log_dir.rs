@@ -903,3 +903,207 @@ fn a_key_in_a_persons_name_that_isnt_theirs_stops_their_programs() {
     assert!(riley.log.record(&p, &after, &[], "edit", T).is_err());
     let _ = fs::remove_dir_all(&dir);
 }
+
+// ---------------------------------------------------------------------------
+// The owner's key (docs/research/owner-key.md)
+
+/// A budget whose roles were set unsigned (before 0.7.0) and a key put in
+/// the owner's name by someone else before the owner's app did: the owner's
+/// computer starts it again. The new folder takes the old one's place with
+/// the budget as it stood, the owner's real key and everyone's roles; the
+/// old folder is kept aside and ignored; members' apps notice; a computer
+/// reading the folder afresh takes it all in; the owner's key is
+/// remembered; and a stop between the two moves is finished on the next
+/// open.
+#[test]
+fn the_owner_starts_a_budget_again_after_a_key_is_planted() {
+    use method_core::log::{Change, Op, Role, Signer};
+
+    let dir = temp_dir("start-again");
+    let keys = dir.join("owner-keys");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    // Roles set by a version that didn't sign.
+    let mut alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+    let cat = alex
+        .log
+        .project()
+        .budget
+        .categories()
+        .next()
+        .unwrap()
+        .code
+        .clone();
+    let cat_uid = alex.log.project().binding.categories[&cat];
+    alex.log
+        .grant(actor(3), Role::Editor, "Riley edits", T)
+        .unwrap();
+    alex.log
+        .grant(
+            actor(4),
+            Role::Department([cat_uid].into_iter().collect()),
+            "Sam edits a category",
+            T,
+        )
+        .unwrap();
+    let p = alex.log.project();
+    let mut after = p.budget.clone();
+    after.title = "Before the key".into();
+    alex.log.record(&p, &after, &[], "Alex edits", T).unwrap();
+    log::flush(&alex.log, &alex.dir).unwrap();
+    let old_id = alex.info.budget_id.clone();
+
+    // Someone with the folder puts a key in Alex's name first.
+    let theirs = log::sign::KeyPair::from_seed([77; 32]);
+    let mut planted = Change {
+        actor: actor(1),
+        seq: alex.log.own_seq() + 1,
+        deps: alex.log.frontier().clone(),
+        lamport: alex.log.lamport() + 1,
+        time: T.into(),
+        label: "Added this computer's key".into(),
+        ops: vec![Op::Key {
+            key: theirs.public(),
+        }],
+        sig: None,
+    };
+    planted.sig = Some(theirs.sign(&planted));
+    alex.dir.write_segment(&[planted]).unwrap();
+
+    // Riley's app has the budget open.
+    let (riley, _) = log::open_in(&path, actor(3), Ids::seeded(3), Some(&keys)).unwrap();
+
+    // Alex's computer finds the key isn't its own, and starts again.
+    let (mut owner, _) = log::open_in(&path, actor(1), Ids::seeded(11), Some(&keys)).unwrap();
+    let mine = keyed(&mut owner.log, 1);
+    assert_eq!(owner.log.key_conflict(), Some(theirs.public()));
+    let before = owner.log.project();
+    let signer = std::sync::Arc::new(log::sign::KeyPair::from_seed([1; 32]));
+    let other = std::sync::Arc::new(log::sign::KeyPair::from_seed([77; 32]));
+    assert!(
+        log::start_again(&owner, other, Some(&keys), Ids::seeded(12), T).is_err(),
+        "nothing to start again when the key is this computer's"
+    );
+    let new = log::start_again(&owner, signer, Some(&keys), Ids::seeded(12), T).unwrap();
+
+    assert_ne!(new.info.budget_id, old_id);
+    assert_eq!(
+        LogDir::for_budget(&path).info().unwrap().budget_id,
+        new.info.budget_id
+    );
+    assert_eq!(new.log.key_of(actor(1)), Some(mine));
+    assert!(new.log.signing_started());
+    assert_eq!(new.log.role_of(actor(3)), Role::Editor);
+    let sam = new.log.role_of(actor(4));
+    let new_cat = new.log.project().binding.categories[&cat];
+    assert_eq!(sam, Role::Department([new_cat].into_iter().collect()));
+    let mut was = before.budget.clone();
+    let mut now = new.log.project().budget;
+    was.provenance = None;
+    now.provenance = None;
+    assert_eq!(
+        method_format::to_string(&now),
+        method_format::to_string(&was)
+    );
+    assert_eq!(now.title, "Before the key");
+    assert_eq!(log::remembered_owner_key(&keys, &new.info), Some(mine));
+
+    // The old folder is kept aside, marked and ignored.
+    let aside: Vec<PathBuf> = fs::read_dir(&dir)
+        .unwrap()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| {
+            p.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("Feature.mthd-log-replaced-")
+        })
+        .collect();
+    assert_eq!(aside.len(), 1, "{aside:?}");
+    let marker = fs::read_to_string(aside[0].join(log::REPLACED_FILE)).unwrap();
+    assert_eq!(marker.trim(), new.info.budget_id);
+    assert!(!LogDir::at(&aside[0]).exists());
+
+    // Riley's app notices; reading the folder afresh takes everything in.
+    assert!(log::replaced(&riley));
+    let (fresh, report) = log::open_in(&path, actor(3), Ids::seeded(13), Some(&keys)).unwrap();
+    assert!(report.rejected.is_empty(), "{:?}", report.rejected);
+    assert_eq!(fresh.log.key_of(actor(1)), Some(mine));
+    assert_eq!(fresh.log.project().budget.title, "Before the key");
+
+    // A stop between moving the old folder aside and moving the new one in
+    // is finished by the next open.
+    let staging = dir.join(".~Feature.mthd-log-new");
+    fs::rename(LogDir::for_budget(&path).root(), &staging).unwrap();
+    assert!(log::is_shared(&path));
+    let (again, _) = log::open(&path, actor(9), Ids::seeded(14)).unwrap();
+    assert_eq!(again.info.budget_id, new.info.budget_id);
+    assert!(!staging.exists());
+    // So is a stop after the old folder was marked and before it moved.
+    let final_root = LogDir::for_budget(&path).root().to_path_buf();
+    fs::rename(&final_root, &staging).unwrap();
+    fs::create_dir(&final_root).unwrap();
+    fs::write(final_root.join("budget.json"), "{}").unwrap();
+    fs::write(final_root.join(log::REPLACED_FILE), "marked\n").unwrap();
+    assert!(log::is_shared(&path));
+    let (again, _) = log::open(&path, actor(9), Ids::seeded(15)).unwrap();
+    assert_eq!(again.info.budget_id, new.info.budget_id);
+    assert!(dir.join("Feature.mthd-log-replaced-unfinished").is_dir());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// Each computer remembers the owner key it first sees, outside the shared
+/// folder; on the owner's own computer only its own key is remembered, so a
+/// key planted before it looked is never taken for its own; and a key the
+/// owner's program can't vouch for is never written.
+#[test]
+fn the_first_owner_key_seen_is_remembered_outside_the_folder() {
+    use method_core::log::Role;
+
+    let dir = temp_dir("owner-key-seen");
+    let keys = dir.join("owner-keys");
+    let path = dir.join("Feature.mthd");
+    write_budget(&path, &sample());
+    let mut alex = log::init(&path, actor(1), Ids::seeded(1), T).unwrap();
+    let alex_key = keyed(&mut alex.log, 1);
+    alex.log
+        .grant(actor(3), Role::Editor, "Riley edits", T)
+        .unwrap();
+    log::flush(&alex.log, &alex.dir).unwrap();
+
+    // Riley's computer remembers Alex's key once it has seen it.
+    let (mut riley, _) = log::open_in(&path, actor(3), Ids::seeded(3), Some(&keys)).unwrap();
+    assert!(log::remember_owner_key(&mut riley, &keys, actor(3), T).unwrap());
+    assert_eq!(riley.log.owner_key_pin(), Some(alex_key));
+    assert!(!log::remember_owner_key(&mut riley, &keys, actor(3), T).unwrap());
+    assert_eq!(
+        log::remembered_owner_key(&keys, &riley.info),
+        Some(alex_key)
+    );
+    // Opened again, the key is checked from the first change read.
+    let (again, _) = log::open_in(&path, actor(3), Ids::seeded(4), Some(&keys)).unwrap();
+    assert_eq!(again.log.owner_key_pin(), Some(alex_key));
+    // Nothing of it is in the shared folder.
+    let mut stack = vec![alex.dir.root().to_path_buf()];
+    while let Some(d) = stack.pop() {
+        for e in fs::read_dir(&d).unwrap().flatten() {
+            if e.path().is_dir() {
+                stack.push(e.path());
+            }
+            assert_ne!(
+                e.file_name().to_string_lossy(),
+                format!("{}.json", riley.info.budget_id)
+            );
+        }
+    }
+
+    // On the owner's computer with a different key (the one in the folder
+    // isn't its own), nothing is remembered.
+    let elsewhere = dir.join("elsewhere-keys");
+    let (mut other, _) = log::open_in(&path, actor(1), Ids::seeded(5), Some(&elsewhere)).unwrap();
+    keyed(&mut other.log, 2);
+    assert!(!log::remember_owner_key(&mut other, &elsewhere, actor(1), T).unwrap());
+    assert_eq!(log::remembered_owner_key(&elsewhere, &other.info), None);
+    let _ = fs::remove_dir_all(&dir);
+}

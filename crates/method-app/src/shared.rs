@@ -354,6 +354,18 @@ pub struct ShareStatus {
     /// computer's (someone else put it in): nothing here is signed or
     /// shared until that is sorted out. In a sentence.
     pub key_warning: Option<String>,
+    /// This is the owner's computer and a key in the owner's name isn't its
+    /// own: Start Again is offered (docs/research/owner-key.md, part 1).
+    pub can_start_again: bool,
+    /// The owner's key isn't the one this computer saw first (part 2): what
+    /// to tell the person, and Trust the New Key is offered.
+    pub owner_key_warning: Option<String>,
+    /// The owner started this budget again: what to tell the person, who
+    /// reopens it to join.
+    pub replaced: Option<String>,
+    /// This person's changes that weren't shared before the budget was
+    /// started again, by label, to make again by hand.
+    pub not_in_new: Vec<String>,
 }
 
 /// How many refused changes the status lists.
@@ -465,6 +477,15 @@ pub struct SharedDoc {
     tools_root: Option<PathBuf>,
     /// This person's own programs' actors on this computer.
     local_tools: BTreeSet<ActorId>,
+    /// This computer's key, once given (kept to sign a budget started
+    /// again or opened afresh).
+    signer: Option<std::sync::Arc<dyn Signer>>,
+    /// The owner started this budget again: this person's changes that
+    /// weren't shared yet, by label. Nothing is written until they reopen.
+    replaced: Option<Vec<String>>,
+    /// Where this computer remembers owner keys (`None`: nowhere, so none
+    /// is remembered; docs/research/owner-key.md, part 2).
+    owner_keys: Option<PathBuf>,
 }
 
 impl std::fmt::Debug for SharedDoc {
@@ -614,6 +635,9 @@ impl SharedDoc {
             outside: None,
             tools_root: flog::actor_id_path().map(|p| flog::tools_root(&p)),
             local_tools: BTreeSet::new(),
+            signer: None,
+            replaced: None,
+            owner_keys: None,
         }
         .with_scan()
     }
@@ -728,6 +752,9 @@ impl SharedDoc {
         hints: &[Hint],
         label: &str,
     ) -> Result<Option<Budget>, String> {
+        if let Some(t) = self.replaced_text() {
+            return Err(t);
+        }
         let id = self
             .shared
             .log
@@ -891,8 +918,25 @@ impl SharedDoc {
     /// is replaced when changes arrive.
     pub fn tick(&mut self, now: Instant, budget: &mut Budget) -> TickOut {
         let mut out = TickOut::default();
+        if self.replaced.is_some() {
+            return out;
+        }
         if !self.shared.dir.exists() {
             self.error = Some("Can't reach the shared folder.".into());
+            return out;
+        }
+        // The owner started the budget again: nothing more goes into the
+        // folder from this log (docs/research/owner-key.md, part 1).
+        if flog::replaced(&self.shared) {
+            self.replaced = Some(
+                self.shared
+                    .log
+                    .own_after(self.written_seq)
+                    .iter()
+                    .map(|c| c.label.clone())
+                    .collect(),
+            );
+            self.error = None;
             return out;
         }
         self.flush(now, false);
@@ -919,11 +963,13 @@ impl SharedDoc {
         }
         self.last_sync = Some(now);
         self.waiting = report.pending;
-        // The owner's key arrived: this computer's goes in too.
+        // The owner's key arrived: this computer's goes in too, and the
+        // owner's is remembered.
         if report.applied > 0 && self.shared.log.signer_key().is_some() {
             if let Err(e) = self.publish_key() {
                 self.error = Some(e);
             }
+            self.remember_owner_key();
         }
         if report.applied > 0 {
             let me = self.actor();
@@ -1341,6 +1387,12 @@ impl SharedDoc {
             signed: self.shared.log.signing_started(),
             signed_text: self.signed_text(),
             key_warning: self.key_warning(),
+            can_start_again: self.signer.is_some()
+                && self.shared.log.owner() == Some(me)
+                && self.shared.log.key_conflict().is_some(),
+            owner_key_warning: self.owner_key_warning(),
+            replaced: self.replaced_text(),
+            not_in_new: self.replaced.clone().unwrap_or_default(),
         }
     }
 
@@ -1585,7 +1637,13 @@ impl SharedDoc {
 
     /// Why this person can't change anything, when their role reads only.
     pub fn refusal(&self) -> Option<String> {
+        if let Some(w) = self.replaced_text() {
+            return Some(w);
+        }
         if let Some(w) = self.key_warning() {
+            return Some(w);
+        }
+        if let Some(w) = self.owner_key_warning() {
             return Some(w);
         }
         if self.shared.log.removed(self.actor()) {
@@ -1610,6 +1668,11 @@ impl SharedDoc {
                 if reason == method_core::log::sign::why::KEY_TAKEN =>
             {
                 return self.key_warning().unwrap_or_default()
+            }
+            LogError::Unsigned { reason, .. }
+                if reason == method_core::log::sign::why::OWNER_KEY_CHANGED =>
+            {
+                return self.owner_key_warning().unwrap_or_default()
             }
             LogError::Unsigned { .. } => {
                 return "Changes in this shared budget are signed, and this one couldn\u{2019}t be signed with this computer\u{2019}s key, so it wasn\u{2019}t shared.".into()
@@ -1786,9 +1849,141 @@ impl SharedDoc {
     /// decisions.md, entry 89). When the budget's changes are signed, or
     /// this is the owner of a budget with roles, the key goes into the
     /// log now, as a change of its own.
+    /// Where this computer remembers owner keys (the app passes
+    /// [`flog::owner_keys_dir`]; tests pass a folder of their own).
+    pub fn set_owner_keys_dir(&mut self, dir: Option<PathBuf>) {
+        self.owner_keys = dir;
+    }
+
     pub fn use_key(&mut self, key: std::sync::Arc<dyn Signer>) -> Result<(), String> {
-        self.shared.log.set_signer(key);
-        self.publish_key()
+        self.shared.log.set_signer(key.clone());
+        self.signer = Some(key);
+        self.publish_key()?;
+        self.remember_owner_key();
+        Ok(())
+    }
+
+    /// Remembers the owner's key the first time this computer sees it
+    /// (docs/research/owner-key.md, part 2).
+    fn remember_owner_key(&mut self) {
+        let Some(dir) = self.owner_keys.clone() else {
+            return;
+        };
+        if self.signer.is_none() {
+            return;
+        }
+        let me = self.actor();
+        if let Err(e) = flog::remember_owner_key(&mut self.shared, &dir, me, &iso_now()) {
+            self.error = Some(format!(
+                "Couldn\u{2019}t remember the owner\u{2019}s key: {}",
+                e.0
+            ));
+        }
+    }
+
+    /// Start Again (docs/research/owner-key.md, part 1): on the owner's
+    /// computer, when a key in the owner's name isn't this computer's, a new
+    /// shared budget made from this one as it stands, signed with this
+    /// computer's key and with everyone's roles, takes the log folder's
+    /// place; the old one is kept aside. The budget itself doesn't change;
+    /// who changed what and undo start fresh, and everyone else reopens it.
+    pub fn start_again(&mut self) -> Result<(), String> {
+        if self.shared.log.owner() != Some(self.actor()) || self.shared.log.key_conflict().is_none()
+        {
+            return Err("Start Again is for the owner, when a key in their name isn\u{2019}t this computer\u{2019}s.".into());
+        }
+        let signer = self.signer.clone().ok_or(
+            "This computer has no key to sign with, so the budget can\u{2019}t be started again.",
+        )?;
+        // Everything of this person's is in the folder first, so the old
+        // log kept aside is whole.
+        self.flush(Instant::now(), true);
+        let shared = flog::start_again(
+            &self.shared,
+            signer,
+            self.owner_keys.as_deref(),
+            Ids::from_os(),
+            &iso_now(),
+        )
+        .map_err(|e| e.0)?;
+        self.adopt_log(shared);
+        self.keeper = true;
+        let path = self.shared.path.clone();
+        self.note_snapshot(&path);
+        Ok(())
+    }
+
+    /// Opens this budget afresh from its folder: joins the budget the owner
+    /// started again, or takes in what a newly trusted owner key kept
+    /// aside. Returns the budget as it now stands.
+    pub fn reopen(&mut self) -> Result<Budget, String> {
+        let actor = self.actor();
+        let path = self.shared.path.clone();
+        let (shared, report) =
+            flog::open_in(&path, actor, Ids::from_os(), self.owner_keys.as_deref())
+                .map_err(|e| e.0)?;
+        self.keeper = shared.info.genesis.actor == actor;
+        self.adopt_log(shared);
+        self.waiting = report.pending;
+        if let Some(signer) = self.signer.clone() {
+            self.use_key(signer)?;
+        }
+        Ok(self.proj.budget.clone())
+    }
+
+    /// Trust the New Key (docs/research/owner-key.md, part 2): this
+    /// computer remembers the owner's new key in place of the one it saw
+    /// before (an owner who moved to a new computer), and the budget is
+    /// opened afresh so what the old key kept aside comes in.
+    pub fn trust_owner_key(&mut self) -> Result<Budget, String> {
+        let key = self
+            .shared
+            .log
+            .owner_key_changed()
+            .ok_or("The owner\u{2019}s key in this budget hasn\u{2019}t changed.")?;
+        let dir = self
+            .owner_keys
+            .clone()
+            .ok_or("This computer has nowhere to remember the owner\u{2019}s key.")?;
+        flog::trust_owner_key(&dir, &self.shared.info, key, &iso_now()).map_err(|e| e.0)?;
+        self.reopen()
+    }
+
+    /// Takes `shared` in place of this budget's log: a budget started again,
+    /// or the same budget read afresh. Undo, the recent list and the
+    /// counts start over.
+    fn adopt_log(&mut self, shared: Shared) {
+        self.shared = shared;
+        if let Some(signer) = self.signer.clone() {
+            self.shared.log.set_signer(signer);
+        }
+        self.written_seq = self.shared.dir.highest_written(self.actor());
+        self.snapshot_len = self.shared.log.len();
+        self.steps.clear();
+        self.redo.clear();
+        self.recent.clear();
+        self.replaced = None;
+        self.error = None;
+        self.waiting = 0;
+        self.scan = self.shared.dir.scan();
+        self.last_sync = Some(Instant::now());
+        self.reproject();
+    }
+
+    /// When the owner's key isn't the one this computer saw first, what to
+    /// tell the person (docs/research/owner-key.md, part 2).
+    pub fn owner_key_warning(&self) -> Option<String> {
+        self.shared.log.owner_key_changed()?;
+        Some(format!(
+            "The owner\u{2019}s key in this shared budget changed, and this computer saw a different one before. Changes signed with the new key are left out here, and nothing you change is shared. Ask {} before you go on.",
+            self.owner_name()
+        ))
+    }
+
+    /// What to tell the person once the owner started the budget again.
+    fn replaced_text(&self) -> Option<String> {
+        self.replaced.as_ref()?;
+        Some("The owner started this shared budget again. Reopen it to join; until then you can read it but not change it.".into())
     }
 
     /// Puts this computer's key into the log when it should be there and

@@ -2841,6 +2841,98 @@ fn a_key_published_in_my_name_stops_me_signing() {
     assert_eq!(reader.key_conflict(), None);
 }
 
+// ---------------------------------------------------------------------------
+// The owner's key (docs/research/owner-key.md)
+
+/// A folder whose owner key isn't the one this computer remembers (someone
+/// rebuilt the log from the budget's first change with a key of their own):
+/// the owner's changes with that key are kept aside, the log says the
+/// owner's key changed, and nothing is recorded here. Without the
+/// remembered key the same folder is taken in, which is the gap part 1
+/// covers from the owner's side.
+#[test]
+fn a_remembered_owner_key_keeps_a_different_one_out() {
+    let owner = signed_budget();
+    let genesis = owner.changes().next().unwrap().clone();
+    let mut after_genesis = Log::new(actor(9), Ids::seeded(9));
+    after_genesis.apply(genesis.clone()).unwrap();
+    let mut swapped = forged(
+        actor(1),
+        2,
+        &after_genesis,
+        vec![
+            Op::Grant {
+                actor: actor(2),
+                role: Role::Editor,
+            },
+            Op::Key {
+                key: TestKey(66).public(),
+            },
+        ],
+    );
+    swapped.sig = Some(TestKey(66).sign(&swapped));
+    let folder = vec![genesis, swapped.clone()];
+
+    // Jordan's computer saw key 1 first.
+    let mut jordan = keyed(Log::new(actor(2), Ids::seeded(2)), Some(2));
+    jordan.pin_owner_key(TestKey(1).public());
+    deliver(&mut jordan, &folder);
+    assert_eq!(jordan.owner_key_changed(), Some(TestKey(66).public()));
+    let why = reason_of(&jordan, swapped.id()).expect("kept aside");
+    assert!(
+        why.contains(method_core::log::sign::why::OWNER_KEY_CHANGED),
+        "{why}"
+    );
+    assert_eq!(jordan.key_of(actor(1)), None);
+    let before = jordan.own_seq();
+    match try_edit(&mut jordan, |b| b.title = "Mine".into()).unwrap_err() {
+        LogError::Unsigned { reason, .. } => {
+            assert_eq!(reason, method_core::log::sign::why::OWNER_KEY_CHANGED)
+        }
+        e => panic!("{e}"),
+    }
+    assert_eq!(jordan.own_seq(), before, "nothing recorded");
+
+    // The real folder raises nothing on the same computer.
+    let mut real = keyed(Log::new(actor(2), Ids::seeded(3)), Some(2));
+    real.pin_owner_key(TestKey(1).public());
+    deliver(&mut real, &written(&[&owner]));
+    assert!(real.rejected().is_empty(), "{:?}", real.rejected());
+    assert_eq!(real.owner_key_changed(), None);
+    try_edit(&mut real, |b| b.title = "Mine".into())
+        .unwrap()
+        .unwrap();
+
+    // A computer that remembers nothing takes the swapped folder in.
+    let mut fresh = keyed(Log::new(actor(2), Ids::seeded(4)), Some(2));
+    deliver(&mut fresh, &folder);
+    assert!(fresh.rejected().is_empty(), "{:?}", fresh.rejected());
+    assert_eq!(fresh.key_of(actor(1)), Some(TestKey(66).public()));
+    assert_eq!(fresh.owner_key_changed(), None);
+}
+
+/// A budget started again publishes the owner's key in the change after its
+/// first, before any role: signing starts there, and every computer checking
+/// signatures takes it in.
+#[test]
+fn publishing_the_owners_key_before_any_role_starts_signing() {
+    let mut owner = keyed(adopt(1, &sample()), Some(1));
+    assert!(!owner.signing_started());
+    let id = owner.publish_key_now("Key", T).unwrap().expect("published");
+    assert!(owner.signing_started());
+    assert_eq!(owner.key_of(actor(1)), Some(TestKey(1).public()));
+    assert!(owner.change(id).unwrap().sig.is_some());
+    assert_eq!(owner.publish_key_now("Key", T).unwrap(), None, "once");
+    owner
+        .grant(actor(2), Role::Editor, "Jordan edits", T)
+        .unwrap();
+    assert!(owner.changes().last().unwrap().sig.is_some());
+    let mut reader = keyed(Log::new(actor(9), Ids::seeded(9)), None);
+    deliver(&mut reader, &written(&[&owner]));
+    assert!(reader.rejected().is_empty(), "{:?}", reader.rejected());
+    assert!(reader.signing_started());
+}
+
 /// A credit's minimum spend, broker's fee and shared cap, and the budget's
 /// shared caps (decisions.md, entry 88), are written in the change log only
 /// when set, project back, and clear when taken off.
