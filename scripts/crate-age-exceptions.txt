@@ -1,0 +1,11 @@
+# Exact versions allowed under the 14-day cooldown, read by scripts/check-crate-ages.py
+# (the suite's shared copy, SUITE-STANDARDS.md section 6). One "name version" per line, then
+# the reason:
+# - a security fix that cannot wait: name its RUSTSEC id; releases may ship it;
+# - a version that cannot be pinned back: give the date it turns 14 days old; main stays
+#   green, but no release ships it (the release check runs with --release);
+# - the owner's override for a named release: start the reason "owner-approved override",
+#   then who approved it, when, and for which release; releases may ship it.
+# Remove a line once the version is 14 days old.
+rustls-webpki 0.103.16   # security: RUSTSEC-2026-0382 (fixed in 0.103.16; the updater's TLS); 14 days old on 2026-11-03
+webpki-roots 1.0.10      # security: RUSTSEC-2026-0381 (distrusted emSign roots removed; the updater's TLS); 14 days old on 2026-11-02
