@@ -157,7 +157,13 @@ jobs:
         # Every release tests each system before anything is built for it or signed
         # (SUITE-STANDARDS.md section 6). On macOS this runs the Apple silicon code; the
         # Intel half is tested under Rosetta before the tag (docs/RELEASING.md).
+        # Test threads get 8 MiB: the formula tests build the longest chain a file may hold
+        # (2,048 terms, a tree as deep), which a debug build walks recursively in more than
+        # the 1 MiB a Windows test thread has (the 0.6.0 rehearsal). An optimized build, the
+        # one that ships, needs under 256 KiB. Walking it iteratively is roadmap 3.22.
         shell: bash
+        env:
+          RUST_MIN_STACK: "8388608"
         run: cargo test --workspace --locked --no-fail-fast
 
       - name: Install Tauri CLI (pinned, prebuilt)
