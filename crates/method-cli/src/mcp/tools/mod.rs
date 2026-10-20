@@ -18,6 +18,7 @@ use super::paths::Roots;
 
 pub mod files;
 pub mod lines;
+pub mod rates;
 pub mod read;
 pub mod setup;
 
@@ -144,6 +145,7 @@ pub fn all() -> Vec<Tool> {
     v.extend(read::tools());
     v.extend(lines::tools());
     v.extend(setup::tools());
+    v.extend(rates::tools());
     v.extend(files::tools());
     v
 }

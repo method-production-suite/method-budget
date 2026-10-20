@@ -173,7 +173,7 @@ the first time a tool names it, and `budget_open` opens it again on purpose.
 
 ## Tools
 
-47 tools; `--read-only` keeps the 16 marked read.
+54 tools; `--read-only` keeps the 18 marked read.
 
 | Group | Tools |
 |---|---|
@@ -182,6 +182,7 @@ the first time a tool names it, and `budget_open` opens it again on purpose.
 | Lines | `add_lines`, `update_lines`, `delete_lines`, `move_lines`, `tag_lines` |
 | Setup | `set_global`, `add_setup`, `update_setup`, `rename_setup`, `delete_setup` |
 | Charges and credits | `set_charge`, `set_credit`, `apply_charge`, `delete_charge` |
+| Rate tables | `list_rate_tables` (read), `get_rate_table` (read), `set_rate_table`, `delete_rate_table`, `import_rate_table`, `fill_rate`, `update_rates` |
 | Topsheet | `add_category`, `update_category`, `delete_category`, `add_production_total`, `delete_production_total`, `add_account`, `update_account`, `delete_account`, `set_title` |
 | Files | `new_budget`, `save_as`, `export`, `import_sheet`, `import_budget_export`, `schedule_days`, `merge`, `undo` |
 
@@ -222,7 +223,8 @@ globals, fringes, groups, sets, locations, units, currencies, charges, credits, 
 default (5,000 at most). Each row: `id`, `n`, `kind` (`line`, `subtotal`, `adjustment`,
 `separator`), `description`, `amount`, `unit`, `x`, `unit2`, `rate`, `unit3`, `x4`, `unit4`,
 `currency`, `fringes`, `groups`, `set`, `location`, `fringe_range`, `person` (only when
-set), `bold`, `italic`, `indent`, `color`, `notes`; and what it works out to: `included`, `quantity`,
+set), `rate_source` (only when the rate was filled from a rate table: `table`,
+`classification`, `unit`, `as_of`, `rate`), `bold`, `italic`, `indent`, `color`, `notes`; and what it works out to: `included`, `quantity`,
 `row_currency`, `local_total_cents`, `total_cents`, `subtotal_cents`, `fringes_cents` (per
 fringe), `fringe_total_cents`, `fringe_full_total_cents` (the fringes with no cutoff and no
 range: each percent fringe on the whole total, the flat ones as earned; 0 on a row that
@@ -419,6 +421,51 @@ and `shared_cap_cents`.
 
 **`apply_charge`** `{path, type, name, applied}`: makes a charge or credit count or stop
 counting. **`delete_charge`** `{path, type, name}` removes it.
+
+### Rate tables
+
+Rate tables are the user's own: classifications with a rate per unit and, when figures
+change over time, the dates each row is in effect (docs/FORMAT.md, "Rate table";
+decisions.md, entry 90). Nothing comes with the app. Filling writes a figure once, as a
+number, and the line remembers where it came from (`get_account` shows a filled row's
+`rate_source`); a table changed later never changes a line on its own.
+
+**`list_rate_tables`** `{path}`: the tables (`name`, `rows`, `units`, `notes`) and
+`filled_lines`: every line filled from one, with its `state`: `current`, `changed` (with
+`now`, what the table says now; the line keeps `rate` until `update_rates`), `edited`
+(changed by hand since) or `missing` (with `message`).
+
+**`get_rate_table`** `{path, name}`: the table in full, figures as decimal strings.
+
+**`set_rate_table`** `{path, table: {name, notes?, rows: [{classification, rates: [{unit,
+rate}], from?, to?, notes?}]}, replacing?}`: adds a table, or replaces `replacing` (which
+may rename it; lines filled from it follow). Two rows of one classification may not be in
+effect on the same day.
+
+**`delete_rate_table`** `{path, name}`: lines filled from it keep their rates.
+
+**`import_rate_table`** `{path, sheet, sheet_index?, name?, columns?, replace?, dry_run?}`:
+reads a table from a spreadsheet: a classification column, then a column per unit or a
+unit and a rate column, guessed from the titles; `columns` (`header_row`,
+`classification`, `from`, `to`, `notes`, `unit`, `rate`, each a column number from 1 or
+null, and `unit_columns: [{unit, column}]`) changes the guess. Problems come back with
+their rows and nothing is written while any is left; a table of the same name is refused
+unless `replace`. Returns the `mapping` it used.
+
+**`fill_rate`** `{path, ids, table, classification, unit?, as_of?}`: fills the lines'
+rates from the classification (case and extra spaces ignored), per `unit` or each line's
+own. A unit the table has no figure for converts from the closest unit in hours, only when
+both units have hours in the budget, rounded to cents; `as_of` picks the row in effect on
+that date. Returns each line's `before`, `rate` and how it was `converted`.
+
+**`update_rates`** `{path, ids?}`: gives the lines (or every line) filled from a table
+whose table now says something else what it says now, as one change. Lines changed by
+hand are left alone.
+
+```json
+{"name": "fill_rate", "arguments": {"path": "film.mthd", "ids": [17], "table": "Crew Card",
+  "classification": "Grip, Key", "unit": "Day"}}
+```
 
 ### Topsheet
 

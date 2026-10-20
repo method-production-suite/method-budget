@@ -488,6 +488,17 @@ pub fn row_json(d: &Detail, n: usize, rt: Option<&RowTotals>) -> Value {
     if let Some(p) = &d.person {
         v["person"] = json!(p);
     }
+    // Where the rate came from, when it was filled from a rate table
+    // (decisions.md, entry 90); only when set.
+    if let Some(s) = &d.rate_source {
+        v["rate_source"] = json!({
+            "table": s.table,
+            "classification": s.classification,
+            "unit": s.unit,
+            "as_of": s.as_of,
+            "rate": s.rate.to_string(),
+        });
+    }
     if let Some(r) = rt {
         v["included"] = json!(r.included);
         v["quantity"] = json!(r.quantity.to_string());

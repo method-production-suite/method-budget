@@ -35,6 +35,7 @@ mod cmd {
     pub mod merge_driver;
     pub mod new;
     pub mod pack;
+    pub mod rates;
     pub mod report;
     pub mod review;
     pub mod sample;
@@ -162,6 +163,11 @@ const COMMANDS: &[Command] = &[
         name: "pack",
         usage: cmd::pack::USAGE,
         run: cmd::pack::run,
+    },
+    Command {
+        name: "rates",
+        usage: cmd::rates::USAGE,
+        run: cmd::rates::run,
     },
     Command {
         name: "log",

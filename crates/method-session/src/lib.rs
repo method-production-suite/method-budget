@@ -41,6 +41,7 @@ pub mod packs;
 pub mod presets;
 pub mod projects;
 pub mod quickadd;
+pub mod rates;
 pub mod rename;
 pub mod renumber;
 pub mod report_dto;

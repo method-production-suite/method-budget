@@ -610,6 +610,11 @@ pub(crate) fn row_fields(d: &Detail) -> Vec<Field> {
             d.fringe_range.map_or("none".into(), |n| n.to_string()),
         ),
         text("person", "person", opt_text(&d.person)),
+        text(
+            "rate_source",
+            "rate source",
+            rate_source_text(d.rate_source.as_ref()),
+        ),
         names("fringes", "fringes", &d.fringes),
         names("groups", "groups", &d.groups),
         text("set", "set", opt_text(&d.set)),
@@ -2450,6 +2455,25 @@ fn money_lines(
         None,
     ));
     (accounts, categories, totals)
+}
+
+/// A line's rate source in words, for diffs and merges: "none", or
+/// "Table / Classification per Day at 500 (on 2030-01-01)".
+pub fn rate_source_text(s: Option<&crate::rates::RateSource>) -> String {
+    match s {
+        None => "none".into(),
+        Some(s) => {
+            let on = s
+                .as_of
+                .as_deref()
+                .map(|d| format!(" (on {d})"))
+                .unwrap_or_default();
+            format!(
+                "{} / {} per {} at {}{on}",
+                s.table, s.classification, s.unit, s.rate
+            )
+        }
+    }
 }
 
 #[cfg(test)]

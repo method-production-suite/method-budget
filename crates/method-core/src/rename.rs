@@ -556,6 +556,9 @@ fn rewrite(b: &mut Budget, kind: SetupKind, from: &str, to: &str) -> usize {
                     count(true);
                 }
             }
+            // So do the rate tables' figures and the lines' rate sources
+            // (tools and provenance, not references: not counted).
+            crate::rates::rename_unit(b, from, to);
         }
         SetupKind::Set => rekey(&mut b.sets, from, to),
         SetupKind::Location => {

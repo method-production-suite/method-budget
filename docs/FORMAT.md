@@ -140,6 +140,7 @@ Fields in written order:
 | `tag_presets`     | list of [tag presets](#tag-preset) | Saved bundles of line tags, in the user's order. Left out when there are none. |
 | `line_presets`    | list of [line blocks](#line-block) | Saved blocks of rows to insert, in the user's order. Left out when there are none. |
 | `ot_patterns`     | list of [overtime patterns](#overtime-pattern) | Saved overtime patterns for the overtime helper, in the user's order. Left out when there are none. |
+| `rate_tables`     | list of [rate tables](#rate-table) | Rate tables the user keeps, to fill lines' rates from, in the user's order. Left out when there are none. |
 | `compact_versions` | `true` or `false` | Write `versions` as changes instead of full copies ([version deltas](#version-deltas)). A file setting, not content. Default `false`, left out then. |
 | `versions`        | list of [versions](#version) | Named copies of the budget, oldest first. Left out when there are none. |
 
@@ -436,6 +437,7 @@ Fields in written order:
 | `currency`     | optional text | Currency code; not set means the base currency. |
 | `fringe_range` | optional integer 0 to 4294967295 | Consecutive lines and adjustment rows with the same number share each percent fringe's cutoff as one earner, used up in row order: each row takes the percent of its total, or of what is left of the cutoff when that is less (nothing once it is used), rounded on its own. |
 | `person`       | optional text | The person this line or adjustment row pays (see [person cutoffs](#person-cutoffs)). Left out when unset. |
+| `rate_source`  | optional [rate source](#rate-source) | Where the line's rate came from, when it was filled from a [rate table](#rate-table). Left out when unset. |
 | `fringes`      | name set | Fringes applied to this line or adjustment row. |
 | `groups`       | name set | Groups this line belongs to. |
 | `set`          | optional text | Set name. |
@@ -779,7 +781,7 @@ the type-ahead follow it; nothing else depends on it. Layout, not content: a
 
 Named folders of setup items, one set of folders per kind: an object whose keys are kinds
 (`global`, `fringe`, `group`, `unit`, `set`, `location`, `currency`, `charge`, `credit`,
-`tag_preset`, `line_preset`, `report_preset`, `ot_pattern`), each an object of folder names to lists of
+`tag_preset`, `line_preset`, `report_preset`, `ot_pattern`, `rate_table`), each an object of folder names to lists of
 item names (exact names: a charge, credit or preset by its `name`). An item is in at most
 one folder of its kind; an item in none is unfiled. A folder may be empty. A folder name is
 1 to 60 characters with no control characters, unique within its kind ignoring case (the
@@ -837,7 +839,7 @@ in the provenance's `pack`. It usually has [setup folders](#setup-folders) (the 
 and [setup sources](#setup-sources) (per-item notes and links). A pack holds whatever
 setup items its maker picked plus everything they need (a fringe's globals and flat unit,
 a global's globals, a charge's excluded groups and currency, a credit's groups and
-excluded fringes, a tag preset's tags, what a line block's rows use, a report preset's
+excluded fringes, a tag preset's tags, a rate table's units, what a line block's rows use, a report preset's
 groups and header and footer globals), and never the budget settings Import Setup carries
 (`account_coding`, `fringe_posting`, `fringe_row`, `cutoff_factor`, `new_line_defaults`),
 which belong to a production.
@@ -1185,6 +1187,69 @@ breaks these rules.
 
 That is "8 hours straight time, then 1.5x after 8, 2x after 12; sixth day 1.5x".
 
+### Rate table
+
+A rate table the user keeps (`docs/decisions.md`, entry 90): classifications with a rate
+per unit, and, when the figures change over time, the dates each row is in effect. Every
+figure is the user's; Method Budget ships none. Tools, not budget content, like overtime
+patterns: a [version](#version) never has them, and restoring a version keeps the current
+ones. Fields in written order:
+
+| Field   | Type | Notes |
+|---------|------|-------|
+| `name`  | text, **required** | 1 to 80 characters, one line, no spaces at either end. Unique within the list. |
+| `notes` | text | Where the figures came from, what they cover. Up to 2,000 characters. Left out when empty. |
+| `rows`  | list of rows | In the user's order. Left out when there are none. |
+
+A **row** has, in written order:
+
+| Field            | Type | Notes |
+|------------------|------|-------|
+| `classification` | text, **required** | As the user writes it ("Grip, Key"), 1 to 120 characters, no spaces at either end. Matched ignoring case and extra spaces. |
+| `rates`          | map of decimal, **required** | Unit name to the rate per one of it, at least one and at most 12, none negative. Unit names are the budget's own (a name the budget lacks is kept, and fills only a line with that unit). |
+| `from`           | optional date | First day in effect, `YYYY-MM-DD`. Left out for open. |
+| `to`             | optional date | Last day in effect. Left out for open; never before `from`. |
+| `notes`          | text | Up to 2,000 characters. Left out when empty. |
+
+Two rows of one classification may not be in effect on the same day (a row with no dates is
+in effect every day). A reader rejects a table that breaks these rules.
+
+```json
+"rate_tables": [
+  {
+    "name": "Example Crew",
+    "notes": "Invented figures.",
+    "rows": [
+      { "classification": "Grip, Key", "rates": { "Day": "410.5", "Week": "2000" }, "from": "2030-01-01", "to": "2030-12-31" },
+      { "classification": "Grip, Best Boy", "rates": { "Hour": "33" } }
+    ]
+  }
+]
+```
+
+### Rate source
+
+Where a detail row's rate came from, when it was filled from a [rate table](#rate-table)
+(`docs/decisions.md`, entry 90). It never changes a figure: the row's `rate` is the number
+written then, and stays so whatever happens to the table. A program compares it with the
+table as it is now to say whether the table says something else, and offers an update.
+Fields in written order:
+
+| Field            | Type | Notes |
+|------------------|------|-------|
+| `table`          | text, **required** | The table's name. |
+| `classification` | text, **required** | The classification, as the table spelled it. |
+| `unit`           | text, **required** | The unit the rate is for. |
+| `as_of`          | optional date | The date the row was picked for, `YYYY-MM-DD`, when it was picked by date. |
+| `rate`           | decimal, **required** | The figure written into the row (the table's, or converted from another unit through unit hours and rounded to cents). |
+
+A row whose `rate` or rate unit no longer matches its source was changed by hand since. A
+source naming a table, classification or unit that is gone is kept as it is.
+
+```json
+"rate_source": { "table": "Example Crew", "classification": "Grip, Key", "unit": "Day", "as_of": "2030-06-01", "rate": "410.5" }
+```
+
 ## Reading rules
 
 A reader that follows this document should:
@@ -1349,6 +1414,16 @@ valid. Loading and saving it in Method Budget normalizes it.
   them only when set: a credit's `minimum_spend`, `broker_fee` and `shared_cap` and the
   root's `shared_caps` (a value tagged `shared_caps`; field names added at the end of the
   list), so a log of a budget that doesn't use them stays readable by older versions.
+- Version 1, additive (2026-10): budget [`rate_tables`](#rate-table) (written after
+  `ot_patterns`), detail row and line block row [`rate_source`](#rate-source) (written
+  after `person`) and setup folders and sources for `rate_table` (decisions.md, entry 90).
+  Each is left out when unused, so files that don't use them read and write byte for byte
+  as before. An older reader refuses a file that uses them (readers refuse unknown
+  fields): that is the only effect, and only on files that keep a rate table or a filled
+  line. The change log's budget gains `rate_tables` and its rows `rate_source` (field
+  names added at the end of the list), each written only when used, so a log of a budget
+  that never uses them is one 0.3.0 reads; removing the last table, or a row's source, is
+  a write of null.
 
 ## Complete example
 
@@ -1679,7 +1754,9 @@ credit's `minimum_spend`, `broker_fee` (an integer of cents) and `shared_cap` (t
 name, as text: shared caps are a setting, not entities) and the root's `shared_caps` (a
 value tagged `shared_caps`, the `.mthd`'s map of `{amount}`; one register, so two people
 changing shared caps at once keep the later change) are written only when set and cleared
-with `null` (decisions.md, entry 88). The provenance is about one file and is not logged.
+with `null` (decisions.md, entry 88). The same goes for `root`'s `rate_tables` (written
+only when there are any, the whole list as one value) and a row's `rate_source`
+(decisions.md, entry 90). The provenance is about one file and is not logged.
 
 ### Reading rules
 
