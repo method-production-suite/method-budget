@@ -114,6 +114,7 @@ pub fn restore_version(
     let tags = std::mem::take(&mut b.tag_presets);
     let blocks = std::mem::take(&mut b.line_presets);
     let ot = std::mem::take(&mut b.ot_patterns);
+    let rates = std::mem::take(&mut b.rate_tables);
     let display = std::mem::take(&mut b.display);
     let order = std::mem::take(&mut b.setup_order);
     let folders = std::mem::take(&mut b.setup_folders);
@@ -135,6 +136,7 @@ pub fn restore_version(
     b.tag_presets = tags;
     b.line_presets = blocks;
     b.ot_patterns = ot;
+    b.rate_tables = rates;
     b.display = display;
     Ok(auto)
 }

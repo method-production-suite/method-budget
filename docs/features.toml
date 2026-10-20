@@ -166,9 +166,9 @@ ref = ["2.16", "D38"]
 [[feature]]
 group = "fringes"
 title = "Incentive estimates by location"
-text = "Limit a credit to the locations where the money is spent and see every program's estimate side by side, applied or not, from rates and caps you enter yourself."
+text = "Limit a credit to the locations where the money is spent and see every program's estimate side by side, applied or not, from rates, caps, minimum spends, broker's fees and shared caps you enter yourself."
 status = "have"
-ref = "D80"
+ref = ["D80", "D88"]
 
 [[feature]]
 group = "fringes"
@@ -454,7 +454,7 @@ ref = "2.25"
 [[feature]]
 group = "engine"
 title = "Incentive what-ifs"
-text = "Move lines between locations and see what each incentive program gains or loses, with minimum spends and shared caps."
+text = "Move lines between locations and see what each incentive program gains or loses."
 status = "soon"
 ref = "3.6"
 
@@ -474,8 +474,15 @@ ref = "3.18"
 
 [[feature]]
 group = "fringes"
+title = "Your own rate tables"
+text = "Keep rate tables of your own (classifications with a rate per hour, day or week and the dates each is in effect), type them in or import them from a spreadsheet, and pick a classification on a line to fill its rate; the line remembers where the rate came from and tells you when the table changes."
+status = "have"
+ref = "D90"
+
+[[feature]]
+group = "fringes"
 title = "Rate card lookup"
-text = "Pick a union classification and fill in the rate from public rate cards, with the source and effective date shown."
+text = "Pick a union classification from public rate cards that come with the app and fill in the rate, with the source and effective date shown."
 status = "soon"
 ref = "3.9"
 
@@ -489,6 +496,6 @@ ref = ["3.20", "D84"]
 [[feature]]
 group = "setup"
 title = "New project window"
-text = "Start a budget from one window with its title, chart of accounts, schedule, currency, your setup library and setup packs, and later rate setup, ready to fill in."
-status = "soon"
+text = "Start a budget from one window with its title, chart of accounts, schedule, currency, your setup library and setup packs, in a project folder of its own, ready to fill in. Duplicate a budget, or start a new one from a category or account."
+status = "have"
 ref = "3.19"

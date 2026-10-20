@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 
 use method_core::VersionId;
-use tauri::{Runtime, State, WebviewWindow};
+use tauri::{Manager, Runtime, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::app::{apply, finish, with_budget_extension, AppState, DocId};
@@ -130,6 +130,59 @@ pub fn share_copy_store<R: Runtime>(
     let copy = copy_to_store(&state, doc, original)?;
     apply(&window, &state, Some(original), |s| {
         method_session::sharing::share_copy_store(s, &copy, &name, &created)
+    })
+}
+
+/// What `sub_budget_from_row` made.
+#[derive(Debug, serde::Serialize)]
+pub struct RowSubBudget {
+    /// The sub-budget, in front.
+    pub view: View,
+    pub message: String,
+}
+
+/// Makes the sub-budget of category or account row `row` of budget `doc`
+/// (`None`: the one in front): a separate file beside the budget's own,
+/// named after its title (the first free "… 2", "… 3" when taken, never
+/// over a file), opened in front as a saved budget. A budget with no file
+/// yet gets the sub-budget in a new tab with no file.
+#[tauri::command]
+pub fn sub_budget_from_row<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    safety: State<'_, crate::safety_app::Safety>,
+    doc: Option<DocId>,
+    row: RowInput,
+    saved: String,
+) -> Result<RowSubBudget, String> {
+    let (b, dir) = {
+        let s = state.lock_doc(doc)?;
+        let b = make_row_sub_budget(s.budget(), &row, &saved)?;
+        (b, s.path().and_then(|p| p.parent()).map(PathBuf::from))
+    };
+    let Some(dir) = dir.filter(|d| d.is_dir()) else {
+        let title = b.title.clone();
+        let id = state
+            .docs()
+            .add(crate::session::Session::with_budget(b, None));
+        return Ok(RowSubBudget {
+            view: finish(&window, &mut state.lock_doc(Some(id))?, None),
+            message: format!("Opened \"{title}\" in a new tab. It has no file until you save it."),
+        });
+    };
+    let stem = crate::app::safe_file_stem(&b.title);
+    let (id, path) = crate::start::save_new_free(&state, &safety, &b, &dir, &stem)?;
+    crate::safety_app::refresh_menu(window.app_handle());
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    Ok(RowSubBudget {
+        view: finish(&window, &mut state.lock_doc(Some(id))?, None),
+        message: format!(
+            "Made the sub-budget \"{}\", saved beside this budget as {name}.",
+            b.title
+        ),
     })
 }
 

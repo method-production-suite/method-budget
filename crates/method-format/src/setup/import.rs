@@ -46,6 +46,7 @@ pub enum What {
     LinePreset,
     ReportPreset,
     OtPattern,
+    RateTable,
     AccountCoding,
     FringePosting,
     FringeRow,
@@ -54,7 +55,7 @@ pub enum What {
 }
 
 impl What {
-    pub const ALL: [What; 18] = [
+    pub const ALL: [What; 19] = [
         What::Global,
         What::Fringe,
         What::Group,
@@ -68,6 +69,7 @@ impl What {
         What::LinePreset,
         What::ReportPreset,
         What::OtPattern,
+        What::RateTable,
         What::AccountCoding,
         What::FringePosting,
         What::FringeRow,
@@ -90,6 +92,7 @@ impl What {
             What::LinePreset => "line_preset",
             What::ReportPreset => "report_preset",
             What::OtPattern => "ot_pattern",
+            What::RateTable => "rate_table",
             What::AccountCoding => "account_coding",
             What::FringePosting => "fringe_posting",
             What::FringeRow => "fringe_row",
@@ -177,6 +180,7 @@ pub fn all_items(b: &Budget) -> Vec<Key> {
             What::LinePreset => b.line_presets.iter().map(|p| p.name.clone()).collect(),
             What::ReportPreset => b.report_presets.iter().map(|p| p.name.clone()).collect(),
             What::OtPattern => b.ot_patterns.iter().map(|p| p.name.clone()).collect(),
+            What::RateTable => b.rate_tables.iter().map(|t| t.name.clone()).collect(),
             _ => vec![String::new()],
         };
         out.extend(names.into_iter().map(|n| (w, n)));
@@ -200,6 +204,7 @@ fn has(b: &Budget, w: What, name: &str) -> bool {
             preset_index(b, w, name).is_some()
         }
         What::OtPattern => b.ot_patterns.iter().any(|p| p.name == name),
+        What::RateTable => b.rate_tables.iter().any(|t| t.name == name),
         _ => true,
     }
 }
@@ -350,6 +355,14 @@ fn needs(b: &Budget, w: What, name: &str) -> BTreeSet<Key> {
                 }
             }
         }
+        // A rate table's figures are per the budget's units.
+        What::RateTable => {
+            if let Some(t) = b.rate_tables.iter().find(|t| t.name == name) {
+                for u in t.units() {
+                    add(What::Unit, &u);
+                }
+            }
+        }
         _ => {}
     }
     out
@@ -415,6 +428,10 @@ fn status_of(src: &Budget, here: &Budget, w: What, name: &str) -> Status {
             src.ot_patterns.iter().find(|p| p.name == name),
             here.ot_patterns.iter().find(|p| p.name == name),
         ),
+        What::RateTable => clipboard::status(
+            src.rate_tables.iter().find(|t| t.name == name),
+            here.rate_tables.iter().find(|t| t.name == name),
+        ),
         What::AccountCoding => {
             clipboard::status(Some(&src.account_coding), Some(&here.account_coding))
         }
@@ -478,6 +495,11 @@ pub fn describe(b: &Budget, w: What, name: &str) -> String {
             .iter()
             .find(|p| p.name == name)
             .map(describe_ot),
+        What::RateTable => b
+            .rate_tables
+            .iter()
+            .find(|t| t.name == name)
+            .map(describe_rate_table),
         What::AccountCoding => Some(describe_coding(&b.account_coding)),
         What::FringePosting => Some(describe_posting(
             &b.fringe_posting,
@@ -542,8 +564,25 @@ fn describe_credit(c: &Credit) -> String {
     } else {
         String::new()
     };
+    let minimum = c
+        .minimum_spend
+        .map(|m| format!("minimum spend {}", clipboard::money(m)))
+        .unwrap_or_default();
+    let fee = if c.broker_fee == 0 {
+        String::new()
+    } else {
+        format!("{} fee", clipboard::money(c.broker_fee))
+    };
+    let shared = c
+        .shared_cap
+        .as_ref()
+        .map(|n| format!("shares the cap {n}"))
+        .unwrap_or_default();
     let applied = if c.applied { "applied" } else { "not applied" }.to_string();
-    join(vec![rows, cap, discount, row_caps, applied], "")
+    join(
+        vec![rows, cap, discount, row_caps, minimum, fee, shared, applied],
+        "",
+    )
 }
 
 fn describe_tags(t: &method_core::TagPreset) -> String {
@@ -607,6 +646,23 @@ fn describe_ot(p: &method_core::overtime::OtPattern) -> String {
     }
     if let Some(m) = p.seventh_day {
         parts.push(format!("7th day {m}x"));
+    }
+    parts.join(", ")
+}
+
+fn describe_rate_table(t: &method_core::rates::RateTable) -> String {
+    let classes: BTreeSet<String> = t
+        .rows
+        .iter()
+        .map(|r| method_core::rates::classification_key(&r.classification))
+        .collect();
+    let mut parts = vec![count(classes.len(), "classification", "classifications")];
+    let units = t.units();
+    if !units.is_empty() {
+        parts.push(format!("per {}", units.join(", ")));
+    }
+    if t.rows.iter().any(|r| r.from.is_some() || r.to.is_some()) {
+        parts.push("with dates".into());
     }
     parts.join(", ")
 }
@@ -709,6 +765,7 @@ fn proposed_names(here: &Budget, src: &Budget, items: &[(Key, Status)]) -> BTree
             What::ReportPreset => MAX_PRESET_NAME_CHARS,
             What::TagPreset | What::LinePreset => method_core::MAX_TOOL_PRESET_NAME_CHARS,
             What::OtPattern => method_core::overtime::MAX_OT_NAME_CHARS,
+            What::RateTable => method_core::rates::MAX_TABLE_NAME_CHARS,
             _ => usize::MAX,
         };
         if new.chars().count() > longest {
@@ -1009,6 +1066,12 @@ pub fn import(
             method_core::overtime::MAX_OT_PATTERNS,
             "overtime patterns",
         ),
+        (
+            What::RateTable,
+            b.rate_tables.len(),
+            method_core::rates::MAX_RATE_TABLES,
+            "rate tables",
+        ),
     ] {
         if have + added(kind) > most {
             return Err(format!("A budget can keep at most {most} {what}."));
@@ -1092,6 +1155,14 @@ pub fn import(
                     .iter()
                     .map(|l| clipboard::renamed(&renames.locations, l))
                     .collect();
+                // A shared cap the budget doesn't have comes with the
+                // credit; one it has keeps its amount (decisions.md, entry
+                // 88).
+                if let Some(cap) = c.shared_cap.as_ref() {
+                    if let Some(amount) = src.shared_caps.get(cap) {
+                        b.shared_caps.entry(cap.clone()).or_insert(*amount);
+                    }
+                }
                 match b.credits.iter().position(|x| x.name == to) {
                     Some(i) => b.credits[i] = c,
                     None => b.credits.push(c),
@@ -1192,6 +1263,24 @@ pub fn import(
                 match b.ot_patterns.iter().position(|x| x.name == to) {
                     Some(i) => b.ot_patterns[i] = p,
                     None => b.ot_patterns.push(p),
+                }
+            }
+            What::RateTable => {
+                let Some(t) = src.rate_tables.iter().find(|t| t.name == from) else {
+                    continue;
+                };
+                let mut t = t.clone();
+                t.name = to.clone();
+                // Units brought in under a new name: the figures follow.
+                for r in &mut t.rows {
+                    r.rates = std::mem::take(&mut r.rates)
+                        .into_iter()
+                        .map(|(u, v)| (clipboard::renamed(&renames.units, &u), v))
+                        .collect();
+                }
+                match b.rate_tables.iter().position(|x| x.name == to) {
+                    Some(i) => b.rate_tables[i] = t,
+                    None => b.rate_tables.push(t),
                 }
             }
             What::AccountCoding => b.account_coding = src.account_coding,

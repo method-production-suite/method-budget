@@ -4,7 +4,7 @@
 //! A budget can sort its setup items into named folders, one set of folders
 //! per kind of item: `setup_folders` maps a kind (`global`, `fringe`,
 //! `group`, `unit`, `set`, `location`, `currency`, `charge`, `credit`,
-//! `tag_preset`, `line_preset`, `report_preset`, `ot_pattern`) to its folders, and each
+//! `tag_preset`, `line_preset`, `report_preset`, `ot_pattern`, `rate_table`) to its folders, and each
 //! folder to the names of the items in it. An item is in at most one folder
 //! of its kind; an item in none is unfiled. A folder can be empty.
 //!
@@ -19,7 +19,7 @@ use crate::model::Budget;
 use crate::rename::SetupKind;
 
 /// The kinds that can have folders, in the order the library lists them.
-pub const KINDS: [&str; 13] = [
+pub const KINDS: [&str; 14] = [
     "global",
     "fringe",
     "group",
@@ -33,6 +33,7 @@ pub const KINDS: [&str; 13] = [
     "line_preset",
     "report_preset",
     "ot_pattern",
+    "rate_table",
 ];
 
 /// Longest folder name, in characters.
@@ -88,6 +89,7 @@ pub fn exists(b: &Budget, kind: &str, name: &str) -> bool {
         "line_preset" => b.line_presets.iter().any(|p| p.name == name),
         "report_preset" => b.report_presets.iter().any(|p| p.name == name),
         "ot_pattern" => b.ot_patterns.iter().any(|p| p.name == name),
+        "rate_table" => b.rate_tables.iter().any(|t| t.name == name),
         _ => false,
     }
 }

@@ -396,10 +396,20 @@ pub enum Field {
     Person,
     // Added by entry 80 (a credit's locations), after entry 79's.
     Locations,
+    // Added by entry 88 (a credit's minimum spend, broker's fee and shared
+    // cap, and the budget's shared caps), after entry 80's.
+    MinimumSpend,
+    BrokerFee,
+    SharedCap,
+    SharedCaps,
+    // Added by entry 90 (rate tables and a row's rate source), after
+    // entry 88's.
+    RateTables,
+    RateSource,
 }
 
 impl Field {
-    pub const ALL: [Field; 97] = [
+    pub const ALL: [Field; 103] = [
         Field::Name,
         Field::Code,
         Field::Description,
@@ -497,6 +507,12 @@ impl Field {
         Field::RoundAccountTotals,
         Field::Person,
         Field::Locations,
+        Field::MinimumSpend,
+        Field::BrokerFee,
+        Field::SharedCap,
+        Field::SharedCaps,
+        Field::RateTables,
+        Field::RateSource,
     ];
 
     /// The name files use.
@@ -599,6 +615,12 @@ impl Field {
             Field::RoundAccountTotals => "round_account_totals",
             Field::Person => "person",
             Field::Locations => "locations",
+            Field::MinimumSpend => "minimum_spend",
+            Field::BrokerFee => "broker_fee",
+            Field::SharedCap => "shared_cap",
+            Field::SharedCaps => "shared_caps",
+            Field::RateTables => "rate_tables",
+            Field::RateSource => "rate_source",
         }
     }
 
@@ -652,9 +674,15 @@ pub enum Value {
     TagPresets(Vec<crate::presets::TagPreset>),
     LinePresets(Vec<crate::presets::LinePreset>),
     OtPatterns(Vec<crate::overtime::OtPattern>),
+    /// Rate tables (decisions.md, entry 90).
+    RateTables(Vec<crate::rates::RateTable>),
+    /// Where a row's rate came from (decisions.md, entry 90).
+    RateSource(crate::rates::RateSource),
     SetupOrder(crate::order::SetupOrder),
     SetupFolders(crate::folders::SetupFolders),
     SetupSources(crate::pack::SetupSources),
+    /// The budget's shared caps, by name (decisions.md, entry 88).
+    SharedCaps(std::collections::BTreeMap<String, crate::Cents>),
 }
 
 impl Value {
@@ -734,9 +762,12 @@ impl Value {
             Value::TagPresets(_) => "tag presets".into(),
             Value::LinePresets(_) => "line blocks".into(),
             Value::OtPatterns(_) => "overtime patterns".into(),
+            Value::RateTables(_) => "rate tables".into(),
+            Value::RateSource(s) => crate::diff::rate_source_text(Some(s)),
             Value::SetupOrder(_) => "setup order".into(),
             Value::SetupFolders(_) => "setup folders".into(),
             Value::SetupSources(_) => "setup sources".into(),
+            Value::SharedCaps(_) => "shared caps".into(),
         }
     }
 }

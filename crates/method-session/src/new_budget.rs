@@ -25,6 +25,7 @@
 use std::collections::BTreeMap;
 
 use method_core::Budget;
+use method_format::import::schedule::ScheduleDays;
 use method_format::setup::import::{self, all_items, item_ref, Resolution, What};
 use method_format::setup::pack::{self, pack_kind};
 use serde::Serialize;
@@ -153,6 +154,66 @@ pub fn bring_in(b: &mut Budget, ticked: &[Ticked]) -> Result<SetupBrought, Strin
     }
     *b = out;
     Ok(done)
+}
+
+/// The budget info fields a linked schedule's dates go to, with each date.
+fn schedule_dates(days: &ScheduleDays) -> [(&'static str, Option<&str>); 4] {
+    let sd = &days.shoot_days;
+    [
+        ("Prep start", sd.prep_start.as_deref()),
+        ("Shoot start", Some(sd.start.as_str())),
+        ("Shoot end", sd.end.as_deref()),
+        ("Wrap end", sd.wrap_end.as_deref()),
+    ]
+}
+
+/// New Budget's **Link a Schedule…** (roadmap 3.19 with 3.8; decisions.md,
+/// entries 76 and 91): a schedule days file's shoot days in all go to
+/// `SHOOT_DAYS`, linked to the schedule as File > Import Schedule Days links
+/// it (the global's setup source, so a later import finds it and says what
+/// changed), and its prep start, shoot start, shoot end and wrap end, where
+/// the file has them, to the budget info fields of those names that the
+/// budget doesn't have yet. Nothing else of the file: the other figures are
+/// picked later in Import Schedule Days. All or nothing; the sentence saying
+/// what came in.
+pub fn link_schedule(b: &mut Budget, days: &ScheduleDays) -> Result<String, String> {
+    let mut next = b.clone();
+    crate::schedule_days::apply(&mut next, days, None)?;
+    let mut dates = 0;
+    for (name, value) in schedule_dates(days) {
+        let Some(value) = value.map(str::trim).filter(|v| !v.is_empty()) else {
+            continue;
+        };
+        if next.info.contains_key(name) {
+            continue;
+        }
+        let input = crate::edit::InfoInput {
+            kind: "date".into(),
+            value: value.to_string(),
+        };
+        crate::edit::set_info(&mut next, name, &input).map_err(|e| format!("{name}: {e}"))?;
+        dates += 1;
+    }
+    *b = next;
+    let title = days.schedule.trim();
+    let from = if title.is_empty() {
+        "the schedule".to_string()
+    } else {
+        format!("the schedule {title}")
+    };
+    let n = days.shoot_days.total;
+    let mut s = format!(
+        "Shoot days from {from} ({n} {}",
+        if n == 1 { "day" } else { "days" }
+    );
+    if dates > 0 {
+        s.push_str(&format!(
+            ", {dates} {}",
+            if dates == 1 { "date" } else { "dates" }
+        ));
+    }
+    s.push_str("), linked for later imports.");
+    Ok(s)
 }
 
 #[cfg(test)]
@@ -414,5 +475,48 @@ mod tests {
             let mut b = starter::budget();
             bring_in(&mut b, &t).unwrap();
         }
+    }
+
+    #[test]
+    fn a_linked_schedule_brings_shoot_days_and_dates_and_the_link() {
+        let days = crate::schedule_days::read(
+            "every-field-days.json",
+            include_bytes!("../../method-format/tests/fixtures/schedule/every-field-days.json"),
+        )
+        .unwrap();
+        let mut b = method_core::starter::budget();
+        // A date typed in the form is kept.
+        crate::edit::set_info(
+            &mut b,
+            "Shoot start",
+            &crate::edit::InfoInput {
+                kind: "date".into(),
+                value: "2027-02-22".into(),
+            },
+        )
+        .unwrap();
+        let msg = link_schedule(&mut b, &days).unwrap();
+        assert_eq!(
+            msg,
+            "Shoot days from the schedule Harbor Light (6 days, 3 dates), linked for later imports."
+        );
+        assert_eq!(b.globals["SHOOT_DAYS"].0, "6");
+        let src = b.setup_sources.get("global", "SHOOT_DAYS").unwrap();
+        assert!(src.notes.contains("Harbor Light"), "{}", src.notes);
+        let date = |n: &str| match b.info.get(n) {
+            Some(method_core::InfoValue::Date(d)) => d.clone(),
+            other => panic!("{n}: {other:?}"),
+        };
+        assert_eq!(date("Prep start"), "2027-01-18");
+        assert_eq!(date("Shoot start"), "2027-02-22", "the form's date stays");
+        assert_eq!(date("Shoot end"), "2027-03-09");
+        assert_eq!(date("Wrap end"), "2027-03-26");
+        // A later import of the same schedule finds the link: nothing to change.
+        let r = crate::schedule_days::review(&b, &days, None);
+        assert_eq!((r.adds, r.updates), (0, 0));
+        // A budget with no SHOOT_DAYS (a chart) gets one.
+        let mut empty = method_core::starter::blank("Chart", "USD");
+        link_schedule(&mut empty, &days).unwrap();
+        assert_eq!(empty.globals["SHOOT_DAYS"].0, "6");
     }
 }

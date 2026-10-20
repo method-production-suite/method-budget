@@ -26,7 +26,8 @@ use serde::{Deserialize, Serialize};
 use crate::dto::{
     FileBaseline, FileBudget, FileCoding, FileDisplay, FileFringeRow, FileGroupRules, FileInfo,
     FileItemSource, FileLinePreset, FileNewLineDefaults, FileOtPattern, FilePosting,
-    FileReportPreset, FileSetupOrder, FileSnapshot, FileTagPreset,
+    FileRateSource, FileRateTable, FileReportPreset, FileSetupOrder, FileSharedCap, FileSnapshot,
+    FileTagPreset,
 };
 use crate::fsio::{read_capped, read_to_string_capped, MAX_READ_BYTES};
 
@@ -536,6 +537,11 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
             "ot_patterns",
             p.iter().cloned().map(FileOtPattern).collect::<Vec<_>>(),
         ),
+        Value::RateTables(t) => tagged(
+            "rate_tables",
+            t.iter().cloned().map(FileRateTable).collect::<Vec<_>>(),
+        ),
+        Value::RateSource(s) => tagged("rate_source", FileRateSource(s.clone())),
         Value::SetupOrder(o) => tagged("setup_order", FileSetupOrder::from(o.clone())),
         Value::SetupFolders(f) => tagged("setup_folders", &f.0),
         Value::SetupSources(s) => tagged(
@@ -549,6 +555,12 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
                             .collect::<BTreeMap<_, _>>(),
                     )
                 })
+                .collect::<BTreeMap<_, _>>(),
+        ),
+        Value::SharedCaps(m) => tagged(
+            "shared_caps",
+            m.iter()
+                .map(|(n, a)| (n.clone(), FileSharedCap { amount: *a }))
                 .collect::<BTreeMap<_, _>>(),
         ),
     }
@@ -621,6 +633,13 @@ pub fn value_from_json(v: serde_json::Value) -> Result<Value, String> {
                         .map(|p| p.0)
                         .collect(),
                 ),
+                "rate_tables" => Value::RateTables(
+                    from_json::<Vec<FileRateTable>>(&key, v)?
+                        .into_iter()
+                        .map(|t| t.0)
+                        .collect(),
+                ),
+                "rate_source" => Value::RateSource(from_json::<FileRateSource>(&key, v)?.0),
                 "setup_order" => Value::SetupOrder(from_json::<FileSetupOrder>(&key, v)?.into()),
                 "setup_folders" => {
                     Value::SetupFolders(method_core::folders::SetupFolders(from_json(&key, v)?))
@@ -634,6 +653,10 @@ pub fn value_from_json(v: serde_json::Value) -> Result<Value, String> {
                             })
                             .collect(),
                     ))
+                }
+                "shared_caps" => {
+                    let m: BTreeMap<String, FileSharedCap> = from_json(&key, v)?;
+                    Value::SharedCaps(m.into_iter().map(|(n, c)| (n, c.amount)).collect())
                 }
                 other => return Err(format!("unknown value type {other:?}")),
             })
@@ -1901,6 +1924,78 @@ mod tests {
         assert!(err.contains("scope"), "{err}");
     }
 
+    /// Rate tables and a row's rate source (decisions.md, entry 90) are
+    /// written to the log only when used, as in the `.mthd`, so a shared
+    /// budget that never uses them writes logs an app without them reads.
+    /// Adding, filling, changing and removing still travel through the log.
+    #[test]
+    fn unused_rate_tables_write_no_key_in_the_log() {
+        let b = method_core::sample::budget(&method_core::sample::SampleSpec {
+            rows: 20,
+            accounts: 2,
+            categories: 1,
+            ..Default::default()
+        });
+        let t = "2030-01-01T00:00:00Z";
+        let mut log = Log::adopt(actor(1), Ids::seeded(1), &b, "Adopted", t);
+        let p = log.project();
+        let mut after = p.budget.clone();
+        after.title = "Renamed".into();
+        log.record(&p, &after, &[], "Title", t).unwrap();
+        for c in log.changes() {
+            let j = change_to_json(c);
+            assert!(
+                !j.contains("rate_tables") && !j.contains("rate_source"),
+                "{j}"
+            );
+        }
+        // A table, then a line filled from it, then the table gone.
+        let p = log.project();
+        let mut after = p.budget.clone();
+        after.rate_tables.push(method_core::rates::RateTable {
+            name: "Invented Crew".into(),
+            notes: String::new(),
+            rows: vec![method_core::rates::RateRow {
+                classification: "Made Up".into(),
+                rates: [("Day".to_string(), "410.5".parse().unwrap())].into(),
+                from: None,
+                to: None,
+                notes: String::new(),
+            }],
+        });
+        log.record(&p, &after, &[], "Table", t).unwrap();
+        assert_eq!(log.project().budget, after);
+        let p = log.project();
+        let mut after = p.budget.clone();
+        let row = after
+            .categories()
+            .flat_map(|c| &c.accounts)
+            .flat_map(|a| &a.details)
+            .find(|d| d.kind == method_core::RowKind::Line)
+            .unwrap()
+            .id;
+        method_core::rates::fill(
+            &mut after,
+            row,
+            "Invented Crew",
+            "Made Up",
+            Some("Day"),
+            None,
+        )
+        .unwrap();
+        log.record(&p, &after, &[], "Fill", t).unwrap();
+        assert_eq!(log.project().budget, after);
+        let p = log.project();
+        let mut after = p.budget.clone();
+        after.rate_tables.clear();
+        log.record(&p, &after, &[], "No table", t).unwrap();
+        assert_eq!(log.project().budget, after);
+        for c in log.changes() {
+            let line = change_to_json(c);
+            assert_eq!(&change_from_json(&line).unwrap(), c);
+        }
+    }
+
     #[test]
     fn every_value_type_round_trips() {
         let b = crate::from_str(&crate::to_string(&method_core::sample::budget(
@@ -1936,9 +2031,28 @@ mod tests {
             Value::TagPresets(b.tag_presets.clone()),
             Value::LinePresets(b.line_presets.clone()),
             Value::OtPatterns(b.ot_patterns.clone()),
+            Value::RateTables(vec![method_core::rates::RateTable {
+                name: "Invented".into(),
+                notes: "n".into(),
+                rows: vec![method_core::rates::RateRow {
+                    classification: "Made Up".into(),
+                    rates: [("Day".to_string(), "1.5".parse().unwrap())].into(),
+                    from: Some("2030-01-01".into()),
+                    to: None,
+                    notes: String::new(),
+                }],
+            }]),
+            Value::RateSource(method_core::rates::RateSource {
+                table: "Invented".into(),
+                classification: "Made Up".into(),
+                unit: "Day".into(),
+                as_of: Some("2030-01-01".into()),
+                rate: "1.5".parse().unwrap(),
+            }),
             Value::SetupOrder(b.setup_order.clone()),
             Value::SetupFolders(b.setup_folders.clone()),
             Value::SetupSources(b.setup_sources.clone()),
+            Value::SharedCaps([("State".to_string(), 50_000)].into()),
         ];
         for v in values {
             let j = value_to_json(&v);

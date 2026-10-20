@@ -10,7 +10,8 @@
 //! double holds; decisions.md, entry 55), each fringe on each line
 //! (percent or flat, the cutoff and how much of it the lines above in a
 //! range left, decisions.md, entry 56; a person's one cutoff across
-//! accounts and each line's share of it, entry 79), where fringes post, what a group or a
+//! accounts and each line's share of it, entry 79), the rate table a
+//! line's rate was filled from and how it stands now (entry 90), where fringes post, what a group or a
 //! report filter left out and why, a charge's base and exclusions, a credit's
 //! gross, excluded, net and caps.
 //!
@@ -25,6 +26,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+
+use crate::diff::quoted;
 
 use super::arith::{converted, float_digits, float_text, percent_of, Money, Num, Window};
 use super::fringes::{
@@ -1680,12 +1683,87 @@ impl<'a> Explainer<'a> {
             notes.push(Step::note(label, dmoney(credit)).with(row_notes));
         }
         notes.push(Step::note("Rows added", dmoney(total)));
-        let capped = credit_cap(arith, total, c.cap).ok_or_else(ovf)?;
-        if let Some(cap) = c.cap {
+        // The engine's own figures for what comes after the rows
+        // (decisions.md, entry 88): the minimum, the shared cap and the fee.
+        let reported = self
+            .report
+            .credits
+            .get(i)
+            .ok_or_else(|| gone("that credit"))?;
+        let mut capped = credit_cap(arith, total, c.cap).ok_or_else(ovf)?;
+        if let Some(min) = c.minimum_spend {
+            let mut qualified: Cents = 0;
+            for r in &reported.rows {
+                qualified = qualified.checked_add(r.net).ok_or_else(ovf)?;
+            }
+            if reported.below_minimum {
+                notes.push(Step::note(
+                    "Minimum spend",
+                    format!(
+                        "the rows' net spend {} is below the minimum of {}, so the credit is 0",
+                        money(qualified),
+                        money(min)
+                    ),
+                ));
+                capped = Money::cents(arith, 0);
+            } else {
+                notes.push(Step::note(
+                    "Minimum spend",
+                    format!(
+                        "the rows' net spend {} is at least the minimum of {}",
+                        money(qualified),
+                        money(min)
+                    ),
+                ));
+            }
+        }
+        if let Some(cap) = c.cap.filter(|_| !reported.below_minimum) {
             notes.push(Step::note(
                 "Credit cap",
                 format!("at most {}: {}", money(cap), dmoney(capped)),
             ));
+        }
+        if let Some(name) = c.shared_cap.as_deref() {
+            let amount = self.b.shared_caps.get(name);
+            match (amount, reported.shared) {
+                (Some(cap), Some(share)) => {
+                    let others: Vec<&str> = self
+                        .b
+                        .credits
+                        .iter()
+                        .filter(|o| o.applied && o.name != c.name)
+                        .filter(|o| o.shared_cap.as_deref() == Some(name))
+                        .map(|o| o.name.as_str())
+                        .collect();
+                    notes.push(Step::note(
+                        "Shared cap",
+                        format!(
+                            "{} caps this credit and {} at {} together; its share, in proportion to {}, is {}",
+                            quoted(name),
+                            others.join(", "),
+                            money(*cap),
+                            dmoney(capped),
+                            money(share)
+                        ),
+                    ));
+                    capped = Money::cents(arith, share);
+                }
+                (Some(cap), None) => notes.push(Step::note(
+                    "Shared cap",
+                    format!(
+                        "{} caps the credits sharing it at {} together, which they are within",
+                        quoted(name),
+                        money(*cap)
+                    ),
+                )),
+                (None, _) => notes.push(Step::note(
+                    "Shared cap",
+                    format!(
+                        "{} is not in the budget's shared caps, so it holds nothing down",
+                        quoted(name)
+                    ),
+                )),
+            }
         }
         let keep = credit_keep(arith, c.discount_percent).ok_or_else(ovf)?;
         let exact = capped.checked_mul_money(keep).ok_or_else(ovf)?;
@@ -1701,8 +1779,22 @@ impl<'a> Explainer<'a> {
                 ),
             ));
         }
-        let amount = exact.to_cents().ok_or_else(ovf)?;
-        notes.extend(rounding(exact, amount));
+        let rounded = exact.to_cents().ok_or_else(ovf)?;
+        notes.extend(rounding(exact, rounded));
+        let amount = rounded.checked_sub(reported.fee).ok_or_else(ovf)?;
+        if c.broker_fee != 0 {
+            let text = if reported.fee == c.broker_fee {
+                format!("less {}: {}", money(c.broker_fee), money(amount))
+            } else {
+                format!(
+                    "less {}, but never below zero: {} taken off, {}",
+                    money(c.broker_fee),
+                    money(reported.fee),
+                    money(amount)
+                )
+            };
+            notes.push(Step::note("Broker's fee", text));
+        }
         Ok(Step::value(&c.name, "an applied credit", amount)
             .with(notes)
             .with_expand(Target::Credit(i)))
@@ -2026,6 +2118,11 @@ fn account_calc(ctx: &Ctx, ci: usize, ai: usize, code: &str, details: &[Detail])
                     )
                 };
                 notes.push(Step::note("Rate", rate_text));
+                // Where the rate came from, when it was filled from a rate
+                // table (decisions.md, entry 90): words only.
+                if let Some(words) = crate::rates::source_words(ctx.b, d) {
+                    notes.push(Step::note("Rate source", words));
+                }
                 let line = Money::num(quantity).checked_mul(rate).ok_or_else(ovf)?;
                 let local = line.to_cents().ok_or_else(ovf)?;
                 let cur_code = match &d.currency {

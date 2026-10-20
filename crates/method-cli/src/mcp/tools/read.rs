@@ -178,7 +178,8 @@ pub fn tools() -> Vec<Tool> {
             name: "list_charges",
             title: "Charges and credits",
             description: "Contractual charges (percent or flat, exclusions, applied or not) and \
-                credits (rows, caps, discount), each with what it comes to.",
+                credits (rows, caps, discount, minimum spend, broker's fee, shared cap), each \
+                with what it comes to.",
             mutating: false,
             destructive: false,
             schema: || object(vec![path_prop()], &["path"]),
@@ -190,8 +191,10 @@ pub fn tools() -> Vec<Tool> {
             description: "Spend at each location (lines, fringes, total; location null for lines \
                 with none), then every credit as an incentive program, applied or not: the \
                 locations its spend has to be at, its qualified spend (and by location), the \
-                credit after its caps and discount, whether its cap holds it down, and any \
-                problem. Nothing changes.",
+                credit after its minimum spend, caps, discount and broker's fee, whether its \
+                cap holds it down, its share of a cap it shares with other credits, and any \
+                problem. An unapplied credit is worked out as if applied alongside the applied \
+                ones. Nothing changes.",
             mutating: false,
             destructive: false,
             schema: || object(vec![path_prop()], &["path"]),
@@ -484,6 +487,17 @@ pub fn row_json(d: &Detail, n: usize, rt: Option<&RowTotals>) -> Value {
     // Only when set, so budgets without persons read as before.
     if let Some(p) = &d.person {
         v["person"] = json!(p);
+    }
+    // Where the rate came from, when it was filled from a rate table
+    // (decisions.md, entry 90); only when set.
+    if let Some(s) = &d.rate_source {
+        v["rate_source"] = json!({
+            "table": s.table,
+            "classification": s.classification,
+            "unit": s.unit,
+            "as_of": s.as_of,
+            "rate": s.rate.to_string(),
+        });
     }
     if let Some(r) = rt {
         v["included"] = json!(r.included);
@@ -1004,6 +1018,10 @@ fn list_charges(ctx: &mut Ctx, a: &Args) -> ToolResult {
                 "discount_percent": c.discount_percent.to_string(),
                 "excluded_fringes": c.excluded_fringes,
                 "locations": c.locations,
+                "minimum_spend_cents": c.minimum_spend,
+                "broker_fee_cents": c.broker_fee,
+                "shared_cap": c.shared_cap,
+                "shared_cap_cents": c.shared_cap.as_ref().and_then(|n| b.shared_caps.get(n)),
                 "rows": rows,
                 "amount_cents": computed.map(|t| t.amount),
             })

@@ -8,6 +8,13 @@
 //! be set side by side before one is taken off the net total, and spend is
 //! shown by location.
 //!
+//! A program can also have a minimum spend, a flat broker's fee and a cap
+//! it shares with other programs (decisions.md, entry 88). An applied
+//! program shares its cap with the other applied ones; an unapplied one is
+//! worked out as if it were applied too, alongside them, so applying it
+//! takes off exactly its estimate (and may lower the others' through the
+//! shared cap).
+//!
 //! Every program and rate is the user's: nothing about any real program is
 //! built in. Figures are the engine's own (exact integer cents, rounded once
 //! per credit as the topsheet rounds them), so an applied program's estimate
@@ -15,7 +22,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::calc::topsheet::{credit_figures, location_spend};
+use crate::calc::topsheet::SpendByLocation;
+use crate::calc::topsheet::{credit_stage, finish_credits, location_spend, CreditStage};
 use crate::calc::{overflow, CalcError};
 use crate::decimal::Dec;
 use crate::model::{Budget, Credit};
@@ -59,6 +67,14 @@ pub struct Program {
     pub locations: BTreeSet<String>,
     pub cap: Option<Cents>,
     pub discount_percent: Dec,
+    /// The qualified spend below which it pays nothing.
+    pub minimum_spend: Option<Cents>,
+    /// The flat fee taken off after the discount.
+    pub broker_fee: Cents,
+    /// The shared cap it names, and that cap's amount when the budget has
+    /// it.
+    pub shared_cap: Option<String>,
+    pub shared_cap_amount: Option<Cents>,
     /// The credit's figures, as the topsheet would list it applied. `None`
     /// when it can't be worked out (`problem` says why).
     pub figures: Option<CreditTotals>,
@@ -76,7 +92,8 @@ pub struct Program {
 }
 
 impl Program {
-    /// The estimate: the credit after its caps and discount, in cents.
+    /// The estimate: the credit after its minimum, caps, discount and fee,
+    /// in cents.
     pub fn amount(&self) -> Option<Cents> {
         self.figures.as_ref().map(|f| f.amount)
     }
@@ -111,11 +128,55 @@ pub fn incentives(b: &Budget, report: &Report) -> Result<Incentives, CalcError> 
         });
     }
 
+    // Every credit up to its own cap; then the applied ones finished
+    // together, as the topsheet does, and each unapplied one finished
+    // alongside them.
+    let stages: Vec<Result<CreditStage, CalcError>> =
+        b.credits.iter().map(|c| credit_stage(b, cats, c)).collect();
+    let applied: Vec<usize> = (0..b.credits.len())
+        .filter(|&i| b.credits[i].applied && stages[i].is_ok())
+        .collect();
+    let finish = |with: &[usize]| {
+        let credits: Vec<&Credit> = with.iter().map(|&i| &b.credits[i]).collect();
+        let stages = with
+            .iter()
+            .filter_map(|&i| stages[i].as_ref().ok().cloned())
+            .collect();
+        finish_credits(b, &credits, stages)
+    };
+    let mut finished: Vec<Option<Result<(CreditTotals, SpendByLocation), CalcError>>> =
+        (0..b.credits.len()).map(|_| None).collect();
+    match finish(&applied) {
+        Ok(done) => {
+            for (&i, f) in applied.iter().zip(done) {
+                finished[i] = Some(Ok(f));
+            }
+        }
+        Err(e) => {
+            for &i in &applied {
+                finished[i] = Some(Err(e.clone()));
+            }
+        }
+    }
+    for (i, stage) in stages.iter().enumerate() {
+        if finished[i].is_some() {
+            continue;
+        }
+        finished[i] = Some(match stage {
+            Err(e) => Err(e.clone()),
+            Ok(_) => {
+                let mut with = applied.clone();
+                with.push(i);
+                finish(&with).map(|mut done| done.pop().expect("one for each"))
+            }
+        });
+    }
     let programs = b
         .credits
         .iter()
+        .zip(finished)
         .enumerate()
-        .map(|(index, c)| program(b, report, index, c))
+        .map(|(index, (c, f))| program(b, index, c, f.expect("every credit")))
         .collect();
     Ok(Incentives {
         locations,
@@ -123,7 +184,12 @@ pub fn incentives(b: &Budget, report: &Report) -> Result<Incentives, CalcError> 
     })
 }
 
-fn program(b: &Budget, report: &Report, index: usize, c: &Credit) -> Program {
+fn program(
+    b: &Budget,
+    index: usize,
+    c: &Credit,
+    finished: Result<(CreditTotals, SpendByLocation), CalcError>,
+) -> Program {
     let mut p = Program {
         index,
         name: c.name.clone(),
@@ -131,6 +197,14 @@ fn program(b: &Budget, report: &Report, index: usize, c: &Credit) -> Program {
         locations: c.locations.clone(),
         cap: c.cap,
         discount_percent: c.discount_percent,
+        minimum_spend: c.minimum_spend,
+        broker_fee: c.broker_fee,
+        shared_cap: c.shared_cap.clone(),
+        shared_cap_amount: c
+            .shared_cap
+            .as_ref()
+            .and_then(|n| b.shared_caps.get(n))
+            .copied(),
         figures: None,
         problem: None,
         qualified: 0,
@@ -138,7 +212,7 @@ fn program(b: &Budget, report: &Report, index: usize, c: &Credit) -> Program {
         rows_total: Dec::ZERO,
         capped: false,
     };
-    match credit_figures(b, &report.categories, c) {
+    match finished {
         Ok((figures, by_location)) => {
             let qualified = figures
                 .rows
@@ -152,7 +226,8 @@ fn program(b: &Budget, report: &Report, index: usize, c: &Credit) -> Program {
                 (Some(q), Some(t)) => {
                     p.qualified = q;
                     p.rows_total = t;
-                    p.capped = figures.capped < t;
+                    // Below the minimum the credit is 0 whatever its cap.
+                    p.capped = !figures.below_minimum && figures.capped < t;
                     p.by_location = in_order(by_location);
                     p.figures = Some(figures);
                 }

@@ -386,3 +386,36 @@ export function newSubBudget(ctx) {
     { onClose: () => ctx.focus() },
   );
 }
+
+/**
+ * The cursor row's category or account, for New Sub-Budget from This Row:
+ * `{kind: 'category' | 'account', code}`, or null. `level` is the grid's
+ * level, `row` its cursor row (main.js), `acct` the account whose lines
+ * are shown.
+ */
+export function subBudgetRow(level, row, acct) {
+  if (level === 'topsheet') {
+    const code = row && row.kind === 'category' && row.cells && row.cells.code ? row.cells.code.text : '';
+    return code ? { kind: 'category', code: String(code) } : null;
+  }
+  if (level === 'accounts') return row && row.code ? { kind: 'account', code: String(row.code) } : null;
+  if (level === 'details') return acct && acct.code ? { kind: 'account', code: String(acct.code) } : null;
+  return null;
+}
+
+/**
+ * New Sub-Budget from This Category or Account (src/sharing.rs,
+ * sub_budget_from_row): the row's accounts, lines and the setup they use,
+ * as a separate budget. The desktop saves it beside this budget's file and
+ * opens it; without a file (or in a browser) it opens in a new tab.
+ */
+export async function subBudgetFromRow(ctx, row) {
+  if (!row) return;
+  try {
+    const r = await ctx.invoke('sub_budget_from_row', { row, saved: localStamp() });
+    if (r && r.view) ctx.apply(r.view);
+    if (r && r.message) ctx.toast(r.message);
+  } catch (e) {
+    ctx.toast(e);
+  }
+}

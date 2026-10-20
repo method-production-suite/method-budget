@@ -104,6 +104,10 @@ pub struct Budget {
     pub charges: Vec<Charge>,
     /// Applied credits (incentives), in application order.
     pub credits: Vec<Credit>,
+    /// Caps that several credits share, keyed by name (decisions.md, entry
+    /// 88): the credits naming one in `shared_cap` never come to more than
+    /// it together.
+    pub shared_caps: BTreeMap<String, Cents>,
     /// Frozen totals to compare against ("original" vs current).
     pub baseline: Option<Baseline>,
     /// How numbers show on screen. Not content: versions don't carry it.
@@ -148,6 +152,10 @@ pub struct Budget {
     /// and source notes (see [`crate::pack`]). About the items, not
     /// content: versions don't carry it.
     pub setup_sources: crate::pack::SetupSources,
+    /// Rate tables the user keeps, in the user's order (see
+    /// [`crate::rates`]). Tools, not content, like overtime patterns:
+    /// versions don't carry them.
+    pub rate_tables: Vec<crate::rates::RateTable>,
 }
 
 impl Budget {
@@ -177,6 +185,7 @@ impl Budget {
             topsheet: Vec::new(),
             charges: Vec::new(),
             credits: Vec::new(),
+            shared_caps: BTreeMap::new(),
             baseline: None,
             display: DisplayPrefs::default(),
             versions: Vec::new(),
@@ -190,6 +199,7 @@ impl Budget {
             actuals: Arc::default(),
             ot_patterns: Vec::new(),
             setup_sources: crate::pack::SetupSources::default(),
+            rate_tables: Vec::new(),
         }
     }
 
@@ -957,6 +967,10 @@ pub struct Detail {
     /// with a person leaves its fringe range for percent fringes. `None`
     /// (the default) changes nothing. See [`Detail::person_name`].
     pub person: Option<String>,
+    /// Where the rate came from, when it was filled from a rate table
+    /// (decisions.md, entry 90). Never changes a figure: the rate is the
+    /// number written; this only says where it came from.
+    pub rate_source: Option<crate::rates::RateSource>,
     /// Text style. Display only: never affects totals.
     pub bold: bool,
     pub italic: bool,
@@ -989,6 +1003,7 @@ impl Detail {
             set: None,
             fringe_range: None,
             person: None,
+            rate_source: None,
             bold: false,
             italic: false,
             indent: 0,
@@ -1099,6 +1114,17 @@ pub struct Credit {
     /// A typed amount is unaffected. Empty (the default) counts every line,
     /// wherever it is.
     pub locations: BTreeSet<String>,
+    /// The qualified spend below which the program pays nothing
+    /// (decisions.md, entry 88): compared with the rows' net spend added
+    /// up, after the locations and excluded fringes, before any cap.
+    /// `None`: no minimum.
+    pub minimum_spend: Option<Cents>,
+    /// A flat fee taken off after the cap and the discount, never taking
+    /// the credit below zero (decisions.md, entry 88). 0: no fee.
+    pub broker_fee: Cents,
+    /// The name of a cap in the budget's `shared_caps` this credit shares
+    /// with others (decisions.md, entry 88). `None`: no shared cap.
+    pub shared_cap: Option<String>,
     pub rows: Vec<CreditRow>,
 }
 
@@ -1271,6 +1297,7 @@ pub struct BudgetSnapshot {
     pub topsheet: Vec<TopsheetRow>,
     pub charges: Vec<Charge>,
     pub credits: Vec<Credit>,
+    pub shared_caps: BTreeMap<String, Cents>,
     pub baseline: Option<Baseline>,
 }
 
@@ -1303,6 +1330,7 @@ impl Budget {
             topsheet,
             charges,
             credits,
+            shared_caps,
             baseline,
             display: _,
             versions: _,
@@ -1316,6 +1344,7 @@ impl Budget {
             actuals: _,
             ot_patterns: _,
             setup_sources: _,
+            rate_tables: _,
         } = self;
         BudgetSnapshot {
             title: title.clone(),
@@ -1342,6 +1371,7 @@ impl Budget {
             topsheet: topsheet.clone(),
             charges: charges.clone(),
             credits: credits.clone(),
+            shared_caps: shared_caps.clone(),
             baseline: baseline.clone(),
         }
     }
@@ -1374,6 +1404,7 @@ impl Budget {
             topsheet,
             charges,
             credits,
+            shared_caps,
             baseline,
             display: _,
             versions,
@@ -1387,6 +1418,7 @@ impl Budget {
             actuals: _,
             ot_patterns: _,
             setup_sources: _,
+            rate_tables: _,
         } = self;
         let content = BudgetSnapshot {
             title,
@@ -1413,6 +1445,7 @@ impl Budget {
             topsheet,
             charges,
             credits,
+            shared_caps,
             baseline,
         };
         (content, versions)
@@ -1490,6 +1523,7 @@ impl BudgetSnapshot {
             topsheet,
             charges,
             credits,
+            shared_caps,
             baseline,
         } = self;
         Budget {
@@ -1517,6 +1551,7 @@ impl BudgetSnapshot {
             topsheet,
             charges,
             credits,
+            shared_caps,
             baseline,
             display: DisplayPrefs::default(),
             versions,
@@ -1530,6 +1565,7 @@ impl BudgetSnapshot {
             actuals: Arc::default(),
             ot_patterns: Vec::new(),
             setup_sources: crate::pack::SetupSources::default(),
+            rate_tables: Vec::new(),
         }
     }
 

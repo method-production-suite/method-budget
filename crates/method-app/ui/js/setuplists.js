@@ -40,6 +40,7 @@ export const SHEET_KINDS = [
   ['credit', 'Credits'],
   ['tag_preset', 'Tag presets'],
   ['ot_pattern', 'Overtime patterns'],
+  ['rate_table', 'Rate tables'],
 ];
 
 /** File > Export > Setup Lists…: which kinds, as a workbook or CSV files. */

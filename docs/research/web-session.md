@@ -181,6 +181,7 @@ Commands in version 1 (187: 60 from phase 1, 113 from phase 1b, 14 added since):
 | Find, rename, renumber | `find`, `replace`, `rename_setup_item`, `renumber_preview`, `renumber_accounts` |
 | Setup lists | `setup_usage`, `set_setup_order`, `move_setup_item`, `set_short_code` |
 | Explain, overtime | `explain_number`, `ot_calculate`, `ot_apply`, `ot_save_pattern`, `ot_delete_pattern` |
+| Rate tables | `rate_table_save`, `rate_table_delete`, `rate_choices`, `rate_fill`, `rate_update`, `rate_import_pick`, `rate_import_read` (decisions.md, entry 90; `rate_import_pick` takes the spreadsheet as `file`) |
 | Compare, What Changed, merge | `compare_budgets`, `compare_detail`, `compare_pick_files`, `what_changed`, `merge_preview`, `merge_apply`, `merge_pick_file` (What Changed against the saved file is refused: the host keeps no file; pick it as a file) |
 | Export, reports | `export_budget`, `save_report_preset`, `delete_report_preset` |
 | Templates, charts | `template_new`, `template_save`, `chart_templates`, `chart_template_new` |

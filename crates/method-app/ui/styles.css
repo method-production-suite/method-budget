@@ -895,6 +895,25 @@ table.grid {
   border-color: transparent var(--accent) transparent transparent;
 }
 
+/* A rate filled from a rate table (decisions.md, entry 90): a dotted rule
+   under the figure; where it came from is its tooltip. When the table now
+   says something else, a mark in the corner (the figure stays until the
+   line's Update rate). */
+.grid td.rate-from-table {
+  text-decoration: underline dotted var(--text-muted);
+  text-underline-offset: 3px;
+}
+
+.grid td.rate-table-changed::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  border-style: solid;
+  border-width: 0 0 7px 7px;
+  border-color: transparent transparent var(--note) transparent;
+}
+
 /* A fringe range: a bracket in the # column spanning its lines. */
 .grid tr.fr td.c-num::before {
   content: "";
@@ -1511,4 +1530,65 @@ body.panel-resizing {
   flex: none;
   display: flex;
   gap: 6px;
+}
+
+/* Fill Rate from Table (js/ratepick.js): the classifications to pick from,
+   one per row: the classification, its table and period, the figure. */
+.ratepick {
+  width: min(640px, calc(100vw - 32px));
+}
+
+.ratepick-filters {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.ratepick-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.ratepick-choice {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ratepick-choice:hover,
+.ratepick-choice:focus-visible {
+  background: var(--selection);
+}
+
+.ratepick-choice[aria-disabled="true"] {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.ratepick-table {
+  color: var(--text-muted);
+}
+
+.ratepick-rate {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.ratepick-empty {
+  padding: 10px;
+  color: var(--text-muted);
 }

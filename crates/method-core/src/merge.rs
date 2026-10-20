@@ -216,6 +216,7 @@ pub fn base_as_shared(base: &Budget, ours: &Budget, copy: &Budget) -> Budget {
     out.setup_order = copy.setup_order.clone();
     out.setup_folders = copy.setup_folders.clone();
     out.ot_patterns = copy.ot_patterns.clone();
+    out.rate_tables = copy.rate_tables.clone();
     out.setup_sources = copy.setup_sources.clone();
     out.compact_versions = copy.compact_versions;
     out.actuals = copy.actuals.clone();
@@ -843,6 +844,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         topsheet: _,
         charges: _,
         credits: _,
+        shared_caps: _,
         baseline: _,
         display: _,
         versions: _,
@@ -856,6 +858,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         actuals: _,
         ot_patterns: _,
         setup_sources: _,
+        rate_tables: _,
     } = o;
 
     // Budget settings.
@@ -1209,6 +1212,30 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
             ),
             excluded_fringes: th.names(|c| &c.excluded_fringes),
             locations: th.names(|c| &c.locations),
+            minimum_spend: th.field(
+                cx,
+                at,
+                "minimum_spend",
+                "minimum spend",
+                |c| &c.minimum_spend,
+                |v| v.map_or("none".into(), crate::diff::money),
+            ),
+            broker_fee: th.field(
+                cx,
+                at,
+                "broker_fee",
+                "broker's fee",
+                |c| &c.broker_fee,
+                |v| crate::diff::money(*v),
+            ),
+            shared_cap: th.field(
+                cx,
+                at,
+                "shared_cap",
+                "shared cap",
+                |c| &c.shared_cap,
+                opt_text,
+            ),
             rows: th.field(
                 cx,
                 at,
@@ -1224,10 +1251,35 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
                         discount_percent: crate::Dec::ZERO,
                         excluded_fringes: BTreeSet::new(),
                         locations: BTreeSet::new(),
+                        minimum_spend: None,
+                        broker_fee: 0,
+                        shared_cap: None,
                         rows: rows.clone(),
                     })
                 },
             ),
+        },
+    );
+
+    // Shared caps name by name (decisions.md, entry 88).
+    let shared_caps = merge_map(
+        cx,
+        Kind {
+            key: "shared_cap",
+            word: "Shared cap",
+            table: None,
+        },
+        (&b.shared_caps, &o.shared_caps, &t.shared_caps),
+        &|v| crate::diff::shared_cap_fields(*v),
+        &|cx, at, th| {
+            th.field(
+                cx,
+                at,
+                "amount",
+                "amount",
+                |v| v,
+                |v| crate::diff::money(*v),
+            )
         },
     );
 
@@ -1297,6 +1349,14 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         &|_| Vec::new(),
         &|cx, at, th| whole_pick(cx, at, th),
     );
+    let rate_tables = merge_list(
+        cx,
+        tool("rate_table", "Rate table"),
+        (&b.rate_tables, &o.rate_tables, &t.rate_tables),
+        &|p: &crate::rates::RateTable| p.name.as_str(),
+        &|_| Vec::new(),
+        &|cx, at, th| whole_pick(cx, at, th),
+    );
     let compact_versions = merge_value(
         cx,
         &setting_at("compact_versions", "Compact versions"),
@@ -1341,6 +1401,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         topsheet,
         charges,
         credits,
+        shared_caps,
         baseline,
         display,
         versions,
@@ -1355,6 +1416,7 @@ fn merge_budgets(cx: &mut Cx, b: &Budget, o: &Budget, t: &Budget) -> (Budget, us
         actuals,
         ot_patterns,
         setup_sources,
+        rate_tables,
     };
     (merged, renumbered_rows + renumbered_versions)
 }
@@ -2456,6 +2518,14 @@ fn merge_detail(cx: &mut Cx, at: &At, th: Three<Detail>, id: RowId) -> Detail {
             |r| r.map_or("none".into(), |n| n.to_string()),
         ),
         person: th.field(cx, at, "person", "person", |d| &d.person, opt_text),
+        rate_source: th.field(
+            cx,
+            at,
+            "rate_source",
+            "rate source",
+            |d| &d.rate_source,
+            |s| crate::diff::rate_source_text(s.as_ref()),
+        ),
         bold: th.field(cx, at, "bold", "bold", |d| &d.bold, |v| on_off(*v)),
         italic: th.field(cx, at, "italic", "italic", |d| &d.italic, |v| on_off(*v)),
         indent: th.field(cx, at, "indent", "indent", |d| &d.indent, |v| v.to_string()),

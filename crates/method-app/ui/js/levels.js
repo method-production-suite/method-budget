@@ -63,6 +63,9 @@ export function indexView(view) {
   const persons = view.persons && typeof view.persons === 'object' ? view.persons : null;
   // Some line has a person even when the totals failed: the Person column stays.
   const hasPersons = Boolean(view.has_persons) || Boolean(persons);
+  // Lines on screen filled from a rate table, by row id, and how each
+  // stands against its table now (decisions.md, entry 90).
+  const rateChecks = view.rate_checks && typeof view.rate_checks === 'object' ? view.rate_checks : {};
 
   // Lines, accounts and categories with review comments to settle
   // (comments.js): a mark on their number.
@@ -73,7 +76,7 @@ export function indexView(view) {
     categories: new Set(rv && Array.isArray(rv.categories) ? rv.categories : []),
   };
 
-  return { b, r, topsheet, cats, levels, cellIssues, accountHasIssue, categoryHasIssue, variance, cost, persons, hasPersons, commented };
+  return { b, r, topsheet, cats, levels, cellIssues, accountHasIssue, categoryHasIssue, variance, cost, persons, hasPersons, commented, rateChecks };
 }
 
 // ---------------------------------------------------------------------------
@@ -584,6 +587,21 @@ export function personKey(name) {
 }
 
 /**
+ * A Rate cell filled from a rate table: where it came from in its tooltip,
+ * and a mark when the table now says something else (the line keeps its
+ * figure until Update Rate). `check` is the view's rate_checks entry.
+ */
+export function rateFromTable(cell, check) {
+  if (!check || typeof check !== 'object') return cell;
+  const words = typeof check.words === 'string' ? check.words : '';
+  const title = check.state === 'changed' ? `${words}\nRight-click the line and choose Update rate to take the table's figure.` : words;
+  cell.title = [cell.title, title.charAt(0).toUpperCase() + title.slice(1)].filter(Boolean).join('\n');
+  const cls = check.state === 'changed' ? 'rate-from-table rate-table-changed' : 'rate-from-table';
+  cell.cls = cell.cls ? `${cell.cls} ${cls}` : cls;
+  return cell;
+}
+
+/**
  * A line's Person cell: the name, with the person's running totals across
  * accounts as its tooltip (what they are paid, and each percent fringe's pay
  * against its cutoff); a cutoff reached is marked.
@@ -791,7 +809,7 @@ export function detailRows(ix, entry, ai, full, shown = null) {
       cells.person = personCell(ix, d.person);
     }
     if (line) {
-      cells.rate = formulaCell(d.rate, issues.rate, cellCtx('rate'));
+      cells.rate = rateFromTable(formulaCell(d.rate, issues.rate, cellCtx('rate')), ix.rateChecks && ix.rateChecks[d.id]);
       cells.unit3 = textCell(d.unit3);
       cells.currency = textCell(d.currency, issues.currency);
       cells.fringes = tagCell(ix.b, 'fringes', d.fringes, issues.fringes);

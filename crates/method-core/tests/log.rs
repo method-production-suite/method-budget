@@ -374,6 +374,9 @@ fn account_credit_rows_currency_formats_and_frozen_baselines_project_back() {
         discount_percent: Dec::ZERO,
         excluded_fringes: BTreeSet::new(),
         locations: BTreeSet::new(),
+        minimum_spend: None,
+        broker_fee: 0,
+        shared_cap: None,
         rows: vec![CreditRow {
             description: "Crew".into(),
             source: CreditSource::Account {
@@ -2074,6 +2077,9 @@ fn program_at(locations: &[&str]) -> Credit {
         discount_percent: Dec::ZERO,
         excluded_fringes: BTreeSet::new(),
         locations: set(locations),
+        minimum_spend: None,
+        broker_fee: 0,
+        shared_cap: None,
         rows: vec![CreditRow {
             description: "Spend".into(),
             source: CreditSource::Flat(100_000),
@@ -2629,4 +2635,51 @@ fn signed_changes_and_removals_converge_in_any_order() {
             .count();
     }
     assert!(cut > 5, "removals cut {cut} changes in all");
+}
+
+/// A credit's minimum spend, broker's fee and shared cap, and the budget's
+/// shared caps (decisions.md, entry 88), are written in the change log only
+/// when set, project back, and clear when taken off.
+#[test]
+fn credit_terms_and_shared_caps_log_only_when_set() {
+    let mut start = sample();
+    start.credits.push(program_at(&[]));
+    let log = adopt(1, &start);
+    let written = |log: &Log, word: &str| {
+        log.changes()
+            .flat_map(|c| &c.ops)
+            .any(|op| format!("{op:?}").contains(word))
+    };
+    for word in ["MinimumSpend", "BrokerFee", "SharedCap"] {
+        assert!(!written(&log, word), "{word} written");
+    }
+
+    let mut with = start.clone();
+    let c = with.credits.last_mut().unwrap();
+    c.minimum_spend = Some(50_000);
+    c.broker_fee = 1_000;
+    c.shared_cap = Some("State".into());
+    with.shared_caps.insert("State".into(), 20_000);
+    let mut log = adopt(1, &with);
+    for word in ["MinimumSpend", "BrokerFee", "SharedCaps"] {
+        assert!(written(&log, word), "{word} not written");
+    }
+    assert_eq!(normalized(&log.project().budget), normalized(&with));
+
+    // Changing a shared cap's amount, then taking every term off.
+    let p = log.project();
+    let mut changed = p.budget.clone();
+    changed.shared_caps.insert("State".into(), 30_000);
+    record(&mut log, &p, &changed, &[], "Shared cap");
+    let p = log.project();
+    assert_eq!(p.budget.shared_caps.get("State"), Some(&30_000));
+    let mut cleared = p.budget.clone();
+    let c = cleared.credits.last_mut().unwrap();
+    c.minimum_spend = None;
+    c.broker_fee = 0;
+    c.shared_cap = None;
+    cleared.shared_caps.clear();
+    record(&mut log, &p, &cleared, &[], "No terms");
+    let p = log.project();
+    assert_eq!(normalized(&p.budget), normalized(&cleared));
 }

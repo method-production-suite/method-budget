@@ -843,6 +843,9 @@ mod tests {
             discount_percent: Dec::ZERO,
             excluded_fringes: BTreeSet::new(),
             locations: BTreeSet::new(),
+            minimum_spend: None,
+            broker_fee: 0,
+            shared_cap: None,
             rows: Vec::new(),
         });
         let mut preset = crate::ReportPreset {
