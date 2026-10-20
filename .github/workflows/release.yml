@@ -86,13 +86,15 @@ jobs:
       - name: Every locked crate is at least 14 days old
         # SUITE-STANDARDS.md section 6: no release ships a crate younger than the
         # cooldown, so both locks are checked in full here, before any build or signing
-        # step (build and release need this job). The script has no list of young crates
-        # to excuse; the one exception it knows, a git dependency pinned to a full commit
-        # from scripts/crate-age-git-allow.txt, has no publish date and cannot change.
+        # step (build and release need this job). With --release it honours only the
+        # security entries in scripts/crate-age-exceptions.txt (a RUSTSEC id in the reason),
+        # never an age-out entry, so no release ships a crate still under the cooldown for
+        # any other reason; a git dependency pinned to a full commit from
+        # scripts/crate-age-git-allow.txt has no publish date and cannot change.
         run: |
           set -euo pipefail
           for lock in Cargo.lock fuzz/Cargo.lock; do
-            python3 scripts/check-crate-ages.py --lock "$lock"
+            python3 scripts/check-crate-ages.py --lock "$lock" --release
           done
 
   build:

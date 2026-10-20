@@ -121,7 +121,7 @@ cargo xtask capture-screens                 # retake the pictures
 cargo xtask review-screens --out target/screens/review.html   # and look at what changed
 python3 scripts/site.py                     # the website's "What's new" box follows the notes
 cargo xtask check-version --tag v0.2.0      # what the release workflow checks first
-python3 scripts/check-crate-ages.py          # and every locked crate 14 days old (fuzz/Cargo.lock too, with --lock)
+python3 scripts/check-crate-ages.py --release   # every locked crate 14 days old, bar RUSTSEC fixes (fuzz/Cargo.lock too, with --lock)
 scripts/check.sh                            # the full local check
 cargo test --workspace --locked --target x86_64-apple-darwin   # the Mac app's Intel half, under Rosetta (rustup target add x86_64-apple-darwin once)
 git add Cargo.toml Cargo.lock crates/method-app/tauri.conf.json docs/releases/0.2.0.md README.md site/index.html assets/screens site/img
@@ -182,7 +182,7 @@ signed and the draft's description says the first launch needs the one-time step
 
 | Job | Permissions | What it does |
 |---|---|---|
-| `check` | contents: read | a rehearsal runs only from `main`; a tag's commit is on `main`; `cargo xtask check-version --tag` (the tag, or `v<rehearse_version>`); every crate in `Cargo.lock` and `fuzz/Cargo.lock` at least 14 days old (`scripts/check-crate-ages.py` in full, SUITE-STANDARDS.md section 6), before anything is built or signed |
+| `check` | contents: read | a rehearsal runs only from `main`; a tag's commit is on `main`; `cargo xtask check-version --tag` (the tag, or `v<rehearse_version>`); every crate in `Cargo.lock` and `fuzz/Cargo.lock` at least 14 days old (`scripts/check-crate-ages.py --release` in full: only `scripts/crate-age-exceptions.txt`'s security entries pass, SUITE-STANDARDS.md section 6), before anything is built or signed |
 | `build` (macOS universal, Windows, Linux) | contents: read | runs every test (`cargo test --workspace --locked`) before anything is built or signed; builds the bundles; on macOS signs, notarizes, staples and verifies, and writes the updater archive and signs it for its version (`cargo xtask sign-update`), each only when its secrets are there |
 | `release` | contents: write (the only job with it: it creates the draft and uploads the files) | `cargo xtask update-manifest`, then `gh release create --draft` with the notes; skipped by a rehearsal |
 
