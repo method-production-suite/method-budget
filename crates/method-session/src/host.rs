@@ -259,6 +259,7 @@ pub const COMMANDS: &[&str] = &[
     // Report presets
     "save_report_preset",
     "delete_report_preset",
+    "bid_sheet",
     // Import spreadsheet
     "sheet_import_pick",
     "sheet_import_preview",

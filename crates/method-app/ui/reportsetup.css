@@ -286,3 +286,51 @@
 .rs-status.bad {
   color: var(--danger);
 }
+
+/* The bid layout (js/reportsetup.js bidGroup): a header field is a label and
+   a value; each line its kind, name and moves, then what it takes. */
+
+.rs-slot.rs-bid-field {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto;
+}
+
+.rs-slot.rs-bid-field .rs-text,
+.rs-bid-line .rs-slot .rs-text {
+  grid-column: auto;
+}
+
+.rs-bid-line {
+  margin: 6px 0;
+  padding: 4px 0 6px;
+  border-top: 1px solid var(--border);
+}
+
+.rs-bid-line .rs-slot {
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+}
+
+.rs-bid-line .rs-inline {
+  display: flex;
+  margin: 3px 0;
+}
+
+.rs-bid-line .rs-inline > span {
+  flex: 0 0 72px;
+}
+
+.rs-bid-line .rs-inline .rs-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: 13px;
+}
+
+.rs-bid-line .rs-text[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.rs-bid-adds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}

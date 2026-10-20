@@ -157,6 +157,7 @@ const COMMANDS: &[&str] = &[
     // Reports: saved report presets, printing and PDF (src/reports.rs)
     "save_report_preset",
     "delete_report_preset",
+    "bid_sheet",
     "print_report",
     // Spreadsheet export: Excel, CSV, tab-delimited (src/export.rs)
     "export_budget",

@@ -182,7 +182,7 @@ Commands in version 1 (187: 60 from phase 1, 113 from phase 1b, 14 added since):
 | Setup lists | `setup_usage`, `set_setup_order`, `move_setup_item`, `set_short_code` |
 | Explain, overtime | `explain_number`, `ot_calculate`, `ot_apply`, `ot_save_pattern`, `ot_delete_pattern` |
 | Compare, What Changed, merge | `compare_budgets`, `compare_detail`, `compare_pick_files`, `what_changed`, `merge_preview`, `merge_apply`, `merge_pick_file` (What Changed against the saved file is refused: the host keeps no file; pick it as a file) |
-| Export, reports | `export_budget`, `save_report_preset`, `delete_report_preset` |
+| Export, reports | `export_budget`, `save_report_preset`, `delete_report_preset`, `bid_sheet` |
 | Templates, charts | `template_new`, `template_save`, `chart_templates`, `chart_template_new` |
 | Imports | `open_budget`, `import_setup_pick`, `import_setup`, `sheet_import_pick`, `sheet_import_preview`, `sheet_import`, `coa_import_pick`, `coa_import_preview`, `coa_import`, `export_import_pick`, `export_import_preview`, `export_import`, `setup_sheet_export`, `setup_sheet_pick`, `setup_sheet_guess`, `setup_sheet_review`, `schedule_days_pick`, `schedule_days_review`, `schedule_days_apply` (decisions.md, entry 76) |
 | Review files | `review_start`, `review_open`, `review_close`, `review_list`, `review_add`, `review_update`, `review_resolve`, `review_delete`, `review_restore`, `review_settle`, `review_save` (decisions.md, entry 81; `review_start` and `review_open` take the review file as `file`, `review_save` gives it back as a download) |

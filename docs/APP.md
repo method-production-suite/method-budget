@@ -1985,8 +1985,9 @@ still prints the topsheet straight away, with the standard layout.
   fringes, total), notes list, budget information, chart of accounts (every category and
   account code with its name, account and row counts, production totals where they fall),
   units (plural, description, hours, rows using it), sets and locations with totals (rows,
-  lines total, fringes, total of the lines in the budget total) and currencies (the base
-  first, then each with its symbol and rate, rows in it). A checkbox prints a section, the
+  lines total, fringes, total of the lines in the budget total), currencies (the base
+  first, then each with its symbol and rate, rows in it), the cost report and the bid
+  (below). A checkbox prints a section, the
   arrows move it.
 - **Categories and accounts**: a tree with a checkbox for every category (its accounts
   under the ▸) and an All box. It decides the account level, the detail level and the
@@ -2034,7 +2035,38 @@ figures: a report is always drawn from the budget as it is. Each change is one u
 and marks the budget edited. Versions don't carry presets, and restoring a version keeps
 the current ones.
 
-**Print… and Save as PDF….** Print… opens the system print sheet with the orientation
+**Bid layouts** (roadmap 3.13; decisions entry 92). For commercial work a budget is often
+shown as a bid: a summary in sections the producer defines, with markups and a total.
+Tick **Bid** under Sections and a **Bid layout** group opens below them, starting from a
+plain example (header fields Client, Agency, Job number, Dates and Contact; sections
+Pre-production, Shoot, Post and Fees; a subtotal and a 10% markup) that takes no accounts
+yet. Everything in it is yours to rename, remove and add to:
+
+- **Header fields**: a label and a value each, printed above the bid. Add Header Field
+  adds one; × removes it.
+- **Sections** take accounts: **Categories** (category codes, comma-separated) take every
+  account in them, **Accounts** take account numbers and ranges (`4000 to 4999`). An
+  account counts in the first section that takes it.
+- **Subtotal** adds up everything above it. **Markup (%)** is a percent of the sections
+  ticked under it (none ticked: every section and Unassigned); **Flat amount** is a fixed
+  amount. Renaming a section keeps the markups ticked on it.
+- **List each section's accounts** prints each account under its section instead of the
+  section's total alone. The arrows move a line, × removes it.
+
+The bid prints its fields, its lines in order, then **Unassigned** (every account no
+section takes, with its total; accounts at zero are counted, not listed), the budget's own
+charges and credits, and the **Bid total**, with a line saying how it reconciles: the
+budget's net total plus the bid's markups. Each account counts once, at its lines plus the
+fringes they earn wherever the budget posts them. The group lists what to check: accounts
+in no section, an account two sections take, a pick that takes nothing, a markup of a
+section that isn't there. Figures come from the engine (`bid_sheet`) as the layout
+changes. The layout is saved with the preset, so it goes wherever a preset goes: in the
+budget, through What Changed and Merge, Import Setup and the setup library; a preset that
+prints Bid with no layout prints the example. The bid prints in the base currency. Not yet: a ready-made
+layout of the industry bid form, which waits on the owner's legal-line answer (roadmap,
+"Legal line before building").
+
+**Print… and Save as PDF….****Print… and Save as PDF….** Print… opens the system print sheet with the orientation
 already set. Save as PDF… asks where to save and writes the PDF straight there, with no
 print sheet. Both print exactly the pages in the preview: the report is laid out by the app
 into Letter-sized pages, each with its own header, footer and page number, because the
@@ -2045,6 +2077,7 @@ entry 28).
 |---|---|---|
 | `save_report_preset` | `index` (the preset to replace, or `null` to add one), `preset` (FORMAT.md, "Report preset") | View |
 | `delete_report_preset` | `index` | View |
+| `bid_sheet` | `layout` (a bid layout in the file's shape, FORMAT.md "Bid layout"; `null`: the example) | The bid worked out on the current totals, changing nothing: `layout` (the one used), `fields`, `lines` (`section` with `accounts` and `total`, `subtotal` and `markup` with `amount`; a markup's `percent` and `base`, `percent` `null` when flat), `unassigned`, `unassigned_total`, `unposted_fringes`, `charges`, `credits` (`{name, amount}`), `budget_net`, `markups`, `total`, `warnings`; money in cents |
 | `print_report` | `pdf` (true: into a PDF file chosen in a Save dialog), `landscape`, `title` (the job's name and the suggested file name) | `{supported, done, file}`: `supported` false where the app prints with `window.print()` instead (not macOS); `done` false when cancelled; `file` the PDF's file name |
 
 For other screens, `ui/js/report.js` lays out and prints any table the same way:
@@ -3266,6 +3299,11 @@ Screen readers (decisions.md, entry 82) need a live check with VoiceOver, and wi
 Narrator or NVDA on Windows: the grid's cells, the announcement after an edit and the
 dialogs. The footer's other totals aren't announced, and an empty grid shows focus only
 by its border.
+
+The report setup's Bid layout group (decisions.md, entry 92) needs a live check in the app
+(it is checked headless in the browser build): ticking Bid, editing the lines, saving the
+preset and printing a bid to PDF. A ready-made layout of the industry bid form waits on
+the owner's legal-line answer.
 
 The Person column (decisions.md, entry 79) needs a live check: typing a name, the
 type-ahead of people, the running-total tooltip and the cutoff mark. The spreadsheet

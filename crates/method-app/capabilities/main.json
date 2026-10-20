@@ -134,6 +134,7 @@
     "allow-pane-view",
     "allow-save-report-preset",
     "allow-delete-report-preset",
+    "allow-bid-sheet",
     "allow-print-report",
     "allow-export-budget",
     "allow-save-tag-preset",

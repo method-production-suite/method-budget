@@ -758,6 +758,42 @@
   font-weight: 700;
 }
 
+/* The bid (js/report.js bidSection): section headings like the cost
+   report's categories, the budget's own charges set off above the total. */
+
+.method-report .rpt-bid tr.rpt-bid-field td {
+  border-bottom: 0;
+}
+
+.method-report .rpt-bid tr.rpt-bid-field.last td {
+  padding-bottom: 8pt;
+}
+
+.method-report .rpt-bid .rpt-bid-label {
+  display: inline-block;
+  min-width: 9em;
+  font-weight: 600;
+}
+
+.method-report .rpt-bid tr.rpt-bid-head td {
+  padding-top: 7pt;
+  border-bottom: 0.75pt solid #000;
+  font-weight: 700;
+}
+
+.method-report .rpt-bid tr.rpt-bid-acct td.txt {
+  padding-left: 14pt;
+}
+
+.method-report .rpt-bid tr.rpt-bid-budget.first td {
+  padding-top: 6pt;
+  border-top: 1.5pt solid #000;
+}
+
+.method-report .rpt-bid tr.rpt-bid-total td {
+  border-top: 1.5pt solid #000;
+}
+
 .method-report .rpt-notes td.note-text {
   white-space: pre-line;
 }
