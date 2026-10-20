@@ -1301,7 +1301,15 @@ budget's thumbnail (below), its title, its file name and folder (the home folder
 `~`), its net total in its base currency, when the file last changed, "Open in a tab" for
 a budget that is (its unsaved changes are in the total), and "Can't find this file." or why
 it can't be read. Typing searches both lists (every word must be in the
-title, the file name or the folder). Keys: Down from the search box into the list, Up and
+title, the file name or the folder). **Sort** beside the search box (decision 91) puts the
+lists, and a project's, in another order: Last opened (as listed: pinned as pinned,
+recent newest first, a project by title), Name, Last changed (newest first) or Net total
+(largest first), rows without one last; a row shown under a budget stays with it. The
+choice is kept for next time. A budget with a change log beside it (`X.mthd-log/`, shared
+through a folder, decision 64) says "shared" and, on a line of its own, who was in it
+lately and where, latest first, from each person's heartbeat in the log ("Bo in account
+2101, Today 09:00; Ann, Yesterday"; at most five people). The start window only reads the
+log folder; it never writes to it. Keys: Down from the search box into the list, Up and
 Down, Home and End move, Enter opens (in the search box, the first match), P pins or
 unpins, D duplicates, Delete or Backspace takes a budget off the list (recent and pinned;
 the file is never touched), Left goes to the places and Right (from a place) back to the
@@ -1387,6 +1395,18 @@ what came in ("Setup from your library and Union Basics: 12 items added, 1 item
 replaced."). Nothing in a pack or a library is bundled rate data: packs ship empty
 (decision 50) and a library holds only what the user put in it.
 
+**Link a Schedule…** (under the schedule's length; decision 91, with roadmap 3.8) picks the
+days file Method Schedule writes for a budget (`method-schedule-days`, as File > Import
+Schedule Days reads it). The form's Shoot days, Shoot start and Shoot end take its
+figures (they can still be changed), and a line says which schedule it is and how many
+shoot days it has; **Unlink** takes it back. At Create the file's shoot days in all go to
+`SHOOT_DAYS` linked to the schedule exactly as Import Schedule Days links a global (its
+setup source names the figure and the schedule), so a later import finds it and says what
+changed; its prep start and wrap end, when it has them, go to those budget info fields. All
+of that comes in after the setup and before the form's details, so a value typed in the
+form wins (the global stays linked). The other figures (units, sets, locations, weeks,
+elements) are picked later in Import Schedule Days. The budget file gets no new field.
+
 **Save in**: the folder the last new budget was saved in, else Documents, else the home
 folder; **Choose Folder…** changes it. **Make a project folder for it** (decision 91; on
 unless turned off, which is remembered; off for New Budget Here) makes a folder named like
@@ -1421,7 +1441,7 @@ as one undo step, so closing it asks to save.
 
 | Command | Arguments | Returns |
 |---|---|---|
-| `start_list` | none | `{pinned, recent, projects, fresh}`: each row `{token, file, title, folder, modified (ms since 1970), net_total (cents), currency, bars, kind, openable, under, pinned, recent, open, problem}` (`bars` the thumbnail, `[{label, share}]` with `share` in thousandths; `kind` `budget`, `sub-budget`, `shared copy`, `editable copy`, `setup pack`, `schedule` or `actuals`; `openable` false for a schedule or actuals file; `under` for something shown under the budget it came from); each project `{token, name, folder, items, more, problem}`, its rows' `file` the path inside the folder; `fresh` when only an untouched Untitled budget is open |
+| `start_list` | none | `{pinned, recent, projects, fresh}`: each row `{token, file, title, folder, modified (ms since 1970), net_total (cents), currency, bars, kind, openable, under, shared, people, pinned, recent, open, problem}` (`bars` the thumbnail, `[{label, share}]` with `share` in thousandths; `shared` when a change log is beside it, `people` then `[{name, place, at}]`, latest first; `kind` `budget`, `sub-budget`, `shared copy`, `editable copy`, `setup pack`, `schedule` or `actuals`; `openable` false for a schedule or actuals file; `under` for something shown under the budget it came from); each project `{token, name, folder, items, more, problem}`, its rows' `file` the path inside the folder; `fresh` when only an untouched Untitled budget is open |
 | `start_open` | `token` (a budget file) | View of its tab |
 | `start_duplicate` | `token` | `{view, message}`: the duplicate in front |
 | `start_add_project` | none (shows the folder dialog) | the lists again, or `null` when cancelled |
@@ -1435,7 +1455,7 @@ as one undo step, so closing it asks to save.
 | `new_budget_setup` | none | `{library, packs}`: `library` `{name, items, problem}` or `null` when none is picked; `packs` the Packs list's rows (`{token, file, place, title, version, effective, region, items, problem}`), listed again (tokens from an older listing are refused) |
 | `new_budget_folder` | none | Save In's first folder: `{token, folder}` (`folder` to show, `~` for home), or `null` |
 | `new_budget_pick_folder` | `current` (a folder token, or `null`; shows the folder dialog from there) | `{token, folder}`, or `null` when cancelled |
-| `new_budget_create` | `spec` (`{title, kind, season, episode, episodes, prep_start, shoot_start, shoot_end, wrap_end, prep_weeks, shoot_days, wrap_weeks, country, region, city, currency, start, chart, template, fringe_posting, arithmetic, folder, file_name, library, packs, project}`; `start` is `starter`, `blank`, `chart` with `chart` an id, or `file` with `template` the picked token; `folder` a folder token or `null` for no file; `file_name` blank for the title; `library` true to bring in the setup library, `packs` the tokens of packs from `new_budget_setup`; `project` true to make a project folder in `folder`) | `{view, message, taken}`: `taken` (a free file name, without `.mthd`) when a file of that name is there, and then nothing was made (`view` is `null`) |
+| `new_budget_create` | `spec` (`{title, kind, season, episode, episodes, prep_start, shoot_start, shoot_end, wrap_end, prep_weeks, shoot_days, wrap_weeks, country, region, city, currency, start, chart, template, fringe_posting, arithmetic, folder, file_name, library, packs, project, schedule}`; `start` is `starter`, `blank`, `chart` with `chart` an id, or `file` with `template` the picked token; `folder` a folder token or `null` for no file; `file_name` blank for the title; `library` true to bring in the setup library, `packs` the tokens of packs from `new_budget_setup`; `project` true to make a project folder in `folder`; `schedule` the token of a days file picked with `schedule_days_pick`, or `null`) | `{view, message, taken}`: `taken` (a free file name, without `.mthd`) when a file of that name is there, and then nothing was made (`view` is `null`) |
 
 The pinned list (at most 100), each file's bookmark, the last Save In folder and the
 project folders are the data folder's `start.json`. A file is read once for its row and
@@ -3335,10 +3355,11 @@ check in the tools window and with a long history.
 The start window's projects, thumbnails and Duplicate, and New Sub-Budget from This
 Category or Account (decisions.md, entry 91), need a live check in the app: Add Folder…'s
 dialog, a project made by New Budget appearing down the left, the bars' look in light and
-dark, D and the arrows between the places and the list, and the sub-budget's file appearing
-beside its parent. Their logic and file work are tested in Rust, the page in a headless
-browser harness, and the row sub-budget's menu item in the browser smoke. Rates at creation
-wait on 3.9; sorting, created dates, the schedule link and shared-folder badges are later.
+dark, D and the arrows between the places and the list, Link a Schedule…'s dialog, a shared
+budget's people, and the sub-budget's file appearing beside its parent. Their logic and file
+work are tested in Rust, the page in a headless browser harness, and the row sub-budget's
+menu item in the browser smoke. Rates at creation wait on 3.9; created dates and hiding
+archived projects are later.
 
 The sample budget (decisions.md, entry 84) needs a live check in the app: the first start
 on a fresh data folder opening it with its Sample tab and line, a second start not opening
