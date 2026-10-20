@@ -1024,7 +1024,7 @@ that does), and restoring a version keeps the current ones. Fields in written or
 |-------|------|-------|
 | `name` | text, **required** | The application keeps names unique (ignoring case and surrounding spaces), 1 to 80 characters; the reader does not check. |
 | `default` | boolean, default `false` | The preset the application's Print dialog opens with. The application keeps at most one; a reader that finds several uses the first. |
-| `sections` | list of section names | In print order, each once: `"topsheet"`, `"accounts"` (each category's accounts with their totals), `"detail"`, `"fringes"`, `"globals"`, `"groups"` (with their totals), `"notes"` (every note on categories, accounts and lines, each with its date and author), `"info"` (budget information), `"chart"` (chart of accounts: every category and account code with its name), `"units"`, `"sets"` (with their totals), `"locations"` (with their totals), `"currencies"`, `"cost_report"` (budget, baseline, actual, estimate to complete, estimate at completion, variance and percent spent per account, category and the topsheet; see [actuals](#actuals)), `"bid"` (the preset's [bid layout](#bid-layout) worked out, or the example layout when the preset has none). |
+| `sections` | list of section names | In print order, each once: `"topsheet"`, `"accounts"` (each category's accounts with their totals), `"detail"`, `"fringes"`, `"globals"`, `"groups"` (with their totals), `"notes"` (every note on categories, accounts and lines, each with its date and author), `"info"` (budget information), `"chart"` (chart of accounts: every category and account code with its name), `"units"`, `"sets"` (with their totals), `"locations"` (with their totals), `"currencies"`, `"cost_report"` (budget, baseline, actual, estimate to complete, estimate at completion, variance and percent spent per account, category and the topsheet; see [actuals](#actuals)), `"bid"` (the preset's [bid layout](#bid-layout) worked out, or the example layout when the preset has none), `"incentives"` (each location's spend and the incentive programs counting it, every program's terms and figures, and the totals; decisions.md, entry 93). |
 | `excluded_categories` | name set | Category codes left out of the account and detail sections and the notes list. The topsheet always lists every category. |
 | `excluded_accounts` | name set | Account codes left out the same way. |
 | `skip_empty_accounts` | boolean, default `false` | Leave out accounts with no rows. |
@@ -1486,6 +1486,9 @@ valid. Loading and saving it in Method Budget normalizes it.
   names added at the end of the list), each written only when used, so a log of a budget
   that never uses them is one 0.3.0 reads; removing the last table, or a row's source, is
   a write of null.
+- Version 1, additive (2026-10): report preset section `"incentives"` (decisions.md,
+  entry 93). Written only in a preset that prints it, so files without it are unchanged
+  byte for byte; an older reader refuses a preset naming it (unknown section).
 
 ## Complete example
 

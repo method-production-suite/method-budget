@@ -1593,7 +1593,7 @@ reference), with the calls it needed:
 
 ## 46. The product is Method Budget (2026-10-09, the owner)
 
-methodbudget.com is the site, and the repo is https://github.com/ssandweiss/method-budget.
+methodbudget.com is the site, and the repo is https://github.com/method-production-suite/method-budget.
 Never shorten the name to "MB" (that is how people shorten Movie Magic Budgeting), and no
 file extension of ours resembles `.mbd` or `.mmbx`. What it covers:
 
@@ -1678,8 +1678,8 @@ kept for a while as an alias) and the app's executable `method-budget-app`.
   from Help > Release Notes, as plain text. A tag whose notes aren't ready builds nothing.
   `cargo xtask notes-facts` lists the commits since the last tag for drafting, treating
   their subjects as untrusted data.
-- **Mac releases are signed as Clockwork Post Production, LLC** with its existing
-  Developer ID Application certificate, notarized with an App Store Connect API key,
+- **Mac releases are signed with the suite's Developer ID**, its Developer ID
+  Application certificate, notarized with an App Store Connect API key,
   stapled, and checked with `codesign` and `spctl` in the release workflow. Each step skips
   cleanly when its secrets are absent (the build is then ad-hoc signed, as before).
   Roadmap 1.21 is built as a pipeline; the first signed release needs the secrets
@@ -4256,7 +4256,7 @@ From 0.6.0 the Mac app holds both Intel and Apple silicon code.
   `darwin-aarch64` and `darwin-x86_64`. method-update asks for `darwin-x86_64-app`, then
   `darwin-x86_64` on an Intel Mac; it is pinned to method-libs `25c80f8` (its #7), which
   lets an Intel Mac ask at all. Copies of 0.2.x on Intel Macs use the Tauri updater plugin,
-  ask the old `ssandweiss/method-budget` address (GitHub forwards it to the org's latest
+  ask the repository's old address (GitHub forwards it to the org's latest
   release) for the same keys and trust the same key, so they are offered 0.6.0.
 - **What an Intel Mac says when there's no build.** The words were "Updates are for Apple
   silicon Macs."; they are now "There's no update for this computer yet. This version stays
@@ -4606,6 +4606,92 @@ number, Dates and Contact; sections Pre-production, Shoot, Post and Fees; a subt
   reading, round trips and byte identity (`report_presets`), renumbering, the host
   command, the command line in every format, and the browser build drawing a bid and
   editing a layout in the report setup (scripts/web-smoke.mjs).
+
+## 93. Incentive programs: a what-if that moves lines, an estimate's row figures, a printed report by location (2026-10-20)
+
+Roadmap 3.6, third slice: the three items entries 80 and 88 left. A program is still a
+credit worked out by the topsheet's own code. Behavior: docs/APP.md, "Incentive
+programs", "Printing and reports" and "Exporting spreadsheets"; command line:
+docs/CLI.md, `method-budget incentives what-if` and `method-budget report`; MCP:
+`incentives_what_if`; file: docs/FORMAT.md, "Report preset".
+
+- **A what-if is the real budget with the lines moved, worked out the real way.**
+  `method_core::incentives::what_if` picks the lines (rows by id, every line of some
+  accounts or categories, only those at one place now if asked, less some rows; lines and
+  adjustment rows only, since only their location counts), moves them on a copy with the
+  same `move_lines` that applying uses, recalculates the copy, and sets `incentives` on
+  both side by side: each program's estimate before and after and the difference, its
+  qualified spend before and after, the spend at each location, and the topsheet's grand
+  total, credits taken off, net total and the unapplied estimates before and after. No
+  separate approximation: a program's figure after is what the topsheet would say after
+  the move. The app works the copy out as it works the budget out (a budget with problems
+  from its cleaned copy, then marked `partial`).
+- **Applying is a separate command, one undo step.** `apply_what_if` makes the same move
+  on the budget ("Move 2 lines to Cold Spring field station"), so the figures
+  are then exactly the what-if's "after". A move to a location the budget doesn't have, a
+  row or code it doesn't have, no lines, or lines already there is refused, so no empty
+  step is ever added. The what-if itself is never saved: no file field, no log entry.
+- **Properties.** Over random budgets with random programs and shared caps: a what-if
+  leaves the budget alone, its "before" is `incentives` as it is, and applying it then
+  estimating gives its "after" (estimates, credits taken off, net total) with the grand
+  total unchanged; the order the lines are listed in changes nothing, and moving two sets
+  of lines one after the other is moving them together; a what-if with no lines, or with
+  lines already where it moves them, changes nothing.
+- **An unapplied credit's row figures.** `incentives` already worked out an unapplied
+  credit as if applied (entry 88), rows included. The Credits tab's rows table now shows
+  those row figures (gross, fringes out, net, credit, over cap) as it does an applied
+  credit's, under a note that they are an estimate, each tooltip starting "Estimate.".
+  They fill in place when the estimates come, so typing in the table never loses focus.
+- **A printed report by location, through the report machinery.** A report section
+  `incentives` ("Incentives by location"): each location's spend (lines with their
+  fringes, as Spend by location) with the programs that count it and what each counts
+  there; then every program with its status, qualified spend (and what of it was typed
+  in), minimum, cap, shared cap share, discount, fee and credit, and which terms held it
+  down; then the credits applied, the unapplied estimates, the grand total and the net
+  total. The figures are `method_core::incentives::by_location::location_report`, made
+  from the same estimates, so the credits applied are the topsheet's credits total and
+  the net total the topsheet's (tested by hand, by property over random budgets, and on
+  the export table). It prints in the app's preview, Print and Save as PDF (from the full
+  view's new `incentives` field), and in `method-budget report` as text, HTML, CSV and PDF.
+  The spreadsheet (.xlsx) and CSV exports gain an Incentives table, one row kind per
+  line (`Location`, `Counted`, `Program`, `Total`), only for a budget with credits, so
+  every other export is unchanged.
+- **The file: one additive section name.** A report preset may name the section
+  `"incentives"`. It is written only in a preset that prints it, so Field Station and
+  every other file read and write byte for byte as before (tested); an older reader
+  refuses a preset naming it as an unknown section, as with `"cost_report"`. No other
+  format change.
+- **Built on the recommendation** (the owner can reverse each from the digest): a
+  program's credit is printed once, not split by location, since a share per location is a
+  figure no program rule gives (each location lists what the program counts there); the
+  exports gain the Incentives table only when the budget has credits; the What if… panel
+  picks one category or account at a time (less the lines unticked), where the command
+  line and MCP take any mix of rows, accounts and categories; applying a what-if that
+  moves nothing is refused.
+- **Where it shows.** Budget Setup's Credits tab: a What if… panel under Spend by
+  location (Lines in, Now at, Move to; the lines it would move, each with a box to leave
+  it out; Programs before and after; the totals; the spend at the locations that change;
+  Move N lines to …). Commands `what_if` (read-only, allowed in the main and Budget Setup
+  windows) and `apply_what_if`, in the browser build too. `method-budget incentives
+  what-if <file> (--to-location NAME | --no-location) [--lines ROWS] [--account CODE]
+  [--category CODE] [--from-location NAME | --from-no-location] [--except ROWS] [--json]
+  [--apply]`. The MCP `incentives_what_if` tool (read-only; `tag_lines` or `update_lines`
+  with the location makes the move).
+- Tests: method-core `incentives` (a move by hand with each program before and after,
+  the grand and net totals and the spend by location; applying gives the "after"; picking
+  by row, account, category, place now and leaving rows out; unknown rows, codes and
+  locations refused and changing nothing; an empty what-if; the report's blocks, totals
+  and terms by hand) and `properties` (the four properties above); method-session's
+  what-if and apply (nothing changes, one undo step, refusals); method-app's estimated row
+  figures, the what-if as the page sends it and the full view's report figures, and the
+  commands wired to the Budget Setup window; method-format's Incentives table reconciling
+  with the topsheet and absent without credits, and the section name round trip with
+  Field Station byte for byte; the command line's what-if (text, JSON, picking, `--apply`,
+  refusals) and report section (text, CSV, PDF, a budget without credits); the MCP tool.
+  The panel, the estimated rows and the printed section were checked offscreen in
+  headless Chrome against the browser build; the app itself needs a live check.
+- **Not built**: a what-if from lines picked in the budget grid (the panel picks a
+  category or an account), and a preset of program fields to fill in.
 
 ## 94. Localization: one string table for the page and the menu bar, English first (2026-10-20, the owner's instruction)
 

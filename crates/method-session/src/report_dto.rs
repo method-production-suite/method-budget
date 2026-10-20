@@ -253,6 +253,123 @@ impl From<&method_core::incentives::Incentives> for IncentivesDto {
     }
 }
 
+/// The printed per-location incentive report (decisions.md, entry 93):
+/// each location's spend and the programs counting it, then every program
+/// with its terms, and totals that reconcile with the topsheet's credits.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct LocationReportDto {
+    /// From a cleaned copy of a budget with problems: figures may be short.
+    pub partial: bool,
+    pub locations: Vec<LocationBlockDto>,
+    pub programs: Vec<ProgramSummaryDto>,
+    pub spend_total: Cents,
+    /// The applied programs' credits: the topsheet's credits total.
+    pub applied_total: Cents,
+    pub estimates_total: Cents,
+    pub grand_total: Cents,
+    pub net_total: Cents,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct LocationBlockDto {
+    /// `null`: lines with no location.
+    pub location: Option<String>,
+    pub known: bool,
+    pub lines: Cents,
+    pub fringes: Cents,
+    pub total: Cents,
+    pub programs: Vec<LocationProgramDto>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct LocationProgramDto {
+    pub index: usize,
+    pub name: String,
+    pub applied: bool,
+    pub qualified_here: Cents,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct ProgramSummaryDto {
+    pub index: usize,
+    pub name: String,
+    pub applied: bool,
+    pub locations: Vec<String>,
+    pub qualified: Cents,
+    /// Of the qualified spend, the amounts typed in.
+    pub typed: Cents,
+    pub rows_total: String,
+    pub minimum_spend: Option<Cents>,
+    pub below_minimum: bool,
+    pub cap: Option<Cents>,
+    pub capped: bool,
+    pub shared_cap: Option<String>,
+    pub shared: Option<Cents>,
+    pub discount_percent: String,
+    pub discount: Cents,
+    pub fee: Cents,
+    pub amount: Option<Cents>,
+    pub problem: Option<String>,
+}
+
+impl From<&method_core::incentives::by_location::LocationReport> for LocationReportDto {
+    fn from(r: &method_core::incentives::by_location::LocationReport) -> LocationReportDto {
+        LocationReportDto {
+            partial: false,
+            locations: r
+                .locations
+                .iter()
+                .map(|l| LocationBlockDto {
+                    location: l.spend.location.clone(),
+                    known: l.spend.known,
+                    lines: l.spend.lines,
+                    fringes: l.spend.fringes,
+                    total: l.spend.total,
+                    programs: l
+                        .programs
+                        .iter()
+                        .map(|p| LocationProgramDto {
+                            index: p.index,
+                            name: p.name.clone(),
+                            applied: p.applied,
+                            qualified_here: p.qualified_here,
+                        })
+                        .collect(),
+                })
+                .collect(),
+            programs: r
+                .programs
+                .iter()
+                .map(|p| ProgramSummaryDto {
+                    index: p.index,
+                    name: p.name.clone(),
+                    applied: p.applied,
+                    locations: p.locations.iter().cloned().collect(),
+                    qualified: p.qualified,
+                    typed: p.typed,
+                    rows_total: dec(p.rows_total),
+                    minimum_spend: p.minimum_spend,
+                    below_minimum: p.below_minimum,
+                    cap: p.cap,
+                    capped: p.capped,
+                    shared_cap: p.shared_cap.clone(),
+                    shared: p.shared,
+                    discount_percent: dec(p.discount_percent),
+                    discount: p.discount,
+                    fee: p.fee,
+                    amount: p.amount,
+                    problem: p.problem.clone(),
+                })
+                .collect(),
+            spend_total: r.spend_total,
+            applied_total: r.applied_total,
+            estimates_total: r.estimates_total,
+            grand_total: r.grand_total,
+            net_total: r.net_total,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct FringeSummaryDto {
     pub uses: u32,

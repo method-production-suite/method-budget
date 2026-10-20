@@ -36,6 +36,41 @@
   margin-top: 10px;
 }
 
+/* What if… (decisions.md, entry 93): its bands, then its tables. */
+.tss-whatif {
+  margin-top: 12px;
+}
+
+.tss-whatif > .sw-table {
+  margin-top: 8px;
+}
+
+.tss-hint {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.tss-whatif > .tss-note,
+.tss-whatif > .setup-error,
+.tss-estimated > .tss-note {
+  margin: 6px 10px;
+}
+
+.sw-cols-whatif-lines .sw-grid-head,
+.sw-cols-whatif-lines .sw-grid-row {
+  grid-template-columns: 14px 28px minmax(80px, 0.6fr) minmax(160px, 2fr) minmax(120px, 1.2fr) minmax(100px, 1fr);
+}
+
+.sw-cols-whatif-programs .sw-grid-head,
+.sw-cols-whatif-programs .sw-grid-row {
+  grid-template-columns: 14px minmax(160px, 2fr) minmax(80px, 0.7fr) minmax(100px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr);
+}
+
+.sw-cols-whatif-totals .sw-grid-head,
+.sw-cols-whatif-totals .sw-grid-row {
+  grid-template-columns: 14px minmax(180px, 2fr) minmax(100px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr);
+}
+
 .sw-cols-info .sw-grid-head,
 .sw-cols-info .sw-grid-row {
   grid-template-columns: 14px minmax(140px, 1fr) 112px minmax(200px, 2.5fr) 32px;

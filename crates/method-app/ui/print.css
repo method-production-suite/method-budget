@@ -731,6 +731,22 @@
   font-weight: 700;
 }
 
+/* Incentives by location (js/report.js incentivesSection): locations bold,
+   the programs counting them indented; figures columns as the cost report's. */
+
+.method-report .rpt-incent col.c-cm { width: 7.2em; }
+.method-report .rpt-incent col.c-short { width: 6em; }
+
+.method-report .rpt-incent tr.rpt-incent-loc td {
+  padding-top: 6pt;
+  border-bottom: 0.75pt solid #000;
+  font-weight: 700;
+}
+
+.method-report .rpt-incent td.muted {
+  color: #444;
+}
+
 /* Cost report (js/report.js costReportSection): six or seven figures
    columns, in em so big figures fit at every type size; landscape gives the
    description the most room. Over-budget variances print bold. */

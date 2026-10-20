@@ -246,3 +246,71 @@ fn set_credit_takes_a_minimum_a_fee_and_a_shared_cap() {
     .unwrap();
     assert!(b.shared_caps.is_empty());
 }
+
+/// Decisions.md, entry 93: an unapplied program's rows come with their
+/// figures as if applied (the rows table shows them as an estimate); the
+/// What if… panel's `what_if`, sent as the page sends it, changes nothing,
+/// and `apply_what_if` gives its "after" in one undo step; the printed
+/// report's figures come with the full view.
+#[test]
+fn an_estimate_has_row_figures_and_a_what_if_applies_as_one_step() {
+    let mut s = session();
+    let got = serde_json::to_value(incentives_in(&mut s).unwrap()).unwrap();
+    let p = got["programs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["name"] == "Ridge program")
+        .unwrap()
+        .clone();
+    assert_eq!(p["applied"], false);
+    let rows = p["figures"]["rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 1);
+    // 1,000.00 at Ridge, 25%.
+    assert_eq!(rows[0]["net"], 100_000);
+    assert_eq!(rows[0]["credit"], "250");
+
+    let code = s.budget().credits.last().unwrap().rows[0].source.clone();
+    let method_core::CreditSource::Account { account } = code else {
+        panic!("an account row")
+    };
+    let pick: method_session::what_if::WhatIfInput = serde_json::from_value(json!({
+        "accounts": [account], "from": {"location": "Coast"}, "except": [], "to": "Ridge"
+    }))
+    .unwrap();
+    let before = s.budget().clone();
+    let w = serde_json::to_value(method_session::what_if::what_if(&mut s, &pick).unwrap()).unwrap();
+    assert_eq!(s.budget(), &before);
+    assert_eq!(w["changed"], 1);
+    let ridge = w["programs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["name"] == "Ridge program")
+        .unwrap()
+        .clone();
+    // 1,500.00 at 25% is 375.00, held to the 200.00 cap, less 10%.
+    assert_eq!(ridge["before"], 18_000);
+    assert_eq!(ridge["after"], 18_000);
+    assert_eq!(ridge["qualified_after"], 150_000);
+
+    method_session::what_if::apply_what_if(&mut s, &pick).unwrap();
+    let now = serde_json::to_value(incentives_in(&mut s).unwrap()).unwrap();
+    let p = now["programs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["name"] == "Ridge program")
+        .unwrap()
+        .clone();
+    assert_eq!(p["qualified"], ridge["qualified_after"]);
+    assert_eq!(p["amount"], ridge["after"]);
+    s.undo();
+    assert_eq!(s.budget(), &before);
+
+    let full = serde_json::to_value(s.full_view()).unwrap();
+    let inc = &full["incentives"];
+    assert_eq!(inc["applied_total"], full["report"]["credits_total"]);
+    assert_eq!(inc["estimates_total"], 18_000);
+    assert_eq!(inc["programs"].as_array().unwrap().len(), 1);
+}
