@@ -133,6 +133,10 @@ this page goes ahead without waiting.
       list in docs/research/parity-tracker.md, section 2. The export test plan
       (docs/research/export-test-plan.md) has the steps; exports go in `imports/`, never
       committed.
+- [ ] **The Intel code in the window, on this Mac** (D87; after 0.6.0 is published, about
+      a minute): install 0.6.0, select Method Budget in Applications, File > Get Info,
+      tick "Open using Rosetta", open it and open Help > Open Sample: Field Station should
+      show its totals. Untick the box afterwards.
 - [ ] **An Intel Mac** (D87; needs an Intel Mac, after 0.6.0 is published): install
       0.6.0 from the release's `.dmg` and open the Field Station sample; and on an Intel Mac
       that has 0.2.x, Help > Check for Updates should find 0.6.0, download it and restart
