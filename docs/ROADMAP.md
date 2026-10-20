@@ -34,6 +34,13 @@ this page goes ahead without waiting.
 
 ### Open decisions
 
+- **A signing dependency for shared budgets** (3.18; D78): the next step, signed changes
+  (each person's key pair, every change signed, removal by cutoff), needs the
+  `ed25519-dalek` crate (3.0.0), a new cryptography dependency: widely used, pure Rust,
+  BSD-3-Clause (already on `deny.toml`'s licence list). **Recommend: yes**, held to the
+  usual 14-day age and `cargo deny` checks. Not
+  started: waiting on the yes, since it adds security-critical code.
+
 - **Which languages first** (3.14; D82): nothing is translated yet and no translation
   framework is started. The words live inline in the page scripts, the menu bar and the
   engine's messages; docs/research/accessibility-audit.md, "Localization", lists where
@@ -183,25 +190,26 @@ this page goes ahead without waiting.
 
 ## Where we are
 
-As of 2026-10-18. The engine covers the v1 calculation model and works figures out as the
-reference product does by default (decisions 55 to 61 and 69; exact decimals are a
-per-budget setting), property-tested. Budgets save as our own documented, diff-friendly
-`.mthd` JSON. The Mac app has all of Phase 1 and Phase 2 but two items: the engine checks
-that need the reference product (1.17) and the Windows and Linux live check (2.25). That
-includes autosave with recovery copies and backups, recent files and opening a `.mthd`
-from the Finder, budget tabs and split view, right-click menus, bold, italic, indent,
-color and dated notes, copying rows with their tags and the paste review, find and
-replace, versions, compare and the History list, report choices with a live preview and
-PDF, imports from spreadsheets and from the reference product's exports, and a signed,
-notarized Mac build with updates inside the app (decision 48). Twelve of Phase 3's nineteen
-items are built; sharing through a folder (3.18), the start window (3.19), incentive
-modeling (3.6) and accessibility (3.14) are partway. Around the app: the command line is `method-budget` (decision 74; `method`
-still runs as an alias for now); an MCP server lets coding agents work on budget files
-(3.17); a browser build runs the same page on the engine compiled to WebAssembly, for the
-website's demo (decisions 70 to 73); the Help menu has the User Guide, Report a Bug,
-Licenses and Notices and the suite's site; the README and site pictures come from Field
-Station, an invented budget. Release 0.3.0 is in preparation. Many built items still need a
-live check in the app (docs/APP.md, "Not yet").
+As of 2026-10-20. Release 0.6.0 is out (2026-10-20): one universal Mac app for Intel and
+Apple silicon again (decision 87), with Intel Macs still on 0.2 offered it, plus Windows
+and Linux builds that are included but not yet tested by hand. The engine covers the v1
+calculation model and works figures out as the reference product does by default
+(decisions 55 to 61 and 69; exact decimals are a per-budget setting), property-tested.
+Budgets save as our own documented, diff-friendly `.mthd` JSON. The Mac app has all of
+Phase 1 and Phase 2 but two items: the engine checks that need the reference product (1.17)
+and the Windows and Linux live check (2.25). That includes autosave with recovery copies and
+backups, recent files, budget tabs and split view, find and replace, versions and compare,
+reports with a live preview and PDF, imports from spreadsheets and from other programs'
+exports, and a signed, notarized Mac build that updates itself through the suite's
+method-update (decision 83). Sixteen of Phase 3's twenty-two items are built; incentive
+modeling (3.6), localization (3.14), working together on one budget (3.18) and the new
+project window (3.19) are partway, and rate tables (3.9) and bid layouts (3.13) wait on the
+legal line above. Around the app: the `method-budget` command line, an MCP server for coding
+agents (3.17), a browser build for the website's demo, the Field Station sample opened once
+at the first start (3.20), and Method Launcher's two command-line options and recent list
+(3.21). Every release is rehearsed on main first, tests all three systems before anything is
+signed, and runs nothing but prebuilt programs once a signing key is in reach. Many built
+items still need a live check in the app (docs/APP.md, "Not yet").
 
 ---
 
