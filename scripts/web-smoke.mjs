@@ -16,7 +16,8 @@
 // control has a name, the budget grid is an ARIA grid whose cursor cell says
 // its column and row, cells say whether they are selected, the cursor cell's
 // id stays the same across a redraw, an edit is announced politely, and a
-// dialog is a named modal dialog that gives focus back when it closes.
+// dialog is a named modal dialog that gives focus back when it closes. A bid
+// layout is worked out by the engine and drawn into report pages.
 //
 // No npm packages: Node's own http server and Chrome's DevTools protocol over
 // a pipe (scripts/chrome-pipe.mjs, which also finds Chrome; CHROME= names
@@ -268,6 +269,61 @@ async function main() {
     await evaluate(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`);
     await until('focus back on Rename budget', `!document.querySelector('#modal-root [role="dialog"]') && document.activeElement.textContent.trim() === 'Rename budget'`, 5_000);
     console.log(`web-smoke: the "${named(dialog)}" dialog is modal, holds focus and gives it back`);
+
+    // 2c. A bid layout (decisions.md, entry 92): the engine works the bid
+    // out (bid_sheet) and the report draws it into pages, reconciled: the
+    // budget's net total plus the bid's own markups.
+    const bid = await evaluate(`(async () => {
+      const { renderReport, withBid } = await import('./js/report.js');
+      const full = await window.__METHOD_WEB__.invoke('smoke', 'get_full_view', {});
+      const spec = {
+        sections: ['bid'],
+        bid: {
+          fields: [{ label: 'Client', value: 'Smoke Test Coffee' }],
+          lines: [
+            { kind: 'section', name: 'Story', picks: [{ kind: 'category', code: '10' }] },
+            { kind: 'subtotal', name: 'Subtotal' },
+            { kind: 'flat', name: 'Handling', amount: 100000 },
+          ],
+          show_accounts: true,
+        },
+      };
+      const view = await withBid(full, spec);
+      const box = document.createElement('div');
+      document.body.append(box);
+      const out = renderReport(box, view, spec);
+      const text = box.textContent;
+      box.remove();
+      return { pages: out.pages, text, net: full.report.net_total, sheet: view.bid_sheet, error: view.bid_error };
+    })()`);
+    if (!bid.sheet) fail(`the bid wasn't worked out: ${bid.error}`);
+    if (bid.sheet.total !== bid.net + 100000) fail(`the bid total ${bid.sheet.total} isn't the net total ${bid.net} plus 1,000.00`);
+    const fmt = (c) => `${Math.trunc(c / 100).toLocaleString('en-US')}.${String(c % 100).padStart(2, '0')}`;
+    for (const want of ['Smoke Test Coffee', 'Total Story', 'Unassigned', 'Handling', 'Bid total', fmt(bid.sheet.total)]) {
+      if (!bid.text.includes(want)) fail(`the bid's pages don't show "${want}"`);
+    }
+    if (!(bid.pages >= 1)) fail('the bid laid out no pages');
+    console.log(`web-smoke: a bid layout draws ${bid.pages} page(s), its total ${fmt(bid.sheet.total)} the net total plus its markups`);
+
+    // 2d. The bid layout in the report setup: ticking Bid starts the
+    // example layout, adding a section and naming its accounts redraws the
+    // preview with the engine's figures.
+    await evaluate(`(async () => {
+      const { showReportSetup } = await import('./js/reportsetup.js');
+      window.__smokeCloseSetup = await showReportSetup({ view: () => null, call: (c, a) => window.__METHOD_WEB__.invoke('smoke', c, a), toast: (m) => console.error(String(m)) });
+      document.getElementById('rs-sec-bid').click();
+      return true;
+    })()`);
+    await until('the example bid layout in the setup', `document.querySelectorAll('.rs-bid-line').length === 6 && document.getElementById('rs-bid-l0-name').value === 'Pre-production'`, 10_000);
+    await evaluate(`(() => {
+      const cats = document.getElementById('rs-bid-l0-cats');
+      cats.value = '10, 11';
+      cats.dispatchEvent(new Event('input'));
+      return true;
+    })()`);
+    await until('the bid in the preview', `(() => { const t = document.querySelector('.rs-pages').textContent; return t.includes('Bid total') && t.includes('Pre-production') && !t.includes('takes category'); })()`, 10_000);
+    await evaluate(`(window.__smokeCloseSetup(), true)`);
+    console.log('web-smoke: the report setup edits a bid layout and previews it');
 
     // 3. The charts of accounts: the list, then one chart, fetched when asked.
     const charts = await evaluate(`window.__METHOD_WEB__.invoke('smoke', 'chart_templates', {})`);

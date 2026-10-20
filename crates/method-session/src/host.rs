@@ -89,6 +89,7 @@ pub const COMMANDS: &[&str] = &[
     "selection_totals",
     "preview_charge",
     "incentives",
+    "what_if",
     // History
     "undo",
     "redo",
@@ -139,6 +140,7 @@ pub const COMMANDS: &[&str] = &[
     "move_charge",
     "set_credit",
     "delete_credit",
+    "apply_what_if",
     "move_credit",
     "set_set",
     "delete_set",
@@ -269,6 +271,7 @@ pub const COMMANDS: &[&str] = &[
     // Report presets
     "save_report_preset",
     "delete_report_preset",
+    "bid_sheet",
     // Import spreadsheet
     "sheet_import_pick",
     "sheet_import_preview",
@@ -586,6 +589,16 @@ impl Host {
                 )?)
             }
             "incentives" => json(cmd::incentives(&mut *self.state.lock_doc(doc)?)?),
+            "what_if" => {
+                let a: WhatIfArgs = d.args()?;
+                json(crate::what_if::what_if(
+                    &mut *self.state.lock_doc(doc)?,
+                    &a.pick,
+                )?)
+            }
+            "apply_what_if" => {
+                d.view_with(|s, a: WhatIfArgs| crate::what_if::apply_what_if(s, &a.pick))
+            }
             "undo" => d.view(|s| {
                 s.undo();
                 Ok(())
@@ -880,6 +893,11 @@ struct FocusArgs {
 #[serde(rename_all = "camelCase")]
 struct RowIds {
     row_ids: Vec<RowId>,
+}
+
+#[derive(Deserialize)]
+struct WhatIfArgs {
+    pick: crate::what_if::WhatIfInput,
 }
 
 #[derive(Deserialize)]

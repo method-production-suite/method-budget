@@ -310,6 +310,97 @@ fn report_presets_from_the_budget() {
 }
 
 #[test]
+fn bid_layouts_print_from_the_command_line() {
+    let d = Dir::new("bid");
+    let p = d.starter("a.mthd");
+    let date = "2026-10-20 09:00 UTC";
+    // With no bid layout in the budget, the bid section prints the example:
+    // every account Unassigned, the bid total the budget's net total.
+    let o = method(&["report", &p, "--sections", "bid", "--date", date]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let txt = out(&o);
+    assert!(txt.contains("Bid\n==="), "{txt}");
+    for want in [
+        "Pre-production",
+        "Unassigned",
+        "Contingency",
+        "Bid total",
+        "578,600.00",
+    ] {
+        assert!(txt.contains(want), "{want}: {txt}");
+    }
+
+    // A layout of the user's own, written into the file (the format is open).
+    let text = read(&p);
+    let preset = r#"    "report_presets": [
+      {
+        "name": "Spot bid",
+        "sections": ["bid"],
+        "bid": {
+          "fields": [{ "label": "Client", "value": "Bluefin Juice" }, { "label": "Job number", "value": "BJ-7" }],
+          "lines": [
+            { "kind": "section", "name": "Above", "picks": [{ "kind": "range", "from": "1000", "to": "1399" }] },
+            { "kind": "section", "name": "Shoot", "picks": [{ "kind": "category", "code": "20" }, { "kind": "category", "code": "21" }, { "kind": "category", "code": "22" }] },
+            { "kind": "section", "name": "Post", "picks": [{ "kind": "range", "from": "4000", "to": "4999" }, { "kind": "account", "code": "9999" }] },
+            { "kind": "subtotal", "name": "Production" },
+            { "kind": "flat", "name": "Handling", "amount": 100000 }
+          ],
+          "show_accounts": true
+        }
+      }
+    ]
+  }
+}
+"#;
+    let cut = text.rfind("\n  }\n}").unwrap();
+    std::fs::write(&p, format!("{},\n{preset}", &text[..cut])).unwrap();
+    let o = method(&["check", &p]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let o = method(&["report", &p, "--preset", "Spot bid", "--date", date]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let txt = out(&o);
+    for want in [
+        "Bluefin Juice",
+        "BJ-7",
+        "Above",
+        "1001",
+        "Total Above",
+        "Shoot",
+        "Production",
+        "Handling",
+        "Unassigned",
+        "5001",
+        "Contingency",
+        "52,600.00",
+        // The budget's net total plus the bid's markups.
+        "579,600.00",
+        "\"Post\" takes account 9999",
+    ] {
+        assert!(txt.contains(want), "{want}: {txt}");
+    }
+    let c = d.path("bid.csv");
+    let o = method(&[
+        "report", &p, "--preset", "Spot bid", "-o", &c, "--date", date,
+    ]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let csv = read(&c);
+    assert!(csv.contains("Client,Bluefin Juice\r\n"), "{csv}");
+    assert!(csv.contains(",Bid total,579600.00\r\n"), "{csv}");
+    let h = d.path("bid.html");
+    assert_eq!(
+        code(&method(&["report", &p, "--preset", "Spot bid", "-o", &h])),
+        0
+    );
+    assert!(read(&h).contains("Bid total"));
+    let pdf = d.path("bid.pdf");
+    let o = method(&[
+        "report", &p, "--preset", "Spot bid", "-o", &pdf, "--date", date,
+    ]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    check_pdf(&std::fs::read(&pdf).unwrap());
+}
+
+#[test]
 fn set_changes_one_value() {
     let d = Dir::new("set");
     let p = d.starter("a.mthd");
@@ -907,6 +998,192 @@ fn incentives_text_notes_the_minimum_shared_cap_and_fee() {
     assert!(
         text.contains("\tbelow the minimum spend of 1000000.00\n"),
         "{text}"
+    );
+}
+
+/// `method-budget incentives what-if` (decisions.md, entry 93): the
+/// county program before and after moving the fire road's location lines
+/// to the field station; the file doesn't change until --apply, and then
+/// `incentives` gives the what-if's "after".
+#[test]
+fn incentives_what_if_and_apply() {
+    let p = format!(
+        "{}/../../fixtures/field-station/field-station.mthd",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let d = Dir::new("incentive-what-if");
+    let file = d.path("field.mthd");
+    std::fs::copy(&p, &file).unwrap();
+    let before = read(&file);
+    let args = [
+        "incentives",
+        "what-if",
+        &file,
+        "--category",
+        "26",
+        "--from-location",
+        "Hollins Ridge fire road",
+        "--to-location",
+        "Cold Spring field station",
+    ];
+    let o = method(&args);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let text = out(&o);
+    // 1,350.00 and 780.00 at the county program's 25% for locations.
+    assert!(
+        text.contains("line\t#86\t26-02:2\tSite fee, Hollins Ridge fire road\tHollins Ridge fire road\t1350.00\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains(
+            "program\tCold Spring County film program\testimate\t9701.00\t10233.50\t532.50\n"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.contains("location\tCold Spring field station\t56660.44\t58790.44\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("total\testimates\t9701.00\t10233.50\n"),
+        "{text}"
+    );
+    assert_eq!(read(&file), before, "a what-if writes nothing");
+
+    let j = out(&method(&[&args[..], &["--json"]].concat()));
+    assert!(j.contains("\"difference\": 53250"), "{j}");
+
+    // Lines picked by row and left out by row.
+    let o = method(&[
+        "incentives",
+        "what-if",
+        &file,
+        "--lines",
+        "26-02:*",
+        "--except",
+        "#86",
+        "--from-location",
+        "Hollins Ridge fire road",
+        "--to-location",
+        "Cold Spring field station",
+    ]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(!out(&o).contains("line\t"), "{}", out(&o));
+
+    let o = method(&[&args[..], &["--apply"]].concat());
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(out(&o).ends_with("moved\t2\n"), "{}", out(&o));
+    let now = out(&method(&["incentives", &file]));
+    assert!(
+        now.contains("program\tCold Spring County film program\testimate\t43627.00\t10233.50\t"),
+        "{now}"
+    );
+
+    // A place the budget doesn't have is refused; a missing target is a
+    // usage error.
+    let o = method(&[
+        "incentives",
+        "what-if",
+        &file,
+        "--category",
+        "26",
+        "--to-location",
+        "Nowhere",
+    ]);
+    assert_eq!(code(&o), 3);
+    assert!(err(&o).contains("no location named Nowhere"), "{}", err(&o));
+    assert_eq!(
+        code(&method(&[
+            "incentives",
+            "what-if",
+            &file,
+            "--category",
+            "26"
+        ])),
+        2
+    );
+}
+
+/// `method-budget report --sections incentives` (decisions.md, entry 93):
+/// the per-location report in text, CSV and PDF, its totals the
+/// topsheet's; a budget without credits says so.
+#[test]
+fn the_incentives_report_prints_in_every_format() {
+    let p = format!(
+        "{}/../../fixtures/field-station/field-station.mthd",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let d = Dir::new("incentive-report");
+    let date = "2026-10-20 12:00 UTC";
+    let o = method(&["report", &p, "--sections", "incentives", "--date", date]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let txt = out(&o);
+    assert!(txt.contains("Incentives by location\n"), "{txt}");
+    assert!(txt.contains("Cold Spring County film program"), "{txt}");
+    assert!(txt.contains("Estimates not applied"), "{txt}");
+    assert!(txt.contains("9,701.00"), "{txt}");
+
+    let c = d.path("r.csv");
+    let o = method(&[
+        "report",
+        &p,
+        "--sections",
+        "incentives",
+        "-o",
+        &c,
+        "--date",
+        date,
+    ]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    let csv = read(&c);
+    assert!(
+        csv.starts_with("Incentives by location\r\nKind,Location,Program,"),
+        "{csv}"
+    );
+    assert!(
+        csv.contains("Location,Cold Spring field station,,,56660.44,"),
+        "{csv}"
+    );
+    assert!(
+        csv.contains(
+            "Counted,Cold Spring field station,Cold Spring County film program,Estimate,,41497.00,"
+        ),
+        "{csv}"
+    );
+    assert!(
+        csv.contains("Total,,Credits applied,,,,,,,,,0.00,"),
+        "{csv}"
+    );
+    assert!(csv.contains("Total,,Net total,,,,,,,,,"), "{csv}");
+
+    let pdf_path = d.path("r.pdf");
+    let o = method(&[
+        "report",
+        &p,
+        "--sections",
+        "topsheet,incentives",
+        "-o",
+        &pdf_path,
+        "--date",
+        date,
+    ]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    check_pdf(&std::fs::read(&pdf_path).unwrap());
+
+    let starter = d.starter("a.mthd");
+    let o = method(&[
+        "report",
+        &starter,
+        "--sections",
+        "incentives",
+        "--date",
+        date,
+    ]);
+    assert_eq!(code(&o), 0, "{}", err(&o));
+    assert!(
+        out(&o).contains("This budget has no credits"),
+        "{}",
+        out(&o)
     );
 }
 

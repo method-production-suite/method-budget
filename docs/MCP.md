@@ -181,7 +181,7 @@ the first time a tool names it, and `budget_open` opens it again on purpose.
 | Group | Tools |
 |---|---|
 | Files and summaries (read) | `list_budgets`, `budget_open`, `review_comments`, `budget_info` |
-| Reading (read) | `list_topsheet`, `list_accounts`, `get_account`, `list_globals`, `list_setup`, `list_charges`, `incentives`, `totals`, `explain`, `find`, `validate`, `diff` |
+| Reading (read) | `list_topsheet`, `list_accounts`, `get_account`, `list_globals`, `list_setup`, `list_charges`, `incentives`, `incentives_what_if`, `totals`, `explain`, `find`, `validate`, `diff` |
 | Lines | `add_lines`, `update_lines`, `delete_lines`, `move_lines`, `tag_lines` |
 | Setup | `set_global`, `add_setup`, `update_setup`, `rename_setup`, `delete_setup` |
 | Charges and credits | `set_charge`, `set_credit`, `apply_charge`, `delete_charge` |
@@ -264,6 +264,19 @@ program, applied or not (`programs`: `name`, `applied`, `locations`, `cap`,
 `capped`, `problem`, `figures` with `below_minimum`, `shared` and `fee`), money in integer
 cents (decisions.md, entries 80 and 88). An unapplied program is worked out as if applied
 alongside the applied ones. Nothing changes.
+
+**`incentives_what_if`** `{path, to_location, rows?, accounts?, categories?,
+from_location?, except?}`: what moving lines to another location would do to every
+program (decisions.md, entry 93), without changing the budget. The lines are `rows` (ids),
+every line of `accounts` and `categories` (codes), only those now at `from_location`
+when it is given (`null`: lines with no location), less `except`; `to_location` is a
+location the budget has, or `null` for no location. Returns `lines` (`id`, `account`,
+`line`, `description`, `location`, `total`, `fringes`), `changed` (how many would change
+location), `programs` (`name`, `applied`, `qualified_before`, `qualified_after`,
+`before`, `after`, `difference`, `problem`), `locations` (spend `before` and `after`) and
+`before` and `after` totals (`grand_total`, `credits_total`, `net_total`,
+`estimates_total`), money in integer cents. `tag_lines` (or `update_lines`) with that
+location on the same rows makes the move, and `incentives` then gives the "after".
 
 **`totals`** `{path, exclude_groups?}`: `levels` (each production total with its categories
 and their accounts), `total_atl_cents`, `total_btl_cents`, `atl_btl_cents`,

@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 
 use method_core::{Budget, Cents, Dec, Report};
 
-pub use tables::workbook;
+pub use tables::{incentives, workbook};
 
 /// One cell's value.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -85,6 +85,11 @@ pub const SHEET_NAMES: [&str; 10] = [
 /// Sheets a budget with actuals also gets, after [`SHEET_NAMES`]: its cost
 /// report and its transactions (method_core::actuals).
 pub const ACTUALS_SHEETS: [&str; 2] = ["Cost Report", "Actuals"];
+
+/// The sheet a budget with credits also gets, after [`SHEET_NAMES`] and
+/// before [`ACTUALS_SHEETS`]: its incentives by location (decisions.md,
+/// entry 93).
+pub const INCENTIVES_SHEET: &str = "Incentives";
 
 /// The sheet that the tab-delimited flavor writes.
 pub const DETAIL: &str = "Detail";

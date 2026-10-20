@@ -155,10 +155,45 @@ program	Ridge program	estimate	1280.00	0.00	Hollins Ridge fire road	below the mi
 `shared` and `fee`), money in
 integer cents, as the app's `incentives` command returns it (docs/APP.md).
 
+### `method-budget incentives what-if <file.mthd> (--to-location NAME | --no-location) [...]`
+
+What moving lines to another location would do to every program (roadmap 3.6;
+decisions.md, entry 93), without changing the file. The lines are `--lines ROWS`
+(`#ID`, `ACCOUNT:N` or `ACCOUNT:*`, comma-separated), `--account CODE` and `--category
+CODE` (every line in them; each flag can repeat), kept only where they are now with
+`--from-location NAME` (or `--from-no-location`), less `--except ROWS`. Only lines and
+adjustment rows move. Plain output, tab-separated, exact decimals: the lines
+(`line`, `#ID`, `ACCOUNT:N`, description, location now, total), every program (`program`,
+name, `applied` or `estimate`, before, after, difference), the spend at each location
+(`location`, name, before, after), then `total` lines for the credits taken off, the
+unapplied estimates and the net total, before and after. The figures come from the same
+code as `incentives` on a copy with the lines moved. `--json` prints them as JSON, money
+in integer cents (the app's `what_if` reply). `--apply` also moves the lines in the file,
+saved atomically, and prints `moved<TAB>N` last; `incentives` then gives the what-if's
+"after". A location the budget doesn't have, or a row or code it doesn't have, is refused
+(exit 3).
+
+```text
+line	#86	26-02:2	Site fee, Hollins Ridge fire road	Hollins Ridge fire road	1350.00
+line	#90	26-04:2	Base camp and parking, fire road	Hollins Ridge fire road	780.00
+program	Cold Spring County film program	estimate	9701.00	10233.50	532.50
+location	Cold Spring field station	56660.44	58790.44
+location	Hollins Ridge fire road	30775.69	28645.69
+location	Kettle Lake boathouse	23463.85	23463.85
+location	(none)	827142.90	827142.90
+total	credits	0.00	0.00
+total	estimates	9701.00	10233.50
+total	net	1050288.03	1050288.03
+```
+
+That is `method-budget incentives what-if field-station.mthd --category 26
+--from-location "Hollins Ridge fire road" --to-location "Cold Spring field station"`.
+
 ### `method-budget export <file.mthd> --xlsx|--csv|--tsv <path> [--bom]`
 
 Also `--format xlsx|csv|tsv --out <path>`. The evaluated budget as a spreadsheet (.xlsx)
-(Topsheet, Accounts, Detail and the setup tables), as one CSV file per table (named
+(Topsheet, Accounts, Detail and the setup tables, and Incentives when the budget has
+credits), as one CSV file per table (named
 `<stem> - <Table>.csv` beside the path), or the Detail table as tab-delimited text for
 accounting tools (decision 30). A folder as the path names the file after the budget.
 `--bom` starts CSV and TSV with a UTF-8 byte order mark, for spreadsheet apps that need it
@@ -169,13 +204,17 @@ for accented letters.
 Draws a report from one of the budget's saved report presets (docs/FORMAT.md, "Report
 preset"): its sections in order, category and account exclusions, skipped accounts and
 lines, "only these groups", detail columns, notes, orientation, type size, shading,
-vertical rules, collapsed detail, the topsheet fringes column, header and footer.
+vertical rules, collapsed detail, the topsheet fringes column, header and footer, and its
+bid layout.
 
 - `--preset NAME` picks a preset by name (exact, else ignoring case). Without it, the
   budget's default preset, else the topsheet and the detail with the standard columns.
 - `--sections topsheet,detail,...` replaces the preset's sections. Names: `topsheet`,
   `accounts`, `detail`, `fringes`, `globals`, `groups`, `notes`, `info`, `chart`,
-  `units`, `sets`, `locations`, `currencies`.
+  `units`, `sets`, `locations`, `currencies`, `bid`, `incentives` (each location's spend
+  and the incentive programs counting it, every program's terms and figures, and the
+  totals: the credits applied are the topsheet's credits; decisions.md, entry 93). A
+  budget without credits prints a note there.
 - `--format html|txt|csv|pdf`, else from the extension of `-o`, else `txt`.
 - `-o PATH` writes the report; without it (or with `-o -`) it goes to stdout. PDF needs
   `-o`.
@@ -187,6 +226,20 @@ vertical rules, collapsed detail, the topsheet fringes column, header and footer
 Like the app's reports, a filter never changes a total: leaving accounts or lines out
 prints the budget's own totals with a note, and the topsheet always lists every
 category. Original and variance columns print only when the budget has a baseline.
+
+**Bids.** The `bid` section prints the preset's bid layout (docs/FORMAT.md, "Bid layout";
+decisions entry 92), or the example layout when the preset has none: the header fields,
+each section (with its accounts when the layout lists them), subtotals and markups,
+Unassigned, the budget's own charges and credits, and the bid total, which is the
+budget's net total plus the bid's markups; a closing note says so, and any `Check:` line
+names an account two sections take, a pick that takes nothing or a markup of a missing
+section. In CSV the fields come first as `label,value` rows, then `code,description,amount`
+rows, the amounts as exact decimals:
+
+```sh
+method-budget report spot.mthd --preset "Spot bid" -o "Spot bid.pdf"
+method-budget report spot.mthd --sections bid --format csv
+```
 
 The formats:
 

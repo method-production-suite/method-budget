@@ -1024,7 +1024,7 @@ that does), and restoring a version keeps the current ones. Fields in written or
 |-------|------|-------|
 | `name` | text, **required** | The application keeps names unique (ignoring case and surrounding spaces), 1 to 80 characters; the reader does not check. |
 | `default` | boolean, default `false` | The preset the application's Print dialog opens with. The application keeps at most one; a reader that finds several uses the first. |
-| `sections` | list of section names | In print order, each once: `"topsheet"`, `"accounts"` (each category's accounts with their totals), `"detail"`, `"fringes"`, `"globals"`, `"groups"` (with their totals), `"notes"` (every note on categories, accounts and lines, each with its date and author), `"info"` (budget information), `"chart"` (chart of accounts: every category and account code with its name), `"units"`, `"sets"` (with their totals), `"locations"` (with their totals), `"currencies"`, `"cost_report"` (budget, baseline, actual, estimate to complete, estimate at completion, variance and percent spent per account, category and the topsheet; see [actuals](#actuals)). |
+| `sections` | list of section names | In print order, each once: `"topsheet"`, `"accounts"` (each category's accounts with their totals), `"detail"`, `"fringes"`, `"globals"`, `"groups"` (with their totals), `"notes"` (every note on categories, accounts and lines, each with its date and author), `"info"` (budget information), `"chart"` (chart of accounts: every category and account code with its name), `"units"`, `"sets"` (with their totals), `"locations"` (with their totals), `"currencies"`, `"cost_report"` (budget, baseline, actual, estimate to complete, estimate at completion, variance and percent spent per account, category and the topsheet; see [actuals](#actuals)), `"bid"` (the preset's [bid layout](#bid-layout) worked out, or the example layout when the preset has none), `"incentives"` (each location's spend and the incentive programs counting it, every program's terms and figures, and the totals; decisions.md, entry 93). |
 | `excluded_categories` | name set | Category codes left out of the account and detail sections and the notes list. The topsheet always lists every category. |
 | `excluded_accounts` | name set | Account codes left out the same way. |
 | `skip_empty_accounts` | boolean, default `false` | Leave out accounts with no rows. |
@@ -1044,6 +1044,7 @@ that does), and restoring a version keeps the current ones. Fields in written or
 | `topsheet_pages` | boolean, default `false` | The topsheet gets a Page column: the page of the printout where each category's detail starts (blank when it doesn't print). |
 | `header` | optional [band](#band) | Left out means the standard header (budget title, section, date printed); `{}` means none. |
 | `footer` | optional [band](#band) | Left out means the standard footer (page number at the right); `{}` means none. |
+| `bid` | optional [bid layout](#bid-layout) | What the `"bid"` section prints. Left out when the preset has none (the section then prints the application's example layout); `{}` is an empty layout. |
 
 Unknown section or column names are errors, like unknown fields.
 
@@ -1066,6 +1067,61 @@ only, and later pages have none. Slots:
 | `info` | `label` text, **required** | The budget information field with that label, if there is one. |
 | `global` | `name` text, **required** | That global's value, if the budget has it. Renaming the global renames it here. |
 | `text` | `text` text, **required** | The text as written (the application allows up to 200 characters). |
+
+#### Bid layout
+
+A summary of the budget laid out by the user, for commercial work (roadmap 3.13;
+`docs/decisions.md`, entry 92): header fields, then lines in print order. Every name,
+label and grouping is the user's; the format holds no figures. Fields in written order,
+each left out when empty or `false`:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `fields` | list of `{"label": text, "value": text}` | Printed above the bid, in order. `label` is **required**; `value` is left out when empty. The application allows labels of 1 to 80 characters and values up to 200, at most 100 fields. |
+| `lines` | list of bid lines | In print order; at most 100 in the application. |
+| `show_accounts` | boolean, default `false` | List each account under its section, not only the section's total. |
+
+A bid line is a tagged object, its `name` text **required** (1 to 80 characters in the
+application):
+
+| `kind` | Fields | Prints |
+|--------|--------|--------|
+| `section` | `picks`: list of picks, left out when empty | The accounts the picks take, and their total. Section names are unique in a layout, ignoring case and surrounding spaces (the application's rule; the reader does not check). |
+| `subtotal` | | Everything above it in the layout added up: sections and markups. |
+| `percent` | `percent` decimal, **required**; `of`: list of section names, left out when empty | `percent` of the named sections' totals (`"10"` is 10%), rounded once to cents, half away from zero, whatever the budget's [arithmetic](#arithmetic). Names match ignoring case and surrounding spaces; empty means every section and the Unassigned accounts. A name no section has counts nothing. |
+| `flat` | `amount` cents, **required** | A fixed amount, in the base currency. |
+
+A pick is a tagged object:
+
+| `kind` | Fields | Takes |
+|--------|--------|-------|
+| `category` | `code` text, **required** | Every account in the category with that code. |
+| `account` | `code` text, **required** | The account with that code. |
+| `range` | `from` and `to` text, both **required** | Every account whose code sorts from `from` to `to`, both included. Codes sort by number where they hold digits (`900` before `1000`; `1100-01` after `1100`) and by character elsewhere. |
+
+How a bid adds up (the engine's `method_core::bid`): every account counts once, at its
+lines plus the fringes they earn wherever the budget posts them, in the first section (in
+layout order) whose picks take it, or else under **Unassigned**, which prints whenever an
+account is left there. After the lines come the budget's own applied charges and credits,
+so that everything down to there adds up to the budget's net total, and the bid's
+`percent` and `flat` lines are on top: the bid total is the budget's net total plus the
+bid's markups. Fringes the budget earns but doesn't post (fringes posted by production
+level with `trailing_level_fringes` `"drop"`) print as one line taking them back off.
+Renumbering accounts carries every pick's codes, a range's ends included.
+
+```json
+"bid": {
+  "fields": [{ "label": "Client", "value": "Bluefin Juice" }, { "label": "Job number" }],
+  "lines": [
+    { "kind": "section", "name": "Shoot", "picks": [{ "kind": "category", "code": "20" }, { "kind": "range", "from": "2100", "to": "2999" }] },
+    { "kind": "section", "name": "Post", "picks": [{ "kind": "account", "code": "4001" }] },
+    { "kind": "subtotal", "name": "Production subtotal" },
+    { "kind": "percent", "name": "Markup", "percent": "10", "of": ["Shoot", "Post"] },
+    { "kind": "flat", "name": "Handling", "amount": 100000 }
+  ],
+  "show_accounts": true
+}
+```
 
 Example (inside `budget`, after `baseline` and before `versions`):
 
@@ -1406,6 +1462,12 @@ valid. Loading and saving it in Method Budget normalizes it.
   when empty, so a log whose credits have none stays readable by 0.3.0; a set a record
   leaves out counts as empty when the log records an edit. It is a weak reference: deleting
   a location never brings it back, and the credit keeps its name.
+- Version 1, additive (2026-10): report preset [`bid`](#bid-layout) (a bid layout:
+  header fields, sections that take accounts, subtotals and markups; decisions.md, entry
+  92) and section name `"bid"`. Left out when a preset has none, so files without one
+  read and write byte for byte as before. An older reader refuses a file that uses either,
+  as it refuses any field or name it doesn't know; the version stays 1. The change log
+  carries presets whole, so the same holds for a shared budget's log.
 - Version 1, additive (2026-10): credit `minimum_spend`, `broker_fee` and `shared_cap`,
   and budget [`shared_caps`](#shared-cap) (decisions.md, entry 88). Each is left out at its
   default (no minimum, no fee, no shared cap, no shared caps), which is what a file without
@@ -1424,6 +1486,9 @@ valid. Loading and saving it in Method Budget normalizes it.
   names added at the end of the list), each written only when used, so a log of a budget
   that never uses them is one 0.3.0 reads; removing the last table, or a row's source, is
   a write of null.
+- Version 1, additive (2026-10): report preset section `"incentives"` (decisions.md,
+  entry 93). Written only in a preset that prints it, so files without it are unchanged
+  byte for byte; an older reader refuses a preset naming it (unknown section).
 
 ## Complete example
 

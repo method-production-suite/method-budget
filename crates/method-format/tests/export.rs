@@ -10,7 +10,7 @@ use method_core::{
 };
 use method_format::export::{
     self, csv, money_text, render, workbook, xlsx, Cell, Format, Options, Sheet, Workbook,
-    SHEET_NAMES,
+    INCENTIVES_SHEET, SHEET_NAMES,
 };
 
 fn sample() -> Budget {
@@ -57,7 +57,12 @@ fn tables_line_up_with_the_budget() {
         let r = report(&b);
         let wb = workbook(&b, &r).unwrap();
         let names: Vec<&str> = wb.sheets.iter().map(|s| s.name).collect();
-        assert_eq!(names, SHEET_NAMES);
+        // A budget with credits also gets its incentives by location.
+        let mut want = SHEET_NAMES.to_vec();
+        if !b.credits.is_empty() {
+            want.push(INCENTIVES_SHEET);
+        }
+        assert_eq!(names, want);
         for s in &wb.sheets {
             for row in &s.rows {
                 assert_eq!(row.len(), s.columns.len(), "{} row width", s.name);
@@ -308,7 +313,10 @@ fn csv_files_read_back_field_for_field() {
         Options { bom: true },
     )
     .unwrap();
-    assert_eq!(files.len(), SHEET_NAMES.len());
+    assert_eq!(
+        files.len(),
+        SHEET_NAMES.len() + usize::from(!b.credits.is_empty())
+    );
     for (f, s) in files.iter().zip(&wb.sheets) {
         assert_eq!(
             f.path,
@@ -381,4 +389,82 @@ fn a_stale_report_is_refused() {
     let r = report(&starter::budget());
     assert!(workbook(&b, &r).is_err());
     assert!(export::workbook_of(&b).is_ok());
+}
+
+/// The Incentives sheet (decisions.md, entry 93) reconciles with the
+/// topsheet: its applied credits are the credits total, its net total the
+/// topsheet's, each program's spend counted location by location adds up
+/// to its qualified spend less what is typed in, and the locations' spend
+/// adds up. A budget without credits has no such sheet.
+#[test]
+fn the_incentives_sheet_reconciles_with_the_topsheet() {
+    let p = format!(
+        "{}/../../fixtures/field-station/field-station.mthd",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let mut b = method_format::from_str(&std::fs::read_to_string(p).unwrap()).unwrap();
+    // The county program applied, and a second one anywhere.
+    b.credits[0].applied = true;
+    let mut other = b.credits[0].clone();
+    other.name = "State program".into();
+    other.locations.clear();
+    other.applied = false;
+    b.credits.push(other);
+    let r = report(&b);
+    let wb = workbook(&b, &r).unwrap();
+    let s = wb.sheet(INCENTIVES_SHEET).unwrap();
+    let (kind, program, spend, qualified, credit) = (
+        col(s, "Kind"),
+        col(s, "Program"),
+        col(s, "Spend"),
+        col(s, "Qualified"),
+        col(s, "Credit"),
+    );
+    let money_at = |row: &Vec<Cell>, i: usize| match &row[i] {
+        Cell::Money(m) => *m,
+        _ => 0,
+    };
+    let rows_of = |k: &str| -> Vec<&Vec<Cell>> {
+        s.rows.iter().filter(|r| r[kind] == Cell::text(k)).collect()
+    };
+    let total = |label: &str| {
+        let row = rows_of("Total")
+            .into_iter()
+            .find(|r| r[program] == Cell::text(label))
+            .unwrap();
+        money_at(row, spend) + money_at(row, credit)
+    };
+    assert_eq!(total("Credits applied"), r.credits_total);
+    assert_eq!(total("Net total"), r.net_total);
+    assert_eq!(total("Grand total"), r.grand_total);
+    let spend_sum: Cents = rows_of("Location").iter().map(|r| money_at(r, spend)).sum();
+    assert_eq!(total("Spend at every location"), spend_sum);
+    let applied: Cents = rows_of("Program")
+        .iter()
+        .filter(|r| r[col(s, "Status")] == Cell::text("Applied"))
+        .map(|r| money_at(r, credit))
+        .sum();
+    assert_eq!(applied, r.credits_total);
+    for p in rows_of("Program") {
+        let counted: Cents = rows_of("Counted")
+            .iter()
+            .filter(|c| c[program] == p[program])
+            .map(|c| money_at(c, qualified))
+            .sum();
+        // No typed amounts in these programs.
+        assert_eq!(counted, money_at(p, qualified), "{:?}", p[program]);
+    }
+    // The county program counts the field station only; the state one
+    // counts every location.
+    let county: Vec<_> = rows_of("Counted")
+        .into_iter()
+        .filter(|c| c[program] == Cell::text("Cold Spring County film program"))
+        .collect();
+    assert_eq!(county.len(), 1);
+    assert!(rows_of("Counted").len() > 2);
+
+    let plain = starter::budget();
+    assert!(plain.credits.is_empty());
+    let wb = workbook(&plain, &report(&plain)).unwrap();
+    assert!(wb.sheet(INCENTIVES_SHEET).is_none());
 }

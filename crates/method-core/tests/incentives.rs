@@ -721,3 +721,269 @@ fn diff_and_merge_follow_the_minimum_fee_and_shared_cap() {
     let m = merge::merge(&b, &ours, &theirs);
     assert_eq!(m.conflicts.len(), 1, "{:?}", m.conflicts);
 }
+
+// ---------------------------------------------------------------------------
+// What if lines moved between locations (decisions.md, entry 93)
+
+use method_core::incentives::by_location::location_report;
+use method_core::incentives::what_if::{move_lines, pick_lines, what_if, LinePick, WhatIfError};
+
+/// A program's name with its estimate before, after and the difference.
+type BeforeAfter<'a> = (&'a str, Option<Cents>, Option<Cents>, Option<Cents>);
+/// A location, its spend, and each program counting it with its spend there.
+type Block<'a> = (Option<&'a str>, Cents, Vec<(&'a str, Cents)>);
+
+/// The Ridge program (applied, 25% of category 2100 at Ridge) and the
+/// Coast program (not applied, 20% of category 2100 at Coast).
+fn two_programs() -> Budget {
+    let mut b = budget();
+    let mut ridge = program("Ridge program", &["Ridge"], cat("2100"), "25");
+    ridge.applied = true;
+    b.credits.push(ridge);
+    b.credits
+        .push(program("Coast program", &["Coast"], cat("2100"), "20"));
+    b
+}
+
+#[test]
+fn moving_a_line_shows_each_program_before_and_after() {
+    let b = two_programs();
+    // The 1,000.00 Ridge line (with its 100.00 fringe) shot at Coast.
+    let w = what_if(&b, &[1], Some("Coast")).unwrap();
+    assert_eq!(w.rows, vec![1]);
+    assert_eq!(w.changed, 1);
+    let got: Vec<BeforeAfter> = w
+        .programs
+        .iter()
+        .map(|p| (p.name.as_str(), p.before, p.after, p.difference))
+        .collect();
+    assert_eq!(
+        got,
+        vec![
+            // 1,400.00 at 25% before; 300.00 at 25% after.
+            ("Ridge program", Some(35_000), Some(7_500), Some(-27_500)),
+            // 500.00 at 20% before; 1,600.00 at 20% after.
+            ("Coast program", Some(10_000), Some(32_000), Some(22_000)),
+        ]
+    );
+    assert_eq!(w.programs[0].qualified_before, 140_000);
+    assert_eq!(w.programs[0].qualified_after, 30_000);
+    // The grand total doesn't move; the net total follows the applied
+    // program only.
+    assert_eq!(w.before_totals.grand_total, 210_000);
+    assert_eq!(w.after_totals.grand_total, 210_000);
+    assert_eq!(w.before_totals.net_total, 175_000);
+    assert_eq!(w.after_totals.net_total, 202_500);
+    assert_eq!(w.before_totals.estimates_total, 10_000);
+    assert_eq!(w.after_totals.estimates_total, 32_000);
+    let spend: Vec<(Option<&str>, Cents, Cents)> = w
+        .locations
+        .iter()
+        .map(|l| (l.location.as_deref(), l.before, l.after))
+        .collect();
+    assert_eq!(
+        spend,
+        vec![
+            (Some("Coast"), 50_000, 160_000),
+            (Some("Ridge"), 140_000, 30_000),
+            (None, 20_000, 20_000),
+        ]
+    );
+    // Nothing changed in the budget itself.
+    assert_eq!(b, two_programs());
+}
+
+#[test]
+fn applying_the_what_if_gives_its_after_figures() {
+    let b = two_programs();
+    let w = what_if(&b, &[1, 4], Some("Coast")).unwrap();
+    let mut moved = b.clone();
+    assert_eq!(move_lines(&mut moved, &[1, 4], Some("Coast")), Ok(2));
+    assert_eq!(estimate(&moved), w.after);
+    assert_eq!(estimate(&b), w.before);
+    let r = recalc(&moved, &RecalcOptions::default()).unwrap();
+    assert_eq!(r.net_total, w.after_totals.net_total);
+    assert_eq!(r.credits_total, w.after_totals.credits_total);
+}
+
+#[test]
+fn lines_are_picked_by_row_account_or_category_and_where_they_are_now() {
+    let b = two_programs();
+    let pick = |p: LinePick| pick_lines(&b, &p).unwrap();
+    assert_eq!(
+        pick(LinePick {
+            accounts: vec!["2101".into()],
+            ..LinePick::default()
+        }),
+        vec![1, 2, 3]
+    );
+    // Only the lines at Ridge now.
+    assert_eq!(
+        pick(LinePick {
+            categories: vec!["2100".into()],
+            from: Some(Some("Ridge".into())),
+            ..LinePick::default()
+        }),
+        vec![1, 4]
+    );
+    // Only the lines with no location, and one left out by hand.
+    assert_eq!(
+        pick(LinePick {
+            categories: vec!["2100".into()],
+            from: Some(None),
+            ..LinePick::default()
+        }),
+        vec![3]
+    );
+    assert_eq!(
+        pick(LinePick {
+            rows: vec![4, 2],
+            accounts: vec!["2101".into()],
+            except: vec![3],
+            ..LinePick::default()
+        }),
+        vec![1, 2, 4]
+    );
+    assert_eq!(
+        pick_lines(
+            &b,
+            &LinePick {
+                rows: vec![99],
+                ..LinePick::default()
+            }
+        ),
+        Err(WhatIfError::NoRow(99))
+    );
+    assert_eq!(
+        pick_lines(
+            &b,
+            &LinePick {
+                accounts: vec!["9999".into()],
+                ..LinePick::default()
+            }
+        ),
+        Err(WhatIfError::NoAccount("9999".into()))
+    );
+    assert_eq!(
+        pick_lines(
+            &b,
+            &LinePick {
+                categories: vec!["9900".into()],
+                ..LinePick::default()
+            }
+        ),
+        Err(WhatIfError::NoCategory("9900".into()))
+    );
+}
+
+#[test]
+fn a_what_if_needs_a_location_the_budget_has() {
+    let b = two_programs();
+    assert_eq!(
+        what_if(&b, &[1], Some("Desert")),
+        Err(WhatIfError::NoLocation("Desert".into()))
+    );
+    let mut m = b.clone();
+    assert_eq!(
+        move_lines(&mut m, &[1], Some("Desert")),
+        Err(WhatIfError::NoLocation("Desert".into()))
+    );
+    assert_eq!(m, b);
+    assert_eq!(
+        move_lines(&mut m, &[1, 77], Some("Coast")),
+        Err(WhatIfError::NoRow(77))
+    );
+    assert_eq!(m, b, "a refused move changes nothing");
+    // No location is a place too: the Ridge line counted nowhere.
+    let w = what_if(&b, &[1], None).unwrap();
+    assert_eq!(w.programs[0].after, Some(7_500));
+    assert_eq!(w.programs[1].after, Some(10_000));
+    assert_eq!(w.programs[1].difference, Some(0));
+}
+
+#[test]
+fn a_what_if_with_no_lines_changes_nothing() {
+    let b = two_programs();
+    let w = what_if(&b, &[], Some("Coast")).unwrap();
+    assert_eq!(w.changed, 0);
+    assert_eq!(w.before, w.after);
+    assert!(w.programs.iter().all(|p| p.difference == Some(0)));
+    assert_eq!(w.before_totals, w.after_totals);
+    // Lines already there change nothing either.
+    let w = what_if(&b, &[2], Some("Coast")).unwrap();
+    assert_eq!(w.changed, 0);
+    assert_eq!(w.before, w.after);
+}
+
+// ---------------------------------------------------------------------------
+// The per-location report (decisions.md, entry 93)
+
+#[test]
+fn the_location_report_lists_spend_and_the_programs_counting_it() {
+    let b = two_programs();
+    let r = recalc(&b, &RecalcOptions::default()).unwrap();
+    let inc = incentives(&b, &r).unwrap();
+    let rep = location_report(&r, &inc).unwrap();
+    let blocks: Vec<Block> = rep
+        .locations
+        .iter()
+        .map(|l| {
+            (
+                l.spend.location.as_deref(),
+                l.spend.total,
+                l.programs
+                    .iter()
+                    .map(|p| (p.name.as_str(), p.qualified_here))
+                    .collect(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        blocks,
+        vec![
+            (Some("Coast"), 50_000, vec![("Coast program", 50_000)]),
+            (Some("Ridge"), 140_000, vec![("Ridge program", 140_000)]),
+            (None, 20_000, vec![]),
+        ]
+    );
+    assert_eq!(rep.spend_total, 210_000);
+    assert_eq!(rep.applied_total, 35_000);
+    assert_eq!(rep.applied_total, r.credits_total);
+    assert_eq!(rep.estimates_total, 10_000);
+    assert_eq!(rep.grand_total, r.grand_total);
+    assert_eq!(rep.net_total, r.net_total);
+    let p = &rep.programs[0];
+    assert_eq!((p.qualified, p.typed, p.amount), (140_000, 0, Some(35_000)));
+}
+
+#[test]
+fn the_location_report_shows_the_terms_each_program_met() {
+    let mut b = two_programs();
+    // Ridge: a 300.00 cap, a 10% discount and a 20.00 fee; Coast: a
+    // 600.00 minimum it doesn't meet, and a typed amount of 50.00.
+    b.credits[0].cap = Some(30_000);
+    b.credits[0].discount_percent = d("10");
+    b.credits[0].broker_fee = 2_000;
+    b.credits[1].minimum_spend = Some(60_000);
+    b.credits[1].rows.push(CreditRow {
+        description: "Typed".into(),
+        source: CreditSource::Flat(5_000),
+        percent: d("20"),
+        cap: CreditCap::None,
+    });
+    let r = recalc(&b, &RecalcOptions::default()).unwrap();
+    let inc = incentives(&b, &r).unwrap();
+    let rep = location_report(&r, &inc).unwrap();
+    let ridge = &rep.programs[0];
+    // 350.00 held to 300.00, less 30.00, less 20.00.
+    assert!(ridge.capped);
+    assert_eq!(ridge.discount, 3_000);
+    assert_eq!(ridge.fee, 2_000);
+    assert_eq!(ridge.amount, Some(25_000));
+    let coast = &rep.programs[1];
+    assert!(coast.below_minimum);
+    assert_eq!(coast.typed, 5_000);
+    assert_eq!(coast.qualified, 55_000);
+    assert_eq!(coast.amount, Some(0));
+    assert_eq!(rep.applied_total, r.credits_total);
+}

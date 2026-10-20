@@ -6,11 +6,17 @@
 // the default the dialog opens with. Print sends the pages to the print sheet;
 // Save as PDF writes them straight into a PDF file (report.js).
 //
+// A preset that prints the Bid section carries a bid layout the user builds
+// here (decisions.md, entry 92): header fields, sections that take accounts,
+// subtotals and markups. The preview's figures come from the engine
+// (`bid_sheet`), never from the page.
+//
 // Everything from the budget goes in through textContent or input values.
 
 import { el } from './dom.js';
 import { customDialog } from './modal.js';
 import { invoke } from './api.js';
+import { money } from './format.js';
 import {
   SECTIONS,
   REPORT_COLUMNS,
@@ -23,6 +29,8 @@ import {
   renderReport,
   scalePreview,
   printReport,
+  withBid,
+  bidLayout,
 } from './report.js';
 
 const SLOTS = [
@@ -169,12 +177,18 @@ export async function showReportSetup(ctx) {
     }
   });
   pageInput.addEventListener('blur', drawNav);
-  const draw = () => {
+  let drawSeq = 0;
+  const draw = async () => {
     clearTimeout(timer);
     timer = 0;
     if (!pages.isConnected) return;
+    // The bid's figures come from the engine; a later draw wins.
+    const seq = (drawSeq += 1);
+    const view = await withBid(full, spec);
+    if (seq !== drawSeq || !pages.isConnected) return;
+    showBidNotes(view);
     const top = pages.scrollTop;
-    const out = renderReport(pages, full, spec);
+    const out = renderReport(pages, view, spec);
     const width = Math.max(240, pages.clientWidth - 40);
     scalePreview(pages, width, spec.landscape);
     sections = out.sections;
@@ -221,10 +235,15 @@ export async function showReportSetup(ctx) {
       const i = on.indexOf(key);
       const item = el('li', { class: `rs-section${i < 0 ? ' off' : ''}` });
       item.append(
-        check(s.label, i >= 0, (v) =>
-          change(() => {
-            spec.sections = v ? [...on, key] : on.filter((k) => k !== key);
-          }),
+        check(
+          s.label,
+          i >= 0,
+          (v) => {
+            change(() => {
+              spec.sections = v ? [...on, key] : on.filter((k) => k !== key);
+            });
+            if (key === 'bid' && v && !spec.bid) startBid();
+          },
           { key: `sec-${key}` },
         ),
       );
@@ -521,11 +540,220 @@ export async function showReportSetup(ctx) {
     );
   }
 
+  // --- The bid layout ------------------------------------------------
+
+  const bidNotes = el('div', { class: 'rs-bid-notes', attrs: { 'aria-live': 'polite' } });
+  function showBidNotes(view) {
+    const sheet = view && view.bid_sheet;
+    const notes = [];
+    if (view && view.bid_error) notes.push(view.bid_error);
+    if (sheet) {
+      const n = Array.isArray(sheet.unassigned) ? sheet.unassigned.length : 0;
+      if (n) notes.push(`${n} ${n === 1 ? 'account is' : 'accounts are'} in no section; the bid lists ${n === 1 ? 'it' : 'them'} under Unassigned.`);
+      for (const w of sheet.warnings || []) notes.push(`${w.charAt(0).toUpperCase()}${w.slice(1)}.`);
+    }
+    bidNotes.replaceChildren(...notes.map((t) => el('p', { class: 'rs-hint', text: t })));
+  }
+
+  /** Starts the layout from the example the engine has (bid_sheet with no layout). */
+  async function startBid() {
+    try {
+      const sheet = await invoke('bid_sheet', { layout: null });
+      if (!spec.bid) spec.bid = bidLayout(sheet.layout) || { fields: [], lines: [], show_accounts: false };
+      drawSettings();
+      redraw();
+    } catch (e) {
+      say(String(e), true);
+    }
+  }
+
+  const sameName = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+  /** "10, 11" and "2001, 4000 to 4999" from a section's picks. */
+  function pickTexts(picks) {
+    const cats = picks.filter((p) => p.kind === 'category').map((p) => p.code);
+    const accts = picks.filter((p) => p.kind !== 'category').map((p) => (p.kind === 'range' ? `${p.from} to ${p.to}` : p.code));
+    return [cats.join(', '), accts.join(', ')];
+  }
+
+  /** A section's picks from its two typed lists. */
+  function picksOf(catText, acctText) {
+    const list = (t) =>
+      t
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean);
+    const picks = list(catText).map((code) => ({ kind: 'category', code }));
+    for (const item of list(acctText)) {
+      const m2 = /^(.+?)\s+to\s+(.+)$/i.exec(item);
+      picks.push(m2 ? { kind: 'range', from: m2[1].trim(), to: m2[2].trim() } : { kind: 'account', code: item });
+    }
+    return picks;
+  }
+
+  const PERCENT = /^-?\d+(\.\d+)?$/;
+  const AMOUNT = /^-?(\d{1,3}(,\d{3})+|\d+)(\.\d{1,2})?$/;
+
+  /** Typed money ("1,250.50") as cents, or null. No floats. */
+  function cents(t) {
+    const v = t.trim();
+    if (!AMOUNT.test(v)) return null;
+    const neg = v.startsWith('-');
+    const [int, frac = ''] = v.replace(/^-/, '').replace(/,/g, '').split('.');
+    const c = Number(int) * 100 + Number(frac.padEnd(2, '0'));
+    return Number.isSafeInteger(c) ? (neg ? -c : c) : null;
+  }
+
+  function bidInput(id, label, value, onInput, { placeholder = '', maxlength = '80', cls = '' } = {}) {
+    const input = el('input', { class: `modal-input rs-text ${cls}`.trim(), attrs: { id, type: 'text', autocomplete: 'off', spellcheck: 'false', 'aria-label': label, placeholder, maxlength } });
+    input.value = value;
+    input.addEventListener('input', () => {
+      const ok = onInput(input.value);
+      input.setAttribute('aria-invalid', ok === false ? 'true' : 'false');
+      if (ok !== false) redraw();
+    });
+    return input;
+  }
+
+  function bidButton(id, text, label, onClick, disabled = false) {
+    const b2 = el('button', { class: 'btn btn-quiet rs-move', text, title: label, attrs: { type: 'button', id, 'aria-label': label } });
+    b2.disabled = disabled;
+    b2.addEventListener('click', onClick);
+    return b2;
+  }
+
+  function bidGroup() {
+    if (!spec.sections.includes('bid')) return null;
+    const bid = spec.bid;
+    if (!bid) {
+      const start = el('button', { class: 'btn', text: 'Edit a Bid Layout', attrs: { type: 'button', id: 'rs-bid-start' } });
+      start.addEventListener('click', startBid);
+      return group('Bid layout', el('p', { class: 'rs-hint', text: 'This setup prints the example layout. Edit a layout of your own: its header fields, its sections and which accounts each takes, subtotals and markups.' }), start, bidNotes);
+    }
+    const parts = [];
+    parts.push(
+      check('List each section’s accounts', bid.show_accounts, (v) => change(() => (bid.show_accounts = v)), { key: 'bid-accounts' }),
+      el('p', { class: 'rs-sub', text: 'Header fields' }),
+    );
+    bid.fields.forEach((f, i) => {
+      parts.push(
+        el(
+          'div',
+          { class: 'rs-slot rs-bid-field' },
+          bidInput(`rs-bid-f${i}-label`, `Header field ${i + 1} label`, f.label, (v) => (f.label = v), { placeholder: 'Label' }),
+          bidInput(`rs-bid-f${i}-value`, `Header field ${i + 1} value`, f.value, (v) => (f.value = v), { placeholder: 'Value', maxlength: '200' }),
+          bidButton(`rs-bid-f${i}-del`, '×', `Remove header field ${f.label || i + 1}`, () => change(() => bid.fields.splice(i, 1))),
+        ),
+      );
+    });
+    const addField = el('button', { class: 'btn btn-quiet rs-reset', text: 'Add Header Field', attrs: { type: 'button', id: 'rs-bid-add-field' } });
+    addField.addEventListener('click', () => change(() => bid.fields.push({ label: 'Field', value: '' })));
+    parts.push(addField, el('p', { class: 'rs-sub', text: 'Lines, in print order' }));
+    const sectionNames = bid.lines.filter((l) => l.kind === 'section').map((l) => l.name);
+    const KIND = { section: 'Section', subtotal: 'Subtotal', percent: 'Markup (%)', flat: 'Flat amount' };
+    bid.lines.forEach((l, i) => {
+      const id = `rs-bid-l${i}`;
+      const box = el('div', { class: 'rs-bid-line' });
+      const head = el(
+        'div',
+        { class: 'rs-slot' },
+        el('span', { class: 'rs-slot-label', text: KIND[l.kind] }),
+        bidInput(`${id}-name`, `${KIND[l.kind]} ${i + 1} name`, l.name, (v) => {
+          // Markups on a section follow its new name.
+          if (l.kind === 'section') {
+            for (const x of bid.lines) if (x.kind === 'percent') x.of = x.of.map((n) => (sameName(n, l.name) ? v : n));
+          }
+          l.name = v;
+        }, { placeholder: 'Name' }),
+        el(
+          'span',
+          { class: 'rs-moves' },
+          bidButton(`${id}-up`, '↑', `Move ${l.name || 'line'} up`, () => change(() => ([bid.lines[i - 1], bid.lines[i]] = [bid.lines[i], bid.lines[i - 1]])), i === 0),
+          bidButton(`${id}-down`, '↓', `Move ${l.name || 'line'} down`, () => change(() => ([bid.lines[i + 1], bid.lines[i]] = [bid.lines[i], bid.lines[i + 1]])), i === bid.lines.length - 1),
+          bidButton(`${id}-del`, '×', `Remove ${l.name || 'line'}`, () => change(() => bid.lines.splice(i, 1))),
+        ),
+      );
+      box.append(head);
+      if (l.kind === 'section') {
+        const [catText, acctText] = pickTexts(l.picks);
+        let cats = catText;
+        let accts = acctText;
+        box.append(
+          el('label', { class: 'rs-inline' }, el('span', { text: 'Categories' }), bidInput(`${id}-cats`, `Categories ${l.name} takes`, catText, (v) => ((cats = v), (l.picks = picksOf(cats, accts))), { placeholder: 'Category codes', maxlength: '2000' })),
+          el('label', { class: 'rs-inline' }, el('span', { text: 'Accounts' }), bidInput(`${id}-accts`, `Accounts ${l.name} takes`, acctText, (v) => ((accts = v), (l.picks = picksOf(cats, accts))), { placeholder: 'Numbers or ranges', maxlength: '2000' })),
+        );
+      } else if (l.kind === 'percent') {
+        box.append(
+          el(
+            'label',
+            { class: 'rs-inline' },
+            el('span', { text: 'Percent' }),
+            bidInput(`${id}-pct`, `${l.name} percent`, l.percent, (v) => {
+              if (!PERCENT.test(v.trim())) return false;
+              l.percent = v.trim();
+              return true;
+            }, { placeholder: 'Percent', maxlength: '20' }),
+          ),
+        );
+        const of = el('div', { class: 'rs-groups' });
+        sectionNames.forEach((n, k) => {
+          of.append(
+            check(n || '(no name)', l.of.some((x) => sameName(x, n)), (v) =>
+              change(() => {
+                l.of = v ? [...l.of, n] : l.of.filter((x) => !sameName(x, n));
+              }),
+              { key: `bid-l${i}-of${k}` },
+            ),
+          );
+        });
+        box.append(el('p', { class: 'rs-hint', text: 'Of these sections (none ticked: every section and Unassigned)' }), of);
+      } else if (l.kind === 'flat') {
+        box.append(
+          el(
+            'label',
+            { class: 'rs-inline' },
+            el('span', { text: 'Amount' }),
+            bidInput(`${id}-amt`, `${l.name} amount`, money(l.amount).replace(/^\((.*)\)$/, '-$1'), (v) => {
+              const c = cents(v);
+              if (c === null) return false;
+              l.amount = c;
+              return true;
+            }, { placeholder: 'Amount', maxlength: '24' }),
+          ),
+        );
+      }
+      parts.push(box);
+    });
+    const add = (kind, label, line) => {
+      const b2 = el('button', { class: 'btn btn-quiet rs-reset', text: label, attrs: { type: 'button', id: `rs-bid-add-${kind}` } });
+      b2.addEventListener('click', () => change(() => bid.lines.push(line())));
+      return b2;
+    };
+    const fresh = (base) => {
+      let n = 1;
+      while (bid.lines.some((x) => sameName(x.name, `${base} ${n}`))) n += 1;
+      return `${base} ${n}`;
+    };
+    parts.push(
+      el(
+        'div',
+        { class: 'rs-bid-adds' },
+        add('section', 'Add Section', () => ({ kind: 'section', name: fresh('Section'), picks: [] })),
+        add('subtotal', 'Add Subtotal', () => ({ kind: 'subtotal', name: 'Subtotal' })),
+        add('percent', 'Add Markup', () => ({ kind: 'percent', name: 'Markup', percent: '10', of: [] })),
+        add('flat', 'Add Flat Amount', () => ({ kind: 'flat', name: 'Fee', amount: 0 })),
+      ),
+      el('p', { class: 'rs-hint', text: 'Accounts: numbers, or ranges such as 4000 to 4999. An account counts in the first section that takes it. Below the lines the bid adds the budget’s own charges and credits, so the bid total is the budget’s net total plus these markups.' }),
+      bidNotes,
+    );
+    return group('Bid layout', ...parts);
+  }
+
   function drawSettings() {
     const scroll = left.scrollTop;
     const active = document.activeElement;
     const focusId = active && left.contains(active) ? active.id : '';
-    left.replaceChildren(sectionsGroup(), treeGroup(), leaveOutGroup(), topsheetGroup(), columnsGroup(), layoutGroup(), bandsGroup());
+    left.replaceChildren(...[sectionsGroup(), bidGroup()].filter(Boolean), treeGroup(), leaveOutGroup(), topsheetGroup(), columnsGroup(), layoutGroup(), bandsGroup());
     left.scrollTop = scroll;
     if (focusId) {
       const again = [...left.querySelectorAll('[id]')].find((n) => n.id === focusId);

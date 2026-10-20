@@ -1281,6 +1281,7 @@ impl Session {
         };
         let mut view = FullView::build(&mut self.budget, &st);
         view.cost = self.cost(None, true);
+        view.incentives = crate::commands::location_report(self).ok();
         view
     }
 

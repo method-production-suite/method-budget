@@ -8,7 +8,7 @@ use method_core::{
     RowKind, TopsheetLine,
 };
 
-use super::{lines_up, Cell, ExportError, Sheet, Workbook};
+use super::{lines_up, Cell, ExportError, Sheet, Workbook, INCENTIVES_SHEET};
 
 /// Every table, from `b` and the report `r` computed from it with the
 /// default options (`method_core::recalc(b, &RecalcOptions::default())`).
@@ -28,6 +28,12 @@ pub fn workbook(b: &Budget, r: &Report) -> Result<Workbook, ExportError> {
         sets(b, r),
         locations(b, r),
     ];
+    // A budget with credits also gets its incentives by location
+    // (decisions.md, entry 93); one without exports as before.
+    // (Only a spend too large to add up leaves it out.)
+    if !b.credits.is_empty() {
+        sheets.extend(incentives(r, b));
+    }
     // A budget with actuals also gets its cost report and transactions.
     if !b.actuals.is_empty() {
         if let Some(c) = method_core::actuals::cost_report_of(b, r) {
@@ -585,6 +591,141 @@ fn locations(b: &Budget, r: &Report) -> Sheet {
         ]),
         rows,
     }
+}
+
+// ---------------------------------------------------------------------------
+// Incentives by location (only for a budget with credits)
+
+/// Incentives: each location's spend (`Location` rows) and what each
+/// program counts there (`Counted`), every program with its terms
+/// (`Program`), then the totals (`Total`): the spend, the applied credits
+/// (the topsheet's credits), the unapplied estimates, the grand and net
+/// totals (method_core::incentives::by_location). `None` when a spend is
+/// too large to add up.
+pub fn incentives(r: &Report, b: &Budget) -> Option<Sheet> {
+    use method_core::incentives::by_location::location_report;
+    let inc = method_core::incentives::incentives(b, r).ok()?;
+    let rep = location_report(r, &inc).ok()?;
+    let place = |l: &Option<String>| Cell::text(l.as_deref().unwrap_or("(no location)"));
+    let status = |applied: bool, amount: Option<Cents>| {
+        Cell::text(match (amount, applied) {
+            (None, _) => "Problem",
+            (Some(_), true) => "Applied",
+            (Some(_), false) => "Estimate",
+        })
+    };
+    let blank = |n: usize| vec![Cell::Empty; n];
+    let mut rows = Vec::new();
+    for l in &rep.locations {
+        let mut row = vec![
+            Cell::text("Location"),
+            place(&l.spend.location),
+            Cell::Empty,
+            Cell::Empty,
+        ];
+        row.push(Cell::Money(l.spend.total));
+        row.extend(blank(7));
+        row.push(Cell::text(if l.spend.known {
+            ""
+        } else {
+            "not in the budget's locations"
+        }));
+        rows.push(row);
+        for p in &l.programs {
+            let amount = rep.programs.get(p.index).and_then(|q| q.amount);
+            let mut row = vec![
+                Cell::text("Counted"),
+                place(&l.spend.location),
+                Cell::text(&p.name),
+                status(p.applied, amount),
+                Cell::Empty,
+                Cell::Money(p.qualified_here),
+            ];
+            row.extend(blank(7));
+            rows.push(row);
+        }
+    }
+    for p in &rep.programs {
+        let mut note = Vec::new();
+        if p.below_minimum {
+            note.push("below the minimum spend".to_string());
+        }
+        if p.capped {
+            note.push("held to its cap".to_string());
+        }
+        if let Some(name) = &p.shared_cap {
+            note.push(match p.shared {
+                Some(_) => format!("its share of shared cap {name}"),
+                None => format!("shares cap {name}"),
+            });
+        }
+        if p.typed != 0 {
+            note.push(format!("includes {} typed in", super::money_text(p.typed)));
+        }
+        if let Some(problem) = &p.problem {
+            note.push(problem.clone());
+        }
+        rows.push(vec![
+            Cell::text("Program"),
+            Cell::text(p.locations.iter().cloned().collect::<Vec<_>>().join(", ")),
+            Cell::text(&p.name),
+            status(p.applied, p.amount),
+            Cell::Empty,
+            Cell::Money(p.qualified),
+            money_or_empty(p.minimum_spend),
+            money_or_empty(p.cap),
+            money_or_empty(p.shared),
+            Cell::Money(p.discount),
+            Cell::Money(p.fee),
+            money_or_empty(p.amount),
+            Cell::text(note.join("; ")),
+        ]);
+    }
+    let total = |label: &str, spend: Option<Cents>, credit: Option<Cents>| {
+        let mut row = vec![
+            Cell::text("Total"),
+            Cell::Empty,
+            Cell::text(label),
+            Cell::Empty,
+        ];
+        row.push(money_or_empty(spend));
+        row.extend(blank(6));
+        row.push(money_or_empty(credit));
+        row.push(Cell::Empty);
+        row
+    };
+    rows.push(total(
+        "Spend at every location",
+        Some(rep.spend_total),
+        None,
+    ));
+    rows.push(total("Credits applied", None, Some(rep.applied_total)));
+    rows.push(total(
+        "Estimates not applied",
+        None,
+        Some(rep.estimates_total),
+    ));
+    rows.push(total("Grand total", None, Some(rep.grand_total)));
+    rows.push(total("Net total", None, Some(rep.net_total)));
+    Some(Sheet {
+        name: INCENTIVES_SHEET,
+        columns: columns(&[
+            "Kind",
+            "Location",
+            "Program",
+            "Status",
+            "Spend",
+            "Qualified",
+            "Minimum",
+            "Cap",
+            "Shared Cap Share",
+            "Discount",
+            "Fee",
+            "Credit",
+            "Note",
+        ]),
+        rows,
+    })
 }
 
 // ---------------------------------------------------------------------------

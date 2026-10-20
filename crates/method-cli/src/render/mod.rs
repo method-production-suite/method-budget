@@ -16,8 +16,9 @@ pub mod text;
 use std::collections::BTreeSet;
 
 use method_core::{
-    Account, Band, BandField, Baseline, Budget, Cents, Dec, FontSize, InfoValue, Note, Report,
-    ReportColumn, ReportSection, ReportSpec, RowKind, TopsheetLine,
+    bid_sheet, Account, Band, BandField, Baseline, BidLayout, BidSheet, BidSheetLine, Budget,
+    Cents, Dec, FontSize, InfoValue, Note, Report, ReportColumn, ReportSection, ReportSpec,
+    RowKind, TopsheetLine,
 };
 use method_format::export::{self, Cell, Sheet};
 
@@ -256,7 +257,15 @@ fn col(title: &str, numeric: bool) -> Column {
 /// Builds the report. `r` must be `method_core::recalc(b, &RecalcOptions::default())`.
 pub fn build(b: &Budget, r: &Report, spec: &ReportSpec, ctx: &Context) -> Result<Doc, String> {
     let wb = export::workbook(b, r).map_err(|e| e.to_string())?;
+    // A preset without a bid layout prints the example (decisions.md, entry 92).
+    let layout = spec.bid.clone().unwrap_or_else(BidLayout::example);
+    let bid = if spec.sections.contains(&ReportSection::Bid) {
+        Some(bid_sheet(b, r, &layout).map_err(|e| e.to_string())?)
+    } else {
+        None
+    };
     let b_ctx = Builder {
+        bid: bid.map(|s| (s, layout.show_accounts)),
         b,
         r,
         spec,
@@ -352,6 +361,8 @@ fn section_title(s: ReportSection) -> &'static str {
         ReportSection::Sets => "Sets",
         ReportSection::Locations => "Locations",
         ReportSection::Currencies => "Currencies",
+        ReportSection::Bid => "Bid",
+        ReportSection::Incentives => "Incentives by location",
         // Sections this writer doesn't draw yet print their title only.
         #[allow(unreachable_patterns)]
         _ => "",
@@ -365,6 +376,8 @@ struct Builder<'a> {
     wb: &'a export::Workbook,
     baseline: Option<&'a Baseline>,
     cols: Vec<ReportColumn>,
+    /// The bid worked out, and whether it lists each section's accounts.
+    bid: Option<(BidSheet, bool)>,
 }
 
 impl Builder<'_> {
@@ -384,6 +397,8 @@ impl Builder<'_> {
             ReportSection::Sets => vec![self.sheet("Sets")],
             ReportSection::Locations => vec![self.sheet("Locations")],
             ReportSection::Currencies => vec![self.sheet("Currencies")],
+            ReportSection::Bid => self.bid(),
+            ReportSection::Incentives => vec![self.incentives()],
             #[allow(unreachable_patterns)]
             _ => Vec::new(),
         };
@@ -869,7 +884,155 @@ impl Builder<'_> {
         }
     }
 
+    /// The bid (decisions.md, entry 92): its header fields, then its lines,
+    /// the Unassigned bucket, the budget's own charges and credits and the
+    /// bid total, with a line saying how it reconciles.
+    fn bid(&self) -> Vec<Table> {
+        let Some((s, show_accounts)) = &self.bid else {
+            return Vec::new();
+        };
+        let mut tables = Vec::new();
+        if !s.fields.is_empty() {
+            tables.push(Table {
+                columns: vec![col("Field", false), col("Value", false)],
+                rows: s
+                    .fields
+                    .iter()
+                    .map(|f| {
+                        Row::new(
+                            vec![Cell::text(&f.label), Cell::text(&f.value)],
+                            Style::Normal,
+                        )
+                    })
+                    .collect(),
+            });
+        }
+        let mut rows = Vec::new();
+        let line = |code: &str, text: &str, amount: Cents, style| {
+            Row::new(
+                vec![Cell::text(code), Cell::text(text), Cell::Money(amount)],
+                style,
+            )
+        };
+        let account_rows = |rows: &mut Vec<Row>, accounts: &[method_core::BidAccount]| {
+            for a in accounts {
+                let mut row = line(&a.code, &a.name, a.amount, Style::Normal);
+                row.indent = 1;
+                rows.push(row);
+            }
+        };
+        for l in &s.lines {
+            match l {
+                BidSheetLine::Section {
+                    name,
+                    accounts,
+                    total,
+                } if *show_accounts => {
+                    rows.push(Row::spanning(name.clone(), Style::Heading));
+                    account_rows(&mut rows, accounts);
+                    rows.push(line("", &format!("Total {name}"), *total, Style::Total));
+                }
+                BidSheetLine::Section { name, total, .. } => {
+                    rows.push(line("", name, *total, Style::Normal))
+                }
+                BidSheetLine::Subtotal { name, amount } => {
+                    rows.push(line("", name, *amount, Style::Total))
+                }
+                BidSheetLine::Markup {
+                    name,
+                    percent: Some(p),
+                    base,
+                    amount,
+                } => rows.push(line(
+                    "",
+                    &format!("{name} ({p}% of {})", crate::cli::money(*base)),
+                    *amount,
+                    Style::Normal,
+                )),
+                BidSheetLine::Markup { name, amount, .. } => {
+                    rows.push(line("", name, *amount, Style::Normal))
+                }
+            }
+        }
+        if !s.unassigned.is_empty() {
+            rows.push(Row::spanning("Unassigned", Style::Heading));
+            let (shown, zero): (Vec<_>, Vec<_>) =
+                s.unassigned.iter().cloned().partition(|a| a.amount != 0);
+            account_rows(&mut rows, &shown);
+            if !zero.is_empty() {
+                rows.push(Row::spanning(
+                    format!(
+                        "{} more {} at zero.",
+                        zero.len(),
+                        if zero.len() == 1 {
+                            "account"
+                        } else {
+                            "accounts"
+                        }
+                    ),
+                    Style::Note,
+                ));
+            }
+            rows.push(line(
+                "",
+                "Total Unassigned",
+                s.unassigned_total,
+                Style::Total,
+            ));
+        }
+        if s.unposted_fringes != 0 {
+            rows.push(line(
+                "",
+                "Fringes the budget doesn't post",
+                s.unposted_fringes,
+                Style::Normal,
+            ));
+        }
+        for (name, amount) in &s.charges {
+            rows.push(line("", name, *amount, Style::Normal));
+        }
+        for (name, amount) in &s.credits {
+            rows.push(line("", &format!("Less {name}"), -amount, Style::Normal));
+        }
+        rows.push(line("", "Bid total", s.total, Style::Total));
+        rows.push(Row::spanning(
+            format!(
+                "The budget's net total {} plus the bid's markups {}. Each account counts once, with the fringes it earns.",
+                crate::cli::money(s.budget_net),
+                crate::cli::money(s.markups)
+            ),
+            Style::Note,
+        ));
+        for w in &s.warnings {
+            rows.push(Row::spanning(format!("Check: {w}."), Style::Note));
+        }
+        tables.push(Table {
+            columns: vec![
+                col("Code", false),
+                col("Description", false),
+                col("Amount", true),
+            ],
+            rows,
+        });
+        tables
+    }
+
     /// A setup table straight from the export.
+    /// The Incentives sheet (decisions.md, entry 93), or a note when the
+    /// budget has no credits.
+    fn incentives(&self) -> Table {
+        if self.wb.sheet(export::INCENTIVES_SHEET).is_some() {
+            return self.sheet(export::INCENTIVES_SHEET);
+        }
+        Table {
+            columns: vec![col("Incentives", false)],
+            rows: vec![Row::spanning(
+                "This budget has no credits, so no incentive programs.",
+                Style::Note,
+            )],
+        }
+    }
+
     fn sheet(&self, name: &str) -> Table {
         let empty = Sheet {
             name: "",
