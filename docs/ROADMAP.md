@@ -17,21 +17,16 @@ missing pieces), **[missing]** not started. Size: **S** a day or two, **M** abou
 
 ## Waiting on the owner
 
-Updated 2026-10-19. Only what needs the owner's answer, hands or yes; everything else on
+Updated 2026-10-20. Only what needs the owner's answer, hands or yes; everything else on
 this page goes ahead without waiting.
 
 ### Release go-aheads
 
-- **0.6.0, not before Method Launcher 0.1.2 is published** (about 2026-10-28 at the
-  earliest; MOrg says when): Launcher 0.1.0 and 0.1.1 refuse universal app bundles, and
-  0.6.0 is universal again (D87, the owner's decision of 2026-10-19; Intel Macs on 0.2.x are
-  offered it). The app's own updates aren't affected. On main so far, the launcher contract (two
-  command-line flags and the suite's `recent.json`, D85), the first-start sample without its
-  setting (D86), a missed same-size change on Linux and Windows fixed, the Windows build no
-  longer bundling copies with Windows line endings, checksums on every release and the
-  prebuilt Tauri CLI; queued, the weekly full build (#52) and the release key check (#53).
-  Before the tag: run `updater-key-check` once (proves the release key still signs with the new
-  minisign, D83) and the weekly build on the release commit. The tag needs the owner's yes.
+- **0.6.0 is out** (published 2026-10-20, universal; methodbudget.com follows it). The
+  next release needs the owner's yes as usual, after two things on this page's roadmap land:
+  the release bundling with the prebuilt Tauri CLI only while signing keys are present (the
+  suite's stricter rule of 2026-10-19), and 3.22 (formulas walked without recursion), which
+  lets the release tests drop their 8 MiB stack setting. Nothing waits on the owner yet.
 - **rustls update, on or after 2026-10-28**: the fix (0.23.46) leaves the 14-day crate
   cooldown then. `cargo update -p rustls` and the four RUSTSEC-2026-0346 to 0349 ignores
   taken out of `deny.toml` go in as one pull request. None of the four applies to the
@@ -115,7 +110,7 @@ this page goes ahead without waiting.
 
 ### Tests that need the owner's hands or hardware
 
-- [ ] **The sample budget at the first start** (3.20; D84): quit the app, move its data
+- [ ] **The sample budget at the first start** (3.20; D84, D86; on 0.6.0, **ready now**): quit the app, move its data
       folder aside (on a Mac `~/Library/Application Support/com.methodbudget.desktop`),
       and start it: Field Station should open in the tab
       "Sample: Field Station" with the line above the grid, instead of the start window.
@@ -123,7 +118,7 @@ this page goes ahead without waiting.
       Help > Open Sample opens a fresh copy, and the Help menu has no switch for the
       sample (D86). Save the sample under a name: the tab loses "Sample" and the
       line goes. Put the data folder back afterwards.
-- [ ] **The launcher's flags** (3.21; D85): quit the app, then from Terminal run
+- [ ] **The launcher's flags** (3.21; D85; on 0.6.0, **ready now**): quit the app, then from Terminal run
       `open -a "Method Budget" --args --open-sample`: Field Station opens, not the start
       window. Quit, then `open -a "Method Budget" --args --check-for-updates`: the toolbar
       says "Checking for updates…", then the answer. Open a budget and quit: the data
@@ -135,11 +130,11 @@ this page goes ahead without waiting.
       list in docs/research/parity-tracker.md, section 2. The export test plan
       (docs/research/export-test-plan.md) has the steps; exports go in `imports/`, never
       committed.
-- [ ] **The Intel code in the window, on this Mac** (D87; after 0.6.0 is published, about
-      a minute): install 0.6.0, select Method Budget in Applications, File > Get Info,
+- [ ] **The Intel code in the window, on this Mac** (D87; **ready now**, about a
+      minute): install 0.6.0, select Method Budget in Applications, File > Get Info,
       tick "Open using Rosetta", open it and open Help > Open Sample: Field Station should
       show its totals. Untick the box afterwards.
-- [ ] **An Intel Mac** (D87; needs an Intel Mac, after 0.6.0 is published): install
+- [ ] **An Intel Mac** (D87; needs an Intel Mac; **ready now**): install
       0.6.0 from the release's `.dmg` and open the Field Station sample; and on an Intel Mac
       that has 0.2.x, Help > Check for Updates should find 0.6.0, download it and restart
       into it.
@@ -147,7 +142,7 @@ this page goes ahead without waiting.
       print the topsheet and detail; menu keys (Alt+Up and Alt+Down, Ctrl+F, the setup
       keys); double-click a `.mthd` to open it; on Windows, install 0.3.0 over 0.2.x and
       check the install folder doesn't keep an old `method-budget.exe` beside
-      `method-budget-app.exe` (D74). Best on 0.6.0 or later: earlier Windows builds
+      `method-budget-app.exe` (D74). Use 0.6.0 (**ready now**): earlier Windows builds
       bundled the chart templates and the sample with Windows line endings.
 - [ ] **Help menu on a Mac**: User Guide opens docs/APP.md; Report a Bug opens a new issue
       with the version and system filled in; Licenses and Notices opens and scrolls;

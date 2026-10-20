@@ -272,8 +272,10 @@ jobs:
           UPDATER_PRIVATE_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
         run: |
           set -euo pipefail
-          # Packaging only: `bundle` takes the build the step above compiled and never runs
-          # cargo, so no third-party code runs while the secrets below are in reach.
+          # Packaging only: `bundle` takes the build the step above compiled. It runs the
+          # Tauri CLI's own prebuilt binary (`cargo-tauri`, never `cargo tauri`), so cargo
+          # can't start beside the keys (SUITE-STANDARDS.md section 3, made strict
+          # 2026-10-19; xtask's release_workflow test holds this file to it).
           args=(bundle --bundles "$BUNDLES")
           if [ -n "$TARGET" ]; then args+=(--target "$TARGET"); fi
           # Notarizing (the Tauri CLI notarizes and staples the app when these are set,
@@ -288,7 +290,7 @@ jobs:
             args+=(--config '{"bundle":{"createUpdaterArtifacts":true}}')
           fi
           unset NOTARY_KEY_ID NOTARY_ISSUER UPDATER_PRIVATE_KEY UPDATER_PRIVATE_KEY_PASSWORD
-          cargo tauri "${args[@]}"
+          cargo-tauri "${args[@]}"
 
       - name: Sign, notarize and staple the disk image (macOS)
         if: runner.os == 'macOS' && env.MACOS_NOTARIZE == 'yes'

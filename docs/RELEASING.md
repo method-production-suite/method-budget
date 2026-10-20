@@ -201,6 +201,11 @@ green run). Pull requests run only the dependency checks (`ci.yml`: crate ages a
 deny) and are tested locally before they are marked ready (`scripts/check.sh`). Before a
 tag, the rehearsal (above) is the full build; no weekly run is needed first.
 
+Once a signing key is in a job, only prebuilt programs run: the Tauri CLI's own
+`cargo-tauri bundle` and `target/debug/xtask`, never `cargo` (SUITE-STANDARDS.md section 3,
+made strict 2026-10-19). xtask's `release_workflow` test fails if any step after the first
+one that reads a secret runs cargo.
+
 Only first-party actions are used, each pinned to a full commit SHA. Each secret is given
 only to the steps that use it, never to the Windows and Linux builds. Every signing,
 notarizing and updater-signing step is skipped cleanly when its secrets are absent; the
