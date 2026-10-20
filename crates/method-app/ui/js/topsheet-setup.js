@@ -1163,8 +1163,21 @@ function creditInput(c0) {
     excluded_fringes: arr(c.excluded_fringes).map(k.str),
     // Where the spend has to be (decisions.md, entry 80); none: anywhere.
     locations: arr(c.locations).map(k.str),
+    // The program's terms (decisions.md, entry 88). A shared cap's amount
+    // is the budget's, sent only when it changes.
+    minimum_spend: isNone(c.minimum_spend) ? null : k.centsToText(c.minimum_spend),
+    broker_fee: isNone(c.broker_fee) || c.broker_fee === 0 ? null : k.centsToText(c.broker_fee),
+    shared_cap: isNone(c.shared_cap) ? null : k.str(c.shared_cap),
+    shared_cap_amount: null,
     rows: arr(c.rows).map(creditRowInput),
   };
+}
+
+// The budget's shared caps by name, in cents (decisions.md, entry 88).
+function sharedCaps() {
+  const out = {};
+  for (const [n, v] of k.entries(k.budget().shared_caps)) out[n] = obj(v).amount;
+  return out;
 }
 
 function creditArgs(index, patch) {
@@ -1220,16 +1233,29 @@ function creditFoot(i) {
     );
   }
   if (f.entry) {
-    // The discount comes off after the cap; the credit is rounded once.
-    const before = dollarsToCents(f.entry.capped);
-    if (before !== null && before !== BigInt(f.entry.amount)) {
+    const e = f.entry;
+    const fee = isNone(e.fee) ? 0n : BigInt(e.fee);
+    // Below the minimum spend the credit is 0 (decisions.md, entry 88).
+    if (e.below_minimum === true) {
+      out.push({ label: 'Minimum', value: 'Not met', title: 'The rows’ net spend is below the credit’s minimum spend, so it pays nothing' });
+    }
+    // Its share of a cap it shares with other credits, in whole cents.
+    if (!isNone(e.shared)) {
+      out.push({ label: 'Shared cap', value: k.formatCents(e.shared), title: `Its share of the shared cap; exactly ${k.formatDecimal(e.capped)} before it` });
+    }
+    // The discount comes off after the caps, then the fee; the credit is
+    // rounded once.
+    const before = !isNone(e.shared) ? BigInt(e.shared) : dollarsToCents(e.capped);
+    const after = BigInt(e.amount) + fee;
+    if (before !== null && before !== after) {
       out.push({
         label: 'Discount',
-        value: k.formatCents(before - BigInt(f.entry.amount)),
-        title: `Exactly ${k.formatDecimal(f.entry.capped)} before the discount, after the cap`,
+        value: k.formatCents(before - after),
+        title: `Exactly ${isNone(e.shared) ? k.formatDecimal(e.capped) : k.formatCents(e.shared)} before the discount, after the caps`,
       });
     }
-    out.push({ label: 'Net credit', value: k.formatCents(f.entry.amount), title: 'Credit taken off the grand total' });
+    if (fee !== 0n) out.push({ label: 'Broker’s fee', value: k.formatCents(fee), title: 'The flat fee, taken off after the discount' });
+    out.push({ label: 'Net credit', value: k.formatCents(e.amount), title: 'Credit taken off the grand total' });
   }
   return out;
 }
@@ -1272,7 +1298,23 @@ function renderCredits(panel) {
       pickNew.credits = arr(k.budget().credits).length;
       return [
         'set_credit',
-        { index: null, credit: { name: v.name.trim(), account: null, applied: true, cap: null, discount_percent: '0', excluded_fringes: [], locations: [], rows: [] } },
+        {
+          index: null,
+          credit: {
+            name: v.name.trim(),
+            account: null,
+            applied: true,
+            cap: null,
+            discount_percent: '0',
+            excluded_fringes: [],
+            locations: [],
+            minimum_spend: null,
+            broker_fee: null,
+            shared_cap: null,
+            shared_cap_amount: null,
+            rows: [],
+          },
+        },
       ];
     },
   });
@@ -1373,19 +1415,56 @@ function programsTable(programs) {
       .map(obj)
       .map((s) => `${isNone(s.location) ? 'No location' : k.str(s.location)} ${k.formatCents(s.net)}`)
       .join('; ');
+    const f = obj(p.figures);
+    const below = f.below_minimum === true;
+    // Decisions.md, entry 88: the minimum, the shared cap and the fee.
+    const minimum = isNone(p.minimum_spend) ? '' : k.formatCents(p.minimum_spend);
+    const capName = isNone(p.shared_cap) ? '' : k.str(p.shared_cap);
+    const capOf = isNone(p.shared_cap_amount) ? 'not in the budget' : k.formatCents(p.shared_cap_amount);
+    const shared = capName === '' ? '' : isNone(f.shared) ? capName : `${capName}: ${k.formatCents(f.shared)}`;
+    const sharedTitle =
+      capName === ''
+        ? ''
+        : isNone(p.shared_cap_amount)
+          ? `${capName} is not in the budget’s shared caps, so it holds nothing down`
+          : isNone(f.shared)
+            ? `Shares ${capName} (${capOf}) and is within it`
+            : `Its share of ${capName} (${capOf}), in proportion to what each program sharing it comes to`;
+    const fee = isNone(f.fee) || f.fee === 0 ? (p.broker_fee ? k.formatCents(0) : '') : k.formatCents(f.fee);
     li.append(
       lead(),
       textCell(k.str(p.name)),
       textCell(where(p.locations), { muted: !arr(p.locations).length }),
       textCell(k.formatCents(p.qualified), { num: true, title: spend ? `Net spend by location: ${spend}` : '' }),
+      textCell(minimum, {
+        num: true,
+        title: minimum === '' ? '' : below ? 'Below the minimum spend: the program pays nothing' : 'The qualified spend is at least the minimum',
+      }),
+      textCell(shared, { muted: isNone(f.shared), title: sharedTitle }),
+      textCell(fee, { num: true, title: p.broker_fee ? `A flat ${k.formatCents(p.broker_fee)} fee, after the discount, never below zero` : '' }),
       textCell(isNone(p.amount) ? '' : k.formatCents(p.amount), {
         num: true,
-        title: !isNone(p.problem) ? k.str(p.problem) : p.capped ? 'Held down by the credit’s cap' : '',
+        title: !isNone(p.problem)
+          ? k.str(p.problem)
+          : below
+            ? 'Below the minimum spend'
+            : p.capped
+              ? 'Held down by the credit’s cap'
+              : '',
       }),
-      textCell(isNone(p.amount) ? 'Problem' : !isNone(p.problem) ? 'May be short' : p.applied ? 'Applied' : 'Estimate', {
-        muted: !p.applied,
-        title: isNone(p.problem) ? '' : k.str(p.problem),
-      }),
+      textCell(
+        isNone(p.amount) ? 'Problem' : !isNone(p.problem) ? 'May be short' : below ? 'Below minimum' : p.applied ? 'Applied' : 'Estimate',
+        {
+          muted: !p.applied,
+          title: !isNone(p.problem)
+            ? k.str(p.problem)
+            : below
+              ? `The qualified spend ${k.formatCents(p.qualified)} is below the minimum of ${minimum}, so the program pays nothing`
+              : p.applied
+                ? ''
+                : 'Not applied: worked out as if applied alongside the applied programs',
+        },
+      ),
     );
     ul.append(li);
   }
@@ -1394,7 +1473,10 @@ function programsTable(programs) {
     head('Program'),
     head('Spend at'),
     head('Qualified', { num: true, title: 'The rows’ net spend added up' }),
-    head('Credit', { num: true, title: 'After the caps and the discount, rounded once' }),
+    head('Minimum', { num: true, title: 'The qualified spend below which the program pays nothing' }),
+    head('Shared cap', { title: 'A cap the program shares with others, and its share when the cap holds it down' }),
+    head('Fee', { num: true, title: 'The broker’s flat fee, taken off after the discount' }),
+    head('Credit', { num: true, title: 'After the minimum, the caps, the discount and the fee, rounded once' }),
     head(''),
   ], ul);
 }
@@ -1429,7 +1511,8 @@ function locationsTable(spend) {
 
 // Credit `i`'s editor: a band with its name, Applied, cap, discount and
 // account; one with the fringes left out of its spend; one with the
-// locations its spend has to be at; one with Add row;
+// locations its spend has to be at; one with its minimum spend, broker's fee
+// and shared cap; one with Add row;
 // then its rows as one table. Its figures are the footer's.
 function creditEditor(i, c0, c, entry, issues) {
   const raw = obj(c0);
@@ -1498,6 +1581,65 @@ function creditEditor(i, c0, c, entry, issues) {
         options: withKept(locationNames(), c.locations),
         emptyText: 'Anywhere',
         onChange: (list) => k.run(ik, () => creditArgs(i, { locations: list })),
+      }),
+    ),
+  );
+
+  // The program's terms (decisions.md, entry 88): a minimum spend, a flat
+  // broker's fee, and a cap it shares with other credits by name.
+  const caps = sharedCaps();
+  const capName = c.shared_cap || '';
+  const minimum = k.textInput({
+    fieldKey: fk('minimum'),
+    value: isNone(raw.minimum_spend) ? '' : k.formatCents(raw.minimum_spend),
+    num: true,
+    placeholder: 'None',
+    onCommit: commit('minimum', (v) => ({ minimum_spend: v.trim() === '' ? null : v.trim() })),
+  });
+  const fee = k.textInput({
+    fieldKey: fk('fee'),
+    value: isNone(raw.broker_fee) || raw.broker_fee === 0 ? '' : k.formatCents(raw.broker_fee),
+    num: true,
+    placeholder: 'None',
+    onCommit: commit('fee', (v) => ({ broker_fee: v.trim() === '' ? null : v.trim() })),
+  });
+  const capAmount = k.textInput({
+    fieldKey: fk('shared-amount'),
+    value: capName !== '' && !isNone(caps[capName]) ? k.formatCents(caps[capName]) : '',
+    num: true,
+    placeholder: capName === '' ? 'No shared cap' : 'Amount',
+    onCommit: commit('shared-amount', (v) => ({ shared_cap_amount: v.trim() === '' ? null : v.trim() })),
+  });
+  if (capName === '') capAmount.disabled = true;
+  const shared = k.textInput({
+    fieldKey: fk('shared'),
+    value: capName,
+    placeholder: 'None',
+    // A new name keeps the amount shown, so it is never a cap without one.
+    onCommit: commit('shared', (v) => {
+      const n = v.trim();
+      if (n === '') return { shared_cap: null };
+      const amount = capName !== '' && !isNone(caps[capName]) ? k.centsToText(caps[capName]) : null;
+      return { shared_cap: n, shared_cap_amount: isNone(caps[n]) ? amount : null };
+    }),
+  });
+  const sharing = Object.keys(caps).length
+    ? `Shared caps in this budget: ${Object.entries(caps)
+        .map(([n, a]) => `${n} ${k.formatCents(a)}`)
+        .join(', ')}. Credits naming the same one never come to more than it together.`
+    : 'Credits naming the same shared cap never come to more than it together.';
+  ed.append(
+    band(
+      `Terms of ${c.name}`,
+      bandInput('Minimum spend', minimum, {
+        size: 'tss-w-num',
+        title: 'Below this qualified spend (the rows’ net spend at its locations, before any cap) the credit pays nothing',
+      }),
+      bandInput('Broker’s fee', fee, { size: 'tss-w-num', title: 'A flat fee taken off after the cap and the discount, never below zero' }),
+      bandInput('Shared cap', shared, { size: 'tss-w-name', title: sharing }),
+      bandInput('Shared cap amount', capAmount, {
+        size: 'tss-w-num',
+        title: 'The shared cap’s amount, for every credit sharing it. A new shared cap needs one.',
       }),
     ),
   );

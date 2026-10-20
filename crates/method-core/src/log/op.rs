@@ -395,10 +395,16 @@ pub enum Field {
     Person,
     // Added by entry 80 (a credit's locations), after entry 79's.
     Locations,
+    // Added by entry 88 (a credit's minimum spend, broker's fee and shared
+    // cap, and the budget's shared caps), after entry 80's.
+    MinimumSpend,
+    BrokerFee,
+    SharedCap,
+    SharedCaps,
 }
 
 impl Field {
-    pub const ALL: [Field; 97] = [
+    pub const ALL: [Field; 101] = [
         Field::Name,
         Field::Code,
         Field::Description,
@@ -496,6 +502,10 @@ impl Field {
         Field::RoundAccountTotals,
         Field::Person,
         Field::Locations,
+        Field::MinimumSpend,
+        Field::BrokerFee,
+        Field::SharedCap,
+        Field::SharedCaps,
     ];
 
     /// The name files use.
@@ -598,6 +608,10 @@ impl Field {
             Field::RoundAccountTotals => "round_account_totals",
             Field::Person => "person",
             Field::Locations => "locations",
+            Field::MinimumSpend => "minimum_spend",
+            Field::BrokerFee => "broker_fee",
+            Field::SharedCap => "shared_cap",
+            Field::SharedCaps => "shared_caps",
         }
     }
 
@@ -654,6 +668,8 @@ pub enum Value {
     SetupOrder(crate::order::SetupOrder),
     SetupFolders(crate::folders::SetupFolders),
     SetupSources(crate::pack::SetupSources),
+    /// The budget's shared caps, by name (decisions.md, entry 88).
+    SharedCaps(std::collections::BTreeMap<String, crate::Cents>),
 }
 
 impl Value {
@@ -736,6 +752,7 @@ impl Value {
             Value::SetupOrder(_) => "setup order".into(),
             Value::SetupFolders(_) => "setup folders".into(),
             Value::SetupSources(_) => "setup sources".into(),
+            Value::SharedCaps(_) => "shared caps".into(),
         }
     }
 }

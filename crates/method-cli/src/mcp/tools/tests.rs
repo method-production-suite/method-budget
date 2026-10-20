@@ -1756,6 +1756,79 @@ fn incentives_estimate_programs_by_location() {
     );
 }
 
+/// A minimum spend, a broker's fee and a cap shared by two programs
+/// (decisions.md, entry 88), through `set_credit`, `list_charges` and
+/// `incentives`.
+#[test]
+fn set_credit_takes_a_minimum_a_fee_and_a_shared_cap() {
+    let mut f = Fixture::new("incentive-terms", false);
+    let row = json!([{"source": {"kind": "flat", "amount": 1000}, "percent": 25}]);
+    err_contains(
+        f.tool(
+            "set_credit",
+            json!({"path": "film.mthd", "name": "A", "shared_cap": "State", "rows": row}),
+        ),
+        "needs an amount",
+    );
+    // 250.00 and 250.00 under a shared 300.00: 150.00 each.
+    f.tool(
+        "set_credit",
+        json!({"path": "film.mthd", "name": "A", "applied": false, "shared_cap": "State",
+               "shared_cap_amount": 300, "broker_fee": 10, "rows": row}),
+    )
+    .unwrap();
+    f.tool(
+        "set_credit",
+        json!({"path": "film.mthd", "name": "B", "applied": false, "shared_cap": "State",
+               "minimum_spend": 2000, "rows": row}),
+    )
+    .unwrap();
+    let cr = f
+        .tool("list_charges", json!({"path": "film.mthd"}))
+        .unwrap();
+    let a = cr["credits"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "A")
+        .unwrap();
+    assert_eq!(a["shared_cap"], "State");
+    assert_eq!(a["shared_cap_cents"], 30_000);
+    assert_eq!(a["broker_fee_cents"], 1_000);
+
+    // Unapplied, each is estimated as if applied beside the applied ones
+    // (none), so each alone is within 300.00; B is below its minimum.
+    let got = f.tool("incentives", json!({"path": "film.mthd"})).unwrap();
+    let find = |got: &Value, n: &str| {
+        got["programs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["name"] == n)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(find(&got, "A")["amount"], 24_000);
+    assert_eq!(find(&got, "B")["amount"], 0);
+    assert_eq!(find(&got, "B")["figures"]["below_minimum"], true);
+
+    // B's minimum taken off and both applied: they share the cap.
+    f.tool(
+        "set_credit",
+        json!({"path": "film.mthd", "name": "B", "applied": true, "minimum_spend": null}),
+    )
+    .unwrap();
+    f.tool(
+        "set_credit",
+        json!({"path": "film.mthd", "name": "A", "applied": true}),
+    )
+    .unwrap();
+    let got = f.tool("incentives", json!({"path": "film.mthd"})).unwrap();
+    assert_eq!(find(&got, "A")["figures"]["shared"], 15_000);
+    assert_eq!(find(&got, "A")["amount"], 14_000);
+    assert_eq!(find(&got, "B")["amount"], 15_000);
+}
+
 #[test]
 fn review_comments_are_listed_at_their_places() {
     use method_session::review as rv;
