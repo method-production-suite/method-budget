@@ -56,7 +56,7 @@ is a file you own.
   fringes, cutoffs and rounding steps that make it up. Money is kept in whole cents, so
   the topsheet always adds up.
 - **Bring your budgets with you.** Open the budget exports other budgeting tools write
-  (JSON, XML, Excel or tab-delimited), department spreadsheets and accounting exports.
+  (JSON, XML, .xlsx spreadsheet or tab-delimited), department spreadsheets and accounting exports.
   Each import is checked figure by figure against the totals in the file. See
   [Importing](#importing).
 - **Your budget is an open file.** Budgets are `.mthd` files: plain, documented JSON
@@ -150,7 +150,7 @@ this section.
 
 ### Actuals and cost reports
 
-- **Import actuals.** Bring in transactions from CSV, tab-delimited or Excel accounting exports with a column mapping, duplicate checks and a review of unknown accounts.
+- **Import actuals.** Bring in transactions from CSV, tab-delimited or spreadsheet (.xlsx) accounting exports with a column mapping, duplicate checks and a review of unknown accounts.
 - **Cost report.** Budget, actual to date, estimate to complete and variance by account, with each account's estimate method your choice.
 
 ### Reports, PDF and spreadsheets
@@ -158,9 +158,9 @@ this section.
 - **Reports saved in the budget.** Pick sections, accounts and layout, save them as named presets with header and footer fields, and print straight to PDF.
 - **Live preview.** The setup dialog shows the printed pages as you change them, with page navigation and a jump list of sections.
 - **More than the topsheet.** Category summaries, account detail, setup tables, chart of accounts, group totals, budget information and a notes list.
-- **Spreadsheet export.** One Excel workbook with topsheet, accounts, detail and setup tables, plus CSV and tab-delimited files for accounting.
-- **Spreadsheet import.** Turn any department's Excel, CSV or tab-delimited sheet into budget lines with a column mapping and a line-by-line check of the totals.
-- **Import from other budgeting apps.** Open a budget from another program's JSON, XML, Excel or tab-delimited export, with a line-by-line check against that program's own totals.
+- **Spreadsheet export.** One spreadsheet (.xlsx) with topsheet, accounts, detail and setup tables, plus CSV and tab-delimited files for accounting.
+- **Spreadsheet import.** Turn any department's spreadsheet (.xlsx), CSV or tab-delimited file into budget lines with a column mapping and a line-by-line check of the totals.
+- **Import from other budgeting apps.** Open a budget from another program's JSON, XML, spreadsheet (.xlsx) or tab-delimited export, with a line-by-line check against that program's own totals.
 
 ### Setup library and templates
 
@@ -284,9 +284,9 @@ native files ([CLEAN-ROOM.md](CLEAN-ROOM.md)).
 
 | From | Formats | What comes across |
 |---|---|---|
-| Other budgeting software | JSON (best), XML Advanced, Excel, XML Basic, tab-delimited | Accounts, lines, fringes, globals, groups, charges and credits; Basic XML has no groups or globals, tab-delimited has account totals only |
-| Any spreadsheet | Excel, CSV, tab-delimited | Budget lines, with a column mapping |
-| Accounting systems | Excel, CSV, tab-delimited | Actuals for cost reports, with a column mapping |
+| Other budgeting software | JSON (best), XML Advanced, .xlsx spreadsheet, XML Basic, tab-delimited | Accounts, lines, fringes, globals, groups, charges and credits; Basic XML has no groups or globals, tab-delimited has account totals only |
+| Any spreadsheet | .xlsx, CSV, tab-delimited | Budget lines, with a column mapping |
+| Accounting systems | .xlsx, CSV, tab-delimited | Actuals for cost reports, with a column mapping |
 | Another Method budget | `.mthd` | Fringes, globals, charges, credits and other setup |
 
 In the app: **File > Import Budget Export…**. From the terminal:

@@ -312,7 +312,7 @@ ref = ["3.4", "D41"]
 [[feature]]
 group = "actuals"
 title = "Import actuals"
-text = "Bring in transactions from CSV, tab-delimited or Excel accounting exports with a column mapping, duplicate checks and a review of unknown accounts."
+text = "Bring in transactions from CSV, tab-delimited or spreadsheet (.xlsx) accounting exports with a column mapping, duplicate checks and a review of unknown accounts."
 status = "have"
 ref = ["3.7", "D45"]
 
@@ -349,14 +349,14 @@ ref = ["2.5", "D33"]
 [[feature]]
 group = "reports"
 title = "Spreadsheet export"
-text = "One Excel workbook with topsheet, accounts, detail and setup tables, plus CSV and tab-delimited files for accounting."
+text = "One spreadsheet (.xlsx) with topsheet, accounts, detail and setup tables, plus CSV and tab-delimited files for accounting."
 status = "have"
 ref = ["2.1", "D30"]
 
 [[feature]]
 group = "reports"
 title = "Spreadsheet import"
-text = "Turn any department's Excel, CSV or tab-delimited sheet into budget lines with a column mapping and a line-by-line check of the totals."
+text = "Turn any department's spreadsheet (.xlsx), CSV or tab-delimited file into budget lines with a column mapping and a line-by-line check of the totals."
 status = "have"
 ref = ["2.2", "D36"]
 
@@ -365,7 +365,7 @@ ref = ["2.2", "D36"]
 [[feature]]
 group = "reports"
 title = "Import from other budgeting apps"
-text = "Open a budget from another program's JSON, XML, Excel or tab-delimited export, with a line-by-line check against that program's own totals."
+text = "Open a budget from another program's JSON, XML, spreadsheet (.xlsx) or tab-delimited export, with a line-by-line check against that program's own totals."
 status = "have"
 ref = ["1.16", "D59"]
 
