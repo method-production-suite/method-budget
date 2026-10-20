@@ -183,6 +183,9 @@ pub fn sample() -> Budget {
         discount_percent: d("10"),
         excluded_fringes: BTreeSet::new(),
         locations: BTreeSet::new(),
+        minimum_spend: None,
+        broker_fee: 0,
+        shared_cap: None,
         rows: vec![
             CreditRow {
                 description: "Qualified labor".into(),
@@ -335,6 +338,9 @@ pub fn rich() -> Budget {
         discount_percent: Dec::ZERO,
         excluded_fringes: set(&["FICA", "PH"]),
         locations: BTreeSet::new(),
+        minimum_spend: None,
+        broker_fee: 0,
+        shared_cap: None,
         rows: vec![
             CreditRow {
                 description: "Spend cap".into(),
@@ -360,6 +366,9 @@ pub fn rich() -> Budget {
         discount_percent: d("2.5"),
         excluded_fringes: BTreeSet::new(),
         locations: BTreeSet::new(),
+        minimum_spend: None,
+        broker_fee: 0,
+        shared_cap: None,
         rows: vec![],
     });
 

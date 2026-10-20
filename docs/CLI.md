@@ -122,11 +122,15 @@ method-budget totals film.mthd | awk -F'\t' '$1 == "net_total" { print $2 }'
 
 ### `method-budget incentives <file.mthd> [--json]`
 
-Incentive estimates (roadmap 3.6; decisions.md, entry 80). Plain output is one
+Incentive estimates (roadmap 3.6; decisions.md, entries 80 and 88). Plain output is one
 tab-separated line each, exact decimals: the spend at each location (its lines, the
 fringes they earn, the total; `(none)` for lines with no location), then every credit as
 a program, applied or not (`applied` or `estimate`, the qualified spend, the credit after
-its caps and discount, and the locations its spend has to be at). A credit that can't be
+its minimum spend, caps, discount and broker's fee, and the locations its spend has to be
+at), with a last column when one of these applies: `below the minimum spend of …`,
+`shared cap NAME: SHARE of AMOUNT` (its share when a cap it shares with other credits
+holds it down) and `less a … broker's fee`, joined with `; `. An unapplied credit is
+worked out as if it were applied alongside the applied ones. A credit that can't be
 worked out says `problem` and why. Every program and rate is the user's; nothing about a
 real program is built in.
 
@@ -135,11 +139,14 @@ location	Cold Spring field station	7400.00	0.00	7400.00
 location	Hollins Ridge fire road	1280.00	0.00	1280.00
 location	(none)	288695.00	59914.92	348609.92
 program	Station program	estimate	7400.00	1850.00	Cold Spring field station
+program	Ridge program	estimate	1280.00	0.00	Hollins Ridge fire road	below the minimum spend of 5000.00
 ```
 
 `--json` prints `locations` (`location`, `known`, `lines`, `fringes`, `total`) and
-`programs` (`index`, `name`, `applied`, `locations`, `cap`, `discount_percent`, `amount`,
-`problem`, `qualified`, `by_location`, `rows_total`, `capped`, `figures`), money in
+`programs` (`index`, `name`, `applied`, `locations`, `cap`, `discount_percent`,
+`minimum_spend`, `broker_fee`, `shared_cap`, `shared_cap_amount`, `amount`, `problem`,
+`qualified`, `by_location`, `rows_total`, `capped`, `figures` with `below_minimum`,
+`shared` and `fee`), money in
 integer cents, as the app's `incentives` command returns it (docs/APP.md).
 
 ### `method-budget export <file.mthd> --xlsx|--csv|--tsv <path> [--bom]`

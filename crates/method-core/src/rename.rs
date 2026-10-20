@@ -686,6 +686,9 @@ mod tests {
             discount_percent: Dec::ZERO,
             excluded_fringes: ["PEN".to_string()].into(),
             locations: BTreeSet::new(),
+            minimum_spend: None,
+            broker_fee: 0,
+            shared_cap: None,
             rows: vec![CreditRow {
                 description: String::new(),
                 source: CreditSource::Group {

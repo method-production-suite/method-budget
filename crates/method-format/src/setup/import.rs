@@ -564,8 +564,25 @@ fn describe_credit(c: &Credit) -> String {
     } else {
         String::new()
     };
+    let minimum = c
+        .minimum_spend
+        .map(|m| format!("minimum spend {}", clipboard::money(m)))
+        .unwrap_or_default();
+    let fee = if c.broker_fee == 0 {
+        String::new()
+    } else {
+        format!("{} fee", clipboard::money(c.broker_fee))
+    };
+    let shared = c
+        .shared_cap
+        .as_ref()
+        .map(|n| format!("shares the cap {n}"))
+        .unwrap_or_default();
     let applied = if c.applied { "applied" } else { "not applied" }.to_string();
-    join(vec![rows, cap, discount, row_caps, applied], "")
+    join(
+        vec![rows, cap, discount, row_caps, minimum, fee, shared, applied],
+        "",
+    )
 }
 
 fn describe_tags(t: &method_core::TagPreset) -> String {
@@ -1138,6 +1155,14 @@ pub fn import(
                     .iter()
                     .map(|l| clipboard::renamed(&renames.locations, l))
                     .collect();
+                // A shared cap the budget doesn't have comes with the
+                // credit; one it has keeps its amount (decisions.md, entry
+                // 88).
+                if let Some(cap) = c.shared_cap.as_ref() {
+                    if let Some(amount) = src.shared_caps.get(cap) {
+                        b.shared_caps.entry(cap.clone()).or_insert(*amount);
+                    }
+                }
                 match b.credits.iter().position(|x| x.name == to) {
                     Some(i) => b.credits[i] = c,
                     None => b.credits.push(c),

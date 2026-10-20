@@ -265,6 +265,9 @@ fn gen_credit(rng: &mut Rng) -> Credit {
         discount_percent: rng.dec(),
         excluded_fringes: rng.texts(),
         locations: rng.texts(),
+        minimum_spend: rng.chance(30).then(|| rng.cents()),
+        broker_fee: if rng.chance(30) { rng.cents() } else { 0 },
+        shared_cap: rng.opt_text(),
         rows: (0..rng.below(4))
             .map(|_| CreditRow {
                 description: rng.text(),
@@ -453,6 +456,9 @@ fn gen_content(rng: &mut Rng) -> Budget {
     }
     b.charges = (0..rng.below(4)).map(|_| gen_charge(rng)).collect();
     b.credits = (0..rng.below(3)).map(|_| gen_credit(rng)).collect();
+    b.shared_caps = (0..rng.below(3))
+        .map(|_| (rng.text(), rng.cents()))
+        .collect();
     if rng.chance(60) {
         b.baseline = Some(Baseline {
             rows: (0..rng.below(5))

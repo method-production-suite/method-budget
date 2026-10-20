@@ -24,7 +24,8 @@ use serde::{Deserialize, Serialize};
 use crate::dto::{
     FileBaseline, FileBudget, FileCoding, FileDisplay, FileFringeRow, FileGroupRules, FileInfo,
     FileItemSource, FileLinePreset, FileNewLineDefaults, FileOtPattern, FilePosting,
-    FileRateSource, FileRateTable, FileReportPreset, FileSetupOrder, FileSnapshot, FileTagPreset,
+    FileRateSource, FileRateTable, FileReportPreset, FileSetupOrder, FileSharedCap, FileSnapshot,
+    FileTagPreset,
 };
 use crate::fsio::{read_capped, read_to_string_capped, MAX_READ_BYTES};
 
@@ -520,6 +521,12 @@ pub fn value_to_json(v: &Value) -> serde_json::Value {
                 })
                 .collect::<BTreeMap<_, _>>(),
         ),
+        Value::SharedCaps(m) => tagged(
+            "shared_caps",
+            m.iter()
+                .map(|(n, a)| (n.clone(), FileSharedCap { amount: *a }))
+                .collect::<BTreeMap<_, _>>(),
+        ),
     }
 }
 
@@ -610,6 +617,10 @@ pub fn value_from_json(v: serde_json::Value) -> Result<Value, String> {
                             })
                             .collect(),
                     ))
+                }
+                "shared_caps" => {
+                    let m: BTreeMap<String, FileSharedCap> = from_json(&key, v)?;
+                    Value::SharedCaps(m.into_iter().map(|(n, c)| (n, c.amount)).collect())
                 }
                 other => return Err(format!("unknown value type {other:?}")),
             })
@@ -1956,6 +1967,7 @@ mod tests {
             Value::SetupOrder(b.setup_order.clone()),
             Value::SetupFolders(b.setup_folders.clone()),
             Value::SetupSources(b.setup_sources.clone()),
+            Value::SharedCaps([("State".to_string(), 50_000)].into()),
         ];
         for v in values {
             let j = value_to_json(&v);

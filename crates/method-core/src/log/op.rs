@@ -395,14 +395,20 @@ pub enum Field {
     Person,
     // Added by entry 80 (a credit's locations), after entry 79's.
     Locations,
+    // Added by entry 88 (a credit's minimum spend, broker's fee and shared
+    // cap, and the budget's shared caps), after entry 80's.
+    MinimumSpend,
+    BrokerFee,
+    SharedCap,
+    SharedCaps,
     // Added by entry 90 (rate tables and a row's rate source), after
-    // entry 80's.
+    // entry 88's.
     RateTables,
     RateSource,
 }
 
 impl Field {
-    pub const ALL: [Field; 99] = [
+    pub const ALL: [Field; 103] = [
         Field::Name,
         Field::Code,
         Field::Description,
@@ -500,6 +506,10 @@ impl Field {
         Field::RoundAccountTotals,
         Field::Person,
         Field::Locations,
+        Field::MinimumSpend,
+        Field::BrokerFee,
+        Field::SharedCap,
+        Field::SharedCaps,
         Field::RateTables,
         Field::RateSource,
     ];
@@ -604,6 +614,10 @@ impl Field {
             Field::RoundAccountTotals => "round_account_totals",
             Field::Person => "person",
             Field::Locations => "locations",
+            Field::MinimumSpend => "minimum_spend",
+            Field::BrokerFee => "broker_fee",
+            Field::SharedCap => "shared_cap",
+            Field::SharedCaps => "shared_caps",
             Field::RateTables => "rate_tables",
             Field::RateSource => "rate_source",
         }
@@ -666,6 +680,8 @@ pub enum Value {
     SetupOrder(crate::order::SetupOrder),
     SetupFolders(crate::folders::SetupFolders),
     SetupSources(crate::pack::SetupSources),
+    /// The budget's shared caps, by name (decisions.md, entry 88).
+    SharedCaps(std::collections::BTreeMap<String, crate::Cents>),
 }
 
 impl Value {
@@ -750,6 +766,7 @@ impl Value {
             Value::SetupOrder(_) => "setup order".into(),
             Value::SetupFolders(_) => "setup folders".into(),
             Value::SetupSources(_) => "setup sources".into(),
+            Value::SharedCaps(_) => "shared caps".into(),
         }
     }
 }

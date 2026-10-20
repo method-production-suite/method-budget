@@ -890,8 +890,32 @@ pub(crate) fn credit_fields(c: &Credit) -> Vec<Field> {
         ),
         names("excluded_fringes", "excluded fringes", &c.excluded_fringes),
         names("locations", "locations", &c.locations),
+        text(
+            "minimum_spend",
+            "minimum spend",
+            c.minimum_spend.map_or("none".into(), money),
+        ),
+        text("broker_fee", "broker's fee", money(c.broker_fee)),
+        text("shared_cap", "shared cap", opt_text(&c.shared_cap)),
         text("rows", "rows", credit_rows_text(c)),
     ]
+}
+
+/// A shared cap's one field, its amount (decisions.md, entry 88).
+pub(crate) fn shared_cap_fields(amount: Cents) -> Vec<Field> {
+    vec![text("amount", "amount", money(amount))]
+}
+
+/// The budget's shared caps in a few words: `State 500,000.00; Region
+/// 100,000.00`, or `none`.
+pub(crate) fn shared_caps_text(m: &BTreeMap<String, Cents>) -> String {
+    if m.is_empty() {
+        return "none".into();
+    }
+    m.iter()
+        .map(|(n, v)| format!("{} {}", quoted(n), money(*v)))
+        .collect::<Vec<_>>()
+        .join("; ")
 }
 
 pub(crate) fn coding_text(c: &AccountCoding) -> String {
@@ -1048,6 +1072,11 @@ pub(crate) fn setting_fields(b: &Budget) -> Vec<Field> {
             "new_line_defaults",
             "new lines copy",
             defaults_text(&b.new_line_defaults),
+        ),
+        text(
+            "shared_caps",
+            "shared caps",
+            shared_caps_text(&b.shared_caps),
         ),
         text("baseline", "original totals", baseline_text(&b.baseline)),
         text("actuals", "actuals", actuals_text(&b.actuals)),

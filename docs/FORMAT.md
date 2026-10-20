@@ -129,6 +129,7 @@ Fields in written order:
 | `topsheet`        | list of [topsheet rows](#topsheet-row) | Categories and production totals, in display order. |
 | `charges`         | list of [charges](#charge) | Contractual charges, in the order they were made (charges never apply to each other, so the order changes no figure). The topsheet lists them newest first, the reverse of this list. |
 | `credits`         | list of [credits](#credit) | Applied credits (incentives), in application order. The topsheet lists them in reverse, then their subtotal when there are two or more. |
+| `shared_caps`     | map of [shared caps](#shared-cap) | Caps several credits share, keyed by name (`docs/decisions.md`, entry 88). Left out when there are none. |
 | `baseline`        | [baseline](#baseline) | Frozen totals for comparison. Left out when there is none. |
 | `actuals`         | [actuals](#actuals) | Actual costs from accounting and estimates to complete. Left out when there are none. |
 | `display`         | [display settings](#display-settings) | How numbers show on screen. Left out when every setting is the default. |
@@ -550,11 +551,58 @@ catch it).
 | `discount_percent` | decimal, default `"0"` | Taken off after the cap (`"5"` is 5%). |
 | `excluded_fringes` | name set, default empty | Fringes left out of the spend of every `group`, `category` and `account` row (one list per credit; `docs/decisions.md`, entries 57 and 61). A typed `flat` amount has no fringes, so it is unaffected. |
 | `locations`        | name set, default empty | Location names. When not empty, every `group`, `category` and `account` row counts only the lines and adjustment rows whose `location` is one of these, with the fringes they earn; a typed `flat` amount is unaffected. Empty counts every line, wherever it is, as before (`docs/decisions.md`, entry 80). A name the budget's `locations` don't have is kept, and `method-budget check` warns. |
+| `minimum_spend`    | optional cents | The qualified spend below which the credit is 0: the rows' net spend added up (typed amounts included), after `locations` and `excluded_fringes`, before any cap. A spend at the minimum qualifies. Left out when there is none (`docs/decisions.md`, entry 88). |
+| `broker_fee`       | cents, default `0` | A flat fee taken off after the caps and `discount_percent`, never taking the credit below 0 (a fee larger than the credit leaves 0). Left out when `0`. |
+| `shared_cap`       | optional text | The name of a cap in the budget's [`shared_caps`](#shared-cap) this credit shares with other credits. A name the budget doesn't have holds nothing down, and `method-budget check` warns. Left out when there is none. |
 | `rows`             | list of [credit rows](#credit-row) | |
 
 A credit is also how an incentive program is modeled (roadmap 3.6): every rate, cap and
 qualifying group, category or account is the user's, and with `applied` off the credit is
 an estimate the topsheet leaves out.
+
+A credit is worked out in this order (`docs/decisions.md`, entries 80 and 88): each row's
+percent of its net spend under the row's cap; the rows added up; 0 when the qualified
+spend is below `minimum_spend`; the credit's `cap`; its share of its shared cap; less
+`discount_percent`; rounded once to the cent; less `broker_fee`, not below 0.
+
+```json
+{
+  "name": "Ridge county program",
+  "applied": false,
+  "locations": ["Ridge"],
+  "minimum_spend": 25000000,
+  "broker_fee": 150000,
+  "shared_cap": "State pool",
+  "rows": [
+    {
+      "description": "Qualified spend",
+      "source": { "kind": "category", "category": "2100" },
+      "percent": "25"
+    }
+  ]
+}
+```
+
+The three fields are written in that order, after `locations` and before `rows`.
+
+### Shared cap
+
+A cap several credits share (`docs/decisions.md`, entry 88), in the budget's `shared_caps`
+map under its name, which credits give in `shared_cap`:
+
+```json
+"shared_caps": { "State pool": { "amount": 500000000 } }
+```
+
+| Field    | Type | Notes |
+|----------|------|-------|
+| `amount` | cents, **required** | What the applied credits naming this cap come to together, at most. |
+
+When the applied credits naming a cap come to more than it after their own caps (counting
+only those worth more than 0), each gets a share of it in proportion to its figure,
+rounded down to the cent; the cents left go one each to the largest remainders, then in
+credit name order, so the shares add up to the cap exactly whatever the order of the
+credits. Each credit then takes its discount and fee off its own share.
 
 ### Credit row
 
@@ -1358,6 +1406,14 @@ valid. Loading and saving it in Method Budget normalizes it.
   when empty, so a log whose credits have none stays readable by 0.3.0; a set a record
   leaves out counts as empty when the log records an edit. It is a weak reference: deleting
   a location never brings it back, and the credit keeps its name.
+- Version 1, additive (2026-10): credit `minimum_spend`, `broker_fee` and `shared_cap`,
+  and budget [`shared_caps`](#shared-cap) (decisions.md, entry 88). Each is left out at its
+  default (no minimum, no fee, no shared cap, no shared caps), which is what a file without
+  them means, so existing files are unchanged byte for byte. An older reader refuses a
+  file that uses them (an unknown field), so it never misreads one. The change log writes
+  them only when set: a credit's `minimum_spend`, `broker_fee` and `shared_cap` and the
+  root's `shared_caps` (a value tagged `shared_caps`; field names added at the end of the
+  list), so a log of a budget that doesn't use them stays readable by older versions.
 - Version 1, additive (2026-10): budget [`rate_tables`](#rate-table) (written after
   `ot_patterns`), detail row and line block row [`rate_source`](#rate-source) (written
   after `person`) and setup folders and sources for `rate_table` (decisions.md, entry 90).
@@ -1693,9 +1749,14 @@ fields of `root`: `title`, `base_currency`, `totals_currency`, `fringe_posting`,
 `tag_presets`, `line_presets`, `setup_order`, `setup_folders`, `setup_sources`,
 `ot_patterns`, `baseline` and `round_account_totals` (always written; a log from before
 reads as `false`). A row's `person` is written only when set, as in the `.mthd`;
-clearing it is a write of `null`, and a log without it reads as no person. The same goes
-for `root`'s `rate_tables` (written only when there are any, the whole list as one value)
-and a row's `rate_source` (decisions.md, entry 90). The provenance is about one file and is not logged.
+clearing it is a write of `null`, and a log without it reads as no person. Likewise a
+credit's `minimum_spend`, `broker_fee` (an integer of cents) and `shared_cap` (the cap's
+name, as text: shared caps are a setting, not entities) and the root's `shared_caps` (a
+value tagged `shared_caps`, the `.mthd`'s map of `{amount}`; one register, so two people
+changing shared caps at once keep the later change) are written only when set and cleared
+with `null` (decisions.md, entry 88). The same goes for `root`'s `rate_tables` (written
+only when there are any, the whole list as one value) and a row's `rate_source`
+(decisions.md, entry 90). The provenance is about one file and is not logged.
 
 ### Reading rules
 

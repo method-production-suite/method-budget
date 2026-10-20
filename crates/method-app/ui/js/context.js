@@ -381,6 +381,10 @@ function accountItems(onRow) {
     cmd('edit.note', 'Add note…'),
     cmd('edit.delete_rows', 'Delete account'),
     ...moveItems(),
+    SEP,
+    cmd('file.sub_budget_from_row', 'New Sub-Budget from This Account', {
+      title: 'This account, its lines and the setup they use, as a separate budget',
+    }),
     ...presetItems(false),
   ];
 }
@@ -407,6 +411,11 @@ function topsheetItems(onRow) {
     cmd('edit.delete_rows', category ? 'Delete category…' : 'Delete production total'),
     ...moveItems(),
     SEP,
+    category
+      ? cmd('file.sub_budget_from_row', 'New Sub-Budget from This Category', {
+          title: 'This category, its accounts and lines and the setup they use, as a separate budget',
+        })
+      : null,
     ...setup,
     ...(category ? presetItems(false) : []),
   ];

@@ -230,6 +230,9 @@ mod tests {
             discount_percent: Dec::ZERO,
             excluded_fringes: ["KIT".to_string()].into(),
             locations: BTreeSet::new(),
+            minimum_spend: None,
+            broker_fee: 0,
+            shared_cap: None,
             rows: vec![method_core::CreditRow {
                 description: "Labor".into(),
                 source: CreditSource::Group { group: "OT".into() },
@@ -354,6 +357,33 @@ mod tests {
         assert!(s.undo(), "one undo step");
         assert_eq!(s.budget(), &before);
         assert!(!s.can_undo());
+    }
+
+    /// A credit's shared cap comes with it when this budget doesn't have
+    /// one of that name; one it has keeps its amount (decisions.md, entry
+    /// 88).
+    #[test]
+    fn a_credits_shared_cap_comes_with_it_unless_this_budget_has_one() {
+        let mut src = source();
+        src.credits[0].shared_cap = Some("Pool".into());
+        src.credits[0].minimum_spend = Some(10_000);
+        src.credits[0].broker_fee = 500;
+        src.shared_caps.insert("Pool".into(), 70_000);
+        let mut b = starter::budget();
+        import(&mut b, &src, &[pick("credit", "State")], &[]).unwrap();
+        assert_eq!(b.shared_caps.get("Pool"), Some(&70_000));
+        let c = &b.credits[0];
+        assert_eq!(
+            (c.minimum_spend, c.broker_fee, c.shared_cap.as_deref()),
+            (Some(10_000), 500, Some("Pool"))
+        );
+        let described = describe(&src, What::Credit, "State");
+        assert!(described.contains("shares the cap Pool"), "{described}");
+
+        let mut b = starter::budget();
+        b.shared_caps.insert("Pool".into(), 20_000);
+        import(&mut b, &src, &[pick("credit", "State")], &[]).unwrap();
+        assert_eq!(b.shared_caps.get("Pool"), Some(&20_000));
     }
 
     fn conflicted() -> Budget {

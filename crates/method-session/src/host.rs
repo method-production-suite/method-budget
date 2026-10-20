@@ -168,6 +168,7 @@ pub const COMMANDS: &[&str] = &[
     "share_copy_original",
     "share_copy_store",
     "sub_budget_new",
+    "sub_budget_from_row",
     // Setup packs (into and out of a budget; the library is the desktop's)
     "pack_items",
     "pack_export",

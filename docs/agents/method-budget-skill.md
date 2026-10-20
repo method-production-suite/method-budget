@@ -39,7 +39,8 @@ It assumes the `method` MCP server is registered (docs/MCP.md):
   out on request (`exclude_groups`).
 - **Charges.** Applied after the topsheet: contingency, fees, insurance as a percent of ATL plus
   BTL (with exclusions), or a flat amount. **Credits** are incentives taken off at the end:
-  a percent of a group's spend or of a flat amount, with caps and a discount. The **grand
+  a percent of a group's spend or of a flat amount, with caps and a discount, and optionally
+  a minimum spend, a flat broker's fee and a cap shared with other credits. The **grand
   total** includes charges; the **net total** is after credits.
 - **Currencies.** Lines may be in a foreign currency; its rate is base-currency units per one
   of it.

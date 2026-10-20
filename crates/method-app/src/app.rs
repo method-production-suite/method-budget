@@ -1410,6 +1410,10 @@ pub fn run() {
             crate::start::start_pin,
             crate::start::start_forget,
             crate::start::start_reveal,
+            crate::start::start_duplicate,
+            crate::start::start_add_project,
+            crate::start::start_remove_project,
+            crate::start::start_project_folder,
             crate::start::new_budget_pick_template,
             crate::start::new_budget_create,
             crate::start::new_budget_folder,
@@ -1457,6 +1461,7 @@ pub fn run() {
             crate::sharing::share_copy_original,
             crate::sharing::share_copy_store,
             crate::sharing::sub_budget_new,
+            crate::sharing::sub_budget_from_row,
             // Working together through a shared folder (src/shared_app.rs)
             crate::shared_app::share_status,
             crate::shared_app::share_setup,

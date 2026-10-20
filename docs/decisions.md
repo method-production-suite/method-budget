@@ -4271,6 +4271,109 @@ From 0.6.0 the Mac app holds both Intel and Apple silicon code.
 - **Not checked here.** A real Intel Mac: installing 0.6.0, and a copy of 0.2 updating to it,
   is on the owner's list.
 
+## 88. Incentive programs: a minimum spend, a flat broker's fee and caps shared by programs (2026-10-20)
+
+Roadmap 3.6, second slice, on entry 80's model: a program is still a credit, worked out by
+the topsheet's own code, rounded once. Three optional terms join it. Behavior: docs/APP.md,
+"Incentive programs"; file: docs/FORMAT.md, "Credit" and "Shared cap"; command line:
+docs/CLI.md, `method-budget incentives`; MCP: `set_credit`, `list_charges`, `incentives`.
+
+- **The order.** A credit is worked out as: each row's percent of its net spend under the
+  row's cap; the rows added up; 0 when the qualified spend is below the minimum; the
+  credit's own cap; its share of a shared cap; less the discount; rounded once to the cent;
+  less the broker's fee, never below zero.
+- **A minimum spend compares the spend the program counts.** `minimum_spend` is checked
+  against the qualified spend: the rows' net spend added up (typed amounts included), after
+  the credit's locations and excluded fringes, before any cap on the spend, the rows or the
+  credit. A spend at the minimum qualifies; one cent under pays nothing, whatever the caps.
+  Before caps, because a cap on the spend limits what the percent applies to, not what was
+  spent, and a threshold in a program's rules is about what the production spends there.
+  The credit's figures say `below_minimum`, Explain names the spend and the minimum, the
+  footer says "Minimum: Not met", Programs side by side says "Below minimum", and
+  `method-budget incentives` adds "below the minimum spend of …". A credit below its
+  minimum takes no share of a shared cap (it counts as 0 there).
+- **A broker's fee comes off last.** `broker_fee` is a flat amount taken off after the
+  caps, the shared cap and the percentage discount, from the rounded figure. The fee is
+  whole cents, so taking it off after the one rounding adds no rounding of its own. A fee
+  larger than the credit leaves 0, never less: the fee taken is the credit (the figures
+  say how much was taken). A credit of 0 or less pays no fee.
+- **A shared cap is a named amount in the budget.** `shared_caps` is a map of name to
+  `{amount}` beside the credits, and a credit joins one with `shared_cap`. One amount in
+  one place, so two credits can never disagree about it. Changing it on any credit sharing
+  it changes it for all; a new shared cap needs an amount; typing a new name in the app
+  keeps the amount shown; a shared cap no credit names any more goes when a credit is
+  saved or deleted. It is a setting, not a setup kind: no library, folders or packs, and no
+  rename command (a credit's name for it is changed credit by credit). A name the budget
+  doesn't have holds nothing down, and `method-budget check` warns.
+- **Own cap first, then the shared cap, shared in proportion.** The applied credits naming
+  one shared cap are worked out to their own caps and rounded to the cent. When the ones
+  worth more than 0 come to more than the shared cap, each of them gets the cap times its
+  figure over their sum, rounded down to the cent; the cents left (fewer than the number
+  of credits) go one each to the largest remainders, then in credit name order, then list
+  order for two credits with one name. So the shares add up to the cap exactly, and
+  neither the order of the credits nor the order of the lines changes a share. Integer
+  arithmetic on cents gives the same shares in exact and binary arithmetic. A credit worth
+  0 or less keeps its figure. Each credit then takes its own discount and fee off its
+  share. **The one place a figure is rounded twice**: a credit held to a shared cap is a
+  whole-cent share before its discount, so the shares add up to the cap to the cent; a
+  shared cap that holds nothing down changes no figure and no rounding.
+- **An unapplied credit is estimated alongside the applied ones.** The topsheet shares a
+  cap among the applied credits only, so an unapplied credit still changes no figure.
+  Its estimate is its share were it applied too, beside the applied credits as they are,
+  so applying it takes off exactly its estimate (entry 80's promise), and may lower the
+  others' figures through the cap they share. The other way, every credit sharing as if
+  all were applied, would make an unapplied credit's estimate depend on other unapplied
+  credits and break that promise. For a credit without a shared cap nothing changes: its
+  estimate is the same applied or not.
+- **Built on the recommendation** (the owner can reverse each from the digest): the
+  minimum compares the qualified spend before caps; a shared cap is shared in proportion,
+  remainder cents by largest remainder then name; an unapplied credit is estimated
+  alongside the applied ones.
+- **The file: additive, version 1 kept.** `minimum_spend`, `broker_fee` and `shared_cap`
+  are written on a credit after `locations`, and `shared_caps` after `credits`, each only
+  when set, so every existing file reads and writes byte for byte as before (Field
+  Station is tested). Readers are strict: an older reader refuses a file using them with
+  an unknown-field error, so it can't misread one (drop the fee or the cap silently) and
+  no version bump is needed; a reader of version 1 that knows them reads every older file
+  unchanged. The change log writes a credit's three fields and the root's `shared_caps`
+  (a value tagged `shared_caps`) only when set and clears them with `null`; their field
+  names are added at the end of the list, so a log of a budget that doesn't use them stays
+  readable by older versions. The root's `shared_caps` is one register in the log (two
+  people changing shared caps at once keep the later change); `.mthd` merges take them
+  name by name.
+- **Everywhere a credit goes.** Explain (the minimum, the share with the cap and the
+  credits sharing it, the fee; it still adds up to the credit exactly); diff (the three
+  credit fields, and "shared caps" among the budget settings); merge (the three fields, and
+  shared caps name by name, a conflict when both sides change one's amount); setup import
+  (a credit's shared cap comes with it when the budget has none of that name; one it has
+  keeps its amount); setup sheets (Minimum Spend, Broker Fee, Shared Cap and Shared Cap
+  Amount columns on the credits sheet, repeated on each of a credit's rows; two rows that
+  disagree are an error); versions (shared caps are content, so versions carry them);
+  the change log; `method-budget incentives` (a note column); the MCP `set_credit`
+  (`minimum_spend`, `broker_fee`, `shared_cap`, `shared_cap_amount`), `list_charges` and
+  `incentives`; the browser build (the same `incentives` and `set_credit` commands); and
+  Budget Setup's Credits tab (a band of terms under Spend at these locations, the footer,
+  and Minimum, Shared cap and Fee columns in Programs side by side). Renames: nothing to
+  follow, since the terms name no setup item.
+- Tests: the rules by hand (method-core `incentives`: minimum below, at and above, after
+  the locations and before a spend cap and the credit's cap; a fee after the cap and
+  discount, larger than the credit, and below the minimum; a shared cap with one, two and
+  three programs, the remainder cent by largest remainder and by name in either order;
+  own cap then shared cap with the fee after the share; an unapplied program estimated
+  beside an applied one; a program below its minimum taking no share; a cap the budget
+  doesn't have; diff and merge); properties (shared caps never exceeded, adding up to the
+  cent with no discount or fee, never raising a program, order independent, no programs or
+  unapplied ones changing nothing, every estimate what applying takes off, Explain adding
+  up; random minimums and fees in the existing incentive properties); the format
+  (`credit_terms`: placement, left out when unset, the documented example, misspellings
+  refused, versions full and compact, Field Station byte for byte, the log on disk; random
+  terms in the format properties; the setup sheets round trip); the change log (written only
+  when set, cleared); `set_credit` in the app, the MCP and setup import; the command
+  line's note column.
+- **Not built** (3.6 stays partial): the what-if that moves lines between locations, an
+  unapplied credit's row figures in its rows table, and a per-location view in the printed
+  reports. The terms band needs a live check in the app.
+
 ## 90. Rate tables the user keeps, and filling a line's rate from one (2026-10-20, the owner's direction)
 
 Roadmap 3.9. The owner (relayed 2026-10-20): 3.9 is on the legal line, so build only the
@@ -4368,3 +4471,78 @@ docs/FORMAT.md, "Rate table" and "Rate source".
   and MCP end to end.
 - **Not checked here.** The tab, the picker and the import dialog in the running app need
   the owner's screen; they are on the owner's list.
+
+## 91. The start window and New Budget, the rest: projects, thumbnails, Duplicate, sub-budgets from a row, a linked schedule, shared badges, sorting (2026-10-20)
+
+Roadmap 3.19 (design: docs/research/new-project-window.md, sections 4, 5, 7, 8 and 9;
+behavior: docs/APP.md, "The start window and New Budget" and "Sharing copies and
+sub-budgets"). Phases so far: entries 63, 65 and 77. This builds every later item that
+doesn't wait on rate data; rates at creation come from 3.9 when it lands.
+
+- **A project is a folder, listed by the app.** Projects are paths in `start.json` (at most
+  50), shown down the start window's left under Pinned and recent, and read every time the
+  window lists: the folder and the folders directly in it, at most 300 files and folders,
+  hidden ones and `X.mthd-log` folders passed over. No index is kept that could drift from
+  the disk; budgets come through the summary cache like the other lists. What each file is
+  comes from its provenance (method-session's `projects`): budgets by title, each with
+  the sub-budgets and copies whose source title is its title under it, then the rest,
+  setup packs, schedule days files (a `.json` that says `method-schedule-days`) and
+  actuals exports (`.csv`, `.tsv`, `.xlsx` in an `actuals` folder). Add Folder…, New
+  Budget Here…, Show Folder and Remove from List (the folder is never touched).
+- **Built on the recommendation: New Budget makes the project folder.** The design said a
+  project is also "the folder a new budget is saved in", which would turn Documents into a
+  project. Instead Save In has **Make a project folder for it**, on by default (the choice
+  is remembered; off for New Budget Here): it makes `<folder>/<name>/`, saves
+  `<name>.mthd` in it, never over a folder or file of that name (a free name is offered),
+  and lists the folder. Reversible: the box's default, or listing every Save In folder.
+- **Templates aren't guessed** from "no lines": a budget just made from a chart has none
+  either. Setup packs show by their provenance.
+- **Thumbnails are bars from the totals.** One bar per category, in topsheet order, by its
+  share of what the categories come to (below zero counts as nothing); over 12 categories
+  the 11 largest keep their own bar in place and the rest share the last. Worked out with
+  the net total, kept with each file's summary in `start-cache.json` (now version 2, with
+  the kind and source title too; an older cache is read as empty) and read again only
+  when the file's modified time or size changes. Drawn as SVG shapes sized by attributes
+  (the page's CSP has no inline styles). Nothing from the screen, nothing in the budget.
+- **Duplicate is a byte copy beside the file** under the first free "Name 2", "Name 3"…,
+  written to a temporary file and linked into place so it never replaces a file, then
+  opened as a saved tab and listed in Open Recent. The file on disk, so a tab's unsaved
+  changes aren't in it; the title is unchanged; a change log isn't copied (the duplicate
+  is a budget of its own). A file that doesn't read as a budget is refused.
+- **New Sub-Budget from This Category or Account** (context menus of the topsheet and the
+  account list, so Shift+F10 reaches them) keeps exactly: the row (the category with its
+  accounts, or the account under its category) with every row in it and their notes and
+  tags; the setup those lines use and what that setup needs (fringes, globals with the
+  globals they name, units, groups, sets, locations, foreign currencies), anything else
+  pruned with its folder, order and source entries; the settings, budget info, display
+  settings and overtime patterns. It leaves out the other rows, charges and credits (they
+  work on the whole budget), tag, line and report presets, versions, the baseline and
+  actuals. So the row's totals are the same as in its parent (tested for every category
+  and account of the starter): the one exception is a fringe cutoff shared with lines
+  outside the row. Titled "Parent - Row", stamped as a sub-budget with "From category 21
+  Camera", and saved beside the parent's file under the first free name; a budget with no
+  file, and the browser build, open it in a new tab. Logic in
+  `method_session::sharing::make_row_sub_budget`.
+- **Link a Schedule… at New Budget** (with 3.8, entry 76): the days file's shoot days in all
+  go to `SHOOT_DAYS` with Import Schedule Days' own link (the global's setup source), its
+  prep start, shoot start, shoot end and wrap end to the budget info fields the budget
+  doesn't have yet, before the form's details so a typed value wins. No new field in the
+  budget file; the file's path and hash aren't kept (that was proposed in 3.8 as a format
+  change and stays a proposal). `method_session::new_budget::link_schedule`.
+- **Shared badges read, never write.** A budget with a change log folder beside it says
+  "shared" and lists up to five people from their heartbeats (`presence.json`), latest
+  first, one row per name, with the category or account they were in.
+- **Sorting is the page's**: last opened (as listed), name, last changed, net total,
+  kept per user; a row under a budget moves with it.
+- **Paths stay in Rust**: projects, their files and the duplicate's source are named by
+  tokens of the last listing, as before.
+- Tests: method-session's `projects` (thumbnails, kinds, arrangement, recognizing schedule
+  and actuals files, people), `sharing` (what a row's sub-budget carries and that its
+  totals match the row), `new_budget` (the linked schedule) and the host's
+  `sub_budget_from_row`; method-app's start tests (the project folder made and never over a
+  folder or file, Duplicate never over a file, thumbnails kept and read again when the
+  file changes, projects listed by folder, a large folder read to the limit, shared
+  badges, the linked schedule under typed values, the commands wired); and the browser
+  smoke opens a sub-budget from a category with Shift+F10 and checks its total.
+- **Not built**: rates at creation (3.9), created dates and hiding archived projects (design
+  phase 4), keeping a schedule link's path and hash, and a live check in the app.

@@ -201,6 +201,10 @@ const COMMANDS: &[&str] = &[
     "start_pin",
     "start_forget",
     "start_reveal",
+    "start_duplicate",
+    "start_add_project",
+    "start_remove_project",
+    "start_project_folder",
     "new_budget_pick_template",
     "new_budget_create",
     "new_budget_folder",
@@ -250,6 +254,7 @@ const COMMANDS: &[&str] = &[
     "share_copy_original",
     "share_copy_store",
     "sub_budget_new",
+    "sub_budget_from_row",
     // Working together through a shared folder (src/shared_app.rs)
     "share_status",
     "share_setup",

@@ -57,6 +57,9 @@ fn program(name: &str, locations: &[&str], source: CreditSource, percent: &str) 
         discount_percent: Dec::ZERO,
         excluded_fringes: Default::default(),
         locations: set(locations),
+        minimum_spend: None,
+        broker_fee: 0,
+        shared_cap: None,
         rows: vec![CreditRow {
             description: "Qualified spend".into(),
             source,
@@ -367,4 +370,354 @@ fn a_person_cutoff_fringe_counts_in_a_programs_location_like_any_fringe() {
     let e = explain::explain(&b, &RecalcOptions::default(), &explain::Target::Credit(0)).unwrap();
     assert_eq!(e.reported, 147_500);
     assert_eq!(e.root.amount, Some(147_500));
+}
+
+// ---------------------------------------------------------------------------
+// A minimum spend, a flat broker's fee and a cap shared by programs
+// (decisions.md, entry 88)
+
+/// A program paying `percent` of a typed amount of `spend`.
+fn typed(name: &str, spend: Cents, percent: &str) -> Credit {
+    program(name, &[], CreditSource::Flat(spend), percent)
+}
+
+fn amounts(got: &Incentives) -> Vec<Option<Cents>> {
+    got.programs.iter().map(|p| p.amount()).collect()
+}
+
+#[test]
+fn below_the_minimum_spend_a_program_pays_nothing_and_says_so() {
+    // At Ridge: 1,400.00 of spend at 25% is 350.00.
+    let ridge = |min: Option<Cents>| {
+        let mut p = program("Ridge program", &["Ridge"], cat("2100"), "25");
+        p.minimum_spend = min;
+        p
+    };
+    let mut b = budget();
+    b.credits = vec![
+        ridge(Some(140_001)),
+        ridge(Some(140_000)),
+        ridge(Some(100_000)),
+        ridge(None),
+    ];
+    for (i, c) in b.credits.iter_mut().enumerate() {
+        c.name = format!("P{i}");
+    }
+    let got = estimate(&b);
+    assert_eq!(
+        amounts(&got),
+        vec![Some(0), Some(35_000), Some(35_000), Some(35_000)]
+    );
+    let below = &got.programs[0];
+    let f = below.figures.as_ref().unwrap();
+    assert!(f.below_minimum);
+    assert_eq!(f.capped, Dec::ZERO);
+    assert_eq!(below.qualified, 140_000);
+    assert!(!below.capped, "the cap isn't what holds it down");
+    assert!(!got.programs[1].figures.as_ref().unwrap().below_minimum);
+
+    // Applied, the topsheet takes nothing off for it.
+    for c in &mut b.credits {
+        c.applied = true;
+    }
+    let r = recalc(&b, &RecalcOptions::default()).unwrap();
+    assert_eq!(r.credits[0].amount, 0);
+    assert_eq!(r.credits_total, 3 * 35_000);
+    let e = explain::explain(&b, &RecalcOptions::default(), &explain::Target::Credit(0)).unwrap();
+    assert_eq!(e.root.amount, Some(0));
+    let text = format!("{:?}", e.root);
+    assert!(text.contains("below the minimum of 1,400.01"), "{text}");
+}
+
+#[test]
+fn the_minimum_counts_spend_at_the_locations_before_any_cap() {
+    let mut b = budget();
+    // Everywhere it is 2,100.00; at Ridge only 1,400.00, under 1,500.00.
+    let mut anywhere = program("Anywhere", &[], cat("2100"), "25");
+    anywhere.minimum_spend = Some(150_000);
+    let mut ridge = program("Ridge", &["Ridge"], cat("2100"), "25");
+    ridge.minimum_spend = Some(150_000);
+    // A cap on the spend doesn't lower what the minimum compares with:
+    // 1,400.00 qualifies for a 1,000.00 minimum though only 500.00 counts.
+    let mut spend_cap = program("Spend cap", &["Ridge"], cat("2100"), "25");
+    spend_cap.minimum_spend = Some(100_000);
+    spend_cap.rows[0].cap = CreditCap::QualifiedSpend(50_000);
+    // Nor does the program's own cap.
+    let mut own_cap = program("Own cap", &["Ridge"], cat("2100"), "25");
+    own_cap.minimum_spend = Some(100_000);
+    own_cap.cap = Some(10_000);
+    b.credits = vec![anywhere, ridge, spend_cap, own_cap];
+    let got = estimate(&b);
+    assert_eq!(
+        amounts(&got),
+        vec![Some(52_500), Some(0), Some(12_500), Some(10_000)]
+    );
+    assert!(got.programs[3].capped);
+}
+
+#[test]
+fn the_brokers_fee_comes_off_after_the_cap_and_discount_never_below_zero() {
+    let mut b = budget();
+    // 350.00, less 10%: 315.00, less a 15.00 fee: 300.00.
+    let mut p = program("Fee", &["Ridge"], cat("2100"), "25");
+    p.discount_percent = d("10");
+    p.broker_fee = 1_500;
+    // Capped at 200.00, less 10%: 180.00, less 5.00: 175.00.
+    let mut capped = p.clone();
+    capped.name = "Capped".into();
+    capped.cap = Some(20_000);
+    capped.broker_fee = 500;
+    // A fee larger than the credit leaves 0, not less.
+    let mut large = p.clone();
+    large.name = "Large fee".into();
+    large.broker_fee = 40_000;
+    // Below the minimum there is nothing to take a fee from.
+    let mut below = p.clone();
+    below.name = "Below".into();
+    below.minimum_spend = Some(1_000_000);
+    b.credits = vec![p, capped, large, below];
+    let got = estimate(&b);
+    assert_eq!(
+        amounts(&got),
+        vec![Some(30_000), Some(17_500), Some(0), Some(0)]
+    );
+    let fees: Vec<Cents> = got
+        .programs
+        .iter()
+        .map(|p| p.figures.as_ref().unwrap().fee)
+        .collect();
+    assert_eq!(fees, vec![1_500, 500, 31_500, 0]);
+
+    for c in &mut b.credits {
+        c.applied = true;
+    }
+    let r = recalc(&b, &RecalcOptions::default()).unwrap();
+    assert_eq!(r.credits_total, 30_000 + 17_500);
+    for i in 0..4 {
+        let e =
+            explain::explain(&b, &RecalcOptions::default(), &explain::Target::Credit(i)).unwrap();
+        assert_eq!(e.root.amount, Some(r.credits[i].amount), "credit {i}");
+    }
+    let e = explain::explain(&b, &RecalcOptions::default(), &explain::Target::Credit(2)).unwrap();
+    let text = format!("{:?}", e.root);
+    assert!(text.contains("never below zero"), "{text}");
+}
+
+#[test]
+fn one_program_under_a_shared_cap_is_held_to_it() {
+    let mut b = budget();
+    b.shared_caps.insert("State".into(), 30_000);
+    let mut p = program("Ridge program", &["Ridge"], cat("2100"), "25");
+    p.shared_cap = Some("State".into());
+    p.applied = true;
+    b.credits.push(p);
+    let got = estimate(&b);
+    assert_eq!(got.programs[0].amount(), Some(30_000));
+    assert_eq!(
+        got.programs[0].figures.as_ref().unwrap().shared,
+        Some(30_000)
+    );
+    assert_eq!(got.programs[0].shared_cap_amount, Some(30_000));
+    let r = recalc(&b, &RecalcOptions::default()).unwrap();
+    assert_eq!(r.credits_total, 30_000);
+
+    // Under a larger shared cap nothing changes.
+    b.shared_caps.insert("State".into(), 50_000);
+    let got = estimate(&b);
+    assert_eq!(got.programs[0].amount(), Some(35_000));
+    assert_eq!(got.programs[0].figures.as_ref().unwrap().shared, None);
+}
+
+#[test]
+fn two_programs_share_a_cap_in_proportion() {
+    let mut b = budget();
+    b.shared_caps.insert("State".into(), 40_000);
+    // 350.00 and 210.00 (10% of 2,100.00), 560.00 together: 400.00 is
+    // shared 250.00 and 150.00.
+    let mut a = program("A", &["Ridge"], cat("2100"), "25");
+    let mut z = program("B", &[], cat("2100"), "10");
+    for c in [&mut a, &mut z] {
+        c.shared_cap = Some("State".into());
+        c.applied = true;
+    }
+    // A program sharing no cap is unaffected.
+    let mut other = program("Other", &[], cat("2100"), "10");
+    other.applied = true;
+    b.credits = vec![a, z, other];
+    let got = estimate(&b);
+    assert_eq!(
+        amounts(&got),
+        vec![Some(25_000), Some(15_000), Some(21_000)]
+    );
+    let r = recalc(&b, &RecalcOptions::default()).unwrap();
+    assert_eq!(r.credits_total, 40_000 + 21_000);
+
+    // The discount comes off each share: 250.00 less 10% is 225.00.
+    b.credits[0].discount_percent = d("10");
+    assert_eq!(estimate(&b).programs[0].amount(), Some(22_500));
+
+    // Explain says what the share is and still adds up.
+    let e = explain::explain(&b, &RecalcOptions::default(), &explain::Target::Credit(0)).unwrap();
+    assert_eq!(e.root.amount, Some(22_500));
+    let text = format!("{:?}", e.root);
+    assert!(text.contains("Shared cap"), "{text}");
+    assert!(text.contains("250.00"), "{text}");
+}
+
+#[test]
+fn three_programs_share_a_cap_to_the_cent_whatever_their_order() {
+    let mut b = budget();
+    b.shared_caps.insert("Pool".into(), 10_000);
+    // Three of 100.00 under a 100.00 cap: 33.33 each and a cent left,
+    // which goes to the first by name, Alpha.
+    b.credits = ["Gamma", "Alpha", "Beta"]
+        .iter()
+        .map(|n| {
+            let mut c = typed(n, 100_000, "10");
+            c.shared_cap = Some("Pool".into());
+            c.applied = true;
+            c
+        })
+        .collect();
+    let got = estimate(&b);
+    assert_eq!(amounts(&got), vec![Some(3_333), Some(3_334), Some(3_333)]);
+    let r = recalc(&b, &RecalcOptions::default()).unwrap();
+    assert_eq!(r.credits_total, 10_000);
+    b.credits.reverse();
+    let back = estimate(&b);
+    assert_eq!(amounts(&back), vec![Some(3_333), Some(3_334), Some(3_333)]);
+
+    // 100.00, 200.00 and 400.00 under 100.00: 14.2857, 28.5714 and
+    // 57.1428 rounded down make 99.99; the largest remainder (14.2857's)
+    // gets the cent.
+    for (c, spend) in b.credits.iter_mut().zip([100_000, 200_000, 400_000]) {
+        c.rows[0].source = CreditSource::Flat(spend);
+    }
+    let got = estimate(&b);
+    assert_eq!(amounts(&got), vec![Some(1_429), Some(2_857), Some(5_714)]);
+    let total: Cents = amounts(&got).into_iter().flatten().sum();
+    assert_eq!(total, 10_000);
+}
+
+#[test]
+fn a_programs_own_cap_comes_before_the_shared_cap() {
+    let mut b = budget();
+    b.shared_caps.insert("State".into(), 30_000);
+    // A is 350.00 held to its own 200.00; B is 210.00. 410.00 together
+    // over 300.00: 146.34 and 153.65 rounded down, and B's larger
+    // remainder takes the cent.
+    let mut a = program("A", &["Ridge"], cat("2100"), "25");
+    a.cap = Some(20_000);
+    let mut z = program("B", &[], cat("2100"), "10");
+    for c in [&mut a, &mut z] {
+        c.shared_cap = Some("State".into());
+        c.applied = true;
+    }
+    b.credits = vec![a, z];
+    let got = estimate(&b);
+    assert_eq!(amounts(&got), vec![Some(14_634), Some(15_366)]);
+    assert!(got.programs[0].capped);
+    // The fee comes off after the share.
+    b.credits[1].broker_fee = 366;
+    assert_eq!(estimate(&b).programs[1].amount(), Some(15_000));
+}
+
+#[test]
+fn an_unapplied_program_is_estimated_alongside_the_applied_ones() {
+    let mut b = budget();
+    b.shared_caps.insert("State".into(), 40_000);
+    let mut a = program("A", &["Ridge"], cat("2100"), "25");
+    let mut z = program("B", &[], cat("2100"), "10");
+    for c in [&mut a, &mut z] {
+        c.shared_cap = Some("State".into());
+    }
+    a.applied = true;
+    b.credits = vec![a, z];
+    // A alone is within the cap; B's estimate is its share were it applied
+    // too, and A's figure stays what the topsheet takes off.
+    let got = estimate(&b);
+    assert_eq!(amounts(&got), vec![Some(35_000), Some(15_000)]);
+    let r = recalc(&b, &RecalcOptions::default()).unwrap();
+    assert_eq!(r.credits_total, 35_000);
+
+    // Applying B takes off exactly its estimate.
+    b.credits[1].applied = true;
+    let r = recalc(&b, &RecalcOptions::default()).unwrap();
+    assert_eq!(r.credits[1].amount, 15_000);
+    assert_eq!(r.credits_total, 40_000);
+}
+
+#[test]
+fn a_program_below_its_minimum_takes_no_share() {
+    let mut b = budget();
+    b.shared_caps.insert("State".into(), 30_000);
+    let mut a = program("A", &["Ridge"], cat("2100"), "25");
+    a.minimum_spend = Some(1_000_000);
+    let mut z = program("B", &[], cat("2100"), "10");
+    for c in [&mut a, &mut z] {
+        c.shared_cap = Some("State".into());
+        c.applied = true;
+    }
+    b.credits = vec![a, z];
+    assert_eq!(amounts(&estimate(&b)), vec![Some(0), Some(21_000)]);
+}
+
+#[test]
+fn a_shared_cap_the_budget_doesnt_have_holds_nothing_down_and_is_warned_about() {
+    let mut b = budget();
+    let mut p = program("Ridge program", &["Ridge"], cat("2100"), "25");
+    p.shared_cap = Some("Nowhere".into());
+    p.applied = true;
+    b.credits.push(p);
+    let r = recalc(&b, &RecalcOptions::default()).unwrap();
+    assert_eq!(r.credits_total, 35_000);
+    let w = warnings(&b, &r);
+    assert!(
+        w.iter()
+            .any(|w| w.contains("Ridge program") && w.contains("Nowhere")),
+        "{w:?}"
+    );
+}
+
+#[test]
+fn diff_and_merge_follow_the_minimum_fee_and_shared_cap() {
+    let mut a = budget();
+    a.credits
+        .push(program("Ridge program", &[], cat("2100"), "25"));
+    let mut b = a.clone();
+    b.credits[0].minimum_spend = Some(100_000);
+    b.credits[0].broker_fee = 2_500;
+    b.credits[0].shared_cap = Some("State".into());
+    b.shared_caps.insert("State".into(), 50_000);
+    let text = diff::diff(&a, &b).to_text();
+    for word in [
+        "minimum spend",
+        "broker's fee",
+        "shared cap",
+        "State",
+        "500.00",
+    ] {
+        assert!(text.contains(word), "{word}: {text}");
+    }
+
+    // Theirs adds the terms and the shared cap; ours changes the discount.
+    let mut ours = a.clone();
+    ours.credits[0].discount_percent = d("5");
+    let m = merge::merge(&a, &ours, &b);
+    assert!(m.conflicts.is_empty(), "{:?}", m.conflicts);
+    let c = &m.budget.credits[0];
+    assert_eq!(
+        (c.minimum_spend, c.broker_fee, c.shared_cap.as_deref()),
+        (Some(100_000), 2_500, Some("State"))
+    );
+    assert_eq!(c.discount_percent, d("5"));
+    assert_eq!(m.budget.shared_caps.get("State"), Some(&50_000));
+
+    // Both change one shared cap's amount differently: a conflict.
+    let mut ours = b.clone();
+    ours.shared_caps.insert("State".into(), 60_000);
+    let mut theirs = b.clone();
+    theirs.shared_caps.insert("State".into(), 70_000);
+    let m = merge::merge(&b, &ours, &theirs);
+    assert_eq!(m.conflicts.len(), 1, "{:?}", m.conflicts);
 }

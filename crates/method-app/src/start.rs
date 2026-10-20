@@ -23,6 +23,16 @@
 //!   and any ticked setup packs come in before the form's own details,
 //!   through method-session's `new_budget` module; this side reads the
 //!   library's file and the listed packs.
+//! - **Projects, thumbnails and Duplicate** (decision 91). A project is a
+//!   folder: the ones added with Add Folder… or made by New Budget's "Make a
+//!   project folder" box are kept in `start.json`, and each is read two
+//!   levels deep ([`SCAN_LIMIT`] entries at most) every time the lists are
+//!   shown; method-session's `projects` module says what each file is and
+//!   how they are arranged. A budget's thumbnail (a bar per category) is
+//!   kept with its summary in [`CACHE_FILE`], read again when the file's
+//!   modified time or size changes, never written into the budget. Duplicate
+//!   copies a budget file beside itself under the first free name and opens
+//!   it as a saved tab.
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
@@ -31,6 +41,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use method_core::{starter, Budget, Dec};
 use method_session::new_budget::{self, Ticked};
+use method_session::projects::{self, ItemKind, ThumbBar};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Runtime, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
@@ -54,7 +65,12 @@ pub const START_FILE: &str = "start.json";
 /// [`START_FILE`], so a start doesn't read every file again.
 pub const CACHE_FILE: &str = "start-cache.json";
 /// Most summaries kept.
-const CACHE_LIMIT: usize = 200;
+const CACHE_LIMIT: usize = 500;
+/// Most project folders listed.
+pub const PROJECT_LIMIT: usize = 50;
+/// Most files and folders looked at in one project folder (it and the
+/// folders directly in it).
+pub const SCAN_LIMIT: usize = 300;
 /// Longest title, and longest text field, the form takes.
 const TITLE_MAX: usize = 200;
 const TEXT_MAX: usize = 100;
@@ -72,6 +88,9 @@ struct StartJson {
     /// The folder the last new budget was saved in (New Budget's Save In).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     last_folder: Option<String>,
+    /// The project folders, in the order they were added.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    projects: Vec<String>,
 }
 
 /// What a file holds, for its row.
@@ -80,6 +99,19 @@ struct Summary {
     title: String,
     net_total: Option<i64>,
     currency: String,
+    /// The thumbnail: a bar per category (method-session's `projects`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    bars: Vec<ThumbBar>,
+    /// A budget, a sub-budget, a copy or a setup pack (its provenance).
+    #[serde(default = "budget_kind")]
+    kind: ItemKind,
+    /// For a sub-budget or a copy: the title of the budget it came from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source: Option<String>,
+}
+
+fn budget_kind() -> ItemKind {
+    ItemKind::Budget
 }
 
 /// A file's modified time and size: its summary is read again only when
@@ -107,9 +139,16 @@ struct CachedJson {
 
 #[derive(Default, Serialize, Deserialize)]
 struct CacheJson {
+    /// [`CACHE_VERSION`]: a cache written before thumbnails and kinds were
+    /// kept is read as empty, so every file is read once more.
+    #[serde(default)]
+    version: u32,
     #[serde(default)]
     files: Vec<CachedJson>,
 }
+
+/// What [`CACHE_FILE`] holds now: 2 adds thumbnails and kinds.
+const CACHE_VERSION: u32 = 2;
 
 #[derive(Default)]
 struct Inner {
@@ -125,11 +164,13 @@ struct Inner {
     folder: Option<(u64, PathBuf)>,
 }
 
-/// The pinned list and the folder new budgets were last saved in.
+/// The pinned list, the folder new budgets were last saved in and the
+/// project folders.
 #[derive(Default)]
 struct Kept {
     pinned: Vec<Tracked>,
     last_folder: Option<PathBuf>,
+    projects: Vec<PathBuf>,
 }
 
 /// The start window's state (one per app).
@@ -159,6 +200,7 @@ fn stamp_time(t: Option<(u64, u32)>) -> Option<SystemTime> {
 fn load_cache(file: Option<&Path>) -> HashMap<PathBuf, Cached> {
     file.and_then(|f| std::fs::read_to_string(f).ok())
         .and_then(|t| serde_json::from_str::<CacheJson>(&t).ok())
+        .filter(|c| c.version == CACHE_VERSION)
         .unwrap_or_default()
         .files
         .into_iter()
@@ -201,6 +243,13 @@ impl StartState {
                     .last_folder
                     .filter(|s| !s.is_empty())
                     .map(PathBuf::from),
+                projects: json
+                    .projects
+                    .into_iter()
+                    .filter(|s| !s.is_empty())
+                    .map(PathBuf::from)
+                    .take(PROJECT_LIMIT)
+                    .collect(),
             }),
             inner: Mutex::new(Inner {
                 cache,
@@ -256,6 +305,34 @@ impl StartState {
         lock(&self.kept).last_folder.clone()
     }
 
+    /// The project folders, in the order they were added.
+    pub fn projects(&self) -> Vec<PathBuf> {
+        lock(&self.kept).projects.clone()
+    }
+
+    /// Adds folder `dir` to the projects (at the end; once).
+    pub fn add_project(&self, dir: &Path) -> Result<(), String> {
+        let dir = std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
+        let mut kept = lock(&self.kept);
+        if kept.projects.contains(&dir) {
+            return Ok(());
+        }
+        if kept.projects.len() >= PROJECT_LIMIT {
+            return Err(format!(
+                "At most {PROJECT_LIMIT} project folders can be listed. Remove one first."
+            ));
+        }
+        kept.projects.push(dir);
+        self.save(&kept)
+    }
+
+    /// Takes folder `dir` off the projects (the folder stays).
+    pub fn remove_project(&self, dir: &Path) -> Result<(), String> {
+        let mut kept = lock(&self.kept);
+        kept.projects.retain(|p| p != dir);
+        self.save(&kept)
+    }
+
     fn set_last_folder(&self, dir: &Path) -> Result<(), String> {
         let mut kept = lock(&self.kept);
         kept.last_folder = Some(dir.to_path_buf());
@@ -278,6 +355,12 @@ impl StartState {
                 .as_deref()
                 .and_then(Path::to_str)
                 .map(str::to_string),
+            projects: kept
+                .projects
+                .iter()
+                .filter_map(|p| p.to_str())
+                .map(str::to_string)
+                .collect(),
         };
         let bytes = serde_json::to_vec_pretty(&json).map_err(|e| e.to_string())?;
         safety::write_atomically(file, &bytes, Access::Private)
@@ -307,7 +390,10 @@ impl StartState {
             })
             .collect();
         files.sort_by(|a, b| a.path.cmp(&b.path));
-        let Ok(bytes) = serde_json::to_vec_pretty(&CacheJson { files }) else {
+        let Ok(bytes) = serde_json::to_vec_pretty(&CacheJson {
+            version: CACHE_VERSION,
+            files,
+        }) else {
             return;
         };
         if let Some(dir) = file.parent() {
@@ -378,14 +464,16 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) {
 // ---------------------------------------------------------------------------
 // The lists
 
-/// One budget in the start window.
+/// One budget (or, in a project, a schedule or actuals file) in the start
+/// window.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct StartEntry {
     /// Names it to the other start commands, until the next listing.
     pub token: u64,
-    /// The file's name.
+    /// The file's name (in a project: its path inside the project folder).
     pub file: String,
-    /// The budget's title (empty when it couldn't be read).
+    /// The budget's title (empty when it couldn't be read; a schedule's or
+    /// an actuals file's name).
     pub title: String,
     /// The folder it is in, the home folder written `~`.
     pub folder: String,
@@ -394,6 +482,20 @@ pub struct StartEntry {
     /// The net total in cents, in `currency` (the base currency).
     pub net_total: Option<i64>,
     pub currency: String,
+    /// The thumbnail: a bar per category, by its share (empty: nothing to
+    /// draw).
+    pub bars: Vec<ThumbBar>,
+    /// What it is, in a word: "budget", "sub-budget", "shared copy",
+    /// "editable copy", "setup pack", "schedule" or "actuals".
+    pub kind: String,
+    /// Opens as a budget (a schedule or an actuals file is only shown).
+    pub openable: bool,
+    /// In a project: it came from the budget above it, and is shown under it.
+    pub under: bool,
+    /// Shared through a folder: a change log (`X.mthd-log/`) is beside it.
+    pub shared: bool,
+    /// For a shared budget: who was in it, latest first (their heartbeats).
+    pub people: Vec<projects::Person>,
     pub pinned: bool,
     /// On the recent list.
     pub recent: bool,
@@ -403,12 +505,31 @@ pub struct StartEntry {
     pub problem: Option<String>,
 }
 
+/// A project folder in the start window, with what is in it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct ProjectView {
+    /// Names the folder to the other start commands, until the next listing.
+    pub token: u64,
+    /// The folder's name.
+    pub name: String,
+    /// The folder, the home folder written `~`.
+    pub folder: String,
+    /// Its budgets, each with what came from it, then its other files.
+    pub items: Vec<StartEntry>,
+    /// The folder holds more than was looked at ([`SCAN_LIMIT`]).
+    pub more: bool,
+    /// Why it can't be read: the folder is gone.
+    pub problem: Option<String>,
+}
+
 /// The start window's lists.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct StartView {
     pub pinned: Vec<StartEntry>,
     /// The recent budgets that aren't pinned, newest first.
     pub recent: Vec<StartEntry>,
+    /// The project folders, in the order they were added.
+    pub projects: Vec<ProjectView>,
     /// Nothing is open but an untouched Untitled budget (the app has just
     /// started with nothing to reopen).
     pub fresh: bool,
@@ -442,30 +563,332 @@ fn folder_text(dir: Option<&Path>, home: Option<&Path>) -> String {
     dir.display().to_string()
 }
 
-fn summary_of(b: &Budget, net_total: Option<i64>) -> Summary {
+/// The net total and thumbnail of a budget's totals (none when they
+/// couldn't be worked out).
+fn totals_of(report: Option<&method_core::Report>) -> (Option<i64>, Vec<ThumbBar>) {
+    match report {
+        Some(r) => (Some(r.net_total), projects::thumbnail(r)),
+        None => (None, Vec::new()),
+    }
+}
+
+fn summary_of(b: &Budget, (net_total, bars): (Option<i64>, Vec<ThumbBar>)) -> Summary {
+    let (kind, source) = projects::kind_of(b);
     Summary {
         title: b.title.trim().to_string(),
         net_total,
         currency: b.base_currency.clone(),
+        bars,
+        kind,
+        source,
     }
 }
 
-/// Reads `path`'s summary (title, net total, currency).
+/// Reads `path`'s summary (title, net total, currency, thumbnail, kind).
 fn read_summary(path: &Path) -> Result<Summary, String> {
     let (b, _) = crate::session::read_budget(path)?;
     let outcome = crate::diagnose::lenient_recalc(&b);
-    Ok(summary_of(&b, outcome.report.as_ref().map(|r| r.net_total)))
+    Ok(summary_of(&b, totals_of(outcome.report.as_ref())))
 }
 
-/// Lists `pinned` then `recent` (without the pinned ones), giving each a
-/// new token. Pinned files moved in the Finder are followed first. Open
-/// budgets are summed from their tabs; files from the kept summaries (by
-/// modified time and size) or the disk.
+/// Whether `path` names a budget file (by its extension).
+fn is_budget_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case(method_format::EXTENSION))
+}
+
+/// One listing's work: tokens, the kept summaries and the open budgets.
+struct Lister<'a> {
+    g: &'a mut Inner,
+    /// The budgets open in tabs, by file (their unsaved changes count).
+    open: HashMap<PathBuf, Summary>,
+    home: Option<PathBuf>,
+}
+
+impl Lister<'_> {
+    fn token_for(&mut self, path: &Path) -> u64 {
+        self.g.token += 1;
+        let token = self.g.token;
+        self.g.listed.push((token, path.to_path_buf()));
+        token
+    }
+
+    /// `path`'s summary: from its tab when it is open, else the kept one
+    /// while the file's modified time and size are the same, else read.
+    fn summary(&mut self, path: &Path) -> (Result<Summary, String>, Option<SystemTime>, bool) {
+        let meta = std::fs::metadata(path).ok().filter(|m| m.is_file());
+        let modified = meta.as_ref().and_then(|m| m.modified().ok());
+        let key = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        if let Some(s) = self.open.get(&key) {
+            return (Ok(s.clone()), modified, true);
+        }
+        let Some(m) = meta else {
+            return (Err("Can't find this file.".to_string()), modified, false);
+        };
+        let stamp = (modified, m.len());
+        let summary = match self.g.cache.get(path) {
+            Some(c) if c.stamp == stamp => c.summary.clone(),
+            _ => {
+                let summary = read_summary(path);
+                self.g.cache_changed = true;
+                self.g.cache.insert(
+                    path.to_path_buf(),
+                    Cached {
+                        stamp,
+                        summary: summary.clone(),
+                    },
+                );
+                summary
+            }
+        };
+        (summary, modified, false)
+    }
+
+    /// The row of budget file `path`, and its summary when it was read.
+    fn budget(
+        &mut self,
+        path: &Path,
+        is_pinned: bool,
+        is_recent: bool,
+    ) -> (StartEntry, Option<Summary>) {
+        let token = self.token_for(path);
+        let (summary, modified, open) = self.summary(path);
+        let mut e = StartEntry {
+            token,
+            file: path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+            title: String::new(),
+            folder: folder_text(path.parent(), self.home.as_deref()),
+            modified: modified_ms(modified),
+            net_total: None,
+            currency: String::new(),
+            bars: Vec::new(),
+            kind: ItemKind::Budget.word().into(),
+            openable: true,
+            under: false,
+            shared: false,
+            people: Vec::new(),
+            pinned: is_pinned,
+            recent: is_recent,
+            open,
+            problem: None,
+        };
+        // A change log beside it: shared through a folder (read every
+        // listing, as people come and go without the file changing).
+        let log = method_format::log::LogDir::for_budget(path);
+        if log.exists() {
+            e.shared = true;
+            e.people =
+                projects::people(log.presences().into_values().map(|p| projects::Heartbeat {
+                    name: p.name,
+                    category: p.category,
+                    account: p.account,
+                    at: p.at,
+                }));
+        }
+        match summary {
+            Ok(s) => {
+                e.title = s.title.clone();
+                e.net_total = s.net_total;
+                e.currency = s.currency.clone();
+                e.bars = s.bars.clone();
+                e.kind = s.kind.word().into();
+                (e, Some(s))
+            }
+            Err(problem) => {
+                e.problem = Some(problem);
+                (e, None)
+            }
+        }
+    }
+
+    /// Project folder `dir`, with its budgets and other files arranged.
+    fn project(&mut self, dir: &Path, pinned: &[PathBuf], recent: &[PathBuf]) -> ProjectView {
+        let token = self.token_for(dir);
+        let name = dir
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| dir.display().to_string());
+        let folder = folder_text(Some(dir), self.home.as_deref());
+        if !dir.is_dir() {
+            return ProjectView {
+                token,
+                name,
+                folder,
+                items: Vec::new(),
+                more: false,
+                problem: Some("Can't find this folder.".into()),
+            };
+        }
+        let (files, more) = scan(dir);
+        let mut rows = Vec::new();
+        let mut found = Vec::new();
+        for (path, rel) in files {
+            let parts: Vec<&str> = rel.iter().map(String::as_str).collect();
+            let rel_text = rel.join(std::path::MAIN_SEPARATOR_STR);
+            let file_name = parts.last().copied().unwrap_or_default().to_string();
+            if is_budget_path(&path) {
+                let (mut e, summary) =
+                    self.budget(&path, pinned.contains(&path), recent.contains(&path));
+                e.file = rel_text.clone();
+                let (kind, title, source) = match summary {
+                    Some(s) => (s.kind, s.title.clone(), s.source.clone()),
+                    None => (ItemKind::Budget, String::new(), None),
+                };
+                found.push(projects::Found {
+                    kind,
+                    title: if title.is_empty() { file_name } else { title },
+                    source,
+                    file: rel_text,
+                });
+                rows.push(e);
+                continue;
+            }
+            let kind = if projects::is_actuals_file(&parts) {
+                ItemKind::Actuals
+            } else if is_schedule_days(&path) {
+                ItemKind::Schedule
+            } else {
+                continue;
+            };
+            let modified = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
+            let token = self.token_for(&path);
+            rows.push(StartEntry {
+                token,
+                file: rel_text.clone(),
+                title: file_name.clone(),
+                folder: folder.clone(),
+                modified: modified_ms(modified),
+                net_total: None,
+                currency: String::new(),
+                bars: Vec::new(),
+                kind: kind.word().into(),
+                openable: false,
+                under: false,
+                shared: false,
+                people: Vec::new(),
+                pinned: false,
+                recent: false,
+                open: false,
+                problem: None,
+            });
+            found.push(projects::Found {
+                kind,
+                title: file_name,
+                source: None,
+                file: rel_text,
+            });
+        }
+        let items = projects::arrange(&found)
+            .into_iter()
+            .map(|p| StartEntry {
+                under: p.under,
+                ..rows[p.index].clone()
+            })
+            .collect();
+        ProjectView {
+            token,
+            name,
+            folder,
+            items,
+            more,
+            problem: None,
+        }
+    }
+}
+
+/// The files in `dir` and in the folders directly in it, with their paths
+/// inside `dir` as parts, by name; hidden files and folders and change-log
+/// folders (`X.mthd-log`) are passed over. At most [`SCAN_LIMIT`] files and
+/// folders are looked at: true when there were more.
+fn scan(dir: &Path) -> (Vec<(PathBuf, Vec<String>)>, bool) {
+    fn entries(dir: &Path) -> Vec<(String, PathBuf, bool)> {
+        let mut out: Vec<(String, PathBuf, bool)> = std::fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|e| {
+                let name = e.file_name().to_string_lossy().into_owned();
+                if name.starts_with('.') {
+                    return None;
+                }
+                let kind = e.file_type().ok()?;
+                // Links are passed over: a project is what is in its folder.
+                if kind.is_symlink() {
+                    return None;
+                }
+                Some((name, e.path(), kind.is_dir()))
+            })
+            .collect();
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        out
+    }
+    let log_suffix = format!(".{}-log", method_format::EXTENSION);
+    let mut seen = 0;
+    let mut out = Vec::new();
+    let mut more = false;
+    'top: for (name, path, is_dir) in entries(dir) {
+        seen += 1;
+        if seen > SCAN_LIMIT {
+            more = true;
+            break;
+        }
+        if !is_dir {
+            out.push((path, vec![name]));
+            continue;
+        }
+        if name.ends_with(&log_suffix) {
+            continue;
+        }
+        for (inner, ipath, idir) in entries(&path) {
+            seen += 1;
+            if seen > SCAN_LIMIT {
+                more = true;
+                break 'top;
+            }
+            if !idir {
+                out.push((ipath, vec![name.clone(), inner]));
+            }
+        }
+    }
+    (out, more)
+}
+
+/// Whether `path` is a schedule's days file: a `.json` file of at most a
+/// few megabytes whose start says so.
+fn is_schedule_days(path: &Path) -> bool {
+    use std::io::Read;
+    let json = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("json"));
+    if !json {
+        return false;
+    }
+    let Ok(f) = std::fs::File::open(path) else {
+        return false;
+    };
+    if f.metadata().map_or(true, |m| m.len() > 8 * 1024 * 1024) {
+        return false;
+    }
+    let mut head = Vec::with_capacity(4096);
+    if f.take(4096).read_to_end(&mut head).is_err() {
+        return false;
+    }
+    projects::looks_like_schedule_days(&String::from_utf8_lossy(&head))
+}
+
+/// Lists `pinned` then `recent` (without the pinned ones), then each
+/// project folder, giving each row a new token. Pinned files moved in the
+/// Finder are followed first. Open budgets are summed from their tabs;
+/// files from the kept summaries (by modified time and size) or the disk.
 fn list(state: &AppState, start: &StartState, recent: &[PathBuf]) -> StartView {
     start.follow_pinned();
     let pinned = start.pinned();
-    let home = home();
-    // The budgets open in tabs, by file (their unsaved changes count).
+    let project_dirs = start.projects();
     let mut open: HashMap<PathBuf, Summary> = HashMap::new();
     let fresh;
     {
@@ -476,76 +899,36 @@ fn list(state: &AppState, start: &StartState, recent: &[PathBuf]) -> StartView {
             let Some(p) = s.path().map(Path::to_path_buf) else {
                 continue;
             };
-            let total = s.outcome().report.as_ref().map(|r| r.net_total);
-            let sum = summary_of(s.budget(), total);
+            let totals = totals_of(s.outcome().report.as_ref());
+            let sum = summary_of(s.budget(), totals);
             let key = std::fs::canonicalize(&p).unwrap_or(p);
             open.insert(key, sum);
         }
     }
     let mut guard = lock(&start.inner);
-    let g: &mut Inner = &mut guard;
-    g.listed.clear();
-    let entry = |g: &mut Inner, path: &Path, is_pinned: bool, is_recent: bool| {
-        g.token += 1;
-        let token = g.token;
-        g.listed.push((token, path.to_path_buf()));
-        let meta = std::fs::metadata(path).ok().filter(|m| m.is_file());
-        let modified = meta.as_ref().and_then(|m| m.modified().ok());
-        let key = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-        let summary = match (open.get(&key), &meta) {
-            (Some(s), _) => Ok(s.clone()),
-            (None, None) => Err("Can't find this file.".to_string()),
-            (None, Some(m)) => {
-                let stamp = (modified, m.len());
-                match g.cache.get(path) {
-                    Some(c) if c.stamp == stamp => c.summary.clone(),
-                    _ => {
-                        let summary = read_summary(path);
-                        g.cache_changed = true;
-                        g.cache.insert(
-                            path.to_path_buf(),
-                            Cached {
-                                stamp,
-                                summary: summary.clone(),
-                            },
-                        );
-                        summary
-                    }
-                }
-            }
-        };
-        let (title, net_total, currency, problem) = match summary {
-            Ok(s) => (s.title, s.net_total, s.currency, None),
-            Err(e) => (String::new(), None, String::new(), Some(e)),
-        };
-        StartEntry {
-            token,
-            file: path
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default(),
-            title,
-            folder: folder_text(path.parent(), home.as_deref()),
-            modified: modified_ms(modified),
-            net_total,
-            currency,
-            pinned: is_pinned,
-            recent: is_recent,
-            open: open.contains_key(&key),
-            problem,
-        }
+    guard.listed.clear();
+    let mut l = Lister {
+        g: &mut guard,
+        open,
+        home: home(),
     };
     let pinned_rows: Vec<StartEntry> = pinned
         .iter()
-        .map(|p| entry(g, p, true, recent.contains(p)))
+        .map(|p| l.budget(p, true, recent.contains(p)).0)
         .collect();
     let recent_rows: Vec<StartEntry> = recent
         .iter()
         .filter(|p| !pinned.contains(p))
-        .map(|p| entry(g, p, false, true))
+        .map(|p| l.budget(p, false, true).0)
         .collect();
+    let projects: Vec<ProjectView> = project_dirs
+        .iter()
+        .map(|d| l.project(d, &pinned, recent))
+        .collect();
+    let g: &mut Inner = &mut guard;
     // Summaries of files no longer listed aren't needed again soon.
-    let keep: Vec<PathBuf> = g.listed.iter().map(|(_, p)| p.clone()).collect();
+    let keep: std::collections::HashSet<PathBuf> =
+        g.listed.iter().map(|(_, p)| p.clone()).collect();
     let before = g.cache.len();
     g.cache.retain(|p, _| keep.contains(p));
     g.cache_changed |= g.cache.len() != before;
@@ -553,6 +936,7 @@ fn list(state: &AppState, start: &StartState, recent: &[PathBuf]) -> StartView {
     StartView {
         pinned: pinned_rows,
         recent: recent_rows,
+        projects,
         fresh,
     }
 }
@@ -567,9 +951,14 @@ fn reveal(path: &Path) -> Result<(), String> {
 }
 
 /// The system command that shows `path` selected in its folder (macOS and
-/// Windows), else its folder.
+/// Windows), else its folder; a folder (a project) is opened itself.
 fn reveal_command(path: &Path) -> Result<std::process::Command, String> {
     use std::process::Command;
+    let dir = if path.is_dir() {
+        Some(path)
+    } else {
+        path.parent().filter(|d| d.is_dir())
+    };
     if path.is_file() && cfg!(target_os = "macos") {
         let mut cmd = Command::new("open");
         cmd.arg("-R").arg(path);
@@ -582,10 +971,7 @@ fn reveal_command(path: &Path) -> Result<std::process::Command, String> {
         cmd.arg(arg);
         return Ok(cmd);
     }
-    let dir = path
-        .parent()
-        .filter(|d| d.is_dir())
-        .ok_or("That folder isn't there any more.")?;
+    let dir = dir.ok_or("That folder isn't there any more.")?;
     let program = if cfg!(target_os = "macos") {
         "open"
     } else if cfg!(windows) {
@@ -660,6 +1046,12 @@ pub struct NewBudgetSpec {
     /// Setup: the packs to bring in, by their tokens from
     /// `new_budget_setup`'s listing.
     pub packs: Vec<u64>,
+    /// Save In: make a project folder named like the file in the folder,
+    /// save the budget in it and list it with the projects.
+    pub project: bool,
+    /// Link a Schedule: the token of a schedule days file picked with
+    /// `schedule_days_pick` (its shoot days and dates come in, linked).
+    pub schedule: Option<u64>,
 }
 
 fn text(field: &str, value: &str, max: usize) -> Result<String, String> {
@@ -685,6 +1077,18 @@ pub fn build(
     spec: &NewBudgetSpec,
     template: Option<&Budget>,
     setup: &[Ticked],
+) -> Result<(Budget, String), String> {
+    build_with(spec, template, setup, None)
+}
+
+/// [`build`], with a linked schedule's shoot days and dates
+/// (`new_budget::link_schedule`) after the ticked setup and before the
+/// form's own details, so what is typed in the form wins.
+pub fn build_with(
+    spec: &NewBudgetSpec,
+    template: Option<&Budget>,
+    setup: &[Ticked],
+    schedule: Option<&method_format::import::schedule::ScheduleDays>,
 ) -> Result<(Budget, String), String> {
     let title = text("The title", &spec.title, TITLE_MAX)?;
     if title.is_empty() {
@@ -732,6 +1136,9 @@ pub fn build(
     // The ticked setup, before the details typed here, so those win (a
     // library's SHOOT_DAYS gives way to the Shoot days typed).
     let brought = new_budget::bring_in(&mut b, setup)?;
+    let linked = schedule
+        .map(|days| new_budget::link_schedule(&mut b, days))
+        .transpose()?;
 
     // Budget info, in plain words.
     let mut info = |name: &str, kind: &str, value: &str| -> Result<(), String> {
@@ -829,6 +1236,10 @@ pub fn build(
         )
     };
     let message = match brought.sentence() {
+        Some(more) => format!("{message} {more}"),
+        None => message,
+    };
+    let message = match linked {
         Some(more) => format!("{message} {more}"),
         None => message,
     };
@@ -1054,10 +1465,22 @@ fn file_name(stem: &str) -> String {
 
 /// The first of "`stem` 2", "`stem` 3"… with no file of that name in `dir`.
 fn free_stem(dir: &Path, stem: &str) -> String {
+    free_name(stem, |s| dir.join(file_name(s)))
+}
+
+/// The first of "`stem` 2", "`stem` 3"… for which nothing is at `at(name)`.
+fn free_name(stem: &str, at: impl Fn(&str) -> PathBuf) -> String {
     (2..10_000)
         .map(|n| format!("{stem} {n}"))
-        .find(|s| std::fs::symlink_metadata(dir.join(file_name(s))).is_err())
-        .unwrap_or_else(|| format!("{stem} copy"))
+        .find(|s| std::fs::symlink_metadata(at(s)).is_err())
+        .unwrap_or_else(|| format!("{stem} {}", unique_suffix()))
+}
+
+/// A number no other free name took, for when 2 to 9,999 are all taken.
+fn unique_suffix() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos())
 }
 
 /// What saving a new budget into a folder came to.
@@ -1101,6 +1524,125 @@ pub fn save_new(
     Ok(Made::Opened(id, path))
 }
 
+/// Makes project folder `stem` in `dir`, writes `b` in it as `stem`.mthd
+/// and opens it as [`save_new`] does; the folder joins the projects. A
+/// folder or file of that name already in `dir` makes nothing: a name free
+/// for both is offered.
+pub fn save_new_project(
+    state: &AppState,
+    safety: &Safety,
+    start: &StartState,
+    b: &Budget,
+    dir: &Path,
+    stem: &str,
+) -> Result<Made, String> {
+    if !dir.is_dir() {
+        return Err("That folder isn't there any more. Choose another one.".into());
+    }
+    let free = || {
+        free_name(stem, |s| {
+            // Both the folder and a loose file of the name must be free.
+            let folder = dir.join(s);
+            if std::fs::symlink_metadata(dir.join(file_name(s))).is_ok() {
+                dir.join(file_name(s))
+            } else {
+                folder
+            }
+        })
+    };
+    let project = dir.join(stem);
+    if std::fs::symlink_metadata(&project).is_ok()
+        || std::fs::symlink_metadata(dir.join(file_name(stem))).is_ok()
+    {
+        return Ok(Made::Taken(free()));
+    }
+    match std::fs::create_dir(&project) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            return Ok(Made::Taken(free()));
+        }
+        Err(e) => {
+            return Err(format!(
+                "Couldn't make the folder {stem} in {}: {e}.",
+                folder_text(Some(dir), home().as_deref())
+            ))
+        }
+    }
+    let made = save_new(state, safety, b, &project, stem);
+    if !matches!(made, Ok(Made::Opened(..))) {
+        // Nothing was written in it: take the empty folder back.
+        let _ = std::fs::remove_dir(&project);
+        return made;
+    }
+    // Best effort: the budget is saved either way.
+    let _ = start.add_project(&project);
+    made
+}
+
+/// Writes `b` in `dir` as `stem`.mthd, or the first free "`stem` 2",
+/// "`stem` 3"… when that is taken (never over a file), and opens it as
+/// [`save_new`] does. Its id and path.
+pub fn save_new_free(
+    state: &AppState,
+    safety: &Safety,
+    b: &Budget,
+    dir: &Path,
+    stem: &str,
+) -> Result<(DocId, PathBuf), String> {
+    let mut name = stem.to_string();
+    for _ in 0..5 {
+        match save_new(state, safety, b, dir, &name)? {
+            Made::Opened(id, path) => return Ok((id, path)),
+            Made::Taken(free) => name = free,
+        }
+    }
+    Err("Couldn't find a free name for the file. Try again.".into())
+}
+
+/// Writes a duplicate of budget file `path` beside it, as the first free
+/// "`stem` 2", "`stem` 3"… (the file's bytes as they are on disk, so an open
+/// tab's unsaved changes are not in it), never over a file, and opens it in
+/// front as a saved budget listed in Open Recent. Its path.
+pub fn duplicate(
+    state: &AppState,
+    safety: &Safety,
+    path: &Path,
+) -> Result<(DocId, PathBuf), String> {
+    if !is_budget_path(path) {
+        return Err("Only a budget file can be duplicated here.".into());
+    }
+    // Refuse what isn't a readable budget before copying it.
+    crate::session::read_budget(path)?;
+    let bytes =
+        std::fs::read(path).map_err(|e| format!("Couldn't read {}: {e}.", path.display()))?;
+    let dir = path
+        .parent()
+        .filter(|d| d.is_dir())
+        .ok_or("That folder isn't there any more.")?;
+    let stem = path
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "Budget".into());
+    // Another program may take the free name first: try the next.
+    for _ in 0..5 {
+        let to = dir.join(file_name(&free_stem(dir, &stem)));
+        match safety::write_new(&to, &bytes) {
+            Ok(()) => {
+                let id = crate::safety_app::open_path(state, safety, &to)?;
+                return Ok((id, to));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => {
+                return Err(format!(
+                    "Couldn't save the duplicate in {}: {e}.",
+                    folder_text(Some(dir), home().as_deref())
+                ))
+            }
+        }
+    }
+    Err("Couldn't find a free name for the duplicate. Try again.".into())
+}
+
 // ---------------------------------------------------------------------------
 // Commands (registered in app.rs, build.rs and capabilities/main.json; only
 // the main window may call them)
@@ -1131,6 +1673,9 @@ pub fn start_open<R: Runtime>(
     token: u64,
 ) -> Result<View, String> {
     let path = start.listed(token)?;
+    if !is_budget_path(&path) {
+        return Err("That isn't a budget file. Show in Folder shows it.".into());
+    }
     let opened = crate::safety_app::open_path(&state, &safety, &path);
     crate::safety_app::refresh_menu(window.app_handle());
     let id = opened?;
@@ -1168,10 +1713,90 @@ pub async fn start_forget<R: Runtime>(
     Ok(list(&state, &start, &safety.recent_paths()))
 }
 
-/// Shows listed budget `token` in Finder, Explorer or the file manager.
+/// Shows listed budget `token` in Finder, Explorer or the file manager (a
+/// listed project folder is opened itself).
 #[tauri::command]
 pub fn start_reveal(start: State<'_, StartState>, token: u64) -> Result<(), String> {
     reveal(&start.listed(token)?)
+}
+
+/// Duplicates listed budget file `token` beside it ("Big Show 2.mthd"),
+/// never over a file, and opens the duplicate in front as a saved budget.
+#[tauri::command]
+pub fn start_duplicate<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    safety: State<'_, Safety>,
+    start: State<'_, StartState>,
+    token: u64,
+) -> Result<Created, String> {
+    let path = start.listed(token)?;
+    let (id, to) = duplicate(&state, &safety, &path)?;
+    crate::safety_app::refresh_menu(window.app_handle());
+    let name = to
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    Ok(Created {
+        view: Some(finish(&window, &mut state.lock_doc(Some(id))?, None)),
+        message: format!(
+            "Duplicated as {name}, saved in {}.",
+            folder_text(to.parent(), home().as_deref())
+        ),
+        taken: None,
+    })
+}
+
+/// Shows a folder dialog and lists the folder picked with the projects;
+/// the lists again (`None` when cancelled).
+#[tauri::command]
+pub async fn start_add_project<R: Runtime>(
+    window: WebviewWindow<R>,
+    state: State<'_, AppState>,
+    safety: State<'_, Safety>,
+    start: State<'_, StartState>,
+) -> Result<Option<StartView>, String> {
+    let picked = window
+        .dialog()
+        .file()
+        .set_title("Add a project folder")
+        .set_parent(&window)
+        .blocking_pick_folder();
+    let Some(picked) = picked else {
+        return Ok(None);
+    };
+    let dir = picked.into_path().map_err(|e| e.to_string())?;
+    start.add_project(&dir)?;
+    Ok(Some(list(&state, &start, &safety.recent_paths())))
+}
+
+/// Takes listed project folder `token` off the projects (the folder and
+/// what is in it are not touched); the lists again.
+#[tauri::command]
+pub async fn start_remove_project(
+    state: State<'_, AppState>,
+    safety: State<'_, Safety>,
+    start: State<'_, StartState>,
+    token: u64,
+) -> Result<StartView, String> {
+    let dir = start.listed(token)?;
+    start.remove_project(&dir)?;
+    Ok(list(&state, &start, &safety.recent_paths()))
+}
+
+/// Listed project folder `token` as New Budget's Save In (New Budget Here).
+#[tauri::command]
+pub fn start_project_folder(
+    start: State<'_, StartState>,
+    token: u64,
+) -> Result<FolderChoice, String> {
+    let dir = start.listed(token)?;
+    if !dir.is_dir() {
+        return Err("Can't find this folder.".into());
+    }
+    let folder = folder_text(Some(&dir), home().as_deref());
+    let token = start.keep_folder(dir);
+    Ok(FolderChoice { token, folder })
 }
 
 /// What `new_budget_pick_template` picked.
@@ -1305,6 +1930,7 @@ pub fn new_budget_create<R: Runtime>(
     start: State<'_, StartState>,
     library: State<'_, Library>,
     packs: State<'_, Packs>,
+    schedules: State<'_, crate::schedule_days::ScheduleSources>,
     spec: NewBudgetSpec,
 ) -> Result<Created, String> {
     let template = if spec.start.trim() == "file" {
@@ -1314,7 +1940,16 @@ pub fn new_budget_create<R: Runtime>(
     };
     let folder = spec.folder.map(|t| start.folder(t)).transpose()?;
     let setup = ticked_setup(&state.docs(), &library, &packs, &spec)?;
-    let (b, message) = build(&spec, template.as_ref(), &setup)?;
+    let schedule = spec
+        .schedule
+        .map(|t| {
+            schedules
+                .get(t)
+                .map(|(_, days)| days)
+                .map_err(|_| "Choose the schedule to link again.".to_string())
+        })
+        .transpose()?;
+    let (b, message) = build_with(&spec, template.as_ref(), &setup, schedule.as_deref())?;
     let Some(dir) = folder else {
         let id = open_new(&state, &safety, b)?;
         return Ok(Created {
@@ -1325,26 +1960,45 @@ pub fn new_budget_create<R: Runtime>(
     };
     let stem = file_stem_for(&spec.file_name, &b.title)?;
     let where_ = folder_text(Some(&dir), home().as_deref());
-    match save_new(&state, &safety, &b, &dir, &stem)? {
-        Made::Taken(free) => Ok(Created {
-            view: None,
-            message: format!(
-                "A file named \"{}\" is already in {where_}. Pick another name.",
-                file_name(&stem)
-            ),
-            taken: Some(free),
-        }),
+    let made = if spec.project {
+        save_new_project(&state, &safety, &start, &b, &dir, &stem)?
+    } else {
+        save_new(&state, &safety, &b, &dir, &stem)?
+    };
+    match made {
+        Made::Taken(free) => {
+            Ok(Created {
+                view: None,
+                message: if spec.project {
+                    format!("A folder or file named \"{stem}\" is already in {where_}. Pick another name.")
+                } else {
+                    format!(
+                        "A file named \"{}\" is already in {where_}. Pick another name.",
+                        file_name(&stem)
+                    )
+                },
+                taken: Some(free),
+            })
+        }
         Made::Opened(id, _) => {
             // Best effort: the budget is saved either way.
             let _ = start.set_last_folder(&dir);
             crate::safety_app::refresh_menu(window.app_handle());
             Ok(Created {
                 view: Some(finish(&window, &mut state.lock_doc(Some(id))?, None)),
-                message: format!(
-                    "{}, saved in {where_} as {}.",
-                    message.trim_end_matches('.'),
-                    file_name(&stem)
-                ),
+                message: if spec.project {
+                    format!(
+                        "{}, saved as {} in a new project folder in {where_}.",
+                        message.trim_end_matches('.'),
+                        Path::new(&stem).join(file_name(&stem)).display()
+                    )
+                } else {
+                    format!(
+                        "{}, saved in {where_} as {}.",
+                        message.trim_end_matches('.'),
+                        file_name(&stem)
+                    )
+                },
                 taken: None,
             })
         }
@@ -2010,6 +2664,399 @@ mod tests {
         let c = setup_choices(&docs, &library, &packs);
         assert!(c.library.unwrap().problem.is_some());
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The names of the files and folders in `dir`, sorted.
+    fn names_in(dir: &Path) -> Vec<String> {
+        let mut v: Vec<String> = std::fs::read_dir(dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        v.sort();
+        v
+    }
+
+    #[test]
+    fn new_budget_can_make_a_project_folder_with_the_budget_in_it() {
+        let dir = std::fs::canonicalize(safety::tests::temp_dir("start-project")).unwrap();
+        let data = dir.join("data");
+        let safety = Safety::new(Some(&data));
+        let start = StartState::load(Some(data.join(START_FILE)));
+        let state = AppState::with(Docs::default());
+        let (b, _) = build(&spec("Big Show"), None, &[]).unwrap();
+        let made = save_new_project(&state, &safety, &start, &b, &dir, "Big Show").unwrap();
+        let project = dir.join("Big Show");
+        let path = project.join("Big Show.mthd");
+        assert_eq!(made, Made::Opened(state.docs().active(), path.clone()));
+        assert_eq!(
+            names_in(&project),
+            ["Big Show.mthd"],
+            "the budget, nothing else"
+        );
+        {
+            let docs = state.docs();
+            let s = docs.get(docs.active()).unwrap();
+            assert_eq!(s.path(), Some(path.as_path()));
+            assert!(!s.is_dirty(), "a saved budget");
+        }
+        // The folder is listed with the projects, and kept between runs.
+        assert_eq!(start.projects(), std::slice::from_ref(&project));
+        let again = StartState::load(Some(data.join(START_FILE)));
+        assert_eq!(again.projects(), std::slice::from_ref(&project));
+
+        // The same name again makes nothing and offers a free one, also
+        // when only a loose file of that name is there.
+        let (other, _) = build(&spec("Other"), None, &[]).unwrap();
+        assert_eq!(
+            save_new_project(&state, &safety, &start, &other, &dir, "Big Show").unwrap(),
+            Made::Taken("Big Show 2".into())
+        );
+        std::fs::write(dir.join("Pilot.mthd"), "x").unwrap();
+        std::fs::create_dir(dir.join("Pilot 2")).unwrap();
+        assert_eq!(
+            save_new_project(&state, &safety, &start, &other, &dir, "Pilot").unwrap(),
+            Made::Taken("Pilot 3".into())
+        );
+        assert_eq!(names_in(&project), ["Big Show.mthd"], "untouched");
+        assert_eq!(start.projects().len(), 1);
+        // A folder that has gone is refused, and nothing is left behind.
+        assert!(save_new_project(&state, &safety, &start, &other, &dir.join("gone"), "X").is_err());
+        assert!(!dir.join("gone").exists());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_duplicate_is_a_new_file_beside_it_never_over_one() {
+        let dir = std::fs::canonicalize(safety::tests::temp_dir("start-dup")).unwrap();
+        let safety = Safety::new(Some(&dir.join("data")));
+        let state = AppState::with(Docs::default());
+        let a = dir.join("Big Show.mthd");
+        let mut s = Session::with_budget(starter::budget(), None);
+        s.edit("Test edit", |x| edit::set_title(x, "Big Show"))
+            .unwrap();
+        s.save_to(&a).unwrap();
+        let text = std::fs::read(&a).unwrap();
+        // "Big Show 2" is taken by something else: it is left alone.
+        std::fs::write(dir.join("Big Show 2.mthd"), "someone else's").unwrap();
+
+        let (id, to) = duplicate(&state, &safety, &a).unwrap();
+        assert_eq!(to, dir.join("Big Show 3.mthd"));
+        assert_eq!(std::fs::read(&to).unwrap(), text, "the same budget");
+        assert_eq!(std::fs::read(&a).unwrap(), text, "the original untouched");
+        assert_eq!(
+            std::fs::read_to_string(dir.join("Big Show 2.mthd")).unwrap(),
+            "someone else's"
+        );
+        {
+            let docs = state.docs();
+            let s = docs.get(id).unwrap();
+            assert_eq!(docs.active(), id, "in front");
+            assert_eq!(s.path(), Some(to.as_path()));
+            assert!(!s.is_dirty(), "opened as a saved budget");
+            assert_eq!(s.budget().title, "Big Show");
+        }
+        assert!(safety.recent_paths().contains(&to), "listed in Open Recent");
+        // Again: the next free name.
+        let (_, next) = duplicate(&state, &safety, &a).unwrap();
+        assert_eq!(next, dir.join("Big Show 4.mthd"));
+        // Only a readable budget file is duplicated.
+        std::fs::write(dir.join("junk.mthd"), "not a budget").unwrap();
+        assert!(duplicate(&state, &safety, &dir.join("junk.mthd")).is_err());
+        std::fs::write(dir.join("notes.txt"), "x").unwrap();
+        assert!(duplicate(&state, &safety, &dir.join("notes.txt")).is_err());
+        assert!(duplicate(&state, &safety, &dir.join("gone.mthd")).is_err());
+        let names = names_in(&dir);
+        assert!(!names.iter().any(|n| n.ends_with(".tmp")), "{names:?}");
+        assert!(!names.contains(&"junk 2.mthd".to_string()));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn save_new_free_takes_the_next_free_name() {
+        let dir = std::fs::canonicalize(safety::tests::temp_dir("start-free")).unwrap();
+        let safety = Safety::new(Some(&dir.join("data")));
+        let state = AppState::with(Docs::default());
+        std::fs::write(dir.join("Big Show - Camera.mthd"), "kept").unwrap();
+        let (b, _) = build(&spec("Big Show - Camera"), None, &[]).unwrap();
+        let (_, path) = save_new_free(&state, &safety, &b, &dir, "Big Show - Camera").unwrap();
+        assert_eq!(path, dir.join("Big Show - Camera 2.mthd"));
+        assert_eq!(
+            std::fs::read_to_string(dir.join("Big Show - Camera.mthd")).unwrap(),
+            "kept"
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn thumbnails_are_kept_with_the_summary_until_the_file_changes() {
+        let dir = std::fs::canonicalize(safety::tests::temp_dir("start-thumb")).unwrap();
+        let a = dir.join("a.mthd");
+        Session::with_budget(starter::budget(), None)
+            .save_to(&a)
+            .unwrap();
+        let state = AppState::with(Docs::default());
+        let start = StartState::load(Some(dir.join(START_FILE)));
+        let v = list(&state, &start, std::slice::from_ref(&a));
+        let report = crate::diagnose::lenient_recalc(&starter::budget())
+            .report
+            .unwrap();
+        let bars = projects::thumbnail(&report);
+        assert!(!bars.is_empty());
+        assert_eq!(v.recent[0].bars, bars, "drawn from the topsheet's totals");
+        assert_eq!(v.recent[0].kind, "budget");
+        // Kept in the app's data folder, keyed by the file, never in the file.
+        let kept = std::fs::read_to_string(dir.join(CACHE_FILE)).unwrap();
+        assert!(kept.contains("\"bars\""), "{kept}");
+        assert!(kept.contains(&format!("\"version\": {CACHE_VERSION}")));
+        assert!(!std::fs::read_to_string(&a).unwrap().contains("\"bars\""));
+
+        // The next run takes the kept bars without reading the file: kept
+        // bars that differ from the file's show it was not read.
+        let marked = kept.replacen("\"10 Story and rights\"", "\"From the cache\"", 1);
+        assert_ne!(marked, kept);
+        std::fs::write(dir.join(CACHE_FILE), &marked).unwrap();
+        let start = StartState::load(Some(dir.join(START_FILE)));
+        let v = list(&state, &start, std::slice::from_ref(&a));
+        assert_eq!(v.recent[0].bars[0].label, "From the cache");
+
+        // A changed file is read again: one category now.
+        let mut one = starter::budget();
+        let keep_first = one.categories().next().unwrap().code.clone();
+        one.topsheet.retain(|r| match r {
+            method_core::TopsheetRow::Category(c) => c.code == keep_first,
+            _ => false,
+        });
+        Session::with_budget(one, None).save_to(&a).unwrap();
+        let v = list(&state, &start, std::slice::from_ref(&a));
+        assert_eq!(v.recent[0].bars.len(), 1);
+        assert_eq!(v.recent[0].bars[0].share, 1000);
+
+        // A cache from before thumbnails (no version) is read as empty.
+        std::fs::write(
+            dir.join(CACHE_FILE),
+            marked.replace(&format!("\"version\": {CACHE_VERSION},"), ""),
+        )
+        .unwrap();
+        let start = StartState::load(Some(dir.join(START_FILE)));
+        let v = list(&state, &start, std::slice::from_ref(&a));
+        assert_eq!(v.recent[0].bars.len(), 1, "read from the file");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn projects_show_their_budgets_by_folder() {
+        let dir = std::fs::canonicalize(safety::tests::temp_dir("start-projects")).unwrap();
+        let data = dir.join("data");
+        let project = dir.join("Big Show");
+        std::fs::create_dir_all(project.join("actuals")).unwrap();
+        std::fs::create_dir_all(project.join("Big Show.mthd-log")).unwrap();
+        std::fs::create_dir_all(project.join("versions")).unwrap();
+        let mut parent = starter::budget();
+        parent.title = "Big Show".into();
+        Session::with_budget(parent.clone(), None)
+            .save_to(&project.join("Big Show.mthd"))
+            .unwrap();
+        let row = method_session::sharing::RowInput {
+            kind: "category".into(),
+            code: "21".into(),
+        };
+        let sub = method_session::sharing::make_row_sub_budget(
+            &parent,
+            &row,
+            "2026-10-20T10:00:00-07:00",
+        )
+        .unwrap();
+        Session::with_budget(sub, None)
+            .save_to(&project.join("versions").join("Camera.mthd"))
+            .unwrap();
+        Session::with_budget(starter::blank("Pilot", "USD"), None)
+            .save_to(&project.join("Pilot.mthd"))
+            .unwrap();
+        std::fs::write(
+            project.join("Big Show.days.json"),
+            "{\"format\": \"method-schedule-days\", \"version\": 1}",
+        )
+        .unwrap();
+        std::fs::write(project.join("other.json"), "{\"format\": \"x\"}").unwrap();
+        std::fs::write(project.join("actuals").join("2026-09 GL.csv"), "a,b").unwrap();
+        std::fs::write(project.join("notes.txt"), "x").unwrap();
+        std::fs::write(project.join(".hidden.mthd"), "x").unwrap();
+        std::fs::write(project.join("Big Show.mthd-log").join("x.mthd"), "x").unwrap();
+
+        let start = StartState::load(Some(data.join(START_FILE)));
+        start.add_project(&project).unwrap();
+        start.add_project(&project).unwrap();
+        start.add_project(&dir.join("gone")).unwrap();
+        let state = AppState::with(Docs::default());
+        let v = list(&state, &start, &[]);
+        assert_eq!(v.projects.len(), 2, "each folder once");
+        let p = &v.projects[0];
+        assert_eq!(p.name, "Big Show");
+        assert!(p.problem.is_none() && !p.more);
+        let sep = std::path::MAIN_SEPARATOR;
+        let rows: Vec<(String, &str, bool, bool)> = p
+            .items
+            .iter()
+            .map(|e| (e.file.clone(), e.kind.as_str(), e.under, e.openable))
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                ("Big Show.mthd".to_string(), "budget", false, true),
+                (
+                    format!("versions{sep}Camera.mthd"),
+                    "sub-budget",
+                    true,
+                    true
+                ),
+                ("Pilot.mthd".to_string(), "budget", false, true),
+                ("Big Show.days.json".to_string(), "schedule", false, false),
+                (
+                    format!("actuals{sep}2026-09 GL.csv"),
+                    "actuals",
+                    false,
+                    false
+                ),
+            ]
+        );
+        assert_eq!(p.items[1].title, "Big Show - Camera");
+        assert!(p.items[0].net_total.is_some() && !p.items[0].bars.is_empty());
+        assert_eq!(
+            v.projects[1].problem.as_deref(),
+            Some("Can't find this folder.")
+        );
+        // Tokens name the folder and its files; only budgets open.
+        assert_eq!(start.listed(p.token).unwrap(), project);
+        assert_eq!(
+            start.listed(p.items[0].token).unwrap(),
+            project.join("Big Show.mthd")
+        );
+        assert!(is_budget_path(&start.listed(p.items[0].token).unwrap()));
+        assert!(!is_budget_path(&start.listed(p.items[3].token).unwrap()));
+
+        // Removing a project takes it off the list; the folder stays.
+        start.remove_project(&project).unwrap();
+        assert_eq!(start.projects(), [dir.join("gone")]);
+        assert!(project.join("Big Show.mthd").is_file());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_big_project_folder_is_read_up_to_the_limit() {
+        let dir = std::fs::canonicalize(safety::tests::temp_dir("start-big")).unwrap();
+        for n in 0..SCAN_LIMIT + 5 {
+            std::fs::write(dir.join(format!("{n:04}.txt")), "x").unwrap();
+        }
+        let (files, more) = scan(&dir);
+        assert!(more);
+        assert_eq!(files.len(), SCAN_LIMIT);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_project_folder_is_shown_itself() {
+        let dir = std::fs::canonicalize(safety::tests::temp_dir("start-reveal")).unwrap();
+        let cmd = reveal_command(&dir).unwrap();
+        let args: Vec<&std::ffi::OsStr> = cmd.get_args().collect();
+        assert_eq!(args, [dir.as_os_str()]);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_shared_budget_says_so_with_who_was_in_it() {
+        use method_core::log::ActorId;
+        use method_format::log::{LogDir, Presence};
+        let dir = std::fs::canonicalize(safety::tests::temp_dir("start-shared")).unwrap();
+        let a = dir.join("Big Show.mthd");
+        let b = dir.join("Pilot.mthd");
+        for p in [&a, &b] {
+            Session::with_budget(starter::budget(), None)
+                .save_to(p)
+                .unwrap();
+        }
+        let log = LogDir::for_budget(&a);
+        std::fs::create_dir_all(log.root()).unwrap();
+        std::fs::write(log.root().join("budget.json"), "{}").unwrap();
+        for (n, name, acct, at) in [
+            (1u8, "Ann", None, "2026-10-19T10:00:00Z"),
+            (2, "Bo", Some("2101"), "2026-10-20T09:00:00Z"),
+        ] {
+            let p = Presence {
+                name: name.into(),
+                account: acct.map(str::to_string),
+                at: at.into(),
+                ..Presence::default()
+            };
+            log.write_presence(ActorId([n; 32]), &p).unwrap();
+        }
+        let state = AppState::with(Docs::default());
+        let start = StartState::load(Some(dir.join(START_FILE)));
+        let v = list(&state, &start, &[a.clone(), b.clone()]);
+        assert!(v.recent[0].shared);
+        let people: Vec<(&str, &str)> = v.recent[0]
+            .people
+            .iter()
+            .map(|p| (p.name.as_str(), p.place.as_str()))
+            .collect();
+        assert_eq!(people, [("Bo", "account 2101"), ("Ann", "")]);
+        assert!(!v.recent[1].shared && v.recent[1].people.is_empty());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_linked_schedule_comes_in_before_what_the_form_says() {
+        let days = method_session::schedule_days::read(
+            "every-field-days.json",
+            include_bytes!("../../method-format/tests/fixtures/schedule/every-field-days.json"),
+        )
+        .unwrap();
+        let (b, msg) = build_with(&spec("Harbor"), None, &[], Some(&days)).unwrap();
+        assert_eq!(b.globals["SHOOT_DAYS"].0, "6");
+        assert_eq!(
+            info(&b, "Wrap end"),
+            Some(InfoValue::Date("2027-03-26".into()))
+        );
+        assert!(msg.ends_with("linked for later imports."), "{msg}");
+        // What is typed in the form wins.
+        let typed = NewBudgetSpec {
+            shoot_days: "30".into(),
+            shoot_start: "2027-02-22".into(),
+            ..spec("Harbor")
+        };
+        let (b, _) = build_with(&typed, None, &[], Some(&days)).unwrap();
+        assert_eq!(b.globals["SHOOT_DAYS"].0, "30");
+        assert_eq!(
+            info(&b, "Shoot start"),
+            Some(InfoValue::Date("2027-02-22".into()))
+        );
+        assert!(
+            b.setup_sources.get("global", "SHOOT_DAYS").is_some(),
+            "still linked"
+        );
+    }
+
+    #[test]
+    fn projects_duplicate_and_row_sub_budgets_are_wired_for_the_main_window() {
+        for (cmd, perm) in [
+            ("start_duplicate", "allow-start-duplicate"),
+            ("start_add_project", "allow-start-add-project"),
+            ("start_remove_project", "allow-start-remove-project"),
+            ("start_project_folder", "allow-start-project-folder"),
+            ("sub_budget_from_row", "allow-sub-budget-from-row"),
+        ] {
+            assert!(
+                include_str!("app.rs").contains(&format!("::{cmd},")),
+                "{cmd}"
+            );
+            assert!(
+                include_str!("../build.rs").contains(&format!("\"{cmd}\",")),
+                "{cmd}"
+            );
+            assert!(
+                include_str!("../capabilities/main.json").contains(&format!("\"{perm}\"")),
+                "{perm}"
+            );
+        }
     }
 
     #[test]

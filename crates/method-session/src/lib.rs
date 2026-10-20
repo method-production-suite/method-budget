@@ -39,6 +39,7 @@ pub mod open_any;
 pub mod overtime;
 pub mod packs;
 pub mod presets;
+pub mod projects;
 pub mod quickadd;
 pub mod rates;
 pub mod rename;

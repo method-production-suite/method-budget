@@ -121,7 +121,7 @@ this section.
 - **Globals with details.** Give a global a description, a unit and decimals, show it by name in cells, and see the formulas behind a selection.
 - **Contractual charges.** Percent and flat charges with exclusions, a live preview while you type, and the percent shown on the topsheet if you want it.
 - **Credits.** Credit rows show gross, excluded fringes, net and how far you are from a cap.
-- **Incentive estimates by location.** Limit a credit to the locations where the money is spent and see every program's estimate side by side, applied or not, from rates and caps you enter yourself.
+- **Incentive estimates by location.** Limit a credit to the locations where the money is spent and see every program's estimate side by side, applied or not, from rates, caps, minimum spends, broker's fees and shared caps you enter yourself.
 - **Apply panel.** Select lines, then tick fringes, groups, sets and locations on or off, with live totals for the selection.
 - **In-use counts.** Every setup list shows how many lines use each item and what they cost, warns before you delete one in use, and finds them in a click.
 - **Your own rate tables.** Keep rate tables of your own (classifications with a rate per hour, day or week and the dates each is in effect), type them in or import them from a spreadsheet, and pick a classification on a line to fill its rate; the line remembers where the rate came from and tells you when the table changes.
@@ -183,7 +183,7 @@ this section.
 ### On the roadmap
 
 - **Windows and Linux, tested.** Installers for both are built today; printing, keys and file types still need a hands-on check.
-- **Incentive what-ifs.** Move lines between locations and see what each incentive program gains or loses, with minimum spends and shared caps.
+- **Incentive what-ifs.** Move lines between locations and see what each incentive program gains or loses.
 - **Accessibility and translations.** A full accessibility pass and the app in more languages.
 - **Work on a budget together.** Several people in one budget at once, through a shared Dropbox or iCloud folder or a live link, with who changed what and undo that only takes back your own edits.
 - **Rate card lookup.** Pick a union classification from public rate cards that come with the app and fill in the rate, with the source and effective date shown.

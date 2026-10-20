@@ -1311,6 +1311,22 @@ pub struct CreditInput {
     /// location names. Empty counts every line, wherever it is.
     #[serde(default)]
     pub locations: Vec<String>,
+    /// The qualified spend below which the credit pays nothing, as money
+    /// text; blank for none (decisions.md, entry 88).
+    #[serde(default)]
+    pub minimum_spend: Option<String>,
+    /// A flat fee taken off after the discount, as money text; blank for
+    /// none.
+    #[serde(default)]
+    pub broker_fee: Option<String>,
+    /// The name of a cap this credit shares with others; blank for none.
+    #[serde(default)]
+    pub shared_cap: Option<String>,
+    /// The shared cap's amount, as money text. Sets it for every credit
+    /// sharing it; blank keeps the amount it has (a new shared cap needs
+    /// one).
+    #[serde(default)]
+    pub shared_cap_amount: Option<String>,
     #[serde(default)]
     pub rows: Vec<CreditRowInput>,
 }
@@ -1323,6 +1339,7 @@ pub fn set_credit(b: &mut Budget, index: Option<usize>, c: &CreditInput) -> Edit
 pub fn delete_credit(b: &mut Budget, index: usize) -> EditResult {
     check_index(b.credits.len(), index, "credit")?;
     b.credits.remove(index);
+    typed::drop_unshared_caps(b);
     Ok(())
 }
 
