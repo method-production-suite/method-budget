@@ -243,6 +243,21 @@
   color: var(--danger);
 }
 
+/* Who was in a shared budget lately. */
+.st-people {
+  grid-column: 2 / -1;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-sort {
+  flex: 0 0 auto;
+  width: auto;
+}
+
 .st-missing .st-title,
 .st-missing .st-open {
   cursor: default;

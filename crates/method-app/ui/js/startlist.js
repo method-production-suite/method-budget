@@ -179,6 +179,7 @@ export function specFrom(values, startFrom, token, folder = null, setup = null, 
     library: !!(setup && setup.library === true),
     packs: setup && Array.isArray(setup.packs) ? [...new Set(setup.packs.filter(Number.isSafeInteger))] : [],
     project: project === true && Number.isSafeInteger(folder),
+    schedule: null,
   };
   const tv = tvFields(spec.kind);
   if (tv.season) spec.season = s('season');
@@ -251,4 +252,63 @@ export function shareText(share) {
 /** The rows of `project` ({items}) that match `query`, as filterEntries does. */
 export function projectEntries(project, query) {
   return filterEntries(project && Array.isArray(project.items) ? project.items : [], query);
+}
+
+/** The orders the start window's lists can be put in: [value, label]. */
+export const SORTS = [
+  ['recent', 'Last opened'],
+  ['name', 'Name'],
+  ['modified', 'Last changed'],
+  ['total', 'Net total'],
+];
+
+/**
+ * `list` in the order `by` names: `recent` as given (pinned as pinned,
+ * recent newest first, a project as arranged), `name` by title (else file
+ * name), `modified` newest first, `total` largest first; rows without one
+ * last, in their order. A row shown under the one above it (`under`) stays
+ * with it: the groups are sorted, not the rows.
+ */
+export function sortEntries(list, by) {
+  const rows = Array.isArray(list) ? list.filter(Boolean) : [];
+  if (!SORTS.some(([v]) => v === by) || by === 'recent') return rows;
+  const groups = [];
+  for (const r of rows) {
+    if (r.under && groups.length) groups[groups.length - 1].push(r);
+    else groups.push([r]);
+  }
+  const name = (r) => String(r.title || r.file || '');
+  const num = (r) => (by === 'modified' ? r.modified : r.net_total);
+  const cmp = (ga, gb) => {
+    const a = ga[0];
+    const b = gb[0];
+    if (by === 'name') return name(a).localeCompare(name(b), undefined, { sensitivity: 'base', numeric: true });
+    const x = num(a);
+    const y = num(b);
+    const hx = Number.isFinite(x);
+    const hy = Number.isFinite(y);
+    if (hx !== hy) return hx ? -1 : 1;
+    return hx ? y - x : 0;
+  };
+  return groups
+    .map((g, i) => [g, i])
+    .sort((a, b) => cmp(a[0], b[0]) || a[1] - b[1])
+    .flatMap(([g]) => g);
+}
+
+/**
+ * Who was in a shared budget (src/start.rs, people: [{name, place, at}]),
+ * in words: "Bo in account 2101, Today 09:00; Ann, Yesterday". `when`
+ * turns milliseconds into words (whenText). Empty when nobody is known.
+ */
+export function peopleText(people, when = whenText) {
+  return (Array.isArray(people) ? people : [])
+    .filter((p) => p && String(p.name || '').trim())
+    .map((p) => {
+      const t = Date.parse(p.at);
+      const at = Number.isFinite(t) ? when(t) : '';
+      const who = p.place ? `${String(p.name).trim()} in ${p.place}` : String(p.name).trim();
+      return at ? `${who}, ${at}` : who;
+    })
+    .join('; ');
 }

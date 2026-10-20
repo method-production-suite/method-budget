@@ -270,6 +270,59 @@ pub fn arrange(found: &[Found]) -> Vec<Placed> {
     out
 }
 
+// ---------------------------------------------------------------------------
+// Shared budgets
+
+/// Most people a shared budget's row names.
+pub const PEOPLE_SHOWN: usize = 5;
+
+/// One person's last heartbeat in a shared budget (the change log's
+/// `presence.json`, decisions.md entries 62 and 64), as the desktop reads it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Heartbeat {
+    pub name: String,
+    pub category: Option<String>,
+    pub account: Option<String>,
+    /// When it was written, ISO 8601 UTC.
+    pub at: String,
+}
+
+/// Someone who was in a shared budget, for its row in the start window.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Person {
+    pub name: String,
+    /// Where they were: "account 2101", "category 21", or empty.
+    pub place: String,
+    /// When, ISO 8601 UTC, as written.
+    pub at: String,
+}
+
+/// Who was in a shared budget, latest first: one row per name (trimmed,
+/// ignoring case; their latest heartbeat), nameless heartbeats left out, at
+/// most [`PEOPLE_SHOWN`]. Times compare as written (ISO 8601 UTC sorts as
+/// text).
+pub fn people(beats: impl IntoIterator<Item = Heartbeat>) -> Vec<Person> {
+    let mut all: Vec<Heartbeat> = beats
+        .into_iter()
+        .filter(|h| !h.name.trim().is_empty())
+        .collect();
+    all.sort_by(|a, b| b.at.cmp(&a.at).then_with(|| a.name.cmp(&b.name)));
+    let mut seen = std::collections::BTreeSet::new();
+    all.into_iter()
+        .filter(|h| seen.insert(h.name.trim().to_lowercase()))
+        .take(PEOPLE_SHOWN)
+        .map(|h| Person {
+            name: h.name.trim().to_string(),
+            place: match (h.account, h.category) {
+                (Some(a), _) if !a.trim().is_empty() => format!("account {}", a.trim()),
+                (_, Some(c)) if !c.trim().is_empty() => format!("category {}", c.trim()),
+                _ => String::new(),
+            },
+            at: h.at,
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -403,5 +456,43 @@ mod tests {
             ]
         );
         assert!(arrange(&[]).is_empty());
+    }
+
+    #[test]
+    fn a_shared_budgets_people_latest_first_once_each() {
+        let beat = |name: &str, cat: Option<&str>, acct: Option<&str>, at: &str| Heartbeat {
+            name: name.into(),
+            category: cat.map(str::to_string),
+            account: acct.map(str::to_string),
+            at: at.into(),
+        };
+        let p = people([
+            beat("Ann", Some("21"), None, "2026-10-19T10:00:00Z"),
+            beat("Bo", Some("21"), Some("2101"), "2026-10-20T09:00:00Z"),
+            beat(" ann ", None, None, "2026-10-20T08:00:00Z"),
+            beat("", Some("10"), None, "2026-10-20T10:00:00Z"),
+        ]);
+        let rows: Vec<(&str, &str, &str)> = p
+            .iter()
+            .map(|x| (x.name.as_str(), x.place.as_str(), x.at.as_str()))
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                ("Bo", "account 2101", "2026-10-20T09:00:00Z"),
+                ("ann", "", "2026-10-20T08:00:00Z"),
+            ]
+        );
+        let many = (0..9).map(|n| {
+            beat(
+                &format!("P{n}"),
+                None,
+                None,
+                &format!("2026-10-20T0{n}:00:00Z"),
+            )
+        });
+        let p = people(many);
+        assert_eq!(p.len(), PEOPLE_SHOWN);
+        assert_eq!(p[0].name, "P8");
     }
 }

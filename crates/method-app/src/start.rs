@@ -492,6 +492,10 @@ pub struct StartEntry {
     pub openable: bool,
     /// In a project: it came from the budget above it, and is shown under it.
     pub under: bool,
+    /// Shared through a folder: a change log (`X.mthd-log/`) is beside it.
+    pub shared: bool,
+    /// For a shared budget: who was in it, latest first (their heartbeats).
+    pub people: Vec<projects::Person>,
     pub pinned: bool,
     /// On the recent list.
     pub recent: bool,
@@ -665,11 +669,26 @@ impl Lister<'_> {
             kind: ItemKind::Budget.word().into(),
             openable: true,
             under: false,
+            shared: false,
+            people: Vec::new(),
             pinned: is_pinned,
             recent: is_recent,
             open,
             problem: None,
         };
+        // A change log beside it: shared through a folder (read every
+        // listing, as people come and go without the file changing).
+        let log = method_format::log::LogDir::for_budget(path);
+        if log.exists() {
+            e.shared = true;
+            e.people =
+                projects::people(log.presences().into_values().map(|p| projects::Heartbeat {
+                    name: p.name,
+                    category: p.category,
+                    account: p.account,
+                    at: p.at,
+                }));
+        }
         match summary {
             Ok(s) => {
                 e.title = s.title.clone();
@@ -749,6 +768,8 @@ impl Lister<'_> {
                 kind: kind.word().into(),
                 openable: false,
                 under: false,
+                shared: false,
+                people: Vec::new(),
                 pinned: false,
                 recent: false,
                 open: false,
@@ -1028,6 +1049,9 @@ pub struct NewBudgetSpec {
     /// Save In: make a project folder named like the file in the folder,
     /// save the budget in it and list it with the projects.
     pub project: bool,
+    /// Link a Schedule: the token of a schedule days file picked with
+    /// `schedule_days_pick` (its shoot days and dates come in, linked).
+    pub schedule: Option<u64>,
 }
 
 fn text(field: &str, value: &str, max: usize) -> Result<String, String> {
@@ -1053,6 +1077,18 @@ pub fn build(
     spec: &NewBudgetSpec,
     template: Option<&Budget>,
     setup: &[Ticked],
+) -> Result<(Budget, String), String> {
+    build_with(spec, template, setup, None)
+}
+
+/// [`build`], with a linked schedule's shoot days and dates
+/// (`new_budget::link_schedule`) after the ticked setup and before the
+/// form's own details, so what is typed in the form wins.
+pub fn build_with(
+    spec: &NewBudgetSpec,
+    template: Option<&Budget>,
+    setup: &[Ticked],
+    schedule: Option<&method_format::import::schedule::ScheduleDays>,
 ) -> Result<(Budget, String), String> {
     let title = text("The title", &spec.title, TITLE_MAX)?;
     if title.is_empty() {
@@ -1100,6 +1136,9 @@ pub fn build(
     // The ticked setup, before the details typed here, so those win (a
     // library's SHOOT_DAYS gives way to the Shoot days typed).
     let brought = new_budget::bring_in(&mut b, setup)?;
+    let linked = schedule
+        .map(|days| new_budget::link_schedule(&mut b, days))
+        .transpose()?;
 
     // Budget info, in plain words.
     let mut info = |name: &str, kind: &str, value: &str| -> Result<(), String> {
@@ -1197,6 +1236,10 @@ pub fn build(
         )
     };
     let message = match brought.sentence() {
+        Some(more) => format!("{message} {more}"),
+        None => message,
+    };
+    let message = match linked {
         Some(more) => format!("{message} {more}"),
         None => message,
     };
@@ -1887,6 +1930,7 @@ pub fn new_budget_create<R: Runtime>(
     start: State<'_, StartState>,
     library: State<'_, Library>,
     packs: State<'_, Packs>,
+    schedules: State<'_, crate::schedule_days::ScheduleSources>,
     spec: NewBudgetSpec,
 ) -> Result<Created, String> {
     let template = if spec.start.trim() == "file" {
@@ -1896,7 +1940,16 @@ pub fn new_budget_create<R: Runtime>(
     };
     let folder = spec.folder.map(|t| start.folder(t)).transpose()?;
     let setup = ticked_setup(&state.docs(), &library, &packs, &spec)?;
-    let (b, message) = build(&spec, template.as_ref(), &setup)?;
+    let schedule = spec
+        .schedule
+        .map(|t| {
+            schedules
+                .get(t)
+                .map(|(_, days)| days)
+                .map_err(|_| "Choose the schedule to link again.".to_string())
+        })
+        .transpose()?;
+    let (b, message) = build_with(&spec, template.as_ref(), &setup, schedule.as_deref())?;
     let Some(dir) = folder else {
         let id = open_new(&state, &safety, b)?;
         return Ok(Created {
@@ -2907,6 +2960,79 @@ mod tests {
         let args: Vec<&std::ffi::OsStr> = cmd.get_args().collect();
         assert_eq!(args, [dir.as_os_str()]);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_shared_budget_says_so_with_who_was_in_it() {
+        use method_core::log::ActorId;
+        use method_format::log::{LogDir, Presence};
+        let dir = std::fs::canonicalize(safety::tests::temp_dir("start-shared")).unwrap();
+        let a = dir.join("Big Show.mthd");
+        let b = dir.join("Pilot.mthd");
+        for p in [&a, &b] {
+            Session::with_budget(starter::budget(), None)
+                .save_to(p)
+                .unwrap();
+        }
+        let log = LogDir::for_budget(&a);
+        std::fs::create_dir_all(log.root()).unwrap();
+        std::fs::write(log.root().join("budget.json"), "{}").unwrap();
+        for (n, name, acct, at) in [
+            (1u8, "Ann", None, "2026-10-19T10:00:00Z"),
+            (2, "Bo", Some("2101"), "2026-10-20T09:00:00Z"),
+        ] {
+            let p = Presence {
+                name: name.into(),
+                account: acct.map(str::to_string),
+                at: at.into(),
+                ..Presence::default()
+            };
+            log.write_presence(ActorId([n; 32]), &p).unwrap();
+        }
+        let state = AppState::with(Docs::default());
+        let start = StartState::load(Some(dir.join(START_FILE)));
+        let v = list(&state, &start, &[a.clone(), b.clone()]);
+        assert!(v.recent[0].shared);
+        let people: Vec<(&str, &str)> = v.recent[0]
+            .people
+            .iter()
+            .map(|p| (p.name.as_str(), p.place.as_str()))
+            .collect();
+        assert_eq!(people, [("Bo", "account 2101"), ("Ann", "")]);
+        assert!(!v.recent[1].shared && v.recent[1].people.is_empty());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_linked_schedule_comes_in_before_what_the_form_says() {
+        let days = method_session::schedule_days::read(
+            "every-field-days.json",
+            include_bytes!("../../method-format/tests/fixtures/schedule/every-field-days.json"),
+        )
+        .unwrap();
+        let (b, msg) = build_with(&spec("Harbor"), None, &[], Some(&days)).unwrap();
+        assert_eq!(b.globals["SHOOT_DAYS"].0, "6");
+        assert_eq!(
+            info(&b, "Wrap end"),
+            Some(InfoValue::Date("2027-03-26".into()))
+        );
+        assert!(msg.ends_with("linked for later imports."), "{msg}");
+        // What is typed in the form wins.
+        let typed = NewBudgetSpec {
+            shoot_days: "30".into(),
+            shoot_start: "2027-02-22".into(),
+            ..spec("Harbor")
+        };
+        let (b, _) = build_with(&typed, None, &[], Some(&days)).unwrap();
+        assert_eq!(b.globals["SHOOT_DAYS"].0, "30");
+        assert_eq!(
+            info(&b, "Shoot start"),
+            Some(InfoValue::Date("2027-02-22".into()))
+        );
+        assert!(
+            b.setup_sources.get("global", "SHOOT_DAYS").is_some(),
+            "still linked"
+        );
     }
 
     #[test]

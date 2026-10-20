@@ -23,7 +23,10 @@ import {
   fileNameFrom,
   filterEntries,
   packText,
+  peopleText,
   projectEntries,
+  SORTS,
+  sortEntries,
   specFrom,
   startForKind,
   thumbRects,
@@ -148,6 +151,8 @@ function open(ctx, first, charts) {
   // The place shown on the right: null for the pinned and recent budgets,
   // else a project, by its folder (tokens change with every listing).
   let place = null;
+  // The lists' order (startlist.js, SORTS), kept for next time.
+  let sortBy = String(readPref('start.sort', 'recent') || 'recent');
   let busy = false;
   let box = null;
   let close = () => {};
@@ -176,6 +181,17 @@ function open(ctx, first, charts) {
     },
   });
   const lists = el('div', { class: 'st-lists', attrs: { role: 'region', 'aria-label': 'Budgets' } });
+  const sortSelect = el('select', { class: 'modal-input st-sort', attrs: { 'aria-label': 'Sort by' } });
+  for (const [v, label] of SORTS) sortSelect.append(el('option', { text: label, attrs: { value: v } }));
+  if (!SORTS.some(([v]) => v === sortBy)) sortBy = 'recent';
+  sortSelect.value = sortBy;
+  sortSelect.addEventListener('change', () => {
+    sortBy = sortSelect.value;
+    writePref('start.sort', sortBy);
+    drawLists();
+  });
+  /** `list` searched and sorted as the window shows it. */
+  const shown = (list) => sortEntries(filterEntries(list, query), sortBy);
 
   /** Runs `fn` with nothing else running; its error goes to the toast. */
   const once = async (fn) => {
@@ -244,13 +260,14 @@ function open(ctx, first, charts) {
   const row = (e) => {
     const inProject = place !== null;
     const where = inProject ? e.file : [e.file, e.folder].filter(Boolean).join('  ');
-    const note = e.problem || [kindNote(e), e.open ? 'Open in a tab' : ''].filter(Boolean).join(', ');
+    const note = e.problem || [kindNote(e), e.shared ? 'shared' : '', e.open ? 'Open in a tab' : ''].filter(Boolean).join(', ');
     const total = totalText(e);
+    const who = e.shared ? peopleText(e.people) : '';
     const main = el(
       'button',
       {
         class: 'st-open',
-        attrs: { type: 'button', 'aria-label': [e.title || e.file, total, where, note].filter(Boolean).join(', ') },
+        attrs: { type: 'button', 'aria-label': [e.title || e.file, total, where, note, who].filter(Boolean).join(', ') },
         data: { key: `${e.folder}\n${e.file}` },
       },
       e.openable === false ? el('span', { class: 'st-thumb st-thumb-file', attrs: { 'aria-hidden': 'true' } }) : thumbnail(e.bars),
@@ -259,6 +276,7 @@ function open(ctx, first, charts) {
       el('span', { class: 'st-when', text: whenText(e.modified) }),
       el('span', { class: 'st-where', text: where }),
       el('span', { class: e.problem ? 'st-note st-problem' : 'st-note', text: note }),
+      who ? el('span', { class: 'st-people', text: who }) : null,
     );
     main.title = where;
     main.addEventListener('click', () => {
@@ -381,7 +399,7 @@ function open(ctx, first, charts) {
         btn('Remove from List', removeProject),
       ),
     );
-    const items = projectEntries(p, query);
+    const items = sortEntries(projectEntries(p, query), sortBy);
     const parts = [head];
     if (p.problem) parts.push(el('p', { class: 'st-empty st-problem', text: `${p.problem} Remove it from the list, or put the folder back.` }));
     else if (items.length) parts.push(el('ul', { class: 'st-list' }, ...items.map(row)));
@@ -397,8 +415,8 @@ function open(ctx, first, charts) {
       drawProject(p);
       return;
     }
-    const pinned = filterEntries(data.pinned, query);
-    const recent = filterEntries(data.recent, query);
+    const pinned = shown(data.pinned);
+    const recent = shown(data.recent);
     const parts = [];
     if (pinned.length) parts.push(section('Pinned', pinned));
     if (recent.length) parts.push(section('Recent', recent));
@@ -471,8 +489,8 @@ function open(ctx, first, charts) {
     } else if (ev.key === 'Enter') {
       ev.preventDefault();
       const p = project();
-      const shown = (p ? projectEntries(p, query) : [...filterEntries(data.pinned, query), ...filterEntries(data.recent, query)]).filter(canOpen);
-      if (shown.length) openEntry(shown[0]);
+      const first = (p ? sortEntries(projectEntries(p, query), sortBy) : [...shown(data.pinned), ...shown(data.recent)]).filter(canOpen);
+      if (first.length) openEntry(first[0]);
     } else if (ev.key === 'Escape' && search.value) {
       // Escape clears the search first, then closes.
       ev.preventDefault();
@@ -505,6 +523,7 @@ function open(ctx, first, charts) {
         newBtn,
         openBtn,
         search,
+        sortSelect,
       ),
       el('div', { class: 'st-body' }, rail, lists),
       el('p', {
@@ -792,6 +811,43 @@ function open(ctx, first, charts) {
       })
       .catch(() => showFolder());
 
+    // -----------------------------------------------------------------------
+    // Link a Schedule: a schedule days file (Method Schedule's) fills Shoot
+    // days and the shoot dates here, and at Create its shoot days go to
+    // SHOOT_DAYS linked to the schedule, and its prep start and wrap end to
+    // the budget info (src/start.rs, build_with; decision 91).
+
+    let linked = null; // the review of the picked file: { token, file, schedule, shoot_days, start, end }
+    const scheduleText = el('span', { class: 'st-folder-text st-folder-none', attrs: { id: 'st-schedule-text' } });
+    const scheduleBtn = el('button', { class: 'btn', text: 'Link a Schedule…', attrs: { type: 'button', 'aria-describedby': 'st-schedule-text' } });
+    const unlinkBtn = el('button', { class: 'btn btn-quiet', text: 'Unlink', attrs: { type: 'button' } });
+    const showSchedule = () => {
+      unlinkBtn.hidden = !linked;
+      scheduleText.classList.toggle('st-folder-none', !linked);
+      scheduleText.textContent = linked
+        ? `${linked.file}: ${linked.schedule || 'a schedule'}, ${linked.shoot_days} shoot ${linked.shoot_days === 1 ? 'day' : 'days'}. Its prep start and wrap end come too, and Shoot days stays linked to it.`
+        : 'No schedule linked: type the schedule length, or link the days file Method Schedule writes.';
+    };
+    scheduleBtn.addEventListener('click', () =>
+      once(async () => {
+        const r = await ctx.invoke('schedule_days_pick', {});
+        if (r) {
+          linked = r;
+          inputs.shoot_days.value = String(r.shoot_days);
+          if (r.start) inputs.shoot_start.value = r.start;
+          if (r.end) inputs.shoot_end.value = r.end;
+        }
+        showSchedule();
+        scheduleBtn.focus();
+      }),
+    );
+    unlinkBtn.addEventListener('click', () => {
+      linked = null;
+      showSchedule();
+      scheduleBtn.focus();
+    });
+    showSchedule();
+
     const fileName = field('file_name', 'File name', { span: 3, max: 200 });
     let fileTouched = false;
     const followTitle = () => {
@@ -889,6 +945,7 @@ function open(ctx, first, charts) {
         const values = {};
         for (const [k, input] of Object.entries(inputs)) values[k] = input.value;
         const spec = specFrom(values, startValue(), picked ? picked.token : null, folder ? folder.token : null, setupTicks(), projectBox.checked);
+        if (linked && Number.isSafeInteger(linked.token)) spec.schedule = linked.token;
         if (!spec.title) {
           showError('Give the budget a title.');
           inputs.title.focus();
@@ -960,6 +1017,7 @@ function open(ctx, first, charts) {
       num('shoot_days', 'Shoot days'),
       num('wrap_weeks', 'Wrap weeks'),
       el('span', { class: 'st-span1 st-aside', text: 'Kept as globals for formulas.' }),
+      el('div', { class: 'st-folder st-span4' }, scheduleText, unlinkBtn, scheduleBtn),
       heading('Location and money'),
       field('country', 'Country'),
       field('region', 'Region or state'),
