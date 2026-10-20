@@ -48,7 +48,8 @@ import { globalValueText } from './display.js';
 import { globalInfoCell, globalDetails } from './display-settings.js';
 import { saveItemToLibrary } from './library.js';
 import { mountFrame, actionStrip, stripButton, searchBox, gridTable, setFooterTotals } from './setupframe.js';
-import { str, plural, errText, sourceText } from './util.js';
+import { str, errText, sourceText } from './util.js';
+import { t } from './i18n.js';
 
 // Letters, digits and _, with at least one letter or _ (decisions.md, entry 56).
 const GLOBAL_NAME = /^(?=[A-Za-z0-9_]*[A-Za-z_])[A-Za-z0-9_]+$/;
@@ -350,7 +351,7 @@ function run(itemKey, build, opts = {}) {
     applyBusy();
     try {
       const [cmd, args] = build();
-      if (!state.ctx || typeof state.ctx.call !== 'function') throw new Error('Not connected');
+      if (!state.ctx || typeof state.ctx.call !== 'function') throw new Error(t('setup.not_connected'));
       await state.ctx.call(cmd, args);
       if (opts.onOk) opts.onOk();
     } catch (e) {
@@ -477,12 +478,12 @@ function finishItem(li, itemKey, issues, describe) {
 }
 
 // The delete button and its inline confirmation.
-function deleteButton({ itemKey, name, what, confirmText, build, neighborKey, confirmLabel = 'Delete' }) {
+function deleteButton({ itemKey, name, what, confirmText, build, neighborKey, confirmLabel = t('setup.delete_yes') }) {
   const btn = el('button', 'setup-del', '×');
   btn.type = 'button';
   btn.dataset.key = key('del', itemKey);
-  btn.setAttribute('aria-label', `Delete ${what} ${name}`);
-  btn.title = `Delete ${what}`;
+  btn.setAttribute('aria-label', t('setup.delete', { what: whatWord(what), name }));
+  btn.title = t('setup.delete_kind', { what: whatWord(what) });
   btn.addEventListener('click', () => {
     if (isBusy()) return;
     const li = findByData('item', itemKey);
@@ -494,14 +495,14 @@ function deleteButton({ itemKey, name, what, confirmText, build, neighborKey, co
     }
     const box = el('div', 'setup-confirm');
     box.setAttribute('role', 'group');
-    box.setAttribute('aria-label', `Delete ${what} ${name}`);
+    box.setAttribute('aria-label', t('setup.delete', { what: whatWord(what), name }));
     const text = el('p', 'setup-confirm-text', confirmText);
     text.id = nextId();
     const yes = el('button', 'setup-btn setup-btn-danger', confirmLabel);
     yes.type = 'button';
     yes.dataset.key = key('del-yes', itemKey);
     yes.setAttribute('aria-describedby', text.id);
-    const no = el('button', 'setup-btn setup-btn-quiet', 'Cancel');
+    const no = el('button', 'setup-btn setup-btn-quiet', t('setup.cancel'));
     no.type = 'button';
     no.dataset.key = key('del-no', itemKey);
     const close = () => {
@@ -616,7 +617,7 @@ function addForm(tab, { title, fields, hint, validate, build }) {
   head.setAttribute('aria-hidden', 'true');
   const grid = el('div', 'setup-fields');
   grid.append(...fields);
-  const submit = el('button', 'setup-btn setup-btn-primary', 'Add');
+  const submit = el('button', 'setup-btn setup-btn-primary', t('setup.add'));
   submit.type = 'submit';
   submit.dataset.key = key('add-submit', tab);
   const actions = el('div', 'setup-add-actions');
@@ -661,10 +662,16 @@ function addForm(tab, { title, fields, hint, validate, build }) {
   return form;
 }
 
+/** A setup kind's name in words ('global', 'unit'), for sentences. */
+const WHAT = { global: t('setup.what.global'), unit: t('setup.what.unit') };
+function whatWord(what) {
+  return WHAT[what] || what;
+}
+
 function checkName(name, existing, what) {
-  if (name === '') return `Enter a ${what} name.`;
-  if (name.includes(',')) return 'Names can’t contain commas.';
-  if (own(existing, name) !== undefined) return `There is already a ${what} named ${name}.`;
+  if (name === '') return t('setup.enter_a_name', { what: whatWord(what) });
+  if (name.includes(',')) return t('setup.no_commas');
+  if (own(existing, name) !== undefined) return t('setup.already_named', { what: whatWord(what), name });
   return null;
 }
 
@@ -684,7 +691,7 @@ function renderGlobalsCompact(panel) {
   if (Object.keys(b.globals || {}).length) panel.append(listTools('globals', false));
 
   if (!items.length) {
-    panel.append(emptyNote('No globals yet.'));
+    panel.append(emptyNote(t('setup.no_globals')));
   } else {
     const cols = el('div', 'setup-cols setup-grow');
     // The Name head sorts the list (setuplist.js); the others are labels.
@@ -693,12 +700,12 @@ function renderGlobalsCompact(panel) {
       return e;
     };
     const nameHead = el('span');
-    nameHead.append(sortButton('globals', 'Name', redrawLists, key('sort', 'globals')));
-    cols.append(nameHead, hidden(el('span', null, 'Formula')), hidden(el('span', 'setup-right', 'Value')), el('span'));
+    nameHead.append(sortButton('globals', t('setup.column.name'), redrawLists, key('sort', 'globals')));
+    cols.append(nameHead, hidden(el('span', null, t('setup.formula'))), hidden(el('span', 'setup-right', t('setup.column.value'))), el('span'));
     panel.append(cols);
   }
 
-  const ul = list('Globals');
+  const ul = list(t('setup.tab.globals'));
   items.forEach(([name, formula], i) => {
     const ik = key('globals', name);
     const li = itemShell(ik, 'setup-grow');
@@ -714,7 +721,7 @@ function renderGlobalsCompact(panel) {
           restore: [key('globals', name, 'formula'), old],
         }),
     });
-    li.append(nameCell, hiddenLabel(`Formula for ${name}`, input), input, globalValue(name, issues, r), globalDelete(name, ik, issues, r, neighbor('globals', names, i, addKey)));
+    li.append(nameCell, hiddenLabel(t('setup.formula_for', { name }), input), input, globalValue(name, issues, r), globalDelete(name, ik, issues, r, neighbor('globals', names, i, addKey)));
     finishItem(li, ik, issues, input);
     ul.append(li);
   });
@@ -738,7 +745,7 @@ function globalValue(name, issues, r, cls = '') {
   const unitDef = gInfo && gInfo.unit ? own(b.units, gInfo.unit) : undefined;
   const unitWord = gInfo && gInfo.unit ? (raw !== '1' && unitDef && unitDef.plural ? unitDef.plural : gInfo.unit) : '';
   const unitName = unitWord ? ` ${unitWord}` : '';
-  value.title = issues.length ? 'This global has a problem, so it counts as 0' : `${shown}${unitName}`;
+  value.title = issues.length ? t('setup.global_problem') : `${shown}${unitName}`;
   // Where it came from (a setup pack's stamp), in Budget Setup.
   const from = compact ? '' : sourceText(state.view, 'global', name);
   if (from) value.title = `${value.title}\n${from}`;
@@ -750,15 +757,15 @@ function globalDelete(name, ik, issues, r, neighborKey) {
   const raw = r ? own(r.globals, name) : undefined;
   const shown = raw === undefined ? '' : formatDecimal(raw);
   const use = inUse(state.view, 'globals', name);
-  const usedBy = use.lines ? `${plural(use.lines, 'line uses', 'lines use')} it. ` : '';
+  const usedBy = use.lines ? t('setup.lines_use_it', { count: use.lines }) : '';
   return deleteButton({
     itemKey: ik,
     name,
     what: 'global',
     confirmText:
       shown && !issues.length
-        ? `Delete ${name}? ${usedBy}Formulas that use it keep its current value (${shown}) as a plain number.`
-        : `Delete ${name}? ${usedBy}Formulas that use it keep its current value as a plain number, where it has one.`,
+        ? t('setup.delete_global_value', { name, usedBy, value: shown })
+        : t('setup.delete_global', { name, usedBy }),
     build: () => ['delete_global', { name }],
     neighborKey,
   });
@@ -768,15 +775,15 @@ function globalDelete(name, ik, issues, r, neighborKey) {
 function globalAdder() {
   return [
     [
-      { key: 'name', label: 'Name (letters, digits and _, with at least one letter or _)', value: '', placeholder: 'SHOOT_DAYS' },
-      { key: 'formula', label: 'Formula', value: '', placeholder: '30' },
+      { key: 'name', label: t('setup.name_letters_digits_and_with'), value: '', placeholder: t('setup.shoot_days') },
+      { key: 'formula', label: t('setup.formula'), value: '', placeholder: '30' },
     ],
     (v) => {
       const name = v.name.trim();
-      if (name === '') return 'Enter a global name.';
-      if (!GLOBAL_NAME.test(name)) return `“${name}” can’t be a global name.`;
-      if (own(budget().globals, name) !== undefined) return `There is already a global named ${name}.`;
-      if (v.formula.trim() === '') return 'Enter a formula or number.';
+      if (name === '') return t('setup.enter_a_name', { what: whatWord('global') });
+      if (!GLOBAL_NAME.test(name)) return t('setup.bad_global_name', { name });
+      if (own(budget().globals, name) !== undefined) return t('setup.already_named', { what: whatWord('global'), name });
+      if (v.formula.trim() === '') return t('setup.enter_a_formula');
       return null;
     },
     (v) => [['set_global', { name: v.name.trim(), formula: v.formula.trim() }], key('globals', v.name.trim(), 'formula')],
@@ -818,7 +825,7 @@ function renderGlobals(panel) {
   const names = shownList.names;
   const all = Object.keys(b.globals || {}).length;
   const addKey = key('add', 'globals');
-  const ul = list('Globals');
+  const ul = list(t('setup.tab.globals'));
   names.forEach((name, i) => {
     const formula = own(b.globals, name);
     const ik = key('globals', name);
@@ -828,15 +835,15 @@ function renderGlobals(panel) {
     const formulaInput = textInput({
       fieldKey: key('globals', name, 'formula'),
       value: str(formula),
-      label: `Formula for ${name}`,
+      label: t('setup.formula_for', { name }),
       cls: 'sw-cell-input',
       onCommit: (v, old) => run(ik, () => ['set_global', { name, formula: v }], { restore: [key('globals', name, 'formula'), old] }),
     });
     const more = el('button', 'setup-del sw-more', '…');
     more.type = 'button';
     more.dataset.key = key('details', ik);
-    more.title = 'Details: description, unit, decimals, folder, show by name';
-    more.setAttribute('aria-label', `Details of ${name}`);
+    more.title = t('setup.details_description_unit_decimals_folder');
+    more.setAttribute('aria-label', t('setup.details_of', { name }));
     more.addEventListener('click', () => openGlobalDetails(name, more));
     li.append(
       cell(usesButton(state.view, 'globals', name, key('uses', ik)), 'sw-num'),
@@ -851,23 +858,23 @@ function renderGlobals(panel) {
     ul.append(li);
   });
   const [fields, check, build] = globalAdder();
-  const strip = gridStrip('globals', 'global', 'Globals', addAction('globals', 'global', fields, check, build), [
-    ['Details…', 'Show and change its details:', (n) => openGlobalDetails(n, findByData('key', key('details', key('globals', n))))],
+  const strip = gridStrip('globals', 'global', t('setup.tab.globals'), addAction('globals', 'global', fields, check, build), [
+    [t('setup.details'), t('setup.details_does'), (n) => openGlobalDetails(n, findByData('key', key('details', key('globals', n))))],
   ]);
   const body = [];
-  if (!all) body.push(emptyNote('No globals yet.'));
-  else if (!names.length) body.push(emptyNote('Nothing matches the search.'));
+  if (!all) body.push(emptyNote(t('setup.no_globals')));
+  else if (!names.length) body.push(emptyNote(t('setup.nothing_matches')));
   else {
     body.push(
       gridTable(
         'globals',
         gridHeads('globals', [
-          ['uses', 'In use', 'Lines using it; click a count to find them', true],
-          ['name', 'Name', ''],
-          ['description', 'Description', ''],
-          ['formula', 'Calculation', 'A number or a formula; it can use other globals'],
-          ['units', 'Units', 'What its value counts, shown on hover'],
-          ['value', 'Value', '', true],
+          ['uses', t('setup.column.uses'), t('setup.uses_tip'), true],
+          ['name', t('setup.column.name'), ''],
+          ['description', t('setup.column.description'), ''],
+          ['formula', t('setup.column.formula'), t('setup.formula_tip')],
+          ['units', t('setup.column.units'), t('setup.units_tip')],
+          ['value', t('setup.column.value'), '', true],
           null,
         ]),
         ul,
@@ -875,7 +882,7 @@ function renderGlobals(panel) {
     );
   }
   mountFrame(panel, { strip, body });
-  setFooterTotals([{ label: '', value: names.length === all ? plural(all, 'global', 'globals') : `${names.length} of ${plural(all, 'global', 'globals')}` }]);
+  setFooterTotals([{ label: '', value: names.length === all ? t('setup.count_globals', { count: all }) : t('setup.shown_of', { shown: names.length, all: t('setup.count_globals', { count: all }) }) }]);
 }
 
 /** A global's value in column `col`, for sorting. */
@@ -921,9 +928,11 @@ function unitDelete(name, ik, neighborKey) {
     name,
     what: 'unit',
     confirmText: use.lines
-      ? `Delete unit ${name}? ${plural(use.lines, 'line uses', 'lines use')} it; deleting blanks it on ${use.lines === 1 ? 'that line' : 'those lines'}.`
-      : `Delete unit ${name}? No lines use it.${use.other ? ' A flat fringe or a global that names it stops converting.' : ''}`,
-    confirmLabel: use.lines ? `Remove from ${plural(use.lines, 'line', 'lines')} and delete` : 'Delete',
+      ? t('setup.delete_unit_used', { name, count: use.lines })
+      : use.other
+        ? t('setup.delete_unit_other', { name })
+        : t('setup.delete_unit_unused', { name }),
+    confirmLabel: use.lines ? t('setup.remove_and_delete', { count: use.lines }) : t('setup.delete_yes'),
     build: () => ['delete_unit', { name, clearLines: use.lines > 0 }],
     neighborKey,
   });
@@ -933,16 +942,16 @@ function unitDelete(name, ik, neighborKey) {
 function unitAdder() {
   return [
     [
-      { key: 'name', label: 'Name', value: '', placeholder: 'Night' },
-      { key: 'plural', label: 'Plural', value: '', placeholder: 'Nights' },
-      { key: 'hours', label: 'Hours (blank for units like Flat)', value: '', placeholder: 'None' },
-      { key: 'description', label: 'Description', value: '' },
+      { key: 'name', label: t('setup.name'), value: '', placeholder: t('setup.night') },
+      { key: 'plural', label: t('setup.plural'), value: '', placeholder: t('setup.nights') },
+      { key: 'hours', label: t('setup.hours_blank_for_units_like'), value: '', placeholder: t('setup.none') },
+      { key: 'description', label: t('setup.description'), value: '' },
     ],
     (v) => {
       const bad = checkName(v.name.trim(), budget().units, 'unit');
       if (bad) return bad;
       const h = v.hours.trim();
-      if (h !== '' && !DECIMAL.test(h)) return 'Hours must be a number, like 10 or 7.5.';
+      if (h !== '' && !DECIMAL.test(h)) return t('setup.hours_number');
       return null;
     },
     (v) => [
@@ -967,9 +976,9 @@ function renderUnitsCompact(panel) {
   const items = shownList.names.map((n) => [n, own(b.units, n)]);
   const names = items.map(([n]) => n);
   if (Object.keys(b.units || {}).length) panel.append(listTools('units'));
-  else panel.append(emptyNote('No units yet.'));
+  else panel.append(emptyNote(t('setup.no_units')));
 
-  const ul = list('Units');
+  const ul = list(t('setup.tab.units'));
   items.forEach(([name, u0], i) => {
     const u = u0 && typeof u0 === 'object' ? u0 : {};
     const ik = key('units', name);
@@ -1013,7 +1022,7 @@ function renderUnits(panel) {
   const movable = canReorder('units', shownList.filtered);
   const names = shownList.names;
   const all = Object.keys(b.units || {}).length;
-  const ul = list('Units');
+  const ul = list(t('setup.tab.units'));
   names.forEach((name, i) => {
     const u0 = own(b.units, name);
     const u = u0 && typeof u0 === 'object' ? u0 : {};
@@ -1024,7 +1033,7 @@ function renderUnits(panel) {
       textInput({
         fieldKey: key('units', name, f),
         value,
-        label: `${label} of ${name}`,
+        label: t('setup.of', { label, name }),
         cls: 'sw-cell-input',
         ...opts,
         onCommit: (v, old) => run(ik, () => unitArgs(name, patchOf(v)), { restore: [key('units', name, f), old] }),
@@ -1032,12 +1041,12 @@ function renderUnits(panel) {
     li.append(
       cell(usesButton(state.view, 'units', name, key('uses', ik)), 'sw-num'),
       cell(gridName(nameEl, 'units', name, movable, ik)),
-      cell(field('plural', str(u.plural), 'Plural', (v) => ({ plural: v }))),
-      cell(field('description', str(u.description), 'Description', (v) => ({ description: v }))),
+      cell(field('plural', str(u.plural), t('setup.column.plural'), (v) => ({ plural: v }))),
+      cell(field('description', str(u.description), t('setup.column.description'), (v) => ({ description: v }))),
       cell(
-        field('hours', u.hours === undefined || u.hours === null ? '' : String(u.hours), 'Hours', (v) => ({ hours: v.trim() === '' ? null : v.trim() }), {
+        field('hours', u.hours === undefined || u.hours === null ? '' : String(u.hours), t('setup.column.hours'), (v) => ({ hours: v.trim() === '' ? null : v.trim() }), {
           num: true,
-          placeholder: 'None',
+          placeholder: t('setup.none'),
         }),
       ),
       acts(unitDelete(name, ik, neighbor('units', names, i, key('add', 'units')))),
@@ -1046,20 +1055,20 @@ function renderUnits(panel) {
     ul.append(li);
   });
   const [fields, check, build] = unitAdder();
-  const strip = gridStrip('units', 'unit', 'Units', addAction('units', 'unit', fields, check, build), []);
+  const strip = gridStrip('units', 'unit', t('setup.tab.units'), addAction('units', 'unit', fields, check, build), []);
   const body = [];
-  if (!all) body.push(emptyNote('No units yet.'));
-  else if (!names.length) body.push(emptyNote('Nothing matches the search.'));
+  if (!all) body.push(emptyNote(t('setup.no_units')));
+  else if (!names.length) body.push(emptyNote(t('setup.nothing_matches')));
   else {
     body.push(
       gridTable(
         'units',
         gridHeads('units', [
-          ['uses', 'In use', 'Lines using it; click a count to find them', true],
-          ['name', 'Singular', ''],
-          ['plural', 'Plural', ''],
-          ['description', 'Description', ''],
-          ['hours', 'Hours', 'Hours in one; lets flat fringes convert between time units. Blank for units like Flat', true],
+          ['uses', t('setup.column.uses'), t('setup.uses_tip'), true],
+          ['name', t('setup.column.singular'), ''],
+          ['plural', t('setup.column.plural'), ''],
+          ['description', t('setup.column.description'), ''],
+          ['hours', t('setup.column.hours'), t('setup.hours_tip'), true],
           null,
         ]),
         ul,
@@ -1067,7 +1076,7 @@ function renderUnits(panel) {
     );
   }
   mountFrame(panel, { strip, body });
-  setFooterTotals([{ label: '', value: names.length === all ? plural(all, 'unit', 'units') : `${names.length} of ${plural(all, 'unit', 'units')}` }]);
+  setFooterTotals([{ label: '', value: names.length === all ? t('setup.count_units', { count: all }) : t('setup.shown_of', { shown: names.length, all: t('setup.count_units', { count: all }) }) }]);
 }
 
 /** A unit's value in column `col`, for sorting. */
@@ -1165,7 +1174,7 @@ function syncGridStrip(table) {
   for (const b of state.container.querySelectorAll('[data-needs-item]')) {
     if (name === null) b.setAttribute('aria-disabled', 'true');
     else b.removeAttribute('aria-disabled');
-    b.title = name === null ? `Select a ${b.dataset.what} first` : `${b.dataset.does} ${name}`;
+    b.title = name === null ? t('setup.select_first', { what: whatWord(b.dataset.what) }) : `${b.dataset.does} ${name}`;
   }
 }
 
@@ -1179,7 +1188,7 @@ function gridStrip(table, what, label, add, extra) {
     const b = stripButton(text, key('strip', table, text), () => {
       const n = selectedIn(table);
       if (n !== null) run(n);
-    }, { enabled: name !== null, title: name === null ? `Select a ${what} first` : `${does} ${name}` });
+    }, { enabled: name !== null, title: name === null ? t('setup.select_first', { what: whatWord(what) }) : `${does} ${name}` });
     b.dataset.needsItem = '1';
     b.dataset.does = does;
     b.dataset.what = what;
@@ -1188,21 +1197,21 @@ function gridStrip(table, what, label, add, extra) {
   return actionStrip(
     label,
     [
-      stripButton(`New ${what}…`, key('add', table), add, { title: `Add a ${what} to this budget` }),
+      stripButton(t('setup.new_what', { what: whatWord(what) }), key('add', table), add, { title: t('setup.add_a_to_this_budget', { what: whatWord(what) }) }),
       ...extra.map(([text, does, run]) => needs(text, does, run)),
-      needs('Delete…', `Delete ${what}`, (n) => {
+      needs(t('setup.delete_strip'), t('setup.delete_kind', { what: whatWord(what) }), (n) => {
         const del = findByData('key', key('del', key(table, n)));
         if (del) del.click();
       }),
-      needs('Save to Library…', `Copy to your library, with what it needs: ${what}`, (n) =>
+      needs(t('setup.save_to_library'), t('setup.save_to_library_does', { what: whatWord(what) }), (n) =>
         saveItemToLibrary({ call: callCmd, toast: (m) => state.ctx && typeof state.ctx.toast === 'function' && state.ctx.toast(m) }, what, n),
       ),
     ],
     searchBox({
       key: key('search', table),
       value: str(state.filters[table]),
-      label: `Search ${label.toLowerCase()}`,
-      placeholder: `Search ${label.toLowerCase()}`,
+      label: t('setup.search', { what: label.toLowerCase() }),
+      placeholder: t('setup.search', { what: label.toLowerCase() }),
       onChange: (v) => {
         state.filters[table] = v;
         redrawLists();
@@ -1221,15 +1230,15 @@ function gridStrip(table, what, label, add, extra) {
 function listTools(table, sort = true) {
   wantUsage(state.view);
   const row = el('div', 'setup-listtools');
-  row.append(sort ? sortButton(table, 'Name', redrawLists, key('sort', table)) : el('span'), showSelect(table, redrawLists, key('show', table)));
+  row.append(sort ? sortButton(table, t('setup.column.name'), redrawLists, key('sort', table)) : el('span'), showSelect(table, redrawLists, key('show', table)));
   if (compact && canOpenSetup()) {
-    const label = table === 'globals' ? 'globals' : 'units';
-    const go = el('button', 'apply-pill setup-open-setup', 'Setup');
+    const label = table === 'globals' ? t('setup.globals_word') : t('setup.units_word');
+    const go = el('button', 'apply-pill setup-open-setup', t('setup.setup_pill'));
     go.type = 'button';
     go.dataset.key = key('open-setup', table);
     go.dataset.nobusy = '1';
-    go.title = `Every detail of the ${label}, with the library, in the Budget Setup window`;
-    go.setAttribute('aria-label', `Edit ${label} in Budget Setup`);
+    go.title = t('setup.every_detail_of_the_with', { label });
+    go.setAttribute('aria-label', t('setup.edit_in_budget_setup', { label }));
     go.addEventListener('click', () => state.ctx.openSetup(table, null));
     row.append(go);
   }
@@ -1237,7 +1246,7 @@ function listTools(table, sort = true) {
 }
 
 function callCmd(cmd, args) {
-  if (!state.ctx || typeof state.ctx.call !== 'function') return Promise.reject(new Error('Not connected'));
+  if (!state.ctx || typeof state.ctx.call !== 'function') return Promise.reject(new Error(t('setup.not_connected')));
   return state.ctx.call(cmd, args);
 }
 
@@ -1273,11 +1282,11 @@ function orderable(nameEl, table, name, movable, itemKey, uses = true) {
  * in Budget Setup), from the menu too.
  */
 function renameable(nameEl, kind, name, itemKey, focusAfter, details = null) {
-  nameEl.title = `${name}\nDouble-click to rename it everywhere`;
+  nameEl.title = t('setup.double_click_to_rename_it', { name });
   nameEl.tabIndex = 0;
   nameEl.dataset.key = key('name', itemKey);
   nameEl.setAttribute('role', 'button');
-  nameEl.setAttribute('aria-label', `Rename ${kind} ${name}`);
+  nameEl.setAttribute('aria-label', t('setup.rename', { kind: whatWord(kind), name }));
   nameEl.setAttribute('aria-keyshortcuts', 'Enter F2');
   const ctx = () => ({
     call: (cmd, args) => state.ctx.call(cmd, args),
@@ -1318,8 +1327,8 @@ function renameable(nameEl, kind, name, itemKey, focusAfter, details = null) {
         if (del) del.click();
       },
       extra: [
-        ...(details ? [{ label: 'Details…', title: 'Its description, unit, decimals, folder and show by name', run: details }] : []),
-        ...(canOpenSetup() ? [{ label: 'Edit in Budget Setup', title: `Show this ${kind} in the Budget Setup window`, run: () => state.ctx.openSetup(table, name) }] : []),
+        ...(details ? [{ label: t('setup.details'), title: t('setup.its_description_unit_decimals_folder'), run: details }] : []),
+        ...(canOpenSetup() ? [{ label: t('setup.edit_in_budget_setup_item'), title: t('setup.show_this_in_the_budget', { kind: whatWord(kind) }), run: () => state.ctx.openSetup(table, name) }] : []),
       ],
     });
   });
@@ -1335,9 +1344,9 @@ function renameable(nameEl, kind, name, itemKey, focusAfter, details = null) {
  * [[command, args], key of the control to focus once it is added].
  */
 function addRow(tab, what, fields, check, build) {
-  const b = el('button', 'apply-add-btn', `New ${what}…`);
+  const b = el('button', 'apply-add-btn', t('setup.new_what', { what: whatWord(what) }));
   b.type = 'button';
-  b.title = `Add a ${what} to this budget`;
+  b.title = t('setup.add_a_to_this_budget', { what: whatWord(what) });
   b.dataset.key = key('add', tab);
   b.dataset.nobusy = '1';
   const add = addAction(tab, what, fields, check, build);
@@ -1357,14 +1366,14 @@ function addAction(tab, what, fields, check, build) {
     let focus = null;
     anchoredForm({
       anchor: b,
-      title: `New ${what}`,
+      title: t('setup.new', { what: whatWord(what) }),
       fields,
-      submitText: 'Add',
+      submitText: t('setup.add'),
       onSubmit: (v) => {
         const bad = check(v);
         if (bad) return Promise.reject(bad);
         const [[cmd, args], then] = build(v);
-        if (!state.ctx || typeof state.ctx.call !== 'function') return Promise.reject('Not connected');
+        if (!state.ctx || typeof state.ctx.call !== 'function') return Promise.reject(t('setup.not_connected'));
         return state.ctx.call(cmd, args).then(() => {
           focus = then;
         });

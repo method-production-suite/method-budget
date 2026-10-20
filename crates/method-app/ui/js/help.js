@@ -4,7 +4,8 @@
 // it's open, Tab stays inside it, and Escape closes it.
 
 import { el, isMac } from './dom.js';
-import { SHORTCUTS, GROUPS, keysFor, keyText, matches, menuRunsAppKeys, shortcutById } from './shortcuts.js';
+import { t } from './i18n.js';
+import { SHORTCUTS, GROUPS, GROUP_NAMES, keysFor, keyText, matches, menuRunsAppKeys, shortcutById } from './shortcuts.js';
 
 let open = null; // { root, previous }
 
@@ -20,7 +21,7 @@ export function toggleHelp() {
 function keysCell(entry) {
   const td = el('td', { class: 'help-keys' });
   keysFor(entry).forEach((spec, i) => {
-    if (i > 0) td.append(el('span', { class: 'help-or', text: ' or ' }));
+    if (i > 0) td.append(el('span', { class: 'help-or', text: ` ${t('help.or')} ` }));
     td.append(el('kbd', { text: keyText(spec) }));
   });
   return td;
@@ -36,7 +37,7 @@ function sheet() {
     return el(
       'section',
       { class: 'help-group', attrs: { 'aria-labelledby': id } },
-      el('h3', { text: g, attrs: { id } }),
+      el('h3', { text: GROUP_NAMES[g], attrs: { id } }),
       el('table', { class: 'help-table' }, el('tbody', {}, ...rows)),
     );
   });
@@ -46,18 +47,18 @@ function sheet() {
 export function openHelp() {
   if (open) return;
   const previous = document.activeElement;
-  const close = el('button', { class: 'btn', text: 'Close', attrs: { type: 'button' } });
+  const close = el('button', { class: 'btn', text: t('help.close'), attrs: { type: 'button' } });
   const body = el(
     'div',
-    { class: 'help-body', attrs: { tabindex: '0', role: 'region', 'aria-label': 'Shortcut list' } },
+    { class: 'help-body', attrs: { tabindex: '0', role: 'region', 'aria-label': t('help.shortcut_list') } },
     ...sheet(),
   );
   const dialog = el(
     'div',
     { class: 'help', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'help-title' } },
-    el('header', { class: 'help-head' }, el('h2', { class: 'help-title', text: 'Keyboard shortcuts', attrs: { id: 'help-title' } }), close),
+    el('header', { class: 'help-head' }, el('h2', { class: 'help-title', text: t('help.title'), attrs: { id: 'help-title' } }), close),
     body,
-    el('p', { class: 'help-foot', text: `Menus show these keys too. With the mouse, Shift-click selects a range of rows and ${isMac ? 'Command' : 'Ctrl'}-click adds a row; double-click opens or edits.` }),
+    el('p', { class: 'help-foot', text: t('help.foot', { mod: isMac ? t('help.key.command') : t('help.key.ctrl') }) }),
   );
   const root = el('div', { class: 'help-backdrop' }, dialog);
 

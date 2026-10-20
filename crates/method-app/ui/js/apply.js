@@ -70,64 +70,75 @@ import { saveItemToLibrary } from './library.js';
 import { mountFrame, actionStrip, stripButton, searchBox, band, bandField, gridTable, setFooterTotals } from './setupframe.js';
 import { currencyBand } from './setupbands.js';
 import { isWeb } from './host.js';
-import { obj, str, plural, errText, sourceText, FLAT_BASES, isHourUnit, flatCountWords } from './util.js';
+import { obj, str, errText, sourceText, FLAT_BASES, isHourUnit, flatCountWords } from './util.js';
+import { t } from './i18n.js';
 
 const LISTS = [
   {
     id: 'fringes',
-    label: 'Fringes',
+    label: t('apply.fringes'),
     what: 'fringe',
+    word: t('apply.word.fringe'),
+    title: t('apply.kind.fringe'),
     field: 'fringes',
     multi: true,
     defs: (b) => b.fringes,
     // Lines and adjustment rows take fringes (decisions.md, entry 56).
     eligible: (s) => s.costed,
-    noTakers: 'Subtotal rows take no fringes.',
-    none: 'No fringes yet.',
+    noTakers: t('apply.fringes.no_takers'),
+    none: t('apply.fringes.none'),
   },
   {
     id: 'groups',
-    label: 'Groups',
+    label: t('apply.groups'),
     what: 'group',
+    word: t('apply.word.group'),
+    title: t('apply.kind.group'),
     field: 'groups',
     multi: true,
     defs: (b) => b.groups,
     eligible: (s) => s.costed,
-    noTakers: 'Subtotal rows are never in a group.',
-    none: 'No groups yet.',
+    noTakers: t('apply.groups.no_takers'),
+    none: t('apply.groups.none'),
   },
   {
     id: 'sets',
-    label: 'Sets',
+    label: t('apply.sets'),
     what: 'set',
+    word: t('apply.word.set'),
+    title: t('apply.kind.set'),
     field: 'set',
     multi: false,
     defs: (b) => b.sets,
     eligible: (s) => s.costed,
-    noTakers: 'Subtotal rows have no set.',
-    none: 'No sets yet.',
+    noTakers: t('apply.sets.no_takers'),
+    none: t('apply.sets.none'),
   },
   {
     id: 'locations',
-    label: 'Locations',
+    label: t('apply.locations'),
     what: 'location',
+    word: t('apply.word.location'),
+    title: t('apply.kind.location'),
     field: 'location',
     multi: false,
     defs: (b) => b.locations,
     eligible: (s) => s.costed,
-    noTakers: 'Subtotal rows have no location.',
-    none: 'No locations yet.',
+    noTakers: t('apply.locations.no_takers'),
+    none: t('apply.locations.none'),
   },
   {
     id: 'currencies',
-    label: 'Currency',
+    label: t('apply.currency'),
     what: 'currency',
+    word: t('apply.word.currency'),
+    title: t('apply.kind.currency'),
     field: 'currency',
     multi: false,
     defs: (b) => b.currencies,
     eligible: (s) => s.lines,
-    noTakers: 'Currencies go on lines, and the selection has none.',
-    none: 'No other currencies yet.',
+    noTakers: t('apply.currencies.no_takers'),
+    none: t('apply.currencies.none'),
   },
 ];
 
@@ -236,7 +247,7 @@ function fringeRate(def) {
   if (def.kind !== 'flat') return `${rateText(def.rate)}%`;
   const base = str(budget().base_currency);
   const unit = str(def.unit);
-  return `${rateText(def.rate)}${base ? ` ${base}` : ''} per ${unit || 'line'}${flatCountWords(def, budget().units)}`;
+  return `${t('apply.flat_rate', { rate: `${rateText(def.rate)}${base ? ` ${base}` : ''}`, unit: unit || t('apply.per_line_unit') })}${flatCountWords(def, budget().units)}`;
 }
 
 function visible() {
@@ -311,18 +322,18 @@ function sigOf(sc) {
 function scopeLabel(sc, s) {
   const top = Array.isArray(budget().topsheet) ? budget().topsheet : [];
   const named = (x) => `${str(x.code)} ${str(x.name)}`.trim();
-  if (sc.categories.length === 1) return `All lines in ${named(top[sc.categories[0]] || {})}`;
-  if (sc.categories.length > 1) return `All lines in ${plural(sc.categories.length, 'category', 'categories')}`;
+  if (sc.categories.length === 1) return t('apply.all_lines_in', { what: named(top[sc.categories[0]] || {}) });
+  if (sc.categories.length > 1) return t('apply.all_lines_in', { what: t('apply.n_categories', { count: sc.categories.length }) });
   if (sc.accounts.length === 1) {
     for (const row of top) {
       const a = (Array.isArray(row.accounts) ? row.accounts : []).find((x) => x.code === sc.accounts[0]);
-      if (a) return `All lines in ${named(a)}`;
+      if (a) return t('apply.all_lines_in', { what: named(a) });
     }
   }
-  if (sc.accounts.length > 1) return `All lines in ${plural(sc.accounts.length, 'account', 'accounts')}`;
+  if (sc.accounts.length > 1) return t('apply.all_lines_in', { what: t('apply.n_accounts', { count: sc.accounts.length }) });
   const n = s ? s.rows.length : sc.rowIds.length;
-  const lines = s && s.lines !== n ? `, ${plural(s.lines, 'line', 'lines')}` : '';
-  return `${plural(n, 'row', 'rows')} selected${lines}`;
+  const lines = s && s.lines !== n ? `, ${t('apply.n_lines', { count: s.lines })}` : '';
+  return `${t('apply.rows_selected', { count: n })}${lines}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -375,7 +386,7 @@ function shownSummary() {
 // Edits
 
 function call(cmd, args) {
-  if (!st.ctx || typeof st.ctx.call !== 'function') return Promise.reject('Not connected');
+  if (!st.ctx || typeof st.ctx.call !== 'function') return Promise.reject(t('apply.not_connected'));
   return st.ctx.call(cmd, args);
 }
 
@@ -472,26 +483,26 @@ async function replaceTags(anchor) {
   const checks = (kind, label, defs, on) => {
     for (const n of orderedNames(b, kind === 'f' ? 'fringes' : 'groups')) {
       if (!Object.prototype.hasOwnProperty.call(obj(defs), n)) continue;
-      fields.push({ key: `${kind}:${n}`, label: `${label} ${n}`, type: 'check', value: on.includes(n) });
+      fields.push({ key: `${kind}:${n}`, label: t('apply.tag_named', { kind: label, name: n }), type: 'check', value: on.includes(n) });
     }
   };
-  checks('f', 'Fringe', b.fringes, shared('fringes', s.costed));
-  checks('g', 'Group', b.groups, shared('groups', s.costed));
+  checks('f', t('apply.kind.fringe'), b.fringes, shared('fringes', s.costed));
+  checks('g', t('apply.kind.group'), b.groups, shared('groups', s.costed));
   const pick = (key, label, listId, defs, eligible, noneLabel) => {
     const names = orderedNames(b, listId).filter((n) => Object.prototype.hasOwnProperty.call(obj(defs), n));
     const one = shared(listId, eligible).find((n) => names.includes(n)) || '';
     fields.push({ key, label, type: 'select', options: [['', noneLabel], ...names.map((n) => [n, n])], value: one });
   };
-  pick('set', 'Set', 'sets', b.sets, s.costed, 'None');
-  pick('location', 'Location', 'locations', b.locations, s.costed, 'None');
-  pick('currency', 'Currency', 'currencies', b.currencies, s.lines, `${base || 'Base'} (base currency)`);
+  pick('set', t('apply.kind.set'), 'sets', b.sets, s.costed, t('apply.none'));
+  pick('location', t('apply.kind.location'), 'locations', b.locations, s.costed, t('apply.none'));
+  pick('currency', t('apply.kind.currency'), 'currencies', b.currencies, s.lines, base ? t('apply.base_currency_named', { base }) : t('apply.base_currency_unnamed'));
   const rows = s.rows;
   await anchoredForm({
     anchor,
-    title: 'Replace tags',
-    message: `${scopeLabel(st.summaryScope || scope(), s)}: their fringes, groups, set, location and currency become exactly these.`,
+    title: t('apply.replace_tags'),
+    message: t('apply.replace_tags_message', { scope: scopeLabel(st.summaryScope || scope(), s) }),
     fields,
-    submitText: 'Replace',
+    submitText: t('apply.replace'),
     onSubmit: (v) => {
       const chosen = (prefix) =>
         Object.keys(v)
@@ -596,26 +607,26 @@ function drawHead(host) {
   const box = el('div', { class: 'apply-head' });
   if (nothing) {
     box.append(
-      el('p', { class: 'apply-scope', text: 'Nothing selected' }),
-      el('p', { class: 'apply-hint', text: 'Select lines, an account or a category to apply items to them.' }),
+      el('p', { class: 'apply-scope', text: t('apply.nothing_selected') }),
+      el('p', { class: 'apply-hint', text: t('apply.select_lines_an_account_or') }),
     );
   } else if (s && !s.rows.length) {
     box.append(
       el('p', { class: 'apply-scope', text: scopeLabel(sc, s) }),
-      el('p', { class: 'apply-hint', text: 'There are no lines here yet.' }),
+      el('p', { class: 'apply-hint', text: t('apply.there_are_no_lines_here') }),
     );
   } else {
     box.append(el('p', { class: 'apply-scope', text: scopeLabel(sc, s), title: scopeLabel(sc, s) }));
-    const t = obj(obj(s && s.totals).lines);
+    const tot = obj(obj(s && s.totals).lines);
     const stats = el('p', { class: 'apply-stats' });
     stats.append(
-      stat('Lines', s ? money(t.details_total) : ''),
-      stat('Fringes', s ? money(t.fringe_total) : ''),
-      stat('Effective', !s ? '' : s.fringe_percent === null ? 'n/a' : `${twoPlaces(s.fringe_percent)}%`, 'Fringe dollars as a percent of the line totals'),
+      stat(t('apply.stat.lines'), s ? money(tot.details_total) : ''),
+      stat(t('apply.stat.fringes'), s ? money(tot.fringe_total) : ''),
+      stat(t('apply.stat.effective'), !s ? '' : s.fringe_percent === null ? t('apply.na') : `${twoPlaces(s.fringe_percent)}%`, t('apply.stat.effective_tip')),
     );
     box.append(stats);
-    const replace = button('Replace tags…', 'setup-btn apply-btn', 'apply:replace-tags', () => replaceTags(replace), {
-      title: 'Set exactly the fringes, groups, set, location and currency the selected lines carry',
+    const replace = button(t('apply.replace_tags_button'), 'setup-btn apply-btn', 'apply:replace-tags', () => replaceTags(replace), {
+      title: t('apply.set_exactly_the_fringes_groups'),
       enabled: Boolean(s && s.costed),
     });
     box.append(el('div', { class: 'apply-range' }, replace));
@@ -670,7 +681,7 @@ function drawList(host, list) {
   ul.append(addRow(list));
   if (names.length) parts.push(colHead(list));
   if (!names.length) parts.push(el('p', { class: 'setup-empty', text: list.none }));
-  else if (!shown.length) parts.push(el('p', { class: 'setup-empty', text: only ? 'None of these are on the selection.' : 'Nothing matches the filter.' }));
+  else if (!shown.length) parts.push(el('p', { class: 'setup-empty', text: only ? t('apply.none_on_selection') : t('apply.nothing_matches_filter') }));
   parts.push(ul);
   if (list.id === 'fringes' && s.rows.length) parts.push(fringeFoot(s));
   host.replaceChildren(...parts);
@@ -682,8 +693,8 @@ function tools(list, s, eligible) {
     class: 'setup-input apply-filter',
     attrs: {
       type: 'text',
-      placeholder: 'Filter',
-      'aria-label': `Filter ${list.label.toLowerCase()}`,
+      placeholder: t('apply.filter'),
+      'aria-label': t('apply.filter_list', { list: list.label.toLowerCase() }),
       autocomplete: 'off',
       spellcheck: 'false',
       autocapitalize: 'off',
@@ -709,21 +720,21 @@ function tools(list, s, eligible) {
     }
   });
   const only = Boolean(st.onlyApplied[list.id]);
-  const onlyBtn = button('Applied only', 'apply-pill', `apply:only:${list.id}`, () => {
+  const onlyBtn = button(t('apply.applied_only'), 'apply-pill', `apply:only:${list.id}`, () => {
     st.onlyApplied[list.id] = !only;
     draw();
-  }, { title: 'Show only the items on the selected lines' });
+  }, { title: t('apply.show_only_the_items_on') });
   onlyBtn.setAttribute('aria-pressed', String(only));
   onlyBtn.removeAttribute('aria-disabled'); // a view toggle, never busy
   row.append(input, showSelect(list.id, draw, `apply:show:${list.id}`), onlyBtn);
 
   if (list.multi) {
-    const what = list.id === 'fringes' ? 'fringes' : 'groups';
+    const what = list.id === 'fringes' ? t('apply.word.fringes') : t('apply.word.groups');
     const any = Object.keys(obj(s[list.id])).some((k) => tally(s, list.id, k).count > 0);
     row.append(
-      button('Clear', 'apply-pill', `apply:clear:${list.id}`, () => clearAll(list), {
-        label: `Take every ${list.what} off the selected lines`,
-        title: `Take all ${what} off the selected lines`,
+      button(t('apply.clear'), 'apply-pill', `apply:clear:${list.id}`, () => clearAll(list), {
+        label: t('apply.take_every_off_the_selected', { what: list.word }),
+        title: t('apply.take_all_off_the_selected', { what }),
         enabled: eligible > 0 && any,
       }),
     );
@@ -733,11 +744,11 @@ function tools(list, s, eligible) {
       list.id === 'currencies'
         ? tally(s, 'currencies', base).count < eligible
         : Object.keys(obj(s[list.id])).some((k) => tally(s, list.id, k).count > 0);
-    const what = list.what;
+    const what = list.word;
     row.append(
-      button('Clear', 'apply-pill', `apply:clear:${list.id}`, () => clearValue(list), {
-        label: list.id === 'currencies' ? `Use the base currency on the selected lines` : `Clear the ${what} on the selected lines`,
-        title: list.id === 'currencies' ? `Back to the base currency${base ? `, ${base}` : ''}` : `Take the ${what} off the selected lines`,
+      button(t('apply.clear'), 'apply-pill', `apply:clear:${list.id}`, () => clearValue(list), {
+        label: list.id === 'currencies' ? t('apply.use_base_currency') : t('apply.clear_the', { what }),
+        title: list.id === 'currencies' ? (base ? t('apply.back_to_base_named', { base }) : t('apply.back_to_base')) : t('apply.take_the_off', { what }),
         enabled: eligible > 0 && hasValue,
       }),
     );
@@ -757,11 +768,11 @@ function colHead(list) {
     el(
       'span',
       { class: 'apply-colhead-name' },
-      sortButton(list.id, 'Name', draw, `apply:sort:${list.id}`),
-      el('span', { class: 'apply-colhead-num', text: 'Selected', title: 'Dollars on the selected lines' }),
+      sortButton(list.id, t('apply.col.name'), draw, `apply:sort:${list.id}`),
+      el('span', { class: 'apply-colhead-num', text: t('apply.selected'), title: t('apply.dollars_on_the_selected_lines') }),
     ),
-    el('span', { class: 'apply-colhead-num', text: 'Lines', title: 'Lines using it in the whole budget; click a count to find them' }),
-    el('span', { class: 'apply-colhead-num', text: 'Budget', title: 'Its dollars in the whole budget' }),
+    el('span', { class: 'apply-colhead-num', text: t('apply.lines'), title: t('apply.lines_using_it_in_the') }),
+    el('span', { class: 'apply-colhead-num', text: t('apply.budget'), title: t('apply.its_dollars_in_the_whole') }),
   );
 }
 
@@ -772,7 +783,7 @@ function budgetWide(list, name, def) {
     const f = obj(r.fringes)[name];
     if (!f) return '';
     const uses = Number(f.uses) || 0;
-    return uses ? `Whole budget: ${plural(uses, 'line', 'lines')}, ${money(f.total)}` : 'Not used in the budget';
+    return uses ? t('apply.whole_budget', { what: `${t('apply.n_lines', { count: uses })}, ${money(f.total)}` }) : t('apply.not_used');
   }
   if (list.id === 'groups') {
     const g = obj(obj(r.groups)[name]);
@@ -781,27 +792,27 @@ function budgetWide(list, name, def) {
     // Without fringes when the group rule says so (display only).
     const fringes = groupRules().fringes_in_totals === 'exclude' ? 0 : Number(bd.fringe_total) || 0;
     const total = (Number(bd.details_total) || 0) + fringes;
-    return `Whole budget: ${money(total)}${def.in_budget_total === false ? ', not in the total' : ''}`;
+    return def.in_budget_total === false ? t('apply.whole_budget_not_in_total', { amount: money(total) }) : t('apply.whole_budget', { what: money(total) });
   }
   if (list.id === 'sets' || list.id === 'locations') {
     const bd = obj(r[list.id])[name];
-    if (!bd) return 'Not used in the budget';
-    return `Whole budget: ${money((Number(bd.details_total) || 0) + (Number(bd.fringe_total) || 0))}`;
+    if (!bd) return t('apply.not_used');
+    return t('apply.whole_budget', { what: money((Number(bd.details_total) || 0) + (Number(bd.fringe_total) || 0)) });
   }
   return '';
 }
 
 function item(list, s, name, def, eligible, movable = false) {
-  const t = tally(s, list.id, name);
-  const state = stateOf(t.count, eligible);
+  const tl = tally(s, list.id, name);
+  const state = stateOf(tl.count, eligible);
   const infoId = nextId();
   const off = list.id === 'groups' && def.in_budget_total === false;
-  const amount = off ? 'Not in total' : t.count ? money(t.total) : '';
+  const amount = off ? t('apply.not_in_total') : tl.count ? money(tl.total) : '';
   const info = [];
-  if (state === 'some') info.push(`on ${t.count} of ${plural(eligible, 'line', 'lines')}`);
+  if (state === 'some') info.push(t('apply.on_some_of', { some: tl.count, lines: t('apply.n_lines', { count: eligible }) }));
   if (str(def.description)) info.push(str(def.description));
   const key = itemKey(list.id, name);
-  const tip = [str(def.description), budgetWide(list, name, def), 'Click the box to apply; double-click the name to edit'].filter(Boolean).join('\n');
+  const tip = [str(def.description), budgetWide(list, name, def), t('apply.item_tip')].filter(Boolean).join('\n');
 
   const b = el(
     'button',
@@ -823,10 +834,10 @@ function item(list, s, name, def, eligible, movable = false) {
       'span',
       { class: 'apply-name' },
       name,
-      str(def.short_code) ? el('span', { class: 'apply-code', text: str(def.short_code), title: 'Short code: the grid shows it for this item' }) : null,
+      str(def.short_code) ? el('span', { class: 'apply-code', text: str(def.short_code), title: t('apply.short_code_the_grid_shows') }) : null,
     ),
     keyFigure(list, name, def),
-    state === 'some' ? el('span', { class: 'apply-count', text: `${t.count}/${eligible}`, attrs: { 'aria-hidden': 'true' } }) : null,
+    state === 'some' ? el('span', { class: 'apply-count', text: `${tl.count}/${eligible}`, attrs: { 'aria-hidden': 'true' } }) : null,
     el('span', { class: `apply-num apply-amt${off ? ' apply-off' : ''}`, text: amount }),
     el('span', { class: 'setup-sr', text: [info.join('; '), amount].filter(Boolean).join('. '), attrs: { id: infoId } }),
   );
@@ -856,7 +867,7 @@ function item(list, s, name, def, eligible, movable = false) {
       edit: () => editItem(list, name),
       remove: () => deleteItem(list, name),
       extra: [
-        ...(list.id === 'fringes' || list.id === 'groups' ? [{ label: 'Short code…', title: 'A short code the grid shows instead of the name', run: () => editCode(list, name) }] : []),
+        ...(list.id === 'fringes' || list.id === 'groups' ? [{ label: t('apply.short_code'), title: t('apply.a_short_code_the_grid'), run: () => editCode(list, name) }] : []),
         ...openInSetup(list, name),
       ],
       onRenamed: (to) => {
@@ -887,7 +898,7 @@ function item(list, s, name, def, eligible, movable = false) {
     dragHandle(list.id, name, movable, (cmd, args) => call(cmd, args)),
     b,
     usesButton(st.view, list.id, name, `apply:uses:${list.id}:${name}`),
-    el('span', { class: `apply-num apply-total${off ? ' apply-off' : ''}`, text: total, title: off && total ? 'Not in the budget total' : undefined }),
+    el('span', { class: `apply-num apply-total${off ? ' apply-off' : ''}`, text: total, title: off && total ? t('apply.not_in_budget_total') : undefined }),
   );
   if (st.selected[list.id] === name) li.classList.add('is-selected');
   return li;
@@ -926,8 +937,8 @@ function select(listId, name, b) {
 function addRow(list) {
   const b = el('button', {
     class: 'apply-add-btn',
-    text: `New ${list.what}…`,
-    title: `Add a ${list.what} to this budget`,
+    text: t('apply.new', { what: list.word }),
+    title: t('apply.add_a_to_this_budget', { what: list.word }),
     attrs: { type: 'button' },
     data: { key: addKey(list.id), nobusy: '1' },
     on: { click: () => addItem(list) },
@@ -938,30 +949,30 @@ function addRow(list) {
 
 function fringeFoot(s) {
   const foot = el('div', { class: 'apply-foot' });
-  const t = obj(obj(s.totals).lines);
+  const tot = obj(obj(s.totals).lines);
   foot.append(
     el(
       'p',
       { class: 'apply-stats' },
-      stat('Percent', money(s.percent_fringes || 0), 'Dollars from percentage fringes on the selected lines'),
-      stat('Flat', money(s.flat_fringes || 0), 'Dollars from flat fringes on the selected lines'),
-      stat('Fringe total', money(t.fringe_total)),
-      stat('Effective', s.fringe_percent === null ? 'n/a' : `${twoPlaces(s.fringe_percent)}%`, 'Fringe dollars as a percent of the line totals'),
+      stat(t('apply.stat.percent'), money(s.percent_fringes || 0), t('apply.stat.percent_tip')),
+      stat(t('apply.stat.flat'), money(s.flat_fringes || 0), t('apply.stat.flat_tip')),
+      stat(t('apply.stat.fringe_total'), money(tot.fringe_total)),
+      stat(t('apply.stat.effective'), s.fringe_percent === null ? t('apply.na') : `${twoPlaces(s.fringe_percent)}%`, t('apply.stat.effective_tip')),
     ),
   );
   const ranged = Number(s.in_range) || 0;
-  const range = el('div', { class: 'apply-range', attrs: { role: 'group', 'aria-label': 'Fringe range' } });
+  const range = el('div', { class: 'apply-range', attrs: { role: 'group', 'aria-label': t('apply.fringe_range') } });
   range.append(
-    button('Make range', 'setup-btn apply-btn', 'apply:range:make', makeRange, {
-      title: s.range_blocked ? `Can't: ${s.range_blocked}` : 'Make the selected lines one earner: percent fringe cutoffs apply to their combined total',
+    button(t('apply.make_range'), 'setup-btn apply-btn', 'apply:range:make', makeRange, {
+      title: s.range_blocked ? t('apply.cant', { why: s.range_blocked }) : t('apply.make_range_tip'),
       enabled: s.range_blocked === null,
     }),
-    button('Remove range', 'setup-btn apply-btn', 'apply:range:remove', removeRange, {
-      title: ranged ? 'Take the selected lines out of their fringe range' : 'None of the selected lines are in a fringe range',
+    button(t('apply.remove_range'), 'setup-btn apply-btn', 'apply:range:remove', removeRange, {
+      title: ranged ? t('apply.remove_range_tip') : t('apply.none_in_range'),
       enabled: ranged > 0,
     }),
   );
-  if (ranged) range.append(el('span', { class: 'apply-hint', text: `${plural(ranged, 'row', 'rows')} in a range` }));
+  if (ranged) range.append(el('span', { class: 'apply-hint', text: t('apply.rows_in_range', { count: ranged }) }));
   foot.append(range);
   return foot;
 }
@@ -972,9 +983,9 @@ function fringeFoot(s) {
 /** The tools row's Setup button: the list's table in Budget Setup. */
 function setupButton(list) {
   if (!st.ctx || typeof st.ctx.openSetup !== 'function') return null;
-  const b = button('Setup', 'apply-pill', `apply:setup:${list.id}`, () => st.ctx.openSetup(list.id, st.selected[list.id] || null), {
-    label: `Edit ${list.label.toLowerCase()} in Budget Setup`,
-    title: `Every column of ${list.label.toLowerCase()}, with the library, in the Budget Setup window`,
+  const b = button(t('apply.setup_pill'), 'apply-pill', `apply:setup:${list.id}`, () => st.ctx.openSetup(list.id, st.selected[list.id] || null), {
+    label: t('apply.edit_list_in_setup', { list: list.label.toLowerCase() }),
+    title: t('apply.edit_list_in_setup_tip', { list: list.label.toLowerCase() }),
   });
   b.removeAttribute('aria-disabled'); // opens a window, never busy
   return b;
@@ -983,7 +994,7 @@ function setupButton(list) {
 /** The right-click menu's way to item `name` in Budget Setup. */
 function openInSetup(list, name) {
   if (!st.ctx || typeof st.ctx.openSetup !== 'function') return [];
-  return [{ label: 'Edit in Budget Setup', title: `Show this ${list.what} in the Budget Setup window`, run: () => st.ctx.openSetup(list.id, name) }];
+  return [{ label: t('apply.edit_in_budget_setup'), title: t('apply.show_this_in_the_budget', { what: list.word }), run: () => st.ctx.openSetup(list.id, name) }];
 }
 
 /**
@@ -1019,40 +1030,40 @@ function keyFigure(list, name, def) {
 /** The column heads of each table after the name: [id, label, title, numeric]. */
 const SETUP_COLS = {
   fringes: [
-    ['description', 'Description', ''],
-    ['rate', 'Rate', 'A percent of pay, or a flat amount per line or per unit of time', true],
-    ['unit', 'Unit', 'Percent of pay, or flat per line or per unit of time'],
-    ['cutoff', 'Cutoff', 'The most pay per earner a percent fringe is figured on', true],
-    ['uses', 'In use', 'Lines using it in the whole budget; click a count to find them', true],
-    ['total', 'Total', 'Its fringe dollars in the whole budget', true],
+    ['description', t('apply.col.description'), ''],
+    ['rate', t('apply.col.rate'), t('apply.col.rate_tip'), true],
+    ['unit', t('apply.col.unit'), t('apply.col.unit_tip')],
+    ['cutoff', t('apply.col.cutoff'), t('apply.col.cutoff_tip'), true],
+    ['uses', t('apply.col.uses'), t('apply.col.uses_tip'), true],
+    ['total', t('apply.col.total'), t('apply.col.total_tip'), true],
   ],
   groups: [
-    ['description', 'Description', ''],
-    ['counted', 'In budget total', 'Whether its lines count in the budget total'],
-    ['color', 'Color', 'The color its lines show in'],
-    ['uses', 'In use', 'Lines using it in the whole budget; click a count to find them', true],
-    ['total', 'Total', 'Its lines’ dollars, counted in the total or not', true],
-    ['active', 'Active total', 'Its lines’ dollars that count in the budget total', true],
+    ['description', t('apply.col.description'), ''],
+    ['counted', t('apply.col.counted'), t('apply.col.counted_tip')],
+    ['color', t('apply.col.color'), t('apply.col.color_tip')],
+    ['uses', t('apply.col.uses'), t('apply.col.uses_tip'), true],
+    ['total', t('apply.col.total'), t('apply.col.total_tip2'), true],
+    ['active', t('apply.col.active'), t('apply.col.active_tip'), true],
   ],
   sets: [
-    ['description', 'Description', ''],
-    ['uses', 'In use', 'Lines using it in the whole budget; click a count to find them', true],
-    ['total', 'Total', 'Its lines’ dollars in the whole budget', true],
+    ['description', t('apply.col.description'), ''],
+    ['uses', t('apply.col.uses'), t('apply.col.uses_tip'), true],
+    ['total', t('apply.col.total'), t('apply.col.total_tip3'), true],
   ],
   locations: [
-    ['description', 'Description', ''],
-    ['city', 'City', ''],
-    ['region', 'Region', ''],
-    ['country', 'Country', ''],
-    ['uses', 'In use', 'Lines using it in the whole budget; click a count to find them', true],
-    ['total', 'Total', 'Its lines’ dollars in the whole budget', true],
+    ['description', t('apply.col.description'), ''],
+    ['city', t('apply.col.city'), ''],
+    ['region', t('apply.col.region'), ''],
+    ['country', t('apply.col.country'), ''],
+    ['uses', t('apply.col.uses'), t('apply.col.uses_tip'), true],
+    ['total', t('apply.col.total'), t('apply.col.total_tip3'), true],
   ],
   currencies: [
-    ['description', 'Description', ''],
-    ['symbol', 'Symbol', ''],
-    ['uses', 'In use', 'Lines using it in the whole budget; click a count to find them', true],
-    ['rate', 'Rate', 'What one unit is worth in the base currency', true],
-    ['total', 'Total', 'Its lines’ dollars in the base currency', true],
+    ['description', t('apply.col.description'), ''],
+    ['symbol', t('apply.col.symbol'), ''],
+    ['uses', t('apply.col.uses'), t('apply.col.uses_tip'), true],
+    ['rate', t('apply.col.rate'), t('apply.col.rate_tip2'), true],
+    ['total', t('apply.col.total'), t('apply.col.total_tip4'), true],
   ],
 };
 
@@ -1075,9 +1086,9 @@ function fringeUnitValue(def) {
 
 function fringeUnitOptions(def) {
   return [
-    ['percent', 'Percent'],
-    ['flat:', 'Flat per line'],
-    ...timeUnits(def.kind === 'flat' ? str(def.unit) : '').map((u) => [`flat:${u}`, `Flat per ${u}`]),
+    ['percent', t('apply.unit.percent')],
+    ['flat:', t('apply.unit.flat_line')],
+    ...timeUnits(def.kind === 'flat' ? str(def.unit) : '').map((u) => [`flat:${u}`, t('apply.unit.flat_per', { unit: u })]),
   ];
 }
 
@@ -1199,7 +1210,7 @@ function cellKey(list, name, col) {
 /** Fringe `name` as set_fringe takes it, from the newest view, with `patch` (editor values) on top. */
 function fringeStep(name, patch) {
   const defs = obj(budget().fringes);
-  if (!has(defs, name)) throw `Fringe ${name} no longer exists.`;
+  if (!has(defs, name)) throw t('apply.gone.fringe', { name: name });
   const start = fringeFields(obj(defs[name])).filter((f) => f.type !== 'note');
   const values = Object.fromEntries(start.map((f) => [f.key, str(f.value)]));
   const fringe = fringeInput({ ...values, ...patch });
@@ -1210,7 +1221,7 @@ function fringeStep(name, patch) {
 /** Group `name` as update_group takes it, from the newest view, with `patch` on top. */
 function groupStep(name, patch) {
   const defs = obj(budget().groups);
-  if (!has(defs, name)) throw `Group ${name} no longer exists.`;
+  if (!has(defs, name)) throw t('apply.gone.group', { name: name });
   const def = obj(defs[name]);
   const color = typeof def.color === 'string' && def.color ? def.color : null;
   return [
@@ -1229,7 +1240,7 @@ function groupStep(name, patch) {
 
 function locationStep(name, patch) {
   const defs = obj(budget().locations);
-  if (!has(defs, name)) throw `Location ${name} no longer exists.`;
+  if (!has(defs, name)) throw t('apply.gone.location', { name: name });
   const def = obj(defs[name]);
   const location = Object.fromEntries(['description', 'city', 'region', 'country'].map((k) => [k, str(def[k])]));
   return ['set_location', { name, location: { ...location, ...patch } }];
@@ -1237,22 +1248,31 @@ function locationStep(name, patch) {
 
 function currencyStep(code, patch) {
   const defs = obj(budget().currencies);
-  if (!has(defs, code)) throw `Currency ${code} no longer exists.`;
+  if (!has(defs, code)) throw t('apply.gone.currency', { name: code });
   const def = obj(defs[code]);
   return ['set_currency', { code, currency: { description: str(def.description), symbol: str(def.symbol), rate: str(def.rate), ...patch } }];
 }
 
+/** A column's name for a cell's label: its head's words, else the field with a capital. */
+function colName(field) {
+  for (const cols of Object.values(SETUP_COLS)) {
+    const c = cols.find((x) => x[0] === field);
+    if (c) return c[1];
+  }
+  return field[0].toUpperCase() + field.slice(1);
+}
+
 /** Item `name`'s cell in column `col` of `list`. */
 function setupCell(list, name, def, col) {
-  const label = (what) => `${what} of ${list.what} ${name}`;
+  const label = (what) => t('apply.cell_label', { what, kind: list.word, name });
   const text = (field, step, opts = {}) =>
-    cellInput(cellKey(list, name, field), opts.value !== undefined ? opts.value : str(def[field]), label(opts.label || field[0].toUpperCase() + field.slice(1)), (v, undo) => saveCell(() => step(v), undo), opts);
+    cellInput(cellKey(list, name, field), opts.value !== undefined ? opts.value : str(def[field]), label(opts.label || colName(field)), (v, undo) => saveCell(() => step(v), undo), opts);
   if (col === 'uses') return usesButton(st.view, list.id, name, `apply:uses:${list.id}:${name}`);
   if (col === 'total' || col === 'active') {
     if (list.id === 'groups') {
       const v = groupDollars(name, col === 'total' ? 'full' : 'active');
       const off = col === 'active' && def.in_budget_total === false;
-      return el('span', { class: `sw-num${off ? ' apply-off' : ''}`, text: v === null ? '' : money(v), title: off ? 'Not in the budget total' : undefined });
+      return el('span', { class: `sw-num${off ? ' apply-off' : ''}`, text: v === null ? '' : money(v), title: off ? t('apply.not_in_budget_total') : undefined });
     }
     return el('span', { class: 'sw-num', text: totalText(st.view, list.id, name) });
   }
@@ -1262,16 +1282,16 @@ function setupCell(list, name, def, col) {
       return text('rate', (v) => fringeStep(name, { rate: v }), { value: str(def.rate) === '' ? '' : rateText(def.rate), num: true, title: fringeRate(def) });
     }
     if (col === 'unit') {
-      return cellSelect(cellKey(list, name, 'unit'), fringeUnitValue(def), fringeUnitOptions(def), label('Unit'), (v, undo) =>
+      return cellSelect(cellKey(list, name, 'unit'), fringeUnitValue(def), fringeUnitOptions(def), label(t('apply.col.unit')), (v, undo) =>
         saveCell(() => fringeStep(name, v === 'percent' ? { kind: 'percent' } : { kind: 'flat', unit: v.slice('flat:'.length) }), undo),
       );
     }
     if (col === 'cutoff') {
       const cutoff = def.cutoff === undefined || def.cutoff === null ? '' : money(def.cutoff);
       if (def.kind === 'flat') {
-        return el('span', { class: 'sw-num apply-off', text: cutoff, title: cutoff ? 'Kept but not used: cutoffs apply to percent fringes only' : 'Cutoffs apply to percent fringes only' });
+        return el('span', { class: 'sw-num apply-off', text: cutoff, title: cutoff ? t('apply.cutoff_kept') : t('apply.cutoff_percent_only') });
       }
-      return text('cutoff', (v) => fringeStep(name, { cutoff: v }), { value: cutoff, num: true, placeholder: 'None', title: cutoff ? 'Pay per earner above this earns no fringe' : '' });
+      return text('cutoff', (v) => fringeStep(name, { cutoff: v }), { value: cutoff, num: true, placeholder: t('apply.none'), title: cutoff ? t('apply.cutoff_tip') : '' });
     }
   }
   if (list.id === 'groups') {
@@ -1279,8 +1299,8 @@ function setupCell(list, name, def, col) {
     if (col === 'counted') {
       const box = el('input', {
         class: 'setup-check',
-        title: 'Whether its lines count in the budget total',
-        attrs: { type: 'checkbox', 'aria-label': `${name} counts in the budget total` },
+        title: t('apply.whether_its_lines_count_in'),
+        attrs: { type: 'checkbox', 'aria-label': t('apply.counts_in_the_budget_total', { name }) },
         data: { key: cellKey(list, name, 'counted') },
       });
       box.checked = def.in_budget_total !== false;
@@ -1295,9 +1315,9 @@ function setupCell(list, name, def, col) {
     if (col === 'color') {
       const current = typeof def.color === 'string' ? def.color.toLowerCase() : '';
       const ours = paletteColor(current);
-      const options = [['', 'None'], ...PALETTE.map((c) => [c.id, c.label])];
-      if (current && !ours) options.push(['keep', `Other (${current})`]);
-      const sel = cellSelect(cellKey(list, name, 'color'), ours ? ours.id : current ? 'keep' : '', options, label('Color'), (v, undo) => {
+      const options = [['', t('apply.none')], ...PALETTE.map((c) => [c.id, c.label])];
+      if (current && !ours) options.push(['keep', t('apply.other_color', { color: current })]);
+      const sel = cellSelect(cellKey(list, name, 'color'), ours ? ours.id : current ? 'keep' : '', options, label(t('apply.col.color')), (v, undo) => {
         const picked = PALETTE.find((c) => c.id === v);
         saveCell(() => groupStep(name, { color: v === 'keep' ? current : picked ? picked.light : null }), undo);
       });
@@ -1307,7 +1327,7 @@ function setupCell(list, name, def, col) {
   }
   if (list.id === 'sets' && col === 'description') {
     return text('description', (v) => {
-      if (!has(budget().sets, name)) throw `Set ${name} no longer exists.`;
+      if (!has(budget().sets, name)) throw t('apply.gone.set', { name: name });
       return ['set_set', { name, set: { description: v } }];
     });
   }
@@ -1350,7 +1370,7 @@ function syncStrip(list) {
     for (const b of h.querySelectorAll('[data-needs-item]')) {
       if (name === null) b.setAttribute('aria-disabled', 'true');
       else b.removeAttribute('aria-disabled');
-      b.title = name === null ? `Select a ${list.what} first` : `${b.dataset.does} ${name}`;
+      b.title = name === null ? t('apply.select_first', { what: list.word }) : `${b.dataset.does} ${name}`;
     }
   }
 }
@@ -1362,7 +1382,7 @@ function setupStrip(list) {
     const b = stripButton(text, key, () => {
       const n = setupSelected(list);
       if (n !== null) run(n);
-    }, { enabled: name !== null, title: name === null ? `Select a ${list.what} first` : `${does} ${name}` });
+    }, { enabled: name !== null, title: name === null ? t('apply.select_first', { what: list.word }) : `${does} ${name}` });
     b.dataset.needsItem = '1';
     b.dataset.does = does;
     return b;
@@ -1370,17 +1390,17 @@ function setupStrip(list) {
   return actionStrip(
     list.label,
     [
-      stripButton(`New ${list.what}…`, addKey(list.id), () => addItem(list), { title: `Add a ${list.what} to this budget` }),
-      needs('Edit…', `apply:edit:${list.id}`, `Edit ${list.what}`, (n) => editItem(list, n)),
-      needs('Delete…', `apply:delete:${list.id}`, `Delete ${list.what}`, (n) => deleteItem(list, n)),
+      stripButton(t('apply.new', { what: list.word }), addKey(list.id), () => addItem(list), { title: t('apply.add_a_to_this_budget', { what: list.word }) }),
+      needs(t('apply.edit_strip'), `apply:edit:${list.id}`, t('apply.edit_what', { what: list.word }), (n) => editItem(list, n)),
+      needs(t('apply.delete_strip'), `apply:delete:${list.id}`, t('apply.delete_what', { what: list.word }), (n) => deleteItem(list, n)),
       // A browser has no setup library (host.js).
-      isWeb() ? null : needs('Save to Library…', `apply:save:${list.id}`, `Copy to your library, with what it needs: ${list.what}`, (n) => saveItemToLibrary(renameCtx(), list.what, n)),
+      isWeb() ? null : needs(t('apply.save_to_library'), `apply:save:${list.id}`, t('apply.save_to_library_does', { what: list.word }), (n) => saveItemToLibrary(renameCtx(), list.what, n)),
     ],
     searchBox({
       key: `apply:filter:${list.id}`,
       value: str(st.filters[list.id]),
-      label: `Search ${list.label.toLowerCase()}`,
-      placeholder: `Search ${list.label.toLowerCase()}`,
+      label: t('apply.search_list', { list: list.label.toLowerCase() }),
+      placeholder: t('apply.search_list', { list: list.label.toLowerCase() }),
       onChange: (v) => {
         st.filters[list.id] = v;
         draw();
@@ -1397,8 +1417,8 @@ function setupBand(list) {
       const sel = el(
         'select',
         { class: 'setup-input setup-select', title, attrs: { disabled: st.busy }, data: { key: `apply:grouprule:${rule}` } },
-        el('option', { attrs: { value: 'include' }, text: 'Include' }),
-        el('option', { attrs: { value: 'exclude' }, text: 'Exclude' }),
+        el('option', { attrs: { value: 'include' }, text: t('apply.include') }),
+        el('option', { attrs: { value: 'exclude' }, text: t('apply.exclude') }),
       );
       sel.value = now[rule];
       sel.addEventListener('change', () => {
@@ -1416,8 +1436,8 @@ function setupBand(list) {
       });
       return bandField(label, sel, title);
     });
-    const b = band('Group rules', el('span', { class: 'sw-band-title', text: 'Group rules' }), ...fields);
-    b.title = 'They apply to the whole budget. A line left out still shows, but counts as 0.';
+    const b = band(t('apply.group_rules'), el('span', { class: 'sw-band-title', text: t('apply.group_rules') }), ...fields);
+    b.title = t('apply.they_apply_to_the_whole');
     return b;
   }
   if (list.id === 'currencies') {
@@ -1442,7 +1462,7 @@ function setupHead(list) {
   };
   return [
     el('span', { class: 'sw-head' }),
-    head('name', list.id === 'currencies' ? 'Code' : 'Name', '', false),
+    head('name', list.id === 'currencies' ? t('apply.col.code') : t('apply.col.name'), '', false),
     ...cols.map(([id, label, title, num]) => head(id, label, title, num)),
   ];
 }
@@ -1470,7 +1490,7 @@ function drawSetupList(host, list) {
   const body = [];
   if (st.error) body.push(el('p', { class: 'setup-error apply-error', text: st.error, attrs: { role: 'alert' } }));
   if (!names.length) body.push(el('p', { class: 'setup-empty', text: list.none }));
-  else if (!shown.length) body.push(el('p', { class: 'setup-empty', text: 'Nothing matches the search.' }));
+  else if (!shown.length) body.push(el('p', { class: 'setup-empty', text: t('apply.nothing_matches_the_search') }));
   else body.push(gridTable(list.id, setupHead(list), ul));
   host.replaceChildren();
   mountFrame(host, { strip: setupStrip(list), band: setupBand(list), body });
@@ -1482,7 +1502,7 @@ function setupItem(list, name, def, movable) {
   const key = itemKey(list.id, name);
   const infoId = nextId();
   const said = [str(def.description), list.id === 'fringes' ? fringeRate(def) : ''].filter(Boolean).join('; ');
-  const tip = [str(def.description), sourceText(st.view, list.what, name), budgetWide(list, name, def), 'Double-click to edit'].filter(Boolean).join('\n');
+  const tip = [str(def.description), sourceText(st.view, list.what, name), budgetWide(list, name, def), t('apply.double_click_to_edit')].filter(Boolean).join('\n');
   const b = el(
     'button',
     {
@@ -1495,7 +1515,7 @@ function setupItem(list, name, def, movable) {
       'span',
       { class: 'apply-name' },
       name,
-      str(def.short_code) ? el('span', { class: 'apply-code', text: str(def.short_code), title: 'Short code: the grid shows it for this item' }) : null,
+      str(def.short_code) ? el('span', { class: 'apply-code', text: str(def.short_code), title: t('apply.short_code_the_grid_shows') }) : null,
     ),
     el('span', { class: 'setup-sr', text: said, attrs: { id: infoId } }),
   );
@@ -1518,7 +1538,7 @@ function setupItem(list, name, def, movable) {
       ctx: renameCtx(),
       edit: () => editItem(list, name),
       remove: () => deleteItem(list, name),
-      extra: list.id === 'fringes' || list.id === 'groups' ? [{ label: 'Short code…', title: 'A short code the grid shows instead of the name', run: () => editCode(list, name) }] : [],
+      extra: list.id === 'fringes' || list.id === 'groups' ? [{ label: t('apply.short_code'), title: t('apply.a_short_code_the_grid'), run: () => editCode(list, name) }] : [],
       onRenamed: (to) => {
         st.selected[list.id] = to;
         focusAfter(itemKey(list.id, to), list.id);
@@ -1558,22 +1578,29 @@ function setupItem(list, name, def, movable) {
 
 /** The footer: how many items, and for fringes the budget's fringe dollars from percent and flat fringes. */
 function setupFooter(list, defs, shown, all) {
-  const words = { fringes: ['fringe', 'fringes'], groups: ['group', 'groups'], sets: ['set', 'sets'], locations: ['location', 'locations'], currencies: ['currency', 'currencies'] }[list.id];
-  const count = shown === all ? plural(all, words[0], words[1]) : `${shown} of ${plural(all, words[0], words[1])}`;
+  const counted = (n) =>
+    ({
+      fringes: () => t('apply.count.fringes', { count: n }),
+      groups: () => t('apply.count.groups', { count: n }),
+      sets: () => t('apply.count.sets', { count: n }),
+      locations: () => t('apply.count.locations', { count: n }),
+      currencies: () => t('apply.count.currencies', { count: n }),
+    })[list.id]();
+  const count = shown === all ? counted(all) : t('apply.shown_of', { shown, all: counted(all) });
   const items = [{ label: '', value: count }];
   if (list.id === 'fringes' && all) {
     const r = obj(report().fringes);
     let percent = 0;
     let flat = 0;
     for (const [n, def] of Object.entries(defs)) {
-      const t = Number(obj(r[n]).total) || 0;
-      if (obj(def).kind === 'flat') flat += t;
-      else percent += t;
+      const amount = Number(obj(r[n]).total) || 0;
+      if (obj(def).kind === 'flat') flat += amount;
+      else percent += amount;
     }
     items.push(
-      { label: 'Fringe total', value: money(percent + flat), title: 'Every fringe dollar in the budget' },
-      { label: 'Percent', value: money(percent), title: 'Fringe dollars from percent fringes in the whole budget' },
-      { label: 'Flat', value: money(flat), title: 'Fringe dollars from flat fringes in the whole budget' },
+      { label: t('apply.fringe_total'), value: money(percent + flat), title: t('apply.every_fringe_dollar_in_the') },
+      { label: t('apply.percent'), value: money(percent), title: t('apply.fringe_dollars_from_percent_fringes') },
+      { label: t('apply.flat'), value: money(flat), title: t('apply.fringe_dollars_from_flat_fringes') },
     );
   }
   setFooterTotals(items);
@@ -1585,9 +1612,9 @@ function setupFooter(list, defs, shown, all) {
  * rule at its default.
  */
 const GROUP_RULES = [
-  ['ungrouped_lines', 'Lines with no group', 'include', 'Exclude leaves out every line and adjustment row that has no group'],
-  ['conflict', 'Lines in a counted and an uncounted group', 'exclude', 'Include counts a line that is in a group in the total and a group that is not'],
-  ['fringes_in_totals', 'Fringes in group totals', 'include', 'Whether group totals show their lines’ fringes. Display only: budget totals never change'],
+  ['ungrouped_lines', t('apply.rule.ungrouped'), 'include', t('apply.rule.ungrouped_tip')],
+  ['conflict', t('apply.rule.conflict'), 'exclude', t('apply.rule.conflict_tip')],
+  ['fringes_in_totals', t('apply.rule.fringes'), 'include', t('apply.rule.fringes_tip')],
 ];
 
 function groupRules() {
@@ -1629,13 +1656,13 @@ function fringeFields(def) {
   const units = budget().units;
   const basis = FLAT_BASES.some(([b]) => b === def.basis) ? def.basis : 'amount';
   return [
-    { key: 'kind', label: 'Kind', type: 'select', options: [['percent', 'Percent of pay'], ['flat', 'Flat amount']], value: def.kind === 'flat' ? 'flat' : 'percent' },
-    { key: 'rate', label: 'Rate', value: str(def.rate), placeholder: '18.5', suffix: (v) => (v.kind === 'flat' ? base : '%') },
+    { key: 'kind', label: t('apply.kind'), type: 'select', options: [['percent', t('apply.kind_percent')], ['flat', t('apply.kind_flat')]], value: def.kind === 'flat' ? 'flat' : 'percent' },
+    { key: 'rate', label: t('apply.rate'), value: str(def.rate), placeholder: '18.5', suffix: (v) => (v.kind === 'flat' ? base : '%') },
     {
       key: 'cutoff',
-      label: 'Cutoff (pay per earner)',
+      label: t('apply.cutoff_pay_per_earner'),
       value: def.cutoff === undefined || def.cutoff === null ? '' : money(def.cutoff),
-      placeholder: 'None',
+      placeholder: t('apply.none'),
       showIf: (v) => v.kind !== 'flat',
     },
     {
@@ -1643,27 +1670,27 @@ function fringeFields(def) {
       // or an import) but never uses it.
       key: 'cutoff_note',
       type: 'note',
-      text: (v) => `Its cutoff of ${str(v.cutoff).trim()} is kept but not used: cutoffs apply to percent fringes only.`,
+      text: (v) => t('apply.cutoff_kept_note', { cutoff: str(v.cutoff).trim() }),
       showIf: (v) => v.kind === 'flat' && str(v.cutoff).trim() !== '',
     },
     {
       key: 'unit',
-      label: 'Charged per',
+      label: t('apply.charged_per'),
       type: 'select',
-      options: [['', 'Line'], ...timeUnits(unit).map((u) => [u, u])],
+      options: [['', t('apply.unit_line')], ...timeUnits(unit).map((u) => [u, u])],
       value: unit,
       showIf: (v) => v.kind === 'flat',
     },
-    { key: 'basis', label: 'Basis', type: 'select', options: FLAT_BASES, value: basis, showIf: (v) => v.kind === 'flat' },
+    { key: 'basis', label: t('apply.basis'), type: 'select', options: FLAT_BASES, value: basis, showIf: (v) => v.kind === 'flat' },
     {
       key: 'max_hours_per_day',
-      label: 'Max hours per day',
+      label: t('apply.max_hours_per_day'),
       value: str(def.max_hours_per_day),
-      placeholder: 'None',
+      placeholder: t('apply.none'),
       showIf: (v) => v.kind === 'flat' && isHourUnit(units, v.unit),
     },
-    { key: 'description', label: 'Description', value: str(def.description) },
-    { key: 'short_code', label: 'Short code (shown in the grid)', value: str(def.short_code), placeholder: 'None' },
+    { key: 'description', label: t('apply.description'), value: str(def.description) },
+    { key: 'short_code', label: t('apply.short_code_shown_in_the'), value: str(def.short_code), placeholder: t('apply.none') },
   ];
 }
 
@@ -1695,14 +1722,14 @@ const EDITORS = {
   groups: (name, def) => {
     const current = typeof def.color === 'string' ? def.color.toLowerCase() : '';
     const ours = paletteColor(current);
-    const options = [{ id: '', label: 'No color', cls: 'sw-none' }, ...PALETTE.map((c) => ({ id: c.id, label: c.label, cls: `sw-${c.id}` }))];
-    if (current && !ours) options.push({ id: 'keep', label: `Keep its color (${current})`, cls: 'sw-keep' });
+    const options = [{ id: '', label: t('apply.no_color'), cls: 'sw-none' }, ...PALETTE.map((c) => ({ id: c.id, label: c.label, cls: `sw-${c.id}` }))];
+    if (current && !ours) options.push({ id: 'keep', label: t('apply.keep_its_color', { current }), cls: 'sw-keep' });
     return {
       fields: [
-        { key: 'description', label: 'Description', value: str(def.description) },
-        { key: 'short_code', label: 'Short code (shown in the grid)', value: str(def.short_code), placeholder: 'None' },
-        { key: 'counted', label: 'Counts in total', type: 'check', value: def.in_budget_total !== false },
-        { key: 'color', label: 'Line color', type: 'swatches', options, value: ours ? ours.id : current ? 'keep' : '' },
+        { key: 'description', label: t('apply.description'), value: str(def.description) },
+        { key: 'short_code', label: t('apply.short_code_shown_in_the'), value: str(def.short_code), placeholder: t('apply.none') },
+        { key: 'counted', label: t('apply.counts_in_total'), type: 'check', value: def.in_budget_total !== false },
+        { key: 'color', label: t('apply.line_color'), type: 'swatches', options, value: ours ? ours.id : current ? 'keep' : '' },
       ],
       build: (v) => {
         const picked = PALETTE.find((c) => c.id === v.color);
@@ -1718,23 +1745,23 @@ const EDITORS = {
     };
   },
   sets: (name, def) => ({
-    fields: [{ key: 'description', label: 'Description', value: str(def.description) }],
+    fields: [{ key: 'description', label: t('apply.description'), value: str(def.description) }],
     build: (v) => ['set_set', { name, set: { description: v.description } }],
   }),
   locations: (name, def) => ({
-    fields: ['description', 'city', 'region', 'country'].map((k) => ({ key: k, label: k[0].toUpperCase() + k.slice(1), value: str(def[k]) })),
+    fields: ['description', 'city', 'region', 'country'].map((k) => ({ key: k, label: colName(k), value: str(def[k]) })),
     build: (v) => ['set_location', { name, location: { description: v.description, city: v.city, region: v.region, country: v.country } }],
   }),
   currencies: (name, def) => {
     const base = str(budget().base_currency);
     return {
       fields: [
-        { key: 'rate', label: `Rate (${base || 'base'} per 1 ${name || 'unit'})`, value: str(def.rate), placeholder: '1.08' },
-        { key: 'symbol', label: 'Symbol', value: str(def.symbol) },
-        { key: 'description', label: 'Description', value: str(def.description) },
+        { key: 'rate', label: t('apply.currency_rate', { base: base || t('apply.currency_rate_base'), name: name || t('apply.currency_rate_unit') }), value: str(def.rate), placeholder: '1.08' },
+        { key: 'symbol', label: t('apply.symbol'), value: str(def.symbol) },
+        { key: 'description', label: t('apply.description'), value: str(def.description) },
         // How amounts in it are written where totals show in it (decisions.md, entry 61).
-        { key: 'separators', label: 'Separators', type: 'select', options: CURRENCY_SEPARATORS, value: def.separators === 'point_comma' ? 'point_comma' : 'comma_point' },
-        { key: 'symbol_after', label: 'Symbol after the amount', type: 'check', value: def.symbol_after === true },
+        { key: 'separators', label: t('apply.separators'), type: 'select', options: CURRENCY_SEPARATORS, value: def.separators === 'point_comma' ? 'point_comma' : 'comma_point' },
+        { key: 'symbol_after', label: t('apply.symbol_after_the_amount'), type: 'check', value: def.symbol_after === true },
       ],
       build: (v) => [
         'set_currency',
@@ -1758,18 +1785,18 @@ const ADDERS = {
   fringes: {
     fields: () => fringeFields({}),
     build: (name, v) => ['set_fringe', { name, fringe: fringeInput(v) }],
-    check: (v) => (v.rate.trim() === '' ? 'Enter a rate.' : null),
+    check: (v) => (v.rate.trim() === '' ? t('apply.enter_a_rate') : null),
   },
   groups: {
     fields: () => [
-      { key: 'description', label: 'Description', value: '' },
-      { key: 'short_code', label: 'Short code (shown in the grid)', value: '', placeholder: 'None' },
-      { key: 'counted', label: 'Counts in total', type: 'check', value: true },
+      { key: 'description', label: t('apply.description'), value: '' },
+      { key: 'short_code', label: t('apply.short_code_shown_in_the'), value: '', placeholder: t('apply.none') },
+      { key: 'counted', label: t('apply.counts_in_total'), type: 'check', value: true },
     ],
     build: (name, v) => ['set_group', { name, group: { description: v.description, in_budget_total: Boolean(v.counted), short_code: str(v.short_code).trim() } }],
   },
   sets: {
-    fields: () => [{ key: 'description', label: 'Description', value: '', placeholder: 'Interior, night' }],
+    fields: () => [{ key: 'description', label: t('apply.description'), value: '', placeholder: t('apply.interior_night') }],
     build: (name, v) => ['set_set', { name, set: { description: v.description.trim() } }],
   },
   locations: {
@@ -1784,8 +1811,8 @@ const ADDERS = {
     ],
     check: (v) => {
       const rate = v.rate.trim();
-      if (rate === '') return 'Enter a rate.';
-      if (!DECIMAL.test(rate) || Number(rate) <= 0) return 'The rate must be a number above 0, like 1.08.';
+      if (rate === '') return t('apply.enter_a_rate');
+      if (!DECIMAL.test(rate) || Number(rate) <= 0) return t('apply.rate_above_zero');
       return null;
     },
   },
@@ -1796,15 +1823,15 @@ function badName(list, name) {
   const defs = obj(list.defs(budget()));
   const has = Object.prototype.hasOwnProperty.call(defs, name);
   if (list.id === 'currencies') {
-    if (name === '') return 'Enter a currency code.';
-    if (name.includes(',')) return 'Codes can’t contain commas.';
-    if (name === str(budget().base_currency)) return `${name} is the base currency.`;
-    if (has) return `${name} is already in the list.`;
+    if (name === '') return t('apply.enter_a_code');
+    if (name.includes(',')) return t('apply.no_commas_code');
+    if (name === str(budget().base_currency)) return t('apply.is_base_currency', { name });
+    if (has) return t('apply.already_listed', { name });
     return null;
   }
-  if (name === '') return `Enter a ${list.what} name.`;
-  if (name.includes(',')) return 'Names can’t contain commas.';
-  if (has) return `There is already a ${list.what} named ${name}.`;
+  if (name === '') return t('apply.enter_a_name', { what: list.word });
+  if (name.includes(',')) return t('apply.no_commas');
+  if (has) return t('apply.already_named', { what: list.word, name });
   return null;
 }
 
@@ -1837,17 +1864,16 @@ function editItem(list, name) {
   const key = itemKey(list.id, name);
   const start = Object.fromEntries(fields.map((f) => [f.key, f.type === 'check' ? Boolean(f.value) : str(f.value)]));
   const unchanged = JSON.stringify(build(start));
-  const what = list.what[0].toUpperCase() + list.what.slice(1);
-  const nameField = { key: 'newName', label: list.id === 'currencies' ? 'Code' : 'Name', value: name };
+  const nameField = { key: 'newName', label: list.id === 'currencies' ? t('apply.col.code') : t('apply.col.name'), value: name };
   let deleting = false;
   let now = name;
   anchoredForm({
     anchor: byKey(key),
-    title: `${what} ${name}`,
+    title: t('apply.tag_named', { kind: list.title, name }),
     fields: [nameField, ...fields],
     extra: {
-      text: 'Delete…',
-      title: `Delete this ${list.what}`,
+      text: t('apply.delete'),
+      title: t('apply.delete_this', { what: list.word }),
       run: () => {
         deleting = true;
       },
@@ -1881,9 +1907,9 @@ function editCode(list, name) {
   const key = itemKey(list.id, name);
   anchoredForm({
     anchor: byKey(key),
-    title: `Short code for ${list.what} ${name}`,
-    message: 'The grid shows it instead of the name. Leave it empty for none.',
-    fields: [{ key: 'code', label: 'Short code', value: str(obj(defs[name]).short_code), placeholder: 'FICA' }],
+    title: t('apply.short_code_for', { what: list.word, name }),
+    message: t('apply.the_grid_shows_it_instead'),
+    fields: [{ key: 'code', label: t('apply.short_code_field'), value: str(obj(defs[name]).short_code), placeholder: t('apply.fica') }],
     onSubmit: (v) => call('set_short_code', { kind: list.what, name, code: str(v.code).trim() }),
   }).then(() => focusAfter(key, list.id));
 }
@@ -1894,26 +1920,25 @@ function deletePlan(list, name, def) {
   const use = inUse(st.view, list.id, name);
   // The fringe's own count is in every view; the others wait for the counts.
   const lines = list.id === 'fringes' ? Number(obj(obj(r.fringes)[name]).uses) || use.lines : use.lines;
-  const used = lines ? `${plural(lines, 'line uses', 'lines use')} it. ` : '';
-  const removeText = lines ? `Remove from ${plural(lines, 'line', 'lines')} and delete` : 'Delete';
+  const used = lines ? t('apply.lines_use_it', { count: lines }) : '';
+  const removeText = lines ? t('apply.remove_and_delete', { count: lines }) : t('apply.delete_yes');
   if (list.id === 'fringes') {
     return {
-      message: lines ? `${used}Deleting takes it off them.` : 'No lines use it.',
+      message: lines ? t('apply.deleting_takes_off', { used }) : t('apply.no_lines_use_it'),
       submitText: removeText,
       step: ['delete_fringe', { name }],
     };
   }
   if (list.id === 'groups') {
-    const back = def.in_budget_total === false ? ' and they count in the total again' : '';
     return {
-      message: lines ? `${used}Deleting takes it off them${back}.` : 'No lines use it.',
+      message: lines ? (def.in_budget_total === false ? t('apply.deleting_takes_off_counted', { used }) : t('apply.deleting_takes_off', { used })) : t('apply.no_lines_use_it'),
       submitText: removeText,
       step: ['delete_group', { name }],
     };
   }
   if (list.id === 'sets' || list.id === 'locations') {
     return {
-      message: lines ? `${used}Deleting takes it off them.` : 'No lines use it.',
+      message: lines ? t('apply.deleting_takes_off', { used }) : t('apply.no_lines_use_it'),
       submitText: removeText,
       step: [list.id === 'sets' ? 'delete_set' : 'delete_location', { name }],
     };
@@ -1921,9 +1946,9 @@ function deletePlan(list, name, def) {
   const base = str(budget().base_currency);
   return {
     message: lines
-      ? `${plural(lines, 'line is', 'lines are')} in ${name}. Deleting puts ${lines === 1 ? 'it' : 'them'} back in ${base || 'the base currency'}. Charges and the totals currency must not use it.`
-      : 'It can’t be deleted while charges or the totals currency use it.',
-    submitText: lines ? `Move ${plural(lines, 'line', 'lines')} and delete` : 'Delete',
+      ? t('apply.delete_currency_lines', { count: lines, name, base: base || t('apply.the_base_currency') })
+      : t('apply.delete_currency_unused'),
+    submitText: lines ? t('apply.move_and_delete', { count: lines }) : t('apply.delete_yes'),
     step: ['delete_currency', { code: name, clearLines: lines > 0 }],
   };
 }
@@ -1942,9 +1967,9 @@ function deleteItem(list, name) {
   let done = false;
   anchoredForm({
     anchor: byKey(key),
-    title: `Delete ${list.what} ${name}?`,
+    title: t('apply.delete_named', { what: list.word, name }),
     message,
-    submitText: submitText || 'Delete',
+    submitText: submitText || t('apply.delete_yes'),
     danger: true,
     onSubmit: () =>
       call(step[0], step[1]).then(() => {
@@ -1959,14 +1984,14 @@ function addItem(list) {
   const spec = ADDERS[list.id];
   if (!spec) return;
   const nameField = list.id === 'currencies'
-    ? { key: 'name', label: 'Code', value: '', placeholder: 'EUR' }
-    : { key: 'name', label: 'Name', value: '' };
+    ? { key: 'name', label: t('apply.code'), value: '', placeholder: t('apply.eur') }
+    : { key: 'name', label: t('apply.name'), value: '' };
   let added = null;
   anchoredForm({
     anchor: byKey(addKey(list.id)),
-    title: `New ${list.what}`,
+    title: t('apply.new_title', { what: list.word }),
     fields: [nameField, ...spec.fields()],
-    submitText: 'Add',
+    submitText: t('apply.add'),
     onSubmit: (v) => {
       const name = v.name.trim();
       const bad = badName(list, name) || (spec.check ? spec.check(v) : null);

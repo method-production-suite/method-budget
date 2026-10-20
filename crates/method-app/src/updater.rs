@@ -500,14 +500,14 @@ pub fn extend_help_menu<R: Runtime>(app: &AppHandle<R>, help: &Submenu<R>) -> ta
     help.append(&MenuItem::with_id(
         app,
         CHECK_ITEM,
-        "Check for Updates…",
+        crate::i18n::tr("menu.help.check_updates"),
         true,
         None::<&str>,
     )?)?;
     help.append(&CheckMenuItem::with_id(
         app,
         AUTO_ITEM,
-        "Check for Updates Automatically",
+        crate::i18n::tr("menu.help.check_updates_auto"),
         true,
         on,
         None::<&str>,
@@ -840,14 +840,17 @@ mod tests {
             run(&u, true, || Err(offline()), |_| unreachable!()).0,
             Some(Said::Failed)
         );
-        // The page's key for it (ui/js/updates.js, TEXT), and its words.
+        // The page's key for it (ui/js/updates.js, TEXT), and its words
+        // (the string table, ui/i18n/en.js).
         assert_eq!(
             serde_json::to_value(Said::NoBuild).ok(),
             Some(serde_json::json!("no-build"))
         );
-        assert!(UPDATES_JS.contains(
-            "'no-build': 'There’s no update for this computer yet. This version stays as it is.',"
-        ));
+        assert!(UPDATES_JS.contains("'no-build': t('updates.no_build'),"));
+        assert_eq!(
+            crate::i18n::tr("updates.no_build"),
+            "There’s no update for this computer yet. This version stays as it is."
+        );
     }
 
     /// The real check against a manifest served here: an Intel Mac (asked

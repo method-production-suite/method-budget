@@ -26,6 +26,7 @@
 // edits to its budget with its own view (pane_view: its own account).
 
 import { invoke, connected, setDefaultArgs } from './api.js';
+import { t } from './i18n.js';
 import { el, $, isTextField } from './dom.js';
 // A review file's close question (comments.js).
 import { confirmCloseReview } from './comments.js';
@@ -356,7 +357,10 @@ function trackChanges(view, opts) {
     c.last = net - c.prev;
     // Screen readers hear where the net total went (decision 82); an edit
     // that moves no money says nothing.
-    if (c.last !== 0) announce(`Net total ${totalText(net)}, ${c.last > 0 ? 'up' : 'down'} ${totalText(Math.abs(c.last))}`);
+    if (c.last !== 0) {
+      const said = { net: totalText(net), change: totalText(Math.abs(c.last)) };
+      announce(c.last > 0 ? t('main.announce_up', said) : t('main.announce_down', said));
+    }
   }
   c.prev = net;
 }
@@ -491,17 +495,17 @@ function placeOfCell(row, colKey) {
   if (state.level === 'details') {
     if (!row.key || !row.key.startsWith('r') || !state.acct) return null;
     const id = row.key.slice(1);
-    return { kind: 'row', key: id, parent: state.acct.code, field: colKey, text: `line ${row.cells && row.cells.num ? row.cells.num.text : ''} in ${state.acct.code}`.replace('line  in', 'a line in') };
+    return { kind: 'row', key: id, parent: state.acct.code, field: colKey, text: row.cells && row.cells.num && row.cells.num.text ? t('main.line_in', { num: row.cells.num.text, code: state.acct.code }) : t('main.a_line_in', { code: state.acct.code }) };
   }
   if (state.level === 'accounts') {
     if (!row.code || (colKey !== 'name' && colKey !== 'code')) return null;
-    return { kind: 'account', key: row.code, parent: state.cat ? state.cat.code : null, field: colKey, text: `account ${row.code}` };
+    return { kind: 'account', key: row.code, parent: state.cat ? state.cat.code : null, field: colKey, text: t('main.account', { code: row.code }) };
   }
   if (row.kind === 'category' && row.cells && row.cells.code && (colKey === 'name' || colKey === 'code')) {
-    return { kind: 'category', key: row.cells.code.text, field: colKey, text: `category ${row.cells.code.text}` };
+    return { kind: 'category', key: row.cells.code.text, field: colKey, text: t('main.category', { code: row.cells.code.text }) };
   }
   if (row.kind === 'level' && row.cells && row.cells.name && colKey === 'name') {
-    return { kind: 'production_total', key: row.cells.name.text, field: 'name', text: `production total ${row.cells.name.text}` };
+    return { kind: 'production_total', key: row.cells.name.text, field: 'name', text: t('main.production_total', { name: row.cells.name.text }) };
   }
   return null;
 }
@@ -509,12 +513,12 @@ function placeOfCell(row, colKey) {
 /** Right-click > Who Changed This…, or its menu item, on the cursor cell. */
 function whoChangedCell(row, colKey) {
   if (!state.view || !state.view.shared) {
-    toast('Share the budget through a folder to see who changed what.');
+    toast(t('main.share_the_budget_through_a'));
     return;
   }
   const place = placeOfCell(row, colKey);
   if (!place) {
-    toast('Put the cursor on a cell someone types in: totals are worked out, not typed.');
+    toast(t('main.cursor_on_typed_cell'));
     return;
   }
   whoChangedThis(place);
@@ -549,7 +553,7 @@ function zeroFiltered(rows, opts) {
 
 function renderTitle(v) {
   $('doc-name').textContent = v.file.name;
-  $('doc-name').title = v.file.path || 'Not saved yet';
+  $('doc-name').title = v.file.path || t('main.not_saved_yet');
   $('doc-dirty').hidden = !v.file.dirty;
   $('btn-undo').disabled = !v.can_undo;
   $('btn-redo').disabled = !v.can_redo;
@@ -605,7 +609,7 @@ function renderCrumbs(entry, ai) {
   closeMenu('crumbs');
   const ix = state.ix;
   const b = state.view.budget;
-  const parts = [crumb(b.title || 'Untitled budget', () => goTo('topsheet'), state.level === 'topsheet')];
+  const parts = [crumb(b.title || t('main.untitled_budget'), () => goTo('topsheet'), state.level === 'topsheet')];
   if (entry) {
     const c = entry.cat;
     const cats = ix.cats.map((x) => ({
@@ -619,7 +623,7 @@ function renderCrumbs(entry, ai) {
         'span',
         { class: 'crumb-seg' },
         crumb(`${c.code} ${c.name}`.trim(), () => goTo('accounts'), state.level === 'accounts'),
-        crumbPicker('cat', 'Go to another category', cats, (it) => openCategory(it.id)),
+        crumbPicker('cat', t('main.go_to_another_category'), cats, (it) => openCategory(it.id)),
       ),
     );
   }
@@ -636,15 +640,15 @@ function renderCrumbs(entry, ai) {
         'span',
         { class: 'crumb-seg' },
         crumb(`${a.code} ${a.name}`.trim(), null, true),
-        crumbPicker('acct', `Go to another account in ${entry.cat.code}`.trim(), accts, (it) => openAccount(entry.ti, it.id)),
+        crumbPicker('acct', t('main.go_to_another_account_in', { code: entry.cat.code }).trim(), accts, (it) => openAccount(entry.ti, it.id)),
       ),
     );
     parts.push(
       el(
         'span',
-        { class: 'crumb-steps', attrs: { role: 'group', 'aria-label': 'Step through accounts' } },
-        crumbStep('prev', 'Previous account', -1, 'go.prev_account'),
-        crumbStep('next', 'Next account', 1, 'go.next_account'),
+        { class: 'crumb-steps', attrs: { role: 'group', 'aria-label': t('main.step_through_accounts') } },
+        crumbStep('prev', t('main.previous_account'), -1, 'go.prev_account'),
+        crumbStep('next', t('main.next_account'), 1, 'go.next_account'),
       ),
     );
   }
@@ -661,9 +665,9 @@ function renderBanner(v) {
   const count = typeof v.issue_count === 'number' ? v.issue_count : (v.issues || []).length;
   const head = v.report
     ? count > 1
-      ? `${count} problems need fixing. Until then, totals count the flagged cells as blank.`
-      : 'One problem needs fixing. Until then, totals count the flagged cell as blank.'
-    : "This budget can't be totaled until this is fixed:";
+      ? t('main.problems_need_fixing', { count })
+      : t('main.problem_needs_fixing')
+    : t('main.cant_be_totaled');
   banner.replaceChildren(
     el('strong', { text: head }),
     el('span', { class: 'banner-detail', text: `${v.error.at}: ${v.error.message}` }),
@@ -689,32 +693,32 @@ function renderActions() {
   const bar = P().actions;
   if (state.level === 'topsheet') {
     bar.replaceChildren(
-      button('Add category', addCategory),
-      button('Add production total', addProductionTotal, { title: 'Add a production total (a subtotal of the categories above it)' }),
-      button('Rename budget', renameBudget),
+      button(t('main.add_category'), addCategory),
+      button(t('main.add_production_total'), addProductionTotal, { title: t('main.add_a_production_total_a') }),
+      button(t('main.rename_budget'), renameBudget),
       el('span', { class: 'spacer' }),
-      button('Delete', deleteTopsheetRow, { cmd: 'edit.delete_rows', danger: true }),
+      button(t('main.delete'), deleteTopsheetRow, { cmd: 'edit.delete_rows', danger: true }),
     );
   } else if (state.level === 'accounts') {
     bar.replaceChildren(
-      button('Add account', addAccount),
+      button(t('main.add_account'), addAccount),
       el('span', { class: 'spacer' }),
-      button('Delete account', deleteAccount, { cmd: 'edit.delete_rows', danger: true }),
+      button(t('main.delete_account'), deleteAccount, { cmd: 'edit.delete_rows', danger: true }),
     );
   } else {
     bar.replaceChildren(
-      button('Insert line', () => insertRow('line'), { cmd: 'insert.line' }),
-      button('Insert subtotal', () => insertRow('subtotal'), { cmd: 'insert.subtotal' }),
-      button('Insert adjustment', () => insertRow('adjustment'), {
+      button(t('main.insert_line'), () => insertRow('line'), { cmd: 'insert.line' }),
+      button(t('main.insert_subtotal'), () => insertRow('subtotal'), { cmd: 'insert.subtotal' }),
+      button(t('main.insert_adjustment'), () => insertRow('adjustment'), {
         cmd: 'insert.adjustment',
-        title: 'Insert an adjustment: a percentage of the lines above it (Amount 0.1 is 10%)',
+        title: t('main.insert_an_adjustment_a_percentage'),
       }),
-      button('Insert separator', () => insertRow('separator'), {
+      button(t('main.insert_separator'), () => insertRow('separator'), {
         cmd: 'insert.separator',
-        title: 'Insert a separator: a drawn rule line with no cost',
+        title: t('main.insert_a_separator_a_drawn'),
       }),
       el('span', { class: 'spacer' }),
-      button('Delete rows', deleteRows, { cmd: 'edit.delete_rows', danger: true }),
+      button(t('main.delete_rows'), deleteRows, { cmd: 'edit.delete_rows', danger: true }),
     );
   }
 }
@@ -787,10 +791,10 @@ function footerContext() {
   if (state.level === 'details' && state.acct) {
     const a = (entry.cat.accounts || [])[state.acct.ai];
     const ar = entry.rep ? entry.rep.accounts[state.acct.ai] : null;
-    if (a) out.push({ label: `${a.code} ${a.name}`.trim(), cents: ar ? ar.total : null, title: 'Total of the account you are in' });
+    if (a) out.push({ label: `${a.code} ${a.name}`.trim(), cents: ar ? ar.total : null, title: t('main.total_of_the_account_you') });
   }
   const c = entry.cat;
-  out.push({ label: `${c.code} ${c.name}`.trim(), cents: entry.rep ? entry.rep.total : null, title: 'Total of the category you are in' });
+  out.push({ label: `${c.code} ${c.name}`.trim(), cents: entry.rep ? entry.rep.total : null, title: t('main.total_of_the_category_you') });
   return out;
 }
 
@@ -988,7 +992,7 @@ function pasteText(text) {
     // Category and account lists take one cell at a time.
     const at = grid.cursorCell();
     if (!at || at.cell.edit === undefined) return;
-    if (matrix.length > 1 || matrix[0].length > 1) toast('Only one cell can be pasted here; pasted the first one.');
+    if (matrix.length > 1 || matrix[0].length > 1) toast(t('main.only_one_cell_can_be'));
     const value = matrix[0][0];
     if (value !== String(at.cell.edit)) commitCell(at.row.key, at.col.key, value);
     return;
@@ -996,8 +1000,7 @@ function pasteText(text) {
   const { cells, rowsShort } = grid.pasteTargets(matrix);
   if (cells.length) setCells(cells.map((c) => ({ ...c, value: pasteValue(c.colKey, c.value) })), 'paste');
   if (rowsShort) {
-    const rows = rowsShort === 1 ? '1 pasted row' : `${rowsShort} pasted rows`;
-    toast(`${rows} didn't fit below the last line. Insert lines, then paste again.`);
+    toast(t('main.rows_didnt_fit', { count: rowsShort }));
   }
 }
 
@@ -1135,12 +1138,12 @@ async function addCategory() {
   const taken = new Set(ix.cats.map((c) => c.cat.code));
   const suggested = prev ? nextCode(prev, taken, '') : '10';
   const ok = await formDialog({
-    title: 'Add category',
+    title: t('main.add_category'),
     fields: [
-      { key: 'code', label: 'Category number', value: suggested },
-      { key: 'name', label: 'Description', value: '', placeholder: 'e.g. Art department' },
+      { key: 'code', label: t('main.category_number'), value: suggested },
+      { key: 'name', label: t('main.description'), value: '', placeholder: t('main.e_g_art_department') },
     ],
-    submitText: 'Add',
+    submitText: t('main.add'),
     onSubmit: (f) => call('add_category', { code: f.code, name: f.name, at }, { focusKey: `t${at}`, focusCol: 'name' }),
   });
   if (ok) grid.focus();
@@ -1151,10 +1154,10 @@ async function addProductionTotal() {
   const key = grid.cursorKey();
   const at = key && key.startsWith('t') ? Number(key.slice(1)) + 1 : ix.topsheet.length;
   const ok = await formDialog({
-    title: 'Add production total',
-    message: 'A production total adds up every category above it, back to the previous production total. The first one ends above-the-line.',
-    fields: [{ key: 'name', label: 'Name', value: '', placeholder: 'e.g. Total production' }],
-    submitText: 'Add',
+    title: t('main.add_production_total'),
+    message: t('main.a_production_total_adds_up'),
+    fields: [{ key: 'name', label: t('main.name'), value: '', placeholder: t('main.e_g_total_production') }],
+    submitText: t('main.add'),
     onSubmit: (f) => call('add_production_total', { name: f.name, at }, { focusKey: `t${at}`, focusCol: 'name' }),
   });
   if (ok) grid.focus();
@@ -1162,9 +1165,9 @@ async function addProductionTotal() {
 
 async function renameBudget() {
   const ok = await formDialog({
-    title: 'Rename budget',
-    fields: [{ key: 'title', label: 'Budget title', value: state.view.budget.title || '' }],
-    submitText: 'Rename',
+    title: t('main.rename_budget'),
+    fields: [{ key: 'title', label: t('main.budget_title'), value: state.view.budget.title || '' }],
+    submitText: t('main.rename'),
     onSubmit: (f) => call('set_title', { title: f.title }),
   });
   if (ok) grid.focus();
@@ -1203,11 +1206,10 @@ async function deleteTopsheetRow() {
     return;
   }
   const n = (row.accounts || []).length;
-  const what = n === 1 ? '1 account' : `${n} accounts`;
   const ok = await confirmDialog({
-    title: 'Delete category',
-    message: `Delete ${row.code} ${row.name} and its ${what}, with every line in them? You can undo this.`,
-    confirmText: 'Delete',
+    title: t('main.delete_category'),
+    message: t('main.delete_and_its_with_every', { code: row.code, name: row.name, count: n }),
+    confirmText: t('main.delete'),
     danger: true,
   });
   if (ok) await act('delete_topsheet_row', { index: ti });
@@ -1230,12 +1232,12 @@ async function addAccount() {
   const suggested = after ? nextCode(after, taken, first) : taken.has(first) ? nextCode(first, taken, first) : first;
   const insertAt = after ? ai + 1 : accts.length;
   const ok = await formDialog({
-    title: 'Add account',
+    title: t('main.add_account'),
     fields: [
-      { key: 'code', label: 'Account number', value: suggested },
-      { key: 'name', label: 'Description', value: '', placeholder: 'e.g. Set dressing' },
+      { key: 'code', label: t('main.account_number'), value: suggested },
+      { key: 'name', label: t('main.description'), value: '', placeholder: t('main.e_g_set_dressing') },
     ],
-    submitText: 'Add',
+    submitText: t('main.add'),
     onSubmit: (f) =>
       call(
         'add_account',
@@ -1254,9 +1256,9 @@ async function deleteAccount() {
   if (!a) return;
   const n = typeof a.lines === 'number' ? a.lines : (a.details || []).length;
   const ok = n === 0 || (await confirmDialog({
-    title: 'Delete account',
-    message: `Delete ${a.code} ${a.name} and its ${n === 1 ? '1 line' : `${n} lines`}? You can undo this.`,
-    confirmText: 'Delete',
+    title: t('main.delete_account'),
+    message: t('main.delete_account_and_lines', { code: a.code, name: a.name, count: n }),
+    confirmText: t('main.delete'),
     danger: true,
   }));
   if (ok) await act('delete_account', { code: a.code });
@@ -1393,19 +1395,19 @@ function unsavedDialog(name) {
           answer = choice;
           close();
         };
-        const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
-        const discard = el('button', { class: 'btn btn-danger-text', text: 'Close Without Saving', attrs: { type: 'button' } });
-        const save = el('button', { class: 'btn btn-primary', text: 'Save', attrs: { type: 'button', 'data-autofocus': true } });
+        const cancel = el('button', { class: 'btn', text: t('main.cancel'), attrs: { type: 'button' } });
+        const discard = el('button', { class: 'btn btn-danger-text', text: t('main.close_without_saving'), attrs: { type: 'button' } });
+        const save = el('button', { class: 'btn btn-primary', text: t('main.save'), attrs: { type: 'button', 'data-autofocus': true } });
         cancel.addEventListener('click', () => pick(null));
         discard.addEventListener('click', () => pick('discard'));
         save.addEventListener('click', () => pick('save'));
         return el(
           'div',
           { class: 'modal', attrs: { role: 'dialog', 'aria-labelledby': 'unsaved-title', 'aria-describedby': 'unsaved-message' } },
-          el('h2', { class: 'modal-title', text: 'Unsaved changes', attrs: { id: 'unsaved-title' } }),
+          el('h2', { class: 'modal-title', text: t('main.unsaved_changes'), attrs: { id: 'unsaved-title' } }),
           el('p', {
             class: 'modal-message',
-            text: `"${name}" has changes that are not saved. Save them before closing the tab?`,
+            text: t('main.has_changes_that_are_not', { name }),
             attrs: { id: 'unsaved-message' },
           }),
           el('div', { class: 'modal-actions' }, discard, el('span', { class: 'spacer' }), cancel, save),
@@ -1439,8 +1441,8 @@ async function closeTab(id = state.doc, pane = target) {
   try {
     r = await invoke('close_tab', { doc: id, discard: false, ...where });
     if (r && r.unsaved) {
-      const tab = state.tabs.find((t) => t.id === id);
-      const choice = await unsavedDialog(tab ? tab.label : 'This budget');
+      const tab = state.tabs.find((x) => x.id === id);
+      const choice = await unsavedDialog(tab ? tab.label : t('main.this_budget'));
       if (choice === 'save') {
         const v = await call('save_budget', { saveAs: false, doc: id });
         // Cancelled, or not written (the file changed outside the app).
@@ -1658,18 +1660,18 @@ function renderReviewBanner(view) {
     return;
   }
   const reviewing = r.mode === 'reviewing';
-  const show = el('button', { class: 'btn btn-quiet', text: 'Show Comments', attrs: { type: 'button' } });
+  const show = el('button', { class: 'btn btn-quiet', text: t('main.show_comments'), attrs: { type: 'button' } });
   show.addEventListener('click', () => showTab('comments'));
-  const close = el('button', { class: 'btn btn-quiet', text: reviewing ? 'Stop Reviewing' : 'Close Review File', attrs: { type: 'button' } });
+  const close = el('button', { class: 'btn btn-quiet', text: reviewing ? t('main.stop_reviewing') : t('main.close_review_file'), attrs: { type: 'button' } });
   close.addEventListener('click', async () => {
     if (await confirmCloseReview(r)) act('review_close', { doc: view.doc });
   });
   const n = Number(r.to_settle) || 0;
   host.replaceChildren(
-    el('strong', { text: reviewing ? 'Open for review: read-only.' : 'Review comments.' }),
+    el('strong', { text: reviewing ? t('main.open_for_review_read_only') : t('main.review_comments') }),
     el('span', {
       class: 'share-banner-detail',
-      text: reviewing ? `Comments go in ${r.file}.` : `${n} ${n === 1 ? 'comment' : 'comments'} from ${r.file} to merge or dismiss.`,
+      text: reviewing ? t('main.comments_go_in', { file: r.file }) : t('main.comments_to_settle', { count: n, file: r.file }),
     }),
     el('span', { class: 'share-banner-actions' }, show, close),
   );
@@ -1814,7 +1816,7 @@ function jumpTo(entry) {
   if (entry.kind === 'category') {
     const c = state.ix.cats.find((x) => x.ti === entry.ti && x.cat.code === entry.category) || state.ix.cats.find((x) => x.cat.code === entry.category);
     if (!c) {
-      toast('That category is no longer in the budget.');
+      toast(t('main.that_category_is_no_longer'));
       return Promise.resolve();
     }
     if (grid.editor) grid.commitEdit(null);
@@ -1843,7 +1845,7 @@ function jumpTo(entry) {
     }
   }
   if (!target) {
-    toast(accountOnly ? 'That account is no longer in the budget.' : 'That line is no longer in the budget.');
+    toast(accountOnly ? t('main.account_gone') : t('main.line_gone'));
     return Promise.resolve();
   }
   if (grid.editor) grid.commitEdit(null);
@@ -2028,7 +2030,7 @@ function columnsIcon() {
 function openColumnMenu(anchor) {
   openMenu(anchor, {
     owner: 'columns',
-    label: 'Columns',
+    label: t('main.columns'),
     checkable: true,
     items: columnMenuItems(),
     returnFocus: () => P().host.querySelector('.col-chooser'),
@@ -2049,8 +2051,8 @@ function columnMenuButton() {
     'button',
     {
       class: 'col-chooser',
-      title: 'Show or hide columns',
-      attrs: { type: 'button', 'aria-label': 'Choose columns', 'aria-haspopup': 'menu', 'aria-expanded': 'false' },
+      title: t('main.show_or_hide_columns'),
+      attrs: { type: 'button', 'aria-label': t('main.choose_columns'), 'aria-haspopup': 'menu', 'aria-expanded': 'false' },
       data: { focusId: 'col-chooser' },
       on: {
         click: (e) => openColumnMenu(e.currentTarget),
@@ -2208,7 +2210,7 @@ Object.assign(COMMANDS, {
 function fillRateAtCursor() {
   const key = state.level === 'details' ? grid.cursorKey() : null;
   if (typeof key !== 'string' || !key.startsWith('r')) {
-    toast('Put the cursor on a line to fill its rate from a rate table.');
+    toast(t('main.cursor_on_line_for_rate'));
     return;
   }
   openRatePicker(Number(key.slice(1)), {
@@ -2230,13 +2232,13 @@ let toolsExplain = null;
 
 /** Opens the Explain tab on the total a cell shows. */
 function explainCell(row, colKey) {
-  const t = explainTargetFor(row, colKey);
-  if (!t) {
-    toast('Put the cursor on a total to explain it.');
+  const at = explainTargetFor(row, colKey);
+  if (!at) {
+    toast(t('main.cursor_on_total'));
     return;
   }
-  setExplainTarget(t, state.doc);
-  toolsExplain = state.position === 'window' ? t : null;
+  setExplainTarget(at, state.doc);
+  toolsExplain = state.position === 'window' ? at : null;
   showTab('explain');
 }
 
@@ -2367,7 +2369,7 @@ async function doExport(format) {
   try {
     const r = await invoke('export_budget', { format });
     if (r && r.done && Array.isArray(r.files) && r.files.length) {
-      toast(r.files.length === 1 ? `Exported ${r.files[0]}.` : `Exported ${r.files.length} files: ${r.files.join(', ')}.`);
+      toast(r.files.length === 1 ? t('main.exported_one', { file: r.files[0] }) : t('main.exported_files', { count: r.files.length, files: r.files.join(', ') }));
     }
   } catch (e) {
     toast(e);
@@ -2576,7 +2578,7 @@ async function goToCompared(place) {
   }
   const c = state.ix && state.ix.cats.find((x) => x.ci === place.ci);
   if (!c) {
-    toast('That is no longer in the budget.');
+    toast(t('main.that_is_no_longer_in'));
     return;
   }
   const n = (c.cat.accounts || []).length;
@@ -2591,9 +2593,9 @@ async function goToCompared(place) {
 }
 
 for (const [id, cmd, label] of [
-  ['btn-versions', 'file.versions', 'Versions: save, restore and compare named copies of this budget'],
-  ['btn-compare', 'file.compare', 'Compare this budget with others, or with its versions'],
-  ['btn-setup', 'view.setup', 'Budget Setup: every setup table, charges, credits and the budget settings, in a window of their own'],
+  ['btn-versions', 'file.versions', t('main.tip_versions')],
+  ['btn-compare', 'file.compare', t('main.tip_compare')],
+  ['btn-setup', 'view.setup', t('main.tip_setup')],
 ]) {
   const b = $(id);
   if (!b) continue;
@@ -3110,7 +3112,7 @@ async function moveToOtherPane(id, from = target, to = null) {
   if (!isSplit()) return;
   const into = panes[1 - from.index];
   if (paneTabs(from).length < 2) {
-    toast("A pane's only tab can't move to the other pane.");
+    toast(t('main.a_pane_s_only_tab'));
     return;
   }
   if (grid.editor) grid.commitEdit(null);
@@ -3125,27 +3127,27 @@ async function moveToOtherPane(id, from = target, to = null) {
 /** A tab's right-click menu: close it, move it to the other pane, split or merge. */
 function tabMenu(id, pane, at) {
   const lone = paneTabs(pane).length < 2;
-  const items = [{ label: 'Close Tab', shortcut: shortcutText('file.close_tab'), run: () => closeTab(id, pane) }, { separator: true }];
+  const items = [{ label: t('main.close_tab'), shortcut: shortcutText('file.close_tab'), run: () => closeTab(id, pane) }, { separator: true }];
   if (isSplit()) {
     items.push({
-      label: 'Move to Other Pane',
-      title: lone ? "A pane's only tab can't move" : 'Show this budget in the other pane instead',
+      label: t('main.move_to_other_pane'),
+      title: lone ? t('main.lone_tab_cant_move') : t('main.show_in_other_pane'),
       disabled: lone,
       run: () => moveToOtherPane(id, pane),
     });
-    items.push({ label: 'Close Split', run: () => closeSplit() });
+    items.push({ label: t('main.close_split'), run: () => closeSplit() });
   } else {
     items.push({
-      label: 'Split Right',
+      label: t('main.split_right'),
       shortcut: shortcutText('view.split_right'),
-      title: 'Show this budget in a second pane at the right too',
+      title: t('main.show_this_budget_in_a'),
       run: async () => {
         if (id !== state.doc) await switchTo(id, { pane });
         if (state.doc === id) splitRight();
       },
     });
   }
-  openContextMenu(at, { label: 'Tab actions', items, returnFocus: () => pane.strip.focus(id) });
+  openContextMenu(at, { label: t('main.tab_actions'), items, returnFocus: () => pane.strip.focus(id) });
 }
 
 // The History tab (history.js): every undo step of the target's budget.
@@ -3195,14 +3197,14 @@ function wire() {
   $('btn-redo').addEventListener('click', doRedo);
   $('btn-panel').addEventListener('click', togglePanel);
   const tips = {
-    'btn-new': ['New budget, or open a recent one', 'file.new'],
-    'btn-open': ['Open a budget, in a new tab', 'file.open'],
-    'btn-save': ['Save', 'file.save'],
-    'btn-saveas': ['Save as a new file', 'file.save_as'],
-    'btn-undo': ['Undo', 'edit.undo'],
-    'btn-redo': ['Redo', 'edit.redo'],
-    'btn-panel': ['Show or hide the tools panel', 'view.toggle_panel'],
-    'btn-share': ['Share this budget through a folder, or see who is in it', 'file.share'],
+    'btn-new': [t('main.tip_new'), 'file.new'],
+    'btn-open': [t('main.tip_open'), 'file.open'],
+    'btn-save': [t('main.tip_save'), 'file.save'],
+    'btn-saveas': [t('main.tip_saveas'), 'file.save_as'],
+    'btn-undo': [t('main.tip_undo'), 'edit.undo'],
+    'btn-redo': [t('main.tip_redo'), 'edit.redo'],
+    'btn-panel': [t('main.tip_panel'), 'view.toggle_panel'],
+    'btn-share': [t('main.tip_share'), 'file.share'],
   };
   for (const [id, [label, cmd]] of Object.entries(tips)) $(id).title = withShortcut(label, cmd);
   window.addEventListener('keydown', onKeyDown);
@@ -3222,19 +3224,19 @@ function webMode() {
     if (node) node.hidden = true;
   }
   COMMANDS['file.new'] = () => doNew();
-  $('btn-new').title = withShortcut('New budget, in a new tab', 'file.new_tab');
-  $('btn-save').title = withShortcut('Save: download the budget as a file', 'file.save');
-  $('btn-saveas').title = withShortcut('Save under a new name: download the budget as a file', 'file.save_as');
+  $('btn-new').title = withShortcut(t('main.web_tip_new'), 'file.new_tab');
+  $('btn-save').title = withShortcut(t('main.web_tip_save'), 'file.save');
+  $('btn-saveas').title = withShortcut(t('main.web_tip_save_as'), 'file.save_as');
   if (state.position === 'window') state.position = 'right';
   const file = el('button', {
     class: 'btn',
-    text: 'File',
-    title: 'Open, save, import, export and print',
+    text: t('main.file'),
+    title: t('main.open_save_import_export_and'),
     attrs: { type: 'button', id: 'btn-file', 'aria-haspopup': 'menu' },
   });
   file.addEventListener('click', () => {
     const r = file.getBoundingClientRect();
-    openContextMenu({ x: r.left, y: r.bottom + 2 }, { label: 'File', items: webFileMenu(), returnFocus: () => file });
+    openContextMenu({ x: r.left, y: r.bottom + 2 }, { label: t('main.file'), items: webFileMenu(), returnFocus: () => file });
   });
   $('btn-new').before(file);
 }
@@ -3244,51 +3246,51 @@ function webFileMenu() {
   const item = (id, label) => ({ label, shortcut: shortcutText(id) || undefined, run: () => run(id, 'menu') });
   const sep = { separator: true };
   return [
-    item('file.new_tab', 'New Tab'),
-    item('file.open', 'Open…'),
-    item('file.new_from_template', 'New From Template…'),
-    item('file.new_sub_budget', 'New Sub-Budget…'),
+    item('file.new_tab', t('menu.file.new_tab')),
+    item('file.open', t('menu.file.open')),
+    item('file.new_from_template', t('menu.file.new_from_template')),
+    item('file.new_sub_budget', t('menu.file.new_sub_budget')),
     sep,
-    item('file.save', 'Save'),
-    item('file.save_as', 'Save As…'),
-    item('file.save_as_template', 'Save as Template…'),
-    item('file.save_share_copy', 'Save a Copy for Sharing…'),
+    item('file.save', t('menu.file.save')),
+    item('file.save_as', t('menu.file.save_as')),
+    item('file.save_as_template', t('menu.file.save_as_template')),
+    item('file.save_share_copy', t('menu.file.save_share_copy')),
     sep,
     {
-      label: 'Import',
+      label: t('main.import'),
       items: [
-        item('file.import_setup', 'Import Setup From…'),
-        item('file.import_setup_pack', 'Import Setup Pack…'),
-        item('file.import_spreadsheet', 'Import Spreadsheet…'),
-        item('file.import_chart', 'Import Chart of Accounts…'),
-        item('file.import_budget_export', 'Import Budget Export…'),
-        item('file.import_schedule_days', 'Import Schedule Days…'),
-        item('file.import_setup_lists', 'Import Setup Lists…'),
-        item('file.import_actuals', 'Import Actuals…'),
+        item('file.import_setup', t('menu.file.import_setup')),
+        item('file.import_setup_pack', t('menu.file.import_setup_pack')),
+        item('file.import_spreadsheet', t('menu.file.import_spreadsheet')),
+        item('file.import_chart', t('menu.file.import_chart')),
+        item('file.import_budget_export', t('menu.file.import_budget_export')),
+        item('file.import_schedule_days', t('menu.file.import_schedule_days')),
+        item('file.import_setup_lists', t('menu.file.import_setup_lists')),
+        item('file.import_actuals', t('menu.file.import_actuals')),
       ],
     },
     {
-      label: 'Export',
+      label: t('main.export'),
       items: [
-        item('file.export_xlsx', 'Spreadsheet (.xlsx)…'),
-        item('file.export_csv', 'CSV Files…'),
-        item('file.export_tsv', 'Tab-Delimited Detail…'),
-        item('file.export_setup_lists', 'Setup Lists…'),
-        item('file.export_setup_pack', 'Setup Pack…'),
+        item('file.export_xlsx', t('menu.file.export_xlsx')),
+        item('file.export_csv', t('menu.file.export_csv')),
+        item('file.export_tsv', t('menu.file.export_tsv')),
+        item('file.export_setup_lists', t('menu.file.export_setup_lists')),
+        item('file.export_setup_pack', t('main.web_file_export_setup_pack')),
       ],
     },
     sep,
-    item('file.versions', 'Versions…'),
-    item('file.compare', 'Compare Budgets…'),
-    item('file.what_changed', 'What Changed…'),
-    item('file.merge', 'Merge Changes From…'),
-    item('file.open_for_review', 'Open for Review…'),
-    item('file.open_review_comments', 'Open Review Comments…'),
+    item('file.versions', t('menu.file.versions')),
+    item('file.compare', t('menu.file.compare')),
+    item('file.what_changed', t('menu.file.what_changed')),
+    item('file.merge', t('menu.file.merge')),
+    item('file.open_for_review', t('menu.file.open_for_review')),
+    item('file.open_review_comments', t('menu.file.open_review_comments')),
     sep,
-    item('file.print_budget', 'Print…'),
-    item('file.print_topsheet', 'Print Topsheet…'),
+    item('file.print_budget', t('menu.file.print_budget')),
+    item('file.print_topsheet', t('menu.file.print_topsheet')),
     sep,
-    item('help.shortcuts', 'Keyboard Shortcuts'),
+    item('help.shortcuts', t('menu.help.shortcuts')),
   ];
 }
 
@@ -3296,7 +3298,7 @@ async function start() {
   wire();
   if (!connected) {
     $('banner').hidden = false;
-    $('banner').replaceChildren(el('strong', { text: 'Open this page in the Method Budget app.' }));
+    $('banner').replaceChildren(el('strong', { text: t('main.open_this_page_in_the') }));
     return;
   }
   // In a browser (method-web), what only the desktop does is hidden.

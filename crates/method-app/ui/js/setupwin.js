@@ -41,6 +41,7 @@
 
 import { invoke, connected, setDefaultArgs } from './api.js';
 import { $, el, isTextField } from './dom.js';
+import { t } from './i18n.js';
 import { applyView, applyListHost, APPLY_LISTS } from './apply.js';
 import { setupBegin, renderSetupTab, setupEnd } from './setup.js';
 import { setFindHook, onUsage, sortSelect, showSelect, redrawLists } from './setuplist.js';
@@ -65,24 +66,24 @@ const state = {
 
 // The columns the list tabs sort on, for the rail's Sort (setuplist.js).
 const COLUMN_LABELS = {
-  description: 'Description',
-  rate: 'Rate',
-  unit: 'Unit',
-  cutoff: 'Cutoff',
-  uses: 'In use',
-  total: 'Total',
-  active: 'Active total',
-  counted: 'In budget total',
-  color: 'Color',
-  symbol: 'Symbol',
-  city: 'City',
-  region: 'Region',
-  country: 'Country',
-  formula: 'Calculation',
-  units: 'Units',
-  value: 'Value',
-  plural: 'Plural',
-  hours: 'Hours',
+  description: t('setup.column.description'),
+  rate: t('setup.column.rate'),
+  unit: t('setup.column.unit'),
+  cutoff: t('setup.column.cutoff'),
+  uses: t('setup.column.uses'),
+  total: t('setup.column.total'),
+  active: t('setup.column.active'),
+  counted: t('setup.column.counted'),
+  color: t('setup.column.color'),
+  symbol: t('setup.column.symbol'),
+  city: t('setup.column.city'),
+  region: t('setup.column.region'),
+  country: t('setup.column.country'),
+  formula: t('setup.column.formula'),
+  units: t('setup.column.units'),
+  value: t('setup.column.value'),
+  plural: t('setup.column.plural'),
+  hours: t('setup.column.hours'),
 };
 
 // The strip's Undo and Redo go to the main window, as the keys do; the
@@ -105,7 +106,7 @@ onUsage(() => render());
 // The page
 
 function build() {
-  document.title = 'Budget Setup';
+  document.title = t('setup.budget_setup');
   document.body.classList.add('setup-window');
   const host = el('div', { class: 'sw-host', attrs: { id: 'sw-host' } });
   const shell = document.querySelector('.app');
@@ -203,7 +204,7 @@ function setSource(id, source) {
 }
 
 /** The rail's switch: the budget's items or the library's. */
-function sourceSwitch(t, source) {
+function sourceSwitch(tab, source) {
   const b = (id, label, title) => {
     const on = id === source;
     const btn = el('button', {
@@ -214,26 +215,26 @@ function sourceSwitch(t, source) {
       data: { key: `setup:source:${id}`, nobusy: '1' },
     });
     btn.addEventListener('click', () => {
-      if (!on) setSource(t.id, id);
+      if (!on) setSource(tab.id, id);
     });
     return btn;
   };
   return el(
     'div',
-    { class: 'sw-switch', attrs: { role: 'group', 'aria-label': `Show ${t.label.toLowerCase()} from` } },
-    b('budget', 'Budget', `This budget’s ${t.label.toLowerCase()}`),
-    b('library', 'Library', `Your setup library’s ${t.label.toLowerCase()}`),
+    { class: 'sw-switch', attrs: { role: 'group', 'aria-label': t('setup.show_from', { kind: tab.label.toLowerCase() }) } },
+    b('budget', t('setup.source.budget'), t('setup.source.budget_tip', { kind: tab.label.toLowerCase() })),
+    b('library', t('setup.source.library'), t('setup.source.library_tip', { kind: tab.label.toLowerCase() })),
   );
 }
 
 /** A list tab's rail in Budget: its sort and the Show choice (setuplist.js). */
-function listRail(t) {
+function listRail(tab) {
   const label = (text) => el('span', { class: 'sw-rail-label', text, attrs: { 'aria-hidden': 'true' } });
   return el(
     'div',
     { class: 'sw-rail-section' },
-    el('div', { class: 'sw-rail-field' }, label('Sort'), sortSelect(t.id, redrawLists, `setup:sort:${t.id}`, COLUMN_LABELS)),
-    el('div', { class: 'sw-rail-field' }, label('Show'), showSelect(t.id, redrawLists, `setup:show:${t.id}`)),
+    el('div', { class: 'sw-rail-field' }, label(t('setup.rail.sort')), sortSelect(tab.id, redrawLists, `setup:sort:${tab.id}`, COLUMN_LABELS)),
+    el('div', { class: 'sw-rail-field' }, label(t('setup.rail.show')), showSelect(tab.id, redrawLists, `setup:show:${tab.id}`)),
   );
 }
 
@@ -254,7 +255,7 @@ function render() {
   applyView(state.view, c);
   clearFooterTotals();
   setRailHost(null);
-  const strip = el('div', { class: 'sw-tabs', attrs: { role: 'tablist', 'aria-label': 'Budget setup' } });
+  const strip = el('div', { class: 'sw-tabs', attrs: { role: 'tablist', 'aria-label': t('setup.budget_setup_tabs') } });
   SETUP_TABS.forEach((t, i) => strip.append(tabButton(t, i)));
   const tab = SETUP_TABS.find((t) => t.id === state.tab) || SETUP_TABS[0];
   const source = sourceOf(tab);
@@ -266,7 +267,7 @@ function render() {
       state.libraryTab = tab.id;
     }
     const railBody = el('div', { class: 'sw-rail-body' });
-    rail = el('aside', { class: 'sw-rail', attrs: { 'aria-label': `${tab.label}: budget or library` } }, isWeb() ? null : sourceSwitch(tab, source), railBody);
+    rail = el('aside', { class: 'sw-rail', attrs: { 'aria-label': t('setup.budget_or_library', { label: tab.label }) } }, isWeb() ? null : sourceSwitch(tab, source), railBody);
     if (source === 'library') {
       renderLibrarySetup(railBody, main, state.view, c);
     } else {
@@ -462,7 +463,7 @@ async function start() {
   window.addEventListener('keydown', onKeyDownCapture, true);
   window.addEventListener('keydown', onKeyDown);
   if (!connected) {
-    toast('Open this page in the Method Budget app.');
+    toast(t('setup.open_this_page_in_the'));
     return;
   }
   await listen();

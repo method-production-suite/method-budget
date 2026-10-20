@@ -22,6 +22,7 @@
 // through textContent, styling only through classes.
 
 import { el } from './dom.js';
+import { t } from './i18n.js';
 
 const hooks = { menu: null, close: null, view: null };
 
@@ -73,7 +74,7 @@ export function stripButton(text, key, onClick, { title = '', label = '', enable
  * The search box: filters as it is typed (`onChange(text)`); Escape clears
  * it when it has text (else Escape goes on and closes the window).
  */
-export function searchBox({ key, value = '', label, placeholder = 'Search', onChange }) {
+export function searchBox({ key, value = '', label, placeholder = t('setup.search_placeholder'), onChange }) {
   const input = el('input', {
     class: 'setup-input sw-search',
     attrs: {
@@ -110,9 +111,9 @@ function undoRedo() {
   };
   return el(
     'div',
-    { class: 'sw-strip-end', attrs: { role: 'group', 'aria-label': 'Undo and redo' } },
-    stripButton('Undo', 'sw:undo', send('edit.undo'), { title: 'Undo the last change to this budget', enabled: v.can_undo !== false }),
-    stripButton('Redo', 'sw:redo', send('edit.redo'), { title: 'Redo the change undone last', enabled: v.can_redo !== false }),
+    { class: 'sw-strip-end', attrs: { role: 'group', 'aria-label': t('setup.undo_and_redo') } },
+    stripButton(t('setup.undo'), 'sw:undo', send('edit.undo'), { title: t('setup.undo_the_last_change_to'), enabled: v.can_undo !== false }),
+    stripButton(t('setup.redo'), 'sw:redo', send('edit.redo'), { title: t('setup.redo_the_change_undone_last'), enabled: v.can_redo !== false }),
   );
 }
 
@@ -210,12 +211,12 @@ export function clearFooterTotals() {
 
 /** setupwin.js: the footer, with the totals set so far and Close at the right. */
 export function footerBar() {
-  footHost = el('div', { class: 'sw-foot-totals', attrs: { role: 'group', 'aria-label': 'Totals' } });
+  footHost = el('div', { class: 'sw-foot-totals', attrs: { role: 'group', 'aria-label': t('setup.totals') } });
   drawTotals();
   const close = el('button', {
     class: 'sw-act sw-foot-close',
-    text: 'Close',
-    title: 'Close Budget Setup (Escape)',
+    text: t('setup.close'),
+    title: t('setup.close_budget_setup_escape'),
     attrs: { type: 'button' },
     data: { key: 'setup:close', nobusy: '1' },
   });

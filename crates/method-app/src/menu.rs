@@ -1,7 +1,9 @@
 //! The native menu bar.
 //!
 //! Every command item carries an id and keys from the UI's shortcut list,
-//! `ui/js/shortcuts.js` (a test below fails if the two drift apart). Choosing
+//! `ui/js/shortcuts.js` (a test below fails if the two drift apart). Its
+//! words are `menu.<id>` in the page's English table, `ui/i18n/en.js`, read
+//! through src/i18n.rs, as are the menus' own names. Choosing
 //! one sends its id to the web view as a [`EVENT`] event, and `main.js` runs
 //! the same handler the keyboard shortcut runs, so a menu click and a key
 //! press always do the same thing. While the tools window is in front the
@@ -28,6 +30,8 @@
 use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu, HELP_SUBMENU_ID};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
+use crate::i18n::{tr, tr_with};
+
 /// The event the web view listens for; the payload is the item's id.
 pub const EVENT: &str = "menu";
 /// Quit, after asking about unsaved changes (handled in `app.rs`).
@@ -51,9 +55,9 @@ pub const LAST_WINDOW_ITEM: &str = "window.move_to_other_pane";
 /// One menu entry. Keys use the shortcut list's syntax (`mod+shift+s`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Entry {
+    /// Its words are `menu.<id>` in the English table (src/i18n.rs).
     Item {
         id: &'static str,
-        label: &'static str,
         mac: Option<&'static str>,
         other: Option<&'static str>,
     },
@@ -74,33 +78,25 @@ pub enum Entry {
 
 use Entry::Separator as SEP;
 
-const fn item(id: &'static str, label: &'static str, keys: &'static str) -> Entry {
+const fn item(id: &'static str, keys: &'static str) -> Entry {
     Entry::Item {
         id,
-        label,
         mac: Some(keys),
         other: Some(keys),
     }
 }
 
-const fn per_platform(
-    id: &'static str,
-    label: &'static str,
-    mac: &'static str,
-    other: &'static str,
-) -> Entry {
+const fn per_platform(id: &'static str, mac: &'static str, other: &'static str) -> Entry {
     Entry::Item {
         id,
-        label,
         mac: Some(mac),
         other: Some(other),
     }
 }
 
-const fn plain(id: &'static str, label: &'static str) -> Entry {
+const fn plain(id: &'static str) -> Entry {
     Entry::Item {
         id,
-        label,
         mac: None,
         other: None,
     }
@@ -108,156 +104,156 @@ const fn plain(id: &'static str, label: &'static str) -> Entry {
 
 pub const FILE: &[Entry] = &[
     // The start window: recent and pinned budgets, New Budget (src/start.rs).
-    item("file.new", "New…", "mod+n"),
-    item("file.new_tab", "New Tab", "mod+t"),
-    item("file.open", "Open…", "mod+o"),
+    item("file.new", "mod+n"),
+    item("file.new_tab", "mod+t"),
+    item("file.open", "mod+o"),
     // Starting from another budget (src/templates.rs, src/import_setup.rs).
-    plain("file.new_from_template", "New From Template…"),
+    plain("file.new_from_template"),
     // A filtered copy in a new tab (src/sharing.rs).
-    plain("file.new_sub_budget", "New Sub-Budget…"),
+    plain("file.new_sub_budget"),
     SEP,
-    item("file.save", "Save", "mod+s"),
-    item("file.save_as", "Save As…", "mod+shift+s"),
-    plain("file.save_as_template", "Save as Template…"),
+    item("file.save", "mod+s"),
+    item("file.save_as", "mod+shift+s"),
+    plain("file.save_as_template"),
     // A snapshot for someone else, opened read-only (src/sharing.rs).
-    plain("file.save_share_copy", "Save a Copy for Sharing…"),
+    plain("file.save_share_copy"),
     // Working together through a shared folder (src/shared_app.rs).
-    plain("file.share", "Share…"),
+    plain("file.share"),
     SEP,
-    plain("file.import_setup", "Import Setup From…"),
+    plain("file.import_setup"),
     // Setup packs: setup items to share, with where they came from (src/packs.rs).
-    plain("file.import_setup_pack", "Import Setup Pack…"),
-    plain("file.export_setup_pack", "Export Setup Pack…"),
+    plain("file.import_setup_pack"),
+    plain("file.export_setup_pack"),
     // Detail lines from a spreadsheet, with a column mapping (src/sheet_import.rs).
-    plain("file.import_spreadsheet", "Import Spreadsheet…"),
+    plain("file.import_spreadsheet"),
     // A chart of accounts as a new budget, or applied to this one (src/coa_import.rs).
-    plain("file.import_chart", "Import Chart of Accounts…"),
+    plain("file.import_chart"),
     // A whole budget from another program's export, reconciled (src/export_import.rs).
-    plain("file.import_budget_export", "Import Budget Export…"),
+    plain("file.import_budget_export"),
     // A schedule's day counts into globals (src/schedule_days.rs).
-    plain("file.import_schedule_days", "Import Schedule Days…"),
+    plain("file.import_schedule_days"),
     // Setup lists from a workbook or CSV files (src/setup_sheets.rs).
-    plain("file.import_setup_lists", "Import Setup Lists…"),
+    plain("file.import_setup_lists"),
     // Actual costs from an accounting export (src/actuals.rs).
-    plain("file.import_actuals", "Import Actuals…"),
+    plain("file.import_actuals"),
     SEP,
     // Named versions inside the budget, and comparing budgets (src/versions.rs,
     // src/compare.rs).
-    plain("file.versions", "Versions…"),
-    plain("file.compare", "Compare Budgets…"),
+    plain("file.versions"),
+    plain("file.compare"),
     // What changed since another budget, and merging a returned copy
     // (src/diffmerge.rs).
-    plain("file.what_changed", "What Changed…"),
-    plain("file.merge", "Merge Changes From…"),
+    plain("file.what_changed"),
+    plain("file.merge"),
     // Review files: comments beside a budget, merged back as notes
     // (src/review.rs).
-    plain("file.open_for_review", "Open for Review…"),
-    plain("file.open_review_comments", "Open Review Comments…"),
+    plain("file.open_for_review"),
+    plain("file.open_review_comments"),
     SEP,
-    item("file.print_budget", "Print…", "mod+p"),
-    item("file.print_topsheet", "Print Topsheet…", "mod+shift+p"),
+    item("file.print_budget", "mod+p"),
+    item("file.print_topsheet", "mod+shift+p"),
     Entry::Export,
     SEP,
-    item(CLOSE_TAB, "Close Tab", "mod+w"),
-    item(CLOSE, "Close Window", "mod+shift+w"),
+    item(CLOSE_TAB, "mod+w"),
+    item(CLOSE, "mod+shift+w"),
 ];
 
 /// File > Export: the budget as spreadsheets, each through a Save dialog
 /// (src/export.rs).
 pub const EXPORT: &[Entry] = &[
-    plain("file.export_xlsx", "Spreadsheet (.xlsx)…"),
-    plain("file.export_csv", "CSV Files…"),
-    plain("file.export_tsv", "Tab-Delimited Detail…"),
+    plain("file.export_xlsx"),
+    plain("file.export_csv"),
+    plain("file.export_tsv"),
     // Setup lists, a sheet or CSV file per kind (src/setup_sheets.rs).
-    plain("file.export_setup_lists", "Setup Lists…"),
+    plain("file.export_setup_lists"),
 ];
 
 /// Windows and Linux end the File menu with Quit; macOS has it in the app menu.
-pub const FILE_QUIT: &[Entry] = &[SEP, item(QUIT, "Quit", "mod+q")];
+pub const FILE_QUIT: &[Entry] = &[SEP, item(QUIT, "mod+q")];
 
 pub const EDIT: &[Entry] = &[
-    item("edit.undo", "Undo", "mod+z"),
-    per_platform("edit.redo", "Redo", "mod+shift+z", "mod+y"),
+    item("edit.undo", "mod+z"),
+    per_platform("edit.redo", "mod+shift+z", "mod+y"),
     SEP,
     Entry::Cut,
     Entry::Copy,
     Entry::Paste,
     // Whole rows with everything on them (ui/js/clipboard.js).
-    plain("edit.cut_rows", "Cut Rows"),
-    plain("edit.copy_rows", "Copy Rows"),
-    plain("edit.paste_rows", "Paste Rows"),
-    item("edit.select_all", "Select All", "mod+a"),
+    plain("edit.cut_rows"),
+    plain("edit.copy_rows"),
+    plain("edit.paste_rows"),
+    item("edit.select_all", "mod+a"),
     SEP,
-    item("edit.fill_down", "Fill Down", "mod+shift+d"),
-    item("edit.delete_rows", "Delete Rows", "mod+d"),
+    item("edit.fill_down", "mod+shift+d"),
+    item("edit.delete_rows", "mod+d"),
     // Rows one place up or down (src/moverows.rs).
-    item("edit.move_up", "Move Up", "alt+up"),
-    item("edit.move_down", "Move Down", "alt+down"),
+    item("edit.move_up", "alt+up"),
+    item("edit.move_down", "alt+down"),
     SEP,
-    item("edit.note", "Add Note…", "mod+shift+space"),
-    item("edit.make_range", "Make Fringe Range", "mod+r"),
-    item("edit.remove_range", "Remove Fringe Range", "mod+shift+r"),
+    item("edit.note", "mod+shift+space"),
+    item("edit.make_range", "mod+r"),
+    item("edit.remove_range", "mod+shift+r"),
     // How a total is worked out, and the overtime helper (ui/js/explain.js,
     // ui/js/overtime.js; the tools panel's Explain and Overtime tabs).
-    item("edit.explain", "Explain This Number…", "mod+e"),
-    plain("edit.overtime", "Overtime Helper…"),
+    item("edit.explain", "mod+e"),
+    plain("edit.overtime"),
     // A line's rate from one of the budget's rate tables (ui/js/ratepick.js).
-    plain("edit.fill_rate", "Fill Rate from Table…"),
+    plain("edit.fill_rate"),
     // Who changed a cell of a shared budget (src/shared_app.rs).
-    plain("share.blame", "Who Changed This…"),
+    plain("share.blame"),
     SEP,
     // Find and replace: the Find tab of the tools panel (ui/js/find.js).
-    item("edit.find", "Find…", "mod+f"),
-    item("edit.replace", "Find and Replace…", "mod+shift+f"),
-    item("edit.find_next", "Find Next", "f3"),
-    item("edit.find_previous", "Find Previous", "shift+f3"),
+    item("edit.find", "mod+f"),
+    item("edit.replace", "mod+shift+f"),
+    item("edit.find_next", "f3"),
+    item("edit.find_previous", "shift+f3"),
 ];
 
 pub const INSERT: &[Entry] = &[
-    item("insert.line", "Line", "mod+i"),
-    item("insert.subtotal", "Subtotal", "mod+="),
-    item("insert.adjustment", "Adjustment", "mod+-"),
-    plain("insert.separator", "Separator"),
+    item("insert.line", "mod+i"),
+    item("insert.subtotal", "mod+="),
+    item("insert.adjustment", "mod+-"),
+    plain("insert.separator"),
     SEP,
-    plain("insert.account", "Account…"),
-    plain("insert.category", "Category…"),
-    plain("insert.production_total", "Production Total…"),
+    plain("insert.account"),
+    plain("insert.category"),
+    plain("insert.production_total"),
 ];
 
 /// Text style for the selected detail lines (ui/js/rowformat.js). Italic is
 /// not on Cmd+I, which inserts a line.
 pub const FORMAT: &[Entry] = &[
-    item("format.bold", "Bold", "mod+b"),
-    item("format.italic", "Italic", "mod+shift+i"),
+    item("format.bold", "mod+b"),
+    item("format.italic", "mod+shift+i"),
     SEP,
-    item("format.indent_more", "Indent More", "mod+alt+right"),
-    item("format.indent_less", "Indent Less", "mod+alt+left"),
+    item("format.indent_more", "mod+alt+right"),
+    item("format.indent_less", "mod+alt+left"),
     SEP,
     Entry::TextColors,
-    plain("format.clear", "Clear Formatting"),
+    plain("format.clear"),
 ];
 
 /// The text colors, in the order of the palette in ui/js/rowformat.js.
 pub const TEXT_COLORS: &[Entry] = &[
-    plain("format.color.none", "No Color"),
+    plain("format.color.none"),
     SEP,
-    plain("format.color.red", "Red"),
-    plain("format.color.orange", "Orange"),
-    plain("format.color.gold", "Gold"),
-    plain("format.color.green", "Green"),
-    plain("format.color.teal", "Teal"),
-    plain("format.color.blue", "Blue"),
-    plain("format.color.purple", "Purple"),
-    plain("format.color.pink", "Pink"),
+    plain("format.color.red"),
+    plain("format.color.orange"),
+    plain("format.color.gold"),
+    plain("format.color.green"),
+    plain("format.color.teal"),
+    plain("format.color.blue"),
+    plain("format.color.purple"),
+    plain("format.color.pink"),
 ];
 
 pub const GO: &[Entry] = &[
-    item("go.topsheet", "Topsheet", "mod+shift+up"),
-    item("go.up", "Up a Level", "mod+up"),
-    item("go.down", "Down a Level", "mod+down"),
+    item("go.topsheet", "mod+shift+up"),
+    item("go.up", "mod+up"),
+    item("go.down", "mod+down"),
     SEP,
-    item("go.next_account", "Next Account", "mod+right"),
-    item("go.prev_account", "Previous Account", "mod+left"),
+    item("go.next_account", "mod+right"),
+    item("go.prev_account", "mod+left"),
 ];
 
 pub const VIEW: &[Entry] = &[
@@ -266,54 +262,50 @@ pub const VIEW: &[Entry] = &[
     SEP,
     // Split view: two panes of budget tabs side by side (ui/js/pane.js,
     // src/docs.rs). Cmd+\ is the Credits tab.
-    item("view.split_right", "Split Right", "mod+shift+backslash"),
-    plain("view.close_split", "Close Split"),
+    item("view.split_right", "mod+shift+backslash"),
+    plain("view.close_split"),
     SEP,
     // Per-user display choices (ui/js/display.js). Cmd+= inserts a subtotal,
     // so zooming is Option+Cmd+= and Option+Cmd+-.
-    item(
-        "view.formulas",
-        "Show or Hide Formulas in Selection",
-        "mod+alt+f",
-    ),
-    plain("view.hide_zero", "Show or Hide Zero Accounts"),
-    plain("view.totals_cents", "Totals With or Without Cents"),
+    item("view.formulas", "mod+alt+f"),
+    plain("view.hide_zero"),
+    plain("view.totals_cents"),
     SEP,
-    item("view.zoom_in", "Zoom In", "mod+alt+="),
-    item("view.zoom_out", "Zoom Out", "mod+alt+-"),
-    item("view.zoom_reset", "Actual Size", "mod+alt+0"),
+    item("view.zoom_in", "mod+alt+="),
+    item("view.zoom_out", "mod+alt+-"),
+    item("view.zoom_reset", "mod+alt+0"),
 ];
 
 /// View > Tools Panel: show or hide it wherever it is, and its three places
 /// (docked at the right, docked at the bottom, its own window). The panel
 /// header has the same three as buttons (ui/js/tools.js).
 pub const TOOLS_PANEL: &[Entry] = &[
-    item("view.toggle_panel", "Show or Hide Tools Panel", "mod+alt+s"),
+    item("view.toggle_panel", "mod+alt+s"),
     SEP,
-    plain("view.panel.right", "Dock at Right"),
-    plain("view.panel.bottom", "Dock at Bottom"),
-    plain("view.panel.window", "Pop Out into a Window"),
+    plain("view.panel.right"),
+    plain("view.panel.bottom"),
+    plain("view.panel.window"),
     SEP,
     // The panel's tabs, in its default order (ui/js/tools.js): the compact
     // apply lists show here; their full editors are in Budget Setup.
-    plain("view.tool.fringes", "Fringes"),
-    plain("view.tool.groups", "Groups"),
-    plain("view.tool.globals", "Globals"),
-    plain("view.tool.units", "Units"),
-    plain("view.tab.presets", "Presets"),
+    plain("view.tool.fringes"),
+    plain("view.tool.groups"),
+    plain("view.tool.globals"),
+    plain("view.tool.units"),
+    plain("view.tab.presets"),
     SEP,
-    plain("view.tool.sets", "Sets"),
-    plain("view.tool.locations", "Locations"),
-    plain("view.tool.currencies", "Currency"),
-    plain("view.tab.notes", "Notes"),
-    plain("view.tab.library", "Library"),
-    plain("view.tab.history", "History"),
-    plain("view.tab.actuals", "Actuals"),
+    plain("view.tool.sets"),
+    plain("view.tool.locations"),
+    plain("view.tool.currencies"),
+    plain("view.tab.notes"),
+    plain("view.tab.library"),
+    plain("view.tab.history"),
+    plain("view.tab.actuals"),
     // A shared budget's review list and everyone's changes (src/shared_app.rs).
-    plain("view.tab.review", "Review"),
-    plain("view.tab.activity", "Activity"),
+    plain("view.tab.review"),
+    plain("view.tab.activity"),
     // A review file's comments (src/review.rs).
-    plain("view.tab.comments", "Comments"),
+    plain("view.tab.comments"),
 ];
 
 /// View > Budget Setup: the Budget Setup window (src/setupwin.rs), and each
@@ -321,48 +313,48 @@ pub const TOOLS_PANEL: &[Entry] = &[
 /// tools already know (decisions.md, entries 15 and 42): there they open the
 /// setup window on that table too.
 pub const SETUP_TABS: &[Entry] = &[
-    plain("view.setup", "Open Budget Setup"),
+    plain("view.setup"),
     SEP,
-    item("view.tab.fringes", "Fringes", "mod+3"),
-    item("view.tab.groups", "Groups", "mod+4"),
-    item("view.tab.globals", "Globals", "mod+g"),
-    item("view.tab.units", "Units", "mod+7"),
-    item("view.tab.sets", "Sets", "mod+8"),
-    item("view.tab.locations", "Locations", "mod+5"),
-    item("view.tab.currencies", "Currency", "mod+6"),
+    item("view.tab.fringes", "mod+3"),
+    item("view.tab.groups", "mod+4"),
+    item("view.tab.globals", "mod+g"),
+    item("view.tab.units", "mod+7"),
+    item("view.tab.sets", "mod+8"),
+    item("view.tab.locations", "mod+5"),
+    item("view.tab.currencies", "mod+6"),
     SEP,
-    item("view.tab.charges", "Charges", "mod+/"),
-    item("view.tab.credits", "Credits", "mod+backslash"),
-    plain("view.tab.rates", "Rate Tables"),
-    plain("view.tab.info", "Info"),
-    item("view.tab.settings", "Settings", "mod+9"),
-    plain("view.tab.baseline", "Baseline"),
+    item("view.tab.charges", "mod+/"),
+    item("view.tab.credits", "mod+backslash"),
+    plain("view.tab.rates"),
+    plain("view.tab.info"),
+    item("view.tab.settings", "mod+9"),
+    plain("view.tab.baseline"),
 ];
 
 /// Budgets open as tabs: the next and previous tab, and the first two
 /// (Cmd+3 to Cmd+9 are the Budget Setup tabs). The open budgets are listed after
 /// these (src/tabs.rs). Ctrl+Tab and Ctrl+Shift+Tab work too (shortcuts.js).
 pub const WINDOW: &[Entry] = &[
-    item("window.next_tab", "Show Next Tab", "mod+shift+]"),
-    item("window.prev_tab", "Show Previous Tab", "mod+shift+["),
-    item("window.first_tab", "First Tab", "mod+1"),
-    item("window.second_tab", "Second Tab", "mod+2"),
+    item("window.next_tab", "mod+shift+]"),
+    item("window.prev_tab", "mod+shift+["),
+    item("window.first_tab", "mod+1"),
+    item("window.second_tab", "mod+2"),
     SEP,
     // Split view (ui/js/pane.js): the budget in front to the other pane.
-    plain(LAST_WINDOW_ITEM, "Move Tab to Other Pane"),
+    plain(LAST_WINDOW_ITEM),
     SEP,
 ];
 
 pub const HELP: &[Entry] = &[
-    item("help.shortcuts", "Keyboard Shortcuts", "mod+shift+/"),
+    item("help.shortcuts", "mod+shift+/"),
     // docs/APP.md in the browser (src/help.rs).
-    plain(crate::help::USER_GUIDE_ITEM, "User Guide"),
+    plain(crate::help::USER_GUIDE_ITEM),
     // A fresh untitled copy of the sample budget (src/sample.rs).
-    plain(crate::sample::OPEN_ITEM, "Open Sample"),
+    plain(crate::sample::OPEN_ITEM),
     // This version's notes, in the page (ui/js/updates.js). Check for
     // Updates and its automatic switch follow (src/updater.rs), then
     // HELP_LINKS.
-    plain("help.release_notes", "Release Notes"),
+    plain("help.release_notes"),
 ];
 
 /// The end of the Help menu, after Check for Updates (About follows on
@@ -370,12 +362,47 @@ pub const HELP: &[Entry] = &[
 pub const HELP_LINKS: &[Entry] = &[
     SEP,
     // A pre-filled GitHub issue in the browser (src/help.rs).
-    plain(crate::help::REPORT_BUG_ITEM, "Report a Bug…"),
+    plain(crate::help::REPORT_BUG_ITEM),
     // The licences and third-party notices, in the page (ui/js/licenses.js).
-    plain(crate::help::LICENSES_ITEM, "Licenses and Notices"),
+    plain(crate::help::LICENSES_ITEM),
     // The suite's website in the browser (src/help.rs).
-    plain(crate::help::SUITE_SITE_ITEM, "methodproduction.com"),
+    plain(crate::help::SUITE_SITE_ITEM),
 ];
+
+/// Every command item in the menus (not the submenus or separators).
+pub fn all_items() -> Vec<Entry> {
+    [
+        FILE,
+        EXPORT,
+        FILE_QUIT,
+        EDIT,
+        INSERT,
+        FORMAT,
+        TEXT_COLORS,
+        GO,
+        VIEW,
+        TOOLS_PANEL,
+        SETUP_TABS,
+        WINDOW,
+        HELP,
+        HELP_LINKS,
+    ]
+    .iter()
+    .flat_map(|m| m.iter().copied())
+    .filter(|e| matches!(e, Entry::Item { .. }))
+    .collect()
+}
+
+/// The ids of [`all_items`]: each one's words are `menu.<id>` in the table.
+pub fn item_ids() -> Vec<&'static str> {
+    all_items()
+        .into_iter()
+        .filter_map(|e| match e {
+            Entry::Item { id, .. } => Some(id),
+            _ => None,
+        })
+        .collect()
+}
 
 /// A shortcut-list key spec as a Tauri accelerator: `mod+shift+s` is
 /// `CmdOrCtrl+Shift+S`.
@@ -410,18 +437,14 @@ fn append<R: Runtime>(
 ) -> tauri::Result<()> {
     for entry in entries {
         match *entry {
-            Entry::Item {
-                id,
-                label,
-                mac,
-                other,
-            } => {
+            Entry::Item { id, mac, other } => {
                 let keys = if cfg!(target_os = "macos") {
                     mac
                 } else {
                     other
                 };
                 let accel = keys.map(accelerator);
+                let label = tr(&format!("menu.{id}"));
                 menu.append(&MenuItem::with_id(app, id, label, true, accel.as_deref())?)?;
             }
             Entry::Separator => menu.append(&PredefinedMenuItem::separator(app)?)?,
@@ -429,22 +452,22 @@ fn append<R: Runtime>(
             Entry::Copy => menu.append(&PredefinedMenuItem::copy(app, None)?)?,
             Entry::Paste => menu.append(&PredefinedMenuItem::paste(app, None)?)?,
             Entry::ToolsPanel => {
-                let panel = Submenu::new(app, "Tools Panel", true)?;
+                let panel = Submenu::new(app, tr("menu.bar.tools_panel"), true)?;
                 append(app, &panel, TOOLS_PANEL)?;
                 menu.append(&panel)?;
             }
             Entry::SetupTabs => {
-                let tabs = Submenu::new(app, "Budget Setup", true)?;
+                let tabs = Submenu::new(app, tr("menu.bar.budget_setup"), true)?;
                 append(app, &tabs, SETUP_TABS)?;
                 menu.append(&tabs)?;
             }
             Entry::TextColors => {
-                let colors = Submenu::new(app, "Text Color", true)?;
+                let colors = Submenu::new(app, tr("menu.bar.text_color"), true)?;
                 append(app, &colors, TEXT_COLORS)?;
                 menu.append(&colors)?;
             }
             Entry::Export => {
-                let export = Submenu::new(app, "Export", true)?;
+                let export = Submenu::new(app, tr("menu.bar.export"), true)?;
                 append(app, &export, EXPORT)?;
                 menu.append(&export)?;
             }
@@ -470,7 +493,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     // Labels name the product, not the executable (which differs in dev builds).
     let about = PredefinedMenuItem::about(
         app,
-        Some(&format!("About {name}")),
+        Some(&tr_with("menu.appmenu.about", &[("name", &name)])),
         Some(AboutMetadata {
             name: Some(name.clone()),
             version: Some(app.package_info().version.to_string()),
@@ -479,7 +502,10 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             website_label: Some("methodbudget.com".into()),
             // Windows and Linux; macOS shows it in the credits.
             license: Some(LICENSE.into()),
-            credits: Some(format!("methodbudget.com\nLicensed under {LICENSE}")),
+            credits: Some(format!(
+                "methodbudget.com\n{}",
+                tr_with("menu.appmenu.licensed_under", &[("license", LICENSE)])
+            )),
             ..Default::default()
         }),
     )?;
@@ -494,34 +520,34 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         app_menu.append(&PredefinedMenuItem::separator(app)?)?;
         app_menu.append(&PredefinedMenuItem::hide(
             app,
-            Some(&format!("Hide {name}")),
+            Some(&tr_with("menu.appmenu.hide", &[("name", &name)])),
         )?)?;
         app_menu.append(&PredefinedMenuItem::hide_others(app, None)?)?;
         app_menu.append(&PredefinedMenuItem::separator(app)?)?;
         app_menu.append(&MenuItem::with_id(
             app,
             QUIT,
-            format!("Quit {name}"),
+            tr_with("menu.appmenu.quit", &[("name", &name)]),
             true,
             Some(accelerator("mod+q")),
         )?)?;
         menu.append(&app_menu)?;
     }
 
-    let file = submenu(app, "&File", FILE)?;
+    let file = submenu(app, &tr("menu.bar.file"), FILE)?;
     // Open Recent, Autosave and Revert to Backup… (src/safety_app.rs).
     crate::safety_app::extend_file_menu(app, &file)?;
     if !cfg!(target_os = "macos") {
         append(app, &file, FILE_QUIT)?;
     }
     menu.append(&file)?;
-    menu.append(&submenu(app, "&Edit", EDIT)?)?;
-    menu.append(&submenu(app, "&Insert", INSERT)?)?;
-    menu.append(&submenu(app, "F&ormat", FORMAT)?)?;
-    menu.append(&submenu(app, "&Go", GO)?)?;
-    menu.append(&submenu(app, "&View", VIEW)?)?;
+    menu.append(&submenu(app, &tr("menu.bar.edit"), EDIT)?)?;
+    menu.append(&submenu(app, &tr("menu.bar.insert"), INSERT)?)?;
+    menu.append(&submenu(app, &tr("menu.bar.format"), FORMAT)?)?;
+    menu.append(&submenu(app, &tr("menu.bar.go"), GO)?)?;
+    menu.append(&submenu(app, &tr("menu.bar.view"), VIEW)?)?;
 
-    let window = Submenu::with_id(app, WINDOW_MENU, "&Window", true)?;
+    let window = Submenu::with_id(app, WINDOW_MENU, tr("menu.bar.window"), true)?;
     #[cfg(target_os = "macos")]
     {
         window.append(&PredefinedMenuItem::minimize(app, None)?)?;
@@ -532,7 +558,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     append(app, &window, WINDOW)?;
     menu.append(&window)?;
 
-    let help = Submenu::with_id(app, HELP_SUBMENU_ID, "&Help", true)?;
+    let help = Submenu::with_id(app, HELP_SUBMENU_ID, tr("menu.bar.help"), true)?;
     append(app, &help, HELP)?;
     crate::updater::extend_help_menu(app, &help)?;
     append(app, &help, HELP_LINKS)?;
@@ -578,28 +604,8 @@ mod tests {
 
     const SHORTCUTS_JS: &str = include_str!("../ui/js/shortcuts.js");
 
-    /// Every command item in the menus, with its keys.
     fn items() -> Vec<Entry> {
-        [
-            FILE,
-            EXPORT,
-            FILE_QUIT,
-            EDIT,
-            INSERT,
-            FORMAT,
-            TEXT_COLORS,
-            GO,
-            VIEW,
-            TOOLS_PANEL,
-            SETUP_TABS,
-            WINDOW,
-            HELP,
-            HELP_LINKS,
-        ]
-        .iter()
-        .flat_map(|m| m.iter().copied())
-        .filter(|e| matches!(e, Entry::Item { .. }))
-        .collect()
+        all_items()
     }
 
     /// The text after `key: '` (or `key: ['`) up to the next quote.

@@ -26,7 +26,8 @@ import { invoke } from './api.js';
 import { el, isMac } from './dom.js';
 import { money } from './format.js';
 import { orderedNames, TABLE_KIND } from './order.js';
-import { obj, plural } from './util.js';
+import { obj } from './util.js';
+import { t } from './i18n.js';
 
 const USAGE_DELAY_MS = 120;
 const DRAG_START_PX = 4;
@@ -172,14 +173,18 @@ export function sortButton(table, label, onChange, key, col = 'name') {
   const on = sortOf(table) !== 'custom' && sortColOf(table) === col;
   const sort = on ? sortOf(table) : 'custom';
   const next = { custom: 'asc', asc: 'desc', desc: 'custom' }[sort];
-  const says = { custom: col === 'name' ? 'in the budget’s order' : 'not sorted', asc: col === 'name' ? 'A to Z' : 'ascending', desc: col === 'name' ? 'Z to A' : 'descending' };
-  const then = next === 'custom' ? 'the budget’s order' : says[next];
+  const says = {
+    custom: col === 'name' ? t('setup.sort.in_budget_order') : t('setup.sort.not_sorted'),
+    asc: col === 'name' ? t('setup.sort.a_to_z') : t('setup.sort.ascending'),
+    desc: col === 'name' ? t('setup.sort.z_to_a') : t('setup.sort.descending'),
+  };
+  const then = next === 'custom' ? t('setup.sort.budget_order_then') : says[next];
   const b = el(
     'button',
     {
       class: `setup-sort${on ? ' is-sorted' : ''}`,
-      title: `${label} ${says[sort]}. Click for ${then}.`,
-      attrs: { type: 'button', 'aria-label': `${label}, ${says[sort]}; click for ${then}` },
+      title: t('setup.sort.tip', { label, now: says[sort], then }),
+      attrs: { type: 'button', 'aria-label': t('setup.sort.aria', { label, now: says[sort], then }) },
       data: { key, nobusy: '1' },
     },
     el('span', { text: label }),
@@ -201,18 +206,18 @@ export function sortButton(table, label, onChange, key, col = 'name') {
 export function sortSelect(table, onChange, key, cols = {}) {
   const sel = el('select', {
     class: 'setup-input setup-select setup-sortpick',
-    title: 'The order the table lists its items in. Items can be moved only in the budget’s order.',
-    attrs: { 'aria-label': 'Sort' },
+    title: t('setup.the_order_the_table_lists'),
+    attrs: { 'aria-label': t('setup.sort') },
     data: { key, nobusy: '1' },
   });
   const options = [
-    ['custom', 'Budget order'],
-    ['name:asc', 'Name, A to Z'],
-    ['name:desc', 'Name, Z to A'],
+    ['custom', t('setup.sort.budget_order')],
+    ['name:asc', t('setup.sort.name_a_to_z')],
+    ['name:desc', t('setup.sort.name_z_to_a')],
   ];
   const col = sortColOf(table);
   const sort = sortOf(table);
-  if (sort !== 'custom' && col !== 'name') options.push([`${col}:${sort}`, `${cols[col] || col}, ${sort === 'asc' ? 'ascending' : 'descending'}`]);
+  if (sort !== 'custom' && col !== 'name') options.push([`${col}:${sort}`, t('setup.sort.column', { column: cols[col] || col, dir: sort === 'asc' ? t('setup.sort.ascending') : t('setup.sort.descending') })]);
   for (const [v, text] of options) {
     const o = el('option', { text });
     o.value = v;
@@ -235,14 +240,14 @@ export function sortSelect(table, onChange, key, cols = {}) {
 export function showSelect(table, onChange, key) {
   const sel = el('select', {
     class: 'setup-input setup-select setup-show',
-    title: 'Show every item, or only the ones lines and setup use, or only the unused ones',
-    attrs: { 'aria-label': 'Show' },
+    title: t('setup.show_every_item_or_only'),
+    attrs: { 'aria-label': t('setup.show') },
     data: { key, nobusy: '1' },
   });
   for (const [v, text] of [
-    ['all', 'All'],
-    ['used', 'Used'],
-    ['unused', 'Unused'],
+    ['all', t('setup.show.all')],
+    ['used', t('setup.show.used')],
+    ['unused', t('setup.show.unused')],
   ]) {
     const o = el('option', { text });
     o.value = v;
@@ -258,9 +263,9 @@ export function showSelect(table, onChange, key) {
 
 function useWords(u) {
   const parts = [];
-  if (Number(u.lines)) parts.push(`${plural(Number(u.lines), 'line uses', 'lines use')} it`);
-  if (Number(u.other)) parts.push(`${plural(Number(u.other), 'other setting', 'other settings')} ${Number(u.lines) ? 'too' : 'use it'}`);
-  return parts.length ? parts.join('; ') : 'Nothing uses it';
+  if (Number(u.lines)) parts.push(t('setup.uses.lines', { count: Number(u.lines) }));
+  if (Number(u.other)) parts.push(Number(u.lines) ? t('setup.uses.other_too', { count: Number(u.other) }) : t('setup.uses.other', { count: Number(u.other) }));
+  return parts.length ? parts.join('; ') : t('setup.uses.nothing');
 }
 
 /**
@@ -273,8 +278,8 @@ export function usesButton(view, table, name, key) {
   const b = el('button', {
     class: `setup-uses${lines ? '' : ' is-zero'}`,
     text: lines === null ? '' : String(lines),
-    title: u ? `${useWords(u)}${lines ? '. Click to find them.' : '.'}` : 'Counting…',
-    attrs: { type: 'button', 'aria-label': u ? `${useWords(u)}${lines ? ', find them' : ''}` : `Lines using ${name}: counting` },
+    title: u ? (lines ? t('setup.uses.tip_find', { uses: useWords(u) }) : t('setup.uses.tip', { uses: useWords(u) })) : t('setup.uses.counting'),
+    attrs: { type: 'button', 'aria-label': u ? (lines ? t('setup.uses.aria_find', { uses: useWords(u) }) : useWords(u)) : t('setup.uses.aria_counting', { name }) },
     data: { key, nobusy: '1' },
   });
   if (!lines) b.setAttribute('aria-disabled', 'true');
@@ -324,8 +329,8 @@ export function dragHandle(table, name, allowed, call) {
   const h = el('span', {
     class: `setup-handle${allowed ? '' : ' is-off'}`,
     title: allowed
-      ? `Drag to reorder, or ${isMac ? 'Option' : 'Alt'}+Shift+Up and Down`
-      : 'Reordering is off while the list is sorted or filtered',
+      ? t('setup.drag_to_reorder', { alt: isMac ? t('setup.key.option') : t('setup.key.alt') })
+      : t('setup.reorder_off'),
     attrs: { 'aria-hidden': 'true' },
   });
   if (!allowed) return h;

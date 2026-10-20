@@ -26,43 +26,44 @@
 
 import { invoke } from './api.js';
 import { el } from './dom.js';
+import { t } from './i18n.js';
 import { rank, canonicalName } from './autocomplete.js';
 import { withShortcut } from './shortcuts.js';
 import { renameItem } from './rename.js';
 import { obj, str } from './util.js';
 
 const SCOPES = [
-  { id: 'description', label: 'Description', kind: 'text', hint: 'Text in line descriptions' },
-  { id: 'formula', label: 'Formula text', kind: 'text', hint: 'Text in Amount, X, Rate and 4X' },
-  { id: 'global', label: 'Global in formulas', kind: 'global', hint: 'A global, by its whole name' },
-  { id: 'fringe', label: 'Fringe', kind: 'item', table: 'fringes' },
-  { id: 'group', label: 'Group', kind: 'item', table: 'groups' },
-  { id: 'set', label: 'Set', kind: 'item', table: 'sets' },
-  { id: 'location', label: 'Location', kind: 'item', table: 'locations' },
-  { id: 'unit', label: 'Unit', kind: 'item', table: 'units' },
-  { id: 'currency', label: 'Currency', kind: 'item', table: 'currencies' },
-  { id: 'note', label: 'Notes', kind: 'text', hint: 'Text in line notes' },
-  { id: 'account', label: 'Account name or number', kind: 'text', hint: 'Account names and numbers' },
+  { id: 'description', label: t('find.description'), kind: 'text', hint: t('find.text_in_line_descriptions') },
+  { id: 'formula', label: t('find.formula_text'), kind: 'text', hint: t('find.text_in_amount_x_rate') },
+  { id: 'global', label: t('find.global_in_formulas'), kind: 'global', hint: t('find.a_global_by_its_whole') },
+  { id: 'fringe', label: t('find.fringe'), kind: 'item', table: 'fringes' },
+  { id: 'group', label: t('find.group'), kind: 'item', table: 'groups' },
+  { id: 'set', label: t('find.set'), kind: 'item', table: 'sets' },
+  { id: 'location', label: t('find.location'), kind: 'item', table: 'locations' },
+  { id: 'unit', label: t('find.unit'), kind: 'item', table: 'units' },
+  { id: 'currency', label: t('find.currency'), kind: 'item', table: 'currencies' },
+  { id: 'note', label: t('find.notes'), kind: 'text', hint: t('find.text_in_line_notes') },
+  { id: 'account', label: t('find.account_name_or_number'), kind: 'text', hint: t('find.account_names_and_numbers') },
 ];
 
 const FIELD_LABELS = {
-  description: 'Description',
-  amount: 'Amount',
-  x: 'X',
-  rate: 'Rate',
-  x4: '4X',
-  unit: 'Unit',
-  unit2: 'X unit',
-  unit3: 'Rate unit',
-  unit4: '4X unit',
-  fringes: 'Fringes',
-  groups: 'Groups',
-  set: 'Set',
-  location: 'Location',
-  currency: 'Currency',
-  note: 'Note',
-  code: 'Account number',
-  name: 'Account name',
+  description: t('find.field.description'),
+  amount: t('find.field.amount'),
+  x: t('find.field.x'),
+  rate: t('find.field.rate'),
+  x4: t('find.field.x4'),
+  unit: t('find.field.unit'),
+  unit2: t('find.field.unit2'),
+  unit3: t('find.field.unit3'),
+  unit4: t('find.field.unit4'),
+  fringes: t('find.field.fringes'),
+  groups: t('find.field.groups'),
+  set: t('find.field.set'),
+  location: t('find.field.location'),
+  currency: t('find.field.currency'),
+  note: t('find.field.note'),
+  code: t('find.field.code'),
+  name: t('find.field.name'),
 };
 
 const SEARCH_DELAY_MS = 180;
@@ -186,7 +187,7 @@ function hint(scope, name) {
     const values = obj(st.view && st.view.report && st.view.report.globals);
     return values[name] !== undefined ? str(values[name]) : str(obj(budget().globals)[name]);
   }
-  if (scope.id === 'currency' && name === str(budget().base_currency)) return 'Base currency';
+  if (scope.id === 'currency' && name === str(budget().base_currency)) return t('find.base_currency');
   return str(obj(obj(budget()[scope.table])[name]).description);
 }
 
@@ -336,7 +337,7 @@ async function doReplace(remove) {
   try {
     const v = await st.ctx.call('replace', { query: q, targets, with: withValue });
     const n = v && Number.isSafeInteger(v.updated) ? v.updated : targets.length;
-    st.message = `${n} updated`;
+    st.message = t('find.updated', { count: n });
     st.messageRev = v && v.rev !== undefined ? v.rev : null;
     st.current = null;
     st.currentIndex = -1;
@@ -540,7 +541,7 @@ function suggestionList(field, input) {
   input.setAttribute('aria-controls', id);
   if (!s) return null;
   if (s.active >= 0) input.setAttribute('aria-activedescendant', `${id}-${s.active}`);
-  const ul = el('ul', { class: 'find-suggest', attrs: { role: 'listbox', id, 'aria-label': field === 'text' ? 'Suggestions' : 'Replace with suggestions' } });
+  const ul = el('ul', { class: 'find-suggest', attrs: { role: 'listbox', id, 'aria-label': field === 'text' ? t('find.suggestions') : t('find.replace_suggestions') } });
   s.items.forEach((item, i) => {
     const li = el(
       'li',
@@ -563,12 +564,12 @@ function suggestionList(field, input) {
 
 function form() {
   const scope = scopeInfo();
-  const wrap = el('div', { class: 'find-form', attrs: { role: 'search', 'aria-label': 'Find in the budget' } });
+  const wrap = el('div', { class: 'find-form', attrs: { role: 'search', 'aria-label': t('find.find_in_the_budget') } });
 
   // What to look for.
   const select = el('select', {
     class: 'setup-input setup-select find-scope',
-    attrs: { 'aria-label': 'Find what' },
+    attrs: { 'aria-label': t('find.find_what') },
     data: { key: 'find:scope' },
   });
   for (const s of SCOPES) {
@@ -584,13 +585,13 @@ function form() {
     search();
   });
 
-  const placeholder = scope.kind === 'text' ? `Find: ${scope.hint.toLowerCase()}` : scope.kind === 'global' ? 'Global name' : `${scope.label} name`;
+  const placeholder = scope.kind === 'text' ? t('find.find_placeholder', { what: scope.hint.toLowerCase() }) : scope.kind === 'global' ? t('find.global_name') : t('find.item_name', { kind: scope.label });
   const input = el('input', {
     class: 'setup-input find-text',
     attrs: {
       type: 'search',
       placeholder,
-      'aria-label': 'Find',
+      'aria-label': t('find.find'),
       spellcheck: 'false',
       autocomplete: 'off',
       'aria-describedby': 'find-keys',
@@ -629,10 +630,10 @@ function form() {
   });
   input.addEventListener('blur', () => closeSuggestOnBlur('text'));
 
-  const prev = button('‹', 'find:prev', { title: 'Previous result (Shift+Enter)' });
-  prev.setAttribute('aria-label', 'Previous result');
-  const next = button('›', 'find:next', { title: 'Next result (Enter)' });
-  next.setAttribute('aria-label', 'Next result');
+  const prev = button('‹', 'find:prev', { title: t('find.previous_result_shift_enter') });
+  prev.setAttribute('aria-label', t('find.previous_result'));
+  const next = button('›', 'find:next', { title: t('find.next_result_enter') });
+  next.setAttribute('aria-label', t('find.next_result'));
   const none = !(st.found && st.found.hits.length);
   setDisabled(prev, none);
   setDisabled(next, none);
@@ -641,8 +642,8 @@ function form() {
 
   const mode = el('button', {
     class: 'setup-btn setup-btn-quiet find-mode',
-    text: st.replace ? 'Hide replace' : 'Replace…',
-    title: withShortcut('Show or hide Replace', 'edit.replace'),
+    text: st.replace ? t('find.hide_replace') : t('find.replace_open'),
+    title: withShortcut(t('find.show_or_hide_replace'), 'edit.replace'),
     attrs: { type: 'button', 'aria-pressed': String(st.replace) },
     data: { key: 'find:mode', nobusy: '1' },
   });
@@ -661,11 +662,11 @@ function form() {
       el(
         'div',
         { class: 'find-row find-options' },
-        checkbox('Match case', 'find:case', st.matchCase, (on) => {
+        checkbox(t('find.match_case'), 'find:case', st.matchCase, (on) => {
           st.matchCase = on;
           search();
         }),
-        checkbox('Whole word', 'find:word', st.wholeWord, (on) => {
+        checkbox(t('find.whole_word'), 'find:word', st.wholeWord, (on) => {
           st.wholeWord = on;
           search();
         }),
@@ -674,7 +675,7 @@ function form() {
   }
 
   if (st.replace) wrap.append(replaceForm(scope));
-  wrap.append(el('p', { class: 'apply-hint find-keys', text: 'Enter, Shift+Enter: next, previous result (F3, Shift+F3 anywhere)', attrs: { id: 'find-keys' } }));
+  wrap.append(el('p', { class: 'apply-hint find-keys', text: t('find.enter_shift_enter_next_previous'), attrs: { id: 'find-keys' } }));
   return wrap;
 }
 
@@ -682,21 +683,21 @@ function replaceForm(scope) {
   const sec = el('div', { class: 'find-replace' });
   const placeholder =
     scope.kind === 'text'
-      ? 'Replace with (empty removes the text)'
+      ? t('find.replace_with_text')
       : scope.kind === 'global'
-        ? 'A global, a number or a formula'
-        : `Another ${scope.label.toLowerCase()}`;
+        ? t('find.replace_with_global')
+        : t('find.replace_with_item', { kind: scope.label.toLowerCase() });
   const input = el('input', {
     class: 'setup-input find-with',
-    attrs: { type: 'text', placeholder, 'aria-label': 'Replace with', spellcheck: 'false', autocomplete: 'off' },
+    attrs: { type: 'text', placeholder, 'aria-label': t('find.replace_with'), spellcheck: 'false', autocomplete: 'off' },
     data: { key: 'find:with' },
   });
   input.value = st.withText;
   const checked = checkedHits().length;
-  const go = button('Replace', 'find:replace', { primary: true });
+  const go = button(t('find.replace'), 'find:replace', { primary: true });
   const canReplace = () => checked > 0 && !st.busy && (scope.kind === 'text' || st.withText.trim() !== '');
   setDisabled(go, !canReplace());
-  go.title = checked ? `Replace in the ${checked} checked ${checked === 1 ? 'result' : 'results'}` : 'Check one or more results first';
+  go.title = checked ? t('find.replace_in_checked', { count: checked }) : t('find.check_first');
   go.addEventListener('click', () => {
     if (go.getAttribute('aria-disabled') !== 'true') doReplace(false);
   });
@@ -717,11 +718,11 @@ function replaceForm(scope) {
   input.addEventListener('blur', () => closeSuggestOnBlur('with'));
   const row = el('div', { class: 'find-row find-combo' }, input, go);
   if (scope.kind !== 'text') {
-    const remove = button('Remove', 'find:remove', {
+    const remove = button(t('find.remove'), 'find:remove', {
       title:
         scope.kind === 'global'
-          ? 'Put the global’s current value in its place in the checked results'
-          : `Take the ${scope.label.toLowerCase()} off the checked results`,
+          ? t('find.remove_global_tip')
+          : t('find.remove_item_tip', { kind: scope.label.toLowerCase() }),
     });
     setDisabled(remove, !(checked > 0 && !st.busy));
     remove.addEventListener('click', () => {
@@ -750,8 +751,8 @@ function renameLink(scope) {
   const table = scope.kind === 'global' ? 'globals' : scope.table;
   const isBase = scope.id === 'currency' && name === str(budget().base_currency);
   if (!isBase && !Object.prototype.hasOwnProperty.call(obj(budget()[table]), name)) return null;
-  const b = button('Rename everywhere…', 'find:rename', {
-    title: `Give ${name} a new name, with every line, formula and setting that uses it`,
+  const b = button(t('find.rename_everywhere'), 'find:rename', {
+    title: t('find.give_a_new_name_with', { name }),
   });
   b.addEventListener('click', () => {
     if (b.getAttribute('aria-disabled') === 'true' || !st.ctx || typeof st.ctx.call !== 'function') return;
@@ -781,15 +782,15 @@ function status() {
   }
   const f = st.found;
   if (!query()) {
-    box.append(el('p', { class: 'apply-hint', text: scopeInfo().kind === 'text' ? 'Type to search the whole budget.' : 'Type or pick a name.' }));
+    box.append(el('p', { class: 'apply-hint', text: scopeInfo().kind === 'text' ? t('find.type_to_search') : t('find.type_or_pick') }));
   } else if (!f) {
-    box.append(el('p', { class: 'apply-hint', text: 'Searching…' }));
+    box.append(el('p', { class: 'apply-hint', text: t('find.searching') }));
   } else if (!f.count) {
-    box.append(el('p', { class: 'apply-hint', text: 'Nothing found.' }));
+    box.append(el('p', { class: 'apply-hint', text: t('find.nothing_found') }));
   } else {
     const accounts = new Set(f.hits.map((h) => h.account)).size;
-    let text = `${f.count} found in ${accounts} ${accounts === 1 ? 'account' : 'accounts'}`;
-    if (f.truncated) text = `${f.count} found; showing the first ${f.hits.length}`;
+    let text = t('find.found_in_accounts', { found: f.count, count: accounts });
+    if (f.truncated) text = t('find.found_showing_first', { found: f.count, shown: f.hits.length });
     box.append(el('p', { class: 'find-count', text }));
   }
   return box;
@@ -828,12 +829,12 @@ function buildResults(hits) {
   const wrap = el('div', { class: 'find-results' });
   const all = hits.filter(replaceable).map(keyOf);
   if (st.replace && all.length) {
-    const box = el('input', { attrs: { type: 'checkbox', 'aria-label': 'Check every result' }, data: { key: 'find:all' } });
+    const box = el('input', { attrs: { type: 'checkbox', 'aria-label': t('find.check_every_result') }, data: { key: 'find:all' } });
     tristate(box, all);
     box.addEventListener('change', () => setChecked(all, box.checked));
-    wrap.append(el('label', { class: 'find-option find-all' }, box, 'All results'));
+    wrap.append(el('label', { class: 'find-option find-all' }, box, t('find.all_results')));
   }
-  const list = el('ul', { class: 'find-list', attrs: { 'aria-label': 'Results' } });
+  const list = el('ul', { class: 'find-list', attrs: { 'aria-label': t('find.results') } });
   let cat = null;
   let acct = null;
   let acctList = null;
@@ -850,7 +851,7 @@ function buildResults(hits) {
       const head = el('div', { class: 'find-acct-head' });
       if (st.replace && keys.length) {
         const box = el('input', {
-          attrs: { type: 'checkbox', 'aria-label': `Check the results in ${h.account}` },
+          attrs: { type: 'checkbox', 'aria-label': t('find.check_the_results_in', { account: h.account }) },
           data: { key: `find:acct:${h.ti}:${h.ai}` },
         });
         tristate(box, keys);
@@ -876,32 +877,32 @@ function hitItem(h, index) {
   if (st.replace) {
     if (replaceable(h)) {
       const box = el('input', {
-        attrs: { type: 'checkbox', 'aria-label': `Replace here: ${hitLabel(h)}` },
+        attrs: { type: 'checkbox', 'aria-label': t('find.replace_here', { what: hitLabel(h) }) },
         data: { key: `find:check:${key}` },
       });
       box.checked = !st.unchecked.has(key);
       box.addEventListener('change', () => setChecked([key], box.checked));
       li.append(box);
     } else {
-      li.append(el('span', { class: 'find-nocheck', title: 'Account numbers are changed in the account list', attrs: { 'aria-hidden': 'true' } }));
+      li.append(el('span', { class: 'find-nocheck', title: t('find.account_numbers_are_changed_in'), attrs: { 'aria-hidden': 'true' } }));
     }
   }
   const field = FIELD_LABELS[h.field] || h.field;
   const isRow = h.row_id !== null && h.row_id !== undefined;
-  const where = isRow ? `Line ${h.line} · ${field}` : field;
-  const desc = isRow ? str(h.description).trim() || '(no description)' : '';
+  const where = isRow ? t('find.line_field', { line: h.line, field }) : field;
+  const desc = isRow ? str(h.description).trim() || t('find.no_description') : '';
   const showText = !isRow || h.field !== 'description';
   const b = el(
     'button',
     {
       class: 'find-entry',
-      title: `Go to ${hitLabel(h)}`,
+      title: t('find.go_to', { what: hitLabel(h) }),
       attrs: { type: 'button', 'aria-current': key === st.current ? 'true' : null },
       data: { key: `find:hit:${key}`, nobusy: '1' },
     },
     el('span', { class: 'find-where', text: where }),
     desc ? el('span', { class: 'find-desc', text: desc }) : null,
-    showText ? el('span', { class: 'find-snippet', text: str(h.text) || '(blank)' }) : null,
+    showText ? el('span', { class: 'find-snippet', text: str(h.text) || t('find.blank') }) : null,
   );
   b.addEventListener('click', () => goTo(h, index, { keepFocus: false }));
   b.addEventListener('keydown', (e) => {
@@ -920,6 +921,6 @@ function hitItem(h, index) {
 
 function hitLabel(h) {
   const field = FIELD_LABELS[h.field] || h.field;
-  if (h.row_id === null || h.row_id === undefined) return `${field.toLowerCase()} of account ${h.account}`;
-  return `line ${h.line} of ${h.account}, ${field.toLowerCase()}`;
+  if (h.row_id === null || h.row_id === undefined) return t('find.field_of_account', { field: field.toLowerCase(), account: h.account });
+  return t('find.line_of_account', { line: h.line, account: h.account, field: field.toLowerCase() });
 }
