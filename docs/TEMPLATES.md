@@ -26,8 +26,8 @@ in front (adds what is missing, renames by number, never removes an account with
 ## Adding a studio chart
 
 1. Get the chart as a CSV file in the layout below (from the studio's published chart, or
-   from an open-format export of a template you are licensed to use: export it to Excel or
-   CSV, then arrange the columns as below; keep only numbers, names and totals).
+   from an open-format export of a template you are licensed to use: export it to a
+   spreadsheet (.xlsx) or CSV, then arrange the columns as below; keep only numbers, names and totals).
 2. Save it as `imports/coa-sources/<Template Name>.csv`, for example
    `imports/coa-sources/Studio Features.csv`. The file name becomes the template's name.
 3. Run the build script from the repository's folder:
@@ -52,7 +52,7 @@ in front (adds what is missing, renames by number, never removes an account with
 The raw file stays in `imports/coa-sources/` on your machine and is never committed. On a
 machine without it, the script skips that source and keeps the committed template.
 
-Excel workbooks (`.xlsx`) and other budget files (`.mthd`) also work as sources, read the
+Spreadsheets (`.xlsx`) and other budget files (`.mthd`) also work as sources, read the
 same way as File > Import Chart of Accounts reads them; the CSV layout below is the one
 that needs no guessing.
 
