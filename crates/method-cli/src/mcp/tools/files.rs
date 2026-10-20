@@ -115,7 +115,7 @@ pub fn tools() -> Vec<Tool> {
                             ),
                         ),
                         ("date", s::name("Reports: the printed date and time instead of the clock (2026-10-09 14:30).")),
-                        ("bom", s::boolean("CSV and text: start with a UTF-8 byte order mark (for Excel).")),
+                        ("bom", s::boolean("CSV and text: start with a UTF-8 byte order mark (for spreadsheet apps that need it).")),
                         ("overwrite", s::boolean("Replace files that exist.")),
                     ],
                     &["path", "format", "out"],
@@ -190,7 +190,7 @@ pub fn tools() -> Vec<Tool> {
             name: "import_budget_export",
             title: "Import a budget export",
             description: "Makes a whole budget from another budgeting program's budget export \
-                (budget exchange JSON or XML, or its Excel or tab-delimited export; format \
+                (budget exchange JSON or XML, or its .xlsx spreadsheet or tab-delimited export; format \
                 json, xml, xml-advanced, xlsx or tab when the file doesn't say) and compares \
                 its totals, worked out by our engine, with the export's own figures: every \
                 line, account, category, fringe row, charge, credit and the grand and net \

@@ -165,7 +165,7 @@ pub const FILE: &[Entry] = &[
 /// File > Export: the budget as spreadsheets, each through a Save dialog
 /// (src/export.rs).
 pub const EXPORT: &[Entry] = &[
-    plain("file.export_xlsx", "Excel Workbook…"),
+    plain("file.export_xlsx", "Spreadsheet (.xlsx)…"),
     plain("file.export_csv", "CSV Files…"),
     plain("file.export_tsv", "Tab-Delimited Detail…"),
     // Setup lists, a sheet or CSV file per kind (src/setup_sheets.rs).

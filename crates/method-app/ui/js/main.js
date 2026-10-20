@@ -3246,7 +3246,7 @@ function webFileMenu() {
     {
       label: 'Export',
       items: [
-        item('file.export_xlsx', 'Excel Workbook…'),
+        item('file.export_xlsx', 'Spreadsheet (.xlsx)…'),
         item('file.export_csv', 'CSV Files…'),
         item('file.export_tsv', 'Tab-Delimited Detail…'),
         item('file.export_setup_lists', 'Setup Lists…'),

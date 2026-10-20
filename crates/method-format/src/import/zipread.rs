@@ -102,7 +102,7 @@ fn find_end(d: &[u8]) -> Result<usize, ReadError> {
     let last = d
         .len()
         .checked_sub(22)
-        .ok_or_else(|| err("the file is too short to be an Excel workbook"))?;
+        .ok_or_else(|| err("the file is too short to be a spreadsheet (.xlsx)"))?;
     let first = last.saturating_sub(u16::MAX as usize);
     for at in (first..=last).rev() {
         if u32_at(d, at)? == END_OF_CENTRAL && at + 22 + usize::from(u16_at(d, at + 20)?) == d.len()
@@ -111,7 +111,7 @@ fn find_end(d: &[u8]) -> Result<usize, ReadError> {
         }
     }
     Err(err(
-        "the file isn't an Excel workbook (no ZIP directory found)",
+        "the file isn't a spreadsheet (.xlsx) (no ZIP directory found)",
     ))
 }
 

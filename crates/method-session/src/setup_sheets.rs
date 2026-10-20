@@ -201,7 +201,7 @@ impl SheetExport {
     /// The Save dialog's title.
     pub fn title(&self) -> &'static str {
         match self.format {
-            Format::Xlsx => "Export setup lists as an Excel workbook",
+            Format::Xlsx => "Export setup lists as a spreadsheet (.xlsx)",
             _ => "Export setup lists as CSV files",
         }
     }
@@ -209,7 +209,7 @@ impl SheetExport {
     /// The Save dialog's filter name.
     pub fn filter(&self) -> &'static str {
         match self.format {
-            Format::Xlsx => "Excel workbook",
+            Format::Xlsx => "Spreadsheet (.xlsx)",
             _ => "CSV",
         }
     }
@@ -263,7 +263,7 @@ pub fn setup_sheet_export(
     let format = match format {
         "xlsx" => Format::Xlsx,
         "csv" => Format::Csv,
-        _ => return Err("Setup lists export as an Excel workbook or CSV files.".into()),
+        _ => return Err("Setup lists export as a spreadsheet (.xlsx) or CSV files.".into()),
     };
     let kinds = kinds
         .iter()

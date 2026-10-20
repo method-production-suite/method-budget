@@ -99,8 +99,8 @@ fn file_stem(title: &str) -> String {
 pub fn dialog_text(format: Format, stem: &str) -> (&'static str, &'static str, String) {
     match format {
         Format::Xlsx => (
-            "Export Excel workbook",
-            "Excel workbook",
+            "Export spreadsheet (.xlsx)",
+            "Spreadsheet (.xlsx)",
             format!("{stem}.xlsx"),
         ),
         Format::Csv => ("Export CSV files", "CSV files", format!("{stem}.csv")),
@@ -228,8 +228,8 @@ mod tests {
         assert_eq!(
             dialog_text(Format::Xlsx, "Pilot"),
             (
-                "Export Excel workbook",
-                "Excel workbook",
+                "Export spreadsheet (.xlsx)",
+                "Spreadsheet (.xlsx)",
                 "Pilot.xlsx".into()
             )
         );

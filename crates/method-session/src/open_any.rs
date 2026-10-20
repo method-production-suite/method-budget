@@ -41,7 +41,7 @@ pub const ALL_FILTER: &str = "Budgets, budget exports and spreadsheets";
 
 /// What Open reads, in a sentence (the message for anything else).
 pub const OPEN_READS: &str = "Open reads Method Budget files (.mthd), budget exports \
-(budget exchange JSON or XML, or the export's Excel or tab-delimited file) and \
+(budget exchange JSON or XML, or the export's .xlsx spreadsheet or tab-delimited file) and \
 spreadsheets (.xlsx, .csv, .tsv, .txt).";
 
 /// Every extension Open's dialog allows: the budget's, the budget export

@@ -46,7 +46,7 @@ pub fn read_xlsx(bytes: &[u8]) -> Result<Vec<Table>, ReadError> {
     let workbook_path = office_document(&mut zip)?;
     let workbook = zip
         .read(&workbook_path)?
-        .ok_or_else(|| err("the file isn't an Excel workbook (it has no workbook part)"))?;
+        .ok_or_else(|| err("the file isn't a spreadsheet (.xlsx) (it has no workbook part)"))?;
     let (sheets, date1904) = sheet_list(&xml::decode(&workbook)?)?;
     let rels_path = rels_for(&workbook_path);
     let rels = match zip.read(&rels_path)? {

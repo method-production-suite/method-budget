@@ -1446,7 +1446,7 @@ chart built into the app from a source the owner supplied (docs/TEMPLATES.md). P
 opens it like a template file: a new Untitled tab with its categories, accounts and
 production totals, no lines and no setup.
 
-**Import Chart of Accounts…** (File menu) brings in any chart: from an Excel workbook (any
+**Import Chart of Accounts…** (File menu) brings in any chart: from a spreadsheet (.xlsx, any
 sheet), a CSV or tab-delimited file, or another budget file (its own chart). For a
 spreadsheet the dialog works like Import Spreadsheet: the sheet, the header row and a
 column for each field (category number, category name, account number, account name,
@@ -1836,8 +1836,8 @@ Library tab is in each; the dialogs are Rust's and the page never names a path.
 **File > Export > Setup Lists…** writes the budget's setup items as tables, one row per item
 (per credit row for credits) with every part of its definition and where it came from
 (Effective, Source Notes, Source Links): globals, fringes, groups, units, sets, locations,
-currencies, charges, credits, tag presets and overtime patterns, whichever are ticked, as an
-Excel workbook (a sheet per kind) or CSV files (one per kind, named `<file> - Fringes.csv`
+currencies, charges, credits, tag presets and overtime patterns, whichever are ticked, as a
+spreadsheet (.xlsx), a sheet per kind, or CSV files (one per kind, named `<file> - Fringes.csv`
 and so on). Lists (a charge's excluded groups, a tag preset's fringes) are names joined with
 commas; an overtime pattern's bands read `2 @ 1.5; rest @ 2`; a flat fringe's Basis is the
 editor's label (reading also takes `amount`, `amount_counts`, `quantity` or `Full quantity`)
@@ -2059,11 +2059,11 @@ spec (a preset's fields) or the older `"topsheet"`, `"detail"` or `"both"`.
 **File > Export** has three items, each asking where to save with a native Save dialog
 (in the budget's folder, named after its file or, untitled, its title):
 
-- **Excel Workbook…** writes one `.xlsx` with a sheet per table: Topsheet, Accounts,
+- **Spreadsheet (.xlsx)…** writes one `.xlsx` with a sheet per table: Topsheet, Accounts,
   Detail, Globals, Fringes, Groups, Units, Currencies, Sets and Locations.
 - **CSV Files…** writes the same tables as one CSV file each, named from the name chosen:
   `Pilot.csv` gives `Pilot - Topsheet.csv`, `Pilot - Accounts.csv` and so on, beside it.
-  They start with a UTF-8 byte order mark, so Excel reads accented letters.
+  They start with a UTF-8 byte order mark, so spreadsheet apps read accented letters.
 - **Tab-Delimited Detail…** writes the Detail table alone as tab-delimited text (`.txt`,
   no byte order mark), the shape accounting and payroll importers take.
 
@@ -2114,9 +2114,9 @@ open in a tab. The same tables come from the command line:
 
 ### Importing spreadsheets
 
-**File > Import Spreadsheet…** adds detail lines from an Excel workbook (`.xlsx`), a CSV
+**File > Import Spreadsheet…** adds detail lines from a spreadsheet (`.xlsx`), a CSV
 file or tab-delimited text (`.tsv`, `.txt`): any department's sheet, an old budget kept in
-Excel, or our own export. Rust shows the Open dialog and reads the file; then a dialog maps
+a spreadsheet, or our own export. Rust shows the Open dialog and reads the file; then a dialog maps
 the sheet's columns to budget fields and shows what the import will do before anything
 changes:
 
@@ -2187,7 +2187,7 @@ inline strings, numbers as written, booleans, formula results, errors as text, c
 rows without references, Excel's `_xHHHH_` escapes, and the Strict variant's namespaces.
 Dates come in as serial numbers (styles aren't read). An older `.xls` workbook is refused
 with a message to save it as `.xlsx` or CSV. Exporting a budget and importing the Detail
-sheet back (Excel, CSV or tab-delimited) into the same chart without lines gives exactly
+sheet back (.xlsx, CSV or tab-delimited) into the same chart without lines gives exactly
 the same line totals and grand total (tested).
 
 | Command | Arguments | Returns |
@@ -2199,7 +2199,7 @@ the same line totals and grand total (tested).
 ### Importing a budget export
 
 **File > Import Budget Export…** (and File > Open, for a file whose content is an export)
-makes a whole budget from another budgeting program's export: budget exchange JSON or XML (basic or advanced), its Excel workbook or its
+makes a whole budget from another budgeting program's export: budget exchange JSON or XML (basic or advanced), its .xlsx spreadsheet or its
 tab-delimited topsheet (docs/IMPORT.md says what each carries). Rust shows the Open dialog
 (a filter per layout), reads the file, builds the budget and checks it; the review shows,
 before anything changes:
@@ -2395,8 +2395,8 @@ conflict, to_settle, comments, title, matches, rows, accounts, categories}` (`mo
 
 ### Actuals and the cost report
 
-**File > Import Actuals…** brings in actual costs from an accounting system's export (an
-Excel workbook, CSV or tab-delimited file; decisions.md, entry 45). Rust shows the Open
+**File > Import Actuals…** brings in actual costs from an accounting system's export (a
+spreadsheet (.xlsx), CSV or tab-delimited file; decisions.md, entry 45). Rust shows the Open
 dialog and reads the file with the same readers as Import Spreadsheet; the dialog (built
 like Import Spreadsheet's) picks the sheet and header row (both found automatically) and a
 column for each field: date, account number, amount (or debit and credit: the amount is
@@ -2782,7 +2782,7 @@ crates/method-session/   no window, no file system, no threads, no clock of its 
                      (kept by token)
   src/diffmerge.rs   What Changed and Merge Changes From (method_core::diff and
                      method_core::merge do the work); the merge is one undo step
-  src/export.rs      File > Export: the budget's tables as an Excel workbook, CSV files or
+  src/export.rs      File > Export: the budget's tables as a spreadsheet (.xlsx), CSV files or
                      tab-delimited detail, as bytes named as the Save dialog suggests
   src/reports.rs     report presets saved in the budget (one undo step each)
   src/templates.rs   New From Template and Save as Template: a budget stripped to its
