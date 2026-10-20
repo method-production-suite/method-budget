@@ -35,7 +35,13 @@ time through a file lock the system lets go if the program stops), which says on
 are set that it writes for the person (the `acts_for` op), so the app and these commands
 never take the same place in one sequence of changes. `sync` writes the same way. An edit the role doesn't allow is
 refused (exit 3) with nothing written, and so is any edit from a computer with no actor
-id yet once the owner has set roles. Every other command that would rewrite the whole
+id yet once the owner has set roles. Once changes are signed (from the owner's first role
+on; decisions.md, entry 89), these commands sign with the person's key, `signing-key`
+beside the actor file (made the first time, readable by its owner only), the same key the
+app uses; until the person's app has put that key into the budget, an edit is refused
+with "Changes in this shared budget are signed, and this computer's key isn't in it
+yet..." and nothing written; open the budget in Method Budget once. A person who was
+removed is refused too. Every other command that would rewrite the whole
 file (`fmt`, `pack apply`, a merge or import into it) is refused for a shared budget.
 
 ## Exit codes
@@ -556,8 +562,11 @@ change log"; decisions.md, entry 62): the budget id, every actor (computer) with
 changes it made and its last one, changes waiting for ones that haven't arrived or
 refused, what to review after a merge (a value two people changed at once, a deleted item
 still in use, two items with one name...), and the last N changes (10) with their actor,
-time, label and operations. `--init` starts the log: the file as it is becomes the first
-change, by this computer. `--json` prints one JSON object. This computer's actor id lives
+time, label and operations, and whether changes are signed (with how many actors have a
+key in the log; refused changes say why, a signature that doesn't match or a removal
+included). `--init` starts the log: the file as it is becomes the first
+change, by this computer. `--json` prints one JSON object (with `signed`, and each actor's
+`key` or `null`). This computer's actor id lives
 in `~/.method/actor` (or `$METHOD_ACTOR_FILE`), made on first use.
 
 ### `method-budget sync <file.mthd|FOLDER> [--no-write] [--roll]`
