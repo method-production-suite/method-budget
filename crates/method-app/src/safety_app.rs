@@ -30,6 +30,7 @@ use tauri_plugin_dialog::{
 
 use crate::app::{finish, window_title, AppState, DocId};
 use crate::docs::{Docs, TabInfo};
+use crate::i18n::tr;
 use crate::safety::{
     BackupEntry, Backups, OpenTabs, RecentFiles, RecoveryEntry, RecoveryStore, Settings, BACKUP_GAP,
 };
@@ -921,11 +922,24 @@ pub(crate) fn insert_after<R: Runtime>(
 /// (after Save As…) to the File menu. Called by `menu::build`; the recent
 /// list is filled in by [`refresh_menu`].
 pub fn extend_file_menu<R: Runtime>(app: &AppHandle<R>, file: &Submenu<R>) -> tauri::Result<()> {
-    let recent = Submenu::with_id(app, OPEN_RECENT, "Open Recent", true)?;
+    let recent = Submenu::with_id(app, OPEN_RECENT, tr("menu.file.open_recent"), true)?;
     insert_after(file, "file.open", &[&recent])?;
     let on = app.try_state::<Safety>().is_none_or(|s| s.autosave_on());
-    let autosave = CheckMenuItem::with_id(app, AUTOSAVE_ITEM, "Autosave", true, on, None::<&str>)?;
-    let revert = MenuItem::with_id(app, REVERT_BACKUP, "Revert to Backup…", true, None::<&str>)?;
+    let autosave = CheckMenuItem::with_id(
+        app,
+        AUTOSAVE_ITEM,
+        tr("menu.file.autosave"),
+        true,
+        on,
+        None::<&str>,
+    )?;
+    let revert = MenuItem::with_id(
+        app,
+        REVERT_BACKUP,
+        tr("menu.file.revert_backup"),
+        true,
+        None::<&str>,
+    )?;
     insert_after(file, "file.save_as", &[&autosave, &revert])
 }
 
@@ -958,7 +972,7 @@ pub fn refresh_menu<R: Runtime>(app: &AppHandle<R>) {
         recent.append(&MenuItem::with_id(
             app,
             CLEAR_RECENT,
-            "Clear Menu",
+            tr("menu.file.clear_recent"),
             !labels.is_empty(),
             None::<&str>,
         )?)?;

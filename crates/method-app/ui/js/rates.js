@@ -17,7 +17,8 @@ import { el } from './dom.js';
 import { customDialog, confirmDialog } from './modal.js';
 import { mountFrame, actionStrip, stripButton, searchBox, gridTable, band, bandField, setFooterTotals, railHost } from './setupframe.js';
 import { setRules } from './sheet.js';
-import { obj, str, plural, errText } from './util.js';
+import { obj, str, errText } from './util.js';
+import { t } from './i18n.js';
 
 const state = {
   // The table picked in the rail (its saved name), or null.
@@ -94,9 +95,9 @@ function redraw() {
 async function guardLeave() {
   if (!state.dirty) return true;
   return confirmDialog({
-    title: 'Leave without saving?',
-    message: `The changes to ${state.draft && state.draft.name ? state.draft.name : 'this table'} aren't saved. Leave them?`,
-    confirmText: 'Leave Without Saving',
+    title: t('rates.leave_without_saving'),
+    message: t('rates.leave_message', { name: state.draft && state.draft.name ? state.draft.name : t('rates.this_table') }),
+    confirmText: t('rates.leave_without_saving_button'),
     danger: true,
   });
 }
@@ -112,9 +113,9 @@ async function pick(name) {
 
 async function newTable() {
   if (!(await guardLeave())) return;
-  const names = new Set(tables(state.view).map((t) => t.name));
-  let name = 'New rate table';
-  for (let n = 2; names.has(name); n += 1) name = `New rate table ${n}`;
+  const names = new Set(tables(state.view).map((x) => x.name));
+  let name = t('rates.new_table_name');
+  for (let n = 2; names.has(name); n += 1) name = t('rates.new_table_name_n', { n });
   state.selected = null;
   state.draft = { name, notes: '', rows: [{ classification: '', rates: {}, from: '', to: '', notes: '' }] };
   state.base = '';
@@ -149,9 +150,9 @@ async function remove() {
     return;
   }
   const yes = await confirmDialog({
-    title: `Delete the rate table ${state.selected}?`,
-    message: 'Lines filled from it keep their rates; they will say the table is gone. Undo brings the table back.',
-    confirmText: 'Delete Table',
+    title: t('rates.delete_the_rate_table', { selected: state.selected }),
+    message: t('rates.lines_filled_from_it_keep'),
+    confirmText: t('rates.delete_table'),
     danger: true,
   });
   if (!yes) return;
@@ -168,7 +169,7 @@ async function remove() {
 async function updateLines() {
   try {
     await state.ctx.call('rate_update', { row_ids: [] });
-    state.ctx.toast('The lines filled from rate tables now have what their tables say.');
+    state.ctx.toast(t('rates.the_lines_filled_from_rate'));
   } catch (e) {
     state.ctx.toast(errText(e));
   }
@@ -203,18 +204,18 @@ function rail() {
   const host = railHost();
   if (!host) return;
   host.replaceChildren();
-  const list = el('ul', { class: 'rates-rail-list', attrs: { 'aria-label': 'Rate tables' } });
-  for (const t of tables(state.view)) {
-    const on = t.name === state.selected;
-    const rows = Array.isArray(t.rows) ? t.rows.length : 0;
+  const list = el('ul', { class: 'rates-rail-list', attrs: { 'aria-label': t('rates.rate_tables') } });
+  for (const tb of tables(state.view)) {
+    const on = tb.name === state.selected;
+    const rows = Array.isArray(tb.rows) ? tb.rows.length : 0;
     const b = el('button', {
       class: `rates-rail-item${on ? ' is-selected' : ''}`,
-      text: t.name,
-      title: `${t.name}: ${plural(rows, 'row', 'rows')}`,
+      text: tb.name,
+      title: `${tb.name}: ${t('rates.count_rows', { count: rows })}`,
       attrs: { type: 'button', 'aria-pressed': String(on) },
-      data: { key: `rates:table:${t.name}`, nobusy: '1' },
+      data: { key: `rates:table:${tb.name}`, nobusy: '1' },
     });
-    b.addEventListener('click', () => pick(t.name));
+    b.addEventListener('click', () => pick(tb.name));
     list.append(el('li', {}, b));
   }
   host.append(list);
@@ -233,10 +234,10 @@ function unitAdder() {
   if (!missing.length) return null;
   const s = el('select', {
     class: 'setup-input rates-add-unit',
-    attrs: { 'aria-label': 'Add a unit column' },
+    attrs: { 'aria-label': t('rates.add_a_unit_column') },
     data: { key: 'rates:add-unit' },
   });
-  s.append(el('option', { text: 'Add unit…', attrs: { value: '' } }));
+  s.append(el('option', { text: t('rates.add_unit'), attrs: { value: '' } }));
   for (const u of missing) s.append(el('option', { text: u, attrs: { value: u } }));
   s.addEventListener('change', () => {
     if (!s.value) return;
@@ -249,28 +250,28 @@ function unitAdder() {
 function grid() {
   const d = state.draft;
   const head = (text, cls = '') => el('span', { class: `sw-head${cls ? ` ${cls}` : ''}`, text });
-  const heads = [head('Classification'), ...state.units.map((u) => head(`Per ${u}`, 'sw-num')), head('From'), head('To'), head('Notes'), head('')];
-  const list = el('ul', { attrs: { 'aria-label': `Rows of ${d.name}` } });
+  const heads = [head(t('rates.col.classification')), ...state.units.map((u) => head(t('rates.per_unit', { unit: u }), 'sw-num')), head(t('rates.col.from')), head(t('rates.col.to')), head(t('rates.col.notes')), head('')];
+  const list = el('ul', { attrs: { 'aria-label': t('rates.rows_of', { name: d.name }) } });
   const needle = state.filter.trim().toLowerCase();
   d.rows.forEach((r, i) => {
     if (needle && !r.classification.toLowerCase().includes(needle)) return;
-    const cells = [input(r.classification, `rates:row:${i}:class`, `Row ${i + 1} classification`, (v) => (r.classification = v))];
+    const cells = [input(r.classification, `rates:row:${i}:class`, t('rates.aria.classification', { row: i + 1 }), (v) => (r.classification = v))];
     for (const u of state.units) {
       cells.push(
-        input(str(r.rates[u]), `rates:row:${i}:${u}`, `Row ${i + 1} rate per ${u}`, (v) => {
+        input(str(r.rates[u]), `rates:row:${i}:${u}`, t('rates.aria.rate', { row: i + 1, unit: u }), (v) => {
           if (v.trim()) r.rates[u] = v.trim();
           else delete r.rates[u];
         }, 'sw-num'),
       );
     }
-    cells.push(input(r.from, `rates:row:${i}:from`, `Row ${i + 1} first day (YYYY-MM-DD)`, (v) => (r.from = v)));
-    cells.push(input(r.to, `rates:row:${i}:to`, `Row ${i + 1} last day (YYYY-MM-DD)`, (v) => (r.to = v)));
-    cells.push(input(r.notes, `rates:row:${i}:notes`, `Row ${i + 1} notes`, (v) => (r.notes = v)));
+    cells.push(input(r.from, `rates:row:${i}:from`, t('rates.aria.from', { row: i + 1 }), (v) => (r.from = v)));
+    cells.push(input(r.to, `rates:row:${i}:to`, t('rates.aria.to', { row: i + 1 }), (v) => (r.to = v)));
+    cells.push(input(r.notes, `rates:row:${i}:notes`, t('rates.aria.notes', { row: i + 1 }), (v) => (r.notes = v)));
     const del = el('button', {
       class: 'setup-btn sw-acts',
       text: '×',
-      title: 'Remove this row',
-      attrs: { type: 'button', 'aria-label': `Remove row ${i + 1}` },
+      title: t('rates.remove_this_row'),
+      attrs: { type: 'button', 'aria-label': t('rates.aria.remove', { row: i + 1 }) },
       data: { key: `rates:row:${i}:remove`, nobusy: '1' },
     });
     del.addEventListener('click', () => {
@@ -289,59 +290,59 @@ function draw() {
   const panel = state.panel;
   const d = state.draft;
   const actions = [
-    stripButton('New Table', 'rates:new', () => newTable(), { title: 'Start a rate table of your own' }),
-    stripButton('Import from Spreadsheet…', 'rates:import', () => importDialog(), {
-      title: 'Read a rate table from a spreadsheet you have (.xlsx or CSV), mapping its columns',
+    stripButton(t('rates.new_table'), 'rates:new', () => newTable(), { title: t('rates.start_a_rate_table_of') }),
+    stripButton(t('rates.import_sheet'), 'rates:import', () => importDialog(), {
+      title: t('rates.read_a_rate_table_from'),
     }),
   ];
   if (d) {
-    const saveBtn = stripButton('Save Table', 'rates:save', () => save(), { primary: true, title: 'Keep these changes (one undo step)' });
+    const saveBtn = stripButton(t('rates.save_table'), 'rates:save', () => save(), { primary: true, title: t('rates.keep_these_changes_one_undo') });
     saveBtn.dataset.dirty = '1';
     saveBtn.setAttribute('aria-disabled', state.dirty ? 'false' : 'true');
-    const revertBtn = stripButton('Revert', 'rates:revert', () => revert(), { title: 'Drop the changes not saved' });
+    const revertBtn = stripButton(t('rates.revert'), 'rates:revert', () => revert(), { title: t('rates.drop_the_changes_not_saved') });
     revertBtn.dataset.dirty = '1';
     revertBtn.setAttribute('aria-disabled', state.dirty ? 'false' : 'true');
-    actions.push(saveBtn, revertBtn, stripButton('Delete Table…', 'rates:delete', () => remove(), { title: 'Delete this rate table' }));
+    actions.push(saveBtn, revertBtn, stripButton(t('rates.delete_table_strip'), 'rates:delete', () => remove(), { title: t('rates.delete_this_rate_table') }));
   }
   actions.push(
-    stripButton('Update Filled Lines', 'rates:update', () => updateLines(), {
-      title: 'Give every line filled from a rate table what its table says now (one undo step). Lines changed by hand are left as they are.',
+    stripButton(t('rates.update_lines'), 'rates:update', () => updateLines(), {
+      title: t('rates.give_every_line_filled_from'),
     }),
   );
   const search = d
     ? searchBox({
         key: 'rates:search',
         value: state.filter,
-        label: 'Search classifications',
-        placeholder: 'Search classifications',
+        label: t('rates.search_classifications'),
+        placeholder: t('rates.search_classifications'),
         onChange: (v) => {
           state.filter = v;
           redraw();
         },
       })
     : null;
-  const strip = actionStrip('Rate tables', actions, search);
+  const strip = actionStrip(t('setup.sheet_kind.rate_table'), actions, search);
   if (!d) {
     mountFrame(panel, {
       strip,
       body: [
         el('p', {
           class: 'setup-empty',
-          text: 'No rate tables yet. A rate table is yours to keep: classifications with a rate per unit, typed in or imported from a spreadsheet. Pick one on a line to fill its rate. Nothing comes with the app.',
+          text: t('rates.no_rate_tables_yet_a'),
         }),
       ],
     });
     rail();
-    setFooterTotals([{ label: '', value: '0 rate tables' }]);
+    setFooterTotals([{ label: '', value: t('rates.count_tables', { count: 0 }) }]);
     return;
   }
-  const name = input(d.name, 'rates:name', 'Table name', (v) => (d.name = v));
-  const notes = input(d.notes, 'rates:notes', 'Table notes', (v) => (d.notes = v));
+  const name = input(d.name, 'rates:name', t('rates.table_name'), (v) => (d.name = v));
+  const notes = input(d.notes, 'rates:notes', t('rates.table_notes'), (v) => (d.notes = v));
   const adder = unitAdder();
-  const bandEl = band('Rate table', bandField('Name', name), bandField('Notes', notes, 'Where the figures came from, what they cover'), adder ? bandField('Units', adder) : null);
+  const bandEl = band(t('rates.rate_table'), bandField(t('rates.name'), name), bandField(t('rates.col.notes'), notes, t('rates.notes_hint')), adder ? bandField(t('rates.units'), adder) : null);
   const add = el('button', {
     class: 'setup-btn sw-after',
-    text: 'Add classification',
+    text: t('rates.add_classification'),
     attrs: { type: 'button' },
     data: { key: 'rates:add-row', nobusy: '1' },
   });
@@ -354,9 +355,9 @@ function draw() {
   rail();
   const classes = new Set(d.rows.map((r) => r.classification.trim().toLowerCase()).filter(Boolean));
   setFooterTotals([
-    { label: '', value: plural(classes.size, 'classification', 'classifications') },
-    { label: '', value: plural(d.rows.length, 'row', 'rows') },
-    state.dirty ? { label: '', value: 'Not saved', dim: true } : null,
+    { label: '', value: t('rates.count_classifications', { count: classes.size }) },
+    { label: '', value: t('rates.count_rows', { count: d.rows.length }) },
+    state.dirty ? { label: '', value: t('rates.not_saved'), dim: true } : null,
   ]);
 }
 
@@ -373,12 +374,12 @@ export function renderRatesTab(panel, view, ctx) {
 // Import from a spreadsheet
 
 const FIELDS = [
-  ['classification', 'Classification'],
-  ['from', 'From'],
-  ['to', 'To'],
-  ['notes', 'Notes'],
-  ['unit', 'Unit column'],
-  ['rate', 'Rate column'],
+  ['classification', t('rates.col.classification')],
+  ['from', t('rates.col.from')],
+  ['to', t('rates.col.to')],
+  ['notes', t('rates.col.notes')],
+  ['unit', t('rates.col.unit_column')],
+  ['rate', t('rates.col.rate_column')],
 ];
 
 async function importDialog() {
@@ -395,7 +396,7 @@ async function importDialog() {
   const body = el('div', { class: 'rates-import-body' });
   const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
   error.hidden = true;
-  const importBtn = el('button', { class: 'btn btn-primary', text: 'Import', attrs: { type: 'button' } });
+  const importBtn = el('button', { class: 'btn btn-primary', text: t('rates.import'), attrs: { type: 'button' } });
 
   const reread = async (mapping, index = current.index) => {
     try {
@@ -409,7 +410,7 @@ async function importDialog() {
 
   const colSelect = (label, value, onChange) => {
     const s = el('select', { class: 'modal-input', attrs: { 'aria-label': label } });
-    s.append(el('option', { text: '(none)', attrs: { value: '' } }));
+    s.append(el('option', { text: t('rates.none'), attrs: { value: '' } }));
     current.titles.forEach((t, i) => s.append(el('option', { text: t, attrs: { value: String(i) } })));
     s.value = value === null || value === undefined ? '' : String(value);
     s.addEventListener('change', () => onChange(s.value === '' ? null : Number(s.value)));
@@ -420,25 +421,25 @@ async function importDialog() {
     error.hidden = true;
     const m = { ...current.mapping, units: { ...obj(current.mapping.units) } };
     const rows = [];
-    const sheet = el('select', { class: 'modal-input', attrs: { 'aria-label': 'Sheet' } });
-    for (const s of current.sheets) sheet.append(el('option', { text: `${s.name} (${plural(s.rows, 'row', 'rows')})`, attrs: { value: String(s.index) } }));
+    const sheet = el('select', { class: 'modal-input', attrs: { 'aria-label': t('rates.sheet') } });
+    for (const s of current.sheets) sheet.append(el('option', { text: t('setup.sheet_rows', { name: s.name, count: s.rows }), attrs: { value: String(s.index) } }));
     sheet.value = String(current.index);
     sheet.addEventListener('change', () => reread(null, Number(sheet.value)));
-    if (current.sheets.length > 1) rows.push(el('label', { class: 'modal-field' }, el('span', { text: 'Sheet' }), sheet));
-    const nameIn = el('input', { class: 'modal-input', attrs: { type: 'text', 'aria-label': 'Table name' } });
+    if (current.sheets.length > 1) rows.push(el('label', { class: 'modal-field' }, el('span', { text: t('rates.sheet') }), sheet));
+    const nameIn = el('input', { class: 'modal-input', attrs: { type: 'text', 'aria-label': t('rates.table_name') } });
     nameIn.value = name;
     nameIn.addEventListener('change', () => {
       name = nameIn.value;
       reread(m);
     });
-    rows.push(el('label', { class: 'modal-field' }, el('span', { text: 'Table name' }), nameIn));
-    const header = el('input', { class: 'modal-input', attrs: { type: 'number', min: '0', 'aria-label': 'Row of column titles (0 for none)' } });
+    rows.push(el('label', { class: 'modal-field' }, el('span', { text: t('rates.table_name') }), nameIn));
+    const header = el('input', { class: 'modal-input', attrs: { type: 'number', min: '0', 'aria-label': t('rates.title_row') } });
     header.value = m.header_row === null || m.header_row === undefined ? '0' : String(m.header_row + 1);
     header.addEventListener('change', () => {
       const n = Number(header.value);
       reread({ ...m, header_row: n > 0 ? n - 1 : null });
     });
-    rows.push(el('label', { class: 'modal-field' }, el('span', { text: 'Titles on row' }), header));
+    rows.push(el('label', { class: 'modal-field' }, el('span', { text: t('rates.titles_on_row') }), header));
     for (const [k, label] of FIELDS) {
       rows.push(el('label', { class: 'modal-field' }, el('span', { text: label }), colSelect(label, m[k], (v) => reread({ ...m, [k]: v }))));
     }
@@ -447,8 +448,8 @@ async function importDialog() {
         el(
           'label',
           { class: 'modal-field' },
-          el('span', { text: `Rate per ${u}` }),
-          colSelect(`Rate per ${u}`, m.units[u], (v) => {
+          el('span', { text: t('rates.rate_per', { u }) }),
+          colSelect(t('rates.rate_per', { u }), m.units[u], (v) => {
             const units = { ...m.units };
             if (v === null) delete units[u];
             else units[u] = v;
@@ -459,27 +460,27 @@ async function importDialog() {
     }
     const out = [];
     if (current.errors.length) {
-      const ul = el('ul', { class: 'rates-import-errors', attrs: { 'aria-label': 'Problems' } });
-      for (const e of current.errors.slice(0, 50)) ul.append(el('li', { text: `Row ${e.row}: ${e.message}` }));
-      out.push(el('p', { class: 'modal-message', text: 'Nothing is imported while there are problems:' }), ul);
+      const ul = el('ul', { class: 'rates-import-errors', attrs: { 'aria-label': t('rates.problems') } });
+      for (const e of current.errors.slice(0, 50)) ul.append(el('li', { text: t('rates.row', { row: e.row, message: e.message }) }));
+      out.push(el('p', { class: 'modal-message', text: t('rates.nothing_is_imported_while_there') }), ul);
     } else if (current.table) {
-      const t = current.table;
-      const units = unitsOf(t);
-      const ul = el('ul', { class: 'rates-import-preview', attrs: { 'aria-label': 'What the table will hold' } });
-      for (const r of t.rows.slice(0, 40)) {
-        const figures = units.filter((u) => r.rates[u] !== undefined).map((u) => `${r.rates[u]} per ${u}`);
-        const when = [r.from && `from ${r.from}`, r.to && `to ${r.to}`].filter(Boolean).join(' ');
+      const tb = current.table;
+      const units = unitsOf(tb);
+      const ul = el('ul', { class: 'rates-import-preview', attrs: { 'aria-label': t('rates.what_the_table_will_hold') } });
+      for (const r of tb.rows.slice(0, 40)) {
+        const figures = units.filter((u) => r.rates[u] !== undefined).map((u) => t('rates.figure_per', { rate: r.rates[u], unit: u }));
+        const when = [r.from && t('rates.when_from', { date: r.from }), r.to && t('rates.when_to', { date: r.to })].filter(Boolean).join(' ');
         ul.append(el('li', { text: `${r.classification}: ${figures.join(', ')}${when ? ` (${when})` : ''}` }));
       }
-      out.push(el('p', { class: 'modal-message', text: `${plural(t.rows.length, 'row', 'rows')} in ${t.name}${current.exists ? '. This replaces the table of that name.' : '.'}` }), ul);
+      out.push(el('p', { class: 'modal-message', text: current.exists ? t('rates.rows_in_replaces', { count: tb.rows.length, name: tb.name }) : t('rates.rows_in', { count: tb.rows.length, name: tb.name }) }), ul);
     }
-    importBtn.textContent = current.exists ? 'Replace Table' : 'Import';
+    importBtn.textContent = current.exists ? t('rates.replace_table') : t('rates.import');
     importBtn.disabled = !current.table;
     body.replaceChildren(el('div', { class: 'rates-import-map' }, ...rows), ...out);
   };
 
   customDialog((close) => {
-    const cancel = el('button', { class: 'btn', text: 'Cancel', attrs: { type: 'button' } });
+    const cancel = el('button', { class: 'btn', text: t('rates.cancel'), attrs: { type: 'button' } });
     cancel.addEventListener('click', () => close());
     importBtn.addEventListener('click', async () => {
       if (!current.table) return;
@@ -499,8 +500,8 @@ async function importDialog() {
     return el(
       'div',
       { class: 'modal rates-import', attrs: { 'aria-labelledby': 'rates-import-title' } },
-      el('h2', { class: 'modal-title', text: `Import a rate table from ${current.file}`, attrs: { id: 'rates-import-title' } }),
-      el('p', { class: 'modal-message', text: 'Map the sheet’s columns: a classification column, then a column for each unit’s rate, or a unit column and a rate column.' }),
+      el('h2', { class: 'modal-title', text: t('rates.import_a_rate_table_from', { file: current.file }), attrs: { id: 'rates-import-title' } }),
+      el('p', { class: 'modal-message', text: t('rates.map_the_sheet_s_columns') }),
       body,
       error,
       el('div', { class: 'modal-actions' }, cancel, importBtn),

@@ -22,6 +22,7 @@ pub mod export_import;
 pub mod find;
 pub mod help;
 pub mod history;
+pub mod i18n;
 pub mod import_setup;
 pub mod launch;
 pub mod library;

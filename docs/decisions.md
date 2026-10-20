@@ -1593,7 +1593,7 @@ reference), with the calls it needed:
 
 ## 46. The product is Method Budget (2026-10-09, the owner)
 
-methodbudget.com is the site, and the repo is https://github.com/ssandweiss/method-budget.
+methodbudget.com is the site, and the repo is https://github.com/method-production-suite/method-budget.
 Never shorten the name to "MB" (that is how people shorten Movie Magic Budgeting), and no
 file extension of ours resembles `.mbd` or `.mmbx`. What it covers:
 
@@ -1678,8 +1678,8 @@ kept for a while as an alias) and the app's executable `method-budget-app`.
   from Help > Release Notes, as plain text. A tag whose notes aren't ready builds nothing.
   `cargo xtask notes-facts` lists the commits since the last tag for drafting, treating
   their subjects as untrusted data.
-- **Mac releases are signed as Clockwork Post Production, LLC** with its existing
-  Developer ID Application certificate, notarized with an App Store Connect API key,
+- **Mac releases are signed with the suite's Developer ID**, its Developer ID
+  Application certificate, notarized with an App Store Connect API key,
   stapled, and checked with `codesign` and `spctl` in the release workflow. Each step skips
   cleanly when its secrets are absent (the build is then ad-hoc signed, as before).
   Roadmap 1.21 is built as a pipeline; the first signed release needs the secrets
@@ -4256,7 +4256,7 @@ From 0.6.0 the Mac app holds both Intel and Apple silicon code.
   `darwin-aarch64` and `darwin-x86_64`. method-update asks for `darwin-x86_64-app`, then
   `darwin-x86_64` on an Intel Mac; it is pinned to method-libs `25c80f8` (its #7), which
   lets an Intel Mac ask at all. Copies of 0.2.x on Intel Macs use the Tauri updater plugin,
-  ask the old `ssandweiss/method-budget` address (GitHub forwards it to the org's latest
+  ask the repository's old address (GitHub forwards it to the org's latest
   release) for the same keys and trust the same key, so they are offered 0.6.0.
 - **What an Intel Mac says when there's no build.** The words were "Updates are for Apple
   silicon Macs."; they are now "There's no update for this computer yet. This version stays
@@ -4692,3 +4692,64 @@ docs/CLI.md, `method-budget incentives what-if` and `method-budget report`; MCP:
   headless Chrome against the browser build; the app itself needs a live check.
 - **Not built**: a what-if from lines picked in the budget grid (the panel picks a
   category or an account), and a preset of program fields to fill in.
+
+## 94. Localization: one string table for the page and the menu bar, English first (2026-10-20, the owner's instruction)
+
+Roadmap 3.14, the localization half, first slice (behavior: docs/APP.md, "Languages";
+what is left: docs/research/accessibility-audit.md, "Localization"). The owner (relayed
+2026-10-20): start with the framework and English, and leave the choice of languages
+open. So the open decision "Which languages first" stays in docs/ROADMAP.md, now saying
+the framework is built and adding a language is a table.
+
+- **One table, read by both sides.** The English words live in `ui/i18n/en.js`: one
+  object of key to words, strict JSON after a single `export default` line, one entry per
+  line. The page imports it as a module, which its Content-Security-Policy already allows
+  (`script-src 'self'`; `connect-src` has no `'self'`, so a fetched JSON file would be
+  refused, and JSON module imports are newer than the system web views we support). Rust
+  builds the same file in with `include_str!` and parses it with `serde_json`, already a
+  dependency, so the menu bar and the page can't drift apart. No new dependency, no build
+  step, and the browser build copies it with the rest of the page.
+- **A small lookup.** `t(key, params)` fills in `{name}` and, for a value with plural
+  forms, picks the form with `Intl.PluralRules` for `params.count`. Keys are literal at
+  every call (`t('find.replace')`, never a key built at run time) so a test can see every
+  one. The menu bar's items are `menu.<id>` with the shortcut list's ids; that one family
+  is built from ids in Rust, and the test lists the ids from the menus themselves.
+- **Fallback and choice.** A key missing from a language shows the English words, with
+  one console warning per key; a key missing from English too shows the key. The
+  language is the first of the system's preferred languages with a table, matched by
+  whole tag then by language, English otherwise. With English alone this only wires the
+  choice; an override in the preferences waits until there is something to choose. The
+  menu bar stays English until a second table exists, since Rust doesn't read the
+  system's language yet.
+- **A pure move.** The wording is unchanged and every test that pins text still passes;
+  plurals that were written out ("1 row", "3 rows") became plural entries with the same
+  words. Where a sentence was put together from pieces, the whole sentence is now one
+  entry with names in it, so a translation can reorder it. Kind names that appear inside
+  sentences ("Enter a fringe name.") come from the table too, apart from the ids the code
+  keys on.
+- **Converted in this slice** (about 1,200 entries): the start window and New Budget, the
+  Help menu's page parts and About, the shortcut list and sheet, the menu bar (with Open
+  Recent, Autosave, Revert to Backup and Check for Updates), Budget Setup's frame and its
+  list, Globals, Units and Rate Tables tabs, Find and Replace, the main window's dialogs,
+  toolbar tips, banners and messages, the common dialog buttons and the status bar.
+  Kept out, to stay clear of two open pull requests: `share.js`, `activity.js`,
+  `topsheet-setup.js`, `report.js` and `reportsetup.js` (and their styles), and the engine's
+  log, incentive and bid code. They and the rest of the page are converted in later
+  passes.
+- **Tests, written first.** `src/i18n.rs`: the table is well formed (keys of letters,
+  digits, dots and underscores, one entry per line, no key twice, plural entries with an
+  `other` form and only the plural categories, no em dashes or exclamation marks); every
+  key used in the page or in Rust is in the table and every entry is used; a converted
+  script has no `text:`, `title:`, `label:`, `placeholder:`, `message:`, `hint:`,
+  `aria-label` or `toast()` literal with letters in it (symbols, numbers and
+  interpolations alone are allowed, with a short list of non-words); and the scan itself
+  is tested. They failed on the code before the move. `scripts/web-smoke.mjs`, in the
+  browser build: the table is loaded from the page's own files, the lookup fills names,
+  picks plural forms, falls back to English with a warning and picks the language; and
+  the shortcut sheet, the start window, New Budget and every Budget Setup tab draw their
+  words from the table, with no key showing in their place. The menu tests that match
+  `src/menu.rs` to `shortcuts.js` still pass.
+- **Not built** (3.14 stays partial): the scripts kept out above and the rest of the
+  page, engine messages with stable codes, the native dialogs, room for longer words and
+  a right-to-left check, a language override in the preferences, and the languages
+  themselves, which wait on the owner's choice.

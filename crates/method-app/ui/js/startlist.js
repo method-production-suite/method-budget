@@ -1,16 +1,18 @@
 // The start window's plain helpers (start.js): searching the lists, the
 // words for a row, the production types and the chart each one starts
 // from, and the New Budget form's values as the spec src/start.rs takes.
-// No DOM here.
+// No DOM here. Words come from the string table (i18n.js).
+
+import { t } from './i18n.js';
 
 /** The production types New Budget offers: [value, label] (src/start.rs, KINDS). */
 export const KINDS = [
-  ['feature', 'Feature'],
-  ['tv_episode', 'TV episode'],
-  ['tv_season', 'TV season'],
-  ['commercial', 'Commercial'],
-  ['documentary', 'Documentary'],
-  ['other', 'Other'],
+  ['feature', t('start.kind.feature')],
+  ['tv_episode', t('start.kind.tv_episode')],
+  ['tv_season', t('start.kind.tv_season')],
+  ['commercial', t('start.kind.commercial')],
+  ['documentary', t('start.kind.documentary')],
+  ['other', t('start.kind.other')],
 ];
 
 /** Our own bundled chart each type starts from, until Start From is changed by hand. */
@@ -78,7 +80,7 @@ export function chartSections(charts, kind, query = '') {
 /** "212 accounts", "1 account" (blank when unknown). */
 export function accountsText(n) {
   if (!Number.isFinite(n) || n <= 0) return '';
-  return `${n} ${n === 1 ? 'account' : 'accounts'}`;
+  return t('start.accounts', { count: n });
 }
 
 /**
@@ -124,7 +126,20 @@ export function filterEntries(list, query) {
   return (Array.isArray(list) ? list : []).filter((e) => e && matches(e, query));
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS = [
+  t('start.month.jan'),
+  t('start.month.feb'),
+  t('start.month.mar'),
+  t('start.month.apr'),
+  t('start.month.may'),
+  t('start.month.jun'),
+  t('start.month.jul'),
+  t('start.month.aug'),
+  t('start.month.sep'),
+  t('start.month.oct'),
+  t('start.month.nov'),
+  t('start.month.dec'),
+];
 
 /**
  * When a file last changed, short: "Today 14:05", "Yesterday", "Oct 9"
@@ -135,10 +150,10 @@ export function whenText(ms, now = new Date()) {
   const d = new Date(ms);
   const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const days = Math.round((day(now) - day(d)) / 86400000);
-  if (days === 0) return `Today ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  if (days === 1) return 'Yesterday';
-  const md = `${MONTHS[d.getMonth()]} ${d.getDate()}`;
-  return d.getFullYear() === now.getFullYear() ? md : `${md}, ${d.getFullYear()}`;
+  if (days === 0) return t('start.today_at', { time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` });
+  if (days === 1) return t('start.yesterday');
+  const md = t('start.month_day', { month: MONTHS[d.getMonth()], day: d.getDate() });
+  return d.getFullYear() === now.getFullYear() ? md : t('start.month_day_year', { date: md, year: d.getFullYear() });
 }
 
 /**
@@ -207,12 +222,12 @@ export function packText(p) {
   if (!p || typeof p !== 'object') return { name: '', detail: '' };
   const name = String(p.title || p.file || '').trim();
   const bits = [];
-  if (p.version) bits.push(`version ${p.version}`);
-  if (p.effective) bits.push(`from ${p.effective}`);
+  if (p.version) bits.push(t('start.pack.version', { version: p.version }));
+  if (p.effective) bits.push(t('start.pack.from', { date: p.effective }));
   if (p.region) bits.push(String(p.region));
   const n = Number.isFinite(p.items) ? p.items : 0;
-  bits.push(`${n} ${n === 1 ? 'item' : 'items'}`);
-  if (p.place === 'bundled') bits.push('comes with the app');
+  bits.push(t('start.items', { count: n }));
+  if (p.place === 'bundled') bits.push(t('start.pack.bundled'));
   return { name, detail: bits.join(', ') };
 }
 
@@ -256,10 +271,10 @@ export function projectEntries(project, query) {
 
 /** The orders the start window's lists can be put in: [value, label]. */
 export const SORTS = [
-  ['recent', 'Last opened'],
-  ['name', 'Name'],
-  ['modified', 'Last changed'],
-  ['total', 'Net total'],
+  ['recent', t('start.sort.recent')],
+  ['name', t('start.sort.name')],
+  ['modified', t('start.sort.modified')],
+  ['total', t('start.sort.total')],
 ];
 
 /**
@@ -305,9 +320,9 @@ export function peopleText(people, when = whenText) {
   return (Array.isArray(people) ? people : [])
     .filter((p) => p && String(p.name || '').trim())
     .map((p) => {
-      const t = Date.parse(p.at);
-      const at = Number.isFinite(t) ? when(t) : '';
-      const who = p.place ? `${String(p.name).trim()} in ${p.place}` : String(p.name).trim();
+      const ms = Date.parse(p.at);
+      const at = Number.isFinite(ms) ? when(ms) : '';
+      const who = p.place ? t('start.person_in', { name: String(p.name).trim(), place: p.place }) : String(p.name).trim();
       return at ? `${who}, ${at}` : who;
     })
     .join('; ');

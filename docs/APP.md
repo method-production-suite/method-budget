@@ -1252,6 +1252,47 @@ accessibility tree: every control has a name, the grid's roles and the cursor ce
 the announcement after an edit, and a dialog's role, its hold on focus and focus coming
 back.
 
+### Languages
+
+English is the only language for now (decision 94). The app's words are kept apart from
+its code, so another language is a table to fill in, not a change to the screens; which
+languages come first is the owner's call (docs/ROADMAP.md, "Waiting on the owner").
+
+- **The table**: `ui/i18n/en.js` holds the English words by key (`find.replace`,
+  `footer.selected_rows`...), about 1,200 of them. After its `export default` line it is
+  plain JSON, so the page imports it as one of its own scripts (the page's
+  Content-Security-Policy allows only its own files, and nothing is fetched) and the
+  menu bar reads the same file from Rust (`src/i18n.rs`, built in with `include_str!`).
+  The browser build copies it with the rest of the page.
+- **Looking words up**: the page calls `t(key, params)` (`ui/js/i18n.js`). `{name}` in
+  the words is filled in from `params`. A value with a count is an object of plural
+  forms (`"one"`, `"other"`, and `"zero"`, `"two"`, `"few"`, `"many"` where a language
+  has them), and the platform's `Intl.PluralRules` picks the form for `params.count`, so
+  "1 row" and "3 rows" are one entry. The menu bar's items are `menu.<id>`, the same ids
+  as `ui/js/shortcuts.js`; the shortcut sheet's are `shortcut.<id>`.
+- **Which language**: the system's (the browser's list of preferred languages), matched
+  by whole tag and then by language ("pt-BR" takes "pt"), with English when no table
+  matches. A key a language lacks falls back to the English words, with a warning in the
+  console. The menu bar is English until a second table exists.
+- **Adding a language**: copy `ui/i18n/en.js` to `ui/i18n/<code>.js`, translate the
+  values (keeping the keys, the `{names}` and the plural forms the language needs), import
+  it in `ui/js/i18n.js` and add it to `TABLES`. Nothing else changes.
+- **Kept honest by tests** (`src/i18n.rs`): every key the page or Rust uses is in the
+  English table and every entry is used; the table is well formed (one entry per line,
+  no key twice, plural entries with an `other` form, no em dashes or exclamation marks);
+  and the converted scripts hold no words of their own: a new `text:`, `title:`,
+  `label:`, `placeholder:`, `message:` or `aria-label` literal with letters in it fails
+  the build. `scripts/web-smoke.mjs` checks the lookup, the plurals, the fallback and the
+  choice of language in the browser, and that the shortcut sheet, the start window, New
+  Budget and every Budget Setup tab draw their words from the table.
+
+Converted so far: the start window and New Budget, the Help menu and About, the shortcut
+list and sheet, the menu bar, Budget Setup's tabs (the setup lists, Globals, Units and
+Rate Tables), Find and Replace, the main window's dialogs, toolbar tips and messages, the
+status bar, and the common dialog buttons. The rest of the page, the engine's messages
+and the native dialogs are English text still; docs/research/accessibility-audit.md,
+"Localization", lists them.
+
 ### The Help menu
 
 In order: **Keyboard Shortcuts**; **User Guide** (this file on GitHub, in your browser);

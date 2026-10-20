@@ -5,9 +5,10 @@
 
 import { el } from './dom.js';
 import { totalText as money } from './display.js';
+import { t } from './i18n.js';
 
 function stat(label, cents, cls = '', title = '') {
-  const value = cents === null || cents === undefined ? 'n/a' : money(cents);
+  const value = cents === null || cents === undefined ? t('footer.none') : money(cents);
   return el(
     'div',
     { class: `stat ${cls}`, title },
@@ -40,33 +41,32 @@ export function renderFooter(host, view, selection, extra = {}) {
   const left = el(
     'div',
     { class: 'footer-totals' },
-    stat('Above the line', r ? r.total_atl : null),
-    stat('Below the line', r ? r.total_btl : null),
-    stat('Grand total', r ? r.grand_total : null, 'strong'),
+    stat(t('footer.above_the_line'), r ? r.total_atl : null),
+    stat(t('footer.below_the_line'), r ? r.total_btl : null),
+    stat(t('footer.grand_total'), r ? r.grand_total : null, 'strong'),
   );
   if (r && (r.credits.length || r.net_total !== r.grand_total)) {
-    left.append(stat('Net total', r.net_total, 'strong'));
+    left.append(stat(t('footer.net_total'), r.net_total, 'strong'));
   }
   if (view && view.partial) {
-    left.append(el('span', { class: 'footer-note', text: 'Cells with problems count as blank', title: 'Fix the flagged cells for exact totals' }));
+    left.append(el('span', { class: 'footer-note', text: t('footer.partial'), title: t('footer.partial_tip') }));
   }
 
   const context = el('div', { class: 'footer-context' });
   for (const c of extra.context || []) {
-    context.append(stat(c.label, c.cents, 'context', `${c.title}: ${c.label}`));
+    context.append(stat(c.label, c.cents, 'context', t('footer.context_tip', { what: c.title, name: c.label })));
   }
 
   const right = el('div', { class: 'footer-right' });
   if (selection && selection.count > 0) {
-    const t = selection.totals;
-    const rows = selection.count === 1 ? '1 row' : `${selection.count} rows`;
+    const tot = selection.totals;
     right.append(
       el(
         'div',
         { class: 'footer-selection' },
-        el('span', { class: 'sel-count', text: `Selected ${rows}` }),
-        stat('Lines', t ? t.lines.details_total : null),
-        stat('Fringes', t ? t.lines.fringe_total : null),
+        el('span', { class: 'sel-count', text: t('footer.selected_rows', { count: selection.count }) }),
+        stat(t('footer.lines'), tot ? tot.lines.details_total : null),
+        stat(t('footer.fringes'), tot ? tot.lines.fringe_total : null),
       ),
     );
   }
@@ -76,8 +76,8 @@ export function renderFooter(host, view, selection, extra = {}) {
       el(
         'div',
         { class: 'footer-changes' },
-        change('This session', ch.session, 'Net total now, less the net total when this budget was opened or created'),
-        change('Last change', ch.last, 'How much the most recent edit moved the net total'),
+        change(t('footer.this_session'), ch.session, t('footer.this_session_tip')),
+        change(t('footer.last_change'), ch.last, t('footer.last_change_tip')),
       ),
     );
   }

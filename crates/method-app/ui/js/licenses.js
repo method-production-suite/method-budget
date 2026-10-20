@@ -10,20 +10,21 @@
 
 import { invoke } from './api.js';
 import { el } from './dom.js';
+import { t } from './i18n.js';
 import { customDialog, isModalOpen } from './modal.js';
 import { isHelpOpen } from './help.js';
 
 /** The files, in the order the dialog's buttons show them. */
 export const FILES = [
-  { key: 'mit', label: 'MIT License' },
-  { key: 'apache', label: 'Apache License 2.0' },
-  { key: 'notices', label: 'Third-Party Notices' },
+  { key: 'mit', label: t('licenses.mit') },
+  { key: 'apache', label: t('licenses.apache') },
+  { key: 'notices', label: t('licenses.notices') },
 ];
 
 /** The text for `key` in what Rust sent, or '' when it isn't there. */
 export function textFor(texts, key) {
-  const t = texts && typeof texts === 'object' ? texts[key] : '';
-  return typeof t === 'string' ? t : '';
+  const v = texts && typeof texts === 'object' ? texts[key] : '';
+  return typeof v === 'string' ? v : '';
 }
 
 /**
@@ -33,16 +34,16 @@ export function textFor(texts, key) {
 export function licensesBox(texts, close, first = 'mit') {
   const intro = el('p', {
     class: 'licenses-intro',
-    text: 'Method Budget is yours to use under the MIT License or the Apache License 2.0, at your option. It also includes code by others, listed in the third-party notices with their licences.',
+    text: t('licenses.intro'),
   });
   const text = el('pre', { class: 'licenses-text', attrs: { tabindex: '0', role: 'region', 'aria-label': '' } });
-  const picks = el('div', { class: 'licenses-picks', attrs: { role: 'group', 'aria-label': 'Which file' } });
+  const picks = el('div', { class: 'licenses-picks', attrs: { role: 'group', 'aria-label': t('licenses.which_file') } });
   const buttons = new Map();
   function show(key) {
     const f = FILES.find((x) => x.key === key) || FILES[0];
     for (const [k, b] of buttons) b.setAttribute('aria-pressed', String(k === f.key));
     text.setAttribute('aria-label', f.label);
-    text.textContent = textFor(texts, f.key) || 'This file is missing from this build.';
+    text.textContent = textFor(texts, f.key) || t('licenses.missing');
     text.scrollTop = 0;
   }
   for (const f of FILES) {
@@ -52,12 +53,12 @@ export function licensesBox(texts, close, first = 'mit') {
     picks.append(b);
   }
   show(first);
-  const ok = el('button', { class: 'btn btn-primary', text: 'Close', attrs: { type: 'button', 'data-autofocus': true } });
+  const ok = el('button', { class: 'btn btn-primary', text: t('licenses.close'), attrs: { type: 'button', 'data-autofocus': true } });
   ok.addEventListener('click', close);
   return el(
     'div',
     { class: 'modal modal-wide licenses-dialog', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'licenses-title' } },
-    el('h2', { class: 'modal-title', text: 'Licenses and Notices', attrs: { id: 'licenses-title' } }),
+    el('h2', { class: 'modal-title', text: t('licenses.title'), attrs: { id: 'licenses-title' } }),
     intro,
     picks,
     text,

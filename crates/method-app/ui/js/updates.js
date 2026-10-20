@@ -14,6 +14,7 @@
 
 import { invoke } from './api.js';
 import { el } from './dom.js';
+import { t } from './i18n.js';
 import { customDialog, isModalOpen } from './modal.js';
 import { isHelpOpen } from './help.js';
 
@@ -22,16 +23,16 @@ export const SAY_MS = 8000;
 
 /** The indicator's words, by phase and by answer. */
 export const TEXT = {
-  checking: 'Checking for updates…',
-  downloading: 'Downloading the update…',
-  ready: 'Update ready: Restart to update',
-  installing: 'Restarting to update…',
-  current: 'Method Budget is up to date.',
-  failed: 'Couldn’t check for updates',
+  checking: t('updates.checking'),
+  downloading: t('updates.downloading'),
+  ready: t('updates.ready'),
+  installing: t('updates.installing'),
+  current: t('updates.current'),
+  failed: t('updates.failed'),
   // A manifest with no build for this computer (an Intel Mac before releases
   // were universal again in 0.6, or anything that isn't a Mac).
-  'no-build': 'There’s no update for this computer yet. This version stays as it is.',
-  'install-failed': 'Couldn’t install the update. Try again in a moment.',
+  'no-build': t('updates.no_build'),
+  'install-failed': t('updates.install_failed'),
 };
 
 const PHASES = new Set(['idle', 'checking', 'downloading', 'ready', 'installing']);
@@ -61,7 +62,7 @@ export function view(status, said) {
         hidden: false,
         text: said === 'install-failed' ? TEXT['install-failed'] : '',
         button: { label: TEXT.ready, disabled: false },
-        tip: `Method Budget ${v} is ready. Restarting saves your budgets first, and your tabs come back.`,
+        tip: t('updates.ready_tip', { version: v }),
       };
     case 'installing':
       return { hidden: false, text: '', button: { label: TEXT.installing, disabled: true }, tip: '' };
@@ -144,7 +145,7 @@ export function notesBox(notes, heading, close) {
     }
     body.append(list);
   }
-  const ok = el('button', { class: 'btn btn-primary', text: 'Close', attrs: { type: 'button', 'data-autofocus': true } });
+  const ok = el('button', { class: 'btn btn-primary', text: t('updates.close'), attrs: { type: 'button', 'data-autofocus': true } });
   ok.addEventListener('click', close);
   return el(
     'div',
@@ -204,10 +205,10 @@ export function initUpdates(ctx) {
       return;
     }
     if (!notes) {
-      ctx.toast('There are no release notes for this version.');
+      ctx.toast(t('updates.no_notes'));
       return;
     }
-    await showNotes(notes, notes.title || `Method Budget ${notes.version}`);
+    await showNotes(notes, notes.title || t('updates.notes_title', { version: notes.version }));
   }
 
   async function start() {
@@ -227,7 +228,7 @@ export function initUpdates(ctx) {
     } catch (e) {
       return;
     }
-    if (notes) await showNotes(notes, `What’s New in ${notes.version}`);
+    if (notes) await showNotes(notes, t('updates.whats_new', { version: notes.version }));
   }
 
   return { commands: { 'help.release_notes': releaseNotes }, start };
