@@ -849,6 +849,26 @@ pub enum Op {
     /// computer, whatever they claim to have seen. A role given again later
     /// lets them back in from then on.
     Revoke { actor: ActorId },
+    /// An invite (decisions.md, entry 97): whoever presents the secret
+    /// behind `key` with their own new actor gets `role`, as a grant by the
+    /// change's author would give it, once, until `expires` (RFC 3339) or a
+    /// [`Op::CancelInvite`]. Given by the same rules as a grant to a
+    /// newcomer. The secret itself is only ever in the link: `key` is the
+    /// public half of the Ed25519 key whose seed it is.
+    Invite {
+        id: Uid,
+        role: Role,
+        expires: String,
+        key: PublicKey,
+    },
+    /// Takes up invite `invite` for the change's actor: `proof` is the
+    /// invite key's signature over the invite and this actor
+    /// ([`super::invite::claim_message`]), so it can't be copied to anyone
+    /// else. Judged by every computer ([`super::invite`]).
+    Claim { invite: Uid, proof: Signature },
+    /// Cancels invite `invite`: a claim its author hadn't seen is refused,
+    /// whatever it claims to have seen (a cutoff, like a removal).
+    CancelInvite { invite: Uid },
 }
 
 impl Op {
@@ -862,7 +882,13 @@ impl Op {
             | Op::Restore { entity }
             | Op::Add { entity, .. }
             | Op::Remove { entity, .. } => *entity,
-            Op::Grant { .. } | Op::ActsFor { .. } | Op::Key { .. } | Op::Revoke { .. } => Uid::ROOT,
+            Op::Grant { .. }
+            | Op::ActsFor { .. }
+            | Op::Key { .. }
+            | Op::Revoke { .. }
+            | Op::Invite { .. }
+            | Op::Claim { .. }
+            | Op::CancelInvite { .. } => Uid::ROOT,
         }
     }
 
@@ -880,6 +906,9 @@ impl Op {
             Op::ActsFor { .. } => "acts_for",
             Op::Key { .. } => "key",
             Op::Revoke { .. } => "revoke",
+            Op::Invite { .. } => "invite",
+            Op::Claim { .. } => "claim",
+            Op::CancelInvite { .. } => "cancel_invite",
         }
     }
 }
@@ -931,10 +960,18 @@ impl Change {
         })
     }
 
-    /// Whether it gives anyone a role or removes anyone.
+    /// Whether it gives anyone a role, invites anyone, or removes anyone.
     pub fn grants(&self) -> bool {
         self.ops
             .iter()
-            .any(|op| matches!(op, Op::Grant { .. } | Op::Revoke { .. }))
+            .any(|op| matches!(op, Op::Grant { .. } | Op::Revoke { .. } | Op::Invite { .. }))
+    }
+
+    /// The invite this change takes up, if it holds a [`Op::Claim`].
+    pub fn claim(&self) -> Option<(Uid, Signature)> {
+        self.ops.iter().find_map(|op| match op {
+            Op::Claim { invite, proof } => Some((*invite, *proof)),
+            _ => None,
+        })
     }
 }

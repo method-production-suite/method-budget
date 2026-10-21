@@ -173,6 +173,12 @@ pub fn started_at(grants: &BTreeMap<ActorId, Register<GrantWrite>>, deps: &Front
     grants.values().any(|r| visible(r, deps).is_some())
 }
 
+/// Whether roles had started by `deps`: a role given, or an invite made
+/// (decisions.md, entry 97: an invite is a role given ahead).
+pub fn started(state: &State, deps: &Frontier) -> bool {
+    started_at(state.grants(), deps) || state.invites().values().any(|i| deps.includes(i.change))
+}
+
 /// A person's role from their grants as someone who had seen `deps` knew
 /// them. A grant made after seeing another replaces it; among grants none
 /// of which saw the others, the higher-ranked granter wins, then the later
@@ -224,7 +230,7 @@ pub fn role_at(state: &State, actor: ActorId, deps: &Frontier) -> Role {
     if let Some(r) = grants.get(&actor).and_then(|r| grant_at(r, deps)) {
         return r.clone();
     }
-    if started_at(grants, deps) {
+    if started(state, deps) {
         Role::ReadOnly
     } else {
         Role::Editor
@@ -337,6 +343,11 @@ pub struct Bounds {
     pub signing: Option<Bound>,
     /// Every removal applied.
     pub removals: Vec<Removal>,
+    /// Every claim of an invite applied (decisions.md, entry 97): a claim
+    /// made apart from one of these may lose the invite to it.
+    pub claims: Vec<super::invite::ClaimBound>,
+    /// Every invite cancelled: a claim its canceller hadn't seen is refused.
+    pub cancels: Vec<super::invite::CancelBound>,
 }
 
 impl Bounds {
@@ -382,12 +393,24 @@ impl Bounds {
             }
         }
         for op in &change.ops {
-            if let Op::Revoke { actor } = op {
-                self.removals.push(Removal {
+            match op {
+                Op::Revoke { actor } => self.removals.push(Removal {
                     id: change.id(),
                     person: *actor,
                     deps: change.deps.clone(),
-                });
+                }),
+                Op::Claim { invite, .. } => self.claims.push(super::invite::ClaimBound {
+                    id: change.id(),
+                    invite: *invite,
+                    lamport: change.lamport,
+                    deps: change.deps.clone(),
+                }),
+                Op::CancelInvite { invite } => self.cancels.push(super::invite::CancelBound {
+                    id: change.id(),
+                    invite: *invite,
+                    deps: change.deps.clone(),
+                }),
+                _ => {}
             }
         }
     }
@@ -395,6 +418,11 @@ impl Bounds {
     /// Whether `change` (already applied) would be judged differently by
     /// the bounds `new` adds.
     pub fn changes_verdict(state: &State, new: &Bounds, old: &Bounds, change: &Change) -> bool {
+        if change.claim().is_some()
+            && super::invite::cut(state, new, change) != super::invite::cut(state, old, change)
+        {
+            return true;
+        }
         if state.owner() == Some(change.actor) {
             return false;
         }
@@ -493,7 +521,7 @@ pub fn check_within(state: &State, bounds: &Bounds, change: &Change) -> Result<(
             // actor, a member's own (which has a role of its own), or one
             // whose changes were already judged under roles.
             let grants = state.grants();
-            if !started_at(grants, deps) {
+            if !started(state, deps) {
                 return Err(refuse(
                     "an actor says whose it is only once roles are set".into(),
                 ));
@@ -527,6 +555,42 @@ pub fn check_within(state: &State, bounds: &Bounds, change: &Change) -> Result<(
         if let Op::Key { .. } = op {
             // A key is about the computer, not the budget: anyone may
             // publish theirs (the signature checks say whether it is theirs).
+            continue;
+        }
+        if let Op::Claim { .. } = op {
+            // About the claimant's own joining, judged with the invite
+            // (`super::invite`), not by a role they don't have yet.
+            continue;
+        }
+        if let Op::Invite { role: given, .. } = op {
+            // A role given ahead to someone new: the rules of a grant to a
+            // person with no role.
+            if !role.sets_roles() {
+                return Err(refuse("only the owner and admins invite people".into()));
+            }
+            if !may_give(&role, &Role::ReadOnly, given) {
+                return Err(refuse(if role == Role::CoOwner {
+                    "only the owner invites a co-owner".into()
+                } else {
+                    "only the owner and co-owners invite an admin".into()
+                }));
+            }
+            continue;
+        }
+        if let Op::CancelInvite { invite } = op {
+            let Some(rec) = state.invites().get(invite) else {
+                return Err(refuse("there is no such invite".into()));
+            };
+            if !deps.includes(rec.change) {
+                return Err(refuse("made without having seen the invite".into()));
+            }
+            let mine = person_at(state, rec.by, &rec.deps) == person_of_change(state, change);
+            if !(mine || (role.sets_roles() && may_give(&role, &Role::ReadOnly, &rec.role))) {
+                return Err(refuse(
+                    "only the person who made an invite, or someone who may give its role, cancels it"
+                        .into(),
+                ));
+            }
             continue;
         }
         let granted = match op {

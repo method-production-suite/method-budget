@@ -84,6 +84,9 @@ pub trait Signer: Send + Sync {
 pub trait Verifier: Send + Sync {
     /// Whether `change.sig` is `key`'s signature of `change`.
     fn verify(&self, key: &PublicKey, change: &super::Change) -> bool;
+    /// Whether `sig` is `key`'s signature of `message` (an invite key's
+    /// proof in a claim, decisions.md entry 97; [`super::invite`]).
+    fn verify_message(&self, key: &PublicKey, message: &[u8], sig: &Signature) -> bool;
 }
 
 /// Why a change's signature doesn't pass, in words for the list of changes

@@ -24,6 +24,7 @@ pub mod clock;
 pub mod formula;
 pub mod hash;
 pub mod ids;
+pub mod invite;
 pub mod op;
 pub mod project;
 pub mod review;
@@ -46,7 +47,7 @@ pub use project::{project, Binding, Projection};
 pub use review::{Review, ReviewItem};
 pub use seq::{Node, PosId, SeqTree, Side};
 pub use sign::{PublicKey, Signature, Signer, Verifier};
-pub use state::{Entity, GrantWrite, Malformed, OrSet, Place, Register, State};
+pub use state::{Entity, GrantWrite, InviteRecord, Malformed, OrSet, Place, Register, State};
 pub use undo::Inverse;
 
 use crate::model::Budget;
@@ -85,6 +86,9 @@ pub enum LogError {
     /// The change was made after its author was removed, without having
     /// seen the removal (decisions.md, entry 89). Kept aside and listed.
     Removed { id: ChangeId },
+    /// A claim of an invite that doesn't stand (decisions.md, entry 97):
+    /// `reason` is one of [`invite::why`]. Kept aside and listed.
+    Invite { id: ChangeId, reason: String },
 }
 
 /// Why a change is in [`Log::forks`]: it doesn't pass, and the change with
@@ -111,6 +115,8 @@ pub mod refused {
     pub const SIGNATURE: &str = "signature: ";
     /// After the author was removed.
     pub const REMOVED: &str = "removed: ";
+    /// A claim of an invite that doesn't stand (decisions.md, entry 97).
+    pub const INVITE: &str = "invite: ";
     /// Two changes that both pass claim one number.
     pub const FORK: &str = "fork: ";
 }
@@ -131,6 +137,9 @@ impl fmt::Display for LogError {
             }
             LogError::Removed { id } => {
                 write!(f, "change {id} was made after its author was removed")
+            }
+            LogError::Invite { id, reason } => {
+                write!(f, "change {id} doesn't take up its invite: {reason}")
             }
         }
     }
@@ -511,6 +520,22 @@ impl Log {
                     refused::REMOVED
                 ),
                 LogError::Removed { id },
+            )));
+        }
+        let verify = |k: &PublicKey, m: &[u8], s: &Signature| {
+            self.verifier
+                .as_ref()
+                .is_some_and(|v| v.verify_message(k, m, s))
+        };
+        let verify: Option<&dyn Fn(&PublicKey, &[u8], &Signature) -> bool> =
+            self.verifier.as_ref().map(|_| &verify as _);
+        if let Err(why) = invite::judge(&self.state, &self.bounds, change, verify) {
+            return Err(Box::new((
+                format!("{}{why}", refused::INVITE),
+                LogError::Invite {
+                    id,
+                    reason: why.to_string(),
+                },
             )));
         }
         access::check_within(&self.state, &self.bounds, change).map_err(|refusal| {
@@ -1040,7 +1065,7 @@ impl Log {
     /// Whether the owner has given anyone a role: from then on, someone
     /// without one reads only.
     pub fn roles_started(&self) -> bool {
-        access::started_at(self.state.grants(), &self.frontier)
+        access::started(&self.state, &self.frontier)
     }
 
     /// Everyone given a role, with the current one.
@@ -1050,6 +1075,65 @@ impl Log {
             .keys()
             .map(|a| (*a, self.role_of(*a)))
             .collect()
+    }
+
+    // Invites (decisions.md, entry 97)
+
+    /// Invites someone new, as a change by this actor: whoever presents the
+    /// secret whose public key is `key` gets `role`, once, until `expires`
+    /// (RFC 3339). Refused unless this actor may give that role to a
+    /// newcomer. `id` is fresh and random.
+    pub fn invite(
+        &mut self,
+        id: Uid,
+        role: Role,
+        expires: &str,
+        key: PublicKey,
+        label: &str,
+        time: &str,
+    ) -> Result<ChangeId, LogError> {
+        let op = Op::Invite {
+            id,
+            role,
+            expires: expires.to_string(),
+            key,
+        };
+        self.record_ops(vec![op], label, time)
+    }
+
+    /// Takes up invite `invite` as this actor: `proof` is the invite key's
+    /// signature of [`invite::claim_message`] for this actor. This actor's
+    /// key goes in the same change when it has none in the log yet. Refused
+    /// with why ([`LogError::Invite`]) when the claim wouldn't stand.
+    pub fn claim(
+        &mut self,
+        invite: Uid,
+        proof: Signature,
+        label: &str,
+        time: &str,
+    ) -> Result<ChangeId, LogError> {
+        self.record_ops(vec![Op::Claim { invite, proof }], label, time)
+    }
+
+    /// Cancels invite `invite`, as a change by this actor: claims this
+    /// computer hasn't seen are refused everywhere. Refused unless this
+    /// actor made it or may give its role.
+    pub fn cancel_invite(
+        &mut self,
+        invite: Uid,
+        label: &str,
+        time: &str,
+    ) -> Result<ChangeId, LogError> {
+        self.record_ops(vec![Op::CancelInvite { invite }], label, time)
+    }
+
+    /// The person who joined through invite `invite`, when its claim is in.
+    pub fn invite_claimant(&self, invite: Uid) -> Option<ActorId> {
+        self.state
+            .invites()
+            .get(&invite)
+            .and_then(|r| r.claimed)
+            .map(|c| c.actor)
     }
 
     /// Says, as a change by this actor, that it writes for `person` (a

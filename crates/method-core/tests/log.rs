@@ -2206,6 +2206,20 @@ impl Verifier for TestVerifier {
     fn verify(&self, key: &PublicKey, change: &Change) -> bool {
         change.sig == Some(test_sig(key, change))
     }
+    fn verify_message(&self, key: &PublicKey, message: &[u8], sig: &Signature) -> bool {
+        *sig == test_message_sig(key, message)
+    }
+}
+
+/// The stand-in scheme over bytes: what an invite key signs for a claim.
+fn test_message_sig(key: &PublicKey, message: &[u8]) -> Signature {
+    let mut m = format!("{key:?}").into_bytes();
+    m.extend_from_slice(message);
+    let h = method_core::log::hash::sha256(&m);
+    let mut out = [0u8; 64];
+    out[..32].copy_from_slice(&h);
+    out[32..].copy_from_slice(&h);
+    Signature(out)
 }
 
 /// `log` checking signatures, and signing with key `k` when given.
@@ -2978,4 +2992,526 @@ fn credit_terms_and_shared_caps_log_only_when_set() {
     record(&mut log, &p, &cleared, &[], "No terms");
     let p = log.project();
     assert_eq!(normalized(&p.budget), normalized(&cleared));
+}
+
+// ---------------------------------------------------------------------------
+// Invites (decisions.md, entry 97). In the stand-in scheme an invite's
+// secret `s` has the key `PublicKey([s; 32])`, and a claim's proof is that
+// key's stand-in signature over the claim message.
+
+use method_core::log::invite::{self as invites, claim_message};
+
+/// An expiry a week after `T`.
+const EXPIRES: &str = "2026-10-19T14:03:22Z";
+
+fn invite_key(secret: u8) -> PublicKey {
+    PublicKey([secret; 32])
+}
+
+/// The proof that `who` holds invite `invite`'s secret `secret`.
+fn proof(secret: u8, invite: Uid, who: ActorId) -> Signature {
+    test_message_sig(&invite_key(secret), &claim_message(invite, who))
+}
+
+/// A claim by `who` (key `who`'s number, published in it) of `invite` with
+/// secret `secret`, made having seen everything `seen` has, at `time`: what
+/// another computer could write, signed as theirs.
+fn claim_change(who: u8, seen: &Log, invite: Uid, secret: u8, time: &str) -> Change {
+    let mut c = Change {
+        actor: actor(who),
+        seq: 1,
+        deps: seen.frontier().clone(),
+        lamport: seen.lamport() + 1,
+        time: time.into(),
+        label: "Joined".into(),
+        ops: vec![
+            Op::Claim {
+                invite,
+                proof: proof(secret, invite, actor(who)),
+            },
+            Op::Key {
+                key: PublicKey([who; 32]),
+            },
+        ],
+        sig: None,
+    };
+    c.sig = Some(TestKey(who).sign(&c));
+    c
+}
+
+fn invite_reason(log: &Log, id: ChangeId) -> Option<String> {
+    reason_of(log, id).and_then(|r| {
+        r.strip_prefix(method_core::log::refused::INVITE)
+            .map(str::to_string)
+    })
+}
+
+#[test]
+fn an_invite_taken_up_gives_its_role_as_a_grant_would() {
+    let mut owner = signed_budget();
+    let role = scope(&owner, &["2000"]);
+    let inv = Uid(0xA1);
+    owner
+        .invite(inv, role.clone(), EXPIRES, invite_key(50), "Invite", T)
+        .unwrap();
+    // Riley's computer has the folder but no role yet.
+    let mut riley = signed_follower(6, &owner, 6);
+    assert_eq!(riley.role_of(actor(6)), Role::ReadOnly);
+    assert!(try_edit(&mut riley, |b| row_mut(b, 2).unwrap().rate = 7.into()).is_err());
+    let claim = riley
+        .claim(inv, proof(50, inv, actor(6)), "Joined", T)
+        .unwrap();
+    // The claim publishes Riley's key and is signed with it.
+    let c = riley.change(claim).unwrap();
+    assert_eq!(c.key(), Some(PublicKey([6; 32])));
+    assert!(c.sig.is_some());
+    assert_eq!(riley.role_of(actor(6)), role);
+    assert_eq!(riley.invite_claimant(inv), Some(actor(6)));
+    // Within the role, then outside it.
+    try_edit(&mut riley, |b| row_mut(b, 2).unwrap().rate = 500.into())
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        try_edit(&mut riley, |b| row_mut(b, 1).unwrap().rate = 1.into()),
+        Err(LogError::NotAllowed { .. })
+    ));
+    // Everyone takes the claim and the edit in, in any order.
+    let all = written(&[&owner, &riley]);
+    let mut rng = Rng::new(11);
+    for n in 0..8 {
+        let mut fresh = keyed(Log::new(actor(9), Ids::seeded(n)), None);
+        let mut shuffled = all.clone();
+        rng.shuffle(&mut shuffled);
+        deliver(&mut fresh, &shuffled);
+        assert!(fresh.rejected().is_empty(), "{:?}", fresh.rejected());
+        assert_eq!(fresh.role_of(actor(6)), role);
+        assert_eq!(
+            normalized(&fresh.project().budget),
+            normalized(&riley.project().budget)
+        );
+    }
+    // Used: a second person with the link is refused, on their own computer
+    // first, and by everyone when written anyway.
+    send(&riley, &mut owner);
+    let mut morgan = signed_follower(7, &owner, 7);
+    let e = morgan
+        .claim(inv, proof(50, inv, actor(7)), "Joined", T)
+        .unwrap_err();
+    assert_eq!(
+        e,
+        LogError::Invite {
+            id: ChangeId {
+                actor: actor(7),
+                seq: 1
+            },
+            reason: invites::why::USED.into()
+        }
+    );
+    let late = claim_change(7, &owner, inv, 50, T);
+    let _ = owner.apply(late.clone());
+    assert_eq!(
+        invite_reason(&owner, late.id()).as_deref(),
+        Some(invites::why::USED)
+    );
+    assert_eq!(owner.role_of(actor(7)), Role::ReadOnly);
+}
+
+#[test]
+fn claims_that_dont_stand_are_refused_and_listed() {
+    let mut owner = signed_budget();
+    let inv = Uid(0xB2);
+    owner
+        .invite(inv, Role::Editor, EXPIRES, invite_key(51), "Invite", T)
+        .unwrap();
+    // Every computer judges what reaches it, whatever its author's app did.
+    let check = |c: Change, why: &str| {
+        let mut o = owner.clone();
+        let _ = o.apply(c.clone());
+        assert_eq!(invite_reason(&o, c.id()).as_deref(), Some(why), "{c:?}");
+        if c.actor != actor(1) {
+            assert_eq!(o.role_of(c.actor), Role::ReadOnly);
+        }
+        assert_eq!(o.invite_claimant(inv), None);
+    };
+    // The wrong secret.
+    let mut riley = signed_follower(6, &owner, 6);
+    let e = riley
+        .claim(inv, proof(52, inv, actor(6)), "Joined", T)
+        .unwrap_err();
+    assert!(
+        matches!(e, LogError::Invite { ref reason, .. } if reason == invites::why::WRONG_SECRET)
+    );
+    assert!(riley.len() == owner.len(), "nothing recorded");
+    check(
+        claim_change(6, &owner, inv, 52, T),
+        invites::why::WRONG_SECRET,
+    );
+    // Another person's proof, copied: it names the other actor.
+    let mut copied = claim_change(6, &owner, inv, 51, T);
+    copied.ops[0] = Op::Claim {
+        invite: inv,
+        proof: proof(51, inv, actor(8)),
+    };
+    copied.sig = None;
+    copied.sig = Some(TestKey(6).sign(&copied));
+    check(copied, invites::why::WRONG_SECRET);
+    // After the expiry, by the claim's own clock.
+    let after = "2026-10-20T00:00:00Z";
+    let e = riley
+        .claim(inv, proof(51, inv, actor(6)), "Joined", after)
+        .unwrap_err();
+    assert!(matches!(e, LogError::Invite { ref reason, .. } if reason == invites::why::EXPIRED));
+    check(
+        claim_change(6, &owner, inv, 51, after),
+        invites::why::EXPIRED,
+    );
+    // An invite nobody had made, or one the claim hadn't seen.
+    let before = signed_budget();
+    let mut unseen = claim_change(6, &before, inv, 51, T);
+    unseen.deps = before.frontier().clone();
+    check(unseen, invites::why::NOT_FOUND);
+    // The owner doesn't join their own budget.
+    let mut own = claim_change(1, &owner, inv, 51, T);
+    own.ops.truncate(1);
+    own.seq = owner.own_seq() + 1;
+    own.sig = None;
+    own.sig = Some(TestKey(1).sign(&own));
+    check(own, invites::why::OWNER);
+}
+
+#[test]
+fn an_inviter_gives_only_what_their_role_gives_where_the_claim_is_made() {
+    let mut owner = signed_budget();
+    owner.grant(actor(3), Role::Admin, "Kim admin", T).unwrap();
+    let mut kim = signed_follower(3, &owner, 3);
+    // An admin invites editors, never admins.
+    assert!(matches!(
+        kim.invite(Uid(1), Role::Admin, EXPIRES, invite_key(60), "Invite", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    let inv = Uid(0xC3);
+    kim.invite(inv, Role::Editor, EXPIRES, invite_key(61), "Invite", T)
+        .unwrap();
+    send(&kim, &mut owner);
+    // Kim is made an editor before the newcomer claims: the claim, made
+    // having seen that, is refused.
+    owner.grant(actor(3), Role::Editor, "Kim edits", T).unwrap();
+    let mut riley = signed_follower(6, &owner, 6);
+    let e = riley
+        .claim(inv, proof(61, inv, actor(6)), "Joined", T)
+        .unwrap_err();
+    assert!(
+        matches!(e, LogError::Invite { ref reason, .. } if reason == invites::why::NOT_ALLOWED)
+    );
+    let c = claim_change(6, &owner, inv, 61, T);
+    let _ = owner.apply(c.clone());
+    assert_eq!(
+        invite_reason(&owner, c.id()).as_deref(),
+        Some(invites::why::NOT_ALLOWED)
+    );
+    // A claim made before seeing it stands: judged where it was made.
+    let mut before = owner.clone();
+    let mut early_owner = signed_budget();
+    early_owner
+        .grant(actor(3), Role::Admin, "Kim admin", T)
+        .unwrap();
+    deliver(&mut early_owner, &written(&[&kim]));
+    let early = claim_change(7, &early_owner, inv, 61, T);
+    let _ = before.apply(early.clone());
+    assert_eq!(reason_of(&before, early.id()), None);
+    assert_eq!(before.role_of(actor(7)), Role::Editor);
+}
+
+#[test]
+fn a_cancel_refuses_claims_its_author_hadnt_seen_in_any_order() {
+    let mut owner = signed_budget();
+    let used = Uid(0xD4);
+    let open = Uid(0xD5);
+    owner
+        .invite(used, Role::Comment, EXPIRES, invite_key(70), "Invite", T)
+        .unwrap();
+    owner
+        .invite(open, Role::Actuals, EXPIRES, invite_key(71), "Invite", T)
+        .unwrap();
+    // Morgan takes up the first, and the owner sees it before cancelling.
+    let mut morgan = signed_follower(7, &owner, 7);
+    morgan
+        .claim(used, proof(70, used, actor(7)), "Joined", T)
+        .unwrap();
+    send(&morgan, &mut owner);
+    // Riley has the second link and claims it without having seen the
+    // cancel, then adds a transaction... any edit at all is enough.
+    let mut riley = signed_follower(6, &owner, 6);
+    owner.cancel_invite(used, "Cancel", T).unwrap();
+    owner.cancel_invite(open, "Cancel", T).unwrap();
+    let late = riley
+        .claim(open, proof(71, open, actor(6)), "Joined", T)
+        .unwrap();
+    assert_eq!(
+        riley.role_of(actor(6)),
+        Role::Actuals,
+        "until the cancel arrives"
+    );
+    // Only the canceller's author may cancel... and Jordan, an editor, can't.
+    let mut jordan = signed_follower(2, &owner, 2);
+    assert!(matches!(
+        jordan.cancel_invite(used, "Cancel", T),
+        Err(LogError::NotAllowed { .. })
+    ));
+    let all = written(&[&owner, &riley, &morgan]);
+    let mut rng = Rng::new(17);
+    for n in 0..12 {
+        let mut fresh = keyed(Log::new(actor(9), Ids::seeded(n)), None);
+        let mut shuffled = all.clone();
+        rng.shuffle(&mut shuffled);
+        deliver(&mut fresh, &shuffled);
+        assert!(fresh.pending().is_empty());
+        assert_eq!(
+            invite_reason(&fresh, late).as_deref(),
+            Some(invites::why::CANCELLED),
+            "order {n}"
+        );
+        assert_eq!(fresh.role_of(actor(6)), Role::ReadOnly);
+        // The claim the canceller had seen stands.
+        assert_eq!(fresh.role_of(actor(7)), Role::Comment, "order {n}");
+        assert_eq!(fresh.invite_claimant(used), Some(actor(7)));
+        assert_eq!(fresh.rejected().len(), 1, "{:?}", fresh.rejected());
+    }
+    // Riley's computer takes the cancel in and lets the claim go.
+    send(&owner, &mut riley);
+    assert_eq!(
+        invite_reason(&riley, late).as_deref(),
+        Some(invites::why::CANCELLED)
+    );
+    assert_eq!(riley.role_of(actor(6)), Role::ReadOnly);
+    // A removed inviter's invites are cancelled the same way.
+    owner.grant(actor(3), Role::Admin, "Kim admin", T).unwrap();
+    let mut kim = signed_follower(3, &owner, 3);
+    let kims = Uid(0xD6);
+    kim.invite(kims, Role::Editor, EXPIRES, invite_key(72), "Invite", T)
+        .unwrap();
+    send(&kim, &mut owner);
+    let unseen = claim_change(8, &owner, kims, 72, T);
+    owner.revoke(actor(3), "Remove Kim", T).unwrap();
+    let _ = owner.apply(unseen.clone());
+    assert_eq!(
+        invite_reason(&owner, unseen.id()).as_deref(),
+        Some(invites::why::CANCELLED)
+    );
+}
+
+#[test]
+fn two_claims_made_apart_settle_on_the_same_one_everywhere() {
+    let mut owner = signed_budget();
+    let inv = Uid(0xE5);
+    owner
+        .invite(inv, Role::Editor, EXPIRES, invite_key(80), "Invite", T)
+        .unwrap();
+    let mut riley = signed_follower(6, &owner, 6);
+    let mut morgan = signed_follower(7, &owner, 7);
+    riley
+        .claim(inv, proof(80, inv, actor(6)), "Joined", T)
+        .unwrap();
+    morgan
+        .claim(inv, proof(80, inv, actor(7)), "Joined", T)
+        .unwrap();
+    // Each edits under the role they think they have.
+    try_edit(&mut riley, |b| b.title = "Riley's".into())
+        .unwrap()
+        .unwrap();
+    try_edit(&mut morgan, |b| b.title = "Morgan's".into())
+        .unwrap()
+        .unwrap();
+    // Same Lamport clock: the lower actor (Riley) wins, in every order and
+    // on both their computers.
+    let all = written(&[&owner, &riley, &morgan]);
+    let mut rng = Rng::new(23);
+    for n in 0..12 {
+        let mut fresh = keyed(Log::new(actor(9), Ids::seeded(n)), None);
+        let mut shuffled = all.clone();
+        rng.shuffle(&mut shuffled);
+        deliver(&mut fresh, &shuffled);
+        assert_eq!(fresh.invite_claimant(inv), Some(actor(6)), "order {n}");
+        assert_eq!(fresh.role_of(actor(7)), Role::ReadOnly);
+        assert_eq!(fresh.project().budget.title, "Riley's");
+        let why = invite_reason(
+            &fresh,
+            ChangeId {
+                actor: actor(7),
+                seq: 1,
+            },
+        );
+        assert_eq!(why.as_deref(), Some(invites::why::USED), "order {n}");
+        // Morgan's edit, made under a role that didn't stand, is left out.
+        assert_eq!(fresh.rejected().len(), 2, "{:?}", fresh.rejected());
+    }
+    deliver(&mut morgan, &written(&[&riley]));
+    assert_eq!(morgan.role_of(actor(7)), Role::ReadOnly);
+    assert!(morgan.folds() > 0);
+}
+
+#[test]
+fn invites_claims_and_cancels_converge_in_any_order() {
+    let mut used = 0;
+    let mut cancelled = 0;
+    let mut joined = 0;
+    let roles = |log: &Log| {
+        vec![
+            Role::Editor,
+            Role::Comment,
+            Role::Actuals,
+            scope(log, &["2000"]),
+        ]
+    };
+    for seed in 0..24u64 {
+        let mut rng = Rng::new(seed);
+        let mut owner = signed_budget();
+        owner.grant(actor(3), Role::Admin, "Kim admin", T).unwrap();
+        let mut logs = vec![owner.clone(), signed_follower(3, &owner, 3)];
+        for n in 10..=14u8 {
+            logs.push(signed_follower(n, &owner, n));
+        }
+        // Invites made so far: (id, secret).
+        let mut made: Vec<(Uid, u8)> = Vec::new();
+        let mut extra: Vec<Change> = Vec::new();
+        let mut ghost = 40u8;
+        for round in 0..5u8 {
+            for i in 0..logs.len() {
+                // The owner and Kim invite and cancel.
+                if i < 2 && rng.chance(60) {
+                    let id = Uid(seed as u128 * 1000 + round as u128 * 10 + i as u128 + 1);
+                    let secret = 100 + made.len() as u8;
+                    let role = rng.pick(&roles(&logs[i])).clone();
+                    let expires = if rng.chance(20) {
+                        "2026-10-01T00:00:00Z"
+                    } else {
+                        EXPIRES
+                    };
+                    logs[i]
+                        .invite(id, role, expires, invite_key(secret), "Invite", T)
+                        .unwrap();
+                    made.push((id, secret));
+                }
+                if i < 2 && !made.is_empty() && rng.chance(25) {
+                    let (id, _) = *rng.pick(&made);
+                    let _ = logs[i].cancel_invite(id, "Cancel", T);
+                }
+                // Newcomers take up invites they have seen, now and then
+                // with the wrong secret.
+                if i >= 2 && !made.is_empty() && rng.chance(50) {
+                    let (id, secret) = *rng.pick(&made);
+                    let who = logs[i].actor();
+                    let secret = if rng.chance(15) { secret + 1 } else { secret };
+                    let _ = logs[i].claim(id, proof(secret, id, who), "Joined", T);
+                }
+                // Everyone edits; what their role doesn't allow is refused.
+                let p = logs[i].project();
+                let mut after = p.budget.clone();
+                let (label, hints) = random_edit(&mut rng, &mut after, i as u8 + 1);
+                match logs[i].record(&p, &after, &hints, &label, T) {
+                    Ok(_) | Err(LogError::NotAllowed { .. }) | Err(LogError::Invite { .. }) => {}
+                    Err(e) => panic!("seed {seed}: {label}: {e}"),
+                }
+            }
+            // Someone who never ran this app writes a claim straight into
+            // the folder: right or wrong secret, maybe after the expiry.
+            if !made.is_empty() && rng.chance(50) {
+                let seen = &logs[rng.below(logs.len() as u64) as usize];
+                let (id, secret) = *rng.pick(&made);
+                if seen.state().invites().contains_key(&id) {
+                    let secret = if rng.chance(30) { secret + 7 } else { secret };
+                    let time = if rng.chance(20) {
+                        "2026-11-01T00:00:00Z"
+                    } else {
+                        T
+                    };
+                    extra.push(claim_change(ghost, seen, id, secret, time));
+                    ghost += 1;
+                }
+            }
+            let mut all = written(&logs.iter().collect::<Vec<_>>());
+            all.extend(extra.iter().cloned());
+            for log in logs.iter_mut() {
+                let mut missing: Vec<Change> = all
+                    .iter()
+                    .filter(|c| !log.frontier().includes(c.id()))
+                    .cloned()
+                    .collect();
+                rng.shuffle(&mut missing);
+                if rng.chance(50) {
+                    missing.truncate(missing.len() / 2);
+                }
+                for c in missing {
+                    let _ = log.apply(c);
+                }
+            }
+        }
+        let mut all = written(&logs.iter().collect::<Vec<_>>());
+        all.extend(extra.iter().cloned());
+        let mut newcomers = Vec::new();
+        for n in 0..3u8 {
+            let mut fresh = keyed(Log::new(actor(30 + n), Ids::seeded(seed)), None);
+            let mut shuffled = all.clone();
+            rng.shuffle(&mut shuffled);
+            if n == 2 {
+                shuffled.reverse();
+            }
+            deliver_all(&mut fresh, &shuffled);
+            newcomers.push(fresh);
+        }
+        for log in logs.iter_mut() {
+            let mut mine = all.clone();
+            rng.shuffle(&mut mine);
+            deliver_all(log, &mine);
+        }
+        let first = &logs[0];
+        for log in logs.iter().skip(1).chain(newcomers.iter()) {
+            assert!(log.pending().is_empty(), "seed {seed}");
+            assert_eq!(log.frontier(), first.frontier(), "seed {seed}");
+            assert_eq!(rejected_ids(log), rejected_ids(first), "seed {seed}");
+            assert_eq!(
+                normalized(&log.project().budget),
+                normalized(&first.project().budget),
+                "seed {seed}"
+            );
+            assert_eq!(log.members(), first.members(), "seed {seed}");
+            assert_eq!(
+                log.state().invites(),
+                first.state().invites(),
+                "seed {seed}"
+            );
+        }
+        // One claim at most per invite, and only one that stands.
+        for (id, rec) in first.state().invites() {
+            let claims = first
+                .changes()
+                .filter(|c| c.claim().is_some_and(|(i, _)| i == *id))
+                .count();
+            assert!(
+                claims <= 1,
+                "seed {seed}: invite {id:?} used {claims} times"
+            );
+            if let Some(c) = rec.claimed {
+                joined += 1;
+                // A role given by the claim (another invite or a grant may
+                // have changed it since).
+                assert!(
+                    first.members().iter().any(|(a, _)| *a == c.actor),
+                    "seed {seed}"
+                );
+            }
+        }
+        let why = |w: &str| {
+            first
+                .rejected()
+                .iter()
+                .filter(|(_, r)| r.strip_prefix(method_core::log::refused::INVITE) == Some(w))
+                .count()
+        };
+        used += why(invites::why::USED);
+        cancelled += why(invites::why::CANCELLED);
+    }
+    assert!(joined > 10, "invites taken up: {joined}");
+    assert!(used > 3, "claims refused as used: {used}");
+    assert!(cancelled > 3, "claims refused as cancelled: {cancelled}");
 }
