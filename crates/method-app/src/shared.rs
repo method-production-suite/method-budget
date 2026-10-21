@@ -384,7 +384,48 @@ pub struct ShareStatus {
     /// A department editor's accounts outside their scope, by number: their
     /// rows and lines are muted, with a lock. Empty for every other role.
     pub locked_accounts: Vec<String>,
+    /// Whether this person may invite someone (decisions.md, entry 97).
+    pub can_invite: bool,
+    /// Invites waiting to be used, and used ones with who joined: only for
+    /// someone who may give roles.
+    pub invites: Vec<InviteDto>,
 }
+
+/// One invite, as the Share dialog lists it (decisions.md, entry 97).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct InviteDto {
+    /// The invite's id (32 hex characters): what Cancel names.
+    pub id: String,
+    /// Who made it, and their color.
+    pub by: String,
+    pub by_color: String,
+    /// The role it gives, as a key and in words.
+    pub role: String,
+    pub role_text: String,
+    /// When it was made and when it expires (ISO 8601 UTC).
+    pub made: String,
+    pub expires: String,
+    /// "open" (waiting to be used) or "used".
+    pub state: String,
+    /// Who joined with it, once used.
+    pub joined: Option<String>,
+    pub joined_color: Option<String>,
+    /// Whether this person may cancel it.
+    pub can_cancel: bool,
+}
+
+/// An invite just made: the link, shown once and never kept.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct CreatedInvite {
+    pub link: String,
+    /// The role it gives, in words.
+    pub role_text: String,
+    /// When it expires (ISO 8601 UTC).
+    pub expires: String,
+}
+
+/// How long an invite may last, in days: the Share dialog's choices.
+pub const INVITE_DAYS: [u64; 3] = [1, 7, 30];
 
 /// One access request, as the status panel shows it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -1475,6 +1516,8 @@ impl SharedDoc {
             ask_name: self.owner_name(),
             locked_categories,
             locked_accounts,
+            can_invite: self.can_invite(),
+            invites: self.invites(),
         }
     }
 
@@ -2455,6 +2498,281 @@ impl SharedDoc {
             .map_err(|e| format!("Couldn\u{2019}t remember that on this computer: {e}"))
     }
 
+    // Invites (decisions.md, entry 97; docs/APP.md, "Inviting someone")
+
+    /// Whether this person may invite someone now.
+    pub fn can_invite(&self) -> bool {
+        self.replaced.is_none()
+            && self.shared.log.key_conflict().is_none()
+            && self.shared.log.owner_key_changed().is_none()
+            && !self.shared.log.removed(self.actor())
+            && self.role().sets_roles()
+    }
+
+    /// Records an invite giving `role` ("editor", "department" with `scope`'s
+    /// category or account numbers, "actuals", "comment", "read_only", or for
+    /// the owner and co-owners "admin", and the owner "co_owner") for `days`
+    /// days, and returns its link. The link holds the invite's secret, which
+    /// no computer keeps: the log holds only its public key, so the link is
+    /// shown once.
+    pub fn create_invite(
+        &mut self,
+        role: &str,
+        scope: &[String],
+        days: u64,
+    ) -> Result<CreatedInvite, String> {
+        if let Some(t) = self.replaced_text() {
+            return Err(t);
+        }
+        if !self.can_invite() {
+            return Err(self.refusal().unwrap_or_else(|| {
+                format!(
+                    "Only the owner, co-owners and admins invite people. {} can.",
+                    self.owner_name()
+                )
+            }));
+        }
+        if !INVITE_DAYS.contains(&days) {
+            return Err("An invite lasts 1, 7 or 30 days.".into());
+        }
+        if role == "owner" {
+            return Err(
+                "There is one owner, the person who started sharing, and that doesn\u{2019}t change."
+                    .into(),
+            );
+        }
+        if role != "department" && !scope.is_empty() {
+            return Err(
+                "Only Edits some categories names categories. Untick them, or pick Edits some categories."
+                    .into(),
+            );
+        }
+        let mut uids = BTreeSet::new();
+        for code in scope {
+            let code = code.trim();
+            let uid = self
+                .proj
+                .binding
+                .categories
+                .get(code)
+                .or_else(|| self.proj.binding.accounts.get(code))
+                .ok_or_else(|| format!("There is no category or account {code}."))?;
+            uids.insert(*uid);
+        }
+        let given = Role::parse(role, uids).ok_or("That isn\u{2019}t a role a person can have.")?;
+        if given.scope().is_some_and(|s| s.is_empty()) {
+            return Err("Pick at least one category for this person to edit.".into());
+        }
+        if !method_core::log::may_give(&self.role(), &Role::ReadOnly, &given) {
+            return Err(match self.role() {
+                Role::CoOwner => "Only the owner invites a co-owner.".to_string(),
+                _ => "Only the owner and co-owners invite an admin.".to_string(),
+            });
+        }
+        let secret = flog::sign::new_invite_secret().map_err(|e| e.0)?;
+        let id = flog::sign::new_invite_id().map_err(|e| e.0)?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs());
+        let expires = method_core::log::invite::rfc3339_at((now + days * 86_400) as i64);
+        let role_text = self.role_text(&given);
+        let label = format!("Invited someone: {role_text}");
+        self.shared
+            .log
+            .invite(
+                id,
+                given,
+                &expires,
+                flog::sign::invite_key(&secret),
+                &label,
+                &iso_now(),
+            )
+            .map_err(|e| self.refused_text(&e))?;
+        self.reproject();
+        let now = Instant::now();
+        self.last_edit = Some(now);
+        self.unwritten_since.get_or_insert(now);
+        self.last_change = now;
+        let link = crate::invite_link::InviteLink {
+            budget: self.shared.info.budget_id.clone(),
+            invite: id,
+            secret,
+            file: self.file_name(),
+        };
+        Ok(CreatedInvite {
+            link: link.to_text(),
+            role_text,
+            expires,
+        })
+    }
+
+    /// The budget's file name, as the link names it.
+    fn file_name(&self) -> String {
+        self.shared
+            .path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| self.shared.info.file.clone())
+    }
+
+    /// The shared budget's id (`budget.json`'s `budget_id`).
+    pub fn budget_id(&self) -> &str {
+        &self.shared.info.budget_id
+    }
+
+    /// The invites waiting to be used and the ones used, oldest first, for
+    /// someone who may give roles.
+    pub fn invites(&self) -> Vec<InviteDto> {
+        if !self.can_invite() {
+            return Vec::new();
+        }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs() as i64);
+        let me = self.actor();
+        let mine = self.role();
+        let mut out: Vec<InviteDto> = self
+            .shared
+            .log
+            .state()
+            .invites()
+            .values()
+            .filter_map(|rec| {
+                let used = rec.claimed.map(|c| c.actor);
+                let open = method_core::log::invite::open(rec, now);
+                if used.is_none() && !open {
+                    return None;
+                }
+                let by = self.shared.log.person_of(rec.by);
+                Some(InviteDto {
+                    id: rec.id.hex(),
+                    by: self.name_of(rec.by),
+                    by_color: self.color_of(rec.by),
+                    role: rec.role.key().to_string(),
+                    role_text: self.role_text(&rec.role),
+                    made: rec.time.clone(),
+                    expires: rec.expires.clone(),
+                    state: if used.is_some() { "used" } else { "open" }.into(),
+                    joined: used.map(|a| self.name_of(a)),
+                    joined_color: used.map(|a| self.color_of(a)),
+                    can_cancel: open
+                        && (by == me
+                            || method_core::log::may_give(&mine, &Role::ReadOnly, &rec.role)),
+                })
+            })
+            .collect();
+        out.sort_by(|a, b| a.made.cmp(&b.made).then(a.id.cmp(&b.id)));
+        out
+    }
+
+    /// Cancels invite `id` (32 hex characters): a claim this computer
+    /// hasn't seen is refused on every computer.
+    pub fn cancel_invite(&mut self, id: &str) -> Result<(), String> {
+        let uid = Uid::parse(id).ok_or("Couldn\u{2019}t tell which invite that is.")?;
+        let rec = self
+            .shared
+            .log
+            .state()
+            .invites()
+            .get(&uid)
+            .cloned()
+            .ok_or("That invite isn\u{2019}t in this budget.")?;
+        if rec.claimed.is_some() {
+            return Err(format!(
+                "{} already joined with that invite, so there is nothing to cancel. Remove them instead.",
+                self.name_of(rec.claimed.map(|c| c.actor).unwrap_or(rec.by))
+            ));
+        }
+        if rec.cancelled.is_some() {
+            return Ok(());
+        }
+        let label = format!("Cancelled an invite: {}", self.role_text(&rec.role));
+        self.shared
+            .log
+            .cancel_invite(uid, &label, &iso_now())
+            .map_err(|e| match e {
+                LogError::NotAllowed { .. } => {
+                    "Only the person who made an invite, or someone who may give its role, cancels it."
+                        .to_string()
+                }
+                e => self.refused_text(&e),
+            })?;
+        self.reproject();
+        let now = Instant::now();
+        self.last_edit = Some(now);
+        self.unwritten_since.get_or_insert(now);
+        self.last_change = now;
+        Ok(())
+    }
+
+    /// Takes up the invite in `link` as this person (File > Join from
+    /// Link…): checks it against the budget as it reached this computer,
+    /// records the claim (signed, with this computer's key in the log first),
+    /// and writes it to the folder now. Returns the role it gave, in words.
+    /// The errors are sentences for the person.
+    pub fn join_invite(&mut self, link: &crate::invite_link::InviteLink) -> Result<String, String> {
+        if let Some(t) = self.replaced_text() {
+            return Err(t);
+        }
+        if link.budget != self.shared.info.budget_id {
+            return Err(wrong_budget(&link.file));
+        }
+        if let Some(w) = self.key_warning().or_else(|| self.owner_key_warning()) {
+            return Err(w);
+        }
+        let Some(rec) = self.shared.log.state().invites().get(&link.invite).cloned() else {
+            return Err(invite_words(method_core::log::invite::why::NOT_FOUND, None));
+        };
+        let me = self.actor();
+        let role = self.role();
+        let removed = self.shared.log.removed(me);
+        if self.shared.log.owner() == Some(me) || (!removed && !role.reads_only()) {
+            return Err(format!(
+                "You already have a role in this budget ({}), so there is nothing to join.",
+                self.role_text(&role)
+            ));
+        }
+        if rec.claimed.is_some() {
+            return Err(invite_words(method_core::log::invite::why::USED, None));
+        }
+        if rec.cancelled.is_some() {
+            return Err(invite_words(method_core::log::invite::why::CANCELLED, None));
+        }
+        let now = iso_now();
+        let expired = match (
+            method_core::log::invite::rfc3339_secs(&now),
+            method_core::log::invite::rfc3339_secs(&rec.expires),
+        ) {
+            (Some(a), Some(b)) => a > b,
+            _ => true,
+        };
+        if expired {
+            return Err(invite_words(
+                method_core::log::invite::why::EXPIRED,
+                Some(&rec.expires),
+            ));
+        }
+        // This computer's key is in the log before the claim (it goes in
+        // when the budget is opened; once more here in case it didn't).
+        self.publish_key()?;
+        let proof = flog::sign::claim_proof(&link.secret, link.invite, me);
+        let label = format!("Joined from an invite: {}", self.role_text(&rec.role));
+        self.shared
+            .log
+            .claim(link.invite, proof, &label, &now)
+            .map_err(|e| match e {
+                LogError::Invite { reason, .. } => invite_words(&reason, Some(&rec.expires)),
+                e => self.refused_text(&e),
+            })?;
+        self.reproject();
+        let at = Instant::now();
+        self.last_change = at;
+        self.last_edit = Some(at);
+        self.unwritten_since.get_or_insert(at);
+        self.flush(at, true);
+        Ok(self.role_text(&self.role()))
+    }
+
     /// Writes value `index` of a field's history back as this person's
     /// change. Returns the budget to adopt.
     pub fn use_value(
@@ -2529,8 +2847,55 @@ impl SharedDoc {
     }
 }
 
+/// The link is for another shared budget than the one picked.
+pub fn wrong_budget(file: &str) -> String {
+    format!(
+        "This link is for a different shared budget. Pick \u{201c}{file}\u{201d} in the shared folder it was shared through."
+    )
+}
+
+/// Why an invite can't be taken up, in a sentence for the person joining
+/// (`expires`: the invite's expiry, for the date in words).
+pub fn invite_words(reason: &str, expires: Option<&str>) -> String {
+    use method_core::log::invite::why;
+    match reason {
+        why::NOT_FOUND => "The invite hasn\u{2019}t reached this computer yet: the shared folder is still bringing in the changes of the person who invited you. Wait a minute, then try again.".into(),
+        why::USED => "This invite link was already used. Ask the person who sent it for a new one.".into(),
+        why::CANCELLED => "This invite link was cancelled. Ask the person who sent it for a new one.".into(),
+        why::EXPIRED | why::BAD_TIME => match expires.and_then(|e| e.get(..10)) {
+            Some(day) => format!("This invite link expired on {day}. Ask the person who sent it for a new one."),
+            None => "This invite link expired. Ask the person who sent it for a new one.".into(),
+        },
+        why::WRONG_SECRET => "This invite link doesn\u{2019}t match the invite in the budget: part of it may have been changed when it was copied. Ask for it again.".into(),
+        why::NOT_ALLOWED => "The person who sent this link can no longer give that role. Ask them, or the owner, for a new one.".into(),
+        why::OWNER => "You started sharing this budget, so there is nothing to join.".into(),
+        _ => "This invite couldn\u{2019}t be checked on this computer.".into(),
+    }
+}
+
 /// Why a change was left out, in a sentence for the status panel.
 pub fn refused_why(reason: &str) -> String {
+    if let Some(r) = reason.strip_prefix(method_core::log::refused::INVITE) {
+        use method_core::log::invite::why;
+        return match r {
+            why::NOT_FOUND => "It joined through an invite this budget doesn\u{2019}t have.".into(),
+            why::WRONG_SECRET => {
+                "It joined through an invite without the invite\u{2019}s secret.".into()
+            }
+            why::EXPIRED | why::BAD_TIME => {
+                "It joined through an invite after the invite expired.".into()
+            }
+            why::CANCELLED => {
+                "It joined through an invite that was cancelled before it arrived.".into()
+            }
+            why::USED => "It joined through an invite someone else had already used.".into(),
+            why::NOT_ALLOWED => {
+                "It joined through an invite whose maker could no longer give that role.".into()
+            }
+            why::OWNER => "The owner doesn\u{2019}t join through an invite.".into(),
+            _ => "Its invite couldn\u{2019}t be checked.".into(),
+        };
+    }
     use method_core::log::{refused, sign::why};
     if reason.starts_with(refused::FORK) || reason == method_core::log::FORK_SECOND {
         return "Two different changes claim to be the same change by this person, so neither was taken in.".into();

@@ -24,6 +24,7 @@ pub mod help;
 pub mod history;
 pub mod i18n;
 pub mod import_setup;
+pub mod invite_link;
 pub mod launch;
 pub mod library;
 pub mod menu;

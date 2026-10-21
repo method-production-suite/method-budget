@@ -805,3 +805,52 @@
 .toast .toast-action {
   margin-left: 10px;
 }
+
+/* Invites (decisions.md, entry 97): Invite someone in the Share dialog, and
+   File > Join from Link. */
+.share-invite .share-role-row {
+  margin-left: 0;
+}
+
+.share-invite-made {
+  margin: 4px 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.share-invite-linkrow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.share-invite-link {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 12px;
+}
+
+.share-invite-list {
+  margin: 4px 0 8px;
+}
+
+.share-invite-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.share-join-link {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 12px;
+}
+
+.share-join-next {
+  margin-top: 8px;
+}

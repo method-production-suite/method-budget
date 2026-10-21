@@ -522,14 +522,8 @@ impl Log {
                 LogError::Removed { id },
             )));
         }
-        let verify = |k: &PublicKey, m: &[u8], s: &Signature| {
-            self.verifier
-                .as_ref()
-                .is_some_and(|v| v.verify_message(k, m, s))
-        };
-        let verify: Option<&dyn Fn(&PublicKey, &[u8], &Signature) -> bool> =
-            self.verifier.as_ref().map(|_| &verify as _);
-        if let Err(why) = invite::judge(&self.state, &self.bounds, change, verify) {
+        if let Err(why) = invite::judge(&self.state, &self.bounds, change, self.verifier.as_deref())
+        {
             return Err(Box::new((
                 format!("{}{why}", refused::INVITE),
                 LogError::Invite {

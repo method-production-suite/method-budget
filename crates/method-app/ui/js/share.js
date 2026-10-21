@@ -1077,6 +1077,7 @@ function sharedDialog(title, setup) {
         el('h4', { class: 'share-panel-sub', text: t('share.people') }),
         people,
         el('p', { class: 'share-muted', text: rolesNote(s) }),
+        inviteSection(s, setup, error),
         s.key_warning ? el('p', { class: 'share-problem', text: s.key_warning, attrs: { role: 'alert' } }) : null,
         s.signed_text ? el('p', { class: 'share-muted', text: s.signed_text }) : null,
         el('div', { class: 'share-me' }, el('label', { class: 'modal-field', attrs: { for: 'share-name' } }, el('span', { text: t('share.your_name') }), name), el('div', { class: 'modal-field' }, el('span', { text: t('share.your_color') }), colors), save),
@@ -1253,6 +1254,265 @@ function rolePicker(p, s, setup, error) {
     });
   }
   return el('div', { class: 'share-role-row' }, el('label', { class: 'share-line-label', text: t('share.may_change'), attrs: { for: id } }), select, set, remove, cats, first, confirmRemove);
+}
+
+// ---------------------------------------------------------------------------
+// Invites (decisions.md, entry 97): Invite someone in the Share dialog, and
+// File > Join from Link…
+
+/** How long an invite lasts, in days, as the dialog offers it (src/shared.rs INVITE_DAYS). */
+const INVITE_DAYS = () => [
+  [1, t('share.invite.days_1')],
+  [7, t('share.invite.days_7')],
+  [30, t('share.invite.days_30')],
+];
+
+/** A date as the local calendar shows it. */
+function dateText(iso) {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return String(iso || '');
+  return d.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+/** Puts `text` on the clipboard; true when it got there. */
+async function copyText(text, input) {
+  const clip = navigator.clipboard;
+  if (clip && typeof clip.writeText === 'function') {
+    try {
+      await clip.writeText(text);
+      return true;
+    } catch {
+      // refused: the selection below
+    }
+  }
+  if (!input) return false;
+  input.focus();
+  input.select();
+  try {
+    return document.execCommand('copy');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Invite someone: a role (with categories for Edits some categories), how
+ * long the link lasts, and Create invite link, which shows the link once.
+ * Below it, the invites waiting to be used, with Cancel, and the used ones
+ * with who joined. Only for whoever may give roles.
+ */
+function inviteSection(s, setup, error) {
+  if (!s.can_invite) return null;
+  const mine = s.me ? s.me.role : '';
+  const choices = [
+    ...(mine === 'owner' ? [['co_owner', t('share.role.co_owner')]] : []),
+    ...(mine === 'owner' || mine === 'co_owner' ? [['admin', t('share.role.admin')]] : []),
+    ...ROLE_CHOICES(),
+  ];
+  const role = el('select', { class: 'modal-input share-role-select', attrs: { id: 'share-invite-role' } });
+  for (const [key, label] of choices) {
+    const o = el('option', { text: label, attrs: { value: key } });
+    if (key === 'editor') o.selected = true;
+    role.append(o);
+  }
+  const days = el('select', { class: 'modal-input share-role-select', attrs: { id: 'share-invite-days' } });
+  for (const [n, label] of INVITE_DAYS()) {
+    const o = el('option', { text: label, attrs: { value: String(n) } });
+    if (n === 7) o.selected = true;
+    days.append(o);
+  }
+  const picked = new Set();
+  const cats = el('div', { class: 'share-role-cats', attrs: { role: 'group', 'aria-label': t('share.invite.cats_label') } });
+  for (const c of setup.categories || []) {
+    const box = el('input', { attrs: { type: 'checkbox' } });
+    box.addEventListener('change', () => {
+      if (box.checked) picked.add(c.code);
+      else picked.delete(c.code);
+    });
+    cats.append(el('label', { class: 'share-radio' }, box, el('span', { text: `${c.code} ${c.name}` })));
+  }
+  const drawCats = () => { cats.hidden = role.value !== 'department'; };
+  role.addEventListener('change', drawCats);
+  drawCats();
+  const create = el('button', { class: 'btn', text: t('share.invite.create'), attrs: { type: 'button' } });
+  // The link, shown once: nothing keeps it after this dialog.
+  const made = el('div', { class: 'share-invite-made', attrs: { role: 'status' } });
+  made.hidden = true;
+  const list = el('div', { class: 'share-invite-list' });
+  const drawList = () => {
+    const rows = [];
+    for (const inv of s.invites || []) {
+      if (inv.state === 'used') {
+        rows.push(el('p', { class: 'share-muted', text: t('share.invite.used', { name: inv.joined || '', role: inv.role_text }) }));
+        continue;
+      }
+      const cancel = inv.can_cancel ? el('button', { class: 'btn btn-quiet', text: t('share.invite.cancel'), attrs: { type: 'button', 'aria-label': t('share.invite.cancel_label', { role: inv.role_text }) } }) : null;
+      if (cancel) {
+        cancel.addEventListener('click', async () => {
+          error.hidden = true;
+          cancel.disabled = true;
+          try {
+            const status = await ctx.invoke('share_cancel_invite', { doc: ctx.doc(), invite: inv.id });
+            if (status) statusArrived({ doc: ctx.doc(), status });
+            Object.assign(s, status || {});
+            ctx.toast(t('share.invite.cancelled'));
+            drawList();
+          } catch (e) {
+            error.textContent = String(e);
+            error.hidden = false;
+            cancel.disabled = false;
+          }
+        });
+      }
+      rows.push(
+        el(
+          'div',
+          { class: 'share-invite-row' },
+          el('span', { text: t('share.invite.pending', { role: inv.role_text, name: inv.by, date: dateText(inv.expires) }) }),
+          cancel,
+        ),
+      );
+    }
+    list.replaceChildren(...rows);
+    list.hidden = rows.length === 0;
+  };
+  drawList();
+  create.addEventListener('click', async () => {
+    error.hidden = true;
+    create.disabled = true;
+    try {
+      const inv = await ctx.invoke('share_create_invite', {
+        doc: ctx.doc(),
+        role: role.value,
+        scope: role.value === 'department' ? [...picked] : [],
+        days: Number(days.value),
+      });
+      const box = el('input', { class: 'modal-input share-invite-link', attrs: { type: 'text', readonly: 'readonly', 'aria-label': t('share.invite.link_label') } });
+      box.value = inv.link;
+      const copy = el('button', { class: 'btn btn-primary', text: t('share.invite.copy'), attrs: { type: 'button' } });
+      copy.addEventListener('click', async () => {
+        const ok = await copyText(inv.link, box);
+        ctx.toast(ok ? t('share.invite.copied') : t('share.invite.copy_failed'));
+      });
+      made.replaceChildren(
+        el('div', { class: 'share-invite-linkrow' }, box, copy),
+        el('p', { class: 'modal-message', text: t('share.invite.link_note', { role: inv.role_text, date: dateText(inv.expires) }) }),
+        el('p', { class: 'share-muted', text: t('share.invite.folder_note') }),
+      );
+      made.hidden = false;
+      box.focus();
+      box.select();
+      fetchStatus().then(() => {
+        Object.assign(s, current() || {});
+        drawList();
+      });
+    } catch (e) {
+      error.textContent = String(e);
+      error.hidden = false;
+    }
+    create.disabled = false;
+  });
+  return el(
+    'div',
+    { class: 'share-invite' },
+    el('h4', { class: 'share-panel-sub', text: t('share.invite.title') }),
+    el(
+      'div',
+      { class: 'share-role-row' },
+      el('label', { class: 'share-line-label', text: t('share.invite.can'), attrs: { for: 'share-invite-role' } }),
+      role,
+      el('label', { class: 'share-line-label', text: t('share.invite.expires'), attrs: { for: 'share-invite-days' } }),
+      days,
+      create,
+      cats,
+    ),
+    made,
+    list,
+  );
+}
+
+/**
+ * File > Join from Link…: paste the link, then pick the budget's file in
+ * this computer's copy of the shared folder (Rust's own dialog), with the
+ * name and color other people will see.
+ */
+export function openJoinDialog() {
+  if (!ctx || isModalOpen()) return;
+  customDialog(
+    (close) => {
+      const error = el('p', { class: 'modal-error', attrs: { role: 'alert' } });
+      error.hidden = true;
+      const fail = (e) => {
+        error.textContent = String(e);
+        error.hidden = false;
+      };
+      const link = el('textarea', { class: 'modal-input share-join-link', attrs: { id: 'share-join-link', rows: '3', spellcheck: 'false', placeholder: t('share.join.placeholder') } });
+      const me = { name: '', color: 'teal' };
+      const name = el('input', { class: 'modal-input', attrs: { type: 'text', id: 'share-join-name', maxlength: '60', placeholder: t('share.name_placeholder') } });
+      const second = el('div', { class: 'share-join-next' });
+      second.hidden = true;
+      const cancel = el('button', { class: 'btn', text: t('share.cancel'), attrs: { type: 'button' } });
+      const go = el('button', { class: 'btn btn-primary', text: t('share.join.continue'), attrs: { type: 'button' } });
+      let checked = null;
+      cancel.addEventListener('click', () => close());
+      const join = async () => {
+        go.disabled = true;
+        try {
+          const out = await ctx.invoke('share_join_from_link', { link: link.value, me: { name: name.value, color: me.color } });
+          if (!out) {
+            go.disabled = false;
+            return;
+          }
+          if (out.view) ctx.apply(out.view, { cmd: 'share_join' });
+          fetchStatus();
+          if (out.error) {
+            fail(out.error);
+            go.textContent = t('share.join.try_again');
+          } else {
+            close();
+            ctx.toast(t('share.join.joined', { role: out.role_text || '' }));
+          }
+        } catch (e) {
+          fail(e);
+        }
+        go.disabled = false;
+      };
+      go.addEventListener('click', async () => {
+        error.hidden = true;
+        if (checked) {
+          join();
+          return;
+        }
+        try {
+          checked = await ctx.invoke('share_join_check', { link: link.value });
+        } catch (e) {
+          fail(e);
+          return;
+        }
+        name.value = checked.name || '';
+        me.color = checked.color || 'teal';
+        link.readOnly = true;
+        second.replaceChildren(
+          el('p', { class: 'modal-message', text: t('share.join.pick_note', { file: checked.file }) }),
+          el('div', { class: 'share-me' }, el('label', { class: 'modal-field', attrs: { for: 'share-join-name' } }, el('span', { text: t('share.your_name') }), name), el('div', { class: 'modal-field' }, el('span', { text: t('share.your_color') }), colorPicker(me.color, (c) => { me.color = c; }))),
+        );
+        second.hidden = false;
+        go.textContent = t('share.join.choose');
+        name.focus();
+      });
+      return el(
+        'div',
+        { class: 'modal modal-wide share-dialog', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'share-join-title' } },
+        el('h2', { class: 'modal-title', text: t('share.join.title'), attrs: { id: 'share-join-title' } }),
+        el('p', { class: 'modal-message', text: t('share.join.message') }),
+        el('label', { class: 'modal-field', attrs: { for: 'share-join-link' } }, el('span', { text: t('share.join.link') }), link),
+        second,
+        error,
+        el('div', { class: 'modal-actions' }, cancel, go),
+      );
+    },
+    { onClose: () => ctx.focus() },
+  );
 }
 
 /** Once per budget: what sharing means for saving (design 9.2). */

@@ -3376,39 +3376,38 @@ fn invites_claims_and_cancels_converge_in_any_order() {
         let mut extra: Vec<Change> = Vec::new();
         let mut ghost = 40u8;
         for round in 0..5u8 {
-            for i in 0..logs.len() {
+            for (i, log) in logs.iter_mut().enumerate() {
                 // The owner and Kim invite and cancel.
                 if i < 2 && rng.chance(60) {
                     let id = Uid(seed as u128 * 1000 + round as u128 * 10 + i as u128 + 1);
                     let secret = 100 + made.len() as u8;
-                    let role = rng.pick(&roles(&logs[i])).clone();
+                    let role = rng.pick(&roles(log)).clone();
                     let expires = if rng.chance(20) {
                         "2026-10-01T00:00:00Z"
                     } else {
                         EXPIRES
                     };
-                    logs[i]
-                        .invite(id, role, expires, invite_key(secret), "Invite", T)
+                    log.invite(id, role, expires, invite_key(secret), "Invite", T)
                         .unwrap();
                     made.push((id, secret));
                 }
                 if i < 2 && !made.is_empty() && rng.chance(25) {
                     let (id, _) = *rng.pick(&made);
-                    let _ = logs[i].cancel_invite(id, "Cancel", T);
+                    let _ = log.cancel_invite(id, "Cancel", T);
                 }
                 // Newcomers take up invites they have seen, now and then
                 // with the wrong secret.
                 if i >= 2 && !made.is_empty() && rng.chance(50) {
                     let (id, secret) = *rng.pick(&made);
-                    let who = logs[i].actor();
+                    let who = log.actor();
                     let secret = if rng.chance(15) { secret + 1 } else { secret };
-                    let _ = logs[i].claim(id, proof(secret, id, who), "Joined", T);
+                    let _ = log.claim(id, proof(secret, id, who), "Joined", T);
                 }
                 // Everyone edits; what their role doesn't allow is refused.
-                let p = logs[i].project();
+                let p = log.project();
                 let mut after = p.budget.clone();
                 let (label, hints) = random_edit(&mut rng, &mut after, i as u8 + 1);
-                match logs[i].record(&p, &after, &hints, &label, T) {
+                match log.record(&p, &after, &hints, &label, T) {
                     Ok(_) | Err(LogError::NotAllowed { .. }) | Err(LogError::Invite { .. }) => {}
                     Err(e) => panic!("seed {seed}: {label}: {e}"),
                 }

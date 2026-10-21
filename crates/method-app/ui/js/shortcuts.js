@@ -40,6 +40,7 @@ export const SHORTCUTS = [
   { id: 'file.new_sub_budget', group: 'File', label: t('shortcut.file.new_sub_budget'), scope: 'menu' },
   { id: 'file.save_share_copy', group: 'File', label: t('shortcut.file.save_share_copy'), scope: 'menu' },
   { id: 'file.share', group: 'File', label: t('shortcut.file.share'), scope: 'menu' },
+  { id: 'file.join_link', group: 'File', label: t('shortcut.file.join_link'), scope: 'menu' },
   { id: 'file.save_as_template', group: 'File', label: t('shortcut.file.save_as_template'), scope: 'menu' },
   { id: 'file.import_setup', group: 'File', label: t('shortcut.file.import_setup'), scope: 'menu' },
   { id: 'file.import_setup_pack', group: 'File', label: t('shortcut.file.import_setup_pack'), scope: 'menu' },

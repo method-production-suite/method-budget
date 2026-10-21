@@ -659,7 +659,7 @@ fn the_first_role_starts_signing_and_raises_the_log_format_to_3() {
     // A program that reads only format 2 refuses a folder at 3 as newer
     // than it reads, rather than taking in changes it can't check; this one
     // reads 3 (and 4, for invites).
-    assert!(log::LOG_FORMAT_SIGNED <= log::LOG_FORMAT_VERSION);
+    assert_eq!(log::LOG_FORMAT_SIGNED, 3);
     let _ = fs::remove_dir_all(&dir);
 }
 

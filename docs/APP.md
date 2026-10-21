@@ -2025,8 +2025,46 @@ never see it. A request isn't signed, so someone with write access to the folder
 one in another person's name; it gives nothing until someone allowed to give roles allows
 it, and that is their own signed change.
 
+**Inviting someone** (decision 97; design 9.1). In the Share dialog, whoever may give roles
+sees **Invite someone**: what the person can do (the same roles as the People list, with
+the category checklist for Edits some categories; admins and co-owners only for those who
+may give them), how long the link lasts (1 day, 7 days or 30 days), and **Create invite
+link**. That records a signed invite in the change log and shows the link once, with
+**Copy** and "Anyone with this link can join as Edits 2400 Grip until it's used or
+Oct 28, 2026. Send it privately." The link is plain text
+(`methodbudget:join?v=1&b=...&i=...&s=...&f=Feature.mthd`) for the inviter to send any way
+they like; the app sends nothing anywhere. It holds the invite's secret, which no computer
+keeps: the log holds only its public key, so a lost link means a new invite. The person
+still needs the shared folder on their computer, so the inviter shares the folder too.
+Below, the invites waiting to be used are listed with who made them, the role and when the
+link stops working, each with **Cancel Invite** (for its maker and anyone who may give its
+role); a used one says who joined.
+
+**Joining from a link.** File > Join from Link… asks for the link (pasted alone or inside
+the message it came in), checks it, then asks for this person's name and color (as Share
+does) and to choose the budget's `.mthd` in their copy of the shared folder, in the
+system's own file dialog. The app checks the budget's id against the link ("This link is for
+a different shared budget..."), opens and joins it as this computer, puts this computer's
+key in, records the claim and writes it to the folder at once, then says the role it gave
+("You joined: Edits 2400 Grip."). Every computer checks the claim: the link's secret (a
+signature only the link's holder can make, naming this computer, so a claim seen in the
+folder can't be reused by anyone else), that the invite wasn't used, cancelled or past its
+date, and that its maker could still give that role. The errors are plain: used ("already
+used. Ask the person who sent it for a new one."), expired, cancelled, a different budget,
+already a member, and not here yet ("The invite hasn't reached this computer yet... Wait a
+minute, then try again."), which leaves the budget open read only with **Try Again**.
+A link works once: of two people who use it at about the same time, every computer settles
+on the same one (the one whose change came first by the log's clock) and the other's claim
+is left out and listed. Cancel works against any use the canceller hadn't seen when they
+cancelled, even one made before on another computer; a use the canceller had seen stands.
+Expiry is judged by the joining computer's own clock, like every change's time: someone
+with the link and a wrong clock can join late. Cancel is the dependable way to take a link
+back. The first invite raises the shared folder's format to 4 (docs/FORMAT.md), so Method
+Budget 0.7.0 and older refuse the folder from then on and open the file on its own.
+
 **Not yet** (later phases of the design): handing ownership itself on (the owner is one
-computer's id; a co-owner can do everything else), invite links, a new key for a person
+computer's id; a co-owner can do everything else), clickable `methodbudget://` links (File >
+Join from Link… takes the pasted text), invites from the command line, a new key for a person
 (a lost or stolen computer is removed, and comes back with a new sharing id), picking
 single accounts (not only whole categories) in the dialog, a notification for a new
 access request beyond the badge, live sessions with cursors,
@@ -2035,7 +2073,7 @@ Google Drive, LucidLink) the design calls for.
 
 | Command | Arguments | Returns |
 |---|---|---|
-| `share_status` | none | The status item's state (`mode`, `folder`, `file`, `me`, `keeper`, `people`, `synced_secs`, `unshared`, `waiting`, `review_count`, `error`, `file_written`, `changes`, `recent`, `conflicts`, `can_set_roles`, `roles_started`, `refused`, `refused_changes`, `notice`, `signed`, `signed_text`, `requests` (each `actor`, `name`, `color`, `role`, `role_text`, `codes`, `codes_text`, `only`, `note`, `at`), `my_request`, `can_ask`, `ask_name`, `locked_categories`, `locked_accounts`; each person also has `role`, `role_text`, `scope`, `signs` and `removed`), or `null` when the budget isn't shared |
+| `share_status` | none | The status item's state (`mode`, `folder`, `file`, `me`, `keeper`, `people`, `synced_secs`, `unshared`, `waiting`, `review_count`, `error`, `file_written`, `changes`, `recent`, `conflicts`, `can_set_roles`, `roles_started`, `refused`, `refused_changes`, `notice`, `signed`, `signed_text`, `requests` (each `actor`, `name`, `color`, `role`, `role_text`, `codes`, `codes_text`, `only`, `note`, `at`), `my_request`, `can_ask`, `ask_name`, `locked_categories`, `locked_accounts`, `can_invite`, `invites` (each `id`, `by`, `by_color`, `role`, `role_text`, `made`, `expires`, `state` (`open` or `used`), `joined`, `joined_color`, `can_cancel`); each person also has `role`, `role_text`, `scope`, `signs` and `removed`), or `null` when the budget isn't shared |
 | `share_setup` | none | What the Share dialog starts from: `name`, `color`, `colors`, `file`, `folder`, `blocked` (why it can't be shared yet), `picked`, `categories` (`[{code, name}]`, when this person sets roles) |
 | `share_pick_folder` | none; shows Rust's folder dialog | The folder's path (kept in Rust until `share_start`), or `null` when cancelled |
 | `share_start` | `use_picked`, `move_file`, `me` (`{name, color}`) | View of the budget, now shared |
@@ -2051,6 +2089,10 @@ Google Drive, LucidLink) the design calls for.
 | `share_withdraw_request` | none | The status, with the request taken out of the heartbeat |
 | `share_allow_request` | `actor`, `at` (the request's), `only` (give the numbers it names, as a department) | The status, with the role set as one change, by the rules of `share_set_role`; refused when the request was taken back or replaced |
 | `share_decline_request` | `actor`, `at` | The status, without that request (remembered on this computer; nothing in the change log) |
+| `share_create_invite` | `role` (as `share_set_role`), `scope` (category numbers, for `department`), `days` (1, 7 or 30) | `{link, role_text, expires}`: the invite recorded as one change, and its link, shown once; refused unless this person may give that role to someone new |
+| `share_cancel_invite` | `invite` (32 hex characters) | The status, with the cancel recorded as one change; refused for a used invite and unless this person made it or may give its role |
+| `share_join_check` | `link` | `{file, name, color, colors}`: the file the link names and this person's name and color; refused in words for text that isn't a whole invite link |
+| `share_join_from_link` | `link`, `me` (`{name, color}`); shows Rust's file dialog unless the link's budget is open already | `null` when cancelled; otherwise `{view, role_text, error}`: the budget opened and joined in front, and the role the invite gave or why it wasn't taken up; refused before opening for a file without a change log beside it or another budget's |
 
 Rust sends `share-status` (`{doc, status}`) whenever the status changes and
 `share-changed` (`{doc, rev, remote: [{actor, name, color, label, time, places}]}`)

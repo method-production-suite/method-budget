@@ -138,13 +138,13 @@ pub fn cut(state: &State, bounds: &Bounds, change: &Change) -> Option<&'static s
 }
 
 /// Judges `change`'s claim, if it holds one: everything in the module's
-/// description. `verify` checks a signature over bytes against a key (the
-/// log's verifier); `None` when there is none to check with.
+/// description, checking the proof with `verifier` (`None`: there is none
+/// to check with, so the claim is refused).
 pub fn judge(
     state: &State,
     bounds: &Bounds,
     change: &Change,
-    verify: Option<&dyn Fn(&super::PublicKey, &[u8], &super::Signature) -> bool>,
+    verifier: Option<&dyn super::Verifier>,
 ) -> Result<(), &'static str> {
     let Some((invite, proof)) = change.claim() else {
         return Ok(());
@@ -155,10 +155,10 @@ pub fn judge(
     if !change.deps.includes(rec.change) {
         return Err(why::NOT_FOUND);
     }
-    let Some(verify) = verify else {
+    let Some(verifier) = verifier else {
         return Err(why::CANT_CHECK);
     };
-    if !verify(&rec.key, &claim_message(invite, change.actor), &proof) {
+    if !verifier.verify_message(&rec.key, &claim_message(invite, change.actor), &proof) {
         return Err(why::WRONG_SECRET);
     }
     if state.owner() == Some(access::person_of_change(state, change)) {

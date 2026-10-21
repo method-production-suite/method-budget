@@ -83,7 +83,7 @@ import { importActuals } from './actualsimport.js';
 import { saveShareCopy, newSubBudget, renderShareBanner, offerReturnedCopy, subBudgetFromRow, subBudgetRow } from './sharing.js';
 import { displayCommands, userDisplay, withoutZeroRows, totalText } from './display.js';
 import { announce } from './announce.js';
-import { initShare, renderBar as renderShareBar, decorateShare, reportPlace, openShareDialog, whoChangedThis, lookedAt, shareShown, shareLocks, showLocked } from './share.js';
+import { initShare, renderBar as renderShareBar, decorateShare, reportPlace, openShareDialog, openJoinDialog, whoChangedThis, lookedAt, shareShown, shareLocks, showLocked } from './share.js';
 import { setExplainTarget, explainTargetAt } from './explain.js';
 import { openRatePicker } from './ratepick.js';
 import { showStart, closeStart, startMenu, isStartOpen, startAtLaunch, startOnLastClose } from './start.js';
@@ -2478,6 +2478,10 @@ Object.assign(COMMANDS, {
   'file.share': () => {
     if (grid.editor) grid.commitEdit(null);
     openShareDialog();
+  },
+  'file.join_link': () => {
+    if (grid.editor) grid.commitEdit(null);
+    openJoinDialog();
   },
   'share.blame': () => whoChangedCell(grid.cursorRow(), grid.cursorColKey()),
 });
