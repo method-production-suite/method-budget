@@ -43,7 +43,8 @@ original totals worked out from draft 2's figures, and the actuals) is added in 
 docs/FORMAT.md documents, then the file is checked and rewritten in canonical form with
 `method-budget fmt`.
 
-Uses target/release/method-budget (METHOD=... for another build). Python 3.9+, standard
+Uses the release build of method-budget in cargo's build folder (METHOD=... for another
+build). Python 3.9+, standard
 library only.
 """
 

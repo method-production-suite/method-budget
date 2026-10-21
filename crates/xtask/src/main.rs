@@ -17,6 +17,7 @@ mod release_workflow;
 mod repo;
 mod screens;
 mod sign;
+mod target;
 #[cfg(test)]
 mod testdir;
 mod versions;

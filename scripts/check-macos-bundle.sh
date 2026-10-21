@@ -4,7 +4,8 @@
 # Usage: scripts/check-macos-bundle.sh [path/to/Method Budget.app]
 set -euo pipefail
 
-app="${1:-target/release/bundle/macos/Method Budget.app}"
+built="${CARGO_TARGET_DIR:-target}"
+app="${1:-$built/release/bundle/macos/Method Budget.app}"
 if [ ! -d "$app" ]; then
   echo "No bundle at: $app (build it with: cd crates/method-app && cargo tauri build --bundles app)" >&2
   exit 1
