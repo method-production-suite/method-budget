@@ -5018,9 +5018,10 @@ choices.
   `grant`, and the panel names who it is for.
 - **What may be asked, and what Allow gives.** A request names a role (editor, department,
   actuals or comment; never admin or co-owner) and optionally categories or accounts. From
-  a muted cell the page asks to edit, naming that category or account; from the status panel
-  it asks the same, naming where the person is, with an optional note (200 characters, one
-  line). The design's two buttons map onto that: **Allow** gives the role asked (for a
+  a muted cell the page asks for department editing of that category or account only, so
+  Allow adds just it (MReview on pull request #87: a muted cell is a narrow ask, and editing
+  everything is asked for on purpose); from the status panel it asks to edit everything,
+  naming where the person is, with an optional note (200 characters, one line). The design's two buttons map onto that: **Allow** gives the role asked (for a
   department request, the scope asked added to the one they have), **Allow <numbers> only**
   gives department editing of those numbers added to their current scope, and is offered only
   when it differs from Allow. Both go through `SharedDoc::set_role`, so they are checked and

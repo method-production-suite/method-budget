@@ -488,7 +488,7 @@ export function showLocked(locked) {
 async function askForAccess(codes, note) {
   const doc = ctx.doc();
   try {
-    const status = await ctx.invoke('share_request_access', { doc, role: 'editor', codes, note });
+    const status = await ctx.invoke('share_request_access', { doc, role: 'department', codes, note });
     if (status) statusArrived({ doc, status });
     ctx.toast(t('share.requests.sent', { name: status ? status.ask_name : '' }));
   } catch (e) {

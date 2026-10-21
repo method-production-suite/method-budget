@@ -1254,13 +1254,14 @@ fn a_department_editors_request_reaches_who_can_allow_it() {
         .request_access("editor", &[], "")
         .is_err());
 
-    // Jordan asks about the other account, from the cell they typed in.
+    // Jordan asks about the other account, from the cell they typed in:
+    // to edit that account, not everything (MReview on pull request #87).
     let before = alex.shared().unwrap().log().len();
     jordan
         .shared_mut()
         .unwrap()
         .request_access(
-            "editor",
+            "department",
             std::slice::from_ref(&other),
             "  For the grip\nrentals ",
         )
@@ -1275,7 +1276,7 @@ fn a_department_editors_request_reaches_who_can_allow_it() {
     // Written into Jordan's heartbeat, not the change log.
     let dir = method_format::log::LogDir::for_budget(&path);
     let req = dir.read_presence(JORDAN).unwrap().request.unwrap();
-    assert_eq!(req.role, "editor");
+    assert_eq!(req.role, "department");
     assert_eq!(req.codes, vec![other.clone()]);
     tick_at(&mut alex, 60);
     tick_at(&mut kim, 60);
@@ -1286,8 +1287,9 @@ fn a_department_editors_request_reaches_who_can_allow_it() {
     assert_eq!(st.requests.len(), 1, "{:?}", st.requests);
     let r = &st.requests[0];
     assert_eq!(r.name, "Jordan Lee");
-    assert_eq!(r.role_text, "Edits everything");
-    assert!(r.only);
+    assert!(r.role_text.starts_with("Edits "), "{}", r.role_text);
+    assert_ne!(r.role_text, "Edits everything");
+    assert!(!r.only, "Allow already gives just what was asked");
     assert!(r.codes_text.starts_with(&other), "{}", r.codes_text);
     assert_eq!(r.at, mine.at);
     assert!(kim
@@ -1297,11 +1299,11 @@ fn a_department_editors_request_reaches_who_can_allow_it() {
         .requests
         .is_empty());
 
-    // Allow that account only: a role change through the log, and the
-    // request is gone.
+    // Allow adds that account to Jordan's categories: a role change through
+    // the log, and the request is gone.
     alex.shared_mut()
         .unwrap()
-        .allow_request(&JORDAN.hex(), &r.at, true)
+        .allow_request(&JORDAN.hex(), &r.at, false)
         .unwrap();
     assert_eq!(alex.shared().unwrap().log().len(), before + 1);
     let st = alex.shared().unwrap().status(Instant::now());

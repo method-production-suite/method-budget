@@ -2003,15 +2003,17 @@ state above (the chip, and every edit refused in words) and asks from the status
 
 **Asking for access.** Asking writes a request into this computer's own heartbeat file in the
 shared folder (docs/FORMAT.md, "The heartbeat"): no email, nothing sent outside the budget.
-From a muted cell it asks to edit, naming that category or account; from the status panel
-(for anyone who may change less than everything once roles are set) it asks the same, naming
-the account or category on screen if any, with an optional short note. The status panel then
+From a muted cell it asks to edit just that category or account; editing everything is asked
+for on purpose, from the status panel (for anyone who may change less than everything once
+roles are set), naming the account or category on screen if any, with an optional short
+note. The status panel then
 says "You asked Alex Kim for access..." with **Withdraw**; asking again replaces the request.
 The owner, co-owners and admins, whoever may give that role to that person under the rules
 above, see each waiting request in the status panel and as a badge on the status item ("1
 asking"): who, what Allow gives ("Allow gives: Edits everything"), the categories or accounts
 it names, the note, and **Allow**, **Allow 2400 Grip only** (that person edits those
-categories or accounts, added to the ones they have) and **Decline**. Allow records the role
+categories or accounts, added to the ones they have; not offered when Allow gives just that
+already, as it does for a request from a muted cell) and **Decline**. Allow records the role
 through the same path as the Share dialog's Set, so it is checked and signed like any role
 change. Decline is remembered on the computer that declined (beside its sharing id, in
 `~/.method/declined-requests/`, never in the shared folder) and changes nothing in the
